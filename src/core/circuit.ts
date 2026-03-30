@@ -12,6 +12,7 @@ import { pinWorldPosition } from "./pin.js";
 import type { CircuitElement } from "./element.js";
 import type { LogicFamilyConfig } from "./logic-family.js";
 import { mergeCollinearSegments } from "./wire-utils.js";
+import type { ModelEntry } from "./registry.js";
 
 // ---------------------------------------------------------------------------
 // Wire — visual wire segment
@@ -169,6 +170,13 @@ export interface CircuitMetadata {
 
   /** Persisted scope traces — restored after compilation. */
   traces?: SavedTrace[];
+
+  /**
+   * Runtime model registry for user-imported models.
+   * Keyed by component type name (e.g. "NpnBJT"), then model name (e.g. "2N2222").
+   * Each entry is a full ModelEntry with factory refs — runtime only, never serialized directly.
+   */
+  models?: Record<string, Record<string, ModelEntry>>;
 }
 
 function defaultCircuitMetadata(): CircuitMetadata {

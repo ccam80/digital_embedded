@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-30T04:28:57.434Z",
+  "updatedAt": "2026-03-30T06:40:26.327Z",
   "missions": [
     {
       "id": "session:21c4cbb9-908b-4260-be26-2718be466e7d:none",
@@ -18311,15 +18311,15 @@
       "name": "none",
       "objective": "Session mission",
       "createdAt": "2026-03-30T02:58:19.223Z",
-      "updatedAt": "2026-03-30T04:28:57.434Z",
-      "status": "done",
-      "workerCount": 4,
+      "updatedAt": "2026-03-30T06:40:26.327Z",
+      "status": "running",
+      "workerCount": 8,
       "taskCounts": {
-        "total": 4,
+        "total": 8,
         "pending": 0,
         "blocked": 0,
-        "inProgress": 0,
-        "completed": 4,
+        "inProgress": 2,
+        "completed": 6,
         "failed": 0
       },
       "agents": [
@@ -18362,40 +18362,72 @@
           "latestUpdate": "completed",
           "completedSummary": null,
           "updatedAt": "2026-03-30T04:28:57.434Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:a27d5ff",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "a27d5ff2f10f65ad4",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-03-30T04:30:35.824Z"
+        },
+        {
+          "name": "claude-orchestrator:implementer:af04ac0",
+          "role": "claude-orchestrator:implementer",
+          "ownership": "af04ac0bd928b9e94",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-03-30T04:50:58.329Z"
+        },
+        {
+          "name": "architect:ae7813e",
+          "role": "architect",
+          "ownership": "ae7813e720e5af751",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-03-30T05:02:55.007Z"
+        },
+        {
+          "name": "architect:abae29a",
+          "role": "architect",
+          "ownership": "abae29a39b36cd4ea",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-03-30T06:40:26.327Z"
         }
       ],
       "timeline": [
         {
-          "id": "session-stop:a0dbd1c84871a4792:2026-03-30T03:31:55.323Z",
-          "at": "2026-03-30T03:31:55.323Z",
-          "kind": "completion",
-          "agent": "claude-orchestrator:reviewer:a0dbd1c",
-          "detail": "completed",
-          "sourceKey": "session-stop:a0dbd1c84871a4792"
-        },
-        {
-          "id": "session-stop:abdf6793ed2e67831:2026-03-30T04:05:23.923Z",
-          "at": "2026-03-30T04:05:23.923Z",
-          "kind": "completion",
-          "agent": "general-purpose:ac8a53f",
-          "detail": "completed",
-          "sourceKey": "session-stop:abdf6793ed2e67831"
-        },
-        {
-          "id": "session-start:af2bc24e7f9a29323:2026-03-30T04:07:41.141Z",
-          "at": "2026-03-30T04:07:41.141Z",
+          "id": "session-start:ae7813e720e5af751:2026-03-30T04:57:50.382Z",
+          "at": "2026-03-30T04:57:50.382Z",
           "kind": "update",
-          "agent": "claude-orchestrator:implementer:af2bc24",
-          "detail": "started claude-orchestrator:implementer:af2bc24",
-          "sourceKey": "session-start:af2bc24e7f9a29323"
+          "agent": "architect:ae7813e",
+          "detail": "started architect:ae7813e",
+          "sourceKey": "session-start:ae7813e720e5af751"
         },
         {
-          "id": "session-stop:af2bc24e7f9a29323:2026-03-30T04:28:57.434Z",
-          "at": "2026-03-30T04:28:57.434Z",
+          "id": "session-stop:ae7813e720e5af751:2026-03-30T05:02:55.007Z",
+          "at": "2026-03-30T05:02:55.007Z",
           "kind": "completion",
-          "agent": "claude-orchestrator:implementer:af2bc24",
+          "agent": "architect:ae7813e",
           "detail": "completed",
-          "sourceKey": "session-stop:af2bc24e7f9a29323"
+          "sourceKey": "session-stop:ae7813e720e5af751"
+        },
+        {
+          "id": "session-start:abae29a39b36cd4ea:2026-03-30T06:40:26.327Z",
+          "at": "2026-03-30T06:40:26.327Z",
+          "kind": "update",
+          "agent": "architect:abae29a",
+          "detail": "started architect:abae29a",
+          "sourceKey": "session-start:abae29a39b36cd4ea"
         }
       ]
     }

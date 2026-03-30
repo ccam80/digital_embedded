@@ -1,24 +1,36 @@
 {
   "summary": {
     "vitest": {
-      "passed": 7616,
-      "failed": 173,
+      "passed": 7641,
+      "failed": 172,
       "skipped": 0,
-      "totalFiles": 333,
-      "durationSeconds": 17.3
+      "totalFiles": 334,
+      "durationSeconds": 21.4
     },
     "playwright": {
       "passed": 5,
       "failed": 537,
       "skipped": 0,
       "totalFiles": 22,
-      "durationSeconds": 353.35644700000006
+      "durationSeconds": 654.0989790000001
     },
-    "totalFailed": 710,
-    "totalPassed": 7621
+    "totalFailed": 709,
+    "totalPassed": 7646
   },
   "failures": {
     "vitest": [
+      {
+        "message": "expected [] to have a length of 3 but got +0",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\__tests__\\diag-rc-step.test.ts",
+            "test": "check model assignments and partition",
+            "line": 54,
+            "column": 38
+          }
+        ]
+      },
       {
         "message": "expected null not to be null",
         "count": 1,
@@ -33,7 +45,7 @@
       },
       {
         "message": "expected [] to have a length of 1 but got +0",
-        "count": 9,
+        "count": 7,
         "locations": [
           {
             "file": "src\\compile\\__tests__\\pin-loading-menu.test.ts",
@@ -69,18 +81,6 @@
             "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
             "test": "none mode: bridge adapters still present at simulationModel=digital boundary",
             "line": 387,
-            "column": 30
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-            "test": "xor_compiles_to_bridge_instance",
-            "line": 522,
-            "column": 30
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-            "test": "modifying_vOH_on_loaded_circuit_changes_output_voltage",
-            "line": 908,
             "column": 30
           },
           {
@@ -176,84 +176,6 @@
         ]
       },
       {
-        "message": "expected undefined to be defined",
-        "count": 3,
-        "locations": [
-          {
-            "file": "src\\editor\\__tests__\\property-panel-spice.test.ts",
-            "test": "renders a collapsible section header for NPN BJT",
-            "line": 183,
-            "column": 20
-          },
-          {
-            "file": "src\\editor\\__tests__\\property-panel-spice.test.ts",
-            "test": "populates input value from stored _spiceModelOverrides",
-            "line": 220,
-            "column": 21
-          },
-          {
-            "file": "src\\io\\__tests__\\dts-schema.test.ts",
-            "test": "roundtrip_namedParameterSets",
-            "line": 294,
-            "column": 42
-          }
-        ]
-      },
-      {
-        "message": "expected +0 to be 26 // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\editor\\__tests__\\property-panel-spice.test.ts",
-            "test": "renders 26 input fields for NPN BJT (one per param)",
-            "line": 192,
-            "column": 27
-          }
-        ]
-      },
-      {
-        "message": "expected false to be true // Object.is equality",
-        "count": 2,
-        "locations": [
-          {
-            "file": "src\\editor\\__tests__\\property-panel-spice.test.ts",
-            "test": "sets placeholder to default value for each param",
-            "line": 241,
-            "column": 52
-          },
-          {
-            "file": "src\\components\\io\\__tests__\\probe.test.ts",
-            "test": "appears_in_both_palettes",
-            "line": 414,
-            "column": 29
-          }
-        ]
-      },
-      {
-        "message": "Cannot set properties of undefined (setting 'value')",
-        "count": 3,
-        "locations": [
-          {
-            "file": "src\\editor\\__tests__\\property-panel-spice.test.ts",
-            "test": "commits override to _spiceModelOverrides on blur",
-            "line": 251,
-            "column": 13
-          },
-          {
-            "file": "src\\editor\\__tests__\\property-panel-spice.test.ts",
-            "test": "fires change callback on commit",
-            "line": 269,
-            "column": 13
-          },
-          {
-            "file": "src\\editor\\__tests__\\property-panel-spice.test.ts",
-            "test": "deletes key from overrides when input is cleared",
-            "line": 282,
-            "column": 13
-          }
-        ]
-      },
-      {
         "message": "Failed to load url ../../solver/analog/model-defaults.js (resolved id: ../../solver/analog/model-defaults.js) in C:/local_working_projects/digital_in_browser/src/components/semiconductors/diode.ts. Do...",
         "count": 2,
         "locations": [
@@ -284,8 +206,110 @@
         ]
       },
       {
+        "message": "expected false to be true // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\io\\__tests__\\probe.test.ts",
+            "test": "appears_in_both_palettes",
+            "line": 414,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "message": "expected +0 to be 1 // Object.is equality",
+        "count": 7,
+        "locations": [
+          {
+            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
+            "test": "analog_subcircuit_in_digital_not_flattened — analog-engine subcircuit inside digital outer circuit produces boundary",
+            "line": 273,
+            "column": 42
+          },
+          {
+            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
+            "test": "digital_subcircuit_in_analog_not_flattened — digital-engine subcircuit inside analog outer circuit produces boundary",
+            "line": 309,
+            "column": 42
+          },
+          {
+            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
+            "test": "simulation_mode_digital_overrides — analog-engine subcircuit with simulationModel=digital in analog outer circuit produces boundary",
+            "line": 374,
+            "column": 42
+          },
+          {
+            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
+            "test": "pin_mappings_correct — subcircuit with 2 inputs + 1 output produces 3 BoundaryPinMapping entries with correct labels and directions",
+            "line": 402,
+            "column": 42
+          },
+          {
+            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
+            "test": "cross_engine_port_subcircuit_preserved — analog subcircuit with Port interfaces in digital outer circuit produces boundary",
+            "line": 546,
+            "column": 42
+          },
+          {
+            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
+            "test": "port_pin_mappings_in_boundary — Port pins produce correct BoundaryPinMapping entries",
+            "line": 580,
+            "column": 42
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\compile-analog-partition.test.ts",
+            "test": "produces_compiled_circuit_for_simple_analog_partition",
+            "line": 342,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "message": "expected +0 to be 2 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
+            "test": "mixed_port_and_inout_subcircuits — Port subcircuit and In/Out subcircuit both cross-engine are both recorded as boundaries",
+            "line": 641,
+            "column": 42
+          }
+        ]
+      },
+      {
+        "message": "expected 'digital' to be 'neutral' // Object.is equality",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
+            "test": "invalid_submode_produces_diagnostic: unrecognized simulationModel on dual-model component produces invalid-simulation-model diagnostic and neutral modelKey",
+            "line": 275,
+            "column": 38
+          },
+          {
+            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
+            "test": "invalid_logical_submode_produces_diagnostic: simulationModel=logical on dual-model component produces invalid-simulation-model diagnostic",
+            "line": 293,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "message": "expected 'digital' to be 'behavioral' // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
+            "test": "explicit_behavioral_key_respected: simulationModel=behavioral on dual-model component routes to behavioral mna model",
+            "line": 326,
+            "column": 38
+          }
+        ]
+      },
+      {
         "message": "expected \"spy\" to be called once, but got 0 times",
-        "count": 5,
+        "count": 8,
         "locations": [
           {
             "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
@@ -315,6 +339,24 @@
             "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
             "test": "explicit_simplified_compiles",
             "line": 352,
+            "column": 24
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\compile-analog-partition.test.ts",
+            "test": "factory_called_once_for_and_gate",
+            "line": 365,
+            "column": 24
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\compile-analog-partition.test.ts",
+            "test": "pin_node_ids_passed_to_factory_match_group_node_ids",
+            "line": 496,
+            "column": 24
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+            "test": "calls_analog_factory_with_correct_args",
+            "line": 455,
             "column": 24
           }
         ]
@@ -392,14 +434,26 @@
         ]
       },
       {
-        "message": "expected +0 to be close to 2.5, received difference is 2.5, but expected 0.005",
-        "count": 1,
+        "message": "expected [ { code: 'orphan-node', …(8) }, …(1) ] to have a length of +0 but got 2",
+        "count": 3,
         "locations": [
           {
             "file": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
             "test": "runner_integration",
-            "line": 605,
-            "column": 18
+            "line": 585,
+            "column": 20
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
+            "test": "compilation produces correct topology",
+            "line": 414,
+            "column": 20
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
+            "test": "full pipeline: compile → DC OP → transient → analytical match",
+            "line": 561,
+            "column": 20
           }
         ]
       },
@@ -417,7 +471,7 @@
       },
       {
         "message": "expected 0 to be greater than 0",
-        "count": 2,
+        "count": 3,
         "locations": [
           {
             "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
@@ -430,6 +484,12 @@
             "test": "all mode produces more bridge adapter instances than cross-domain for same circuit",
             "line": 374,
             "column": 40
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
+            "test": "transient stepping produces time-varying output",
+            "line": 485,
+            "column": 27
           }
         ]
       },
@@ -442,18 +502,6 @@
             "test": "detects_floating_node",
             "line": 364,
             "column": 21
-          }
-        ]
-      },
-      {
-        "message": "expected -1 to be greater than or equal to 0",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "calls_analog_factory_with_correct_args",
-            "line": 465,
-            "column": 23
           }
         ]
       },
@@ -542,260 +590,176 @@
         ]
       },
       {
-        "message": "expected 0 to be greater than 3.217910447761194",
-        "count": 2,
+        "message": "Compile errors: , , , : expected [ { code: 'orphan-node', …(8) }, …(3) ] to have a length of +0 but got 4",
+        "count": 16,
         "locations": [
           {
             "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
             "test": "xor_output_high_when_inputs_differ",
-            "line": 409,
-            "column": 18
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-            "test": "xor_output_high_when_in2_high_in1_low",
-            "line": 447,
-            "column": 18
-          }
-        ]
-      },
-      {
-        "message": "expected 0 to be greater than 4.875621890547263",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-            "test": "custom_voh_via_component_override_is_respected",
-            "line": 463,
-            "column": 18
-          }
-        ]
-      },
-      {
-        "message": "expected 0 to be greater than 3.900497512437811",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-            "test": "custom_voh_via_pin_override_takes_priority_over_component",
-            "line": 484,
-            "column": 18
-          }
-        ]
-      },
-      {
-        "message": "expected 'ERROR' not to be 'ERROR' // Object.is equality",
-        "count": 11,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-            "test": "output_converges_through_transient_steps",
-            "line": 501,
-            "column": 35
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-            "test": "xor_output_high_when_inputs_differ",
-            "line": 388,
-            "column": 35
+            "line": 363,
+            "column": 80
           },
           {
             "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
             "test": "xor_output_low_when_inputs_match_both_high",
-            "line": 388,
-            "column": 35
+            "line": 363,
+            "column": 80
           },
           {
             "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
             "test": "xor_output_low_when_inputs_match_both_low",
-            "line": 388,
-            "column": 35
+            "line": 363,
+            "column": 80
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
+            "test": "xor_output_high_when_in2_high_in1_low",
+            "line": 363,
+            "column": 80
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
+            "test": "custom_voh_via_component_override_is_respected",
+            "line": 363,
+            "column": 80
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
+            "test": "custom_voh_via_pin_override_takes_priority_over_component",
+            "line": 363,
+            "column": 80
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
+            "test": "output_converges_through_transient_steps",
+            "line": 363,
+            "column": 80
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
+            "test": "xor_output_high_when_inputs_differ",
+            "line": 363,
+            "column": 80
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
+            "test": "xor_output_low_when_inputs_match_both_high",
+            "line": 363,
+            "column": 80
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
+            "test": "xor_output_low_when_inputs_match_both_low",
+            "line": 363,
+            "column": 80
           },
           {
             "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
             "test": "custom_voh_via_component_override_flows_through_bridge",
-            "line": 388,
-            "column": 35
+            "line": 363,
+            "column": 80
           },
           {
             "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
             "test": "custom_voh_via_pin_override_flows_through_bridge",
-            "line": 388,
-            "column": 35
+            "line": 363,
+            "column": 80
           },
           {
             "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
             "test": "converges_through_transient_steps",
-            "line": 388,
-            "column": 35
+            "line": 363,
+            "column": 80
           },
           {
             "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
             "test": "both_modes_agree_on_output_high_for_differing_inputs",
-            "line": 388,
-            "column": 35
+            "line": 363,
+            "column": 80
           },
           {
             "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
             "test": "both_modes_agree_on_output_low_for_matching_inputs",
-            "line": 388,
-            "column": 35
+            "line": 363,
+            "column": 80
           },
           {
             "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
             "test": "both_modes_agree_xor_truth_table",
-            "line": 388,
-            "column": 35
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-            "test": "bridge_handles_indeterminate_input_gracefully",
-            "line": 1063,
-            "column": 35
+            "line": 363,
+            "column": 80
           }
         ]
       },
       {
-        "message": "expected 0 to be greater than 0.5",
-        "count": 2,
+        "message": "Errors: , , , : expected [ { code: 'orphan-node', …(8) }, …(3) ] to have a length of +0 but got 4",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
+            "test": "xor_compiles_to_bridge_instance",
+            "line": 520,
+            "column": 74
+          }
+        ]
+      },
+      {
+        "message": "Unexpected compile errors: ; ; : expected [ { code: 'orphan-node', …(8) }, …(2) ] to have a length of +0 but got 3",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
+            "test": "loads_and_compiles_without_error",
+            "line": 807,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "message": "Compile errors: ; ; : expected [ { code: 'orphan-node', …(8) }, …(2) ] to have a length of +0 but got 3",
+        "count": 3,
         "locations": [
           {
             "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
             "test": "xor_responds_to_ac_source_in_digital_mode",
-            "line": 840,
-            "column": 18
+            "line": 819,
+            "column": 82
           },
           {
             "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
             "test": "xor_responds_to_ac_source_in_simplified_mode",
-            "line": 874,
-            "column": 18
+            "line": 857,
+            "column": 82
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
+            "test": "modifying_vOH_on_loaded_circuit_changes_output_voltage",
+            "line": 905,
+            "column": 82
           }
         ]
       },
       {
-        "message": "mode=behavioral should not enter ERROR: expected 'ERROR' not to be 'ERROR' // Object.is equality",
+        "message": "Compile errors: ; ; ; : expected [ { code: 'orphan-node', …(8) }, …(3) ] to have a length of +0 but got 4",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
+            "test": "bridge_handles_indeterminate_input_gracefully",
+            "line": 1052,
+            "column": 82
+          }
+        ]
+      },
+      {
+        "message": "mode=behavioral compile errors: ; ; ; : expected [ { code: 'orphan-node', …(8) }, …(3) ] to have a length of +0 but got 4",
         "count": 1,
         "locations": [
           {
             "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
             "test": "both_modes_survive_zero_voltage_inputs",
-            "line": 1087,
-            "column": 76
-          }
-        ]
-      },
-      {
-        "message": "expected +0 to be 1 // Object.is equality",
-        "count": 7,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
-            "test": "compilation produces correct topology",
-            "line": 419,
-            "column": 34
-          },
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-            "test": "analog_subcircuit_in_digital_not_flattened — analog-engine subcircuit inside digital outer circuit produces boundary",
-            "line": 273,
-            "column": 42
-          },
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-            "test": "digital_subcircuit_in_analog_not_flattened — digital-engine subcircuit inside analog outer circuit produces boundary",
-            "line": 309,
-            "column": 42
-          },
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-            "test": "simulation_mode_digital_overrides — analog-engine subcircuit with simulationModel=digital in analog outer circuit produces boundary",
-            "line": 374,
-            "column": 42
-          },
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-            "test": "pin_mappings_correct — subcircuit with 2 inputs + 1 output produces 3 BoundaryPinMapping entries with correct labels and directions",
-            "line": 402,
-            "column": 42
-          },
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-            "test": "cross_engine_port_subcircuit_preserved — analog subcircuit with Port interfaces in digital outer circuit produces boundary",
-            "line": 546,
-            "column": 42
-          },
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-            "test": "port_pin_mappings_in_boundary — Port pins produce correct BoundaryPinMapping entries",
-            "line": 580,
-            "column": 42
-          }
-        ]
-      },
-      {
-        "message": "expected 0 to be greater than 0.01",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
-            "test": "transient stepping produces time-varying output",
-            "line": 496,
-            "column": 27
-          }
-        ]
-      },
-      {
-        "message": "expected 0 to be greater than 4.5",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
-            "test": "full pipeline: compile → DC OP → transient → analytical match",
-            "line": 592,
-            "column": 23
-          }
-        ]
-      },
-      {
-        "message": "expected +0 to be 2 // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-            "test": "mixed_port_and_inout_subcircuits — Port subcircuit and In/Out subcircuit both cross-engine are both recorded as boundaries",
-            "line": 641,
-            "column": 42
-          }
-        ]
-      },
-      {
-        "message": "expected 'digital' to be 'neutral' // Object.is equality",
-        "count": 2,
-        "locations": [
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-            "test": "invalid_submode_produces_diagnostic: unrecognized simulationModel on dual-model component produces invalid-simulation-model diagnostic and neutral modelKey",
-            "line": 275,
-            "column": 38
-          },
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-            "test": "invalid_logical_submode_produces_diagnostic: simulationModel=logical on dual-model component produces invalid-simulation-model diagnostic",
-            "line": 293,
-            "column": 38
-          }
-        ]
-      },
-      {
-        "message": "expected 'digital' to be 'behavioral' // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-            "test": "explicit_behavioral_key_respected: simulationModel=behavioral on dual-model component routes to behavioral mna model",
-            "line": 326,
-            "column": 38
+            "line": 1077,
+            "column": 97
           }
         ]
       }
@@ -899,7 +863,7 @@
       },
       {
         "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-        "count": 96,
+        "count": 136,
         "locations": [
           {
             "file": "gui/analog-circuit-assembly.spec.ts",
@@ -1476,37 +1440,7 @@
             "test": "MEMORY/RAMDualPort can be placed from palette",
             "line": 500,
             "column": 7
-          }
-        ]
-      },
-      {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoBeEmpty\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
-        "count": 1,
-        "locations": [
-          {
-            "file": "gui/app-loads.spec.ts",
-            "test": "palette panel is visible with component categories",
-            "line": 45,
-            "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveClass\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed",
-        "count": 1,
-        "locations": [
-          {
-            "file": "gui/app-loads.spec.ts",
-            "test": "dark mode toggle works",
-            "line": 78,
-            "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: worker process exited unexpectedly (code=3221225794, signal=null)",
-        "count": 424,
-        "locations": [
+          },
           {
             "file": "gui/component-sweep.spec.ts",
             "test": "MEMORY/RAMDualAccess can be placed from palette",
@@ -1731,12 +1665,6 @@
           },
           {
             "file": "gui/component-sweep.spec.ts",
-            "test": "SWITCHING/Fuse can be placed from palette",
-            "line": 500,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
             "test": "PLD/Diode can be placed from palette",
             "line": 500,
             "column": 7
@@ -1752,13 +1680,61 @@
             "test": "PLD/PldDiodeBackward can be placed from palette",
             "line": 500,
             "column": 7
-          },
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoBeEmpty\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/app-loads.spec.ts",
+            "test": "palette panel is visible with component categories",
+            "line": 45,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveClass\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/app-loads.spec.ts",
+            "test": "dark mode toggle works",
+            "line": 78,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: page.goto: net::ERR_ABORTED; maybe frame was detached?",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "SWITCHING/Fuse can be placed from palette",
+            "line": 500,
+            "column": 7
+          }
+        ]
+      },
+      {
+        "message": "Error: browserContext.newPage: Target page, context or browser has been closed",
+        "count": 1,
+        "locations": [
           {
             "file": "gui/component-sweep.spec.ts",
             "test": "PLD/PullUp can be placed from palette",
             "line": 500,
             "column": 7
-          },
+          }
+        ]
+      },
+      {
+        "message": "Error: worker process exited unexpectedly (code=3221225794, signal=null)",
+        "count": 382,
+        "locations": [
           {
             "file": "gui/component-sweep.spec.ts",
             "test": "PLD/PullDown can be placed from palette",

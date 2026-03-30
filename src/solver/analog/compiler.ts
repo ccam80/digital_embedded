@@ -84,13 +84,13 @@ function resolveComponentRoute(
   pc: PartitionedComponent,
   digitalPinLoading: "cross-domain" | "all" | "none",
 ): ComponentRoute {
-  const hasAnalogModels = def.modelRegistry !== undefined && Object.keys(def.modelRegistry).length > 0;
-
-  if (pc.modelKey === "digital" || pc.modelKey === "neutral") {
-    if (pc.modelKey === "digital" && digitalPinLoading === "all" && hasAnalogModels) {
-      return { kind: 'bridge' };
-    }
+  if (pc.modelKey === "neutral") {
     return { kind: 'skip' };
+  }
+
+  if (pc.modelKey === "digital") {
+    if (digitalPinLoading === "none") return { kind: 'skip' };
+    return { kind: 'bridge' };
   }
 
   const entry = resolveModelEntry(def, pc.modelKey);

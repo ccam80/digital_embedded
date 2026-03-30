@@ -7,6 +7,7 @@
  */
 
 import type { MnaSubcircuitNetlist } from '../core/mna-subcircuit-netlist.js';
+import type { ParamDef } from '../core/registry.js';
 
 export type { MnaSubcircuitNetlist };
 
@@ -39,6 +40,17 @@ export interface DtsElement {
   properties: Record<string, unknown>;
   /** Whether the component is mirrored horizontally. Omitted when false. */
   mirror?: boolean;
+  /**
+   * Per-element model parameter deltas.
+   * When present, identifies the active model and any user-modified param values
+   * that differ from the model entry's defaults.
+   */
+  modelParamDeltas?: {
+    /** Active model key (e.g. "2N2222"). */
+    model: string;
+    /** Only params that differ from the model entry defaults. */
+    params: Record<string, number>;
+  };
 }
 
 /**
@@ -77,6 +89,17 @@ export interface DtsCircuit {
 }
 
 /**
+ * Serialized form of a single model entry in a .dts document.
+ *
+ * Inline entries carry only params (factory/paramDefs are rehydrated from the
+ * component registry on load). Netlist entries carry their own paramDefs and
+ * netlist (no factory — compiled at load time).
+ */
+export type DtsSerializedModelEntry =
+  | { kind: 'inline'; params: Record<string, number> }
+  | { kind: 'netlist'; netlist: MnaSubcircuitNetlist; paramDefs: ParamDef[]; params: Record<string, number> };
+
+/**
  * The root .dts document structure.
  *
  * A self-contained file: the main circuit and all referenced subcircuit
@@ -95,24 +118,12 @@ export interface DtsDocument {
    */
   subcircuitDefinitions?: Record<string, DtsCircuit>;
   /**
-   * Model subcircuit definitions keyed by model name (e.g. "CmosAnd2",
-   * "user_opamp_741"). Expanded inline by the compiler; not instantiated
-   * as subcircuit elements.
+   * Circuit-level model registry (serialized form).
+   * Keyed by component type name (e.g. "NpnBJT"), then model name (e.g. "2N2222").
+   * Factories and paramDefs for inline entries are rehydrated from the component
+   * registry on load; netlist entries carry their own paramDefs.
    */
-  modelDefinitions?: Record<string, MnaSubcircuitNetlist>;
-  /**
-   * Named SPICE .MODEL parameter sets keyed by model name (e.g. "1N4148",
-   * "2N2222"). Populated on load into the runtime model registry.
-   */
-  namedParameterSets?: Record<string, {
-    deviceType: string;
-    params: Record<string, number>;
-  }>;
-  /**
-   * Per-component-instance subcircuit model bindings.
-   * Maps component instance IDs to their resolved subcircuit model name.
-   */
-  subcircuitBindings?: Record<string, string>;
+  models?: Record<string, Record<string, DtsSerializedModelEntry>>;
   /**
    * Embedded FSM (finite state machine) definition.
    * Present when the document contains an FSM editor state.
@@ -131,6 +142,9 @@ export interface DtsDocument {
  * on success, throws a descriptive Error on any failure.
  *
  * Accepts both `format: 'dts'` (current) and `format: 'digb'`.
+ *
+ * Throws immediately if old-format fields are present (namedParameterSets,
+ * modelDefinitions, subcircuitBindings).
  */
 export function validateDtsDocument(data: unknown): DtsDocument {
   if (data === null || typeof data !== 'object' || Array.isArray(data)) {
@@ -138,6 +152,25 @@ export function validateDtsDocument(data: unknown): DtsDocument {
   }
 
   const doc = data as Record<string, unknown>;
+
+  if ('namedParameterSets' in doc) {
+    throw new Error(
+      'Invalid .dts document: "namedParameterSets" is an obsolete field. ' +
+      'This document was created by an older version of the software and cannot be loaded.',
+    );
+  }
+  if ('modelDefinitions' in doc) {
+    throw new Error(
+      'Invalid .dts document: "modelDefinitions" is an obsolete field. ' +
+      'This document was created by an older version of the software and cannot be loaded.',
+    );
+  }
+  if ('subcircuitBindings' in doc) {
+    throw new Error(
+      'Invalid .dts document: "subcircuitBindings" is an obsolete field. ' +
+      'This document was created by an older version of the software and cannot be loaded.',
+    );
+  }
 
   if (!('format' in doc)) {
     throw new Error('Invalid .dts document: missing required field "format"');
@@ -179,93 +212,72 @@ export function validateDtsDocument(data: unknown): DtsDocument {
     }
   }
 
-  if ('modelDefinitions' in doc && doc['modelDefinitions'] !== undefined) {
+  if ('models' in doc && doc['models'] !== undefined) {
     if (
-      typeof doc['modelDefinitions'] !== 'object' ||
-      doc['modelDefinitions'] === null ||
-      Array.isArray(doc['modelDefinitions'])
+      typeof doc['models'] !== 'object' ||
+      doc['models'] === null ||
+      Array.isArray(doc['models'])
     ) {
-      throw new Error(
-        'Invalid .dts document: "modelDefinitions" must be an object',
-      );
+      throw new Error('Invalid .dts document: "models" must be an object');
     }
-    for (const [key, value] of Object.entries(
-      doc['modelDefinitions'] as Record<string, unknown>,
-    )) {
-      validateMnaSubcircuitNetlist(value, `modelDefinitions["${key}"]`);
-    }
-  }
-
-  if ('subcircuitBindings' in doc && doc['subcircuitBindings'] !== undefined) {
-    if (
-      typeof doc['subcircuitBindings'] !== 'object' ||
-      doc['subcircuitBindings'] === null ||
-      Array.isArray(doc['subcircuitBindings'])
-    ) {
-      throw new Error(
-        'Invalid .dts document: "subcircuitBindings" must be an object',
-      );
-    }
-    for (const [key, value] of Object.entries(
-      doc['subcircuitBindings'] as Record<string, unknown>,
-    )) {
-      if (typeof value !== 'string') {
-        throw new Error(
-          `Invalid .dts document: "subcircuitBindings["${key}"]" must be a string`,
-        );
-      }
-    }
-  }
-
-  if ('namedParameterSets' in doc && doc['namedParameterSets'] !== undefined) {
-    if (
-      typeof doc['namedParameterSets'] !== 'object' ||
-      doc['namedParameterSets'] === null ||
-      Array.isArray(doc['namedParameterSets'])
-    ) {
-      throw new Error(
-        'Invalid .dts document: "namedParameterSets" must be an object',
-      );
-    }
-    for (const [key, entry] of Object.entries(
-      doc['namedParameterSets'] as Record<string, unknown>,
+    for (const [compType, compModels] of Object.entries(
+      doc['models'] as Record<string, unknown>,
     )) {
       if (
-        entry === null ||
-        typeof entry !== 'object' ||
-        Array.isArray(entry)
+        compModels === null ||
+        typeof compModels !== 'object' ||
+        Array.isArray(compModels)
       ) {
         throw new Error(
-          `Invalid .dts document: "namedParameterSets["${key}"]" must be an object`,
+          `Invalid .dts document: "models["${compType}"]" must be an object`,
         );
       }
-      const e = entry as Record<string, unknown>;
-      if (typeof e['deviceType'] !== 'string') {
-        throw new Error(
-          `Invalid .dts document: "namedParameterSets["${key}"].deviceType" must be a string`,
+      for (const [modelName, entry] of Object.entries(
+        compModels as Record<string, unknown>,
+      )) {
+        validateDtsSerializedModelEntry(
+          entry,
+          `models["${compType}"]["${modelName}"]`,
         );
-      }
-      if (
-        typeof e['params'] !== 'object' ||
-        e['params'] === null ||
-        Array.isArray(e['params'])
-      ) {
-        throw new Error(
-          `Invalid .dts document: "namedParameterSets["${key}"].params" must be an object`,
-        );
-      }
-      for (const [pk, pv] of Object.entries(e['params'] as Record<string, unknown>)) {
-        if (typeof pv !== 'number') {
-          throw new Error(
-            `Invalid .dts document: "namedParameterSets["${key}"].params["${pk}"]" must be a number`,
-          );
-        }
       }
     }
   }
 
   const normalized = { ...doc, format: 'dts' };
   return normalized as unknown as DtsDocument;
+}
+
+/** Validate a DtsSerializedModelEntry at the given path. */
+function validateDtsSerializedModelEntry(value: unknown, path: string): void {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Invalid .dts document: "${path}" must be an object`);
+  }
+  const entry = value as Record<string, unknown>;
+  if (entry['kind'] !== 'inline' && entry['kind'] !== 'netlist') {
+    throw new Error(
+      `Invalid .dts document: "${path}.kind" must be "inline" or "netlist"`,
+    );
+  }
+  if (
+    typeof entry['params'] !== 'object' ||
+    entry['params'] === null ||
+    Array.isArray(entry['params'])
+  ) {
+    throw new Error(`Invalid .dts document: "${path}.params" must be an object`);
+  }
+  for (const [pk, pv] of Object.entries(entry['params'] as Record<string, unknown>)) {
+    if (typeof pv !== 'number') {
+      throw new Error(
+        `Invalid .dts document: "${path}.params["${pk}"]" must be a number`,
+      );
+    }
+  }
+  if (entry['kind'] === 'netlist') {
+    validateMnaSubcircuitNetlist(entry['netlist'], `${path}.netlist`);
+    if (!Array.isArray(entry['paramDefs'])) {
+      throw new Error(`Invalid .dts document: "${path}.paramDefs" must be an array`);
+    }
+  }
 }
 
 /** Validate a DtsCircuit value at the given JSON path for error messages. */
@@ -407,6 +419,26 @@ function validateDtsElement(value: unknown, path: string): void {
   }
   if (el['mirror'] !== undefined && typeof el['mirror'] !== 'boolean') {
     throw new Error(`Invalid .dts document: "${path}.mirror" must be a boolean when present`);
+  }
+  if (el['modelParamDeltas'] !== undefined) {
+    const deltas = el['modelParamDeltas'];
+    if (deltas === null || typeof deltas !== 'object' || Array.isArray(deltas)) {
+      throw new Error(`Invalid .dts document: "${path}.modelParamDeltas" must be an object when present`);
+    }
+    const d = deltas as Record<string, unknown>;
+    if (typeof d['model'] !== 'string') {
+      throw new Error(`Invalid .dts document: "${path}.modelParamDeltas.model" must be a string`);
+    }
+    if (d['params'] === null || typeof d['params'] !== 'object' || Array.isArray(d['params'])) {
+      throw new Error(`Invalid .dts document: "${path}.modelParamDeltas.params" must be an object`);
+    }
+    for (const [pk, pv] of Object.entries(d['params'] as Record<string, unknown>)) {
+      if (typeof pv !== 'number') {
+        throw new Error(
+          `Invalid .dts document: "${path}.modelParamDeltas.params["${pk}"]" must be a number`,
+        );
+      }
+    }
   }
 }
 

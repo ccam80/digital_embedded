@@ -253,14 +253,14 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 730,
-      "lastAccessed": 1774844972337,
+      "accessCount": 747,
+      "lastAccessed": 1774847574275,
       "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 393,
-      "lastAccessed": 1774844949190,
+      "accessCount": 396,
+      "lastAccessed": 1774848001321,
       "type": "directory"
     },
     {
@@ -271,20 +271,20 @@
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 172,
-      "lastAccessed": 1774843783794,
+      "accessCount": 176,
+      "lastAccessed": 1774845076934,
       "type": "directory"
     },
     {
       "path": "",
-      "accessCount": 167,
-      "lastAccessed": 1774843726072,
+      "accessCount": 170,
+      "lastAccessed": 1774845082727,
       "type": "directory"
     },
     {
       "path": "src\\editor\\property-panel.ts",
-      "accessCount": 130,
-      "lastAccessed": 1774843250621,
+      "accessCount": 139,
+      "lastAccessed": 1774845227575,
       "type": "file"
     },
     {
@@ -307,8 +307,8 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 93,
-      "lastAccessed": 1774843665811,
+      "accessCount": 95,
+      "lastAccessed": 1774845055634,
       "type": "file"
     },
     {
@@ -325,8 +325,8 @@
     },
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 68,
-      "lastAccessed": 1774844990706,
+      "accessCount": 69,
+      "lastAccessed": 1774845058185,
       "type": "file"
     },
     {
@@ -343,8 +343,14 @@
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 48,
-      "lastAccessed": 1774843667006,
+      "accessCount": 50,
+      "lastAccessed": 1774845059633,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 43,
+      "lastAccessed": 1774845055696,
       "type": "file"
     },
     {
@@ -357,12 +363,6 @@
       "path": "src\\solver\\analog\\model-library.ts",
       "accessCount": 41,
       "lastAccessed": 1774836479224,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 41,
-      "lastAccessed": 1774843666212,
       "type": "file"
     },
     {
@@ -390,6 +390,12 @@
       "type": "directory"
     },
     {
+      "path": "src\\core\\properties.ts",
+      "accessCount": 35,
+      "lastAccessed": 1774845076451,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog",
       "accessCount": 34,
       "lastAccessed": 1774842193618,
@@ -397,14 +403,8 @@
     },
     {
       "path": "src\\editor\\__tests__\\property-panel-spice.test.ts",
-      "accessCount": 33,
-      "lastAccessed": 1774815235466,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\properties.ts",
-      "accessCount": 33,
-      "lastAccessed": 1774843715156,
+      "accessCount": 34,
+      "lastAccessed": 1774845086619,
       "type": "file"
     },
     {

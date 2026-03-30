@@ -10,12 +10,13 @@ import type { PropertyDefinition, PropertyValue } from "@/core/properties";
 import { createInput } from "./property-inputs.js";
 import type { PropertyInput } from "./property-inputs.js";
 import { formatSI, parseSI } from "./si-format.js";
-import type { ComponentDefinition } from "@/core/registry";
-import { WELL_KNOWN_PROPERTY_KEYS } from "@/core/registry";
+import type { ComponentDefinition, ModelEntry, ParamDef } from "@/core/registry";
 import type { PinElectricalSpec } from "@/core/pin-electrical";
 import { resolvePinElectrical } from "@/core/pin-electrical.js";
 import type { LogicFamilyConfig } from "@/core/logic-family";
 import { PinDirection } from "@/core/pin";
+import { createModelSwitchCommand } from "./model-switch-command.js";
+import type { ModelSwitchCommand } from "./model-switch-command.js";
 
 const MODEL_LABELS: Record<string, string> = {
   digital: "Digital",
@@ -252,20 +253,278 @@ export class PropertyPanel {
   }
 
   // ---------------------------------------------------------------------------
-  // Simulation mode dropdown (analog mode only)
+  // Model selector + model param section
   // ---------------------------------------------------------------------------
 
   /**
-   * Show the model dropdown for a component that supports multiple models.
+   * Show the model dropdown and model parameter section for a component that
+   * has a modelRegistry.
    *
-   * @param _element   The selected circuit element.
-   * @param _def       The component definition.
+   * Renders:
+   *  1. A "Model" dropdown listing all available model keys.
+   *  2. Primary params immediately below (always visible).
+   *  3. Secondary params in a collapsed "Advanced Parameters" subsection.
+   *
+   * When the user switches models via the dropdown:
+   *  - A ModelSwitchCommand is created and executed (updating the element's
+   *    model property and replacing the model param partition).
+   *  - The model param section is rebuilt to reflect the new entry's paramDefs.
+   *  - The registered change callbacks are fired so undo integration works.
+   *
+   * @param element         The selected circuit element.
+   * @param def             The component definition.
+   * @param runtimeModels   Optional runtime model entries from circuit.metadata.models
+   *                        for this component type (keyed by model name).
    */
   showModelSelector(
-    _element: CircuitElement,
-    _def: ComponentDefinition,
+    element: CircuitElement,
+    def: ComponentDefinition,
+    runtimeModels?: Record<string, ModelEntry>,
   ): void {
-    // Pending reimplementation with the unified model system.
+    const registry = def.modelRegistry;
+    if (!registry) return;
+
+    const bag = element.getProperties();
+
+    // Build the full list of model keys
+    const staticKeys = Object.keys(registry);
+    const hasDigital = def.models?.digital !== undefined;
+    const runtimeKeys = runtimeModels ? Object.keys(runtimeModels) : [];
+
+    const allKeys: string[] = [];
+    for (const k of staticKeys) {
+      if (!allKeys.includes(k)) allKeys.push(k);
+    }
+    if (hasDigital && !allKeys.includes("digital")) {
+      allKeys.push("digital");
+    }
+    for (const k of runtimeKeys) {
+      if (!allKeys.includes(k)) allKeys.push(k);
+    }
+
+    if (allKeys.length === 0) return;
+
+    // Resolve the currently active model key
+    const currentModelKey = bag.has("model")
+      ? bag.get<string>("model")
+      : (def.defaultModel ?? allKeys[0]);
+
+    // Model dropdown row
+    const select = document.createElement("select");
+    select.style.cssText =
+      "width:100%;padding:2px 4px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:11px;";
+
+    for (const key of allKeys) {
+      const opt = document.createElement("option");
+      opt.value = key;
+      opt.textContent = getModelLabel(key);
+      if (key === currentModelKey) opt.selected = true;
+      select.appendChild(opt);
+    }
+
+    const modelRow = this._buildRow("Model", select as unknown as HTMLElement);
+    this._container.appendChild(modelRow);
+
+    // Container that holds the param section — rebuilt on model switch
+    const paramContainer = document.createElement("div");
+    this._container.appendChild(paramContainer);
+
+    // Render the initial param section
+    this._renderModelParams(element, def, currentModelKey, registry, runtimeModels, paramContainer);
+
+    // Handle model switch
+    select.addEventListener("change", () => {
+      const newKey = select.value;
+      const newEntry = registry[newKey] ?? runtimeModels?.[newKey];
+      const newParams: Record<string, PropertyValue> =
+        newKey === "digital" || !newEntry
+          ? {}
+          : { ...newEntry.params };
+
+      const cmd: ModelSwitchCommand = createModelSwitchCommand(element, newKey, newParams);
+      cmd.execute();
+
+      for (const cb of this._changeCallbacks) {
+        cb("model", cmd.oldModelKey, newKey);
+      }
+
+      // Rebuild the param section
+      paramContainer.innerHTML = "";
+      this._renderModelParams(element, def, newKey, registry, runtimeModels, paramContainer);
+    });
+  }
+
+  /**
+   * Render primary and secondary model params into `container`.
+   * Clears `container` first.
+   */
+  private _renderModelParams(
+    element: CircuitElement,
+    def: ComponentDefinition,
+    modelKey: string,
+    registry: Record<string, ModelEntry>,
+    runtimeModels: Record<string, ModelEntry> | undefined,
+    container: HTMLElement,
+  ): void {
+    if (modelKey === "digital") return;
+
+    const entry = registry[modelKey] ?? runtimeModels?.[modelKey];
+    if (!entry) return;
+
+    const paramDefs = entry.paramDefs;
+    if (!paramDefs || paramDefs.length === 0) return;
+
+    const bag = element.getProperties();
+
+    const primary = paramDefs.filter(p => p.rank === "primary");
+    const secondary = paramDefs.filter(p => p.rank === "secondary");
+
+    // Render primary params directly into container
+    for (const pd of primary) {
+      const row = this._buildModelParamRow(element, def, pd, entry, bag, modelKey, registry, runtimeModels, container);
+      container.appendChild(row);
+    }
+
+    // Secondary params in a collapsed subsection
+    if (secondary.length > 0) {
+      const advSection = document.createElement("div");
+      advSection.style.marginTop = "6px";
+
+      const advToggle = document.createElement("div");
+      advToggle.style.cssText =
+        "font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.6;cursor:pointer;user-select:none;";
+      advToggle.textContent = "▶ Advanced Parameters";
+
+      const advContent = document.createElement("div");
+      advContent.style.display = "none";
+
+      advToggle.addEventListener("click", () => {
+        const open = advContent.style.display !== "none";
+        advContent.style.display = open ? "none" : "block";
+        advToggle.textContent = (open ? "▶" : "▼") + " Advanced Parameters";
+      });
+
+      advSection.appendChild(advToggle);
+      advSection.appendChild(advContent);
+
+      for (const pd of secondary) {
+        const row = this._buildModelParamRow(element, def, pd, entry, bag, modelKey, registry, runtimeModels, advContent);
+        advContent.appendChild(row);
+      }
+
+      container.appendChild(advSection);
+    }
+  }
+
+  /**
+   * Build a single model parameter row with a text input, unit label,
+   * modified indicator, and "Reset to default" button.
+   */
+  private _buildModelParamRow(
+    element: CircuitElement,
+    _def: ComponentDefinition,
+    pd: ParamDef,
+    entry: ModelEntry,
+    bag: ReturnType<CircuitElement["getProperties"]>,
+    _modelKey: string,
+    _registry: Record<string, ModelEntry>,
+    _runtimeModels: Record<string, ModelEntry> | undefined,
+    _container: HTMLElement,
+  ): HTMLElement {
+    const defaultValue = (entry.params as Record<string, number>)[pd.key] ?? 0;
+    const currentValue = bag.hasModelParam(pd.key)
+      ? bag.getModelParam<number>(pd.key)
+      : defaultValue;
+
+    const row = document.createElement("div");
+    row.className = "prop-row";
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "4px";
+
+    const labelEl = document.createElement("label");
+    labelEl.className = "prop-label";
+    labelEl.textContent = pd.label;
+    if (pd.description) labelEl.title = pd.description;
+    row.appendChild(labelEl);
+
+    const inputEl = document.createElement("input");
+    inputEl.type = "text";
+    inputEl.style.cssText =
+      "flex:1;min-width:0;padding:2px 4px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:11px;";
+
+    const isModified = currentValue !== defaultValue;
+
+    // Display value with SI formatting when a unit is present
+    inputEl.value = pd.unit
+      ? formatSI(currentValue, "", 3).trim()
+      : String(currentValue);
+
+    if (isModified) {
+      inputEl.style.borderColor = "var(--accent, #4a90d9)";
+    }
+
+    inputEl.addEventListener("focus", () => inputEl.select());
+
+    const unitSpan = document.createElement("span");
+    unitSpan.style.cssText = "opacity:0.5;font-size:11px;min-width:16px;";
+    unitSpan.textContent = pd.unit ?? "";
+
+    // Reset button — only shown when value differs from default
+    const resetBtn = document.createElement("button");
+    resetBtn.title = "Reset to default";
+    resetBtn.textContent = "↺";
+    resetBtn.style.cssText =
+      "padding:0 4px;font-size:11px;background:none;border:none;cursor:pointer;opacity:0.5;display:" +
+      (isModified ? "inline" : "none") + ";";
+
+    const commitParam = () => {
+      const raw = inputEl.value.trim();
+      const parsed = pd.unit ? parseSI(raw) : parseFloat(raw);
+      if (isNaN(parsed)) {
+        inputEl.value = pd.unit
+          ? formatSI(bag.getModelParam<number>(pd.key), "", 3).trim()
+          : String(bag.getModelParam<number>(pd.key));
+        return;
+      }
+
+      const oldValue = bag.hasModelParam(pd.key) ? bag.getModelParam<number>(pd.key) : defaultValue;
+      if (parsed !== oldValue) {
+        bag.setModelParam(pd.key, parsed);
+        inputEl.value = pd.unit ? formatSI(parsed, "", 3).trim() : String(parsed);
+        inputEl.style.borderColor =
+          parsed !== defaultValue ? "var(--accent, #4a90d9)" : "var(--panel-border)";
+        resetBtn.style.display = parsed !== defaultValue ? "inline" : "none";
+        for (const cb of this._changeCallbacks) {
+          cb(`model:${pd.key}`, oldValue, parsed);
+        }
+      }
+    };
+
+    inputEl.addEventListener("blur", commitParam);
+    inputEl.addEventListener("keydown", (e) => {
+      if ((e as KeyboardEvent).key === "Enter") {
+        e.preventDefault();
+        commitParam();
+        (inputEl as HTMLInputElement).blur();
+      }
+    });
+
+    resetBtn.addEventListener("click", () => {
+      const oldValue = bag.hasModelParam(pd.key) ? bag.getModelParam<number>(pd.key) : defaultValue;
+      bag.setModelParam(pd.key, defaultValue);
+      inputEl.value = pd.unit ? formatSI(defaultValue, "", 3).trim() : String(defaultValue);
+      inputEl.style.borderColor = "var(--panel-border)";
+      resetBtn.style.display = "none";
+      for (const cb of this._changeCallbacks) {
+        cb(`model:${pd.key}`, oldValue, defaultValue);
+      }
+    });
+
+    row.appendChild(inputEl);
+    row.appendChild(unitSpan);
+    row.appendChild(resetBtn);
+    return row;
   }
 
   // ---------------------------------------------------------------------------
@@ -406,21 +665,6 @@ export class PropertyPanel {
     this._container.appendChild(section);
   }
 
-  // ---------------------------------------------------------------------------
-  // SPICE model parameter overrides
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Show a collapsible "SPICE Model Parameters" section for analog components.
-   * Displays per-parameter override fields with resolved defaults as placeholders.
-   * Pending reimplementation with the unified model param partition.
-   */
-  showSpiceModelParameters(
-    _element: CircuitElement,
-    _def: ComponentDefinition,
-  ): void {
-    // Pending reimplementation with unified model param partition.
-  }
 
   // ---------------------------------------------------------------------------
   // Input access (for tests)

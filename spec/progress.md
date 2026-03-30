@@ -923,3 +923,23 @@ What's already done:
   - src/components/semiconductors/__tests__/bjt.test.ts (updated all tests to use model param partition via makeBjtProps helper instead of _modelParams; updated definition tests to verify modelRegistry instead of models.mnaModels; added 6 new ModelParams tests: getModelParam BF/IS defaults, setModelParam BF=200 produces different results, all 11 params in paramDefs, primary/secondary rank checks)
 - **Tests**: 27/27 passing
 - **Full suite**: 7616/7789 passing (173 failing — expected: unmigrated components without modelRegistry)
+
+## Task T6: DTS serializer/deserializer
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/io/__tests__/dts-model-roundtrip.test.ts
+- **Files modified**: src/core/circuit.ts, src/io/dts-schema.ts, src/io/dts-serializer.ts, src/io/dts-deserializer.ts, src/io/__tests__/dts-schema.test.ts
+- **Tests**: 35/35 passing (28 dts-schema + 7 dts-model-roundtrip)
+
+## Task T5: Property panel — model-aware display
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/editor/model-switch-command.ts, src/editor/__tests__/property-panel-model.test.ts
+- **Files modified**: src/editor/property-panel.ts
+- **Files deleted**: src/editor/__tests__/property-panel-spice.test.ts (replaced by property-panel-model.test.ts)
+- **Tests**: 19/19 passing (property-panel-model.test.ts)
+- **Notes**: 
+  - showModelSelector fully implemented: model dropdown (static + digital + runtime keys), primary params always visible, secondary params in collapsed "Advanced Parameters" section, modified indicators, reset-to-default, model switch via ModelSwitchCommand
+  - showSpiceModelParameters removed per spec (no separate SPICE section)
+  - model-switch-command.ts created with createModelSwitchCommand() factory
+  - Wire-current-resolver.test.ts failures (2 tests) are pre-existing Wave 3 failures caused by model-defaults.js deletion (T2), not introduced by T5

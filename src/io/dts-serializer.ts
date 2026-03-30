@@ -8,11 +8,13 @@
 import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
+import type { ModelEntry } from '../core/registry.js';
 import type {
   DtsDocument,
   DtsCircuit,
   DtsElement,
   DtsWire,
+  DtsSerializedModelEntry,
 } from './dts-schema.js';
 
 // ---------------------------------------------------------------------------
@@ -78,7 +80,10 @@ function serializeProperties(
 // Circuit conversion
 // ---------------------------------------------------------------------------
 
-function elementToDtsElement(element: CircuitElement): DtsElement {
+function elementToDtsElement(
+  element: CircuitElement,
+  circuitModels?: Record<string, Record<string, ModelEntry>>,
+): DtsElement {
   const props = serializeProperties(
     element.getProperties().entries() as IterableIterator<[string, unknown]>,
   );
@@ -92,6 +97,28 @@ function elementToDtsElement(element: CircuitElement): DtsElement {
   if (element.mirror) {
     result.mirror = true;
   }
+
+  const bag = element.getProperties();
+  const modelKey = bag.has('model') ? bag.get<string>('model') : undefined;
+  if (modelKey !== undefined && modelKey !== '' && circuitModels !== undefined) {
+    const componentModels = circuitModels[element.typeId];
+    const entry = componentModels?.[modelKey];
+    if (entry !== undefined) {
+      const defaults = entry.params;
+      const deltaParams: Record<string, number> = {};
+      for (const key of bag.getModelParamKeys()) {
+        const current = bag.getModelParam<number>(key);
+        if (current !== defaults[key]) {
+          deltaParams[key] = current;
+        }
+      }
+      result.modelParamDeltas = {
+        model: modelKey,
+        params: sortObjectKeys(deltaParams) as Record<string, number>,
+      };
+    }
+  }
+
   return result;
 }
 
@@ -105,9 +132,10 @@ function wireToDtsWire(wire: Wire): DtsWire {
 }
 
 function circuitToDtsCircuit(circuit: Circuit): DtsCircuit {
+  const circuitModels = circuit.metadata.models;
   const result: DtsCircuit = {
     name: circuit.metadata.name,
-    elements: circuit.elements.map(elementToDtsElement),
+    elements: circuit.elements.map(el => elementToDtsElement(el, circuitModels)),
     wires: circuit.wires.map(wireToDtsWire),
   };
 
@@ -160,12 +188,44 @@ function circuitToDtsCircuit(circuit: Circuit): DtsCircuit {
 // ---------------------------------------------------------------------------
 
 /**
+ * Project a runtime ModelEntry to its serialized form.
+ * Factories are function references and are never serialized.
+ * Inline entries: strip factory and paramDefs (rehydrated from component registry on load).
+ * Netlist entries: keep netlist and paramDefs; no factory to strip.
+ */
+function serializeModelEntry(entry: ModelEntry): DtsSerializedModelEntry {
+  if (entry.kind === 'inline') {
+    return { kind: 'inline', params: entry.params };
+  }
+  return { kind: 'netlist', netlist: entry.netlist, paramDefs: entry.paramDefs, params: entry.params };
+}
+
+/**
  * Build the model-related fields of a DtsDocument from circuit metadata.
+ * Returns an object with a `models` key when runtime models are present,
+ * or an empty object when there are no user-imported models.
  */
 function buildModelFields(
-  _circuit: Circuit,
-): Record<string, never> {
-  return {};
+  circuit: Circuit,
+): { models?: Record<string, Record<string, DtsSerializedModelEntry>> } {
+  const runtimeModels = circuit.metadata.models;
+  if (runtimeModels === undefined || Object.keys(runtimeModels).length === 0) {
+    return {};
+  }
+  const serialized: Record<string, Record<string, DtsSerializedModelEntry>> = {};
+  for (const [compType, compModels] of Object.entries(runtimeModels)) {
+    if (Object.keys(compModels).length === 0) {
+      continue;
+    }
+    serialized[compType] = {};
+    for (const [modelName, entry] of Object.entries(compModels)) {
+      serialized[compType][modelName] = serializeModelEntry(entry);
+    }
+  }
+  if (Object.keys(serialized).length === 0) {
+    return {};
+  }
+  return { models: serialized };
 }
 
 /**

@@ -7,13 +7,12 @@
 
 import { Circuit, Wire } from '../core/circuit.js';
 import type { CircuitMetadata } from '../core/circuit.js';
-import type { ComponentRegistry } from '../core/registry.js';
+import type { ComponentRegistry, ModelEntry } from '../core/registry.js';
 import { PropertyBag } from '../core/properties.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { Rotation } from '../core/pin.js';
-import type { MnaSubcircuitNetlist } from '../core/mna-subcircuit-netlist.js';
 import { validateDtsDocument } from './dts-schema.js';
-import type { DtsCircuit, DtsElement, DtsWire } from './dts-schema.js';
+import type { DtsCircuit, DtsElement, DtsWire, DtsSerializedModelEntry } from './dts-schema.js';
 
 // ---------------------------------------------------------------------------
 // bigint decoding
@@ -75,9 +74,57 @@ function degreesToRotation(degrees: number): Rotation {
 // Circuit reconstruction
 // ---------------------------------------------------------------------------
 
+/**
+ * Rehydrate a serialized model registry into the runtime form.
+ * Inline entries: restore factory and paramDefs from the component registry.
+ * Netlist entries: carry their own paramDefs; factory is compiled later.
+ */
+function rehydrateModels(
+  serialized: Record<string, Record<string, DtsSerializedModelEntry>>,
+  registry: ComponentRegistry,
+): Record<string, Record<string, ModelEntry>> {
+  const result: Record<string, Record<string, ModelEntry>> = {};
+  for (const [compType, compModels] of Object.entries(serialized)) {
+    result[compType] = {};
+    const def = registry.get(compType);
+    for (const [modelName, entry] of Object.entries(compModels)) {
+      if (entry.kind === 'inline') {
+        if (def === undefined || def.modelRegistry === undefined) {
+          throw new Error(
+            `deserializeDts: cannot rehydrate inline model "${compType}"/"${modelName}" — ` +
+            `component type "${compType}" not found in registry or has no modelRegistry.`,
+          );
+        }
+        const baseEntry = Object.values(def.modelRegistry)[0];
+        if (baseEntry === undefined || baseEntry.kind !== 'inline') {
+          throw new Error(
+            `deserializeDts: cannot rehydrate inline model "${compType}"/"${modelName}" — ` +
+            `no inline base entry found in component modelRegistry.`,
+          );
+        }
+        result[compType][modelName] = {
+          kind: 'inline',
+          factory: baseEntry.factory,
+          paramDefs: baseEntry.paramDefs,
+          params: entry.params,
+        };
+      } else {
+        result[compType][modelName] = {
+          kind: 'netlist',
+          netlist: entry.netlist,
+          paramDefs: entry.paramDefs,
+          params: entry.params,
+        };
+      }
+    }
+  }
+  return result;
+}
+
 function deserializeDtsCircuit(
   dtsCircuit: DtsCircuit,
   registry: ComponentRegistry,
+  circuitModels?: Record<string, Record<string, ModelEntry>>,
 ): Circuit {
   const metadata: Partial<CircuitMetadata> = {
     name: dtsCircuit.name,
@@ -116,14 +163,19 @@ function deserializeDtsCircuit(
     }
     const overridesRaw = attrs['digitalPinLoadingOverrides'];
     if (overridesRaw !== undefined) {
-      metadata.digitalPinLoadingOverrides = JSON.parse(overridesRaw) as CircuitMetadata['digitalPinLoadingOverrides'];
+      const parsed = JSON.parse(overridesRaw) as NonNullable<CircuitMetadata['digitalPinLoadingOverrides']>;
+      metadata.digitalPinLoadingOverrides = parsed;
     }
+  }
+
+  if (circuitModels !== undefined) {
+    metadata.models = circuitModels;
   }
 
   const circuit = new Circuit(metadata);
 
   for (const savedEl of dtsCircuit.elements) {
-    const element = createElement(savedEl, registry);
+    const element = createElement(savedEl, registry, circuitModels);
     circuit.addElement(element);
   }
 
@@ -138,6 +190,7 @@ function deserializeDtsCircuit(
 function createElement(
   savedEl: DtsElement,
   registry: ComponentRegistry,
+  circuitModels?: Record<string, Record<string, ModelEntry>>,
 ): import('../core/element.js').CircuitElement {
   const def = registry.get(savedEl.type);
   if (def === undefined) {
@@ -154,8 +207,15 @@ function createElement(
   element.rotation = degreesToRotation(savedEl.rotation);
   element.mirror = savedEl.mirror ?? false;
 
-  // Restore the persisted instanceId (readonly on the class, but must be
-  // restored exactly for round-trip fidelity).
+  if (savedEl.modelParamDeltas !== undefined && circuitModels !== undefined) {
+    const { model: modelKey, params: deltaParams } = savedEl.modelParamDeltas;
+    const entry = circuitModels[savedEl.type]?.[modelKey];
+    if (entry !== undefined) {
+      const merged: Record<string, number> = { ...entry.params, ...deltaParams };
+      props.replaceModelParams(merged);
+    }
+  }
+
   (element as { instanceId: string }).instanceId = savedEl.id;
 
   return element;
@@ -180,14 +240,6 @@ function createWire(savedWire: DtsWire): Wire {
 // ---------------------------------------------------------------------------
 
 /**
- * Options for populating runtime registries during DTS deserialization.
- */
-export interface DtsDeserializeOptions {
-  /** Reserved for future use by the unified model system. */
-  _placeholder?: never;
-}
-
-/**
  * Parse a .dts JSON string back to Circuit objects.
  *
  * Returns the main circuit and a map of subcircuit names to Circuit objects.
@@ -196,21 +248,27 @@ export interface DtsDeserializeOptions {
  *
  * @throws Error if the JSON is malformed or the document fails validation.
  * @throws Error if any component type is not found in the registry.
+ * @throws Error if the document contains obsolete fields (namedParameterSets,
+ *   modelDefinitions, subcircuitBindings).
  */
 export function deserializeDts(
   json: string,
   registry: ComponentRegistry,
-  options?: DtsDeserializeOptions,
 ): { circuit: Circuit; subcircuits: Map<string, Circuit> } {
   const raw = JSON.parse(json) as unknown;
   const doc = validateDtsDocument(raw);
 
-  const circuit = deserializeDtsCircuit(doc.circuit, registry);
+  const circuitModels =
+    doc.models !== undefined
+      ? rehydrateModels(doc.models, registry)
+      : undefined;
+
+  const circuit = deserializeDtsCircuit(doc.circuit, registry, circuitModels);
 
   const subcircuits = new Map<string, Circuit>();
   if (doc.subcircuitDefinitions !== undefined) {
     for (const [name, subDef] of Object.entries(doc.subcircuitDefinitions)) {
-      subcircuits.set(name, deserializeDtsCircuit(subDef, registry));
+      subcircuits.set(name, deserializeDtsCircuit(subDef, registry, circuitModels));
     }
   }
 

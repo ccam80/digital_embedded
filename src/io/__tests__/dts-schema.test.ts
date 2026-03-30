@@ -227,188 +227,131 @@ describe('Serialization', () => {
 });
 
 // ---------------------------------------------------------------------------
-// namedParameterSets in DtsDocument
+// Old-format field rejection
 // ---------------------------------------------------------------------------
 
-describe('namedParameterSets', () => {
-  it('schema_accepts_namedParameterSets', () => {
+describe('old_format_field_rejection', () => {
+  it('rejects_namedParameterSets_field', () => {
     const doc = {
       format: 'dts',
       version: 1,
       circuit: { name: 'Test', elements: [], wires: [] },
       namedParameterSets: {
-        '1N4148': { deviceType: 'D', params: { IS: 2.52e-9, N: 1.752 } },
-        '2N2222': { deviceType: 'NPN', params: { IS: 1.4e-14, BF: 300 } },
+        '1N4148': { deviceType: 'D', params: { IS: 2.52e-9 } },
       },
     };
-    expect(() => validateDtsDocument(doc)).not.toThrow();
-    const result = validateDtsDocument(doc);
-    expect(result.namedParameterSets).toBeDefined();
-    expect(result.namedParameterSets!['1N4148'].deviceType).toBe('D');
-    expect(result.namedParameterSets!['2N2222'].params['BF']).toBe(300);
+    expect(() => validateDtsDocument(doc)).toThrow(/"namedParameterSets" is an obsolete field/);
   });
 
-  it('schema_rejects_namedParameterSets_not_object', () => {
+  it('rejects_modelDefinitions_field', () => {
     const doc = {
       format: 'dts',
       version: 1,
       circuit: { name: 'Test', elements: [], wires: [] },
-      namedParameterSets: 'invalid',
+      modelDefinitions: {
+        MYOPAMP: {
+          ports: ['INP', 'OUT'],
+          elements: [],
+          internalNetCount: 0,
+          netlist: [],
+        },
+      },
     };
-    expect(() => validateDtsDocument(doc)).toThrow(/"namedParameterSets" must be an object/);
+    expect(() => validateDtsDocument(doc)).toThrow(/"modelDefinitions" is an obsolete field/);
   });
 
-  it('schema_rejects_entry_missing_deviceType', () => {
+  it('rejects_subcircuitBindings_field', () => {
     const doc = {
       format: 'dts',
       version: 1,
       circuit: { name: 'Test', elements: [], wires: [] },
-      namedParameterSets: {
-        '1N4148': { params: { IS: 2.52e-9 } },
-      },
+      subcircuitBindings: { 'el-1': 'MyModel' },
     };
-    expect(() => validateDtsDocument(doc)).toThrow(/deviceType.*must be a string/);
-  });
-
-  it('schema_rejects_params_value_not_number', () => {
-    const doc = {
-      format: 'dts',
-      version: 1,
-      circuit: { name: 'Test', elements: [], wires: [] },
-      namedParameterSets: {
-        '1N4148': { deviceType: 'D', params: { IS: 'not-a-number' } },
-      },
-    };
-    expect(() => validateDtsDocument(doc)).toThrow(/params\["IS"\].*must be a number/);
-  });
-
-  it('roundtrip_namedParameterSets', () => {
-    const registry = makeRegistry('In');
-    const circuit = new Circuit({ name: 'SPICE' });
-    circuit.metadata.namedParameterSets = {
-      '1N4148': { deviceType: 'D', params: { IS: 2.52e-9, N: 1.752 } },
-    };
-
-    const json = serializeCircuit(circuit);
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    expect(parsed['namedParameterSets']).toBeDefined();
-
-    const { circuit: restored } = deserializeDts(json, registry);
-    expect(restored.metadata.namedParameterSets).toBeDefined();
-    expect(restored.metadata.namedParameterSets!['1N4148'].deviceType).toBe('D');
-    expect(restored.metadata.namedParameterSets!['1N4148'].params['IS']).toBe(2.52e-9);
-    expect(restored.metadata.namedParameterSets!['1N4148'].params['N']).toBe(1.752);
-  });
-
-  it('absent_namedParameterSets_not_serialized', () => {
-    const circuit = new Circuit({ name: 'NoModels' });
-    const json = serializeCircuit(circuit);
-    const parsed = JSON.parse(json) as Record<string, unknown>;
-    expect('namedParameterSets' in parsed).toBe(false);
-
-    const registry = makeRegistry();
-    const { circuit: restored } = deserializeDts(json, registry);
-    expect(restored.metadata.namedParameterSets).toBeUndefined();
+    expect(() => validateDtsDocument(doc)).toThrow(/"subcircuitBindings" is an obsolete field/);
   });
 });
 
 // ---------------------------------------------------------------------------
-// modelDefinitions in DtsDocument
+// models field in DtsDocument
 // ---------------------------------------------------------------------------
 
-describe('modelDefinitions', () => {
-  it('schema_accepts_modelDefinitions', () => {
+describe('models_field', () => {
+  it('schema_accepts_inline_models_entry', () => {
     const doc = {
       format: 'dts',
       version: 1,
       circuit: { name: 'Test', elements: [], wires: [] },
-      modelDefinitions: {
-        MYOPAMP: {
-          ports: ['INP', 'INN', 'OUT'],
-          elements: [
-            { typeId: 'Resistor', modelRef: 'R1', params: { R: 1000 } },
-          ],
-          internalNetCount: 2,
-          netlist: [[0, 1]],
+      models: {
+        NpnBJT: {
+          '2N2222': { kind: 'inline', params: { BF: 200, IS: 1.4e-14 } },
         },
       },
     };
     expect(() => validateDtsDocument(doc)).not.toThrow();
     const result = validateDtsDocument(doc);
-    expect(result.modelDefinitions).toBeDefined();
-    expect(result.modelDefinitions!['MYOPAMP'].ports).toEqual(['INP', 'INN', 'OUT']);
-    expect(result.modelDefinitions!['MYOPAMP'].internalNetCount).toBe(2);
+    expect(result.models).toBeDefined();
+    const entry = result.models!['NpnBJT']['2N2222'];
+    expect(entry.kind).toBe('inline');
+    expect(entry.params['BF']).toBe(200);
   });
 
-  it('schema_rejects_modelDefinitions_not_object', () => {
+  it('schema_rejects_models_not_object', () => {
     const doc = {
       format: 'dts',
       version: 1,
       circuit: { name: 'Test', elements: [], wires: [] },
-      modelDefinitions: 42,
+      models: 'invalid',
     };
-    expect(() => validateDtsDocument(doc)).toThrow(/"modelDefinitions" must be an object/);
+    expect(() => validateDtsDocument(doc)).toThrow(/"models" must be an object/);
   });
 
-  it('roundtrip_modelDefinitions', () => {
+  it('schema_rejects_entry_with_invalid_kind', () => {
     const doc = {
       format: 'dts',
       version: 1,
-      circuit: { name: 'WithModel', elements: [], wires: [] },
-      modelDefinitions: {
-        MYOPAMP: {
-          ports: ['INP', 'INN', 'OUT'],
-          elements: [{ typeId: 'Resistor' }],
-          internalNetCount: 1,
-          netlist: [[0, 1]],
+      circuit: { name: 'Test', elements: [], wires: [] },
+      models: {
+        NpnBJT: {
+          '2N2222': { kind: 'unknown', params: {} },
         },
       },
     };
-
-    expect(() => validateDtsDocument(doc)).not.toThrow();
-    const result = validateDtsDocument(doc);
-    expect(result.modelDefinitions).toBeDefined();
-    const def = result.modelDefinitions!['MYOPAMP'];
-    expect(def.ports).toEqual(['INP', 'INN', 'OUT']);
-    expect(def.internalNetCount).toBe(1);
-    expect(def.elements).toHaveLength(1);
-    expect(def.elements[0].typeId).toBe('Resistor');
+    expect(() => validateDtsDocument(doc)).toThrow(/kind.*must be "inline" or "netlist"/);
   });
 
-  it('absent_modelDefinitions_not_serialized', () => {
+  it('schema_rejects_entry_params_not_object', () => {
+    const doc = {
+      format: 'dts',
+      version: 1,
+      circuit: { name: 'Test', elements: [], wires: [] },
+      models: {
+        NpnBJT: {
+          '2N2222': { kind: 'inline', params: 'bad' },
+        },
+      },
+    };
+    expect(() => validateDtsDocument(doc)).toThrow(/\.params.*must be an object/);
+  });
+
+  it('schema_rejects_entry_params_value_not_number', () => {
+    const doc = {
+      format: 'dts',
+      version: 1,
+      circuit: { name: 'Test', elements: [], wires: [] },
+      models: {
+        NpnBJT: {
+          '2N2222': { kind: 'inline', params: { BF: 'bad' } },
+        },
+      },
+    };
+    expect(() => validateDtsDocument(doc)).toThrow(/params\["BF"\].*must be a number/);
+  });
+
+  it('absent_models_not_serialized', () => {
     const circuit = new Circuit({ name: 'NoModels' });
     const json = serializeCircuit(circuit);
     const parsed = JSON.parse(json) as Record<string, unknown>;
-    expect('modelDefinitions' in parsed).toBe(false);
-
-    const registry = makeRegistry();
-    const { circuit: restored } = deserializeDts(json, registry);
-    expect(restored.metadata.modelDefinitions).toBeUndefined();
-  });
-
-  it('roundtrip_both_fields_together', () => {
-    const doc = {
-      format: 'dts',
-      version: 1,
-      circuit: { name: 'BothFields', elements: [], wires: [] },
-      namedParameterSets: {
-        '2N2222': { deviceType: 'NPN', params: { BF: 200 } },
-      },
-      modelDefinitions: {
-        RDIV: {
-          ports: ['A', 'B'],
-          elements: [{ typeId: 'Resistor', params: { R: 1000 } }],
-          internalNetCount: 0,
-          netlist: [[0, 1]],
-        },
-      },
-    };
-
-    expect(() => validateDtsDocument(doc)).not.toThrow();
-    const result = validateDtsDocument(doc);
-    expect(result.namedParameterSets!['2N2222'].params['BF']).toBe(200);
-    expect(result.modelDefinitions!['RDIV'].ports).toEqual(['A', 'B']);
-    expect(result.modelDefinitions!['RDIV'].elements).toHaveLength(1);
+    expect('models' in parsed).toBe(false);
   });
 });
 
@@ -418,7 +361,6 @@ describe('modelDefinitions', () => {
 
 describe('mirror', () => {
   it('serializes_mirror_true_when_set', () => {
-    const registry = makeRegistry('In');
     const circuit = new Circuit({ name: 'MirrorTest' });
     const el = makeElement('In', 'id-1', 100, 200);
     el.mirror = true;
@@ -445,7 +387,6 @@ describe('mirror', () => {
   });
 
   it('omits_mirror_field_when_false', () => {
-    const registry = makeRegistry('In');
     const circuit = new Circuit({ name: 'NoMirrorTest' });
     const el = makeElement('In', 'id-1', 100, 200);
     el.mirror = false;
