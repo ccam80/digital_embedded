@@ -13,42 +13,9 @@ import { findCriticalPath } from '../path-analysis.js';
 import { Circuit, Wire } from '../../core/circuit.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { PropertyBag, PropertyType } from '../../core/properties.js';
-import { AbstractCircuitElement } from '../../core/element.js';
-import type { Pin, Rotation } from '../../core/pin.js';
 import { PinDirection } from '../../core/pin.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
-import type { ComponentLayout } from '../../core/registry.js';
-
-// ---------------------------------------------------------------------------
-// Stub element
-// ---------------------------------------------------------------------------
-
-class StubElement extends AbstractCircuitElement {
-  private readonly _pins: Pin[];
-
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pins: Pin[],
-    props: PropertyBag,
-  ) {
-    super(typeId, instanceId, position, 0 as Rotation, false, props);
-    this._pins = pins;
-  }
-
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-}
-
-function makePin(label: string, direction: PinDirection, x: number, y: number): Pin {
-  return { label, direction, position: { x, y }, bitWidth: 1, isNegated: false, isClock: false, kind: "signal" };
-}
-
-function noop(_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void {}
+import { TestElement, makePin } from '../../test-fixtures/test-element.js';
+import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
 
 // ---------------------------------------------------------------------------
 // Registry factory with configurable delays
@@ -64,61 +31,61 @@ function buildRegistry(delays: Record<string, number> = {}): ComponentRegistry {
   registry.register({
     name: 'In',
     typeId: -1,
-    factory: (props) => new StubElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
+    factory: (props) => new TestElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
     pinLayout: [],
     propertyDefs: [{ key: 'label', type: PropertyType.STRING, label: 'Label', defaultValue: '' }],
     attributeMap: [],
     category: 'IO' as any,
     helpText: '',
-    models: { digital: { executeFn: noop, defaultDelay: 0 } },
+    models: { digital: { executeFn: noopExecFn, defaultDelay: 0 } },
   });
 
   registry.register({
     name: 'Out',
     typeId: -1,
-    factory: (props) => new StubElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
+    factory: (props) => new TestElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
     pinLayout: [],
     propertyDefs: [{ key: 'label', type: PropertyType.STRING, label: 'Label', defaultValue: '' }],
     attributeMap: [],
     category: 'IO' as any,
     helpText: '',
-    models: { digital: { executeFn: noop, defaultDelay: 0 } },
+    models: { digital: { executeFn: noopExecFn, defaultDelay: 0 } },
   });
 
   registry.register({
     name: 'And',
     typeId: -1,
-    factory: (props) => new StubElement('And', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
+    factory: (props) => new TestElement('And', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: 'LOGIC' as any,
     helpText: '',
-    models: { digital: { executeFn: noop, defaultDelay: andDelay } },
+    models: { digital: { executeFn: noopExecFn, defaultDelay: andDelay } },
   });
 
   registry.register({
     name: 'Or',
     typeId: -1,
-    factory: (props) => new StubElement('Or', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
+    factory: (props) => new TestElement('Or', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: 'LOGIC' as any,
     helpText: '',
-    models: { digital: { executeFn: noop, defaultDelay: orDelay } },
+    models: { digital: { executeFn: noopExecFn, defaultDelay: orDelay } },
   });
 
   registry.register({
     name: 'Not',
     typeId: -1,
-    factory: (props) => new StubElement('Not', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
+    factory: (props) => new TestElement('Not', crypto.randomUUID(), { x: 0, y: 0 }, [], props),
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: 'LOGIC' as any,
     helpText: '',
-    models: { digital: { executeFn: noop, defaultDelay: notDelay } },
+    models: { digital: { executeFn: noopExecFn, defaultDelay: notDelay } },
   });
 
   return registry;
@@ -148,21 +115,21 @@ describe('path-analysis', () => {
     // AND inputs at (4,1) and (4,3), output at (8,2)
     // Out input at (10,2)
 
-    const inA = new StubElement('In', 'inA', { x: 0, y: 0 }, [
+    const inA = new TestElement('In', 'inA', { x: 0, y: 0 }, [
       makePin('out', PinDirection.OUTPUT, 2, 1),
     ], makeProps({ label: 'A' }));
 
-    const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
+    const inB = new TestElement('In', 'inB', { x: 0, y: 2 }, [
       makePin('out', PinDirection.OUTPUT, 2, 1),
     ], makeProps({ label: 'B' }));
 
-    const andGate = new StubElement('And', 'and1', { x: 4, y: 1 }, [
+    const andGate = new TestElement('And', 'and1', { x: 4, y: 1 }, [
       makePin('in0', PinDirection.INPUT, 0, 0),
       makePin('in1', PinDirection.INPUT, 0, 2),
       makePin('out', PinDirection.OUTPUT, 4, 1),
     ], makeProps());
 
-    const outEl = new StubElement('Out', 'outY', { x: 10, y: 2 }, [
+    const outEl = new TestElement('Out', 'outY', { x: 10, y: 2 }, [
       makePin('in', PinDirection.INPUT, 0, 0),
     ], makeProps({ label: 'Y' }));
 
@@ -197,36 +164,36 @@ describe('path-analysis', () => {
     // NOT: in at (16,2), out at (20,2)
     // InC: out at (10,3) (second input to OR, different path)
 
-    const inA = new StubElement('In', 'inA', { x: 0, y: 0 }, [
+    const inA = new TestElement('In', 'inA', { x: 0, y: 0 }, [
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ], makeProps({ label: 'A' }));
 
-    const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
+    const inB = new TestElement('In', 'inB', { x: 0, y: 2 }, [
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ], makeProps({ label: 'B' }));
 
-    const inC = new StubElement('In', 'inC', { x: 0, y: 3 }, [
+    const inC = new TestElement('In', 'inC', { x: 0, y: 3 }, [
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ], makeProps({ label: 'C' }));
 
-    const andGate = new StubElement('And', 'and1', { x: 4, y: 0 }, [
+    const andGate = new TestElement('And', 'and1', { x: 4, y: 0 }, [
       makePin('in0', PinDirection.INPUT, 0, 0),
       makePin('in1', PinDirection.INPUT, 0, 2),
       makePin('out', PinDirection.OUTPUT, 4, 1),
     ], makeProps());
 
-    const orGate = new StubElement('Or', 'or1', { x: 10, y: 1 }, [
+    const orGate = new TestElement('Or', 'or1', { x: 10, y: 1 }, [
       makePin('in0', PinDirection.INPUT, 0, 0),
       makePin('in1', PinDirection.INPUT, 0, 2),
       makePin('out', PinDirection.OUTPUT, 4, 1),
     ], makeProps());
 
-    const notGate = new StubElement('Not', 'not1', { x: 16, y: 2 }, [
+    const notGate = new TestElement('Not', 'not1', { x: 16, y: 2 }, [
       makePin('in', PinDirection.INPUT, 0, 0),
       makePin('out', PinDirection.OUTPUT, 4, 0),
     ], makeProps());
 
-    const outEl = new StubElement('Out', 'outY', { x: 22, y: 2 }, [
+    const outEl = new TestElement('Out', 'outY', { x: 22, y: 2 }, [
       makePin('in', PinDirection.INPUT, 0, 0),
     ], makeProps({ label: 'Y' }));
 
@@ -269,34 +236,34 @@ describe('path-analysis', () => {
     // Path 2: InB → OR(20ns) → Out
     // Both converge at the Out component; critical path is OR path (20ns)
 
-    const inA = new StubElement('In', 'inA', { x: 0, y: 0 }, [
+    const inA = new TestElement('In', 'inA', { x: 0, y: 0 }, [
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ], makeProps({ label: 'A' }));
 
-    const inB = new StubElement('In', 'inB', { x: 0, y: 4 }, [
+    const inB = new TestElement('In', 'inB', { x: 0, y: 4 }, [
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ], makeProps({ label: 'B' }));
 
     // AND gate on path 1: one input from inA, output at (8, 0)
-    const andGate = new StubElement('And', 'and1', { x: 4, y: 0 }, [
+    const andGate = new TestElement('And', 'and1', { x: 4, y: 0 }, [
       makePin('in0', PinDirection.INPUT, 0, 0),
       makePin('in1', PinDirection.INPUT, 0, 1), // dummy second input
       makePin('out', PinDirection.OUTPUT, 4, 0),
     ], makeProps());
 
     // OR gate on path 2: one input from inB, output at (8, 4)
-    const orGate = new StubElement('Or', 'or1', { x: 4, y: 4 }, [
+    const orGate = new TestElement('Or', 'or1', { x: 4, y: 4 }, [
       makePin('in0', PinDirection.INPUT, 0, 0),
       makePin('in1', PinDirection.INPUT, 0, 1), // dummy second input
       makePin('out', PinDirection.OUTPUT, 4, 0),
     ], makeProps());
 
     // Two separate Out components to avoid merging the paths
-    const outY1 = new StubElement('Out', 'outY1', { x: 10, y: 0 }, [
+    const outY1 = new TestElement('Out', 'outY1', { x: 10, y: 0 }, [
       makePin('in', PinDirection.INPUT, 0, 0),
     ], makeProps({ label: 'Y1' }));
 
-    const outY2 = new StubElement('Out', 'outY2', { x: 10, y: 4 }, [
+    const outY2 = new TestElement('Out', 'outY2', { x: 10, y: 4 }, [
       makePin('in', PinDirection.INPUT, 0, 0),
     ], makeProps({ label: 'Y2' }));
 
@@ -330,26 +297,26 @@ describe('path-analysis', () => {
     // Path: InA → AND → NOT → OutY
     // InA: label "A", AND: no label → typeId "And", NOT: no label → typeId "Not"
 
-    const inA = new StubElement('In', 'inA', { x: 0, y: 0 }, [
+    const inA = new TestElement('In', 'inA', { x: 0, y: 0 }, [
       makePin('out', PinDirection.OUTPUT, 2, 1),
     ], makeProps({ label: 'A' }));
 
-    const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
+    const inB = new TestElement('In', 'inB', { x: 0, y: 2 }, [
       makePin('out', PinDirection.OUTPUT, 2, 1),
     ], makeProps({ label: 'B' }));
 
-    const andGate = new StubElement('And', 'and1', { x: 4, y: 1 }, [
+    const andGate = new TestElement('And', 'and1', { x: 4, y: 1 }, [
       makePin('in0', PinDirection.INPUT, 0, 0),
       makePin('in1', PinDirection.INPUT, 0, 2),
       makePin('out', PinDirection.OUTPUT, 4, 1),
     ], makeProps());
 
-    const notGate = new StubElement('Not', 'not1', { x: 10, y: 2 }, [
+    const notGate = new TestElement('Not', 'not1', { x: 10, y: 2 }, [
       makePin('in', PinDirection.INPUT, 0, 0),
       makePin('out', PinDirection.OUTPUT, 4, 0),
     ], makeProps());
 
-    const outEl = new StubElement('Out', 'outY', { x: 16, y: 2 }, [
+    const outEl = new TestElement('Out', 'outY', { x: 16, y: 2 }, [
       makePin('in', PinDirection.INPUT, 0, 0),
     ], makeProps({ label: 'Y' }));
 

@@ -13,8 +13,10 @@ import {
   createVaractorElement,
   computeVaractorCapacitance,
   VaractorDefinition,
+  VARACTOR_PARAM_DEFAULTS,
 } from "../varactor.js";
 import { PropertyBag } from "../../../core/properties.js";
+import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
@@ -34,9 +36,11 @@ const VARACTOR_DEFAULTS = {
 // ---------------------------------------------------------------------------
 
 function makeVaractor(overrides: Partial<typeof VARACTOR_DEFAULTS> = {}): AnalogElement {
-  const params = { ...VARACTOR_DEFAULTS, ...overrides };
+  const params = { ...VARACTOR_PARAM_DEFAULTS, ...VARACTOR_DEFAULTS, ...overrides };
+  const props = createTestPropertyBag();
+  props.replaceModelParams(params);
   // nodeAnode=1, nodeCathode=2
-  return createVaractorElement(new Map([["A", 1], ["K", 2]]), [], -1, params as unknown as PropertyBag);
+  return createVaractorElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
 }
 
 /**
@@ -177,9 +181,9 @@ describe("Varactor", () => {
 
   it("definition_has_correct_fields", () => {
     expect(VaractorDefinition.name).toBe("VaractorDiode");
-    expect(VaractorDefinition.models?.mnaModels?.behavioral).toBeDefined();
-    expect(VaractorDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("D");
-    expect(VaractorDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(VaractorDefinition.modelRegistry?.["behavioral"]).toBeDefined();
+    expect(VaractorDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
+    expect(VaractorDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
     expect(VaractorDefinition.category).toBe("SEMICONDUCTORS");
   });
 

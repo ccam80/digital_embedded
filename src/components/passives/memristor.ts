@@ -39,11 +39,24 @@ import {
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG } from "../../solver/analog/stamp-helpers.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
-// Stamp helpers — node 0 is ground (skipped)
+// Model parameter declarations
 // ---------------------------------------------------------------------------
 
+export const { paramDefs: MEMRISTOR_PARAM_DEFS, defaults: MEMRISTOR_DEFAULTS } = defineModelParams({
+  primary: {
+    rOn:         { default: 100,    unit: "Ω",       description: "Resistance of fully doped (on) state in ohms", min: 1e-3 },
+    rOff:        { default: 16000,  unit: "Ω",       description: "Resistance of fully undoped (off) state in ohms", min: 1e-3 },
+    initialState:{ default: 0.5,                     description: "Initial normalised doped-region boundary (0=undoped, 1=fully doped)", min: 0 },
+  },
+  secondary: {
+    mobility:    { default: 1e-14,                   description: "Ionic mobility in m² per V·s", min: 1e-20 },
+    deviceLength:{ default: 10e-9,                   description: "Device thickness in metres", min: 1e-12 },
+    windowOrder: { default: 1,                       description: "Joglekar window function order p (integer >= 1)", min: 1 },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // MemristorElement — AnalogElement implementation
@@ -55,11 +68,11 @@ export class MemristorElement implements AnalogElementCore {
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
 
-  private readonly rOn: number;
-  private readonly rOff: number;
-  private readonly mobility: number;
-  private readonly deviceLength: number;
-  private readonly windowOrder: number;
+  private rOn: number;
+  private rOff: number;
+  private mobility: number;
+  private deviceLength: number;
+  private windowOrder: number;
 
   /** Normalised state variable: 0 = fully undoped, 1 = fully doped. */
   private _w: number;
@@ -99,6 +112,15 @@ export class MemristorElement implements AnalogElementCore {
   /** Current normalised state variable w (read-only access for tests). */
   get w(): number {
     return this._w;
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "rOn") this.rOn = value;
+    else if (key === "rOff") this.rOff = value;
+    else if (key === "mobility") this.mobility = value;
+    else if (key === "deviceLength") this.deviceLength = value;
+    else if (key === "windowOrder") this.windowOrder = value;
+    else if (key === "initialState") this._w = Math.max(0, Math.min(1, value));
   }
 
   stamp(_solver: SparseSolver): void {
@@ -295,6 +317,29 @@ export function createMemristorElement(
   );
 }
 
+function createMemristorElementFromModelParams(
+  _pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  _branchIdx: number,
+  props: PropertyBag,
+): AnalogElementCore {
+  const rOn = props.getModelParam<number>("rOn");
+  const rOff = props.getModelParam<number>("rOff");
+  const initialState = props.getModelParam<number>("initialState");
+  const mobility = props.getModelParam<number>("mobility");
+  const deviceLength = props.getModelParam<number>("deviceLength");
+  const windowOrder = props.getModelParam<number>("windowOrder");
+
+  return new MemristorElement(
+    rOn,
+    rOff,
+    initialState,
+    mobility,
+    deviceLength,
+    windowOrder,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Property definitions
 // ---------------------------------------------------------------------------
@@ -397,6 +442,14 @@ export const MemristorDefinition: ComponentDefinition = {
       behavioral: {
       factory: createMemristorElement,
     },
+    },
+  },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createMemristorElementFromModelParams,
+      paramDefs: MEMRISTOR_PARAM_DEFS,
+      params: MEMRISTOR_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

@@ -49,12 +49,29 @@ import {
   capacitorConductance,
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const MIN_RESISTANCE = 1e-9;
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: POLARIZED_CAP_PARAM_DEFS, defaults: POLARIZED_CAP_MODEL_DEFAULTS } = defineModelParams({
+  primary: {
+    capacitance:    { default: 100e-6, unit: "F", description: "Capacitance in farads", min: 1e-12 },
+    esr:            { default: 0.1,    unit: "Ω", description: "Equivalent series resistance in ohms", min: 0 },
+  },
+  secondary: {
+    leakageCurrent: { default: 1e-6,  unit: "A", description: "DC leakage current at rated voltage", min: 0 },
+    voltageRating:  { default: 25,    unit: "V", description: "Maximum rated voltage", min: 1 },
+    reverseMax:     { default: 1.0,   unit: "V", description: "Reverse voltage threshold that triggers a polarity warning", min: 0 },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -195,10 +212,10 @@ export class AnalogPolarizedCapElement implements AnalogElement {
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = true;
 
-  private readonly C: number;
-  private readonly G_esr: number;
-  private readonly G_leak: number;
-  private readonly reverseMax: number;
+  private C: number;
+  private G_esr: number;
+  private G_leak: number;
+  private reverseMax: number;
 
   private geq: number = 0;
   private ieq: number = 0;
@@ -307,6 +324,13 @@ export class AnalogPolarizedCapElement implements AnalogElement {
     return [I, -I];
   }
 
+  updatePhysicalParams(C: number, G_esr: number, G_leak: number, reverseMax: number): void {
+    this.C = C;
+    this.G_esr = G_esr;
+    this.G_leak = G_leak;
+    this.reverseMax = reverseMax;
+  }
+
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
     const nCap = this.pinNodeIds[2];
     const nNeg = this.pinNodeIds[1];
@@ -329,27 +353,67 @@ export class AnalogPolarizedCapElement implements AnalogElement {
 // analogFactory
 // ---------------------------------------------------------------------------
 
+function buildPolarizedCapFromParams(
+  pinNodes: ReadonlyMap<string, number>,
+  internalNodeIds: readonly number[],
+  p: { capacitance: number; esr: number; leakageCurrent: number; voltageRating: number; reverseMax: number },
+): AnalogElementCore {
+  const rLeak = p.leakageCurrent > 0 ? p.voltageRating / p.leakageCurrent : 1e12;
+
+  // nodeIds = [n_pos, n_neg, n_cap_internal] — compiler provides the internal node
+  const el = new AnalogPolarizedCapElement(
+    [pinNodes.get("pos")!, pinNodes.get("neg")!, internalNodeIds[0]],
+    p.capacitance,
+    p.esr,
+    rLeak,
+    p.reverseMax,
+  );
+
+  (el as AnalogElementCore).setParam = function(key: string, value: number): void {
+    if (key in p) {
+      (p as Record<string, number>)[key] = value;
+      const newRLeak = p.leakageCurrent > 0 ? p.voltageRating / p.leakageCurrent : 1e12;
+      el.updatePhysicalParams(
+        p.capacitance,
+        1 / Math.max(p.esr, MIN_RESISTANCE),
+        1 / Math.max(newRLeak, MIN_RESISTANCE),
+        p.reverseMax,
+      );
+    }
+  };
+  return el;
+}
+
 function createPolarizedCapElement(
   pinNodes: ReadonlyMap<string, number>,
   internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const C = props.getOrDefault<number>("capacitance", 100e-6);
-  const esr = props.getOrDefault<number>("esr", 0.1);
-  const voltageRating = props.getOrDefault<number>("voltageRating", 25);
-  const leakageCurrent = props.getOrDefault<number>("leakageCurrent", 1e-6);
-  const rLeak = leakageCurrent > 0 ? voltageRating / leakageCurrent : 1e12;
-  const reverseMax = props.getOrDefault<number>("reverseMax", 1.0);
+  const p = {
+    capacitance:    props.getOrDefault<number>("capacitance", 100e-6),
+    esr:            props.getOrDefault<number>("esr", 0.1),
+    leakageCurrent: props.getOrDefault<number>("leakageCurrent", 1e-6),
+    voltageRating:  props.getOrDefault<number>("voltageRating", 25),
+    reverseMax:     props.getOrDefault<number>("reverseMax", 1.0),
+  };
+  return buildPolarizedCapFromParams(pinNodes, internalNodeIds, p);
+}
 
-  // nodeIds = [n_pos, n_neg, n_cap_internal] — compiler provides the internal node
-  return new AnalogPolarizedCapElement(
-    [pinNodes.get("pos")!, pinNodes.get("neg")!, internalNodeIds[0]],
-    C,
-    esr,
-    rLeak,
-    reverseMax,
-  );
+function createPolarizedCapElementFromModelParams(
+  pinNodes: ReadonlyMap<string, number>,
+  internalNodeIds: readonly number[],
+  _branchIdx: number,
+  props: PropertyBag,
+): AnalogElementCore {
+  const p = {
+    capacitance:    props.getModelParam<number>("capacitance"),
+    esr:            props.getModelParam<number>("esr"),
+    leakageCurrent: props.getModelParam<number>("leakageCurrent"),
+    voltageRating:  props.getModelParam<number>("voltageRating"),
+    reverseMax:     props.getModelParam<number>("reverseMax"),
+  };
+  return buildPolarizedCapFromParams(pinNodes, internalNodeIds, p);
 }
 
 // ---------------------------------------------------------------------------
@@ -473,6 +537,14 @@ export const PolarizedCapDefinition: ComponentDefinition = {
       factory: createPolarizedCapElement,
       getInternalNodeCount: () => 1,
     },
+    },
+  },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createPolarizedCapElement,
+      paramDefs: POLARIZED_CAP_PARAM_DEFS,
+      params: POLARIZED_CAP_MODEL_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

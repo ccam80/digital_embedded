@@ -32,11 +32,11 @@ import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import { DIODE_DEFAULTS } from "../../solver/analog/model-defaults.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -48,6 +48,25 @@ const VT = 0.02585;
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
 
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = defineModelParams({
+  primary: {
+    IS:  { default: 1e-14, unit: "A",  description: "Saturation current" },
+    N:   { default: 1,                 description: "Emission coefficient" },
+  },
+  secondary: {
+    CJO: { default: 0,    unit: "F",  description: "Zero-bias junction capacitance" },
+    VJ:  { default: 1,    unit: "V",  description: "Junction built-in potential" },
+    M:   { default: 0.5,              description: "Grading coefficient" },
+    TT:  { default: 0,    unit: "s",  description: "Transit time" },
+    FC:  { default: 0.5,              description: "Forward-bias capacitance coefficient" },
+    BV:  { default: Infinity, unit: "V", description: "Reverse breakdown voltage" },
+    IBV: { default: 1e-3, unit: "A",  description: "Reverse breakdown current" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // computeJunctionCapacitance
@@ -93,20 +112,16 @@ export function createDiodeElement(
   const nodeAnode = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
-  // Resolve model parameters from _modelParams (injected by compiler) or defaults
-  const modelParams = props.has("_modelParams")
-    ? props.get<Record<string, number>>("_modelParams")
-    : undefined;
-  const mp = modelParams ?? DIODE_DEFAULTS;
-
   const params: Record<string, number> = {
-    IS: mp["IS"] ?? DIODE_DEFAULTS["IS"],
-    N: mp["N"] ?? DIODE_DEFAULTS["N"],
-    CJO: mp["CJO"] ?? DIODE_DEFAULTS["CJO"],
-    VJ: mp["VJ"] ?? DIODE_DEFAULTS["VJ"],
-    M: mp["M"] ?? DIODE_DEFAULTS["M"],
-    TT: mp["TT"] ?? DIODE_DEFAULTS["TT"],
-    FC: mp["FC"] ?? DIODE_DEFAULTS["FC"],
+    IS:  props.getModelParam<number>("IS"),
+    N:   props.getModelParam<number>("N"),
+    CJO: props.getModelParam<number>("CJO"),
+    VJ:  props.getModelParam<number>("VJ"),
+    M:   props.getModelParam<number>("M"),
+    TT:  props.getModelParam<number>("TT"),
+    FC:  props.getModelParam<number>("FC"),
+    BV:  props.getModelParam<number>("BV"),
+    IBV: props.getModelParam<number>("IBV"),
   };
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
@@ -346,14 +361,6 @@ const DIODE_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "SPICE model name (blank = use built-in defaults)",
   },
   LABEL_PROPERTY_DEF,
-  {
-    key: "_spiceModelOverrides",
-    type: PropertyType.STRING,
-    label: "SPICE Model Overrides",
-    defaultValue: {} as Record<string, number>,
-    description: "User-supplied SPICE parameter overrides",
-    hidden: true,
-  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -393,12 +400,13 @@ export const DiodeDefinition: ComponentDefinition = {
     "Diode — Shockley equation with NR linearization.\n" +
     "Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
     "Model parameters: IS, N, CJO, VJ, M, TT, FC.",
-  models: {
-    mnaModels: {
-      behavioral: {
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
       factory: createDiodeElement,
-      deviceType: "D",
-    },
+      paramDefs: DIODE_PARAM_DEFS,
+      params: DIODE_PARAM_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

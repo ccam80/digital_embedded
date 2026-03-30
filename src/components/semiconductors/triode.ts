@@ -38,9 +38,10 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -51,6 +52,23 @@ const GMIN = 1e-12;
 
 /** Maximum V_GK step per NR iteration (prevents exponential overflow). */
 const VGK_MAX_STEP = 1.0;
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: TRIODE_PARAM_DEFS, defaults: TRIODE_PARAM_DEFAULTS } = defineModelParams({
+  primary: {
+    mu:  { default: 100,  description: "Amplification factor µ" },
+    kp:  { default: 600,  description: "Koren K_P parameter controlling plate-voltage sensitivity" },
+    kg1: { default: 1060, description: "Koren K_G1 transconductance scaling factor" },
+  },
+  secondary: {
+    kvb: { default: 300,  description: "Koren K_VB parameter (V²) for grid-plate interaction" },
+    ex:  { default: 1.4,  description: "Koren current exponent EX" },
+    rGI: { default: 2000, unit: "Ω", description: "Grid input resistance (limits grid current when V_GK > 0)" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Stamp helpers — node 0 is ground (skipped)
@@ -153,17 +171,19 @@ export function createTriodeElement(
   const nodeG = pinNodes.get("G")!; // grid
   const nodeK = pinNodes.get("K")!; // cathode
 
-  const mu = props.getOrDefault<number>("mu", 100);
-  const kp = props.getOrDefault<number>("kp", 600);
-  const kvb = props.getOrDefault<number>("kvb", 300);
-  const kg1 = props.getOrDefault<number>("kg1", 1060);
-  const ex = props.getOrDefault<number>("ex", 1.4);
-  const rGI = props.getOrDefault<number>("rGI", 2000);
+  const p = {
+    mu:  props.getModelParam<number>("mu"),
+    kp:  props.getModelParam<number>("kp"),
+    kvb: props.getModelParam<number>("kvb"),
+    kg1: props.getModelParam<number>("kg1"),
+    ex:  props.getModelParam<number>("ex"),
+    rGI: props.getModelParam<number>("rGI"),
+  };
 
   // Initial operating point at V_GK=0, V_PK=0
   let vgk = 0;
   let vpk = 0;
-  let op = computeTriodeOp(vgk, vpk, mu, kp, kvb, kg1, ex, rGI);
+  let op = computeTriodeOp(vgk, vpk, p.mu, p.kp, p.kvb, p.kg1, p.ex, p.rGI);
 
   return {
     branchIndex: -1,
@@ -238,7 +258,7 @@ export function createTriodeElement(
       vgk = vgk + limitedDvgk;
       vpk = vpkNew;
 
-      op = computeTriodeOp(vgk, vpk, mu, kp, kvb, kg1, ex, rGI);
+      op = computeTriodeOp(vgk, vpk, p.mu, p.kp, p.kvb, p.kg1, p.ex, p.rGI);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -275,6 +295,10 @@ export function createTriodeElement(
       const dvpk = Math.abs((vPn - vKn) - (vPp - vKp));
 
       return dvgk <= 0.1 && dvpk <= 0.5;
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in p) (p as Record<string, number>)[key] = value;
     },
   };
 }
@@ -388,55 +412,14 @@ function buildTriodePinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 const TRIODE_PROPERTY_DEFS: PropertyDefinition[] = [
-  {
-    key: "mu",
-    type: PropertyType.FLOAT,
-    label: "µ (amplification factor)",
-    defaultValue: 100,
-    min: 1,
-    description: "Amplification factor µ",
-  },
-  {
-    key: "kp",
-    type: PropertyType.FLOAT,
-    label: "K_P",
-    defaultValue: 600,
-    min: 1,
-    description: "Koren K_P parameter controlling plate-voltage sensitivity",
-  },
-  {
-    key: "kvb",
-    type: PropertyType.FLOAT,
-    label: "K_VB",
-    defaultValue: 300,
-    min: 0,
-    description: "Koren K_VB parameter (V²) for grid-plate interaction",
-  },
-  {
-    key: "kg1",
-    type: PropertyType.FLOAT,
-    label: "K_G1",
-    defaultValue: 1060,
-    min: 1,
-    description: "Koren K_G1 transconductance scaling factor",
-  },
-  {
-    key: "ex",
-    type: PropertyType.FLOAT,
-    label: "EX (exponent)",
-    defaultValue: 1.4,
-    min: 1,
-    description: "Koren current exponent EX",
-  },
-  {
-    key: "rGI",
-    type: PropertyType.FLOAT,
-    label: "R_GI (Ω)",
-    defaultValue: 2000,
-    min: 1,
-    description: "Grid input resistance (limits grid current when V_GK > 0)",
-  },
   LABEL_PROPERTY_DEF,
+  {
+    key: "model",
+    type: PropertyType.STRING,
+    label: "Model",
+    defaultValue: "behavioral",
+    description: "Active model selection",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -444,13 +427,8 @@ const TRIODE_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 export const TRIODE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "mu",    propertyKey: "mu",    convert: (v) => parseFloat(v) },
-  { xmlName: "kp",    propertyKey: "kp",    convert: (v) => parseFloat(v) },
-  { xmlName: "kvb",   propertyKey: "kvb",   convert: (v) => parseFloat(v) },
-  { xmlName: "kg1",   propertyKey: "kg1",   convert: (v) => parseFloat(v) },
-  { xmlName: "ex",    propertyKey: "ex",    convert: (v) => parseFloat(v) },
-  { xmlName: "rGI",   propertyKey: "rGI",   convert: (v) => parseFloat(v) },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
+  { xmlName: "model", propertyKey: "model", convert: (v) => v },
 ];
 
 // ---------------------------------------------------------------------------
@@ -473,12 +451,14 @@ export const TriodeDefinition: ComponentDefinition = {
     "Triode vacuum tube — Koren model.\n" +
     "Pins: P (plate), G (grid), K (cathode).\n" +
     "Standard 12AX7 defaults: µ=100, K_P=600, K_VB=300, K_G1=1060, EX=1.4.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createTriodeElement(pinNodes, internalNodeIds, branchIdx, props),
-    },
+      paramDefs: TRIODE_PARAM_DEFS,
+      params: TRIODE_PARAM_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

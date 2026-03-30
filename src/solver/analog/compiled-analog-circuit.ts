@@ -98,6 +98,11 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
    *  correct bridge adapter at runtime without re-scanning all elements. */
   readonly elementBridgeAdapters: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
 
+  /** Maps boundary group ID → bridge adapters for that cross-domain boundary.
+   *  Populated by compileAnalogPartition after the main element loop.
+   *  The coordinator looks up adapters by boundaryGroupId to drive/read each boundary. */
+  readonly bridgeAdaptersByGroupId: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
+
   /** Diagnostics emitted during compilation (topology issues, missing models, etc.). */
   readonly diagnostics: SolverDiagnostic[];
 
@@ -117,6 +122,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     elementResolvedPins?: Map<number, ResolvedPin[]>;
     groupToNodeId?: Map<number, number>;
     elementBridgeAdapters?: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
+    bridgeAdaptersByGroupId?: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
     diagnostics?: SolverDiagnostic[];
     timeRef?: { value: number };
   }) {
@@ -132,6 +138,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.elementResolvedPins = params.elementResolvedPins ?? new Map();
     this.groupToNodeId = params.groupToNodeId ?? new Map();
     this.elementBridgeAdapters = params.elementBridgeAdapters ?? new Map();
+    this.bridgeAdaptersByGroupId = params.bridgeAdaptersByGroupId ?? new Map();
     this.diagnostics = params.diagnostics ?? [];
     this.timeRef = params.timeRef ?? { value: 0 };
   }

@@ -145,6 +145,13 @@ export interface ConnectivityGroup {
   wires: Wire[];
   domains: Set<string>;
   bitWidth?: number;
+  /**
+   * Per-net loading mode override for boundary groups.
+   * "ideal" instructs the bridge builder to zero out loading contributions
+   * on this net. Only set by applyLoadingDecisions() on boundary groups
+   * that have an explicit per-net "ideal" override.
+   */
+  loadingMode?: "loaded" | "ideal";
 }
 
 // ---------------------------------------------------------------------------

@@ -31,6 +31,23 @@ import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { CoupledInductorPair } from "../../solver/analog/coupled-inductor.js";
 import type { CoupledInductorState } from "../../solver/analog/coupled-inductor.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: TRANSFORMER_PARAM_DEFS, defaults: TRANSFORMER_DEFAULTS } = defineModelParams({
+  primary: {
+    turnsRatio:          { default: 1.0,   description: "Secondary to primary turns ratio N (output/input)", min: 0.001 },
+    primaryInductance:   { default: 10e-3, unit: "H", description: "Primary winding self-inductance in henries", min: 1e-12 },
+    couplingCoefficient: { default: 0.99,  description: "Magnetic coupling coefficient (0 = no coupling, 1 = ideal)", min: 0, max: 1 },
+  },
+  secondary: {
+    primaryResistance:   { default: 1.0,   unit: "Ω", description: "Primary winding series resistance in ohms", min: 0 },
+    secondaryResistance: { default: 1.0,   unit: "Ω", description: "Secondary winding series resistance in ohms", min: 0 },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -179,10 +196,10 @@ export class AnalogTransformerElement implements AnalogElement {
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
 
-  private readonly _pair: CoupledInductorPair;
+  private _pair: CoupledInductorPair;
   private readonly _branch2: number;
-  private readonly _rPri: number;
-  private readonly _rSec: number;
+  private _rPri: number;
+  private _rSec: number;
   private _state: CoupledInductorState;
 
   // Pre-computed companion coefficients, updated in stampCompanion()
@@ -207,6 +224,14 @@ export class AnalogTransformerElement implements AnalogElement {
     this._branch2 = branch1 + 1;
     // turnsRatio = N_primary / N_secondary (e.g. 10 means 10:1 step-down)
     // L_secondary = L_primary / N² so that V_sec = V_pri / N for ideal coupling
+    const lSecondary = lPrimary / (turnsRatio * turnsRatio);
+    this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
+    this._rPri = rPri;
+    this._rSec = rSec;
+    this._state = this._pair.createState();
+  }
+
+  updateDerivedParams(lPrimary: number, turnsRatio: number, k: number, rPri: number, rSec: number): void {
     const lSecondary = lPrimary / (turnsRatio * turnsRatio);
     this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
     this._rPri = rPri;
@@ -357,25 +382,71 @@ export class AnalogTransformerElement implements AnalogElement {
 // analogFactory
 // ---------------------------------------------------------------------------
 
+function buildTransformerElement(
+  pinNodes: ReadonlyMap<string, number>,
+  branchIdx: number,
+  primaryInductance: number,
+  turnsRatio: number,
+  couplingCoefficient: number,
+  primaryResistance: number,
+  secondaryResistance: number,
+): AnalogElementCore {
+  const p = { primaryInductance, turnsRatio, couplingCoefficient, primaryResistance, secondaryResistance };
+  const el = new AnalogTransformerElement(
+    [pinNodes.get("P1")!, pinNodes.get("P2")!, pinNodes.get("S1")!, pinNodes.get("S2")!],
+    branchIdx,
+    p.primaryInductance,
+    p.turnsRatio,
+    p.couplingCoefficient,
+    p.primaryResistance,
+    p.secondaryResistance,
+  );
+  (el as AnalogElementCore).setParam = function(key: string, value: number): void {
+    if (key in p) {
+      (p as Record<string, number>)[key] = value;
+      el.updateDerivedParams(
+        p.primaryInductance,
+        p.turnsRatio,
+        p.couplingCoefficient,
+        p.primaryResistance,
+        p.secondaryResistance,
+      );
+    }
+  };
+  return el;
+}
+
 function createTransformerElement(
   pinNodes: ReadonlyMap<string, number>,
   _internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const lPrimary = props.getOrDefault<number>("primaryInductance", 10e-3);
-  const turnsRatio = props.getOrDefault<number>("turnsRatio", 1.0);
-  const k = props.getOrDefault<number>("couplingCoefficient", 0.99);
-  const rPri = props.getOrDefault<number>("primaryResistance", 1.0);
-  const rSec = props.getOrDefault<number>("secondaryResistance", 1.0);
-  return new AnalogTransformerElement(
-    [pinNodes.get("P1")!, pinNodes.get("P2")!, pinNodes.get("S1")!, pinNodes.get("S2")!],
+  return buildTransformerElement(
+    pinNodes,
     branchIdx,
-    lPrimary,
-    turnsRatio,
-    k,
-    rPri,
-    rSec,
+    props.getOrDefault<number>("primaryInductance", 10e-3),
+    props.getOrDefault<number>("turnsRatio", 1.0),
+    props.getOrDefault<number>("couplingCoefficient", 0.99),
+    props.getOrDefault<number>("primaryResistance", 1.0),
+    props.getOrDefault<number>("secondaryResistance", 1.0),
+  );
+}
+
+function createTransformerElementFromModelParams(
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  branchIdx: number,
+  props: PropertyBag,
+): AnalogElementCore {
+  return buildTransformerElement(
+    pinNodes,
+    branchIdx,
+    props.getModelParam<number>("primaryInductance"),
+    props.getModelParam<number>("turnsRatio"),
+    props.getModelParam<number>("couplingCoefficient"),
+    props.getModelParam<number>("primaryResistance"),
+    props.getModelParam<number>("secondaryResistance"),
   );
 }
 
@@ -491,6 +562,14 @@ export const TransformerDefinition: ComponentDefinition = {
       factory: createTransformerElement,
       branchCount: 1,
     },
+    },
+  },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createTransformerElementFromModelParams,
+      paramDefs: TRANSFORMER_PARAM_DEFS,
+      params: TRANSFORMER_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

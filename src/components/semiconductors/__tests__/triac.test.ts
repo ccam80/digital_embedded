@@ -9,8 +9,9 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { createTriacElement, TriacDefinition } from "../triac.js";
+import { createTriacElement, TriacDefinition, TRIAC_PARAM_DEFAULTS } from "../triac.js";
 import { PropertyBag } from "../../../core/properties.js";
+import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
@@ -34,9 +35,11 @@ const TRIAC_DEFAULTS = {
 // ---------------------------------------------------------------------------
 
 function makeTriac(overrides: Partial<typeof TRIAC_DEFAULTS> = {}): AnalogElement {
-  const params = { ...TRIAC_DEFAULTS, ...overrides };
+  const params = { ...TRIAC_PARAM_DEFAULTS, ...TRIAC_DEFAULTS, ...overrides };
+  const props = createTestPropertyBag();
+  props.replaceModelParams(params);
   // nodeMT1=1, nodeMT2=2, nodeG=3
-  return createTriacElement(new Map([["MT1", 1], ["MT2", 2], ["G", 3]]), [], -1, new PropertyBag(Object.entries(params)));
+  return createTriacElement(new Map([["MT1", 1], ["MT2", 2], ["G", 3]]), [], -1, props);
 }
 
 /**
@@ -172,9 +175,9 @@ describe("Triac", () => {
 
   it("definition_has_correct_fields", () => {
     expect(TriacDefinition.name).toBe("Triac");
-    expect(TriacDefinition.models?.mnaModels?.behavioral).toBeDefined();
-    expect(TriacDefinition.models?.mnaModels?.behavioral?.deviceType).toBeUndefined();
-    expect(TriacDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(TriacDefinition.modelRegistry?.["behavioral"]).toBeDefined();
+    expect(TriacDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
+    expect(TriacDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
     expect(TriacDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

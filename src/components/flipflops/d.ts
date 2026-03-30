@@ -30,6 +30,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import { makeDFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -139,8 +140,8 @@ export class DElement extends AbstractCircuitElement {
         kind: "signal",
       },
     ];
-    const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
-    if (activeModel && DDefinition.subcircuitRefs?.[activeModel]) {
+    const activeModel = this._properties.getOrDefault<string>("model", "");
+    if (activeModel && DDefinition.modelRegistry?.[activeModel]) {
       decls = [
         ...decls,
         {
@@ -259,6 +260,77 @@ const D_FF_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// CMOS_D_FF_NETLIST — master-slave CMOS D flip-flop structural netlist
+//
+// Topology: two-stage (master + slave) CMOS transmission-gate D flip-flop.
+// Ports: D, C, Q, ~Q, VDD, GND
+// Master stage: TG1 (C-controlled), INV1, INV2 (master latch)
+// Slave stage:  TG2 (~C-controlled), INV3, INV4 (slave latch)
+// Each transmission gate: one PMOS + one NMOS in parallel (pass-gate pair).
+// ---------------------------------------------------------------------------
+
+const CMOS_D_FF_NETLIST: MnaSubcircuitNetlist = {
+  ports: ["D", "C", "Q", "~Q", "VDD", "GND"],
+  params: {},
+  elements: [
+    // Master TG1: passes D when C=1 (PMOS gate=C, NMOS gate=C)
+    { typeId: "PMOS", branchCount: 0 }, // m_tg1_p
+    { typeId: "NMOS", branchCount: 0 }, // m_tg1_n
+    // Master inverter INV1 (PMOS + NMOS)
+    { typeId: "PMOS", branchCount: 0 }, // m_inv1_p
+    { typeId: "NMOS", branchCount: 0 }, // m_inv1_n
+    // Master feedback INV2 (PMOS + NMOS) — closes the master latch
+    { typeId: "PMOS", branchCount: 0 }, // m_inv2_p
+    { typeId: "NMOS", branchCount: 0 }, // m_inv2_n
+    // Slave TG2: passes master output when C=0 (PMOS gate=~C, NMOS gate=C)
+    { typeId: "PMOS", branchCount: 0 }, // s_tg2_p
+    { typeId: "NMOS", branchCount: 0 }, // s_tg2_n
+    // Slave inverter INV3 (PMOS + NMOS) — drives Q
+    { typeId: "PMOS", branchCount: 0 }, // s_inv3_p
+    { typeId: "NMOS", branchCount: 0 }, // s_inv3_n
+    // Slave feedback INV4 (PMOS + NMOS) — closes the slave latch
+    { typeId: "PMOS", branchCount: 0 }, // s_inv4_p
+    { typeId: "NMOS", branchCount: 0 }, // s_inv4_n
+    // Clock buffer INV (PMOS + NMOS) — generates ~C
+    { typeId: "PMOS", branchCount: 0 }, // clk_inv_p
+    { typeId: "NMOS", branchCount: 0 }, // clk_inv_n
+  ],
+  // Internal nets (indices >= 6):
+  //   6 = ~C (inverted clock)
+  //   7 = m_in  (master TG1 output / master latch input)
+  //   8 = m_out (master INV1 output / master latch feedback point)
+  //   9 = s_in  (slave TG2 output / slave latch input = ~Q internal)
+  internalNetCount: 4,
+  // Ports: D=0, C=1, Q=2, ~Q=3, VDD=4, GND=5
+  // Internal: ~C=6, m_in=7, m_out=8, s_in=9
+  // PMOS/NMOS pins: [D, G, S] (Drain, Gate, Source)
+  netlist: [
+    // Master TG1_p: D=VDD_side(source), G=C, S=m_in  → [VDD, C, m_in] — wait, TG passes D→m_in
+    // TG1: D pin connects to D(0), output m_in(7). PMOS: [D=0, G=C_bar=6, S=7], NMOS: [D=0, G=C=1, S=7]
+    [0, 6, 7],  // m_tg1_p: D=D(0), G=~C(6), S=m_in(7)
+    [0, 1, 7],  // m_tg1_n: D=D(0), G=C(1), S=m_in(7)
+    // Master INV1: input=m_in(7), output=m_out(8)
+    [4, 7, 8],  // m_inv1_p: D=VDD(4), G=m_in(7), S=m_out(8)
+    [8, 7, 5],  // m_inv1_n: D=m_out(8), G=m_in(7), S=GND(5)
+    // Master INV2 (feedback): input=m_out(8), output=m_in(7) — latch closure
+    [4, 8, 7],  // m_inv2_p: D=VDD(4), G=m_out(8), S=m_in(7)
+    [7, 8, 5],  // m_inv2_n: D=m_in(7), G=m_out(8), S=GND(5)
+    // Slave TG2: m_out(8)→s_in(9), passes when C=0 (PMOS gate=C, NMOS gate=~C)
+    [8, 1, 9],  // s_tg2_p: D=m_out(8), G=C(1), S=s_in(9)
+    [8, 6, 9],  // s_tg2_n: D=m_out(8), G=~C(6), S=s_in(9)
+    // Slave INV3: input=s_in(9), output=Q(2)
+    [4, 9, 2],  // s_inv3_p: D=VDD(4), G=s_in(9), S=Q(2)
+    [2, 9, 5],  // s_inv3_n: D=Q(2), G=s_in(9), S=GND(5)
+    // Slave INV4 (feedback): input=Q(2), output=s_in(9) → drives ~Q(3) too
+    [4, 2, 9],  // s_inv4_p: D=VDD(4), G=Q(2), S=s_in(9)
+    [9, 2, 5],  // s_inv4_n: D=s_in(9), G=Q(2), S=GND(5)
+    // Clock INV: input=C(1), output=~C(6)
+    [4, 1, 6],  // clk_inv_p: D=VDD(4), G=C(1), S=~C(6)
+    [6, 1, 5],  // clk_inv_n: D=~C(6), G=C(1), S=GND(5)
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // DDefinition — ComponentDefinition
 // ---------------------------------------------------------------------------
 
@@ -278,7 +350,14 @@ export const DDefinition: ComponentDefinition = {
     "D Flip-Flop — stores the D input on the rising clock edge.\n" +
     "Q is the stored value, ~Q is its complement.\n" +
     "Edge-triggered: only samples D when clock transitions from 0 to 1.",
-  subcircuitRefs: { cmos: "CmosDFlipflop" },
+  modelRegistry: {
+    cmos: {
+      kind: "netlist",
+      netlist: CMOS_D_FF_NETLIST,
+      paramDefs: [],
+      params: {},
+    },
+  },
   models: {
     digital: {
       executeFn: executeD,

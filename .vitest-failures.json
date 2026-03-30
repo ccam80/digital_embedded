@@ -1,10 +1,779 @@
 {
   "summary": {
-    "passed": 105,
-    "failed": 0,
+    "passed": 9745,
+    "failed": 159,
     "skipped": 0,
-    "totalFiles": 4,
-    "durationSeconds": 0.6
+    "totalFiles": 333,
+    "durationSeconds": 14.6
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "TestElement is not defined",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\compile\\__tests__\\compile.test.ts",
+          "test": "compiles pure digital circuit correctly",
+          "line": 290,
+          "column": 19
+        },
+        {
+          "file": "src\\compile\\__tests__\\compile.test.ts",
+          "test": "populates wireSignalMap for digital circuit with wires",
+          "line": 312,
+          "column": 18
+        },
+        {
+          "file": "src\\compile\\__tests__\\compile.test.ts",
+          "test": "populates labelSignalMap for labeled In/Out components",
+          "line": 345,
+          "column": 18
+        }
+      ]
+    },
+    {
+      "message": "expected [] to have a length of 1 but got +0",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\compile\\__tests__\\pin-loading-menu.test.ts",
+          "test": "cross-domain mode produces exactly one bridge for the DABridge element",
+          "line": 267,
+          "column": 28
+        }
+      ]
+    },
+    {
+      "message": "StubElement is not defined",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\headless\\__tests__\\loader.test.ts",
+          "test": "loadsJsonRoundTrip",
+          "line": 137,
+          "column": 17
+        }
+      ]
+    },
+    {
+      "message": "expected 0 to be greater than 4.9",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\headless\\__tests__\\port-analog-mixed.test.ts",
+          "test": "Port label appears in readAllSignals() for a pure analog circuit",
+          "line": 207,
+          "column": 32
+        },
+        {
+          "file": "src\\headless\\__tests__\\port-analog-mixed.test.ts",
+          "test": "readOutput() via Port label works in a pure analog circuit",
+          "line": 238,
+          "column": 21
+        }
+      ]
+    },
+    {
+      "message": "expected 2 to be 4 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
+          "test": "parsed .MODEL card applied via applySpiceImportResult: circuit compiles and DC converges",
+          "line": 192,
+          "column": 37
+        }
+      ]
+    },
+    {
+      "message": "expected false to be true // Object.is equality",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
+          "test": "applySpiceImportResult with large IS override changes DC operating point vs default",
+          "line": 139,
+          "column": 24
+        },
+        {
+          "file": "src\\solver\\__tests__\\coordinator-capability.test.ts",
+          "test": "snapshotSignals contains non-zero voltages after DC op",
+          "line": 300,
+          "column": 24
+        },
+        {
+          "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
+          "test": "returns finite number for element index 0",
+          "line": 213,
+          "column": 38
+        }
+      ]
+    },
+    {
+      "message": "AbstractCircuitElement is not defined",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\io\\__tests__\\dig-loader.test.ts",
+          "test": "inverterConfigApplied",
+          "line": 177,
+          "column": 33
+        }
+      ]
+    },
+    {
+      "message": "el.getPins is not a function or its return value is not iterable",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\core\\circuit.ts",
+          "test": "missingAttributeUsesDefault",
+          "line": 305,
+          "column": 28
+        }
+      ]
+    },
+    {
+      "message": "this._properties.has is not a function",
+      "count": 10,
+      "locations": [
+        {
+          "file": "src\\core\\element.ts",
+          "test": "resolvesInitCode",
+          "line": 196,
+          "column": 26
+        },
+        {
+          "file": "src\\core\\element.ts",
+          "test": "modifiesComponentAttributes",
+          "line": 196,
+          "column": 26
+        },
+        {
+          "file": "src\\core\\element.ts",
+          "test": "generatesCircuitStructure",
+          "line": 196,
+          "column": 26
+        },
+        {
+          "file": "src\\core\\element.ts",
+          "test": "disabledInitCodeIgnored",
+          "line": 196,
+          "column": 26
+        },
+        {
+          "file": "src\\core\\element.ts",
+          "test": "cachesResults",
+          "line": 196,
+          "column": 26
+        },
+        {
+          "file": "src\\core\\element.ts",
+          "test": "resolveBasic",
+          "line": 196,
+          "column": 26
+        },
+        {
+          "file": "src\\core\\element.ts",
+          "test": "addComponent",
+          "line": 196,
+          "column": 26
+        },
+        {
+          "file": "src\\core\\element.ts",
+          "test": "cacheHit",
+          "line": 196,
+          "column": 26
+        },
+        {
+          "file": "src\\core\\element.ts",
+          "test": "cacheMiss",
+          "line": 196,
+          "column": 26
+        },
+        {
+          "file": "src\\core\\element.ts",
+          "test": "perElementScript",
+          "line": 196,
+          "column": 26
+        }
+      ]
+    },
+    {
+      "message": "circuit.elements.find(...).getProperties(...).getOrDefault is not a function",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\io\\__tests__\\resolve-generics.test.ts",
+          "test": "templateUnmodified",
+          "line": 516,
+          "column": 8
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be close to 1e-14, received difference is NaN, but expected 0.005",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+          "test": "NpnBJT has model params IS and BF",
+          "line": 237,
+          "column": 29
+        },
+        {
+          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+          "test": "each NpnBJT has model params IS and BF",
+          "line": 543,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be close to 2e-14, received difference is NaN, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+          "test": "maps Q with PNP model to PnpBJT with pins B, C, E and IS/BF overrides",
+          "line": 259,
+          "column": 29
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be close to 0.00001, received difference is NaN, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+          "test": "NMOS model params contain W, L, VTO",
+          "line": 299,
+          "column": 28
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be close to 0.000005, received difference is NaN, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+          "test": "maps M with PMOS model to PMOS with pins G, D, S and W/L/VTO overrides",
+          "line": 322,
+          "column": 28
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be close to 2, received difference is NaN, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+          "test": "maps J with PJFET model to PJFET with pins G, S, D and VTO override",
+          "line": 377,
+          "column": 30
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be close to 0.00002, received difference is NaN, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+          "test": "element params merged with model params in overrides",
+          "line": 489,
+          "column": 28
+        }
+      ]
+    },
+    {
+      "message": "expected 0 to be greater than 0",
+      "count": 4,
+      "locations": [
+        {
+          "file": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
+          "test": "voltage source pins span a non-zero potential after DC op",
+          "line": 186,
+          "column": 25
+        },
+        {
+          "file": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
+          "test": "voltageRange max is positive after tracking a 5V DC circuit",
+          "line": 266,
+          "column": 24
+        },
+        {
+          "file": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
+          "test": "voltageRange spans a non-zero range for circuit with voltage differences",
+          "line": 282,
+          "column": 37
+        },
+        {
+          "file": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
+          "test": "voltageRange resets to { min: 0, max: 0 } after coordinator.reset()",
+          "line": 289,
+          "column": 43
+        }
+      ]
+    },
+    {
+      "message": "PropertyBag: model param \"BV\" not found",
+      "count": 7,
+      "locations": [
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "forward_bias_stamp",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "reverse_bias_stamp",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "voltage_limiting_applied",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "junction_capacitance_when_cjo_nonzero",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "isNonlinear_true",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "isReactive_false_when_cjo_zero",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "diode_resistor_dc_op",
+          "line": 121,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "PropertyBag: model param \"vOn\" not found",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "blocks_without_gate",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "triggers_with_gate_current",
+          "line": 121,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be defined",
+      "count": 5,
+      "locations": [
+        {
+          "file": "src\\components\\sensors\\__tests__\\ldr.test.ts",
+          "test": "LDRDefinition has engine type analog",
+          "line": 167,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sensors\\__tests__\\ntc-thermistor.test.ts",
+          "test": "NTCThermistorDefinition has correct engine type",
+          "line": 222,
+          "column": 69
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\current-source.test.ts",
+          "test": "definition_engine_type_analog",
+          "line": 93,
+          "column": 67
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\dc-voltage-source.test.ts",
+          "test": "definition_engine_type_analog",
+          "line": 106,
+          "column": 69
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\variable-rail.test.ts",
+          "test": "definition_engine_type_analog",
+          "line": 133,
+          "column": 66
+        }
+      ]
+    },
+    {
+      "message": "PropertyBag: model param \"rDark\" not found",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "analogFactory creates an LDRElement",
+          "line": 121,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "PropertyBag: model param \"r0\" not found",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "analogFactory creates an NTCThermistorElement",
+          "line": 121,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'behavioral')",
+      "count": 15,
+      "locations": [
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+          "test": "sine_at_t_zero",
+          "line": 74,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+          "test": "sine_at_quarter_period",
+          "line": 74,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+          "test": "square_at_half_period",
+          "line": 74,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+          "test": "triangle_linearity",
+          "line": 74,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+          "test": "dc_offset_applied",
+          "line": 74,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+          "test": "square_wave_breakpoints",
+          "line": 74,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+          "test": "set_scale_applied",
+          "line": 74,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+          "test": "rc_lowpass",
+          "line": 238,
+          "column": 64
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+          "test": "custom_sine",
+          "line": 307,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+          "test": "ramp",
+          "line": 307,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+          "test": "invalid_expression_emits_diagnostic",
+          "line": 307,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+          "test": "expression_parsed_once",
+          "line": 307,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\current-source.test.ts",
+          "test": "default_current_from_analog_factory",
+          "line": 102,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\dc-voltage-source.test.ts",
+          "test": "default_voltage_from_analog_factory",
+          "line": 111,
+          "column": 61
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\variable-rail.test.ts",
+          "test": "analogFactory_creates_element",
+          "line": 140,
+          "column": 58
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be 1 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\components\\sources\\__tests__\\dc-voltage-source.test.ts",
+          "test": "definition_has_requires_branch_row",
+          "line": 102,
+          "column": 82
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\variable-rail.test.ts",
+          "test": "definition_has_requires_branch_row",
+          "line": 129,
+          "column": 79
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be close to 2.5, received difference is 2.5, but expected 0.005",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
+          "test": "runner_integration",
+          "line": 605,
+          "column": 18
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+          "test": "resistor_divider_dc_op_via_compiler",
+          "line": 199,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 3 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+          "test": "compiles_resistor_divider",
+          "line": 285,
+          "column": 38
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'pinNodeIds')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+          "test": "assigns_ground_node_zero",
+          "line": 303,
+          "column": 22
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 2 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+          "test": "detects_voltage_source_loop",
+          "line": 390,
+          "column": 38
+        }
+      ]
+    },
+    {
+      "message": "expected \"spy\" to be called once, but got 0 times",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+          "test": "calls_analog_factory_with_correct_args",
+          "line": 455,
+          "column": 24
+        }
+      ]
+    },
+    {
+      "message": "expected 0 to be greater than 0.55",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+          "test": "diode_circuit_dc_op_via_compiler",
+          "line": 249,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be close to 5, received difference is 5, but expected 0.05",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+          "test": "nmos_common_source_dc_op",
+          "line": 674,
+          "column": 25
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+          "test": "nmos_triode_region_dc_op",
+          "line": 750,
+          "column": 25
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+          "test": "pmos_common_source_dc_op",
+          "line": 829,
+          "column": 25
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 1 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
+          "test": "compilation produces correct topology",
+          "line": 419,
+          "column": 34
+        }
+      ]
+    },
+    {
+      "message": "expected 0 to be greater than 0.01",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
+          "test": "transient stepping produces time-varying output",
+          "line": 496,
+          "column": 27
+        }
+      ]
+    },
+    {
+      "message": "expected 0 to be greater than 4.5",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
+          "test": "full pipeline: compile → DC OP → transient → analytical match",
+          "line": 592,
+          "column": 23
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'digital')",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\compile\\extract-connectivity.ts",
+          "test": "import .MODEL card → store in metadata.models → compile applies IS override",
+          "line": 86,
+          "column": 43
+        },
+        {
+          "file": "src\\compile\\extract-connectivity.ts",
+          "test": "unmodified params stay at NPN defaults when IS is overridden",
+          "line": 86,
+          "column": 43
+        },
+        {
+          "file": "src\\compile\\extract-connectivity.ts",
+          "test": "multiline .MODEL card with continuation is parsed and applied correctly",
+          "line": 86,
+          "column": 43
+        }
+      ]
+    },
+    {
+      "message": "expected [ { code: 'orphan-node', …(8) }, …(1) ] to have a length of +0 but got 2",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+          "test": "override_merge: IS overridden to 1e-14, other params stay at NPN defaults",
+          "line": 195,
+          "column": 20
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+          "test": "empty_overrides: {} leaves _modelParams equal to raw defaults",
+          "line": 209,
+          "column": 20
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+          "test": "no_overrides_property: _modelParams equals raw defaults",
+          "line": 220,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "message": "expected [ { code: 'orphan-node', …(8) } ] to have a length of +0 but got 1",
+      "count": 4,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+          "test": "schottky_lossy_diff_regression: override IS to DIODE_DEFAULTS.IS preserves that value",
+          "line": 313,
+          "column": 20
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+          "test": "zener_defaults: no overrides resolves ZENER_DEFAULTS, not DIODE_DEFAULTS",
+          "line": 398,
+          "column": 20
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+          "test": "schottky_base_defaults: no overrides resolves SCHOTTKY_DEFAULTS.IS, not DIODE_DEFAULTS.IS",
+          "line": 485,
+          "column": 20
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+          "test": "tunnel_diode_migration: _modelParams contains IP, VP, IV, VV from TUNNEL_DIODE_DEFAULTS",
+          "line": 569,
+          "column": 20
+        }
+      ]
+    }
+  ]
 }

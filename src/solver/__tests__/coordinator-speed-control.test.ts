@@ -7,41 +7,21 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { DefaultSimulationCoordinator } from '../coordinator.js';
 import { compileUnified } from '../../compile/compile.js';
 import { Circuit } from '../../core/circuit.js';
-import { AbstractCircuitElement } from '../../core/element.js';
 import { PropertyBag, PropertyType } from '../../core/properties.js';
 import { PinDirection } from '../../core/pin.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
-import type { Pin, Rotation } from '../../core/pin.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
-import type { ComponentDefinition, ComponentLayout } from '../../core/registry.js';
+import type { Pin } from '../../core/pin.js';
+import type { ComponentDefinition } from '../../core/registry.js';
 import type { SerializedElement } from '../../core/element.js';
-import type { AnalogElement } from '../analog/element.js';
-import type { SparseSolver } from '../analog/sparse-solver.js';
-
-class MockElement extends AbstractCircuitElement {
-  private readonly _pins: Pin[];
-  constructor(typeId: string, instanceId: string, position: { x: number; y: number }, pins: Pin[], props: PropertyBag) {
-    super(typeId, instanceId, position, 0 as Rotation, false, props);
-    this._pins = pins;
-  }
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 4, height: 4 }; }
-}
-
-function makePin(label: string, direction: PinDirection, localX: number, localY: number): Pin {
-  return { label, direction, position: { x: localX, y: localY }, bitWidth: 1, isNegated: false, isClock: false, kind: "signal" };
-}
+import { TestElement, makePin } from '../../test-fixtures/test-element.js';
+import { noopExecFn, executePassThrough } from '../../test-fixtures/execute-stubs.js';
 
 function makePropBag(entries: Record<string, string | number | boolean> = {}): PropertyBag {
   const bag = new PropertyBag();
   for (const [k, v] of Object.entries(entries)) bag.set(k, v);
   return bag;
 }
-
-const executePassThrough = (_i: number, _s: Uint32Array, _h: Uint32Array, _l: ComponentLayout): void => {};
-const executeNoop = (_i: number, _s: Uint32Array, _h: Uint32Array, _l: ComponentLayout): void => {};
 
 function makeAnalogElementObj(typeId: string, instanceId: string, pins: Array<{ x: number; y: number; label?: string }>) {
   const resolvedPins: Pin[] = pins.map((p) => ({
@@ -83,25 +63,25 @@ function buildDigitalRegistry(): ComponentRegistry {
   const registry = new ComponentRegistry();
   registry.register({
     name: 'In', typeId: -1,
-    factory: (props) => new MockElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [makePin('out', PinDirection.OUTPUT, 2, 0)], props),
+    factory: (props) => new TestElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [makePin('out', PinDirection.OUTPUT, 2, 0)], props),
     pinLayout: [], propertyDefs: [{ key: 'label', label: 'Label', type: PropertyType.STRING, defaultValue: '', description: 'Label' }],
     attributeMap: [], category: 'IO' as any, helpText: 'In',
     models: { digital: { executeFn: executePassThrough } },
   });
   registry.register({
     name: 'Out', typeId: -1,
-    factory: (props) => new MockElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [makePin('in', PinDirection.INPUT, 0, 0)], props),
+    factory: (props) => new TestElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [makePin('in', PinDirection.INPUT, 0, 0)], props),
     pinLayout: [], propertyDefs: [{ key: 'label', label: 'Label', type: PropertyType.STRING, defaultValue: '', description: 'Label' }],
     attributeMap: [], category: 'IO' as any, helpText: 'Out',
-    models: { digital: { executeFn: executeNoop } },
+    models: { digital: { executeFn: noopExecFn } },
   });
   return registry;
 }
 
 function buildDigitalCircuit(registry: ComponentRegistry): Circuit {
   const circuit = new Circuit();
-  const inA = new MockElement('In', 'inA', { x: 0, y: 0 }, [makePin('out', PinDirection.OUTPUT, 2, 0)], makePropBag({ label: 'A' }));
-  const outY = new MockElement('Out', 'outY', { x: 4, y: 0 }, [makePin('in', PinDirection.INPUT, 0, 0)], makePropBag({ label: 'Y' }));
+  const inA = new TestElement('In', 'inA', { x: 0, y: 0 }, [makePin('out', PinDirection.OUTPUT, 2, 0)], makePropBag({ label: 'A' }));
+  const outY = new TestElement('Out', 'outY', { x: 4, y: 0 }, [makePin('in', PinDirection.INPUT, 0, 0)], makePropBag({ label: 'Y' }));
   circuit.elements.push(inA, outY);
   circuit.wires.push({ start: { x: 2, y: 0 }, end: { x: 4, y: 0 } } as any);
   void registry;

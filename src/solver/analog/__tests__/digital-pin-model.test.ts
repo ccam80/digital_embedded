@@ -1,14 +1,20 @@
 /**
  * Tests for DigitalOutputPinModel and DigitalInputPinModel.
  *
- * Verifies:
- *  - Output pin stamps Norton equivalent (conductance + RHS current) in normal mode
- *  - Output pin stamps only 1/rHiZ conductance in Hi-Z mode
- *  - Switching between drive and Hi-Z changes stamp output
- *  - Companion model stamps correct capacitor conductance
- *  - Input pin stamps 1/rIn conductance
- *  - Threshold detection returns true/false/undefined correctly
- *  - Input companion model stamps correct capacitor conductance
+ * Task 1.1 — DigitalOutputPinModel (ideal voltage source):
+ *  - drive mode stamps branch equation
+ *  - hi-z mode stamps I=0
+ *  - setLogicLevel toggles target voltage
+ *  - loaded mode stamps rOut conductance
+ *  - unloaded mode does not stamp rOut
+ *  - setParam("rOut", 50) updates conductance on next stamp
+ *  - setParam("vOH", 5.0) updates target voltage
+ *
+ * Task 1.2 — DigitalInputPinModel (sense-only + inline loading):
+ *  - loaded input stamps rIn conductance
+ *  - unloaded input stamps nothing
+ *  - readLogicLevel thresholds correctly
+ *  - setParam("rIn", 1e6) takes effect on next stamp
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
@@ -82,185 +88,158 @@ const CMOS_3V3: ResolvedPinElectrical = {
 };
 
 // ---------------------------------------------------------------------------
-// DigitalOutputPinModel tests
+// DigitalOutputPinModel tests (Task 1.1)
 // ---------------------------------------------------------------------------
 
-describe("OutputPin", () => {
-  let solver: MockSolver;
-  let pin: DigitalOutputPinModel;
+describe("DigitalOutputPinModel", () => {
+  // NODE = 1 → nodeIdx = 0 in the solver (0-based)
+  // BRANCH = 4 → branchIdx = 4 in the augmented matrix (totalNodeCount + offset)
   const NODE = 1;
+  const BRANCH = 4;
+  const nodeIdx = NODE - 1; // 0
+  const branchRow = BRANCH; // 4
 
-  beforeEach(() => {
-    solver = new MockSolver();
-    pin = new DigitalOutputPinModel(CMOS_3V3);
-    pin.init(NODE, -1);
-  });
-
-  it("stamps_norton_equivalent", () => {
+  it("drive mode stamps branch equation", () => {
+    const pin = new DigitalOutputPinModel(CMOS_3V3, false);
+    pin.init(NODE, BRANCH);
     pin.setLogicLevel(true);
+    const solver = new MockSolver();
     pin.stamp(solver as any);
 
-    // Conductance 1/rOut at (node-1, node-1) — MNA node IDs are 1-based
-    const gOut = 1 / CMOS_3V3.rOut; // 1/50 = 0.02
-    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(gOut, 10);
-
-    // RHS current V_out/rOut = 3.3/50
-    const expectedCurrent = CMOS_3V3.vOH / CMOS_3V3.rOut;
-    expect(solver.sumRhs(NODE - 1)).toBeCloseTo(expectedCurrent, 10);
+    // branch eq: V_node coefficient → A[branchRow][nodeIdx] === 1
+    expect(solver.sumStamp(branchRow, nodeIdx)).toBe(1);
+    // branch eq RHS: z[branchRow] === vOH
+    expect(solver.sumRhs(branchRow)).toBe(CMOS_3V3.vOH);
   });
 
-  it("stamps_hiz_resistance", () => {
+  it("hi-z mode stamps I=0", () => {
+    const pin = new DigitalOutputPinModel(CMOS_3V3, false);
+    pin.init(NODE, BRANCH);
     pin.setHighZ(true);
+    const solver = new MockSolver();
     pin.stamp(solver as any);
 
-    // Only 1/rHiZ conductance — no current source
-    const gHiZ = 1 / CMOS_3V3.rHiZ;
-    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(gHiZ, 15);
-    expect(solver.rhs.length).toBe(0);
+    // branch eq: I=0 → A[branchRow][branchRow] === 1
+    expect(solver.sumStamp(branchRow, branchRow)).toBe(1);
+    // branch eq RHS: z[branchRow] === 0
+    expect(solver.sumRhs(branchRow)).toBe(0);
   });
 
-  it("switches_between_drive_and_hiz", () => {
-    // Drive mode: RHS present
-    pin.setLogicLevel(false);
-    pin.setHighZ(false);
-    pin.stamp(solver as any);
-    expect(solver.rhs.length).toBeGreaterThan(0);
-    const driveG = solver.sumStamp(NODE - 1, NODE - 1);
+  it("setLogicLevel toggles target voltage", () => {
+    const pin = new DigitalOutputPinModel(CMOS_3V3, false);
+    pin.init(NODE, BRANCH);
 
-    solver.reset();
-
-    // Hi-Z mode: no RHS, different conductance
-    pin.setHighZ(true);
-    pin.stamp(solver as any);
-    expect(solver.rhs.length).toBe(0);
-    const hizG = solver.sumStamp(NODE - 1, NODE - 1);
-
-    expect(driveG).not.toBeCloseTo(hizG, 6);
-
-    solver.reset();
-
-    // Back to drive mode
-    pin.setHighZ(false);
-    pin.stamp(solver as any);
-    expect(solver.rhs.length).toBeGreaterThan(0);
-    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(driveG, 10);
-  });
-
-  it("companion_stamps_capacitance", () => {
-    const dt = 1e-6;
-    pin.stampCompanion(solver as any, dt, "trapezoidal");
-
-    // Trapezoidal: geq = 2*C/dt
-    const C = CMOS_3V3.cOut;
-    const geqExpected = (2 * C) / dt;
-    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(geqExpected, 20);
-  });
-
-  it("nodeId_reflects_init", () => {
-    expect(pin.nodeId).toBe(NODE);
-  });
-
-  it("currentVoltage_reflects_logic_level", () => {
     pin.setLogicLevel(true);
-    expect(pin.currentVoltage).toBe(CMOS_3V3.vOH);
+    const solverHigh = new MockSolver();
+    pin.stamp(solverHigh as any);
+    expect(solverHigh.sumRhs(branchRow)).toBe(CMOS_3V3.vOH);
 
     pin.setLogicLevel(false);
-    expect(pin.currentVoltage).toBe(CMOS_3V3.vOL);
+    const solverLow = new MockSolver();
+    pin.stamp(solverLow as any);
+    expect(solverLow.sumRhs(branchRow)).toBe(CMOS_3V3.vOL);
   });
 
-  it("isHiZ_reflects_state", () => {
-    expect(pin.isHiZ).toBe(false);
-    pin.setHighZ(true);
-    expect(pin.isHiZ).toBe(true);
-    pin.setHighZ(false);
-    expect(pin.isHiZ).toBe(false);
+  it("loaded mode stamps rOut conductance", () => {
+    const pin = new DigitalOutputPinModel(CMOS_3V3, true);
+    pin.init(NODE, BRANCH);
+    pin.setLogicLevel(false);
+    const solver = new MockSolver();
+    pin.stamp(solver as any);
+
+    // A[nodeIdx][nodeIdx] must include 1/rOut
+    expect(solver.sumStamp(nodeIdx, nodeIdx)).toBeCloseTo(
+      1 / CMOS_3V3.rOut,
+      10,
+    );
+  });
+
+  it("unloaded mode does not stamp rOut", () => {
+    const pin = new DigitalOutputPinModel(CMOS_3V3, false);
+    pin.init(NODE, BRANCH);
+    pin.setLogicLevel(false);
+    const solver = new MockSolver();
+    pin.stamp(solver as any);
+
+    // A[nodeIdx][nodeIdx] must NOT include 1/rOut — sum should be 0
+    expect(solver.sumStamp(nodeIdx, nodeIdx)).toBe(0);
+  });
+
+  it("setParam(rOut, 50) updates conductance on next stamp", () => {
+    const pin = new DigitalOutputPinModel(CMOS_3V3, true);
+    pin.init(NODE, BRANCH);
+    pin.setLogicLevel(false);
+
+    pin.setParam("rOut", 100);
+    const solver = new MockSolver();
+    pin.stamp(solver as any);
+
+    expect(solver.sumStamp(nodeIdx, nodeIdx)).toBeCloseTo(1 / 100, 10);
+  });
+
+  it("setParam(vOH, 5.0) updates target voltage", () => {
+    const pin = new DigitalOutputPinModel(CMOS_3V3, false);
+    pin.init(NODE, BRANCH);
+    pin.setLogicLevel(true);
+    pin.setParam("vOH", 5.0);
+
+    const solver = new MockSolver();
+    pin.stamp(solver as any);
+
+    expect(solver.sumRhs(branchRow)).toBe(5.0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// DigitalInputPinModel tests
+// DigitalInputPinModel tests (Task 1.2)
 // ---------------------------------------------------------------------------
 
-describe("InputPin", () => {
-  let solver: MockSolver;
-  let pin: DigitalInputPinModel;
+describe("DigitalInputPinModel", () => {
   const NODE = 2;
+  const nodeIdx = NODE - 1; // 1
 
-  beforeEach(() => {
-    solver = new MockSolver();
-    pin = new DigitalInputPinModel(CMOS_3V3);
+  it("loaded input stamps rIn conductance", () => {
+    const pin = new DigitalInputPinModel(CMOS_3V3, true);
     pin.init(NODE, 0);
-  });
-
-  it("stamps_input_resistance", () => {
+    const solver = new MockSolver();
     pin.stamp(solver as any);
 
-    const gIn = 1 / CMOS_3V3.rIn; // 1e-7
-    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(gIn, 15);
+    expect(solver.sumStamp(nodeIdx, nodeIdx)).toBeCloseTo(
+      1 / CMOS_3V3.rIn,
+      15,
+    );
   });
 
-  it("threshold_detection_high", () => {
-    // 3.0V > vIH (2.0V) → true
-    expect(pin.readLogicLevel(3.0)).toBe(true);
+  it("unloaded input stamps nothing", () => {
+    const pin = new DigitalInputPinModel(CMOS_3V3, false);
+    pin.init(NODE, 0);
+    const solver = new MockSolver();
+    pin.stamp(solver as any);
+
+    expect(solver.sumStamp(nodeIdx, nodeIdx)).toBe(0);
+    expect(solver.stamps.length).toBe(0);
   });
 
-  it("threshold_detection_low", () => {
-    // 0.5V < vIL (0.8V) → false
-    expect(pin.readLogicLevel(0.5)).toBe(false);
+  it("readLogicLevel thresholds correctly", () => {
+    const pin = new DigitalInputPinModel(CMOS_3V3, false);
+    pin.init(NODE, 0);
+
+    // voltage > vIH → true
+    expect(pin.readLogicLevel(CMOS_3V3.vIH + 0.1)).toBe(true);
+    // voltage < vIL → false
+    expect(pin.readLogicLevel(CMOS_3V3.vIL - 0.1)).toBe(false);
+    // voltage between vIL and vIH → undefined
+    expect(pin.readLogicLevel((CMOS_3V3.vIL + CMOS_3V3.vIH) / 2)).toBeUndefined();
   });
 
-  it("threshold_detection_indeterminate", () => {
-    // 1.5V is between vIL (0.8V) and vIH (2.0V) → undefined
-    expect(pin.readLogicLevel(1.5)).toBeUndefined();
-  });
+  it("setParam(rIn, 1e6) takes effect on next stamp", () => {
+    const pin = new DigitalInputPinModel(CMOS_3V3, true);
+    pin.init(NODE, 0);
+    pin.setParam("rIn", 1e6);
 
-  it("threshold_boundary_exactly_at_vIH", () => {
-    // voltage exactly at vIH is NOT strictly greater — indeterminate
-    expect(pin.readLogicLevel(CMOS_3V3.vIH)).toBeUndefined();
-  });
+    const solver = new MockSolver();
+    pin.stamp(solver as any);
 
-  it("threshold_boundary_just_above_vIH", () => {
-    expect(pin.readLogicLevel(CMOS_3V3.vIH + 1e-9)).toBe(true);
-  });
-
-  it("threshold_boundary_exactly_at_vIL", () => {
-    // voltage exactly at vIL is NOT strictly less — indeterminate
-    expect(pin.readLogicLevel(CMOS_3V3.vIL)).toBeUndefined();
-  });
-
-  it("threshold_boundary_just_below_vIL", () => {
-    expect(pin.readLogicLevel(CMOS_3V3.vIL - 1e-9)).toBe(false);
-  });
-
-  it("companion_stamps_capacitance", () => {
-    const dt = 1e-6;
-    pin.stampCompanion(solver as any, dt, "trapezoidal");
-
-    // Trapezoidal: geq = 2*C/dt
-    const C = CMOS_3V3.cIn;
-    const geqExpected = (2 * C) / dt;
-    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(geqExpected, 20);
-  });
-
-  it("companion_bdf1_stamps_correct_conductance", () => {
-    const dt = 1e-9;
-    pin.stampCompanion(solver as any, dt, "bdf1");
-
-    const C = CMOS_3V3.cIn;
-    const geqExpected = C / dt; // BDF-1: C/h
-    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(geqExpected, 10);
-  });
-
-  it("companion_bdf2_stamps_correct_conductance", () => {
-    const dt = 1e-9;
-    pin.stampCompanion(solver as any, dt, "bdf2");
-
-    const C = CMOS_3V3.cIn;
-    const geqExpected = (3 * C) / (2 * dt); // BDF-2: 3C/2h
-    expect(solver.sumStamp(NODE - 1, NODE - 1)).toBeCloseTo(geqExpected, 10);
-  });
-
-  it("nodeId_reflects_init", () => {
-    expect(pin.nodeId).toBe(NODE);
+    expect(solver.sumStamp(nodeIdx, nodeIdx)).toBeCloseTo(1 / 1e6, 15);
   });
 });

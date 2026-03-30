@@ -27,7 +27,6 @@ import { resolve, join } from 'path';
 import { createDefaultRegistry } from '../../src/components/register-all.js';
 import { DefaultSimulatorFacade } from '../../src/headless/default-facade.js';
 import type { ComponentRegistry } from '../../src/core/registry.js';
-import { availableModels } from '../../src/core/registry.js';
 import type { Circuit } from '../../src/core/circuit.js';
 import type { CircuitSpec, PatchOp } from '../../src/headless/netlist-types.js';
 import { extractEmbeddedTestData } from '../../src/headless/test-runner.js';
@@ -216,32 +215,28 @@ describe('circuit_describe', () => {
     expect(pinLabels).toContain('EOC');
   });
 
-  it('returns named MNA models for And gate via availableModels', () => {
-    // And gate has: digital model, behavioral mnaModel, and cmos subcircuitRef
+  it('returns modelRegistry keys for And gate', () => {
     const def = facade.describeComponent('And');
     expect(def).toBeDefined();
 
-    const models = availableModels(def!);
+    const registryKeys = Object.keys(def!.modelRegistry ?? {});
 
-    expect(models).toContain('digital');
-    expect(models).toContain('behavioral');
-    expect(models).toContain('cmos');
-    expect(models.length).toBe(3);
+    expect(registryKeys).toContain('cmos');
   });
 
-  it('returns subcircuitRefs on And gate definition', () => {
+  it('returns cmos netlist entry in modelRegistry on And gate definition', () => {
     const def = facade.describeComponent('And');
     expect(def).toBeDefined();
-    expect(def!.subcircuitRefs).toBeDefined();
-    expect(def!.subcircuitRefs!['cmos']).toBe('CmosAnd2');
+    expect(def!.modelRegistry).toBeDefined();
+    const cmosEntry = def!.modelRegistry!['cmos'];
+    expect(cmosEntry).toBeDefined();
+    expect(cmosEntry!.kind).toBe('netlist');
   });
 
-  it('returns mnaModels.behavioral on And gate definition', () => {
+  it('returns digital model on And gate definition', () => {
     const def = facade.describeComponent('And');
     expect(def).toBeDefined();
-    expect(def!.models.mnaModels).toBeDefined();
-    expect(def!.models.mnaModels!['behavioral']).toBeDefined();
-    expect(typeof def!.models.mnaModels!['behavioral']!.factory).toBe('function');
+    expect(def!.models.digital).toBeDefined();
   });
 
   it('returns defaultModel "digital" for And gate', () => {

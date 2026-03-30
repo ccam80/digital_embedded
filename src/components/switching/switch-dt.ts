@@ -420,5 +420,13 @@ export const SwitchDTDefinition: ComponentDefinition = {
     },
     },
   },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createSwitchDTAnalogElement,
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

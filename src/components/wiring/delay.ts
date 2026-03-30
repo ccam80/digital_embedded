@@ -226,4 +226,5 @@ export const DelayDefinition: ComponentDefinition = {
       outputSchema: ["out"],
     },
   },
+  modelRegistry: {},
 };

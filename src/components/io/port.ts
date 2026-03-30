@@ -194,4 +194,5 @@ export const PortDefinition: ComponentDefinition = {
     "Bidirectional pin that connects internal circuit nodes to external parent circuit nets.\n" +
     "Neutral infrastructure: no simulation model. Domain is inferred from connected components.",
   models: {},
+  modelRegistry: {},
 };

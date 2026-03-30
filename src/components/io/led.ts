@@ -309,5 +309,13 @@ export const LedDefinition: ComponentDefinition = {
       behavioral: { factory: createLedAnalogElement },
     },
   },
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: createLedAnalogElement,
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

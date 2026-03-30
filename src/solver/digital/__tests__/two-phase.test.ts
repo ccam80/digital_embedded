@@ -17,42 +17,18 @@ import { BitVector } from "@/core/signal";
 import { ComponentRegistry } from "@/core/registry";
 import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
-import { AbstractCircuitElement } from "@/core/element";
 import type { Pin, PinDeclaration } from "@/core/pin";
-import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from "@/core/pin";
-import type { RenderContext, Rect } from "@/core/renderer-interface";
+import { PinDirection } from "@/core/pin";
+import type { } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
+import { createTestElementFromDecls } from '@/test-fixtures/test-element.js';
 
 // ---------------------------------------------------------------------------
 // Minimal test CircuitElement implementation
 // ---------------------------------------------------------------------------
 
-class TestElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
 
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pinDecls: PinDeclaration[],
-    props?: PropertyBag,
-  ) {
-    super(typeId, instanceId, position, 0, false, props ?? new PropertyBag());
-    this._pins = resolvePins(
-      pinDecls,
-      position,
-      0,
-      createInverterConfig([]),
-      createClockConfig([]),
-    );
-  }
 
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 2, height: 2 };
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Pin declarations
@@ -122,7 +98,7 @@ function makeDef(
   return {
     name,
     typeId: -1,
-    factory: (props) => new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pins, props),
+    factory: (props) => createTestElementFromDecls(name, crypto.randomUUID(), pins, props),
     pinLayout: pins,
     propertyDefs: [],
     attributeMap: [],

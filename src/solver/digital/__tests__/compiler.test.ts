@@ -15,50 +15,22 @@ import { Circuit, Wire } from "@/core/circuit";
 import { ComponentRegistry } from "@/core/registry";
 import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
-import { AbstractCircuitElement } from "@/core/element";
 import type { Pin, PinDeclaration } from "@/core/pin";
-import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from "@/core/pin";
-import type { RenderContext, Rect } from "@/core/renderer-interface";
+import { PinDirection } from "@/core/pin";
+import type { } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
 import type { PropertyBag as PropertyBagType } from "@/core/properties";
 import { BitsException } from "@/core/errors";
 import type { SolverPartition, ConnectivityGroup, PartitionedComponent, ResolvedGroupPin } from "@/compile/types";
+import { createTestElementFromDecls } from '@/test-fixtures/test-element.js';
+import { noopExecFn } from '@/test-fixtures/execute-stubs.js';
 
 // ---------------------------------------------------------------------------
 // Minimal test CircuitElement implementation
 // ---------------------------------------------------------------------------
 
-class TestElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
 
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pinDecls: PinDeclaration[],
-    props?: PropertyBag,
-  ) {
-    super(typeId, instanceId, position, 0, false, props ?? new PropertyBag());
-    this._pins = resolvePins(
-      pinDecls,
-      position,
-      0,
-      createInverterConfig([]),
-      createClockConfig([]),
-    );
-  }
 
-  getPins(): readonly Pin[] {
-    return this._pins;
-  }
-
-  draw(_ctx: RenderContext): void {}
-
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 2, height: 2 };
-  }
-
-}
 
 // ---------------------------------------------------------------------------
 // Helpers: pin declarations for common gate shapes
@@ -99,19 +71,19 @@ function outputOnlyPin(label: string, position: { x: number; y: number }): PinDe
 // Helpers: build minimal ComponentDefinition
 // ---------------------------------------------------------------------------
 
-const noopExecute: ExecuteFunction = (_index, _state, _layout) => {};
+const noopExecFn: ExecuteFunction = (_index, _state, _layout) => {};
 
 function makeDefinition(
   name: string,
   pins: PinDeclaration[],
-  executeFn: ExecuteFunction = noopExecute,
+  executeFn: ExecuteFunction = noopExecFn,
   defaultDelay?: number,
 ): Omit<ComponentDefinition, "typeId"> & { typeId: number } {
   return {
     name,
     typeId: -1,
     factory: (props: PropertyBagType) =>
-      new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pins, props),
+      createTestElementFromDecls(name, crypto.randomUUID(), pins, props),
     pinLayout: pins,
     propertyDefs: [],
     attributeMap: [],
@@ -155,7 +127,7 @@ describe("Compiler", () => {
     const registry = makeRegistry(andDef);
 
     const circuit = new Circuit();
-    const andEl = new TestElement("And", "and-1", { x: 0, y: 0 }, twoInputPins());
+    const andEl = createTestElementFromDecls("And", "and-1", twoInputPins());
     circuit.addElement(andEl);
 
     const compiled = compileUnified(circuit, registry).digital!;
@@ -188,10 +160,10 @@ describe("Compiler", () => {
     const circuit = new Circuit();
 
     // NOT gate at (0,0): input at (0,0), output at (2,0)
-    const notEl = new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins());
+    const notEl = createTestElementFromDecls("Not", "not-1", notPins());
 
     // AND gate at (8,0): inputs at (8,0) and (8,1), output at (10,0)
-    const andEl = new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputPins());
+    const andEl = createTestElementFromDecls("And", "and-1", twoInputPins(), undefined, { x: 8, y: 0 });
 
     circuit.addElement(notEl);
     circuit.addElement(andEl);
@@ -242,8 +214,8 @@ describe("Compiler", () => {
 
     const circuit = new Circuit();
 
-    const nor1 = new TestElement("Nor", "nor-1", { x: 0, y: 0 }, twoInputPins());
-    const nor2 = new TestElement("Nor", "nor-2", { x: 8, y: 0 }, twoInputPins());
+    const nor1 = createTestElementFromDecls("Nor", "nor-1", twoInputPins());
+    const nor2 = createTestElementFromDecls("Nor", "nor-2", twoInputPins(), undefined, { x: 8, y: 0 });
     circuit.addElement(nor1);
     circuit.addElement(nor2);
 
@@ -282,8 +254,8 @@ describe("Compiler", () => {
     const registry = makeRegistry(notDef, andDef);
 
     const circuit = new Circuit();
-    const notEl = new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins());
-    const andEl = new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputPins());
+    const notEl = createTestElementFromDecls("Not", "not-1", notPins());
+    const andEl = createTestElementFromDecls("And", "and-1", twoInputPins(), undefined, { x: 8, y: 0 });
     circuit.addElement(notEl);
     circuit.addElement(andEl);
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 8, y: 0 }));
@@ -321,8 +293,8 @@ describe("Compiler", () => {
     const andTypeId = registry.get("And")!.typeId;
 
     const circuit = new Circuit();
-    circuit.addElement(new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins()));
-    circuit.addElement(new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputPins()));
+    circuit.addElement(createTestElementFromDecls("Not", "not-1", notPins()));
+    circuit.addElement(createTestElementFromDecls("And", "and-1", twoInputPins(), undefined, { x: 8, y: 0 }));
 
     const compiled = compileUnified(circuit, registry).digital!;
 
@@ -360,11 +332,11 @@ describe("Compiler", () => {
 
     // In element with label "A"
     const inProps = new PropertyBag([["label", "A"]]);
-    const inEl = new TestElement("In", "in-1", { x: 0, y: 0 }, inPins, inProps);
+    const inEl = createTestElementFromDecls("In", "in-1", inPins, inProps);
 
     // Out element with label "S" at (10,0): its input pin is at (10,0)
     const outProps = new PropertyBag([["label", "S"]]);
-    const outEl = new TestElement("Out", "out-1", { x: 10, y: 0 }, outPins, outProps);
+    const outEl = createTestElementFromDecls("Out", "out-1", outPins, outProps, { x: 10, y: 0 });
 
     circuit.addElement(inEl);
     circuit.addElement(outEl);
@@ -389,7 +361,7 @@ describe("Compiler", () => {
     // Don't register anything
 
     const circuit = new Circuit();
-    circuit.addElement(new TestElement("Xyzzy", "xyzzy-1", { x: 0, y: 0 }, notPins()));
+    circuit.addElement(createTestElementFromDecls("Xyzzy", "xyzzy-1", notPins()));
 
     expect(() => compileUnified(circuit, registry)).toThrow(/unknown component type "Xyzzy"/);
   });
@@ -414,8 +386,8 @@ describe("Compiler", () => {
 
     const circuit = new Circuit();
     // Both elements have pins at (2,0) — they'll share a net
-    circuit.addElement(new TestElement("Src", "src-1", { x: 0, y: 0 }, singleBitOutPins));
-    circuit.addElement(new TestElement("Dst", "dst-1", { x: 0, y: 0 }, eightBitInPins));
+    circuit.addElement(createTestElementFromDecls("Src", "src-1", singleBitOutPins));
+    circuit.addElement(createTestElementFromDecls("Dst", "dst-1", eightBitInPins));
 
     expect(() => compileUnified(circuit, registry)).not.toThrow();
     const result = compileUnified(circuit, registry);
@@ -432,8 +404,8 @@ describe("Compiler", () => {
     const registry = makeRegistry(notDef, andDef);
 
     const circuit = new Circuit();
-    const notEl = new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins());
-    const andEl = new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputPins());
+    const notEl = createTestElementFromDecls("Not", "not-1", notPins());
+    const andEl = createTestElementFromDecls("And", "and-1", twoInputPins(), undefined, { x: 8, y: 0 });
     circuit.addElement(notEl);
     circuit.addElement(andEl);
 
@@ -725,7 +697,7 @@ describe("compileDigitalPartition", () => {
     const andDef = makeDefinition("And", twoInputPins());
     const registry = makeRegistry(andDef);
 
-    const andEl = new TestElement("And", "and-1", { x: 0, y: 0 }, twoInputPins());
+    const andEl = createTestElementFromDecls("And", "and-1", twoInputPins());
 
     // Group assignments: each pin is its own group (isolated)
     // pin 0 (a at 0,0) = group 0, pin 1 (b at 0,1) = group 1, pin 2 (out at 2,0) = group 2
@@ -758,8 +730,8 @@ describe("compileDigitalPartition", () => {
     const andDef = makeDefinition("And", twoInputPins());
     const registry = makeRegistry(notDef, andDef);
 
-    const notEl = new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins());
-    const andEl = new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputPins());
+    const notEl = createTestElementFromDecls("Not", "not-1", notPins());
+    const andEl = createTestElementFromDecls("And", "and-1", twoInputPins(), undefined, { x: 8, y: 0 });
     const wire = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
 
     // notPins: [in@(0,0)=group0, out@(2,0)=group1]
@@ -799,8 +771,8 @@ describe("compileDigitalPartition", () => {
     const andDef = makeDefinition("And", twoInputPins());
     const registry = makeRegistry(notDef, andDef);
 
-    const notEl = new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins());
-    const andEl = new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputPins());
+    const notEl = createTestElementFromDecls("Not", "not-1", notPins());
+    const andEl = createTestElementFromDecls("And", "and-1", twoInputPins(), undefined, { x: 8, y: 0 });
 
     const partition = buildPartition(
       [notEl, andEl],
@@ -835,8 +807,8 @@ describe("compileDigitalPartition", () => {
     const norDef = makeDefinition("Nor", twoInputPins());
     const registry = makeRegistry(norDef);
 
-    const nor1 = new TestElement("Nor", "nor-1", { x: 0, y: 0 }, twoInputPins());
-    const nor2 = new TestElement("Nor", "nor-2", { x: 8, y: 0 }, twoInputPins());
+    const nor1 = createTestElementFromDecls("Nor", "nor-1", twoInputPins());
+    const nor2 = createTestElementFromDecls("Nor", "nor-2", twoInputPins(), undefined, { x: 8, y: 0 });
     const w1 = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
     const w2 = new Wire({ x: 10, y: 0 }, { x: 0, y: 1 });
 
@@ -876,8 +848,8 @@ describe("compileDigitalPartition", () => {
 
     const inProps = new PropertyBag([["label", "A"]]);
     const outProps = new PropertyBag([["label", "S"]]);
-    const inEl = new TestElement("In", "in-1", { x: 0, y: 0 }, inPins, inProps);
-    const outEl = new TestElement("Out", "out-1", { x: 10, y: 0 }, outPins, outProps);
+    const inEl = createTestElementFromDecls("In", "in-1", inPins, inProps);
+    const outEl = createTestElementFromDecls("Out", "out-1", outPins, outProps, { x: 10, y: 0 });
     const wire = new Wire({ x: 0, y: 0 }, { x: 10, y: 0 });
 
     // Both pins in group 0 (connected)
@@ -908,8 +880,8 @@ describe("compileDigitalPartition", () => {
     const andDef = makeDefinition("And", twoInputPins());
     const registry = makeRegistry(notDef, andDef);
 
-    const notEl = new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins());
-    const andEl = new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputPins());
+    const notEl = createTestElementFromDecls("Not", "not-1", notPins());
+    const andEl = createTestElementFromDecls("And", "and-1", twoInputPins(), undefined, { x: 8, y: 0 });
     const wire = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
 
     // Via compileUnified (circuit-level path)
@@ -978,8 +950,8 @@ describe("compileDigitalPartition", () => {
     const dstDef = makeDefinition("Dst", eightBitInPins);
     const registry = makeRegistry(srcDef, dstDef);
 
-    const srcEl = new TestElement("Src", "src-1", { x: 0, y: 0 }, singleBitOutPins);
-    const dstEl = new TestElement("Dst", "dst-1", { x: 0, y: 0 }, eightBitInPins);
+    const srcEl = createTestElementFromDecls("Src", "src-1", singleBitOutPins);
+    const dstEl = createTestElementFromDecls("Dst", "dst-1", eightBitInPins);
 
     // Both pins in group 0 — will trigger bit-width mismatch
     const partition = buildPartition(
@@ -1001,7 +973,7 @@ describe("compileDigitalPartition", () => {
     // Partition with a wire assigned to a group — the wire must appear in wireToNetId
     const notDef = makeDefinition("Not", notPins());
     const registry = makeRegistry(notDef);
-    const notEl = new TestElement("Not", "not-1", { x: 0, y: 0 }, notPins());
+    const notEl = createTestElementFromDecls("Not", "not-1", notPins());
     const wire = new Wire({ x: 0, y: 0 }, { x: 2, y: 0 });
 
     // Both NOT pins in group 0 with wire in group 0
@@ -1041,8 +1013,8 @@ describe("Compiler — feedback wire mapping", () => {
     const registry = makeRegistry(norDef);
 
     const circuit = new Circuit();
-    const nor1 = new TestElement("NOr", "nor-1", { x: 0, y: 0 }, twoInputPins());
-    const nor2 = new TestElement("NOr", "nor-2", { x: 6, y: 0 }, twoInputPins());
+    const nor1 = createTestElementFromDecls("NOr", "nor-1", twoInputPins());
+    const nor2 = createTestElementFromDecls("NOr", "nor-2", twoInputPins(), undefined, { x: 6, y: 0 });
     circuit.addElement(nor1);
     circuit.addElement(nor2);
 
@@ -1096,8 +1068,8 @@ describe("Compiler — feedback wire mapping", () => {
     const registry = makeRegistry(norDef);
 
     const circuit = new Circuit();
-    const nor1 = new TestElement("NOr", "nor-1", { x: 0, y: 0 }, norPins);
-    const nor2 = new TestElement("NOr", "nor-2", { x: 10, y: 0 }, norPins);
+    const nor1 = createTestElementFromDecls("NOr", "nor-1", norPins);
+    const nor2 = createTestElementFromDecls("NOr", "nor-2", norPins, undefined, { x: 10, y: 0 });
     circuit.addElement(nor1);
     circuit.addElement(nor2);
 
@@ -1161,17 +1133,17 @@ describe("Compiler — feedback wire mapping", () => {
       { direction: PinDirection.INPUT, label: "GND", defaultBitWidth: 1, position: { x: 1, y:  2 }, isNegatable: false, isClockCapable: false, kind: "power" },
     ];
 
-    const andDefSignalOnly = makeDefinition("AndSignal",        signalPins,          noopExecute);
-    const andDefWithPower   = makeDefinition("AndWithPower",    signalAndPowerPins,  noopExecute);
+    const andDefSignalOnly = makeDefinition("AndSignal",        signalPins,          noopExecFn);
+    const andDefWithPower   = makeDefinition("AndWithPower",    signalAndPowerPins,  noopExecFn);
 
     const registryA = makeRegistry(andDefSignalOnly);
     const registryB = makeRegistry(andDefWithPower);
 
     const circuitA = new Circuit();
-    circuitA.addElement(new TestElement("AndSignal",     "a-1", { x: 0, y: 0 }, signalPins));
+    circuitA.addElement(createTestElementFromDecls("AndSignal", "a-1", signalPins));
 
     const circuitB = new Circuit();
-    circuitB.addElement(new TestElement("AndWithPower",  "b-1", { x: 0, y: 0 }, signalAndPowerPins));
+    circuitB.addElement(createTestElementFromDecls("AndWithPower", "b-1", signalAndPowerPins));
 
     const compiledA = compileUnified(circuitA, registryA).digital!;
     const compiledB = compileUnified(circuitB, registryB).digital!;

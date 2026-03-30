@@ -499,5 +499,13 @@ export const SplitterDefinition: ComponentDefinition = {
     },
     },
   },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createSplitterAnalogElement,
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

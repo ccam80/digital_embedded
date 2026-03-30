@@ -181,4 +181,5 @@ export const LightBulbDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeLightBulb, inputSchema: ["A", "B"], outputSchema: [] },
   },
+  modelRegistry: {},
 };

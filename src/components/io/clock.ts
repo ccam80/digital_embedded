@@ -363,5 +363,25 @@ export const ClockDefinition: ComponentDefinition = {
     },
     },
   },
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory(
+        pinNodes: ReadonlyMap<string, number>,
+        _internalNodeIds: readonly number[],
+        branchIdx: number,
+        props: PropertyBag,
+        _getTime: () => number,
+      ): AnalogElementCore {
+        const frequency = props.getOrDefault<number>("Frequency", 1);
+        const vdd = props.getOrDefault<number>("vdd", 3.3);
+        const nodePos = pinNodes.get("out")!;
+        const nodeNeg = 0;
+        return makeAnalogClockElement(nodePos, nodeNeg, branchIdx, frequency, vdd);
+      },
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

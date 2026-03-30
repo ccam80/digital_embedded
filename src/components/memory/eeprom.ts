@@ -272,6 +272,7 @@ export const EEPROMDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -419,4 +420,5 @@ export const EEPROMDualPortDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };

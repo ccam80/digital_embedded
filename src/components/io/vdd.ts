@@ -153,4 +153,5 @@ export const VddDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeVdd, inputSchema: [], outputSchema: ["out"] },
   },
+  modelRegistry: {},
 };

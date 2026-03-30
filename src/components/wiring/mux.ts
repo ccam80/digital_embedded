@@ -306,5 +306,13 @@ export const MuxDefinition: ComponentDefinition = {
     },
     },
   },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: makeBehavioralMuxAnalogFactory(1),
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

@@ -15,77 +15,25 @@ import { serializeCircuit as serializeDts } from '../dts-serializer.js';
 import { deserializeDts } from '../dts-deserializer.js';
 import { compileUnified } from '../../compile/compile.js';
 import { Circuit, Wire } from '../../core/circuit.js';
-import type { Pin, PinDeclaration } from '../../core/pin.js';
-import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from '../../core/pin.js';
-import { AbstractCircuitElement } from '../../core/element.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
+import type { PinDeclaration } from '../../core/pin.js';
+import { PinDirection } from '../../core/pin.js';
 import { PropertyBag } from '../../core/properties.js';
 import { ComponentRegistry, ComponentCategory } from '../../core/registry.js';
-import type { ComponentDefinition, ComponentModels, ExecuteFunction } from '../../core/registry.js';
-
-// ---------------------------------------------------------------------------
-// Minimal concrete CircuitElement for tests
-// ---------------------------------------------------------------------------
-
-function pinDecl(
-  dir: PinDirection,
-  label: string,
-  x: number,
-  y: number,
-): PinDeclaration {
-  return {
-    direction: dir,
-    label,
-    defaultBitWidth: 1,
-    position: { x, y },
-    isNegatable: false,
-    isClockCapable: false,
-    kind: "signal",
-  };
-}
-
-class TestElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
-
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pinDecls: PinDeclaration[],
-    props?: PropertyBag,
-  ) {
-    super(typeId, instanceId, position, 0, false, props ?? new PropertyBag());
-    this._pins = resolvePins(
-      pinDecls,
-      position,
-      0,
-      createInverterConfig([]),
-      createClockConfig([]),
-    );
-  }
-
-  getPins(): readonly Pin[] {
-    return this._pins;
-  }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 2, height: 2 };
-  }
-}
+import type { ComponentModels, ComponentDefinition } from '../../core/registry.js';
+import { createTestElementFromDecls, inputPinDecl, outputPinDecl } from '../../test-fixtures/test-element.js';
+import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
 
 // ---------------------------------------------------------------------------
 // Registry builder
 // ---------------------------------------------------------------------------
 
-const noopExec: ExecuteFunction = () => {};
-
-const AND_PINS = [
-  pinDecl(PinDirection.INPUT, 'a', 0, 0),
-  pinDecl(PinDirection.INPUT, 'b', 0, 1),
-  pinDecl(PinDirection.OUTPUT, 'out', 2, 0),
+const AND_PINS: PinDeclaration[] = [
+  inputPinDecl('a', 0, 0),
+  inputPinDecl('b', 0, 1),
+  outputPinDecl('out', 2, 0),
 ];
 
-const IN_PINS = [pinDecl(PinDirection.OUTPUT, 'out', 1, 0)];
+const IN_PINS: PinDeclaration[] = [outputPinDecl('out', 1, 0)];
 
 function buildRegistry(): ComponentRegistry {
   const registry = new ComponentRegistry();
@@ -94,39 +42,39 @@ function buildRegistry(): ComponentRegistry {
     name: 'In',
     typeId: -1,
     factory: (props: PropertyBag) =>
-      new TestElement('In', crypto.randomUUID(), { x: 0, y: 0 }, IN_PINS, props),
+      createTestElementFromDecls('In', crypto.randomUUID(), IN_PINS, props),
     pinLayout: IN_PINS,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: '',
-    models: { digital: { executeFn: noopExec } } as ComponentModels,
+    models: { digital: { executeFn: noopExecFn } } as ComponentModels,
   } as ComponentDefinition);
 
   registry.register({
     name: 'Out',
     typeId: -1,
     factory: (props: PropertyBag) =>
-      new TestElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, IN_PINS, props),
+      createTestElementFromDecls('Out', crypto.randomUUID(), IN_PINS, props),
     pinLayout: IN_PINS,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: '',
-    models: { digital: { executeFn: noopExec } } as ComponentModels,
+    models: { digital: { executeFn: noopExecFn } } as ComponentModels,
   } as ComponentDefinition);
 
   registry.register({
     name: 'And',
     typeId: -1,
     factory: (props: PropertyBag) =>
-      new TestElement('And', crypto.randomUUID(), { x: 0, y: 0 }, AND_PINS, props),
+      createTestElementFromDecls('And', crypto.randomUUID(), AND_PINS, props),
     pinLayout: AND_PINS,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: '',
-    models: { digital: { executeFn: noopExec } } as ComponentModels,
+    models: { digital: { executeFn: noopExecFn } } as ComponentModels,
   } as ComponentDefinition);
 
   return registry;

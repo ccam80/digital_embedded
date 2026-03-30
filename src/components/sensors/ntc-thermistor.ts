@@ -32,6 +32,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
+import { defineModelParams } from "../../core/model-params.js";
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
@@ -44,6 +45,23 @@ import { PinDirection } from "../../core/pin.js";
 
 const MIN_RESISTANCE = 1e-12;
 const MIN_TEMPERATURE = 1.0; // 1 K — prevent division by zero
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: NTC_PARAM_DEFS, defaults: NTC_DEFAULTS } = defineModelParams({
+  primary: {
+    r0:          { default: 10000,  unit: "Ω",   description: "Resistance at reference temperature T₀" },
+    beta:        { default: 3950,   unit: "K",   description: "B-parameter (material constant) in Kelvin" },
+    temperature: { default: 298.15, unit: "K",   description: "Operating temperature in Kelvin" },
+  },
+  secondary: {
+    t0:                { default: 298.15, unit: "K",   description: "Reference temperature in Kelvin" },
+    thermalResistance: { default: 50,     unit: "K/W", description: "Thermal resistance to ambient in K/W" },
+    thermalCapacitance:{ default: 0.01,   unit: "J/K", description: "Thermal mass in J/K" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Resistance computation
@@ -96,18 +114,11 @@ export class NTCThermistorElement implements AnalogElementCore {
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean;
 
-  private readonly _r0: number;
-  private readonly _beta: number;
-  private readonly _t0: number;
+  private readonly _p: Record<string, number>;
   private readonly _selfHeating: boolean;
-  private readonly _thermalResistance: number;
-  private readonly _thermalCapacitance: number;
   private readonly _shA: number | undefined;
   private readonly _shB: number | undefined;
   private readonly _shC: number | undefined;
-
-  /** Current temperature in Kelvin. */
-  private _temperature: number;
 
   /**
    * @param r0                  - Resistance at T₀ in ohms
@@ -133,19 +144,25 @@ export class NTCThermistorElement implements AnalogElementCore {
     shB?: number,
     shC?: number,
   ) {
-    this._r0 = Math.max(r0, MIN_RESISTANCE);
-    this._beta = beta;
-    this._t0 = Math.max(t0, MIN_TEMPERATURE);
-    this._temperature = Math.max(temperature, MIN_TEMPERATURE);
+    this._p = {
+      r0:                Math.max(r0, MIN_RESISTANCE),
+      beta,
+      t0:                Math.max(t0, MIN_TEMPERATURE),
+      temperature:       Math.max(temperature, MIN_TEMPERATURE),
+      thermalResistance: Math.max(thermalResistance, 1e-6),
+      thermalCapacitance:Math.max(thermalCapacitance, 1e-12),
+    };
     this._selfHeating = selfHeating;
-    this._thermalResistance = Math.max(thermalResistance, 1e-6);
-    this._thermalCapacitance = Math.max(thermalCapacitance, 1e-12);
     this._shA = shA;
     this._shB = shB;
     this._shC = shC;
     // isReactive is true when self-heating is enabled because the element has
     // dynamic state that evolves with the simulation timestep.
     this.isReactive = selfHeating;
+  }
+
+  setParam(key: string, value: number): void {
+    if (key in this._p) this._p[key] = value;
   }
 
   /** Compute resistance at the current temperature. */
@@ -156,19 +173,19 @@ export class NTCThermistorElement implements AnalogElementCore {
       this._shC !== undefined
     ) {
       return Math.max(
-        steinhartHartResistance(this._shA, this._shB, this._shC, this._temperature),
+        steinhartHartResistance(this._shA, this._shB, this._shC, this._p.temperature),
         MIN_RESISTANCE,
       );
     }
     return Math.max(
-      bParameterResistance(this._r0, this._beta, this._t0, this._temperature),
+      bParameterResistance(this._p.r0, this._p.beta, this._p.t0, this._p.temperature),
       MIN_RESISTANCE,
     );
   }
 
   /** Current temperature in Kelvin — exposed for testing. */
   get temperature(): number {
-    return this._temperature;
+    return this._p.temperature;
   }
 
   stamp(_solver: SparseSolver): void {
@@ -217,9 +234,9 @@ export class NTCThermistorElement implements AnalogElementCore {
 
     // Ambient temperature = initial temperature when selfHeating is enabled.
     // The component treats _t0 as the ambient temperature for the thermal model.
-    const tAmbient = this._t0;
-    const dT = (P - (this._temperature - tAmbient) / this._thermalResistance) / this._thermalCapacitance;
-    this._temperature = Math.max(this._temperature + dT * dt, MIN_TEMPERATURE);
+    const tAmbient = this._p.t0;
+    const dT = (P - (this._p.temperature - tAmbient) / this._p.thermalResistance) / this._p.thermalCapacitance;
+    this._p.temperature = Math.max(this._p.temperature + dT * dt, MIN_TEMPERATURE);
   }
 }
 
@@ -234,13 +251,13 @@ export function createNTCThermistorElement(
   props: PropertyBag,
   _getTime: () => number,
 ): AnalogElementCore {
-  const r0 = props.getOrDefault<number>("r0", 10000);
-  const beta = props.getOrDefault<number>("beta", 3950);
-  const t0 = props.getOrDefault<number>("t0", 298.15);
-  const temperature = props.getOrDefault<number>("temperature", 298.15);
+  const r0 = props.getModelParam<number>("r0");
+  const beta = props.getModelParam<number>("beta");
+  const t0 = props.getModelParam<number>("t0");
+  const temperature = props.getModelParam<number>("temperature");
   const selfHeating = props.getOrDefault<boolean>("selfHeating", false);
-  const thermalResistance = props.getOrDefault<number>("thermalResistance", 50);
-  const thermalCapacitance = props.getOrDefault<number>("thermalCapacitance", 0.01);
+  const thermalResistance = props.getModelParam<number>("thermalResistance");
+  const thermalCapacitance = props.getModelParam<number>("thermalCapacitance");
   const shA = props.has("shA") ? props.getOrDefault<number>("shA", 0) : undefined;
   const shB = props.has("shB") ? props.getOrDefault<number>("shB", 0) : undefined;
   const shC = props.has("shC") ? props.getOrDefault<number>("shC", 0) : undefined;
@@ -471,6 +488,14 @@ export const NTCThermistorDefinition: ComponentDefinition = {
   helpText:
     "NTC Thermistor — negative temperature coefficient resistor. " +
     "Resistance decreases exponentially with temperature (B-parameter model).",
-  models: { mnaModels: { behavioral: { factory: createNTCThermistorElement } } },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createNTCThermistorElement,
+      paramDefs: NTC_PARAM_DEFS,
+      params: NTC_DEFAULTS,
+    },
+  },
   defaultModel: "behavioral",
 };

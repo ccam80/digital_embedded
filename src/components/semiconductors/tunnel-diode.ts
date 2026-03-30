@@ -33,7 +33,7 @@ import {
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
-import { TUNNEL_DIODE_DEFAULTS } from "../../solver/analog/model-defaults.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -54,6 +54,22 @@ const NDR_VSTEP_MAX = 0.1;
 /** Thermal saturation current (A) — default for Shockley component. */
 const IS_THERMAL = 1e-14;
 
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: TUNNEL_DIODE_PARAM_DEFS, defaults: TUNNEL_DIODE_PARAM_DEFAULTS } = defineModelParams({
+  primary: {
+    IP: { default: 1e-3,  unit: "A", description: "Peak tunnel current" },
+    VP: { default: 0.065, unit: "V", description: "Peak voltage" },
+    IV: { default: 1e-4,  unit: "A", description: "Valley current" },
+    VV: { default: 0.35,  unit: "V", description: "Valley voltage" },
+  },
+  secondary: {
+    IS: { default: 1e-14, unit: "A", description: "Shockley saturation current" },
+    N:  { default: 1,                description: "Emission coefficient" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // tunnelDiodeIV — compute I(V) and dI/dV for the tunnel diode model
@@ -122,17 +138,18 @@ export function createTunnelDiodeElement(
   const nodeAnode   = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
-  const modelParams = props.has("_modelParams")
-    ? props.get<Record<string, number>>("_modelParams")
-    : undefined;
-  const mp = modelParams ?? TUNNEL_DIODE_DEFAULTS;
+  function readParam(key: string): number {
+    if (props.hasModelParam(key)) return props.getModelParam<number>(key);
+    return TUNNEL_DIODE_PARAM_DEFAULTS[key] as number;
+  }
+
   const params: Record<string, number> = {
-    IP: mp["IP"] ?? TUNNEL_DIODE_DEFAULTS["IP"],
-    VP: mp["VP"] ?? TUNNEL_DIODE_DEFAULTS["VP"],
-    IV: mp["IV"] ?? TUNNEL_DIODE_DEFAULTS["IV"],
-    VV: mp["VV"] ?? TUNNEL_DIODE_DEFAULTS["VV"],
-    IS: mp["IS"] ?? TUNNEL_DIODE_DEFAULTS["IS"],
-    N: mp["N"] ?? TUNNEL_DIODE_DEFAULTS["N"],
+    IP: readParam("IP"),
+    VP: readParam("VP"),
+    IV: readParam("IV"),
+    VV: readParam("VV"),
+    IS: readParam("IS"),
+    N:  readParam("N"),
   };
 
   // NR linearization state
@@ -325,14 +342,6 @@ function buildTunnelDiodePinDeclarations(): PinDeclaration[] {
 
 const TUNNEL_DIODE_PROPERTY_DEFS: PropertyDefinition[] = [
   LABEL_PROPERTY_DEF,
-  {
-    key: "_spiceModelOverrides",
-    type: PropertyType.STRING,
-    label: "SPICE Model Overrides",
-    defaultValue: {} as Record<string, number>,
-    description: "User-supplied SPICE parameter overrides",
-    hidden: true,
-  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -363,12 +372,13 @@ export const TunnelDiodeDefinition: ComponentDefinition = {
     "Tunnel Diode — N-shaped I-V curve with negative differential resistance.\n" +
     "Peak current I_p at V_p, valley current I_v at V_v.\n" +
     "NDR region: V_p < V < V_v.",
-  models: {
-    mnaModels: {
-      behavioral: {
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
       factory: createTunnelDiodeElement,
-      deviceType: "TUNNEL",
-    },
+      paramDefs: TUNNEL_DIODE_PARAM_DEFS,
+      params: TUNNEL_DIODE_PARAM_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

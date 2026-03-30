@@ -12,9 +12,8 @@
  *   - Nets are numbered by a stable map: node-name → integer x-coordinate.
  *   - Wire segments connect each element pin to the net at the same x value.
  *
- * Inline `.MODEL` parameter overrides are serialised as JSON and stored in the
- * `_spiceModelOverrides` property on each element whose `modelName` matches a
- * parsed inline model name.
+ * Inline `.MODEL` parameter overrides are applied via replaceModelParams()
+ * on each element whose modelName matches a parsed inline model name.
  */
 
 import { Circuit, Wire } from "../core/circuit.js";
@@ -51,6 +50,7 @@ function makeCircuitElement(
   typeId: string,
   pins: Array<{ x: number; y: number; label: string }>,
   propsEntries: Array<[string, string | number | boolean | Record<string, number>]> = [],
+  modelParams?: Record<string, number>,
 ): CircuitElement {
   const instanceId = `${typeId}-spice-${++_spiceBuilderCounter}`;
   const resolvedPins = pins.map((p) => makePin(p.x, p.y, p.label));
@@ -58,6 +58,9 @@ function makeCircuitElement(
     propsEntries as Array<[string, import("../core/properties.js").PropertyValue]>,
   );
   const propertyBag = new PropertyBag(propsMap.entries());
+  if (modelParams !== undefined) {
+    propertyBag.replaceModelParams(modelParams);
+  }
 
   const serialized: SerializedElement = {
     typeId,
@@ -122,7 +125,7 @@ function buildNetMap(sc: ParsedSubcircuit): Map<string, number> {
 }
 
 // ---------------------------------------------------------------------------
-// spiceModelOverrides: build _spiceModelOverrides JSON for an element whose
+// buildModelOverrides: compute merged model params for an element whose
 // model name matches a parsed inline .MODEL statement.
 // ---------------------------------------------------------------------------
 
@@ -175,9 +178,6 @@ function buildElement(
 ): CircuitElement {
   const props: Array<[string, string | number | boolean | Record<string, number>]> = [];
   const overrides = buildModelOverrides(el.modelName, models, el.params);
-  if (overrides !== undefined) {
-    props.push(["_spiceModelOverrides", overrides]);
-  }
 
   switch (el.type) {
     case "R": {
@@ -187,7 +187,7 @@ function buildElement(
       return makeCircuitElement("Resistor", [
         { x: netA, y: yRow, label: "A" },
         { x: netB, y: yRow, label: "B" },
-      ], props);
+      ], props, overrides);
     }
 
     case "C": {
@@ -197,7 +197,7 @@ function buildElement(
       return makeCircuitElement("Capacitor", [
         { x: netA, y: yRow, label: "A" },
         { x: netB, y: yRow, label: "B" },
-      ], props);
+      ], props, overrides);
     }
 
     case "L": {
@@ -207,7 +207,7 @@ function buildElement(
       return makeCircuitElement("Inductor", [
         { x: netA, y: yRow, label: "A" },
         { x: netB, y: yRow, label: "B" },
-      ], props);
+      ], props, overrides);
     }
 
     case "D": {
@@ -217,7 +217,7 @@ function buildElement(
       return makeCircuitElement("Diode", [
         { x: netA, y: yRow, label: "A" },
         { x: netK, y: yRow, label: "K" },
-      ], props);
+      ], props, overrides);
     }
 
     case "Q": {

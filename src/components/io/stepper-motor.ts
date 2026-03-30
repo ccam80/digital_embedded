@@ -310,6 +310,7 @@ export const StepperMotorBipolarDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeStepperMotorBipolar, inputSchema: ["A+", "A-", "B+", "B-"], outputSchema: ["S0", "S1"] },
   },
+  modelRegistry: {},
 };
 
 export const StepperMotorUnipolarDefinition: ComponentDefinition = {
@@ -327,4 +328,5 @@ export const StepperMotorUnipolarDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeStepperMotorUnipolar, inputSchema: ["P0", "P1", "P2", "P3", "com"], outputSchema: ["S0", "S1"] },
   },
+  modelRegistry: {},
 };

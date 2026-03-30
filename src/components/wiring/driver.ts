@@ -282,5 +282,13 @@ export const DriverDefinition: ComponentDefinition = {
     },
     },
   },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createDriverAnalogElement,
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

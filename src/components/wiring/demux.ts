@@ -301,5 +301,13 @@ export const DemuxDefinition: ComponentDefinition = {
     },
     },
   },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: makeBehavioralDemuxAnalogFactory(1),
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

@@ -20,6 +20,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import { makeOrAnalogFactory } from "../../solver/analog/behavioral-gate.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import {
   compWidth,
   buildStandardPinDeclarations,
@@ -53,8 +54,8 @@ export class OrElement extends AbstractCircuitElement {
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     let decls = buildStandardPinDeclarations(inputCount, bitWidth, wideShape);
-    const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
-    if (activeModel && OrDefinition.subcircuitRefs?.[activeModel]) {
+    const activeModel = this._properties.getOrDefault<string>("model", "");
+    if (activeModel && OrDefinition.modelRegistry?.[activeModel]) {
       const w = compWidth(wideShape);
       decls = appendPowerPins(decls, w / 2, -1, inputCount);
     }
@@ -131,6 +132,41 @@ export function executeOr(index: number, state: Uint32Array, _highZs: Uint32Arra
 }
 
 // ---------------------------------------------------------------------------
+// CMOS_OR2_NETLIST — 2-input CMOS OR gate structural netlist
+//
+// Topology: CMOS NOR2 driving a CMOS inverter.
+// Ports: In_1, In_2, out, VDD, GND
+// Internal net: nor_out (net index 5)
+// ---------------------------------------------------------------------------
+
+const CMOS_OR2_NETLIST: MnaSubcircuitNetlist = {
+  ports: ["In_1", "In_2", "out", "VDD", "GND"],
+  params: {},
+  elements: [
+    { typeId: "PMOS", branchCount: 0 },
+    { typeId: "PMOS", branchCount: 0 },
+    { typeId: "NMOS", branchCount: 0 },
+    { typeId: "NMOS", branchCount: 0 },
+    { typeId: "PMOS", branchCount: 0 },
+    { typeId: "NMOS", branchCount: 0 },
+  ],
+  internalNetCount: 2,
+  // Nets 0..4 = ports [In_1, In_2, out, VDD, GND], nets 5,6 = internal [nor_out, series_node]
+  // NOR2: p1(D=VDD,G=In_1,S=series_node), p2(D=series_node,G=In_2,S=nor_out),
+  //        n1(D=nor_out,G=In_1,S=GND), n2(D=nor_out,G=In_2,S=GND)
+  // INV:   pInv(D=VDD,G=nor_out,S=out), nInv(D=out,G=nor_out,S=GND)
+  // PMOS/NMOS pins: [D, G, S]
+  netlist: [
+    [3, 0, 6], // p1: D=VDD(3), G=In_1(0), S=series_node(6)
+    [6, 1, 5], // p2: D=series_node(6), G=In_2(1), S=nor_out(5)
+    [5, 0, 4], // n1: D=nor_out(5), G=In_1(0), S=GND(4)
+    [5, 1, 4], // n2: D=nor_out(5), G=In_2(1), S=GND(4)
+    [3, 5, 2], // pInv: D=VDD(3), G=nor_out(5), S=out(2)
+    [2, 5, 4], // nInv: D=out(2), G=nor_out(5), S=GND(4)
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // OrDefinition
 // ---------------------------------------------------------------------------
 
@@ -157,7 +193,14 @@ export const OrDefinition: ComponentDefinition = {
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved) and IEC/DIN (rectangular with ≥1) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
-  subcircuitRefs: { cmos: "CmosOr2" },
+  modelRegistry: {
+    cmos: {
+      kind: "netlist",
+      netlist: CMOS_OR2_NETLIST,
+      paramDefs: [],
+      params: {},
+    },
+  },
   models: {
     digital: {
       executeFn: executeOr,

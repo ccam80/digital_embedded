@@ -251,4 +251,5 @@ export const FGNFETDefinition: ComponentDefinition = {
       defaultDelay: 0,
     },
   },
+  modelRegistry: {},
 };

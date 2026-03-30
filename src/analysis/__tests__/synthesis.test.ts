@@ -17,42 +17,10 @@ import type { BoolExpr } from '../expression.js';
 import { toNandOnly } from '../expression-modifiers.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { PropertyBag, PropertyType } from '../../core/properties.js';
-import { AbstractCircuitElement } from '../../core/element.js';
-import type { Pin, Rotation } from '../../core/pin.js';
+import type { Pin } from '../../core/pin.js';
 import { PinDirection } from '../../core/pin.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
-import type { ComponentLayout } from '../../core/registry.js';
-
-// ---------------------------------------------------------------------------
-// Stub element — lightweight CircuitElement for testing
-// ---------------------------------------------------------------------------
-
-class StubElement extends AbstractCircuitElement {
-  private readonly _pins: Pin[];
-
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pins: Pin[],
-    props: PropertyBag,
-  ) {
-    super(typeId, instanceId, position, 0 as Rotation, false, props);
-    this._pins = pins;
-  }
-
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-}
-
-function makePin(label: string, direction: PinDirection, x: number, y: number): Pin {
-  return { label, direction, position: { x, y }, bitWidth: 1, isNegated: false, isClock: false, kind: "signal" };
-}
-
-function noop(_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void {}
+import { TestElement, makePin } from '../../test-fixtures/test-element.js';
+import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
 
 // ---------------------------------------------------------------------------
 // Registry factory
@@ -64,7 +32,7 @@ function buildRegistry(): ComponentRegistry {
   registry.register({
     name: 'In',
     typeId: -1,
-    factory: (props) => new StubElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [
+    factory: (props) => new TestElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin('out', PinDirection.OUTPUT, 2, 1),
     ], props),
     pinLayout: [],
@@ -75,13 +43,13 @@ function buildRegistry(): ComponentRegistry {
     attributeMap: [],
     category: 'IO' as any,
     helpText: '',
-    models: { digital: { executeFn: noop } },
+    models: { digital: { executeFn: noopExecFn } },
   });
 
   registry.register({
     name: 'Out',
     typeId: -1,
-    factory: (props) => new StubElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [
+    factory: (props) => new TestElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin('in', PinDirection.INPUT, 0, 1),
     ], props),
     pinLayout: [],
@@ -92,7 +60,7 @@ function buildRegistry(): ComponentRegistry {
     attributeMap: [],
     category: 'IO' as any,
     helpText: '',
-    models: { digital: { executeFn: noop } },
+    models: { digital: { executeFn: noopExecFn } },
   });
 
   registry.register({
@@ -105,7 +73,7 @@ function buildRegistry(): ComponentRegistry {
         pins.push(makePin(`in${i}`, PinDirection.INPUT, 0, i));
       }
       pins.push(makePin('out', PinDirection.OUTPUT, 4, Math.floor(count / 2)));
-      return new StubElement('And', crypto.randomUUID(), { x: 0, y: 0 }, pins, props);
+      return new TestElement('And', crypto.randomUUID(), { x: 0, y: 0 }, pins, props);
     },
     pinLayout: [],
     propertyDefs: [
@@ -115,7 +83,7 @@ function buildRegistry(): ComponentRegistry {
     attributeMap: [],
     category: 'LOGIC' as any,
     helpText: '',
-    models: { digital: { executeFn: noop } },
+    models: { digital: { executeFn: noopExecFn } },
   });
 
   registry.register({
@@ -128,7 +96,7 @@ function buildRegistry(): ComponentRegistry {
         pins.push(makePin(`in${i}`, PinDirection.INPUT, 0, i));
       }
       pins.push(makePin('out', PinDirection.OUTPUT, 4, Math.floor(count / 2)));
-      return new StubElement('Or', crypto.randomUUID(), { x: 0, y: 0 }, pins, props);
+      return new TestElement('Or', crypto.randomUUID(), { x: 0, y: 0 }, pins, props);
     },
     pinLayout: [],
     propertyDefs: [
@@ -138,13 +106,13 @@ function buildRegistry(): ComponentRegistry {
     attributeMap: [],
     category: 'LOGIC' as any,
     helpText: '',
-    models: { digital: { executeFn: noop } },
+    models: { digital: { executeFn: noopExecFn } },
   });
 
   registry.register({
     name: 'Not',
     typeId: -1,
-    factory: (props) => new StubElement('Not', crypto.randomUUID(), { x: 0, y: 0 }, [
+    factory: (props) => new TestElement('Not', crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin('in', PinDirection.INPUT, 0, 0),
       makePin('out', PinDirection.OUTPUT, 4, 0),
     ], props),
@@ -155,7 +123,7 @@ function buildRegistry(): ComponentRegistry {
     attributeMap: [],
     category: 'LOGIC' as any,
     helpText: '',
-    models: { digital: { executeFn: noop } },
+    models: { digital: { executeFn: noopExecFn } },
   });
 
   return registry;

@@ -22,12 +22,23 @@ import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG } from "../../solver/analog/stamp-helpers.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Minimum resistance clamp — prevents G → ∞ for degenerate values
 // ---------------------------------------------------------------------------
 
 const MIN_RESISTANCE = 1e-9;
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: RESISTOR_PARAM_DEFS, defaults: RESISTOR_DEFAULTS } = defineModelParams({
+  primary: {
+    resistance: { default: 1000, unit: "Ω", description: "Resistance in ohms. Minimum clamped to 1e-9 Ω.", min: 1e-9 },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -138,14 +149,12 @@ export class ResistorElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 
-function createResistorElement(
+function buildResistorElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
-  _branchIdx: number,
-  props: PropertyBag,
+  resistance: number,
 ): AnalogElementCore {
-  const rawR = props.getOrDefault<number>("resistance", 1000);
-  let G = 1 / Math.max(rawR, MIN_RESISTANCE);
+  const p = { resistance };
+  let G = 1 / Math.max(p.resistance, MIN_RESISTANCE);
   const n0 = pinNodes.get("A")!;
   const n1 = pinNodes.get("B")!;
 
@@ -155,8 +164,9 @@ function createResistorElement(
     isReactive: false,
 
     setParam(key: string, value: number): void {
-      if (key === "resistance") {
-        G = 1 / Math.max(value, MIN_RESISTANCE);
+      if (key in p) {
+        (p as Record<string, number>)[key] = value;
+        G = 1 / Math.max(p.resistance, MIN_RESISTANCE);
       }
     },
 
@@ -174,6 +184,24 @@ function createResistorElement(
       return [I, -I];
     },
   };
+}
+
+function createResistorElement(
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  _branchIdx: number,
+  props: PropertyBag,
+): AnalogElementCore {
+  return buildResistorElement(pinNodes, props.getOrDefault<number>("resistance", 1000));
+}
+
+function createResistorElementFromModelParams(
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  _branchIdx: number,
+  props: PropertyBag,
+): AnalogElementCore {
+  return buildResistorElement(pinNodes, props.getModelParam<number>("resistance"));
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +268,14 @@ export const ResistorDefinition: ComponentDefinition = {
       behavioral: {
         factory: createResistorElement,
       },
+    },
+  },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createResistorElementFromModelParams,
+      paramDefs: RESISTOR_PARAM_DEFS,
+      params: RESISTOR_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

@@ -196,4 +196,5 @@ export const RgbLedDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeRgbLed, inputSchema: ["R", "G", "B"], outputSchema: [] },
   },
+  modelRegistry: {},
 };

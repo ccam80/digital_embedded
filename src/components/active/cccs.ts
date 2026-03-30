@@ -61,6 +61,17 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: CCCS_PARAM_DEFS, defaults: CCCS_DEFAULTS } = defineModelParams({
+  primary: {
+    currentGain: { default: 1.0, description: "Linear current gain β" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -132,6 +143,8 @@ class CCCSAnalogElement extends ControlledSourceElement {
   private readonly _nOutN: number;
   private readonly _senseBranch: number;
 
+  private _currentGain: number;
+
   constructor(
     nSenseP: number,
     nSenseN: number,
@@ -153,8 +166,13 @@ class CCCSAnalogElement extends ControlledSourceElement {
     this._nOutP = nOutP;
     this._nOutN = nOutN;
     this._senseBranch = senseBranchIdx;
+    this._currentGain = currentGain;
 
     this.branchIndex = senseBranchIdx;
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "currentGain") this._currentGain = value;
   }
 
   /**
@@ -373,29 +391,25 @@ export const CCCSDefinition: ComponentDefinition = {
     return new CCCSElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      branchCount: 1,
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, branchIdx, props) => {
         const expression = props.getOrDefault<string>("expression", "I(sense)");
-        const currentGain = props.getOrDefault<number>("currentGain", 1.0);
+        const currentGain = props.getModelParam<number>("currentGain");
         return new CCCSAnalogElement(
-          pinNodes.get("sense+")!, // sense+
-          pinNodes.get("sense-")!, // sense-
-          pinNodes.get("out+")!,   // out+
-          pinNodes.get("out-")!,   // out-
+          pinNodes.get("sense+")!,
+          pinNodes.get("sense-")!,
+          pinNodes.get("out+")!,
+          pinNodes.get("out-")!,
           branchIdx,
           expression,
           currentGain,
         );
       },
-    },
+      paramDefs: CCCS_PARAM_DEFS,
+      params: CCCS_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

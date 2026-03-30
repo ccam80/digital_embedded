@@ -27,6 +27,17 @@ import {
   inductorConductance,
   inductorHistoryCurrent,
 } from "../../solver/analog/integration.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: INDUCTOR_PARAM_DEFS, defaults: INDUCTOR_DEFAULTS } = defineModelParams({
+  primary: {
+    inductance: { default: 1e-3, unit: "H", description: "Inductance in henries", min: 1e-12 },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -209,6 +220,16 @@ function createInductorElement(
   return new AnalogInductorElement(branchIdx, L);
 }
 
+function createInductorElementFromModelParams(
+  _pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  branchIdx: number,
+  props: PropertyBag,
+): AnalogElementCore {
+  const L = props.getModelParam<number>("inductance");
+  return new AnalogInductorElement(branchIdx, L);
+}
+
 // ---------------------------------------------------------------------------
 // Property definitions
 // ---------------------------------------------------------------------------
@@ -274,6 +295,14 @@ export const InductorDefinition: ComponentDefinition = {
       factory: createInductorElement,
       branchCount: 1,
     },
+    },
+  },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createInductorElementFromModelParams,
+      paramDefs: INDUCTOR_PARAM_DEFS,
+      params: INDUCTOR_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

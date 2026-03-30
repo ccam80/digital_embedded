@@ -241,5 +241,13 @@ export const DecoderDefinition: ComponentDefinition = {
     },
     },
   },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: makeBehavioralDecoderAnalogFactory(1),
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

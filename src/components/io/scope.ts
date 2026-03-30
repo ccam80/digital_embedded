@@ -316,4 +316,5 @@ export const ScopeDefinition: ComponentDefinition = {
     // Schema for default channelCount=1; direction-filter order matches for all channelCounts.
     digital: { executeFn: executeScope, inputSchema: ["clk"], outputSchema: [] },
   },
+  modelRegistry: {},
 };

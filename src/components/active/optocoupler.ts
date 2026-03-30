@@ -88,6 +88,19 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: OPTOCOUPLER_PARAM_DEFS, defaults: OPTOCOUPLER_DEFAULTS } = defineModelParams({
+  primary: {
+    ctr:      { default: 1.0,  description: "Current transfer ratio CTR = I_collector / I_LED" },
+    vForward: { default: 1.2,  unit: "V", description: "LED forward voltage" },
+    rLed:     { default: 10,   unit: "Ω", description: "LED series resistance" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -142,15 +155,21 @@ function buildOptocouplerPinDeclarations(): PinDeclaration[] {
 const G_OFF = 1e-9;
 
 function createOptocouplerElement(
-  nAnode: number,
-  nCathode: number,
-  nCollector: number,
-  nEmitter: number,
-  ctr: number,
-  vForward: number,
-  rLed: number,
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  _branchIdx: number,
+  props: PropertyBag,
 ): AnalogElementCore {
-  const gOn = 1 / rLed;
+  const p: Record<string, number> = {
+    ctr:      props.getModelParam<number>("ctr"),
+    vForward: props.getModelParam<number>("vForward"),
+    rLed:     props.getModelParam<number>("rLed"),
+  };
+
+  const nAnode     = pinNodes.get("anode")!;
+  const nCathode   = pinNodes.get("cathode")!;
+  const nCollector = pinNodes.get("collector")!;
+  const nEmitter   = pinNodes.get("emitter")!;
 
   // Operating-point state
   let vd = 0;       // V_anode - V_cathode at last updateOperatingPoint
@@ -192,8 +211,8 @@ function createOptocouplerElement(
       // --- Output phototransistor stamp ---
       // I_C = CTR * I_LED; I_LED = gLed * V_d - iNR
       const iLed0 = gLed * vd - iNR;
-      const iC0 = ctr * iLed0;
-      const gmCtr = ctr * gLed; // dI_C/dV_d
+      const iC0 = p.ctr * iLed0;
+      const gmCtr = p.ctr * gLed; // dI_C/dV_d
 
       // NR constant term for output Norton source
       const iCnr = iC0 - gmCtr * vd;
@@ -216,9 +235,10 @@ function createOptocouplerElement(
       const vK = readNode(voltages, nCathode);
       vd = vA - vK;
 
-      if (vd >= vForward) {
+      const gOn = 1 / p.rLed;
+      if (vd >= p.vForward) {
         gLed = gOn;
-        iNR = gOn * vForward;
+        iNR = gOn * p.vForward;
       } else {
         gLed = G_OFF;
         iNR = 0;
@@ -234,8 +254,12 @@ function createOptocouplerElement(
       // Phototransistor: I_C = CTR * I_LED
       // Norton source pushes iC0 out of collector → current INTO collector is -iC0
       // Norton source pulls iC0 into emitter → current INTO emitter is +iC0
-      const iC = ctr * iLed;
+      const iC = p.ctr * iLed;
       return [iLed, -iLed, -iC, iC];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in p) p[key] = value;
     },
   };
 }
@@ -439,29 +463,14 @@ export const OptocouplerDefinition: ComponentDefinition = {
     return new OptocouplerElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        _branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        const ctr      = props.getOrDefault<number>("ctr",      1.0);
-        const vForward = props.getOrDefault<number>("vForward", 1.2);
-        const rLed     = props.getOrDefault<number>("rLed",     10);
-        return createOptocouplerElement(
-          pinNodes.get("anode")!,     // anode
-          pinNodes.get("cathode")!,   // cathode
-          pinNodes.get("collector")!, // collector
-          pinNodes.get("emitter")!,   // emitter
-          ctr,
-          vForward,
-          rLed,
-        );
-      },
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createOptocouplerElement(pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: OPTOCOUPLER_PARAM_DEFS,
+      params: OPTOCOUPLER_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

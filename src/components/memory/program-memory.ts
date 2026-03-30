@@ -289,4 +289,5 @@ export const ProgramMemoryDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };

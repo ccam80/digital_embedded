@@ -242,4 +242,5 @@ export const TransGateDefinition: ComponentDefinition = {
       defaultDelay: 0,
     },
   },
+  modelRegistry: {},
 };

@@ -374,6 +374,7 @@ export const MidiDefinition: ComponentDefinition = {
     // Schema for default progChangeEnable=false; direction-filter order matches for all configs.
     digital: { executeFn: executeMidi, inputSchema: ["N", "V", "OnOff", "en", "C"], outputSchema: [], defaultDelay: 0 },
   },
+  modelRegistry: {},
 };
 
 export { MidiOutputManager };

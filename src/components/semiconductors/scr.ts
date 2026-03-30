@@ -28,10 +28,11 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -45,6 +46,26 @@ const GMIN = 1e-12;
 
 /** Maximum alpha value — prevents division-by-zero in blocking formula. */
 const ALPHA_MAX = 0.95;
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defineModelParams({
+  primary: {
+    vOn:        { default: 1.5,   unit: "V", description: "On-state forward voltage drop" },
+    iH:         { default: 5e-3,  unit: "A", description: "Holding current — minimum anode current to stay on" },
+    rOn:        { default: 0.01,  unit: "Ω", description: "On-state series resistance" },
+    vBreakover: { default: 100,   unit: "V", description: "Forward breakover voltage (triggers without gate)" },
+  },
+  secondary: {
+    iS:      { default: 1e-12, unit: "A", description: "Reverse saturation current" },
+    alpha1:  { default: 0.5,              description: "PNP transistor current gain (fixed)" },
+    alpha2_0:{ default: 0.3,              description: "NPN off-state current gain" },
+    i_ref:   { default: 1e-3,  unit: "A", description: "Gate current scale factor for α₂ modulation" },
+    n:       { default: 1,                description: "Emission coefficient" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Stamp helpers — node 0 is ground (skipped)
@@ -65,18 +86,20 @@ export function createScrElement(
   const nodeK = pinNodes.get("K")!; // cathode
   const nodeG = pinNodes.get("G")!; // gate
 
-  const vOn: number       = props.getOrDefault<number>("vOn",        1.5);
-  const iH: number        = props.getOrDefault<number>("iH",         5e-3);
-  const rOn: number       = props.getOrDefault<number>("rOn",        0.01);
-  const vBreakover: number = props.getOrDefault<number>("vBreakover", 100);
-  const iS: number        = props.getOrDefault<number>("iS",         1e-12);
-  const alpha1: number    = props.getOrDefault<number>("alpha1",     0.5);
-  const alpha2_0: number  = props.getOrDefault<number>("alpha2_0",   0.3);
-  const iRef: number      = props.getOrDefault<number>("i_ref",      1e-3);
-  const n: number         = props.getOrDefault<number>("n",          1);
+  const p = {
+    vOn:        props.getModelParam<number>("vOn"),
+    iH:         props.getModelParam<number>("iH"),
+    rOn:        props.getModelParam<number>("rOn"),
+    vBreakover: props.getModelParam<number>("vBreakover"),
+    iS:         props.getModelParam<number>("iS"),
+    alpha1:     props.getModelParam<number>("alpha1"),
+    alpha2_0:   props.getModelParam<number>("alpha2_0"),
+    i_ref:      props.getModelParam<number>("i_ref"),
+    n:          props.getModelParam<number>("n"),
+  };
 
-  const nVt = n * VT;
-  const vcrit = nVt * Math.log(nVt / (iS * Math.SQRT2));
+  let nVt = p.n * VT;
+  let vcrit = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
 
   // Internal state
   let _latched = false;
@@ -88,19 +111,25 @@ export function createScrElement(
   let _gGateGeq = GMIN;
   let _gGateIeq = 0;
 
-  const vcritGate = nVt * Math.log(nVt / (iS * Math.SQRT2));
+  let vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+
+  function recomputeDerivedConstants(): void {
+    nVt = p.n * VT;
+    vcrit = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+    vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+  }
 
   function computeAlpha2(iGate: number): number {
-    const raw = 1 - (1 - alpha2_0) * Math.exp(-Math.abs(iGate) / iRef);
+    const raw = 1 - (1 - p.alpha2_0) * Math.exp(-Math.abs(iGate) / p.i_ref);
     return Math.min(raw, ALPHA_MAX);
   }
 
   function computeOperatingPoint(vak: number, vgk: number): void {
     // Gate current through a small forward-biased junction (simplified model)
-    const iGate = iS * (Math.exp(Math.min(vgk / nVt, 700)) - 1) + GMIN * vgk;
+    const iGate = p.iS * (Math.exp(Math.min(vgk / nVt, 700)) - 1) + GMIN * vgk;
 
     const a2 = computeAlpha2(iGate);
-    const a1clamped = Math.min(alpha1, ALPHA_MAX);
+    const a1clamped = Math.min(p.alpha1, ALPHA_MAX);
     const a2clamped = Math.min(a2, ALPHA_MAX);
     const alphaSum = a1clamped + a2clamped;
 
@@ -113,16 +142,16 @@ export function createScrElement(
       // On-state: model as diode (V_on forward voltage) in series with R_on
       // Effective: V_AK = V_on + I_AK * R_on
       // Linearize: conductance = 1/R_on, Norton current source
-      const gOn = 1.0 / rOn;
+      const gOn = 1.0 / p.rOn;
       // Diode drop: treat V_on as a fixed voltage offset
       // Current in on-state: I_AK = (V_AK - V_on) / R_on
-      const iOn = (vak - vOn) / rOn;
+      const iOn = (vak - p.vOn) / p.rOn;
       _geq = gOn + GMIN;
       _ieq = iOn - _geq * vak;
 
       // Check if current has dropped below holding current → unlatch
       const iAk = _geq * vak + _ieq;
-      if (iAk < iH && vak >= 0) {
+      if (iAk < p.iH && vak >= 0) {
         _latched = false;
         // Re-compute in blocking mode
         computeBlockingMode(vak, alphaSum);
@@ -134,8 +163,8 @@ export function createScrElement(
     // Gate junction model: forward-biased diode linearized at the (already
     // pnjlim-limited) vgk operating point.
     const expVgk = Math.exp(Math.min(vgk / nVt, 700));
-    const gGate = (iS * expVgk) / nVt + GMIN;
-    const iGateCurrent = iS * (expVgk - 1);
+    const gGate = (p.iS * expVgk) / nVt + GMIN;
+    const iGateCurrent = p.iS * (expVgk - 1);
     _gGateGeq = gGate;
     _gGateIeq = iGateCurrent - gGate * vgk;
   }
@@ -154,8 +183,8 @@ export function createScrElement(
       // Use small-signal conductance: nearly zero current
       const expArg = Math.min(vak / nVt, 0); // never positive for reverse
       const expVal = Math.exp(expArg);
-      const iRev = iS * (expVal - 1);
-      const gRev = (iS * expVal) / nVt + GMIN;
+      const iRev = p.iS * (expVal - 1);
+      const gRev = (p.iS * expVal) / nVt + GMIN;
       _geq = gRev;
       _ieq = iRev - gRev * vak;
     }
@@ -200,7 +229,7 @@ export function createScrElement(
       // Breakover triggers when V_AK exceeds the breakover threshold —
       // this must be evaluated against the actual circuit voltage, not the
       // pnjlim-limited value, so it fires at the right operating point.
-      if (!_latched && vakRaw > vBreakover) {
+      if (!_latched && vakRaw > p.vBreakover) {
         _latched = true;
       }
 
@@ -257,8 +286,11 @@ export function createScrElement(
       return [iA, iK, iG];
     },
 
-    setParam(_key: string, _value: number): void {
-      // SCR params are component properties, not SPICE model params
+    setParam(key: string, value: number): void {
+      if (key in p) {
+        (p as Record<string, number>)[key] = value;
+        recomputeDerivedConstants();
+      }
     },
 
     get label(): string | undefined {
@@ -374,82 +406,11 @@ function buildScrPinDeclarations(): PinDeclaration[] {
 const SCR_PROPERTY_DEFS: PropertyDefinition[] = [
   LABEL_PROPERTY_DEF,
   {
-    key: "vOn",
-    type: PropertyType.FLOAT,
-    label: "V_on (V)",
-    defaultValue: 1.5,
-    description: "On-state forward voltage drop",
-  },
-  {
-    key: "iGT",
-    type: PropertyType.FLOAT,
-    label: "I_GT (A)",
-    defaultValue: 200e-6,
-    description: "Gate trigger current threshold",
-  },
-  {
-    key: "iH",
-    type: PropertyType.FLOAT,
-    label: "I_hold (A)",
-    defaultValue: 5e-3,
-    description: "Holding current — minimum anode current to stay on",
-  },
-  {
-    key: "rOn",
-    type: PropertyType.FLOAT,
-    label: "R_on (Ω)",
-    defaultValue: 0.01,
-    description: "On-state series resistance",
-  },
-  {
-    key: "vBreakover",
-    type: PropertyType.FLOAT,
-    label: "V_breakover (V)",
-    defaultValue: 100,
-    description: "Forward breakover voltage (triggers without gate)",
-  },
-  {
-    key: "iS",
-    type: PropertyType.FLOAT,
-    label: "I_S (A)",
-    defaultValue: 1e-12,
-    description: "Reverse saturation current",
-  },
-  {
-    key: "alpha1",
-    type: PropertyType.FLOAT,
-    label: "α₁",
-    defaultValue: 0.5,
-    description: "PNP transistor current gain (fixed)",
-  },
-  {
-    key: "alpha2_0",
-    type: PropertyType.FLOAT,
-    label: "α₂₀",
-    defaultValue: 0.3,
-    description: "NPN off-state current gain",
-  },
-  {
-    key: "i_ref",
-    type: PropertyType.FLOAT,
-    label: "I_ref (A)",
-    defaultValue: 1e-3,
-    description: "Gate current scale factor for α₂ modulation",
-  },
-  {
-    key: "n",
-    type: PropertyType.FLOAT,
-    label: "N",
-    defaultValue: 1,
-    description: "Emission coefficient",
-  },
-  {
-    key: "_spiceModelOverrides",
+    key: "model",
     type: PropertyType.STRING,
-    label: "SPICE Model Overrides",
-    defaultValue: {} as Record<string, number>,
-    description: "User-supplied SPICE parameter overrides",
-    hidden: true,
+    label: "Model",
+    defaultValue: "behavioral",
+    description: "Active model selection",
   },
 ];
 
@@ -459,10 +420,7 @@ const SCR_PROPERTY_DEFS: PropertyDefinition[] = [
 
 export const SCR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
-  { xmlName: "vOn", propertyKey: "vOn", convert: (v) => parseFloat(v) },
-  { xmlName: "iH", propertyKey: "iH", convert: (v) => parseFloat(v) },
-  { xmlName: "rOn", propertyKey: "rOn", convert: (v) => parseFloat(v) },
-  { xmlName: "vBreakover", propertyKey: "vBreakover", convert: (v) => parseFloat(v) },
+  { xmlName: "model", propertyKey: "model", convert: (v) => v },
 ];
 
 // ---------------------------------------------------------------------------
@@ -485,11 +443,14 @@ export const ScrDefinition: ComponentDefinition = {
     "SCR — Silicon Controlled Rectifier.\n" +
     "Pins: A (anode), K (cathode), G (gate).\n" +
     "Triggers when gate current raises α₁+α₂ above 0.95. Latches until I_AK < I_hold.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createScrElement,
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createScrElement(pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: SCR_PARAM_DEFS,
+      params: SCR_PARAM_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

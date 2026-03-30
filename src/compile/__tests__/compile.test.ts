@@ -15,51 +15,16 @@ import { Circuit, Wire } from "../../core/circuit.js";
 import { ComponentRegistry } from "../../core/registry.js";
 import type { ComponentDefinition, ExecuteFunction } from "../../core/registry.js";
 import { ComponentCategory } from "../../core/registry.js";
-import { AbstractCircuitElement } from "../../core/element.js";
 import type { Pin, PinDeclaration } from "../../core/pin.js";
-import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from "../../core/pin.js";
+import { PinDirection } from "../../core/pin.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { PropertyBag as PropertyBagType, PropertyValue } from "../../core/properties.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import type { SerializedElement } from "../../core/element.js";
-
-// ---------------------------------------------------------------------------
-// Minimal test CircuitElement (digital-style, with AbstractCircuitElement)
-// ---------------------------------------------------------------------------
-
-class TestElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
-
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pinDecls: PinDeclaration[],
-    props?: PropertyBag,
-  ) {
-    super(typeId, instanceId, position, 0, false, props ?? new PropertyBag());
-    this._pins = resolvePins(
-      pinDecls,
-      position,
-      0,
-      createInverterConfig([]),
-      createClockConfig([]),
-    );
-  }
-
-  getPins(): readonly Pin[] {
-    return this._pins;
-  }
-
-  draw(_ctx: RenderContext): void {}
-
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 2, height: 2 };
-  }
-
-}
+import { createTestElementFromDecls } from "../../test-fixtures/test-element.js";
+import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
 
 // ---------------------------------------------------------------------------
 // Minimal plain-object CircuitElement (analog-style, no AbstractCircuitElement)
@@ -134,18 +99,16 @@ function outPinDecl(label: string, pos: { x: number; y: number }): PinDeclaratio
 // Definition builder helpers
 // ---------------------------------------------------------------------------
 
-const noopExecute: ExecuteFunction = (_index, _state, _layout) => {};
-
 function makeDigitalDef(
   name: string,
   pinDecls: PinDeclaration[],
-  executeFn: ExecuteFunction = noopExecute,
+  executeFn: ExecuteFunction = noopExecFn,
 ): ComponentDefinition {
   return {
     name,
     typeId: -1 as unknown as number,
     factory: (props: PropertyBagType) =>
-      new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pinDecls, props),
+      createTestElementFromDecls(name, crypto.randomUUID(), pinDecls, props),
     pinLayout: pinDecls,
     propertyDefs: [],
     attributeMap: [],
@@ -163,14 +126,14 @@ function makeInDef(): ComponentDefinition {
     name: "In",
     typeId: -1 as unknown as number,
     factory: (props: PropertyBagType) =>
-      new TestElement("In", crypto.randomUUID(), { x: 0, y: 0 }, pinDecls, props),
+      createTestElementFromDecls("In", crypto.randomUUID(), pinDecls, props),
     pinLayout: pinDecls,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.IO,
     helpText: "",
     models: {
-      digital: { executeFn: noopExecute },
+      digital: { executeFn: noopExecFn },
     },
   } as ComponentDefinition;
 }
@@ -181,14 +144,14 @@ function makeOutDef(): ComponentDefinition {
     name: "Out",
     typeId: -1 as unknown as number,
     factory: (props: PropertyBagType) =>
-      new TestElement("Out", crypto.randomUUID(), { x: 0, y: 0 }, pinDecls, props),
+      createTestElementFromDecls("Out", crypto.randomUUID(), pinDecls, props),
     pinLayout: pinDecls,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.IO,
     helpText: "",
     models: {
-      digital: { executeFn: noopExecute },
+      digital: { executeFn: noopExecFn },
     },
   } as ComponentDefinition;
 }
@@ -323,7 +286,7 @@ describe("compileUnified", () => {
     const registry = makeRegistry(andDef);
 
     const circuit = new Circuit();
-    const andEl = new TestElement("And", "and-1", { x: 0, y: 0 }, twoInputOnePinDecls());
+    const andEl = createTestElementFromDecls("And", "and-1", twoInputOnePinDecls());
     circuit.addElement(andEl);
 
     const result = compileUnified(circuit, registry);
@@ -345,11 +308,11 @@ describe("compileUnified", () => {
     const circuit = new Circuit();
 
     // In component: output pin at (2,0), element at (0,0)
-    const inEl = new TestElement("In", "in-1", { x: 0, y: 0 }, inPinDecl("out", { x: 2, y: 0 }));
+    const inEl = createTestElementFromDecls("In", "in-1", inPinDecl("out", { x: 2, y: 0 }));
     // And gate: a(8,0), b(8,1), out(10,0) — element at (8,0)
-    const andEl = new TestElement("And", "and-1", { x: 8, y: 0 }, twoInputOnePinDecls());
+    const andEl = createTestElementFromDecls("And", "and-1", twoInputOnePinDecls(), undefined, { x: 8, y: 0 });
     // Out component: input pin at (12,0), element at (12,0)
-    const outEl = new TestElement("Out", "out-1", { x: 12, y: 0 }, outPinDecl("in", { x: 0, y: 0 }));
+    const outEl = createTestElementFromDecls("Out", "out-1", outPinDecl("in", { x: 0, y: 0 }), undefined, { x: 12, y: 0 });
 
     circuit.addElement(inEl);
     circuit.addElement(andEl);
@@ -378,9 +341,9 @@ describe("compileUnified", () => {
     const outProps = new PropertyBag([["label", "Y"]]);
 
     // In element at (0,0), output pin at (2,0)
-    const inEl = new TestElement("In", "in-A", { x: 0, y: 0 }, inPinDecl("out", { x: 2, y: 0 }), inProps);
+    const inEl = createTestElementFromDecls("In", "in-A", inPinDecl("out", { x: 2, y: 0 }), inProps);
     // Out element at (10,0), input pin at (0,0) (world: 10,0)
-    const outEl = new TestElement("Out", "out-Y", { x: 10, y: 0 }, outPinDecl("in", { x: 0, y: 0 }), outProps);
+    const outEl = createTestElementFromDecls("Out", "out-Y", outPinDecl("in", { x: 0, y: 0 }), outProps, { x: 10, y: 0 });
 
     const inDef = makeInDef();
     const outDef = makeOutDef();

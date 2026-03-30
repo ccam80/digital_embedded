@@ -6,85 +6,34 @@
  *
  *  1. Subcircuit inlining: all subcircuits are unconditionally inlined.
  *
- *  2. Invalid simulationModel values produce diagnostics.
+ *  2. Invalid model values produce diagnostics.
  *
- *  3. Valid simulationModel keys (digital, behavioral) are respected.
+ *  3. Valid model keys (digital, behavioral) are respected.
  */
 
 import { describe, it, expect } from "vitest";
 import { Circuit, Wire } from "@/core/circuit";
-import { AbstractCircuitElement } from "@/core/element";
 import type { Pin } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
-import type { RenderContext, Rect } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
-import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
+import type { ComponentDefinition } from "@/core/registry";
 import { flattenCircuit } from "@/solver/digital/flatten";
 import type { SubcircuitHost } from "@/solver/digital/flatten";
 import { resolveModelAssignments } from "@/compile/extract-connectivity";
-
-// ---------------------------------------------------------------------------
-// Minimal test element classes
-// ---------------------------------------------------------------------------
-
-class TestLeafElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
-
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    props: PropertyBag,
-    pins: Pin[],
-  ) {
-    super(typeId, instanceId, position, 0, false, props);
-    this._pins = pins;
-  }
-
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 4, height: 4 }; }
-}
-
-class TestSubcircuitElement extends AbstractCircuitElement implements SubcircuitHost {
-  readonly internalCircuit: Circuit;
-  readonly subcircuitName: string;
-  private readonly _pins: readonly Pin[];
-
-  constructor(
-    name: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    internalCircuit: Circuit,
-    pins: Pin[],
-    extraProps?: Record<string, string>,
-  ) {
-    const props = new PropertyBag();
-    if (extraProps) {
-      for (const [k, v] of Object.entries(extraProps)) props.set(k, v);
-    }
-    super(`Subcircuit:${name}`, instanceId, position, 0, false, props);
-    this.subcircuitName = name;
-    this.internalCircuit = internalCircuit;
-    this._pins = pins;
-  }
-
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 6, height: 4 }; }
-}
+import {
+  TestLeafElement,
+  TestSubcircuitElement,
+  makeLeafElement,
+} from "@/test-fixtures/subcircuit-elements";
+import { noopExecFn } from "@/test-fixtures/execute-stubs";
 
 // ---------------------------------------------------------------------------
 // Registry helpers
 // ---------------------------------------------------------------------------
 
-function noopExecute(): ExecuteFunction {
-  return (_index, _state, _layout) => {};
-}
-
 function noopAnalogFactory() {
-  return { pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp: () => {}, getPinCurrents: () => [] };
+  return { branchIndex: -1 as const, isNonlinear: false, isReactive: false, stamp: () => {}, getPinCurrents: () => [] as number[], setParam: (_k: string, _v: number) => {} };
 }
 
 function makeDigitalDef(typeId: string): ComponentDefinition {
@@ -93,7 +42,7 @@ function makeDigitalDef(typeId: string): ComponentDefinition {
     factory: (props) => new TestLeafElement(typeId, "auto", { x: 0, y: 0 }, props, []),
     pinLayout: [], propertyDefs: [], attributeMap: [],
     category: ComponentCategory.MISC, helpText: typeId,
-    models: { digital: { executeFn: noopExecute() } },
+    models: { digital: { executeFn: noopExecFn } },
   };
 }
 
@@ -104,7 +53,8 @@ function makeAnalogDef(typeId: string): ComponentDefinition {
     pinLayout: [], propertyDefs: [], attributeMap: [],
     category: ComponentCategory.MISC, helpText: typeId,
     defaultModel: "behavioral",
-    models: { mnaModels: { behavioral: { factory: noopAnalogFactory } } },
+    models: {},
+    modelRegistry: { behavioral: { kind: "inline" as const, factory: () => noopAnalogFactory(), paramDefs: [], params: {} } },
   };
 }
 
@@ -115,9 +65,9 @@ function makeDualDef(typeId: string): ComponentDefinition {
     pinLayout: [], propertyDefs: [], attributeMap: [],
     category: ComponentCategory.MISC, helpText: typeId,
     models: {
-      digital: { executeFn: noopExecute() },
-      mnaModels: { behavioral: { factory: noopAnalogFactory } },
+      digital: { executeFn: noopExecFn },
     },
+    modelRegistry: { behavioral: { kind: "inline" as const, factory: () => noopAnalogFactory(), paramDefs: [], params: {} } },
   };
 }
 
@@ -164,9 +114,9 @@ describe("FlattenPipelineReorder", () => {
     expect(capEls).toHaveLength(1);
   });
 
-  it("invalid_submode_produces_diagnostic: unrecognized simulationModel on dual-model component produces invalid-simulation-model diagnostic and neutral modelKey", () => {
+  it("invalid_submode_produces_diagnostic: unrecognized model on dual-model component produces invalid-simulation-model diagnostic and neutral modelKey", () => {
     const props = new PropertyBag();
-    props.set("simulationModel", "analog-pins");
+    props.set("model", "analog-pins");
     const el = new TestLeafElement(
       "DualGate", "gate-1", { x: 0, y: 0 }, props,
       [makePin("out", PinDirection.OUTPUT, 2, 1)],
@@ -184,9 +134,9 @@ describe("FlattenPipelineReorder", () => {
     expect(diagnostics[0]!.code).toBe("invalid-simulation-model");
   });
 
-  it("invalid_logical_submode_produces_diagnostic: simulationModel=logical on dual-model component produces invalid-simulation-model diagnostic", () => {
+  it("invalid_logical_submode_produces_diagnostic: model=logical on dual-model component produces invalid-simulation-model diagnostic", () => {
     const props = new PropertyBag();
-    props.set("simulationModel", "logical");
+    props.set("model", "logical");
     const el = new TestLeafElement(
       "DualGate", "gate-2", { x: 0, y: 0 }, props,
       [makePin("out", PinDirection.OUTPUT, 2, 1)],
@@ -201,9 +151,9 @@ describe("FlattenPipelineReorder", () => {
     expect(diagnostics[0]!.code).toBe("invalid-simulation-model");
   });
 
-  it("explicit_digital_key_respected: simulationModel=digital on dual-model component routes to digital", () => {
+  it("explicit_digital_key_respected: model=digital on dual-model component routes to digital", () => {
     const props = new PropertyBag();
-    props.set("simulationModel", "digital");
+    props.set("model", "digital");
     const el = new TestLeafElement(
       "DualGate", "gate-3", { x: 0, y: 0 }, props,
       [makePin("out", PinDirection.OUTPUT, 2, 1)],
@@ -217,9 +167,9 @@ describe("FlattenPipelineReorder", () => {
     expect(assignments[0]!.modelKey).toBe("digital");
   });
 
-  it("explicit_behavioral_key_respected: simulationModel=behavioral on dual-model component routes to behavioral mna model", () => {
+  it("explicit_behavioral_key_respected: model=behavioral on dual-model component routes to behavioral mna model", () => {
     const props = new PropertyBag();
-    props.set("simulationModel", "behavioral");
+    props.set("model", "behavioral");
     const el = new TestLeafElement(
       "DualGate", "gate-4", { x: 0, y: 0 }, props,
       [makePin("out", PinDirection.OUTPUT, 2, 1)],

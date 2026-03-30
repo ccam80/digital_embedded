@@ -30,29 +30,50 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
  * Node assignments (1-based, 0 = ground):
  *   nInp=1, nInn=2, nOut=3, nVccP=4, nVccN=5
  */
-function makeRealOpAmp(overrides: Record<string, number | string> = {}): AnalogElement {
-  const defaults: [string, number | string][] = [
-    ["aol",      100000],
-    ["gbw",      1e6],
-    ["slewRate", 0.5e6],
-    ["vos",      0],
-    ["iBias",    0],
-    ["rIn",      1e12],
-    ["rOut",     75],
-    ["iMax",     25e-3],
-    ["vSatPos",  1.5],
-    ["vSatNeg",  1.5],
-  ];
-  const entries: [string, number | string][] = defaults.map(([k, v]) =>
-    k in overrides ? [k, overrides[k]] : [k, v],
-  );
-  // Add any extra overrides not in defaults
-  for (const [k, v] of Object.entries(overrides)) {
-    if (!defaults.some(([dk]) => dk === k)) {
-      entries.push([k, v]);
+const REAL_OPAMP_MODEL_PARAM_KEYS = new Set([
+  "aol", "gbw", "slewRate", "vos", "iBias", "rIn", "rOut", "iMax", "vSatPos", "vSatNeg",
+]);
+
+/** Build a PropertyBag with all real-opamp model params populated via replaceModelParams. */
+function makeOpAmpProps(params: Record<string, number | string>): PropertyBag {
+  const modelParams: Record<string, number> = {};
+  const staticEntries: [string, number | string][] = [];
+  for (const [k, v] of Object.entries(params)) {
+    if (REAL_OPAMP_MODEL_PARAM_KEYS.has(k)) {
+      modelParams[k] = v as number;
+    } else {
+      staticEntries.push([k, v]);
     }
   }
-  const props = new PropertyBag(entries);
+  const bag = new PropertyBag(staticEntries);
+  bag.replaceModelParams(modelParams);
+  return bag;
+}
+
+function makeRealOpAmp(overrides: Record<string, number | string> = {}): AnalogElement {
+  const modelDefaults: Record<string, number> = {
+    aol:      100000,
+    gbw:      1e6,
+    slewRate: 0.5e6,
+    vos:      0,
+    iBias:    0,
+    rIn:      1e12,
+    rOut:     75,
+    iMax:     25e-3,
+    vSatPos:  1.5,
+    vSatNeg:  1.5,
+  };
+  const modelParams: Record<string, number> = { ...modelDefaults };
+  const staticEntries: [string, number | string][] = [];
+  for (const [k, v] of Object.entries(overrides)) {
+    if (REAL_OPAMP_MODEL_PARAM_KEYS.has(k)) {
+      modelParams[k] = v as number;
+    } else {
+      staticEntries.push([k, v]);
+    }
+  }
+  const props = new PropertyBag(staticEntries);
+  props.replaceModelParams(modelParams);
   const pinNodes = new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]);
   const el = createRealOpAmpElement(pinNodes, props);
   // pinLayout order: [in-, in+, out, Vcc+, Vcc-] → [2, 1, 3, 4, 5]
@@ -197,18 +218,10 @@ describe("DCGain", () => {
     const nVin = 1, nInn = 2, nOut = 3, nInp = 4, nVccP = 5, nVccN = 6;
     const brVin = 6, brInp = 7, brVccP = 8, brVccN = 9;
 
-    const opamp = makeOpAmp(new Map([["in+", nInp], ["in-", nInn], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
-      ["aol",      100000],
-      ["gbw",      1e6],
-      ["slewRate", 0.5e6],
-      ["vos",      0],
-      ["iBias",    0],
-      ["rIn",      1e12],
-      ["rOut",     75],
-      ["iMax",     25e-3],
-      ["vSatPos",  1.5],
-      ["vSatNeg",  1.5],
-    ]));
+    const opamp = makeOpAmp(new Map([["in+", nInp], ["in-", nInn], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), makeOpAmpProps({
+      aol: 100000, gbw: 1e6, slewRate: 0.5e6, vos: 0, iBias: 0,
+      rIn: 1e12, rOut: 75, iMax: 25e-3, vSatPos: 1.5, vSatNeg: 1.5,
+    }));
 
     const elements: AnalogElement[] = [
       opamp,
@@ -241,18 +254,10 @@ describe("DCGain", () => {
     const nInp = 1, nFeedback = 2, nVccP = 3, nVccN = 4;
     const brVin = 4, brVccP = 5, brVccN = 6;
 
-    const opamp = makeOpAmp(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
-      ["aol",      100000],
-      ["gbw",      1e6],
-      ["slewRate", 0.5e6],
-      ["vos",      0],
-      ["iBias",    0],
-      ["rIn",      1e12],
-      ["rOut",     75],
-      ["iMax",     25e-3],
-      ["vSatPos",  1.5],
-      ["vSatNeg",  1.5],
-    ]));
+    const opamp = makeOpAmp(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), makeOpAmpProps({
+      aol: 100000, gbw: 1e6, slewRate: 0.5e6, vos: 0, iBias: 0,
+      rIn: 1e12, rOut: 75, iMax: 25e-3, vSatPos: 1.5, vSatNeg: 1.5,
+    }));
 
     const elements: AnalogElement[] = [
       opamp,
@@ -293,11 +298,10 @@ describe("Bandwidth", () => {
     expect(tauFromFp).toBeCloseTo(tauExpected, 8);
 
     // Verify the element creates successfully with the right params
-    const el = createRealOpAmpElement(new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]), new PropertyBag([
-      ["aol", aol], ["gbw", gbw], ["slewRate", 0.5e6],
-      ["vos", 0], ["iBias", 0], ["rIn", 1e12],
-      ["rOut", 75], ["iMax", 25e-3], ["vSatPos", 1.5], ["vSatNeg", 1.5],
-    ]));
+    const el = createRealOpAmpElement(new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]), makeOpAmpProps({
+      aol, gbw, slewRate: 0.5e6, vos: 0, iBias: 0,
+      rIn: 1e12, rOut: 75, iMax: 25e-3, vSatPos: 1.5, vSatNeg: 1.5,
+    }));
     expect(el.isReactive).toBe(true);
     expect(el.isNonlinear).toBe(true);
   });
@@ -318,11 +322,10 @@ describe("Bandwidth", () => {
     expect(bwCl * aCl).toBeCloseTo(gbw, 0);
 
     // Verify the element is created with correct GBW
-    const el = createRealOpAmpElement(new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]), new PropertyBag([
-      ["aol", 100000], ["gbw", gbw], ["slewRate", 0.5e6],
-      ["vos", 0], ["iBias", 0], ["rIn", 1e12],
-      ["rOut", 75], ["iMax", 25e-3], ["vSatPos", 1.5], ["vSatNeg", 1.5],
-    ]));
+    const el = createRealOpAmpElement(new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]), makeOpAmpProps({
+      aol: 100000, gbw, slewRate: 0.5e6, vos: 0, iBias: 0,
+      rIn: 1e12, rOut: 75, iMax: 25e-3, vSatPos: 1.5, vSatNeg: 1.5,
+    }));
     expect(el).toBeDefined();
   });
 });
@@ -348,18 +351,10 @@ describe("SlewRate", () => {
 
     const slewRate = 0.5e6; // V/s
 
-    const opamp = makeOpAmp(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
-      ["aol",      100000],
-      ["gbw",      1e6],
-      ["slewRate", slewRate],
-      ["vos",      0],
-      ["iBias",    0],
-      ["rIn",      1e12],
-      ["rOut",     75],
-      ["iMax",     25e-3],
-      ["vSatPos",  1.5],
-      ["vSatNeg",  1.5],
-    ]));
+    const opamp = makeOpAmp(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), makeOpAmpProps({
+      aol: 100000, gbw: 1e6, slewRate, vos: 0, iBias: 0,
+      rIn: 1e12, rOut: 75, iMax: 25e-3, vSatPos: 1.5, vSatNeg: 1.5,
+    }));
 
     const elements: AnalogElement[] = [
       opamp,
@@ -397,18 +392,10 @@ describe("SlewRate", () => {
     const slewRate = 0.5e6;
     const dt = 1e-6;
 
-    const opamp = makeOpAmp(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
-      ["aol",      100000],
-      ["gbw",      1e6],
-      ["slewRate", slewRate],
-      ["vos",      0],
-      ["iBias",    0],
-      ["rIn",      1e12],
-      ["rOut",     75],
-      ["iMax",     25e-3],
-      ["vSatPos",  1.5],
-      ["vSatNeg",  1.5],
-    ]));
+    const opamp = makeOpAmp(new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback], ["Vcc+", nVccP], ["Vcc-", nVccN]]), makeOpAmpProps({
+      aol: 100000, gbw: 1e6, slewRate, vos: 0, iBias: 0,
+      rIn: 1e12, rOut: 75, iMax: 25e-3, vSatPos: 1.5, vSatNeg: 1.5,
+    }));
 
     const elements: AnalogElement[] = [
       opamp,
@@ -463,18 +450,10 @@ describe("Offset", () => {
 
     const vos = 1e-3; // 1 mV
 
-    const opamp = withNodeIds(createRealOpAmpElement(new Map([["in+", nInp], ["in-", nInn], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
-      ["aol",      100000],
-      ["gbw",      1e6],
-      ["slewRate", 0.5e6],
-      ["vos",      vos],
-      ["iBias",    0],
-      ["rIn",      1e12],
-      ["rOut",     75],
-      ["iMax",     25e-3],
-      ["vSatPos",  1.5],
-      ["vSatNeg",  1.5],
-    ])), [nInp, nInn, nOut, nVccP, nVccN]);
+    const opamp = withNodeIds(createRealOpAmpElement(new Map([["in+", nInp], ["in-", nInn], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), makeOpAmpProps({
+      aol: 100000, gbw: 1e6, slewRate: 0.5e6, vos, iBias: 0,
+      rIn: 1e12, rOut: 75, iMax: 25e-3, vSatPos: 1.5, vSatNeg: 1.5,
+    })), [nInp, nInn, nOut, nVccP, nVccN]);
 
     // Non-inverting amplifier: in- connected through Rin=1Ω to gnd, Rf=999Ω from out to in-
     // Gain = 1 + 999/1 = 1000
@@ -518,18 +497,10 @@ describe("CurrentLimit", () => {
 
     const iMax = 25e-3;
 
-    const opamp = withNodeIds(createRealOpAmpElement(new Map([["in+", nInp], ["in-", nOut], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), new PropertyBag([
-      ["aol",      100000],
-      ["gbw",      1e6],
-      ["slewRate", 0.5e6],
-      ["vos",      0],
-      ["iBias",    0],
-      ["rIn",      1e12],
-      ["rOut",     75],
-      ["iMax",     iMax],
-      ["vSatPos",  1.5],
-      ["vSatNeg",  1.5],
-    ])), [nInp, nOut, nOut, nVccP, nVccN]);
+    const opamp = withNodeIds(createRealOpAmpElement(new Map([["in+", nInp], ["in-", nOut], ["out", nOut], ["Vcc+", nVccP], ["Vcc-", nVccN]]), makeOpAmpProps({
+      aol: 100000, gbw: 1e6, slewRate: 0.5e6, vos: 0, iBias: 0,
+      rIn: 1e12, rOut: 75, iMax, vSatPos: 1.5, vSatNeg: 1.5,
+    })), [nInp, nOut, nOut, nVccP, nVccN]);
 
     const rLoad = 10; // 10Ω heavy load
 
@@ -569,19 +540,19 @@ describe("RealOpAmp", () => {
     expect(preset.vos).toBe(1e-3);
 
     // Verify that creating an element with model="741" uses the preset values.
-    const props = new PropertyBag([
-      ["model",    "741"],
-      ["aol",      100000],   // These should be overridden by the model preset
-      ["gbw",      2e6],      // This should be overridden
-      ["slewRate", 1e6],
-      ["vos",      0],
-      ["iBias",    0],
-      ["rIn",      1e12],
-      ["rOut",     75],
-      ["iMax",     25e-3],
-      ["vSatPos",  1.5],
-      ["vSatNeg",  1.5],
-    ]);
+    const props = new PropertyBag([["model", "741"]]);
+    props.replaceModelParams({
+      aol:      100000,   // These should be overridden by the model preset
+      gbw:      2e6,      // This should be overridden
+      slewRate: 1e6,
+      vos:      0,
+      iBias:    0,
+      rIn:      1e12,
+      rOut:     75,
+      iMax:     25e-3,
+      vSatPos:  1.5,
+      vSatNeg:  1.5,
+    });
     const el = createRealOpAmpElement(new Map([["in+", 1], ["in-", 2], ["out", 3], ["Vcc+", 4], ["Vcc-", 5]]), props);
     expect(el).toBeDefined();
     expect(el.isNonlinear).toBe(true);
@@ -618,10 +589,10 @@ describe("RealOpAmp", () => {
   });
 
   it("component_definition_has_correct_engine_type", () => {
-    expect(RealOpAmpDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(RealOpAmpDefinition.modelRegistry?.["behavioral"]).toBeDefined();
     expect(RealOpAmpDefinition.name).toBe("RealOpAmp");
     expect(RealOpAmpDefinition.pinLayout).toHaveLength(5);
-    expect(RealOpAmpDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(RealOpAmpDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
     expect(RealOpAmpDefinition.factory).toBeDefined();
   });
 });

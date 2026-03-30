@@ -45,6 +45,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
+import { defineModelParams } from "../../core/model-params.js";
 import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import {
@@ -52,6 +53,16 @@ import {
   DigitalOutputPinModel,
 } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: ADC_PARAM_DEFS, defaults: ADC_DEFAULTS } = defineModelParams({
+  primary: {
+    vRef: { default: 5.0, unit: "V", description: "Full-scale reference voltage" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin electrical specs
@@ -231,7 +242,9 @@ function createADCElement(
   props: PropertyBag,
 ): AnalogElementCore {
   const bits = Math.max(1, Math.min(32, props.getOrDefault<number>("bits", 8)));
-  const vRefProp = props.getOrDefault<number>("vRef", 5.0);
+  const p: Record<string, number> = {
+    vRef: props.getModelParam<number>("vRef"),
+  };
   const mode = props.getOrDefault<string>("mode", "unipolar") as "unipolar" | "bipolar";
   const conversionType = props.getOrDefault<string>("conversionType", "instant") as
     | "instant"
@@ -294,7 +307,7 @@ function createADCElement(
 
   function computeCode(voltages: Float64Array): number {
     const vIn = readVoltage(voltages, nVin);
-    const vRef = nVref > 0 ? readVoltage(voltages, nVref) : vRefProp;
+    const vRef = nVref > 0 ? readVoltage(voltages, nVref) : p.vRef;
     const vGnd = readVoltage(voltages, nGnd);
 
     const span = vRef - vGnd;
@@ -323,17 +336,17 @@ function createADCElement(
       if (nClk > 0) clkPin.stamp(solver);
 
       // Output Norton equivalents — EOC and data bits
-      if (nEoc > 0) eocPin.stamp(solver);
+      if (nEoc > 0) eocPin.stampOutput(solver);
       for (let i = 0; i < bits; i++) {
-        if (nDigital[i] > 0) digitalPins[i].stamp(solver);
+        if (nDigital[i] > 0) digitalPins[i].stampOutput(solver);
       }
     },
 
     stampNonlinear(solver: SparseSolver): void {
       // Re-stamp output pins with current logic levels (Norton currents)
-      if (nEoc > 0) eocPin.stamp(solver);
+      if (nEoc > 0) eocPin.stampOutput(solver);
       for (let i = 0; i < bits; i++) {
-        if (nDigital[i] > 0) digitalPins[i].stamp(solver);
+        if (nDigital[i] > 0) digitalPins[i].stampOutput(solver);
       }
     },
 
@@ -431,6 +444,10 @@ function createADCElement(
     get eocActive(): boolean {
       return eocActive;
     },
+
+    setParam(key: string, value: number): void {
+      if (key in p) p[key] = value;
+    },
   } as AnalogElementCore & { latchedCode: number; eocActive: boolean };
 }
 
@@ -516,18 +533,14 @@ export const ADCDefinition: ComponentDefinition = {
     return new ADCElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        internalNodeIds: readonly number[],
-        branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        return createADCElement(pinNodes, internalNodeIds, branchIdx, props);
-      },
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createADCElement(pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: ADC_PARAM_DEFS,
+      params: ADC_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

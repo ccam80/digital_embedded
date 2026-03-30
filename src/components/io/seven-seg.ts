@@ -297,5 +297,13 @@ export const SevenSegDefinition: ComponentDefinition = {
       behavioral: { factory: createSevenSegAnalogElement },
     },
   },
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: createSevenSegAnalogElement,
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

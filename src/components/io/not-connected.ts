@@ -140,4 +140,5 @@ export const NotConnectedDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeNotConnected, inputSchema: ["nc"], outputSchema: [] },
   },
+  modelRegistry: {},
 };

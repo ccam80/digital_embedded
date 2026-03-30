@@ -201,4 +201,5 @@ export const PowerSupplyDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executePowerSupply, inputSchema: ["VDD", "GND"], outputSchema: [] },
   },
+  modelRegistry: {},
 };

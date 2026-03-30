@@ -230,4 +230,5 @@ export const LookUpTableDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };

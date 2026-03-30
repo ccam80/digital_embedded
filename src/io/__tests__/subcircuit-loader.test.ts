@@ -11,32 +11,17 @@ import {
 import { SubcircuitElement } from "../../components/subcircuit/subcircuit.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition } from "../../core/registry.js";
-import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
-import type { Pin } from "../../core/pin.js";
-
 import { EmbeddedResolver } from "../file-resolver.js";
 import type { FileResolver } from "../file-resolver.js";
-
-// ---------------------------------------------------------------------------
-// Minimal element for built-in registry entries
-// ---------------------------------------------------------------------------
-
-class StubElement extends AbstractCircuitElement {
-  getPins(): readonly Pin[] { return []; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-}
+import { TestElement } from "../../test-fixtures/test-element.js";
+import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
 
 function stubDef(name: string): ComponentDefinition {
   return {
     name,
     typeId: -1,
-    factory: (props) => new StubElement(name, crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
-    models: { digital: { executeFn: () => {} } },
+    factory: (props) => new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, [], props),
+    models: { digital: { executeFn: noopExecFn } },
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],

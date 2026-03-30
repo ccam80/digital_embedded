@@ -281,5 +281,13 @@ export const CounterDefinition: ComponentDefinition = {
     },
     },
   },
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: makeBehavioralCounterAnalogFactory(),
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

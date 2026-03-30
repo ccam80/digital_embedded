@@ -313,4 +313,5 @@ export const RegisterFileDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };

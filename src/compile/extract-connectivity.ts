@@ -38,6 +38,13 @@ export interface ModelAssignment {
   modelKey: string;
   /** The resolved model object, or null for neutral/infrastructure elements. */
   model: import('../core/registry.js').DigitalModel | null;
+  /**
+   * True when the component has both a digital model and at least one analog
+   * model (via modelRegistry or mnaModels). Dual-model components with
+   * modelKey="digital" contribute both "digital" and "analog" domain tags to
+   * their connectivity groups, creating boundary groups for bridge synthesis.
+   */
+  isDualModel: boolean;
 }
 
 /**
@@ -50,6 +57,7 @@ export interface ModelAssignment {
 export function resolveModelAssignments(
   elements: readonly CircuitElement[],
   registry: ComponentRegistry,
+  runtimeModels?: Record<string, Record<string, import('../core/registry.js').ModelEntry>>,
 ): [ModelAssignment[], Diagnostic[]] {
   const result: ModelAssignment[] = [];
   const diagnostics: Diagnostic[] = [];
@@ -58,20 +66,71 @@ export function resolveModelAssignments(
     const el = elements[i]!;
 
     if (INFRASTRUCTURE_TYPES.has(el.typeId)) {
-      result.push({ elementIndex: i, modelKey: 'neutral', model: null });
+      result.push({ elementIndex: i, modelKey: 'neutral', model: null, isDualModel: false });
       continue;
     }
 
     const def = registry.get(el.typeId);
     if (def === undefined) {
-      result.push({ elementIndex: i, modelKey: 'neutral', model: null });
+      result.push({ elementIndex: i, modelKey: 'neutral', model: null, isDualModel: false });
       continue;
     }
 
     const props = el.getProperties();
-    const modelKey = (props.has('model') ? props.get<string>('model') : undefined)
-      ?? def.defaultModel
-      ?? (def.models.digital ? 'digital' : 'neutral');
+
+    // Resolve the requested model key from component properties.
+    const requestedKey = props.has('model') ? props.get<string>('model') : undefined;
+
+    // Collect all available model keys for this component.
+    // modelRegistry is the canonical source for analog models.
+    // Legacy: some definitions attach mnaModels directly on def.models (test-only pattern).
+    // Runtime models from circuit.metadata.models are also valid keys.
+    const hasDigital = Boolean(def.models?.digital);
+    const registryKeys = def.modelRegistry ? Object.keys(def.modelRegistry) : [];
+    const mnaModelsObj = (def.models as Record<string, unknown>)['mnaModels'];
+    const staticKeys =
+      registryKeys.length > 0
+        ? registryKeys
+        : (mnaModelsObj && typeof mnaModelsObj === 'object' ? Object.keys(mnaModelsObj) : []);
+    const runtimeKeys = runtimeModels?.[el.typeId] ? Object.keys(runtimeModels[el.typeId]!) : [];
+    const mnaKeys = runtimeKeys.length > 0 ? [...new Set([...staticKeys, ...runtimeKeys])] : staticKeys;
+    const hasAnalogModel = mnaKeys.length > 0;
+
+    // Determine the default model key for this component:
+    //   1. Explicit defaultModel from definition.
+    //   2. "digital" when a digital model exists.
+    //   3. First analog model key when only analog models exist.
+    //   4. "neutral" as final fallback (infrastructure-like).
+    const defaultKey =
+      def.defaultModel ??
+      (hasDigital ? 'digital' : undefined) ??
+      mnaKeys[0] ??
+      'neutral';
+
+    const candidateKey = requestedKey ?? defaultKey;
+
+    // Validate the candidate key against available models.
+    // Valid keys: "digital" (when digital model exists), any key in mnaKeys,
+    // or the component's own defaultModel (trusted by definition).
+    const isValidKey =
+      (candidateKey === 'digital' && hasDigital) ||
+      mnaKeys.includes(candidateKey) ||
+      candidateKey === def.defaultModel;
+
+    let modelKey: string;
+    if (requestedKey !== undefined && !isValidKey) {
+      // User-provided key is not valid for this component — emit diagnostic and neutralize.
+      diagnostics.push({
+        severity: 'warning',
+        code: 'invalid-simulation-model',
+        message: `Component "${def.name}" has no model "${requestedKey}". Valid models: ${[hasDigital ? 'digital' : undefined, ...mnaKeys].filter(Boolean).join(', ') || '(none)'}`,
+      });
+      modelKey = 'neutral';
+    } else if (candidateKey === 'neutral') {
+      modelKey = 'neutral';
+    } else {
+      modelKey = candidateKey;
+    }
 
     let model: import('../core/registry.js').DigitalModel | null;
     if (modelKey === 'digital') {
@@ -80,7 +139,15 @@ export function resolveModelAssignments(
       model = null;
     }
 
-    result.push({ elementIndex: i, modelKey, model });
+    // A component is dual-model when "model" is explicitly set to
+    // "digital" AND the component also has analog models available. In this
+    // case the component runs its digital model in the digital engine while
+    // its pins simultaneously contribute "analog" domain to connectivity groups,
+    // creating boundary groups for bridge adapter synthesis even when no
+    // physical connection to an analog net exists.
+    const isDualModel = requestedKey === 'digital' && hasDigital && hasAnalogModel;
+
+    result.push({ elementIndex: i, modelKey, model, isDualModel });
   }
 
   return [result, diagnostics];
@@ -312,6 +379,25 @@ export function extractConnectivityGroups(
         domain,
         kind: pin.kind ?? "signal",
       });
+
+      // Dual-model components participate in both domains simultaneously.
+      // A digital-domain dual-model component (e.g. a gate with an MNA model)
+      // also contributes "analog" to its groups, creating boundary groups that
+      // trigger bridge adapter synthesis without requiring physical connection
+      // to an analog net.
+      if (assignment.isDualModel && domain === 'digital') {
+        groupPins[groupId]!.push({
+          elementIndex: i,
+          pinIndex: j,
+          pinLabel: pin.label,
+          direction: pin.direction as PinDirection,
+          bitWidth: pin.bitWidth,
+          worldPosition: wp,
+          wireVertex: null,
+          domain: 'analog',
+          kind: pin.kind ?? "signal",
+        });
+      }
     }
   }
 
@@ -443,6 +529,48 @@ export interface PinLoadingOverride {
     | { type: 'label'; label: string }
     | { type: 'pin'; instanceId: string; pinLabel: string };
   loading: 'loaded' | 'ideal';
+}
+
+// ---------------------------------------------------------------------------
+// applyLoadingDecisions — inject "analog" domain into digital-only nets
+// ---------------------------------------------------------------------------
+
+/**
+ * Mutate connectivity groups to reflect loading decisions.
+ *
+ * For each group that contains "digital" but not "analog":
+ *   - If a per-net override says "loaded" → add "analog" to domains.
+ *   - Else if digitalPinLoading === "all" → add "analog" to domains.
+ *
+ * For boundary groups (already have both "digital" and "analog"):
+ *   - If a per-net override says "ideal" → set group.loadingMode = "ideal".
+ *
+ * Groups that are digital-only and receive a per-net "ideal" override are
+ * left unchanged: "ideal" only makes sense on an already-boundary group.
+ */
+export function applyLoadingDecisions(
+  groups: ConnectivityGroup[],
+  digitalPinLoading: "cross-domain" | "all" | "none",
+  perNetOverrides: ReadonlyMap<number, "loaded" | "ideal">,
+): void {
+  for (const group of groups) {
+    const isDigital = group.domains.has("digital");
+    const isAnalog = group.domains.has("analog");
+
+    if (isDigital && !isAnalog) {
+      const override = perNetOverrides.get(group.groupId);
+      if (override === "loaded") {
+        group.domains.add("analog");
+      } else if (digitalPinLoading === "all") {
+        group.domains.add("analog");
+      }
+    } else if (isDigital && isAnalog) {
+      const override = perNetOverrides.get(group.groupId);
+      if (override === "ideal") {
+        group.loadingMode = "ideal";
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

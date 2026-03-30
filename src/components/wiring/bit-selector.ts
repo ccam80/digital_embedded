@@ -216,4 +216,5 @@ export const BitSelectorDefinition: ComponentDefinition = {
       outputSchema: ["out"],
     },
   },
+  modelRegistry: {},
 };

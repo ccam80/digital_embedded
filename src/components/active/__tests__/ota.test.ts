@@ -40,12 +40,11 @@ function makeOTAElement(
   const gmMax = opts.gmMax ?? 0.01;
   const vt = opts.vt ?? 0.026;
   const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>([
-    ["gmMax", gmMax],
-    ["vt", vt],
     ["label", ""],
   ]).entries());
+  props.replaceModelParams({ gmMax, vt });
   return withNodeIds(
-    OTADefinition.models!.mnaModels!.behavioral!.factory(
+    OTADefinition.modelRegistry!["behavioral"]!.factory(
       new Map([["V+", nVp], ["V-", nVm], ["Iabc", nIabc], ["OUT+", nOutP], ["OUT", nOutN]]),
       [],
       -1,

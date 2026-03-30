@@ -37,15 +37,13 @@ function makeOptocouplerElement(
   const vForward = opts.vForward ?? 1.2;
   const rLed     = opts.rLed     ?? 10;
   const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>([
-    ["ctr",      ctr],
-    ["vForward", vForward],
-    ["rLed",     rLed],
     ["vceSat",   0.3],
     ["bandwidth", 50000],
     ["label",    ""],
   ]).entries());
+  props.replaceModelParams({ ctr, vForward, rLed });
   return withNodeIds(
-    OptocouplerDefinition.models!.mnaModels!.behavioral!.factory(
+    OptocouplerDefinition.modelRegistry!["behavioral"]!.factory(
       new Map([["anode", nAnode], ["cathode", nCathode], ["collector", nCollector], ["emitter", nEmitter]]),
       [],
       -1,

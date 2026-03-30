@@ -34,8 +34,8 @@ import { NJfetAnalogElement } from "./njfet.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import { JFET_P_DEFAULTS } from "../../solver/analog/model-defaults.js";
 import type { FetCapacitances } from "../../solver/analog/fet-base.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -48,9 +48,27 @@ const VT = 0.02585;
 const GMIN = 1e-12;
 
 // ---------------------------------------------------------------------------
-// Stamp helpers — node 0 is ground (skipped)
+// Model parameter declarations
 // ---------------------------------------------------------------------------
 
+export const { paramDefs: PJFET_PARAM_DEFS, defaults: PJFET_PARAM_DEFAULTS } = defineModelParams({
+  primary: {
+    VTO:    { default: 2.0,   unit: "V",    description: "Pinch-off (threshold) voltage" },
+    BETA:   { default: 1e-4,  unit: "A/V²", description: "Transconductance coefficient" },
+    LAMBDA: { default: 0.0,   unit: "1/V",  description: "Channel-length modulation" },
+  },
+  secondary: {
+    IS:  { default: 1e-14, unit: "A", description: "Gate junction saturation current" },
+    CGS: { default: 0,     unit: "F", description: "Gate-source capacitance" },
+    CGD: { default: 0,     unit: "F", description: "Gate-drain capacitance" },
+    PB:  { default: 1.0,   unit: "V", description: "Gate junction built-in potential" },
+    FC:  { default: 0.5,              description: "Forward-bias capacitance coefficient" },
+    RD:  { default: 0,     unit: "Ω", description: "Drain ohmic resistance" },
+    RS:  { default: 0,     unit: "Ω", description: "Source ohmic resistance" },
+    KF:  { default: 0,                description: "Flicker noise coefficient" },
+    AF:  { default: 1,                description: "Flicker noise exponent" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // PJfetAnalogElement
@@ -169,30 +187,9 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
 // Factory
 // ---------------------------------------------------------------------------
 
-function resolveJfetParams(props: PropertyBag, defaults: Record<string, number>) {
-  const modelParams = props.has("_modelParams")
-    ? props.get<Record<string, number>>("_modelParams")
-    : undefined;
-  const mp = modelParams ?? defaults;
-
-  return {
-    VTO: mp["VTO"] ?? defaults["VTO"],
-    BETA: mp["BETA"] ?? defaults["BETA"],
-    LAMBDA: mp["LAMBDA"] ?? defaults["LAMBDA"],
-    IS: mp["IS"] ?? defaults["IS"],
-    CGS: mp["CGS"] ?? defaults["CGS"],
-    CGD: mp["CGD"] ?? defaults["CGD"],
-    PB: mp["PB"] ?? defaults["PB"],
-    FC: mp["FC"] ?? defaults["FC"],
-    RD: mp["RD"] ?? defaults["RD"],
-    RS: mp["RS"] ?? defaults["RS"],
-    KF: mp["KF"] ?? defaults["KF"],
-    AF: mp["AF"] ?? defaults["AF"],
-  };
-}
-
 export function createPJfetElement(
   pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
 ): PJfetAnalogElement {
@@ -200,7 +197,20 @@ export function createPJfetElement(
   const nodeD = pinNodes.get("D")!; // drain
   const nodeS = pinNodes.get("S")!; // source
 
-  const p = resolveJfetParams(props, JFET_P_DEFAULTS);
+  const p = {
+    VTO:    props.getModelParam<number>("VTO"),
+    BETA:   props.getModelParam<number>("BETA"),
+    LAMBDA: props.getModelParam<number>("LAMBDA"),
+    IS:     props.getModelParam<number>("IS"),
+    CGS:    props.getModelParam<number>("CGS"),
+    CGD:    props.getModelParam<number>("CGD"),
+    PB:     props.getModelParam<number>("PB"),
+    FC:     props.getModelParam<number>("FC"),
+    RD:     props.getModelParam<number>("RD"),
+    RS:     props.getModelParam<number>("RS"),
+    KF:     props.getModelParam<number>("KF"),
+    AF:     props.getModelParam<number>("AF"),
+  };
   return new PJfetAnalogElement(nodeG, nodeD, nodeS, p);
 }
 
@@ -330,18 +340,10 @@ const JFET_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "model",
     type: PropertyType.STRING,
     label: "Model",
-    defaultValue: "",
-    description: "SPICE model name (blank = use built-in defaults)",
+    defaultValue: "behavioral",
+    description: "Active model selection",
   },
   LABEL_PROPERTY_DEF,
-  {
-    key: "_spiceModelOverrides",
-    type: PropertyType.STRING,
-    label: "SPICE Model Overrides",
-    defaultValue: {} as Record<string, number>,
-    description: "User-supplied SPICE parameter overrides",
-    hidden: true,
-  },
 ];
 
 export const PJFET_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
@@ -365,13 +367,14 @@ export const PJfetDefinition: ComponentDefinition = {
     "P-channel JFET — Shichman-Hodges model (polarity inverted).\n" +
     "Pins: G (gate), D (drain), S (source).\n" +
     "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
-        createPJfetElement(pinNodes, branchIdx, props),
-      deviceType: "PJFET",
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createPJfetElement(pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: PJFET_PARAM_DEFS,
+      params: PJFET_PARAM_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

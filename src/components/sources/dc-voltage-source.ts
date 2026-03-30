@@ -27,6 +27,17 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: DC_VOLTAGE_SOURCE_PARAM_DEFS, defaults: DC_VOLTAGE_SOURCE_DEFAULTS } = defineModelParams({
+  primary: {
+    voltage: { default: 5, unit: "V", description: "Source voltage in volts" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // DcVoltageSourceElement — CircuitElement implementation
@@ -158,7 +169,7 @@ export function makeDcVoltageSource(
   voltage: number,
 ): AnalogElementCore {
   let scale = 1;
-  let V = voltage;
+  const p: Record<string, number> = { voltage };
 
   return {
     branchIndex: branchIdx,
@@ -166,9 +177,7 @@ export function makeDcVoltageSource(
     isReactive: false,
 
     setParam(key: string, value: number): void {
-      if (key === "voltage") {
-        V = value;
-      }
+      if (key in p) (p as Record<string, number>)[key] = value;
     },
 
     setSourceScale(factor: number): void {
@@ -187,7 +196,7 @@ export function makeDcVoltageSource(
       if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
 
       // RHS voltage constraint (scaled for source stepping)
-      solver.stampRHS(k, V * scale);
+      solver.stampRHS(k, p.voltage * scale);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -227,20 +236,21 @@ export const DcVoltageSourceDefinition: ComponentDefinition = {
     );
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      branchCount: 1,
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],
         branchIdx: number,
         props: PropertyBag,
       ): AnalogElementCore {
-        const voltage = (props.has("voltage") ? props.get<number>("voltage") : 5) ?? 5;
+        const voltage = props.getModelParam<number>("voltage");
         return makeDcVoltageSource(pinNodes.get("pos")!, pinNodes.get("neg")!, branchIdx, voltage);
       },
-    },
+      paramDefs: DC_VOLTAGE_SOURCE_PARAM_DEFS,
+      params: DC_VOLTAGE_SOURCE_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

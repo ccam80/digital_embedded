@@ -3,6 +3,14 @@ import { buildSpiceSubcircuit } from "../spice-model-builder.js";
 import { parseSubcircuit } from "../../solver/analog/model-parser.js";
 import type { ParsedSubcircuit } from "../../solver/analog/model-parser.js";
 
+function getModelParams(el: { getProperties(): { getModelParamKeys(): string[]; getModelParam<T>(k: string): T } }): Record<string, number> {
+  return Object.fromEntries(
+    el.getProperties().getModelParamKeys().map(k => [k, el.getProperties().getModelParam<number>(k)])
+  );
+}
+
+
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -222,10 +230,10 @@ Q1 c b e NPN
     expect(labels).toContain("E");
   });
 
-  it("NpnBJT has _spiceModelOverrides with IS and BF", () => {
+  it("NpnBJT has model params IS and BF", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
     const el = circuit.elements.find((e) => e.typeId === "NpnBJT");
-    const overrides = el!.getAttribute("_spiceModelOverrides") as Record<string, number>;
+    const overrides = getModelParams(el!);
     expect(overrides["IS"]).toBeCloseTo(1e-14);
     expect(overrides["BF"]).toBe(200);
   });
@@ -247,7 +255,7 @@ Q1 c b e PNP
     expect(pinLabels).toContain("B");
     expect(pinLabels).toContain("C");
     expect(pinLabels).toContain("E");
-    const overrides = el!.getAttribute("_spiceModelOverrides") as Record<string, number>;
+    const overrides = getModelParams(el!);
     expect(overrides["IS"]).toBeCloseTo(2e-14);
     expect(overrides["BF"]).toBe(100);
   });
@@ -284,10 +292,10 @@ M1 d g s b NMOS W=10u L=1u
     expect(labels).toContain("S");
   });
 
-  it("NMOS _spiceModelOverrides contains W, L, VTO", () => {
+  it("NMOS model params contain W, L, VTO", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
     const el = circuit.elements.find((e) => e.typeId === "NMOS");
-    const overrides = el!.getAttribute("_spiceModelOverrides") as Record<string, number>;
+    const overrides = getModelParams(el!);
     expect(overrides["W"]).toBeCloseTo(10e-6);
     expect(overrides["L"]).toBeCloseTo(1e-6);
     expect(overrides["VTO"]).toBeCloseTo(0.7);
@@ -310,7 +318,7 @@ M1 d g s b PMOS W=5u L=1u
     expect(pinLabels).toContain("G");
     expect(pinLabels).toContain("D");
     expect(pinLabels).toContain("S");
-    const overrides = el!.getAttribute("_spiceModelOverrides") as Record<string, number>;
+    const overrides = getModelParams(el!);
     expect(overrides["W"]).toBeCloseTo(5e-6);
     expect(overrides["L"]).toBeCloseTo(1e-6);
     expect(overrides["VTO"]).toBeCloseTo(-0.7);
@@ -365,7 +373,7 @@ J1 d g s PJFET
     expect(pinLabels).toContain("G");
     expect(pinLabels).toContain("S");
     expect(pinLabels).toContain("D");
-    const overrides = el!.getAttribute("_spiceModelOverrides") as Record<string, number>;
+    const overrides = getModelParams(el!);
     expect(overrides["VTO"]).toBeCloseTo(2);
   });
 });
@@ -452,20 +460,20 @@ R1 inp 1 10k
 });
 
 // ---------------------------------------------------------------------------
-// Inline model overrides — no model = no _spiceModelOverrides
+// Inline model overrides — no model = no model params
 // ---------------------------------------------------------------------------
 
 describe("buildSpiceSubcircuit — model overrides", () => {
-  it("Resistor without inline model has no _spiceModelOverrides", () => {
+  it("Resistor without inline model has no model params", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a b\nR1 a b 1k\n.ENDS`));
     const el = circuit.elements.find((e) => e.typeId === "Resistor");
-    expect(el!.getAttribute("_spiceModelOverrides")).toBeUndefined();
+    expect(el!.getProperties().getModelParamKeys()).toHaveLength(0);
   });
 
-  it("Diode without inline model has no _spiceModelOverrides", () => {
+  it("Diode without inline model has no model params", () => {
     const circuit = buildSpiceSubcircuit(parse(`.SUBCKT t a k\nD1 a k 1N4148\n.ENDS`));
     const el = circuit.elements.find((e) => e.typeId === "Diode");
-    expect(el!.getAttribute("_spiceModelOverrides")).toBeUndefined();
+    expect(el!.getProperties().getModelParamKeys()).toHaveLength(0);
   });
 
   it("element params merged with model params in overrides", () => {
@@ -477,7 +485,7 @@ M1 d g s b NMOS W=20u L=2u
 `;
     const circuit = buildSpiceSubcircuit(parse(TEXT));
     const el = circuit.elements.find((e) => e.typeId === "NMOS");
-    const overrides = el!.getAttribute("_spiceModelOverrides") as Record<string, number>;
+    const overrides = getModelParams(el!);
     expect(overrides["W"]).toBeCloseTo(20e-6);
     expect(overrides["L"]).toBeCloseTo(2e-6);
     expect(overrides["VTO"]).toBeCloseTo(0.5);
@@ -527,11 +535,11 @@ V1 vcc 0 DC 5
     expect(vs!.getAttribute("voltage")).toBeCloseTo(5);
   });
 
-  it("each NpnBJT has _spiceModelOverrides with IS and BF", () => {
+  it("each NpnBJT has model params IS and BF", () => {
     const circuit = buildSpiceSubcircuit(parse(TEXT));
     const bjts = circuit.elements.filter((e) => e.typeId === "NpnBJT");
     for (const bjt of bjts) {
-      const overrides = bjt.getAttribute("_spiceModelOverrides") as Record<string, number>;
+      const overrides = getModelParams(bjt);
       expect(overrides["IS"]).toBeCloseTo(1e-14);
       expect(overrides["BF"]).toBe(200);
     }

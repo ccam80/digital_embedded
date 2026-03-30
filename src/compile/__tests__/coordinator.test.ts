@@ -6,15 +6,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { DefaultSimulationCoordinator } from '../../solver/coordinator.js';
 import { compileUnified } from '../compile.js';
 import { Circuit, Wire } from '../../core/circuit.js';
-import { AbstractCircuitElement } from '../../core/element.js';
 import { PropertyBag, PropertyType } from '../../core/properties.js';
 import { PinDirection } from '../../core/pin.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { FacadeError } from '../../headless/types.js';
-import type { Pin, Rotation } from '../../core/pin.js';
+import type { Pin } from '../../core/pin.js';
 import type { PinDeclaration } from '../../core/pin.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
-import type { ComponentDefinition, ComponentLayout } from '../../core/registry.js';
+import type { ComponentDefinition } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { PropertyValue } from '../../core/properties.js';
 import type { MeasurementObserver } from '../../core/engine-interface.js';
@@ -23,21 +21,8 @@ import type { AnalogElement } from '../../solver/analog/element.js';
 import type { SparseSolver } from '../../solver/analog/sparse-solver.js';
 import type { SignalAddress, CompiledCircuitUnified } from '../types.js';
 import { ConcreteCompiledAnalogCircuit } from '../../solver/analog/compiled-analog-circuit.js';
-
-class MockElement extends AbstractCircuitElement {
-  private readonly _pins: Pin[];
-  constructor(typeId: string, instanceId: string, position: { x: number; y: number }, pins: Pin[], props: PropertyBag) {
-    super(typeId, instanceId, position, 0 as Rotation, false, props);
-    this._pins = pins;
-  }
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 4, height: 4 }; }
-}
-
-function makePin(label: string, direction: PinDirection, localX: number, localY: number): Pin {
-  return { label, direction, position: { x: localX, y: localY }, bitWidth: 1, isNegated: false, isClock: false, kind: "signal" };
-}
+import { TestElement, makePin } from '../../test-fixtures/test-element.js';
+import { noopExecFn, executePassThrough, executeAnd2 } from '../../test-fixtures/execute-stubs.js';
 
 function makePropBag(entries: Record<string, string | number | boolean> = {}): PropertyBag {
   const bag = new PropertyBag();
@@ -45,33 +30,25 @@ function makePropBag(entries: Record<string, string | number | boolean> = {}): P
   return bag;
 }
 
-const executePassThrough = (_i: number, _s: Uint32Array, _h: Uint32Array, _l: ComponentLayout): void => {};
-const executeNoop = (_i: number, _s: Uint32Array, _h: Uint32Array, _l: ComponentLayout): void => {};
-const executeAnd2 = (index: number, state: Uint32Array, _h: Uint32Array, layout: ComponentLayout): void => {
-  const a = state[layout.wiringTable[layout.inputOffset(index)]] ?? 0;
-  const b = state[layout.wiringTable[layout.inputOffset(index) + 1]] ?? 0;
-  state[layout.wiringTable[layout.outputOffset(index)]] = (a & b) >>> 0;
-};
-
 function buildDigitalRegistry(): ComponentRegistry {
   const registry = new ComponentRegistry();
   registry.register({
     name: 'In', typeId: -1,
-    factory: (props) => new MockElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [makePin('out', PinDirection.OUTPUT, 2, 0)], props),
+    factory: (props) => new TestElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [makePin('out', PinDirection.OUTPUT, 2, 0)], props),
     pinLayout: [], propertyDefs: [{ key: 'label', label: 'Label', type: PropertyType.STRING, defaultValue: '', description: 'Label' }],
     attributeMap: [], category: 'IO' as any, helpText: 'In',
     models: { digital: { executeFn: executePassThrough } },
   });
   registry.register({
     name: 'Out', typeId: -1,
-    factory: (props) => new MockElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [makePin('in', PinDirection.INPUT, 0, 0)], props),
+    factory: (props) => new TestElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [makePin('in', PinDirection.INPUT, 0, 0)], props),
     pinLayout: [], propertyDefs: [{ key: 'label', label: 'Label', type: PropertyType.STRING, defaultValue: '', description: 'Label' }],
     attributeMap: [], category: 'IO' as any, helpText: 'Out',
-    models: { digital: { executeFn: executeNoop } },
+    models: { digital: { executeFn: noopExecFn } },
   });
   registry.register({
     name: 'AND', typeId: -1,
-    factory: (props) => new MockElement('AND', crypto.randomUUID(), { x: 0, y: 0 }, [
+    factory: (props) => new TestElement('AND', crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin('in0', PinDirection.INPUT, -2, -1),
       makePin('in1', PinDirection.INPUT, -2, 1),
       makePin('out', PinDirection.OUTPUT, 2, 0),
@@ -85,14 +62,14 @@ function buildDigitalRegistry(): ComponentRegistry {
 
 function buildAndGateCircuit(registry: ComponentRegistry): Circuit {
   const circuit = new Circuit();
-  const inA = new MockElement('In', 'inA', { x: 0, y: 0 }, [makePin('out', PinDirection.OUTPUT, 2, 0)], makePropBag({ label: 'A' }));
-  const inB = new MockElement('In', 'inB', { x: 0, y: 2 }, [makePin('out', PinDirection.OUTPUT, 2, 0)], makePropBag({ label: 'B' }));
-  const and = new MockElement('AND', 'and1', { x: 4, y: 0 }, [
+  const inA = new TestElement('In', 'inA', { x: 0, y: 0 }, [makePin('out', PinDirection.OUTPUT, 2, 0)], makePropBag({ label: 'A' }));
+  const inB = new TestElement('In', 'inB', { x: 0, y: 2 }, [makePin('out', PinDirection.OUTPUT, 2, 0)], makePropBag({ label: 'B' }));
+  const and = new TestElement('AND', 'and1', { x: 4, y: 0 }, [
     makePin('in0', PinDirection.INPUT, 0, 0),
     makePin('in1', PinDirection.INPUT, 0, 2),
     makePin('out', PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
-  const outY = new MockElement('Out', 'outY', { x: 9, y: 1 }, [makePin('in', PinDirection.INPUT, 0, 0)], makePropBag({ label: 'Y' }));
+  const outY = new TestElement('Out', 'outY', { x: 9, y: 1 }, [makePin('in', PinDirection.INPUT, 0, 0)], makePropBag({ label: 'Y' }));
   circuit.elements.push(inA, inB, and, outY);
   circuit.wires.push({ start: { x: 2, y: 0 }, end: { x: 4, y: 0 } } as any);
   circuit.wires.push({ start: { x: 2, y: 2 }, end: { x: 4, y: 2 } } as any);

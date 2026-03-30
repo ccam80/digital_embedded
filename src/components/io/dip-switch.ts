@@ -240,4 +240,5 @@ export const DipSwitchDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeDipSwitch, inputSchema: [], outputSchema: ["out"] },
   },
+  modelRegistry: {},
 };

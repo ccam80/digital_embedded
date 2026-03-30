@@ -42,6 +42,19 @@ import type { AnalogElement, AnalogElementCore } from "../../solver/analog/eleme
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
 import { PropertyBag } from "../../core/properties.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: ANALOG_FUSE_PARAM_DEFS, defaults: ANALOG_FUSE_DEFAULTS } = defineModelParams({
+  primary: {
+    rCold:     { default: 0.01,  unit: "Ω", description: "Cold (intact) resistance in ohms", min: 1e-12 },
+    rBlown:    { default: 1e9,   unit: "Ω", description: "Blown (open) resistance in ohms", min: 1e-6 },
+    i2tRating: { default: 1e-4,  unit: "A²s", description: "I²t energy rating in A²·s", min: 1e-30 },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -234,6 +247,35 @@ export class AnalogFuseElement implements AnalogElement {
 // analogFactory — creates AnalogFuseElement with PropertyBag writeback
 // ---------------------------------------------------------------------------
 
+function buildAnalogFuseElement(
+  pinNodes: ReadonlyMap<string, number>,
+  props: PropertyBag,
+  rCold: number,
+  rBlown: number,
+  i2tRating: number,
+): AnalogElementCore {
+  const p = { rCold, rBlown, i2tRating };
+  const el = new AnalogFuseElement(
+    [pinNodes.get("out1")!, pinNodes.get("out2")!],
+    p.rCold,
+    p.rBlown,
+    p.i2tRating,
+    undefined,
+    (blown, thermalRatio) => {
+      props.set("_thermalRatio", thermalRatio);
+      if (blown) {
+        props.set("blown", true);
+      }
+    },
+  );
+  (el as AnalogElementCore).setParam = function(key: string, value: number): void {
+    if (key in p) {
+      (p as Record<string, number>)[key] = value;
+    }
+  };
+  return el;
+}
+
 export function createAnalogFuseElement(
   pinNodes: ReadonlyMap<string, number>,
   _internalNodeIds: readonly number[],
@@ -241,14 +283,27 @@ export function createAnalogFuseElement(
   props: PropertyBag,
   _getTime: () => number,
 ): AnalogElementCore {
-  const rCold = props.getOrDefault<number>("rCold", 0.01);
-  const rBlown = props.getOrDefault<number>("rBlown", 1e9);
-  const i2tRating = props.getOrDefault<number>("i2tRating", 1e-4);
+  return buildAnalogFuseElement(
+    pinNodes,
+    props,
+    props.getOrDefault<number>("rCold", 0.01),
+    props.getOrDefault<number>("rBlown", 1e9),
+    props.getOrDefault<number>("i2tRating", 1e-4),
+  );
+}
 
-  return new AnalogFuseElement([pinNodes.get("out1")!, pinNodes.get("out2")!], rCold, rBlown, i2tRating, undefined, (blown, thermalRatio) => {
-    props.set("_thermalRatio", thermalRatio);
-    if (blown) {
-      props.set("blown", true);
-    }
-  });
+export function createAnalogFuseElementFromModelParams(
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  _branchIdx: number,
+  props: PropertyBag,
+  _getTime: () => number,
+): AnalogElementCore {
+  return buildAnalogFuseElement(
+    pinNodes,
+    props,
+    props.getModelParam<number>("rCold"),
+    props.getModelParam<number>("rBlown"),
+    props.getModelParam<number>("i2tRating"),
+  );
 }

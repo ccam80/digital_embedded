@@ -243,5 +243,13 @@ export const ButtonLEDDefinition: ComponentDefinition = {
       behavioral: { factory: createButtonLEDAnalogElement },
     },
   },
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: createButtonLEDAnalogElement,
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

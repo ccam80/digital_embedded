@@ -51,6 +51,17 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: VCCS_PARAM_DEFS, defaults: VCCS_DEFAULTS } = defineModelParams({
+  primary: {
+    transconductance: { default: 0.001, unit: "S", description: "Linear transconductance gm" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -120,6 +131,8 @@ class VCCSAnalogElement extends ControlledSourceElement {
   private readonly _nOutP: number;
   private readonly _nOutN: number;
 
+  private _transconductance: number;
+
   constructor(
     nCtrlP: number,
     nCtrlN: number,
@@ -140,7 +153,11 @@ class VCCSAnalogElement extends ControlledSourceElement {
     this._nCtrlN = nCtrlN;
     this._nOutP = nOutP;
     this._nOutN = nOutN;
+    this._transconductance = transconductance;
+  }
 
+  setParam(key: string, value: number): void {
+    if (key === "transconductance") this._transconductance = value;
   }
 
   protected override _bindContext(voltages: Float64Array): void {
@@ -336,27 +353,24 @@ export const VCCSDefinition: ComponentDefinition = {
     return new VCCSElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        _branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, _branchIdx, props) => {
         const expression = props.getOrDefault<string>("expression", "V(ctrl)");
-        const transconductance = props.getOrDefault<number>("transconductance", 0.001);
+        const transconductance = props.getModelParam<number>("transconductance");
         return new VCCSAnalogElement(
-          pinNodes.get("ctrl+")!, // ctrl+
-          pinNodes.get("ctrl-")!, // ctrl-
-          pinNodes.get("out+")!,  // out+
-          pinNodes.get("out-")!,  // out-
+          pinNodes.get("ctrl+")!,
+          pinNodes.get("ctrl-")!,
+          pinNodes.get("out+")!,
+          pinNodes.get("out-")!,
           expression,
           transconductance,
         );
       },
-    },
+      paramDefs: VCCS_PARAM_DEFS,
+      params: VCCS_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

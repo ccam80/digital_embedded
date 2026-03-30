@@ -7,45 +7,24 @@
 
 import { describe, it, expect } from "vitest";
 import { Circuit, Wire } from "@/core/circuit";
-import { AbstractCircuitElement } from "@/core/element";
 import type { Pin } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
-import type { RenderContext, Rect } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
 import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { flattenCircuit } from "@/solver/digital/flatten";
 import type { SubcircuitHost } from "@/solver/digital/flatten";
+import {
+  TestLeafElement,
+  TestSubcircuitElement,
+  makeLeafElement,
+  makeInElement,
+  makeOutElement,
+} from "@/test-fixtures/subcircuit-elements";
 
 // ---------------------------------------------------------------------------
-// Test helpers (same pattern as flatten.test.ts)
+// Local helpers
 // ---------------------------------------------------------------------------
-
-class TestLeafElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
-
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    props: PropertyBag,
-    pins: Pin[],
-  ) {
-    super(typeId, instanceId, position, 0, false, props);
-    this._pins = pins;
-  }
-
-  getPins(): readonly Pin[] {
-    return this._pins;
-  }
-
-  draw(_ctx: RenderContext): void {}
-
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-
-}
 
 function makePortElement(
   instanceId: string,
@@ -72,120 +51,20 @@ function makePortElement(
   return new TestLeafElement("Port", instanceId, position, props, pins);
 }
 
-function makeInElement(
-  instanceId: string,
-  label: string,
-  position: { x: number; y: number } = { x: 0, y: 0 },
-): TestLeafElement {
-  const props = new PropertyBag();
-  props.set("label", label);
-  const pins: Pin[] = [
-    {
-      direction: PinDirection.OUTPUT,
-      position: { x: 2, y: 1 },
-      label: "out",
-      bitWidth: 1,
-      isNegated: false,
-      isClock: false,
-      kind: "signal",
-    },
-  ];
-  return new TestLeafElement("In", instanceId, position, props, pins);
-}
-
-function makeOutElement(
-  instanceId: string,
-  label: string,
-  position: { x: number; y: number } = { x: 10, y: 0 },
-): TestLeafElement {
-  const props = new PropertyBag();
-  props.set("label", label);
-  const pins: Pin[] = [
-    {
-      direction: PinDirection.INPUT,
-      position: { x: 0, y: 1 },
-      label: "in",
-      bitWidth: 1,
-      isNegated: false,
-      isClock: false,
-      kind: "signal",
-    },
-  ];
-  return new TestLeafElement("Out", instanceId, position, props, pins);
-}
-
-function makeLeaf(
-  typeId: string,
-  instanceId: string,
-  position: { x: number; y: number } = { x: 0, y: 0 },
-  label?: string,
-): TestLeafElement {
-  const props = new PropertyBag();
-  if (label !== undefined) {
-    props.set("label", label);
-  }
-  const pins: Pin[] = [
-    {
-      direction: PinDirection.OUTPUT,
-      position: { x: 2, y: 1 },
-      label: "out",
-      bitWidth: 1,
-      isNegated: false,
-      isClock: false,
-      kind: "signal",
-    },
-  ];
-  return new TestLeafElement(typeId, instanceId, position, props, pins);
-}
-
-class TestSubcircuitElement extends AbstractCircuitElement implements SubcircuitHost {
-  readonly internalCircuit: Circuit;
-  readonly subcircuitName: string;
-  private readonly _pins: readonly Pin[];
-
-  constructor(
-    name: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    internalCircuit: Circuit,
-    pins: Pin[],
-  ) {
-    super(`Subcircuit:${name}`, instanceId, position, 0, false, new PropertyBag());
-    this.subcircuitName = name;
-    this.internalCircuit = internalCircuit;
-    this._pins = pins;
-  }
-
-  getPins(): readonly Pin[] {
-    return this._pins;
-  }
-
-  draw(_ctx: RenderContext): void {}
-
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 6, height: 4 };
-  }
-
-}
-
-function makeNoOpExecute(): ExecuteFunction {
-  return (_index, _state, _layout) => {};
-}
-
 function makeRegistry(...typeIds: string[]): ComponentRegistry {
   const reg = new ComponentRegistry();
   for (const typeId of typeIds) {
     const def: ComponentDefinition = {
       name: typeId,
       typeId: -1,
-      factory: (_props) => makeLeaf(typeId, "auto", { x: 0, y: 0 }),
+      factory: (_props) => makeLeafElement(typeId, "auto", { x: 0, y: 0 }),
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: typeId,
       models: {
-        digital: { executeFn: makeNoOpExecute() },
+        digital: { executeFn: (_i: number, _s: Uint32Array, _h: Uint32Array) => {} },
       },
     };
     reg.register(def);
@@ -202,7 +81,7 @@ describe("flattenCircuit — Port interface elements", () => {
     // Internal circuit: Port("A") → And gate
     const internal = new Circuit({ name: "PortSub" });
     const portEl = makePortElement("port-A", "A", { x: 0, y: 0 });
-    const gate = makeLeaf("And", "and1", { x: 5, y: 0 });
+    const gate = makeLeafElement("And", "and1", { x: 5, y: 0 });
     internal.addElement(portEl);
     internal.addElement(gate);
     internal.addWire(new Wire(
@@ -242,7 +121,7 @@ describe("flattenCircuit — Port interface elements", () => {
     const internal = new Circuit({ name: "InOutSub" });
     const inEl = makeInElement("in1", "X", { x: 0, y: 0 });
     const outEl = makeOutElement("out1", "Y", { x: 10, y: 0 });
-    const gate = makeLeaf("And", "and1", { x: 5, y: 0 });
+    const gate = makeLeafElement("And", "and1", { x: 5, y: 0 });
     internal.addElement(inEl);
     internal.addElement(outEl);
     internal.addElement(gate);
@@ -291,7 +170,7 @@ describe("flattenCircuit — Port interface elements", () => {
     // Internal circuit has an Out("Z") but NO Port("Z")
     const internal = new Circuit({ name: "MismatchSub" });
     const outEl = makeOutElement("out1", "Z", { x: 10, y: 0 });
-    const gate = makeLeaf("And", "and1", { x: 5, y: 0 });
+    const gate = makeLeafElement("And", "and1", { x: 5, y: 0 });
     internal.addElement(outEl);
     internal.addElement(gate);
 
@@ -331,7 +210,7 @@ describe("flattenCircuit — Port interface elements", () => {
     // Internal circuit: Port("BUS") with bitWidth 8
     const internal = new Circuit({ name: "BusSub" });
     const portEl = makePortElement("port-BUS", "BUS", { x: 0, y: 0 }, 8);
-    const gate = makeLeaf("And", "and1", { x: 5, y: 0 });
+    const gate = makeLeafElement("And", "and1", { x: 5, y: 0 });
     internal.addElement(portEl);
     internal.addElement(gate);
     internal.addWire(new Wire(

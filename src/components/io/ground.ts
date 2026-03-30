@@ -179,5 +179,13 @@ export const GroundDefinition: ComponentDefinition = {
       behavioral: { factory: createGroundAnalogElement },
     },
   },
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: createGroundAnalogElement,
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

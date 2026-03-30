@@ -23,12 +23,24 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Minimum resistance clamp
 // ---------------------------------------------------------------------------
 
 const MIN_RESISTANCE = 1e-9;
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: POTENTIOMETER_PARAM_DEFS, defaults: POTENTIOMETER_DEFAULTS } = defineModelParams({
+  primary: {
+    resistance: { default: 10000, unit: "Ω", description: "Total resistance in ohms", min: 1e-9 },
+    position:   { default: 0.5,              description: "Wiper position (0.0 = full bottom, 1.0 = full top)", min: 0, max: 1 },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Inline geometry helpers (Falstad coordinate system)
@@ -214,8 +226,8 @@ class AnalogPotentiometerElement implements AnalogElement {
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
 
-  private readonly R: number;
-  private readonly position: number;
+  private R: number;
+  private pos: number;
   private G_top: number;
   private G_bottom: number;
 
@@ -223,10 +235,20 @@ class AnalogPotentiometerElement implements AnalogElement {
     this.pinNodeIds = pinNodeIds;
     this.allNodeIds = pinNodeIds;
     this.R = resistance;
-    this.position = Math.max(0, Math.min(1, position));
+    this.pos = Math.max(0, Math.min(1, position));
 
-    const R_top = Math.max(this.R * this.position, MIN_RESISTANCE);
-    const R_bottom = Math.max(this.R * (1 - this.position), MIN_RESISTANCE);
+    const R_top = Math.max(this.R * this.pos, MIN_RESISTANCE);
+    const R_bottom = Math.max(this.R * (1 - this.pos), MIN_RESISTANCE);
+    this.G_top = 1 / R_top;
+    this.G_bottom = 1 / R_bottom;
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "resistance") this.R = value;
+    else if (key === "position") this.pos = Math.max(0, Math.min(1, value));
+    else return;
+    const R_top = Math.max(this.R * this.pos, MIN_RESISTANCE);
+    const R_bottom = Math.max(this.R * (1 - this.pos), MIN_RESISTANCE);
     this.G_top = 1 / R_top;
     this.G_bottom = 1 / R_bottom;
   }
@@ -292,6 +314,21 @@ function createPotentiometerElement(
 ): AnalogElementCore {
   const R = props.getOrDefault<number>("resistance", 10000);
   const position = props.getOrDefault<number>("position", 0.5);
+  return new AnalogPotentiometerElement(
+    [pinNodes.get("A")!, pinNodes.get("B")!, pinNodes.get("W")!],
+    R,
+    position,
+  );
+}
+
+function createPotentiometerElementFromModelParams(
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  _branchIdx: number,
+  props: PropertyBag,
+): AnalogElementCore {
+  const R = props.getModelParam<number>("resistance");
+  const position = props.getModelParam<number>("position");
   return new AnalogPotentiometerElement(
     [pinNodes.get("A")!, pinNodes.get("B")!, pinNodes.get("W")!],
     R,
@@ -377,6 +414,14 @@ export const PotentiometerDefinition: ComponentDefinition = {
       behavioral: {
       factory: createPotentiometerElement,
     },
+    },
+  },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createPotentiometerElementFromModelParams,
+      paramDefs: POTENTIOMETER_PARAM_DEFS,
+      params: POTENTIOMETER_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

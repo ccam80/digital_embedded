@@ -27,7 +27,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
@@ -35,6 +35,7 @@ import {
   capacitorConductance,
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -46,6 +47,18 @@ const VT = 0.02585;
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
 
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: VARACTOR_PARAM_DEFS, defaults: VARACTOR_PARAM_DEFAULTS } = defineModelParams({
+  primary: {
+    cjo: { default: 20e-12, unit: "F", description: "Zero-bias junction capacitance" },
+    vj:  { default: 0.7,    unit: "V", description: "Junction built-in potential" },
+    m:   { default: 0.5,               description: "Junction grading coefficient (0.5 = abrupt junction)" },
+    iS:  { default: 1e-14,  unit: "A", description: "Reverse saturation current" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // computeVaractorCapacitance — exported for tests
@@ -89,15 +102,16 @@ export function createVaractorElement(
   const nodeAnode   = pinNodes.get("A")!; // anode (typically more negative in reverse bias)
   const nodeCathode = pinNodes.get("K")!; // cathode (typically more positive in reverse bias)
 
-  const propsMap = props as unknown as Record<string, unknown>;
-  const cjo: number = (propsMap["cjo"] as number) ?? 20e-12;
-  const vj: number  = (propsMap["vj"] as number)  ?? 0.7;
-  const m: number   = (propsMap["m"] as number)   ?? 0.5;
-  const iS: number  = (propsMap["iS"] as number)  ?? 1e-14;
+  const p = {
+    cjo: props.getModelParam<number>("cjo"),
+    vj:  props.getModelParam<number>("vj"),
+    m:   props.getModelParam<number>("m"),
+    iS:  props.getModelParam<number>("iS"),
+  };
   const nParam = 1; // emission coefficient fixed at 1 for varactor
 
   const nVt = nParam * VT;
-  const vcrit = nVt * Math.log(nVt / (iS * Math.SQRT2));
+  let vcrit = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
 
   // NR linearization state for diode I-V
   let _vd = 0; // junction voltage (positive = forward biased)
@@ -155,9 +169,9 @@ export function createVaractorElement(
       // Shockley equation linearized at operating point
       const expArg = Math.min(_vd / nVt, 700);
       const expVal = Math.exp(expArg);
-      const id = iS * (expVal - 1);
+      const id = p.iS * (expVal - 1);
       _id = id;
-      _geq = (iS * expVal) / nVt + GMIN;
+      _geq = (p.iS * expVal) / nVt + GMIN;
       _ieq = id - _geq * _vd;
     },
 
@@ -168,7 +182,7 @@ export function createVaractorElement(
 
       // Reverse bias voltage: V_R = -V_d (positive when reverse biased)
       const vReverse = -vNow;
-      const Cj = computeVaractorCapacitance(vReverse, cjo, vj, m);
+      const Cj = computeVaractorCapacitance(vReverse, p.cjo, p.vj, p.m);
 
       // Recover previous capacitor current for trapezoidal history
       const iNow = _capGeq * vNow + _capIeq;
@@ -196,6 +210,13 @@ export function createVaractorElement(
       const iCap = _capGeq * vd + _capIeq;
       const I = iDiode + iCap;
       return [I, -I];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in p) {
+        (p as Record<string, number>)[key] = value;
+        vcrit = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+      }
     },
   };
 }
@@ -305,32 +326,11 @@ function buildVaractorPinDeclarations(): PinDeclaration[] {
 const VARACTOR_PROPERTY_DEFS: PropertyDefinition[] = [
   LABEL_PROPERTY_DEF,
   {
-    key: "cjo",
-    type: PropertyType.FLOAT,
-    label: "CJO (F)",
-    defaultValue: 20e-12,
-    description: "Zero-bias junction capacitance",
-  },
-  {
-    key: "vj",
-    type: PropertyType.FLOAT,
-    label: "VJ (V)",
-    defaultValue: 0.7,
-    description: "Junction built-in potential",
-  },
-  {
-    key: "m",
-    type: PropertyType.FLOAT,
-    label: "M (grading coeff)",
-    defaultValue: 0.5,
-    description: "Junction grading coefficient (0.5 = abrupt junction)",
-  },
-  {
-    key: "iS",
-    type: PropertyType.FLOAT,
-    label: "I_S (A)",
-    defaultValue: 1e-14,
-    description: "Reverse saturation current",
+    key: "model",
+    type: PropertyType.STRING,
+    label: "Model",
+    defaultValue: "behavioral",
+    description: "Active model selection",
   },
 ];
 
@@ -340,9 +340,7 @@ const VARACTOR_PROPERTY_DEFS: PropertyDefinition[] = [
 
 export const VARACTOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
-  { xmlName: "cjo",   propertyKey: "cjo",   convert: (v) => parseFloat(v) },
-  { xmlName: "vj",    propertyKey: "vj",    convert: (v) => parseFloat(v) },
-  { xmlName: "m",     propertyKey: "m",     convert: (v) => parseFloat(v) },
+  { xmlName: "model", propertyKey: "model", convert: (v) => v },
 ];
 
 // ---------------------------------------------------------------------------
@@ -365,12 +363,14 @@ export const VaractorDefinition: ComponentDefinition = {
     "Varactor Diode — voltage-controlled junction capacitance.\n" +
     "C_j(V_R) = CJO / (1 + V_R/VJ)^M\n" +
     "Used for voltage-controlled oscillators and tuned circuits.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createVaractorElement,
-      deviceType: "D",
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createVaractorElement(pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: VARACTOR_PARAM_DEFS,
+      params: VARACTOR_PARAM_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

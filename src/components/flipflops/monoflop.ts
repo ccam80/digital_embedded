@@ -251,4 +251,5 @@ export const MonoflopDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };

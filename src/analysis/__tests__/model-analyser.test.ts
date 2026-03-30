@@ -14,66 +14,17 @@ import { analyseCircuit } from '../model-analyser.js';
 import { DefaultSimulatorFacade } from '../../headless/default-facade.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { PropertyBag, PropertyType } from '../../core/properties.js';
-import { AbstractCircuitElement } from '../../core/element.js';
-import type { Pin, Rotation } from '../../core/pin.js';
-import { PinDirection } from '../../core/pin.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 import type { ComponentLayout } from '../../core/registry.js';
+import { PinDirection } from '../../core/pin.js';
 import { Circuit, Wire } from '../../core/circuit.js';
 import type { SimulatorFacade } from '../../headless/facade.js';
-
-// ---------------------------------------------------------------------------
-// Stub element
-// ---------------------------------------------------------------------------
-
-class StubElement extends AbstractCircuitElement {
-  private readonly _pins: Pin[];
-
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pins: Pin[],
-    props: PropertyBag,
-  ) {
-    super(typeId, instanceId, position, 0 as Rotation, false, props);
-    this._pins = pins;
-  }
-
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-}
-
-function makePin(
-  label: string,
-  direction: PinDirection,
-  x: number,
-  y: number,
-  bitWidth = 1,
-): Pin {
-  return { label, direction, position: { x, y }, bitWidth, isNegated: false, isClock: false, kind: "signal" };
-}
+import { TestElement, makePin } from '../../test-fixtures/test-element.js';
+import { noopExecFn, executePassThrough, executeAnd2 } from '../../test-fixtures/execute-stubs.js';
 
 function makePropBag(entries: Record<string, string | number | boolean> = {}): PropertyBag {
   const bag = new PropertyBag();
   for (const [k, v] of Object.entries(entries)) bag.set(k, v);
   return bag;
-}
-
-// ---------------------------------------------------------------------------
-// Execute functions
-// ---------------------------------------------------------------------------
-
-function executePassThrough(_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void {}
-function executeNoop(_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void {}
-
-function executeAnd2(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
-  const a = state[layout.wiringTable[layout.inputOffset(index)]] ?? 0;
-  const b = state[layout.wiringTable[layout.inputOffset(index) + 1]] ?? 0;
-  state[layout.wiringTable[layout.outputOffset(index)]] = (a & b) >>> 0;
 }
 
 function executeXor2(index: number, state: Uint32Array, _highZs: Uint32Array, layout: ComponentLayout): void {
@@ -97,7 +48,7 @@ function buildRegistry(): ComponentRegistry {
   registry.register({
     name: 'In',
     typeId: -1,
-    factory: (props) => new StubElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [
+    factory: (props) => new TestElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ], props),
     pinLayout: [],
@@ -114,7 +65,7 @@ function buildRegistry(): ComponentRegistry {
   registry.register({
     name: 'Out',
     typeId: -1,
-    factory: (props) => new StubElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [
+    factory: (props) => new TestElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin('in', PinDirection.INPUT, 0, 0),
     ], props),
     pinLayout: [],
@@ -125,13 +76,13 @@ function buildRegistry(): ComponentRegistry {
     attributeMap: [],
     category: 'IO' as any,
     helpText: '',
-    models: { digital: { executeFn: executeNoop } },
+    models: { digital: { executeFn: noopExecFn } },
   });
 
   registry.register({
     name: 'AND',
     typeId: -1,
-    factory: (props) => new StubElement('AND', crypto.randomUUID(), { x: 0, y: 0 }, [
+    factory: (props) => new TestElement('AND', crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin('in0', PinDirection.INPUT, -2, -1),
       makePin('in1', PinDirection.INPUT, -2, 1),
       makePin('out', PinDirection.OUTPUT, 2, 0),
@@ -147,7 +98,7 @@ function buildRegistry(): ComponentRegistry {
   registry.register({
     name: 'XOR',
     typeId: -1,
-    factory: (props) => new StubElement('XOR', crypto.randomUUID(), { x: 0, y: 0 }, [
+    factory: (props) => new TestElement('XOR', crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin('in0', PinDirection.INPUT, -2, -1),
       makePin('in1', PinDirection.INPUT, -2, 1),
       makePin('out', PinDirection.OUTPUT, 2, 0),
@@ -163,7 +114,7 @@ function buildRegistry(): ComponentRegistry {
   registry.register({
     name: 'NOT',
     typeId: -1,
-    factory: (props) => new StubElement('NOT', crypto.randomUUID(), { x: 0, y: 0 }, [
+    factory: (props) => new TestElement('NOT', crypto.randomUUID(), { x: 0, y: 0 }, [
       makePin('in', PinDirection.INPUT, -2, 0),
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ], props),
@@ -198,21 +149,21 @@ function buildFacade(registry: ComponentRegistry): SimulatorFacade {
 function buildAndGate(): { circuit: Circuit } {
   const circuit = new Circuit();
 
-  const inA = new StubElement('In', 'inA', { x: 0, y: 0 }, [
+  const inA = new TestElement('In', 'inA', { x: 0, y: 0 }, [
     makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'A', bitWidth: 1 }));
 
-  const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
+  const inB = new TestElement('In', 'inB', { x: 0, y: 2 }, [
     makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'B', bitWidth: 1 }));
 
-  const and = new StubElement('AND', 'and1', { x: 4, y: 0 }, [
+  const and = new TestElement('AND', 'and1', { x: 4, y: 0 }, [
     makePin('in0', PinDirection.INPUT, 0, 0),
     makePin('in1', PinDirection.INPUT, 0, 2),
     makePin('out', PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
-  const out = new StubElement('Out', 'outY', { x: 9, y: 1 }, [
+  const out = new TestElement('Out', 'outY', { x: 9, y: 1 }, [
     makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Y', bitWidth: 1 }));
 
@@ -232,31 +183,31 @@ function buildAndGate(): { circuit: Circuit } {
 function buildHalfAdder(): { circuit: Circuit } {
   const circuit = new Circuit();
 
-  const inA = new StubElement('In', 'inA', { x: 0, y: 0 }, [
+  const inA = new TestElement('In', 'inA', { x: 0, y: 0 }, [
     makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'A', bitWidth: 1 }));
 
-  const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
+  const inB = new TestElement('In', 'inB', { x: 0, y: 2 }, [
     makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'B', bitWidth: 1 }));
 
-  const xor = new StubElement('XOR', 'xor1', { x: 4, y: 0 }, [
+  const xor = new TestElement('XOR', 'xor1', { x: 4, y: 0 }, [
     makePin('in0', PinDirection.INPUT, 0, 0),
     makePin('in1', PinDirection.INPUT, 0, 2),
     makePin('out', PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
-  const and = new StubElement('AND', 'and1', { x: 4, y: 4 }, [
+  const and = new TestElement('AND', 'and1', { x: 4, y: 4 }, [
     makePin('in0', PinDirection.INPUT, 0, -4),
     makePin('in1', PinDirection.INPUT, 0, -2),
     makePin('out', PinDirection.OUTPUT, 4, 1),
   ], makePropBag());
 
-  const outSum = new StubElement('Out', 'outSum', { x: 9, y: 1 }, [
+  const outSum = new TestElement('Out', 'outSum', { x: 9, y: 1 }, [
     makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Sum', bitWidth: 1 }));
 
-  const outCarry = new StubElement('Out', 'outCarry', { x: 9, y: 5 }, [
+  const outCarry = new TestElement('Out', 'outCarry', { x: 9, y: 5 }, [
     makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Carry', bitWidth: 1 }));
 
@@ -276,7 +227,7 @@ function buildTooManyInputs(): { circuit: Circuit } {
   const circuit = new Circuit();
 
   for (let i = 0; i < 21; i++) {
-    const inEl = new StubElement('In', `in${i}`, { x: 0, y: i * 4 }, [
+    const inEl = new TestElement('In', `in${i}`, { x: 0, y: i * 4 }, [
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ], makePropBag({ label: `I${i}`, bitWidth: 1 }));
     circuit.elements.push(inEl);
@@ -291,7 +242,7 @@ function buildTooManyInputs(): { circuit: Circuit } {
 function buildCyclicCircuit(): { circuit: Circuit } {
   const circuit = new Circuit();
 
-  const not1 = new StubElement('NOT', 'not1', { x: 4, y: 0 }, [
+  const not1 = new TestElement('NOT', 'not1', { x: 4, y: 0 }, [
     makePin('in', PinDirection.INPUT, 0, 0),
     makePin('out', PinDirection.OUTPUT, 4, 0),
   ], makePropBag());
@@ -318,29 +269,29 @@ function buildMultiBitCircuit(): { circuit: Circuit } {
   // Each input goes through a NOT gate and out
   const circuit = new Circuit();
 
-  const inA = new StubElement('In', 'inA', { x: 0, y: 0 }, [
+  const inA = new TestElement('In', 'inA', { x: 0, y: 0 }, [
     makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'A', bitWidth: 1 }));
 
-  const inB = new StubElement('In', 'inB', { x: 0, y: 4 }, [
+  const inB = new TestElement('In', 'inB', { x: 0, y: 4 }, [
     makePin('out', PinDirection.OUTPUT, 2, 0),
   ], makePropBag({ label: 'B', bitWidth: 1 }));
 
-  const notA = new StubElement('NOT', 'notA', { x: 4, y: 0 }, [
+  const notA = new TestElement('NOT', 'notA', { x: 4, y: 0 }, [
     makePin('in', PinDirection.INPUT, 0, 0),
     makePin('out', PinDirection.OUTPUT, 4, 0),
   ], makePropBag());
 
-  const notB = new StubElement('NOT', 'notB', { x: 4, y: 4 }, [
+  const notB = new TestElement('NOT', 'notB', { x: 4, y: 4 }, [
     makePin('in', PinDirection.INPUT, 0, 0),
     makePin('out', PinDirection.OUTPUT, 4, 0),
   ], makePropBag());
 
-  const outY = new StubElement('Out', 'outY', { x: 10, y: 0 }, [
+  const outY = new TestElement('Out', 'outY', { x: 10, y: 0 }, [
     makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Y', bitWidth: 1 }));
 
-  const outZ = new StubElement('Out', 'outZ', { x: 10, y: 4 }, [
+  const outZ = new TestElement('Out', 'outZ', { x: 10, y: 4 }, [
     makePin('in', PinDirection.INPUT, 0, 0),
   ], makePropBag({ label: 'Z', bitWidth: 1 }));
 

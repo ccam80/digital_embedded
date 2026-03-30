@@ -230,4 +230,5 @@ export const NFETDefinition: ComponentDefinition = {
       defaultDelay: 0,
     },
   },
+  modelRegistry: {},
 };

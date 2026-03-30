@@ -53,6 +53,7 @@ import {
   inductorConductance,
   inductorHistoryCurrent,
 } from "../../solver/analog/integration.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Derived parameter helpers
@@ -73,6 +74,21 @@ export function crystalMotionalInductance(freqHz: number, Cs: number): number {
 export function crystalSeriesResistance(freqHz: number, Ls: number, Q: number): number {
   return (2 * Math.PI * freqHz * Ls) / Q;
 }
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: CRYSTAL_PARAM_DEFS, defaults: CRYSTAL_DEFAULTS } = defineModelParams({
+  primary: {
+    frequency:           { default: 32768,   unit: "Hz", description: "Series resonant frequency in hertz", min: 1 },
+    qualityFactor:       { default: 50000,   description: "Quality factor controlling resonance bandwidth", min: 1 },
+  },
+  secondary: {
+    motionalCapacitance: { default: 12.5e-15, unit: "F", description: "Series motional capacitance in farads", min: 1e-18 },
+    shuntCapacitance:    { default: 3e-12,    unit: "F", description: "Parallel electrode capacitance in farads", min: 1e-18 },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -186,23 +202,23 @@ export class AnalogCrystalElement implements AnalogElement {
   readonly isReactive: boolean = true;
 
   // Series resistance
-  private readonly G_s: number;
+  private G_s: number;
 
   // Motional inductance (L_s) companion model
-  private readonly L_s: number;
+  private L_s: number;
   private geqL: number = 0;
   private ieqL: number = 0;
   private iPrevL: number = 0;
   private vPrevL: number = 0;
 
   // Motional capacitance (C_s) companion model
-  private readonly C_s: number;
+  private C_s: number;
   private geqCs: number = 0;
   private ieqCs: number = 0;
   private vPrevCs: number = 0;
 
   // Shunt electrode capacitance (C_0) companion model
-  private readonly C_0: number;
+  private C_0: number;
   private geqC0: number = 0;
   private ieqC0: number = 0;
   private vPrevC0: number = 0;
@@ -226,6 +242,13 @@ export class AnalogCrystalElement implements AnalogElement {
     this.pinNodeIds = pinNodeIds;
     this.allNodeIds = pinNodeIds;
     this.branchIndex = branchIndex;
+    this.G_s = 1 / Math.max(Rs, 1e-12);
+    this.L_s = Ls;
+    this.C_s = Cs;
+    this.C_0 = C0;
+  }
+
+  updateDerivedParams(Rs: number, Ls: number, Cs: number, C0: number): void {
     this.G_s = 1 / Math.max(Rs, 1e-12);
     this.L_s = Ls;
     this.C_s = Cs;
@@ -332,29 +355,63 @@ export class AnalogCrystalElement implements AnalogElement {
 // analogFactory
 // ---------------------------------------------------------------------------
 
+function buildCrystalElementFromParams(
+  pinNodes: ReadonlyMap<string, number>,
+  internalNodeIds: readonly number[],
+  branchIdx: number,
+  p: { frequency: number; qualityFactor: number; motionalCapacitance: number; shuntCapacitance: number },
+): AnalogElementCore {
+  const Ls = crystalMotionalInductance(p.frequency, p.motionalCapacitance);
+  const Rs = crystalSeriesResistance(p.frequency, Ls, p.qualityFactor);
+
+  const el = new AnalogCrystalElement(
+    [pinNodes.get("A")!, pinNodes.get("B")!, internalNodeIds[0], internalNodeIds[1]],
+    branchIdx,
+    Rs,
+    Ls,
+    p.motionalCapacitance,
+    p.shuntCapacitance,
+  );
+
+  (el as AnalogElementCore).setParam = function(key: string, value: number): void {
+    if (key in p) {
+      (p as Record<string, number>)[key] = value;
+      const newLs = crystalMotionalInductance(p.frequency, p.motionalCapacitance);
+      const newRs = crystalSeriesResistance(p.frequency, newLs, p.qualityFactor);
+      el.updateDerivedParams(newRs, newLs, p.motionalCapacitance, p.shuntCapacitance);
+    }
+  };
+  return el;
+}
+
 export function createCrystalElement(
   pinNodes: ReadonlyMap<string, number>,
   internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const freq = props.getOrDefault<number>("frequency", 32768);
-  const Q = props.getOrDefault<number>("qualityFactor", 50000);
-  const Cs = props.getOrDefault<number>("motionalCapacitance", 12.5e-15);
-  const C0 = props.getOrDefault<number>("shuntCapacitance", 3e-12);
+  const p = {
+    frequency:           props.getOrDefault<number>("frequency", 32768),
+    qualityFactor:       props.getOrDefault<number>("qualityFactor", 50000),
+    motionalCapacitance: props.getOrDefault<number>("motionalCapacitance", 12.5e-15),
+    shuntCapacitance:    props.getOrDefault<number>("shuntCapacitance", 3e-12),
+  };
+  return buildCrystalElementFromParams(pinNodes, internalNodeIds, branchIdx, p);
+}
 
-  const Ls = crystalMotionalInductance(freq, Cs);
-  const Rs = crystalSeriesResistance(freq, Ls, Q);
-
-  // nodeIds = [n_A, n_B, n1_internal, n2_internal]
-  return new AnalogCrystalElement(
-    [pinNodes.get("A")!, pinNodes.get("B")!, internalNodeIds[0], internalNodeIds[1]],
-    branchIdx,
-    Rs,
-    Ls,
-    Cs,
-    C0,
-  );
+function createCrystalElementFromModelParams(
+  pinNodes: ReadonlyMap<string, number>,
+  internalNodeIds: readonly number[],
+  branchIdx: number,
+  props: PropertyBag,
+): AnalogElementCore {
+  const p = {
+    frequency:           props.getModelParam<number>("frequency"),
+    qualityFactor:       props.getModelParam<number>("qualityFactor"),
+    motionalCapacitance: props.getModelParam<number>("motionalCapacitance"),
+    shuntCapacitance:    props.getModelParam<number>("shuntCapacitance"),
+  };
+  return buildCrystalElementFromParams(pinNodes, internalNodeIds, branchIdx, p);
 }
 
 // ---------------------------------------------------------------------------
@@ -464,6 +521,14 @@ export const CrystalDefinition: ComponentDefinition = {
       branchCount: 1,
       getInternalNodeCount: () => 2,
     },
+    },
+  },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createCrystalElementFromModelParams,
+      paramDefs: CRYSTAL_PARAM_DEFS,
+      params: CRYSTAL_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

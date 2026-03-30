@@ -43,11 +43,11 @@ function makeCCCSElement(
   const expression = opts.expression ?? "I(sense)";
   const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>([
     ["expression", expression],
-    ["currentGain", gain],
     ["label", ""],
   ]).entries());
+  props.replaceModelParams({ currentGain: gain });
   return withNodeIds(
-    CCCSDefinition.models!.mnaModels!.behavioral!.factory(
+    CCCSDefinition.modelRegistry!["behavioral"]!.factory(
       new Map([["sense+", nSenseP], ["sense-", nSenseN], ["out+", nOutP], ["out-", nOutN]]),
       [],
       senseBranchIdx,

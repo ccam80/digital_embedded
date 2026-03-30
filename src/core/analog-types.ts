@@ -116,10 +116,9 @@ export interface AnalogElementCore {
   /**
    * Update a mutable parameter on a live compiled element without
    * recompilation. Called by the coordinator for slider/property-panel
-   * hot-patching. Optional — elements that don't support live mutation
-   * simply omit it.
+   * hot-patching. All compiled elements must implement this method.
    */
-  setParam?(key: string, value: number): void;
+  setParam(key: string, value: number): void;
 
   /**
    * Stamp the element's frequency-domain small-signal model for AC analysis.

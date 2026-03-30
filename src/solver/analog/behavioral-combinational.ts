@@ -129,7 +129,7 @@ export class BehavioralMuxElement implements AnalogElementCore {
       const level = inputPin.readLogicLevel(inputVoltage);
       const outLevel = level ?? false;
       this._outPins[bit].setLogicLevel(outLevel);
-      this._outPins[bit].stamp(solver);
+      this._outPins[bit].stampOutput(solver);
     }
   }
 
@@ -271,7 +271,7 @@ export class BehavioralDemuxElement implements AnalogElementCore {
     // Route: selected output gets input level, all others get LOW
     for (let i = 0; i < this._outputCount; i++) {
       this._outPins[i].setLogicLevel(i === sel ? inLevel : false);
-      this._outPins[i].stamp(solver);
+      this._outPins[i].stampOutput(solver);
     }
   }
 
@@ -393,7 +393,7 @@ export class BehavioralDecoderElement implements AnalogElementCore {
     // One-hot output: only the selected index is HIGH
     for (let i = 0; i < this._outputCount; i++) {
       this._outPins[i].setLogicLevel(i === sel);
-      this._outPins[i].stamp(solver);
+      this._outPins[i].stampOutput(solver);
     }
   }
 

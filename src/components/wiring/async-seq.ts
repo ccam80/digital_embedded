@@ -206,4 +206,5 @@ export const AsyncSeqDefinition: ComponentDefinition = {
       outputSchema: [],
     },
   },
+  modelRegistry: {},
 };

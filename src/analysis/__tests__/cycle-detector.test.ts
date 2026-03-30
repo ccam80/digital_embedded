@@ -9,45 +9,8 @@
 import { describe, it, expect } from 'vitest';
 import { detectCycles } from '../cycle-detector.js';
 import { Circuit, Wire } from '../../core/circuit.js';
-import { AbstractCircuitElement } from '../../core/element.js';
-import type { Pin, Rotation } from '../../core/pin.js';
 import { PinDirection } from '../../core/pin.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
-import { PropertyBag } from '../../core/properties.js';
-
-// ---------------------------------------------------------------------------
-// Test element stub
-// ---------------------------------------------------------------------------
-
-class StubElement extends AbstractCircuitElement {
-  private readonly _pins: Pin[];
-
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pins: Pin[],
-  ) {
-    super(typeId, instanceId, position, 0 as Rotation, false, new PropertyBag());
-    this._pins = pins;
-  }
-
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-}
-
-function makePin(
-  label: string,
-  direction: PinDirection,
-  x: number,
-  y: number,
-  bitWidth = 1,
-): Pin {
-  return { label, direction, position: { x, y }, bitWidth, isNegated: false, isClock: false, kind: "signal" };
-}
+import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -66,18 +29,18 @@ describe('CycleDetector', () => {
 
     const circuit = new Circuit();
 
-    const inA = new StubElement('In', 'inA', { x: 0, y: 0 }, [
+    const inA = new TestElement('In', 'inA', { x: 0, y: 0 }, [
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ]);
-    const inB = new StubElement('In', 'inB', { x: 0, y: 2 }, [
+    const inB = new TestElement('In', 'inB', { x: 0, y: 2 }, [
       makePin('out', PinDirection.OUTPUT, 2, 2),
     ]);
-    const and = new StubElement('AND', 'and1', { x: 4, y: 0 }, [
+    const and = new TestElement('AND', 'and1', { x: 4, y: 0 }, [
       makePin('in0', PinDirection.INPUT, 4, 0),
       makePin('in1', PinDirection.INPUT, 4, 2),
       makePin('out', PinDirection.OUTPUT, 8, 1),
     ]);
-    const out = new StubElement('Out', 'out1', { x: 10, y: 1 }, [
+    const out = new TestElement('Out', 'out1', { x: 10, y: 1 }, [
       makePin('in', PinDirection.INPUT, 10, 1),
     ]);
 
@@ -99,7 +62,7 @@ describe('CycleDetector', () => {
 
     const circuit = new Circuit();
 
-    const notGate = new StubElement('NOT', 'not1', { x: 0, y: 0 }, [
+    const notGate = new TestElement('NOT', 'not1', { x: 0, y: 0 }, [
       makePin('in', PinDirection.INPUT, 0, 0),
       makePin('out', PinDirection.OUTPUT, 4, 0),
     ]);
@@ -120,25 +83,25 @@ describe('CycleDetector', () => {
 
     const circuit = new Circuit();
 
-    const inX = new StubElement('In', 'inX', { x: 0, y: 0 }, [
+    const inX = new TestElement('In', 'inX', { x: 0, y: 0 }, [
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ]);
-    const not1 = new StubElement('NOT', 'not1', { x: 4, y: 0 }, [
+    const not1 = new TestElement('NOT', 'not1', { x: 4, y: 0 }, [
       makePin('in', PinDirection.INPUT, 4, 0),
       makePin('out', PinDirection.OUTPUT, 8, 0),
     ]);
-    const outY = new StubElement('Out', 'outY', { x: 10, y: 0 }, [
+    const outY = new TestElement('Out', 'outY', { x: 10, y: 0 }, [
       makePin('in', PinDirection.INPUT, 10, 0),
     ]);
 
-    const inP = new StubElement('In', 'inP', { x: 0, y: 10 }, [
+    const inP = new TestElement('In', 'inP', { x: 0, y: 10 }, [
       makePin('out', PinDirection.OUTPUT, 2, 10),
     ]);
-    const not2 = new StubElement('NOT', 'not2', { x: 4, y: 10 }, [
+    const not2 = new TestElement('NOT', 'not2', { x: 4, y: 10 }, [
       makePin('in', PinDirection.INPUT, 4, 10),
       makePin('out', PinDirection.OUTPUT, 8, 10),
     ]);
-    const outQ = new StubElement('Out', 'outQ', { x: 10, y: 10 }, [
+    const outQ = new TestElement('Out', 'outQ', { x: 10, y: 10 }, [
       makePin('in', PinDirection.INPUT, 10, 10),
     ]);
 
@@ -167,15 +130,15 @@ describe('CycleDetector', () => {
 
     const circuit = new Circuit();
 
-    const inD = new StubElement('In', 'inD', { x: 0, y: 0 }, [
+    const inD = new TestElement('In', 'inD', { x: 0, y: 0 }, [
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ]);
     // FlipflopD: D input at (4,0), Q output at (8,0)
-    const ff = new StubElement('FlipflopD', 'ff1', { x: 4, y: 0 }, [
+    const ff = new TestElement('FlipflopD', 'ff1', { x: 4, y: 0 }, [
       makePin('D', PinDirection.INPUT, 4, 0),
       makePin('Q', PinDirection.OUTPUT, 8, 0),
     ]);
-    const outQ = new StubElement('Out', 'outQ', { x: 10, y: 0 }, [
+    const outQ = new TestElement('Out', 'outQ', { x: 10, y: 0 }, [
       makePin('in', PinDirection.INPUT, 10, 0),
     ]);
 

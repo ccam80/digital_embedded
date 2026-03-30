@@ -62,6 +62,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Built-in op-amp model presets
@@ -129,6 +130,27 @@ export const REAL_OPAMP_MODELS: Record<string, {
     vSatNeg: 1.0,
   },
 };
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: REAL_OPAMP_PARAM_DEFS, defaults: REAL_OPAMP_DEFAULTS } = defineModelParams({
+  primary: {
+    aol:      { default: 100000, description: "Open-loop DC voltage gain" },
+    gbw:      { default: 1e6,    unit: "Hz", description: "Gain-bandwidth product" },
+    slewRate: { default: 0.5e6, unit: "V/s", description: "Slew rate" },
+    vos:      { default: 1e-3,  unit: "V",   description: "Input offset voltage" },
+    iBias:    { default: 80e-9, unit: "A",   description: "Input bias current" },
+  },
+  secondary: {
+    rIn:      { default: 2e6,   unit: "Ω",   description: "Input resistance" },
+    rOut:     { default: 75,    unit: "Ω",   description: "Output resistance" },
+    iMax:     { default: 25e-3, unit: "A",   description: "Output current limit" },
+    vSatPos:  { default: 1.5,   unit: "V",   description: "Positive rail saturation drop" },
+    vSatNeg:  { default: 1.5,   unit: "V",   description: "Negative rail saturation drop" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -305,36 +327,32 @@ export function createRealOpAmpElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ): AnalogElementCore {
-  // Extract parameters with defaults
-  let aol       = Math.max(props.getOrDefault<number>("aol",       100000),  1);
-  let gbw       = Math.max(props.getOrDefault<number>("gbw",       1e6),     1);
-  let slewRate  = Math.max(props.getOrDefault<number>("slewRate",  0.5e6),   1e-6);
-  let vos       = props.getOrDefault<number>("vos",       0);
-  let iBias     = Math.abs(props.getOrDefault<number>("iBias",     0));
-  const rIn     = Math.max(props.getOrDefault<number>("rIn",       2e6),     1e-9);
-  const rOut    = Math.max(props.getOrDefault<number>("rOut",      75),      1e-9);
-  const iMax    = Math.max(props.getOrDefault<number>("iMax",      25e-3),   1e-12);
-  const vSatPos = Math.max(props.getOrDefault<number>("vSatPos",   1.5),     0);
-  const vSatNeg = Math.max(props.getOrDefault<number>("vSatNeg",   1.5),     0);
+  // Extract parameters from model param partition
+  const p: Record<string, number> = {
+    aol:      props.getModelParam<number>("aol"),
+    gbw:      props.getModelParam<number>("gbw"),
+    slewRate: props.getModelParam<number>("slewRate"),
+    vos:      props.getModelParam<number>("vos"),
+    iBias:    props.getModelParam<number>("iBias"),
+    rIn:      props.getModelParam<number>("rIn"),
+    rOut:     props.getModelParam<number>("rOut"),
+    iMax:     props.getModelParam<number>("iMax"),
+    vSatPos:  props.getModelParam<number>("vSatPos"),
+    vSatNeg:  props.getModelParam<number>("vSatNeg"),
+  };
 
   // Apply named model overrides if specified
   const modelName = props.getOrDefault<string>("model", "");
   if (modelName.length > 0) {
     const preset = REAL_OPAMP_MODELS[modelName];
     if (preset) {
-      aol      = preset.aol;
-      gbw      = preset.gbw;
-      slewRate = preset.slewRate;
-      vos      = preset.vos;
-      iBias    = preset.iBias;
+      p.aol      = preset.aol;
+      p.gbw      = preset.gbw;
+      p.slewRate = preset.slewRate;
+      p.vos      = preset.vos;
+      p.iBias    = preset.iBias;
     }
   }
-
-  const G_out = 1 / rOut;
-  const G_in  = 1 / rIn;
-
-  // Single-pole rolloff time constant: τ = A_OL / (2π * GBW)
-  const tau = aol / (2 * Math.PI * gbw);
 
   const nInn  = pinNodes.get("in-")!;  // inverting input
   const nInp  = pinNodes.get("in+")!;  // non-inverting input
@@ -369,8 +387,8 @@ export function createRealOpAmpElement(
   let scale = 1;
 
   // Transient: effective gain reduced from A_OL by bandwidth limiting.
-  // In DC mode (no companion): aEff = aol. In transient: aEff < aol.
-  let aEff = aol;
+  // In DC mode (no companion): aEff = p.aol. In transient: aEff < p.aol.
+  let aEff = p.aol;
 
   // BDF-1 companion model for the gain-stage integrator.
   // geq_int > 0 only during transient; 0 during DC.
@@ -405,6 +423,8 @@ export function createRealOpAmpElement(
     },
 
     stamp(solver: SparseSolver): void {
+      const G_in  = 1 / Math.max(p.rIn,  1e-9);
+      const G_out = 1 / Math.max(p.rOut, 1e-9);
       // Input resistance between in+ and in- (always present)
       stampCond(solver, nInp, nInn, G_in);
 
@@ -423,12 +443,14 @@ export function createRealOpAmpElement(
       // up the companion conductance geq_int = tau/dt for the gain-stage integrator.
       vIntPrev = vInt;
       vOutPrev = readNode(voltages, nOut);
+      const tau = Math.max(p.aol, 1) / (2 * Math.PI * Math.max(p.gbw, 1));
       geq_int  = tau / dt;
     },
 
     stampNonlinear(solver: SparseSolver): void {
+      const G_out = 1 / Math.max(p.rOut, 1e-9);
       // 1. Input bias currents
-      const iBiasScaled = iBias * scale;
+      const iBiasScaled = Math.abs(p.iBias) * scale;
       if (nInp > 0) solver.stampRHS(nInp - 1, -iBiasScaled);
       if (nInn > 0) solver.stampRHS(nInn - 1, -iBiasScaled);
 
@@ -473,10 +495,10 @@ export function createRealOpAmpElement(
         // The gain-stage BDF-1 companion gives:
         //   vInt = aEff * vDiff + ieq/G_out
         // where:
-        //   aEff = aol / (1 + geq_int)   (bandwidth-limited gain)
+        //   aEff = p.aol / (1 + geq_int)   (bandwidth-limited gain)
         //   ieq  = (geq_int / (1 + geq_int)) * vIntPrev * G_out  (history current)
         //
-        // In DC mode geq_int = 0, so aEff = aol and ieq = 0 (pure VCVS).
+        // In DC mode geq_int = 0, so aEff = p.aol and ieq = 0 (pure VCVS).
         // In transient mode the history current carries forward the previous
         // accepted vIntPrev, making the NR equation linear and convergent in
         // one iteration regardless of the initial iterate.
@@ -487,11 +509,17 @@ export function createRealOpAmpElement(
         if (nInp > 0) solver.stamp(nOut - 1, nInp - 1, -aEffScaled * G_out);
         if (nInn > 0) solver.stamp(nOut - 1, nInn - 1,  aEffScaled * G_out);
         // History current + V_os offset
-        solver.stampRHS(nOut - 1, ieq + aEffScaled * G_out * vos * scale);
+        solver.stampRHS(nOut - 1, ieq + aEffScaled * G_out * p.vos * scale);
       }
     },
 
     updateOperatingPoint(voltages: Float64Array): void {
+      const G_out  = 1 / Math.max(p.rOut,  1e-9);
+      const iMax   = Math.max(p.iMax,   1e-12);
+      const vSatPos = Math.max(p.vSatPos, 0);
+      const vSatNeg = Math.max(p.vSatNeg, 0);
+      const aol    = Math.max(p.aol, 1);
+
       vInp  = readNode(voltages, nInp);
       vInn  = readNode(voltages, nInn);
       vVccP = readNode(voltages, nVccP);
@@ -499,7 +527,7 @@ export function createRealOpAmpElement(
       vOut  = readNode(voltages, nOut);
 
       const vDiff = vInp - vInn;
-      const vOsScaled = vos * scale;
+      const vOsScaled = p.vos * scale;
 
       // Supply rail limits
       const vRailPos = vVccP - vSatPos;
@@ -513,8 +541,9 @@ export function createRealOpAmpElement(
         // oscillation risk as long as the stamp and the operating-point update
         // agree on the slew state.
         const g = geq_int;
+        const tau = aol / (2 * Math.PI * Math.max(p.gbw, 1));
         const dt = tau / g;
-        const slewLimit = slewRate * dt;
+        const slewLimit = Math.max(p.slewRate, 1e-6) * dt;
         const target = (aol * (vDiff + vOsScaled) + g * vIntPrev) / (1 + g);
         const delta = target - vIntPrev;
         const clampedDelta = Math.max(-slewLimit, Math.min(slewLimit, delta));
@@ -562,10 +591,10 @@ export function createRealOpAmpElement(
       // When saturated, vInt is rail-clamped and (vInt - vOut)*G_out correctly
       // represents the drive current into the load.
       if (outputSaturated) {
-        const iOut = (outputClampLevel - vOut) * G_out;
-        if (Math.abs(iOut) > iMax) {
+        const iOutNow = (outputClampLevel - vOut) * G_out;
+        if (Math.abs(iOutNow) > iMax) {
           currentLimited = true;
-          iOutLimited    = iOut > 0 ? iMax : -iMax;
+          iOutLimited    = iOutNow > 0 ? iMax : -iMax;
         } else {
           currentLimited = false;
           iOutLimited    = 0;
@@ -597,7 +626,9 @@ export function createRealOpAmpElement(
       // Split by output polarity: Vcc+ provides current when output sources,
       // Vcc- sinks current when output sinks.
 
-      const iBiasScaled = iBias * scale;
+      const G_in  = 1 / Math.max(p.rIn,  1e-9);
+      const G_out = 1 / Math.max(p.rOut, 1e-9);
+      const iBiasScaled = Math.abs(p.iBias) * scale;
 
       // Input pin currents (resistor + bias)
       const iInn = (nInn > 0 ? (vInn - vInp) * G_in : 0) + iBiasScaled;
@@ -635,6 +666,10 @@ export function createRealOpAmpElement(
       }
 
       return [iInn, iInp, iOut, iVccP, iVccN];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in p) p[key] = value;
     },
   };
 }
@@ -789,18 +824,14 @@ export const RealOpAmpDefinition: ComponentDefinition = {
     );
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        _branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        return createRealOpAmpElement(pinNodes, props);
-      },
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, _branchIdx, props) =>
+        createRealOpAmpElement(pinNodes, props),
+      paramDefs: REAL_OPAMP_PARAM_DEFS,
+      params: REAL_OPAMP_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

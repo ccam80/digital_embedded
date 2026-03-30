@@ -8,7 +8,6 @@ import { DefaultSimulationCoordinator } from '../coordinator.js';
 import { DefaultSimulatorFacade } from '../../headless/default-facade.js';
 import { createDefaultRegistry } from '../../components/register-all.js';
 import { Circuit, Wire } from '../../core/circuit.js';
-import { AbstractCircuitElement } from '../../core/element.js';
 import { PropertyBag } from '../../core/properties.js';
 import { PinDirection } from '../../core/pin.js';
 import { ComponentRegistry } from '../../core/registry.js';
@@ -16,25 +15,10 @@ import { ResistorDefinition } from '../../components/passives/resistor.js';
 import { DcVoltageSourceDefinition } from '../../components/sources/dc-voltage-source.js';
 import { GroundDefinition } from '../../components/io/ground.js';
 import { compileUnified } from '../../compile/compile.js';
-import type { Pin, Rotation } from '../../core/pin.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
+import type { Pin } from '../../core/pin.js';
 import type { CircuitElement, SerializedElement } from '../../core/element.js';
 import type { PropertyValue } from '../../core/properties.js';
-
-// ---------------------------------------------------------------------------
-// Minimal element helpers
-// ---------------------------------------------------------------------------
-
-class MockElement extends AbstractCircuitElement {
-  private readonly _pins: Pin[];
-  constructor(typeId: string, instanceId: string, position: { x: number; y: number }, pins: Pin[]) {
-    super(typeId, instanceId, position, 0 as Rotation, false, new PropertyBag());
-    this._pins = pins;
-  }
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 4, height: 4 }; }
-}
+import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 
 function makeAnalogEl(
   typeId: string,

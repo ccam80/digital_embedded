@@ -8,111 +8,25 @@
 
 import { describe, it, expect } from "vitest";
 import { Circuit, Wire } from "@/core/circuit";
-import { AbstractCircuitElement } from "@/core/element";
-import type { Pin } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
-import type { RenderContext, Rect } from "@/core/renderer-interface";
+import type { Pin } from "@/core/pin";
 import { PropertyBag } from "@/core/properties";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
 import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { flattenCircuit, isSubcircuitHost } from "@/solver/digital/flatten";
 import type { SubcircuitHost } from "@/solver/digital/flatten";
+import {
+  TestLeafElement,
+  TestSubcircuitElement,
+  makeLeafElement,
+  makeInElement,
+  makeOutElement,
+  makeLeafPin,
+} from "@/test-fixtures/subcircuit-elements";
 
 // ---------------------------------------------------------------------------
-// Test helpers: minimal leaf component (And-like)
+// Local helpers
 // ---------------------------------------------------------------------------
-
-class TestLeafElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
-
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    props: PropertyBag,
-    pins: Pin[],
-  ) {
-    super(typeId, instanceId, position, 0, false, props);
-    this._pins = pins;
-  }
-
-  getPins(): readonly Pin[] {
-    return this._pins;
-  }
-
-  draw(_ctx: RenderContext): void {}
-
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-
-}
-
-function makeLeaf(
-  typeId: string,
-  instanceId: string,
-  position: { x: number; y: number } = { x: 0, y: 0 },
-  label?: string,
-): TestLeafElement {
-  const props = new PropertyBag();
-  if (label !== undefined) {
-    props.set("label", label);
-  }
-  const pins: Pin[] = [
-    {
-      direction: PinDirection.OUTPUT,
-      position: { x: 2, y: 1 },
-      label: "out",
-      bitWidth: 1,
-      isNegated: false,
-      isClock: false,
-      kind: "signal",
-    },
-  ];
-  return new TestLeafElement(typeId, instanceId, position, props, pins);
-}
-
-function makeInElement(
-  instanceId: string,
-  label: string,
-  position: { x: number; y: number } = { x: 0, y: 0 },
-): TestLeafElement {
-  const props = new PropertyBag();
-  props.set("label", label);
-  const pins: Pin[] = [
-    {
-      direction: PinDirection.OUTPUT,
-      position: { x: 2, y: 1 },
-      label: "out",
-      bitWidth: 1,
-      isNegated: false,
-      isClock: false,
-      kind: "signal",
-    },
-  ];
-  return new TestLeafElement("In", instanceId, position, props, pins);
-}
-
-function makeOutElement(
-  instanceId: string,
-  label: string,
-  position: { x: number; y: number } = { x: 10, y: 0 },
-): TestLeafElement {
-  const props = new PropertyBag();
-  props.set("label", label);
-  const pins: Pin[] = [
-    {
-      direction: PinDirection.INPUT,
-      position: { x: 0, y: 1 },
-      label: "in",
-      bitWidth: 1,
-      isNegated: false,
-      isClock: false,
-      kind: "signal",
-    },
-  ];
-  return new TestLeafElement("Out", instanceId, position, props, pins);
-}
 
 function makePortElement(
   instanceId: string,
@@ -139,40 +53,6 @@ function makePortElement(
   return new TestLeafElement("Port", instanceId, position, props, pins);
 }
 
-// ---------------------------------------------------------------------------
-// TestSubcircuitElement — implements SubcircuitHost for test use
-// ---------------------------------------------------------------------------
-
-class TestSubcircuitElement extends AbstractCircuitElement implements SubcircuitHost {
-  readonly internalCircuit: Circuit;
-  readonly subcircuitName: string;
-  private readonly _pins: readonly Pin[];
-
-  constructor(
-    name: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    internalCircuit: Circuit,
-    pins: Pin[],
-  ) {
-    super(`Subcircuit:${name}`, instanceId, position, 0, false, new PropertyBag());
-    this.subcircuitName = name;
-    this.internalCircuit = internalCircuit;
-    this._pins = pins;
-  }
-
-  getPins(): readonly Pin[] {
-    return this._pins;
-  }
-
-  draw(_ctx: RenderContext): void {}
-
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 6, height: 4 };
-  }
-
-}
-
 function makeSubcircuitElement(
   name: string,
   instanceId: string,
@@ -183,28 +63,20 @@ function makeSubcircuitElement(
   return new TestSubcircuitElement(name, instanceId, position, internalCircuit, interfacePins);
 }
 
-// ---------------------------------------------------------------------------
-// Registry helpers
-// ---------------------------------------------------------------------------
-
-function makeNoOpExecute(): ExecuteFunction {
-  return (_index, _state, _layout) => {};
-}
-
 function makeRegistry(...typeIds: string[]): ComponentRegistry {
   const reg = new ComponentRegistry();
   for (const typeId of typeIds) {
     const def: ComponentDefinition = {
       name: typeId,
       typeId: -1,
-      factory: (_props) => makeLeaf(typeId, "auto", { x: 0, y: 0 }),
+      factory: (_props) => makeLeafElement(typeId, "auto", { x: 0, y: 0 }),
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: typeId,
       models: {
-        digital: { executeFn: makeNoOpExecute() },
+        digital: { executeFn: (_index: number, _state: Uint32Array, _highZs: Uint32Array) => {} },
       },
     };
     reg.register(def);
@@ -219,8 +91,8 @@ function makeRegistry(...typeIds: string[]): ComponentRegistry {
 describe("flattenCircuit", () => {
   it("noSubcircuitsUnchanged — circuit with no subcircuits returns structurally identical circuit", () => {
     const circuit = new Circuit({ name: "Top" });
-    const andEl = makeLeaf("And", "and-1", { x: 0, y: 0 });
-    const orEl = makeLeaf("Or", "or-1", { x: 10, y: 0 });
+    const andEl = makeLeafElement("And", "and-1", { x: 0, y: 0 });
+    const orEl = makeLeafElement("Or", "or-1", { x: 10, y: 0 });
     circuit.addElement(andEl);
     circuit.addElement(orEl);
     circuit.addWire(new Wire({ x: 4, y: 1 }, { x: 10, y: 1 }));
@@ -235,8 +107,8 @@ describe("flattenCircuit", () => {
 
   it("preservesLeafComponents — gates and other leaf elements pass through unchanged", () => {
     const circuit = new Circuit();
-    const and1 = makeLeaf("And", "and-a", { x: 0, y: 0 });
-    const and2 = makeLeaf("And", "and-b", { x: 5, y: 0 });
+    const and1 = makeLeafElement("And", "and-a", { x: 0, y: 0 });
+    const and2 = makeLeafElement("And", "and-b", { x: 5, y: 0 });
     circuit.addElement(and1);
     circuit.addElement(and2);
 
@@ -252,7 +124,7 @@ describe("flattenCircuit", () => {
     // Internal circuit: In → And → Out
     const internal = new Circuit({ name: "AndWrapper" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 0 });
-    const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
+    const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
     const outEl = makeOutElement("out-1", "Y", { x: 10, y: 0 });
     internal.addElement(inEl);
     internal.addElement(andEl);
@@ -307,7 +179,7 @@ describe("flattenCircuit", () => {
   it("twoInstances — two instances of same subcircuit have distinct scoped names", () => {
     const internal = new Circuit({ name: "HalfAdder" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 0 });
-    const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
+    const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
     const outEl = makeOutElement("out-1", "S", { x: 10, y: 0 });
     internal.addElement(inEl);
     internal.addElement(andEl);
@@ -352,7 +224,7 @@ describe("flattenCircuit", () => {
     // Inner: just an And gate
     const inner = new Circuit({ name: "Inner" });
     const innerIn = makeInElement("in-i", "X", { x: 0, y: 0 });
-    const innerAnd = makeLeaf("And", "and-i", { x: 5, y: 0 });
+    const innerAnd = makeLeafElement("And", "and-i", { x: 5, y: 0 });
     const innerOut = makeOutElement("out-i", "Z", { x: 10, y: 0 });
     inner.addElement(innerIn);
     inner.addElement(innerAnd);
@@ -463,7 +335,7 @@ describe("flattenCircuit", () => {
   it("isSubcircuitHost — correctly identifies SubcircuitHost elements", () => {
     const internal = new Circuit({ name: "X" });
     const sub = makeSubcircuitElement("X", "sub-1", { x: 0, y: 0 }, internal, []);
-    const leaf = makeLeaf("And", "and-1", { x: 0, y: 0 });
+    const leaf = makeLeafElement("And", "and-1", { x: 0, y: 0 });
 
     expect(isSubcircuitHost(sub)).toBe(true);
     expect(isSubcircuitHost(leaf)).toBe(false);
@@ -472,7 +344,7 @@ describe("flattenCircuit", () => {
   it("singleSubcircuit — original circuit is not mutated by flattening", () => {
     const internal = new Circuit({ name: "Sub" });
     const inEl = makeInElement("in-1", "A", { x: 0, y: 0 });
-    const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
+    const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
     internal.addElement(inEl);
     internal.addElement(andEl);
 
@@ -504,7 +376,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     // Internal circuit: Port("A") → And gate → Port("Y")
     const internal = new Circuit({ name: "PortWrapper" });
     const portA = makePortElement("port-A", "A", { x: 0, y: 0 });
-    const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
+    const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
     const portY = makePortElement("port-Y", "Y", { x: 10, y: 0 });
     internal.addElement(portA);
     internal.addElement(andEl);
@@ -566,7 +438,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     // Inner circuit: Port("X") → And gate → Port("Z")
     const inner = new Circuit({ name: "Inner" });
     const innerPortX = makePortElement("port-X", "X", { x: 0, y: 0 });
-    const innerAnd = makeLeaf("And", "and-i", { x: 5, y: 0 });
+    const innerAnd = makeLeafElement("And", "and-i", { x: 5, y: 0 });
     const innerPortZ = makePortElement("port-Z", "Z", { x: 10, y: 0 });
     inner.addElement(innerPortX);
     inner.addElement(innerAnd);
@@ -613,7 +485,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
   it("multiInstancePortSubcircuit — two instances of the same Port-based subcircuit have distinct scoped names", () => {
     const internal = new Circuit({ name: "PortGate" });
     const portA = makePortElement("port-A", "A", { x: 0, y: 0 });
-    const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
+    const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
     const portY = makePortElement("port-Y", "Y", { x: 10, y: 0 });
     internal.addElement(portA);
     internal.addElement(andEl);
@@ -657,7 +529,7 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     // Internal circuit: Port("BUS") with bitWidth 8 → And gate
     const internal = new Circuit({ name: "BusSub" });
     const portBus = makePortElement("port-BUS", "BUS", { x: 0, y: 0 }, 8);
-    const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
+    const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
     internal.addElement(portBus);
     internal.addElement(andEl);
     internal.addWire(new Wire(
@@ -700,8 +572,8 @@ describe("flattenCircuit — Port-based subcircuits", () => {
     // Internal circuit: Port("IN") → And → Or → Port("OUT")
     const internal = new Circuit({ name: "TwoGates" });
     const portIn = makePortElement("port-IN", "IN", { x: 0, y: 0 });
-    const andEl = makeLeaf("And", "and-1", { x: 5, y: 0 });
-    const orEl = makeLeaf("Or", "or-1", { x: 10, y: 0 });
+    const andEl = makeLeafElement("And", "and-1", { x: 5, y: 0 });
+    const orEl = makeLeafElement("Or", "or-1", { x: 10, y: 0 });
     const portOut = makePortElement("port-OUT", "OUT", { x: 15, y: 0 });
     internal.addElement(portIn);
     internal.addElement(andEl);

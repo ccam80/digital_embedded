@@ -33,6 +33,7 @@ import type { AnalogElement, AnalogElementCore } from "../../solver/analog/eleme
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
 import type { ExprNode } from "../../solver/analog/expression.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Waveform computation
@@ -169,6 +170,21 @@ export function squareWaveBreakpoints(
 
   return breakpoints;
 }
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: AC_VOLTAGE_SOURCE_PARAM_DEFS, defaults: AC_VOLTAGE_SOURCE_DEFAULTS } = defineModelParams({
+  primary: {
+    amplitude: { default: 5,    unit: "V",   description: "Peak amplitude in volts" },
+    frequency: { default: 1000, unit: "Hz",  description: "Frequency in Hz" },
+  },
+  secondary: {
+    phase:    { default: 0, unit: "rad", description: "Phase offset in radians" },
+    dcOffset: { default: 0, unit: "V",   description: "DC offset added to waveform" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // AcVoltageSourceElement — CircuitElement implementation
@@ -426,10 +442,16 @@ function createAcVoltageSourceElement(
 ): AcVoltageSourceAnalogElement {
   const nodePos = pinNodes.get("pos")!;
   const nodeNeg = pinNodes.get("neg")!;
-  let amplitude = props.getOrDefault<number>("amplitude", 5);
-  let frequency = props.getOrDefault<number>("frequency", 1000);
-  let phase = props.getOrDefault<number>("phase", 0);
-  let dcOffset = props.getOrDefault<number>("dcOffset", 0);
+  const p: Record<string, number> = {
+    amplitude: props.getModelParam<number>("amplitude"),
+    frequency: props.getModelParam<number>("frequency"),
+    phase:     props.getModelParam<number>("phase"),
+    dcOffset:  props.getModelParam<number>("dcOffset"),
+  };
+  let amplitude = p.amplitude;
+  let frequency = p.frequency;
+  let phase = p.phase;
+  let dcOffset = p.dcOffset;
   const waveform = props.getOrDefault<string>("waveform", "sine") as Waveform;
   const ext: ExtendedWaveformParams = {
     freqStart: props.getOrDefault<number>("freqStart", 100),
@@ -464,10 +486,13 @@ function createAcVoltageSourceElement(
     _parseError: parseError,
 
     setParam(key: string, value: number): void {
-      if (key === "amplitude") amplitude = value;
-      else if (key === "frequency") frequency = value;
-      else if (key === "phase") phase = value;
-      else if (key === "dcOffset") dcOffset = value;
+      if (key in p) {
+        (p as Record<string, number>)[key] = value;
+        amplitude = p.amplitude;
+        frequency = p.frequency;
+        phase = p.phase;
+        dcOffset = p.dcOffset;
+      }
     },
 
     setSourceScale(factor: number): void {
@@ -551,10 +576,10 @@ export const AcVoltageSourceDefinition: ComponentDefinition = {
     return new AcVoltageSourceElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      branchCount: 1,
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
       factory(
         pinNodes: ReadonlyMap<string, number>,
         internalNodeIds: readonly number[],
@@ -564,7 +589,8 @@ export const AcVoltageSourceDefinition: ComponentDefinition = {
       ): AnalogElementCore {
         return createAcVoltageSourceElement(pinNodes, internalNodeIds, branchIdx, props, getTime);
       },
-    },
+      paramDefs: AC_VOLTAGE_SOURCE_PARAM_DEFS,
+      params: AC_VOLTAGE_SOURCE_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

@@ -65,10 +65,15 @@ export interface PropertyDefinition {
 
 export class PropertyBag {
   private readonly _map: Map<string, PropertyValue>;
-  private readonly _modelParams: Map<string, PropertyValue> = new Map();
+  private readonly _mparams: Map<string, PropertyValue> = new Map();
 
   constructor(entries?: Iterable<readonly [string, PropertyValue]>) {
-    this._map = new Map(entries);
+    this._map = new Map();
+    if (entries) {
+      for (const [k, v] of entries) {
+        this._map.set(k, v);
+      }
+    }
   }
 
   /**
@@ -111,7 +116,7 @@ export class PropertyBag {
   // -------------------------------------------------------------------------
 
   getModelParam<T extends PropertyValue>(key: string): T {
-    const value = this._modelParams.get(key);
+    const value = this._mparams.get(key);
     if (value === undefined) {
       throw new Error(`PropertyBag: model param "${key}" not found`);
     }
@@ -119,22 +124,22 @@ export class PropertyBag {
   }
 
   setModelParam(key: string, value: PropertyValue): void {
-    this._modelParams.set(key, value);
+    this._mparams.set(key, value);
   }
 
   replaceModelParams(params: Record<string, PropertyValue>): void {
-    this._modelParams.clear();
+    this._mparams.clear();
     for (const [k, v] of Object.entries(params)) {
-      this._modelParams.set(k, v);
+      this._mparams.set(k, v);
     }
   }
 
   getModelParamKeys(): string[] {
-    return Array.from(this._modelParams.keys());
+    return Array.from(this._mparams.keys());
   }
 
   hasModelParam(key: string): boolean {
-    return this._modelParams.has(key);
+    return this._mparams.has(key);
   }
 
   /**
@@ -146,8 +151,8 @@ export class PropertyBag {
     for (const [k, v] of this._map) {
       cloned._map.set(k, Array.isArray(v) ? [...v] : (typeof v === 'object' && v !== null ? { ...v } : v));
     }
-    for (const [k, v] of this._modelParams) {
-      cloned._modelParams.set(k, Array.isArray(v) ? [...v] : (typeof v === 'object' && v !== null ? { ...v } : v));
+    for (const [k, v] of this._mparams) {
+      cloned._mparams.set(k, Array.isArray(v) ? [...v] : (typeof v === 'object' && v !== null ? { ...v } : v));
     }
     return cloned;
   }

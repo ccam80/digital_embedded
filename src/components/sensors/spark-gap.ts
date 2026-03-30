@@ -32,7 +32,7 @@
  *   updateOperatingPoint — tracks terminal voltage for resistance computation
  */
 
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -41,6 +41,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
+import { defineModelParams } from "../../core/model-params.js";
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
@@ -53,6 +54,21 @@ import { PinDirection } from "../../core/pin.js";
 // ---------------------------------------------------------------------------
 
 const MIN_RESISTANCE = 1e-12;
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: SPARK_GAP_PARAM_DEFS, defaults: SPARK_GAP_DEFAULTS } = defineModelParams({
+  primary: {
+    vBreakdown: { default: 1000, unit: "V",  description: "Voltage at which the spark gap fires" },
+    rOn:        { default: 5,    unit: "Ω",  description: "Resistance when gap is conducting" },
+  },
+  secondary: {
+    rOff:  { default: 1e10, unit: "Ω",  description: "Resistance when gap is blocking" },
+    iHold: { default: 0.01, unit: "A",  description: "Minimum current to sustain conduction" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Smooth resistance helpers
@@ -88,10 +104,7 @@ export class SparkGapElement implements AnalogElementCore {
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
 
-  private readonly _vBreakdown: number;
-  private readonly _rOn: number;
-  private readonly _rOff: number;
-  private readonly _iHold: number;
+  private readonly _p: Record<string, number>;
 
   /** True when the spark gap is in the conducting state. */
   private _conducting: boolean = false;
@@ -111,10 +124,16 @@ export class SparkGapElement implements AnalogElementCore {
     rOff: number,
     iHold: number,
   ) {
-    this._vBreakdown = Math.max(vBreakdown, 1e-6);
-    this._rOn = Math.max(rOn, MIN_RESISTANCE);
-    this._rOff = Math.max(rOff, 1);
-    this._iHold = Math.max(iHold, 1e-12);
+    this._p = {
+      vBreakdown: Math.max(vBreakdown, 1e-6),
+      rOn:        Math.max(rOn, MIN_RESISTANCE),
+      rOff:       Math.max(rOff, 1),
+      iHold:      Math.max(iHold, 1e-12),
+    };
+  }
+
+  setParam(key: string, value: number): void {
+    if (key in this._p) this._p[key] = value;
   }
 
   /**
@@ -130,12 +149,12 @@ export class SparkGapElement implements AnalogElementCore {
     const absV = Math.abs(this._vTerminal);
 
     if (!this._conducting) {
-      return firingResistance(absV, this._vBreakdown, this._rOff, this._rOn);
+      return firingResistance(absV, this._p.vBreakdown, this._p.rOff, this._p.rOn);
     }
 
     // In conducting state: current is V / rOn (on-state conduction)
-    const absI = absV / Math.max(this._rOn, MIN_RESISTANCE);
-    return extinctionResistance(absI, this._iHold, this._rOn, this._rOff);
+    const absI = absV / Math.max(this._p.rOn, MIN_RESISTANCE);
+    return extinctionResistance(absI, this._p.iHold, this._p.rOn, this._p.rOff);
   }
 
   /** True if the gap is currently conducting — exposed for testing. */
@@ -185,12 +204,11 @@ export class SparkGapElement implements AnalogElementCore {
     const absV = Math.abs(this._vTerminal);
 
     // Update discrete state with hysteresis
-    if (!this._conducting && absV > this._vBreakdown) {
+    if (!this._conducting && absV > this._p.vBreakdown) {
       this._conducting = true;
     } else if (this._conducting) {
-      const R = this._rOn;
-      const absI = absV / Math.max(R, MIN_RESISTANCE);
-      if (absI < this._iHold) {
+      const absI = absV / Math.max(this._p.rOn, MIN_RESISTANCE);
+      if (absI < this._p.iHold) {
         this._conducting = false;
       }
     }
@@ -208,11 +226,13 @@ export function createSparkGapElement(
   props: PropertyBag,
   _getTime: () => number,
 ): AnalogElementCore {
-  const vBreakdown = props.getOrDefault<number>("vBreakdown", 1000);
-  const rOn = props.getOrDefault<number>("rOn", 5);
-  const rOff = props.getOrDefault<number>("rOff", 1e10);
-  const iHold = props.getOrDefault<number>("iHold", 0.01);
-  return new SparkGapElement(vBreakdown, rOn, rOff, iHold);
+  const p: Record<string, number> = {
+    vBreakdown: props.getOrDefault<number>("vBreakdown", SPARK_GAP_DEFAULTS.vBreakdown),
+    rOn:        props.getOrDefault<number>("rOn",        SPARK_GAP_DEFAULTS.rOn),
+    rOff:       props.getOrDefault<number>("rOff",       SPARK_GAP_DEFAULTS.rOff),
+    iHold:      props.getOrDefault<number>("iHold",      SPARK_GAP_DEFAULTS.iHold),
+  };
+  return new SparkGapElement(p.vBreakdown, p.rOn, p.rOff, p.iHold);
 }
 
 // ---------------------------------------------------------------------------
@@ -383,6 +403,14 @@ export const SparkGapDefinition: ComponentDefinition = {
   helpText:
     "Spark Gap — voltage-triggered switch with hysteresis. " +
     "Fires at breakdown voltage; stays on until current drops below holding threshold.",
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: createSparkGapElement,
+      paramDefs: SPARK_GAP_PARAM_DEFS,
+      params: SPARK_GAP_DEFAULTS,
+    },
+  },
   models: { mnaModels: { behavioral: { factory: createSparkGapElement } } },
   defaultModel: "behavioral",
 };

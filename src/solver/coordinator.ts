@@ -32,6 +32,7 @@ import type {
   SignalValue,
 } from '../compile/types.js';
 import type { ConcreteCompiledAnalogCircuit } from './analog/compiled-analog-circuit.js';
+import type { BridgeOutputAdapter, BridgeInputAdapter } from './analog/bridge-adapter.js';
 import { SpeedControl } from '../integration/speed-control.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import { PropertyType } from '../core/properties.js';
@@ -60,6 +61,8 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private readonly _analog: AnalogEngine | null;
   private readonly _bridges: BridgeAdapter[];
   private readonly _topLevelBridgeStates: TopLevelBridgeState[];
+  /** Resolved MNA bridge adapters parallel to _bridges. Index i → adapters for _bridges[i]. */
+  private readonly _resolvedBridgeAdapters: Array<Array<BridgeOutputAdapter | BridgeInputAdapter>>;
   private readonly _clockManager: ClockManager | null;
   private _diagnostics: DiagnosticCollector | null = null;
   private readonly _observers: Set<MeasurementObserver> = new Set();
@@ -82,6 +85,18 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     this._compiled = compiled;
     this._bridges = compiled.bridges;
     this._topLevelBridgeStates = compiled.bridges.map(() => ({ prevBit: 0 }));
+
+    // Resolve MNA bridge adapters from the compiled analog circuit.
+    // Each BridgeAdapter descriptor maps to the adapters registered under its
+    // boundaryGroupId in bridgeAdaptersByGroupId.
+    if (compiled.analog !== null) {
+      const compiledAnalog = compiled.analog as ConcreteCompiledAnalogCircuit;
+      this._resolvedBridgeAdapters = compiled.bridges.map(bridge =>
+        compiledAnalog.bridgeAdaptersByGroupId.get(bridge.boundaryGroupId) ?? [],
+      );
+    } else {
+      this._resolvedBridgeAdapters = compiled.bridges.map(() => []);
+    }
 
     if (compiled.digital !== null) {
       const engine = new DigitalEngine('level');
@@ -189,16 +204,48 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       const bridge = this._bridges[i]!;
       if (bridge.direction !== 'analog-to-digital') continue;
       const voltage = analog.getNodeVoltage(bridge.analogNodeId);
-      const bit = this._thresholdVoltage(voltage, bridge, i);
+      const adapters = this._resolvedBridgeAdapters[i]!;
+      let bit: number;
+      const inputAdapter = adapters.find(
+        (a): a is BridgeInputAdapter => 'readLogicLevel' in a,
+      );
+      if (inputAdapter === undefined) {
+        this._diagnostics?.emit({
+          code: 'bridge-missing-inner-pin',
+          severity: 'error',
+          summary: `No BridgeInputAdapter for boundary group ${bridge.boundaryGroupId}`,
+          explanation: 'An analog-to-digital bridge has no registered BridgeInputAdapter. This indicates a compilation error — the bridge was not fully assembled.',
+          suggestions: [],
+        });
+        continue;
+      }
+      const level = inputAdapter.readLogicLevel(voltage);
+      if (level === true) {
+        bit = 1;
+        this._topLevelBridgeStates[i]!.prevBit = 1;
+      } else if (level === false) {
+        bit = 0;
+        this._topLevelBridgeStates[i]!.prevBit = 0;
+      } else {
+        bit = this._topLevelBridgeStates[i]!.prevBit;
+      }
       digital.setSignalValue(bridge.digitalNetId, BitVector.fromNumber(bit, bridge.bitWidth));
     }
 
     digital.step();
 
-    for (const bridge of this._bridges) {
+    for (let i = 0; i < this._bridges.length; i++) {
+      const bridge = this._bridges[i]!;
       if (bridge.direction !== 'digital-to-analog') continue;
       const raw = digital.getSignalRaw(bridge.digitalNetId);
       const high = raw !== 0;
+      const adapters = this._resolvedBridgeAdapters[i]!;
+      const outputAdapter = adapters.find(
+        (a): a is BridgeOutputAdapter => 'setLogicLevel' in a,
+      );
+      if (outputAdapter !== undefined) {
+        outputAdapter.setLogicLevel(high);
+      }
       if (high) {
         analog.addBreakpoint(analog.simTime);
       }
@@ -505,13 +552,14 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     if (elementIndex === -1) return;
     const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
 
-    // Composite pin-param key (e.g. "A.rOut") → route to bridge adapter
+    // Composite pin-param key (e.g. "A.rOut") → route to bridge adapters via
+    // bridgeAdaptersByGroupId. We find adapters whose label ends with the pin
+    // label suffix so that "A.rOut" routes to the adapter for pin "A".
     const dotIdx = key.indexOf('.');
     if (dotIdx !== -1) {
       const pinLabel = key.slice(0, dotIdx);
       const paramName = key.slice(dotIdx + 1);
-      const adapters = compiledAnalog.elementBridgeAdapters?.get(elementIndex);
-      if (adapters) {
+      for (const adapters of compiledAnalog.bridgeAdaptersByGroupId.values()) {
         for (const adapter of adapters) {
           if (adapter.label?.endsWith(`:${pinLabel}`)) {
             adapter.setParam(paramName, value);
@@ -563,23 +611,6 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
    */
   setDiagnosticCollector(collector: DiagnosticCollector): void {
     this._diagnostics = collector;
-  }
-
-  private _thresholdVoltage(voltage: number, bridge: BridgeAdapter, bridgeIndex: number): number {
-    const spec = bridge.electricalSpec;
-    const vIH = spec.vIH ?? 2.0;
-    const vIL = spec.vIL ?? 0.8;
-    const state = this._topLevelBridgeStates[bridgeIndex]!;
-    if (voltage >= vIH) {
-      state.prevBit = 1;
-      return 1;
-    }
-    if (voltage <= vIL) {
-      state.prevBit = 0;
-      return 0;
-    }
-    // Indeterminate band: hold previous value (hysteresis)
-    return state.prevBit;
   }
 
   /**

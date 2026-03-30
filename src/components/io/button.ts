@@ -196,4 +196,5 @@ export const ButtonDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeButton, inputSchema: [], outputSchema: ["out"] },
   },
+  modelRegistry: {},
 };

@@ -250,4 +250,5 @@ export const FGPFETDefinition: ComponentDefinition = {
       defaultDelay: 0,
     },
   },
+  modelRegistry: {},
 };

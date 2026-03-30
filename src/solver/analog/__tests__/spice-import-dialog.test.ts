@@ -2,11 +2,11 @@
  * Headless tests for the .MODEL import flow (W11.1).
  *
  * Verifies:
- * 1. parseModelCard() → store as _spiceModelOverrides → compile → params applied
- * 2. Display name stored as _spiceModelName
- * 3. applySpiceImportResult sets both properties on the PropertyBag
+ * 1. parseModelCard() extracts name, deviceType, and params correctly
+ * 2. applySpiceImportResult sets model property and model params on PropertyBag
+ * 3. applySpiceImportResult writes to circuit.metadata.models
  * 4. Invalid .MODEL text produces a ParseError (not stored)
- * 5. Params from the imported model are merged over defaults at compile time
+ * 5. Params from the imported model are applied at compile time via metadata.models
  */
 
 import { describe, it, expect } from "vitest";
@@ -15,7 +15,7 @@ import { applySpiceImportResult } from "../../../app/spice-model-apply.js";
 import { compileUnified } from "@/compile/compile.js";
 import { Circuit, Wire } from "../../../core/circuit.js";
 import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js";
-import type { ComponentDefinition, ExecuteFunction } from "../../../core/registry.js";
+import type { ComponentDefinition, ExecuteFunction, ModelEntry } from "../../../core/registry.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { PropertyValue } from "../../../core/properties.js";
 import type { CircuitElement } from "../../../core/element.js";
@@ -26,7 +26,7 @@ import type { SerializedElement } from "../../../core/element.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
-import { BJT_NPN_DEFAULTS } from "../model-defaults.js";
+import { BJT_NPN_DEFAULTS } from "../../../components/semiconductors/bjt.js";
 
 // ---------------------------------------------------------------------------
 // Minimal element builder (shared with spice-model-overrides.test.ts pattern)
@@ -105,27 +105,44 @@ describe("spice-import-dialog: parse and apply", () => {
     expect(typeof result.message).toBe("string");
   });
 
-  it("applySpiceImportResult stores _spiceModelOverrides as Record<string, number>", () => {
+  it("applySpiceImportResult sets model property on element", () => {
     const element = makeElement("NpnStub", "q1", [
       { x: 0, y: 0, label: "C" },
       { x: 0, y: 0, label: "B" },
       { x: 0, y: 0, label: "E" },
     ]);
     const circuit = new Circuit();
+
+    // Build a minimal registry with NpnStub that has a behavioral modelRegistry entry
+    const registry = new ComponentRegistry();
+    registry.register({
+      name: "NpnStub",
+      typeId: -1,
+      factory: (_props: unknown) => { throw new Error("unused"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: "NPN Stub",
+      modelRegistry: {
+        behavioral: {
+          kind: "inline",
+          factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }),
+          params: {},
+        },
+      },
+    } as unknown as ComponentDefinition);
 
     applySpiceImportResult(element, {
       overrides: { IS: 1e-14, BF: 200 },
       modelName: "2N2222",
       deviceType: "NPN",
-    }, circuit);
+    }, circuit, registry);
 
-    const stored = element.getProperties().get("_spiceModelOverrides") as Record<string, number>;
-    expect(typeof stored).toBe("object");
-    expect(stored["IS"]).toBe(1e-14);
-    expect(stored["BF"]).toBe(200);
+    expect(element.getProperties().get("model")).toBe("2N2222");
   });
 
-  it("applySpiceImportResult stores _spiceModelName for display", () => {
+  it("applySpiceImportResult stores params in model params partition", () => {
     const element = makeElement("NpnStub", "q1", [
       { x: 0, y: 0, label: "C" },
       { x: 0, y: 0, label: "B" },
@@ -133,19 +150,37 @@ describe("spice-import-dialog: parse and apply", () => {
     ]);
     const circuit = new Circuit();
 
+    const registry = new ComponentRegistry();
+    registry.register({
+      name: "NpnStub",
+      typeId: -1,
+      factory: (_props: unknown) => { throw new Error("unused"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: "NPN Stub",
+      modelRegistry: {
+        behavioral: {
+          kind: "inline",
+          factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }),
+          params: {},
+        },
+      },
+    } as unknown as ComponentDefinition);
+
     applySpiceImportResult(element, {
       overrides: { IS: 2e-14 },
       modelName: "BC547",
       deviceType: "NPN",
-    }, circuit);
+    }, circuit, registry);
 
-    expect(element.getProperties().get("_spiceModelName")).toBe("BC547");
+    expect(element.getProperties().getModelParam<number>("IS")).toBe(2e-14);
   });
 
   it("applySpiceImportResult overwrites previously stored model name and overrides", () => {
     const propsMap = new Map<string, PropertyValue>([
-      ["_spiceModelName", "OLD_MODEL"],
-      ["_spiceModelOverrides", { IS: 1e-10 }],
+      ["model", "OLD_MODEL"],
     ]);
     const element = makeElement("NpnStub", "q1", [
       { x: 0, y: 0, label: "C" },
@@ -154,19 +189,37 @@ describe("spice-import-dialog: parse and apply", () => {
     ], propsMap);
     const circuit = new Circuit();
 
+    const registry = new ComponentRegistry();
+    registry.register({
+      name: "NpnStub",
+      typeId: -1,
+      factory: (_props: unknown) => { throw new Error("unused"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: "NPN Stub",
+      modelRegistry: {
+        behavioral: {
+          kind: "inline",
+          factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }),
+          params: {},
+        },
+      },
+    } as unknown as ComponentDefinition);
+
     applySpiceImportResult(element, {
       overrides: { IS: 5e-15, BF: 300 },
       modelName: "2SC1815",
       deviceType: "NPN",
-    }, circuit);
+    }, circuit, registry);
 
-    expect(element.getProperties().get("_spiceModelName")).toBe("2SC1815");
-    const overrides = element.getProperties().get("_spiceModelOverrides") as Record<string, number>;
-    expect(overrides["IS"]).toBe(5e-15);
-    expect(overrides["BF"]).toBe(300);
+    expect(element.getProperties().get("model")).toBe("2SC1815");
+    expect(element.getProperties().getModelParam<number>("IS")).toBe(5e-15);
+    expect(element.getProperties().getModelParam<number>("BF")).toBe(300);
   });
 
-  it("applySpiceImportResult writes to circuit.metadata.namedParameterSets (library-level)", () => {
+  it("applySpiceImportResult writes to circuit.metadata.models (library-level)", () => {
     const element = makeElement("NpnStub", "q1", [
       { x: 0, y: 0, label: "C" },
       { x: 0, y: 0, label: "B" },
@@ -174,16 +227,36 @@ describe("spice-import-dialog: parse and apply", () => {
     ]);
     const circuit = new Circuit();
 
+    const registry = new ComponentRegistry();
+    registry.register({
+      name: "NpnStub",
+      typeId: -1,
+      factory: (_props: unknown) => { throw new Error("unused"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: "NPN Stub",
+      modelRegistry: {
+        behavioral: {
+          kind: "inline",
+          factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }),
+          params: {},
+        },
+      },
+    } as unknown as ComponentDefinition);
+
     applySpiceImportResult(element, {
       overrides: { IS: 1e-14, BF: 200 },
       modelName: "2N2222",
       deviceType: "NPN",
-    }, circuit);
+    }, circuit, registry);
 
-    const sets = circuit.metadata.namedParameterSets;
-    expect(sets!["2N2222"].deviceType).toBe("NPN");
-    expect(sets!["2N2222"].params["IS"]).toBe(1e-14);
-    expect(sets!["2N2222"].params["BF"]).toBe(200);
+    const entry = circuit.metadata.models?.["NpnStub"]?.["2N2222"];
+    expect(entry).toBeDefined();
+    expect(entry!.kind).toBe("inline");
+    expect(entry!.params["IS"]).toBe(1e-14);
+    expect(entry!.params["BF"]).toBe(200);
   });
 });
 
@@ -192,15 +265,15 @@ describe("spice-import-dialog: parse and apply", () => {
 // ---------------------------------------------------------------------------
 
 describe("spice-import-dialog: compile integration", () => {
-  function buildRegistryAndCircuit(spiceModelOverrides?: Record<string, number>): {
+  function buildRegistryAndCircuit(modelOverrides?: Record<string, number>): {
     capturedModelParams: Record<string, number> | undefined;
     diagnostics: Array<{ code: string; severity: string; summary?: string }>;
   } {
     let capturedModelParams: Record<string, number> | undefined;
 
     const npnFactory: AnalogElementFactory = (_pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
-      capturedModelParams = props.has("_modelParams")
-        ? (props.get("_modelParams") as unknown as Record<string, number>)
+      capturedModelParams = props.getModelParamKeys().length > 0
+        ? Object.fromEntries(props.getModelParamKeys().map(k => [k, props.getModelParam<number>(k)]))
         : undefined;
       const stub: AnalogElement = {
         pinNodeIds: [],
@@ -240,21 +313,17 @@ describe("spice-import-dialog: compile integration", () => {
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: "NPN Stub",
-      models: {
-        mnaModels: {
-          behavioral: {
-            deviceType: "NPN" as string,
-            factory: npnFactory,
-          },
+      modelRegistry: {
+        behavioral: {
+          kind: "inline",
+          factory: npnFactory,
+          params: { ...BJT_NPN_DEFAULTS },
         },
       },
     } as unknown as ComponentDefinition);
 
     const propsMap = new Map<string, PropertyValue>();
     propsMap.set("label", "q1");
-    if (spiceModelOverrides !== undefined) {
-      propsMap.set("_spiceModelOverrides", spiceModelOverrides);
-    }
 
     const circuit = new Circuit();
     const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }], new Map(), registry);
@@ -270,6 +339,19 @@ describe("spice-import-dialog: compile integration", () => {
       registry,
     );
 
+    // If overrides provided, store them in circuit.metadata.models and set model property.
+    // Merge defaults from the behavioral entry params so unoverridden params are present.
+    if (modelOverrides !== undefined) {
+      const behavioralEntry = registry.get("NpnStub")!.modelRegistry!["behavioral"]!;
+      const entry: ModelEntry = {
+        kind: "inline",
+        factory: behavioralEntry.factory,
+        params: { ...behavioralEntry.params, ...modelOverrides },
+      };
+      circuit.metadata.models = { NpnStub: { imported: entry } };
+      npn.getProperties().set("model", "imported");
+    }
+
     circuit.addElement(gnd);
     circuit.addElement(npn);
     circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
@@ -280,7 +362,7 @@ describe("spice-import-dialog: compile integration", () => {
     return { capturedModelParams, diagnostics: compiled.diagnostics };
   }
 
-  it("import .MODEL card → store as _spiceModelOverrides → compile applies IS override", () => {
+  it("import .MODEL card → store in metadata.models → compile applies IS override", () => {
     const modelCard = ".MODEL 2N2222 NPN(IS=1e-14 BF=200)";
     const parsed = parseModelCard(modelCard);
 
@@ -296,7 +378,7 @@ describe("spice-import-dialog: compile integration", () => {
     expect(capturedModelParams!["BF"]).toBe(200);
   });
 
-  it("import .MODEL card → _spiceModelName stored on element → visible in PropertyBag", () => {
+  it("import .MODEL card → model name stored on element via model property → visible in PropertyBag", () => {
     const modelCard = ".MODEL BC547 NPN(IS=6e-15 BF=110)";
     const parsed = parseModelCard(modelCard);
 
@@ -309,17 +391,35 @@ describe("spice-import-dialog: compile integration", () => {
       { x: 0, y: 0, label: "E" },
     ]);
 
+    const registry = new ComponentRegistry();
+    registry.register({
+      name: "NpnStub",
+      typeId: -1,
+      factory: (_props: unknown) => { throw new Error("unused"); },
+      pinLayout: [],
+      propertyDefs: [],
+      attributeMap: [],
+      category: ComponentCategory.MISC,
+      helpText: "NPN Stub",
+      modelRegistry: {
+        behavioral: {
+          kind: "inline",
+          factory: () => ({ pinNodeIds: [], allNodeIds: [], branchIndex: -1, isNonlinear: false, isReactive: false, stamp() {} }),
+          params: {},
+        },
+      },
+    } as unknown as ComponentDefinition);
+
     const circuit = new Circuit();
     applySpiceImportResult(element, {
       overrides: parsed.params,
       modelName: parsed.name,
       deviceType: parsed.deviceType,
-    }, circuit);
+    }, circuit, registry);
 
-    expect(element.getProperties().get("_spiceModelName")).toBe("BC547");
-    const overrides = element.getProperties().get("_spiceModelOverrides") as Record<string, number>;
-    expect(overrides["IS"]).toBe(6e-15);
-    expect(overrides["BF"]).toBe(110);
+    expect(element.getProperties().get("model")).toBe("BC547");
+    expect(element.getProperties().getModelParam<number>("IS")).toBe(6e-15);
+    expect(element.getProperties().getModelParam<number>("BF")).toBe(110);
   });
 
   it("unmodified params stay at NPN defaults when IS is overridden", () => {
@@ -332,6 +432,7 @@ describe("spice-import-dialog: compile integration", () => {
     const { capturedModelParams } = buildRegistryAndCircuit(parsed.params);
 
     expect(capturedModelParams!["IS"]).toBe(2e-15);
+    // BF not overridden, should come from behavioral entry defaults
     expect(capturedModelParams!["BF"]).toBe(BJT_NPN_DEFAULTS["BF"]);
     expect(capturedModelParams!["NF"]).toBe(BJT_NPN_DEFAULTS["NF"]);
   });

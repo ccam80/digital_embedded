@@ -20,6 +20,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import { makeNorAnalogFactory } from "../../solver/analog/behavioral-gate.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import {
   compWidth,
   buildInvertedPinDeclarations,
@@ -53,8 +54,8 @@ export class NOrElement extends AbstractCircuitElement {
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     let decls = buildInvertedPinDeclarations(inputCount, bitWidth, wideShape);
-    const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
-    if (activeModel && NOrDefinition.subcircuitRefs?.[activeModel]) {
+    const activeModel = this._properties.getOrDefault<string>("model", "");
+    if (activeModel && NOrDefinition.modelRegistry?.[activeModel]) {
       const w = compWidth(wideShape);
       decls = appendPowerPins(decls, w / 2, -1, inputCount);
     }
@@ -137,6 +138,36 @@ export function executeNOr(index: number, state: Uint32Array, _highZs: Uint32Arr
 }
 
 // ---------------------------------------------------------------------------
+// CMOS_NOR2_NETLIST — 2-input CMOS NOR gate structural netlist
+//
+// Topology: 2 PMOS in series (pull-up), 2 NMOS in parallel (pull-down).
+// Ports: In_1, In_2, out, VDD, GND
+// Internal net: series_node (net index 5)
+// ---------------------------------------------------------------------------
+
+const CMOS_NOR2_NETLIST: MnaSubcircuitNetlist = {
+  ports: ["In_1", "In_2", "out", "VDD", "GND"],
+  params: {},
+  elements: [
+    { typeId: "PMOS", branchCount: 0 },
+    { typeId: "PMOS", branchCount: 0 },
+    { typeId: "NMOS", branchCount: 0 },
+    { typeId: "NMOS", branchCount: 0 },
+  ],
+  internalNetCount: 1,
+  // Nets 0..4 = ports [In_1, In_2, out, VDD, GND], net 5 = series_node
+  // p1(D=VDD,G=In_1,S=series_node), p2(D=series_node,G=In_2,S=out),
+  // n1(D=out,G=In_1,S=GND), n2(D=out,G=In_2,S=GND)
+  // PMOS/NMOS pins: [D, G, S]
+  netlist: [
+    [3, 0, 5], // p1: D=VDD(3), G=In_1(0), S=series_node(5)
+    [5, 1, 2], // p2: D=series_node(5), G=In_2(1), S=out(2)
+    [2, 0, 4], // n1: D=out(2), G=In_1(0), S=GND(4)
+    [2, 1, 4], // n2: D=out(2), G=In_2(1), S=GND(4)
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // NOrDefinition
 // ---------------------------------------------------------------------------
 
@@ -163,7 +194,14 @@ export const NOrDefinition: ComponentDefinition = {
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with ≥1 and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
-  subcircuitRefs: { cmos: "CmosNor2" },
+  modelRegistry: {
+    cmos: {
+      kind: "netlist",
+      netlist: CMOS_NOR2_NETLIST,
+      paramDefs: [],
+      params: {},
+    },
+  },
   models: {
     digital: {
       executeFn: executeNOr,

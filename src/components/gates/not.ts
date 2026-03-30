@@ -29,6 +29,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import { makeNotAnalogFactory } from "../../solver/analog/behavioral-gate.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -73,8 +74,8 @@ export class NotElement extends AbstractCircuitElement {
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     let decls: PinDeclaration[] = buildPinDeclarations(bitWidth, wideShape);
-    const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
-    if (activeModel && NotDefinition.subcircuitRefs?.[activeModel]) {
+    const activeModel = this._properties.getOrDefault<string>("model", "");
+    if (activeModel && NotDefinition.modelRegistry?.[activeModel]) {
       const w = compWidth(wideShape);
       const centerX = w / 2;
       decls = [
@@ -224,6 +225,29 @@ const NOT_PROPERTY_DEFS: PropertyDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// CMOS_INVERTER_NETLIST — CMOS inverter structural netlist
+//
+// Topology: 1 PMOS (pull-up) + 1 NMOS (pull-down).
+// Ports: in, out, VDD, GND
+// ---------------------------------------------------------------------------
+
+const CMOS_INVERTER_NETLIST: MnaSubcircuitNetlist = {
+  ports: ["in", "out", "VDD", "GND"],
+  params: {},
+  elements: [
+    { typeId: "PMOS", branchCount: 0 },
+    { typeId: "NMOS", branchCount: 0 },
+  ],
+  internalNetCount: 0,
+  // Nets 0..3 = ports [in, out, VDD, GND]
+  // PMOS pins: [D, G, S], NMOS pins: [D, G, S]
+  netlist: [
+    [2, 0, 1], // p: D=VDD(2), G=in(0), S=out(1)
+    [1, 0, 3], // n: D=out(1), G=in(0), S=GND(3)
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // NotDefinition
 // ---------------------------------------------------------------------------
 
@@ -249,7 +273,14 @@ export const NotDefinition: ComponentDefinition = {
     "Not gate — performs bitwise NOT (inversion) of the input.\n" +
     "Single input, configurable bit width (1–32).\n" +
     "Both IEEE/US (triangle with bubble) and IEC/DIN (rectangular with 1) shapes are supported.",
-  subcircuitRefs: { cmos: "CmosInverter" },
+  modelRegistry: {
+    cmos: {
+      kind: "netlist",
+      netlist: CMOS_INVERTER_NETLIST,
+      paramDefs: [],
+      params: {},
+    },
+  },
   models: {
     digital: {
       executeFn: executeNot,

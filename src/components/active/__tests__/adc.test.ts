@@ -97,8 +97,11 @@ function makeAdc(props: Record<string, number | string> = {}): ADCElement {
   const merged = new Map<string, number | string>(defaults);
   for (const [k, v] of Object.entries(props)) merged.set(k, v);
 
+  const modelParams: Record<string, number> = { vRef: merged.get("vRef") as number ?? V_REF };
+  merged.delete("vRef");
   const bag = new PropertyBag(Array.from(merged.entries()));
-  return ADCDefinition.models!.mnaModels!.behavioral!.factory(makeNodeIds(), [], -1, bag, () => 0) as ADCElement;
+  bag.replaceModelParams(modelParams);
+  return ADCDefinition.modelRegistry!["behavioral"]!.factory(makeNodeIds(), [], -1, bag, () => 0) as ADCElement;
 }
 
 // ---------------------------------------------------------------------------

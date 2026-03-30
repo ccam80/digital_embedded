@@ -21,7 +21,7 @@
 import type { Circuit } from "../core/circuit.js";
 import type { ComponentRegistry } from "../core/registry.js";
 
-import { resolveModelAssignments, extractConnectivityGroups, resolveLoadingOverrides, INFRASTRUCTURE_TYPES } from "./extract-connectivity.js";
+import { resolveModelAssignments, extractConnectivityGroups, resolveLoadingOverrides, applyLoadingDecisions, INFRASTRUCTURE_TYPES } from "./extract-connectivity.js";
 import { partitionByDomain } from "./partition.js";
 import { flattenCircuit, isSubcircuitHost } from "../solver/digital/flatten.js";
 import { compileDigitalPartition } from "../solver/digital/compiler.js";
@@ -58,7 +58,7 @@ export function compileUnified(
   // Step 1: Resolve model assignments for each element
   // -------------------------------------------------------------------------
 
-  const [inputModelAssignments, inputModelDiags] = resolveModelAssignments(inputCircuit.elements, registry);
+  const [inputModelAssignments, inputModelDiags] = resolveModelAssignments(inputCircuit.elements, registry, inputCircuit.metadata.models);
   diagnostics.push(...inputModelDiags);
 
   // -------------------------------------------------------------------------
@@ -84,7 +84,7 @@ export function compileUnified(
   // and we reuse the assignments already computed above.
   let flatModelAssignments: import('./extract-connectivity.js').ModelAssignment[];
   if (hasSubcircuits) {
-    const [flatAssignments, flatModelDiags] = resolveModelAssignments(circuit.elements, registry);
+    const [flatAssignments, flatModelDiags] = resolveModelAssignments(circuit.elements, registry, circuit.metadata.models);
     diagnostics.push(...flatModelDiags);
     flatModelAssignments = flatAssignments;
   } else {
@@ -132,6 +132,12 @@ export function compileUnified(
   diagnostics.push(...overrideDiags);
 
   // -------------------------------------------------------------------------
+  // Step 3b: Apply loading decisions — inject "analog" into loaded nets
+  // -------------------------------------------------------------------------
+
+  applyLoadingDecisions(groups, circuit.metadata.digitalPinLoading ?? "cross-domain", perNetLoadingOverrides);
+
+  // -------------------------------------------------------------------------
   // Step 4: Partition by domain
   // -------------------------------------------------------------------------
 
@@ -172,7 +178,8 @@ export function compileUnified(
   // Step 6: Compile analog domain (if partition is non-empty)
   // -------------------------------------------------------------------------
 
-  const hasAnalog = analogPartition.components.length > 0;
+  const hasAnalog = analogPartition.components.length > 0 ||
+                    analogPartition.groups.length > 0;
   const innerDigitalCompiler: DigitalCompilerFn = (innerCircuit, innerRegistry) =>
     compileUnified(innerCircuit, innerRegistry).digital!;
   const compiledAnalog = hasAnalog

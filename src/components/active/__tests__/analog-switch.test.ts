@@ -37,18 +37,18 @@ function makeMockSolver() {
   } as unknown as SparseSolverType;
 }
 
+const SWITCH_MODEL_PARAM_KEYS = new Set(["rOn", "rOff", "threshold", "transitionSharpness"]);
+
 function makeProps(overrides: Record<string, number | string> = {}): PropertyBag {
-  const defaults: [string, number | string][] = [
-    ["rOn", 10],
-    ["rOff", 1e9],
-    ["threshold", 1.65],
-    ["transitionSharpness", 20],
-  ];
-  const entries = new Map<string, number | string>(defaults);
+  const modelParams: Record<string, number> = {
+    rOn: 10, rOff: 1e9, threshold: 1.65, transitionSharpness: 20,
+  };
   for (const [k, v] of Object.entries(overrides)) {
-    entries.set(k, v);
+    if (SWITCH_MODEL_PARAM_KEYS.has(k)) modelParams[k] = v as number;
   }
-  return new PropertyBag(Array.from(entries.entries()));
+  const bag = new PropertyBag([]);
+  bag.replaceModelParams(modelParams);
+  return bag;
 }
 
 function makeSPST(
@@ -58,7 +58,7 @@ function makeSPST(
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
   return withNodeIds(
-    SwitchSPSTDefinition.models!.mnaModels!.behavioral!.factory(
+    SwitchSPSTDefinition.modelRegistry!["behavioral"]!.factory(
       new Map([["in", nIn], ["out", nOut], ["ctrl", nCtrl]]),
       [],
       -1,
@@ -77,7 +77,7 @@ function makeSPDT(
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
   return withNodeIds(
-    SwitchSPDTDefinition.models!.mnaModels!.behavioral!.factory(
+    SwitchSPDTDefinition.modelRegistry!["behavioral"]!.factory(
       new Map([["com", nCom], ["no", nNO], ["nc", nNC], ["ctrl", nCtrl]]),
       [],
       -1,

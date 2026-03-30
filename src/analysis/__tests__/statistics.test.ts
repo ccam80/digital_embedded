@@ -10,113 +10,23 @@
 import { describe, expect, it } from 'vitest';
 import { computeStatistics } from '../statistics.js';
 import { Circuit, Wire } from '../../core/circuit.js';
-import { ComponentRegistry } from '../../core/registry.js';
-import { PropertyBag, PropertyType } from '../../core/properties.js';
-import { AbstractCircuitElement } from '../../core/element.js';
-import type { Pin, Rotation } from '../../core/pin.js';
+import { PropertyBag } from '../../core/properties.js';
 import { PinDirection } from '../../core/pin.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
-import type { ComponentLayout } from '../../core/registry.js';
-
-// ---------------------------------------------------------------------------
-// Stub element
-// ---------------------------------------------------------------------------
-
-class StubElement extends AbstractCircuitElement {
-  private readonly _pins: Pin[];
-
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pins: Pin[],
-    props: PropertyBag,
-  ) {
-    super(typeId, instanceId, position, 0 as Rotation, false, props);
-    this._pins = pins;
-  }
-
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-}
-
-function makePin(label: string, direction: PinDirection, x: number, y: number): Pin {
-  return { label, direction, position: { x, y }, bitWidth: 1, isNegated: false, isClock: false, kind: "signal" };
-}
-
-function noop(_i: number, _s: Uint32Array, _hz: Uint32Array, _l: ComponentLayout): void {}
+import { ComponentCategory } from '../../core/registry.js';
+import { TestElement, makePin } from '../../test-fixtures/test-element.js';
+import { buildDigitalRegistry } from '../../test-fixtures/registry-builders.js';
 
 // ---------------------------------------------------------------------------
 // Registry factory
 // ---------------------------------------------------------------------------
 
-function buildRegistry(): ComponentRegistry {
-  const registry = new ComponentRegistry();
-
-  registry.register({
-    name: 'In',
-    typeId: -1,
-    factory: (props) => new StubElement('In', crypto.randomUUID(), { x: 0, y: 0 }, [
-      makePin('out', PinDirection.OUTPUT, 2, 1),
-    ], props),
-    pinLayout: [],
-    propertyDefs: [{ key: 'label', type: PropertyType.STRING, label: 'Label', defaultValue: '' }],
-    attributeMap: [],
-    category: 'IO' as any,
-    helpText: '',
-    models: { digital: { executeFn: noop } },
-  });
-
-  registry.register({
-    name: 'Out',
-    typeId: -1,
-    factory: (props) => new StubElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, [
-      makePin('in', PinDirection.INPUT, 0, 1),
-    ], props),
-    pinLayout: [],
-    propertyDefs: [{ key: 'label', type: PropertyType.STRING, label: 'Label', defaultValue: '' }],
-    attributeMap: [],
-    category: 'IO' as any,
-    helpText: '',
-    models: { digital: { executeFn: noop } },
-  });
-
-  registry.register({
-    name: 'And',
-    typeId: -1,
-    factory: (props) => new StubElement('And', crypto.randomUUID(), { x: 0, y: 0 }, [
-      makePin('in0', PinDirection.INPUT, 0, 0),
-      makePin('in1', PinDirection.INPUT, 0, 1),
-      makePin('out', PinDirection.OUTPUT, 4, 0),
-    ], props),
-    pinLayout: [],
-    propertyDefs: [],
-    attributeMap: [],
-    category: 'LOGIC' as any,
-    helpText: '',
-    models: { digital: { executeFn: noop } },
-  });
-
-  registry.register({
-    name: 'Or',
-    typeId: -1,
-    factory: (props) => new StubElement('Or', crypto.randomUUID(), { x: 0, y: 0 }, [
-      makePin('in0', PinDirection.INPUT, 0, 0),
-      makePin('in1', PinDirection.INPUT, 0, 1),
-      makePin('out', PinDirection.OUTPUT, 4, 0),
-    ], props),
-    pinLayout: [],
-    propertyDefs: [],
-    attributeMap: [],
-    category: 'LOGIC' as any,
-    helpText: '',
-    models: { digital: { executeFn: noop } },
-  });
-
-  return registry;
+function buildRegistry() {
+  return buildDigitalRegistry([
+    { name: 'In', category: ComponentCategory.IO },
+    { name: 'Out', category: ComponentCategory.IO },
+    { name: 'And', category: ComponentCategory.LOGIC },
+    { name: 'Or', category: ComponentCategory.LOGIC },
+  ]);
 }
 
 function emptyProps(): PropertyBag {
@@ -144,7 +54,7 @@ describe('statistics', () => {
 
     // Add 3 AND gates
     for (let i = 0; i < 3; i++) {
-      circuit.addElement(new StubElement('And', `and${i}`, { x: i * 6, y: 0 }, [
+      circuit.addElement(new TestElement('And', `and${i}`, { x: i * 6, y: 0 }, [
         makePin('in0', PinDirection.INPUT, i * 6, 0),
         makePin('in1', PinDirection.INPUT, i * 6, 1),
         makePin('out', PinDirection.OUTPUT, i * 6 + 4, 0),
@@ -153,7 +63,7 @@ describe('statistics', () => {
 
     // Add 2 OR gates
     for (let i = 0; i < 2; i++) {
-      circuit.addElement(new StubElement('Or', `or${i}`, { x: i * 6, y: 6 }, [
+      circuit.addElement(new TestElement('Or', `or${i}`, { x: i * 6, y: 6 }, [
         makePin('in0', PinDirection.INPUT, i * 6, 6),
         makePin('in1', PinDirection.INPUT, i * 6, 7),
         makePin('out', PinDirection.OUTPUT, i * 6 + 4, 6),
@@ -179,11 +89,11 @@ describe('statistics', () => {
     const circuit = new Circuit();
 
     // Add In and Out with a chain of 5 wires connecting them
-    circuit.addElement(new StubElement('In', 'inA', { x: 0, y: 0 }, [
+    circuit.addElement(new TestElement('In', 'inA', { x: 0, y: 0 }, [
       makePin('out', PinDirection.OUTPUT, 2, 0),
     ], labelProps('A')));
 
-    circuit.addElement(new StubElement('Out', 'outY', { x: 12, y: 0 }, [
+    circuit.addElement(new TestElement('Out', 'outY', { x: 12, y: 0 }, [
       makePin('in', PinDirection.INPUT, 12, 0),
     ], labelProps('Y')));
 

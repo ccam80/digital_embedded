@@ -58,6 +58,7 @@ import {
   inductorConductance,
   inductorHistoryCurrent,
 } from "../../solver/analog/integration.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -65,6 +66,22 @@ import {
 
 const MIN_CONDUCTANCE = 1e-12;
 const SHORT_CIRCUIT_CONDUCTANCE = 1e9;
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: TRANSMISSION_LINE_PARAM_DEFS, defaults: TRANSMISSION_LINE_DEFAULTS } = defineModelParams({
+  primary: {
+    impedance:    { default: 50,    description: "Characteristic impedance Z\u2080 in ohms", min: 1 },
+    delay:        { default: 1e-9,  unit: "s", description: "Total one-way propagation delay in seconds", min: 1e-15 },
+  },
+  secondary: {
+    lossPerMeter: { default: 0,     description: "Conductor and dielectric loss in dB per metre", min: 0 },
+    length:       { default: 1.0,   description: "Physical length of the transmission line in metres", min: 1e-6 },
+    segments:     { default: 10,    description: "Number of lumped RLCG segments (more segments = more accurate, slower)", min: 2, max: 100 },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Stamp helpers — node 0 is ground (skipped), 1-based → 0-based solver index
@@ -582,24 +599,65 @@ export class TransmissionLineElement implements AnalogElement {
 // Factory function
 // ---------------------------------------------------------------------------
 
+function buildTransmissionLineElement(
+  pinNodes: ReadonlyMap<string, number>,
+  internalNodeIds: readonly number[],
+  branchIdx: number,
+  impedance: number,
+  delay: number,
+  lossPerMeter: number,
+  length: number,
+  segments: number,
+): AnalogElementCore {
+  const p = { impedance, delay, lossPerMeter, length, segments };
+  const nodeIds = [
+    pinNodes.get("P1b")!,
+    pinNodes.get("P2b")!,
+    ...internalNodeIds,
+  ];
+  const el = new TransmissionLineElement(nodeIds, branchIdx, p.impedance, p.delay, p.lossPerMeter, p.length, p.segments);
+  (el as AnalogElementCore).setParam = function(key: string, value: number): void {
+    if (key in p) {
+      (p as Record<string, number>)[key] = value;
+    }
+  };
+  return el;
+}
+
 function createTransmissionLineElement(
   pinNodes: ReadonlyMap<string, number>,
   internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const z0 = props.getOrDefault<number>("impedance", 50);
-  const delay = props.getOrDefault<number>("delay", 1e-9);
-  const lossDb = props.getOrDefault<number>("lossPerMeter", 0);
-  const length = props.getOrDefault<number>("length", 1.0);
-  const segments = props.getOrDefault<number>("segments", 10);
+  return buildTransmissionLineElement(
+    pinNodes,
+    internalNodeIds,
+    branchIdx,
+    props.getOrDefault<number>("impedance", 50),
+    props.getOrDefault<number>("delay", 1e-9),
+    props.getOrDefault<number>("lossPerMeter", 0),
+    props.getOrDefault<number>("length", 1.0),
+    props.getOrDefault<number>("segments", 10),
+  );
+}
 
-  const nodeIds = [
-    pinNodes.get("P1b")!,
-    pinNodes.get("P2b")!,
-    ...internalNodeIds,
-  ];
-  return new TransmissionLineElement(nodeIds, branchIdx, z0, delay, lossDb, length, segments);
+function createTransmissionLineElementFromModelParams(
+  pinNodes: ReadonlyMap<string, number>,
+  internalNodeIds: readonly number[],
+  branchIdx: number,
+  props: PropertyBag,
+): AnalogElementCore {
+  return buildTransmissionLineElement(
+    pinNodes,
+    internalNodeIds,
+    branchIdx,
+    props.getModelParam<number>("impedance"),
+    props.getModelParam<number>("delay"),
+    props.getModelParam<number>("lossPerMeter"),
+    props.getModelParam<number>("length"),
+    props.getModelParam<number>("segments"),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -731,6 +789,14 @@ export const TransmissionLineDefinition: ComponentDefinition = {
         return (N - 1) * 2;
       },
     },
+    },
+  },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createTransmissionLineElementFromModelParams,
+      paramDefs: TRANSMISSION_LINE_PARAM_DEFS,
+      params: TRANSMISSION_LINE_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

@@ -12,8 +12,7 @@ import { describe, it, expect } from 'vitest';
 import { compileUnified } from '../compile.js';
 import { Circuit, Wire } from '../../core/circuit.js';
 import type { Pin, PinDeclaration } from '../../core/pin.js';
-import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from '../../core/pin.js';
-import { AbstractCircuitElement } from '../../core/element.js';
+import { PinDirection } from '../../core/pin.js';
 import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 import { PropertyBag } from '../../core/properties.js';
 import type { PropertyBag as PropertyBagType, PropertyValue } from '../../core/properties.js';
@@ -24,40 +23,11 @@ import type { SerializedElement } from '../../core/element.js';
 import type { CircuitElement } from '../../core/element.js';
 import type { SparseSolver } from '../../solver/analog/sparse-solver.js';
 import type { AnalogElement } from '../../solver/analog/element.js';
+import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
+import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
 
 // ---------------------------------------------------------------------------
-// Minimal test element using AbstractCircuitElement (digital circuits)
-// ---------------------------------------------------------------------------
-
-class TestElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
-
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pinDecls: PinDeclaration[],
-    props?: PropertyBag,
-    rotation: 0 | 1 | 2 | 3 = 0,
-    mirror = false,
-  ) {
-    super(typeId, instanceId, position, rotation, mirror, props ?? new PropertyBag());
-    this._pins = resolvePins(
-      pinDecls,
-      position,
-      rotation,
-      createInverterConfig([]),
-      createClockConfig([]),
-    );
-  }
-
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 2, height: 2 }; }
-}
-
-// ---------------------------------------------------------------------------
-// Minimal flat CircuitElement (analog circuits, no AbstractCircuitElement)
+// Minimal flat CircuitElement (analog circuits)
 // ---------------------------------------------------------------------------
 
 function makeAnalogPin(x: number, y: number): Pin {
@@ -170,19 +140,18 @@ function makeCapacitorElement(nodeA: number, nodeB: number, branchIdx: number): 
 // Registry builders
 // ---------------------------------------------------------------------------
 
-const noopExec: ExecuteFunction = () => {};
 
 function makeDigitalDef(name: string, pins: PinDeclaration[] = []): Omit<ComponentDefinition, 'typeId'> {
   return {
     name,
     typeId: -1,
-    factory: (props: PropertyBagType) => new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pins, props),
+    factory: (props: PropertyBagType) => createTestElementFromDecls(name, crypto.randomUUID(), pins, props),
     pinLayout: pins,
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: '',
-    models: { digital: { executeFn: noopExec } } as ComponentModels,
+    models: { digital: { executeFn: noopExecFn } } as ComponentModels,
   };
 }
 
@@ -303,7 +272,7 @@ function buildMixedRegistry(): ComponentRegistry {
     category: ComponentCategory.MISC,
     helpText: '',
     models: {
-      digital: { executeFn: noopExec },
+      digital: { executeFn: noopExecFn },
       mnaModels: {
         behavioral: {
           branchCount: 0,
@@ -329,7 +298,7 @@ describe('compileUnified — simple AND gate (digital only)', () => {
     const registry = buildDigitalRegistry();
 
     const circuit = new Circuit();
-    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, twoIn));
+    circuit.addElement(createTestElementFromDecls('And', 'and-1', twoIn));
 
     const reference = compileUnified(circuit, registry).digital!;
     const unified = compileUnified(circuit, registry);
@@ -345,8 +314,8 @@ describe('compileUnified — simple AND gate (digital only)', () => {
     const registry = buildDigitalRegistry();
 
     const circuit = new Circuit();
-    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, twoIn));
-    circuit.addElement(new TestElement('And', 'and-2', { x: 8, y: 0 }, twoIn));
+    circuit.addElement(createTestElementFromDecls('And', 'and-1', twoIn));
+    circuit.addElement(createTestElementFromDecls('And', 'and-2', twoIn, undefined, { x: 8, y: 0 }));
     const wire = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
     circuit.addWire(wire);
 
@@ -366,8 +335,8 @@ describe('compileUnified — simple AND gate (digital only)', () => {
     const registry = buildDigitalRegistry();
 
     const circuit = new Circuit();
-    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, twoIn));
-    circuit.addElement(new TestElement('And', 'and-2', { x: 8, y: 0 }, twoIn));
+    circuit.addElement(createTestElementFromDecls('And', 'and-1', twoIn));
+    circuit.addElement(createTestElementFromDecls('And', 'and-2', twoIn, undefined, { x: 8, y: 0 }));
     const wire = new Wire({ x: 2, y: 0 }, { x: 8, y: 0 });
     circuit.addWire(wire);
 
@@ -397,8 +366,8 @@ describe('compileUnified — SR latch (digital feedback)', () => {
     const registry = buildDigitalRegistry();
 
     const circuit = new Circuit();
-    const nor1 = new TestElement('Nor', 'nor-1', { x: 0, y: 0 }, twoIn);
-    const nor2 = new TestElement('Nor', 'nor-2', { x: 8, y: 0 }, twoIn);
+    const nor1 = createTestElementFromDecls('Nor', 'nor-1', twoIn);
+    const nor2 = createTestElementFromDecls('Nor', 'nor-2', twoIn, undefined, { x: 8, y: 0 });
     circuit.addElement(nor1);
     circuit.addElement(nor2);
 
@@ -428,8 +397,8 @@ describe('compileUnified — SR latch (digital feedback)', () => {
     const registry = buildDigitalRegistry();
 
     const circuit = new Circuit();
-    circuit.addElement(new TestElement('Nor', 'nor-1', { x: 0, y: 0 }, twoIn));
-    circuit.addElement(new TestElement('Nor', 'nor-2', { x: 8, y: 0 }, twoIn));
+    circuit.addElement(createTestElementFromDecls('Nor', 'nor-1', twoIn));
+    circuit.addElement(createTestElementFromDecls('Nor', 'nor-2', twoIn, undefined, { x: 8, y: 0 }));
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 8, y: 0 }));
     circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 0, y: 1 }));
 
@@ -574,7 +543,7 @@ describe('compileUnified — mixed digital+analog', () => {
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
 
     const circuit = new Circuit();
-    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, twoIn));
+    circuit.addElement(createTestElementFromDecls('And', 'and-1', twoIn));
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 30, y: 0 }, { x: 40, y: 0 }]));
     circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 40, y: 0 }]));
     circuit.addWire(new Wire({ x: 40, y: 0 }, { x: 40, y: 0 }));
@@ -591,8 +560,8 @@ describe('compileUnified — mixed digital+analog', () => {
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
 
     const circuit = new Circuit();
-    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, twoIn));
-    circuit.addElement(new TestElement('And', 'and-2', { x: 8, y: 0 }, twoIn));
+    circuit.addElement(createTestElementFromDecls('And', 'and-1', twoIn));
+    circuit.addElement(createTestElementFromDecls('And', 'and-2', twoIn, undefined, { x: 8, y: 0 }));
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 30, y: 0 }, { x: 40, y: 0 }]));
     circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 40, y: 0 }]));
 
@@ -622,8 +591,8 @@ describe('compileUnified — mixed digital+analog', () => {
     const bridgePins = [inputPin(0, 0, 'din'), outputPin(1, 0, 'aout')];
 
     const circuit = new Circuit();
-    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, twoIn));
-    circuit.addElement(new TestElement('DABridge', 'bridge-1', { x: 4, y: 0 }, bridgePins));
+    circuit.addElement(createTestElementFromDecls('And', 'and-1', twoIn));
+    circuit.addElement(createTestElementFromDecls('DABridge', 'bridge-1', bridgePins, undefined, { x: 4, y: 0 }));
     circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 5, y: 0 }, { x: 10, y: 0 }]));
     circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 10, y: 0 }]));
 
@@ -662,10 +631,10 @@ describe('compileUnified — tunnel merging', () => {
     const andPins = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
     const notPins = [inputPin(0, 0, 'in'), outputPin(2, 0, 'out')];
 
-    circuit.addElement(new TestElement('And', 'and-1', { x: 0, y: 0 }, andPins));
-    circuit.addElement(new TestElement('Tunnel', 't1', { x: 2, y: 0 }, tunnelPins, tunnelProps1));
-    circuit.addElement(new TestElement('Tunnel', 't2', { x: 20, y: 0 }, tunnelPins, tunnelProps2));
-    circuit.addElement(new TestElement('Not', 'not-1', { x: 20, y: 0 }, notPins));
+    circuit.addElement(createTestElementFromDecls('And', 'and-1', andPins));
+    circuit.addElement(createTestElementFromDecls('Tunnel', 't1', tunnelPins, tunnelProps1, { x: 2, y: 0 }));
+    circuit.addElement(createTestElementFromDecls('Tunnel', 't2', tunnelPins, tunnelProps2, { x: 20, y: 0 }));
+    circuit.addElement(createTestElementFromDecls('Not', 'not-1', notPins, undefined, { x: 20, y: 0 }));
 
     const unified = compileUnified(circuit, registry);
 
@@ -684,9 +653,8 @@ describe('compileUnified — tunnel merging', () => {
     const tunnelProps = new PropertyBag(new Map([['label', 'SIG']]));
 
     const circuit = new Circuit();
-    const t1 = new TestElement('Tunnel', 't1', { x: 0, y: 0 }, tunnelPins, tunnelProps);
-    const t2 = new TestElement('Tunnel', 't2', { x: 50, y: 0 }, tunnelPins,
-      new PropertyBag(new Map([['label', 'SIG']])));
+    const t1 = createTestElementFromDecls('Tunnel', 't1', tunnelPins, tunnelProps);
+    const t2 = createTestElementFromDecls('Tunnel', 't2', tunnelPins, new PropertyBag(new Map([['label', 'SIG']])), { x: 50, y: 0 });
     circuit.addElement(t1);
     circuit.addElement(t2);
 
@@ -715,30 +683,30 @@ describe('compileUnified — width mismatch diagnostic', () => {
     registry.register({
       name: 'Src',
       typeId: -1,
-      factory: (props: PropertyBagType) => new TestElement('Src', crypto.randomUUID(), { x: 0, y: 0 }, oneBitOutPins, props),
+      factory: (props: PropertyBagType) => createTestElementFromDecls('Src', crypto.randomUUID(), oneBitOutPins, props),
       pinLayout: oneBitOutPins,
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: '',
-      models: { digital: { executeFn: noopExec } } as ComponentModels,
+      models: { digital: { executeFn: noopExecFn } } as ComponentModels,
     } as ComponentDefinition);
     registry.register({
       name: 'Dst',
       typeId: -1,
-      factory: (props: PropertyBagType) => new TestElement('Dst', crypto.randomUUID(), { x: 0, y: 0 }, eightBitInPins, props),
+      factory: (props: PropertyBagType) => createTestElementFromDecls('Dst', crypto.randomUUID(), eightBitInPins, props),
       pinLayout: eightBitInPins,
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: '',
-      models: { digital: { executeFn: noopExec } } as ComponentModels,
+      models: { digital: { executeFn: noopExecFn } } as ComponentModels,
     } as ComponentDefinition);
 
     const circuit = new Circuit();
     // Both at (0,0) so their pins at (2,0) overlap → share a net with mismatched widths
-    circuit.addElement(new TestElement('Src', 'src-1', { x: 0, y: 0 }, oneBitOutPins));
-    circuit.addElement(new TestElement('Dst', 'dst-1', { x: 0, y: 0 }, eightBitInPins));
+    circuit.addElement(createTestElementFromDecls('Src', 'src-1', oneBitOutPins));
+    circuit.addElement(createTestElementFromDecls('Dst', 'dst-1', eightBitInPins));
 
     // compileUnified must not throw for width mismatch — emit diagnostic instead
     expect(() => compileUnified(circuit, registry)).not.toThrow();
@@ -792,32 +760,32 @@ describe('compileUnified — labelSignalMap', () => {
     registry.register({
       name: 'In',
       typeId: -1,
-      factory: (props: PropertyBagType) => new TestElement('In', crypto.randomUUID(), { x: 0, y: 0 }, inPins, props),
+      factory: (props: PropertyBagType) => createTestElementFromDecls('In', crypto.randomUUID(), inPins, props),
       pinLayout: inPins,
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.IO,
       helpText: '',
-      models: { digital: { executeFn: noopExec } } as ComponentModels,
+      models: { digital: { executeFn: noopExecFn } } as ComponentModels,
     } as ComponentDefinition);
     registry.register({
       name: 'Out',
       typeId: -1,
-      factory: (props: PropertyBagType) => new TestElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, outPins, props),
+      factory: (props: PropertyBagType) => createTestElementFromDecls('Out', crypto.randomUUID(), outPins, props),
       pinLayout: outPins,
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.IO,
       helpText: '',
-      models: { digital: { executeFn: noopExec } } as ComponentModels,
+      models: { digital: { executeFn: noopExecFn } } as ComponentModels,
     } as ComponentDefinition);
 
     const circuit = new Circuit();
 
     const inProps = new PropertyBag(new Map([['label', 'A']]));
     const outProps = new PropertyBag(new Map([['label', 'Y']]));
-    const inEl = new TestElement('In', 'in-1', { x: 0, y: 0 }, inPins, inProps);
-    const outEl = new TestElement('Out', 'out-1', { x: 10, y: 0 }, outPins, outProps);
+    const inEl = createTestElementFromDecls('In', 'in-1', inPins, inProps);
+    const outEl = createTestElementFromDecls('Out', 'out-1', outPins, outProps, { x: 10, y: 0 });
 
     circuit.addElement(inEl);
     circuit.addElement(outEl);
@@ -847,31 +815,31 @@ describe('compileUnified — labelSignalMap', () => {
     registry.register({
       name: 'In',
       typeId: -1,
-      factory: (props: PropertyBagType) => new TestElement('In', crypto.randomUUID(), { x: 0, y: 0 }, inPins, props),
+      factory: (props: PropertyBagType) => createTestElementFromDecls('In', crypto.randomUUID(), inPins, props),
       pinLayout: inPins,
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.IO,
       helpText: '',
-      models: { digital: { executeFn: noopExec } } as ComponentModels,
+      models: { digital: { executeFn: noopExecFn } } as ComponentModels,
     } as ComponentDefinition);
     registry.register({
       name: 'Out',
       typeId: -1,
-      factory: (props: PropertyBagType) => new TestElement('Out', crypto.randomUUID(), { x: 0, y: 0 }, outPins, props),
+      factory: (props: PropertyBagType) => createTestElementFromDecls('Out', crypto.randomUUID(), outPins, props),
       pinLayout: outPins,
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.IO,
       helpText: '',
-      models: { digital: { executeFn: noopExec } } as ComponentModels,
+      models: { digital: { executeFn: noopExecFn } } as ComponentModels,
     } as ComponentDefinition);
 
     const circuit = new Circuit();
     const inProps = new PropertyBag(new Map([['label', 'A']]));
     const outProps = new PropertyBag(new Map([['label', 'Y']]));
-    circuit.addElement(new TestElement('In', 'in-1', { x: 0, y: 0 }, inPins, inProps));
-    circuit.addElement(new TestElement('Out', 'out-1', { x: 10, y: 0 }, outPins, outProps));
+    circuit.addElement(createTestElementFromDecls('In', 'in-1', inPins, inProps));
+    circuit.addElement(createTestElementFromDecls('Out', 'out-1', outPins, outProps, { x: 10, y: 0 }));
     circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 10, y: 0 }));
 
     const reference = compileUnified(circuit, registry).digital!;
@@ -930,14 +898,14 @@ describe('compileUnified — model resolution', () => {
     r.register({
       name: 'DualAnd',
       typeId: -1,
-      factory: (props: PropertyBagType) => new TestElement('DualAnd', crypto.randomUUID(), { x: 0, y: 0 }, twoIn, props),
+      factory: (props: PropertyBagType) => createTestElementFromDecls('DualAnd', crypto.randomUUID(), twoIn, props),
       pinLayout: twoIn,
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.LOGIC,
       helpText: '',
       models: {
-        digital: { executeFn: noopExec },
+        digital: { executeFn: noopExecFn },
       } as ComponentModels,
       modelRegistry: { behavioral: behavioralEntry },
       defaultModel: 'digital',
@@ -951,7 +919,7 @@ describe('compileUnified — model resolution', () => {
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
 
     const circuit = new Circuit();
-    circuit.addElement(new TestElement('DualAnd', 'and-1', { x: 0, y: 0 }, twoIn));
+    circuit.addElement(createTestElementFromDecls('DualAnd', 'and-1', twoIn));
     circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
     circuit.addWire(new Wire({ x: 0, y: 1 }, { x: 0, y: 1 }));
     circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 2, y: 0 }));
@@ -969,7 +937,7 @@ describe('compileUnified — model resolution', () => {
     const propsMap = new Map<string, PropertyValue>([['model', 'behavioral']]);
     const props = new PropertyBag(propsMap);
     const circuit = new Circuit();
-    circuit.addElement(new TestElement('DualAnd', 'and-1', { x: 0, y: 0 }, twoIn, props));
+    circuit.addElement(createTestElementFromDecls('DualAnd', 'and-1', twoIn, props));
     circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 0, y: 0 }]));
     circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 0, y: 0 }));
     circuit.addWire(new Wire({ x: 0, y: 1 }, { x: 0, y: 1 }));

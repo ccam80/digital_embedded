@@ -5,10 +5,10 @@
  *   parseModelCard -> applySpiceImportResult (with circuit) -> compile
  *
  * Tests:
- *   1. Parsed .MODEL card parameters stored in circuit.metadata.namedParameterSets.
+ *   1. Parsed .MODEL card parameters stored in circuit.metadata.models.
  *   2. applySpiceImportResult writes both per-instance and library-level entries.
  *   3. After apply + compile, circuit compiles cleanly with overrides active.
- *   4. Serialize -> deserialize preserves namedParameterSets entries.
+ *   4. Serialize -> deserialize preserves circuit.metadata.models entries.
  *   5. Deserialized circuit produces same DC result as before serialization.
  */
 
@@ -80,7 +80,7 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
 // Test suite 1: parseModelCard + applySpiceImportResult storage
 // ---------------------------------------------------------------------------
 
-describe('spice-import round-trip MCP surface -- parseModelCard to namedParameterSets', () => {
+describe('spice-import round-trip MCP surface -- parseModelCard to circuit.metadata.models', () => {
   it('parseModelCard correctly extracts name, deviceType, and params from .MODEL text', () => {
     const modelText = '.MODEL Q2N2222 NPN (IS=1e-14 BF=200 VAF=100 IKF=0.3)';
     const result = parseModelCard(modelText);
@@ -94,7 +94,7 @@ describe('spice-import round-trip MCP surface -- parseModelCard to namedParamete
     expect(parsed.params['IKF']).toBeCloseTo(0.3, 5);
   });
 
-  it('applySpiceImportResult writes to circuit.metadata.namedParameterSets', () => {
+  it('applySpiceImportResult writes to circuit.metadata.models', () => {
     const { circuit } = buildBjtCircuit();
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     expect(q1).toBeDefined();
@@ -102,41 +102,41 @@ describe('spice-import round-trip MCP surface -- parseModelCard to namedParamete
       q1,
       { overrides: { IS: 1e-14, BF: 200 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
+      registry,
     );
-    expect(circuit.metadata.namedParameterSets).toBeDefined();
-    const entry = circuit.metadata.namedParameterSets!['Q2N2222'];
+    expect(circuit.metadata.models).toBeDefined();
+    const entry = circuit.metadata.models!['NpnBJT']?.['Q2N2222'];
     expect(entry).toBeDefined();
-    expect(entry.deviceType).toBe('NPN');
-    expect(entry.params['IS']).toBeCloseTo(1e-14, 20);
-    expect(entry.params['BF']).toBe(200);
+    expect(entry!.kind).toBe('inline');
+    expect(entry!.params['IS']).toBeCloseTo(1e-14, 20);
+    expect(entry!.params['BF']).toBe(200);
   });
 
-  it('applySpiceImportResult writes _spiceModelOverrides to the element', () => {
+  it('applySpiceImportResult sets model property on the element', () => {
     const { circuit } = buildBjtCircuit();
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
       { overrides: { IS: 1e-14, BF: 200 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
+      registry,
     );
     const bag = q1.getProperties();
-    expect(bag.has('_spiceModelOverrides')).toBe(true);
-    const stored = bag.get('_spiceModelOverrides') as Record<string, number>;
-    expect(stored['IS']).toBeCloseTo(1e-14, 20);
-    expect(stored['BF']).toBe(200);
+    expect(bag.get('model')).toBe('Q2N2222');
   });
 
-  it('applySpiceImportResult writes _spiceModelName to the element', () => {
+  it('applySpiceImportResult stores params in model params partition of element', () => {
     const { circuit } = buildBjtCircuit();
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
       { overrides: { IS: 1e-14, BF: 200 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
+      registry,
     );
     const bag = q1.getProperties();
-    expect(bag.has('_spiceModelName')).toBe(true);
-    expect(bag.get('_spiceModelName')).toBe('Q2N2222');
+    expect(bag.getModelParam<number>('IS')).toBeCloseTo(1e-14, 20);
+    expect(bag.getModelParam<number>('BF')).toBe(200);
   });
 });
 
@@ -145,20 +145,21 @@ describe('spice-import round-trip MCP surface -- parseModelCard to namedParamete
 // ---------------------------------------------------------------------------
 
 describe('spice-import round-trip MCP surface -- apply then compile', () => {
-  it('circuit with applySpiceImportResult compiles without INVALID_SPICE_OVERRIDES', () => {
+  it('circuit with applySpiceImportResult compiles without errors', () => {
     const { circuit, facade } = buildBjtCircuit();
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
       { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
+      registry,
     );
     facade.compile(circuit);
     const compiled = facade.getCompiledUnified();
     expect(compiled).not.toBeNull();
     expect(compiled!.analog).not.toBeNull();
     const diagnosticCodes = compiled!.analog!.diagnostics.map(d => d.code);
-    expect(diagnosticCodes).not.toContain('INVALID_SPICE_OVERRIDES');
+    expect(diagnosticCodes).not.toContain('ANALOG_COMPILE_ERROR');
   });
 
   it('parsed .MODEL card applied via applySpiceImportResult: circuit compiles and DC converges', () => {
@@ -172,14 +173,17 @@ describe('spice-import round-trip MCP surface -- apply then compile', () => {
       q1,
       { overrides: parsedModel.params, modelName: parsedModel.name, deviceType: parsedModel.deviceType },
       circuit,
+      registry,
     );
     facade.compile(circuit);
     const compiled = facade.getCompiledUnified();
     expect(compiled).not.toBeNull();
     expect(compiled!.analog).not.toBeNull();
-    // Override params were stored in namedParameterSets and element overrides
-    expect(circuit.metadata.namedParameterSets!['Q2N2222'].params['IS']).toBeCloseTo(1e-14, 20);
-    expect(circuit.metadata.namedParameterSets!['Q2N2222'].params['BF']).toBe(200);
+    // Override params were stored in circuit.metadata.models
+    const entry = circuit.metadata.models!['NpnBJT']?.['Q2N2222'];
+    expect(entry).toBeDefined();
+    expect(entry!.params['IS']).toBeCloseTo(1e-14, 20);
+    expect(entry!.params['BF']).toBe(200);
     // Simulation must converge with the override active
     const dc = facade.getDcOpResult();
     expect(dc).not.toBeNull();
@@ -190,38 +194,39 @@ describe('spice-import round-trip MCP surface -- apply then compile', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test suite 3: serialize -> deserialize preserves namedParameterSets
+// Test suite 3: serialize -> deserialize preserves circuit.metadata.models
 // ---------------------------------------------------------------------------
 
-describe('spice-import round-trip MCP surface -- serialize/deserialize preserves namedParameterSets', () => {
-  it('namedParameterSets entry survives serialize -> deserialize', () => {
+describe('spice-import round-trip MCP surface -- serialize/deserialize preserves metadata.models', () => {
+  it('circuit.metadata.models entry survives serialize -> deserialize', () => {
     const { circuit, facade } = buildBjtCircuit();
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
       { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
+      registry,
     );
     const json = facade.serialize(circuit);
     expect(json).toContain('Q2N2222');
-    expect(json).toContain('namedParameterSets');
     const reloaded = facade.deserialize(json);
-    expect(reloaded.metadata.namedParameterSets).toBeDefined();
-    const entry = reloaded.metadata.namedParameterSets!['Q2N2222'];
+    expect(reloaded.metadata.models).toBeDefined();
+    const entry = reloaded.metadata.models!['NpnBJT']?.['Q2N2222'];
     expect(entry).toBeDefined();
-    expect(entry.deviceType).toBe('NPN');
-    expect(entry.params['IS']).toBeCloseTo(1e-14, 20);
-    expect(entry.params['BF']).toBe(200);
-    expect(entry.params['VAF']).toBe(100);
+    expect(entry!.kind).toBe('inline');
+    expect(entry!.params['IS']).toBeCloseTo(1e-14, 20);
+    expect(entry!.params['BF']).toBe(200);
+    expect(entry!.params['VAF']).toBe(100);
   });
 
-  it('deserialized circuit with namedParameterSets compiles cleanly', () => {
+  it('deserialized circuit with metadata.models compiles cleanly', () => {
     const { circuit, facade } = buildBjtCircuit();
     const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
       { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
+      registry,
     );
     const json = facade.serialize(circuit);
     const reloaded = facade.deserialize(json);
@@ -230,7 +235,7 @@ describe('spice-import round-trip MCP surface -- serialize/deserialize preserves
     expect(compiled).not.toBeNull();
     expect(compiled!.analog).not.toBeNull();
     const codes = compiled!.analog!.diagnostics.map(d => d.code);
-    expect(codes).not.toContain('INVALID_SPICE_OVERRIDES');
+    expect(codes).not.toContain('ANALOG_COMPILE_ERROR');
   });
 
   it('deserialized circuit produces same DC result as pre-serialization', () => {
@@ -240,6 +245,7 @@ describe('spice-import round-trip MCP surface -- serialize/deserialize preserves
       q1,
       { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
       circuit,
+      registry,
     );
     facade.compile(circuit);
     const dcOriginal = facade.getDcOpResult();

@@ -172,4 +172,5 @@ export const ConstDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeConst, inputSchema: [], outputSchema: ["out"] },
   },
+  modelRegistry: {},
 };

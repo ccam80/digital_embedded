@@ -9,9 +9,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { createDiacElement, DiacDefinition } from "../diac.js";
-import { createTriacElement } from "../triac.js";
+import { createDiacElement, DiacDefinition, DIAC_PARAM_DEFAULTS } from "../diac.js";
+import { createTriacElement, TRIAC_PARAM_DEFAULTS } from "../triac.js";
 import { PropertyBag } from "../../../core/properties.js";
+import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
@@ -32,9 +33,11 @@ const DIAC_DEFAULTS = {
 // ---------------------------------------------------------------------------
 
 function makeDiac(overrides: Partial<typeof DIAC_DEFAULTS> = {}): AnalogElement {
-  const params = { ...DIAC_DEFAULTS, ...overrides };
+  const params = { ...DIAC_PARAM_DEFAULTS, ...DIAC_DEFAULTS, ...overrides };
+  const props = createTestPropertyBag();
+  props.replaceModelParams(params);
   // nodeA=1, nodeB=2
-  return createDiacElement(new Map([["A", 1], ["B", 2]]), [], -1, new PropertyBag(Object.entries(params)));
+  return createDiacElement(new Map([["A", 1], ["B", 2]]), [], -1, props);
 }
 
 /**
@@ -148,11 +151,13 @@ describe("Diac", () => {
     // Simplified unit test: verify diac produces gate current > triac I_GT
     // when driven by V_BO voltage, then manually check triac triggers.
 
+    const triacProps = createTestPropertyBag();
+    triacProps.replaceModelParams({ ...TRIAC_PARAM_DEFAULTS, vOn: 1.5, iH: 10e-3, rOn: 0.01, iS: 1e-12, alpha1: 0.5, alpha2_0: 0.3, i_ref: 1e-3, n: 1 });
     const triac = createTriacElement(
       new Map([["MT1", 1], ["MT2", 2], ["G", 3]]),
       [],
       -1,
-      new PropertyBag(Object.entries({ vOn: 1.5, iH: 10e-3, rOn: 0.01, iS: 1e-12, alpha1: 0.5, alpha2_0: 0.3, i_ref: 1e-3, n: 1 })),
+      triacProps,
     );
 
     // Step 1: verify diac at V=40V (above V_BO=32V) produces current that can trigger triac
@@ -190,9 +195,9 @@ describe("Diac", () => {
 
   it("definition_has_correct_fields", () => {
     expect(DiacDefinition.name).toBe("Diac");
-    expect(DiacDefinition.models?.mnaModels?.behavioral).toBeDefined();
-    expect(DiacDefinition.models?.mnaModels?.behavioral?.deviceType).toBeUndefined();
-    expect(DiacDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(DiacDefinition.modelRegistry?.["behavioral"]).toBeDefined();
+    expect(DiacDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
+    expect(DiacDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
     expect(DiacDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

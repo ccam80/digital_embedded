@@ -106,9 +106,9 @@ test.describe('SPICE Model Parameters panel', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Test 3: Panel hidden when component's simulationModel is "logical"
+  // Test 3: Panel hidden when component's model is "logical"
   // -------------------------------------------------------------------------
-  test('panel not shown when simulationModel is logical', async ({ page }) => {
+  test('panel not shown when model is logical', async ({ page }) => {
     // Use an And gate which has both logical and analog models.
     // In logical mode (default) it has no deviceType in its analog model,
     // so the SPICE section must not appear.

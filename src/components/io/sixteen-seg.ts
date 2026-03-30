@@ -296,4 +296,5 @@ export const SixteenSegDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeSixteenSeg, inputSchema: ["led", "dp"], outputSchema: [] },
   },
+  modelRegistry: {},
 };

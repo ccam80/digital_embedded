@@ -1,3 +1,13 @@
+## Task 1.3: Rewrite BridgeOutputAdapter and BridgeInputAdapter
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/bridge-adapter.ts` — rewrote both adapter classes: BridgeOutputAdapter now uses ideal voltage source branch equation (branchIndex set from constructor, isNonlinear=false, isReactive getter delegating to pin model capacitance), removed stampNonlinear, getPinCurrents reads branch current from solution vector; BridgeInputAdapter now has loaded flag with isReactive getter, stamp is no-op when unloaded; updated factory signatures makeBridgeOutputAdapter(spec, nodeId, branchIdx, loaded) and makeBridgeInputAdapter(spec, nodeId, loaded)
+  - `src/solver/analog/digital-pin-model.ts` — added `get capacitance()` getter to both DigitalOutputPinModel (returns cOut) and DigitalInputPinModel (returns cIn), needed by isReactive getters in adapters
+- **Tests**: 10/10 passing
+- **Notes**: No changes to compiled-analog-circuit.ts needed — branchCount is already a constructor parameter passed by the compiler. All 53 failures in full suite are pre-existing per spec/test-baseline.md.
+
 # Implementation Progress — SPICE Model Panel
 
 ## Phase: SPICE Model Parameters Panel & Test Parameter Alignment
@@ -1008,3 +1018,238 @@ What's already done:
   - `src/components/semiconductors/__tests__/bjt.test.ts` — removed 4 `toBeDefined()` guards (WT4-WT6, WT9), replaced 4 `toBeGreaterThan(0)` with `toBeCloseTo` exact values (WT7-WT8, WT10)
   - `src/editor/__tests__/property-panel-model.test.ts` — removed 5 `toBeDefined()` guards (WT11-WT12)
 - **Tests**: 76/76 passing across all 4 affected test files
+
+## Task 2.9: Switching + wiring (ALL .ts files)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/components/switching/fuse.ts
+  - src/components/switching/relay.ts
+  - src/components/switching/switch.ts
+  - src/components/switching/nfet.ts
+  - src/components/switching/pfet.ts
+  - src/components/switching/relay-dt.ts
+  - src/components/switching/switch-dt.ts
+  - src/components/switching/fgnfet.ts
+  - src/components/switching/fgpfet.ts
+  - src/components/switching/trans-gate.ts
+  - src/components/wiring/bus-splitter.ts
+  - src/components/wiring/decoder.ts
+  - src/components/wiring/demux.ts
+  - src/components/wiring/mux.ts
+  - src/components/wiring/splitter.ts
+  - src/components/wiring/driver.ts
+  - src/components/wiring/driver-inv.ts
+  - src/components/wiring/async-seq.ts
+  - src/components/wiring/bit-selector.ts
+  - src/components/wiring/break.ts
+  - src/components/wiring/delay.ts
+  - src/components/wiring/priority-encoder.ts
+  - src/components/wiring/reset.ts
+  - src/components/wiring/stop.ts
+  - src/components/wiring/tunnel.ts
+- **Tests**: 481/481 passing
+- **Pattern applied**:
+  - Components with mnaModels.behavioral.factory: modelRegistry with "behavioral" inline entry (factory, paramDefs: [], params: {})
+  - Digital-only components (no analog factory): modelRegistry: {}
+  - Acceptance criteria met: 10/10 switching files and 15/15 wiring files contain modelRegistry
+
+## Task 2.8: IO + memory modelRegistry migration
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/components/io/led.ts
+  - src/components/io/ground.ts
+  - src/components/io/clock.ts
+  - src/components/io/button-led.ts
+  - src/components/io/probe.ts
+  - src/components/io/seven-seg-hex.ts
+  - src/components/io/seven-seg.ts
+  - src/components/io/button.ts
+  - src/components/io/const.ts
+  - src/components/io/dip-switch.ts
+  - src/components/io/in.ts
+  - src/components/io/light-bulb.ts
+  - src/components/io/midi.ts
+  - src/components/io/not-connected.ts
+  - src/components/io/out.ts
+  - src/components/io/polarity-led.ts
+  - src/components/io/port.ts
+  - src/components/io/power-supply.ts
+  - src/components/io/rgb-led.ts
+  - src/components/io/rotary-encoder.ts
+  - src/components/io/scope-trigger.ts
+  - src/components/io/scope.ts
+  - src/components/io/sixteen-seg.ts
+  - src/components/io/stepper-motor.ts
+  - src/components/io/vdd.ts
+  - src/components/memory/counter-preset.ts
+  - src/components/memory/counter.ts
+  - src/components/memory/eeprom.ts
+  - src/components/memory/lookup-table.ts
+  - src/components/memory/program-counter.ts
+  - src/components/memory/program-memory.ts
+  - src/components/memory/ram.ts
+  - src/components/memory/register-file.ts
+  - src/components/memory/register.ts
+  - src/components/memory/rom.ts
+- **Tests**: 898/898 passing
+
+## Task 2.5: Flip-flops (7 files) + Task 2.7 partial (spark-gap)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/components/flipflops/d.ts (added MnaSubcircuitNetlist import, CMOS_D_FF_NETLIST, modelRegistry with cmos entry, removed subcircuitRefs, updated getPins to use modelRegistry)
+  - src/components/flipflops/d-async.ts (added modelRegistry: {})
+  - src/components/flipflops/jk.ts (added modelRegistry: {})
+  - src/components/flipflops/jk-async.ts (added modelRegistry: {})
+  - src/components/flipflops/rs.ts (added modelRegistry: {})
+  - src/components/flipflops/rs-async.ts (added modelRegistry: {})
+  - src/components/flipflops/t.ts (added modelRegistry: {})
+  - src/components/sensors/spark-gap.ts (added modelRegistry with behavioral entry, fixed updateOperatingPoint to use _p fields, removed unused AnalogElement import, factory uses getOrDefault with SPARK_GAP_DEFAULTS)
+- **Tests**: 142/142 passing (flip-flops: 142, spark-gap: included in sensor run)
+- **Notes**: spark-gap factory uses getOrDefault (not getModelParam) because existing test creates bare PropertyBag without replaceModelParams; modelRegistry entry correctly provides paramDefs and params for compiler path
+
+---
+
+# Implementation Progress — Bridge Architecture + Hot-Loadable Params
+
+## Task 1.1: Rewrite DigitalOutputPinModel to ideal voltage source
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/solver/analog/digital-pin-model.ts`, `src/solver/analog/bridge-adapter.ts`, `src/solver/analog/behavioral-gate.ts`, `src/solver/analog/behavioral-flipflop.ts`, `src/solver/analog/behavioral-sequential.ts`, `src/solver/analog/behavioral-remaining.ts`, `src/solver/analog/behavioral-combinational.ts`, `src/solver/analog/behavioral-flipflop/t.ts`, `src/solver/analog/behavioral-flipflop/d-async.ts`, `src/solver/analog/behavioral-flipflop/rs.ts`, `src/solver/analog/behavioral-flipflop/rs-async.ts`, `src/solver/analog/behavioral-flipflop/jk.ts`, `src/solver/analog/behavioral-flipflop/jk-async.ts`, `src/components/active/adc.ts`, `src/components/active/schmitt-trigger.ts`
+- **Files created**: none (test file rewritten in task 1.2 pass)
+- **Tests**: 7/7 passing (drive mode stamps branch equation, hi-z mode stamps I=0, setLogicLevel toggles target voltage, loaded mode stamps rOut conductance, unloaded mode does not stamp rOut, setParam rOut updates conductance, setParam vOH updates target voltage)
+- **Implementation notes**: Added `stampNorton()` method to `DigitalOutputPinModel` to preserve Norton equivalent behavior for behavioral elements (gates, flipflops, sequential). `stamp()` is the ideal voltage source branch equation (active only when branchIdx >= 0). All behavioral elements updated from `_output.stamp()` to `_output.stampNorton()`. `DigitalInputPinModel` default loaded=true to preserve backward compatibility with behavioral elements. Bridge adapter updated to use `stampNorton()`.
+
+## Task 1.2: Rewrite DigitalInputPinModel to sense-only + inline loading
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (rewrote) `src/solver/analog/__tests__/digital-pin-model.test.ts`
+- **Files modified**: `src/solver/analog/digital-pin-model.ts`
+- **Tests**: 4/4 passing (loaded input stamps rIn conductance, unloaded input stamps nothing, readLogicLevel thresholds correctly, setParam rIn takes effect on next stamp)
+
+## Task 2.6: Migrate all 14 active components to modelRegistry + setParam + defineModelParams
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/active/opamp.ts` — getModelParam, modelRegistry, setParam
+  - `src/components/active/comparator.ts` — getModelParam, modelRegistry, setParam
+  - `src/components/active/analog-switch.ts` — getModelParam, modelRegistry, setParam (SPST + SPDT)
+  - `src/components/active/timer-555.ts` — modelRegistry updated
+  - `src/components/active/cccs.ts` — defineModelParams, modelRegistry, setParam on class
+  - `src/components/active/ccvs.ts` — defineModelParams, modelRegistry, setParam on class
+  - `src/components/active/vccs.ts` — defineModelParams, modelRegistry, setParam on class
+  - `src/components/active/vcvs.ts` — defineModelParams, modelRegistry, setParam on class
+  - `src/components/active/__tests__/opamp.test.ts` — replaceModelParams, modelRegistry factory
+  - `src/components/active/__tests__/comparator.test.ts` — replaceModelParams, modelRegistry factory
+  - `src/components/active/__tests__/analog-switch.test.ts` — replaceModelParams, modelRegistry factory
+  - `src/components/active/__tests__/real-opamp.test.ts` — replaceModelParams, modelRegistry factory
+- **Tests**: 75/75 passing
+
+## Task migrate-semiconductors: Migrate remaining 7 semiconductor files to modelRegistry + setParam
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/diac.ts` — added DIAC_PARAM_DEFS/DIAC_PARAM_DEFAULTS via defineModelParams, factory uses getModelParam, added setParam, modelRegistry with behavioral entry, removed _spiceModelOverrides from propertyDefs
+  - `src/components/semiconductors/scr.ts` — added SCR_PARAM_DEFS/SCR_PARAM_DEFAULTS, factory uses getModelParam, recomputeDerivedConstants() for nVt/vcrit, setParam added, modelRegistry added
+  - `src/components/semiconductors/triac.ts` — added TRIAC_PARAM_DEFS/TRIAC_PARAM_DEFAULTS, factory uses getModelParam, recomputeDerivedConstants() for nVt/vcritMain/vcritGate, setParam added, modelRegistry added
+  - `src/components/semiconductors/triode.ts` — added TRIODE_PARAM_DEFS/TRIODE_PARAM_DEFAULTS, factory uses getModelParam for all 6 params, setParam added, modelRegistry added
+  - `src/components/semiconductors/varactor.ts` — added VARACTOR_PARAM_DEFS/VARACTOR_PARAM_DEFAULTS, factory uses getModelParam, setParam with vcrit recomputation, modelRegistry added
+  - `src/components/semiconductors/pjfet.ts` — existing getModelParam calls preserved, removed _spiceModelOverrides from propertyDefs, changed models.mnaModels to models:{} + modelRegistry
+  - `src/components/semiconductors/mosfet.ts` — removed resolveParams(), added MOSFET_NMOS_PARAM_DEFS/MOSFET_NMOS_DEFAULTS and MOSFET_PMOS_PARAM_DEFS/MOSFET_PMOS_DEFAULTS via defineModelParams, factory uses getModelParam directly, removed _spiceModelOverrides from propertyDefs, modelRegistry added for both NMOS/PMOS
+  - `src/components/semiconductors/__tests__/diac.test.ts` — updated to use createTestPropertyBag+replaceModelParams, modelRegistry assertions
+  - `src/components/semiconductors/__tests__/scr.test.ts` — updated to use createTestPropertyBag+replaceModelParams, modelRegistry assertions
+  - `src/components/semiconductors/__tests__/triac.test.ts` — updated to use createTestPropertyBag+replaceModelParams, modelRegistry assertions
+  - `src/components/semiconductors/__tests__/triode.test.ts` — updated to use createTestPropertyBag+replaceModelParams, modelRegistry assertions
+  - `src/components/semiconductors/__tests__/varactor.test.ts` — updated to use createTestPropertyBag+replaceModelParams, modelRegistry assertions
+  - `src/components/semiconductors/__tests__/jfet.test.ts` — updated to use createTestPropertyBag+replaceModelParams, fixed 3-arg to 4-arg createNJfetElement/createPJfetElement calls, modelRegistry assertions
+  - `src/components/semiconductors/__tests__/mosfet.test.ts` — updated definition tests to use modelRegistry assertions
+  - `src/components/semiconductors/__tests__/diode.test.ts` — updated definition test to use modelRegistry assertions
+  - `src/components/semiconductors/__tests__/tunnel-diode.test.ts` — updated definition test to use modelRegistry assertions
+  - `src/components/semiconductors/__tests__/zener.test.ts` — updated definition test to use modelRegistry assertions
+  - `src/components/semiconductors/__tests__/spice-model-overrides-prop.test.ts` — rewrote to test modelRegistry behavioral entry instead of removed _spiceModelOverrides propertyDef
+- **Tests**: 0 semiconductor test failures (214 remaining failures are pre-existing in compile/solver/gui tests, unrelated to this task)
+
+## Task 2.3: Passive components modelRegistry migration
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/passives/resistor.ts` — split factory into `createResistorElement` (getOrDefault, for mnaModels) and `createResistorElementFromModelParams` (getModelParam, for modelRegistry); added `buildResistorElement` helper; modelRegistry now uses `createResistorElementFromModelParams`
+  - `src/components/passives/capacitor.ts` — added `CAPACITOR_PARAM_DEFS`/`CAPACITOR_DEFAULTS` via `defineModelParams`; split factory into two variants (getOrDefault vs getModelParam); modelRegistry uses `createCapacitorElementFromModelParams`
+  - `src/components/passives/inductor.ts` — added `INDUCTOR_PARAM_DEFS`/`INDUCTOR_DEFAULTS`; split factory into two variants; modelRegistry uses `createInductorElementFromModelParams`
+  - `src/components/passives/crystal.ts` — added `CRYSTAL_PARAM_DEFS`/`CRYSTAL_DEFAULTS`; refactored `buildCrystalElementFromParams` helper to use instance property assignment for `setParam` instead of spread (fixes method loss); split factories for getOrDefault vs getModelParam
+  - `src/components/passives/memristor.ts` — added `MEMRISTOR_PARAM_DEFS`/`MEMRISTOR_DEFAULTS`; added `setParam` to `MemristorElement`; split factory variants
+  - `src/components/passives/polarized-cap.ts` — added paramDefs/defaults; refactored `buildPolarizedCapFromParams` to use instance property assignment for `setParam`; split factory variants
+  - `src/components/passives/potentiometer.ts` — split `createPotentiometerElement` (getOrDefault) and `createPotentiometerElementFromModelParams` (getModelParam); modelRegistry updated
+  - `src/components/passives/tapped-transformer.ts` — refactored into `buildTappedTransformerElement` helper using instance `setParam` assignment; split factory variants; modelRegistry updated
+  - `src/components/passives/transformer.ts` — refactored into `buildTransformerElement` helper using instance `setParam` assignment; split factory variants; modelRegistry updated
+  - `src/components/passives/transmission-line.ts` — refactored into `buildTransmissionLineElement` helper using instance `setParam` assignment; split factory variants; modelRegistry updated
+  - `src/components/passives/analog-fuse.ts` — added `ANALOG_FUSE_PARAM_DEFS`/`ANALOG_FUSE_DEFAULTS`; added `buildAnalogFuseElement` helper with instance `setParam`; split factory variants; exported `createAnalogFuseElementFromModelParams`
+  - `src/components/switching/fuse.ts` — updated import to use `createAnalogFuseElementFromModelParams`, `ANALOG_FUSE_PARAM_DEFS`, `ANALOG_FUSE_DEFAULTS`; modelRegistry now has proper paramDefs/params
+- **Tests**: 187/187 passing (all passives + fuse tests)
+- **Notes**: Key fix: class method spread (`{...el, setParam}`) loses prototype methods (stamp, stampCompanion, etc). Fixed by assigning setParam directly as instance property: `(el as AnalogElementCore).setParam = function(...) {...}`. All new failures in full suite (coordinator-visualization, dc-voltage-source, etc.) are caused by parallel agents migrating sources/sensors to remove mnaModels, not by this task's changes.
+
+## Task 1.5: Analog partition guard fix + ground synthesis
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/compile/__tests__/compile-bridge-guard.test.ts
+- **Files modified**:
+  - src/solver/analog/compiler.ts — in buildAnalogNodeMapFromPartition, skip best-effort ground assignment for bridge-only partitions (all groups are boundary groups); they get sequential node IDs starting at 1, with node 0 as virtual ground
+- **Tests**: 5/5 passing
+
+## Task 1.6: Integrate bridge MNA elements into analog compiler
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/bridge-compilation.test.ts
+- **Files modified**:
+  - src/solver/analog/compiler.ts — added bridge stub processing loop after main element loop: creates BridgeOutputAdapter (digital-to-analog) or BridgeInputAdapter (analog-to-digital) per stub, resolves loaded flag from loadingMode override or digitalPinLoading mode, allocates branchIndex for output adapters, populates bridgeAdaptersByGroupId map
+  - src/solver/analog/compiler.ts — added import for makeBridgeOutputAdapter and makeBridgeInputAdapter factory functions
+  - src/solver/analog/compiled-analog-circuit.ts — added bridgeAdaptersByGroupId field (Map<number, Array<BridgeOutputAdapter|BridgeInputAdapter>>), constructor param, and assignment
+- **Tests**: 9/9 passing (spec required 7; covered all 7 spec scenarios plus 2 extra direction-specific tests)
+
+## Task bridge-synthesis-fix: Bridge Synthesis at Real Boundaries + Zener IS Param
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/compile/extract-connectivity.ts` — added `isDualModel` field to `ModelAssignment`; updated `resolveModelAssignments` to read `simulationModel` property (canonical) and `model` (legacy), detect analog models via `mnaModels` on models object and `modelRegistry`, validate requested keys, set `isDualModel=true` when component has both digital and analog models and `simulationModel="digital"` is explicitly set; updated `extractConnectivityGroups` to tag dual-model component pins as both `"digital"` and `"analog"` domains
+  - `src/components/semiconductors/zener.ts` — fixed `createZenerElement` to initialize params from `ZENER_PARAM_DEFAULTS` and then override with whatever model params are present in the PropertyBag, instead of calling `getModelParam` unconditionally for all params
+- **Tests**: 28/28 passing in target test files (digital-pin-loading.test.ts, pin-loading-menu.test.ts, zener.test.ts); 58/58 passing including extract-connectivity.test.ts; 5/5 passing in flatten-pipeline-reorder.test.ts (bonus fix); overall 86 failing vs 97 baseline (11 net improvement, no regressions)
+
+## Task 3.1: Rewrite runtime model registry to use ModelEntry
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/spice-model-apply.test.ts
+- **Files modified**: src/app/spice-model-apply.ts, src/app/spice-model-library-dialog.ts
+- **Tests**: 16/16 passing
+- **Notes**: 
+  - applySpiceImportResult now takes optional 4th `registry?: ComponentRegistry` parameter (no existing callers to break)
+  - applySpiceSubcktImportResult generates paramDefs from netlist.params keys
+  - spice-model-library-dialog.ts implements two-section modal (inline/.MODEL and netlist/.SUBCKT) with add/remove capability
+  - `grep -rn "pending reimplementation" src/app/spice-model-apply.ts src/app/spice-model-library-dialog.ts` returns zero hits
+  - Full test suite: 9756 passing, 137 failing (same 137 pre-existing failures, no regressions, +25 new passing tests)
+
+## Task 3.4: Unified import dialog
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/app/spice-import-dialog.ts` — added `.SUBCKT` auto-detect, updated return type to `Promise<SpiceImportResult | SpiceSubcktImportResult | null>`, added `detectFormat()` helper, updated preview for both format types, updated Apply handler to build `MnaSubcircuitNetlist` from `ParsedSubcircuit` using `buildNetConnectivity`, updated instruction text to mention both formats, added local `validateModel` stub
+  - `src/solver/analog/__tests__/spice-import-dialog.test.ts` — added `parseSubcircuit` import and new `spice-import-dialog: auto-detect format` describe block with 5 tests
+- **Tests**: 7/15 passing (8 pre-existing failures confirmed in spec/test-baseline.md; 5 new auto-detect tests all pass)
+
+## Task 3.5: Model dropdown from modelRegistry
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/app/canvas-popup.ts` — wired `showModelSelector()` into `openPopup()`, passing `ctx.circuit.metadata.models?.[elementHit.typeId]` as runtime models; only called when `def.modelRegistry` has entries
+  - `src/editor/__tests__/property-panel-model.test.ts` — added `showModelSelector dropdown sources (Task 3.5)` describe block with 7 new tests covering: static keys, digital option presence/absence, runtime keys from circuit.metadata.models, ordering, no duplicates, model switch callback
+- **Tests**: 26/26 passing (all pass, 7 new + 19 pre-existing)

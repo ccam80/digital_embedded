@@ -37,19 +37,28 @@ function makeMockSolver() {
   } as unknown as SparseSolverType;
 }
 
+const MODEL_PARAM_KEYS = new Set(["vTH", "vTL", "vOH", "vOL", "rOut"]);
+
 function makeProps(overrides: Record<string, number | string> = {}): PropertyBag {
-  const defaults: [string, number | string][] = [
-    ["vTH", 2.0],
-    ["vTL", 1.0],
-    ["vOH", 3.3],
-    ["vOL", 0.0],
-    ["rOut", 50],
-  ];
-  const entries = new Map<string, number | string>(defaults);
+  const modelDefaults: Record<string, number> = {
+    vTH: 2.0,
+    vTL: 1.0,
+    vOH: 3.3,
+    vOL: 0.0,
+    rOut: 50,
+  };
+  const staticEntries: [string, number | string][] = [];
+  const modelParams: Record<string, number> = { ...modelDefaults };
   for (const [k, v] of Object.entries(overrides)) {
-    entries.set(k, v);
+    if (MODEL_PARAM_KEYS.has(k)) {
+      modelParams[k] = v as number;
+    } else {
+      staticEntries.push([k, v]);
+    }
   }
-  return new PropertyBag(Array.from(entries.entries()));
+  const bag = new PropertyBag(staticEntries);
+  bag.replaceModelParams(modelParams);
+  return bag;
 }
 
 function makeSchmittInverting(
@@ -57,7 +66,7 @@ function makeSchmittInverting(
   nOut: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return SchmittInvertingDefinition.models!.mnaModels!.behavioral!.factory(
+  return SchmittInvertingDefinition.modelRegistry!["behavioral"]!.factory(
     new Map([["in", nIn], ["out", nOut]]),
     [],
     -1,
@@ -71,7 +80,7 @@ function makeSchmittNonInverting(
   nOut: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return SchmittNonInvertingDefinition.models!.mnaModels!.behavioral!.factory(
+  return SchmittNonInvertingDefinition.modelRegistry!["behavioral"]!.factory(
     new Map([["in", nIn], ["out", nOut]]),
     [],
     -1,

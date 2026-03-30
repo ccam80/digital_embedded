@@ -295,4 +295,5 @@ export const ProgramCounterDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };

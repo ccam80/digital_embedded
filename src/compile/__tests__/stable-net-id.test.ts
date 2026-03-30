@@ -16,45 +16,21 @@ import {
 import { Wire } from '../../core/circuit.js';
 import type { CircuitElement } from '../../core/element.js';
 import type { Pin, PinDeclaration } from '../../core/pin.js';
-import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from '../../core/pin.js';
-import { AbstractCircuitElement } from '../../core/element.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
+import { PinDirection } from '../../core/pin.js';
 import { PropertyBag } from '../../core/properties.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import type { ComponentDefinition, ComponentModels } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { ConnectivityGroup } from '../types.js';
+import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
+import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
 
 // ---------------------------------------------------------------------------
 // Minimal test element
 // ---------------------------------------------------------------------------
 
-class TestElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
 
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pinDecls: PinDeclaration[],
-    props?: PropertyBag,
-    rotation: 0 | 1 | 2 | 3 = 0,
-    mirror = false,
-  ) {
-    super(typeId, instanceId, position, rotation, mirror, props ?? new PropertyBag());
-    this._pins = resolvePins(
-      pinDecls,
-      position,
-      0,
-      createInverterConfig([]),
-      createClockConfig([]),
-    );
-  }
 
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 2, height: 2 }; }
-}
 
 // ---------------------------------------------------------------------------
 // Pin declaration helpers
@@ -94,7 +70,7 @@ function makeBaseDef(name: string, models: ComponentModels): Omit<ComponentDefin
   return {
     name,
     typeId: -1,
-    factory: (props: PropertyBag) => new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, [], props),
+    factory: (props: PropertyBag) => createTestElementFromDecls(name, crypto.randomUUID(), [], props),
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
@@ -142,8 +118,8 @@ function singlePinGroup(
 describe('stableNetId', () => {
   it('returns label:X for a group containing a Tunnel with a label', () => {
     const tunnelProps = new PropertyBag(new Map([['label', 'CLK']]));
-    const tunnel = new TestElement('Tunnel', 'tunnel-1', { x: 0, y: 0 }, [outputPin(0, 0, 'p')], tunnelProps);
-    const andEl  = new TestElement('And',    'and-1',    { x: 2, y: 0 }, [inputPin(0, 0, 'A')]);
+    const tunnel = createTestElementFromDecls('Tunnel', 'tunnel-1', [outputPin(0, 0, 'p')], tunnelProps);
+    const andEl  = createTestElementFromDecls('And', 'and-1', [inputPin(0, 0, 'A')], undefined, { x: 2, y: 0 });
 
     const elements: CircuitElement[] = [tunnel, andEl];
     const group: ConnectivityGroup = {
@@ -162,7 +138,7 @@ describe('stableNetId', () => {
 
   it('returns label:X for a group containing a Port with a label', () => {
     const portProps = new PropertyBag(new Map([['label', 'DATA']]));
-    const port   = new TestElement('Port', 'port-1', { x: 0, y: 0 }, [outputPin(0, 0, 'p')], portProps);
+    const port   = createTestElementFromDecls('Port', 'port-1', [outputPin(0, 0, 'p')], portProps);
     const elements: CircuitElement[] = [port];
     const group: ConnectivityGroup = {
       groupId: 0,
@@ -178,7 +154,7 @@ describe('stableNetId', () => {
   });
 
   it('returns pin:instanceId:pinLabel for an unnamed net (no Tunnel or Port)', () => {
-    const resistor = new TestElement('Resistor', 'res-abc', { x: 0, y: 0 }, [outputPin(0, 0, 'p1'), outputPin(2, 0, 'p2')]);
+    const resistor = createTestElementFromDecls('Resistor', 'res-abc', [outputPin(0, 0, 'p1'), outputPin(2, 0, 'p2')]);
     const elements: CircuitElement[] = [resistor];
     const group: ConnectivityGroup = {
       groupId: 0,
@@ -195,8 +171,8 @@ describe('stableNetId', () => {
 
   it('uses first canonical pin (sorted by instanceId) for unnamed nets with multiple pins', () => {
     // Element with instanceId "aaa" sorts before "zzz"
-    const elA = new TestElement('And', 'zzz-instance', { x: 0, y: 0 }, [outputPin(2, 0, 'out')]);
-    const elB = new TestElement('And', 'aaa-instance', { x: 4, y: 0 }, [inputPin(0, 0, 'in')]);
+    const elA = createTestElementFromDecls('And', 'zzz-instance', [outputPin(2, 0, 'out')]);
+    const elB = createTestElementFromDecls('And', 'aaa-instance', [inputPin(0, 0, 'in')], undefined, { x: 4, y: 0 });
     const elements: CircuitElement[] = [elA, elB];
 
     const group: ConnectivityGroup = {
@@ -216,8 +192,8 @@ describe('stableNetId', () => {
 
   it('ignores Tunnel/Port elements that have an empty label', () => {
     const emptyLabelProps = new PropertyBag(new Map([['label', '']]));
-    const tunnel   = new TestElement('Tunnel', 'tunnel-empty', { x: 0, y: 0 }, [outputPin(0, 0, 'p')], emptyLabelProps);
-    const resistor = new TestElement('Resistor', 'res-xyz', { x: 2, y: 0 }, [outputPin(0, 0, 'p1')]);
+    const tunnel   = createTestElementFromDecls('Tunnel', 'tunnel-empty', [outputPin(0, 0, 'p')], emptyLabelProps);
+    const resistor = createTestElementFromDecls('Resistor', 'res-xyz', [outputPin(0, 0, 'p1')], undefined, { x: 2, y: 0 });
     const elements: CircuitElement[] = [tunnel, resistor];
 
     const group: ConnectivityGroup = {
@@ -243,7 +219,7 @@ describe('stableNetId', () => {
 describe('resolveLoadingOverrides', () => {
   it('returns empty map and no diagnostics when overrides list is empty', () => {
     const registry = buildMixedRegistry();
-    const andEl = new TestElement('And', 'a1', { x: 0, y: 0 }, [
+    const andEl = createTestElementFromDecls('And', 'a1', [
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
     const elements: CircuitElement[] = [andEl];
@@ -259,8 +235,8 @@ describe('resolveLoadingOverrides', () => {
     // Build a circuit with a Tunnel labelled "CLK" connected to an And gate input
     const registry = buildMixedRegistry();
     const tunnelProps = new PropertyBag(new Map([['label', 'CLK']]));
-    const tunnel = new TestElement('Tunnel', 'tunnel-clk', { x: 0, y: 0 }, [outputPin(0, 0, 'p')], tunnelProps);
-    const andEl  = new TestElement('And', 'and-1', { x: 0, y: 0 }, [
+    const tunnel = createTestElementFromDecls('Tunnel', 'tunnel-clk', [outputPin(0, 0, 'p')], tunnelProps);
+    const andEl  = createTestElementFromDecls('And', 'and-1', [
       inputPin(0, 0, 'A'),
     ]);
 
@@ -285,7 +261,7 @@ describe('resolveLoadingOverrides', () => {
 
   it('resolves pin anchor override to the correct connectivity group', () => {
     const registry = buildMixedRegistry();
-    const andEl = new TestElement('And', 'fixed-id-123', { x: 0, y: 0 }, [
+    const andEl = createTestElementFromDecls('And', 'fixed-id-123', [
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
     const elements: CircuitElement[] = [andEl];
@@ -310,7 +286,7 @@ describe('resolveLoadingOverrides', () => {
 
   it('emits orphaned-pin-loading-override warning for a label anchor that does not exist', () => {
     const registry = buildMixedRegistry();
-    const andEl = new TestElement('And', 'a1', { x: 0, y: 0 }, [
+    const andEl = createTestElementFromDecls('And', 'a1', [
       outputPin(2, 0, 'out'),
     ]);
     const elements: CircuitElement[] = [andEl];
@@ -332,7 +308,7 @@ describe('resolveLoadingOverrides', () => {
 
   it('emits orphaned-pin-loading-override warning for a pin anchor that does not exist', () => {
     const registry = buildMixedRegistry();
-    const andEl = new TestElement('And', 'a1', { x: 0, y: 0 }, [
+    const andEl = createTestElementFromDecls('And', 'a1', [
       outputPin(2, 0, 'out'),
     ]);
     const elements: CircuitElement[] = [andEl];
@@ -355,8 +331,8 @@ describe('resolveLoadingOverrides', () => {
   it('resolves multiple overrides independently and emits one warning per orphan', () => {
     const registry = buildMixedRegistry();
     const tunnelProps = new PropertyBag(new Map([['label', 'CLK']]));
-    const tunnel = new TestElement('Tunnel', 'tunnel-clk', { x: 0, y: 0 }, [outputPin(0, 0, 'p')], tunnelProps);
-    const andEl  = new TestElement('And', 'and-fixed', { x: 0, y: 0 }, [outputPin(2, 0, 'out')]);
+    const tunnel = createTestElementFromDecls('Tunnel', 'tunnel-clk', [outputPin(0, 0, 'p')], tunnelProps);
+    const andEl  = createTestElementFromDecls('And', 'and-fixed', [outputPin(2, 0, 'out')]);
     const elements: CircuitElement[] = [tunnel, andEl];
     const [assignments] = resolveModelAssignments(elements, registry);
     const [groups] = extractConnectivityGroups(elements, [], registry, assignments);

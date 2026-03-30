@@ -14,44 +14,20 @@ import {
 import { Circuit, Wire } from '../../core/circuit.js';
 import type { CircuitElement } from '../../core/element.js';
 import type { Pin, PinDeclaration } from '../../core/pin.js';
-import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from '../../core/pin.js';
-import { AbstractCircuitElement } from '../../core/element.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
+import { PinDirection } from '../../core/pin.js';
 import { PropertyBag } from '../../core/properties.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import type { ComponentDefinition, ComponentModels } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
+import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
+import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
 
 // ---------------------------------------------------------------------------
 // Minimal test element
 // ---------------------------------------------------------------------------
 
-class TestElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
 
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pinDecls: PinDeclaration[],
-    props?: PropertyBag,
-    rotation: 0 | 1 | 2 | 3 = 0,
-    mirror = false,
-  ) {
-    super(typeId, instanceId, position, rotation, mirror, props ?? new PropertyBag());
-    this._pins = resolvePins(
-      pinDecls,
-      position,
-      0,
-      createInverterConfig([]),
-      createClockConfig([]),
-    );
-  }
 
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 2, height: 2 }; }
-}
 
 // ---------------------------------------------------------------------------
 // Pin declaration helpers
@@ -103,7 +79,7 @@ function makeBaseDef(name: string, models: ComponentModels, defaultModel?: strin
   return {
     name,
     typeId: -1,
-    factory: (props: PropertyBag) => new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, [], props),
+    factory: (props: PropertyBag) => createTestElementFromDecls(name, crypto.randomUUID(), [], props),
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
@@ -151,7 +127,7 @@ function buildMixedRegistry(): ComponentRegistry {
 describe('resolveModelAssignments', () => {
   it('assigns digital modelKey for digital-only components', () => {
     const registry = buildDigitalRegistry();
-    const andEl = new TestElement('And', 'a1', { x: 0, y: 0 }, [
+    const andEl = createTestElementFromDecls('And', 'a1', [
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
     const [assignments] = resolveModelAssignments([andEl], registry);
@@ -162,7 +138,7 @@ describe('resolveModelAssignments', () => {
 
   it('assigns mna modelKey for analog-only components', () => {
     const registry = buildAnalogRegistry();
-    const res = new TestElement('Resistor', 'r1', { x: 0, y: 0 }, [
+    const res = createTestElementFromDecls('Resistor', 'r1', [
       outputPin(0, 0, 'p1'), outputPin(2, 0, 'p2'),
     ]);
     const [assignments] = resolveModelAssignments([res], registry);
@@ -171,8 +147,8 @@ describe('resolveModelAssignments', () => {
 
   it('assigns neutral for infrastructure types', () => {
     const registry = buildDigitalRegistry();
-    const tunnel = new TestElement('Tunnel', 't1', { x: 0, y: 0 }, [outputPin(0, 0, 'p')]);
-    const ground = new TestElement('Ground', 'g1', { x: 0, y: 0 }, [outputPin(0, 0, 'p')]);
+    const tunnel = createTestElementFromDecls('Tunnel', 't1', [outputPin(0, 0, 'p')]);
+    const ground = createTestElementFromDecls('Ground', 'g1', [outputPin(0, 0, 'p')]);
     const [assignments] = resolveModelAssignments([tunnel, ground], registry);
     expect(assignments[0]!.modelKey).toBe('neutral');
     expect(assignments[1]!.modelKey).toBe('neutral');
@@ -181,7 +157,7 @@ describe('resolveModelAssignments', () => {
   it('uses model property when present', () => {
     const registry = buildMixedRegistry();
     const props = new PropertyBag(new Map([['model', 'behavioral']]));
-    const bridge = new TestElement('Bridge', 'b1', { x: 0, y: 0 }, [], props);
+    const bridge = createTestElementFromDecls('Bridge', 'b1', [], props);
     const [assignments] = resolveModelAssignments([bridge], registry);
     expect(assignments[0]!.modelKey).toBe('behavioral');
   });
@@ -191,14 +167,14 @@ describe('resolveModelAssignments', () => {
     registry.register(makeBaseDef('Bridge', {
       digital: { executeFn: noopExecFn },
     }, 'digital') as ComponentDefinition);
-    const bridge = new TestElement('Bridge', 'b1', { x: 0, y: 0 }, []);
+    const bridge = createTestElementFromDecls('Bridge', 'b1', []);
     const [assignments] = resolveModelAssignments([bridge], registry);
     expect(assignments[0]!.modelKey).toBe('digital');
   });
 
   it('assigns neutral for unknown component types', () => {
     const registry = new ComponentRegistry();
-    const unknown = new TestElement('NoSuchType', 'u1', { x: 0, y: 0 }, []);
+    const unknown = createTestElementFromDecls('NoSuchType', 'u1', []);
     const [assignments] = resolveModelAssignments([unknown], registry);
     expect(assignments[0]!.modelKey).toBe('neutral');
     expect(assignments[0]!.model).toBeNull();
@@ -212,7 +188,7 @@ describe('resolveModelAssignments', () => {
 describe('extractConnectivityGroups — pure digital', () => {
   it('returns one group per disconnected pin when there are no wires', () => {
     const registry = buildDigitalRegistry();
-    const el = new TestElement('And', 'a1', { x: 0, y: 0 }, [
+    const el = createTestElementFromDecls('And', 'a1', [
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
     const elements: CircuitElement[] = [el];
@@ -226,8 +202,8 @@ describe('extractConnectivityGroups — pure digital', () => {
   it('wires merge two pins into one group', () => {
     const registry = buildDigitalRegistry();
     // Out-component output at (2,0); In-component input at (2,0) — same position via wire
-    const outEl = new TestElement('Out', 'o1', { x: 0, y: 0 }, [outputPin(2, 0, 'out')]);
-    const inEl  = new TestElement('In',  'i1', { x: 2, y: 0 }, [inputPin(0, 0, 'in')]);
+    const outEl = createTestElementFromDecls('Out', 'o1', [outputPin(2, 0, 'out')]);
+    const inEl  = createTestElementFromDecls('In', 'i1', [inputPin(0, 0, 'in')], undefined, { x: 2, y: 0 });
     // outEl pin world pos: element(0,0) + pin(2,0) = (2,0)
     // inEl  pin world pos: element(2,0) + pin(0,0) = (2,0) — same position
 
@@ -243,7 +219,7 @@ describe('extractConnectivityGroups — pure digital', () => {
 
   it('all groups have domains containing only "digital"', () => {
     const registry = buildDigitalRegistry();
-    const andEl = new TestElement('And', 'a1', { x: 0, y: 0 }, [
+    const andEl = createTestElementFromDecls('And', 'a1', [
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
     const elements: CircuitElement[] = [andEl];
@@ -259,11 +235,11 @@ describe('extractConnectivityGroups — pure digital', () => {
   it('wire connects two separated components', () => {
     const registry = buildDigitalRegistry();
     // And gate output at element(0,0)+pin(2,0) = (2,0)
-    const andEl = new TestElement('And', 'a1', { x: 0, y: 0 }, [
+    const andEl = createTestElementFromDecls('And', 'a1', [
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
     // Out probe input at element(4,0)+pin(0,0) = (4,0)
-    const probeEl = new TestElement('Out', 'p1', { x: 4, y: 0 }, [inputPin(0, 0, 'in')]);
+    const probeEl = createTestElementFromDecls('Out', 'p1', [inputPin(0, 0, 'in')], undefined, { x: 4, y: 0 });
 
     const wire = new Wire({ x: 2, y: 0 }, { x: 4, y: 0 });
 
@@ -293,8 +269,8 @@ describe('extractConnectivityGroups — pure digital', () => {
     registry.register(makeBaseDef('NarrowIn', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
 
     // 4-bit output at (2,0), 1-bit input at (2,0) — same position
-    const wideEl   = new TestElement('WideOut',   'w1', { x: 0, y: 0 }, [outputPin(2, 0, 'out', 4)]);
-    const narrowEl = new TestElement('NarrowIn',  'n1', { x: 2, y: 0 }, [inputPin(0, 0, 'in', 1)]);
+    const wideEl   = createTestElementFromDecls('WideOut', 'w1', [outputPin(2, 0, 'out', 4)]);
+    const narrowEl = createTestElementFromDecls('NarrowIn', 'n1', [inputPin(0, 0, 'in', 1)], undefined, { x: 2, y: 0 });
 
     const elements: CircuitElement[] = [wideEl, narrowEl];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -307,8 +283,8 @@ describe('extractConnectivityGroups — pure digital', () => {
 
   it('no diagnostic when all digital pins in group agree on bit width', () => {
     const registry = buildDigitalRegistry();
-    const outEl = new TestElement('Out', 'o1', { x: 0, y: 0 }, [outputPin(2, 0, 'out', 4)]);
-    const inEl  = new TestElement('In',  'i1', { x: 2, y: 0 }, [inputPin(0, 0, 'in', 4)]);
+    const outEl = createTestElementFromDecls('Out', 'o1', [outputPin(2, 0, 'out', 4)]);
+    const inEl  = createTestElementFromDecls('In', 'i1', [inputPin(0, 0, 'in', 4)], undefined, { x: 2, y: 0 });
 
     const elements: CircuitElement[] = [outEl, inEl];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -319,8 +295,8 @@ describe('extractConnectivityGroups — pure digital', () => {
 
   it('bit width is set on group when all digital pins agree', () => {
     const registry = buildDigitalRegistry();
-    const outEl = new TestElement('Out', 'o1', { x: 0, y: 0 }, [outputPin(2, 0, 'out', 8)]);
-    const inEl  = new TestElement('In',  'i1', { x: 2, y: 0 }, [inputPin(0, 0, 'in', 8)]);
+    const outEl = createTestElementFromDecls('Out', 'o1', [outputPin(2, 0, 'out', 8)]);
+    const inEl  = createTestElementFromDecls('In', 'i1', [inputPin(0, 0, 'in', 8)], undefined, { x: 2, y: 0 });
 
     const elements: CircuitElement[] = [outEl, inEl];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -343,8 +319,8 @@ describe('extractConnectivityGroups — Tunnel merging', () => {
     // Two Tunnel elements with label "clk", physically far apart
     const propsA = new PropertyBag(new Map([['label', 'clk']]));
     const propsB = new PropertyBag(new Map([['label', 'clk']]));
-    const tA = new TestElement('Tunnel', 'tA', { x: 0, y: 0 }, [outputPin(0, 0, 'p')], propsA);
-    const tB = new TestElement('Tunnel', 'tB', { x: 100, y: 0 }, [outputPin(0, 0, 'p')], propsB);
+    const tA = createTestElementFromDecls('Tunnel', 'tA', [outputPin(0, 0, 'p')], propsA);
+    const tB = createTestElementFromDecls('Tunnel', 'tB', [outputPin(0, 0, 'p')], propsB, { x: 100, y: 0 });
 
     const elements: CircuitElement[] = [tA, tB];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -361,8 +337,8 @@ describe('extractConnectivityGroups — Tunnel merging', () => {
 
     const propsA = new PropertyBag(new Map([['label', 'clk']]));
     const propsB = new PropertyBag(new Map([['label', 'data']]));
-    const tA = new TestElement('Tunnel', 'tA', { x: 0,  y: 0 }, [outputPin(0, 0, 'p')], propsA);
-    const tB = new TestElement('Tunnel', 'tB', { x: 10, y: 0 }, [outputPin(0, 0, 'p')], propsB);
+    const tA = createTestElementFromDecls('Tunnel', 'tA', [outputPin(0, 0, 'p')], propsA);
+    const tB = createTestElementFromDecls('Tunnel', 'tB', [outputPin(0, 0, 'p')], propsB, { x: 10, y: 0 });
 
     const elements: CircuitElement[] = [tA, tB];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -376,8 +352,8 @@ describe('extractConnectivityGroups — Tunnel merging', () => {
 
     const propsA = new PropertyBag(new Map([['NetName', 'vcc']]));
     const propsB = new PropertyBag(new Map([['NetName', 'vcc']]));
-    const tA = new TestElement('Tunnel', 'tA', { x: 0,   y: 0 }, [outputPin(0, 0, 'p')], propsA);
-    const tB = new TestElement('Tunnel', 'tB', { x: 200, y: 0 }, [outputPin(0, 0, 'p')], propsB);
+    const tA = createTestElementFromDecls('Tunnel', 'tA', [outputPin(0, 0, 'p')], propsA);
+    const tB = createTestElementFromDecls('Tunnel', 'tB', [outputPin(0, 0, 'p')], propsB, { x: 200, y: 0 });
 
     const elements: CircuitElement[] = [tA, tB];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -390,8 +366,8 @@ describe('extractConnectivityGroups — Tunnel merging', () => {
   it('Tunnel with no label is not merged with anything', () => {
     const registry = buildDigitalRegistry();
 
-    const tA = new TestElement('Tunnel', 'tA', { x: 0, y: 0 }, [outputPin(0, 0, 'p')]);
-    const tB = new TestElement('Tunnel', 'tB', { x: 5, y: 0 }, [outputPin(0, 0, 'p')]);
+    const tA = createTestElementFromDecls('Tunnel', 'tA', [outputPin(0, 0, 'p')]);
+    const tB = createTestElementFromDecls('Tunnel', 'tB', [outputPin(0, 0, 'p')], undefined, { x: 5, y: 0 });
 
     const elements: CircuitElement[] = [tA, tB];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -412,8 +388,8 @@ describe('extractConnectivityGroups — Port label-merge', () => {
 
     const propsA = new PropertyBag(new Map([['label', 'sig']]));
     const propsB = new PropertyBag(new Map([['label', 'sig']]));
-    const pA = new TestElement('Port', 'pA', { x: 0, y: 0 }, [bidiPin(0, 0, 'port')], propsA);
-    const pB = new TestElement('Port', 'pB', { x: 100, y: 0 }, [bidiPin(0, 0, 'port')], propsB);
+    const pA = createTestElementFromDecls('Port', 'pA', [bidiPin(0, 0, 'port')], propsA);
+    const pB = createTestElementFromDecls('Port', 'pB', [bidiPin(0, 0, 'port')], propsB, { x: 100, y: 0 });
 
     const elements: CircuitElement[] = [pA, pB];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -429,8 +405,8 @@ describe('extractConnectivityGroups — Port label-merge', () => {
 
     const propsA = new PropertyBag(new Map([['label', 'A']]));
     const propsB = new PropertyBag(new Map([['label', 'B']]));
-    const pA = new TestElement('Port', 'pA', { x: 0, y: 0 }, [bidiPin(0, 0, 'port')], propsA);
-    const pB = new TestElement('Port', 'pB', { x: 10, y: 0 }, [bidiPin(0, 0, 'port')], propsB);
+    const pA = createTestElementFromDecls('Port', 'pA', [bidiPin(0, 0, 'port')], propsA);
+    const pB = createTestElementFromDecls('Port', 'pB', [bidiPin(0, 0, 'port')], propsB, { x: 10, y: 0 });
 
     const elements: CircuitElement[] = [pA, pB];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -442,8 +418,8 @@ describe('extractConnectivityGroups — Port label-merge', () => {
   it('Port with no label is not merged', () => {
     const registry = buildDigitalRegistry();
 
-    const pA = new TestElement('Port', 'pA', { x: 0, y: 0 }, [bidiPin(0, 0, 'port')]);
-    const pB = new TestElement('Port', 'pB', { x: 5, y: 0 }, [bidiPin(0, 0, 'port')]);
+    const pA = createTestElementFromDecls('Port', 'pA', [bidiPin(0, 0, 'port')]);
+    const pB = createTestElementFromDecls('Port', 'pB', [bidiPin(0, 0, 'port')], undefined, { x: 5, y: 0 });
 
     const elements: CircuitElement[] = [pA, pB];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -457,8 +433,8 @@ describe('extractConnectivityGroups — Port label-merge', () => {
 
     const portProps = new PropertyBag(new Map([['label', 'net1']]));
     const tunProps = new PropertyBag(new Map([['label', 'net1']]));
-    const port = new TestElement('Port', 'p1', { x: 0, y: 0 }, [bidiPin(0, 0, 'port')], portProps);
-    const tunnel = new TestElement('Tunnel', 't1', { x: 50, y: 0 }, [outputPin(0, 0, 'p')], tunProps);
+    const port = createTestElementFromDecls('Port', 'p1', [bidiPin(0, 0, 'port')], portProps);
+    const tunnel = createTestElementFromDecls('Tunnel', 't1', [outputPin(0, 0, 'p')], tunProps, { x: 50, y: 0 });
 
     const elements: CircuitElement[] = [port, tunnel];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -477,7 +453,7 @@ describe('extractConnectivityGroups — Port label-merge', () => {
 describe('extractConnectivityGroups — pure analog', () => {
   it('all groups have domains containing only "analog"', () => {
     const registry = buildAnalogRegistry();
-    const r1 = new TestElement('Resistor', 'r1', { x: 0, y: 0 }, [
+    const r1 = createTestElementFromDecls('Resistor', 'r1', [
       outputPin(0, 0, 'p1'), outputPin(2, 0, 'p2'),
     ]);
     const elements: CircuitElement[] = [r1];
@@ -494,12 +470,12 @@ describe('extractConnectivityGroups — pure analog', () => {
     const registry = buildAnalogRegistry();
     // Two analog pins at the same position with different bitWidths —
     // width-mismatch only applies to digital pins
-    const r1 = new TestElement('Resistor', 'r1', { x: 0, y: 0 }, [
+    const r1 = createTestElementFromDecls('Resistor', 'r1', [
       { ...outputPin(2, 0, 'p1', 4), direction: PinDirection.BIDIRECTIONAL },
     ]);
-    const r2 = new TestElement('Resistor', 'r2', { x: 2, y: 0 }, [
+    const r2 = createTestElementFromDecls('Resistor', 'r2', [
       { ...inputPin(0, 0, 'p2', 1), direction: PinDirection.BIDIRECTIONAL },
-    ]);
+    ], undefined, { x: 2, y: 0 });
     const elements: CircuitElement[] = [r1, r2];
     const [assignments] = resolveModelAssignments(elements, registry);
     const [_groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
@@ -517,12 +493,12 @@ describe('extractConnectivityGroups — mixed circuit', () => {
     const registry = buildMixedRegistry();
 
     // Digital And gate output at (2,0); analog Resistor pin at (2,0) — boundary
-    const andEl = new TestElement('And', 'a1', { x: 0, y: 0 }, [
+    const andEl = createTestElementFromDecls('And', 'a1', [
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
-    const resEl = new TestElement('Resistor', 'r1', { x: 2, y: 0 }, [
+    const resEl = createTestElementFromDecls('Resistor', 'r1', [
       outputPin(0, 0, 'p1'), outputPin(2, 0, 'p2'),
-    ]);
+    ], undefined, { x: 2, y: 0 });
 
     const elements: CircuitElement[] = [andEl, resEl];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -539,12 +515,12 @@ describe('extractConnectivityGroups — mixed circuit', () => {
   it('pure digital groups have only digital domain', () => {
     const registry = buildMixedRegistry();
 
-    const andEl = new TestElement('And', 'a1', { x: 0, y: 0 }, [
+    const andEl = createTestElementFromDecls('And', 'a1', [
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
-    const resEl = new TestElement('Resistor', 'r1', { x: 10, y: 0 }, [
+    const resEl = createTestElementFromDecls('Resistor', 'r1', [
       outputPin(0, 0, 'p1'), outputPin(2, 0, 'p2'),
-    ]);
+    ], undefined, { x: 10, y: 0 });
 
     const elements: CircuitElement[] = [andEl, resEl];
     const [assignments] = resolveModelAssignments(elements, registry);
@@ -585,7 +561,7 @@ describe('extractConnectivityGroups — empty circuit', () => {
 describe('extractConnectivityGroups — group metadata', () => {
   it('groupId is a unique sequential integer starting from 0', () => {
     const registry = buildDigitalRegistry();
-    const andEl = new TestElement('And', 'a1', { x: 0, y: 0 }, [
+    const andEl = createTestElementFromDecls('And', 'a1', [
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
     const [groups] = extractConnectivityGroups([andEl], [], registry,
@@ -599,10 +575,10 @@ describe('extractConnectivityGroups — group metadata', () => {
 
   it('every pin appears in exactly one group', () => {
     const registry = buildDigitalRegistry();
-    const andEl = new TestElement('And', 'a1', { x: 0, y: 0 }, [
+    const andEl = createTestElementFromDecls('And', 'a1', [
       inputPin(0, 0, 'A'), inputPin(0, 1, 'B'), outputPin(2, 0, 'out'),
     ]);
-    const probeEl = new TestElement('Out', 'p1', { x: 4, y: 0 }, [inputPin(0, 0, 'in')]);
+    const probeEl = createTestElementFromDecls('Out', 'p1', [inputPin(0, 0, 'in')], undefined, { x: 4, y: 0 });
     const wire = new Wire({ x: 2, y: 0 }, { x: 4, y: 0 });
 
     const elements: CircuitElement[] = [andEl, probeEl];
@@ -621,8 +597,8 @@ describe('extractConnectivityGroups — group metadata', () => {
     const registry = buildDigitalRegistry();
     // Ground is neutral; And gate is digital
     // Ground pin at (0,0), And gate input at (0,0) → they share a position
-    const groundEl = new TestElement('Ground', 'g1', { x: 0, y: 0 }, [outputPin(0, 0, 'gnd')]);
-    const andEl    = new TestElement('And',    'a1', { x: 0, y: 0 }, [
+    const groundEl = createTestElementFromDecls('Ground', 'g1', [outputPin(0, 0, 'gnd')]);
+    const andEl    = createTestElementFromDecls('And', 'a1', [
       inputPin(0, 0, 'A'), outputPin(2, 0, 'out'),
     ]);
 

@@ -45,10 +45,16 @@ const TD_MODEL_PARAMS = {
 // Helpers
 // ---------------------------------------------------------------------------
 
+function makeParamBag(params: Record<string, number>): PropertyBag {
+  const bag = new PropertyBag();
+  bag.replaceModelParams(params);
+  return bag;
+}
+
 function makeTunnelDiode(overrides: Partial<typeof TD_MODEL_PARAMS> = {}): AnalogElement {
   const modelParams = { ...TD_MODEL_PARAMS, ...overrides };
   // nodeAnode=1, nodeCathode=2
-  return createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, new PropertyBag([["_modelParams", modelParams]]));
+  return createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, makeParamBag(modelParams));
 }
 
 /**
@@ -242,7 +248,7 @@ describe("TunnelDiode", () => {
       new Map([["A", 2], ["K", 0]]),
       [],
       -1,
-      new PropertyBag([["_modelParams", TD_MODEL_PARAMS]]),
+      makeParamBag(TD_MODEL_PARAMS),
     ), [2, 0]);
 
     // Resistor element
@@ -297,9 +303,9 @@ describe("TunnelDiode", () => {
 
   it("definition_has_correct_fields", () => {
     expect(TunnelDiodeDefinition.name).toBe("TunnelDiode");
-    expect(TunnelDiodeDefinition.models?.mnaModels?.behavioral).toBeDefined();
-    expect(TunnelDiodeDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("TUNNEL");
-    expect(TunnelDiodeDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(TunnelDiodeDefinition.modelRegistry?.["behavioral"]).toBeDefined();
+    expect(TunnelDiodeDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
+    expect(TunnelDiodeDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
     expect(TunnelDiodeDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

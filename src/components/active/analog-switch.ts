@@ -34,6 +34,20 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: ANALOG_SWITCH_PARAM_DEFS, defaults: ANALOG_SWITCH_DEFAULTS } = defineModelParams({
+  primary: {
+    rOn:                { default: 10,  unit: "Ω",   description: "On-state resistance" },
+    rOff:               { default: 1e9, unit: "Ω",   description: "Off-state resistance" },
+    threshold:          { default: 1.65, unit: "V",  description: "Control voltage threshold" },
+    transitionSharpness:{ default: 20,  unit: "1/V", description: "Transition sharpness" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Shared resistance computation
@@ -90,17 +104,19 @@ function createSwitchSPSTElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ): AnalogElementCore {
-  const rOn  = Math.max(props.getOrDefault<number>("rOn",  10),   1e-6);
-  const rOff = Math.max(props.getOrDefault<number>("rOff", 1e9),  rOn + 1);
-  const vTh  = props.getOrDefault<number>("threshold", 1.65);
-  const k    = Math.max(props.getOrDefault<number>("transitionSharpness", 20), 1e-6);
+  const p: Record<string, number> = {
+    rOn:                Math.max(props.getModelParam<number>("rOn"),  1e-6),
+    rOff:               Math.max(props.getModelParam<number>("rOff"), 1e-6),
+    threshold:          props.getModelParam<number>("threshold"),
+    transitionSharpness:Math.max(props.getModelParam<number>("transitionSharpness"), 1e-6),
+  };
 
   const nIn   = pinNodes.get("in")!;   // signal in
   const nOut  = pinNodes.get("out")!;  // signal out
   const nCtrl = pinNodes.get("ctrl")!; // control terminal
 
   // Current operating-point resistance
-  let currentR = rOff;
+  let currentR = p.rOff;
 
   function readNode(voltages: Float64Array, n: number): number {
     return n > 0 ? voltages[n - 1] : 0;
@@ -122,7 +138,7 @@ function createSwitchSPSTElement(
 
     updateOperatingPoint(voltages: Float64Array): void {
       const vCtrl = readNode(voltages, nCtrl);
-      currentR = switchResistance(vCtrl, vTh, rOn, rOff, k, false);
+      currentR = switchResistance(vCtrl, p.threshold, Math.max(p.rOn, 1e-6), Math.max(p.rOff, p.rOn + 1), p.transitionSharpness, false);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -133,6 +149,10 @@ function createSwitchSPSTElement(
       const vOut = readNode(voltages, nOut);
       const iThrough = g * (vIn - vOut);
       return [iThrough, -iThrough, 0];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in p) (p as Record<string, number>)[key] = value;
     },
   };
 }
@@ -145,18 +165,20 @@ function createSwitchSPDTElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ): AnalogElementCore {
-  const rOn  = Math.max(props.getOrDefault<number>("rOn",  10),   1e-6);
-  const rOff = Math.max(props.getOrDefault<number>("rOff", 1e9),  rOn + 1);
-  const vTh  = props.getOrDefault<number>("threshold", 1.65);
-  const k    = Math.max(props.getOrDefault<number>("transitionSharpness", 20), 1e-6);
+  const p: Record<string, number> = {
+    rOn:                Math.max(props.getModelParam<number>("rOn"),  1e-6),
+    rOff:               Math.max(props.getModelParam<number>("rOff"), 1e-6),
+    threshold:          props.getModelParam<number>("threshold"),
+    transitionSharpness:Math.max(props.getModelParam<number>("transitionSharpness"), 1e-6),
+  };
 
   const nCom  = pinNodes.get("com")!;  // common terminal
   const nNO   = pinNodes.get("no")!;   // normally-open terminal
   const nNC   = pinNodes.get("nc")!;   // normally-closed terminal
   const nCtrl = pinNodes.get("ctrl")!; // control terminal
 
-  let rNO = rOff; // COM-NO resistance (closes when V_ctrl > V_th)
-  let rNC = rOn;  // COM-NC resistance (opens  when V_ctrl > V_th)
+  let rNO = p.rOff; // COM-NO resistance (closes when V_ctrl > V_th)
+  let rNC = p.rOn;  // COM-NC resistance (opens  when V_ctrl > V_th)
 
   function readNode(voltages: Float64Array, n: number): number {
     return n > 0 ? voltages[n - 1] : 0;
@@ -178,8 +200,10 @@ function createSwitchSPDTElement(
 
     updateOperatingPoint(voltages: Float64Array): void {
       const vCtrl = readNode(voltages, nCtrl);
-      rNO = switchResistance(vCtrl, vTh, rOn, rOff, k, false);
-      rNC = switchResistance(vCtrl, vTh, rOn, rOff, k, true);
+      const rOnNow  = Math.max(p.rOn, 1e-6);
+      const rOffNow = Math.max(p.rOff, rOnNow + 1);
+      rNO = switchResistance(vCtrl, p.threshold, rOnNow, rOffNow, p.transitionSharpness, false);
+      rNC = switchResistance(vCtrl, p.threshold, rOnNow, rOffNow, p.transitionSharpness, true);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -191,6 +215,10 @@ function createSwitchSPDTElement(
       const iNO = (1 / rNO) * (vCom - vNo);
       const iNC = (1 / rNC) * (vCom - vNc);
       return [iNO + iNC, -iNO, -iNC, 0];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in p) (p as Record<string, number>)[key] = value;
     },
   };
 }
@@ -443,18 +471,14 @@ export const SwitchSPSTDefinition: ComponentDefinition = {
     return new SwitchSPSTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        _branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        return createSwitchSPSTElement(pinNodes, props);
-      },
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, _branchIdx, props) =>
+        createSwitchSPSTElement(pinNodes, props),
+      paramDefs: ANALOG_SWITCH_PARAM_DEFS,
+      params: ANALOG_SWITCH_DEFAULTS,
     },
   },
   defaultModel: "behavioral",
@@ -477,18 +501,14 @@ export const SwitchSPDTDefinition: ComponentDefinition = {
     return new SwitchSPDTElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        _branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        return createSwitchSPDTElement(pinNodes, props);
-      },
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, _branchIdx, props) =>
+        createSwitchSPDTElement(pinNodes, props),
+      paramDefs: ANALOG_SWITCH_PARAM_DEFS,
+      params: ANALOG_SWITCH_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

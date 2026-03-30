@@ -13,43 +13,23 @@ import { compileUnified } from '../../compile/compile.js';
 import { DefaultSimulatorFacade } from '../../headless/default-facade.js';
 import { createDefaultRegistry } from '../../components/register-all.js';
 import { Circuit } from '../../core/circuit.js';
-import { AbstractCircuitElement } from '../../core/element.js';
 import { PropertyBag } from '../../core/properties.js';
 import { PinDirection } from '../../core/pin.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
-import type { Pin, Rotation } from '../../core/pin.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
+import type { Pin } from '../../core/pin.js';
 import type { ComponentDefinition, AnalogFactory } from '../../core/registry.js';
 import type { AnalogElement } from '../analog/element.js';
 import type { SparseSolver } from '../analog/sparse-solver.js';
-
-// ---------------------------------------------------------------------------
-// Minimal element helper
-// ---------------------------------------------------------------------------
-
-class MockElement extends AbstractCircuitElement {
-  private readonly _pins: Pin[];
-  constructor(typeId: string, instanceId: string, position: { x: number; y: number }, pins: Pin[]) {
-    super(typeId, instanceId, position, 0 as Rotation, false, new PropertyBag());
-    this._pins = pins;
-  }
-  getPins(): readonly Pin[] { return this._pins; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect { return { x: this.position.x, y: this.position.y, width: 4, height: 4 }; }
-}
-
-function makePin(label: string, direction: PinDirection, localX: number, localY: number): Pin {
-  return { label, direction, position: { x: localX, y: localY }, bitWidth: 1, isNegated: false, isClock: false, kind: "signal" };
-}
+import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 
 function makeAnalogElementObj(
   typeId: string,
   instanceId: string,
   pinDescs: { x: number; y: number; label: string }[],
-): MockElement {
+): TestElement {
   const pins = pinDescs.map(p => makePin(p.label, PinDirection.BIDIRECTIONAL, p.x, p.y));
-  return new MockElement(typeId, instanceId, { x: 0, y: 0 }, pins);
+  return new TestElement(typeId, instanceId, { x: 0, y: 0 }, pins);
 }
 
 // ---------------------------------------------------------------------------

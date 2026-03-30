@@ -58,11 +58,9 @@ function makeOpAmp(opts: {
     gain = 1e6,
     rOut = 75,
   } = opts;
-  const props = new PropertyBag([
-    ["gain", gain],
-    ["rOut", rOut],
-  ]);
-  return OpAmpDefinition.models!.mnaModels!.behavioral!.factory(
+  const props = new PropertyBag([]);
+  props.replaceModelParams({ gain, rOut });
+  return OpAmpDefinition.modelRegistry!["behavioral"]!.factory(
     new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]),
     [],
     -1,
@@ -201,8 +199,9 @@ describe("OpAmp", () => {
     const brVin = 5, brVinn = 6, brVccP = 7, brVccN = 8;
     const matrixSize = 9;
 
-    const props = new PropertyBag([["gain", 1e6], ["rOut", 75]]);
-    const opampEl = withNodeIds(OpAmpDefinition.models!.mnaModels!.behavioral!.factory(
+    const props = new PropertyBag([]);
+    props.replaceModelParams({ gain: 1e6, rOut: 75 });
+    const opampEl = withNodeIds(OpAmpDefinition.modelRegistry!["behavioral"]!.factory(
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
     ), [nInn, nInp, nOut]); // pinLayout order: [in-, in+, out]
 
@@ -277,8 +276,9 @@ describe("Integration", () => {
     const brVin = 6, brInp = 7, brVccP = 8, brVccN = 9;
     const matrixSize = 10;
 
-    const props = new PropertyBag([["gain", 1e6], ["rOut", 75]]);
-    const opampEl = withNodeIds(OpAmpDefinition.models!.mnaModels!.behavioral!.factory(
+    const props = new PropertyBag([]);
+    props.replaceModelParams({ gain: 1e6, rOut: 75 });
+    const opampEl = withNodeIds(OpAmpDefinition.modelRegistry!["behavioral"]!.factory(
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
     ), [nInn, nInp, nOut]); // pinLayout order: [in-, in+, out]
 
@@ -316,9 +316,10 @@ describe("Integration", () => {
     const brVin = 4, brVccP = 5, brVccN = 6;
     const matrixSize = 7;
 
-    const props = new PropertyBag([["gain", 1e6], ["rOut", 75]]);
+    const props = new PropertyBag([]);
+    props.replaceModelParams({ gain: 1e6, rOut: 75 });
     // in- and out share nFeedback (voltage follower)
-    const opampEl = withNodeIds(OpAmpDefinition.models!.mnaModels!.behavioral!.factory(
+    const opampEl = withNodeIds(OpAmpDefinition.modelRegistry!["behavioral"]!.factory(
       new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback]]), [], -1, props, () => 0,
     ), [nFeedback, nInp, nFeedback]); // pinLayout order: [in-, in+, out]
 

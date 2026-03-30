@@ -149,7 +149,7 @@ export class BehavioralGateElement implements AnalogElementCore {
 
     const outputBit = this._truthTable(this._latchedLevels);
     this._output.setLogicLevel(outputBit);
-    this._output.stamp(solver);
+    this._output.stampOutput(solver);
   }
 
   /**

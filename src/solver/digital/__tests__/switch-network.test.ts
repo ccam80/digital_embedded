@@ -24,11 +24,12 @@ import { BusResolver } from "../bus-resolution.js";
 import { Circuit, Wire } from "@/core/circuit";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
 import type { ComponentDefinition } from "@/core/registry";
-import { AbstractCircuitElement } from "@/core/element";
 import type { Pin, PinDeclaration } from "@/core/pin";
-import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from "@/core/pin";
-import type { RenderContext, Rect } from "@/core/renderer-interface";
+import { PinDirection } from "@/core/pin";
+import type { } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
+import { createTestElementFromDecls } from '@/test-fixtures/test-element.js';
+import { noopExecFn } from '@/test-fixtures/execute-stubs.js';
 
 // ---------------------------------------------------------------------------
 // Helpers: mock layout for unit tests
@@ -76,37 +77,8 @@ function makeTransGateLayout(opts: {
 // Integration test helpers
 // ---------------------------------------------------------------------------
 
-class TestElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
 
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pinDecls: PinDeclaration[],
-    props?: PropertyBag,
-  ) {
-    super(typeId, instanceId, position, 0, false, props ?? new PropertyBag());
-    this._pins = resolvePins(
-      pinDecls,
-      position,
-      0,
-      createInverterConfig([]),
-      createClockConfig([]),
-    );
-  }
 
-  getPins(): readonly Pin[] {
-    return this._pins;
-  }
-
-  draw(_ctx: RenderContext): void {}
-
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 2, height: 2 };
-  }
-
-}
 
 function outputOnlyPin(position: { x: number; y: number }): PinDeclaration[] {
   return [
@@ -122,12 +94,12 @@ function nfetPins(): PinDeclaration[] {
   ];
 }
 
-const noopExecute: ExecuteFunction = () => {};
+const noopExecFn: ExecuteFunction = () => {};
 
 function makeDefinition(
   name: string,
   pins: PinDeclaration[],
-  executeFn: ExecuteFunction = noopExecute,
+  executeFn: ExecuteFunction = noopExecFn,
   extra?: Partial<ComponentDefinition>,
 ): ComponentDefinition {
   const { stateSlotCount, switchPins, defaultDelay, ...restExtra } = extra ?? {};
@@ -135,7 +107,7 @@ function makeDefinition(
     name,
     typeId: -1,
     factory: (props: PropertyBag) =>
-      new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pins, props),
+      createTestElementFromDecls(name, crypto.randomUUID(), pins, props),
     pinLayout: pins,
     propertyDefs: [],
     attributeMap: [],
@@ -336,13 +308,13 @@ describe("SwitchNetwork", () => {
 
     const circuit = new Circuit();
     // DriverA at (0,0), output pin at (2,0) => world (2,0)
-    const elA = new TestElement("DriverA", "a1", { x: 0, y: 0 }, driverPins);
+    const elA = createTestElementFromDecls("DriverA", "a1", driverPins);
     // NFET at (0,0), G at (0,1.5), D at (3,0), S at (3,3)
     // We need G to be wired to the driver output.
     // Place NFET so G pin world pos matches driver output world pos.
     // G relative (0,1.5) + NFET pos = driver output world (2,0)
     // => NFET pos = (2, -1.5)
-    const elN = new TestElement("NFET", "n1", { x: 2, y: -1.5 }, nfetPinDecls);
+    const elN = createTestElementFromDecls("NFET", "n1", nfetPinDecls, undefined, { x: 2, y: -1.5 });
     circuit.addElement(elA);
     circuit.addElement(elN);
 
@@ -396,17 +368,17 @@ describe("SwitchNetwork", () => {
     const circuit = new Circuit();
 
     // NFET at (10, 0): G at (10,1.5), D at (13,0), S at (13,3)
-    const elN = new TestElement("NFET", "n1", { x: 10, y: 0 }, nfetPinDecls);
+    const elN = createTestElementFromDecls("NFET", "n1", nfetPinDecls, undefined, { x: 10, y: 0 });
 
     // DriverA at (11,0), output at relative (2,0) => world (13,0) — same as D
-    const elA = new TestElement("DriverA", "a1", { x: 11, y: 0 }, driverPins);
+    const elA = createTestElementFromDecls("DriverA", "a1", driverPins, undefined, { x: 11, y: 0 });
     // DriverB at (11,-3), output at relative (2,0) => world (13,-3)
-    const elB = new TestElement("DriverB", "b1", { x: 11, y: -3 }, driverPins);
+    const elB = createTestElementFromDecls("DriverB", "b1", driverPins, undefined, { x: 11, y: -3 });
 
     // DriverC at (11,3), output at relative (2,0) => world (13,3) — same as S
-    const elC = new TestElement("DriverC", "c1", { x: 11, y: 3 }, driverPins);
+    const elC = createTestElementFromDecls("DriverC", "c1", driverPins, undefined, { x: 11, y: 3 });
     // DriverD at (11,6), output at relative (2,0) => world (13,6)
-    const elD = new TestElement("DriverD", "d1", { x: 11, y: 6 }, driverPins);
+    const elD = createTestElementFromDecls("DriverD", "d1", driverPins, undefined, { x: 11, y: 6 });
 
     // Gate driver: output at (10,1.5)
     const gatePins = outputOnlyPin({ x: 2, y: 0 });
@@ -423,7 +395,7 @@ describe("SwitchNetwork", () => {
     registry2.register(nfetDef);
     registry2.register(gateDriverDef as ComponentDefinition);
 
-    const elGate = new TestElement("GateDriver", "g1", { x: 8, y: 1.5 }, gatePins);
+    const elGate = createTestElementFromDecls("GateDriver", "g1", gatePins, undefined, { x: 8, y: 1.5 });
 
     circuit.addElement(elN);
     circuit.addElement(elA);
@@ -498,9 +470,9 @@ describe("SwitchNetwork", () => {
     const circuit = new Circuit();
 
     // NFET at (10, 0): G at (10,1.5), D at (13,0), S at (13,3)
-    const elN = new TestElement("NFET", "n1", { x: 10, y: 0 }, nfetPinDecls);
+    const elN = createTestElementFromDecls("NFET", "n1", nfetPinDecls, undefined, { x: 10, y: 0 });
     // GateDriver output at (10,1.5) — same as G pin
-    const elG = new TestElement("GateDriver", "g1", { x: 8, y: 1.5 }, driverPins);
+    const elG = createTestElementFromDecls("GateDriver", "g1", driverPins, undefined, { x: 8, y: 1.5 });
 
     circuit.addElement(elN);
     circuit.addElement(elG);

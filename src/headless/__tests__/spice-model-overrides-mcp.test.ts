@@ -1,12 +1,12 @@
 /**
- * MCP tool surface tests for _spiceModelOverrides (P3.2).
+ * MCP tool surface tests for SPICE model param overrides.
  *
  * Tests verify that the override path works through the facade's MCP-facing
- * interface (build → patch → compile → read), and that overrides survive a
- * full serialize/deserialize round-trip.
+ * interface (build -> applySpiceImportResult -> compile -> read), and that
+ * overrides survive a full serialize/deserialize round-trip.
  *
  * Tests:
- *   1. Override via MCP: build a BJT circuit, patch to set _spiceModelOverrides,
+ *   1. Override via applySpiceImportResult: build a BJT circuit, apply overrides,
  *      circuit_compile, verify override changes simulation result vs default.
  *   2. Round-trip serialization: set overrides, serialize, deserialize, recompile,
  *      verify overrides persist and still affect simulation.
@@ -15,11 +15,12 @@
 import { describe, it, expect } from 'vitest';
 import { DefaultSimulatorFacade } from '../default-facade.js';
 import { createDefaultRegistry } from '../../components/register-all.js';
-import { BJT_NPN_DEFAULTS } from '../../solver/analog/model-defaults.js';
+import { BJT_NPN_DEFAULTS } from '../../components/semiconductors/bjt.js';
 import { Circuit, Wire } from '../../core/circuit.js';
 import { PropertyBag } from '../../core/properties.js';
 import type { PropertyValue } from '../../core/properties.js';
 import { pinWorldPosition } from '../../core/pin.js';
+import { applySpiceImportResult } from '../../app/spice-model-apply.js';
 
 const registry = createDefaultRegistry();
 
@@ -53,15 +54,11 @@ function createElement(
 //   Vb neg → Ground
 //
 // Component labels: Q1 (NpnBJT), Rc (Resistor), Vcc (DcVoltageSource), Vb (DcVoltageSource)
-//
-// Placed with distinct positions so pin world positions don't collide.
-// Wires connect by pin world position (analog topology resolution).
 // ---------------------------------------------------------------------------
 
 function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade } {
   const facade = new DefaultSimulatorFacade(registry);
 
-  // Place components at distinct grid positions
   const vcc = createElement('DcVoltageSource', { x: 0, y: 0 },  { label: 'Vcc', voltage: 5 });
   const vb  = createElement('DcVoltageSource', { x: 8, y: 0 },  { label: 'Vb',  voltage: 0.7 });
   const rc  = createElement('Resistor',        { x: 4, y: 0 },  { label: 'Rc',  resistance: 10000 });
@@ -75,7 +72,6 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
   circuit.addElement(q1);
   circuit.addElement(gnd);
 
-  // Resolve pin world positions
   const vccPins = vcc.getPins();
   const vbPins  = vb.getPins();
   const rcPins  = rc.getPins();
@@ -93,7 +89,6 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
   const q1E    = pinWorldPosition(q1,  q1Pins.find(p => p.label === 'E')!);
   const gndOut = pinWorldPosition(gnd, gndPins[0]!);
 
-  // Wire topology: VCC → Rc → Q1(C); Vb → Q1(B); Q1(E) → Gnd; negatives → Gnd
   circuit.addWire(new Wire(vccPos, rcA));
   circuit.addWire(new Wire(rcB,    q1C));
   circuit.addWire(new Wire(vbPos,  q1B));
@@ -105,46 +100,29 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
 }
 
 // ---------------------------------------------------------------------------
-// Test 1: Override via MCP
-//
-// Use circuit_patch (op: 'set') to apply _spiceModelOverrides on Q1,
-// then circuit_compile and verify:
-//   a) compiled analog diagnostics do not include INVALID_SPICE_OVERRIDES
-//   b) DC node voltages differ from those compiled without the override
+// Test 1: Override via applySpiceImportResult
 // ---------------------------------------------------------------------------
 
-describe('spice-model-overrides MCP surface — override via patch', () => {
-  it('patch with _spiceModelOverrides changes DC operating point vs default', () => {
-    // Compile the same circuit topology twice — once without overrides, once with.
-    // The ONLY difference is the _spiceModelOverrides patch on Q1.
+describe('spice-model-overrides MCP surface — override via applySpiceImportResult', () => {
+  it('applySpiceImportResult with large IS override changes DC operating point vs default', () => {
+    // Compile default circuit (no overrides)
     const { circuit: circuitDefault, facade: facadeDefault } = buildBjtCircuit();
-
     facadeDefault.compile(circuitDefault);
-    const compiledDefault = facadeDefault.getCompiledUnified();
-    expect(compiledDefault?.analog?.diagnostics).toBeInstanceOf(Array);
-
     const dcDefault = facadeDefault.getDcOpResult();
     expect(dcDefault?.converged).toBe(true);
     const voltagesDefault = Array.from(dcDefault!.nodeVoltages);
 
-    const baselineCodes = compiledDefault!.analog!.diagnostics.map(d => d.code);
-    expect(baselineCodes).not.toContain('INVALID_SPICE_OVERRIDES');
-
-    // Build an identical circuit, then apply override via patch
+    // Build identical circuit, then apply IS override (1e-10 vs default 1e-16)
     const { circuit: circuitOverridden, facade: facadeOverridden } = buildBjtCircuit();
-
-    // Override IS: default 1e-16, override to 1e-10 (1M× increase)
-    facadeOverridden.patch(circuitOverridden, [
-      { op: 'set', target: 'Q1', props: { _spiceModelOverrides: { IS: 1e-10 } } },
-    ]);
+    const q1 = circuitOverridden.elements.find(el => el.getProperties().get('label') === 'Q1')!;
+    applySpiceImportResult(
+      q1,
+      { overrides: { IS: 1e-10 }, modelName: 'Q2N2222_test', deviceType: 'NPN' },
+      circuitOverridden,
+      registry,
+    );
 
     facadeOverridden.compile(circuitOverridden);
-    const compiledOverridden = facadeOverridden.getCompiledUnified();
-    expect(compiledOverridden?.analog?.diagnostics).toBeInstanceOf(Array);
-
-    const overriddenCodes = compiledOverridden!.analog!.diagnostics.map(d => d.code);
-    expect(overriddenCodes).not.toContain('INVALID_SPICE_OVERRIDES');
-
     const dcOverridden = facadeOverridden.getDcOpResult();
     expect(dcOverridden?.converged).toBe(true);
     const voltagesOverridden = Array.from(dcOverridden!.nodeVoltages);
@@ -161,106 +139,137 @@ describe('spice-model-overrides MCP surface — override via patch', () => {
     expect(anyDiffers).toBe(true);
   });
 
-  it('patch with _spiceModelOverrides records the override in _spiceModelOverrides property', () => {
+  it('applySpiceImportResult stores model name in element model property', () => {
+    const { circuit, facade: _ } = buildBjtCircuit();
+    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
+
+    applySpiceImportResult(
+      q1,
+      { overrides: { IS: 1e-14, BF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
+      circuit,
+      registry,
+    );
+
+    const bag = q1.getProperties();
+    expect(bag.get('model')).toBe('Q2N2222');
+  });
+
+  it('applySpiceImportResult stores override params in model params partition', () => {
+    const { circuit, facade: _ } = buildBjtCircuit();
+    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
+
+    applySpiceImportResult(
+      q1,
+      { overrides: { IS: 1e-14, BF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
+      circuit,
+      registry,
+    );
+
+    const bag = q1.getProperties();
+    expect(bag.getModelParam<number>('IS')).toBe(1e-14);
+    expect(bag.getModelParam<number>('BF')).toBe(100);
+  });
+
+  it('applySpiceImportResult registers model entry in circuit.metadata.models', () => {
+    const { circuit, facade: _ } = buildBjtCircuit();
+    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
+
+    applySpiceImportResult(
+      q1,
+      { overrides: { IS: 1e-14, BF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
+      circuit,
+      registry,
+    );
+
+    const entry = circuit.metadata.models?.['NpnBJT']?.['Q2N2222'];
+    expect(entry).toBeDefined();
+    expect(entry!.kind).toBe('inline');
+    expect(entry!.params['IS']).toBe(1e-14);
+    expect(entry!.params['BF']).toBe(100);
+  });
+
+  it('default params remain at BJT defaults when only IS is overridden', () => {
     const { circuit, facade } = buildBjtCircuit();
+    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
 
-    // Apply IS override via patch
-    const patchResult = facade.patch(circuit, [
-      {
-        op: 'set',
-        target: 'Q1',
-        props: { _spiceModelOverrides: { IS: 1e-14, BF: 100 } },
-      },
-    ]);
+    applySpiceImportResult(
+      q1,
+      { overrides: { IS: 1e-14 }, modelName: 'Q2N2222', deviceType: 'NPN' },
+      circuit,
+      registry,
+    );
 
-    // Patch must succeed without errors
-    expect(patchResult.diagnostics.filter(d => d.severity === 'error')).toHaveLength(0);
+    // The model entry params should only contain overridden values
+    const entry = circuit.metadata.models?.['NpnBJT']?.['Q2N2222'];
+    expect(entry!.params['IS']).toBe(1e-14);
+    // BF not in overrides, so not in entry.params (defaults come from component definition)
+    expect(entry!.params['BF']).toBeUndefined();
 
-    // The Q1 element in the circuit must now have _spiceModelOverrides stored
-    const q1Element = circuit.elements.find(el => {
-      const bag = el.getProperties();
-      return bag.has('label') && bag.get('label') === 'Q1';
-    });
-    expect(q1Element).not.toBeUndefined();
-
-    const bag = q1Element!.getProperties();
-    expect(bag.has('_spiceModelOverrides')).toBe(true);
-
-    const stored = bag.get('_spiceModelOverrides') as Record<string, number>;
-    expect(stored['IS']).toBe(1e-14);
-    expect(stored['BF']).toBe(100);
+    facade.compile(circuit);
+    expect(facade.getDcOpResult()?.converged).toBe(true);
   });
 });
 
 // ---------------------------------------------------------------------------
 // Test 2: Round-trip serialization
-//
-// Set overrides, serialize, deserialize, recompile — overrides must persist
-// and the circuit must still compile without INVALID_SPICE_OVERRIDES.
-// The DC node voltages after round-trip must match the pre-serialization result.
 // ---------------------------------------------------------------------------
 
 describe('spice-model-overrides MCP surface — round-trip serialization', () => {
-  it('overrides survive serialize → deserialize → recompile', () => {
+  it('overrides survive serialize -> deserialize -> recompile', () => {
     const { circuit, facade } = buildBjtCircuit();
+    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
 
-    // Apply _spiceModelOverrides
-    facade.patch(circuit, [
-      {
-        op: 'set',
-        target: 'Q1',
-        props: { _spiceModelOverrides: { IS: 1e-14, BF: 100 } },
-      },
-    ]);
+    applySpiceImportResult(
+      q1,
+      { overrides: { IS: 1e-14, BF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
+      circuit,
+      registry,
+    );
 
     const json = facade.serialize(circuit);
     expect(typeof json).toBe('string');
-    expect(json).toContain('_spiceModelOverrides');
+    expect(json).toContain('Q2N2222');
     expect(json).toContain('1e-14');
 
-    // Deserialize and recompile (circuit_load equivalent)
     const reloaded = facade.deserialize(json);
     expect(reloaded).not.toBeUndefined();
+
+    const entry = reloaded.metadata.models?.['NpnBJT']?.['Q2N2222'];
+    expect(entry).toBeDefined();
+    expect(entry!.params['IS']).toBe(1e-14);
+    expect(entry!.params['BF']).toBe(100);
 
     facade.compile(reloaded);
     const compiled = facade.getCompiledUnified();
     expect(compiled?.analog?.diagnostics).toBeInstanceOf(Array);
-
-    // No INVALID_SPICE_OVERRIDES — JSON survived serialization intact
     const diagnosticCodes = compiled!.analog!.diagnostics.map(d => d.code);
-    expect(diagnosticCodes).not.toContain('INVALID_SPICE_OVERRIDES');
+    expect(diagnosticCodes).not.toContain('ANALOG_COMPILE_ERROR');
   });
 
   it('deserialized circuit with overrides produces same DC result as pre-serialization', () => {
     const { circuit, facade } = buildBjtCircuit();
+    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
 
-    facade.patch(circuit, [
-      {
-        op: 'set',
-        target: 'Q1',
-        props: { _spiceModelOverrides: { IS: 1e-14, BF: 100, VAF: 100 } },
-      },
-    ]);
+    applySpiceImportResult(
+      q1,
+      { overrides: { IS: 1e-14, BF: 100, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
+      circuit,
+      registry,
+    );
 
-    const json = facade.serialize(circuit);
-
-    // Compile original and capture DC operating point
     facade.compile(circuit);
     const dcOriginal = facade.getDcOpResult();
     expect(dcOriginal?.converged).toBe(true);
     const voltagesOriginal = Array.from(dcOriginal!.nodeVoltages);
 
-    // Deserialize and recompile (circuit_load + circuit_compile equivalent)
+    const json = facade.serialize(circuit);
     const reloaded = facade.deserialize(json);
     facade.compile(reloaded);
     const dcReloaded = facade.getDcOpResult();
     expect(dcReloaded?.converged).toBe(true);
     const voltagesReloaded = Array.from(dcReloaded!.nodeVoltages);
 
-    // Node voltage arrays must have the same length
     expect(voltagesReloaded.length).toBe(voltagesOriginal.length);
-
-    // Every node voltage must match within floating-point tolerance
     for (let i = 0; i < voltagesOriginal.length; i++) {
       expect(voltagesReloaded[i]).toBeCloseTo(voltagesOriginal[i]!, 6);
     }

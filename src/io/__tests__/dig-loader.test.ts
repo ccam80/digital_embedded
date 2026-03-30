@@ -9,15 +9,13 @@ import { parseDigXml } from "../dig-parser.js";
 import { loadDigCircuit, loadDig, loadDigFromParsed, createElementFromDig, createWireFromDig, extractCircuitMetadata, applyInverterConfig, DigParserError } from "../dig-loader.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition, AttributeMapping } from "../../core/registry.js";
-import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
-import type { Pin } from "../../core/pin.js";
-import { PinDirection, createInverterConfig, makePin } from "../../core/pin.js";
+import { PinDirection, makePin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import type { DigCircuit, DigVisualElement } from "../dig-schema.js";
 import { stringConverter, boolConverter, intConverter, testDataConverter } from "../attribute-map.js";
 import { CircuitBuilder } from "../../headless/builder.js";
+import { TestElement } from "../../test-fixtures/test-element.js";
+import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -28,31 +26,12 @@ function readCircuit(name: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Minimal test CircuitElement
-// ---------------------------------------------------------------------------
-
-class TestElement extends AbstractCircuitElement {
-  getPins(): readonly Pin[] { return []; }
-  draw(_ctx: RenderContext): void { /* no-op */ }
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Factory helper — creates a TestElement from props, recording label
 // ---------------------------------------------------------------------------
 
 function makeFactory(typeName: string) {
   return (props: PropertyBag) =>
-    new TestElement(
-      typeName,
-      crypto.randomUUID(),
-      { x: 0, y: 0 },
-      0,
-      false,
-      props,
-    );
+    new TestElement(typeName, crypto.randomUUID(), { x: 0, y: 0 }, [], props);
 }
 
 // ---------------------------------------------------------------------------
@@ -65,8 +44,6 @@ const INPUTS_MAPPING: AttributeMapping = intConverter("Inputs", "inputCount");
 const BITS_MAPPING: AttributeMapping = intConverter("Bits", "bitWidth");
 const TEST_DATA_MAPPING: AttributeMapping = testDataConverter();
 
-function noopExecute(): void { /* no-op */ }
-
 function makeDefinition(name: string, extraMappings: AttributeMapping[] = []): ComponentDefinition {
   return {
     name,
@@ -78,7 +55,7 @@ function makeDefinition(name: string, extraMappings: AttributeMapping[] = []): C
     category: ComponentCategory.LOGIC,
     helpText: name,
     models: {
-      digital: { executeFn: noopExecute },
+      digital: { executeFn: noopExecFn },
     },
   };
 }
@@ -523,7 +500,7 @@ describe("DigLoader", () => {
       category: ComponentCategory.LOGIC,
       helpText: "GateWithDefault",
       models: {
-        digital: { executeFn: noopExecute },
+        digital: { executeFn: noopExecFn },
       },
     });
 

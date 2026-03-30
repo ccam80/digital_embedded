@@ -1,18 +1,17 @@
 /**
- * DigitalPinModel — reusable MNA stamp helpers for digital pins.
+ * DigitalPinModel — MNA stamp helpers for digital pins.
  *
- * DigitalOutputPinModel stamps the Norton equivalent of a digital output:
- *   - Normal mode: conductance 1/rOut from node to ground + current source
- *     V_out/rOut into the node (RHS). No branch variable required.
- *   - Hi-Z mode: conductance 1/rHiZ from node to ground only.
- *   - Companion model for C_out using the same coefficients as the Phase 1
- *     capacitor companion (trapezoidal: 2C/h, BDF-1: C/h, BDF-2: 3C/2h).
+ * DigitalOutputPinModel stamps an ideal voltage source branch equation:
+ *   - Drive mode: branch equation enforces V_node = V_target.
+ *     If loaded, also stamps 1/rOut on the node diagonal.
+ *   - Hi-Z mode: branch equation enforces I = 0.
+ *     If loaded, stamps 1/rHiZ on the node diagonal.
+ *   - Companion model for C_out only when loaded and cOut > 0.
  *
- * DigitalInputPinModel stamps the load of a digital input:
- *   - Conductance 1/rIn from node to ground (input loading).
- *   - Companion model for C_in.
- *   - Threshold detection: voltage > vIH → true, voltage < vIL → false,
- *     between → undefined (indeterminate).
+ * DigitalInputPinModel is sense-only by default:
+ *   - When loaded, stamps 1/rIn on the node diagonal.
+ *   - Companion model for C_in only when loaded and cIn > 0.
+ *   - Threshold detection always available regardless of loaded flag.
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
@@ -37,57 +36,54 @@ export function readMnaVoltage(nodeId: number, voltages: Float64Array): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Stamps the analog equivalent of one digital output pin into the MNA matrix.
+ * Stamps the analog equivalent of one digital output pin into the MNA matrix
+ * using an ideal voltage source branch equation.
  *
- * Normal mode uses a Norton equivalent (conductance + current source) so no
- * branch variable is needed. Hi-Z mode replaces the Norton equivalent with a
- * single pull-down conductance 1/rHiZ.
- *
- * A companion model for the output capacitance C_out is maintained using the
- * same coefficients as the Phase 1 capacitor companion model.
+ * The branch variable at branchIdx represents the current injected by the
+ * ideal source. The branch equation selects between drive and Hi-Z modes.
+ * Loading (rOut, cOut) is stamped only when the loaded flag is true.
  */
 export class DigitalOutputPinModel {
   private _spec: ResolvedPinElectrical;
+  private _loaded: boolean;
 
   /** Node this pin drives. Set by init(). */
   private _nodeId = -1;
 
-  /** Target output voltage — vOH when high, vOL when low. */
-  private _targetVoltage: number;
+  /** Absolute branch row/col in the augmented matrix. Set by init(). */
+  private _branchIdx = -1;
+
+  /** True when logic level is high. */
+  private _high = false;
 
   /** True when in Hi-Z state. */
   private _hiZ = false;
 
-  // Companion model state for C_out
   private _prevVoltage = 0;
   private _prevCurrent = 0;
 
-  constructor(spec: ResolvedPinElectrical) {
-    this._spec = spec;
-    this._targetVoltage = spec.vOL;
+  constructor(spec: ResolvedPinElectrical, loaded = false) {
+    this._spec = { ...spec };
+    this._loaded = loaded;
   }
 
   /**
-   * Assign the node this pin drives.
+   * Assign the node this pin drives and the branch variable index.
    *
-   * branchIdx is accepted for compatibility with bridge adapter callers that
-   * track branch variables; Norton-equivalent outputs do not use a branch
-   * variable, so it is accepted but not stored.
+   * branchIdx is the absolute row/col in the augmented MNA matrix
+   * (= totalNodeCount + assignedBranchOffset).
    */
-  init(nodeId: number, _branchIdx: number): void {
+  init(nodeId: number, branchIdx: number): void {
     this._nodeId = nodeId;
+    this._branchIdx = branchIdx;
   }
 
   /** Set the output logic level. High → vOH, low → vOL. */
   setLogicLevel(high: boolean): void {
-    this._targetVoltage = high ? this._spec.vOH : this._spec.vOL;
+    this._high = high;
   }
 
-  /**
-   * Switch between driven and Hi-Z states.
-   *
-   * When hiZ is true the Norton equivalent is replaced by 1/rHiZ to ground.
-   */
+  /** Switch between driven and Hi-Z states. */
   setHighZ(hiZ: boolean): void {
     this._hiZ = hiZ;
   }
@@ -100,42 +96,91 @@ export class DigitalOutputPinModel {
   }
 
   /**
-   * Stamp the linear (topology-constant) portion into the MNA matrix.
+   * Stamp the ideal voltage source branch equation into the MNA matrix.
    *
-   * Normal mode: conductance 1/rOut on the diagonal + current source
-   *   V_out/rOut into the node (RHS).
-   * Hi-Z mode: conductance 1/rHiZ on the diagonal only.
+   * Drive mode:
+   *   stamp(branchIdx, nodeIdx, 1)   — branch eq: V_node coefficient
+   *   stamp(branchIdx, branchIdx, 0) — sparsity pre-allocation
+   *   stamp(nodeIdx, branchIdx, 1)   — KCL: branch current into node
+   *   stampRHS(branchIdx, V_target)  — branch eq RHS
+   *   If loaded: stamp(nodeIdx, nodeIdx, 1/rOut)
    *
-   * No allocation on this path.
+   * Hi-Z mode:
+   *   stamp(branchIdx, branchIdx, 1) — branch eq: I = 0
+   *   stamp(branchIdx, nodeIdx, 0)   — sparsity pre-allocation
+   *   stamp(nodeIdx, branchIdx, 1)   — KCL: branch current (= 0)
+   *   stampRHS(branchIdx, 0)         — branch eq RHS
+   *   If loaded: stamp(nodeIdx, nodeIdx, 1/rHiZ)
+   *
+   * When branchIdx < 0 (not assigned), this method is a no-op.
+   * Behavioral elements that need a conductance+current-source stamp use stampOutput().
    */
   stamp(solver: SparseSolver): void {
     const node = this._nodeId;
     if (node <= 0) return;
-    const idx = node - 1;
+    const bIdx = this._branchIdx;
+    if (bIdx < 0) return;
+    const nodeIdx = node - 1;
+
     if (this._hiZ) {
-      solver.stamp(idx, idx, 1 / this._spec.rHiZ);
+      solver.stamp(bIdx, bIdx, 1);
+      solver.stamp(bIdx, nodeIdx, 0);
+      solver.stamp(nodeIdx, bIdx, 1);
+      solver.stampRHS(bIdx, 0);
+      if (this._loaded) {
+        solver.stamp(nodeIdx, nodeIdx, 1 / this._spec.rHiZ);
+      }
+    } else {
+      solver.stamp(bIdx, nodeIdx, 1);
+      solver.stamp(bIdx, bIdx, 0);
+      solver.stamp(nodeIdx, bIdx, 1);
+      solver.stampRHS(bIdx, this._high ? this._spec.vOH : this._spec.vOL);
+      if (this._loaded) {
+        solver.stamp(nodeIdx, nodeIdx, 1 / this._spec.rOut);
+      }
+    }
+  }
+
+  /**
+   * Stamp a conductance + current source for the output into the MNA matrix.
+   *
+   * Drive mode: stamps 1/rOut on diagonal + V_target/rOut current source on RHS.
+   * Hi-Z mode: stamps 1/rHiZ on diagonal only.
+   *
+   * Used by behavioral elements (gates, flipflops, sequential) which model
+   * the output as a conductance+current-source in the nonlinear NR loop. These
+   * elements do not use a branch variable, so the branch-equation stamp() is not
+   * applicable to them.
+   */
+  stampOutput(solver: SparseSolver): void {
+    const node = this._nodeId;
+    if (node <= 0) return;
+    const nodeIdx = node - 1;
+    if (this._hiZ) {
+      solver.stamp(nodeIdx, nodeIdx, 1 / this._spec.rHiZ);
     } else {
       const gOut = 1 / this._spec.rOut;
-      solver.stamp(idx, idx, gOut);
-      solver.stampRHS(idx, this._targetVoltage * gOut);
+      solver.stamp(nodeIdx, nodeIdx, gOut);
+      solver.stampRHS(nodeIdx, (this._high ? this._spec.vOH : this._spec.vOL) * gOut);
     }
   }
 
   /**
    * Stamp the companion model for C_out.
    *
-   * Stamps conductance geq = 2C/h (trapezoidal), C/h (BDF-1), or 3C/2h
-   * (BDF-2) plus the history current source ieq into the node.
+   * Only active when loaded and cOut > 0.
    */
   stampCompanion(
     solver: SparseSolver,
     dt: number,
     method: IntegrationMethod,
   ): void {
+    if (!this._loaded) return;
     const node = this._nodeId;
     if (node <= 0) return;
-    const idx = node - 1;
     const C = this._spec.cOut;
+    if (C <= 0) return;
+    const idx = node - 1;
     const geq = capacitorConductance(C, dt, method);
     const ieq = capacitorHistoryCurrent(
       C,
@@ -151,16 +196,15 @@ export class DigitalOutputPinModel {
 
   /**
    * Update C_out companion state for the newly accepted timestep voltage.
-   *
-   * Stores the voltage and recomputes the companion current so the next
-   * stampCompanion() call uses correct history values.
    */
   updateCompanion(
     dt: number,
     method: IntegrationMethod,
     voltage: number,
   ): void {
+    if (!this._loaded) return;
     const C = this._spec.cOut;
+    if (C <= 0) return;
     const geq = capacitorConductance(C, dt, method);
     const ieq = capacitorHistoryCurrent(
       C,
@@ -170,7 +214,6 @@ export class DigitalOutputPinModel {
       0,
       this._prevCurrent,
     );
-    // Current through C_out at the accepted timestep
     const iNow = geq * voltage + ieq;
     this._prevCurrent = iNow;
     this._prevVoltage = voltage;
@@ -181,9 +224,19 @@ export class DigitalOutputPinModel {
     return this._nodeId;
   }
 
+  /** The branch index assigned by init(). */
+  get branchIndex(): number {
+    return this._branchIdx;
+  }
+
   /** The target output voltage (vOH or vOL). */
   get currentVoltage(): number {
-    return this._targetVoltage;
+    return this._high ? this._spec.vOH : this._spec.vOL;
+  }
+
+  /** Output capacitance in farads. */
+  get capacitance(): number {
+    return this._spec.cOut;
   }
 
   /** True when the output is in Hi-Z state. */
@@ -209,29 +262,26 @@ export class DigitalOutputPinModel {
 /**
  * Stamps the analog equivalent of one digital input pin into the MNA matrix.
  *
- * Stamps a conductance 1/rIn from the node to ground (input loading) plus a
- * companion model for C_in. Provides threshold detection via readLogicLevel().
+ * Sense-only by default — threshold detection is always available.
+ * When loaded, stamps 1/rIn on the node diagonal and cIn companion model.
  */
 export class DigitalInputPinModel {
   private _spec: ResolvedPinElectrical;
+  private _loaded: boolean;
 
   /** Node this pin reads. Set by init(). */
   private _nodeId = -1;
 
-  // Companion model state for C_in
   private _prevVoltage = 0;
   private _prevCurrent = 0;
 
-  constructor(spec: ResolvedPinElectrical) {
-    this._spec = spec;
+  constructor(spec: ResolvedPinElectrical, loaded = true) {
+    this._spec = { ...spec };
+    this._loaded = loaded;
   }
 
   /**
    * Assign the node this pin reads.
-   *
-   * groundNode is accepted for interface symmetry but the conductance is
-   * always stamped relative to the MNA ground node (row/col 0 is not
-   * explicitly stamped — ground is implicit in MNA formulation).
    */
   init(nodeId: number, _groundNode: number): void {
     this._nodeId = nodeId;
@@ -247,10 +297,10 @@ export class DigitalInputPinModel {
   /**
    * Stamp the input loading conductance 1/rIn from node to ground.
    *
-   * In MNA, ground is node 0 and is not represented in the matrix. The
-   * conductance stamps as a self-conductance on the node's diagonal only.
+   * No-op when not loaded.
    */
   stamp(solver: SparseSolver): void {
+    if (!this._loaded) return;
     const node = this._nodeId;
     if (node <= 0) return;
     solver.stamp(node - 1, node - 1, 1 / this._spec.rIn);
@@ -259,17 +309,19 @@ export class DigitalInputPinModel {
   /**
    * Stamp the companion model for C_in.
    *
-   * Same coefficient formulas as the Phase 1 capacitor companion.
+   * No-op when not loaded or cIn === 0.
    */
   stampCompanion(
     solver: SparseSolver,
     dt: number,
     method: IntegrationMethod,
   ): void {
+    if (!this._loaded) return;
     const node = this._nodeId;
     if (node <= 0) return;
-    const idx = node - 1;
     const C = this._spec.cIn;
+    if (C <= 0) return;
+    const idx = node - 1;
     const geq = capacitorConductance(C, dt, method);
     const ieq = capacitorHistoryCurrent(
       C,
@@ -291,7 +343,9 @@ export class DigitalInputPinModel {
     method: IntegrationMethod,
     voltage: number,
   ): void {
+    if (!this._loaded) return;
     const C = this._spec.cIn;
+    if (C <= 0) return;
     const geq = capacitorConductance(C, dt, method);
     const ieq = capacitorHistoryCurrent(
       C,
@@ -327,5 +381,10 @@ export class DigitalInputPinModel {
   /** Input impedance in ohms. */
   get rIn(): number {
     return this._spec.rIn;
+  }
+
+  /** Input capacitance in farads. */
+  get capacitance(): number {
+    return this._spec.cIn;
   }
 }

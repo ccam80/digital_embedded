@@ -534,19 +534,19 @@ describe("AndGate", () => {
   // ---------------------------------------------------------------------------
 
   describe("powerPins", () => {
-    it("no power pins when simulationModel is not set (digital mode)", () => {
+    it("no power pins when model is not set (digital mode)", () => {
       const el = makeAnd({ inputCount: 2 });
       const pins = el.getPins();
       const powerPins = pins.filter((p) => p.label === "VDD" || p.label === "GND");
       expect(powerPins).toHaveLength(0);
     });
 
-    it("VDD and GND pins appended when simulationModel is cmos", () => {
+    it("VDD and GND pins appended when model is cmos", () => {
       const props = new PropertyBag();
       props.set("inputCount", 2);
       props.set("bitWidth", 1);
       props.set("wideShape", false);
-      props.set("simulationModel", "cmos");
+      props.set("model", "cmos");
       const el = new AndElement("cmos-test", { x: 0, y: 0 }, 0, false, props);
       const pins = el.getPins();
       const vdd = pins.find((p) => p.label === "VDD");
@@ -560,7 +560,7 @@ describe("AndGate", () => {
       props.set("inputCount", 2);
       props.set("bitWidth", 1);
       props.set("wideShape", false);
-      props.set("simulationModel", "cmos");
+      props.set("model", "cmos");
       const el = new AndElement("cmos-test", { x: 0, y: 0 }, 0, false, props);
       const vdd = el.getPins().find((p) => p.label === "VDD");
       expect(vdd?.direction).toBe(PinDirection.INPUT);
@@ -571,7 +571,7 @@ describe("AndGate", () => {
       props.set("inputCount", 2);
       props.set("bitWidth", 1);
       props.set("wideShape", false);
-      props.set("simulationModel", "cmos");
+      props.set("model", "cmos");
       const el = new AndElement("cmos-test", { x: 0, y: 0 }, 0, false, props);
       const gnd = el.getPins().find((p) => p.label === "GND");
       expect(gnd?.direction).toBe(PinDirection.INPUT);
@@ -582,7 +582,7 @@ describe("AndGate", () => {
       props.set("inputCount", 2);
       props.set("bitWidth", 1);
       props.set("wideShape", false);
-      props.set("simulationModel", "cmos");
+      props.set("model", "cmos");
       const el = new AndElement("cmos-test", { x: 0, y: 0 }, 0, false, props);
       const pins = el.getPins();
       const signalPins = pins.filter((p) => p.label !== "VDD" && p.label !== "GND");
@@ -594,7 +594,7 @@ describe("AndGate", () => {
       props.set("inputCount", 2);
       props.set("bitWidth", 1);
       props.set("wideShape", false);
-      props.set("simulationModel", "cmos");
+      props.set("model", "cmos");
       const el = new AndElement("cmos-test", { x: 0, y: 0 }, 0, false, props);
       const vdd = el.getPins().find((p) => p.label === "VDD");
       const gnd = el.getPins().find((p) => p.label === "GND");

@@ -72,6 +72,18 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: OTA_PARAM_DEFS, defaults: OTA_DEFAULTS } = defineModelParams({
+  primary: {
+    gmMax: { default: 0.01, unit: "S", description: "Maximum transconductance" },
+    vt:    { default: 0.026, unit: "V", description: "Thermal voltage V_T" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -132,15 +144,21 @@ function buildOTAPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 function createOTAElement(
-  nVp: number,
-  nVm: number,
-  nIabc: number,
-  nOutP: number,
-  nOutN: number,
-  gmMax: number,
-  vt: number,
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  _branchIdx: number,
+  props: PropertyBag,
 ): AnalogElementCore {
-  const twoVt = 2 * vt;
+  const p: Record<string, number> = {
+    gmMax: props.getModelParam<number>("gmMax"),
+    vt:    props.getModelParam<number>("vt"),
+  };
+
+  const nVp   = pinNodes.get("V+")!;
+  const nVm   = pinNodes.get("V-")!;
+  const nIabc = pinNodes.get("Iabc")!;
+  const nOutP = pinNodes.get("OUT+")!;
+  const nOutN = pinNodes.get("OUT")!;
 
   // Operating-point state
   let vDiff = 0;
@@ -161,22 +179,23 @@ function createOTAElement(
     },
 
     stampNonlinear(solver: SparseSolver): void {
+      const twoVt = 2 * p.vt;
       // Evaluate tanh-limited output current at current operating point.
       const x = vDiff / twoVt;
       // tanh computed via standard formula; clamp argument to avoid overflow
       const xClamped = Math.max(-50, Math.min(50, x));
       const tanhX = Math.tanh(xClamped);
 
-      const iOut = iBias * tanhX;
+      const iOutNow = iBias * tanhX;
 
       // Effective transconductance: dI_out/dV_diff = I_bias/(2*V_T) * sech²(x)
       // sech²(x) = 1 - tanh²(x)
       const sech2 = 1 - tanhX * tanhX;
       const gmRaw = (iBias / twoVt) * sech2;
-      const gmEff = Math.min(Math.abs(gmRaw), gmMax);
+      const gmEff = Math.min(Math.abs(gmRaw), p.gmMax);
 
       // NR constant term (Norton offset)
-      const iNR = iOut - gmEff * vDiff;
+      const iNR = iOutNow - gmEff * vDiff;
 
       // Stamp VCCS: current gm_eff * V_diff injected into OUT+ from (V+, V-)
       // G[OUT+, V+] -= gmEff   G[OUT+, V-] += gmEff
@@ -192,6 +211,7 @@ function createOTAElement(
     },
 
     updateOperatingPoint(voltages: Float64Array): void {
+      const twoVt = 2 * p.vt;
       const vp = readNode(voltages, nVp);
       const vm = readNode(voltages, nVm);
       vDiff = vp - vm;
@@ -220,6 +240,10 @@ function createOTAElement(
      */
     getPinCurrents(_voltages: Float64Array): number[] {
       return [0, 0, 0, iOut, -iOut];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in p) p[key] = value;
     },
   };
 }
@@ -369,28 +393,14 @@ export const OTADefinition: ComponentDefinition = {
     return new OTAElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        _branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        const gmMax = props.getOrDefault<number>("gmMax", 0.01);
-        const vt = props.getOrDefault<number>("vt", 0.026);
-        return createOTAElement(
-          pinNodes.get("V+")!,   // V+
-          pinNodes.get("V-")!,   // V-
-          pinNodes.get("Iabc")!, // Iabc
-          pinNodes.get("OUT+")!, // OUT+
-          pinNodes.get("OUT")!,  // OUT (OUT-)
-          gmMax,
-          vt,
-        );
-      },
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createOTAElement(pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: OTA_PARAM_DEFS,
+      params: OTA_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

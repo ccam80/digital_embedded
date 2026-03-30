@@ -221,4 +221,5 @@ export const PolarityLedDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executePolarityLed, inputSchema: ["A", "K"], outputSchema: [] },
   },
+  modelRegistry: {},
 };

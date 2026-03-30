@@ -20,6 +20,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import { makeAndAnalogFactory } from "../../solver/analog/behavioral-gate.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import {
   compWidth,
   buildStandardPinDeclarations,
@@ -53,8 +54,8 @@ export class AndElement extends AbstractCircuitElement {
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     let decls = buildStandardPinDeclarations(inputCount, bitWidth, wideShape);
-    const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
-    if (activeModel && AndDefinition.subcircuitRefs?.[activeModel]) {
+    const activeModel = this._properties.getOrDefault<string>("model", "");
+    if (activeModel && AndDefinition.modelRegistry?.[activeModel]) {
       const w = compWidth(wideShape);
       decls = appendPowerPins(decls, w / 2, -1, inputCount);
     }
@@ -119,6 +120,41 @@ export function executeAnd(index: number, state: Uint32Array, _highZs: Uint32Arr
 
 
 // ---------------------------------------------------------------------------
+// CMOS_AND2_NETLIST — 2-input CMOS AND gate structural netlist
+//
+// Topology: CMOS NAND2 driving a CMOS inverter.
+// Ports: In_1, In_2, out, VDD, GND
+// Internal nets: nand_out (net index 5)
+// ---------------------------------------------------------------------------
+
+const CMOS_AND2_NETLIST: MnaSubcircuitNetlist = {
+  ports: ["In_1", "In_2", "out", "VDD", "GND"],
+  params: {},
+  elements: [
+    { typeId: "PMOS", branchCount: 0 },
+    { typeId: "PMOS", branchCount: 0 },
+    { typeId: "NMOS", branchCount: 0 },
+    { typeId: "NMOS", branchCount: 0 },
+    { typeId: "PMOS", branchCount: 0 },
+    { typeId: "NMOS", branchCount: 0 },
+  ],
+  internalNetCount: 2,
+  // Nets 0..4 = ports [In_1, In_2, out, VDD, GND], nets 5,6 = internal [nand_out, series_node]
+  // NAND2: p1(D=VDD,G=In_1,S=nand_out), p2(D=VDD,G=In_2,S=nand_out),
+  //        n1(D=nand_out,G=In_1,S=series_node), n2(D=series_node,G=In_2,S=GND)
+  // INV:   pInv(D=VDD,G=nand_out,S=out), nInv(D=out,G=nand_out,S=GND)
+  // PMOS pins: [D, G, S], NMOS pins: [D, G, S]
+  netlist: [
+    [3, 0, 5], // p1: D=VDD(3), G=In_1(0), S=nand_out(5)
+    [3, 1, 5], // p2: D=VDD(3), G=In_2(1), S=nand_out(5)
+    [5, 0, 6], // n1: D=nand_out(5), G=In_1(0), S=series_node(6)
+    [6, 1, 4], // n2: D=series_node(6), G=In_2(1), S=GND(4)
+    [3, 5, 2], // pInv: D=VDD(3), G=nand_out(5), S=out(2)
+    [2, 5, 4], // nInv: D=out(2), G=nand_out(5), S=GND(4)
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // AndDefinition — ComponentDefinition for registry registration (Decision 4)
 //
 // typeId: -1 signals to the registry that it should auto-assign a numeric ID.
@@ -147,7 +183,14 @@ export const AndDefinition: ComponentDefinition = {
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved) and IEC/DIN (rectangular with &) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
-  subcircuitRefs: { cmos: "CmosAnd2" },
+  modelRegistry: {
+    cmos: {
+      kind: "netlist",
+      netlist: CMOS_AND2_NETLIST,
+      paramDefs: [],
+      params: {},
+    },
+  },
   models: {
     digital: {
       executeFn: executeAnd,

@@ -37,6 +37,19 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { defineModelParams } from "../../core/model-params.js";
+import { DigitalOutputPinModel } from "../../solver/analog/digital-pin-model.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: TIMER555_PARAM_DEFS, defaults: TIMER555_DEFAULTS } = defineModelParams({
+  primary: {
+    vDrop:      { default: 1.5, unit: "V", description: "Voltage drop from VCC for high output state" },
+    rDischarge: { default: 10,  unit: "Ω", description: "Saturation resistance of the discharge transistor" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin declarations
@@ -214,10 +227,14 @@ export class Timer555Element extends AbstractCircuitElement {
  */
 function createTimer555Element(
   pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  _branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const vDrop      = props.getOrDefault<number>("vDrop", 1.5);
-  const rDischarge  = Math.max(props.getOrDefault<number>("rDischarge", 10), 1e-3);
+  const p: Record<string, number> = {
+    vDrop:      props.getModelParam<number>("vDrop"),
+    rDischarge: props.getModelParam<number>("rDischarge"),
+  };
   const rOut        = 10;     // output drive resistance (Ω)
   const rHiZ        = 1e6;    // discharge transistor off-state resistance (Ω)
   const rDiv1       = 5000;   // VCC→CTRL divider arm (Ω)
@@ -234,9 +251,19 @@ function createTimer555Element(
 
   // SR flip-flop output: true=SET(high output), false=RESET(low output)
   let _flipflopQ = false;
-  // Cached output voltage levels, updated each operating point evaluation
-  let _vOH = 3.5;
-  let _vOL = 0.1;
+
+  const _outputPin = new DigitalOutputPinModel({
+    rOut,
+    cOut:  0,
+    rIn:   1e7,
+    cIn:   0,
+    vOH:   3.5,
+    vOL:   0.1,
+    vIH:   2.0,
+    vIL:   0.8,
+    rHiZ:  1e7,
+  });
+  _outputPin.init(nOut, -1);
 
   function readNode(voltages: Float64Array, n: number): number {
     return n > 0 ? voltages[n - 1] : 0;
@@ -252,37 +279,11 @@ function createTimer555Element(
     }
   }
 
-  /**
-   * Stamp a Norton equivalent voltage source between nPos and nNeg.
-   * Drives (nPos − nNeg) toward vTarget with output resistance R.
-   * The Norton current I = vTarget / R is injected into nPos (out of nNeg).
-   */
-  function stampNorton(
-    solver: SparseSolver,
-    nPos: number,
-    nNeg: number,
-    vTarget: number,
-    R: number,
-  ): void {
-    const G = 1 / R;
-    if (nPos > 0) solver.stamp(nPos - 1, nPos - 1, G);
-    if (nNeg > 0) solver.stamp(nNeg - 1, nNeg - 1, G);
-    if (nPos > 0 && nNeg > 0) {
-      solver.stamp(nPos - 1, nNeg - 1, -G);
-      solver.stamp(nNeg - 1, nPos - 1, -G);
-    }
-    const iNorton = vTarget * G;
-    if (nPos > 0) solver.stampRHS(nPos - 1, iNorton);
-    if (nNeg > 0) solver.stampRHS(nNeg - 1, -iNorton);
-  }
-
-  function updateVoltageCache(voltages: Float64Array): void {
-    // Update cached output levels from current VCC/GND — no state change.
-    // Called on every NR iteration to keep output levels accurate.
+  function updateOutputPinLevels(voltages: Float64Array): void {
     const vVcc = readNode(voltages, nVcc);
     const vGnd = readNode(voltages, nGnd);
-    _vOH = vVcc - vDrop;
-    _vOL = vGnd + 0.1;
+    _outputPin.setParam("vOH", vVcc - p.vDrop);
+    _outputPin.setParam("vOL", vGnd + 0.1);
   }
 
   function advanceFlipflop(voltages: Float64Array): void {
@@ -331,29 +332,29 @@ function createTimer555Element(
     },
 
     stampNonlinear(solver: SparseSolver): void {
-      // Output stage: Norton equivalent from OUT to GND
-      const vOutTarget = _flipflopQ ? _vOH : _vOL;
-      stampNorton(solver, nOut, nGnd, vOutTarget, rOut);
+      // Output stage: conductance + current source driving OUT toward vOH or vOL
+      _outputPin.setLogicLevel(_flipflopQ);
+      _outputPin.stampOutput(solver);
 
       // Discharge transistor: R_sat to GND when Q=0, Hi-Z when Q=1
       if (_flipflopQ) {
         stampResistor(solver, nDis, nGnd, rHiZ);
       } else {
-        stampResistor(solver, nDis, nGnd, rDischarge);
+        stampResistor(solver, nDis, nGnd, Math.max(p.rDischarge, 1e-3));
       }
     },
 
     updateOperatingPoint(voltages: Float64Array): void {
-      // Update voltage levels for stampNonlinear but do NOT advance flip-flop.
-      // Keeping flip-flop state constant within each NR solve lets the solver
-      // converge to the linearized operating point. State transitions only
-      // occur in updateState() after each accepted timestep.
-      updateVoltageCache(voltages);
+      // Update output pin voltage levels for stampNonlinear but do NOT advance
+      // flip-flop. Keeping flip-flop state constant within each NR solve lets
+      // the solver converge to the linearized operating point. State transitions
+      // only occur in updateState() after each accepted timestep.
+      updateOutputPinLevels(voltages);
     },
 
     updateState(_dt: number, voltages: Float64Array): void {
       // Called once per accepted timestep: now safe to advance state.
-      updateVoltageCache(voltages);
+      updateOutputPinLevels(voltages);
       advanceFlipflop(voltages);
     },
 
@@ -365,7 +366,8 @@ function createTimer555Element(
       //
       // Stamped constitutive equations (read from stamp() / stampNonlinear()):
       //   Voltage divider:  rDiv1 between VCC↔CTRL, rDiv2 between CTRL↔GND
-      //   Output Norton:    conductance rOut between OUT↔GND, Norton current vOutTarget/rOut into OUT
+      //   Output:           DigitalOutputPinModel stamps G_out on nOut diagonal,
+      //                     vTarget*G_out on RHS at nOut (reference = MNA node 0)
       //   Discharge:        conductance r_dis between DIS↔GND (rDischarge when Q=0, rHiZ when Q=1)
       //
       // TRIG, THR, RST are pure voltage sense inputs — no current is stamped at these pins.
@@ -381,45 +383,35 @@ function createTimer555Element(
       const gDiv1 = 1 / rDiv1;
       const gDiv2 = 1 / rDiv2;
       const gOut  = 1 / rOut;
-      const rDis  = _flipflopQ ? rHiZ : rDischarge;
+      const rDis  = _flipflopQ ? rHiZ : Math.max(p.rDischarge, 1e-3);
       const gDis  = 1 / rDis;
 
-      // Output Norton target (matches stampNonlinear logic)
-      const vOutTarget = _flipflopQ ? _vOH : _vOL;
+      // Output target voltage (absolute, stamped by DigitalOutputPinModel)
+      const vOutTarget = _outputPin.currentVoltage;
 
-      // Current into element at each pin from its stamped conductance(s).
+      // Current into element at each pin.
       // For a resistor A↔B: I_into_element_at_A = G*(V_A - V_B)
-      //                      I_into_element_at_B = G*(V_B - V_A)
-      // For Norton at OUT↔GND: element injects iNorton=vTarget*gOut INTO OUT (sourcing).
-      //   → current into element at OUT  = G_out*(V_out - V_gnd) - vTarget*G_out
-      //   → current into element at GND (Norton contribution) = G_out*(V_gnd - V_out) + vTarget*G_out
-      //     (the Norton source pulls vTarget*G_out OUT of the element at GND, so INTO element = +vTarget*G_out... wait: Norton injects into OUT from RHS; GND gets -iNorton on RHS, meaning element takes vTarget*G_out from GND node: INTO element at GND = -(−vTarget*G_out) = ... )
-      //
-      // Careful re GND Norton term:
-      //   stampRHS(nPos-1, +iNorton) → element sources iNorton INTO the OUT node (element supplies this)
-      //   stampRHS(nNeg-1, -iNorton) → element sinks iNorton FROM the GND node (element takes this)
-      // So: current element draws FROM GND due to Norton = +iNorton = vTarget*G_out
-      //     i.e. current INTO element at GND (Norton part) = +vTarget*G_out
-      //     current INTO element at OUT (Norton part) = -iNorton = -vTarget*G_out
-      //       (the element supplies current to OUT, so it receives negative current at OUT from circuit)
-      //
-      // Net INTO element at OUT  = G_out*(V_out - V_gnd) - vTarget*G_out
-      // Net INTO element at GND  = G_div2*(V_gnd - V_ctrl) + G_dis*(V_gnd - V_dis)
-      //                          + G_out*(V_gnd - V_out) + vTarget*G_out
+      // For DigitalOutputPinModel: stamps G_out on OUT diagonal and vTarget*G_out on RHS.
+      //   The element supplies vTarget*G_out current INTO OUT from MNA node 0.
+      //   → current into element at OUT = G_out*(V_out - 0) - vTarget*G_out
+      //   → GND carries the return: absorbed into GND pin current via KCL balance.
 
       const iDis  = gDis * (vDis  - vGnd);
       const iTrig = 0;
       const iThr  = 0;
       const iVcc  = gDiv1 * (vVcc  - vCtrl);
       const iCtrl = gDiv1 * (vCtrl - vVcc) + gDiv2 * (vCtrl - vGnd);
-      const iOut  = gOut  * (vOut  - vGnd)  - vOutTarget * gOut;
+      const iOut  = gOut  * vOut - vOutTarget * gOut;
       const iRst  = 0;
       const iGnd  = gDiv2 * (vGnd  - vCtrl)
-                  + gDis  * (vGnd  - vDis)
-                  + gOut  * (vGnd  - vOut)  + vOutTarget * gOut;
+                  + gDis  * (vGnd  - vDis);
 
       // Return in pinLayout order: [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
       return [iDis, iTrig, iThr, iVcc, iCtrl, iOut, iRst, iGnd];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in p) p[key] = value;
     },
   };
 }
@@ -496,18 +488,14 @@ export const Timer555Definition: ComponentDefinition = {
     return new Timer555Element(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        _branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        return createTimer555Element(pinNodes, props);
-      },
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createTimer555Element(pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: TIMER555_PARAM_DEFS,
+      params: TIMER555_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

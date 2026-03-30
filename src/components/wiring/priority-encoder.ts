@@ -254,4 +254,5 @@ export const PriorityEncoderDefinition: ComponentDefinition = {
       outputSchema: ["num", "any"],
     },
   },
+  modelRegistry: {},
 };

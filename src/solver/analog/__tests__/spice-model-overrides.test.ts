@@ -26,7 +26,11 @@ import type { SerializedElement } from "../../../core/element.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
-import { BJT_NPN_DEFAULTS, TUNNEL_DIODE_DEFAULTS, DIODE_DEFAULTS, SCHOTTKY_DEFAULTS, ZENER_DEFAULTS } from "../model-defaults.js";
+import { BJT_NPN_DEFAULTS } from "../../../components/semiconductors/bjt.js";
+import { TUNNEL_DIODE_PARAM_DEFAULTS as TUNNEL_DIODE_DEFAULTS } from "../../../components/semiconductors/tunnel-diode.js";
+import { DIODE_PARAM_DEFAULTS as DIODE_DEFAULTS } from "../../../components/semiconductors/diode.js";
+import { SCHOTTKY_PARAM_DEFAULTS as SCHOTTKY_DEFAULTS } from "../../../components/semiconductors/schottky.js";
+import { ZENER_PARAM_DEFAULTS as ZENER_DEFAULTS } from "../../../components/semiconductors/zener.js";
 
 // ---------------------------------------------------------------------------
 // Shared circuit-building helpers
@@ -89,8 +93,8 @@ function buildAndCompile(spiceModelOverrides?: Record<string, number> | string):
   let capturedModelParams: Record<string, number> | undefined;
 
   const npnFactory: AnalogElementFactory = (_pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
-    capturedModelParams = props.has("_modelParams")
-      ? (props.get("_modelParams") as unknown as Record<string, number>)
+    capturedModelParams = props.getModelParamKeys().length > 0
+      ? Object.fromEntries(props.getModelParamKeys().map(k => [k, props.getModelParam<number>(k)]))
       : undefined;
     const stub: AnalogElement = {
       pinNodeIds: [],
@@ -228,9 +232,9 @@ describe("spice-model-overrides compiler merge", () => {
     let capturedModelParams: Record<string, number> | undefined;
 
     const schottkyFactory: AnalogElementFactory = (_pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
-      capturedModelParams = props.has("_modelParams")
-        ? (props.get("_modelParams") as unknown as Record<string, number>)
-        : undefined;
+      capturedModelParams = props.getModelParamKeys().length > 0
+      ? Object.fromEntries(props.getModelParamKeys().map(k => [k, props.getModelParam<number>(k)]))
+      : undefined;
       const stub: AnalogElement = {
         pinNodeIds: [],
         allNodeIds: [],
@@ -318,9 +322,9 @@ describe("spice-model-overrides compiler merge", () => {
     let capturedModelParams: Record<string, number> | undefined;
 
     const zenerFactory: AnalogElementFactory = (_pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
-      capturedModelParams = props.has("_modelParams")
-        ? (props.get("_modelParams") as unknown as Record<string, number>)
-        : undefined;
+      capturedModelParams = props.getModelParamKeys().length > 0
+      ? Object.fromEntries(props.getModelParamKeys().map(k => [k, props.getModelParam<number>(k)]))
+      : undefined;
       const stub: AnalogElement = {
         pinNodeIds: [],
         allNodeIds: [],
@@ -405,9 +409,9 @@ describe("spice-model-overrides compiler merge", () => {
     let capturedModelParams: Record<string, number> | undefined;
 
     const schottkyFactory: AnalogElementFactory = (_pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
-      capturedModelParams = props.has("_modelParams")
-        ? (props.get("_modelParams") as unknown as Record<string, number>)
-        : undefined;
+      capturedModelParams = props.getModelParamKeys().length > 0
+      ? Object.fromEntries(props.getModelParamKeys().map(k => [k, props.getModelParam<number>(k)]))
+      : undefined;
       const stub: AnalogElement = {
         pinNodeIds: [],
         allNodeIds: [],
@@ -492,9 +496,9 @@ describe("spice-model-overrides compiler merge", () => {
     let capturedModelParams: Record<string, number> | undefined;
 
     const tunnelFactory: AnalogElementFactory = (_pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
-      capturedModelParams = props.has("_modelParams")
-        ? (props.get("_modelParams") as unknown as Record<string, number>)
-        : undefined;
+      capturedModelParams = props.getModelParamKeys().length > 0
+      ? Object.fromEntries(props.getModelParamKeys().map(k => [k, props.getModelParam<number>(k)]))
+      : undefined;
       const stub: AnalogElement = {
         pinNodeIds: [],
         allNodeIds: [],

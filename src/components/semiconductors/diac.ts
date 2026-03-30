@@ -27,9 +27,10 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -38,6 +39,18 @@ import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
 
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: DIAC_PARAM_DEFS, defaults: DIAC_PARAM_DEFAULTS } = defineModelParams({
+  primary: {
+    vBreakover: { default: 32,  unit: "V", description: "Breakover voltage — conduction threshold" },
+    vHold:      { default: 28,  unit: "V", description: "On-state holding voltage" },
+    rOn:        { default: 10,  unit: "Ω", description: "On-state resistance" },
+    rOff:       { default: 1e7, unit: "Ω", description: "Off-state resistance" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // diacConductance — smooth piecewise model
@@ -111,10 +124,12 @@ export function createDiacElement(
   const nodeA = pinNodes.get("A")!; // terminal A
   const nodeB = pinNodes.get("B")!; // terminal B
 
-  const vBreakover: number = props.getOrDefault<number>("vBreakover", 32);
-  const vHold: number      = props.getOrDefault<number>("vHold",      28);
-  const rOn: number        = props.getOrDefault<number>("rOn",        10);
-  const rOff: number       = props.getOrDefault<number>("rOff",       1e7);
+  const p = {
+    vBreakover: props.getModelParam<number>("vBreakover"),
+    vHold:      props.getModelParam<number>("vHold"),
+    rOn:        props.getModelParam<number>("rOn"),
+    rOff:       props.getModelParam<number>("rOff"),
+  };
 
   // Sharpness of the tanh transition: smaller = sharper snap.
   // V_BO - V_hold gives the snap width; use ~0.5V for good NR convergence.
@@ -122,12 +137,12 @@ export function createDiacElement(
 
   // Cached NR linearization
   let _v = 0;
-  let _geq = 1.0 / rOff + GMIN;
+  let _geq = 1.0 / p.rOff + GMIN;
   let _ieq = 0;
   let _id = 0; // cached device current for getPinCurrents
 
   function recompute(v: number): void {
-    const { i, geq, ieq } = diacModel(v, vBreakover, vHold, rOn, rOff, sharpness);
+    const { i, geq, ieq } = diacModel(v, p.vBreakover, p.vHold, p.rOn, p.rOff, sharpness);
     _id = i;
     _geq = geq;
     _ieq = ieq;
@@ -174,8 +189,8 @@ export function createDiacElement(
       return [_id, -_id];
     },
 
-    setParam(_key: string, _value: number): void {
-      // Diac params are component properties, not SPICE model params
+    setParam(key: string, value: number): void {
+      if (key in p) (p as Record<string, number>)[key] = value;
     },
   };
 }
@@ -293,47 +308,11 @@ function buildDiacPinDeclarations(): PinDeclaration[] {
 const DIAC_PROPERTY_DEFS: PropertyDefinition[] = [
   LABEL_PROPERTY_DEF,
   {
-    key: "vBreakover",
-    type: PropertyType.FLOAT,
-    label: "V_breakover (V)",
-    defaultValue: 32,
-    description: "Breakover voltage — conduction threshold",
-  },
-  {
-    key: "vHold",
-    type: PropertyType.FLOAT,
-    label: "V_hold (V)",
-    defaultValue: 28,
-    description: "On-state holding voltage",
-  },
-  {
-    key: "rOn",
-    type: PropertyType.FLOAT,
-    label: "R_on (Ω)",
-    defaultValue: 10,
-    description: "On-state resistance",
-  },
-  {
-    key: "rOff",
-    type: PropertyType.FLOAT,
-    label: "R_off (Ω)",
-    defaultValue: 1e7,
-    description: "Off-state resistance",
-  },
-  {
-    key: "iH",
-    type: PropertyType.FLOAT,
-    label: "I_hold (A)",
-    defaultValue: 1e-3,
-    description: "Holding current",
-  },
-  {
-    key: "_spiceModelOverrides",
+    key: "model",
     type: PropertyType.STRING,
-    label: "SPICE Model Overrides",
-    defaultValue: {} as Record<string, number>,
-    description: "User-supplied SPICE parameter overrides",
-    hidden: true,
+    label: "Model",
+    defaultValue: "behavioral",
+    description: "Active model selection",
   },
 ];
 
@@ -342,11 +321,8 @@ const DIAC_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 export const DIAC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "Label",       propertyKey: "label",       convert: (v) => v },
-  { xmlName: "vBreakover",  propertyKey: "vBreakover",  convert: (v) => parseFloat(v) },
-  { xmlName: "vHold",       propertyKey: "vHold",       convert: (v) => parseFloat(v) },
-  { xmlName: "rOn",         propertyKey: "rOn",         convert: (v) => parseFloat(v) },
-  { xmlName: "rOff",        propertyKey: "rOff",        convert: (v) => parseFloat(v) },
+  { xmlName: "Label", propertyKey: "label", convert: (v) => v },
+  { xmlName: "model", propertyKey: "model", convert: (v) => v },
 ];
 
 // ---------------------------------------------------------------------------
@@ -369,11 +345,14 @@ export const DiacDefinition: ComponentDefinition = {
     "Diac — bidirectional trigger diode.\n" +
     "Pins: A (terminal 1), B (terminal 2).\n" +
     "Blocks until |V| > V_breakover, then snaps to V_hold.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createDiacElement,
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createDiacElement(pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: DIAC_PARAM_DEFS,
+      params: DIAC_PARAM_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

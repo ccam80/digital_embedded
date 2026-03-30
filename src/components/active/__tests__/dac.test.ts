@@ -81,10 +81,9 @@ function solveDac(
 
   const props = new PropertyBag([
     ["bits",  BITS],
-    ["vRef",  vRef],
     ["mode",  "unipolar"],
-    ["rOut",  100],
   ]);
+  props.replaceModelParams({ vRef, rOut: 100 });
 
   const dacPinNodeIds: number[] = [];
   for (let i = 0; i < BITS; i++) dacPinNodeIds.push(i + 1);  // D0=1..D7=8
@@ -92,7 +91,7 @@ function solveDac(
   dacPinNodeIds.push(nOutNode);   // OUT
   dacPinNodeIds.push(0);          // GND
   const dacEl = withNodeIds(
-    DACDefinition.models!.mnaModels!.behavioral!.factory(dacPinNodes, [], -1, props, () => 0),
+    DACDefinition.modelRegistry!["behavioral"]!.factory(dacPinNodes, [], -1, props, () => 0),
     dacPinNodeIds,
   );
 

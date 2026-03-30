@@ -25,7 +25,7 @@ import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import { ZENER_DEFAULTS } from "../../solver/analog/model-defaults.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -37,6 +37,18 @@ const VT = 0.02585;
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
 
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: ZENER_PARAM_DEFS, defaults: ZENER_PARAM_DEFAULTS } = defineModelParams({
+  primary: {
+    IS:  { default: 1e-14, unit: "A", description: "Saturation current" },
+    N:   { default: 1,                description: "Emission coefficient" },
+    BV:  { default: 5.1,  unit: "V", description: "Reverse breakdown voltage" },
+    IBV: { default: 1e-3, unit: "A", description: "Reverse breakdown current" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // createZenerElement — AnalogElement factory
@@ -51,18 +63,10 @@ export function createZenerElement(
   const nodeAnode = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
-  // Resolve model parameters from _modelParams (injected by compiler with ZENER_DEFAULTS base)
-  const mp =
-    (props.has("_modelParams")
-      ? props.get<Record<string, number>>("_modelParams")
-      : undefined) ?? ZENER_DEFAULTS;
-
-  const params: Record<string, number> = {
-    IS: mp["IS"],
-    N: mp["N"],
-    BV: Number.isFinite(mp["BV"]) ? mp["BV"] : ZENER_DEFAULTS["BV"],
-    IBV: mp["IBV"],
-  };
+  const params: Record<string, number> = { ...ZENER_PARAM_DEFAULTS };
+  for (const key of props.getModelParamKeys()) {
+    params[key] = props.getModelParam<number>(key);
+  }
 
   // NR linearization state
   let vd = 0;
@@ -288,14 +292,6 @@ const ZENER_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "SPICE model name (blank = use built-in defaults)",
   },
   LABEL_PROPERTY_DEF,
-  {
-    key: "_spiceModelOverrides",
-    type: PropertyType.STRING,
-    label: "SPICE Model Overrides",
-    defaultValue: {} as Record<string, number>,
-    description: "User-supplied SPICE parameter overrides",
-    hidden: true,
-  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -335,13 +331,13 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
     "Zener Diode — Shockley diode with reverse breakdown at BV.\n" +
     "Forward: Id = IS * (exp(Vd/(N*Vt)) - 1)\n" +
     "Reverse breakdown (Vd < -BV): Id = -IS * exp(-(Vd+BV)/(N*Vt))",
-  models: {
-    mnaModels: {
-      behavioral: {
-        factory: createZenerElement,
-        deviceType: "D",
-        defaultParams: ZENER_DEFAULTS,
-      },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createZenerElement,
+      paramDefs: ZENER_PARAM_DEFS,
+      params: ZENER_PARAM_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

@@ -144,7 +144,7 @@ export function createDriverAnalogElement(
 
       outputPin.setHighZ(!latchedSel);
       outputPin.setLogicLevel(latchedIn);
-      outputPin.stamp(s);
+      outputPin.stampOutput(s);
     },
 
     updateOperatingPoint(voltages: Float64Array): void {
@@ -249,7 +249,7 @@ export function createDriverInvAnalogElement(
       // Active-low: hiZ when sel is HIGH
       outputPin.setHighZ(latchedSel);
       outputPin.setLogicLevel(latchedIn);
-      outputPin.stamp(s);
+      outputPin.stampOutput(s);
     },
 
     updateOperatingPoint(voltages: Float64Array): void {
@@ -370,7 +370,7 @@ export function createSplitterAnalogElement(
       }
       for (let i = 0; i < numOut; i++) {
         outputPins[i].setLogicLevel(latchedLevels[i] ?? false);
-        outputPins[i].stamp(s);
+        outputPins[i].stampOutput(s);
       }
     },
 
@@ -820,12 +820,12 @@ export function createButtonLEDAnalogElement(
     isReactive: false,
 
     stamp(s: SparseSolver): void {
-      outputPin.stamp(s);
+      outputPin.stampOutput(s);
       ledDiode.stamp(s);
     },
 
     stampNonlinear(s: SparseSolver): void {
-      outputPin.stamp(s);
+      outputPin.stampOutput(s);
       ledDiode.stampNonlinear!(s);
     },
 

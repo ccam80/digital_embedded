@@ -34,11 +34,11 @@ function makeVCCSElement(
   const expression = opts.expression ?? "V(ctrl)";
   const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>([
     ["expression", expression],
-    ["transconductance", gm],
     ["label", ""],
   ]).entries());
+  props.replaceModelParams({ transconductance: gm });
   return withNodeIds(
-    VCCSDefinition.models!.mnaModels!.behavioral!.factory(
+    VCCSDefinition.modelRegistry!["behavioral"]!.factory(
       new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
       [],
       -1,

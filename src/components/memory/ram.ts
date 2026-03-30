@@ -348,6 +348,7 @@ export const RAMSinglePortDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -464,6 +465,7 @@ export const RAMSinglePortSelDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -593,6 +595,7 @@ export const RAMDualPortDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -723,6 +726,7 @@ export const RAMDualAccessDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -824,6 +828,7 @@ export const RAMAsyncDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -946,4 +951,5 @@ export const BlockRAMDualPortDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };

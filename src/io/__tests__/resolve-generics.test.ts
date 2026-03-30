@@ -12,39 +12,18 @@ import { GenericCache, computeGenericCacheKey } from "../generic-cache.js";
 import { Circuit } from "../../core/circuit.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition, AttributeMapping } from "../../core/registry.js";
-import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext } from "../../core/renderer-interface.js";
-import type { Rect } from "../../core/renderer-interface.js";
-import type { Pin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import { AndDefinition } from "../../components/gates/and.js";
 import { InDefinition } from "../../components/io/in.js";
 import { parseDigXml } from "../dig-parser.js";
 import { loadDigCircuit } from "../dig-loader.js";
 import type { HGSValue } from "../../hgs/value.js";
-
-// ---------------------------------------------------------------------------
-// Minimal test CircuitElement
-// ---------------------------------------------------------------------------
-
-class TestElement extends AbstractCircuitElement {
-  getPins(): readonly Pin[] { return []; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-}
+import { TestElement } from "../../test-fixtures/test-element.js";
+import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
 
 function makeTestFactory(typeName: string) {
   return (props: PropertyBag) =>
-    new TestElement(
-      typeName,
-      crypto.randomUUID(),
-      { x: 0, y: 0 },
-      0,
-      false,
-      props,
-    );
+    new TestElement(typeName, crypto.randomUUID(), { x: 0, y: 0 }, [], props);
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +49,7 @@ function makeGenericCodeDef(typeName: string): ComponentDefinition {
     category: ComponentCategory.MISC,
     helpText: typeName,
     models: {
-      digital: { executeFn: () => {} },
+      digital: { executeFn: noopExecFn },
     },
   };
 }

@@ -10,11 +10,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ElementRenderer } from "../element-renderer.js";
 import { MockRenderContext } from "@/test-utils/mock-render-context";
 import { Circuit } from "@/core/circuit";
-import { AbstractCircuitElement } from "@/core/element";
 import type { RenderContext, Rect } from "@/core/renderer-interface";
 import type { Pin } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
-import { PropertyBag } from "@/core/properties";
+import { TestElement } from "@/test-fixtures/test-element";
 
 // ---------------------------------------------------------------------------
 // Stub element factory
@@ -46,44 +45,22 @@ function makePin(
   };
 }
 
-class StubElement extends AbstractCircuitElement {
-  private readonly _pins: Pin[];
-  private readonly _bb: Rect;
-  private readonly _drawFn: (ctx: RenderContext) => void;
-  drawCallCount = 0;
-
-  constructor(opts: StubElementOptions = {}) {
-    super(
-      "Stub",
-      "stub-id",
-      opts.position ?? { x: 0, y: 0 },
-      opts.rotation ?? 0,
-      opts.mirror ?? false,
-      new PropertyBag(),
-    );
-    this._pins = opts.pins ?? [];
-    this._bb = opts.boundingBox ?? {
-      x: opts.position?.x ?? 0,
-      y: opts.position?.y ?? 0,
-      width: 4,
-      height: 4,
-    };
-    this._drawFn = opts.drawFn ?? (() => {});
-  }
-
-  getPins(): readonly Pin[] {
-    return this._pins;
-  }
-
-  getBoundingBox(): Rect {
-    return this._bb;
-  }
-
-  draw(ctx: RenderContext): void {
-    this.drawCallCount++;
-    this._drawFn(ctx);
-  }
-
+function makeStubElement(opts: StubElementOptions = {}): TestElement {
+  const pos = opts.position ?? { x: 0, y: 0 };
+  const bb = opts.boundingBox ?? { x: pos.x, y: pos.y, width: 4, height: 4 };
+  return new TestElement(
+    "Stub",
+    "stub-id",
+    pos,
+    opts.pins ?? [],
+    undefined,
+    {
+      rotation: opts.rotation,
+      mirror: opts.mirror,
+      boundingBox: bb,
+      drawFn: opts.drawFn,
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +82,7 @@ describe("ElementRenderer", () => {
   // -------------------------------------------------------------------------
 
   it("drawsElementWithTransform", () => {
-    const element = new StubElement({
+    const element = makeStubElement({
       position: { x: 5, y: 3 },
       rotation: 1,
       boundingBox: { x: 5, y: 3, width: 4, height: 4 },
@@ -149,7 +126,7 @@ describe("ElementRenderer", () => {
   it("drawsPinIndicators", () => {
     const pin1 = makePin(2, 3);
     const pin2 = makePin(6, 3);
-    const element = new StubElement({
+    const element = makeStubElement({
       pins: [pin1, pin2],
       boundingBox: { x: 0, y: 0, width: 8, height: 6 },
     });
@@ -169,7 +146,7 @@ describe("ElementRenderer", () => {
 
   it("drawsNegationBubble", () => {
     const negatedPin = makePin(3, 2, true, false);
-    const element = new StubElement({
+    const element = makeStubElement({
       pins: [negatedPin],
       boundingBox: { x: 0, y: 0, width: 4, height: 4 },
     });
@@ -189,7 +166,7 @@ describe("ElementRenderer", () => {
   // -------------------------------------------------------------------------
 
   it("drawsSelectionHighlight", () => {
-    const element = new StubElement({
+    const element = makeStubElement({
       position: { x: 1, y: 1 },
       boundingBox: { x: 1, y: 1, width: 4, height: 4 },
     });
@@ -225,7 +202,7 @@ describe("ElementRenderer", () => {
 
   it("cullsOffscreenElements", () => {
     // Place element far outside the viewport
-    const element = new StubElement({
+    const element = makeStubElement({
       position: { x: 1000, y: 1000 },
       boundingBox: { x: 1000, y: 1000, width: 4, height: 4 },
     });

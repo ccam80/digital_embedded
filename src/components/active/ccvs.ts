@@ -59,6 +59,17 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: CCVS_PARAM_DEFS, defaults: CCVS_DEFAULTS } = defineModelParams({
+  primary: {
+    transresistance: { default: 1000, unit: "Ω", description: "Linear transresistance" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -131,6 +142,8 @@ class CCVSAnalogElement extends ControlledSourceElement {
   private readonly _senseBranch: number; // absolute MNA row for 0V sense source
   private readonly _outBranch: number;   // absolute MNA row for output voltage source
 
+  private _transresistance: number;
+
   constructor(
     nSenseP: number,
     nSenseN: number,
@@ -153,8 +166,13 @@ class CCVSAnalogElement extends ControlledSourceElement {
     this._nOutN = nOutN;
     this._senseBranch = senseBranchIdx;
     this._outBranch = senseBranchIdx + 1;
+    this._transresistance = transresistance;
 
     this.branchIndex = senseBranchIdx;
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "transresistance") this._transresistance = value;
   }
 
   /**
@@ -361,29 +379,25 @@ export const CCVSDefinition: ComponentDefinition = {
     return new CCVSElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      branchCount: 1,
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, branchIdx, props) => {
         const expression = props.getOrDefault<string>("expression", "I(sense)");
-        const transresistance = props.getOrDefault<number>("transresistance", 1000);
+        const transresistance = props.getModelParam<number>("transresistance");
         return new CCVSAnalogElement(
-          pinNodes.get("sense+")!, // sense+
-          pinNodes.get("sense-")!, // sense-
-          pinNodes.get("out+")!,   // out+
-          pinNodes.get("out-")!,   // out-
+          pinNodes.get("sense+")!,
+          pinNodes.get("sense-")!,
+          pinNodes.get("out+")!,
+          pinNodes.get("out-")!,
           branchIdx,
           expression,
           transresistance,
         );
       },
-    },
+      paramDefs: CCVS_PARAM_DEFS,
+      params: CCVS_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

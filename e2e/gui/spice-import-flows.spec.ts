@@ -5,7 +5,7 @@
  *   1. .MODEL import — right-click BJT → "Import SPICE Model..." menu item visible
  *   2. .MODEL import — dialog opens with textarea
  *   3. .MODEL import — paste valid .MODEL card, preview shows name/type/param count
- *   4. .MODEL import — Apply stores _spiceModelOverrides (verified via property popup IS field)
+ *   4. .MODEL import — Apply stores model params override (verified via property popup IS field)
  *   5. .SUBCKT import — right-click BJT (with subcircuitModel) → "Import SPICE Subcircuit..." menu item visible
  *   6. .SUBCKT import — dialog opens and parses .SUBCKT block, preview shows summary
  *   7. .MODEL resistor — right-click Resistor → no "Import SPICE Model..." in menu
@@ -86,7 +86,7 @@ test.describe('SPICE import flows', () => {
   });
 
   // -------------------------------------------------------------------------
-  // 4. Apply stores _spiceModelOverrides — verified via IS field in property popup
+  // 4. Apply stores model params override — verified via IS field in property popup
   // -------------------------------------------------------------------------
   test('.MODEL Apply stores overrides visible in SPICE panel', async ({ page }) => {
     await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');

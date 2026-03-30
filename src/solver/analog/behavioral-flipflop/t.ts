@@ -70,8 +70,8 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
     this._solver = solver;
     this._qPin.setLogicLevel(this._latchedQ);
     this._qBarPin.setLogicLevel(!this._latchedQ);
-    this._qPin.stamp(solver);
-    this._qBarPin.stamp(solver);
+    this._qPin.stampOutput(solver);
+    this._qBarPin.stampOutput(solver);
   }
 
   updateOperatingPoint(voltages: Float64Array): void {

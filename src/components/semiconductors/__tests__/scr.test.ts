@@ -11,8 +11,9 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { createScrElement, ScrDefinition } from "../scr.js";
+import { createScrElement, ScrDefinition, SCR_PARAM_DEFAULTS } from "../scr.js";
 import { PropertyBag } from "../../../core/properties.js";
+import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
@@ -42,9 +43,11 @@ const SCR_DEFAULTS = {
 // ---------------------------------------------------------------------------
 
 function makeScrElement(overrides: Partial<typeof SCR_DEFAULTS> = {}): AnalogElement {
-  const params = { ...SCR_DEFAULTS, ...overrides };
+  const params = { ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS, ...overrides };
+  const props = createTestPropertyBag();
+  props.replaceModelParams(params);
   // nodeA=1, nodeK=2, nodeG=3
-  return createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, new PropertyBag(Object.entries(params)));
+  return createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, props);
 }
 
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
@@ -335,9 +338,9 @@ describe("SCR", () => {
 
   it("definition_has_correct_fields", () => {
     expect(ScrDefinition.name).toBe("SCR");
-    expect(ScrDefinition.models?.mnaModels?.behavioral).toBeDefined();
-    expect(ScrDefinition.models?.mnaModels?.behavioral?.deviceType).toBeUndefined();
-    expect(ScrDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(ScrDefinition.modelRegistry?.["behavioral"]).toBeDefined();
+    expect(ScrDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
+    expect(ScrDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
     expect(ScrDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

@@ -9,38 +9,24 @@ import { describe, it, expect } from 'vitest';
 import { serializeCircuit } from '../dts-serializer.js';
 import { deserializeDts } from '../dts-deserializer.js';
 import { Circuit } from '../../core/circuit.js';
-import { AbstractCircuitElement } from '../../core/element.js';
 import { PropertyBag } from '../../core/properties.js';
 import { ComponentRegistry, ComponentCategory } from '../../core/registry.js';
 import type { ModelEntry } from '../../core/registry.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
-import type { Pin } from '../../core/pin.js';
 import type { PropertyValue } from '../../core/properties.js';
 import {
   BJT_MODEL_ENTRY,
   BJT_PARAM_DEFS,
   STUB_ANALOG_FACTORY,
 } from '../../test-fixtures/model-fixtures.js';
-
-// ---------------------------------------------------------------------------
-// Minimal stub element
-// ---------------------------------------------------------------------------
-
-class StubElement extends AbstractCircuitElement {
-  getPins(): readonly Pin[] { return []; }
-  draw(_ctx: RenderContext): void {}
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-}
+import { TestElement } from '../../test-fixtures/test-element.js';
 
 function makeElement(
   typeName: string,
   instanceId: string,
   props: Record<string, PropertyValue> = {},
-): StubElement {
+): TestElement {
   const bag = new PropertyBag(Object.entries(props));
-  return new StubElement(typeName, instanceId, { x: 0, y: 0 }, 0, false, bag);
+  return new TestElement(typeName, instanceId, { x: 0, y: 0 }, [], bag);
 }
 
 function makeBjtRegistry(): ComponentRegistry {
@@ -49,7 +35,7 @@ function makeBjtRegistry(): ComponentRegistry {
     name: 'NpnBJT',
     typeId: -1,
     factory: (props: PropertyBag) =>
-      new StubElement('NpnBJT', 'inst-NpnBJT', { x: 0, y: 0 }, 0, false, props),
+      new TestElement('NpnBJT', 'inst-NpnBJT', { x: 0, y: 0 }, [], props),
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],

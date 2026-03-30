@@ -31,6 +31,18 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: OPAMP_PARAM_DEFS, defaults: OPAMP_DEFAULTS } = defineModelParams({
+  primary: {
+    gain: { default: 1e6,  description: "Open-loop voltage gain" },
+    rOut: { default: 75,   unit: "Ω",  description: "Output resistance" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -157,9 +169,10 @@ function createOpAmpElement(
   _branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const gain = props.getOrDefault<number>("gain", 1e6);
-  const rOut = Math.max(props.getOrDefault<number>("rOut", 75), 1e-9);
-  const G_out = 1 / rOut;
+  const p: Record<string, number> = {
+    gain: props.getModelParam<number>("gain"),
+    rOut: props.getModelParam<number>("rOut"),
+  };
 
   const nInp = pinNodes.get("in+")!; // non-inverting input node (1-based, 0=ground)
   const nInn = pinNodes.get("in-")!; // inverting input node
@@ -190,6 +203,7 @@ function createOpAmpElement(
     },
 
     stamp(solver: SparseSolver): void {
+      const G_out = 1 / Math.max(p.rOut, 1e-9);
       // G_out: output resistance between nOut and ground (always present).
       if (nOut > 0) {
         solver.stamp(nOut - 1, nOut - 1, G_out);
@@ -201,7 +215,7 @@ function createOpAmpElement(
       // MNA row for out: G[out,out] += G_out (above), G[out,in+] -= gain*G_out,
       //                                                G[out,in-] += gain*G_out
       if (!saturated) {
-        const effectiveGain = gain * scale;
+        const effectiveGain = p.gain * scale;
         if (nOut > 0 && nInp > 0) {
           solver.stamp(nOut - 1, nInp - 1, -effectiveGain * G_out);
         }
@@ -212,6 +226,7 @@ function createOpAmpElement(
     },
 
     stampNonlinear(solver: SparseSolver): void {
+      const G_out = 1 / Math.max(p.rOut, 1e-9);
       // Saturation: inject Norton current to clamp output to rail voltage.
       // In linear region: no nonlinear contribution (all handled in stamp()).
       if (saturated && nOut > 0) {
@@ -242,6 +257,7 @@ function createOpAmpElement(
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
+      const G_out = 1 / Math.max(p.rOut, 1e-9);
       // Input pins: ideal op-amp — infinite input impedance, zero input current.
       // No conductance is stamped at in+ or in- nodes, so I_in+ = I_in- = 0.
 
@@ -256,15 +272,20 @@ function createOpAmpElement(
       // Reconstruct: in linear, target = gain * scale * (V_inp - V_inn).
       const idealTarget = saturated
         ? vOutTarget
-        : gain * scale * (vInp - vInn);
+        : p.gain * scale * (vInp - vInn);
       const iOut = nOut > 0 ? (vOut - idealTarget) * G_out : 0;
 
       // pinLayout order: in-, in+, out
       // Sum is nonzero — residual is implicit supply current (no explicit Vcc/Vee pins).
       return [0, 0, iOut];
     },
+
+    setParam(key: string, value: number): void {
+      if (key in p) (p as Record<string, number>)[key] = value;
+    },
   };
 }
+
 
 // ---------------------------------------------------------------------------
 // Property definitions
@@ -327,18 +348,14 @@ export const OpAmpDefinition: ComponentDefinition = {
     return new OpAmpElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        internalNodeIds: readonly number[],
-        branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        return createOpAmpElement(pinNodes, internalNodeIds, branchIdx, props);
-      },
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createOpAmpElement(pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: OPAMP_PARAM_DEFS,
+      params: OPAMP_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

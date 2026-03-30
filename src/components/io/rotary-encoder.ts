@@ -214,4 +214,5 @@ export const RotaryEncoderDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeRotaryEncoder, inputSchema: [], outputSchema: ["A", "B"] },
   },
+  modelRegistry: {},
 };

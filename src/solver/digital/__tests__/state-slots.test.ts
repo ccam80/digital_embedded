@@ -13,49 +13,21 @@ import { ComponentRegistry } from "@/core/registry";
 import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
 import { PropertyType } from "@/core/properties";
-import { AbstractCircuitElement } from "@/core/element";
 import type { Pin, PinDeclaration } from "@/core/pin";
-import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from "@/core/pin";
-import type { RenderContext, Rect } from "@/core/renderer-interface";
+import { PinDirection } from "@/core/pin";
+import type { } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
 import type { PropertyBag as PropertyBagType } from "@/core/properties";
 import { DigitalEngine } from "../digital-engine.js";
+import { createTestElementFromDecls } from '@/test-fixtures/test-element.js';
+import { noopExecFn } from '@/test-fixtures/execute-stubs.js';
 
 // ---------------------------------------------------------------------------
 // Minimal test CircuitElement implementation
 // ---------------------------------------------------------------------------
 
-class TestElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
 
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pinDecls: PinDeclaration[],
-    props?: PropertyBag,
-  ) {
-    super(typeId, instanceId, position, 0, false, props ?? new PropertyBag());
-    this._pins = resolvePins(
-      pinDecls,
-      position,
-      0,
-      createInverterConfig([]),
-      createClockConfig([]),
-    );
-  }
 
-  getPins(): readonly Pin[] {
-    return this._pins;
-  }
-
-  draw(_ctx: RenderContext): void {}
-
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 2, height: 2 };
-  }
-
-}
 
 // ---------------------------------------------------------------------------
 // Pin declarations
@@ -89,7 +61,7 @@ function dynamicPins(): PinDeclaration[] {
 // ExecuteFn stubs
 // ---------------------------------------------------------------------------
 
-const noopExecute: ExecuteFunction = () => {};
+const noopExecFn: ExecuteFunction = () => {};
 
 const executeAnd: ExecuteFunction = (index, state, _highZs, layout) => {
   const wt = layout.wiringTable;
@@ -121,14 +93,14 @@ const executeDFF: ExecuteFunction = (index, state, _highZs, layout) => {
 function makeDefinition(
   name: string,
   pins: PinDeclaration[],
-  executeFn: ExecuteFunction = noopExecute,
+  executeFn: ExecuteFunction = noopExecFn,
   stateSlotCount?: number | ((props: PropertyBagType) => number),
 ): Omit<ComponentDefinition, "typeId"> & { typeId: number } {
   return {
     name,
     typeId: -1,
     factory: (props: PropertyBagType) =>
-      new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pins, props),
+      createTestElementFromDecls(name, crypto.randomUUID(), pins, props),
     pinLayout: pins,
     propertyDefs: [],
     attributeMap: [],
@@ -276,7 +248,7 @@ describe("StateSlotAllocation", () => {
     const dynamicDef = makeDefinition(
       "DynComp",
       dynamicPins(),
-      noopExecute,
+      noopExecFn,
       (props: PropertyBagType) => props.getOrDefault<number>("size", 4),
     );
     const registry = makeRegistry(dynamicDef);
@@ -284,11 +256,11 @@ describe("StateSlotAllocation", () => {
     const circuit = new Circuit();
 
     const props1 = new PropertyBag([["size", 4]]);
-    const inst1 = new TestElement("DynComp", crypto.randomUUID(), { x: 0, y: 0 }, dynamicPins(), props1);
+    const inst1 = createTestElementFromDecls("DynComp", crypto.randomUUID(), dynamicPins(), props1);
     circuit.addElement(inst1);
 
     const props2 = new PropertyBag([["size", 8]]);
-    const inst2 = new TestElement("DynComp", crypto.randomUUID(), { x: 20, y: 0 }, dynamicPins(), props2);
+    const inst2 = createTestElementFromDecls("DynComp", crypto.randomUUID(), dynamicPins(), props2, { x: 20, y: 0 });
     circuit.addElement(inst2);
 
     registry.get("DynComp")!.propertyDefs = [

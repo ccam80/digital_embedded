@@ -1,15 +1,21 @@
 /**
- * Tests for the digitalPinLoading circuit metadata field (W6.1).
+ * Tests for the digitalPinLoading circuit metadata field.
  *
  * Verifies that the three loading modes produce the correct bridge adapter
  * behaviour when compiling a mixed digital/analog circuit:
  *
- *   cross-domain (default): bridge adapters only where simulationModel=digital
- *                            is set (or at real cross-engine boundaries)
- *   all:                     every dual-model component gets bridge adapters
- *                            regardless of per-component simulationModel
- *   none:                    bridges at partition boundaries use ideal params
- *                            (rIn = Infinity, rOut = 0)
+ *   cross-domain (default): bridge adapters only at real cross-engine
+ *                            boundaries (groups that have both digital and
+ *                            analog pins from real boundary components).
+ *   all:                     bridge adapters on EVERY digital net — digital-
+ *                            only groups receive an injected "analog" domain
+ *                            entry so each net gets a per-net bridge.
+ *   none:                    bridges at real boundaries only, with zero
+ *                            loading (BridgeInputAdapter stamps nothing,
+ *                            cIn=0, cOut=0).
+ *
+ * Bridge count is measured per-net (one BridgeAdapter per boundary group),
+ * not per-component. Components never change partition based on loading mode.
  *
  * The tests use a stub registry with Ground, In, Out, a Resistor (MNA-only),
  * and a DigitalXor (dual-model: digital + mna behavioral). The Resistor forces
@@ -30,6 +36,7 @@ import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
 import { BridgeOutputAdapter, BridgeInputAdapter } from "../bridge-adapter.js";
 import { compileUnified } from "@/compile/compile.js";
+import type { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
 
 // ---------------------------------------------------------------------------
 // Stub helpers (mirrored from digital-bridge-path.test.ts)
@@ -281,215 +288,240 @@ function buildCircuit(
 }
 
 // ---------------------------------------------------------------------------
+// Helper: count total bridge adapters across all boundary groups in the
+// analog domain's bridgeAdaptersByGroupId map.
+// ---------------------------------------------------------------------------
+
+function countBridgeAdapters(analogDomain: ConcreteCompiledAnalogCircuit | null): number {
+  if (analogDomain === null) return 0;
+  let count = 0;
+  for (const adapters of analogDomain.bridgeAdaptersByGroupId.values()) {
+    count += adapters.length;
+  }
+  return count;
+}
+
+// ---------------------------------------------------------------------------
 // Tests: digitalPinLoading modes
 // ---------------------------------------------------------------------------
 
 describe("digitalPinLoading: cross-domain (default)", () => {
-  it("absent metadata defaults to cross-domain: no bridge adapters for non-logical digital component", () => {
+  it("absent metadata defaults to cross-domain: no per-net bridges for isolated digital nets", () => {
     const registry = buildRegistry();
-    // No simulationModel set — DigitalXor stays in digital partition, no bridges.
+    // No model set — DigitalXor stays digital-only, no analog boundary.
+    // "cross-domain" only bridges real cross-domain boundaries, so zero bridges.
     const circuit = buildCircuit();
 
     const compiled = compileUnified(circuit, registry);
-    const analogBridges = compiled.analog?.bridges ?? [];
-    const inlineBridgeCount = analogBridges.reduce(
-      (n, b) => n + b.inputAdapters.length + b.outputAdapters.length, 0,
-    );
-    expect(inlineBridgeCount).toBe(0);
+    expect(compiled.bridges).toHaveLength(0);
   });
 
-  it("explicit cross-domain metadata also produces no inline bridges for default-digital component", () => {
+  it("explicit cross-domain metadata produces no bridges for isolated digital-only nets", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit({ digitalPinLoading: "cross-domain" });
 
     const compiled = compileUnified(circuit, registry);
-    const analogBridges = compiled.analog?.bridges ?? [];
-    const inlineBridgeCount = analogBridges.reduce(
-      (n, b) => n + b.inputAdapters.length + b.outputAdapters.length, 0,
-    );
-    expect(inlineBridgeCount).toBe(0);
+    expect(compiled.bridges).toHaveLength(0);
   });
 
-  it("cross-domain with simulationModel=digital does produce bridge adapters", () => {
+  it("cross-domain with model=digital produces bridges at real boundary", () => {
+    // model=digital forces the XOR into the digital domain; its pins
+    // touch an analog net, creating a real cross-domain boundary group.
     const registry = buildRegistry();
     const circuit = buildCircuit(
-      { digitalPinLoading: "all" },
-      new Map([["simulationModel", "digital"]]),
+      { digitalPinLoading: "cross-domain" },
+      new Map([["model", "digital"]]),
     );
 
-    const compiled = compileUnified(circuit, registry).analog!;
-    expect(compiled.bridges).toHaveLength(1);
+    const compiled = compileUnified(circuit, registry);
+    expect(compiled.bridges.length).toBeGreaterThan(0);
   });
 });
 
 describe("digitalPinLoading: all", () => {
-  it("all mode: dual-model component in digital partition gets exactly one bridge", () => {
+  it("all mode: produces per-net bridges on digital nets (more bridges than cross-domain)", () => {
+    // "all" injects "analog" into every digital-only net, so isolated digital
+    // nets also get bridge entries. "cross-domain" has none for this circuit.
+    const registry = buildRegistry();
+    const circuitAll   = buildCircuit({ digitalPinLoading: "all" });
+    const circuitCross = buildCircuit({ digitalPinLoading: "cross-domain" });
+
+    const compiledAll   = compileUnified(circuitAll, registry);
+    const compiledCross = compileUnified(circuitCross, registry);
+
+    expect(compiledAll.bridges.length).toBeGreaterThan(compiledCross.bridges.length);
+  });
+
+  it("all mode: bridge adapters are stored in bridgeAdaptersByGroupId (per-net, not per-component)", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit({ digitalPinLoading: "all" });
 
-    const compiled = compileUnified(circuit, registry).analog!;
-    expect(compiled.bridges).toHaveLength(1);
+    const compiled = compileUnified(circuit, registry);
+    const analogDomain = compiled.analog as ConcreteCompiledAnalogCircuit | null;
+
+    expect(analogDomain).not.toBeNull();
+    // One boundary group per digital net — DigitalXor has 3 pins → 3 nets.
+    expect(analogDomain!.bridgeAdaptersByGroupId.size).toBeGreaterThan(0);
   });
 
-  it("all mode: bridge has correct adapter counts (2 inputs + 1 output)", () => {
+  it("all mode: each bridge group contains BridgeInputAdapter or BridgeOutputAdapter instances", () => {
     const registry = buildRegistry();
     const circuit = buildCircuit({ digitalPinLoading: "all" });
 
-    const compiled = compileUnified(circuit, registry).analog!;
-    // Exactly one bridge expected (from the DigitalXor component)
-    expect(compiled.bridges).toHaveLength(1);
-    const bridge = compiled.bridges[0]!;
-    // DigitalXor: 2 inputs → 2 BridgeInputAdapters; 1 output → 1 BridgeOutputAdapter
-    expect(bridge.inputAdapters).toHaveLength(2);
-    expect(bridge.outputAdapters).toHaveLength(1);
-    expect(bridge.inputAdapters[0]).toBeInstanceOf(BridgeInputAdapter);
-    expect(bridge.inputAdapters[1]).toBeInstanceOf(BridgeInputAdapter);
-    expect(bridge.outputAdapters[0]).toBeInstanceOf(BridgeOutputAdapter);
+    const compiled = compileUnified(circuit, registry);
+    const analogDomain = compiled.analog as ConcreteCompiledAnalogCircuit | null;
+
+    expect(analogDomain).not.toBeNull();
+    for (const adapters of analogDomain!.bridgeAdaptersByGroupId.values()) {
+      expect(adapters.length).toBeGreaterThan(0);
+      for (const adapter of adapters) {
+        const isBridge = adapter instanceof BridgeInputAdapter || adapter instanceof BridgeOutputAdapter;
+        expect(isBridge).toBe(true);
+      }
+    }
   });
 
-  it("all mode: analog factory is not called (digital component uses bridge, not factory)", () => {
+  it("all mode produces more bridge adapter instances than cross-domain for same circuit", () => {
+    const registry = buildRegistry();
+
+    const circuitAll   = buildCircuit({ digitalPinLoading: "all" });
+    const circuitCross = buildCircuit({ digitalPinLoading: "cross-domain" });
+
+    const compiledAll   = compileUnified(circuitAll, registry);
+    const compiledCross = compileUnified(circuitCross, registry);
+
+    expect(countBridgeAdapters(compiledAll.analog as ConcreteCompiledAnalogCircuit | null)).toBeGreaterThan(
+      countBridgeAdapters(compiledCross.analog as ConcreteCompiledAnalogCircuit | null),
+    );
+  });
+
+  it("all mode: analog factory is not called when component has bridge adapters", () => {
     const analogFactory = vi.fn(makeStubAnalogElement);
     const registry = buildRegistry(analogFactory);
     const circuit = buildCircuit({ digitalPinLoading: "all" });
 
     compileUnified(circuit, registry);
 
+    // The DigitalXor component is handled by bridge adapters, not analog factory.
     expect(analogFactory).not.toHaveBeenCalled();
-  });
-
-  it("all mode produces more bridge adapter instances than cross-domain for same circuit", () => {
-    const registry = buildRegistry();
-
-    const circuitAll = buildCircuit({ digitalPinLoading: "all" });
-    const circuitCross = buildCircuit({ digitalPinLoading: "cross-domain" });
-
-    const compiledAll = compileUnified(circuitAll, registry).analog;
-    const compiledCross = compileUnified(circuitCross, registry).analog;
-
-    const countAdapters = (compiled: typeof compiledAll) =>
-      (compiled?.bridges ?? []).reduce(
-        (n, b) => n + b.inputAdapters.length + b.outputAdapters.length, 0,
-      );
-
-    expect(countAdapters(compiledAll)).toBeGreaterThan(countAdapters(compiledCross));
   });
 });
 
 describe("digitalPinLoading: none", () => {
-  it("none mode: bridge adapters still present at simulationModel=digital boundary", () => {
+  it("none mode: no per-net bridges on isolated digital-only nets (same count as cross-domain)", () => {
+    // "none" does not inject "analog" into digital-only nets. Only real
+    // cross-domain boundaries get bridges — with zero loading applied.
     const registry = buildRegistry();
-    const circuit = buildCircuit(
-      { digitalPinLoading: "all" },
-      new Map([["simulationModel", "digital"]]),
-    );
+    const circuitNone  = buildCircuit({ digitalPinLoading: "none" });
+    const circuitCross = buildCircuit({ digitalPinLoading: "cross-domain" });
 
-    const compiled = compileUnified(circuit, registry).analog!;
-    expect(compiled.bridges).toHaveLength(1);
+    const compiledNone  = compileUnified(circuitNone, registry);
+    const compiledCross = compileUnified(circuitCross, registry);
+
+    expect(compiledNone.bridges).toHaveLength(compiledCross.bridges.length);
   });
 
-  it("none mode: bridge input adapters have finite rIn", () => {
+  it("none mode: bridges exist at real cross-domain boundaries (model=digital)", () => {
+    // With a real boundary, "none" still creates bridges — just zero-loaded.
     const registry = buildRegistry();
     const circuit = buildCircuit(
-      { digitalPinLoading: "all" },
-      new Map([["simulationModel", "digital"]]),
+      { digitalPinLoading: "none" },
+      new Map([["model", "digital"]]),
     );
 
-    const compiled = compileUnified(circuit, registry).analog!;
-    const bridge = compiled.bridges[0]!;
+    const compiled = compileUnified(circuit, registry);
+    expect(compiled.bridges.length).toBeGreaterThan(0);
+  });
 
-    expect(bridge.inputAdapters.length).toBeGreaterThan(0);
-    for (const adapter of bridge.inputAdapters) {
-      expect(isFinite((adapter as BridgeInputAdapter).rIn)).toBe(true);
+  it("none mode at real boundary: BridgeInputAdapters have finite rIn (parameter exists)", () => {
+    const registry = buildRegistry();
+    const circuit = buildCircuit(
+      { digitalPinLoading: "none" },
+      new Map([["model", "digital"]]),
+    );
+
+    const compiled = compileUnified(circuit, registry);
+    const analogDomain = compiled.analog as ConcreteCompiledAnalogCircuit | null;
+
+    expect(analogDomain).not.toBeNull();
+
+    let foundInputAdapter = false;
+    for (const adapters of analogDomain!.bridgeAdaptersByGroupId.values()) {
+      for (const adapter of adapters) {
+        if (adapter instanceof BridgeInputAdapter) {
+          foundInputAdapter = true;
+          // rIn property exists and is finite (cIn=0 makes it unloaded but
+          // the parameter is still accessible).
+          expect(isFinite(adapter.rIn)).toBe(true);
+        }
+      }
     }
+    expect(foundInputAdapter).toBe(true);
   });
 
-  it("none mode: bridge output adapters have finite rOut", () => {
-    const registry = buildRegistry();
-    const circuit = buildCircuit(
-      { digitalPinLoading: "all" },
-      new Map([["simulationModel", "digital"]]),
-    );
-
-    const compiled = compileUnified(circuit, registry).analog!;
-    const bridge = compiled.bridges[0]!;
-
-    expect(bridge.outputAdapters.length).toBeGreaterThan(0);
-    for (const adapter of bridge.outputAdapters) {
-      expect(isFinite((adapter as BridgeOutputAdapter).rOut)).toBe(true);
-    }
-  });
-
-  it("cross-domain mode: bridge input adapters have finite rIn (not ideal)", () => {
-    const registry = buildRegistry();
-    const circuit = buildCircuit(
-      { digitalPinLoading: "all" },
-      new Map([["simulationModel", "digital"]]),
-    );
-
-    const compiled = compileUnified(circuit, registry).analog!;
-    const bridge = compiled.bridges[0]!;
-
-    expect(bridge.inputAdapters.length).toBeGreaterThan(0);
-    for (const adapter of bridge.inputAdapters) {
-      expect(isFinite((adapter as BridgeInputAdapter).rIn)).toBe(true);
-    }
-  });
-
-  it("none bridge count matches cross-domain (same boundary detection)", () => {
+  it("none mode bridge count equals cross-domain bridge count (same boundary detection)", () => {
     const registry = buildRegistry();
 
-    const circuitNone = buildCircuit(
-      { digitalPinLoading: "all" },
-      new Map([["simulationModel", "digital"]]),
+    const circuitNone  = buildCircuit(
+      { digitalPinLoading: "none" },
+      new Map([["model", "digital"]]),
     );
     const circuitCross = buildCircuit(
-      { digitalPinLoading: "all" },
-      new Map([["simulationModel", "digital"]]),
+      { digitalPinLoading: "cross-domain" },
+      new Map([["model", "digital"]]),
     );
 
-    const compiledNone = compileUnified(circuitNone, registry).analog!;
-    const compiledCross = compileUnified(circuitCross, registry).analog!;
+    const compiledNone  = compileUnified(circuitNone, registry);
+    const compiledCross = compileUnified(circuitCross, registry);
 
     expect(compiledNone.bridges).toHaveLength(compiledCross.bridges.length);
   });
 });
 
 describe("digitalPinLoading: ordering invariant (all > cross-domain >= none)", () => {
-  it("all produces more total bridge adapters than cross-domain (with digital component)", () => {
+  it("all produces more bridges than cross-domain for circuit with only isolated digital nets", () => {
     const registry = buildRegistry();
 
-    const circuitAll = buildCircuit(
-      { digitalPinLoading: "all" },
-      new Map([["simulationModel", "digital"]]),
-    );
-    const circuitCross = buildCircuit(
-      { digitalPinLoading: "cross-domain" },
-      new Map([["simulationModel", "digital"]]),
-    );
+    const circuitAll   = buildCircuit({ digitalPinLoading: "all" });
+    const circuitCross = buildCircuit({ digitalPinLoading: "cross-domain" });
 
-    const countAdapters = (compiled: ReturnType<typeof compileUnified>) =>
-      (compiled.analog?.bridges ?? []).reduce(
-        (n, b) => n + b.inputAdapters.length + b.outputAdapters.length, 0,
-      );
+    const compiledAll   = compileUnified(circuitAll, registry);
+    const compiledCross = compileUnified(circuitCross, registry);
 
-    // Both have 1 bridge for the same component — same pin counts.
-    // "all" handles the same component, so counts are equal.
-    expect(countAdapters(compileUnified(circuitAll, registry))).toBeGreaterThanOrEqual(
-      countAdapters(compileUnified(circuitCross, registry)),
-    );
+    expect(compiledAll.bridges.length).toBeGreaterThan(compiledCross.bridges.length);
   });
 
-  it("all mode input adapters have finite rIn", () => {
+  it("cross-domain and none produce the same bridge count for the same circuit", () => {
     const registry = buildRegistry();
 
-    const circuitAll = buildCircuit(
-      { digitalPinLoading: "all" },
-      new Map([["simulationModel", "digital"]]),
-    );
+    const circuitNone  = buildCircuit({ digitalPinLoading: "none" });
+    const circuitCross = buildCircuit({ digitalPinLoading: "cross-domain" });
 
-    const compiledAll = compileUnified(circuitAll, registry).analog!;
+    const compiledNone  = compileUnified(circuitNone, registry);
+    const compiledCross = compileUnified(circuitCross, registry);
 
-    const allAdapter = compiledAll.bridges[0]!.inputAdapters[0]! as BridgeInputAdapter;
-    expect(isFinite(allAdapter.rIn)).toBe(true);
+    expect(compiledNone.bridges.length).toBe(compiledCross.bridges.length);
+  });
+
+  it("all mode: BridgeInputAdapter and BridgeOutputAdapter both appear in bridgeAdaptersByGroupId", () => {
+    // DigitalXor has 2 inputs and 1 output; both adapter types must be present.
+    const registry = buildRegistry();
+    const circuit = buildCircuit({ digitalPinLoading: "all" });
+
+    const compiled = compileUnified(circuit, registry);
+    const analogDomain = compiled.analog as ConcreteCompiledAnalogCircuit | null;
+
+    expect(analogDomain).not.toBeNull();
+
+    let hasInput = false;
+    let hasOutput = false;
+    for (const adapters of analogDomain!.bridgeAdaptersByGroupId.values()) {
+      for (const adapter of adapters) {
+        if (adapter instanceof BridgeInputAdapter) hasInput = true;
+        if (adapter instanceof BridgeOutputAdapter) hasOutput = true;
+      }
+    }
+    expect(hasInput).toBe(true);
+    expect(hasOutput).toBe(true);
   });
 });

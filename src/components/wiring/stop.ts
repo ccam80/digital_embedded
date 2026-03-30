@@ -175,4 +175,5 @@ export const StopDefinition: ComponentDefinition = {
       outputSchema: [],
     },
   },
+  modelRegistry: {},
 };

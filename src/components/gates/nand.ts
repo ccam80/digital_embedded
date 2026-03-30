@@ -20,6 +20,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import { makeNandAnalogFactory } from "../../solver/analog/behavioral-gate.js";
+import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import {
   compWidth,
   buildInvertedPinDeclarations,
@@ -51,8 +52,8 @@ export class NAndElement extends AbstractCircuitElement {
     const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     const wideShape = this._properties.getOrDefault<boolean>("wideShape", false);
     let decls = buildInvertedPinDeclarations(inputCount, bitWidth, wideShape);
-    const activeModel = this._properties.getOrDefault<string>("simulationModel", "");
-    if (activeModel && NAndDefinition.subcircuitRefs?.[activeModel]) {
+    const activeModel = this._properties.getOrDefault<string>("model", "");
+    if (activeModel && NAndDefinition.modelRegistry?.[activeModel]) {
       const w = compWidth(wideShape);
       decls = appendPowerPins(decls, w / 2, -1, inputCount);
     }
@@ -121,6 +122,36 @@ export function executeNAnd(index: number, state: Uint32Array, _highZs: Uint32Ar
 }
 
 // ---------------------------------------------------------------------------
+// CMOS_NAND2_NETLIST — 2-input CMOS NAND gate structural netlist
+//
+// Topology: 2 PMOS in parallel (pull-up), 2 NMOS in series (pull-down).
+// Ports: In_1, In_2, out, VDD, GND
+// Internal net: series_node (net index 5)
+// ---------------------------------------------------------------------------
+
+const CMOS_NAND2_NETLIST: MnaSubcircuitNetlist = {
+  ports: ["In_1", "In_2", "out", "VDD", "GND"],
+  params: {},
+  elements: [
+    { typeId: "PMOS", branchCount: 0 },
+    { typeId: "PMOS", branchCount: 0 },
+    { typeId: "NMOS", branchCount: 0 },
+    { typeId: "NMOS", branchCount: 0 },
+  ],
+  internalNetCount: 1,
+  // Nets 0..4 = ports [In_1, In_2, out, VDD, GND], net 5 = series_node
+  // p1(D=VDD,G=In_1,S=out), p2(D=VDD,G=In_2,S=out),
+  // n1(D=out,G=In_1,S=series_node), n2(D=series_node,G=In_2,S=GND)
+  // PMOS/NMOS pins: [D, G, S]
+  netlist: [
+    [3, 0, 2], // p1: D=VDD(3), G=In_1(0), S=out(2)
+    [3, 1, 2], // p2: D=VDD(3), G=In_2(1), S=out(2)
+    [2, 0, 5], // n1: D=out(2), G=In_1(0), S=series_node(5)
+    [5, 1, 4], // n2: D=series_node(5), G=In_2(1), S=GND(4)
+  ],
+};
+
+// ---------------------------------------------------------------------------
 // NAndDefinition
 // ---------------------------------------------------------------------------
 
@@ -147,7 +178,14 @@ export const NAndDefinition: ComponentDefinition = {
     "Configurable input count (2–5) and bit width (1–32).\n" +
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with & and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
-  subcircuitRefs: { cmos: "CmosNand2" },
+  modelRegistry: {
+    cmos: {
+      kind: "netlist",
+      netlist: CMOS_NAND2_NETLIST,
+      paramDefs: [],
+      params: {},
+    },
+  },
   models: {
     digital: {
       executeFn: executeNAnd,

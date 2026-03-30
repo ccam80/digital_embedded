@@ -276,6 +276,7 @@ export const TDefinition: ComponentDefinition = {
     "With T input: toggles only when T=1.\n" +
     "Without T input: toggles on every rising clock edge.\n" +
     "Q and ~Q are always complementary.",
+  modelRegistry: {},
   models: {
     digital: {
       executeFn: executeT,

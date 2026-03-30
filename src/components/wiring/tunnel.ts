@@ -211,4 +211,5 @@ export const TunnelDefinition: ComponentDefinition = {
       outputSchema: [],
     },
   },
+  modelRegistry: {},
 };

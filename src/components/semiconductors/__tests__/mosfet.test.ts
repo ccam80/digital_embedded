@@ -32,7 +32,6 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
-import { MOSFET_NMOS_DEFAULTS } from "../../../solver/analog/model-defaults.js";
 
 // ---------------------------------------------------------------------------
 // Default NMOS parameters (W=1µ, L=1µ, KP=120µA/V², VTO=0.7, LAMBDA=0.02)
@@ -66,6 +65,13 @@ function makeMockSolver() {
   } as unknown as SparseSolverType;
 }
 
+
+function makeParamBag(params: Record<string, number>): PropertyBag {
+  const bag = new PropertyBag();
+  bag.replaceModelParams(params);
+  return bag;
+}
+
 // ---------------------------------------------------------------------------
 // Helper: create NMOS element driven to a specific operating point
 //
@@ -79,7 +85,7 @@ function makeNmosAtVgs_Vds(
   vds: number,
   modelParams: Record<string, number> = NMOS_DEFAULTS,
 ): AnalogElement {
-  const propsObj = new PropertyBag([["_modelParams", modelParams]]);
+  const propsObj = makeParamBag(modelParams);
   const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
   // pinNodeIds: pinLayout order [G, D, S, B]; B=S for 3-terminal → [2, 1, 3, 3]
   Object.assign(element, { pinNodeIds: [2, 1, 3, 3], allNodeIds: [2, 1, 3, 3] });
@@ -246,26 +252,26 @@ describe("NMOS", () => {
   });
 
   it("isNonlinear_true", () => {
-    const propsObj = new PropertyBag([["_modelParams", NMOS_DEFAULTS]]);
+    const propsObj = makeParamBag(NMOS_DEFAULTS);
     const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
     expect(element.isNonlinear).toBe(true);
   });
 
   it("isReactive_false_when_no_capacitances", () => {
-    const propsObj = new PropertyBag([["_modelParams", NMOS_DEFAULTS]]);
+    const propsObj = makeParamBag(NMOS_DEFAULTS);
     const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
     expect(element.isReactive).toBe(false);
   });
 
   it("isReactive_true_when_cbd_nonzero", () => {
     const paramsWithCap = { ...NMOS_DEFAULTS, CBD: 1e-12 };
-    const propsObj = new PropertyBag([["_modelParams", paramsWithCap]]);
+    const propsObj = makeParamBag(paramsWithCap);
     const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
     expect(element.isReactive).toBe(true);
   });
 
   it("three_terminal_node_indices", () => {
-    const propsObj = new PropertyBag([["_modelParams", NMOS_DEFAULTS]]);
+    const propsObj = makeParamBag(NMOS_DEFAULTS);
     const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
     // pinNodeIds set by compiler in production; here we verify the factory uses pin nodes correctly
     // by checking that stamp methods work when pinNodeIds is injected (pinLayout: [G, D, S, B])
@@ -368,7 +374,7 @@ describe("PMOS", () => {
     // PMOS is on when Vgs < VTO (negative): use Vgs=-3V, Vds=-5V
     // In MNA: nodeS at high voltage (5V), nodeD at 0V, nodeG at 2V (so Vgs = 2-5 = -3V)
     // createMosfetElement pin order: [G, S, D]
-    const propsObj = new PropertyBag([["_modelParams", PMOS_DEFAULTS]]);
+    const propsObj = makeParamBag(PMOS_DEFAULTS);
     const element = createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
 
     // vS=5V (node3), vG=2V (node2), vD=0V (node1)
@@ -411,8 +417,8 @@ describe("PMOS", () => {
   });
 
   it("pmos_definition_has_correct_device_type", () => {
-    expect(PmosfetDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("PMOS");
-    expect(PmosfetDefinition.models?.mnaModels?.behavioral).toBeDefined();
+    expect(PmosfetDefinition.modelRegistry?.["behavioral"]).toBeDefined();
+    expect(PmosfetDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
   });
 });
 
@@ -452,9 +458,9 @@ describe("computeCapacitances", () => {
 describe("NmosfetDefinition", () => {
   it("has_correct_fields", () => {
     expect(NmosfetDefinition.name).toBe("NMOS");
-    expect(NmosfetDefinition.models?.mnaModels?.behavioral).toBeDefined();
-    expect(NmosfetDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("NMOS");
-    expect(NmosfetDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(NmosfetDefinition.modelRegistry?.["behavioral"]).toBeDefined();
+    expect(NmosfetDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
+    expect(NmosfetDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
   });
 
   it("pin_layout_has_three_pins", () => {
@@ -517,8 +523,8 @@ describe("Integration", () => {
 
     // NMOS: G=node3, S=ground(0), D=node1, W=10µ, L=1µ
     // createMosfetElement pin order: [G, S, D]
-    const nmosParams = { ...MOSFET_NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
-    const propsObj = new PropertyBag([["_modelParams", nmosParams]]);
+    const nmosParams = { ...NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
+    const propsObj = makeParamBag(nmosParams);
     const nmos = withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]);
 
     const solver = new SparseSolver();

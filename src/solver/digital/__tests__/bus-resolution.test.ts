@@ -22,12 +22,13 @@ import { Circuit, Wire } from "@/core/circuit";
 import { ComponentRegistry } from "@/core/registry";
 import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
-import { AbstractCircuitElement } from "@/core/element";
 import type { Pin, PinDeclaration } from "@/core/pin";
-import { PinDirection, resolvePins, createInverterConfig, createClockConfig } from "@/core/pin";
-import type { RenderContext, Rect } from "@/core/renderer-interface";
+import { PinDirection } from "@/core/pin";
+import type { } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
 import type { PropertyBag as PropertyBagType } from "@/core/properties";
+import { createTestElementFromDecls } from '@/test-fixtures/test-element.js';
+import { noopExecFn } from '@/test-fixtures/execute-stubs.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -403,37 +404,8 @@ describe("BusResolver", () => {
 // Integration test helpers — compile real circuits and run the engine
 // ---------------------------------------------------------------------------
 
-class TestElement extends AbstractCircuitElement {
-  private readonly _pins: readonly Pin[];
 
-  constructor(
-    typeId: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    pinDecls: PinDeclaration[],
-    props?: PropertyBag,
-  ) {
-    super(typeId, instanceId, position, 0, false, props ?? new PropertyBag());
-    this._pins = resolvePins(
-      pinDecls,
-      position,
-      0,
-      createInverterConfig([]),
-      createClockConfig([]),
-    );
-  }
 
-  getPins(): readonly Pin[] {
-    return this._pins;
-  }
-
-  draw(_ctx: RenderContext): void {}
-
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 2, height: 2 };
-  }
-
-}
 
 function outputOnlyPin(position: { x: number; y: number }): PinDeclaration[] {
   return [
@@ -455,18 +427,18 @@ function twoInputOneOutputPins(): PinDeclaration[] {
   ];
 }
 
-const noopExecute: ExecuteFunction = (_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout) => {};
+const noopExecFn: ExecuteFunction = (_index: number, _state: Uint32Array, _highZs: Uint32Array, _layout) => {};
 
 function makeDefinition(
   name: string,
   pins: PinDeclaration[],
-  executeFn: ExecuteFunction = noopExecute,
+  executeFn: ExecuteFunction = noopExecFn,
 ): Omit<ComponentDefinition, "typeId"> & { typeId: number } {
   return {
     name,
     typeId: -1,
     factory: (props: PropertyBagType) =>
-      new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, pins, props),
+      createTestElementFromDecls(name, crypto.randomUUID(), pins, props),
     pinLayout: pins,
     propertyDefs: [],
     attributeMap: [],
@@ -509,9 +481,9 @@ describe("BusIntegration", () => {
     const registry = makeRegistry(driverADef, driverBDef, readerCDef);
 
     const circuit = new Circuit();
-    const elA = new TestElement("DriverA", "a1", { x: 3, y: 0 }, driverAPins);
-    const elB = new TestElement("DriverB", "b1", { x: 3, y: 5 }, driverBPins);
-    const elC = new TestElement("ReaderC", "c1", { x: 5, y: 0 }, readerCPins);
+    const elA = createTestElementFromDecls("DriverA", "a1", driverAPins, undefined, { x: 3, y: 0 });
+    const elB = createTestElementFromDecls("DriverB", "b1", driverBPins, undefined, { x: 3, y: 5 });
+    const elC = createTestElementFromDecls("ReaderC", "c1", readerCPins, undefined, { x: 5, y: 0 });
     circuit.addElement(elA);
     circuit.addElement(elB);
     circuit.addElement(elC);
@@ -552,9 +524,9 @@ describe("BusIntegration", () => {
     const registry = makeRegistry(driverADef, driverBDef, readerCDef);
 
     const circuit = new Circuit();
-    const elA = new TestElement("DriverA", "a1", { x: 3, y: 0 }, driverAPins);
-    const elB = new TestElement("DriverB", "b1", { x: 3, y: 5 }, driverBPins);
-    const elC = new TestElement("ReaderC", "c1", { x: 5, y: 0 }, readerCPins);
+    const elA = createTestElementFromDecls("DriverA", "a1", driverAPins, undefined, { x: 3, y: 0 });
+    const elB = createTestElementFromDecls("DriverB", "b1", driverBPins, undefined, { x: 3, y: 5 });
+    const elC = createTestElementFromDecls("ReaderC", "c1", readerCPins, undefined, { x: 5, y: 0 });
     circuit.addElement(elA);
     circuit.addElement(elB);
     circuit.addElement(elC);
@@ -599,9 +571,9 @@ describe("BusIntegration", () => {
     const registry = makeRegistry(driverADef, driverBDef, readerCDef);
 
     const circuit = new Circuit();
-    const elA = new TestElement("DriverA", "a1", { x: 3, y: 0 }, driverAPins);
-    const elB = new TestElement("DriverB", "b1", { x: 3, y: 5 }, driverBPins);
-    const elC = new TestElement("ReaderC", "c1", { x: 5, y: 0 }, readerCPins);
+    const elA = createTestElementFromDecls("DriverA", "a1", driverAPins, undefined, { x: 3, y: 0 });
+    const elB = createTestElementFromDecls("DriverB", "b1", driverBPins, undefined, { x: 3, y: 5 });
+    const elC = createTestElementFromDecls("ReaderC", "c1", readerCPins, undefined, { x: 5, y: 0 });
     circuit.addElement(elA);
     circuit.addElement(elB);
     circuit.addElement(elC);
@@ -642,9 +614,9 @@ describe("BusIntegration", () => {
     const registry = makeRegistry(driverADef, pullUpDef, readerCDef);
 
     const circuit = new Circuit();
-    const elA = new TestElement("DriverA", "a1", { x: 3, y: 0 }, driverAPins);
-    const elPU = new TestElement("PullUp", "pu1", { x: 3, y: 5 }, pullUpPins);
-    const elC = new TestElement("ReaderC", "c1", { x: 5, y: 0 }, readerCPins);
+    const elA = createTestElementFromDecls("DriverA", "a1", driverAPins, undefined, { x: 3, y: 0 });
+    const elPU = createTestElementFromDecls("PullUp", "pu1", pullUpPins, undefined, { x: 3, y: 5 });
+    const elC = createTestElementFromDecls("ReaderC", "c1", readerCPins, undefined, { x: 5, y: 0 });
     circuit.addElement(elA);
     circuit.addElement(elPU);
     circuit.addElement(elC);
@@ -676,7 +648,7 @@ describe("BusIntegration", () => {
     const registry = makeRegistry(andDef);
 
     const circuit = new Circuit();
-    const andEl = new TestElement("And", "and-1", { x: 0, y: 0 }, andPins);
+    const andEl = createTestElementFromDecls("And", "and-1", andPins);
     circuit.addElement(andEl);
 
     const compiled = compileUnified(circuit, registry).digital!;

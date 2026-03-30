@@ -54,17 +54,21 @@ import { vi } from "vitest";
 // Helpers
 // ---------------------------------------------------------------------------
 
+const TIMER555_MODEL_PARAM_KEYS = new Set(["vDrop", "rDischarge"]);
+
 function makeProps(overrides: Record<string, number | string> = {}): PropertyBag {
-  const defaults: [string, number | string][] = [
-    ["vDrop", 1.5],
-    ["rDischarge", 10],
-    ["variant", "bipolar"],
-  ];
-  const entries = new Map<string, number | string>(defaults);
+  const modelParams: Record<string, number> = { vDrop: 1.5, rDischarge: 10 };
+  const staticEntries: [string, number | string][] = [["variant", "bipolar"]];
   for (const [k, v] of Object.entries(overrides)) {
-    entries.set(k, v);
+    if (TIMER555_MODEL_PARAM_KEYS.has(k)) {
+      modelParams[k] = v as number;
+    } else {
+      staticEntries.push([k, v]);
+    }
   }
-  return new PropertyBag(Array.from(entries.entries()));
+  const bag = new PropertyBag(staticEntries);
+  bag.replaceModelParams(modelParams);
+  return bag;
 }
 
 /**
@@ -77,7 +81,7 @@ function make555(
 ): AnalogElement {
   // pinLayout order: [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
   return withNodeIds(
-    Timer555Definition.models!.mnaModels!.behavioral!.factory(
+    Timer555Definition.modelRegistry!["behavioral"]!.factory(
       new Map([
         ["DIS",  nodes.dis],
         ["TRIG", nodes.trig],

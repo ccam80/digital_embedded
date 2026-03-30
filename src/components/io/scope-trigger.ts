@@ -223,4 +223,5 @@ export const ScopeTriggerDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeScopeTrigger, inputSchema: ["T"], outputSchema: [] },
   },
+  modelRegistry: {},
 };

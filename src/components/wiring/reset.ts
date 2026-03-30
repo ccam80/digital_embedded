@@ -220,4 +220,5 @@ export const ResetDefinition: ComponentDefinition = {
       outputSchema: ["Reset"],
     },
   },
+  modelRegistry: {},
 };

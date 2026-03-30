@@ -369,5 +369,13 @@ export const CounterPresetDefinition: ComponentDefinition = {
     },
     },
   },
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: makeBehavioralCounterPresetAnalogFactory(),
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

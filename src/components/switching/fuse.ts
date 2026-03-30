@@ -38,7 +38,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
-import { createAnalogFuseElement } from "../passives/analog-fuse.js";
+import { createAnalogFuseElement, createAnalogFuseElementFromModelParams, ANALOG_FUSE_PARAM_DEFS, ANALOG_FUSE_DEFAULTS } from "../passives/analog-fuse.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -435,6 +435,14 @@ export const FuseDefinition: ComponentDefinition = {
       behavioral: {
       factory: createAnalogFuseElement,
     },
+    },
+  },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createAnalogFuseElementFromModelParams,
+      paramDefs: ANALOG_FUSE_PARAM_DEFS,
+      params: ANALOG_FUSE_DEFAULTS,
     },
   },
   defaultModel: "digital",

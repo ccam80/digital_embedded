@@ -34,11 +34,11 @@ function makeCCVSElement(
   const expression = opts.expression ?? "I(sense)";
   const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>([
     ["expression", expression],
-    ["transresistance", rm],
     ["label", ""],
   ]).entries());
+  props.replaceModelParams({ transresistance: rm });
   return withNodeIds(
-    CCVSDefinition.models!.mnaModels!.behavioral!.factory(
+    CCVSDefinition.modelRegistry!["behavioral"]!.factory(
       new Map([["sense+", nSenseP], ["sense-", nSenseN], ["out+", nOutP], ["out-", nOutN]]),
       [],
       senseBranchIdx,

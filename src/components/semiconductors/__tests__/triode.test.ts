@@ -11,9 +11,10 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { createTriodeElement, TriodeDefinition, TriodeCircuitElement } from "../triode.js";
+import { createTriodeElement, TriodeDefinition, TriodeCircuitElement, TRIODE_PARAM_DEFAULTS } from "../triode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
+import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
@@ -35,15 +36,18 @@ const RGI = 2000;
 function makeProps(overrides: Partial<{
   mu: number; kp: number; kvb: number; kg1: number; ex: number; rGI: number;
 }> = {}): PropertyBag {
-  const map = new Map<string, import("../../../core/properties.js").PropertyValue>([
-    ["mu",  overrides.mu  ?? MU],
-    ["kp",  overrides.kp  ?? KP],
-    ["kvb", overrides.kvb ?? KVB],
-    ["kg1", overrides.kg1 ?? KG1],
-    ["ex",  overrides.ex  ?? EX],
-    ["rGI", overrides.rGI ?? RGI],
-  ]);
-  return new PropertyBag(map.entries());
+  const params = {
+    ...TRIODE_PARAM_DEFAULTS,
+    mu:  overrides.mu  ?? MU,
+    kp:  overrides.kp  ?? KP,
+    kvb: overrides.kvb ?? KVB,
+    kg1: overrides.kg1 ?? KG1,
+    ex:  overrides.ex  ?? EX,
+    rGI: overrides.rGI ?? RGI,
+  };
+  const props = createTestPropertyBag();
+  props.replaceModelParams(params);
+  return props;
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +310,8 @@ describe("Triode", () => {
 
   describe("definition", () => {
     it("TriodeDefinition has correct engine type", () => {
-      expect(TriodeDefinition.models?.mnaModels?.behavioral).toBeDefined();
+      expect(TriodeDefinition.modelRegistry?.["behavioral"]).toBeDefined();
+      expect(TriodeDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
     });
 
     it("TriodeDefinition is in SEMICONDUCTORS category", () => {
@@ -314,21 +319,21 @@ describe("Triode", () => {
     });
 
     it("TriodeDefinition has mu default 100", () => {
-      const prop = TriodeDefinition.propertyDefs.find((p) => p.key === "mu");
-      expect(prop).toBeDefined();
-      expect(prop!.defaultValue).toBe(100);
+      const entry = TriodeDefinition.modelRegistry?.["behavioral"];
+      expect(entry).toBeDefined();
+      expect(entry!.params["mu"]).toBe(100);
     });
 
     it("TriodeDefinition has kp default 600", () => {
-      const prop = TriodeDefinition.propertyDefs.find((p) => p.key === "kp");
-      expect(prop).toBeDefined();
-      expect(prop!.defaultValue).toBe(600);
+      const entry = TriodeDefinition.modelRegistry?.["behavioral"];
+      expect(entry).toBeDefined();
+      expect(entry!.params["kp"]).toBe(600);
     });
 
     it("TriodeDefinition has kg1 default 1060", () => {
-      const prop = TriodeDefinition.propertyDefs.find((p) => p.key === "kg1");
-      expect(prop).toBeDefined();
-      expect(prop!.defaultValue).toBe(1060);
+      const entry = TriodeDefinition.modelRegistry?.["behavioral"];
+      expect(entry).toBeDefined();
+      expect(entry!.params["kg1"]).toBe(1060);
     });
 
     it("analogFactory creates a triode element with isNonlinear=true", () => {

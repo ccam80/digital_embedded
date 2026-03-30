@@ -33,11 +33,11 @@ function makeVCVSElement(
   const expression = opts.expression ?? "V(ctrl)";
   const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>([
     ["expression", expression],
-    ["gain", gain],
     ["label", ""],
   ]).entries());
+  props.replaceModelParams({ gain });
   return withNodeIds(
-    VCVSDefinition.models!.mnaModels!.behavioral!.factory(
+    VCVSDefinition.modelRegistry!["behavioral"]!.factory(
       new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
       [],
       branchIdx,

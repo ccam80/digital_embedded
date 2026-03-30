@@ -207,4 +207,5 @@ export const BreakDefinition: ComponentDefinition = {
       outputSchema: [],
     },
   },
+  modelRegistry: {},
 };

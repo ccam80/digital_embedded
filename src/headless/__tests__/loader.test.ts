@@ -9,49 +9,28 @@ import { SimulationLoader } from "../loader.js";
 import { serializeCircuit } from "../../io/dts-serializer.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition } from "../../core/registry.js";
-import { AbstractCircuitElement } from "../../core/element.js";
 import { PropertyBag } from "../../core/properties.js";
 import { Circuit, Wire } from "../../core/circuit.js";
-import type { RenderContext, Rect } from "../../core/renderer-interface.js";
-import type { Pin } from "../../core/pin.js";
-
-// ---------------------------------------------------------------------------
-// Minimal concrete CircuitElement
-// ---------------------------------------------------------------------------
-
-class StubElement extends AbstractCircuitElement {
-  getPins(): readonly Pin[] {
-    return [];
-  }
-  draw(_ctx: RenderContext): void {
-    // no-op
-  }
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-}
+import { TestElement } from "../../test-fixtures/test-element.js";
+import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
 
 // ---------------------------------------------------------------------------
 // Registry helpers
 // ---------------------------------------------------------------------------
-
-function noopExecute(): void {
-  // no-op
-}
 
 function makeDefinition(name: string): ComponentDefinition {
   return {
     name,
     typeId: -1,
     factory: (props: PropertyBag) =>
-      new StubElement(name, crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
+      new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, [], props),
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: name,
     models: {
-      digital: { executeFn: noopExecute },
+      digital: { executeFn: noopExecFn },
     },
   };
 }

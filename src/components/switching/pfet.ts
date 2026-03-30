@@ -231,4 +231,5 @@ export const PFETDefinition: ComponentDefinition = {
       defaultDelay: 0,
     },
   },
+  modelRegistry: {},
 };

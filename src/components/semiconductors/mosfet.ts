@@ -40,13 +40,13 @@ import type { IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim } from "../../solver/analog/newton-raphson.js";
-import { MOSFET_NMOS_DEFAULTS, MOSFET_PMOS_DEFAULTS } from "../../solver/analog/model-defaults.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
 import { AbstractFetElement } from "../../solver/analog/fet-base.js";
 import type { FetCapacitances } from "../../solver/analog/fet-base.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -78,32 +78,45 @@ interface MosfetParams {
   L: number;
 }
 
-function resolveParams(
-  props: PropertyBag,
-  defaults: Record<string, number>,
-  propsW: number | undefined,
-  propsL: number | undefined,
-): MosfetParams {
-  const modelParams = props.has("_modelParams")
-    ? props.get<Record<string, number>>("_modelParams")
-    : undefined;
-  const mp = modelParams ?? defaults;
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
 
-  return {
-    VTO: mp["VTO"] ?? defaults["VTO"],
-    KP: mp["KP"] ?? defaults["KP"],
-    LAMBDA: mp["LAMBDA"] ?? defaults["LAMBDA"],
-    PHI: mp["PHI"] ?? defaults["PHI"],
-    GAMMA: mp["GAMMA"] ?? defaults["GAMMA"],
-    CBD: mp["CBD"] ?? defaults["CBD"],
-    CBS: mp["CBS"] ?? defaults["CBS"],
-    CGDO: mp["CGDO"] ?? defaults["CGDO"],
-    CGSO: mp["CGSO"] ?? defaults["CGSO"],
-    // W and L can be overridden by component properties
-    W: propsW ?? mp["W"] ?? defaults["W"],
-    L: propsL ?? mp["L"] ?? defaults["L"],
-  };
-}
+export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS } = defineModelParams({
+  primary: {
+    VTO:    { default: 1.0,  unit: "V",      description: "Threshold voltage" },
+    KP:     { default: 2e-5, unit: "A/V²",   description: "Process transconductance parameter" },
+    LAMBDA: { default: 0.01, unit: "1/V",    description: "Channel-length modulation" },
+    W:      { default: 1e-6, unit: "m",      description: "Channel width" },
+    L:      { default: 1e-6, unit: "m",      description: "Channel length" },
+  },
+  secondary: {
+    PHI:    { default: 0.6,  unit: "V",      description: "Surface potential" },
+    GAMMA:  { default: 0.0,  unit: "V^0.5",  description: "Body-effect coefficient" },
+    CBD:    { default: 0,    unit: "F",      description: "Drain-bulk junction capacitance" },
+    CBS:    { default: 0,    unit: "F",      description: "Source-bulk junction capacitance" },
+    CGDO:   { default: 0,    unit: "F/m",    description: "Gate-drain overlap capacitance per unit width" },
+    CGSO:   { default: 0,    unit: "F/m",    description: "Gate-source overlap capacitance per unit width" },
+  },
+});
+
+export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS } = defineModelParams({
+  primary: {
+    VTO:    { default: -1.0, unit: "V",      description: "Threshold voltage" },
+    KP:     { default: 1e-5, unit: "A/V²",   description: "Process transconductance parameter" },
+    LAMBDA: { default: 0.01, unit: "1/V",    description: "Channel-length modulation" },
+    W:      { default: 1e-6, unit: "m",      description: "Channel width" },
+    L:      { default: 1e-6, unit: "m",      description: "Channel length" },
+  },
+  secondary: {
+    PHI:    { default: 0.6,  unit: "V",      description: "Surface potential" },
+    GAMMA:  { default: 0.0,  unit: "V^0.5",  description: "Body-effect coefficient" },
+    CBD:    { default: 0,    unit: "F",      description: "Drain-bulk junction capacitance" },
+    CBS:    { default: 0,    unit: "F",      description: "Source-bulk junction capacitance" },
+    CGDO:   { default: 0,    unit: "F/m",    description: "Gate-drain overlap capacitance per unit width" },
+    CGSO:   { default: 0,    unit: "F/m",    description: "Gate-source overlap capacitance per unit width" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // computeIds — drain current for three operating regions
@@ -543,19 +556,19 @@ export function createMosfetElement(
   // Bulk node: use internalNodeIds[0] if provided (4-terminal body), else treat bulk = source
   const nodeB = internalNodeIds.length >= 1 ? internalNodeIds[0] : nodeS;
 
-  const defaults = polarity === 1 ? MOSFET_NMOS_DEFAULTS : MOSFET_PMOS_DEFAULTS;
-
-  // W and L can be set directly on the component instance.
-  // Support both PropertyBag (has/get API) and plain objects (tests cast {} as PropertyBag).
-  const hasFn = typeof props.has === "function";
-  const propsW = hasFn
-    ? (props.has("W") ? props.get<number>("W") : undefined)
-    : (props as unknown as Record<string, unknown>)["W"] as number | undefined;
-  const propsL = hasFn
-    ? (props.has("L") ? props.get<number>("L") : undefined)
-    : (props as unknown as Record<string, unknown>)["L"] as number | undefined;
-
-  const p = resolveParams(props, defaults, propsW, propsL);
+  const p: MosfetParams = {
+    VTO:    props.getModelParam<number>("VTO"),
+    KP:     props.getModelParam<number>("KP"),
+    LAMBDA: props.getModelParam<number>("LAMBDA"),
+    PHI:    props.getModelParam<number>("PHI"),
+    GAMMA:  props.getModelParam<number>("GAMMA"),
+    CBD:    props.getModelParam<number>("CBD"),
+    CBS:    props.getModelParam<number>("CBS"),
+    CGDO:   props.getModelParam<number>("CGDO"),
+    CGSO:   props.getModelParam<number>("CGSO"),
+    W:      props.getModelParam<number>("W"),
+    L:      props.getModelParam<number>("L"),
+  };
 
   return new MosfetAnalogElement(polarity, nodeD, nodeG, nodeS, nodeB, p);
 }
@@ -794,8 +807,8 @@ const MOSFET_PROPERTY_DEFS: PropertyDefinition[] = [
     key: "model",
     type: PropertyType.STRING,
     label: "Model",
-    defaultValue: "",
-    description: "SPICE model name (blank = use built-in defaults)",
+    defaultValue: "behavioral",
+    description: "Active model selection",
   },
   {
     key: "W",
@@ -812,14 +825,6 @@ const MOSFET_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "Channel length in meters",
   },
   LABEL_PROPERTY_DEF,
-  {
-    key: "_spiceModelOverrides",
-    type: PropertyType.STRING,
-    label: "SPICE Model Overrides",
-    defaultValue: {} as Record<string, number>,
-    description: "User-supplied SPICE parameter overrides",
-    hidden: true,
-  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -873,13 +878,14 @@ export const NmosfetDefinition: ComponentDefinition = {
     "N-channel MOSFET — Level 2 model with body effect and channel-length modulation.\n" +
     "Pins: D (drain), G (gate), S (source).\n" +
     "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
-  models: {
-    mnaModels: {
-      behavioral: {
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
-      deviceType: "NMOS",
-    },
+      paramDefs: MOSFET_NMOS_PARAM_DEFS,
+      params: MOSFET_NMOS_DEFAULTS,
     },
   },
   defaultModel: "behavioral",
@@ -897,13 +903,14 @@ export const PmosfetDefinition: ComponentDefinition = {
     "P-channel MOSFET — Level 2 model with body effect and channel-length modulation (PMOS polarity).\n" +
     "Pins: D (drain), G (gate), S (source).\n" +
     "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
-  models: {
-    mnaModels: {
-      behavioral: {
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
-      deviceType: "PMOS",
-    },
+      paramDefs: MOSFET_PMOS_PARAM_DEFS,
+      params: MOSFET_PMOS_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

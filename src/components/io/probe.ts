@@ -271,5 +271,13 @@ export const ProbeDefinition: ComponentDefinition = {
       behavioral: { factory: probeAnalogFactory },
     },
   },
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: probeAnalogFactory,
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

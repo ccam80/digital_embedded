@@ -7,28 +7,11 @@ import { validateDtsDocument } from '../dts-schema.js';
 import { serializeCircuit, serializeWithSubcircuits } from '../dts-serializer.js';
 import { deserializeDts } from '../dts-deserializer.js';
 import { Circuit, Wire } from '../../core/circuit.js';
-import { AbstractCircuitElement } from '../../core/element.js';
 import { PropertyBag } from '../../core/properties.js';
 import { ComponentRegistry, ComponentCategory } from '../../core/registry.js';
-import type { RenderContext, Rect } from '../../core/renderer-interface.js';
-import type { Pin } from '../../core/pin.js';
 import type { PropertyValue } from '../../core/properties.js';
-
-// ---------------------------------------------------------------------------
-// Minimal stub element for tests
-// ---------------------------------------------------------------------------
-
-class StubElement extends AbstractCircuitElement {
-  getPins(): readonly Pin[] {
-    return [];
-  }
-  draw(_ctx: RenderContext): void {
-    // no-op
-  }
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-}
+import { TestElement } from '../../test-fixtures/test-element.js';
+import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
 
 function makeElement(
   typeName: string,
@@ -36,9 +19,9 @@ function makeElement(
   x: number,
   y: number,
   props: Record<string, PropertyValue> = {},
-): StubElement {
+): TestElement {
   const bag = new PropertyBag(Object.entries(props));
-  return new StubElement(typeName, instanceId, { x, y }, 0, false, bag);
+  return new TestElement(typeName, instanceId, { x, y }, [], bag);
 }
 
 function makeRegistry(...typeNames: string[]): ComponentRegistry {
@@ -48,14 +31,14 @@ function makeRegistry(...typeNames: string[]): ComponentRegistry {
       name,
       typeId: -1,
       factory: (props: PropertyBag) =>
-        new StubElement(name, `inst-${name}`, { x: 0, y: 0 }, 0, false, props),
+        new TestElement(name, `inst-${name}`, { x: 0, y: 0 }, [], props),
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.MISC,
       helpText: name,
       models: {
-        digital: { executeFn: () => {} },
+        digital: { executeFn: noopExecFn },
       },
     });
   }

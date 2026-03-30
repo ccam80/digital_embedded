@@ -39,6 +39,18 @@ import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: DAC_PARAM_DEFS, defaults: DAC_DEFAULTS } = defineModelParams({
+  primary: {
+    vRef: { default: 5.0, unit: "V", description: "Full-scale reference voltage" },
+    rOut: { default: 100, unit: "Ω", description: "Output impedance" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin declarations — variable N, built at factory time
@@ -206,10 +218,12 @@ function createDACElement(
   props: PropertyBag,
 ): AnalogElementCore {
   const bits   = Math.max(1, Math.min(32, props.getOrDefault<number>("bits", 8)));
-  const vRef   = props.getOrDefault<number>("vRef", 5.0);
+  const p: Record<string, number> = {
+    vRef: props.getModelParam<number>("vRef"),
+    rOut: props.getModelParam<number>("rOut"),
+  };
   const mode   = props.getOrDefault<string>("mode", "unipolar");
-  const rOut   = Math.max(props.getOrDefault<number>("rOut", 100), 1e-9);
-  const G_out  = 1 / rOut;
+  const G_out  = 1 / Math.max(p.rOut, 1e-9);
 
   const maxCode = Math.pow(2, bits);
 
@@ -219,7 +233,7 @@ function createDACElement(
   // GND node — not directly stamped (MNA ground handled implicitly)
 
   // DigitalInputPinModel instances — one per bit
-  const inputSpec = makeInputPinSpec(vRef);
+  const inputSpec = makeInputPinSpec(p.vRef);
   const inputModels: DigitalInputPinModel[] = [];
   // Collect digital bit node IDs in order D0..D(N-1)
   const nDigitalBits: number[] = [];
@@ -339,6 +353,10 @@ function createDACElement(
         }
       }
     },
+
+    setParam(key: string, value: number): void {
+      if (key in p) p[key] = value;
+    },
   };
 }
 
@@ -427,18 +445,14 @@ export const DACDefinition: ComponentDefinition = {
     return new DACElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        internalNodeIds: readonly number[],
-        branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        return createDACElement(pinNodes, internalNodeIds, branchIdx, props);
-      },
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createDACElement(pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: DAC_PARAM_DEFS,
+      params: DAC_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

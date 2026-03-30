@@ -28,10 +28,11 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -45,6 +46,25 @@ const GMIN = 1e-12;
 
 /** Maximum alpha value — prevents division-by-zero. */
 const ALPHA_MAX = 0.95;
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: TRIAC_PARAM_DEFS, defaults: TRIAC_PARAM_DEFAULTS } = defineModelParams({
+  primary: {
+    vOn:  { default: 1.5,   unit: "V", description: "On-state forward voltage drop" },
+    iH:   { default: 10e-3, unit: "A", description: "Holding current — minimum main current to stay on" },
+    rOn:  { default: 0.01,  unit: "Ω", description: "On-state series resistance" },
+    iS:   { default: 1e-12, unit: "A", description: "Reverse saturation current" },
+  },
+  secondary: {
+    alpha1:   { default: 0.5,  description: "PNP transistor current gain (fixed)" },
+    alpha2_0: { default: 0.3,  description: "NPN off-state current gain" },
+    i_ref:    { default: 1e-3, unit: "A", description: "Gate current scale factor for α₂ modulation" },
+    n:        { default: 1,               description: "Emission coefficient" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Stamp helpers — node 0 is ground (skipped)
@@ -65,18 +85,26 @@ export function createTriacElement(
   const nodeMT1 = pinNodes.get("MT1")!; // Main Terminal 1
   const nodeG   = pinNodes.get("G")!;   // Gate
 
-  const vOn: number      = props.getOrDefault<number>("vOn",      1.5);
-  const iH: number       = props.getOrDefault<number>("iH",       10e-3);
-  const rOn: number      = props.getOrDefault<number>("rOn",      0.01);
-  const iS: number       = props.getOrDefault<number>("iS",       1e-12);
-  const alpha1: number   = props.getOrDefault<number>("alpha1",   0.5);
-  const alpha2_0: number = props.getOrDefault<number>("alpha2_0", 0.3);
-  const iRef: number     = props.getOrDefault<number>("i_ref",    1e-3);
-  const n: number        = props.getOrDefault<number>("n",        1);
+  const p = {
+    vOn:      props.getModelParam<number>("vOn"),
+    iH:       props.getModelParam<number>("iH"),
+    rOn:      props.getModelParam<number>("rOn"),
+    iS:       props.getModelParam<number>("iS"),
+    alpha1:   props.getModelParam<number>("alpha1"),
+    alpha2_0: props.getModelParam<number>("alpha2_0"),
+    i_ref:    props.getModelParam<number>("i_ref"),
+    n:        props.getModelParam<number>("n"),
+  };
 
-  const nVt = n * VT;
-  const vcritMain = nVt * Math.log(nVt / (iS * Math.SQRT2));
-  const vcritGate = nVt * Math.log(nVt / (iS * Math.SQRT2));
+  let nVt = p.n * VT;
+  let vcritMain = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+  let vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+
+  function recomputeDerivedConstants(): void {
+    nVt = p.n * VT;
+    vcritMain = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+    vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+  }
 
   // Forward path (MT2→MT1 positive): latch state
   let _latchedFwd = false;
@@ -94,14 +122,14 @@ export function createTriacElement(
   let _gGateIeq = 0;
 
   function computeAlpha2(iGate: number): number {
-    const raw = 1 - (1 - alpha2_0) * Math.exp(-Math.abs(iGate) / iRef);
+    const raw = 1 - (1 - p.alpha2_0) * Math.exp(-Math.abs(iGate) / p.i_ref);
     return Math.min(raw, ALPHA_MAX);
   }
 
   function computeOnState(vmt: number): void {
     // On-state: low-resistance path with V_on offset
-    const gOn = 1.0 / rOn;
-    const iOn = (vmt - vOn) / rOn;
+    const gOn = 1.0 / p.rOn;
+    const iOn = (vmt - p.vOn) / p.rOn;
     _geq = gOn + GMIN;
     _ieq = iOn - _geq * vmt;
   }
@@ -114,10 +142,10 @@ export function createTriacElement(
 
   function computeOperatingPoint(vmt: number, vg1: number): void {
     // Gate current (forward-biased gate-MT1 junction)
-    const iGate = iS * (Math.exp(Math.min(vg1 / nVt, 700)) - 1) + GMIN * vg1;
+    const iGate = p.iS * (Math.exp(Math.min(vg1 / nVt, 700)) - 1) + GMIN * vg1;
 
     const a2 = computeAlpha2(iGate);
-    const a1c = Math.min(alpha1, ALPHA_MAX);
+    const a1c = Math.min(p.alpha1, ALPHA_MAX);
     const a2c = Math.min(a2, ALPHA_MAX);
     const alphaSum = a1c + a2c;
     const triggered = alphaSum > 0.95;
@@ -131,7 +159,7 @@ export function createTriacElement(
         computeOnState(vmt);
         // Unlatch when current falls below I_hold
         const iMt = _geq * vmt + _ieq;
-        if (iMt < iH) {
+        if (iMt < p.iH) {
           _latchedFwd = false;
           computeBlockingState();
         }
@@ -148,13 +176,13 @@ export function createTriacElement(
       }
       if (_latchedRev) {
         // Mirror: current flows MT1→MT2, V_drop = -V_on
-        const gOn = 1.0 / rOn;
-        const iOn = (vmt + vOn) / rOn; // vmt negative, vmt + vOn < 0
+        const gOn = 1.0 / p.rOn;
+        const iOn = (vmt + p.vOn) / p.rOn; // vmt negative, vmt + vOn < 0
         _geq = gOn + GMIN;
         _ieq = iOn - _geq * vmt;
         // Unlatch when |current| falls below I_hold
         const iMt = _geq * vmt + _ieq;
-        if (iMt > -iH) {
+        if (iMt > -p.iH) {
           _latchedRev = false;
           computeBlockingState();
         }
@@ -167,8 +195,8 @@ export function createTriacElement(
 
     // Gate junction: linearized at (already pnjlim-limited) vg1
     const expVg = Math.exp(Math.min(vg1 / nVt, 700));
-    const gGate = (iS * expVg) / nVt + GMIN;
-    const iGateCurrent = iS * (expVg - 1);
+    const gGate = (p.iS * expVg) / nVt + GMIN;
+    const iGateCurrent = p.iS * (expVg - 1);
     _gGateGeq = gGate;
     _gGateIeq = iGateCurrent - gGate * vg1;
   }
@@ -260,8 +288,11 @@ export function createTriacElement(
       return [iMT2, iMT1, iG];
     },
 
-    setParam(_key: string, _value: number): void {
-      // Triac params are component properties, not SPICE model params
+    setParam(key: string, value: number): void {
+      if (key in p) {
+        (p as Record<string, number>)[key] = value;
+        recomputeDerivedConstants();
+      }
     },
   };
 }
@@ -386,40 +417,11 @@ function buildTriacPinDeclarations(): PinDeclaration[] {
 const TRIAC_PROPERTY_DEFS: PropertyDefinition[] = [
   LABEL_PROPERTY_DEF,
   {
-    key: "vOn",
-    type: PropertyType.FLOAT,
-    label: "V_on (V)",
-    defaultValue: 1.5,
-    description: "On-state forward voltage drop",
-  },
-  {
-    key: "iH",
-    type: PropertyType.FLOAT,
-    label: "I_hold (A)",
-    defaultValue: 10e-3,
-    description: "Holding current — minimum main current to stay on",
-  },
-  {
-    key: "rOn",
-    type: PropertyType.FLOAT,
-    label: "R_on (Ω)",
-    defaultValue: 0.01,
-    description: "On-state series resistance",
-  },
-  {
-    key: "iS",
-    type: PropertyType.FLOAT,
-    label: "I_S (A)",
-    defaultValue: 1e-12,
-    description: "Reverse saturation current",
-  },
-  {
-    key: "_spiceModelOverrides",
+    key: "model",
     type: PropertyType.STRING,
-    label: "SPICE Model Overrides",
-    defaultValue: {} as Record<string, number>,
-    description: "User-supplied SPICE parameter overrides",
-    hidden: true,
+    label: "Model",
+    defaultValue: "behavioral",
+    description: "Active model selection",
   },
 ];
 
@@ -428,10 +430,8 @@ const TRIAC_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 export const TRIAC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "Label",      propertyKey: "label", convert: (v) => v },
-  { xmlName: "vOn",        propertyKey: "vOn",   convert: (v) => parseFloat(v) },
-  { xmlName: "iH",         propertyKey: "iH",    convert: (v) => parseFloat(v) },
-  { xmlName: "rOn",        propertyKey: "rOn",   convert: (v) => parseFloat(v) },
+  { xmlName: "Label", propertyKey: "label", convert: (v) => v },
+  { xmlName: "model", propertyKey: "model", convert: (v) => v },
 ];
 
 // ---------------------------------------------------------------------------
@@ -454,11 +454,14 @@ export const TriacDefinition: ComponentDefinition = {
     "Triac — bidirectional thyristor.\n" +
     "Pins: MT1 (main terminal 1), MT2 (main terminal 2), G (gate).\n" +
     "Conducts in both directions when triggered. Turns off at current zero-crossing.",
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory: createTriacElement,
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createTriacElement(pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: TRIAC_PARAM_DEFS,
+      params: TRIAC_PARAM_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

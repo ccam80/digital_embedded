@@ -43,6 +43,23 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: TAPPED_TRANSFORMER_PARAM_DEFS, defaults: TAPPED_TRANSFORMER_DEFAULTS } = defineModelParams({
+  primary: {
+    turnsRatio:          { default: 2.0,   description: "Total secondary to primary turns ratio N (both halves combined)", min: 0.001 },
+    primaryInductance:   { default: 10e-3, unit: "H", description: "Primary winding self-inductance in henries", min: 1e-12 },
+    couplingCoefficient: { default: 0.99,  description: "Magnetic coupling coefficient (0 = no coupling, 1 = ideal)", min: 0, max: 1 },
+  },
+  secondary: {
+    primaryResistance:   { default: 0.0,   unit: "Ω", description: "Primary winding series resistance in ohms", min: 0 },
+    secondaryResistance: { default: 0.0,   unit: "Ω", description: "Each secondary half winding series resistance in ohms", min: 0 },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -189,16 +206,16 @@ export class AnalogTappedTransformerElement implements AnalogElement {
 
   private readonly _b2: number;
   private readonly _b3: number;
-  private readonly _rPri: number;
-  private readonly _rSec: number;
+  private _rPri: number;
+  private _rSec: number;
 
   // Inductances and mutual inductances
-  private readonly _l1: number;
-  private readonly _l2: number;
-  private readonly _l3: number;
-  private readonly _m12: number;
-  private readonly _m13: number;
-  private readonly _m23: number;
+  private _l1: number;
+  private _l2: number;
+  private _l3: number;
+  private _m12: number;
+  private _m13: number;
+  private _m23: number;
 
   // Pre-computed companion coefficients, updated in stampCompanion()
   private _g11: number = 0;
@@ -242,6 +259,18 @@ export class AnalogTappedTransformerElement implements AnalogElement {
     this._l2 = lPrimary * halfRatio * halfRatio;
     this._l3 = lPrimary * halfRatio * halfRatio;
 
+    this._m12 = k * Math.sqrt(this._l1 * this._l2);
+    this._m13 = k * Math.sqrt(this._l1 * this._l3);
+    this._m23 = k * Math.sqrt(this._l2 * this._l3);
+  }
+
+  updateDerivedParams(lPrimary: number, turnsRatio: number, k: number, rPri: number, rSec: number): void {
+    this._rPri = rPri;
+    this._rSec = rSec;
+    this._l1 = lPrimary;
+    const halfRatio = turnsRatio / 2;
+    this._l2 = lPrimary * halfRatio * halfRatio;
+    this._l3 = lPrimary * halfRatio * halfRatio;
     this._m12 = k * Math.sqrt(this._l1 * this._l2);
     this._m13 = k * Math.sqrt(this._l1 * this._l3);
     this._m23 = k * Math.sqrt(this._l2 * this._l3);
@@ -438,25 +467,71 @@ export class AnalogTappedTransformerElement implements AnalogElement {
 // analogFactory
 // ---------------------------------------------------------------------------
 
+function buildTappedTransformerElement(
+  pinNodes: ReadonlyMap<string, number>,
+  branchIdx: number,
+  primaryInductance: number,
+  turnsRatio: number,
+  couplingCoefficient: number,
+  primaryResistance: number,
+  secondaryResistance: number,
+): AnalogElementCore {
+  const p = { primaryInductance, turnsRatio, couplingCoefficient, primaryResistance, secondaryResistance };
+  const el = new AnalogTappedTransformerElement(
+    [pinNodes.get("P1")!, pinNodes.get("P2")!, pinNodes.get("S1")!, pinNodes.get("CT")!, pinNodes.get("S2")!],
+    branchIdx,
+    p.primaryInductance,
+    p.turnsRatio,
+    p.couplingCoefficient,
+    p.primaryResistance,
+    p.secondaryResistance,
+  );
+  (el as AnalogElementCore).setParam = function(key: string, value: number): void {
+    if (key in p) {
+      (p as Record<string, number>)[key] = value;
+      el.updateDerivedParams(
+        p.primaryInductance,
+        p.turnsRatio,
+        p.couplingCoefficient,
+        p.primaryResistance,
+        p.secondaryResistance,
+      );
+    }
+  };
+  return el;
+}
+
 function createTappedTransformerElement(
   pinNodes: ReadonlyMap<string, number>,
   _internalNodeIds: readonly number[],
   branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const lPrimary = props.getOrDefault<number>("primaryInductance", 10e-3);
-  const turnsRatio = props.getOrDefault<number>("turnsRatio", 2.0);
-  const k = props.getOrDefault<number>("couplingCoefficient", 0.99);
-  const rPri = props.getOrDefault<number>("primaryResistance", 0.0);
-  const rSec = props.getOrDefault<number>("secondaryResistance", 0.0);
-  return new AnalogTappedTransformerElement(
-    [pinNodes.get("P1")!, pinNodes.get("P2")!, pinNodes.get("S1")!, pinNodes.get("CT")!, pinNodes.get("S2")!],
+  return buildTappedTransformerElement(
+    pinNodes,
     branchIdx,
-    lPrimary,
-    turnsRatio,
-    k,
-    rPri,
-    rSec,
+    props.getOrDefault<number>("primaryInductance", 10e-3),
+    props.getOrDefault<number>("turnsRatio", 2.0),
+    props.getOrDefault<number>("couplingCoefficient", 0.99),
+    props.getOrDefault<number>("primaryResistance", 0.0),
+    props.getOrDefault<number>("secondaryResistance", 0.0),
+  );
+}
+
+function createTappedTransformerElementFromModelParams(
+  pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  branchIdx: number,
+  props: PropertyBag,
+): AnalogElementCore {
+  return buildTappedTransformerElement(
+    pinNodes,
+    branchIdx,
+    props.getModelParam<number>("primaryInductance"),
+    props.getModelParam<number>("turnsRatio"),
+    props.getModelParam<number>("couplingCoefficient"),
+    props.getModelParam<number>("primaryResistance"),
+    props.getModelParam<number>("secondaryResistance"),
   );
 }
 
@@ -572,6 +647,14 @@ export const TappedTransformerDefinition: ComponentDefinition = {
       factory: createTappedTransformerElement,
       branchCount: 1,
     },
+    },
+  },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createTappedTransformerElementFromModelParams,
+      paramDefs: TAPPED_TRANSFORMER_PARAM_DEFS,
+      params: TAPPED_TRANSFORMER_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

@@ -10,51 +10,24 @@ import { parseCtzUrl, parseCtzCircuitFromText } from "../ctz-parser.js";
 import { parseCtzText, mapCtzToCircuit, CTZ_TYPE_MAP } from "../ctz-format.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition } from "../../core/registry.js";
-import { AbstractCircuitElement } from "../../core/element.js";
 import { PropertyBag } from "../../core/properties.js";
-import type { RenderContext, Rect } from "../../core/renderer-interface.js";
-import type { Pin, Rotation } from "../../core/pin.js";
 import type { Diagnostic } from "../../headless/netlist-types.js";
-
-// ---------------------------------------------------------------------------
-// Minimal stub element for registry
-// ---------------------------------------------------------------------------
-
-class StubElement extends AbstractCircuitElement {
-  constructor(
-    typeName: string,
-    instanceId: string,
-    position: { x: number; y: number },
-    rotation: Rotation,
-    mirror: boolean,
-    props: PropertyBag,
-  ) {
-    super(typeName, instanceId, position, rotation, mirror, props);
-  }
-  getPins(): readonly Pin[] {
-    return [];
-  }
-  draw(_ctx: RenderContext): void {
-    // no-op
-  }
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 2 };
-  }
-}
+import { TestElement } from "../../test-fixtures/test-element.js";
+import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
 
 function makeDefinition(name: string): ComponentDefinition {
   return {
     name,
     typeId: -1,
     factory: (props: PropertyBag) =>
-      new StubElement(name, crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
+      new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, [], props),
     pinLayout: [],
     propertyDefs: [],
     attributeMap: [],
     category: ComponentCategory.PASSIVES,
     helpText: name,
     models: {
-      digital: { executeFn: () => undefined },
+      digital: { executeFn: noopExecFn },
     },
   };
 }

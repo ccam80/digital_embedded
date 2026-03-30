@@ -29,17 +29,23 @@ const VT = 0.02585;
 // Helpers
 // ---------------------------------------------------------------------------
 
+function makeParamBag(params: Record<string, number>): PropertyBag {
+  const bag = new PropertyBag();
+  bag.replaceModelParams(params);
+  return bag;
+}
+
 function makeZenerAtVd(
   vd: number,
   modelOverrides?: Record<string, number>,
 ): AnalogElement {
-  const propsObj = new PropertyBag([["_modelParams", {
+  const propsObj = makeParamBag({
     IS: 1e-14,
     N: 1,
     BV: 5.1,
     IBV: 1e-3,
     ...modelOverrides,
-  }]]);
+  });
   const element = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
 
   // Drive to operating point
@@ -97,7 +103,7 @@ describe("Zener", () => {
     expect(expectedId).toBeGreaterThan(1.0); // >> IBV = 1mA
 
     // Create element and drive to breakdown
-    const propsObj = new PropertyBag([["_modelParams", { IS, N, BV, IBV }]]);
+    const propsObj = makeParamBag({ IS, N, BV, IBV });
     const el = createZenerElement(new Map([["A", 1], ["K", 0]]), [], -1, propsObj);
 
     // Verify the element is nonlinear
@@ -131,22 +137,22 @@ describe("Zener", () => {
   });
 
   it("isNonlinear_true", () => {
-    const propsObj = new PropertyBag([["_modelParams", { IS: 1e-14, N: 1, BV: 5.1 }]]);
+    const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1 });
     const element = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
     expect(element.isNonlinear).toBe(true);
   });
 
   it("isReactive_false", () => {
-    const propsObj = new PropertyBag([["_modelParams", { IS: 1e-14, N: 1, BV: 5.1 }]]);
+    const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1 });
     const element = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
     expect(element.isReactive).toBe(false);
   });
 
   it("definition_has_correct_fields", () => {
     expect(ZenerDiodeDefinition.name).toBe("ZenerDiode");
-    expect(ZenerDiodeDefinition.models?.mnaModels?.behavioral).toBeDefined();
-    expect(ZenerDiodeDefinition.models?.mnaModels?.behavioral?.deviceType).toBe("D");
-    expect(ZenerDiodeDefinition.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(ZenerDiodeDefinition.modelRegistry?.["behavioral"]).toBeDefined();
+    expect(ZenerDiodeDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
+    expect(ZenerDiodeDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
   });
 });
 
@@ -181,7 +187,7 @@ describe("Integration", () => {
     // Zener: anode=ground(0), cathode=node1
     // When node1 ≈ 5.1V, Vd = 0 - 5.1 = -5.1V (breakdown)
     // IBV=1e-3 gives sharp clamping at BV (SPICE default)
-    const zenerProps = new PropertyBag([["_modelParams", { IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3 }]]);
+    const zenerProps = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3 });
     const z = withNodeIds(createZenerElement(new Map([["A", 0], ["K", 1]]), [], -1, zenerProps), [0, 1]);
 
     const solver = new SparseSolver();

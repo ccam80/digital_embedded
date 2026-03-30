@@ -10,27 +10,10 @@ import { deserializeCircuit as deserializeJson } from "../load.js";
 import { serializeCircuit as serializeDts } from "../dts-serializer.js";
 import { deserializeDts } from "../dts-deserializer.js";
 import { Circuit } from "../../core/circuit.js";
-import { AbstractCircuitElement } from "../../core/element.js";
 import { PropertyBag } from "../../core/properties.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
-import type { RenderContext, Rect } from "../../core/renderer-interface.js";
-import type { Pin } from "../../core/pin.js";
-
-// ---------------------------------------------------------------------------
-// Minimal stub element
-// ---------------------------------------------------------------------------
-
-class StubElement extends AbstractCircuitElement {
-  getPins(): readonly Pin[] {
-    return [];
-  }
-  draw(_ctx: RenderContext): void {
-    // no-op
-  }
-  getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y, width: 4, height: 4 };
-  }
-}
+import { TestElement } from "../../test-fixtures/test-element.js";
+import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
 
 function makeRegistry(...names: string[]): ComponentRegistry {
   const registry = new ComponentRegistry();
@@ -39,14 +22,14 @@ function makeRegistry(...names: string[]): ComponentRegistry {
       name,
       typeId: -1,
       factory: (props: PropertyBag) =>
-        new StubElement(name, crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props),
+        new TestElement(name, crypto.randomUUID(), { x: 0, y: 0 }, [], props),
       pinLayout: [],
       propertyDefs: [],
       attributeMap: [],
       category: ComponentCategory.LOGIC,
       helpText: name,
       models: {
-        digital: { executeFn: () => {} },
+        digital: { executeFn: noopExecFn },
       },
     });
   }

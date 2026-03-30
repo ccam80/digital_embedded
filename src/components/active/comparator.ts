@@ -45,6 +45,20 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: COMPARATOR_PARAM_DEFS, defaults: COMPARATOR_DEFAULTS } = defineModelParams({
+  primary: {
+    hysteresis:   { default: 0,    unit: "V", description: "Hysteresis band width" },
+    vos:          { default: 0.001, unit: "V", description: "Input offset voltage" },
+    rSat:         { default: 50,   unit: "Ω", description: "Output saturation resistance" },
+    responseTime: { default: 1e-6, unit: "s", description: "Propagation delay time constant" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -170,16 +184,18 @@ function createComparatorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ): AnalogElementCore {
-  const hysteresis    = Math.max(props.getOrDefault<number>("hysteresis",    0),     0);
-  const vos           = props.getOrDefault<number>("vos",           0.001);
-  const rSat          = Math.max(props.getOrDefault<number>("rSat",          50),    1e-9);
-  const outputType    = props.getOrDefault<string>("outputType",    "open-collector");
-  const responseTime  = Math.max(props.getOrDefault<number>("responseTime",  1e-6),  1e-12);
+  const p: Record<string, number> = {
+    hysteresis:   Math.max(props.getModelParam<number>("hysteresis"),   0),
+    vos:          props.getModelParam<number>("vos"),
+    rSat:         Math.max(props.getModelParam<number>("rSat"),   1e-9),
+    responseTime: Math.max(props.getModelParam<number>("responseTime"), 1e-12),
+  };
+  const outputType = props.getOrDefault<string>("outputType", "open-collector");
 
   const R_OFF = 1e9; // open-collector off-state impedance (1 GΩ)
-
-  const G_sat = 1 / rSat;
   const G_off = 1 / R_OFF;
+
+  // G_sat is computed from p.rSat at call time to support setParam hot-loading
 
   const nInp = pinNodes.get("in+")!; // non-inverting input node (1-based)
   const nInn = pinNodes.get("in-")!; // inverting input node (1-based)
@@ -203,7 +219,7 @@ function createComparatorElement(
   }
 
   function computeGeff(): number {
-    // Blend conductance according to current weight
+    const G_sat = 1 / Math.max(p.rSat, 1e-9);
     return G_off + _outputWeight * (G_sat - G_off);
   }
 
@@ -241,10 +257,10 @@ function createComparatorElement(
     updateOperatingPoint(voltages: Float64Array): void {
       const vInp = readNode(voltages, nInp);
       const vInn = readNode(voltages, nInn);
-      const vDiff = vInp - vInn - vos;
+      const vDiff = vInp - vInn - p.vos;
 
       // Hysteresis comparison with dead band
-      const halfHyst = hysteresis / 2;
+      const halfHyst = p.hysteresis / 2;
       if (_outputActive) {
         // Currently active (sinking); stays active until V+ drops well below V-
         if (vDiff < -halfHyst) {
@@ -293,7 +309,7 @@ function createComparatorElement(
       // Update _outputWeight toward its target using first-order Euler step.
       // This models the propagation delay specified by responseTime.
       const target = _outputActive ? 1.0 : 0.0;
-      const tau = responseTime;
+      const tau = Math.max(p.responseTime, 1e-12);
       const alpha = dt / (tau + dt); // first-order low-pass coefficient
       _outputWeight = _outputWeight + alpha * (target - _outputWeight);
 
@@ -303,6 +319,10 @@ function createComparatorElement(
         _solver.stamp(nOut - 1, nOut - 1, gNew - _gEff);
       }
       _gEff = gNew;
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in p) (p as Record<string, number>)[key] = value;
     },
   };
 }
@@ -394,18 +414,14 @@ export const VoltageComparatorDefinition: ComponentDefinition = {
     return new ComparatorElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        _branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        return createComparatorElement(pinNodes, props);
-      },
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, _branchIdx, props) =>
+        createComparatorElement(pinNodes, props),
+      paramDefs: COMPARATOR_PARAM_DEFS,
+      params: COMPARATOR_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

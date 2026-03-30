@@ -28,6 +28,17 @@ import {
   capacitorConductance,
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: CAPACITOR_PARAM_DEFS, defaults: CAPACITOR_DEFAULTS } = defineModelParams({
+  primary: {
+    capacitance: { default: 1e-6, unit: "F", description: "Capacitance in farads", min: 1e-15 },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -191,6 +202,16 @@ function createCapacitorElement(
   return new AnalogCapacitorElement(C);
 }
 
+function createCapacitorElementFromModelParams(
+  _pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  _branchIdx: number,
+  props: PropertyBag,
+): AnalogElementCore {
+  const C = props.getModelParam<number>("capacitance");
+  return new AnalogCapacitorElement(C);
+}
+
 // ---------------------------------------------------------------------------
 // Property definitions
 // ---------------------------------------------------------------------------
@@ -255,6 +276,14 @@ export const CapacitorDefinition: ComponentDefinition = {
       behavioral: {
       factory: createCapacitorElement,
     },
+    },
+  },
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createCapacitorElementFromModelParams,
+      paramDefs: CAPACITOR_PARAM_DEFS,
+      params: CAPACITOR_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

@@ -24,6 +24,17 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: CURRENT_SOURCE_PARAM_DEFS, defaults: CURRENT_SOURCE_DEFAULTS } = defineModelParams({
+  primary: {
+    current: { default: 0.01, unit: "A", description: "Source current in amperes" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // CurrentSourceElement — CircuitElement implementation
@@ -162,7 +173,7 @@ export function makeCurrentSource(
   current: number,
 ): AnalogElementCore {
   let scale = 1;
-  let Isrc = current;
+  const p: Record<string, number> = { current };
 
   return {
     branchIndex: -1,
@@ -170,9 +181,7 @@ export function makeCurrentSource(
     isReactive: false,
 
     setParam(key: string, value: number): void {
-      if (key === "current") {
-        Isrc = value;
-      }
+      if (key in p) (p as Record<string, number>)[key] = value;
     },
 
     setSourceScale(factor: number): void {
@@ -180,7 +189,7 @@ export function makeCurrentSource(
     },
 
     stamp(solver: SparseSolver): void {
-      const I = Isrc * scale;
+      const I = p.current * scale;
       if (nodePos !== 0) solver.stampRHS(nodePos - 1, I);
       if (nodeNeg !== 0) solver.stampRHS(nodeNeg - 1, -I);
     },
@@ -191,7 +200,7 @@ export function makeCurrentSource(
       // Conventional current flows from neg through source to pos (arrow direction).
       // Current into pos = -I (current exits element at pos into the circuit).
       // Current into neg = +I (current enters element at neg from the circuit).
-      const I = Isrc * scale;
+      const I = p.current * scale;
       return [-I, I];
     },
   };
@@ -222,19 +231,21 @@ export const CurrentSourceDefinition: ComponentDefinition = {
     );
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
       factory(
         pinNodes: ReadonlyMap<string, number>,
         _internalNodeIds: readonly number[],
         _branchIdx: number,
         props: PropertyBag,
       ): AnalogElementCore {
-        const current = (props.has("current") ? props.get<number>("current") : 0.01) ?? 0.01;
+        const current = props.getModelParam<number>("current");
         return makeCurrentSource(pinNodes.get("pos")!, pinNodes.get("neg")!, current);
       },
-    },
+      paramDefs: CURRENT_SOURCE_PARAM_DEFS,
+      params: CURRENT_SOURCE_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

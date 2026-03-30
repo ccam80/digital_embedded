@@ -225,4 +225,5 @@ export const OutDefinition: ComponentDefinition = {
   models: {
     digital: { executeFn: executeOut, inputSchema: ["in"], outputSchema: [] },
   },
+  modelRegistry: {},
 };

@@ -49,6 +49,17 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
 import { ControlledSourceElement } from "../../solver/analog/controlled-source-base.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: VCVS_PARAM_DEFS, defaults: VCVS_DEFAULTS } = defineModelParams({
+  primary: {
+    gain: { default: 1.0, description: "Linear voltage gain" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -119,6 +130,8 @@ class VCVSAnalogElement extends ControlledSourceElement {
   private readonly _nOutN: number;
   private readonly _k: number; // branch row (absolute 0-based)
 
+  private _gain: number;
+
   constructor(
     nCtrlP: number,
     nCtrlN: number,
@@ -141,8 +154,13 @@ class VCVSAnalogElement extends ControlledSourceElement {
     this._nOutP = nOutP;
     this._nOutN = nOutN;
     this._k = branchIdx;
+    this._gain = gain;
 
     this.branchIndex = branchIdx;
+  }
+
+  setParam(key: string, value: number): void {
+    if (key === "gain") this._gain = value;
   }
 
   /** Stamp the linear B/C incidence for the output voltage source branch. */
@@ -330,29 +348,25 @@ export const VCVSDefinition: ComponentDefinition = {
     return new VCVSElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      branchCount: 1,
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, branchIdx, props) => {
         const expression = props.getOrDefault<string>("expression", "V(ctrl)");
-        const gain = props.getOrDefault<number>("gain", 1.0);
+        const gain = props.getModelParam<number>("gain");
         return new VCVSAnalogElement(
-          pinNodes.get("ctrl+")!, // ctrl+
-          pinNodes.get("ctrl-")!, // ctrl-
-          pinNodes.get("out+")!,  // out+
-          pinNodes.get("out-")!,  // out-
+          pinNodes.get("ctrl+")!,
+          pinNodes.get("ctrl-")!,
+          pinNodes.get("out+")!,
+          pinNodes.get("out-")!,
           branchIdx,
           expression,
           gain,
         );
       },
-    },
+      paramDefs: VCVS_PARAM_DEFS,
+      params: VCVS_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

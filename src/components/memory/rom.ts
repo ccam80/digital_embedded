@@ -245,6 +245,7 @@ export const ROMDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -376,4 +377,5 @@ export const ROMDualPortDefinition: ComponentDefinition = {
       defaultDelay: 10,
     },
   },
+  modelRegistry: {},
 };

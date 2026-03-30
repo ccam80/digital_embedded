@@ -39,6 +39,18 @@ import {
 } from "../../core/registry.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: VARIABLE_RAIL_PARAM_DEFS, defaults: VARIABLE_RAIL_DEFAULTS } = defineModelParams({
+  primary: {
+    voltage:    { default: 5,    unit: "V", description: "Output voltage in volts" },
+    resistance: { default: 0.01, unit: "Ω", description: "Internal series resistance" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // VariableRailElement — CircuitElement implementation
@@ -166,6 +178,8 @@ export interface VariableRailAnalogElement extends AnalogElement {
   setVoltage(v: number): void;
   /** Current rail voltage. */
   readonly currentVoltage: number;
+  /** Live parameter mutation. */
+  setParam(key: string, value: number): void;
 }
 
 export function makeVariableRailElement(
@@ -176,18 +190,21 @@ export function makeVariableRailElement(
   initialVoltage: number,
   resistance: number,
 ): VariableRailAnalogElement {
-  let _voltage = initialVoltage;
-  const G = resistance > 0 ? 1 / resistance : 1e9;
+  const p: Record<string, number> = { voltage: initialVoltage, resistance };
 
   const element: VariableRailAnalogElement = {
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
 
-    get currentVoltage() { return _voltage; },
+    get currentVoltage() { return p.voltage; },
 
     setVoltage(v: number): void {
-      _voltage = v;
+      p.voltage = v;
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in p) (p as Record<string, number>)[key] = value;
     },
 
     setSourceScale(_factor: number): void {
@@ -201,13 +218,14 @@ export function makeVariableRailElement(
 
     stamp(solver: SparseSolver): void {
       const k = branchIdx;
+      const G = p.resistance > 0 ? 1 / p.resistance : 1e9;
 
       // Ideal voltage source: nodePos → nodeInt (internal node before R_int)
       if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
       if (nodeInt !== 0) solver.stamp(nodeInt - 1, k, -1);
       if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
       if (nodeInt !== 0) solver.stamp(k, nodeInt - 1, -1);
-      solver.stampRHS(k, _voltage);
+      solver.stampRHS(k, p.voltage);
 
       // Internal resistance: nodeInt → nodeNeg
       if (nodeInt !== 0) solver.stamp(nodeInt - 1, nodeInt - 1, G);
@@ -241,24 +259,25 @@ export const VariableRailDefinition: ComponentDefinition = {
     return new VariableRailElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      branchCount: 1,
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
       factory(
         pinNodes: ReadonlyMap<string, number>,
         internalNodeIds: readonly number[],
         branchIdx: number,
         props: PropertyBag,
       ): AnalogElementCore {
-        const voltage = props.getOrDefault<number>("voltage", 5);
-        const resistance = props.getOrDefault<number>("resistance", 0.01);
+        const voltage = props.getModelParam<number>("voltage");
+        const resistance = props.getModelParam<number>("resistance");
         const nodePos = pinNodes.get("pos")!;
         const nodeNeg = 0;
         const nodeInt = internalNodeIds[0] ?? nodePos;
         return makeVariableRailElement(nodePos, nodeNeg, nodeInt, branchIdx, voltage, resistance);
       },
-    },
+      paramDefs: VARIABLE_RAIL_PARAM_DEFS,
+      params: VARIABLE_RAIL_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

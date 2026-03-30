@@ -37,6 +37,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
+import { defineModelParams } from "../../core/model-params.js";
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
@@ -50,6 +51,21 @@ import { PinDirection } from "../../core/pin.js";
 const MIN_RESISTANCE = 1e-12;
 
 // ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: LDR_PARAM_DEFS, defaults: LDR_DEFAULTS } = defineModelParams({
+  primary: {
+    rDark:  { default: 1e6,  unit: "Ω",   description: "Resistance in darkness (lux = 0)" },
+    lux:    { default: 500,  unit: "lux", description: "Current light level in lux" },
+  },
+  secondary: {
+    luxRef: { default: 100,  unit: "lux", description: "Reference illumination level in lux" },
+    gamma:  { default: 0.7,               description: "Power-law exponent" },
+  },
+});
+
+// ---------------------------------------------------------------------------
 // LDRElement — MNA implementation
 // ---------------------------------------------------------------------------
 
@@ -59,12 +75,7 @@ export class LDRElement implements AnalogElementCore {
   readonly isNonlinear: boolean = true;
   readonly isReactive: boolean = false;
 
-  private readonly _rDark: number;
-  private readonly _luxRef: number;
-  private readonly _gamma: number;
-
-  /** Current light level in lux — adjustable via slider/property update. */
-  private _lux: number;
+  private readonly _p: Record<string, number>;
 
   /**
    * @param rDark  - Resistance in darkness (lux=0) in ohms
@@ -78,29 +89,35 @@ export class LDRElement implements AnalogElementCore {
     gamma: number,
     lux: number,
   ) {
-    this._rDark = Math.max(rDark, MIN_RESISTANCE);
-    this._luxRef = Math.max(luxRef, 1e-12);
-    this._gamma = gamma;
-    this._lux = Math.max(lux, 0);
+    this._p = {
+      rDark:  Math.max(rDark, MIN_RESISTANCE),
+      luxRef: Math.max(luxRef, 1e-12),
+      gamma,
+      lux:    Math.max(lux, 0),
+    };
   }
 
   /** Compute resistance at the current lux level. */
   resistance(): number {
-    if (this._lux <= 0) {
-      return this._rDark;
+    if (this._p.lux <= 0) {
+      return this._p.rDark;
     }
-    const R = this._rDark * Math.pow(this._lux / this._luxRef, -this._gamma);
+    const R = this._p.rDark * Math.pow(this._p.lux / this._p.luxRef, -this._p.gamma);
     return Math.max(R, MIN_RESISTANCE);
   }
 
   /** Current lux level — exposed for testing. */
   get lux(): number {
-    return this._lux;
+    return this._p.lux;
   }
 
   /** Update the lux level (slider interaction). */
   setLux(lux: number): void {
-    this._lux = Math.max(lux, 0);
+    this._p.lux = Math.max(lux, 0);
+  }
+
+  setParam(key: string, value: number): void {
+    if (key in this._p) this._p[key] = value;
   }
 
   stamp(_solver: SparseSolver): void {
@@ -155,10 +172,10 @@ export function createLDRElement(
   props: PropertyBag,
   _getTime: () => number,
 ): AnalogElementCore {
-  const rDark = props.getOrDefault<number>("rDark", 1e6);
-  const luxRef = props.getOrDefault<number>("luxRef", 100);
-  const gamma = props.getOrDefault<number>("gamma", 0.7);
-  const lux = props.getOrDefault<number>("lux", 500);
+  const rDark = props.getModelParam<number>("rDark");
+  const luxRef = props.getModelParam<number>("luxRef");
+  const gamma = props.getModelParam<number>("gamma");
+  const lux = props.getModelParam<number>("lux");
   return new LDRElement(rDark, luxRef, gamma, lux);
 }
 
@@ -360,6 +377,14 @@ export const LDRDefinition: ComponentDefinition = {
   helpText:
     "LDR (Light Dependent Resistor) — resistance varies with illumination. " +
     "Power-law model: R = R_dark × (lux / lux_ref)^(-γ).",
-  models: { mnaModels: { behavioral: { factory: createLDRElement } } },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createLDRElement,
+      paramDefs: LDR_PARAM_DEFS,
+      params: LDR_DEFAULTS,
+    },
+  },
   defaultModel: "behavioral",
 };

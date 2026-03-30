@@ -23,8 +23,28 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore } from "../../solver/analog/element.js";
-import { SCHOTTKY_DEFAULTS } from "../../solver/analog/model-defaults.js";
 import { createDiodeElement } from "./diode.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: SCHOTTKY_PARAM_DEFS, defaults: SCHOTTKY_PARAM_DEFAULTS } = defineModelParams({
+  primary: {
+    IS:  { default: 1e-8,  unit: "A", description: "Saturation current" },
+    N:   { default: 1.05,             description: "Emission coefficient" },
+  },
+  secondary: {
+    CJO: { default: 1e-12, unit: "F", description: "Zero-bias junction capacitance" },
+    VJ:  { default: 0.6,   unit: "V", description: "Junction built-in potential" },
+    M:   { default: 0.5,              description: "Grading coefficient" },
+    TT:  { default: 0,     unit: "s", description: "Transit time" },
+    FC:  { default: 0.5,              description: "Forward-bias capacitance coefficient" },
+    BV:  { default: 40,    unit: "V", description: "Reverse breakdown voltage" },
+    IBV: { default: 1e-3,  unit: "A", description: "Reverse breakdown current" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // createSchottkyElement — AnalogElement factory
@@ -157,14 +177,6 @@ const SCHOTTKY_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "SPICE model name (blank = use built-in Schottky defaults)",
   },
   LABEL_PROPERTY_DEF,
-  {
-    key: "_spiceModelOverrides",
-    type: PropertyType.STRING,
-    label: "SPICE Model Overrides",
-    defaultValue: {} as Record<string, number>,
-    description: "User-supplied SPICE parameter overrides",
-    hidden: true,
-  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -204,13 +216,13 @@ export const SchottkyDiodeDefinition: ComponentDefinition = {
     "Schottky Diode \u2014 metal-semiconductor junction with low forward voltage.\n" +
     "Same Shockley equation as standard diode but with Schottky defaults:\n" +
     "IS=1e-8, N=1.05, BV=40V, RS=1\u03A9, CJO=1pF.",
-  models: {
-    mnaModels: {
-      behavioral: {
-        factory: createSchottkyElement,
-        deviceType: "D",
-        defaultParams: SCHOTTKY_DEFAULTS,
-      },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: createSchottkyElement,
+      paramDefs: SCHOTTKY_PARAM_DEFS,
+      params: SCHOTTKY_PARAM_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

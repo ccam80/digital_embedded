@@ -769,7 +769,7 @@ test.describe('Component sweep tests', () => {
 
           // For gates/flip-flops in non-digital mode, set simulation model
           // via the property panel row labelled "Model" (added dynamically by
-          // showModelSelector; internal key is 'simulationModel').
+          // showModelSelector; internal key is 'model').
           // Gates have "cmos" model, flip-flops have "behavioral" model.
           if (mode !== 'digital' && (mode === 'cmos' || mode === 'behavioral')) {
             await builder.setComponentProperty('DUT', 'Model', mode);

@@ -31,6 +31,7 @@ import {
 import { defaultLogicFamily, getLogicFamilyPreset } from "../../core/logic-family.js";
 import { resolvePinElectrical } from "../../core/pin-electrical.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
+import { makeBridgeOutputAdapter, makeBridgeInputAdapter } from "./bridge-adapter.js";
 import type { BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
 import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
@@ -51,9 +52,11 @@ type ComponentRoute =
 function resolveModelEntry(
   def: ComponentDefinition,
   modelKey: string,
+  runtimeModelMap?: Record<string, Record<string, ModelEntry>>,
 ): ModelEntry | null {
-  if (!def.modelRegistry) return null;
-  return def.modelRegistry[modelKey] ?? null;
+  if (def.modelRegistry?.[modelKey]) return def.modelRegistry[modelKey]!;
+  if (runtimeModelMap?.[def.name]?.[modelKey]) return runtimeModelMap[def.name]![modelKey]!;
+  return null;
 }
 
 /**
@@ -74,6 +77,7 @@ function resolveComponentRoute(
   def: ComponentDefinition,
   pc: PartitionedComponent,
   _digitalPinLoading: "cross-domain" | "all" | "none",
+  runtimeModelMap?: Record<string, Record<string, ModelEntry>>,
 ): ComponentRoute {
   if (pc.modelKey === "neutral") {
     return { kind: 'skip' };
@@ -83,7 +87,7 @@ function resolveComponentRoute(
     return { kind: 'skip' };
   }
 
-  const entry = resolveModelEntry(def, pc.modelKey);
+  const entry = resolveModelEntry(def, pc.modelKey, runtimeModelMap);
   if (!entry) return { kind: 'skip' };
 
   if (entry.kind === "netlist") {
@@ -253,6 +257,8 @@ function compileSubcircuitToMnaModel(
           }
           return currents;
         },
+
+        setParam(_key: string, _value: number): void {},
       };
 
       if (anyNonlinear) {
@@ -734,6 +740,7 @@ function runPassA_partition(
   externalNodeCount: number,
   diagnostics: SolverDiagnostic[],
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
+  runtimeModelMap?: Record<string, Record<string, ModelEntry>>,
 ): PassAPartitionResult {
   let nextInternalNode = externalNodeCount + 1;
   let branchCount = 0;
@@ -748,7 +755,7 @@ function runPassA_partition(
     }
 
     const def = pc.definition;
-    const route = resolveComponentRoute(def, pc, digitalPinLoading);
+    const route = resolveComponentRoute(def, pc, digitalPinLoading, runtimeModelMap);
 
     switch (route.kind) {
       case 'skip': {
@@ -927,37 +934,47 @@ function buildAnalogNodeMapFromPartition(
     }
   }
 
-  // If no ground group found, pick the largest group as best-effort ground
+  // If no ground group found, handle based on partition type.
+  // Bridge-only partitions (all groups are boundary groups, no Ground component):
+  // synthesize a virtual ground at node 0 without consuming any group ID.
+  // All boundary groups then get sequential node IDs starting at 1.
+  // Other partitions: pick the largest group as best-effort ground.
   if (groundGroupIds.size === 0 && groups.length > 0) {
-    let bestGroupId = groups[0]!.groupId;
-    let bestSize = 0;
-    for (const g of groups) {
-      const size = g.pins.length + g.wires.length;
-      if (size > bestSize) {
-        bestSize = size;
-        bestGroupId = g.groupId;
+    const isBridgeOnly = partition.bridgeStubs.length > 0 &&
+      groups.every(g => g.domains.has("digital") || g.domains.size > 1);
+    if (!isBridgeOnly) {
+      let bestGroupId = groups[0]!.groupId;
+      let bestSize = 0;
+      for (const g of groups) {
+        const size = g.pins.length + g.wires.length;
+        if (size > bestSize) {
+          bestSize = size;
+          bestGroupId = g.groupId;
+        }
       }
+      groundGroupIds.add(bestGroupId);
+      diagnostics.push(
+        makeDiagnostic(
+          "no-ground",
+          "warning",
+          "No Ground element found in partition",
+          {
+            explanation:
+              "MNA simulation requires a ground reference node. " +
+              "The most-connected wire group has been assigned as ground (node 0). " +
+              "Add a Ground element to suppress this warning.",
+            suggestions: [
+              {
+                text: "Add a Ground element connected to the reference node.",
+                automatable: false,
+              },
+            ],
+          },
+        ),
+      );
     }
-    groundGroupIds.add(bestGroupId);
-    diagnostics.push(
-      makeDiagnostic(
-        "no-ground",
-        "warning",
-        "No Ground element found in partition",
-        {
-          explanation:
-            "MNA simulation requires a ground reference node. " +
-            "The most-connected wire group has been assigned as ground (node 0). " +
-            "Add a Ground element to suppress this warning.",
-          suggestions: [
-            {
-              text: "Add a Ground element connected to the reference node.",
-              automatable: false,
-            },
-          ],
-        },
-      ),
-    );
+    // Bridge-only: node 0 is a virtual ground (no group mapped to it).
+    // Boundary groups will be assigned node IDs starting at 1 below.
   }
 
   // Assign node IDs: ground groups → 0, others → 1, 2, 3, …
@@ -1269,12 +1286,57 @@ export function compileAnalogPartition(
 
   totalNodeCount = nextInternalNode - 1;
 
+  // Bridge stub processing — create MNA elements for each cross-domain boundary.
+  const bridgeAdaptersByGroupId = new Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>();
+
+  for (const stub of partition.bridgeStubs) {
+    const { boundaryGroupId, descriptor } = stub;
+    const nodeId = groupToNodeId.get(boundaryGroupId);
+    if (nodeId === undefined) continue;
+
+    // Determine loaded flag: use per-net override if present, else circuit-level mode.
+    // "none" mode → unloaded (ideal); "cross-domain" or "all" → loaded.
+    const override = descriptor.boundaryGroup.loadingMode;
+    const loaded = override !== undefined
+      ? override === "loaded"
+      : digitalPinLoading !== "none";
+
+    const spec = resolvePinElectrical(circuitFamily, descriptor.electricalSpec);
+    const adapters: Array<BridgeOutputAdapter | BridgeInputAdapter> = [];
+
+    if (descriptor.direction === "digital-to-analog") {
+      // Digital output pin drives the analog node — BridgeOutputAdapter (voltage source)
+      const branchIdx = totalNodeCount + branchCount;
+      branchCount++;
+      const adapter = makeBridgeOutputAdapter(spec, nodeId, branchIdx, loaded);
+      analogElements.push(adapter);
+      adapters.push(adapter);
+    } else {
+      // Analog voltage drives digital input — BridgeInputAdapter (loading sense)
+      const adapter = makeBridgeInputAdapter(spec, nodeId, loaded);
+      analogElements.push(adapter);
+      adapters.push(adapter);
+    }
+
+    bridgeAdaptersByGroupId.set(boundaryGroupId, adapters);
+  }
+
   // Topology validation — orphan/floating nodes, source loops.
   validateTopologyAndEmitDiagnostics(topologyInfo, totalNodeCount, diagnostics);
 
   // Check for ground.
   const hasGround = partition.components.some((pc) => pc.element.typeId === "Ground");
-  if (!hasGround) {
+  const isBridgeOnlyPartition = !hasGround && partition.bridgeStubs.length > 0;
+  if (isBridgeOnlyPartition) {
+    // Bridge-only partitions have no Ground component by definition. Node 0 is
+    // reserved by the node map builder as a virtual ground reference. Suppress
+    // any "no-ground" diagnostic that was emitted during node map construction.
+    for (let i = diagnostics.length - 1; i >= 0; i--) {
+      if (diagnostics[i]!.code === "no-ground") {
+        diagnostics.splice(i, 1);
+      }
+    }
+  } else if (!hasGround) {
     const alreadyHasGroundDiag = diagnostics.some((d) => d.code === "no-ground");
     if (!alreadyHasGroundDiag) {
       diagnostics.push(
@@ -1313,6 +1375,7 @@ export function compileAnalogPartition(
     elementResolvedPins,
     groupToNodeId,
     elementBridgeAdapters,
+    bridgeAdaptersByGroupId,
     diagnostics,
     timeRef,
   });

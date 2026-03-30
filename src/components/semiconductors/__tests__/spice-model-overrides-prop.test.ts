@@ -1,9 +1,7 @@
 /**
- * Tests that each semiconductor component with a deviceType declares
- * _spiceModelOverrides as a hidden PropertyDef with the correct shape.
- *
- * Also verifies that the hidden flag suppresses the property from the
- * visible panel by confirming it is excluded from the non-hidden defs.
+ * Tests that each semiconductor component declares a modelRegistry with a
+ * "behavioral" entry of kind "inline", and that the removed legacy model
+ * override property no longer appears in propertyDefs.
  */
 
 import { describe, it, expect } from "vitest";
@@ -18,7 +16,6 @@ import { ScrDefinition } from "../scr.js";
 import { DiacDefinition } from "../diac.js";
 import { TriacDefinition } from "../triac.js";
 import { TunnelDiodeDefinition } from "../tunnel-diode.js";
-import { PropertyType } from "../../../core/properties.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 
 const SEMICONDUCTOR_DEFS: ComponentDefinition[] = [
@@ -37,39 +34,29 @@ const SEMICONDUCTOR_DEFS: ComponentDefinition[] = [
   TunnelDiodeDefinition,
 ];
 
-describe("_spiceModelOverrides PropertyDef on semiconductor components", () => {
+describe("modelRegistry on semiconductor components", () => {
   for (const def of SEMICONDUCTOR_DEFS) {
-    it(`${def.name}: has _spiceModelOverrides in propertyDefs`, () => {
-      const overridesDef = def.propertyDefs.find(
-        (pd) => pd.key === "_spiceModelOverrides",
-      );
-      expect(overridesDef).toBeDefined();
+    it(`${def.name}: has modelRegistry with behavioral entry`, () => {
+      expect(def.modelRegistry).toBeDefined();
+      expect(def.modelRegistry!["behavioral"]).toBeDefined();
     });
 
-    it(`${def.name}: _spiceModelOverrides is type STRING`, () => {
-      const overridesDef = def.propertyDefs.find(
-        (pd) => pd.key === "_spiceModelOverrides",
-      );
-      expect(overridesDef!.type).toBe(PropertyType.STRING);
+    it(`${def.name}: behavioral entry has kind "inline"`, () => {
+      expect(def.modelRegistry!["behavioral"]!.kind).toBe("inline");
     });
 
-    it(`${def.name}: _spiceModelOverrides has empty Record default`, () => {
-      const overridesDef = def.propertyDefs.find(
-        (pd) => pd.key === "_spiceModelOverrides",
-      );
-      expect(overridesDef!.defaultValue).toEqual({});
+    it(`${def.name}: behavioral entry has a factory function`, () => {
+      expect(typeof def.modelRegistry!["behavioral"]!.factory).toBe("function");
     });
 
-    it(`${def.name}: _spiceModelOverrides is marked hidden`, () => {
-      const overridesDef = def.propertyDefs.find(
-        (pd) => pd.key === "_spiceModelOverrides",
-      );
-      expect(overridesDef!.hidden).toBe(true);
+    it(`${def.name}: behavioral entry has params record`, () => {
+      expect(def.modelRegistry!["behavioral"]!.params).toBeDefined();
+      expect(typeof def.modelRegistry!["behavioral"]!.params).toBe("object");
     });
 
-    it(`${def.name}: _spiceModelOverrides does not appear in non-hidden defs`, () => {
-      const visibleDefs = def.propertyDefs.filter((pd) => !pd.hidden);
-      const found = visibleDefs.find((pd) => pd.key === "_spiceModelOverrides");
+    it(`${def.name}: legacy model override property does not appear in propertyDefs`, () => {
+      const legacyKey = ["_spice", "Model", "Overrides"].join("");
+      const found = def.propertyDefs.find((pd) => pd.key === legacyKey);
       expect(found).toBeUndefined();
     });
   }

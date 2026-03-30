@@ -242,5 +242,13 @@ export const RegisterDefinition: ComponentDefinition = {
     },
     },
   },
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: makeBehavioralRegisterAnalogFactory(),
+      paramDefs: [],
+      params: {},
+    },
+  },
   defaultModel: "digital",
 };

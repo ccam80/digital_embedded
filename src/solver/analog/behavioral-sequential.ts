@@ -113,11 +113,11 @@ export class BehavioralCounterElement implements AnalogElementCore {
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const high = ((this._count >> bit) & 1) === 1;
       this._outBitPins[bit].setLogicLevel(high);
-      this._outBitPins[bit].stamp(solver);
+      this._outBitPins[bit].stampOutput(solver);
     }
     const ovf = this._count === this._maxValue;
     this._ovfPin.setLogicLevel(ovf);
-    this._ovfPin.stamp(solver);
+    this._ovfPin.stampOutput(solver);
   }
 
   updateOperatingPoint(voltages: Float64Array): void {
@@ -298,7 +298,7 @@ export class BehavioralRegisterElement implements AnalogElementCore {
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const high = ((this._storedValue >> bit) & 1) === 1;
       this._outBitPins[bit].setLogicLevel(high);
-      this._outBitPins[bit].stamp(solver);
+      this._outBitPins[bit].stampOutput(solver);
     }
   }
 
@@ -553,7 +553,7 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const high = ((this._count >> bit) & 1) === 1;
       this._outBitPins[bit].setLogicLevel(high);
-      this._outBitPins[bit].stamp(solver);
+      this._outBitPins[bit].stampOutput(solver);
     }
     const dirHigh = this._dirPin.readLogicLevel(
       readMnaVoltage(this._dirPin.nodeId, this._cachedVoltages),
@@ -566,7 +566,7 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
       readMnaVoltage(this._enPin.nodeId, this._cachedVoltages),
     );
     this._ovfPin.setLogicLevel(atOverflow && enHigh === true);
-    this._ovfPin.stamp(solver);
+    this._ovfPin.stampOutput(solver);
   }
 
   updateOperatingPoint(voltages: Float64Array): void {

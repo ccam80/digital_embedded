@@ -37,41 +37,56 @@ import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { DigitalOutputPinModel, DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
+import { defineModelParams } from "../../core/model-params.js";
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations
+// ---------------------------------------------------------------------------
+
+export const { paramDefs: SCHMITT_PARAM_DEFS, defaults: SCHMITT_DEFAULTS } = defineModelParams({
+  primary: {
+    vTH:  { default: 2.0, unit: "V", description: "Rising input threshold" },
+    vTL:  { default: 1.0, unit: "V", description: "Falling input threshold" },
+    vOH:  { default: 3.3, unit: "V", description: "Output high voltage" },
+    vOL:  { default: 0.0, unit: "V", description: "Output low voltage" },
+    rOut: { default: 50,  unit: "Ω", description: "Output impedance" },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // buildPinElectrical — construct ResolvedPinElectrical from component props
 // ---------------------------------------------------------------------------
 
 /**
- * Build a ResolvedPinElectrical from component properties.
+ * Build a ResolvedPinElectrical from the mutable params record.
  *
  * Fields not covered by the Schmitt trigger's own properties use sensible
  * CMOS 3.3V defaults (rIn=10MΩ, cIn=5pF, cOut=5pF, rHiZ=10MΩ).
  */
-function buildOutputSpec(props: PropertyBag): ResolvedPinElectrical {
+function buildOutputSpec(p: Record<string, number>): ResolvedPinElectrical {
   return {
-    rOut:  Math.max(props.getOrDefault<number>("rOut", 50), 1e-9),
+    rOut:  Math.max(p.rOut, 1e-9),
     cOut:  5e-12,
     rIn:   1e7,
     cIn:   5e-12,
-    vOH:   props.getOrDefault<number>("vOH", 3.3),
-    vOL:   props.getOrDefault<number>("vOL", 0.0),
-    vIH:   props.getOrDefault<number>("vTH", 2.0),
-    vIL:   props.getOrDefault<number>("vTL", 1.0),
+    vOH:   p.vOH,
+    vOL:   p.vOL,
+    vIH:   p.vTH,
+    vIL:   p.vTL,
     rHiZ:  1e7,
   };
 }
 
-function buildInputSpec(props: PropertyBag): ResolvedPinElectrical {
+function buildInputSpec(p: Record<string, number>): ResolvedPinElectrical {
   return {
     rOut:  50,
     cOut:  5e-12,
     rIn:   1e7,
     cIn:   5e-12,
-    vOH:   props.getOrDefault<number>("vOH", 3.3),
-    vOL:   props.getOrDefault<number>("vOL", 0.0),
-    vIH:   props.getOrDefault<number>("vTH", 2.0),
-    vIL:   props.getOrDefault<number>("vTL", 1.0),
+    vOH:   p.vOH,
+    vOL:   p.vOL,
+    vIH:   p.vTH,
+    vIL:   p.vTL,
     rHiZ:  1e7,
   };
 }
@@ -89,19 +104,24 @@ function buildInputSpec(props: PropertyBag): ResolvedPinElectrical {
  */
 function createSchmittTriggerElement(
   pinNodes: ReadonlyMap<string, number>,
+  _internalNodeIds: readonly number[],
+  _branchIdx: number,
   props: PropertyBag,
   inverting: boolean,
 ): AnalogElementCore {
-  const vTH = props.getOrDefault<number>("vTH", 2.0);
-  const vTL = props.getOrDefault<number>("vTL", 1.0);
-  const vOH = props.getOrDefault<number>("vOH", 3.3);
-  const vOL = props.getOrDefault<number>("vOL", 0.0);
+  const p: Record<string, number> = {
+    vTH:  props.getModelParam<number>("vTH"),
+    vTL:  props.getModelParam<number>("vTL"),
+    vOH:  props.getModelParam<number>("vOH"),
+    vOL:  props.getModelParam<number>("vOL"),
+    rOut: props.getModelParam<number>("rOut"),
+  };
 
   const nIn  = pinNodes.get("in")!;  // input node (1-based, 0=ground)
   const nOut = pinNodes.get("out")!; // output node (1-based, 0=ground)
 
-  const outputSpec = buildOutputSpec(props);
-  const inputSpec  = buildInputSpec(props);
+  const outputSpec = buildOutputSpec(p);
+  const inputSpec  = buildInputSpec(p);
 
   const outModel = new DigitalOutputPinModel(outputSpec);
   const inModel  = new DigitalInputPinModel(inputSpec);
@@ -141,23 +161,23 @@ function createSchmittTriggerElement(
       _solver = solver;
       // Linear loading: input resistance + output drive (Norton equivalent)
       if (nIn > 0)  inModel.stamp(solver);
-      if (nOut > 0) outModel.stamp(solver);
+      if (nOut > 0) outModel.stampOutput(solver);
     },
 
     stampNonlinear(solver: SparseSolver): void {
       // Re-stamp the output Norton equivalent with the current target voltage.
       // The output level was already updated in updateOperatingPoint.
-      if (nOut > 0) outModel.stamp(solver);
+      if (nOut > 0) outModel.stampOutput(solver);
     },
 
     updateOperatingPoint(voltages: Float64Array): void {
       const vIn = readNode(voltages, nIn);
 
       // Apply hysteresis state machine
-      if (_outputHigh && vIn < vTL) {
+      if (_outputHigh && vIn < p.vTL) {
         _outputHigh = false;
         updateOutputLevel();
-      } else if (!_outputHigh && vIn > vTH) {
+      } else if (!_outputHigh && vIn > p.vTH) {
         _outputHigh = true;
         updateOutputLevel();
       }
@@ -192,6 +212,10 @@ function createSchmittTriggerElement(
         inModel.stampCompanion(_solver, dt, method);
         inModel.updateCompanion(dt, method, vIn);
       }
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in p) p[key] = value;
     },
   };
 }
@@ -445,18 +469,14 @@ export const SchmittInvertingDefinition: ComponentDefinition = {
     return new SchmittInvertingElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        _branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        return createSchmittTriggerElement(pinNodes, props, true);
-      },
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createSchmittTriggerElement(pinNodes, internalNodeIds, branchIdx, props, true),
+      paramDefs: SCHMITT_PARAM_DEFS,
+      params: SCHMITT_DEFAULTS,
     },
   },
   defaultModel: "behavioral",
@@ -479,18 +499,14 @@ export const SchmittNonInvertingDefinition: ComponentDefinition = {
     return new SchmittNonInvertingElement(crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
   },
 
-  models: {
-    mnaModels: {
-      behavioral: {
-      factory(
-        pinNodes: ReadonlyMap<string, number>,
-        _internalNodeIds: readonly number[],
-        _branchIdx: number,
-        props: PropertyBag,
-      ): AnalogElementCore {
-        return createSchmittTriggerElement(pinNodes, props, false);
-      },
-    },
+  models: {},
+  modelRegistry: {
+    "behavioral": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createSchmittTriggerElement(pinNodes, internalNodeIds, branchIdx, props, false),
+      paramDefs: SCHMITT_PARAM_DEFS,
+      params: SCHMITT_DEFAULTS,
     },
   },
   defaultModel: "behavioral",

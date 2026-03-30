@@ -22,8 +22,8 @@ import {
   createPJfetElement,
   PJfetAnalogElement,
 } from "../pjfet.js";
-import { PropertyBag } from "../../../core/properties.js";
 import { ComponentRegistry } from "../../../core/registry.js";
+import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
@@ -93,8 +93,9 @@ function makeNJfetAt(
   const nodeG = 1;
   const nodeD = 2;
   const nodeS = sourceNode;
-  const propsObj = new PropertyBag([["_modelParams", params]]);
-  const element = createNJfetElement(new Map([["G", nodeG], ["S", nodeS], ["D", nodeD]]), -1, propsObj) as NJfetAnalogElement;
+  const propsObj = createTestPropertyBag();
+  propsObj.replaceModelParams(params);
+  const element = createNJfetElement(new Map([["G", nodeG], ["S", nodeS], ["D", nodeD]]), [], -1, propsObj) as NJfetAnalogElement;
 
   // Build voltage vector: node1=G=vgs, node2=D=vds (with S at 0)
   const maxNode = Math.max(nodeG, nodeD, nodeS);
@@ -141,8 +142,9 @@ describe("NJFET", () => {
     // V_GS = -3V < V_P = -2V → device off
     // With nodeG=1, nodeD=2, nodeS=0 (ground)
     // G=voltage[0]=-3V, D=voltage[1]=5V
-    const propsObj = new PropertyBag([["_modelParams", NJFET_PARAMS]]);
-    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), -1, propsObj);
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(NJFET_PARAMS);
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
 
     const voltages = new Float64Array(2);
     voltages[0] = -3; // V(G) = -3V → Vgs = -3V
@@ -169,8 +171,9 @@ describe("NJFET", () => {
     //      = 1e-4/2 * (0 - (-2))² * 1
     //      = 1e-4/2 * 4 = 0.2mA
     const params = { ...NJFET_PARAMS, LAMBDA: 0 };
-    const propsObj = new PropertyBag([["_modelParams", params]]);
-    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), -1, propsObj) as NJfetAnalogElement;
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(params);
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj) as NJfetAnalogElement;
 
     const voltages = new Float64Array(2);
     voltages[0] = 0; // V(G) = 0V → Vgs = 0
@@ -198,8 +201,9 @@ describe("NJFET", () => {
     // V_GS - V_P = 2V, V_DS = 0.5V < 2V → linear region
     // I_DS = β*(Vgst*Vds - Vds²/2) = 1e-4*(2*0.5 - 0.25/2) = 1e-4*(1-0.125) = 0.0875mA
     const params = { ...NJFET_PARAMS, LAMBDA: 0 };
-    const propsObj = new PropertyBag([["_modelParams", params]]);
-    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), -1, propsObj) as NJfetAnalogElement;
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(params);
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj) as NJfetAnalogElement;
 
     const voltages = new Float64Array(2);
     voltages[0] = 0;   // Vgs = 0
@@ -267,8 +271,9 @@ describe("NJFET", () => {
     expect(expectedIg).toBeGreaterThan(IS * 100);
 
     // Create element with forward-biased gate
-    const propsObj = new PropertyBag([["_modelParams", NJFET_PARAMS]]);
-    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), -1, propsObj);
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(NJFET_PARAMS);
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
 
     const voltages = new Float64Array(2);
     voltages[0] = 0.7; // V(G) = 0.7V → Vgs = 0.7V
@@ -324,8 +329,9 @@ describe("PJFET", () => {
     // Vs = 5V (source at high rail), Vg = 2V, Vd = 0V
     // Vsg = 5 - 2 = 3V > |VTO| = 2V → device on
     // Vsd = 5 - 0 = 5V → saturation (Vsd > Vsg - Vp = 3 - 2 = 1V)
-    const propsObj = new PropertyBag([["_modelParams", PJFET_PARAMS]]);
-    const element = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), -1, propsObj);
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(PJFET_PARAMS);
+    const element = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj);
 
     // node1=G=2V, node2=D=0V, node3=S=5V
     const voltages = new Float64Array(3);
@@ -369,8 +375,9 @@ describe("NR", () => {
     const diagnostics = new DiagnosticCollector();
 
     // createNJfetElement pin order: [G, S, D]
-    const propsObj = new PropertyBag([["_modelParams", NJFET_PARAMS]]);
-    const jfet = withNodeIds(createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), -1, propsObj), [3, 0, 1]);
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(NJFET_PARAMS);
+    const jfet = withNodeIds(createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]);
     const rd = makeResistorElement(2, 1, 10000); // Rd=10kΩ from Vdd to drain
     const vdd = makeDcVoltageSource(2, 0, 3, 10.0); // Vdd=10V
     const vgate = makeDcVoltageSource(3, 0, 4, 0.0); // Vg=0V
@@ -399,9 +406,9 @@ describe("Registration", () => {
 
     const def = registry.get("NJFET");
     expect(def).toBeDefined();
-    expect(def!.models?.mnaModels?.behavioral).toBeDefined();
+    expect(def!.modelRegistry?.["behavioral"]).toBeDefined();
     expect(def!.category).toBeDefined();
-    expect(def!.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(def!.modelRegistry?.["behavioral"]?.factory).toBeDefined();
   });
 
   it("pjfet_registered", () => {
@@ -410,8 +417,8 @@ describe("Registration", () => {
 
     const def = registry.get("PJFET");
     expect(def).toBeDefined();
-    expect(def!.models?.mnaModels?.behavioral).toBeDefined();
-    expect(def!.models?.mnaModels?.behavioral?.factory).toBeDefined();
+    expect(def!.modelRegistry?.["behavioral"]).toBeDefined();
+    expect(def!.modelRegistry?.["behavioral"]?.factory).toBeDefined();
   });
 
   it("njfet_pin_layout_has_three_pins", () => {
