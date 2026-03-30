@@ -1,65 +1,10 @@
 {
   "summary": {
-    "passed": 10116,
-    "failed": 9,
+    "passed": 26,
+    "failed": 0,
     "skipped": 0,
-    "totalFiles": 342,
-    "durationSeconds": 14.8
+    "totalFiles": 2,
+    "durationSeconds": 0.3
   },
-  "failures": [
-    {
-      "message": "Transient should converge: expected false to be true // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
-          "test": "latches_on_rising_edge",
-          "line": 392,
-          "column": 52
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
-          "test": "holds_on_falling_edge",
-          "line": 409,
-          "column": 52
-        }
-      ]
-    },
-    {
-      "message": "Should converge D=H: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
-          "test": "q_bar_complement",
-          "line": 427,
-          "column": 40
-        }
-      ]
-    },
-    {
-      "message": "DC OP should converge: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
-          "test": "clock_to_q_delay",
-          "line": 459,
-          "column": 51
-        }
-      ]
-    },
-    {
-      "message": "Step 1 should converge: expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\cmos-flipflop.test.ts",
-          "test": "toggle_mode",
-          "line": 520,
-          "column": 43
-        }
-      ]
-    }
-  ]
+  "failures": []
 }

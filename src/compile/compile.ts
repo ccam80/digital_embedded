@@ -20,7 +20,7 @@
 
 import type { Circuit } from "../core/circuit.js";
 import type { ComponentRegistry } from "../core/registry.js";
-import type { SubcircuitModelRegistry } from "../solver/analog/subcircuit-model-registry.js";
+
 import { resolveModelAssignments, extractConnectivityGroups, resolveLoadingOverrides, INFRASTRUCTURE_TYPES } from "./extract-connectivity.js";
 import { partitionByDomain } from "./partition.js";
 import { flattenCircuit, isSubcircuitHost } from "../solver/digital/flatten.js";

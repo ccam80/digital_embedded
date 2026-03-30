@@ -794,3 +794,53 @@ What's already done:
 - **Files created**: none
 - **Files modified**: src/app/spice-model-library-dialog.ts, src/solver/analog/__tests__/spice-model-library.test.ts
 - **Tests**: 56/56 passing
+
+## Task T1: Add new types
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/core/model-params.ts, src/test-fixtures/model-fixtures.ts, src/core/__tests__/model-params.test.ts, src/core/__tests__/property-bag-partition.test.ts
+- **Files modified**: src/core/registry.ts, src/core/properties.ts
+- **Tests**: 26/26 passing
+
+## Task T2: Delete all old infrastructure
+- **Status**: complete
+- **Agent**: implementer
+- **Files deleted**:
+  - src/solver/analog/model-library.ts
+  - src/solver/analog/subcircuit-model-registry.ts
+  - src/solver/analog/model-param-meta.ts
+  - src/solver/analog/model-defaults.ts
+  - src/solver/analog/default-models.ts
+  - src/solver/analog/transistor-expansion.ts
+  - src/app/spice-subckt-dialog.ts
+  - src/solver/analog/transistor-models/ (entire directory: cmos-gates.ts, cmos-flipflop.ts, darlington.ts)
+  - src/solver/analog/__tests__/model-library.test.ts
+  - src/solver/analog/__tests__/model-param-meta.test.ts
+  - src/solver/analog/__tests__/spice-subckt-dialog.test.ts
+  - src/solver/analog/__tests__/spice-model-library.test.ts
+  - src/solver/analog/__tests__/cmos-flipflop.test.ts
+  - src/solver/analog/__tests__/cmos-gates.test.ts
+  - src/solver/analog/__tests__/darlington.test.ts
+  - src/io/__tests__/dts-model-roundtrip.test.ts
+  - circuits/debug/4-1-mux-2-bit-selector-routes-one-of-four-inputs.dig
+  - circuits/debug/sr-latch-from-nand-gates-set-hold-reset.dig
+- **Files modified**:
+  - src/core/registry.ts (removed MnaModel, mnaModels from ComponentModels, subcircuitRefs from ComponentDefinition, removed getActiveModelKey, availableModels, hasAnalogModel, modelKeyToDomain functions, updated getWithModel to use modelRegistry)
+  - src/core/circuit.ts (removed namedParameterSets, modelDefinitions, subcircuitBindings from CircuitMetadata)
+  - src/solver/analog/compiler.ts (removed imports of SubcircuitModelRegistry, getAnalogFactory, ModelLibrary; removed _modelParams injection blocks)
+  - src/compile/compile.ts (removed SubcircuitModelRegistry import)
+  - src/compile/partition.ts (removed modelKeyToDomain import)
+  - src/compile/extract-connectivity.ts (removed getActiveModelKey import)
+  - src/headless/default-facade.ts (removed getTransistorModels import)
+  - src/editor/property-panel.ts (removed getParamMeta, getDeviceDefaults, availableModels imports)
+  - src/io/dts-deserializer.ts (removed ModelLibrary, SubcircuitModelRegistry imports)
+  - src/io/dts-serializer.ts (removed SubcircuitModelRegistry import)
+  - src/app/canvas-popup.ts (removed availableModels, getActiveModelKey, modelKeyToDomain, openSpiceSubcktDialog, getTransistorModels imports)
+  - src/app/spice-model-library-dialog.ts (removed SubcircuitModelRegistry, getTransistorModels imports)
+  - src/app/spice-model-apply.ts (removed SubcircuitModelRegistry import, cleaned comment)
+  - src/app/spice-import-dialog.ts (removed validateModel import)
+  - src/app/menu-toolbar.ts (removed getActiveModelKey, modelKeyToDomain imports)
+  - src/app/test-bridge.ts (removed getActiveModelKey, modelKeyToDomain imports)
+  - src/io/spice-model-builder.ts (cleaned comment referencing transistor-models/)
+- **Tests**: 26/26 passing (T1 new type tests verified passing after T2 deletions)
+- **Expected state**: Most of codebase will not compile. Component files (80+) still reference mnaModels and model-defaults — addressed in Wave 3. Compiler/serializer/deserializer have dangling type references — addressed in Wave 2 (T3, T5, T6).

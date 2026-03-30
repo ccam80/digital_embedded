@@ -2,12 +2,10 @@
  * SPICE subcircuit-to-MnaSubcircuitNetlist builder.
  *
  * Converts a `ParsedSubcircuit` (from `parseSubcircuit()`) into an
- * `MnaSubcircuitNetlist` that can be registered in `SubcircuitModelRegistry`
- * and compiled at compile time by the composite factory path
- * (`compileSubcircuitToMnaModel` in compiler.ts).
+ * `MnaSubcircuitNetlist` that can be compiled at compile time by the
+ * composite factory path (`compileSubcircuitToMnaModel` in compiler.ts).
  *
- * The resulting Circuit follows the same conventions as the hand-written
- * subcircuit definitions in `transistor-models/`:
+ * The resulting Circuit follows these conventions:
  *   - Interface elements ("In" typeId) are placed at y=0 with pin label "out",
  *     one per port.  Their x-coordinate is the net index (1-based).
  *   - Internal elements are placed at successive y rows starting at y=2.

@@ -11,8 +11,6 @@ import type { ComponentRegistry } from '../core/registry.js';
 import { PropertyBag } from '../core/properties.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { Rotation } from '../core/pin.js';
-import type { ModelLibrary } from '../solver/analog/model-library.js';
-import type { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
 import type { MnaSubcircuitNetlist } from '../core/mna-subcircuit-netlist.js';
 import { validateDtsDocument } from './dts-schema.js';
 import type { DtsCircuit, DtsElement, DtsWire } from './dts-schema.js';

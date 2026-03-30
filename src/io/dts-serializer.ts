@@ -8,7 +8,6 @@
 import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
-import type { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
 import type { MnaSubcircuitNetlist } from '../core/mna-subcircuit-netlist.js';
 import type {
   DtsDocument,

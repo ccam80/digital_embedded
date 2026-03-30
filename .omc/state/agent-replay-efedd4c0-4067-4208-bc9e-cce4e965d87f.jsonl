@@ -1,0 +1,4 @@
+{"t":0,"agent":"ac8a53f","agent_type":"general-purpose","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"ac8a53f","agent_type":"general-purpose","event":"agent_stop","success":true,"duration_ms":355505}
+{"t":0,"agent":"ad1cfb3","agent_type":"claude-orchestrator:implementer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"ad1cfb3","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true,"duration_ms":586923}

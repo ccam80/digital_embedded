@@ -7,7 +7,6 @@
 
 import type { CircuitElement } from "../core/element.js";
 import type { ComponentRegistry } from "../core/registry.js";
-import { modelKeyToDomain } from "../core/registry.js";
 import { PinDirection } from "../core/pin.js";
 import type { PinElectricalSpec } from "../core/pin-electrical.js";
 import type { CrossEngineBoundary } from "../solver/digital/cross-engine-boundary.js";

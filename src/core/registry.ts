@@ -10,8 +10,44 @@ import type { CircuitElement } from "./element.js";
 import type { PinDeclaration } from "./pin.js";
 import { PropertyType } from "./properties.js";
 import type { PropertyBag, PropertyDefinition, PropertyValue } from "./properties.js";
-import type { AnalogElementCore, DeviceType } from "./analog-types.js";
+import type { AnalogElementCore } from "./analog-types.js";
+import type { MnaSubcircuitNetlist } from "./mna-subcircuit-netlist.js";
 import type { PinElectricalSpec } from "./pin-electrical.js";
+
+// ---------------------------------------------------------------------------
+// AnalogFactory — named factory signature for MNA element construction
+// ---------------------------------------------------------------------------
+
+export type AnalogFactory = (
+  pinNodes: ReadonlyMap<string, number>,
+  internalNodeIds: readonly number[],
+  branchIdx: number,
+  props: PropertyBag,
+  getTime: () => number,
+) => AnalogElementCore;
+
+// ---------------------------------------------------------------------------
+// ParamDef — schema entry for one model parameter
+// ---------------------------------------------------------------------------
+
+export interface ParamDef {
+  key: string;
+  type: PropertyType;
+  label: string;
+  unit?: string;
+  description?: string;
+  rank: "primary" | "secondary";
+  min?: number;
+  max?: number;
+}
+
+// ---------------------------------------------------------------------------
+// ModelEntry — unified model type (inline factory or netlist-derived)
+// ---------------------------------------------------------------------------
+
+export type ModelEntry =
+  | { kind: "inline"; factory: AnalogFactory; paramDefs: ParamDef[]; params: Record<string, number> }
+  | { kind: "netlist"; netlist: MnaSubcircuitNetlist; paramDefs: ParamDef[]; params: Record<string, number> };
 
 // ---------------------------------------------------------------------------
 // Well-known property keys
@@ -175,41 +211,11 @@ export interface DigitalModel {
 }
 
 /**
- * Named MNA simulation model entry in the mnaModels map.
- * Each key is a user-selectable model name (e.g. "behavioral", "ideal", "real").
- */
-export interface MnaModel {
-  /** Produces AnalogElementCore stamp objects for this component. */
-  factory: (
-    pinNodes: ReadonlyMap<string, number>,
-    internalNodeIds: readonly number[],
-    branchIdx: number,
-    props: PropertyBag,
-    getTime: () => number,
-  ) => AnalogElementCore;
-
-  /** Number of internal MNA nodes needed. */
-  getInternalNodeCount?: (props: PropertyBag) => number;
-
-  /** Number of MNA branch rows needed (voltage sources, inductors). */
-  branchCount?: number;
-
-  /** Device type for SPICE parameter lookup (e.g., "NPN", "D", "NMOS"). */
-  deviceType?: DeviceType;
-
-  /** Default parameter values for this model. */
-  defaultParams?: Record<string, number>;
-}
-
-/**
  * Container for all simulation models a component type supports.
- * A component may have a digital model, MNA models, or both.
  */
 export interface ComponentModels {
   /** Event-driven digital: reads/writes bit vectors on discrete nets. */
   digital?: DigitalModel;
-  /** Named MNA models keyed by model name (e.g. "behavioral", "ideal", "real"). */
-  mnaModels?: Record<string, MnaModel>;
 }
 
 // ---------------------------------------------------------------------------
@@ -245,8 +251,11 @@ export interface ComponentDefinition {
   helpText: string;
   /** Structured simulation model container. */
   models: ComponentModels;
+  /** Named MNA models keyed by model name (e.g. "behavioral", "ideal"). */
+  modelRegistry?: Record<string, ModelEntry>;
   /**
-   * Default model key (e.g. "digital", "analog"). When omitted, the first key
+   * Default model key — indexes into `modelRegistry` keys or the implicit
+   * `"digital"` key when a digital model exists. When omitted, the first key
    * present in `models` is used. Hidden from the property panel when only one
    * model is available.
    */
@@ -255,8 +264,6 @@ export interface ComponentDefinition {
   pinElectrical?: PinElectricalSpec;
   /** Per-pin overrides for bridge adapter specs. */
   pinElectricalOverrides?: Record<string, PinElectricalSpec>;
-  /** Named subcircuit model references for MNA expansion. Keys are model names, values are subcircuit names. */
-  subcircuitRefs?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -266,74 +273,6 @@ export interface ComponentDefinition {
 /** Returns true if the component definition has a digital simulation model. */
 export function hasDigitalModel(def: ComponentDefinition): boolean {
   return def.models?.digital !== undefined;
-}
-
-/** Returns true if the component definition has an MNA simulation model. */
-export function hasAnalogModel(def: ComponentDefinition): boolean {
-  return def.models?.mnaModels !== undefined && Object.keys(def.models.mnaModels).length > 0;
-}
-
-/** Returns the list of model keys available on this component definition. */
-export function availableModels(def: ComponentDefinition): string[] {
-  const keys: string[] = [];
-  if (def.models?.digital) keys.push('digital');
-  if (def.models?.mnaModels) keys.push(...Object.keys(def.models.mnaModels));
-  if (def.subcircuitRefs) {
-    for (const k of Object.keys(def.subcircuitRefs)) {
-      if (!keys.includes(k)) keys.push(k);
-    }
-  }
-  return keys;
-}
-
-/**
- * Resolves the active model key for a component instance.
- *
- * Resolution order:
- * 1. `simulationModel` property on the element (if set and valid)
- * 2. `def.defaultModel` (if set)
- * 3. `"digital"` if a digital model exists
- * 4. First key in `mnaModels`
- *
- * Throws if the `simulationModel` property is set to an unrecognised key,
- * or if the component has no models at all.
- */
-export function getActiveModelKey(
-  el: CircuitElement,
-  def: ComponentDefinition,
-): string {
-  const prop = el.getAttribute('simulationModel');
-  if (typeof prop === 'string' && prop.length > 0) {
-    if (prop === 'digital' && def.models.digital) return prop;
-    if (def.models.mnaModels?.[prop]) return prop;
-    if (def.subcircuitRefs?.[prop]) return prop;
-    const validKeys: string[] = [];
-    if (def.models.digital) validKeys.push('digital');
-    validKeys.push(...Object.keys(def.models.mnaModels ?? {}));
-    validKeys.push(...Object.keys(def.subcircuitRefs ?? {}));
-    throw new Error(
-      `Unknown simulationModel "${prop}" on ${el.instanceId}; valid keys: ${validKeys.join(', ')}`,
-    );
-  }
-  if (def.defaultModel !== undefined) return def.defaultModel;
-  if (def.models.digital) return 'digital';
-  const mnaKeys = Object.keys(def.models.mnaModels ?? {});
-  if (mnaKeys.length > 0) return mnaKeys[0]!;
-  throw new Error(`Component ${el.instanceId} (${def.name}) has no models`);
-}
-
-/**
- * Maps a resolved model key to its simulation domain.
- *
- * `"digital"` → `"digital"` domain.
- * Anything present in `mnaModels` → `"mna"` domain.
- */
-export function modelKeyToDomain(
-  key: string,
-  def: ComponentDefinition,
-): "digital" | "mna" {
-  if (key === 'digital' && def.models.digital) return 'digital';
-  return 'mna';
 }
 
 // ---------------------------------------------------------------------------
@@ -478,16 +417,16 @@ export class ComponentRegistry {
   }
 
   /** Return all definitions that have a simulation model for the given model key.
-   * Passing "analog" returns all components with any named MNA model. */
+   * Passing "analog" returns all components with any modelRegistry entry. */
   getWithModel(modelKey: string): ComponentDefinition[] {
     return Array.from(this._byName.values()).filter((d) => {
       if (modelKey === 'analog') {
-        return d.models.mnaModels !== undefined && Object.keys(d.models.mnaModels).length > 0;
+        return d.modelRegistry !== undefined && Object.keys(d.modelRegistry).length > 0;
       }
       if (modelKey === 'digital') {
         return d.models.digital !== undefined;
       }
-      return d.models.mnaModels?.[modelKey] !== undefined;
+      return d.modelRegistry?.[modelKey] !== undefined;
     });
   }
 

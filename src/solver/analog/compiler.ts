@@ -23,14 +23,11 @@ import { pinWorldPosition, PinDirection } from "../../core/pin.js";
 import type { PinDeclaration, ResolvedPin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import { makeDiagnostic } from "./diagnostics.js";
-import { SubcircuitModelRegistry } from "./subcircuit-model-registry.js";
-import { getAnalogFactory } from "./transistor-expansion.js";
 import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import {
   ConcreteCompiledAnalogCircuit,
   type DeviceModel,
 } from "./compiled-analog-circuit.js";
-import { ModelLibrary, registerDefaultNamedModels, validateModel } from "./model-library.js";
 import { defaultLogicFamily, getLogicFamilyPreset } from "../../core/logic-family.js";
 import { resolvePinElectrical } from "../../core/pin-electrical.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
@@ -195,13 +192,6 @@ function compileSubcircuitToMnaModel(
         if (subEl.params) {
           for (const [k, v] of Object.entries(subEl.params)) {
             if (typeof v === "number") subProps.set(k, v);
-          }
-        }
-
-        if (subEl.modelRef) {
-          const namedModel = modelLibrary.get(subEl.modelRef);
-          if (namedModel) {
-            subProps.set("_modelParams", namedModel.params as unknown as import("../../core/properties.js").PropertyValue);
           }
         }
 
@@ -1351,31 +1341,6 @@ export function compileAnalogPartition(
         );
       }
       props.set("_pinElectrical", pinElectricalMap as unknown as import("../../core/properties.js").PropertyValue);
-    }
-
-    if (activeModel.deviceType !== undefined) {
-      const modelName = props.has("model") ? props.get<string>("model") : "";
-      const namedModel = modelName !== "" ? modelLibrary.get(modelName) : undefined;
-      const resolvedModel = namedModel ?? modelLibrary.getDefault(activeModel.deviceType);
-
-      const modelDiags = validateModel(resolvedModel);
-      diagnostics.push(...modelDiags);
-
-      // Resolution order for base params:
-      // 1. Component-specific defaultParams (e.g. SCHOTTKY_DEFAULTS)
-      // 2. Named model params (user-assigned .MODEL card)
-      // 3. Library default for the deviceType (base of resolution chain)
-      const baseParams = activeModel.defaultParams
-        ?? resolvedModel.params;
-      let finalParams = baseParams;
-      if (namedModel && activeModel.defaultParams) {
-        finalParams = { ...baseParams, ...namedModel.params };
-      }
-      if (props.has("_spiceModelOverrides")) {
-        const overrides = props.get<Record<string, number>>("_spiceModelOverrides");
-        finalParams = { ...finalParams, ...overrides };
-      }
-      props.set("_modelParams", finalParams as unknown as import("../../core/properties.js").PropertyValue);
     }
 
     const analogFactory = activeModel.factory;

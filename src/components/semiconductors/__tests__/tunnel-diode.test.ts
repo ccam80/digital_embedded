@@ -34,14 +34,21 @@ const TD_DEFAULTS = {
   vv: 0.5,    // 500 mV valley voltage
 };
 
+const TD_MODEL_PARAMS = {
+  IP: TD_DEFAULTS.ip,
+  VP: TD_DEFAULTS.vp,
+  IV: TD_DEFAULTS.iv,
+  VV: TD_DEFAULTS.vv,
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeTunnelDiode(overrides: Partial<typeof TD_DEFAULTS> = {}): AnalogElement {
-  const params = { ...TD_DEFAULTS, ...overrides };
+function makeTunnelDiode(overrides: Partial<typeof TD_MODEL_PARAMS> = {}): AnalogElement {
+  const modelParams = { ...TD_MODEL_PARAMS, ...overrides };
   // nodeAnode=1, nodeCathode=2
-  return createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, new PropertyBag(Object.entries(params)));
+  return createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, new PropertyBag([["_modelParams", modelParams]]));
 }
 
 /**
@@ -235,7 +242,7 @@ describe("TunnelDiode", () => {
       new Map([["A", 2], ["K", 0]]),
       [],
       -1,
-      new PropertyBag(Object.entries(TD_DEFAULTS)),
+      new PropertyBag([["_modelParams", TD_MODEL_PARAMS]]),
     ), [2, 0]);
 
     // Resistor element

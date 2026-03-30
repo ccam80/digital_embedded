@@ -25,7 +25,7 @@ import { serializeCircuitToDig } from '../io/dig-serializer.js';
 import { Circuit, Wire } from '../core/circuit.js';
 import { resolveModelAssignments, extractConnectivityGroups, stableNetId } from '../compile/extract-connectivity.js';
 import type { PinLoadingOverride } from '../compile/extract-connectivity.js';
-import { getActiveModelKey, modelKeyToDomain } from '../core/registry.js';
+
 import { darkColorScheme, lightColorScheme, THEME_COLORS } from '../core/renderer-interface.js';
 import { buildColorMap } from '../editor/color-scheme.js';
 import { hitTestElements, hitTestWires } from '../editor/hit-test.js';

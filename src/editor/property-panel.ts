@@ -11,13 +11,11 @@ import { createInput } from "./property-inputs.js";
 import type { PropertyInput } from "./property-inputs.js";
 import { formatSI, parseSI } from "./si-format.js";
 import type { ComponentDefinition } from "@/core/registry";
-import { availableModels, WELL_KNOWN_PROPERTY_KEYS } from "@/core/registry";
+import { WELL_KNOWN_PROPERTY_KEYS } from "@/core/registry";
 import type { PinElectricalSpec } from "@/core/pin-electrical";
 import { resolvePinElectrical } from "@/core/pin-electrical.js";
 import type { LogicFamilyConfig } from "@/core/logic-family";
 import { PinDirection } from "@/core/pin";
-import { getParamMeta } from "../solver/analog/model-param-meta.js";
-import { getDeviceDefaults } from "../solver/analog/model-defaults.js";
 
 const MODEL_LABELS: Record<string, string> = {
   digital: "Digital",

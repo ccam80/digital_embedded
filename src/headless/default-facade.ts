@@ -31,7 +31,7 @@ import type { SimulatorFacade } from './facade.js';
 import { CircuitBuilder } from './builder.js';
 import type { CompiledCircuitUnified } from '../compile/types.js';
 import { compileUnified } from '../compile/compile.js';
-import { getTransistorModels } from '../solver/analog/default-models.js';
+
 import { SimulationLoader } from './loader.js';
 import { serializeCircuit } from '../io/dts-serializer.js';
 import { deserializeDts } from '../io/dts-deserializer.js';

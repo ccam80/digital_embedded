@@ -14,8 +14,6 @@ import { createModal } from './dialog-manager.js';
 import { parseModelCard } from '../solver/analog/model-parser.js';
 import { parseSubcircuit } from '../solver/analog/model-parser.js';
 import type { Circuit } from '../core/circuit.js';
-import { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
-import { getTransistorModels } from '../solver/analog/default-models.js';
 import { buildNetConnectivity } from '../core/mna-subcircuit-netlist.js';
 import type { MnaSubcircuitNetlist, SubcircuitElement } from '../core/mna-subcircuit-netlist.js';
 

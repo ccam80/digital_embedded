@@ -65,6 +65,7 @@ export interface PropertyDefinition {
 
 export class PropertyBag {
   private readonly _map: Map<string, PropertyValue>;
+  private readonly _modelParams: Map<string, PropertyValue> = new Map();
 
   constructor(entries?: Iterable<readonly [string, PropertyValue]>) {
     this._map = new Map(entries);
@@ -105,6 +106,37 @@ export class PropertyBag {
     return this._map.has(key);
   }
 
+  // -------------------------------------------------------------------------
+  // Model parameter partition
+  // -------------------------------------------------------------------------
+
+  getModelParam<T extends PropertyValue>(key: string): T {
+    const value = this._modelParams.get(key);
+    if (value === undefined) {
+      throw new Error(`PropertyBag: model param "${key}" not found`);
+    }
+    return value as T;
+  }
+
+  setModelParam(key: string, value: PropertyValue): void {
+    this._modelParams.set(key, value);
+  }
+
+  replaceModelParams(params: Record<string, PropertyValue>): void {
+    this._modelParams.clear();
+    for (const [k, v] of Object.entries(params)) {
+      this._modelParams.set(k, v);
+    }
+  }
+
+  getModelParamKeys(): string[] {
+    return Array.from(this._modelParams.keys());
+  }
+
+  hasModelParam(key: string): boolean {
+    return this._modelParams.has(key);
+  }
+
   /**
    * Deep copy. Arrays within values are cloned element-by-element.
    * Primitive types (number, string, boolean, bigint) are copied by value.
@@ -113,6 +145,9 @@ export class PropertyBag {
     const cloned = new PropertyBag();
     for (const [k, v] of this._map) {
       cloned._map.set(k, Array.isArray(v) ? [...v] : (typeof v === 'object' && v !== null ? { ...v } : v));
+    }
+    for (const [k, v] of this._modelParams) {
+      cloned._modelParams.set(k, Array.isArray(v) ? [...v] : (typeof v === 'object' && v !== null ? { ...v } : v));
     }
     return cloned;
   }

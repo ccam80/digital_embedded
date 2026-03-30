@@ -9,7 +9,6 @@
 
 import { parseModelCard } from '../solver/analog/model-parser.js';
 import type { ParsedModel, ParseError } from '../solver/analog/model-parser.js';
-import { validateModel } from '../solver/analog/model-library.js';
 import { createModal } from './dialog-manager.js';
 import type { CircuitElement } from '../core/element.js';
 import type { ComponentDefinition } from '../core/registry.js';

@@ -1,14 +1,9 @@
 /**
  * Pure helpers for applying SPICE import results to component instances.
- *
- * Separated from spice-import-dialog.ts and spice-subckt-dialog.ts so they
- * can be imported in headless (node) test environments without pulling in
- * DOM dependencies.
  */
 
 import type { CircuitElement } from '../core/element.js';
 import type { Circuit } from '../core/circuit.js';
-import { SubcircuitModelRegistry } from '../solver/analog/subcircuit-model-registry.js';
 import type { MnaSubcircuitNetlist } from '../core/mna-subcircuit-netlist.js';
 /** The result produced by the .MODEL import dialog. */
 export interface SpiceImportResult {

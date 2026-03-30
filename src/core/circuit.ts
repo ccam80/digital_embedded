@@ -167,25 +167,6 @@ export interface CircuitMetadata {
     loading: 'loaded' | 'ideal';
   }>;
 
-  /**
-   * Named SPICE .MODEL parameter sets imported by the user.
-   * Keys are model names (e.g. "2N2222", "1N4148").
-   * Values are serialized as { deviceType, params } for persistence.
-   */
-  namedParameterSets?: Record<string, {
-    deviceType: string;
-    params: Record<string, number>;
-  }>;
-
-  /**
-   * Subcircuit model definitions imported from .SUBCKT blocks.
-   * Keys are subcircuit names (e.g. "OPAMP", "MYBJT").
-   * Values are MnaSubcircuitNetlist objects for persistence.
-   */
-  modelDefinitions?: Record<string, import("./mna-subcircuit-netlist.js").MnaSubcircuitNetlist>;
-  /** Maps 'ComponentType:modelKey' strings to subcircuit definition names. */
-  subcircuitBindings?: Record<string, string>;
-
   /** Persisted scope traces — restored after compilation. */
   traces?: SavedTrace[];
 }

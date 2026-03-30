@@ -9,12 +9,9 @@ import type { AppContext } from './app-context.js';
 import type { RenderPipeline } from './render-pipeline.js';
 import type { CanvasInteractionDeps } from './canvas-interaction.js';
 import { PropertyPanel } from '../editor/property-panel.js';
-import { availableModels, getActiveModelKey, modelKeyToDomain } from '../core/registry.js';
 import { defaultLogicFamily } from '../core/logic-family.js';
 import { openSpiceImportDialog } from './spice-import-dialog.js';
-import { openSpiceSubcktDialog } from './spice-subckt-dialog.js';
 import { applySpiceImportResult, applySpiceSubcktImportResult } from './spice-model-apply.js';
-import { getTransistorModels } from '../solver/analog/default-models.js';
 
 // ---------------------------------------------------------------------------
 // PopupController

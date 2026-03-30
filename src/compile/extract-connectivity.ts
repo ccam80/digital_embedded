@@ -7,7 +7,7 @@
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
 import type { ComponentRegistry } from '../core/registry.js';
-import { getActiveModelKey } from '../core/registry.js';
+import type { ComponentDefinition } from '../core/registry.js';
 import { pinWorldPosition } from '../core/pin.js';
 import { UnionFind } from './union-find.js';
 import type { ConnectivityGroup, ResolvedGroupPin } from './types.js';
