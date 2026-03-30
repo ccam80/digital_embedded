@@ -10,7 +10,6 @@ import type { Point, PinDirection } from "../core/pin.js";
 import type { PinElectricalSpec } from "../core/pin-electrical.js";
 import type { ComponentDefinition, DigitalModel, AnalogFactory } from "../core/registry.js";
 import type { ComponentRegistry } from "../core/registry.js";
-import type { CrossEngineBoundary } from "../solver/digital/cross-engine-boundary.js";
 import type { CompiledCircuitImpl as CompiledDigitalDomain } from "../solver/digital/compiled-circuit.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledAnalogDomain } from "../solver/analog/compiled-analog-circuit.js";
 import type { NetPin } from "../headless/netlist-types.js";
@@ -94,7 +93,7 @@ export interface MnaModel {
 // ---------------------------------------------------------------------------
 
 export type { Wire, CircuitElement, ComponentDefinition, DigitalModel, AnalogFactory };
-export type { PinElectricalSpec, CrossEngineBoundary };
+export type { PinElectricalSpec };
 export type { CompiledDigitalDomain, CompiledAnalogDomain };
 
 // ---------------------------------------------------------------------------
@@ -191,7 +190,6 @@ export interface SolverPartition {
   components: PartitionedComponent[];
   groups: ConnectivityGroup[];
   bridgeStubs: BridgeStub[];
-  crossEngineBoundaries: CrossEngineBoundary[];
 }
 
 // ---------------------------------------------------------------------------

@@ -1,10 +1,10 @@
 {
   "summary": {
-    "passed": 7641,
-    "failed": 172,
+    "passed": 7610,
+    "failed": 100,
     "skipped": 0,
-    "totalFiles": 334,
-    "durationSeconds": 21.4
+    "totalFiles": 327,
+    "durationSeconds": 12.5
   },
   "failures": [
     {
@@ -33,49 +33,13 @@
     },
     {
       "message": "expected [] to have a length of 1 but got +0",
-      "count": 7,
+      "count": 1,
       "locations": [
         {
           "file": "src\\compile\\__tests__\\pin-loading-menu.test.ts",
           "test": "cross-domain mode produces exactly one bridge for the DABridge element",
           "line": 289,
           "column": 28
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "invalid_model_key_emits_diagnostic_and_skips_factory",
-          "line": 503,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-          "test": "cross-domain with simulationModel=digital does produce bridge adapters",
-          "line": 321,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-          "test": "all mode: dual-model component in digital partition gets exactly one bridge",
-          "line": 331,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-          "test": "all mode: bridge has correct adapter counts (2 inputs + 1 output)",
-          "line": 340,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-          "test": "none mode: bridge adapters still present at simulationModel=digital boundary",
-          "line": 387,
-          "column": 30
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "digital_mode_bridge_adapters_stamp_at_correct_nodes",
-          "line": 1107,
-          "column": 30
         }
       ]
     },
@@ -117,25 +81,13 @@
     },
     {
       "message": "Cannot read properties of null (reading 'elements')",
-      "count": 7,
+      "count": 5,
       "locations": [
         {
           "file": "src\\compile\\__tests__\\pin-loading-menu.test.ts",
           "test": "none mode on mixed circuit preserves the analog partition with exactly one base element",
           "line": 362,
           "column": 27
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "compiles_and_gate_in_analog_circuit",
-          "line": 210,
-          "column": 21
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "compiler_routes_only_stamp_bridge_skip_after_resolve",
-          "line": 570,
-          "column": 21
         },
         {
           "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
@@ -206,222 +158,6 @@
       ]
     },
     {
-      "message": "expected +0 to be 1 // Object.is equality",
-      "count": 7,
-      "locations": [
-        {
-          "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-          "test": "analog_subcircuit_in_digital_not_flattened — analog-engine subcircuit inside digital outer circuit produces boundary",
-          "line": 273,
-          "column": 42
-        },
-        {
-          "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-          "test": "digital_subcircuit_in_analog_not_flattened — digital-engine subcircuit inside analog outer circuit produces boundary",
-          "line": 309,
-          "column": 42
-        },
-        {
-          "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-          "test": "simulation_mode_digital_overrides — analog-engine subcircuit with simulationModel=digital in analog outer circuit produces boundary",
-          "line": 374,
-          "column": 42
-        },
-        {
-          "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-          "test": "pin_mappings_correct — subcircuit with 2 inputs + 1 output produces 3 BoundaryPinMapping entries with correct labels and directions",
-          "line": 402,
-          "column": 42
-        },
-        {
-          "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-          "test": "cross_engine_port_subcircuit_preserved — analog subcircuit with Port interfaces in digital outer circuit produces boundary",
-          "line": 546,
-          "column": 42
-        },
-        {
-          "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-          "test": "port_pin_mappings_in_boundary — Port pins produce correct BoundaryPinMapping entries",
-          "line": 580,
-          "column": 42
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\compile-analog-partition.test.ts",
-          "test": "produces_compiled_circuit_for_simple_analog_partition",
-          "line": 342,
-          "column": 38
-        }
-      ]
-    },
-    {
-      "message": "expected +0 to be 2 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\digital\\__tests__\\flatten-bridge.test.ts",
-          "test": "mixed_port_and_inout_subcircuits — Port subcircuit and In/Out subcircuit both cross-engine are both recorded as boundaries",
-          "line": 641,
-          "column": 42
-        }
-      ]
-    },
-    {
-      "message": "expected 'digital' to be 'neutral' // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-          "test": "invalid_submode_produces_diagnostic: unrecognized simulationModel on dual-model component produces invalid-simulation-model diagnostic and neutral modelKey",
-          "line": 275,
-          "column": 38
-        },
-        {
-          "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-          "test": "invalid_logical_submode_produces_diagnostic: simulationModel=logical on dual-model component produces invalid-simulation-model diagnostic",
-          "line": 293,
-          "column": 38
-        }
-      ]
-    },
-    {
-      "message": "expected 'digital' to be 'behavioral' // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-          "test": "explicit_behavioral_key_respected: simulationModel=behavioral on dual-model component routes to behavioral mna model",
-          "line": 326,
-          "column": 38
-        }
-      ]
-    },
-    {
-      "message": "expected \"spy\" to be called once, but got 0 times",
-      "count": 8,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "resolves_logic_family_defaults",
-          "line": 219,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "respects_circuit_logic_family",
-          "line": 257,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "pin_override_applied",
-          "line": 312,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "default_is_first_simulationModel_entry",
-          "line": 337,
-          "column": 18
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "explicit_simplified_compiles",
-          "line": 352,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\compile-analog-partition.test.ts",
-          "test": "factory_called_once_for_and_gate",
-          "line": 365,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\compile-analog-partition.test.ts",
-          "test": "pin_node_ids_passed_to_factory_match_group_node_ids",
-          "line": 496,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-          "test": "calls_analog_factory_with_correct_args",
-          "line": 455,
-          "column": 24
-        }
-      ]
-    },
-    {
-      "message": "Cannot read properties of null (reading 'bridges')",
-      "count": 6,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "digital_mode_creates_bridge_instance",
-          "line": 458,
-          "column": 21
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\digital-bridge-path.test.ts",
-          "test": "creates_one_bridge_instance",
-          "line": 254,
-          "column": 21
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\digital-bridge-path.test.ts",
-          "test": "bridge_has_correct_adapter_counts",
-          "line": 262,
-          "column": 29
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\digital-bridge-path.test.ts",
-          "test": "inner_net_ids_are_valid",
-          "line": 277,
-          "column": 29
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\digital-bridge-path.test.ts",
-          "test": "adapter_outer_node_ids_are_non_negative",
-          "line": 297,
-          "column": 29
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\digital-bridge-path.test.ts",
-          "test": "adapter_labels_include_pin_name",
-          "line": 336,
-          "column": 29
-        }
-      ]
-    },
-    {
-      "message": "Cannot read properties of null (reading 'diagnostics')",
-      "count": 4,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "analog_internals_with_transistorModel_but_no_registry_emits_diagnostic",
-          "line": 485,
-          "column": 33
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "unresolved_modelRef_emits_unresolved_model_ref_diagnostic",
-          "line": 524,
-          "column": 33
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-          "test": "subcircuitBindings_override_merges_with_static_subcircuitRefs",
-          "line": 552,
-          "column": 33
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\digital-bridge-path.test.ts",
-          "test": "no_errors_emitted_in_digital_mode",
-          "line": 315,
-          "column": 29
-        }
-      ]
-    },
-    {
       "message": "expected [ { code: 'orphan-node', …(8) }, …(1) ] to have a length of +0 but got 2",
       "count": 3,
       "locations": [
@@ -442,18 +178,6 @@
           "test": "full pipeline: compile → DC OP → transient → analytical match",
           "line": 561,
           "column": 20
-        }
-      ]
-    },
-    {
-      "message": "expected 0 to be greater than or equal to 1",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\bridge-diagnostics.test.ts",
-          "test": "emits_bridge_impedance_mismatch_when_source_resistance_too_high",
-          "line": 458,
-          "column": 34
         }
       ]
     },
@@ -494,6 +218,18 @@
       ]
     },
     {
+      "message": "expected \"spy\" to be called once, but got 0 times",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+          "test": "calls_analog_factory_with_correct_args",
+          "line": 455,
+          "column": 24
+        }
+      ]
+    },
+    {
       "message": "Cannot read properties of null (reading 'matrixSize')",
       "count": 1,
       "locations": [
@@ -530,224 +266,104 @@
       ]
     },
     {
-      "message": "expected \"makeStubAnalogElement\" to be called once, but got 0 times",
-      "count": 1,
+      "message": "Target cannot be null or undefined.",
+      "count": 4,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\digital-bridge-path.test.ts",
-          "test": "behavioral_mode_still_calls_analog_factory",
-          "line": 327,
-          "column": 27
+          "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
+          "test": "cross-domain with simulationModel=digital does produce bridge adapters",
+          "line": 321,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
+          "test": "all mode: dual-model component in digital partition gets exactly one bridge",
+          "line": 331,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
+          "test": "all mode: bridge has correct adapter counts (2 inputs + 1 output)",
+          "line": 340,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
+          "test": "none mode: bridge adapters still present at simulationModel=digital boundary",
+          "line": 387,
+          "column": 30
         }
       ]
     },
     {
-      "message": "Cannot read properties of undefined (reading 'inputAdapters')",
-      "count": 3,
+      "message": "Cannot read properties of undefined (reading '0')",
+      "count": 4,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
           "test": "none mode: bridge input adapters have finite rIn",
-          "line": 400,
-          "column": 19
+          "line": 398,
+          "column": 29
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
+          "test": "none mode: bridge output adapters have finite rOut",
+          "line": 414,
+          "column": 29
         },
         {
           "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
           "test": "cross-domain mode: bridge input adapters have finite rIn (not ideal)",
-          "line": 432,
-          "column": 19
+          "line": 430,
+          "column": 29
         },
         {
           "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
           "test": "all mode input adapters have finite rIn",
           "line": 492,
-          "column": 48
+          "column": 36
         }
       ]
     },
     {
-      "message": "Cannot read properties of undefined (reading 'outputAdapters')",
+      "message": "Cannot read properties of undefined (reading 'length')",
       "count": 1,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-          "test": "none mode: bridge output adapters have finite rOut",
-          "line": 416,
-          "column": 19
+          "test": "none bridge count matches cross-domain (same boundary detection)",
+          "line": 453,
+          "column": 69
         }
       ]
     },
     {
-      "message": "Compile errors: , , , : expected [ { code: 'orphan-node', …(8) }, …(3) ] to have a length of +0 but got 4",
-      "count": 16,
+      "message": "expected 'digital' to be 'neutral' // Object.is equality",
+      "count": 2,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "xor_output_high_when_inputs_differ",
-          "line": 363,
-          "column": 80
+          "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
+          "test": "invalid_submode_produces_diagnostic: unrecognized simulationModel on dual-model component produces invalid-simulation-model diagnostic and neutral modelKey",
+          "line": 182,
+          "column": 38
         },
         {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "xor_output_low_when_inputs_match_both_high",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "xor_output_low_when_inputs_match_both_low",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "xor_output_high_when_in2_high_in1_low",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "custom_voh_via_component_override_is_respected",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "custom_voh_via_pin_override_takes_priority_over_component",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "output_converges_through_transient_steps",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "xor_output_high_when_inputs_differ",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "xor_output_low_when_inputs_match_both_high",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "xor_output_low_when_inputs_match_both_low",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "custom_voh_via_component_override_flows_through_bridge",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "custom_voh_via_pin_override_flows_through_bridge",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "converges_through_transient_steps",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "both_modes_agree_on_output_high_for_differing_inputs",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "both_modes_agree_on_output_low_for_matching_inputs",
-          "line": 363,
-          "column": 80
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "both_modes_agree_xor_truth_table",
-          "line": 363,
-          "column": 80
+          "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
+          "test": "invalid_logical_submode_produces_diagnostic: simulationModel=logical on dual-model component produces invalid-simulation-model diagnostic",
+          "line": 200,
+          "column": 38
         }
       ]
     },
     {
-      "message": "Errors: , , , : expected [ { code: 'orphan-node', …(8) }, …(3) ] to have a length of +0 but got 4",
+      "message": "expected 'digital' to be 'behavioral' // Object.is equality",
       "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "xor_compiles_to_bridge_instance",
-          "line": 520,
-          "column": 74
-        }
-      ]
-    },
-    {
-      "message": "Unexpected compile errors: ; ; : expected [ { code: 'orphan-node', …(8) }, …(2) ] to have a length of +0 but got 3",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "loads_and_compiles_without_error",
-          "line": 807,
-          "column": 7
-        }
-      ]
-    },
-    {
-      "message": "Compile errors: ; ; : expected [ { code: 'orphan-node', …(8) }, …(2) ] to have a length of +0 but got 3",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "xor_responds_to_ac_source_in_digital_mode",
-          "line": 819,
-          "column": 82
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "xor_responds_to_ac_source_in_simplified_mode",
-          "line": 857,
-          "column": 82
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "modifying_vOH_on_loaded_circuit_changes_output_voltage",
-          "line": 905,
-          "column": 82
-        }
-      ]
-    },
-    {
-      "message": "Compile errors: ; ; ; : expected [ { code: 'orphan-node', …(8) }, …(3) ] to have a length of +0 but got 4",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "bridge_handles_indeterminate_input_gracefully",
-          "line": 1052,
-          "column": 82
-        }
-      ]
-    },
-    {
-      "message": "mode=behavioral compile errors: ; ; ; : expected [ { code: 'orphan-node', …(8) }, …(3) ] to have a length of +0 but got 4",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\lrcxor-fixture.test.ts",
-          "test": "both_modes_survive_zero_voltage_inputs",
-          "line": 1077,
-          "column": 97
+          "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
+          "test": "explicit_behavioral_key_respected: simulationModel=behavioral on dual-model component routes to behavioral mna model",
+          "line": 233,
+          "column": 38
         }
       ]
     }

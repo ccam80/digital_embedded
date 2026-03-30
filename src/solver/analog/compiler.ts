@@ -20,7 +20,7 @@ import type { CircuitElement } from "../../core/element.js";
 import type { ComponentRegistry } from "../../core/registry.js";
 import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
 import { pinWorldPosition, PinDirection } from "../../core/pin.js";
-import type { PinDeclaration, ResolvedPin } from "../../core/pin.js";
+import type { ResolvedPin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
@@ -31,18 +31,10 @@ import {
 import { defaultLogicFamily, getLogicFamilyPreset } from "../../core/logic-family.js";
 import { resolvePinElectrical } from "../../core/pin-electrical.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
-import type { SubcircuitHost } from "../digital/flatten.js";
-import type { CrossEngineBoundary } from "../digital/cross-engine-boundary.js";
-import type { BridgeInstance } from "./bridge-instance.js";
-import { makeBridgeOutputAdapter, makeBridgeInputAdapter, BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
-import type { CompiledCircuitImpl } from "../digital/compiled-circuit.js";
+import type { BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
 import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
 import type { ModelEntry } from "../../core/registry.js";
-
-function compileInnerDigitalCircuit(circuit: Circuit, registry: ComponentRegistry, digitalCompiler: DigitalCompilerFn): CompiledCircuitImpl {
-  return digitalCompiler(circuit, registry) as CompiledCircuitImpl;
-}
 
 // ---------------------------------------------------------------------------
 // Component routing — shared decision logic for Pass A and Pass B
@@ -50,7 +42,6 @@ function compileInnerDigitalCircuit(circuit: Circuit, registry: ComponentRegistr
 
 type ComponentRoute =
   | { kind: 'stamp';  model: MnaModel; entry: ModelEntry | null }
-  | { kind: 'bridge' }
   | { kind: 'skip' };
 
 /**
@@ -82,15 +73,14 @@ function modelEntryToMnaModel(entry: ModelEntry): MnaModel | null {
 function resolveComponentRoute(
   def: ComponentDefinition,
   pc: PartitionedComponent,
-  digitalPinLoading: "cross-domain" | "all" | "none",
+  _digitalPinLoading: "cross-domain" | "all" | "none",
 ): ComponentRoute {
   if (pc.modelKey === "neutral") {
     return { kind: 'skip' };
   }
 
   if (pc.modelKey === "digital") {
-    if (digitalPinLoading === "none") return { kind: 'skip' };
-    return { kind: 'bridge' };
+    return { kind: 'skip' };
   }
 
   const entry = resolveModelEntry(def, pc.modelKey);
@@ -741,7 +731,6 @@ type PassAPartitionResult = {
  */
 function runPassA_partition(
   partition: SolverPartition,
-  crossEnginePlaceholderIds: Set<string>,
   externalNodeCount: number,
   diagnostics: SolverDiagnostic[],
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
@@ -752,8 +741,6 @@ function runPassA_partition(
 
   for (const pc of partition.components) {
     const el = pc.element;
-
-    if (crossEnginePlaceholderIds.has(el.instanceId)) continue;
 
     if (el.typeId === "Ground" || el.typeId === "Tunnel") {
       elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
@@ -768,9 +755,6 @@ function runPassA_partition(
         elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
         continue;
       }
-      case 'bridge':
-        elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
-        continue;
       case 'stamp': {
         const modelBranchCount = route.model.branchCount ?? 0;
         const branchIdx = modelBranchCount > 0 ? branchCount : -1;
@@ -1049,7 +1033,7 @@ export function compileAnalogPartition(
   registry: ComponentRegistry,
   logicFamily?: LogicFamilyConfig,
   outerCircuit?: Circuit,
-  digitalCompiler?: DigitalCompilerFn,
+  _digitalCompiler?: DigitalCompilerFn,
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
   perNetLoadingOverrides?: ReadonlyMap<number, "loaded" | "ideal">,
 ): ConcreteCompiledAnalogCircuit {
@@ -1080,11 +1064,6 @@ export function compileAnalogPartition(
   // Use the caller-supplied logic family or fall back to the default.
   const circuitFamily = logicFamily ?? defaultLogicFamily();
 
-  // Build set of cross-engine placeholder elements (from bridgeStubs)
-  const crossEnginePlaceholderIds = new Set<string>(
-    partition.crossEngineBoundaries.map((b) => (b.subcircuitElement as CircuitElement).instanceId),
-  );
-
   // Stage 2b: Resolve subcircuit-backed models into MnaModel factories.
   const runtimeModels: Record<string, MnaSubcircuitNetlist> = outerCircuit !== undefined
     ? extractRuntimeModels(outerCircuit.metadata as Record<string, unknown>)
@@ -1092,7 +1071,7 @@ export function compileAnalogPartition(
   resolveSubcircuitModels(partition, runtimeModels, registry, diagnostics);
 
   // Stage 3 (Pass A): Assign branch indices and allocate internal nodes.
-  const passA = runPassA_partition(partition, crossEnginePlaceholderIds, externalNodeCount, diagnostics, digitalPinLoading);
+  const passA = runPassA_partition(partition, externalNodeCount, diagnostics, digitalPinLoading);
 
   const elementMeta = passA.elementMeta;
   let branchCount = passA.branchCount;
@@ -1109,7 +1088,6 @@ export function compileAnalogPartition(
   const allWires = partition.groups.flatMap((g) => g.wires);
   const partitionCircuitStub = { wires: allWires } as import("../../core/circuit.js").Circuit;
 
-  const inlineBridges: BridgeInstance[] = [];
   const analogElements: import("./element.js").AnalogElement[] = [];
   const elementToCircuitElement = new Map<number, CircuitElement>();
   const elementPinVertices = new Map<number, Array<{ x: number; y: number } | null>>();
@@ -1140,138 +1118,6 @@ export function compileAnalogPartition(
     const route = resolveComponentRoute(def, pc, digitalPinLoading);
 
     if (route.kind === 'skip') {
-      continue;
-    }
-
-    if (route.kind === 'bridge') {
-      const outerPinNodeIds = resolveElementNodes(el, wireToNodeId, partitionCircuitStub, undefined, positionToNodeId);
-
-      let hasUnconnectedPin = false;
-      for (let pi = 0; pi < outerPinNodeIds.length; pi++) {
-        if (outerPinNodeIds[pi]! < 0) {
-          hasUnconnectedPin = true;
-          const elLabel = props.has("label") ? props.get<string>("label") : el.typeId;
-          const pinLabel = def.pinLayout[pi]?.label ?? `pin ${pi}`;
-          diagnostics.push(
-            makeDiagnostic(
-              "unconnected-analog-pin",
-              "error",
-              `The "${pinLabel}" pin on "${elLabel}" (${el.typeId}) is not connected to any wire`,
-              {
-                explanation:
-                  `Component "${elLabel}" has a pin ("${pinLabel}") that doesn't touch any wire ` +
-                  `endpoint in the circuit. The digital bridge path requires all pins to be connected.`,
-              },
-            ),
-          );
-        }
-      }
-      if (hasUnconnectedPin) continue;
-
-      const innerCircuit = synthesizeDigitalCircuit(el, def, registry);
-      let compiledInner: CompiledCircuitImpl;
-      try {
-        compiledInner = compileInnerDigitalCircuit(innerCircuit, registry, digitalCompiler!);
-      } catch (err) {
-        diagnostics.push(
-          makeDiagnostic(
-            "bridge-inner-compile-error",
-            "error",
-            `Failed to compile inner digital circuit for "${el.typeId}": ${String(err)}`,
-            {},
-          ),
-        );
-        continue;
-      }
-
-      const outputAdapters: BridgeOutputAdapter[] = [];
-      const inputAdapters: BridgeInputAdapter[] = [];
-      const outputPinNetIds: number[] = [];
-      const inputPinNetIds: number[] = [];
-
-      const elLabel = props.has("label") ? props.get<string>("label") : el.typeId;
-      let adapterError = false;
-
-      for (let pi = 0; pi < def.pinLayout.length; pi++) {
-        const pinDecl = def.pinLayout[pi]!;
-        const outerNodeId = outerPinNodeIds[pi]!;
-        const innerNetId = compiledInner.labelToNetId.get(pinDecl.label) ?? -1;
-
-        if (innerNetId < 0) {
-          diagnostics.push(
-            makeDiagnostic(
-              "bridge-missing-inner-pin",
-              "warning",
-              `Digital bridge: inner circuit has no net for pin label "${pinDecl.label}" on "${elLabel}"`,
-              {},
-            ),
-          );
-          adapterError = true;
-          continue;
-        }
-
-        const defPinOverride = def.pinElectricalOverrides?.[pinDecl.label];
-        const componentOverride = def.pinElectrical;
-        const userBridgeOverrides: Record<string, Partial<ResolvedPinElectrical>> = {};
-        if (props.has("_pinElectricalOverrides")) {
-          const flatOverrides = props.get<Record<string, number>>("_pinElectricalOverrides");
-          for (const [compositeKey, val] of Object.entries(flatOverrides)) {
-            const dotIdx = compositeKey.indexOf('.');
-            if (dotIdx === -1) continue;
-            const pinLabel = compositeKey.slice(0, dotIdx);
-            const field = compositeKey.slice(dotIdx + 1);
-            if (!userBridgeOverrides[pinLabel]) userBridgeOverrides[pinLabel] = {};
-            (userBridgeOverrides[pinLabel] as Record<string, number>)[field] = val;
-          }
-        }
-        const userPinOverride = userBridgeOverrides[pinDecl.label];
-        const mergedPinOverride = userPinOverride
-          ? { ...defPinOverride, ...userPinOverride }
-          : defPinOverride;
-        // Per-net override takes precedence over circuit-level digitalPinLoading.
-        const netOverride = nodeIdToLoadingOverride.get(outerNodeId);
-        const useIdeal = netOverride === "ideal" || (netOverride === undefined && digitalPinLoading === "none");
-        const spec = useIdeal
-          ? resolvePinElectrical(circuitFamily, { rIn: Infinity, rOut: 0, ...mergedPinOverride }, componentOverride)
-          : resolvePinElectrical(circuitFamily, mergedPinOverride, componentOverride);
-
-        if (pinDecl.direction === PinDirection.OUTPUT) {
-          const adapter = makeBridgeOutputAdapter(spec, outerNodeId);
-          adapter.label = `${elLabel}:${pinDecl.label}`;
-          outputAdapters.push(adapter);
-          outputPinNetIds.push(innerNetId);
-          const adapterIdx = analogElements.length;
-          if (!elementToCircuitElement.has(adapterIdx)) elementToCircuitElement.set(adapterIdx, el);
-          const adapterList = elementBridgeAdapters.get(adapterIdx) ?? [];
-          adapterList.push(adapter);
-          elementBridgeAdapters.set(adapterIdx, adapterList);
-          analogElements.push(adapter);
-          topologyInfo.push({ nodeIds: Array.from(adapter.pinNodeIds), isBranch: false, typeHint: "other" });
-        } else {
-          const adapter = makeBridgeInputAdapter(spec, outerNodeId);
-          adapter.label = `${elLabel}:${pinDecl.label}`;
-          inputAdapters.push(adapter);
-          inputPinNetIds.push(innerNetId);
-          const adapterIdx = analogElements.length;
-          if (!elementToCircuitElement.has(adapterIdx)) elementToCircuitElement.set(adapterIdx, el);
-          const adapterList = elementBridgeAdapters.get(adapterIdx) ?? [];
-          adapterList.push(adapter);
-          elementBridgeAdapters.set(adapterIdx, adapterList);
-          analogElements.push(adapter);
-          topologyInfo.push({ nodeIds: Array.from(adapter.pinNodeIds), isBranch: false, typeHint: "other" });
-        }
-      }
-
-      if (!adapterError && (outputAdapters.length > 0 || inputAdapters.length > 0)) {
-        inlineBridges.push({
-          compiledInner,
-          outputAdapters,
-          inputAdapters,
-          outputPinNetIds,
-          inputPinNetIds,
-          instanceName: typeof elLabel === "string" ? elLabel : el.instanceId,
-        });
-      }
       continue;
     }
 
@@ -1457,35 +1303,6 @@ export function compileAnalogPartition(
     }
   }
 
-  // Stage 8: Process cross-engine boundaries into BridgeInstances when an outer
-  // circuit is provided (supplies wire-endpoint geometry for node resolution).
-  const bridges: BridgeInstance[] = [...inlineBridges];
-  if (outerCircuit !== undefined) {
-    for (const boundary of partition.crossEngineBoundaries) {
-      const bridgeInstance = compileBridgeInstance(
-        boundary,
-        wireToNodeId,
-        outerCircuit,
-        totalNodeCount,
-        circuitFamily,
-        registry,
-        diagnostics,
-        digitalCompiler!,
-        digitalPinLoading,
-        nodeIdToLoadingOverride,
-      );
-      if (bridgeInstance !== null) {
-        for (const adapter of bridgeInstance.outputAdapters) {
-          analogElements.push(adapter);
-        }
-        for (const adapter of bridgeInstance.inputAdapters) {
-          analogElements.push(adapter);
-        }
-        bridges.push(bridgeInstance);
-      }
-    }
-  }
-
   // Build and return ConcreteCompiledAnalogCircuit
   const models = new Map<string, DeviceModel>();
 
@@ -1502,389 +1319,6 @@ export function compileAnalogPartition(
     groupToNodeId,
     elementBridgeAdapters,
     diagnostics,
-    bridges,
     timeRef,
   });
-}
-
-// ---------------------------------------------------------------------------
-// Bridge instance compilation helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Scan the outer circuit for elements connected to `targetNodeId` and return
- * the highest resistance property found among driving elements.
- *
- * Checks each CircuitElement in the outer circuit: if any of its pins are
- * wired to `targetNodeId`, the element's "resistance" property (or "R") is
- * read. Returns the maximum resistance found, or null if no resistive element
- * is found on the node.
- *
- * This is a heuristic check — it only detects simple resistor elements with
- * a "resistance" or "R" property. More complex impedances (e.g., op-amps,
- * current sources) are not detected.
- */
-function detectHighSourceImpedance(
-  targetNodeId: number,
-  outerCircuit: Circuit,
-  wireToNodeId: Map<import("../../core/circuit.js").Wire, number>,
-  registry: ComponentRegistry,
-): number | null {
-  let maxResistance: number | null = null;
-
-  for (const el of outerCircuit.elements) {
-    const def = registry.get(el.typeId);
-    if (!def) continue;
-
-    // Only inspect elements with analog models
-    if (!def.modelRegistry || Object.keys(def.modelRegistry).length === 0) continue;
-
-    // Check if any pin of this element is connected to targetNodeId
-    const nodeIds = resolveElementNodes(el, wireToNodeId, outerCircuit);
-    if (!nodeIds.includes(targetNodeId)) continue;
-
-    // Try to read a resistance property from the element using safe access
-    const props = el.getProperties();
-    let rRaw = 0;
-    if (props.has("resistance")) rRaw = props.getOrDefault<number>("resistance", 0);
-    else if (props.has("R")) rRaw = props.getOrDefault<number>("R", 0);
-    else if (props.has("Resistance")) rRaw = props.getOrDefault<number>("Resistance", 0);
-    if (typeof rRaw === "number" && rRaw > 0) {
-      if (maxResistance === null || rRaw > maxResistance) {
-        maxResistance = rRaw;
-      }
-    }
-  }
-
-  return maxResistance;
-}
-
-// ---------------------------------------------------------------------------
-// Bridge instance compilation
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// synthesizeDigitalCircuit
-// ---------------------------------------------------------------------------
-
-/**
- * Synthesize a minimal digital circuit from a single "both" component.
- *
- * Creates a Circuit containing:
- *   - One instance of the component (same type and props, minus _pinElectrical)
- *   - One In element per input pin, labeled to match the component's pin label
- *   - One Out element per output pin, labeled to match the component's pin label
- *   - Wires connecting each In/Out to the component's pins
- *
- * The resulting circuit can be compiled by the digital compiler and used as
- * the inner circuit of a BridgeInstance. The digital compiler's labelToNetId
- * uses the label property of In/Out elements — so by setting each In/Out
- * element's label to the matching pin label we get a direct lookup:
- *   compiledInner.labelToNetId.get(pinLabel) → inner net ID
- *
- * Layout:
- *   Inputs:    x = 0,   y = 0, 10, 20, …  (one per input pin)
- *   Component: x = 200, y = 0
- *   Outputs:   x = 400, y = 0, 10, 20, …  (one per output pin)
- *
- * Pin positions on InElement are (0,0) LOCAL — the world position equals the
- * element position because rotation=0, mirror=false.
- * Pin positions on OutElement are (0,0) LOCAL — same reasoning.
- * Component pins are accessed via getPins() which returns LOCAL coordinates;
- * world = element.position + pin.position (rotation=0).
- */
-function synthesizeDigitalCircuit(
-  el: CircuitElement,
-  def: import("../../core/registry.js").ComponentDefinition,
-  registry: ComponentRegistry,
-): Circuit {
-  const inner = new Circuit({ name: el.typeId });
-
-  // Build stripped props: copy all properties except analog-compiler concerns.
-  const srcProps = el.getProperties();
-  const innerProps = new PropertyBag();
-  for (const [key, val] of srcProps.entries()) {
-    if (key === "_pinElectrical") continue;
-    innerProps.set(key, val);
-  }
-
-  // Place the component at the centre column (x=200, y=0, rotation=0).
-  const compDef = registry.get(el.typeId)!;
-  const compEl = compDef.factory(innerProps);
-  compEl.position = { x: 200, y: 0 };
-  // Assert rotation=0 — this is the one place where raw position + pin.position
-  // is valid because we control the element's transform. A non-zero rotation
-  // would make compPinWorld = element.position + pin.position incorrect.
-  if (compEl.rotation !== 0) {
-    throw new Error('synthesizeDigitalCircuit: component must have rotation=0');
-  }
-  inner.addElement(compEl);
-
-  // Determine pin world positions for the newly-placed component.
-  const compPins = compEl.getPins();
-
-  let inputRow = 0;
-  let outputRow = 0;
-
-  for (let pi = 0; pi < def.pinLayout.length; pi++) {
-    const pinDecl: PinDeclaration = def.pinLayout[pi]!;
-    const compPin = compPins[pi];
-    if (!compPin) continue;
-
-    // World position of this component pin (element at x=200, y=0, rotation=0).
-    const compPinWorld = pinWorldPosition(compEl, compPin);
-
-    if (pinDecl.direction === PinDirection.INPUT || pinDecl.direction === PinDirection.BIDIRECTIONAL) {
-      // Create an In element at (0, inputRow*10) with label matching the pin label.
-      const inDef = registry.get("In");
-      if (!inDef) continue;
-      const inProps = new PropertyBag();
-      inProps.set("label", pinDecl.label);
-      inProps.set("bitWidth", compPin.bitWidth);
-      const inEl = inDef.factory(inProps);
-      inEl.position = { x: 0, y: inputRow * 10 };
-      inner.addElement(inEl);
-
-      // InElement output pin is at (0,0) LOCAL → world = element.position.
-      const inPinWorld = { x: 0, y: inputRow * 10 };
-      inner.addWire(new Wire(inPinWorld, compPinWorld));
-      inputRow++;
-    } else {
-      // Create an Out element at (400, outputRow*10) with label matching the pin label.
-      const outDef = registry.get("Out");
-      if (!outDef) continue;
-      const outProps = new PropertyBag();
-      outProps.set("label", pinDecl.label);
-      outProps.set("bitWidth", compPin.bitWidth);
-      const outEl = outDef.factory(outProps);
-      outEl.position = { x: 400, y: outputRow * 10 };
-      inner.addElement(outEl);
-
-      // OutElement input pin is at (0,0) LOCAL → world = element.position.
-      const outPinWorld = { x: 400, y: outputRow * 10 };
-      inner.addWire(new Wire(compPinWorld, outPinWorld));
-      outputRow++;
-    }
-  }
-
-  return inner;
-}
-
-/**
- * Compile one CrossEngineBoundary into a BridgeInstance.
- *
- * Steps:
- *   1. Compile the inner circuit with the digital compiler.
- *   2. For each BoundaryPinMapping, resolve the outer MNA node ID by matching
- *      the subcircuit element's pin position to wires in the outer circuit.
- *   3. Create BridgeOutputAdapter (for 'out' pins) or BridgeInputAdapter
- *      (for 'in' pins) using the resolved electrical spec.
- *   4. Map each adapter to its corresponding net ID in the inner compiled circuit.
- *
- * Returns null and emits diagnostics when compilation fails.
- */
-function compileBridgeInstance(
-  boundary: CrossEngineBoundary,
-  wireToNodeId: Map<import("../../core/circuit.js").Wire, number>,
-  outerCircuit: Circuit,
-  _totalNodeCount: number,
-  circuitFamily: LogicFamilyConfig,
-  registry: ComponentRegistry,
-  diagnostics: SolverDiagnostic[],
-  digitalCompiler: DigitalCompilerFn,
-  digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
-  nodeIdToLoadingOverride: ReadonlyMap<number, "loaded" | "ideal"> = new Map(),
-): BridgeInstance | null {
-  // Step 1: Compile the inner digital circuit.
-  let compiledInner: CompiledCircuitImpl;
-  try {
-    compiledInner = compileInnerDigitalCircuit(boundary.internalCircuit, registry, digitalCompiler);
-  } catch (err) {
-    diagnostics.push(
-      makeDiagnostic(
-        "bridge-inner-compile-error",
-        "error",
-        `Failed to compile inner circuit for bridge "${boundary.instanceName}": ${String(err)}`,
-        {},
-      ),
-    );
-    return null;
-  }
-
-  const outputAdapters: BridgeOutputAdapter[] = [];
-  const inputAdapters: BridgeInputAdapter[] = [];
-  const outputPinNetIds: number[] = [];
-  const inputPinNetIds: number[] = [];
-
-  // Step 2 & 3: For each pin mapping, resolve the outer node ID and create
-  //             the appropriate bridge adapter.
-  for (const mapping of boundary.pinMappings) {
-    // Resolve the outer MNA node ID for this pin by matching the subcircuit
-    // element's pin position to wires in the outer circuit.
-    const outerNodeId = resolveSubcircuitPinNode(
-      boundary.subcircuitElement,
-      mapping.pinLabel,
-      wireToNodeId,
-      outerCircuit,
-    );
-
-    if (outerNodeId < 0) {
-      // Pin not connected to any wire in the outer circuit — skip with diagnostic.
-      diagnostics.push(
-        makeDiagnostic(
-          "bridge-unconnected-pin",
-          "warning",
-          `Bridge pin "${mapping.pinLabel}" on "${boundary.instanceName}" is not connected in the outer circuit`,
-          {},
-        ),
-      );
-      continue;
-    }
-
-    // Resolve the inner net ID for this pin from the compiled inner circuit.
-    const innerNetId = compiledInner.labelToNetId.get(mapping.innerLabel) ?? -1;
-    if (innerNetId < 0) {
-      diagnostics.push(
-        makeDiagnostic(
-          "bridge-missing-inner-pin",
-          "warning",
-          `Bridge: inner circuit "${boundary.instanceName}" has no net for pin label "${mapping.innerLabel}"`,
-          {},
-        ),
-      );
-      continue;
-    }
-
-    // Resolve the pin electrical spec from the circuit logic family.
-    // Per-net override takes precedence over circuit-level digitalPinLoading.
-    const netOverride = nodeIdToLoadingOverride.get(outerNodeId);
-    const useIdeal = netOverride === "ideal" || (netOverride === undefined && digitalPinLoading === "none");
-    const spec = useIdeal
-      ? resolvePinElectrical(circuitFamily, { rIn: Infinity, rOut: 0 })
-      : resolvePinElectrical(circuitFamily);
-
-    if (mapping.direction === "out") {
-      // Digital subcircuit output → drives analog net.
-      const adapter = makeBridgeOutputAdapter(spec, outerNodeId);
-      adapter.label = `${boundary.instanceName}:${mapping.pinLabel}`;
-      outputAdapters.push(adapter);
-      outputPinNetIds.push(innerNetId);
-    } else {
-      // Analog net → feeds digital subcircuit input.
-      const adapter = makeBridgeInputAdapter(spec, outerNodeId);
-      adapter.label = `${boundary.instanceName}:${mapping.pinLabel}`;
-      inputAdapters.push(adapter);
-      inputPinNetIds.push(innerNetId);
-
-      // Check for impedance mismatch: if any element driving this node has a
-      // source resistance much greater than rIn (threshold: R_source > 100 × rIn),
-      // emit an info diagnostic.
-      const rIn = spec.rIn;
-      const rSourceMismatch = detectHighSourceImpedance(
-        outerNodeId,
-        outerCircuit,
-        wireToNodeId,
-        registry,
-      );
-      if (rSourceMismatch !== null && rSourceMismatch > 100 * rIn) {
-        diagnostics.push(
-          makeDiagnostic(
-            "bridge-impedance-mismatch",
-            "info",
-            `Bridge input pin "${adapter.label}" source impedance ${rSourceMismatch.toExponential(2)}Ω >> R_in ${rIn.toExponential(2)}Ω — may not reliably drive the digital input`,
-            {
-              explanation:
-                `The analog source driving bridge input "${adapter.label}" has an estimated ` +
-                `source resistance of ${rSourceMismatch.toExponential(2)}Ω, which is more than ` +
-                `100× the bridge input resistance R_in = ${rIn.toExponential(2)}Ω. ` +
-                `The voltage at the bridge pin will be attenuated by the resistor divider ` +
-                `formed by R_source and R_in, potentially preventing the signal from ` +
-                `reaching valid logic levels. Add a buffer or lower the source impedance.`,
-              suggestions: [
-                {
-                  text: "Add a unity-gain buffer (voltage follower) between the high-impedance source and the bridge input.",
-                  automatable: false,
-                },
-              ],
-            },
-          ),
-        );
-      }
-    }
-  }
-
-  return {
-    compiledInner,
-    outputAdapters,
-    inputAdapters,
-    outputPinNetIds,
-    inputPinNetIds,
-    instanceName: boundary.instanceName,
-  };
-}
-
-/**
- * Resolve the outer MNA node ID for a world-space position.
- *
- * Used by the mixed-mode partitioner to find the node ID at a cut-point
- * position without requiring a SubcircuitHost element. Scans all wires
- * for an endpoint matching the position (within 0.5 tolerance).
- */
-function resolvePositionToNodeId(
-  pos: { x: number; y: number },
-  wireToNodeId: Map<import("../../core/circuit.js").Wire, number>,
-  outerCircuit: Circuit,
-): number {
-  for (const wire of outerCircuit.wires) {
-    const matchStart =
-      Math.abs(wire.start.x - pos.x) < 0.5 &&
-      Math.abs(wire.start.y - pos.y) < 0.5;
-    const matchEnd =
-      Math.abs(wire.end.x - pos.x) < 0.5 &&
-      Math.abs(wire.end.y - pos.y) < 0.5;
-    if (matchStart || matchEnd) {
-      const nodeId = wireToNodeId.get(wire);
-      if (nodeId !== undefined) return nodeId;
-    }
-  }
-  return -1;
-}
-
-/**
- * Resolve the outer MNA node ID for a subcircuit element's pin.
- *
- * Finds the pin on the subcircuit element whose label matches `pinLabel`,
- * then finds a wire in the outer circuit whose endpoint touches the pin's
- * position. Returns the wire's node ID, or -1 if no match found.
- */
-function resolveSubcircuitPinNode(
-  subcircuitEl: SubcircuitHost,
-  pinLabel: string,
-  wireToNodeId: Map<import("../../core/circuit.js").Wire, number>,
-  outerCircuit: Circuit,
-): number {
-  const pins = subcircuitEl.getPins();
-  let pinPos: { x: number; y: number } | undefined;
-  for (const pin of pins) {
-    if (pin.label === pinLabel) {
-      // Use pinWorldPosition to get world-space coordinates
-      pinPos = pinWorldPosition(subcircuitEl, pin);
-      break;
-    }
-  }
-  if (pinPos === undefined) return -1;
-
-  for (const wire of outerCircuit.wires) {
-    const matchStart =
-      Math.abs(wire.start.x - pinPos.x) < 0.5 &&
-      Math.abs(wire.start.y - pinPos.y) < 0.5;
-    const matchEnd =
-      Math.abs(wire.end.x - pinPos.x) < 0.5 &&
-      Math.abs(wire.end.y - pinPos.y) < 0.5;
-    if (matchStart || matchEnd) {
-      const nodeId = wireToNodeId.get(wire);
-      if (nodeId !== undefined) return nodeId;
-    }
-  }
-  return -1;
 }

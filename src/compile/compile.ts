@@ -24,7 +24,6 @@ import type { ComponentRegistry } from "../core/registry.js";
 import { resolveModelAssignments, extractConnectivityGroups, resolveLoadingOverrides, INFRASTRUCTURE_TYPES } from "./extract-connectivity.js";
 import { partitionByDomain } from "./partition.js";
 import { flattenCircuit, isSubcircuitHost } from "../solver/digital/flatten.js";
-import type { FlattenResult } from "../solver/digital/flatten.js";
 import { compileDigitalPartition } from "../solver/digital/compiler.js";
 import { compileAnalogPartition } from "../solver/analog/compiler.js";
 import { BitsException } from "../core/errors.js";
@@ -68,19 +67,16 @@ export function compileUnified(
   // -------------------------------------------------------------------------
 
   let circuit: Circuit;
-  let crossEngineBoundaries: FlattenResult["crossEngineBoundaries"];
 
   // Only flatten when there are subcircuit elements — flattening creates new
   // Wire objects which would break wireToNetId identity for callers that hold
   // references to the original Wire instances.
   const hasSubcircuits = inputCircuit.elements.some(isSubcircuitHost);
   if (hasSubcircuits) {
-    const flattenResult = flattenCircuit(inputCircuit, registry, inputModelAssignments);
+    const flattenResult = flattenCircuit(inputCircuit, registry);
     circuit = flattenResult.circuit;
-    crossEngineBoundaries = flattenResult.crossEngineBoundaries;
   } else {
     circuit = inputCircuit;
-    crossEngineBoundaries = [];
   }
 
   // Resolve model assignments for the (possibly flattened) circuit.
@@ -145,7 +141,6 @@ export function compileUnified(
       circuit.elements,
       registry,
       flatModelAssignments,
-      crossEngineBoundaries,
       circuit.metadata.digitalPinLoading ?? "cross-domain",
       perNetLoadingOverrides,
     );

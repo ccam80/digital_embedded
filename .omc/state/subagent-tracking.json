@@ -176,11 +176,22 @@
       "agent_type": "oh-my-claudecode:architect",
       "started_at": "2026-03-30T06:40:26.327Z",
       "parent_mode": "none",
-      "status": "running"
+      "status": "completed",
+      "completed_at": "2026-03-30T06:44:05.250Z",
+      "duration_ms": 218923
+    },
+    {
+      "agent_id": "a6e3621a2b3bf5c7e",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-03-30T06:59:56.666Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-30T07:38:28.180Z",
+      "duration_ms": 2311514
     }
   ],
-  "total_spawned": 20,
-  "total_completed": 19,
+  "total_spawned": 21,
+  "total_completed": 21,
   "total_failed": 0,
-  "last_updated": "2026-03-30T06:40:26.430Z"
+  "last_updated": "2026-03-30T07:38:28.288Z"
 }

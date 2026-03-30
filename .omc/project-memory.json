@@ -253,26 +253,26 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 747,
-      "lastAccessed": 1774847574275,
+      "accessCount": 806,
+      "lastAccessed": 1774855496052,
       "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 396,
-      "lastAccessed": 1774848001321,
+      "accessCount": 406,
+      "lastAccessed": 1774856318567,
       "type": "directory"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 185,
-      "lastAccessed": 1774840622557,
+      "accessCount": 186,
+      "lastAccessed": 1774856265665,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 176,
-      "lastAccessed": 1774845076934,
+      "accessCount": 184,
+      "lastAccessed": 1774855745443,
       "type": "directory"
     },
     {
@@ -289,8 +289,8 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
-      "accessCount": 129,
-      "lastAccessed": 1774818458765,
+      "accessCount": 133,
+      "lastAccessed": 1774854995065,
       "type": "directory"
     },
     {
@@ -307,8 +307,8 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 95,
-      "lastAccessed": 1774845055634,
+      "accessCount": 96,
+      "lastAccessed": 1774854001198,
       "type": "file"
     },
     {

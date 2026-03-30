@@ -26,5 +26,4 @@ export type {
   DigitalModel,
   MnaModel,
   PinElectricalSpec,
-  CrossEngineBoundary,
 } from "./types.js";

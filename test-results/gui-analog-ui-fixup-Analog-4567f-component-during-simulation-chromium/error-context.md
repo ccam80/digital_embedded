@@ -1,0 +1,41 @@
+# Page snapshot
+
+```yaml
+- iframe [ref=e2]:
+  - generic [ref=f1e2]:
+    - menubar [ref=f1e3]:
+      - menuitem "File" [ref=f1e4] [cursor=pointer]: File ▶ ▶
+      - menuitem "Edit" [ref=f1e5] [cursor=pointer]
+      - generic [ref=f1e6] [cursor=pointer]: View
+      - menuitem "Insert" [ref=f1e7] [cursor=pointer]
+      - menuitem "Simulation" [ref=f1e8] [cursor=pointer]
+      - generic [ref=f1e9] [cursor=pointer]: Analysis
+      - generic [ref=f1e10] [cursor=pointer]: Tutorials
+      - textbox "Circuit name" [ref=f1e11]: Untitled
+      - generic [ref=f1e12]:
+        - button "↶" [disabled] [ref=f1e13]
+        - button "↷" [disabled] [ref=f1e14]
+        - button "⧉" [ref=f1e15] [cursor=pointer]
+        - button "▶" [ref=f1e17] [cursor=pointer]
+        - button "⏵" [ref=f1e18] [cursor=pointer]
+        - 'textbox "Step to sim-time offset (SI suffixes: s, m=ms, u=µs, n=ns)" [ref=f1e19]':
+          - /placeholder: e.g. 5m, 100u
+          - text: 1m
+        - button "▶▶" [ref=f1e20] [cursor=pointer]
+        - button "■" [ref=f1e21] [cursor=pointer]
+        - button "−" [ref=f1e22] [cursor=pointer]
+        - textbox "Steps per second" [ref=f1e23]: "1000"
+        - button "+" [ref=f1e24] [cursor=pointer]
+        - generic [ref=f1e25]: steps/s
+        - button "Toggle light/dark mode" [ref=f1e27] [cursor=pointer]: ☾
+    - generic [ref=f1e28]:
+      - generic [ref=f1e29]:
+        - generic [ref=f1e30]: Components
+        - tree
+        - button "‹" [ref=f1e31] [cursor=pointer]
+      - generic "Drag to resize palette" [ref=f1e32]
+      - generic "Circuit editor canvas" [ref=f1e34]
+    - generic [ref=f1e35]:
+      - generic [ref=f1e36]: Ready
+      - button "100%" [ref=f1e38] [cursor=pointer]
+```

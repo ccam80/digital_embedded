@@ -9,7 +9,6 @@ import type { CircuitElement } from "../core/element.js";
 import type { ComponentRegistry } from "../core/registry.js";
 import { PinDirection } from "../core/pin.js";
 import type { PinElectricalSpec } from "../core/pin-electrical.js";
-import type { CrossEngineBoundary } from "../solver/digital/cross-engine-boundary.js";
 import type {
   ConnectivityGroup,
   PartitionedComponent,
@@ -98,7 +97,6 @@ export function partitionByDomain(
   elements: readonly CircuitElement[],
   registry: ComponentRegistry,
   modelAssignments: ModelAssignment[],
-  crossEngineBoundaries: CrossEngineBoundary[],
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
   perNetLoadingOverrides?: ReadonlyMap<number, "loaded" | "ideal">,
 ): PartitionResult {
@@ -259,14 +257,12 @@ export function partitionByDomain(
     components: digitalComponents,
     groups: digitalGroups,
     bridgeStubs: digitalBridgeStubs,
-    crossEngineBoundaries: [...crossEngineBoundaries],
   };
 
   const analog: SolverPartition = {
     components: analogComponents,
     groups: analogGroups,
     bridgeStubs: analogBridgeStubs,
-    crossEngineBoundaries: [...crossEngineBoundaries],
   };
 
   return { digital, analog, bridges };

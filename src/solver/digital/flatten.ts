@@ -24,13 +24,10 @@ import { Circuit, Wire } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { ComponentRegistry } from "../../core/registry.js";
-import type { ModelAssignment } from "../../compile/extract-connectivity.js";
-import { resolveModelAssignments } from "../../compile/extract-connectivity.js";
 import type { Pin } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
 import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { SerializedElement } from "../../core/element.js";
-import type { CrossEngineBoundary, BoundaryPinMapping } from "./cross-engine-boundary.js";
 
 // ---------------------------------------------------------------------------
 // SubcircuitHost interface — the contract flatten.ts needs from a subcircuit element
@@ -76,18 +73,12 @@ export function isSubcircuitHost(el: CircuitElement): el is SubcircuitHost {
 /**
  * The result of flattening a circuit.
  *
- * `circuit` contains only leaf elements (non-subcircuit components), except
- * for cross-engine subcircuit placeholders which are left in place.
- *
- * `crossEngineBoundaries` lists every subcircuit instance whose internal
- * engine type differs from the outer circuit's engine type. The analog
- * compiler uses these to insert bridge adapter elements.
+ * `circuit` contains only leaf elements (non-subcircuit components).
+ * All subcircuits are unconditionally inlined.
  */
 export interface FlattenResult {
-  /** The flattened circuit (leaf elements only, except cross-engine placeholders). */
+  /** The flattened circuit (leaf elements only). */
   circuit: Circuit;
-  /** Boundaries that the compiler must handle via bridge adapters. */
-  crossEngineBoundaries: CrossEngineBoundary[];
 }
 
 // ---------------------------------------------------------------------------
@@ -95,32 +86,22 @@ export interface FlattenResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Return a FlattenResult with the circuit flattened (all same-engine
- * subcircuit instances replaced by their internal components) and a list of
- * cross-engine boundaries that were NOT flattened.
+ * Flatten a circuit by unconditionally inlining all subcircuit instances.
  *
- * Cross-engine subcircuits (where the internal domain differs from the
- * outer circuit's domain, or where the subcircuit instance has
- * simulationModel='digital' in an analog outer circuit) are preserved
- * as opaque placeholder elements in the flat result. The compiler must handle
- * them separately via bridge adapters.
- *
- * Same-engine subcircuits are recursively inlined as before. Digital-only
- * callers can ignore `crossEngineBoundaries`.
+ * Every subcircuit is recursively replaced by its internal components.
+ * Domain classification is the partitioner's job — the flattener does not
+ * care about simulation domains.
  *
  * @param circuit   Source circuit (may contain subcircuit elements).
- * @param registry  Component registry (used only for leaf component validation).
- * @returns         FlattenResult containing the flat circuit and any cross-engine boundaries.
+ * @param registry  Component registry (unused, retained for API compatibility).
+ * @returns         FlattenResult containing the flat circuit.
  */
 export function flattenCircuit(
   circuit: Circuit,
-  registry: ComponentRegistry,
-  modelAssignments?: ModelAssignment[],
+  _registry: ComponentRegistry,
 ): FlattenResult {
-  const assignments = modelAssignments ?? resolveModelAssignments(circuit.elements, registry)[0];
-  const boundaries: CrossEngineBoundary[] = [];
-  const flatCircuit = flattenCircuitScoped(circuit, "", registry, assignments, new Set(), boundaries);
-  return { circuit: flatCircuit, crossEngineBoundaries: boundaries };
+  const flatCircuit = flattenCircuitScoped(circuit, "", new Set());
+  return { circuit: flatCircuit };
 }
 
 // ---------------------------------------------------------------------------
@@ -130,16 +111,12 @@ export function flattenCircuit(
 /**
  * Recursive implementation. `scopePrefix` is the dotted-path prefix applied to
  * all internal component instanceIds. `seen` tracks circuit identities to
- * detect infinite recursion. `boundaries` accumulates cross-engine boundary
- * records as they are discovered.
+ * detect infinite recursion.
  */
 function flattenCircuitScoped(
   circuit: Circuit,
   scopePrefix: string,
-  registry: ComponentRegistry,
-  modelAssignments: ModelAssignment[],
   seen: Set<Circuit>,
-  boundaries: CrossEngineBoundary[],
 ): Circuit {
   if (seen.has(circuit)) {
     throw new Error(
@@ -150,21 +127,12 @@ function flattenCircuitScoped(
 
   const result = new Circuit({ ...circuit.metadata });
 
-  // Track which wires belong to the flat result. We start with all non-
-  // subcircuit wires, then add bridge wires for subcircuit interface pins.
   const resultWires: Wire[] = [];
 
-  // Determine the outer domain from the pre-resolved model assignments.
-  // The outer domain is "analog" if any non-infrastructure leaf element resolves
-  // to "analog", "digital" if all resolve to "digital", "auto" otherwise.
-  const outerDomain = domainFromAssignments(circuit.elements, modelAssignments);
-
-  // For each element, either pass it through (leaf) or inline it (subcircuit).
   for (let elemIdx = 0; elemIdx < circuit.elements.length; elemIdx++) {
     const el = circuit.elements[elemIdx]!;
 
     if (!isSubcircuitHost(el)) {
-      // Leaf element — pass through with scoped instanceId
       const scopedEl = scopeInstanceId(el, scopePrefix);
       result.addElement(scopedEl);
       continue;
@@ -172,47 +140,11 @@ function flattenCircuitScoped(
 
     const instanceName = buildInstanceName(el, elemIdx, scopePrefix);
 
-    // Detect cross-engine boundary using pre-resolved model assignments.
-    //   (a) the subcircuit instance has simulationModel='digital' in an analog
-    //       outer context (explicit per-instance override), OR
-    //   (b) the internal circuit's components resolve to a different domain
-    //       than the outer circuit.
-    const [internalAssignments] = resolveModelAssignments(
-      el.internalCircuit.elements,
-      registry,
-    );
-    const internalDomain = domainFromAssignments(el.internalCircuit.elements, internalAssignments);
-    const instanceSimMode = el.getAttribute("simulationModel");
-    const isCrossEngine =
-      (outerDomain === "analog" && instanceSimMode === "digital") ||
-      (outerDomain !== internalDomain && internalDomain !== "auto" && outerDomain !== "auto");
-
-    if (isCrossEngine) {
-      // Record the boundary and leave the element as a placeholder.
-      const pinMappings = buildPinMappings(el);
-      boundaries.push({
-        subcircuitElement: el,
-        internalCircuit: el.internalCircuit,
-        internalEngineType: internalDomain,
-        outerEngineType: outerDomain,
-        pinMappings,
-        instanceName,
-      });
-      // Keep the subcircuit element in the flat result as an opaque placeholder
-      // so the compiler can locate it by its identity when processing bridges.
-      result.addElement(el);
-      continue;
-    }
-
-    // Same-engine subcircuit — inline its contents.
     const inlineResult = inlineSubcircuit(
       el,
       instanceName,
       circuit,
-      registry,
-      internalAssignments,
       seen,
-      boundaries,
     );
 
     for (const inlinedEl of inlineResult.elements) {
@@ -225,7 +157,6 @@ function flattenCircuitScoped(
 
   seen.delete(circuit);
 
-  // Add all non-subcircuit-internal wires from the parent
   for (const wire of circuit.wires) {
     resultWires.push(new Wire({ ...wire.start }, { ...wire.end }));
   }
@@ -235,38 +166,6 @@ function flattenCircuitScoped(
   }
 
   return result;
-}
-
-// ---------------------------------------------------------------------------
-// Domain resolution from model assignments
-// ---------------------------------------------------------------------------
-
-/**
- * Derive the simulation domain for a circuit from its pre-resolved model assignments.
- *
- * Returns "analog" if any non-infrastructure element has modelKey "analog",
- * "digital" if all non-infrastructure elements have modelKey "digital",
- * "auto" when no non-infrastructure elements are present or domain is mixed.
- */
-function domainFromAssignments(
-  elements: readonly CircuitElement[],
-  assignments: ModelAssignment[],
-): "digital" | "analog" | "auto" {
-  let hasDigital = false;
-  let hasAnalog = false;
-
-  for (let i = 0; i < elements.length; i++) {
-    const el = elements[i]!;
-    if (isSubcircuitHost(el)) continue;
-    const assignment = assignments[i];
-    if (assignment === undefined || assignment.modelKey === "neutral") continue;
-    if (assignment.modelKey === "digital") hasDigital = true;
-    else hasAnalog = true;
-  }
-
-  if (hasAnalog && !hasDigital) return "analog";
-  if (hasDigital && !hasAnalog) return "digital";
-  return "auto";
 }
 
 // ---------------------------------------------------------------------------
@@ -299,21 +198,14 @@ function inlineSubcircuit(
   subcircuitEl: SubcircuitHost,
   instanceName: string,
   _parentCircuit: Circuit,
-  registry: ComponentRegistry,
-  internalAssignments: ModelAssignment[],
   seen: Set<Circuit>,
-  boundaries: CrossEngineBoundary[],
 ): InlineResult {
   const internalCircuit = subcircuitEl.internalCircuit;
 
-  // Recursively flatten the internal circuit
   const flatInternal = flattenCircuitScoped(
     internalCircuit,
     instanceName,
-    registry,
-    internalAssignments,
     new Set(seen),
-    boundaries,
   );
 
   const elements: CircuitElement[] = [];
@@ -380,27 +272,6 @@ function inlineSubcircuit(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Build the BoundaryPinMapping list for a cross-engine subcircuit instance.
- *
- * Each pin on the subcircuit element in the outer circuit becomes one
- * BoundaryPinMapping. The direction is from the subcircuit's perspective:
- *   - INPUT pin on the outer element  → 'in'  (data flows into the subcircuit)
- *   - OUTPUT pin on the outer element → 'out' (data flows out of the subcircuit)
- */
-function buildPinMappings(el: SubcircuitHost): BoundaryPinMapping[] {
-  const mappings: BoundaryPinMapping[] = [];
-  for (const pin of el.getPins()) {
-    mappings.push({
-      pinLabel: pin.label,
-      direction: pin.direction === PinDirection.INPUT ? "in" : "out",
-      innerLabel: pin.label,
-      bitWidth: pin.bitWidth,
-    });
-  }
-  return mappings;
-}
 
 /**
  * Find the internal interface element whose label matches the given interface

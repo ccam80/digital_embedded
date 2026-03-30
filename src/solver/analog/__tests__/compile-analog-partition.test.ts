@@ -132,7 +132,7 @@ function buildRegistry(factorySpy?: ReturnType<typeof vi.fn>): ComponentRegistry
 
   registry.register({
     ...makeBaseDef("Ground"),
-    models: { mnaModels: { behavioral: {} } },
+    models: {},
   });
 
   const andFactory = factorySpy ?? vi.fn((pinNodes: ReadonlyMap<string, number>) => makeStubElement([...pinNodes.values()]));
@@ -140,11 +140,16 @@ function buildRegistry(factorySpy?: ReturnType<typeof vi.fn>): ComponentRegistry
   registry.register({
     ...makeBaseDef("BehavioralAnd"),
     pinLayout: makeGatePinLayout(2),
-    models: {
-      digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction },
-      mnaModels: { behavioral: { factory: andFactory as unknown as import("../../core/registry.js").MnaModel["factory"] } },
+    models: {},
+    modelRegistry: {
+      behavioral: {
+        kind: "inline" as const,
+        factory: andFactory as unknown as import("../../core/registry.js").AnalogFactory,
+        paramDefs: [],
+        params: {},
+      },
     },
-    defaultModel: "digital",
+    defaultModel: "behavioral",
   });
 
   return registry;
@@ -307,14 +312,16 @@ function buildAndGatePartition(propsMap: Map<string, PropertyValue> = new Map())
   const andComponent: PartitionedComponent = {
     element: andGate,
     definition: andDef,
-    model: andDef.models!.mnaModels!.behavioral!,
+    modelKey: "behavioral",
+    model: null,
     resolvedPins: andResolvedPins,
   };
 
   const gndComponent: PartitionedComponent = {
     element: gnd,
     definition: gndDef,
-    model: gndDef.models!.mnaModels!.behavioral!,
+    modelKey: "neutral",
+    model: null,
     resolvedPins: gndResolvedPins,
   };
 
@@ -322,7 +329,6 @@ function buildAndGatePartition(propsMap: Map<string, PropertyValue> = new Map())
     components: [andComponent, gndComponent],
     groups: [groupGnd, group1, group2, group3],
     bridgeStubs: [],
-    crossEngineBoundaries: [],
   };
 
   return { partition, registry, factorySpy };
@@ -411,8 +417,7 @@ describe("compileAnalogPartition", () => {
       components: [],
       groups: [],
       bridgeStubs: [],
-      crossEngineBoundaries: [],
-    };
+      };
 
     // Should not throw; no elements → no analog elements compiled
     const compiled = compileAnalogPartition(emptyPartition, registry);
@@ -447,7 +452,8 @@ describe("compileAnalogPartition", () => {
       components: [{
         element: andGate,
         definition: andDef,
-        model: andDef.models!.mnaModels!.behavioral!,
+        modelKey: "behavioral",
+        model: null,
         resolvedPins: andResolvedPins,
       }],
       groups: [
@@ -471,8 +477,7 @@ describe("compileAnalogPartition", () => {
         },
       ],
       bridgeStubs: [],
-      crossEngineBoundaries: [],
-    };
+      };
 
     const compiled = compileAnalogPartition(noGroundPartition, registry);
     const groundDiags = compiled.diagnostics.filter((d) => d.code === "no-ground");

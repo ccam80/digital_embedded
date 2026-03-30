@@ -5,7 +5,6 @@ import type { ConnectivityGroup, ResolvedGroupPin } from "../types.js";
 import { PinDirection } from "@/core/pin.js";
 import type { CircuitElement } from "@/core/element.js";
 import type { ComponentDefinition, ComponentRegistry, DigitalModel, MnaModel } from "@/core/registry.js";
-import type { CrossEngineBoundary } from "@/solver/digital/cross-engine-boundary.js";
 
 // ---------------------------------------------------------------------------
 // Minimal stubs
@@ -113,7 +112,6 @@ function makeGroup(
   return { groupId, pins, wires: [], domains, bitWidth };
 }
 
-const NO_BOUNDARIES: CrossEngineBoundary[] = [];
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -135,7 +133,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 1, modelKey: "digital", model: DIGITAL_MODEL },
       ];
 
-      const result = partitionByDomain([group], [el0, el1], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([group], [el0, el1], registry, assignments);
 
       expect(result.digital.components).toHaveLength(2);
       expect(result.analog.components).toHaveLength(0);
@@ -149,7 +147,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
       ];
 
-      const result = partitionByDomain([group], [el0], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([group], [el0], registry, assignments);
 
       expect(result.analog).toBeDefined();
       expect(result.analog.components).toHaveLength(0);
@@ -166,7 +164,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
       ];
 
-      const result = partitionByDomain([g0, g1], [el0], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([g0, g1], [el0], registry, assignments);
 
       expect(result.digital.groups).toHaveLength(2);
       expect(result.analog.groups).toHaveLength(0);
@@ -188,7 +186,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
       ];
 
-      const result = partitionByDomain([group], [el0, el1], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([group], [el0, el1], registry, assignments);
 
       expect(result.analog.components).toHaveLength(2);
       expect(result.digital.components).toHaveLength(0);
@@ -202,7 +200,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 0, modelKey: "analog", model: ANALOG_MODEL },
       ];
 
-      const result = partitionByDomain([group], [el0], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([group], [el0], registry, assignments);
 
       expect(result.digital).toBeDefined();
       expect(result.digital.components).toHaveLength(0);
@@ -237,7 +235,6 @@ describe("partitionByDomain", () => {
         [elD, elA],
         registry,
         assignments,
-        NO_BOUNDARIES,
       );
 
       expect(result.digital.components).toHaveLength(1);
@@ -260,7 +257,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
       ];
 
-      const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
 
       expect(result.bridges[0].direction).toBe("digital-to-analog");
     });
@@ -281,7 +278,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
       ];
 
-      const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
 
       expect(result.bridges[0].direction).toBe("analog-to-digital");
     });
@@ -301,7 +298,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
       ];
 
-      const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
 
       expect(result.digital.bridgeStubs).toHaveLength(1);
       expect(result.analog.bridgeStubs).toHaveLength(1);
@@ -324,7 +321,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
       ];
 
-      const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
 
       expect(result.bridges[0].bitWidth).toBe(4);
     });
@@ -344,7 +341,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
       ];
 
-      const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
 
       const dGroupIds = result.digital.groups.map((g) => g.groupId);
       const aGroupIds = result.analog.groups.map((g) => g.groupId);
@@ -362,7 +359,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
       ];
 
-      const result = partitionByDomain([group], [el0], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([group], [el0], registry, assignments);
 
       // groupId is preserved as-is; no extra id field is attached
       expect(result.digital.groups[0].groupId).toBe(42);
@@ -383,7 +380,7 @@ describe("partitionByDomain", () => {
         // elementIndex 0 (Tunnel) intentionally omitted
       ];
 
-      const result = partitionByDomain([group], [elTunnel, elAnd], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([group], [elTunnel, elAnd], registry, assignments);
 
       expect(result.digital.components).toHaveLength(1);
       expect(result.digital.components[0].element.typeId).toBe("And");
@@ -399,7 +396,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 0, modelKey: "somethingElse", model: DIGITAL_MODEL },
       ];
 
-      const result = partitionByDomain([group], [el0], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([group], [el0], registry, assignments);
 
       expect(result.analog.components).toHaveLength(1);
       expect(result.digital.components).toHaveLength(0);
@@ -413,7 +410,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 0, modelKey: "somethingElse", model: ANALOG_MODEL },
       ];
 
-      const result = partitionByDomain([group], [el0], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([group], [el0], registry, assignments);
 
       expect(result.analog.components).toHaveLength(1);
       expect(result.digital.components).toHaveLength(0);
@@ -424,32 +421,13 @@ describe("partitionByDomain", () => {
     it("returns empty partitions for an empty groups and elements list", () => {
       const registry = makeRegistry([]);
 
-      const result = partitionByDomain([], [], registry, [], NO_BOUNDARIES);
+      const result = partitionByDomain([], [], registry, []);
 
       expect(result.digital.components).toHaveLength(0);
       expect(result.digital.groups).toHaveLength(0);
       expect(result.analog.components).toHaveLength(0);
       expect(result.analog.groups).toHaveLength(0);
       expect(result.bridges).toHaveLength(0);
-    });
-  });
-
-  describe("crossEngineBoundaries propagation", () => {
-    it("crossEngineBoundaries are copied to both partitions", () => {
-      const el0 = makeElement("And", 0);
-      const registry = makeRegistry([makeDigitalDef("And")]);
-      const group = makeGroup(0, [makePin(0, 0, "digital")]);
-      const assignments: ModelAssignment[] = [
-        { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
-      ];
-      const fakeBoundary = { instanceName: "test-boundary" } as unknown as CrossEngineBoundary;
-
-      const result = partitionByDomain([group], [el0], registry, assignments, [fakeBoundary]);
-
-      expect(result.digital.crossEngineBoundaries).toHaveLength(1);
-      expect(result.analog.crossEngineBoundaries).toHaveLength(1);
-      expect(result.digital.crossEngineBoundaries[0]).toBe(fakeBoundary);
-      expect(result.analog.crossEngineBoundaries[0]).toBe(fakeBoundary);
     });
   });
 
@@ -481,7 +459,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 1, modelKey: "analog", model: analogModel },
       ];
 
-      const result = partitionByDomain([gBoundary], [el0, el1], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([gBoundary], [el0, el1], registry, assignments);
 
       expect(result.bridges[0].electricalSpec).toEqual({ vOH: 5.0, vOL: 0.1, rOut: 100 });
     });
@@ -500,7 +478,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
       ];
 
-      const result = partitionByDomain([gBoundary], [el0, el1], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([gBoundary], [el0, el1], registry, assignments);
 
       expect(result.bridges[0].electricalSpec).toEqual(
         expect.objectContaining({ vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 }),
@@ -522,7 +500,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
       ];
 
-      const result = partitionByDomain([g0, g1], [el0], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([g0, g1], [el0], registry, assignments);
 
       const comp = result.digital.components[0];
       expect(comp.resolvedPins).toHaveLength(2);
@@ -562,7 +540,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
       ];
 
-      const result = partitionByDomain([gAnalog], [elNeutral, elAnalog], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([gAnalog], [elNeutral, elAnalog], registry, assignments);
 
       expect(result.analog.components.some((c) => c.element.typeId === "Ground")).toBe(true);
       expect(result.digital.components.some((c) => c.element.typeId === "Ground")).toBe(true);
@@ -583,7 +561,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 1, modelKey: "digital", model: DIGITAL_MODEL },
       ];
 
-      const result = partitionByDomain([gDigital], [elNeutral, elDigital], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([gDigital], [elNeutral, elDigital], registry, assignments);
 
       expect(result.digital.components.some((c) => c.element.typeId === "Ground")).toBe(true);
       expect(result.analog.components.some((c) => c.element.typeId === "Ground")).toBe(false);
@@ -614,7 +592,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 2, modelKey: "digital", model: DIGITAL_MODEL },
       ];
 
-      const result = partitionByDomain([gAnalog, gDigital], [elNeutral, elAnalog, elDigital], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([gAnalog, gDigital], [elNeutral, elAnalog, elDigital], registry, assignments);
 
       expect(result.analog.components.some((c) => c.element.typeId === "Ground")).toBe(true);
       expect(result.digital.components.some((c) => c.element.typeId === "Ground")).toBe(true);
@@ -628,7 +606,7 @@ describe("partitionByDomain", () => {
         { elementIndex: 0, modelKey: "neutral", model: null as never },
       ];
 
-      const result = partitionByDomain([], [elNeutral], registry, assignments, NO_BOUNDARIES);
+      const result = partitionByDomain([], [elNeutral], registry, assignments);
 
       expect(result.digital.components.some((c) => c.element.typeId === "Ground")).toBe(true);
       expect(result.analog.components.some((c) => c.element.typeId === "Ground")).toBe(false);

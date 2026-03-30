@@ -693,7 +693,6 @@ function buildPartition(
     components: partitionedComponents,
     groups,
     bridgeStubs: [],
-    crossEngineBoundaries: [],
   };
 }
 
@@ -710,8 +709,7 @@ describe("compileDigitalPartition", () => {
       components: [],
       groups: [],
       bridgeStubs: [],
-      crossEngineBoundaries: [],
-    };
+      };
     const registry = new ComponentRegistry();
     const compiled = compileDigitalPartition(partition, registry);
     expect(compiled.netCount).toBe(0);

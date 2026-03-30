@@ -11,7 +11,6 @@ import type { CompiledAnalogCircuit, SolverDiagnostic } from "../../core/analog-
 import type { Wire } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
 import type { AnalogElement } from "./element.js";
-import type { BridgeInstance } from "./bridge-instance.js";
 import type { BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
 import type { ResolvedPin } from "../../core/pin.js";
 
@@ -102,16 +101,6 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   /** Diagnostics emitted during compilation (topology issues, missing models, etc.). */
   readonly diagnostics: SolverDiagnostic[];
 
-  /**
-   * Bridge instances for cross-engine subcircuits found during compilation.
-   *
-   * Each entry corresponds to one CrossEngineBoundary in the FlattenResult.
-   * The DefaultSimulationCoordinator reads this list to create DigitalEngine
-   * instances and synchronize signal values at each analog timestep. Empty
-   * when no mixed-signal subcircuits are present.
-   */
-  readonly bridges: BridgeInstance[];
-
   /** Mutable time reference shared with element closures. The engine updates
    *  `timeRef.value` each timestep so elements see the current simulation time. */
   readonly timeRef: { value: number };
@@ -129,7 +118,6 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     groupToNodeId?: Map<number, number>;
     elementBridgeAdapters?: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
     diagnostics?: SolverDiagnostic[];
-    bridges?: BridgeInstance[];
     timeRef?: { value: number };
   }) {
     this.nodeCount = params.nodeCount;
@@ -145,7 +133,6 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.groupToNodeId = params.groupToNodeId ?? new Map();
     this.elementBridgeAdapters = params.elementBridgeAdapters ?? new Map();
     this.diagnostics = params.diagnostics ?? [];
-    this.bridges = params.bridges ?? [];
     this.timeRef = params.timeRef ?? { value: 0 };
   }
 

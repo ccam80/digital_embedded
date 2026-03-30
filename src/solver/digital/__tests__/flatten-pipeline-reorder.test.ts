@@ -1,23 +1,14 @@
 /**
  * Tests for the pipeline-reorder changes introduced in Wave 2.1.
  *
- * Covers four scenarios for flattenCircuit() after resolveModelAssignments
- * runs first and cross-engine detection uses pre-resolved model assignments:
+ * Covers flattenCircuit() unconditional inlining and resolveModelAssignments
+ * model key validation:
  *
- *  1. Per-instance override: a dual-model subcircuit instance with
- *     simulationModel="digital" in an analog outer circuit is treated as a
- *     cross-engine boundary (not inlined).
+ *  1. Subcircuit inlining: all subcircuits are unconditionally inlined.
  *
- *  2. Same-domain inline: an analog subcircuit inside an analog outer circuit
- *     is flattened (inlined) rather than treated as a boundary.
+ *  2. Invalid simulationModel values produce diagnostics.
  *
- *  3. Cross-domain opaque: a digital-only subcircuit inside an analog outer
- *     circuit is preserved as an opaque placeholder with a boundary record.
- *
- *  4. "Analog wins" for sub-mode label: when a dual-model component has
- *     simulationModel="analog-pins" (a sub-mode value, not a model key),
- *     resolveModelAssignments assigns modelKey="analog", routing the component
- *     to the analog partition.
+ *  3. Valid simulationModel keys (digital, behavioral) are respected.
  */
 
 import { describe, it, expect } from "vitest";
@@ -139,46 +130,7 @@ function makePin(label: string, dir: PinDirection, x: number, y: number): Pin {
 // ---------------------------------------------------------------------------
 
 describe("FlattenPipelineReorder", () => {
-  it("per_instance_override: simulationModel=digital on dual-model subcircuit in analog outer circuit produces cross-engine boundary", () => {
-    // Internal circuit: dual-model gate (XorGate has both digital + analog)
-    const internal = new Circuit({ name: "DualGate" });
-    const internalGate = new TestLeafElement(
-      "DualGate", "gate-inner", { x: 0, y: 0 }, new PropertyBag(),
-      [makePin("out", PinDirection.OUTPUT, 2, 1)],
-    );
-    internal.addElement(internalGate);
-
-    // Outer analog circuit with Resistor (analog-only, not infrastructure) to establish analog domain
-    const outer = new Circuit({ name: "Top" });
-    const resistor = new TestLeafElement(
-      "Resistor", "r-1", { x: 0, y: 0 }, new PropertyBag(),
-      [makePin("p1", PinDirection.BIDIRECTIONAL, 0, 0), makePin("p2", PinDirection.BIDIRECTIONAL, 4, 0)],
-    );
-    outer.addElement(resistor);
-
-    // Subcircuit instance with simulationModel="digital" (per-instance override)
-    const subEl = new TestSubcircuitElement(
-      "DualGate", "sub-1", { x: 10, y: 0 }, internal,
-      [makePin("out", PinDirection.OUTPUT, 12, 1)],
-      { simulationModel: "digital" },
-    );
-    outer.addElement(subEl);
-
-    const registry = new ComponentRegistry();
-    registry.register(makeAnalogDef("Resistor"));
-    registry.register(makeDualDef("DualGate"));
-
-    const { crossEngineBoundaries } = flattenCircuit(outer, registry);
-
-    // The per-instance override simulationModel="digital" in analog outer context
-    // must produce exactly one boundary record
-    expect(crossEngineBoundaries).toHaveLength(1);
-    expect(crossEngineBoundaries[0]!.subcircuitElement).toBe(subEl);
-    expect(crossEngineBoundaries[0]!.outerEngineType).toBe("analog");
-    expect(crossEngineBoundaries[0]!.internalEngineType).toBeDefined();
-  });
-
-  it("same_domain_inline: analog subcircuit in analog outer circuit is inlined", () => {
+  it("same_domain_inline: subcircuit in outer circuit is always inlined", () => {
     // Internal circuit: analog-only capacitor
     const internal = new Circuit({ name: "AnalogFilter" });
     const capIn = new TestLeafElement(
@@ -205,56 +157,11 @@ describe("FlattenPipelineReorder", () => {
     registry.register(makeAnalogDef("Resistor"));
     registry.register(makeAnalogDef("Capacitor"));
 
-    const { circuit: flat, crossEngineBoundaries } = flattenCircuit(outer, registry);
+    const { circuit: flat } = flattenCircuit(outer, registry);
 
-    // Same-engine: no boundaries, internal Capacitor is inlined
-    expect(crossEngineBoundaries).toHaveLength(0);
+    // Subcircuit is unconditionally inlined — internal Capacitor appears in flat result
     const capEls = flat.elements.filter((e) => e.typeId === "Capacitor");
     expect(capEls).toHaveLength(1);
-  });
-
-  it("cross_domain_opaque: digital subcircuit in analog outer circuit is NOT inlined and boundary is recorded", () => {
-    // Internal circuit: digital-only AND gate
-    const internal = new Circuit({ name: "DigitalCounter" });
-    const andGate = new TestLeafElement(
-      "And", "and-inner", { x: 0, y: 0 }, new PropertyBag(),
-      [makePin("A", PinDirection.INPUT, 0, 1), makePin("out", PinDirection.OUTPUT, 2, 1)],
-    );
-    internal.addElement(andGate);
-
-    // Outer circuit: analog (Resistor makes it analog domain)
-    const outer = new Circuit({ name: "Top" });
-    const resistor = new TestLeafElement(
-      "Resistor", "r-outer", { x: 0, y: 0 }, new PropertyBag(),
-      [makePin("p1", PinDirection.BIDIRECTIONAL, 0, 0), makePin("p2", PinDirection.BIDIRECTIONAL, 4, 0)],
-    );
-    outer.addElement(resistor);
-
-    const subEl = new TestSubcircuitElement(
-      "DigitalCounter", "sub-1", { x: 10, y: 0 }, internal,
-      [makePin("CLK", PinDirection.INPUT, 10, 1), makePin("Q", PinDirection.OUTPUT, 12, 1)],
-    );
-    outer.addElement(subEl);
-
-    const registry = new ComponentRegistry();
-    registry.register(makeAnalogDef("Resistor"));
-    registry.register(makeDigitalDef("And"));
-
-    const { circuit: flat, crossEngineBoundaries } = flattenCircuit(outer, registry);
-
-    // Digital subcircuit in analog outer circuit must produce a boundary
-    expect(crossEngineBoundaries).toHaveLength(1);
-    expect(crossEngineBoundaries[0]!.subcircuitElement).toBe(subEl);
-    expect(crossEngineBoundaries[0]!.internalEngineType).toBe("digital");
-    expect(crossEngineBoundaries[0]!.outerEngineType).toBe("analog");
-
-    // Internal AND gate must NOT appear in the flat circuit
-    const andEls = flat.elements.filter((e) => e.typeId === "And");
-    expect(andEls).toHaveLength(0);
-
-    // The subcircuit placeholder must remain in the flat circuit as opaque element
-    const subEls = flat.elements.filter((e) => e === subEl);
-    expect(subEls).toHaveLength(1);
   });
 
   it("invalid_submode_produces_diagnostic: unrecognized simulationModel on dual-model component produces invalid-simulation-model diagnostic and neutral modelKey", () => {
