@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { parseModelCard } from "../model-parser.js";
+import { parseModelCard, parseSubcircuit } from "../model-parser.js";
 import { applySpiceImportResult } from "../../../app/spice-model-apply.js";
 import { compileUnified } from "@/compile/compile.js";
 import { Circuit, Wire } from "../../../core/circuit.js";
@@ -359,5 +359,71 @@ describe("spice-import-dialog: compile integration", () => {
 
     expect(capturedModelParams!["IS"]).toBeCloseTo(6.734e-15, 20);
     expect(capturedModelParams!["BF"]).toBeCloseTo(416.4, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests: auto-detect format from first non-blank line
+// ---------------------------------------------------------------------------
+
+describe("spice-import-dialog: auto-detect format", () => {
+  it(".SUBCKT auto-detect — input starting with .SUBCKT is parsed as subcircuit", () => {
+    const text = ".SUBCKT MYAMP in out vcc vee\nR1 in out 1k\n.ENDS";
+    const trimmed = text.trim();
+    const firstNonBlank = trimmed.split("\n").find((l) => l.trim() !== "")!.trim();
+    expect(/^\.subckt\b/i.test(firstNonBlank)).toBe(true);
+
+    const result = parseSubcircuit(trimmed);
+    expect(result.name).toBe("MYAMP");
+    expect(result.ports).toEqual(["in", "out", "vcc", "vee"]);
+    expect(result.elements).toHaveLength(1);
+    expect(result.elements[0]!.type).toBe("R");
+  });
+
+  it(".MODEL auto-detect — input starting with .MODEL is parsed as model card", () => {
+    const text = ".MODEL 2N2222 NPN(IS=1e-14 BF=200)";
+    const trimmed = text.trim();
+    const firstNonBlank = trimmed.split("\n").find((l) => l.trim() !== "")!.trim();
+    expect(/^\.subckt\b/i.test(firstNonBlank)).toBe(false);
+
+    const result = parseModelCard(trimmed);
+    expect("message" in result).toBe(false);
+    if ("message" in result) return;
+    expect(result.name).toBe("2N2222");
+    expect(result.deviceType).toBe("NPN");
+  });
+
+  it("mixed content auto-detect — first non-blank line determines type (.SUBCKT wins)", () => {
+    const text = "\n\n.SUBCKT FILTER in out\nR1 in out 10k\n.ENDS\n.MODEL EXTRA NPN()";
+    const lines = text.split("\n");
+    const firstNonBlank = lines.find((l) => l.trim() !== "")!.trim();
+    expect(/^\.subckt\b/i.test(firstNonBlank)).toBe(true);
+
+    const result = parseSubcircuit(text.trim());
+    expect(result.name).toBe("FILTER");
+    expect(result.ports).toEqual(["in", "out"]);
+  });
+
+  it("mixed content auto-detect — first non-blank line determines type (.MODEL wins)", () => {
+    const text = "\n\n.MODEL 1N4148 D(IS=2.52e-9 RS=0.568)\n.SUBCKT IGNORED a b\n.ENDS";
+    const lines = text.split("\n");
+    const firstNonBlank = lines.find((l) => l.trim() !== "")!.trim();
+    expect(/^\.subckt\b/i.test(firstNonBlank)).toBe(false);
+
+    const result = parseModelCard(text.trim());
+    expect("message" in result).toBe(false);
+    if ("message" in result) return;
+    expect(result.name).toBe("1N4148");
+    expect(result.deviceType).toBe("D");
+  });
+
+  it(".SUBCKT case-insensitive — lower-case .subckt is detected as subcircuit", () => {
+    const text = ".subckt mymod a b\nR1 a b 1k\n.ends";
+    const firstNonBlank = text.trim().split("\n").find((l) => l.trim() !== "")!.trim();
+    expect(/^\.subckt\b/i.test(firstNonBlank)).toBe(true);
+
+    const result = parseSubcircuit(text);
+    expect(result.name).toBe("mymod");
+    expect(result.ports).toEqual(["a", "b"]);
   });
 });

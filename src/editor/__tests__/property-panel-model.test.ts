@@ -208,3 +208,83 @@ describe('showModelSelector param commit on blur', () => {
     expect(r.old).toBe(100); expect(r.newVal).toBe(150);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 3.5 — dropdown lists correct entries from modelRegistry + digital + runtime
+// ---------------------------------------------------------------------------
+
+describe('showModelSelector dropdown sources (Task 3.5)', () => {
+  it('lists all static modelRegistry keys in dropdown', () => {
+    const def: ComponentDefinition = {
+      ...makeBjtDef(false),
+      modelRegistry: {
+        behavioral: makeBehavioralEntry(),
+        cmos: makeBehavioralEntry(),
+      },
+    } as unknown as ComponentDefinition;
+    panel.showModelSelector(makeElement('behavioral'), def);
+    const opts = doc.findSelects()[0]!.children.map(o => o.value);
+    expect(opts).toContain('behavioral');
+    expect(opts).toContain('cmos');
+  });
+
+  it('includes "digital" when models.digital is defined', () => {
+    panel.showModelSelector(makeElement('behavioral'), makeBjtDef(true));
+    const opts = doc.findSelects()[0]!.children.map(o => o.value);
+    expect(opts).toContain('digital');
+  });
+
+  it('excludes "digital" when models.digital is absent', () => {
+    panel.showModelSelector(makeElement('behavioral'), makeBjtDef(false));
+    const opts = doc.findSelects()[0]!.children.map(o => o.value);
+    expect(opts).not.toContain('digital');
+  });
+
+  it('includes runtime model keys from circuit.metadata.models', () => {
+    const runtimeModels: Record<string, ModelEntry> = {
+      '2N2222': makeBehavioralEntry({ BF: 200 }),
+      'BC547': makeBehavioralEntry({ BF: 110 }),
+    };
+    panel.showModelSelector(makeElement('behavioral'), makeBjtDef(false), runtimeModels);
+    const opts = doc.findSelects()[0]!.children.map(o => o.value);
+    expect(opts).toContain('2N2222');
+    expect(opts).toContain('BC547');
+  });
+
+  it('static keys appear before runtime keys in dropdown', () => {
+    const runtimeModels: Record<string, ModelEntry> = {
+      '2N2222': makeBehavioralEntry({ BF: 200 }),
+    };
+    panel.showModelSelector(makeElement('behavioral'), makeBjtDef(false), runtimeModels);
+    const opts = doc.findSelects()[0]!.children.map(o => o.value);
+    const behavioralIdx = opts.indexOf('behavioral');
+    const runtimeIdx = opts.indexOf('2N2222');
+    expect(behavioralIdx).toBeGreaterThanOrEqual(0);
+    expect(runtimeIdx).toBeGreaterThan(behavioralIdx);
+  });
+
+  it('no duplicate keys when runtime has same key as static', () => {
+    const runtimeModels: Record<string, ModelEntry> = {
+      behavioral: makeBehavioralEntry({ BF: 999 }),
+    };
+    panel.showModelSelector(makeElement('behavioral'), makeBjtDef(false), runtimeModels);
+    const opts = doc.findSelects()[0]!.children.map(o => o.value);
+    const count = opts.filter(o => o === 'behavioral').length;
+    expect(count).toBe(1);
+  });
+
+  it('model switch via dropdown fires onPropertyChange callback', () => {
+    const runtimeModels: Record<string, ModelEntry> = {
+      '2N2222': makeBehavioralEntry({ BF: 200 }),
+    };
+    const changes: Array<{ key: string; old: unknown; newVal: unknown }> = [];
+    panel.onPropertyChange((key, old, v) => changes.push({ key, old, newVal: v }));
+    panel.showModelSelector(makeElement('behavioral'), makeBjtDef(false), runtimeModels);
+    const sel = doc.findSelects()[0]!;
+    sel.value = '2N2222';
+    sel.dispatchEvent('change');
+    const modelChange = changes.find(c => c.key === 'model');
+    expect(modelChange).toBeDefined();
+    expect(modelChange!.newVal).toBe('2N2222');
+  });
+});

@@ -65,6 +65,10 @@ export function createPopupController(
     propertyPopup.showProperties(elementHit, def.propertyDefs);
 
     const family = ctx.circuit.metadata.logicFamily ?? defaultLogicFamily();
+    const runtimeModels = ctx.circuit.metadata.models?.[elementHit.typeId];
+    if (def.modelRegistry && Object.keys(def.modelRegistry).length > 0) {
+      propertyPopup.showModelSelector(elementHit, def, runtimeModels);
+    }
     propertyPopup.showPinElectricalOverrides(elementHit, def, family);
     // Live-update: numeric parameter changes are hot-patched into the running
     // engine via coordinator.setComponentProperty() (updates conductances
