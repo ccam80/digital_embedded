@@ -25,6 +25,16 @@ import { RegisterDefinition } from "../../../components/memory/register.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
@@ -363,7 +373,7 @@ describe("Register", () => {
 
 describe("Registration", () => {
   it("counter_has_analog_factory", () => {
-    expect(typeof CounterDefinition.modelRegistry?.behavioral?.factory).toBe("function");
+    expect(typeof (CounterDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBe("function");
   });
 
   it("counter_engine_type_is_both", () => {
@@ -377,7 +387,7 @@ describe("Registration", () => {
   });
 
   it("counter_preset_has_analog_factory", () => {
-    expect(typeof CounterPresetDefinition.modelRegistry?.behavioral?.factory).toBe("function");
+    expect(typeof (CounterPresetDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBe("function");
   });
 
   it("counter_preset_engine_type_is_both", () => {
@@ -386,7 +396,7 @@ describe("Registration", () => {
   });
 
   it("register_has_analog_factory", () => {
-    expect(typeof RegisterDefinition.modelRegistry?.behavioral?.factory).toBe("function");
+    expect(typeof (RegisterDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBe("function");
   });
 
   it("register_engine_type_is_both", () => {
@@ -400,7 +410,7 @@ describe("Registration", () => {
   });
 
   it("counter_analog_factory_returns_analog_element", () => {
-    const factory = CounterDefinition.modelRegistry!.behavioral!.factory;
+    const factory = getFactory(CounterDefinition.modelRegistry!.behavioral!);
     const props = {
       has: (k: string) => k === "bitWidth",
       get: (k: string) => k === "bitWidth" ? 4 : undefined,
@@ -419,7 +429,7 @@ describe("Registration", () => {
   });
 
   it("register_analog_factory_returns_analog_element", () => {
-    const factory = RegisterDefinition.modelRegistry!.behavioral!.factory;
+    const factory = getFactory(RegisterDefinition.modelRegistry!.behavioral!);
     const props = {
       has: (k: string) => k === "bitWidth",
       get: (k: string) => k === "bitWidth" ? 8 : undefined,

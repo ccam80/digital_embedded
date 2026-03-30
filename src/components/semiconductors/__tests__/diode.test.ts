@@ -22,6 +22,16 @@ import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sp
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Physical constants
 // ---------------------------------------------------------------------------
 
@@ -222,7 +232,7 @@ describe("Diode", () => {
     expect(DiodeDefinition.name).toBe("Diode");
     expect(DiodeDefinition.modelRegistry?.["behavioral"]).toBeDefined();
     expect(DiodeDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
-    expect(DiodeDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
+    expect((DiodeDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 });
 

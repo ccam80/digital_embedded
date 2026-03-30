@@ -50,6 +50,16 @@ import { SwitchDTDefinition } from "../../../components/switching/switch-dt.js";
 import { ButtonLEDDefinition } from "../../../components/io/button-led.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Shared constants
 // ---------------------------------------------------------------------------
 
@@ -185,7 +195,7 @@ describe("LED", () => {
     const props = new PropertyBag();
 
     // LED: anode = circuit node 2, cathode = ground (0)
-    const led = LedDefinition.modelRegistry!.behavioral!.factory(new Map([["in", 2]]), [], -1, props, () => 0);
+    const led = getFactory(LedDefinition.modelRegistry!.behavioral!)(new Map([["in", 2]]), [], -1, props, () => 0);
 
     // VS at circuit node 1 (solver row 0), branch row 2 (absolute)
     const vs = makeVoltageSource(1, 0, 2, VDD);

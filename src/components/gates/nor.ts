@@ -20,6 +20,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
+import { makeNorAnalogFactory } from "../../solver/analog/behavioral-gate.js";
 import {
   compWidth,
   buildInvertedPinDeclarations,
@@ -194,6 +195,12 @@ export const NOrDefinition: ComponentDefinition = {
     "Both IEEE/US (curved with bubble) and IEC/DIN (rectangular with ≥1 and bubble) shapes are supported.\n" +
     "Individual inputs can be inverted via the inverterConfig property.",
   modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: makeNorAnalogFactory(0),
+      paramDefs: [],
+      params: {},
+    },
     cmos: {
       kind: "netlist",
       netlist: CMOS_NOR2_NETLIST,

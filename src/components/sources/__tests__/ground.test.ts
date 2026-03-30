@@ -9,6 +9,16 @@ import { PinDirection } from "../../../core/pin.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Mock SparseSolver
 // ---------------------------------------------------------------------------
 
@@ -26,7 +36,7 @@ function makeMockSolver() {
 describe("Ground", () => {
   it("stamp_is_noop", () => {
     const props = new PropertyBag();
-    const element = GroundDefinition.modelRegistry!.behavioral!.factory(
+    const element = getFactory(GroundDefinition.modelRegistry!.behavioral!)(
       new Map([["out", 3]]),
       [],
       -1,
@@ -54,12 +64,12 @@ describe("Ground", () => {
   });
 
   it("definition_has_analog_factory", () => {
-    expect(GroundDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
+    expect((GroundDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
   it("element_is_not_nonlinear_and_not_reactive", () => {
     const props = new PropertyBag();
-    const element = GroundDefinition.modelRegistry!.behavioral!.factory(
+    const element = getFactory(GroundDefinition.modelRegistry!.behavioral!)(
       new Map([["out", 0]]),
       [],
       -1,
@@ -73,7 +83,7 @@ describe("Ground", () => {
 
   it("element_branch_index_is_minus_one", () => {
     const props = new PropertyBag();
-    const element = GroundDefinition.modelRegistry!.behavioral!.factory(
+    const element = getFactory(GroundDefinition.modelRegistry!.behavioral!)(
       new Map([["out", 2]]),
       [],
       -1,
@@ -86,7 +96,7 @@ describe("Ground", () => {
 
   it("element_node_indices_matches_input", () => {
     const props = new PropertyBag();
-    const element = GroundDefinition.modelRegistry!.behavioral!.factory(
+    const element = getFactory(GroundDefinition.modelRegistry!.behavioral!)(
       new Map([["out", 5]]),
       [],
       -1,

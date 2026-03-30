@@ -41,6 +41,7 @@ export class BehavioralDAsyncFlipflopElement implements AnalogElementCore {
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
+  setParam(_key: string, _value: number): void {}
   label?: string;
 
   constructor(

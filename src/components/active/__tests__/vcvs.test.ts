@@ -18,6 +18,16 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -37,7 +47,7 @@ function makeVCVSElement(
   ]).entries());
   props.replaceModelParams({ gain });
   return withNodeIds(
-    VCVSDefinition.modelRegistry!["behavioral"]!.factory(
+    getFactory(VCVSDefinition.modelRegistry!["behavioral"]!)(
       new Map([["ctrl+", nCtrlP], ["ctrl-", nCtrlN], ["out+", nOutP], ["out-", nOutN]]),
       [],
       branchIdx,

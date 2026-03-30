@@ -6,7 +6,7 @@
  * DefaultSimulatorFacade (the facade exposed through the MCP server).
  *
  * These tests use the real component registry (createDefaultRegistry) with
- * the `And` gate — a dual-model component (digital + mna behavioral) — placed
+ * the `And` gate — a component with digital and behavioral models — placed
  * in an analog circuit alongside passive components.
  */
 

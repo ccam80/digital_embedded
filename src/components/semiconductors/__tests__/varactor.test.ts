@@ -21,6 +21,16 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Default varactor parameters
 // ---------------------------------------------------------------------------
 
@@ -183,7 +193,7 @@ describe("Varactor", () => {
     expect(VaractorDefinition.name).toBe("VaractorDiode");
     expect(VaractorDefinition.modelRegistry?.["behavioral"]).toBeDefined();
     expect(VaractorDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
-    expect(VaractorDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
+    expect((VaractorDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     expect(VaractorDefinition.category).toBe("SEMICONDUCTORS");
   });
 

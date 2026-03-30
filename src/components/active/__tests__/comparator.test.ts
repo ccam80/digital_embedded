@@ -21,6 +21,16 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -56,7 +66,7 @@ function makeComparator(
   nOut: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return VoltageComparatorDefinition.modelRegistry!["behavioral"]!.factory(
+  return getFactory(VoltageComparatorDefinition.modelRegistry!["behavioral"]!)(
     new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]),
     [],
     -1,

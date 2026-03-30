@@ -36,6 +36,16 @@ import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { makeVoltageSource, makeResistor } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Transient simulation helpers
 // ---------------------------------------------------------------------------
 
@@ -571,11 +581,11 @@ describe("TransformerDefinition", () => {
   });
 
   it("has analogFactory", () => {
-    expect(TransformerDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
+    expect((TransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
   it("branchCount is 1", () => {
-    expect(TransformerDefinition.modelRegistry?.behavioral?.branchCount).toBe(1);
+    expect((TransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
   });
 
   it("category is PASSIVES", () => {
@@ -599,7 +609,7 @@ describe("TransformerDefinition", () => {
     props.setModelParam("primaryResistance", 0);
     props.setModelParam("secondaryResistance", 0);
 
-    const el = TransformerDefinition.modelRegistry!.behavioral!.factory(new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), [], 5, props, () => 0) as AnalogTransformerElement;
+    const el = getFactory(TransformerDefinition.modelRegistry!.behavioral!)(new Map([["P1", 1], ["P2", 0], ["S1", 2], ["S2", 0]]), [], 5, props, () => 0) as AnalogTransformerElement;
     expect(el.branchIndex).toBe(5);
     expect(el.branch2).toBe(6);
   });

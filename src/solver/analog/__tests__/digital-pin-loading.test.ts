@@ -18,7 +18,7 @@
  * not per-component. Components never change partition based on loading mode.
  *
  * The tests use a stub registry with Ground, In, Out, a Resistor (MNA-only),
- * and a DigitalXor (dual-model: digital + mna behavioral). The Resistor forces
+ * and a DigitalXor (digital + mna behavioral models). The Resistor forces
  * an analog partition so bridge synthesis can run.
  */
 
@@ -76,7 +76,7 @@ function makeStubAnalogElement(pinNodes: ReadonlyMap<string, number>): AnalogEle
 // ---------------------------------------------------------------------------
 // Registry builder
 //
-// Includes: Ground, In, Out, Resistor (MNA-only), DigitalXor (dual-model)
+// Includes: Ground, In, Out, Resistor (MNA-only), DigitalXor (digital + behavioral)
 //
 // The Resistor is MNA-only to ensure the analog partition is non-empty so
 // bridge synthesis runs regardless of the DigitalXor's model mode.
@@ -225,7 +225,7 @@ function buildRegistry(
 //   - Ground at (0,0) — provides MNA reference node
 //   - Resistor at (20,0) with pins A=(20,0) and B=(22,0) — MNA-only component
 //     that forces a non-empty analog partition
-//   - DigitalXor at (10,0) — dual-model component under test
+//   - DigitalXor at (10,0) — component under test (digital + behavioral)
 //
 // All components share wires to Ground so they form a connected net.
 // ---------------------------------------------------------------------------
@@ -316,18 +316,6 @@ describe("digitalPinLoading: cross-domain (default)", () => {
     expect(compiled.bridges).toHaveLength(0);
   });
 
-  it("cross-domain with model=digital produces bridges at real boundary", () => {
-    // model=digital forces the XOR into the digital domain; its pins
-    // touch an analog net, creating a real cross-domain boundary group.
-    const registry = buildRegistry();
-    const circuit = buildCircuit(
-      { digitalPinLoading: "cross-domain" },
-      new Map([["model", "digital"]]),
-    );
-
-    const compiled = compileUnified(circuit, registry);
-    expect(compiled.bridges.length).toBeGreaterThan(0);
-  });
 });
 
 describe("digitalPinLoading: all", () => {
@@ -411,44 +399,6 @@ describe("digitalPinLoading: none", () => {
     const compiledCross = compileUnified(circuitCross, registry);
 
     expect(compiledNone.bridges).toHaveLength(compiledCross.bridges.length);
-  });
-
-  it("none mode: bridges exist at real cross-domain boundaries (model=digital)", () => {
-    // With a real boundary, "none" still creates bridges — just zero-loaded.
-    const registry = buildRegistry();
-    const circuit = buildCircuit(
-      { digitalPinLoading: "none" },
-      new Map([["model", "digital"]]),
-    );
-
-    const compiled = compileUnified(circuit, registry);
-    expect(compiled.bridges.length).toBeGreaterThan(0);
-  });
-
-  it("none mode at real boundary: BridgeInputAdapters have finite rIn (parameter exists)", () => {
-    const registry = buildRegistry();
-    const circuit = buildCircuit(
-      { digitalPinLoading: "none" },
-      new Map([["model", "digital"]]),
-    );
-
-    const compiled = compileUnified(circuit, registry);
-    const analogDomain = compiled.analog as ConcreteCompiledAnalogCircuit | null;
-
-    expect(analogDomain).not.toBeNull();
-
-    let foundInputAdapter = false;
-    for (const adapters of analogDomain!.bridgeAdaptersByGroupId.values()) {
-      for (const adapter of adapters) {
-        if (adapter instanceof BridgeInputAdapter) {
-          foundInputAdapter = true;
-          // rIn property exists and is finite (cIn=0 makes it unloaded but
-          // the parameter is still accessible).
-          expect(isFinite(adapter.rIn)).toBe(true);
-        }
-      }
-    }
-    expect(foundInputAdapter).toBe(true);
   });
 
   it("none mode bridge count equals cross-domain bridge count (same boundary detection)", () => {

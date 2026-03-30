@@ -26,6 +26,16 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Mock SparseSolver
 // ---------------------------------------------------------------------------
 
@@ -60,7 +70,7 @@ function makeOpAmp(opts: {
   } = opts;
   const props = new PropertyBag([]);
   props.replaceModelParams({ gain, rOut });
-  return OpAmpDefinition.modelRegistry!["behavioral"]!.factory(
+  return getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
     new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]),
     [],
     -1,
@@ -201,7 +211,7 @@ describe("OpAmp", () => {
 
     const props = new PropertyBag([]);
     props.replaceModelParams({ gain: 1e6, rOut: 75 });
-    const opampEl = withNodeIds(OpAmpDefinition.modelRegistry!["behavioral"]!.factory(
+    const opampEl = withNodeIds(getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
     ), [nInn, nInp, nOut]); // pinLayout order: [in-, in+, out]
 
@@ -278,7 +288,7 @@ describe("Integration", () => {
 
     const props = new PropertyBag([]);
     props.replaceModelParams({ gain: 1e6, rOut: 75 });
-    const opampEl = withNodeIds(OpAmpDefinition.modelRegistry!["behavioral"]!.factory(
+    const opampEl = withNodeIds(getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
       new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]), [], -1, props, () => 0,
     ), [nInn, nInp, nOut]); // pinLayout order: [in-, in+, out]
 
@@ -319,7 +329,7 @@ describe("Integration", () => {
     const props = new PropertyBag([]);
     props.replaceModelParams({ gain: 1e6, rOut: 75 });
     // in- and out share nFeedback (voltage follower)
-    const opampEl = withNodeIds(OpAmpDefinition.modelRegistry!["behavioral"]!.factory(
+    const opampEl = withNodeIds(getFactory(OpAmpDefinition.modelRegistry!["behavioral"]!)(
       new Map([["in+", nInp], ["in-", nFeedback], ["out", nFeedback]]), [], -1, props, () => 0,
     ), [nFeedback, nInp, nFeedback]); // pinLayout order: [in-, in+, out]
 

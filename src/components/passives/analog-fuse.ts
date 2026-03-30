@@ -94,9 +94,9 @@ export class AnalogFuseElement implements AnalogElement {
   readonly isReactive: boolean = false;
   setParam(_key: string, _value: number): void {}
 
-  private readonly _rCold: number;
-  private readonly _rBlown: number;
-  private readonly _i2tRating: number;
+  private _rCold: number;
+  private _rBlown: number;
+  private _i2tRating: number;
 
   private _thermalEnergy: number = 0;
   private _blown: boolean = false;
@@ -209,6 +209,12 @@ export class AnalogFuseElement implements AnalogElement {
     }
   }
 
+  updatePhysicalParams(rCold: number, rBlown: number, i2tRating: number): void {
+    this._rCold = Math.max(rCold, 1e-12);
+    this._rBlown = Math.max(rBlown, 1e-6);
+    this._i2tRating = Math.max(i2tRating, 1e-30);
+  }
+
   /** Current thermal energy state — exposed for testing. */
   get thermalEnergy(): number {
     return this._thermalEnergy;
@@ -272,6 +278,7 @@ function buildAnalogFuseElement(
   (el as AnalogElementCore).setParam = function(key: string, value: number): void {
     if (key in p) {
       (p as Record<string, number>)[key] = value;
+      el.updatePhysicalParams(p.rCold, p.rBlown, p.i2tRating);
     }
   };
   return el;

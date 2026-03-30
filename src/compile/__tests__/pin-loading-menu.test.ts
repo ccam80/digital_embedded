@@ -77,6 +77,12 @@ function makeAnalogElement(
     entries() { return Array.from(propsMap.entries()); },
     clone() { return this; },
     size: 0,
+    getModelParam<T>(_k: string): T { return undefined as unknown as T; },
+    setModelParam(_k: string, _v: unknown) { /* no-op */ },
+    hasModelParam(_k: string): boolean { return false; },
+    getModelParamKeys(): string[] { return []; },
+    replaceModelParams(_p: Record<string, number>) { /* no-op */ },
+    getOrDefault<T>(_k: string, d: T): T { return propsMap.has(_k) ? propsMap.get(_k) as T : d; },
   } as unknown as PropertyBagType;
 
   const serialized: SerializedElement = {
@@ -117,7 +123,7 @@ function outputPin(x: number, y: number, label: string): PinDeclaration {
 }
 
 // ---------------------------------------------------------------------------
-// Registry with digital, analog, and dual-model (bridge) components
+// Registry with digital, analog, and mixed-model (bridge) components
 // ---------------------------------------------------------------------------
 
 
@@ -172,7 +178,7 @@ function buildMixedRegistry(): ComponentRegistry {
     modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error('not used'); }, paramDefs: [], params: {} } },
   } as ComponentDefinition);
 
-  // Dual-model component: digital model + MNA model
+  // Mixed-model component: digital model + MNA model
   r.register({
     name: 'DABridge',
     typeId: -1,

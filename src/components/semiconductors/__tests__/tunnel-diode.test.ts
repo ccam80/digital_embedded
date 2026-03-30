@@ -24,6 +24,16 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Default tunnel diode parameters
 // ---------------------------------------------------------------------------
 
@@ -305,7 +315,7 @@ describe("TunnelDiode", () => {
     expect(TunnelDiodeDefinition.name).toBe("TunnelDiode");
     expect(TunnelDiodeDefinition.modelRegistry?.["behavioral"]).toBeDefined();
     expect(TunnelDiodeDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
-    expect(TunnelDiodeDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
+    expect((TunnelDiodeDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     expect(TunnelDiodeDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

@@ -8,6 +8,16 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Mock solver
 // ---------------------------------------------------------------------------
 
@@ -145,7 +155,7 @@ describe("AnalogClock", () => {
     const props = new PropertyBag();
     props.set("Frequency", 1000);
     props.set("vdd", 3.3);
-    const el = ClockDefinition.modelRegistry!.behavioral!.factory!(new Map([["out", 1]]), [], 1, props, () => 0);
+    const el = getFactory(ClockDefinition.modelRegistry!.behavioral!)!(new Map([["out", 1]]), [], 1, props, () => 0);
     expect(el).toBeDefined();
     expect(el.isNonlinear).toBe(false);
     expect(el.isReactive).toBe(false);

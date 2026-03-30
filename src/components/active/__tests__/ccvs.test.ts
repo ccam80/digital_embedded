@@ -19,6 +19,16 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -38,7 +48,7 @@ function makeCCVSElement(
   ]).entries());
   props.replaceModelParams({ transresistance: rm });
   return withNodeIds(
-    CCVSDefinition.modelRegistry!["behavioral"]!.factory(
+    getFactory(CCVSDefinition.modelRegistry!["behavioral"]!)(
       new Map([["sense+", nSenseP], ["sense-", nSenseN], ["out+", nOutP], ["out-", nOutN]]),
       [],
       senseBranchIdx,

@@ -23,6 +23,16 @@ import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Default SCR parameters (matching spec defaults)
 // ---------------------------------------------------------------------------
 
@@ -340,7 +350,7 @@ describe("SCR", () => {
     expect(ScrDefinition.name).toBe("SCR");
     expect(ScrDefinition.modelRegistry?.["behavioral"]).toBeDefined();
     expect(ScrDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
-    expect(ScrDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
+    expect((ScrDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     expect(ScrDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

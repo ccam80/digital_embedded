@@ -21,6 +21,16 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -57,7 +67,7 @@ describe("Potentiometer", () => {
       props.setModelParam("resistance", 10000);
       props.setModelParam("position", 0.5);
 
-      const analogElement = PotentiometerDefinition.modelRegistry!.behavioral!.factory(
+      const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
         new Map([["A", 1], ["B", 2], ["W", 3]]),
         [],
         -1,
@@ -86,7 +96,7 @@ describe("Potentiometer", () => {
       props.setModelParam("resistance", 10000);
       props.setModelParam("position", 0);
 
-      const analogElement = PotentiometerDefinition.modelRegistry!.behavioral!.factory(
+      const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
         new Map([["A", 1], ["B", 2], ["W", 3]]),
         [],
         -1,
@@ -113,7 +123,7 @@ describe("Potentiometer", () => {
       props.setModelParam("resistance", 10000);
       props.setModelParam("position", 1);
 
-      const analogElement = PotentiometerDefinition.modelRegistry!.behavioral!.factory(
+      const analogElement = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
         new Map([["A", 1], ["B", 2], ["W", 3]]),
         [],
         -1,
@@ -144,7 +154,7 @@ describe("Potentiometer", () => {
     });
 
     it("PotentiometerDefinition has analogFactory", () => {
-      expect(PotentiometerDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
+      expect((PotentiometerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     });
 
     it("PotentiometerDefinition category is PASSIVES", () => {

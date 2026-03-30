@@ -238,7 +238,7 @@ function buildElement(
         { x: netB, y: yRow, label: "B" },
         { x: netC, y: yRow, label: "C" },
         { x: netE, y: yRow, label: "E" },
-      ], props);
+      ], props, overrides);
     }
 
     case "M": {
@@ -259,7 +259,7 @@ function buildElement(
         { x: netG, y: yRow, label: "G" },
         { x: netD, y: yRow, label: "D" },
         { x: netS, y: yRow, label: "S" },
-      ], props);
+      ], props, overrides);
     }
 
     case "J": {
@@ -279,7 +279,7 @@ function buildElement(
         { x: netG, y: yRow, label: "G" },
         { x: netS, y: yRow, label: "S" },
         { x: netD, y: yRow, label: "D" },
-      ], props);
+      ], props, overrides);
     }
 
     case "V": {

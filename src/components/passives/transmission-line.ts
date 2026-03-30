@@ -206,6 +206,7 @@ class SegmentResistorElement implements AnalogElement {
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
+  setParam(_key: string, _value: number): void {}
 
   private readonly G: number;
 
@@ -242,6 +243,7 @@ class SegmentShuntConductanceElement implements AnalogElement {
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
+  setParam(_key: string, _value: number): void {}
 
   private readonly G: number;
 
@@ -286,6 +288,7 @@ class SegmentInductorElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  setParam(_key: string, _value: number): void {}
 
   private readonly L: number;
   private geq: number = 0;
@@ -349,6 +352,7 @@ class SegmentCapacitorElement implements AnalogElement {
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  setParam(_key: string, _value: number): void {}
 
   private readonly C: number;
   private geq: number = 0;
@@ -403,6 +407,7 @@ class CombinedRLElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  setParam(_key: string, _value: number): void {}
 
   private readonly R: number;
   private readonly L: number;

@@ -28,6 +28,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeRSAsyncLatchAnalogFactory } from "../../solver/analog/behavioral-flipflop/rs-async.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -200,7 +201,14 @@ export const RSAsyncDefinition: ComponentDefinition = {
     "RS Flip-Flop Async — level-sensitive SR latch (no clock).\n" +
     "S=1, R=0 → Q=1; S=0, R=1 → Q=0; S=0, R=0 → hold; S=1, R=1 → forbidden (Q=~Q=0).\n" +
     "Changes propagate immediately without a clock edge.",
-  modelRegistry: {},
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: makeRSAsyncLatchAnalogFactory(),
+      paramDefs: [],
+      params: {},
+    },
+  },
   models: {
     digital: {
       executeFn: executeRSAsync,

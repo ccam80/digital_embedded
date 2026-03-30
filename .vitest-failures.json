@@ -1,87 +1,243 @@
 {
   "summary": {
-    "passed": 52,
-    "failed": 15,
+    "passed": 9858,
+    "failed": 58,
     "skipped": 0,
-    "totalFiles": 1,
-    "durationSeconds": 0.6
+    "totalFiles": 333,
+    "durationSeconds": 29.9
   },
   "failures": [
     {
-      "message": "expected undefined to be close to 1e-14, received difference is NaN, but expected 0.005",
-      "count": 2,
+      "message": "props.getModelParamKeys is not a function",
+      "count": 9,
       "locations": [
         {
-          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
-          "test": "NpnBJT has model params IS and BF",
-          "line": 237,
-          "column": 29
+          "file": "src\\solver\\analog\\compiler.ts",
+          "test": "node count matches reference compileUnified for resistor divider",
+          "line": 1245,
+          "column": 38
         },
         {
-          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
-          "test": "each NpnBJT has model params IS and BF",
-          "line": 543,
+          "file": "src\\solver\\analog\\compiler.ts",
+          "test": "element count matches reference for resistor divider",
+          "line": 1245,
+          "column": 38
+        },
+        {
+          "file": "src\\solver\\analog\\compiler.ts",
+          "test": "wireSignalMap has analog addresses for all wires",
+          "line": 1245,
+          "column": 38
+        },
+        {
+          "file": "src\\solver\\analog\\compiler.ts",
+          "test": "branch count matches reference for RC circuit",
+          "line": 1245,
+          "column": 38
+        },
+        {
+          "file": "src\\solver\\analog\\compiler.ts",
+          "test": "matrix size matches reference for RC circuit",
+          "line": 1245,
+          "column": 38
+        },
+        {
+          "file": "src\\solver\\analog\\compiler.ts",
+          "test": "both digital and analog domains populated for mixed circuit",
+          "line": 1245,
+          "column": 38
+        },
+        {
+          "file": "src\\solver\\analog\\compiler.ts",
+          "test": "wireSignalMap contains entries for both domain wires in mixed circuit",
+          "line": 1245,
+          "column": 38
+        },
+        {
+          "file": "src\\solver\\analog\\compiler.ts",
+          "test": "bridges array is non-empty when circuit has cross-domain boundary",
+          "line": 1245,
+          "column": 38
+        },
+        {
+          "file": "src\\solver\\analog\\compiler.ts",
+          "test": "neutral Ground component touching analog net produces non-null analog domain",
+          "line": 1245,
+          "column": 38
+        }
+      ]
+    },
+    {
+      "message": "expected [] to have a length of 1 but got +0",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\compile\\__tests__\\pin-loading-menu.test.ts",
+          "test": "cross-domain mode produces exactly one bridge for the DABridge element",
+          "line": 267,
+          "column": 28
+        }
+      ]
+    },
+    {
+      "message": "expected false to be true // Object.is equality",
+      "count": 6,
+      "locations": [
+        {
+          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
+          "test": "parsed .MODEL card applied via applySpiceImportResult: circuit compiles and DC converges",
+          "line": 198,
+          "column": 27
+        },
+        {
+          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
+          "test": "compile with default IS vs IS=1e-20 produces different collector voltage",
+          "line": 231,
+          "column": 34
+        },
+        {
+          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
+          "test": "deserialized circuit produces same DC result as pre-serialization",
+          "line": 319,
+          "column": 35
+        },
+        {
+          "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
+          "test": "default params remain at BJT defaults when only IS is overridden",
+          "line": 217,
+          "column": 47
+        },
+        {
+          "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
+          "test": "deserialized circuit with overrides produces same DC result as pre-serialization",
+          "line": 270,
+          "column": 35
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
+          "test": "none mode at real boundary: BridgeInputAdapters have finite rIn (parameter exists)",
+          "line": 451,
           "column": 31
         }
       ]
     },
     {
-      "message": "expected undefined to be close to 2e-14, received difference is NaN, but expected 0.005",
-      "count": 1,
+      "message": "PropertyBag: model param \"BV\" not found",
+      "count": 7,
       "locations": [
         {
-          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
-          "test": "maps Q with PNP model to PnpBJT with pins B, C, E and IS/BF overrides",
-          "line": 259,
-          "column": 29
+          "file": "src\\core\\properties.ts",
+          "test": "forward_bias_stamp",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "reverse_bias_stamp",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "voltage_limiting_applied",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "junction_capacitance_when_cjo_nonzero",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "isNonlinear_true",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "isReactive_false_when_cjo_zero",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "diode_resistor_dc_op",
+          "line": 121,
+          "column": 13
         }
       ]
     },
     {
-      "message": "expected undefined to be close to 0.00001, received difference is NaN, but expected 0.005",
-      "count": 1,
+      "message": "PropertyBag: model param \"vOn\" not found",
+      "count": 2,
       "locations": [
         {
-          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
-          "test": "NMOS model params contain W, L, VTO",
-          "line": 299,
-          "column": 28
+          "file": "src\\core\\properties.ts",
+          "test": "blocks_without_gate",
+          "line": 121,
+          "column": 13
+        },
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "triggers_with_gate_current",
+          "line": 121,
+          "column": 13
         }
       ]
     },
     {
-      "message": "expected undefined to be close to 0.000005, received difference is NaN, but expected 0.005",
-      "count": 1,
+      "message": "expected 0 to be greater than 0",
+      "count": 2,
       "locations": [
         {
-          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
-          "test": "maps M with PMOS model to PMOS with pins G, D, S and W/L/VTO overrides",
-          "line": 322,
-          "column": 28
+          "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
+          "test": "cross-domain with model=digital produces bridges at real boundary",
+          "line": 329,
+          "column": 37
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
+          "test": "none mode: bridges exist at real cross-domain boundaries (model=digital)",
+          "line": 425,
+          "column": 37
         }
       ]
     },
     {
-      "message": "expected undefined to be close to 2, received difference is NaN, but expected 0.005",
+      "message": "expected 5 to be less than 5",
       "count": 1,
       "locations": [
         {
-          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
-          "test": "maps J with PJFET model to PJFET with pins G, S, D and VTO override",
-          "line": 377,
-          "column": 30
+          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+          "test": "nmos_common_source_dc_op",
+          "line": 680,
+          "column": 20
         }
       ]
     },
     {
-      "message": "expected undefined to be close to 0.00002, received difference is NaN, but expected 0.005",
+      "message": "expected 4.832268370607029 to be less than 2.3",
       "count": 1,
       "locations": [
         {
-          "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
-          "test": "element params merged with model params in overrides",
-          "line": 489,
-          "column": 28
+          "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+          "test": "nmos_triode_region_dc_op",
+          "line": 753,
+          "column": 20
+        }
+      ]
+    },
+    {
+      "message": "expected 0.7874477956219328 to be greater than 3.810298571841737",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
+          "test": "full pipeline: compile → DC OP → transient → analytical match",
+          "line": 595,
+          "column": 23
         }
       ]
     }

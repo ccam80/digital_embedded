@@ -171,7 +171,7 @@ export interface AnalogElement {
    * recompilation. Called by the coordinator for slider/property-panel
    * hot-patching.
    */
-  setParam?(key: string, value: number): void;
+  setParam(key: string, value: number): void;
 
   /**
    * Stamp the element's frequency-domain small-signal model for AC analysis.

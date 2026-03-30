@@ -16,6 +16,16 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Default Triac parameters
 // ---------------------------------------------------------------------------
 
@@ -177,7 +187,7 @@ describe("Triac", () => {
     expect(TriacDefinition.name).toBe("Triac");
     expect(TriacDefinition.modelRegistry?.["behavioral"]).toBeDefined();
     expect(TriacDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
-    expect(TriacDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
+    expect((TriacDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     expect(TriacDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

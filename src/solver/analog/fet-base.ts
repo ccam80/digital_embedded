@@ -61,6 +61,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: boolean;
+  setParam(_key: string, _value: number): void {}
 
   /** Gate node index (MNA node, 0 = ground). */
   readonly gateNode: number;

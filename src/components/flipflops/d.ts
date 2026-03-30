@@ -29,6 +29,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
+import { makeDFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -349,6 +350,12 @@ export const DDefinition: ComponentDefinition = {
     "Q is the stored value, ~Q is its complement.\n" +
     "Edge-triggered: only samples D when clock transitions from 0 to 1.",
   modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: makeDFlipflopAnalogFactory(),
+      paramDefs: [],
+      params: {},
+    },
     cmos: {
       kind: "netlist",
       netlist: CMOS_D_FF_NETLIST,

@@ -253,20 +253,20 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 91,
-      "lastAccessed": 1774907245306,
+      "accessCount": 92,
+      "lastAccessed": 1774907591047,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\extract-connectivity.ts",
+      "accessCount": 83,
+      "lastAccessed": 1774908559170,
       "type": "file"
     },
     {
       "path": "spec\\bridge-and-hot-loadable-params.md",
       "accessCount": 80,
       "lastAccessed": 1774907196293,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 72,
-      "lastAccessed": 1774907075385,
       "type": "file"
     },
     {
@@ -277,8 +277,8 @@
     },
     {
       "path": "",
-      "accessCount": 47,
-      "lastAccessed": 1774903089758,
+      "accessCount": 48,
+      "lastAccessed": 1774907628056,
       "type": "directory"
     },
     {
@@ -288,15 +288,15 @@
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 32,
-      "lastAccessed": 1774903068771,
+      "path": "src\\compile\\compile.ts",
+      "accessCount": 34,
+      "lastAccessed": 1774908552325,
       "type": "file"
     },
     {
-      "path": "src\\compile\\compile.ts",
+      "path": "spec\\.context\\rules.md",
       "accessCount": 32,
-      "lastAccessed": 1774903426634,
+      "lastAccessed": 1774903068771,
       "type": "file"
     },
     {
@@ -318,21 +318,39 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\crystal.ts",
-      "accessCount": 22,
-      "lastAccessed": 1774906117465,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\gates\\and.ts",
-      "accessCount": 21,
-      "lastAccessed": 1774905899633,
+      "accessCount": 26,
+      "lastAccessed": 1774908275238,
       "type": "file"
     },
     {
       "path": "src\\components\\passives\\analog-fuse.ts",
-      "accessCount": 21,
-      "lastAccessed": 1774906116070,
+      "accessCount": 25,
+      "lastAccessed": 1774908186553,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\crystal.ts",
+      "accessCount": 23,
+      "lastAccessed": 1774908096158,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\resistor.ts",
+      "accessCount": 20,
+      "lastAccessed": 1774907555832,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\tapped-transformer.ts",
+      "accessCount": 20,
+      "lastAccessed": 1774908097136,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\flipflops\\d.ts",
+      "accessCount": 20,
+      "lastAccessed": 1774908281806,
       "type": "file"
     },
     {
@@ -342,15 +360,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\resistor.ts",
+      "path": "src\\components\\passives\\polarized-cap.ts",
       "accessCount": 19,
-      "lastAccessed": 1774905575847,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\tapped-transformer.ts",
-      "accessCount": 19,
-      "lastAccessed": 1774906119279,
+      "lastAccessed": 1774908096583,
       "type": "file"
     },
     {
@@ -360,15 +372,15 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\polarized-cap.ts",
-      "accessCount": 18,
-      "lastAccessed": 1774906118373,
-      "type": "file"
-    },
-    {
       "path": "spec\\.context\\lock-protocol.md",
       "accessCount": 17,
       "lastAccessed": 1774897906892,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\not.ts",
+      "accessCount": 16,
+      "lastAccessed": 1774908280601,
       "type": "file"
     },
     {
@@ -378,15 +390,15 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\flipflops\\d.ts",
-      "accessCount": 15,
-      "lastAccessed": 1774906853114,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\semiconductors\\triac.ts",
       "accessCount": 14,
       "lastAccessed": 1774869841089,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\or.ts",
+      "accessCount": 14,
+      "lastAccessed": 1774908276568,
       "type": "file"
     },
     {
@@ -402,15 +414,45 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\gates\\nand.ts",
+      "accessCount": 13,
+      "lastAccessed": 1774908277357,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\nor.ts",
+      "accessCount": 13,
+      "lastAccessed": 1774908278174,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\xor.ts",
+      "accessCount": 13,
+      "lastAccessed": 1774908278833,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\xnor.ts",
+      "accessCount": 13,
+      "lastAccessed": 1774908279408,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\pjfet.ts",
       "accessCount": 12,
       "lastAccessed": 1774902815297,
       "type": "file"
     },
     {
-      "path": "src\\components\\gates\\not.ts",
+      "path": "src\\components\\flipflops\\d-async.ts",
       "accessCount": 12,
-      "lastAccessed": 1774904882996,
+      "lastAccessed": 1774908282575,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\flipflops\\jk.ts",
+      "accessCount": 12,
+      "lastAccessed": 1774908283759,
       "type": "file"
     },
     {
@@ -468,36 +510,6 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\gates\\or.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774904876155,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\gates\\nand.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774904876951,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\gates\\nor.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774904877865,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\gates\\xor.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774904878868,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\gates\\xnor.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774904880798,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\semiconductors\\tunnel-diode.ts",
       "accessCount": 8,
       "lastAccessed": 1774872791541,
@@ -513,18 +525,6 @@
       "path": ".vitest-failures.json",
       "accessCount": 8,
       "lastAccessed": 1774904133984,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\flipflops\\d-async.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774904904789,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\flipflops\\jk.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774904906111,
       "type": "file"
     },
     {

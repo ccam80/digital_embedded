@@ -25,6 +25,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeDAsyncFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop/d-async.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -286,7 +287,14 @@ export const DAsyncDefinition: ComponentDefinition = {
     "Set (active-high) forces Q=1 asynchronously.\n" +
     "Clr (active-high) forces Q=0 asynchronously.\n" +
     "When Set and Clr are both inactive, stores D on rising clock edge.",
-  modelRegistry: {},
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: makeDAsyncFlipflopAnalogFactory(),
+      paramDefs: [],
+      params: {},
+    },
+  },
   models: {
     digital: {
       executeFn: executeDAsync,

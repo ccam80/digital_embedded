@@ -30,6 +30,16 @@ import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { makeVoltageSource, makeResistor, makeDiode, makeCapacitor } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Element construction helper
 // ---------------------------------------------------------------------------
 
@@ -356,11 +366,11 @@ describe("TappedTransformerDefinition", () => {
   });
 
   it("has analogFactory", () => {
-    expect(TappedTransformerDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
+    expect((TappedTransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
   it("branchCount is 1", () => {
-    expect(TappedTransformerDefinition.modelRegistry?.behavioral?.branchCount).toBe(1);
+    expect((TappedTransformerDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
   });
 
   it("category is PASSIVES", () => {
@@ -385,7 +395,7 @@ describe("TappedTransformerDefinition", () => {
     props.setModelParam("primaryResistance", 0);
     props.setModelParam("secondaryResistance", 0);
 
-    const el = TappedTransformerDefinition.modelRegistry!.behavioral!.factory(
+    const el = getFactory(TappedTransformerDefinition.modelRegistry!.behavioral!)(
       new Map([["P1", 1], ["P2", 0], ["S1", 2], ["CT", 3], ["S2", 4]]),
       [],
       10,

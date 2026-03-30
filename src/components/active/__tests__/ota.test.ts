@@ -26,6 +26,16 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -44,7 +54,7 @@ function makeOTAElement(
   ]).entries());
   props.replaceModelParams({ gmMax, vt });
   return withNodeIds(
-    OTADefinition.modelRegistry!["behavioral"]!.factory(
+    getFactory(OTADefinition.modelRegistry!["behavioral"]!)(
       new Map([["V+", nVp], ["V-", nVm], ["Iabc", nIabc], ["OUT+", nOutP], ["OUT", nOutN]]),
       [],
       -1,

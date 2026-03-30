@@ -22,6 +22,16 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -57,7 +67,7 @@ function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamp
 
 /** Call analogFactory and inject pinNodeIds (simulating what the compiler does). */
 function makeCapacitorElement(pinNodes: Map<string, number>, props: PropertyBag) {
-  const el = CapacitorDefinition.modelRegistry!.behavioral!.factory(pinNodes, [], -1, props, () => 0);
+  const el = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(pinNodes, [], -1, props, () => 0);
   Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
   return el;
 }
@@ -148,7 +158,7 @@ describe("Capacitor", () => {
     });
 
     it("CapacitorDefinition has analogFactory", () => {
-      expect(CapacitorDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
+      expect((CapacitorDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     });
 
     it("CapacitorDefinition category is PASSIVES", () => {

@@ -26,6 +26,16 @@ import type { ThemeColor } from "../../../core/renderer-interface.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -363,7 +373,7 @@ describe("Probe", () => {
         solve: () => new Float64Array([]),
       };
 
-      const analogElement = ProbeDefinition.modelRegistry!.behavioral!.factory(
+      const analogElement = getFactory(ProbeDefinition.modelRegistry!.behavioral!)(
         new Map([["in", 3]]),
         [],
         -1,
@@ -379,7 +389,7 @@ describe("Probe", () => {
 
     it("reads_node_voltage returns voltage at node index", () => {
       const props = new PropertyBag();
-      const analogElement = ProbeDefinition.modelRegistry!.behavioral!.factory(
+      const analogElement = getFactory(ProbeDefinition.modelRegistry!.behavioral!)(
         new Map([["in", 3]]),
         [],
         -1,
@@ -416,7 +426,7 @@ describe("Probe", () => {
 
     it("analogFactory returns AnalogElement with correct properties", () => {
       const props = new PropertyBag();
-      const analogElement = ProbeDefinition.modelRegistry!.behavioral!.factory(
+      const analogElement = getFactory(ProbeDefinition.modelRegistry!.behavioral!)(
         new Map([["in", 5]]),
         [],
         -1,

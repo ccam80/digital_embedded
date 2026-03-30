@@ -21,6 +21,16 @@ import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -592,7 +602,7 @@ describe("RealOpAmp", () => {
     expect(RealOpAmpDefinition.modelRegistry?.["behavioral"]).toBeDefined();
     expect(RealOpAmpDefinition.name).toBe("RealOpAmp");
     expect(RealOpAmpDefinition.pinLayout).toHaveLength(5);
-    expect(RealOpAmpDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
+    expect((RealOpAmpDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     expect(RealOpAmpDefinition.factory).toBeDefined();
   });
 });

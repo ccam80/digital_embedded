@@ -25,6 +25,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
+import { makeJKAsyncFlipflopAnalogFactory } from "../../solver/analog/behavioral-flipflop/jk-async.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -316,7 +317,14 @@ export const JKAsyncDefinition: ComponentDefinition = {
     "Set (active-high) forces Q=1 asynchronously.\n" +
     "Clr (active-high) forces Q=0 asynchronously.\n" +
     "On rising clock edge: J=0,K=0 → hold; J=1,K=0 → set; J=0,K=1 → reset; J=1,K=1 → toggle.",
-  modelRegistry: {},
+  modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: makeJKAsyncFlipflopAnalogFactory(),
+      paramDefs: [],
+      params: {},
+    },
+  },
   models: {
     digital: {
       executeFn: executeJKAsync,

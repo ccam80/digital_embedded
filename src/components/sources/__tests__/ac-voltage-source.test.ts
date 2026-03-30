@@ -23,6 +23,16 @@ import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Mock solver
 // ---------------------------------------------------------------------------
 
@@ -71,7 +81,7 @@ function makeAcElement(
   let simTime = time;
   const getTime = () => simTime;
 
-  const el = AcVoltageSourceDefinition.modelRegistry!.behavioral!.factory(
+  const el = getFactory(AcVoltageSourceDefinition.modelRegistry!.behavioral!)(
     new Map([["pos", nodePos], ["neg", nodeNeg]]),
     [],
     branchIdx,
@@ -235,7 +245,7 @@ describe("Integration", () => {
     let simTime = 0;
     const getTime = () => simTime;
 
-    const acSrc = AcVoltageSourceDefinition.modelRegistry!.behavioral!.factory(
+    const acSrc = getFactory(AcVoltageSourceDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1], ["neg", 0]]),
       [],
       2,
@@ -304,7 +314,7 @@ function makeExprElement(
   props.set("expression", exprText);
 
   let simTime = time;
-  const el = AcVoltageSourceDefinition.modelRegistry!.behavioral!.factory(
+  const el = getFactory(AcVoltageSourceDefinition.modelRegistry!.behavioral!)(
     new Map([["pos", 1], ["neg", 0]]),
     [],
     2,

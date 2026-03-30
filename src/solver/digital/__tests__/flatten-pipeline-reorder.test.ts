@@ -58,7 +58,7 @@ function makeAnalogDef(typeId: string): ComponentDefinition {
   };
 }
 
-function makeDualDef(typeId: string): ComponentDefinition {
+function makeMultiModelDef(typeId: string): ComponentDefinition {
   return {
     name: typeId, typeId: -1,
     factory: (props) => new TestLeafElement(typeId, "auto", { x: 0, y: 0 }, props, []),
@@ -114,27 +114,27 @@ describe("FlattenPipelineReorder", () => {
     expect(capEls).toHaveLength(1);
   });
 
-  it("invalid_submode_produces_diagnostic: unrecognized model on dual-model component produces invalid-simulation-model diagnostic and neutral modelKey", () => {
+  it("invalid_submode_produces_diagnostic: unrecognized model key produces invalid-simulation-model diagnostic and neutral modelKey", () => {
     const props = new PropertyBag();
-    props.set("model", "analog-pins");
+    props.set("model", "nonexistent-model");
     const el = new TestLeafElement(
       "DualGate", "gate-1", { x: 0, y: 0 }, props,
       [makePin("out", PinDirection.OUTPUT, 2, 1)],
     );
 
     const registry = new ComponentRegistry();
-    registry.register(makeDualDef("DualGate"));
+    registry.register(makeMultiModelDef("DualGate"));
 
     const [assignments, diagnostics] = resolveModelAssignments([el], registry);
 
-    // "analog-pins" is not a valid model key — must produce a diagnostic and neutral
+    // "nonexistent-model" is not a valid model key — must produce a diagnostic and neutral
     expect(assignments).toHaveLength(1);
     expect(assignments[0]!.modelKey).toBe("neutral");
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]!.code).toBe("invalid-simulation-model");
   });
 
-  it("invalid_logical_submode_produces_diagnostic: model=logical on dual-model component produces invalid-simulation-model diagnostic", () => {
+  it("invalid_logical_submode_produces_diagnostic: model=logical produces invalid-simulation-model diagnostic", () => {
     const props = new PropertyBag();
     props.set("model", "logical");
     const el = new TestLeafElement(
@@ -143,7 +143,7 @@ describe("FlattenPipelineReorder", () => {
     );
 
     const registry = new ComponentRegistry();
-    registry.register(makeDualDef("DualGate"));
+    registry.register(makeMultiModelDef("DualGate"));
 
     const [assignments, diagnostics] = resolveModelAssignments([el], registry);
 
@@ -151,7 +151,7 @@ describe("FlattenPipelineReorder", () => {
     expect(diagnostics[0]!.code).toBe("invalid-simulation-model");
   });
 
-  it("explicit_digital_key_respected: model=digital on dual-model component routes to digital", () => {
+  it("explicit_digital_key_respected: model=digital routes to digital", () => {
     const props = new PropertyBag();
     props.set("model", "digital");
     const el = new TestLeafElement(
@@ -160,14 +160,14 @@ describe("FlattenPipelineReorder", () => {
     );
 
     const registry = new ComponentRegistry();
-    registry.register(makeDualDef("DualGate"));
+    registry.register(makeMultiModelDef("DualGate"));
 
     const [assignments] = resolveModelAssignments([el], registry);
 
     expect(assignments[0]!.modelKey).toBe("digital");
   });
 
-  it("explicit_behavioral_key_respected: model=behavioral on dual-model component routes to behavioral mna model", () => {
+  it("explicit_behavioral_key_respected: model=behavioral routes to behavioral mna model", () => {
     const props = new PropertyBag();
     props.set("model", "behavioral");
     const el = new TestLeafElement(
@@ -176,7 +176,7 @@ describe("FlattenPipelineReorder", () => {
     );
 
     const registry = new ComponentRegistry();
-    registry.register(makeDualDef("DualGate"));
+    registry.register(makeMultiModelDef("DualGate"));
 
     const [assignments] = resolveModelAssignments([el], registry);
 

@@ -28,6 +28,16 @@ import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { makeDiagnostic } from "../../../solver/analog/diagnostics.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -120,7 +130,7 @@ describe("TLine", () => {
       // nodeCount = 2 + 2*(N-1) = 2 + 4 = 6. Branches start at index 6.
       const firstBranch = 6;
 
-      const el = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
+      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
 
       // Set up companion model (dt=1ns, BDF-1) before stamping so inductors are active
       const voltages = new Float64Array(6 + N);
@@ -183,7 +193,7 @@ describe("TLine", () => {
       const nodeCount = 2 + internalCount; // 20
       const firstBranch = nodeCount;
 
-      const el = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
+      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
         new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0,
       );
 
@@ -270,7 +280,7 @@ describe("TLine", () => {
       props.setModelParam("length", 1.0);
       props.setModelParam("segments", N);
 
-      const tlineEl = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
+      const tlineEl = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
         new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
       );
 
@@ -372,7 +382,7 @@ describe("TLine", () => {
       props.setModelParam("length", 1.0);
       props.setModelParam("segments", N);
 
-      const tlineEl = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
+      const tlineEl = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
         new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
       );
 
@@ -399,7 +409,7 @@ describe("TLine", () => {
       const rSrc = makeResistor(nodeVs, port1, Z0);
       const rLoad = makeResistor(port2, 0, Z0);
 
-      const tlineEl2 = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
+      const tlineEl2 = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
         new Map([["P1b", nodeIds2[0]], ["P2b", nodeIds2[1]], ["P1a", 0], ["P2a", 0]]), nodeIds2.slice(2), firstL2, props, () => 0,
       );
 
@@ -450,7 +460,7 @@ describe("TLine", () => {
         props.setModelParam("length", 1.0);
         props.setModelParam("segments", N);
 
-        const tlineEl = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
+        const tlineEl = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
           new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
         );
         const vs = makeVoltageSource(1, 0, nodeCount, 1.0);
@@ -511,7 +521,7 @@ describe("TLine", () => {
         props.setModelParam("length", 1.0);
         props.setModelParam("segments", N);
 
-        const tlineEl = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
+        const tlineEl = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
           new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
         );
         const vs = makeVoltageSource(1, 0, nodeCount, 1.0);
@@ -578,7 +588,7 @@ describe("TLine", () => {
       props.setModelParam("length", 1.0);
       props.setModelParam("segments", N);
 
-      const tlineEl = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(
+      const tlineEl = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
         new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
       );
 
@@ -634,11 +644,11 @@ describe("TransmissionLine", () => {
     });
 
     it("has analogFactory", () => {
-      expect(TransmissionLineDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
+      expect((TransmissionLineDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     });
 
     it("requires branch row", () => {
-      expect(TransmissionLineDefinition.modelRegistry?.behavioral?.branchCount).toBe(1);
+      expect((TransmissionLineDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
     });
 
     it("has behavioral model entry", () => {
@@ -700,7 +710,7 @@ describe("TransmissionLine", () => {
       props.setModelParam("lossPerMeter", 0);
       props.setModelParam("length", 1.0);
       const nodeIds = buildNodeIds(1, 2, 3, 5);
-      const el = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 10, props, () => 0);
+      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 10, props, () => 0);
       expect(el.isReactive).toBe(true);
     });
 
@@ -712,7 +722,7 @@ describe("TransmissionLine", () => {
       props.setModelParam("lossPerMeter", 0);
       props.setModelParam("length", 1.0);
       const nodeIds = buildNodeIds(1, 2, 3, 5);
-      const el = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 10, props, () => 0);
+      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 10, props, () => 0);
       expect(el.isNonlinear).toBe(false);
     });
 
@@ -727,7 +737,7 @@ describe("TransmissionLine", () => {
       const internalCount = 2 * 2; // (N-1)*2 = 4
       const nodeCount = 2 + internalCount; // 6
       const firstBranch = nodeCount;
-      const el = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
+      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
 
       const voltages = new Float64Array(nodeCount + 3);
       el.stampCompanion!(1e-9, "bdf1", voltages);
@@ -745,7 +755,7 @@ describe("TransmissionLine", () => {
       props.setModelParam("lossPerMeter", 0);
       props.setModelParam("length", 1.0);
       const nodeIds = buildNodeIds(1, 2, 3, 3);
-      const el = TransmissionLineDefinition.modelRegistry!.behavioral!.factory(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 6, props, () => 0);
+      const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 6, props, () => 0);
       expect(el.stampCompanion).toBeDefined();
     });
   });

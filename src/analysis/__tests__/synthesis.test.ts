@@ -16,7 +16,7 @@ import { and, or, variable, negatedVariable, constant } from '../expression.js';
 import type { BoolExpr } from '../expression.js';
 import { toNandOnly } from '../expression-modifiers.js';
 import { ComponentRegistry } from '../../core/registry.js';
-import { PropertyBag, PropertyType } from '../../core/properties.js';
+import { PropertyType } from '../../core/properties.js';
 import type { Pin } from '../../core/pin.js';
 import { PinDirection } from '../../core/pin.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';

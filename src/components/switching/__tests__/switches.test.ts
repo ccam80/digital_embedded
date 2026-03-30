@@ -736,6 +736,16 @@ import {
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
 
+// ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
 function makeMockSolver() {
   const stamps: Array<{ row: number; col: number; value: number }> = [];
   const rhs: Record<number, number> = {};
@@ -776,7 +786,7 @@ describe("AnalogSwitch", () => {
 
   it("closed_stamps_ron", () => {
     const props = makeSpstProps({ closed: true, Ron: 1 });
-    const el = SwitchDefinition.modelRegistry!.behavioral!.factory(
+    const el = getFactory(SwitchDefinition.modelRegistry!.behavioral!)(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,
@@ -795,7 +805,7 @@ describe("AnalogSwitch", () => {
 
   it("open_stamps_roff", () => {
     const props = makeSpstProps({ closed: false, Roff: 1e9 });
-    const el = SwitchDefinition.modelRegistry!.behavioral!.factory(
+    const el = getFactory(SwitchDefinition.modelRegistry!.behavioral!)(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,
@@ -813,7 +823,7 @@ describe("AnalogSwitch", () => {
 
   it("toggle_changes_conductance", () => {
     const props = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
-    const el = SwitchDefinition.modelRegistry!.behavioral!.factory(
+    const el = getFactory(SwitchDefinition.modelRegistry!.behavioral!)(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,
@@ -843,7 +853,7 @@ describe("AnalogSwitch", () => {
     props.set("Ron", 1);
     props.set("Roff", 1e9);
 
-    const el = SwitchDefinition.modelRegistry!.behavioral!.factory(
+    const el = getFactory(SwitchDefinition.modelRegistry!.behavioral!)(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,
@@ -868,7 +878,7 @@ describe("AnalogSPDT", () => {
     props.set("Ron", 1);
     props.set("Roff", 1e9);
 
-    const el = SwitchDTDefinition.modelRegistry!.behavioral!.factory(
+    const el = getFactory(SwitchDTDefinition.modelRegistry!.behavioral!)(
       new Map([["A1", 1], ["B1", 2], ["C1", 3]]),
       [],
       -1,
@@ -894,7 +904,7 @@ describe("AnalogSPDT", () => {
     props.set("Ron", 1);
     props.set("Roff", 1e9);
 
-    const el = SwitchDTDefinition.modelRegistry!.behavioral!.factory(
+    const el = getFactory(SwitchDTDefinition.modelRegistry!.behavioral!)(
       new Map([["A1", 1], ["B1", 2], ["C1", 3]]),
       [],
       -1,
@@ -925,7 +935,7 @@ describe("Integration", () => {
     // Open switch: V across R ≈ 0V
 
     const switchProps = makeSpstProps({ closed: true, Ron: 1, Roff: 1e9 });
-    const swEl = SwitchDefinition.modelRegistry!.behavioral!.factory(
+    const swEl = getFactory(SwitchDefinition.modelRegistry!.behavioral!)(
       new Map([["A1", 1], ["B1", 2]]),
       [],
       -1,

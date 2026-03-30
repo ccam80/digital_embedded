@@ -912,7 +912,7 @@ describe('compileUnified — model resolution', () => {
     return r;
   }
 
-  it('dual-model component with defaultModel="digital" and no model property compiles as digital (no analog domain)', () => {
+  it('component with defaultModel="digital" and no model property compiles as digital (no analog domain)', () => {
     const r = buildDualModelRegistry();
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
 
@@ -928,7 +928,7 @@ describe('compileUnified — model resolution', () => {
     expect(result.analog).toBeNull();
   });
 
-  it('dual-model component with model="behavioral" produces analog domain with elements', () => {
+  it('component with model="behavioral" produces analog domain with elements', () => {
     const r = buildDualModelRegistry();
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
 

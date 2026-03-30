@@ -35,6 +35,16 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Circuit builder helpers
 // ---------------------------------------------------------------------------
 
@@ -91,7 +101,7 @@ function solveDac(
   dacPinNodeIds.push(nOutNode);   // OUT
   dacPinNodeIds.push(0);          // GND
   const dacEl = withNodeIds(
-    DACDefinition.modelRegistry!["behavioral"]!.factory(dacPinNodes, [], -1, props, () => 0),
+    getFactory(DACDefinition.modelRegistry!["behavioral"]!)(dacPinNodes, [], -1, props, () => 0),
     dacPinNodeIds,
   );
 

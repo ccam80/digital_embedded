@@ -125,7 +125,7 @@ function makeGatePinLayout(inputCount: number): PinDeclaration[] {
 }
 
 /**
- * Build a registry with Ground and a dual-model AND gate.
+ * Build a registry with Ground and an AND gate (digital + behavioral models).
  */
 function buildRegistry(factorySpy?: ReturnType<typeof vi.fn>): ComponentRegistry {
   const registry = new ComponentRegistry();

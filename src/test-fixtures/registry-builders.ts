@@ -40,7 +40,7 @@ export interface AnalogComponentConfig {
 }
 
 /**
- * Config for a dual-model (digital + analog) component.
+ * Config for a component with both digital and analog models.
  */
 export interface MixedComponentConfig {
   /** Component type name. */

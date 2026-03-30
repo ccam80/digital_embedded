@@ -52,7 +52,6 @@ import type { TutorialManifest } from './tutorial/types.js';
 import { createTestBridge } from './test-bridge.js';
 import { DefaultSimulatorFacade } from '../headless/default-facade.js';
 import { createEditorBinding } from '../integration/editor-binding.js';
-import type { Wire } from '../core/circuit.js';
 import type { Point } from '../core/renderer-interface.js';
 import type { AcParams } from '../solver/analog/ac-analysis.js';
 import { initViewerController } from './viewer-controller.js';

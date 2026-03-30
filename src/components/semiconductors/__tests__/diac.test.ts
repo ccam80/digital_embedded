@@ -17,6 +17,16 @@ import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sp
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Default Diac parameters (matching spec defaults)
 // ---------------------------------------------------------------------------
 
@@ -197,7 +207,7 @@ describe("Diac", () => {
     expect(DiacDefinition.name).toBe("Diac");
     expect(DiacDefinition.modelRegistry?.["behavioral"]).toBeDefined();
     expect(DiacDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
-    expect(DiacDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
+    expect((DiacDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     expect(DiacDefinition.category).toBe("SEMICONDUCTORS");
   });
 });

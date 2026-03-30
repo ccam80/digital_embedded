@@ -14,6 +14,13 @@ import { MemristorElement, MemristorDefinition, createMemristorElement, MEMRISTO
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
 // ---------------------------------------------------------------------------
 // Test defaults matching MemristorDefinition
 // ---------------------------------------------------------------------------
@@ -310,7 +317,7 @@ describe("Memristor", () => {
     });
 
     it("branchCount is false", () => {
-      expect(MemristorDefinition.modelRegistry?.behavioral?.branchCount).toBeFalsy();
+      expect((MemristorDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBeFalsy();
     });
   });
 });

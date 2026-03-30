@@ -49,6 +49,15 @@ import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
 import { EngineState } from "../../../core/engine-interface.js";
 import { vi } from "vitest";
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+
+// ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -81,7 +90,7 @@ function make555(
 ): AnalogElement {
   // pinLayout order: [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
   return withNodeIds(
-    Timer555Definition.modelRegistry!["behavioral"]!.factory(
+    getFactory(Timer555Definition.modelRegistry!["behavioral"]!)(
       new Map([
         ["DIS",  nodes.dis],
         ["TRIG", nodes.trig],

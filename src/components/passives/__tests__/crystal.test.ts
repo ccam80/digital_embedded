@@ -29,6 +29,16 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Analytical impedance of BVD model
 // ---------------------------------------------------------------------------
 
@@ -343,16 +353,16 @@ describe("Crystal", () => {
     });
 
     it("CrystalDefinition has analogFactory", () => {
-      expect(CrystalDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
+      expect((CrystalDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     });
 
     it("CrystalDefinition branchCount is 1", () => {
-      expect(CrystalDefinition.modelRegistry?.behavioral?.branchCount).toBe(1);
+      expect((CrystalDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
     });
 
     it("CrystalDefinition has branchCount 1 (requires 2 internal nodes)", () => {
       // Crystal uses 2 internal nodes; branchCount reflects the motional arm branch
-      expect(CrystalDefinition.modelRegistry?.behavioral?.branchCount).toBe(1);
+      expect((CrystalDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
     });
 
     it("CrystalDefinition isReactive", () => {
@@ -361,7 +371,7 @@ describe("Crystal", () => {
       props.setModelParam("qualityFactor", 1000);
       props.setModelParam("motionalCapacitance", 20e-15);
       props.setModelParam("shuntCapacitance", 5e-12);
-      const el = CrystalDefinition.modelRegistry!.behavioral!.factory(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
+      const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
       expect(el.isReactive).toBe(true);
     });
 
@@ -371,7 +381,7 @@ describe("Crystal", () => {
       props.setModelParam("qualityFactor", 1000);
       props.setModelParam("motionalCapacitance", 20e-15);
       props.setModelParam("shuntCapacitance", 5e-12);
-      const el = CrystalDefinition.modelRegistry!.behavioral!.factory(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
+      const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
       expect(el.isNonlinear).toBe(false);
     });
 

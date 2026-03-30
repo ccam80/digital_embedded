@@ -30,6 +30,16 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -101,7 +111,7 @@ function makeAdc(props: Record<string, number | string> = {}): ADCElement {
   merged.delete("vRef");
   const bag = new PropertyBag(Array.from(merged.entries()));
   bag.replaceModelParams(modelParams);
-  return ADCDefinition.modelRegistry!["behavioral"]!.factory(makeNodeIds(), [], -1, bag, () => 0) as ADCElement;
+  return getFactory(ADCDefinition.modelRegistry!["behavioral"]!)(makeNodeIds(), [], -1, bag, () => 0) as ADCElement;
 }
 
 // ---------------------------------------------------------------------------

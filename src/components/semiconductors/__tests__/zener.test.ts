@@ -20,6 +20,16 @@ import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sp
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Physical constants
 // ---------------------------------------------------------------------------
 
@@ -152,7 +162,7 @@ describe("Zener", () => {
     expect(ZenerDiodeDefinition.name).toBe("ZenerDiode");
     expect(ZenerDiodeDefinition.modelRegistry?.["behavioral"]).toBeDefined();
     expect(ZenerDiodeDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
-    expect(ZenerDiodeDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
+    expect((ZenerDiodeDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 });
 

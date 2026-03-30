@@ -34,6 +34,16 @@ import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sp
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Default NMOS parameters (W=1µ, L=1µ, KP=120µA/V², VTO=0.7, LAMBDA=0.02)
 // ---------------------------------------------------------------------------
 
@@ -460,7 +470,7 @@ describe("NmosfetDefinition", () => {
     expect(NmosfetDefinition.name).toBe("NMOS");
     expect(NmosfetDefinition.modelRegistry?.["behavioral"]).toBeDefined();
     expect(NmosfetDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
-    expect(NmosfetDefinition.modelRegistry?.["behavioral"]?.factory).toBeDefined();
+    expect((NmosfetDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
   it("pin_layout_has_three_pins", () => {

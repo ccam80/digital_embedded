@@ -187,7 +187,7 @@ describe("LDR", () => {
     });
 
     it("branchCount is false", () => {
-      expect(LDRDefinition.modelRegistry?.behavioral?.branchCount).toBeFalsy();
+      expect((LDRDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBeFalsy();
     });
   });
 });

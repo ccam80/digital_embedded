@@ -8,6 +8,16 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Mock solver
 // ---------------------------------------------------------------------------
 
@@ -94,13 +104,13 @@ describe("CurrentSource", () => {
   });
 
   it("definition_does_not_require_branch_row", () => {
-    expect(CurrentSourceDefinition.modelRegistry?.behavioral?.branchCount).toBeFalsy();
+    expect((CurrentSourceDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBeFalsy();
   });
 
   it("default_current_from_analog_factory", () => {
     const props = new PropertyBag();
     props.replaceModelParams(CURRENT_SOURCE_DEFAULTS);
-    const el = CurrentSourceDefinition.modelRegistry!.behavioral!.factory(
+    const el = getFactory(CurrentSourceDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1], ["neg", 2]]),
       [],
       -1,

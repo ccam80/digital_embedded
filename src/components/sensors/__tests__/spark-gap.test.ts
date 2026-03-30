@@ -272,7 +272,7 @@ describe("SparkGap", () => {
     });
 
     it("branchCount is false", () => {
-      expect(SparkGapDefinition.modelRegistry?.behavioral?.branchCount).toBeFalsy();
+      expect((SparkGapDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBeFalsy();
     });
   });
 });

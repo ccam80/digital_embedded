@@ -88,6 +88,7 @@ export abstract class ControlledSourceElement implements AnalogElementCore {
 
   readonly isNonlinear = true as const;
   readonly isReactive = false as const;
+  setParam(_key: string, _value: number): void {}
 
   label?: string;
 

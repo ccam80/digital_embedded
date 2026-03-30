@@ -18,6 +18,16 @@ import { TriacDefinition } from "../triac.js";
 import { TunnelDiodeDefinition } from "../tunnel-diode.js";
 import type { ComponentDefinition } from "../../../core/registry.js";
 
+// ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
 const SEMICONDUCTOR_DEFS: ComponentDefinition[] = [
   NpnBjtDefinition,
   PnpBjtDefinition,
@@ -46,7 +56,7 @@ describe("modelRegistry on semiconductor components", () => {
     });
 
     it(`${def.name}: behavioral entry has a factory function`, () => {
-      expect(typeof def.modelRegistry!["behavioral"]!.factory).toBe("function");
+      expect(typeof getFactory(def.modelRegistry!["behavioral"]!)).toBe("function");
     });
 
     it(`${def.name}: behavioral entry has params record`, () => {

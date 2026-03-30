@@ -12,6 +12,16 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import { PropertyBag } from "../../../core/properties.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -126,7 +136,7 @@ describe("VariableRail", () => {
   });
 
   it("definition_has_requires_branch_row", () => {
-    expect(VariableRailDefinition.modelRegistry?.behavioral?.branchCount).toBe(1);
+    expect((VariableRailDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
   });
 
   it("definition_engine_type_analog", () => {
@@ -137,7 +147,7 @@ describe("VariableRail", () => {
     const props = new PropertyBag();
     props.setModelParam("voltage", 7);
     props.setModelParam("resistance", 0.05);
-    const el = VariableRailDefinition.modelRegistry!.behavioral!.factory(
+    const el = getFactory(VariableRailDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1]]),
       [2],
       3,

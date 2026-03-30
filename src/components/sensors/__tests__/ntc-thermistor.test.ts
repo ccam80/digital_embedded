@@ -242,7 +242,7 @@ describe("NTC", () => {
     });
 
     it("branchCount is false", () => {
-      expect(NTCThermistorDefinition.modelRegistry?.behavioral?.branchCount).toBeFalsy();
+      expect((NTCThermistorDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBeFalsy();
     });
   });
 });

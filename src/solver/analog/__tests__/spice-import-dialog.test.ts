@@ -29,6 +29,16 @@ import type { AnalogElementFactory } from "../behavioral-gate.js";
 import { BJT_NPN_DEFAULTS } from "../../../components/semiconductors/bjt.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Minimal element builder (shared with spice-model-overrides.test.ts pattern)
 // ---------------------------------------------------------------------------
 
@@ -348,7 +358,7 @@ describe("spice-import-dialog: compile integration", () => {
       const behavioralEntry = registry.get("NpnStub")!.modelRegistry!["behavioral"]!;
       const entry: ModelEntry = {
         kind: "inline",
-        factory: behavioralEntry.factory,
+        factory: getFactory(behavioralEntry),
         params: { ...behavioralEntry.params, ...modelOverrides },
       };
       circuit.metadata.models = { NpnStub: { imported: entry } };

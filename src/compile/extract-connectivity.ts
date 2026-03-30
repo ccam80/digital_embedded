@@ -7,7 +7,6 @@
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
 import type { ComponentRegistry } from '../core/registry.js';
-import type { ComponentDefinition } from '../core/registry.js';
 import { pinWorldPosition } from '../core/pin.js';
 import { UnionFind } from './union-find.js';
 import type { ConnectivityGroup, ResolvedGroupPin } from './types.js';
@@ -38,13 +37,6 @@ export interface ModelAssignment {
   modelKey: string;
   /** The resolved model object, or null for neutral/infrastructure elements. */
   model: import('../core/registry.js').DigitalModel | null;
-  /**
-   * True when the component has both a digital model and at least one analog
-   * model (via modelRegistry). Dual-model components with
-   * modelKey="digital" contribute both "digital" and "analog" domain tags to
-   * their connectivity groups, creating boundary groups for bridge synthesis.
-   */
-  isDualModel: boolean;
 }
 
 /**
@@ -66,13 +58,13 @@ export function resolveModelAssignments(
     const el = elements[i]!;
 
     if (INFRASTRUCTURE_TYPES.has(el.typeId)) {
-      result.push({ elementIndex: i, modelKey: 'neutral', model: null, isDualModel: false });
+      result.push({ elementIndex: i, modelKey: 'neutral', model: null });
       continue;
     }
 
     const def = registry.get(el.typeId);
     if (def === undefined) {
-      result.push({ elementIndex: i, modelKey: 'neutral', model: null, isDualModel: false });
+      result.push({ elementIndex: i, modelKey: 'neutral', model: null });
       continue;
     }
 
@@ -133,15 +125,7 @@ export function resolveModelAssignments(
       model = null;
     }
 
-    // A component is dual-model when "model" is explicitly set to
-    // "digital" AND the component also has analog models available. In this
-    // case the component runs its digital model in the digital engine while
-    // its pins simultaneously contribute "analog" domain to connectivity groups,
-    // creating boundary groups for bridge adapter synthesis even when no
-    // physical connection to an analog net exists.
-    const isDualModel = requestedKey === 'digital' && hasDigital && hasAnalogModel;
-
-    result.push({ elementIndex: i, modelKey, model, isDualModel });
+    result.push({ elementIndex: i, modelKey, model });
   }
 
   return [result, diagnostics];
@@ -374,24 +358,6 @@ export function extractConnectivityGroups(
         kind: pin.kind ?? "signal",
       });
 
-      // Dual-model components participate in both domains simultaneously.
-      // A digital-domain dual-model component (e.g. a gate with an MNA model)
-      // also contributes "analog" to its groups, creating boundary groups that
-      // trigger bridge adapter synthesis without requiring physical connection
-      // to an analog net.
-      if (assignment.isDualModel && domain === 'digital') {
-        groupPins[groupId]!.push({
-          elementIndex: i,
-          pinIndex: j,
-          pinLabel: pin.label,
-          direction: pin.direction as PinDirection,
-          bitWidth: pin.bitWidth,
-          worldPosition: wp,
-          wireVertex: null,
-          domain: 'analog',
-          kind: pin.kind ?? "signal",
-        });
-      }
     }
   }
 

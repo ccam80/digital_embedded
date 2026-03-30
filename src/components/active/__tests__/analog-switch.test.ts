@@ -27,6 +27,16 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -58,7 +68,7 @@ function makeSPST(
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
   return withNodeIds(
-    SwitchSPSTDefinition.modelRegistry!["behavioral"]!.factory(
+    getFactory(SwitchSPSTDefinition.modelRegistry!["behavioral"]!)(
       new Map([["in", nIn], ["out", nOut], ["ctrl", nCtrl]]),
       [],
       -1,
@@ -77,7 +87,7 @@ function makeSPDT(
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
   return withNodeIds(
-    SwitchSPDTDefinition.modelRegistry!["behavioral"]!.factory(
+    getFactory(SwitchSPDTDefinition.modelRegistry!["behavioral"]!)(
       new Map([["com", nCom], ["no", nNO], ["nc", nNC], ["ctrl", nCtrl]]),
       [],
       -1,

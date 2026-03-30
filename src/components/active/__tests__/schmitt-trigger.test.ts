@@ -27,6 +27,16 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -66,7 +76,7 @@ function makeSchmittInverting(
   nOut: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return SchmittInvertingDefinition.modelRegistry!["behavioral"]!.factory(
+  return getFactory(SchmittInvertingDefinition.modelRegistry!["behavioral"]!)(
     new Map([["in", nIn], ["out", nOut]]),
     [],
     -1,
@@ -80,7 +90,7 @@ function makeSchmittNonInverting(
   nOut: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return SchmittNonInvertingDefinition.modelRegistry!["behavioral"]!.factory(
+  return getFactory(SchmittNonInvertingDefinition.modelRegistry!["behavioral"]!)(
     new Map([["in", nIn], ["out", nOut]]),
     [],
     -1,

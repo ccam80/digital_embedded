@@ -27,6 +27,16 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import { FuseDefinition } from "../../switching/fuse.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -345,8 +355,8 @@ describe("AnalogFuseElement", () => {
     });
 
     it("FuseDefinition has analogFactory", () => {
-      expect(FuseDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
-      expect(typeof FuseDefinition.modelRegistry?.behavioral?.factory).toBe("function");
+      expect((FuseDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
+      expect(typeof (FuseDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBe("function");
     });
 
     it("FuseDefinition has switchPins for bus resolver", () => {

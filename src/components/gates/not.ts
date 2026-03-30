@@ -29,6 +29,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
+import { makeNotAnalogFactory } from "../../solver/analog/behavioral-gate.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -273,6 +274,12 @@ export const NotDefinition: ComponentDefinition = {
     "Single input, configurable bit width (1–32).\n" +
     "Both IEEE/US (triangle with bubble) and IEC/DIN (rectangular with 1) shapes are supported.",
   modelRegistry: {
+    behavioral: {
+      kind: "inline",
+      factory: makeNotAnalogFactory(),
+      paramDefs: [],
+      params: {},
+    },
     cmos: {
       kind: "netlist",
       netlist: CMOS_INVERTER_NETLIST,

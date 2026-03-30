@@ -8,6 +8,16 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Mock solver
 // ---------------------------------------------------------------------------
 
@@ -99,7 +109,7 @@ describe("DcVoltageSource", () => {
   });
 
   it("definition_has_requires_branch_row", () => {
-    expect(DcVoltageSourceDefinition.modelRegistry?.behavioral?.branchCount).toBe(1);
+    expect((DcVoltageSourceDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
   });
 
   it("definition_engine_type_analog", () => {
@@ -109,7 +119,7 @@ describe("DcVoltageSource", () => {
   it("default_voltage_from_analog_factory", () => {
     const props = new PropertyBag();
     props.replaceModelParams({ voltage: 5 });
-    const el = DcVoltageSourceDefinition.modelRegistry!.behavioral!.factory(
+    const el = getFactory(DcVoltageSourceDefinition.modelRegistry!.behavioral!)(
       new Map([["pos", 1], ["neg", 0]]),
       [],
       2,

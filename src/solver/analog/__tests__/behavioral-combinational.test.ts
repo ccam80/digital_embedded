@@ -39,6 +39,16 @@ import { DemuxDefinition } from "../../../components/wiring/demux.js";
 import { DecoderDefinition } from "../../../components/wiring/decoder.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Shared test constants
 // ---------------------------------------------------------------------------
 
@@ -345,17 +355,17 @@ describe("Decoder", () => {
 describe("Registration", () => {
   it("mux_has_analog_factory", () => {
     expect(MuxDefinition.models?.digital).not.toBeUndefined();
-    expect(typeof MuxDefinition.modelRegistry?.behavioral?.factory).toBe("function");
+    expect(typeof (MuxDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBe("function");
   });
 
   it("demux_has_analog_factory", () => {
     expect(DemuxDefinition.models?.digital).not.toBeUndefined();
-    expect(typeof DemuxDefinition.modelRegistry?.behavioral?.factory).toBe("function");
+    expect(typeof (DemuxDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBe("function");
   });
 
   it("decoder_has_analog_factory", () => {
     expect(DecoderDefinition.models?.digital).not.toBeUndefined();
-    expect(typeof DecoderDefinition.modelRegistry?.behavioral?.factory).toBe("function");
+    expect(typeof (DecoderDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBe("function");
   });
 
   it("factory_produces_nonlinear_element", () => {

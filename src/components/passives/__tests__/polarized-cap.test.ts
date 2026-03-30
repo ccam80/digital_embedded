@@ -25,6 +25,16 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { SolverDiagnostic } from "../../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -298,7 +308,9 @@ describe("PolarizedCap", () => {
     });
 
     it("PolarizedCapDefinition has analogFactory", () => {
-      expect(PolarizedCapDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
+      const entry = PolarizedCapDefinition.modelRegistry?.behavioral;
+      const factory = entry?.kind === "inline" ? entry.factory : undefined;
+      expect(factory).toBeDefined();
     });
 
     it("PolarizedCapDefinition has behavioral model entry", () => {
@@ -308,14 +320,14 @@ describe("PolarizedCap", () => {
     it("PolarizedCapDefinition isReactive", () => {
       const props = new PropertyBag();
       props.replaceModelParams({ ...POLARIZED_CAP_MODEL_DEFAULTS, capacitance: 100e-6 });
-      const el = PolarizedCapDefinition.modelRegistry!.behavioral!.factory(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
+      const el = getFactory(PolarizedCapDefinition.modelRegistry!.behavioral!)(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
       expect(el.isReactive).toBe(true);
     });
 
     it("PolarizedCapDefinition isNonlinear", () => {
       const props = new PropertyBag();
       props.replaceModelParams(POLARIZED_CAP_MODEL_DEFAULTS);
-      const el = PolarizedCapDefinition.modelRegistry!.behavioral!.factory(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
+      const el = getFactory(PolarizedCapDefinition.modelRegistry!.behavioral!)(new Map([["pos", 1], ["neg", 0]]), [2], -1, props, () => 0);
       expect(el.isNonlinear).toBe(true);
     });
 

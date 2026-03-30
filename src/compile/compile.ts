@@ -32,7 +32,6 @@ import type {
   BridgeAdapter,
   SignalAddress,
   Wire,
-  ConnectivityGroup,
   DigitalCompilerFn,
 } from "./types.js";
 import type { Diagnostic } from "./types.js";

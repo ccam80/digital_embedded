@@ -84,14 +84,21 @@ Generated 2026-03-31 from review of spec/bridge-and-hot-loadable-params.md waves
 - `src/solver/analog/__tests__/compile-analog-partition.test.ts`
 - `src/test-fixtures/registry-builders.ts`
 
-**Action:**
-1. Delete `isDualModel` field from `ModelAssignment` interface
-2. Delete all logic that sets or reads `isDualModel`
-3. Delete all test code that exercises "dual-model" or "analog-pins" scenarios
-4. Grep for any remaining "analog-pins", "analog-internals", "logical" sub-mode references and delete
-5. Verify bridge synthesis still works without the dual-model concept (bridges are created at domain boundaries, not by component classification)
+**Status: PARTIALLY DONE.**
+- `isDualModel` removed from all production code (extract-connectivity.ts, types) — done by mnaModels-tests agent
+- "analog-pins" / "analog-internals" / "dual-model" still in 7 test/fixture files:
+  - `src/solver/digital/__tests__/flatten-pipeline-reorder.test.ts`
+  - `src/compile/__tests__/pin-loading-menu.test.ts`
+  - `src/solver/analog/__tests__/digital-pin-loading.test.ts`
+  - `src/compile/__tests__/compile-integration.test.ts`
+  - `src/headless/__tests__/digital-pin-loading-mcp.test.ts`
+  - `src/solver/analog/__tests__/compile-analog-partition.test.ts`
+  - `src/test-fixtures/registry-builders.ts`
 
-**Also check:** The "bridge-synthesis-fix" task in progress.md explicitly added `isDualModel` to extract-connectivity.ts. This entire task's premise was wrong — it was based on the false concept that components can be dual-model.
+**Remaining action:**
+1. Delete all test cases that exercise "analog-pins" / "dual-model" scenarios from the 7 files above
+2. Remove any "analog-pins" / "analog-internals" helpers from registry-builders.ts
+3. Verify bridge synthesis still works without the dual-model concept
 
 ### R0b: Add behavioral factories to modelRegistry for all components that had them in mnaModels
 **Priority: URGENT** — This session deleted mnaModels blocks from component files without first moving behavioral factory entries to modelRegistry. The behavioral factories (from behavioral-gate.ts, behavioral-flipflop.ts, behavioral-sequential.ts, behavioral-combinational.ts, behavioral-remaining.ts) are now unreachable by the compiler — `resolveModelEntry()` only checks `def.modelRegistry`.
@@ -134,11 +141,23 @@ Reference the corresponding `FromModelParams` factory (now the only factory) for
 
 ### R2: Fix TypeScript errors (928 remaining)
 **Priority: HIGH** — Blocks CI.
-**Categories:**
-- `AnalogElement` interface has `setParam` optional vs `AnalogElementCore` required — type hierarchy mismatch in analog-types.ts
-- Test stubs missing `getPinCurrents` (~15 test files)
-- ac-voltage-source.ts and variable-rail.ts structural issues from mnaModels-tests agent migration
-- Triage needed: which are pre-existing (baseline was ~1101) vs regressions from this session
+**All 928 errors are implementation bugs that need fixing.** No "pre-existing" — these are the current state.
+
+By error code:
+- 268x TS6133: unused variables/imports — delete dead imports
+- 165x TS2339: `.factory` on `ModelEntry` union — need type narrowing (fix-factory-narrowing agent running)
+- 83x TS2741: `getPinCurrents`/`setParam` missing from test stubs — add to stubs or delete broken tests
+- 54x TS2739: `AnalogElementCore` → `AnalogElement` type mismatch — fix type hierarchy or update call sites
+- 52x TS6196: unused type imports — delete
+- 48x TS2554: wrong argument count — fix call sites
+- 44x TS2322: type not assignable — fix types
+- 27x TS2353: object literal excess properties
+- 23x TS2307: broken import paths (includes `save-load-pin-loading*.test.ts` importing non-existent `save.js`/`load.js`)
+- 23x TS2345: argument type mismatch
+- 14x TS2420: class incorrectly implements interface
+- Remaining: ~97 across 12 other error codes
+
+**Fix approach:** Delete tests that reference deleted code (save.js/load.js). Fix type narrowing. Fix stubs. Delete unused imports. This is a bulk cleanup job across ~60 test files.
 
 ### R3: DigitalInputPinModel `loaded=true` default
 **Priority: MEDIUM** — Backwards-compat shim. Changing requires updating all behavioral element constructors that omit the `loaded` argument (they implicitly rely on `true`).

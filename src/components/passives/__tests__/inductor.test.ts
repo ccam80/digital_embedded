@@ -23,6 +23,16 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -58,7 +68,7 @@ function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamp
 
 /** Call analogFactory and inject pinNodeIds (simulating what the compiler does). */
 function makeInductorElement(pinNodes: Map<string, number>, branchIdx: number, props: PropertyBag) {
-  const el = InductorDefinition.modelRegistry!.behavioral!.factory(pinNodes, [], branchIdx, props, () => 0);
+  const el = getFactory(InductorDefinition.modelRegistry!.behavioral!)(pinNodes, [], branchIdx, props, () => 0);
   Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
   return el;
 }
@@ -160,11 +170,11 @@ describe("Inductor", () => {
     });
 
     it("InductorDefinition has analogFactory", () => {
-      expect(InductorDefinition.modelRegistry?.behavioral?.factory).toBeDefined();
+      expect((InductorDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     });
 
     it("InductorDefinition branchCount is 1", () => {
-      expect(InductorDefinition.modelRegistry?.behavioral?.branchCount).toBe(1);
+      expect((InductorDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
     });
 
     it("InductorDefinition category is PASSIVES", () => {

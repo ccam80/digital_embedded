@@ -331,6 +331,6 @@ describe("Registration", () => {
     // cmos model is a netlist entry — verify it has the expected netlist structure
     const cmosModel = DDefinition.modelRegistry!.cmos!;
     expect(cmosModel.kind).toBe("netlist");
-    expect(cmosModel.netlist).toBeDefined();
+    expect((cmosModel as {kind:"netlist";netlist:unknown}).netlist).toBeDefined();
   });
 });

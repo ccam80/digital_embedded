@@ -23,6 +23,16 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -43,7 +53,7 @@ function makeOptocouplerElement(
   ]).entries());
   props.replaceModelParams({ ctr, vForward, rLed });
   return withNodeIds(
-    OptocouplerDefinition.modelRegistry!["behavioral"]!.factory(
+    getFactory(OptocouplerDefinition.modelRegistry!["behavioral"]!)(
       new Map([["anode", nAnode], ["cathode", nCathode], ["collector", nCollector], ["emitter", nEmitter]]),
       [],
       -1,

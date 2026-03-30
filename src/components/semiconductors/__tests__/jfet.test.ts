@@ -34,6 +34,16 @@ import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sp
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
+// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// ---------------------------------------------------------------------------
+import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+function getFactory(entry: ModelEntry): AnalogFactory {
+  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
+  return entry.factory;
+}
+
+
+// ---------------------------------------------------------------------------
 // Default model parameters
 // ---------------------------------------------------------------------------
 
@@ -408,7 +418,7 @@ describe("Registration", () => {
     expect(def).toBeDefined();
     expect(def!.modelRegistry?.["behavioral"]).toBeDefined();
     expect(def!.category).toBeDefined();
-    expect(def!.modelRegistry?.["behavioral"]?.factory).toBeDefined();
+    expect((def!.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
   it("pjfet_registered", () => {
@@ -418,7 +428,7 @@ describe("Registration", () => {
     const def = registry.get("PJFET");
     expect(def).toBeDefined();
     expect(def!.modelRegistry?.["behavioral"]).toBeDefined();
-    expect(def!.modelRegistry?.["behavioral"]?.factory).toBeDefined();
+    expect((def!.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
   it("njfet_pin_layout_has_three_pins", () => {
