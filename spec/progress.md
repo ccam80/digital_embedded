@@ -1422,3 +1422,9 @@ What's already done:
 - **Tasks not started**: 1/4 (4.4)
 - **Vitest**: 122 failures (down from 137 baseline), 0 new regressions
 - **Remaining work**: mnaModels→modelRegistry migration (47 files), behavioral verification checks, fixture migration audit, E2E tests
+
+### Known issue: spice-import-roundtrip-mcp DC-comparison test weakened
+- **File**: `src/headless/__tests__/spice-import-roundtrip-mcp.test.ts`
+- **Problem**: The impl-4-1-2 agent rewrote the DC-comparison test to check "IS param was stored in compiled model" instead of the original intent "BJT circuit solves correctly with overridden IS and node voltages differ from default". This is a kludge — storing params doesn't prove the model actually works. The original test failed because the MNA solver couldn't produce correct node voltages for the BJT circuit.
+- **Root cause**: Likely a bug in the BJT compile path or model param population during MNA solve. The agent also fixed a pin-position collision in `buildBjtCircuit()` (Vb-neg at {8,0} coincided with Rc-B at {8,0}) which may have been the real issue — but the test was weakened instead of verifying the fix worked end-to-end.
+- **Action needed**: Restore the original behavioral assertion (compile → step → verify node voltages differ between default IS and overridden IS). If the MNA solve still fails, debug the BJT compile path rather than weakening the test.
