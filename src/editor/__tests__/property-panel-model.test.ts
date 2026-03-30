@@ -136,16 +136,14 @@ describe('showModelSelector modified indicator', () => {
   it('accent border when param modified', () => {
     const el = makeElement('behavioral'); el.getProperties().replaceModelParams({ BF: 200, NF: 1, IS: 1e-14 });
     panel.showModelSelector(el, makeBjtDef());
-    const inp = doc.findInputs().find(i => i.value === '200');
-    expect(inp).toBeDefined();
-    expect(inp!.style['borderColor']).toContain('accent');
+    const inp = doc.findInputs().find(i => i.value === '200')!;
+    expect(inp.style['borderColor']).toContain('accent');
   });
   it('no accent border at default value', () => {
     const el = makeElement('behavioral'); el.getProperties().replaceModelParams({ BF: 100, NF: 1, IS: 1e-14 });
     panel.showModelSelector(el, makeBjtDef());
-    const inp = doc.findInputs().find(i => i.value === '100');
-    expect(inp).toBeDefined();
-    expect(inp!.style['borderColor'] ?? '').not.toContain('accent');
+    const inp = doc.findInputs().find(i => i.value === '100')!;
+    expect(inp.style['borderColor'] ?? '').not.toContain('accent');
   });
 });
 
@@ -156,8 +154,8 @@ describe('showModelSelector reset to default', () => {
     panel.onPropertyChange((key, _o, v) => ch.push({ key, newVal: v }));
     panel.showModelSelector(el, makeBjtDef());
     doc.findByTagName('button').filter(b => b.textContent === '↺')[0]!.dispatchEvent('click');
-    const r = ch.find(c => c.key === 'model:BF');
-    expect(r).toBeDefined(); expect(r!.newVal).toBe(100);
+    const r = ch.find(c => c.key === 'model:BF')!;
+    expect(r.newVal).toBe(100);
   });
   it('reset writes default to model partition', () => {
     const el = makeElement('behavioral'); el.getProperties().replaceModelParams({ BF: 200, NF: 1, IS: 1e-14 });
@@ -186,8 +184,8 @@ describe('showModelSelector model switch', () => {
     panel.onPropertyChange((key, old, v) => ch.push({ key, old, newVal: v }));
     panel.showModelSelector(el, makeBjtDef(true));
     const sel = doc.findSelects()[0]!; sel.value = 'digital'; sel.dispatchEvent('change');
-    const r = ch.find(c => c.key === 'model');
-    expect(r).toBeDefined(); expect(r!.old).toBe('behavioral'); expect(r!.newVal).toBe('digital');
+    const r = ch.find(c => c.key === 'model')!;
+    expect(r.old).toBe('behavioral'); expect(r.newVal).toBe('digital');
   });
 });
 
@@ -206,7 +204,7 @@ describe('showModelSelector param commit on blur', () => {
     panel.showModelSelector(el, makeBjtDef());
     const inp = doc.findInputs().find(i => i.value === '100')!;
     inp.value = '150'; inp.dispatchEvent('blur');
-    const r = ch.find(c => c.key === 'model:BF');
-    expect(r).toBeDefined(); expect(r!.old).toBe(100); expect(r!.newVal).toBe(150);
+    const r = ch.find(c => c.key === 'model:BF')!;
+    expect(r.old).toBe(100); expect(r.newVal).toBe(150);
   });
 });

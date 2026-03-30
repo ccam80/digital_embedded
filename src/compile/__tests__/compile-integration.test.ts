@@ -18,7 +18,7 @@ import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 import { PropertyBag } from '../../core/properties.js';
 import type { PropertyBag as PropertyBagType, PropertyValue } from '../../core/properties.js';
 import { ComponentRegistry } from '../../core/registry.js';
-import type { ComponentDefinition, ComponentModels, ExecuteFunction } from '../../core/registry.js';
+import type { ComponentDefinition, ComponentModels, ExecuteFunction, ModelEntry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { CircuitElement } from '../../core/element.js';
@@ -918,6 +918,15 @@ describe('compileUnified — model resolution', () => {
     } as ComponentDefinition);
 
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+    const behavioralEntry: ModelEntry = {
+      kind: 'inline',
+      factory: (pinNodes: ReadonlyMap<string, number>) => {
+        const [n0, n1] = [...pinNodes.values()];
+        return makeResistorElement(n0 ?? 0, n1 ?? 0);
+      },
+      paramDefs: [],
+      params: {},
+    };
     r.register({
       name: 'DualAnd',
       typeId: -1,
@@ -929,22 +938,15 @@ describe('compileUnified — model resolution', () => {
       helpText: '',
       models: {
         digital: { executeFn: noopExec },
-        mnaModels: {
-          behavioral: {
-            factory: (pinNodes: ReadonlyMap<string, number>) => {
-              const [n0, n1] = [...pinNodes.values()];
-              return makeResistorElement(n0 ?? 0, n1 ?? 0);
-            },
-          },
-        },
       } as ComponentModels,
+      modelRegistry: { behavioral: behavioralEntry },
       defaultModel: 'digital',
     } as ComponentDefinition);
 
     return r;
   }
 
-  it('dual-model component with defaultModel="digital" and no simulationModel compiles as digital (no analog domain)', () => {
+  it('dual-model component with defaultModel="digital" and no model property compiles as digital (no analog domain)', () => {
     const r = buildDualModelRegistry();
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
 
@@ -960,11 +962,11 @@ describe('compileUnified — model resolution', () => {
     expect(result.analog).toBeNull();
   });
 
-  it('dual-model component with simulationModel="behavioral" produces analog domain with elements', () => {
+  it('dual-model component with model="behavioral" produces analog domain with elements', () => {
     const r = buildDualModelRegistry();
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
 
-    const propsMap = new Map<string, PropertyValue>([['simulationModel', 'behavioral']]);
+    const propsMap = new Map<string, PropertyValue>([['model', 'behavioral']]);
     const props = new PropertyBag(propsMap);
     const circuit = new Circuit();
     circuit.addElement(new TestElement('DualAnd', 'and-1', { x: 0, y: 0 }, twoIn, props));

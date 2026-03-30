@@ -1216,16 +1216,11 @@ export function compileAnalogPartition(
       props.set("_pinElectrical", pinElectricalMap as unknown as import("../../core/properties.js").PropertyValue);
     }
 
-    // Populate model params from ModelEntry defaults, then overlay user deltas
+    // Populate model params from ModelEntry defaults on first compile only.
+    // If the partition already has keys, the user has set explicit values — preserve them.
     const modelEntry = route.entry;
-    if (modelEntry && Object.keys(modelEntry.params).length > 0) {
+    if (modelEntry && props.getModelParamKeys().length === 0) {
       props.replaceModelParams(modelEntry.params);
-      // Overlay user-set deltas: model params the user explicitly changed
-      for (const key of modelEntry.paramDefs.map(pd => pd.key)) {
-        if (props.has(`_mp_${key}`)) {
-          props.setModelParam(key, props.get<number>(`_mp_${key}`));
-        }
-      }
     }
 
     const analogFactory = activeModel.factory;

@@ -2,7 +2,6 @@
  * Circuit-level SPICE model library dialog.
  *
  * Opened from the main menu ("SPICE Models...").
- * Pending reimplementation using the unified model system.
  */
 
 import type { Circuit } from '../core/circuit.js';

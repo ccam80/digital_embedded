@@ -1,385 +1,24 @@
 {
   "summary": {
     "vitest": {
-      "passed": 7610,
-      "failed": 100,
+      "passed": 105,
+      "failed": 0,
       "skipped": 0,
-      "totalFiles": 327,
-      "durationSeconds": 12.5
+      "totalFiles": 4,
+      "durationSeconds": 0.6
     },
     "playwright": {
       "passed": 5,
       "failed": 537,
       "skipped": 0,
       "totalFiles": 22,
-      "durationSeconds": 422.890282
+      "durationSeconds": 453.61919100000006
     },
-    "totalFailed": 637,
-    "totalPassed": 7615
+    "totalFailed": 537,
+    "totalPassed": 110
   },
   "failures": {
-    "vitest": [
-      {
-        "message": "expected [] to have a length of 3 but got +0",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\__tests__\\diag-rc-step.test.ts",
-            "test": "check model assignments and partition",
-            "line": 54,
-            "column": 38
-          }
-        ]
-      },
-      {
-        "message": "expected null not to be null",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\compile-integration.test.ts",
-            "test": "dual-model component with simulationModel=\"behavioral\" produces analog domain with elements",
-            "line": 978,
-            "column": 31
-          }
-        ]
-      },
-      {
-        "message": "expected [] to have a length of 1 but got +0",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\pin-loading-menu.test.ts",
-            "test": "cross-domain mode produces exactly one bridge for the DABridge element",
-            "line": 289,
-            "column": 28
-          }
-        ]
-      },
-      {
-        "message": "expected 4 to be 3 // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\pin-loading-menu.test.ts",
-            "test": "all mode routes dual-model components to the analog partition, reducing digital component count",
-            "line": 305,
-            "column": 24
-          }
-        ]
-      },
-      {
-        "message": "expected 4 to be 5 // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\pin-loading-menu.test.ts",
-            "test": "all mode removes the DABridge from the digital partition (strict all > cross-domain)",
-            "line": 321,
-            "column": 26
-          }
-        ]
-      },
-      {
-        "message": "expected 4 to be less than 4",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\pin-loading-menu.test.ts",
-            "test": "changing digitalPinLoading from cross-domain to all changes compile output",
-            "line": 351,
-            "column": 24
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of null (reading 'elements')",
-        "count": 5,
-        "locations": [
-          {
-            "file": "src\\compile\\__tests__\\pin-loading-menu.test.ts",
-            "test": "none mode on mixed circuit preserves the analog partition with exactly one base element",
-            "line": 362,
-            "column": 27
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "compiles_resistor_divider",
-            "line": 285,
-            "column": 21
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "assigns_ground_node_zero",
-            "line": 302,
-            "column": 32
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "detects_voltage_source_loop",
-            "line": 390,
-            "column": 21
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "elementToCircuitElement_maps_index_to_element",
-            "line": 489,
-            "column": 34
-          }
-        ]
-      },
-      {
-        "message": "Failed to load url ../../solver/analog/model-defaults.js (resolved id: ../../solver/analog/model-defaults.js) in C:/local_working_projects/digital_in_browser/src/components/semiconductors/diode.ts. Do...",
-        "count": 2,
-        "locations": [
-          {
-            "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-            "test": "cross-component current equality through real compiled lrctest.dig",
-            "line": null,
-            "column": null
-          },
-          {
-            "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-            "test": "component-as-node KCL: wire at pin A ≈ wire at pin B ≈ body current",
-            "line": null,
-            "column": null
-          }
-        ]
-      },
-      {
-        "message": "expected [] to include 'And'",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\components\\gates\\__tests__\\analog-gates.test.ts",
-            "test": "analog_palette_includes_gates",
-            "line": 89,
-            "column": 25
-          }
-        ]
-      },
-      {
-        "message": "expected false to be true // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\components\\io\\__tests__\\probe.test.ts",
-            "test": "appears_in_both_palettes",
-            "line": 414,
-            "column": 29
-          }
-        ]
-      },
-      {
-        "message": "expected [ { code: 'orphan-node', …(8) }, …(1) ] to have a length of +0 but got 2",
-        "count": 3,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
-            "test": "runner_integration",
-            "line": 585,
-            "column": 20
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
-            "test": "compilation produces correct topology",
-            "line": 414,
-            "column": 20
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
-            "test": "full pipeline: compile → DC OP → transient → analytical match",
-            "line": 561,
-            "column": 20
-          }
-        ]
-      },
-      {
-        "message": "expected 0 to be greater than 0",
-        "count": 3,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "maps_labels_to_nodes",
-            "line": 338,
-            "column": 48
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-            "test": "all mode produces more bridge adapter instances than cross-domain for same circuit",
-            "line": 374,
-            "column": 40
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
-            "test": "transient stepping produces time-varying output",
-            "line": 485,
-            "column": 27
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of null (reading 'nodeCount')",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "detects_floating_node",
-            "line": 364,
-            "column": 21
-          }
-        ]
-      },
-      {
-        "message": "expected \"spy\" to be called once, but got 0 times",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "calls_analog_factory_with_correct_args",
-            "line": 455,
-            "column": 24
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of null (reading 'matrixSize')",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "matrixSize_equals_nodeCount_plus_branchCount",
-            "line": 508,
-            "column": 21
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of null (reading 'netCount')",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "netCount_equals_nodeCount",
-            "line": 515,
-            "column": 21
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of null (reading 'componentCount')",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
-            "test": "componentCount_equals_elementCount",
-            "line": 522,
-            "column": 21
-          }
-        ]
-      },
-      {
-        "message": "Target cannot be null or undefined.",
-        "count": 4,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-            "test": "cross-domain with simulationModel=digital does produce bridge adapters",
-            "line": 321,
-            "column": 30
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-            "test": "all mode: dual-model component in digital partition gets exactly one bridge",
-            "line": 331,
-            "column": 30
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-            "test": "all mode: bridge has correct adapter counts (2 inputs + 1 output)",
-            "line": 340,
-            "column": 30
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-            "test": "none mode: bridge adapters still present at simulationModel=digital boundary",
-            "line": 387,
-            "column": 30
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of undefined (reading '0')",
-        "count": 4,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-            "test": "none mode: bridge input adapters have finite rIn",
-            "line": 398,
-            "column": 29
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-            "test": "none mode: bridge output adapters have finite rOut",
-            "line": 414,
-            "column": 29
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-            "test": "cross-domain mode: bridge input adapters have finite rIn (not ideal)",
-            "line": 430,
-            "column": 29
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-            "test": "all mode input adapters have finite rIn",
-            "line": 492,
-            "column": 36
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of undefined (reading 'length')",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\digital-pin-loading.test.ts",
-            "test": "none bridge count matches cross-domain (same boundary detection)",
-            "line": 453,
-            "column": 69
-          }
-        ]
-      },
-      {
-        "message": "expected 'digital' to be 'neutral' // Object.is equality",
-        "count": 2,
-        "locations": [
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-            "test": "invalid_submode_produces_diagnostic: unrecognized simulationModel on dual-model component produces invalid-simulation-model diagnostic and neutral modelKey",
-            "line": 182,
-            "column": 38
-          },
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-            "test": "invalid_logical_submode_produces_diagnostic: simulationModel=logical on dual-model component produces invalid-simulation-model diagnostic",
-            "line": 200,
-            "column": 38
-          }
-        ]
-      },
-      {
-        "message": "expected 'digital' to be 'behavioral' // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\digital\\__tests__\\flatten-pipeline-reorder.test.ts",
-            "test": "explicit_behavioral_key_respected: simulationModel=behavioral on dual-model component routes to behavioral mna model",
-            "line": 233,
-            "column": 38
-          }
-        ]
-      }
-    ],
+    "vitest": [],
     "playwright": [
       {
         "message": "Error: page.evaluate: Error: Timed out waiting for message: sim-ready",
@@ -479,7 +118,7 @@
       },
       {
         "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-        "count": 122,
+        "count": 132,
         "locations": [
           {
             "file": "gui/analog-circuit-assembly.spec.ts",
@@ -1212,37 +851,7 @@
             "test": "WIRING/Reset can be placed from palette",
             "line": 500,
             "column": 7
-          }
-        ]
-      },
-      {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoBeEmpty\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
-        "count": 1,
-        "locations": [
-          {
-            "file": "gui/app-loads.spec.ts",
-            "test": "palette panel is visible with component categories",
-            "line": 45,
-            "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveClass\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed",
-        "count": 1,
-        "locations": [
-          {
-            "file": "gui/app-loads.spec.ts",
-            "test": "dark mode toggle works",
-            "line": 78,
-            "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: worker process exited unexpectedly (code=3221225794, signal=null)",
-        "count": 398,
-        "locations": [
+          },
           {
             "file": "gui/component-sweep.spec.ts",
             "test": "WIRING/Stop can be placed from palette",
@@ -1302,7 +911,37 @@
             "test": "SWITCHING/FGNFET can be placed from palette",
             "line": 500,
             "column": 7
-          },
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).not.\u001b[22mtoBeEmpty\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/app-loads.spec.ts",
+            "test": "palette panel is visible with component categories",
+            "line": 45,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveClass\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/app-loads.spec.ts",
+            "test": "dark mode toggle works",
+            "line": 78,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: browserType.launch: Target page, context or browser has been closed",
+        "count": 2,
+        "locations": [
           {
             "file": "gui/component-sweep.spec.ts",
             "test": "SWITCHING/FGPFET can be placed from palette",
@@ -1314,7 +953,13 @@
             "test": "SWITCHING/Fuse can be placed from palette",
             "line": 500,
             "column": 7
-          },
+          }
+        ]
+      },
+      {
+        "message": "Error: worker process exited unexpectedly (code=3221225794, signal=null)",
+        "count": 386,
+        "locations": [
           {
             "file": "gui/component-sweep.spec.ts",
             "test": "PLD/Diode can be placed from palette",

@@ -206,11 +206,11 @@ describe("NPN", () => {
     expect(stampCalls.length).toBe(16);
     expect(rhsCalls.length).toBe(3); // C, B, E Norton currents
 
-    // gm > 0 and go > 0
-    expect(exp.gm).toBeGreaterThan(0);
-    expect(exp.go).toBeGreaterThan(0);
-    expect(exp.gpi).toBeGreaterThan(0);
-    expect(exp.gmu).toBeGreaterThan(0);
+    // gm, go, gpi, gmu: exact values computed from Gummel-Poon at this operating point
+    expect(exp.gm).toBeCloseTo(0.08510638298011017, 10);
+    expect(exp.go).toBeCloseTo(1e-12, 20);
+    expect(exp.gpi).toBeCloseTo(0.0008510638307911016, 10);
+    expect(exp.gmu).toBeCloseTo(1e-12, 20);
   });
 
   it("cutoff_region", () => {
@@ -236,16 +236,16 @@ describe("NPN", () => {
     const If = BJT_NPN_DEFAULTS.IS * (Math.exp(vbe / nfVt) - 1);
     const Ir = BJT_NPN_DEFAULTS.IS * (Math.exp(vbc / nfVt) - 1);
 
-    // Forward current exists (both junction forward biased means If and Ir both large)
-    expect(If).toBeGreaterThan(0);
-    expect(Ir).toBeGreaterThan(0);
+    // Forward current exists (both junctions forward biased — exact values at Vbe=0.8, Vbc=0.6)
+    expect(If).toBeCloseTo(0.2757072476037856, 8);
+    expect(Ir).toBeCloseTo(0.00012031953282638291, 12);
 
     // Ic is reduced compared to active region due to reverse current Ir
     // (saturation: Ic < BF * Ib)
     expect(exp.ic / exp.ib).toBeLessThan(100);
 
-    // Collector current is positive but suppressed
-    expect(exp.ic).toBeGreaterThan(0);
+    // Collector current exact value at saturation operating point
+    expect(exp.ic).toBeCloseTo(0.27558692807095925, 8);
   });
 
   it("voltage_limiting_both_junctions", () => {
@@ -366,12 +366,10 @@ describe("PNP", () => {
     expect(rhsPnp).toHaveLength(3);
 
     // Collector (node 1 → row 0) RHS for NPN and PNP should be negated
-    const npnCollRhs = rhsNpn.find((c) => c[0] === 0);
-    const pnpCollRhs = rhsPnp.find((c) => c[0] === 0);
-    expect(npnCollRhs).toBeDefined();
-    expect(pnpCollRhs).toBeDefined();
+    const npnCollRhs = rhsNpn.find((c) => c[0] === 0)!;
+    const pnpCollRhs = rhsPnp.find((c) => c[0] === 0)!;
     // PNP collector RHS should be negated relative to NPN
-    expect(pnpCollRhs![1]).toBeCloseTo(-(npnCollRhs![1] as number), 10);
+    expect(pnpCollRhs[1]).toBeCloseTo(-(npnCollRhs[1] as number), 10);
   });
 
   it("pnp_active_region_currents_positive", () => {
@@ -400,8 +398,6 @@ describe("PNP", () => {
 describe("Definitions", () => {
   it("npn_definition_fields", () => {
     expect(NpnBjtDefinition.name).toBe("NpnBJT");
-    expect(NpnBjtDefinition.modelRegistry).toBeDefined();
-    expect(NpnBjtDefinition.modelRegistry!["behavioral"]).toBeDefined();
     expect(NpnBjtDefinition.modelRegistry!["behavioral"].kind).toBe("inline");
     expect(NpnBjtDefinition.modelRegistry!["behavioral"].paramDefs).toBe(BJT_PARAM_DEFS);
     expect(NpnBjtDefinition.defaultModel).toBe("behavioral");
@@ -410,8 +406,6 @@ describe("Definitions", () => {
 
   it("pnp_definition_fields", () => {
     expect(PnpBjtDefinition.name).toBe("PnpBJT");
-    expect(PnpBjtDefinition.modelRegistry).toBeDefined();
-    expect(PnpBjtDefinition.modelRegistry!["behavioral"]).toBeDefined();
     expect(PnpBjtDefinition.modelRegistry!["behavioral"].kind).toBe("inline");
     expect(PnpBjtDefinition.defaultModel).toBe("behavioral");
     expect(PnpBjtDefinition.pinLayout).toHaveLength(3);
@@ -611,9 +605,9 @@ describe("Integration", () => {
     // Base current ≈ (Vbb - Vb) / Rb
     const ib = (vVbb - vBase) / 100_000;
 
-    // Both currents should be positive (BJT conducting)
-    expect(ic).toBeGreaterThan(0);
-    expect(ib).toBeGreaterThan(0);
+    // Both currents — exact DC operating point values (IS=1e-14, BF=100)
+    expect(ic).toBeCloseTo(0.004307509615241744, 8);
+    expect(ib).toBeCloseTo(0.00004307509614279056, 12);
 
     // Ic / Ib ratio should be bounded by BF=100 (in saturation or active)
     // In active region: Ic/Ib ≈ BF. In saturation Ic/Ib < BF.

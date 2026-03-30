@@ -975,3 +975,36 @@ What's already done:
   - 3 failures in flatten-pipeline-reorder.test.ts are pre-existing (tests use `simulationModel` property but resolveModelAssignments checks `model` property)
   - ~15 new failures across src/__tests__/diag-rc-step.test.ts, compile-integration.test.ts, pin-loading-menu.test.ts, analog-gates.test.ts, probe.test.ts, wire-current-resolver.test.ts, analog-engine.test.ts, compiler.test.ts, digital-pin-loading.test.ts, rc-ac-transient.test.ts are tests that relied on the deleted bridge path (dual-model components with defaultModel="digital" routing through synthesizeDigitalCircuit + BridgeInstance)
   - Zero remaining references to: CrossEngineBoundary, BoundaryPinMapping, BridgeInstance, synthesizeDigitalCircuit, compileBridgeInstance, domainFromAssignments, buildPinMappings, resolvePositionToNodeId, resolveSubcircuitPinNode, detectHighSourceImpedance, crossEnginePlaceholderIds
+
+---
+
+## Wave 2 Review Fixes
+
+### Fix 1: Remove historical-provenance comments (V3, V4)
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/app/spice-model-library-dialog.ts`, `src/app/spice-model-apply.ts`
+- **Tests**: 0 new tests (comment-only changes)
+
+### Fix 2: simulationModel → model in compile-integration.test.ts (V6)
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/compile/__tests__/compile-integration.test.ts`
+- **Notes**: Also updated test fixture to use `modelRegistry` (inline ModelEntry) instead of `models.mnaModels`, so the compiler can actually resolve the behavioral model via `resolveModelEntry`. Test now correctly exercises the `model='behavioral'` path.
+- **Tests**: 23/23 passing in compile-integration.test.ts
+
+### Fix 3: Remove _mp_ delta mechanism from compiler.ts (V8)
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/solver/analog/compiler.ts`
+- **Change**: Replaced `replaceModelParams(entry.params)` + `_mp_` overlay loop with a single first-compile-only guard: populates model params from entry defaults only when partition is empty. No `_mp_` references remain in the codebase.
+- **Tests**: 0 regressions introduced (compiler.test.ts failures were pre-existing per git HEAD .vitest-failures.json)
+
+### Fix 4: Strengthen weak test assertions (WT1-WT12)
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**:
+  - `src/io/__tests__/dts-model-roundtrip.test.ts` — removed 2 `toBeDefined()` guards (WT1-WT3)
+  - `src/components/semiconductors/__tests__/bjt.test.ts` — removed 4 `toBeDefined()` guards (WT4-WT6, WT9), replaced 4 `toBeGreaterThan(0)` with `toBeCloseTo` exact values (WT7-WT8, WT10)
+  - `src/editor/__tests__/property-panel-model.test.ts` — removed 5 `toBeDefined()` guards (WT11-WT12)
+- **Tests**: 76/76 passing across all 4 affected test files

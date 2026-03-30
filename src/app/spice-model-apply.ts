@@ -1,8 +1,5 @@
 /**
  * Helpers for applying SPICE import results to component instances.
- *
- * Pending reimplementation using the unified model system (model property +
- * modelRegistry + PropertyBag model param partition).
  */
 
 import type { CircuitElement } from '../core/element.js';

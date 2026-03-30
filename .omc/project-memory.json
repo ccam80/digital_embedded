@@ -253,38 +253,38 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 806,
-      "lastAccessed": 1774855496052,
+      "accessCount": 826,
+      "lastAccessed": 1774859279377,
       "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 406,
-      "lastAccessed": 1774856318567,
+      "accessCount": 416,
+      "lastAccessed": 1774859829377,
       "type": "directory"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 186,
-      "lastAccessed": 1774856265665,
+      "accessCount": 190,
+      "lastAccessed": 1774857718191,
       "type": "file"
     },
     {
       "path": "src\\core\\registry.ts",
-      "accessCount": 184,
-      "lastAccessed": 1774855745443,
+      "accessCount": 185,
+      "lastAccessed": 1774859320654,
       "type": "directory"
     },
     {
       "path": "",
-      "accessCount": 170,
-      "lastAccessed": 1774845082727,
+      "accessCount": 174,
+      "lastAccessed": 1774859478435,
       "type": "directory"
     },
     {
       "path": "src\\editor\\property-panel.ts",
-      "accessCount": 139,
-      "lastAccessed": 1774845227575,
+      "accessCount": 143,
+      "lastAccessed": 1774857853767,
       "type": "file"
     },
     {
@@ -300,15 +300,21 @@
       "type": "file"
     },
     {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 98,
+      "lastAccessed": 1774858895965,
+      "type": "file"
+    },
+    {
       "path": "src\\app\\canvas-popup.ts",
       "accessCount": 97,
       "lastAccessed": 1774842709283,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 96,
-      "lastAccessed": 1774854001198,
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 75,
+      "lastAccessed": 1774859063796,
       "type": "file"
     },
     {
@@ -321,12 +327,6 @@
       "path": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
       "accessCount": 72,
       "lastAccessed": 1774842577039,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 69,
-      "lastAccessed": 1774845058185,
       "type": "file"
     },
     {
@@ -343,8 +343,8 @@
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 50,
-      "lastAccessed": 1774845059633,
+      "accessCount": 51,
+      "lastAccessed": 1774859697331,
       "type": "file"
     },
     {
@@ -355,8 +355,14 @@
     },
     {
       "path": "spec\\.context\\reviewer.md",
+      "accessCount": 43,
+      "lastAccessed": 1774857692497,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
       "accessCount": 42,
-      "lastAccessed": 1774840594127,
+      "lastAccessed": 1774859151119,
       "type": "file"
     },
     {
@@ -372,34 +378,34 @@
       "type": "directory"
     },
     {
+      "path": "src\\core\\properties.ts",
+      "accessCount": 38,
+      "lastAccessed": 1774858969436,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\mosfet.ts",
       "accessCount": 36,
       "lastAccessed": 1774819954254,
       "type": "file"
     },
     {
+      "path": "src\\headless\\default-facade.ts",
+      "accessCount": 36,
+      "lastAccessed": 1774858820596,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog",
+      "accessCount": 36,
+      "lastAccessed": 1774859274057,
+      "type": "directory"
+    },
+    {
       "path": "src\\solver\\analog\\model-defaults.ts",
       "accessCount": 35,
       "lastAccessed": 1774823959252,
       "type": "file"
-    },
-    {
-      "path": "src\\headless\\default-facade.ts",
-      "accessCount": 35,
-      "lastAccessed": 1774842356872,
-      "type": "directory"
-    },
-    {
-      "path": "src\\core\\properties.ts",
-      "accessCount": 35,
-      "lastAccessed": 1774845076451,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog",
-      "accessCount": 34,
-      "lastAccessed": 1774842193618,
-      "type": "directory"
     },
     {
       "path": "src\\editor\\__tests__\\property-panel-spice.test.ts",
@@ -417,12 +423,6 @@
       "path": "src\\components\\semiconductors\\schottky.ts",
       "accessCount": 26,
       "lastAccessed": 1774816969994,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
-      "accessCount": 23,
-      "lastAccessed": 1774844398718,
       "type": "file"
     },
     {
@@ -456,15 +456,15 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors",
-      "accessCount": 17,
-      "lastAccessed": 1774816938276,
+      "path": "src\\headless",
+      "accessCount": 18,
+      "lastAccessed": 1774858825085,
       "type": "directory"
     },
     {
-      "path": "src\\headless",
+      "path": "src\\components\\semiconductors",
       "accessCount": 17,
-      "lastAccessed": 1774835644838,
+      "lastAccessed": 1774816938276,
       "type": "directory"
     },
     {

@@ -18,3 +18,7 @@
 {"t":0,"agent":"abae29a","agent_type":"architect","event":"agent_stop","success":true,"duration_ms":218923}
 {"t":0,"agent":"a6e3621","agent_type":"claude-orchestrator:implementer","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"a6e3621","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true,"duration_ms":2311514}
+{"t":0,"agent":"ace205c","agent_type":"claude-orchestrator:reviewer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"ace205c","agent_type":"claude-orchestrator:reviewer","event":"agent_stop","success":true,"duration_ms":456008}
+{"t":0,"agent":"a870c93","agent_type":"claude-orchestrator:implementer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a870c93","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true,"duration_ms":931091}
