@@ -31,22 +31,19 @@ export interface ModelAssignment {
   /** Index into the elements array. */
   elementIndex: number;
   /**
-   * Active model key: "digital" | a named mna model key | "neutral".
+   * Active model key: "digital" | a named analog model key | "neutral".
    * "neutral" for infrastructure components (Wire, Tunnel, Ground, etc.)
    * that carry no simulation model but are still part of connectivity.
    */
   modelKey: string;
   /** The resolved model object, or null for neutral/infrastructure elements. */
-  model: import('../core/registry.js').DigitalModel | import('../core/registry.js').MnaModel | null;
+  model: import('../core/registry.js').DigitalModel | null;
 }
 
 /**
  * Resolve the active model for every element in the circuit.
  *
- * Per spec Section 4.1: for each element look up
- *   `def.models[modelKey]` where
- *   `modelKey = el.props.simulationModel ?? def.defaultModel ?? firstKey(def.models)`
- *
+ * For each element, look up `def.models` and determine the active model key.
  * Infrastructure components (Wire, Tunnel, Ground, etc.) are tagged as
  * neutral — they participate in connectivity but have no simulation model.
  */
@@ -60,7 +57,6 @@ export function resolveModelAssignments(
   for (let i = 0; i < elements.length; i++) {
     const el = elements[i]!;
 
-    // Infrastructure types are neutral regardless of what the registry says
     if (INFRASTRUCTURE_TYPES.has(el.typeId)) {
       result.push({ elementIndex: i, modelKey: 'neutral', model: null });
       continue;
@@ -68,33 +64,20 @@ export function resolveModelAssignments(
 
     const def = registry.get(el.typeId);
     if (def === undefined) {
-      // Unknown component — treat as neutral rather than crashing
       result.push({ elementIndex: i, modelKey: 'neutral', model: null });
       continue;
     }
 
-    // Delegate to getActiveModelKey — throws on invalid simulationModel prop values.
-    let modelKey: string;
-    try {
-      modelKey = getActiveModelKey(el, def);
-    } catch (err) {
-      // Invalid simulationModel property — record a diagnostic and continue with neutral
-      // so the rest of compilation can proceed and report all errors at once.
-      diagnostics.push({
-        severity: 'error',
-        code: 'invalid-simulation-model',
-        message: err instanceof Error ? err.message : String(err),
-      });
-      result.push({ elementIndex: i, modelKey: 'neutral', model: null });
-      continue;
-    }
+    const props = el.getProperties();
+    const modelKey = (props.has('model') ? props.get<string>('model') : undefined)
+      ?? def.defaultModel
+      ?? (def.models.digital ? 'digital' : 'neutral');
 
-    // Resolve the actual model object
-    let model: import('../core/registry.js').DigitalModel | import('../core/registry.js').MnaModel | null;
+    let model: import('../core/registry.js').DigitalModel | null;
     if (modelKey === 'digital') {
       model = def.models.digital ?? null;
     } else {
-      model = def.models.mnaModels?.[modelKey] ?? null;
+      model = null;
     }
 
     result.push({ elementIndex: i, modelKey, model });
@@ -110,12 +93,10 @@ export function resolveModelAssignments(
 /**
  * Map a model key to a domain string used by the partition system.
  *
- * Returns "analog" (not "mna") for all non-digital, non-neutral keys because
- * partition.ts checks `g.domains.has("analog")` and `ma.modelKey === "analog"`.
- * The canonical registry.modelKeyToDomain() returns "mna", which is incompatible
- * with those checks, so this local version is intentionally kept.
+ * Returns "analog" for all non-digital, non-neutral keys because
+ * partition.ts checks `g.domains.has("analog")`.
  */
-function modelKeyToDomain(modelKey: string): string {
+function resolveDomainFromModelKey(modelKey: string): string {
   if (modelKey === 'digital') return 'digital';
   if (modelKey === 'neutral') return 'neutral';
   return 'analog';
@@ -310,7 +291,7 @@ export function extractConnectivityGroups(
     const el = elements[i]!;
     const pins = allPins[i]!;
     const assignment = modelAssignments[i]!;
-    const domain = modelKeyToDomain(assignment.modelKey);
+    const domain = resolveDomainFromModelKey(assignment.modelKey);
 
     for (let j = 0; j < pins.length; j++) {
       const pin = pins[j]!;

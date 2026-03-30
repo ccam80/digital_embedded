@@ -1,62 +1,50 @@
 /**
- * Pure helpers for applying SPICE import results to component instances.
+ * Helpers for applying SPICE import results to component instances.
+ *
+ * Pending reimplementation using the unified model system (model property +
+ * modelRegistry + PropertyBag model param partition).
  */
 
 import type { CircuitElement } from '../core/element.js';
 import type { Circuit } from '../core/circuit.js';
 import type { MnaSubcircuitNetlist } from '../core/mna-subcircuit-netlist.js';
+
 /** The result produced by the .MODEL import dialog. */
 export interface SpiceImportResult {
-  /** Parsed params object — stored as _spiceModelOverrides. */
+  /** Parsed params object. */
   overrides: Record<string, number>;
-  /** Display name — stored as _spiceModelName. */
+  /** Display name. */
   modelName: string;
   /** Parsed device type for library-level storage. */
   deviceType: string;
 }
 
 /**
- * Apply the .MODEL import result:
- *   1. Write to circuit.metadata.namedParameterSets (library-level).
- *   2. Write _spiceModelOverrides and _spiceModelName on the element (per-instance).
- * Both coexist: library provides shared defaults, instance overrides customize this component.
+ * Apply the .MODEL import result to a component instance and circuit.
  */
 export function applySpiceImportResult(
-  element: CircuitElement,
-  result: SpiceImportResult,
-  circuit: Circuit,
+  _element: CircuitElement,
+  _result: SpiceImportResult,
+  _circuit: Circuit,
 ): void {
-  if (!circuit.metadata.namedParameterSets) circuit.metadata.namedParameterSets = {};
-  circuit.metadata.namedParameterSets[result.modelName] = {
-    deviceType: result.deviceType,
-    params: { ...result.overrides },
-  };
-  element.getProperties().set('_spiceModelOverrides', result.overrides);
-  element.getProperties().set('_spiceModelName', result.modelName);
+  throw new Error("applySpiceImportResult: pending reimplementation with unified model system");
 }
 
 /** The result produced by the .SUBCKT import dialog. */
 export interface SpiceSubcktImportResult {
   /** Subcircuit name (from the .SUBCKT header). */
   subcktName: string;
-  /** Compiled netlist — registered in SubcircuitModelRegistry and stored in circuit.metadata.modelDefinitions. */
+  /** Compiled netlist. */
   netlist: MnaSubcircuitNetlist;
 }
 
 /**
- * Apply the .SUBCKT import result:
- *   1. Register the netlist in the provided SubcircuitModelRegistry.
- *   2. Write the MnaSubcircuitNetlist to circuit.metadata.modelDefinitions.
- *   3. Set simulationModel on the instance to the subcircuit name.
+ * Apply the .SUBCKT import result to a component instance and circuit.
  */
 export function applySpiceSubcktImportResult(
-  element: CircuitElement,
-  result: SpiceSubcktImportResult,
-  modelRegistry: SubcircuitModelRegistry,
-  circuit: Circuit,
+  _element: CircuitElement,
+  _result: SpiceSubcktImportResult,
+  _circuit: Circuit,
 ): void {
-  modelRegistry.register(result.subcktName, result.netlist);
-  if (!circuit.metadata.modelDefinitions) circuit.metadata.modelDefinitions = {};
-  circuit.metadata.modelDefinitions[result.subcktName] = result.netlist;
-  element.getProperties().set('simulationModel', result.subcktName);
+  throw new Error("applySpiceSubcktImportResult: pending reimplementation with unified model system");
 }

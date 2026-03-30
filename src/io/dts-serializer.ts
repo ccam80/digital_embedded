@@ -8,7 +8,6 @@
 import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
-import type { MnaSubcircuitNetlist } from '../core/mna-subcircuit-netlist.js';
 import type {
   DtsDocument,
   DtsCircuit,
@@ -162,39 +161,11 @@ function circuitToDtsCircuit(circuit: Circuit): DtsCircuit {
 
 /**
  * Build the model-related fields of a DtsDocument from circuit metadata.
- *
- * When a `SubcircuitModelRegistry` is provided, its MnaSubcircuitNetlist
- * objects are written directly. Without the registry, the metadata
- * MnaSubcircuitNetlist is written as-is.
  */
 function buildModelFields(
-  circuit: Circuit,
-  subcircuitModels?: SubcircuitModelRegistry,
-): Pick<DtsDocument, 'modelDefinitions' | 'namedParameterSets' | 'subcircuitBindings'> {
-  const result: Pick<DtsDocument, 'modelDefinitions' | 'namedParameterSets' | 'subcircuitBindings'> = {};
-
-  if (circuit.metadata.modelDefinitions !== undefined) {
-    const modelDefinitions: Record<string, MnaSubcircuitNetlist> = {};
-    for (const [name, def] of Object.entries(circuit.metadata.modelDefinitions)) {
-      const registryNetlist = subcircuitModels?.get(name);
-      if (registryNetlist !== undefined) {
-        modelDefinitions[name] = registryNetlist;
-      } else {
-        modelDefinitions[name] = def;
-      }
-    }
-    result.modelDefinitions = modelDefinitions;
-  }
-
-  if (circuit.metadata.namedParameterSets !== undefined) {
-    result.namedParameterSets = circuit.metadata.namedParameterSets;
-  }
-
-  if (circuit.metadata.subcircuitBindings !== undefined) {
-    result.subcircuitBindings = circuit.metadata.subcircuitBindings;
-  }
-
-  return result;
+  _circuit: Circuit,
+): Record<string, never> {
+  return {};
 }
 
 /**
@@ -203,20 +174,16 @@ function buildModelFields(
  * Produces a self-contained document with `format: "dts"`, `version: 1`,
  * and no `subcircuitDefinitions` key (standalone circuit).
  *
- * When `subcircuitModels` is provided, MnaSubcircuitNetlist objects from the
- * registry are serialized directly.
- *
  * Output is deterministic: same circuit always produces byte-identical JSON.
  */
 export function serializeCircuit(
   circuit: Circuit,
-  subcircuitModels?: SubcircuitModelRegistry,
 ): string {
   const doc: DtsDocument = {
     format: 'dts',
     version: 1,
     circuit: circuitToDtsCircuit(circuit),
-    ...buildModelFields(circuit, subcircuitModels),
+    ...buildModelFields(circuit),
   };
 
   return JSON.stringify(doc, sortedReplacer, 2);
@@ -230,13 +197,10 @@ export function serializeCircuit(
  * placed under `subcircuitDefinitions` keyed by its name. The result is a
  * fully self-contained document — no external files are required to load it.
  *
- * When `subcircuitModels` is provided, MnaSubcircuitNetlist objects from the
- * registry are serialized directly.
  */
 export function serializeWithSubcircuits(
   circuit: Circuit,
   subcircuits: Map<string, Circuit>,
-  subcircuitModels?: SubcircuitModelRegistry,
 ): string {
   const subcircuitDefinitions: Record<string, DtsCircuit> = {};
   for (const [name, sub] of subcircuits) {
@@ -248,7 +212,7 @@ export function serializeWithSubcircuits(
     version: 1,
     circuit: circuitToDtsCircuit(circuit),
     subcircuitDefinitions,
-    ...buildModelFields(circuit, subcircuitModels),
+    ...buildModelFields(circuit),
   };
 
   return JSON.stringify(doc, sortedReplacer, 2);

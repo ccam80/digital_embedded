@@ -165,7 +165,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
       const def = registry.get(el.typeId);
       if (def === undefined) return false;
       try {
-        return modelKeyToDomain(getActiveModelKey(el, def), def) === 'mna';
+        return def.models?.digital === undefined;
       } catch {
         return false;
       }
@@ -380,7 +380,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
         const def = registry.get(el.typeId);
         if (def === undefined) return false;
         try {
-          return modelKeyToDomain(getActiveModelKey(el, def), def) === 'mna';
+          return def.models?.digital === undefined;
         } catch {
           return false;
         }

@@ -891,10 +891,10 @@ describe('compileUnified — labelSignalMap', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 6: Model resolution via getActiveModelKey — H2-H8 / H12-H15 coverage
+// Test 6: Model resolution — H2-H8 / H12-H15 coverage
 // ---------------------------------------------------------------------------
 
-describe('compileUnified — model resolution via getActiveModelKey', () => {
+describe('compileUnified — model resolution', () => {
   function buildDualModelRegistry(): ComponentRegistry {
     const r = new ComponentRegistry();
 

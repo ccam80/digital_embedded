@@ -183,16 +183,8 @@ function createWire(savedWire: DtsWire): Wire {
  * Options for populating runtime registries during DTS deserialization.
  */
 export interface DtsDeserializeOptions {
-  /**
-   * When provided, named parameter sets from the document are added to this
-   * library so they are available at compile time.
-   */
-  modelLibrary?: ModelLibrary;
-  /**
-   * When provided, MnaSubcircuitNetlist objects from the document are
-   * registered here directly so they can be expanded at compile time.
-   */
-  subcircuitModelRegistry?: SubcircuitModelRegistry;
+  /** Reserved for future use by the unified model system. */
+  _placeholder?: never;
 }
 
 /**
@@ -201,10 +193,6 @@ export interface DtsDeserializeOptions {
  * Returns the main circuit and a map of subcircuit names to Circuit objects.
  * The subcircuits map is empty when the document has no `subcircuitDefinitions`.
  * Accepts both `format: 'dts'` (current) and `format: 'digb'`.
- *
- * When `options.modelLibrary` is provided, named parameter sets are added to
- * it. When `options.subcircuitModelRegistry` is provided, MnaSubcircuitNetlist
- * objects are registered in it directly.
  *
  * @throws Error if the JSON is malformed or the document fails validation.
  * @throws Error if any component type is not found in the registry.
@@ -224,35 +212,6 @@ export function deserializeDts(
     for (const [name, subDef] of Object.entries(doc.subcircuitDefinitions)) {
       subcircuits.set(name, deserializeDtsCircuit(subDef, registry));
     }
-  }
-
-  if (doc.namedParameterSets !== undefined) {
-    circuit.metadata.namedParameterSets = doc.namedParameterSets;
-    if (options?.modelLibrary !== undefined) {
-      for (const [name, entry] of Object.entries(doc.namedParameterSets)) {
-        options.modelLibrary.add({
-          name,
-          type: entry.deviceType as import('../core/analog-types.js').DeviceType,
-          level: 1,
-          params: entry.params,
-        });
-      }
-    }
-  }
-
-  if (doc.modelDefinitions !== undefined) {
-    const modelDefinitions: Record<string, MnaSubcircuitNetlist> = {};
-    for (const [name, nlDef] of Object.entries(doc.modelDefinitions)) {
-      modelDefinitions[name] = nlDef;
-      if (options?.subcircuitModelRegistry !== undefined && nlDef.elements.length > 0) {
-        options.subcircuitModelRegistry.register(name, nlDef);
-      }
-    }
-    circuit.metadata.modelDefinitions = modelDefinitions;
-  }
-
-  if (doc.subcircuitBindings !== undefined) {
-    circuit.metadata.subcircuitBindings = doc.subcircuitBindings as Record<string, string>;
   }
 
   return { circuit, subcircuits };

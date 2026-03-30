@@ -102,7 +102,7 @@ export interface DtsDocument {
   modelDefinitions?: Record<string, MnaSubcircuitNetlist>;
   /**
    * Named SPICE .MODEL parameter sets keyed by model name (e.g. "1N4148",
-   * "2N2222"). Populated on load into the ModelLibrary.
+   * "2N2222"). Populated on load into the runtime model registry.
    */
   namedParameterSets?: Record<string, {
     deviceType: string;

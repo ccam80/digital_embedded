@@ -158,9 +158,9 @@ export function partitionByDomain(
 
     if (ma.modelKey === "digital") {
       // When digitalPinLoading is "all", every dual-model component (digital +
-      // at least one mnaModel) is treated as if at a partition boundary and
+      // at least one analog model) is treated as if at a partition boundary and
       // routed to the analog partition for bridge synthesis.
-      const isDualModel = def.models?.mnaModels !== undefined && Object.keys(def.models.mnaModels).length > 0;
+      const isDualModel = def.modelRegistry !== undefined && Object.keys(def.modelRegistry).length > 0;
       if (digitalPinLoading === "all" && isDualModel) {
         analogComponents.push(partComp);
       } else {
@@ -193,10 +193,7 @@ export function partitionByDomain(
       }
       digitalComponents.push(partComp);
     } else {
-      // Named model key: use modelKeyToDomain to determine the partition.
-      // An unrecognised key is a programming error — throw rather than silently
-      // routing to the wrong domain.
-      const domain = modelKeyToDomain(ma.modelKey, def);
+      const domain = ma.modelKey === "digital" ? "digital" : "analog";
       if (domain === "digital") {
         digitalComponents.push(partComp);
       } else {

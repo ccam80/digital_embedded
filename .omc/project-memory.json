@@ -253,21 +253,27 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 650,
-      "lastAccessed": 1774840366796,
+      "accessCount": 680,
+      "lastAccessed": 1774842543559,
       "type": "directory"
     },
     {
       "path": "src",
-      "accessCount": 357,
-      "lastAccessed": 1774840290758,
+      "accessCount": 389,
+      "lastAccessed": 1774843579147,
       "type": "directory"
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 180,
-      "lastAccessed": 1774839441680,
+      "accessCount": 185,
+      "lastAccessed": 1774840622557,
       "type": "file"
+    },
+    {
+      "path": "src\\core\\registry.ts",
+      "accessCount": 168,
+      "lastAccessed": 1774843331908,
+      "type": "directory"
     },
     {
       "path": "",
@@ -276,10 +282,10 @@
       "type": "directory"
     },
     {
-      "path": "src\\core\\registry.ts",
-      "accessCount": 161,
-      "lastAccessed": 1774840195951,
-      "type": "directory"
+      "path": "src\\editor\\property-panel.ts",
+      "accessCount": 130,
+      "lastAccessed": 1774843250621,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\analog-compiler.test.ts",
@@ -288,27 +294,21 @@
       "type": "directory"
     },
     {
-      "path": "src\\editor\\property-panel.ts",
-      "accessCount": 117,
-      "lastAccessed": 1774840243367,
-      "type": "file"
-    },
-    {
       "path": "e2e\\gui\\analog-circuit-assembly.spec.ts",
       "accessCount": 111,
       "lastAccessed": 1774747767956,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 90,
-      "lastAccessed": 1774839918141,
+      "path": "src\\app\\canvas-popup.ts",
+      "accessCount": 97,
+      "lastAccessed": 1774842709283,
       "type": "file"
     },
     {
-      "path": "src\\app\\canvas-popup.ts",
-      "accessCount": 86,
-      "lastAccessed": 1774840423346,
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 92,
+      "lastAccessed": 1774841936900,
       "type": "file"
     },
     {
@@ -319,8 +319,8 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
-      "accessCount": 70,
-      "lastAccessed": 1774818803264,
+      "accessCount": 72,
+      "lastAccessed": 1774842577039,
       "type": "file"
     },
     {
@@ -331,8 +331,8 @@
     },
     {
       "path": "src\\core\\analog-types.ts",
-      "accessCount": 62,
-      "lastAccessed": 1774839944444,
+      "accessCount": 65,
+      "lastAccessed": 1774842482191,
       "type": "file"
     },
     {
@@ -349,8 +349,8 @@
     },
     {
       "path": "spec\\.context\\reviewer.md",
-      "accessCount": 41,
-      "lastAccessed": 1774774319392,
+      "accessCount": 42,
+      "lastAccessed": 1774840594127,
       "type": "file"
     },
     {
@@ -361,14 +361,14 @@
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 39,
-      "lastAccessed": 1774839918596,
+      "accessCount": 40,
+      "lastAccessed": 1774841936948,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\model-parser.ts",
-      "accessCount": 36,
-      "lastAccessed": 1774818605546,
+      "accessCount": 38,
+      "lastAccessed": 1774842487475,
       "type": "directory"
     },
     {
@@ -384,33 +384,33 @@
       "type": "file"
     },
     {
+      "path": "src\\headless\\default-facade.ts",
+      "accessCount": 35,
+      "lastAccessed": 1774842356872,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog",
+      "accessCount": 34,
+      "lastAccessed": 1774842193618,
+      "type": "directory"
+    },
+    {
       "path": "src\\editor\\__tests__\\property-panel-spice.test.ts",
       "accessCount": 33,
       "lastAccessed": 1774815235466,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog",
-      "accessCount": 33,
-      "lastAccessed": 1774817432067,
-      "type": "directory"
-    },
-    {
-      "path": "src\\headless\\default-facade.ts",
-      "accessCount": 32,
-      "lastAccessed": 1774840417432,
-      "type": "directory"
+      "path": "src\\core\\properties.ts",
+      "accessCount": 31,
+      "lastAccessed": 1774843049494,
+      "type": "file"
     },
     {
       "path": ".vitest-failures.json",
       "accessCount": 27,
       "lastAccessed": 1774839847283,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\properties.ts",
-      "accessCount": 27,
-      "lastAccessed": 1774840005114,
       "type": "file"
     },
     {
@@ -463,8 +463,8 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\model-binding.test.ts",
-      "accessCount": 16,
-      "lastAccessed": 1774819075809,
+      "accessCount": 17,
+      "lastAccessed": 1774840697270,
       "type": "file"
     },
     {
@@ -535,8 +535,8 @@
     },
     {
       "path": "src\\headless\\netlist-types.ts",
-      "accessCount": 2,
-      "lastAccessed": 1774695969404,
+      "accessCount": 3,
+      "lastAccessed": 1774843110263,
       "type": "directory"
     },
     {

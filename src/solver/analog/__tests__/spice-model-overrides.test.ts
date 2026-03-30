@@ -137,7 +137,7 @@ function buildAndCompile(spiceModelOverrides?: Record<string, number> | string):
     models: {
       mnaModels: {
         behavioral: {
-          deviceType: "NPN" as import("../../../core/analog-types.js").DeviceType,
+          deviceType: "NPN" as string,
           factory: npnFactory,
         },
       },
@@ -271,7 +271,7 @@ describe("spice-model-overrides compiler merge", () => {
       models: {
         mnaModels: {
           behavioral: {
-            deviceType: "D" as import("../../../core/analog-types.js").DeviceType,
+            deviceType: "D" as string,
             factory: schottkyFactory,
             defaultParams: SCHOTTKY_DEFAULTS,
           },
@@ -361,7 +361,7 @@ describe("spice-model-overrides compiler merge", () => {
       models: {
         mnaModels: {
           behavioral: {
-            deviceType: "D" as import("../../../core/analog-types.js").DeviceType,
+            deviceType: "D" as string,
             factory: zenerFactory,
             defaultParams: ZENER_DEFAULTS,
           },
@@ -448,7 +448,7 @@ describe("spice-model-overrides compiler merge", () => {
       models: {
         mnaModels: {
           behavioral: {
-            deviceType: "D" as import("../../../core/analog-types.js").DeviceType,
+            deviceType: "D" as string,
             factory: schottkyFactory,
             defaultParams: SCHOTTKY_DEFAULTS,
           },
@@ -535,7 +535,7 @@ describe("spice-model-overrides compiler merge", () => {
       models: {
         mnaModels: {
           behavioral: {
-            deviceType: "TUNNEL" as import("../../../core/analog-types.js").DeviceType,
+            deviceType: "TUNNEL" as string,
             factory: tunnelFactory,
           },
         },

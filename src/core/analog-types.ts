@@ -148,13 +148,6 @@ export interface AnalogElementCore {
 }
 
 // ---------------------------------------------------------------------------
-// DeviceType
-// ---------------------------------------------------------------------------
-
-/** Device type codes recognized in SPICE .MODEL statements. */
-export type DeviceType = "NPN" | "PNP" | "NMOS" | "PMOS" | "NJFET" | "PJFET" | "D" | "TUNNEL";
-
-// ---------------------------------------------------------------------------
 // SolverDiagnosticCode — exhaustive union of all diagnostic codes
 // ---------------------------------------------------------------------------
 

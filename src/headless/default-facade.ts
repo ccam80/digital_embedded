@@ -103,7 +103,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     this._circuit = null;
     this._coordinator = new NullSimulationCoordinator();
 
-    const unified = compileUnified(circuit, this._registry, getTransistorModels());
+    const unified = compileUnified(circuit, this._registry);
     const coordinator = new DefaultSimulationCoordinator(unified, this._registry);
     this._coordinator = coordinator;
     this._circuit = circuit;

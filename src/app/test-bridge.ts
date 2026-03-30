@@ -230,7 +230,7 @@ export function createTestBridge(
         const def = registry.get(el.typeId);
         if (def === undefined) return false;
         try {
-          return modelKeyToDomain(getActiveModelKey(el, def), def) === 'mna';
+          return def.models?.digital === undefined;
         } catch {
           return false;
         }

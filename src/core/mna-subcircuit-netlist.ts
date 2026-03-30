@@ -1,7 +1,7 @@
 export interface SubcircuitElement {
   /** Component type (NMOS, PMOS, Resistor, Diode, etc.) */
   typeId: string;
-  /** Named .MODEL reference — resolved from ModelLibrary at compile time. */
+  /** Named .MODEL reference — resolved at compile time. */
   modelRef?: string;
   /** Element-level parameter overrides. String values reference subcircuit params by name. */
   params?: Record<string, number | string>;

@@ -391,7 +391,7 @@ describe("partitionByDomain", () => {
   });
 
   describe("unknown model key fallback", () => {
-    it("routes unknown-key component to analog partition via modelKeyToDomain", () => {
+    it("routes unknown-key component to analog partition via domain resolution", () => {
       const el0 = makeElement("And", 0);
       const registry = makeRegistry([makeDigitalDef("And")]);
       const group = makeGroup(0, [makePin(0, 0, "digital")]);

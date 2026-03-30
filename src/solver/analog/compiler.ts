@@ -57,15 +57,15 @@ function resolveComponentRoute(
   pc: PartitionedComponent,
   digitalPinLoading: "cross-domain" | "all" | "none",
 ): ComponentRoute {
-  const hasMnaModels = def.models?.mnaModels !== undefined
-    && Object.keys(def.models.mnaModels).length > 0;
+  const hasAnalogModels = def.modelRegistry !== undefined
+    && Object.keys(def.modelRegistry).length > 0;
 
   if (pc.model === null) return { kind: 'skip' };
 
   const isDigitalModel = 'executeFn' in pc.model;
 
   if (isDigitalModel) {
-    if (digitalPinLoading === "all" && hasMnaModels) {
+    if (digitalPinLoading === "all" && hasAnalogModels) {
       return { kind: 'bridge' };
     }
     return { kind: 'skip' };
@@ -82,27 +82,25 @@ function resolveComponentRoute(
 /**
  * Resolve subcircuit-backed models into MnaModel factories.
  *
- * For each PartitionedComponent whose active model key appears in
- * `subcircuitRefs` or `subcircuitBindings`, look up the MnaSubcircuitNetlist
- * and compile it into an MnaModel with a composite factory. Replaces
- * `pc.model` in-place so the main compiler loop only sees stamp/bridge/skip.
+ * For each PartitionedComponent whose active model key resolves to a
+ * subcircuit netlist, compile it into an MnaModel with a composite factory.
+ * Replaces `pc.model` in-place so the main compiler loop only sees
+ * stamp/bridge/skip.
  */
 function resolveSubcircuitModels(
   partition: SolverPartition,
-  subcircuitModels: SubcircuitModelRegistry | undefined,
-  modelLibrary: ModelLibrary,
-  subcircuitBindings: Record<string, string>,
-  modelDefinitions: Record<string, MnaSubcircuitNetlist>,
+  runtimeModels: Record<string, MnaSubcircuitNetlist>,
   diagnostics: import("../../core/analog-engine-interface.js").SolverDiagnostic[],
 ): void {
   for (const pc of partition.components) {
     const def = pc.definition;
-    const defName = subcircuitBindings[`${def.name}:${pc.modelKey}`]
-      ?? def.subcircuitRefs?.[pc.modelKey];
-    if (!defName) continue;
+    const modelReg = def.modelRegistry;
+    if (!modelReg) continue;
+    const entry = modelReg[pc.modelKey];
+    if (!entry || entry.kind !== 'netlist') continue;
+    const defName = pc.modelKey;
 
-    const netlist = modelDefinitions[defName]
-      ?? subcircuitModels?.get(defName);
+    const netlist = runtimeModels[defName];
     if (!netlist) {
       diagnostics.push(
         makeDiagnostic(
@@ -112,8 +110,7 @@ function resolveSubcircuitModels(
           {
             explanation:
               `Component "${def.name}" references subcircuit definition "${defName}" ` +
-              `via subcircuitRefs or subcircuitBindings, but no MnaSubcircuitNetlist ` +
-              `with that name was found in modelDefinitions or the SubcircuitModelRegistry.`,
+              `but no MnaSubcircuitNetlist with that name was found in runtime models.`,
           },
         ),
       );
@@ -121,7 +118,7 @@ function resolveSubcircuitModels(
       continue;
     }
 
-    pc.model = compileSubcircuitToMnaModel(netlist, modelLibrary, pc);
+    pc.model = compileSubcircuitToMnaModel(netlist, pc);
   }
 }
 
@@ -134,7 +131,6 @@ function resolveSubcircuitModels(
  */
 function compileSubcircuitToMnaModel(
   netlist: MnaSubcircuitNetlist,
-  modelLibrary: ModelLibrary,
   _pc: PartitionedComponent,
 ): MnaModel {
   let totalBranches = 0;
@@ -659,26 +655,21 @@ function resolveLogicFamily(
       : defaultLogicFamily();
 }
 
-function populateModelLibrary(
-  modelLibrary: ModelLibrary,
+/**
+ * Extract runtime subcircuit netlists from circuit metadata.
+ */
+function extractRuntimeModels(
   metadataSource: Record<string, unknown>,
-): void {
-  const namedParameterSets = metadataSource["namedParameterSets"];
+): Record<string, MnaSubcircuitNetlist> {
+  const models = metadataSource["models"];
   if (
-    namedParameterSets !== null &&
-    typeof namedParameterSets === 'object' &&
-    !Array.isArray(namedParameterSets)
+    models !== null &&
+    typeof models === 'object' &&
+    !Array.isArray(models)
   ) {
-    const sets = namedParameterSets as Record<string, { deviceType: string; params: Record<string, number> }>;
-    for (const [name, entry] of Object.entries(sets)) {
-      modelLibrary.add({
-        name,
-        type: entry.deviceType as import("../../core/analog-types.js").DeviceType,
-        level: 1,
-        params: entry.params,
-      });
-    }
+    return models as Record<string, MnaSubcircuitNetlist>;
   }
+  return {};
 }
 
 /** Per-element metadata produced by Pass A for `compileAnalogPartition`. */
@@ -1011,7 +1002,6 @@ function buildAnalogNodeMapFromPartition(
 export function compileAnalogPartition(
   partition: SolverPartition,
   registry: ComponentRegistry,
-  subcircuitModels?: SubcircuitModelRegistry,
   logicFamily?: LogicFamilyConfig,
   outerCircuit?: Circuit,
   digitalCompiler?: DigitalCompilerFn,
@@ -1045,24 +1035,16 @@ export function compileAnalogPartition(
   // Use the caller-supplied logic family or fall back to the default.
   const circuitFamily = logicFamily ?? defaultLogicFamily();
 
-  // Stage 2: Build model library from outer circuit metadata (if provided).
-  const modelLibrary = new ModelLibrary();
-  registerDefaultNamedModels(modelLibrary);
-  if (outerCircuit !== undefined) {
-    populateModelLibrary(modelLibrary, outerCircuit.metadata as Record<string, unknown>);
-  }
-
   // Build set of cross-engine placeholder elements (from bridgeStubs)
   const crossEnginePlaceholderIds = new Set<string>(
     partition.crossEngineBoundaries.map((b) => (b.subcircuitElement as CircuitElement).instanceId),
   );
 
   // Stage 2b: Resolve subcircuit-backed models into MnaModel factories.
-  const subcircuitBindings: Record<string, string> =
-    outerCircuit?.metadata.subcircuitBindings ?? {};
-  const modelDefinitions: Record<string, MnaSubcircuitNetlist> =
-    outerCircuit?.metadata.modelDefinitions ?? {};
-  resolveSubcircuitModels(partition, subcircuitModels, modelLibrary, subcircuitBindings, modelDefinitions, diagnostics);
+  const runtimeModels: Record<string, MnaSubcircuitNetlist> = outerCircuit !== undefined
+    ? extractRuntimeModels(outerCircuit.metadata as Record<string, unknown>)
+    : {};
+  resolveSubcircuitModels(partition, runtimeModels, diagnostics);
 
   // Stage 3 (Pass A): Assign branch indices and allocate internal nodes.
   const passA = runPassA_partition(partition, crossEnginePlaceholderIds, externalNodeCount, diagnostics, digitalPinLoading);
@@ -1497,8 +1479,8 @@ function detectHighSourceImpedance(
     const def = registry.get(el.typeId);
     if (!def) continue;
 
-    // Only inspect elements with MNA models
-    if (!def.models?.mnaModels || Object.keys(def.models.mnaModels).length === 0) continue;
+    // Only inspect elements with analog models
+    if (!def.modelRegistry || Object.keys(def.modelRegistry).length === 0) continue;
 
     // Check if any pin of this element is connected to targetNodeId
     const nodeIds = resolveElementNodes(el, wireToNodeId, outerCircuit);
@@ -1532,8 +1514,7 @@ function detectHighSourceImpedance(
  * Synthesize a minimal digital circuit from a single "both" component.
  *
  * Creates a Circuit containing:
- *   - One instance of the component (same type and props, minus simulationModel
- *     and _pinElectrical)
+ *   - One instance of the component (same type and props, minus _pinElectrical)
  *   - One In element per input pin, labeled to match the component's pin label
  *   - One Out element per output pin, labeled to match the component's pin label
  *   - Wires connecting each In/Out to the component's pins
@@ -1566,7 +1547,7 @@ function synthesizeDigitalCircuit(
   const srcProps = el.getProperties();
   const innerProps = new PropertyBag();
   for (const [key, val] of srcProps.entries()) {
-    if (key === "simulationModel" || key === "_pinElectrical") continue;
+    if (key === "_pinElectrical") continue;
     innerProps.set(key, val);
   }
 

@@ -47,13 +47,11 @@ import type { Diagnostic } from "./types.js";
  *
  * @param inputCircuit      The visual circuit model.
  * @param registry          Component registry providing definitions and models.
- * @param subcircuitModels  Optional subcircuit model registry for analog components.
  * @returns                 CompiledCircuitUnified with both domains, bridges, and maps.
  */
 export function compileUnified(
   inputCircuit: Circuit,
   registry: ComponentRegistry,
-  subcircuitModels?: SubcircuitModelRegistry,
 ): CompiledCircuitUnified {
   const diagnostics: Diagnostic[] = [];
 
@@ -186,7 +184,6 @@ export function compileUnified(
     ? compileAnalogPartition(
         analogPartition,
         registry,
-        subcircuitModels,
         circuit.metadata.logicFamily ?? undefined,
         circuit,
         innerDigitalCompiler,

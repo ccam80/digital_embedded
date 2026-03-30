@@ -324,7 +324,7 @@ function buildElement(
 
 /**
  * Convert a `ParsedSubcircuit` into a `Circuit` suitable for registration in
- * `SubcircuitModelRegistry`.
+ * the runtime model registry.
  *
  * The Circuit follows the same wire-coordinate-as-net-ID convention used by
  * `cmos-gates.ts` and `darlington.ts`:

@@ -3,8 +3,7 @@
  *
  * Triggered from right-click context menu on semiconductor components.
  * Parses a pasted .MODEL card, shows a parse preview, and on Apply stores
- * the parsed params as _spiceModelOverrides and _spiceModelName on the
- * component instance's PropertyBag.
+ * the parsed params via the unified model system.
  */
 
 import { parseModelCard } from '../solver/analog/model-parser.js';
@@ -193,19 +192,11 @@ export function openSpiceImportDialog(
 
     textarea.addEventListener('input', updatePreview);
 
-    // Pre-populate with existing overrides if any
-    const existingOverrides = element.getProperties().get('_spiceModelOverrides');
-    const existingName = element.getProperties().get('_spiceModelName');
-    if (existingOverrides && typeof existingOverrides === 'object' && !Array.isArray(existingOverrides)) {
-      const params = existingOverrides as Record<string, number>;
-      const name = typeof existingName === 'string' ? existingName : 'IMPORTED';
-      const deviceType = resolveDeviceTypeFromDefinition(definition);
-      if (deviceType && Object.keys(params).length > 0) {
-        const lines = [`.MODEL ${name} ${deviceType}(`];
-        const paramPairs = Object.entries(params).map(([k, v]) => `${k}=${v}`);
-        lines.push(paramPairs.join(' '));
-        lines.push(')');
-        textarea.value = lines.join('\n');
+    // Pre-populate with existing model params if any
+    {
+      const deviceType = resolveSpiceTypeFromDefinition(definition);
+      if (deviceType) {
+        textarea.placeholder = `.MODEL MYMODEL ${deviceType}(IS=1e-14 BF=200)`;
         updatePreview();
       }
     }
@@ -228,13 +219,13 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * Attempt to infer the device type from the component definition's MNA models.
+ * Attempt to infer the device type from the component definition's model registry.
  * Used only for pre-populating the textarea with existing overrides.
  */
-function resolveDeviceTypeFromDefinition(def?: ComponentDefinition): string | null {
-  if (!def?.models?.mnaModels) return null;
-  for (const model of Object.values(def.models.mnaModels)) {
-    if (model.deviceType) return model.deviceType;
+function resolveSpiceTypeFromDefinition(def?: ComponentDefinition): string | null {
+  if (!def?.modelRegistry) return null;
+  for (const entry of Object.values(def.modelRegistry)) {
+    if ('deviceType' in entry && typeof entry.deviceType === 'string') return entry.deviceType;
   }
   return null;
 }

@@ -99,7 +99,7 @@ function bidiPin(x: number, y: number, label: string, bitWidth = 1): PinDeclarat
 
 const noopExecFn = (() => {}) as unknown as ComponentDefinition['models']['digital'] extends { executeFn: infer F } ? F : never;
 
-function makeBaseDef(name: string, models: ComponentModels): Omit<ComponentDefinition, 'typeId'> {
+function makeBaseDef(name: string, models: ComponentModels, defaultModel?: string): Omit<ComponentDefinition, 'typeId'> {
   return {
     name,
     typeId: -1,
@@ -110,6 +110,7 @@ function makeBaseDef(name: string, models: ComponentModels): Omit<ComponentDefin
     category: ComponentCategory.MISC,
     helpText: '',
     models,
+    defaultModel,
   };
 }
 
@@ -120,15 +121,15 @@ function buildDigitalRegistry(): ComponentRegistry {
   r.register(makeBaseDef('And', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
   r.register(makeBaseDef('Tunnel', { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
   r.register(makeBaseDef('Port', {}) as ComponentDefinition);
-  r.register(makeBaseDef('Ground', { mnaModels: { behavioral: {} } }) as ComponentDefinition);
+  r.register(makeBaseDef('Ground', {}) as ComponentDefinition);
   return r;
 }
 
 function buildAnalogRegistry(): ComponentRegistry {
   const r = new ComponentRegistry();
-  r.register(makeBaseDef('Ground',   { mnaModels: { behavioral: {} } }) as ComponentDefinition);
-  r.register(makeBaseDef('Resistor', { mnaModels: { behavioral: {} } }) as ComponentDefinition);
-  r.register(makeBaseDef('Tunnel',   { mnaModels: { behavioral: {} } }) as ComponentDefinition);
+  r.register(makeBaseDef('Ground',   {}, 'behavioral') as ComponentDefinition);
+  r.register(makeBaseDef('Resistor', {}, 'behavioral') as ComponentDefinition);
+  r.register(makeBaseDef('Tunnel',   {}, 'behavioral') as ComponentDefinition);
   return r;
 }
 
@@ -137,9 +138,9 @@ function buildMixedRegistry(): ComponentRegistry {
   r.register(makeBaseDef('In',       { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
   r.register(makeBaseDef('Out',      { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
   r.register(makeBaseDef('And',      { digital: { executeFn: noopExecFn } }) as ComponentDefinition);
-  r.register(makeBaseDef('Ground',   { mnaModels: { behavioral: {} } }) as ComponentDefinition);
-  r.register(makeBaseDef('Resistor', { mnaModels: { behavioral: {} } }) as ComponentDefinition);
-  r.register(makeBaseDef('Bridge',   { digital: { executeFn: noopExecFn }, mnaModels: { behavioral: {} } }) as ComponentDefinition);
+  r.register(makeBaseDef('Ground',   {}, 'behavioral') as ComponentDefinition);
+  r.register(makeBaseDef('Resistor', {}, 'behavioral') as ComponentDefinition);
+  r.register(makeBaseDef('Bridge',   { digital: { executeFn: noopExecFn } }, 'behavioral') as ComponentDefinition);
   return r;
 }
 
@@ -177,26 +178,21 @@ describe('resolveModelAssignments', () => {
     expect(assignments[1]!.modelKey).toBe('neutral');
   });
 
-  it('uses simulationModel property when present', () => {
+  it('uses model property when present', () => {
     const registry = buildMixedRegistry();
-    // Bridge component has both digital and mna models; default is digital
-    // Override via simulationModel property to behavioral mna model
-    const props = new PropertyBag(new Map([['simulationModel', 'behavioral']]));
+    const props = new PropertyBag(new Map([['model', 'behavioral']]));
     const bridge = new TestElement('Bridge', 'b1', { x: 0, y: 0 }, [], props);
     const [assignments] = resolveModelAssignments([bridge], registry);
     expect(assignments[0]!.modelKey).toBe('behavioral');
   });
 
-  it('falls back to defaultModel when no simulationModel property', () => {
+  it('falls back to defaultModel when no model property', () => {
     const registry = new ComponentRegistry();
     registry.register(makeBaseDef('Bridge', {
       digital: { executeFn: noopExecFn },
-      mnaModels: { behavioral: {} },
-    }, ) as ComponentDefinition);
-    // defaultModel not set — first key is used
+    }, 'digital') as ComponentDefinition);
     const bridge = new TestElement('Bridge', 'b1', { x: 0, y: 0 }, []);
     const [assignments] = resolveModelAssignments([bridge], registry);
-    // First key of { digital, mnaModels } is "digital"
     expect(assignments[0]!.modelKey).toBe('digital');
   });
 

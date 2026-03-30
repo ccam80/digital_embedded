@@ -10,8 +10,6 @@ import type { RenderPipeline } from './render-pipeline.js';
 import type { CanvasInteractionDeps } from './canvas-interaction.js';
 import { PropertyPanel } from '../editor/property-panel.js';
 import { defaultLogicFamily } from '../core/logic-family.js';
-import { openSpiceImportDialog } from './spice-import-dialog.js';
-import { applySpiceImportResult, applySpiceSubcktImportResult } from './spice-model-apply.js';
 
 // ---------------------------------------------------------------------------
 // PopupController
@@ -65,25 +63,9 @@ export function createPopupController(
     popup.appendChild(propsContainer);
     const propertyPopup = new PropertyPanel(propsContainer);
     propertyPopup.showProperties(elementHit, def.propertyDefs);
-    if (availableModels(def).length > 1) {
-      propertyPopup.showModelSelector(elementHit, def);
-    }
-    try {
-      const activeKey = getActiveModelKey(elementHit, def);
-      const domain = modelKeyToDomain(activeKey, def);
 
-      if (domain === 'digital') {
-        const family = ctx.circuit.metadata.logicFamily ?? defaultLogicFamily();
-        propertyPopup.showPinElectricalOverrides(elementHit, def, family);
-      } else {
-        const mnaModel = def.models.mnaModels?.[activeKey];
-        if (mnaModel?.deviceType) {
-          propertyPopup.showSpiceModelParameters(elementHit, def);
-        }
-      }
-    } catch {
-      // Component has no models — skip panel display.
-    }
+    const family = ctx.circuit.metadata.logicFamily ?? defaultLogicFamily();
+    propertyPopup.showPinElectricalOverrides(elementHit, def, family);
     // Live-update: numeric parameter changes are hot-patched into the running
     // engine via coordinator.setComponentProperty() (updates conductances
     // in-place, no recompile). Non-numeric changes (waveform, expression, etc.)
@@ -102,50 +84,6 @@ export function createPopupController(
       renderPipeline.scheduleRender();
     });
 
-    // SPICE import buttons — shown for semiconductor components with deviceType models
-    {
-      let hasSemiconductorModel = false;
-      const hasSubcircuitModel = def.subcircuitRefs !== undefined && Object.keys(def.subcircuitRefs).length > 0;
-      if (def.models?.mnaModels) {
-        for (const mnaModel of Object.values(def.models.mnaModels)) {
-          if (mnaModel.deviceType) hasSemiconductorModel = true;
-        }
-      }
-
-      if (hasSemiconductorModel) {
-        const spiceBtn = document.createElement('button');
-        spiceBtn.className = 'spice-import-apply';
-        spiceBtn.textContent = 'Import SPICE Model\u2026';
-        spiceBtn.disabled = ctx.isSimActive();
-        spiceBtn.addEventListener('click', () => {
-          closePopup();
-          void openSpiceImportDialog(elementHit, container, def).then((result) => {
-            if (!result) return;
-            applySpiceImportResult(elementHit, result, ctx.circuit);
-            ctx.invalidateCompiled();
-            ctx.showStatus(`Applied SPICE model "${result.modelName}" to ${elementHit.typeId}`);
-          });
-        });
-        propsContainer.appendChild(spiceBtn);
-      }
-
-      if (hasSubcircuitModel) {
-        const subcktBtn = document.createElement('button');
-        subcktBtn.className = 'spice-import-apply';
-        subcktBtn.textContent = 'Import SPICE Subcircuit\u2026';
-        subcktBtn.disabled = ctx.isSimActive();
-        subcktBtn.addEventListener('click', () => {
-          closePopup();
-          void openSpiceSubcktDialog(elementHit, container).then((result) => {
-            if (!result) return;
-            applySpiceSubcktImportResult(elementHit, result, getTransistorModels(), ctx.circuit);
-            ctx.invalidateCompiled();
-            ctx.showStatus(`Registered subcircuit "${result.subcktName}" and applied to ${elementHit.typeId}`);
-          });
-        });
-        propsContainer.appendChild(subcktBtn);
-      }
-    }
 
     popup.style.left = `${Math.min(screenPt.x + 10, container.clientWidth - 200)}px`;
     popup.style.top = `${Math.min(screenPt.y + 10, container.clientHeight - 200)}px`;

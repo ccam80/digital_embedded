@@ -11,7 +11,8 @@
 // Types
 // ---------------------------------------------------------------------------
 
-import type { DeviceType } from "../../core/analog-types.js";
+/** Device type codes recognized in SPICE .MODEL statements. */
+type DeviceType = "NPN" | "PNP" | "NMOS" | "PMOS" | "NJFET" | "PJFET" | "D" | "TUNNEL";
 
 /** A successfully parsed .MODEL record. */
 export interface ParsedModel {
