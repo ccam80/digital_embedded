@@ -108,7 +108,7 @@ function elementToDtsElement(
       const deltaParams: Record<string, number> = {};
       for (const key of bag.getModelParamKeys()) {
         const current = bag.getModelParam<number>(key);
-        if (current !== defaults[key]) {
+        if (current !== defaults[key] && Number.isFinite(current)) {
           deltaParams[key] = current;
         }
       }

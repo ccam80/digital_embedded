@@ -9,15 +9,14 @@ import { describe, it, expect } from 'vitest';
 import {
   extractConnectivityGroups,
   resolveModelAssignments,
-  type ModelAssignment,
 } from '../extract-connectivity.js';
-import { Circuit, Wire } from '../../core/circuit.js';
+import { Wire } from '../../core/circuit.js';
 import type { CircuitElement } from '../../core/element.js';
-import type { Pin, PinDeclaration } from '../../core/pin.js';
+import type { PinDeclaration } from '../../core/pin.js';
 import { PinDirection } from '../../core/pin.js';
 import { PropertyBag } from '../../core/properties.js';
 import { ComponentRegistry } from '../../core/registry.js';
-import type { ComponentDefinition, ComponentModels } from '../../core/registry.js';
+import type { ComponentDefinition } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
 import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
@@ -73,10 +72,8 @@ function bidiPin(x: number, y: number, label: string, bitWidth = 1): PinDeclarat
 // Registry helpers
 // ---------------------------------------------------------------------------
 
-const noopExecFn = (() => {}) as unknown as ComponentDefinition['models']['digital'] extends { executeFn: infer F } ? F : never;
-
-function makeBaseDef(name: string, models: ComponentModels, defaultModel?: string): Omit<ComponentDefinition, 'typeId'> {
-  return {
+function makeBaseDef(name: string, models: object, defaultModel?: string): ComponentDefinition {
+  const def: Record<string, unknown> = {
     name,
     typeId: -1,
     factory: (props: PropertyBag) => createTestElementFromDecls(name, crypto.randomUUID(), [], props),
@@ -86,8 +83,9 @@ function makeBaseDef(name: string, models: ComponentModels, defaultModel?: strin
     category: ComponentCategory.MISC,
     helpText: '',
     models,
-    defaultModel,
   };
+  if (defaultModel !== undefined) def['defaultModel'] = defaultModel;
+  return def as unknown as ComponentDefinition;
 }
 
 function buildDigitalRegistry(): ComponentRegistry {

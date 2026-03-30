@@ -10,8 +10,126 @@
     </entry>
   </attributes>
   <visualElements>
+    <visualElement>
+      <elementName>In</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>CTRL</string>
+        </entry>
+      </elementAttributes>
+      <pos x="60" y="160"/>
+    </visualElement>
+    <visualElement>
+      <elementName>DcVoltageSource</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>Vs</string>
+        </entry>
+      </elementAttributes>
+      <pos x="60" y="280"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Ground</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="120" y="400"/>
+    </visualElement>
+    <visualElement>
+      <elementName>SwitchSPST</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>SW1</string>
+        </entry>
+      </elementAttributes>
+      <pos x="240" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Resistor</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>R1</string>
+        </entry>
+      </elementAttributes>
+      <pos x="400" y="200"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Ground</elementName>
+      <elementAttributes>
+      </elementAttributes>
+      <pos x="480" y="320"/>
+    </visualElement>
+    <visualElement>
+      <elementName>Probe</elementName>
+      <elementAttributes>
+        <entry>
+          <string>Label</string>
+          <string>P1</string>
+        </entry>
+      </elementAttributes>
+      <pos x="520" y="200"/>
+    </visualElement>
   </visualElements>
   <wires>
+    <wire>
+      <p1 x="60" y="160"/>
+      <p2 x="280" y="160"/>
+    </wire>
+    <wire>
+      <p1 x="280" y="160"/>
+      <p2 x="280" y="220"/>
+    </wire>
+    <wire>
+      <p1 x="280" y="220"/>
+      <p2 x="280" y="240"/>
+    </wire>
+    <wire>
+      <p1 x="140" y="280"/>
+      <p2 x="220" y="280"/>
+    </wire>
+    <wire>
+      <p1 x="220" y="200"/>
+      <p2 x="220" y="280"/>
+    </wire>
+    <wire>
+      <p1 x="220" y="200"/>
+      <p2 x="240" y="200"/>
+    </wire>
+    <wire>
+      <p1 x="320" y="200"/>
+      <p2 x="400" y="200"/>
+    </wire>
+    <wire>
+      <p1 x="480" y="200"/>
+      <p2 x="480" y="320"/>
+    </wire>
+    <wire>
+      <p1 x="60" y="280"/>
+      <p2 x="60" y="400"/>
+    </wire>
+    <wire>
+      <p1 x="60" y="400"/>
+      <p2 x="120" y="400"/>
+    </wire>
+    <wire>
+      <p1 x="320" y="180"/>
+      <p2 x="320" y="200"/>
+    </wire>
+    <wire>
+      <p1 x="320" y="180"/>
+      <p2 x="500" y="180"/>
+    </wire>
+    <wire>
+      <p1 x="500" y="180"/>
+      <p2 x="500" y="200"/>
+    </wire>
+    <wire>
+      <p1 x="500" y="200"/>
+      <p2 x="520" y="200"/>
+    </wire>
   </wires>
   <measurementOrdering/>
 </circuit>

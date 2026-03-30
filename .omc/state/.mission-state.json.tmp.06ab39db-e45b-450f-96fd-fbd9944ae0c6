@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-03-30T19:55:34.365Z",
+  "updatedAt": "2026-03-30T11:45:29.769Z",
   "missions": [
     {
       "id": "session:21c4cbb9-908b-4260-be26-2718be466e7d:none",
@@ -18677,15 +18677,15 @@
       "name": "none",
       "objective": "Session mission",
       "createdAt": "2026-03-30T10:41:41.742Z",
-      "updatedAt": "2026-03-30T19:23:14.672Z",
+      "updatedAt": "2026-03-30T11:45:29.769Z",
       "status": "running",
-      "workerCount": 30,
+      "workerCount": 19,
       "taskCounts": {
-        "total": 30,
+        "total": 19,
         "pending": 0,
         "blocked": 0,
-        "inProgress": 2,
-        "completed": 28,
+        "inProgress": 4,
+        "completed": 15,
         "failed": 0
       },
       "agents": [
@@ -18813,21 +18813,21 @@
           "name": "claude-orchestrator:implementer:a956fa9",
           "role": "claude-orchestrator:implementer",
           "ownership": "a956fa994c1687937",
-          "status": "done",
+          "status": "running",
           "currentStep": null,
-          "latestUpdate": "completed",
+          "latestUpdate": null,
           "completedSummary": null,
-          "updatedAt": "2026-03-30T11:58:05.924Z"
+          "updatedAt": "2026-03-30T11:18:15.354Z"
         },
         {
           "name": "claude-orchestrator:implementer:abdc0da",
           "role": "claude-orchestrator:implementer",
           "ownership": "abdc0daa1cc8ef164",
-          "status": "done",
+          "status": "running",
           "currentStep": null,
-          "latestUpdate": "completed",
+          "latestUpdate": null,
           "completedSummary": null,
-          "updatedAt": "2026-03-30T11:59:42.948Z"
+          "updatedAt": "2026-03-30T11:18:20.117Z"
         },
         {
           "name": "claude-orchestrator:implementer:a406a04",
@@ -18843,11 +18843,11 @@
           "name": "claude-orchestrator:implementer:a4fb368",
           "role": "claude-orchestrator:implementer",
           "ownership": "a4fb3681c7b45c67b",
-          "status": "running",
+          "status": "done",
           "currentStep": null,
-          "latestUpdate": null,
+          "latestUpdate": "completed",
           "completedSummary": null,
-          "updatedAt": "2026-03-30T11:18:35.741Z"
+          "updatedAt": "2026-03-30T11:45:29.769Z"
         },
         {
           "name": "claude-orchestrator:implementer:a71b2b0",
@@ -18873,283 +18873,45 @@
           "name": "claude-orchestrator:implementer:a38439e",
           "role": "claude-orchestrator:implementer",
           "ownership": "a38439ef2854ee310",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T12:05:52.949Z"
-        },
-        {
-          "name": "claude-orchestrator:implementer:a3df6f5",
-          "role": "claude-orchestrator:implementer",
-          "ownership": "a3df6f5398e9763eb",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T12:00:06.949Z"
-        },
-        {
-          "name": "claude-orchestrator:implementer:a0a7848",
-          "role": "claude-orchestrator:implementer",
-          "ownership": "a0a78485e1dff74e9",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T12:03:37.820Z"
-        },
-        {
-          "name": "claude-orchestrator:implementer:a722d49",
-          "role": "claude-orchestrator:implementer",
-          "ownership": "a722d497e15205221",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T11:55:38.986Z"
-        },
-        {
-          "name": "code-reviewer:a371ab6",
-          "role": "code-reviewer",
-          "ownership": "a371ab62ed0e1e771",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T12:09:13.188Z"
-        },
-        {
-          "name": "code-reviewer:a42024c",
-          "role": "code-reviewer",
-          "ownership": "a42024c0fe4416657",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T12:10:45.402Z"
-        },
-        {
-          "name": "verifier:aa52676",
-          "role": "verifier",
-          "ownership": "aa52676a349281b7b",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T12:08:22.571Z"
-        },
-        {
-          "name": "verifier:ad0f421",
-          "role": "verifier",
-          "ownership": "ad0f4217458194396",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T12:09:10.180Z"
-        },
-        {
-          "name": "claude-orchestrator:implementer:ada7d92",
-          "role": "claude-orchestrator:implementer",
-          "ownership": "ada7d929b372c33bf",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T12:15:58.310Z"
-        },
-        {
-          "name": "claude-orchestrator:implementer:afa8ca8",
-          "role": "claude-orchestrator:implementer",
-          "ownership": "afa8ca871743d094a",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T12:36:50.887Z"
-        },
-        {
-          "name": "claude-orchestrator:implementer:a4452f2",
-          "role": "claude-orchestrator:implementer",
-          "ownership": "a4452f202ae375123",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T12:15:07.833Z"
-        },
-        {
-          "name": "claude-orchestrator:implementer:ae7fb27",
-          "role": "claude-orchestrator:implementer",
-          "ownership": "ae7fb273b64281767",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T19:23:14.672Z"
-        }
-      ],
-      "timeline": [
-        {
-          "id": "session-stop:ada7d929b372c33bf:2026-03-30T12:15:58.310Z",
-          "at": "2026-03-30T12:15:58.310Z",
-          "kind": "completion",
-          "agent": "claude-orchestrator:implementer:ada7d92",
-          "detail": "completed",
-          "sourceKey": "session-stop:ada7d929b372c33bf"
-        },
-        {
-          "id": "session-stop:afa8ca871743d094a:2026-03-30T12:36:50.887Z",
-          "at": "2026-03-30T12:36:50.887Z",
-          "kind": "completion",
-          "agent": "claude-orchestrator:implementer:afa8ca8",
-          "detail": "completed",
-          "sourceKey": "session-stop:afa8ca871743d094a"
-        },
-        {
-          "id": "session-start:ae7fb273b64281767:2026-03-30T19:19:48.667Z",
-          "at": "2026-03-30T19:19:48.667Z",
-          "kind": "update",
-          "agent": "claude-orchestrator:implementer:ae7fb27",
-          "detail": "started claude-orchestrator:implementer:ae7fb27",
-          "sourceKey": "session-start:ae7fb273b64281767"
-        },
-        {
-          "id": "session-stop:ae7fb273b64281767:2026-03-30T19:23:14.672Z",
-          "at": "2026-03-30T19:23:14.672Z",
-          "kind": "completion",
-          "agent": "claude-orchestrator:implementer:ae7fb27",
-          "detail": "completed",
-          "sourceKey": "session-stop:ae7fb273b64281767"
-        }
-      ]
-    },
-    {
-      "id": "session:8bd99b7c-a537-4a32-b66b-5344bc70f542:none",
-      "source": "session",
-      "name": "none",
-      "objective": "Session mission",
-      "createdAt": "2026-03-30T18:46:18.456Z",
-      "updatedAt": "2026-03-30T19:55:34.365Z",
-      "status": "running",
-      "workerCount": 5,
-      "taskCounts": {
-        "total": 5,
-        "pending": 0,
-        "blocked": 0,
-        "inProgress": 2,
-        "completed": 3,
-        "failed": 0
-      },
-      "agents": [
-        {
-          "name": "general-purpose:ac239ce",
-          "role": "general-purpose",
-          "ownership": "ac239ce55bd953dc4",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T19:55:34.365Z"
-        },
-        {
-          "name": "claude-orchestrator:implementer:a56e57c",
-          "role": "claude-orchestrator:implementer",
-          "ownership": "a56e57c0a46e2cf40",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T19:03:05.444Z"
-        },
-        {
-          "name": "claude-orchestrator:implementer:aec712a",
-          "role": "claude-orchestrator:implementer",
-          "ownership": "aec712a0ae25105a7",
-          "status": "done",
-          "currentStep": null,
-          "latestUpdate": "completed",
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T19:09:35.902Z"
-        },
-        {
-          "name": "claude-orchestrator:implementer:acc8b78",
-          "role": "claude-orchestrator:implementer",
-          "ownership": "acc8b78683d150d9b",
           "status": "running",
           "currentStep": null,
           "latestUpdate": null,
           "completedSummary": null,
-          "updatedAt": "2026-03-30T19:11:25.047Z"
-        },
-        {
-          "name": "claude-orchestrator:implementer:a0be46d",
-          "role": "claude-orchestrator:implementer",
-          "ownership": "a0be46d0cc4cdd541",
-          "status": "running",
-          "currentStep": null,
-          "latestUpdate": null,
-          "completedSummary": null,
-          "updatedAt": "2026-03-30T19:11:43.443Z"
+          "updatedAt": "2026-03-30T11:45:12.505Z"
         }
       ],
       "timeline": [
         {
-          "id": "session-stop:aec712a0ae25105a7:2026-03-30T19:09:35.902Z",
-          "at": "2026-03-30T19:09:35.902Z",
+          "id": "session-stop:a2ba521194d09ca10:2026-03-30T11:44:26.969Z",
+          "at": "2026-03-30T11:44:26.969Z",
           "kind": "completion",
-          "agent": "claude-orchestrator:implementer:aec712a",
+          "agent": "claude-orchestrator:implementer:a2ba521",
           "detail": "completed",
-          "sourceKey": "session-stop:aec712a0ae25105a7"
+          "sourceKey": "session-stop:a2ba521194d09ca10"
         },
         {
-          "id": "session-start:acc8b78683d150d9b:2026-03-30T19:11:25.047Z",
-          "at": "2026-03-30T19:11:25.047Z",
+          "id": "session-stop:ad104b051db6ad750:2026-03-30T11:44:36.733Z",
+          "at": "2026-03-30T11:44:36.733Z",
+          "kind": "completion",
+          "agent": "general-purpose:aa6635f",
+          "detail": "completed",
+          "sourceKey": "session-stop:ad104b051db6ad750"
+        },
+        {
+          "id": "session-start:a38439ef2854ee310:2026-03-30T11:45:12.505Z",
+          "at": "2026-03-30T11:45:12.505Z",
           "kind": "update",
-          "agent": "claude-orchestrator:implementer:acc8b78",
-          "detail": "started claude-orchestrator:implementer:acc8b78",
-          "sourceKey": "session-start:acc8b78683d150d9b"
+          "agent": "claude-orchestrator:implementer:a38439e",
+          "detail": "started claude-orchestrator:implementer:a38439e",
+          "sourceKey": "session-start:a38439ef2854ee310"
         },
         {
-          "id": "session-start:a0be46d0cc4cdd541:2026-03-30T19:11:43.443Z",
-          "at": "2026-03-30T19:11:43.443Z",
-          "kind": "update",
-          "agent": "claude-orchestrator:implementer:a0be46d",
-          "detail": "started claude-orchestrator:implementer:a0be46d",
-          "sourceKey": "session-start:a0be46d0cc4cdd541"
-        },
-        {
-          "id": "session-stop:af1721f9d48f00852:2026-03-30T19:25:55.711Z",
-          "at": "2026-03-30T19:25:55.711Z",
+          "id": "session-stop:a4fb3681c7b45c67b:2026-03-30T11:45:29.769Z",
+          "at": "2026-03-30T11:45:29.769Z",
           "kind": "completion",
-          "agent": "general-purpose:ac239ce",
+          "agent": "claude-orchestrator:implementer:a4fb368",
           "detail": "completed",
-          "sourceKey": "session-stop:af1721f9d48f00852"
-        },
-        {
-          "id": "session-stop:a997a62ac6903ad74:2026-03-30T19:32:44.378Z",
-          "at": "2026-03-30T19:32:44.378Z",
-          "kind": "completion",
-          "agent": "general-purpose:ac239ce",
-          "detail": "completed",
-          "sourceKey": "session-stop:a997a62ac6903ad74"
-        },
-        {
-          "id": "session-stop:ae6e9b7b33ecdb1de:2026-03-30T19:43:56.729Z",
-          "at": "2026-03-30T19:43:56.729Z",
-          "kind": "completion",
-          "agent": "general-purpose:ac239ce",
-          "detail": "completed",
-          "sourceKey": "session-stop:ae6e9b7b33ecdb1de"
-        },
-        {
-          "id": "session-stop:a9590caf32b57cc1a:2026-03-30T19:55:34.365Z",
-          "at": "2026-03-30T19:55:34.365Z",
-          "kind": "completion",
-          "agent": "general-purpose:ac239ce",
-          "detail": "completed",
-          "sourceKey": "session-stop:a9590caf32b57cc1a"
+          "sourceKey": "session-stop:a4fb3681c7b45c67b"
         }
       ]
     }

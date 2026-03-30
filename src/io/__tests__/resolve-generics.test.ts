@@ -83,8 +83,7 @@ function buildInitCodeCircuit(code: string, enabled: boolean = true): Circuit {
     "GenericInitCode",
     crypto.randomUUID(),
     { x: 0, y: 0 },
-    0,
-    false,
+    [],
     props,
   );
   circuit.addElement(el);
@@ -95,7 +94,7 @@ function buildInitCodeCircuit(code: string, enabled: boolean = true): Circuit {
  * Build an element with the given typeId and property set.
  */
 function buildElement(typeId: string, props: PropertyBag): TestElement {
-  return new TestElement(typeId, crypto.randomUUID(), { x: 0, y: 0 }, 0, false, props);
+  return new TestElement(typeId, crypto.randomUUID(), { x: 0, y: 0 }, [], props);
 }
 
 // ---------------------------------------------------------------------------

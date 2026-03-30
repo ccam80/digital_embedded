@@ -56,7 +56,7 @@ export function applySpiceImportResult(
   circuit.metadata.models[element.typeId]![result.modelName] = entry;
 
   element.getProperties().set("model", result.modelName);
-  element.getProperties().replaceModelParams(result.overrides);
+  element.getProperties().replaceModelParams({ ...behavioralEntry.params, ...result.overrides });
 }
 
 /** The result produced by the .SUBCKT import dialog. */

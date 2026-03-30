@@ -41,32 +41,40 @@ function createElement(
 
 function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade } {
   const facade = new DefaultSimulatorFacade(registry);
-  const vcc = createElement('DcVoltageSource', { x: 0, y: 0 },  { label: 'Vcc', voltage: 5 });
-  const vb  = createElement('DcVoltageSource', { x: 8, y: 0 },  { label: 'Vb',  voltage: 0.7 });
-  const rc  = createElement('Resistor',        { x: 4, y: 0 },  { label: 'Rc',  resistance: 10000 });
-  const q1  = createElement('NpnBJT',          { x: 4, y: 8 },  { label: 'Q1' });
-  const gnd = createElement('Ground',          { x: 4, y: 16 });
+  // Layout chosen so no pin world-position coincides with an unintended wire
+  // endpoint.  Pin positions (local → world):
+  //   Gnd  at {0, 0}: out={0,0}
+  //   Vcc  at {0, 4}: neg={0,4}, pos={4,4}
+  //   Rc   at {4, 4}: A={4,4},   B={8,4}
+  //   Vb   at {0, 8}: neg={0,8}, pos={4,8}
+  //   Q1   at {4,12}: B={4,12},  C={8,11}, E={8,13}
+  const gnd = createElement('Ground',          { x: 0, y:  0 });
+  const vcc = createElement('DcVoltageSource', { x: 0, y:  4 }, { label: 'Vcc', voltage: 5 });
+  const rc  = createElement('Resistor',        { x: 4, y:  4 }, { label: 'Rc',  resistance: 10000 });
+  const vb  = createElement('DcVoltageSource', { x: 0, y:  8 }, { label: 'Vb',  voltage: 0.7 });
+  const q1  = createElement('NpnBJT',          { x: 4, y: 12 }, { label: 'Q1' });
   const circuit = new Circuit();
-  circuit.addElement(vcc);
-  circuit.addElement(vb);
-  circuit.addElement(rc);
-  circuit.addElement(q1);
   circuit.addElement(gnd);
+  circuit.addElement(vcc);
+  circuit.addElement(rc);
+  circuit.addElement(vb);
+  circuit.addElement(q1);
   const vccPins = vcc.getPins();
   const vbPins  = vb.getPins();
   const rcPins  = rc.getPins();
   const q1Pins  = q1.getPins();
   const gndPins = gnd.getPins();
+  const gndOut = pinWorldPosition(gnd, gndPins[0]!);
   const vccPos = pinWorldPosition(vcc, vccPins.find(p => p.label === 'pos')!);
   const vccNeg = pinWorldPosition(vcc, vccPins.find(p => p.label === 'neg')!);
-  const vbPos  = pinWorldPosition(vb,  vbPins.find(p => p.label === 'pos')!);
-  const vbNeg  = pinWorldPosition(vb,  vbPins.find(p => p.label === 'neg')!);
   const rcA    = pinWorldPosition(rc,  rcPins.find(p => p.label === 'A')!);
   const rcB    = pinWorldPosition(rc,  rcPins.find(p => p.label === 'B')!);
+  const vbPos  = pinWorldPosition(vb,  vbPins.find(p => p.label === 'pos')!);
+  const vbNeg  = pinWorldPosition(vb,  vbPins.find(p => p.label === 'neg')!);
   const q1B    = pinWorldPosition(q1,  q1Pins.find(p => p.label === 'B')!);
   const q1C    = pinWorldPosition(q1,  q1Pins.find(p => p.label === 'C')!);
   const q1E    = pinWorldPosition(q1,  q1Pins.find(p => p.label === 'E')!);
-  const gndOut = pinWorldPosition(gnd, gndPins[0]!);
+  // Vcc.pos and Rc.A share world position {4,4} — zero-length wire is valid.
   circuit.addWire(new Wire(vccPos, rcA));
   circuit.addWire(new Wire(rcB,    q1C));
   circuit.addWire(new Wire(vbPos,  q1B));
@@ -96,7 +104,7 @@ describe('spice-import round-trip MCP surface -- parseModelCard to circuit.metad
 
   it('applySpiceImportResult writes to circuit.metadata.models', () => {
     const { circuit } = buildBjtCircuit();
-    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
+    const q1 = circuit.elements.find(el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1')!;
     expect(q1).toBeDefined();
     applySpiceImportResult(
       q1,
@@ -114,7 +122,7 @@ describe('spice-import round-trip MCP surface -- parseModelCard to circuit.metad
 
   it('applySpiceImportResult sets model property on the element', () => {
     const { circuit } = buildBjtCircuit();
-    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
+    const q1 = circuit.elements.find(el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
       { overrides: { IS: 1e-14, BF: 200 }, modelName: 'Q2N2222', deviceType: 'NPN' },
@@ -127,7 +135,7 @@ describe('spice-import round-trip MCP surface -- parseModelCard to circuit.metad
 
   it('applySpiceImportResult stores params in model params partition of element', () => {
     const { circuit } = buildBjtCircuit();
-    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
+    const q1 = circuit.elements.find(el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
       { overrides: { IS: 1e-14, BF: 200 }, modelName: 'Q2N2222', deviceType: 'NPN' },
@@ -147,7 +155,7 @@ describe('spice-import round-trip MCP surface -- parseModelCard to circuit.metad
 describe('spice-import round-trip MCP surface -- apply then compile', () => {
   it('circuit with applySpiceImportResult compiles without errors', () => {
     const { circuit, facade } = buildBjtCircuit();
-    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
+    const q1 = circuit.elements.find(el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
       { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
@@ -168,7 +176,7 @@ describe('spice-import round-trip MCP surface -- apply then compile', () => {
     const parsed = parseModelCard(modelText);
     expect('message' in parsed).toBe(false);
     const parsedModel = parsed as Exclude<typeof parsed, { message: string }>;
-    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
+    const q1 = circuit.elements.find(el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
       { overrides: parsedModel.params, modelName: parsedModel.name, deviceType: parsedModel.deviceType },
@@ -188,8 +196,9 @@ describe('spice-import round-trip MCP surface -- apply then compile', () => {
     const dc = facade.getDcOpResult();
     expect(dc).not.toBeNull();
     expect(dc!.converged).toBe(true);
-    // BJT circuit has 4 non-ground nodes: Vcc+, Vb+, Rc midpoint (collector), and emitter
-    expect(dc!.nodeVoltages.length).toBe(4);
+    // BJT circuit has 3 non-ground nodes: supply (Vcc+/Rc.A), collector (Rc.B/Q1.C), base (Vb+/Q1.B).
+    // Q1 emitter connects directly to ground, so it is the ground node.
+    expect(dc!.nodeVoltages.length).toBe(3);
   });
 });
 
@@ -200,7 +209,7 @@ describe('spice-import round-trip MCP surface -- apply then compile', () => {
 describe('spice-import round-trip MCP surface -- serialize/deserialize preserves metadata.models', () => {
   it('circuit.metadata.models entry survives serialize -> deserialize', () => {
     const { circuit, facade } = buildBjtCircuit();
-    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
+    const q1 = circuit.elements.find(el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
       { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
@@ -221,7 +230,7 @@ describe('spice-import round-trip MCP surface -- serialize/deserialize preserves
 
   it('deserialized circuit with metadata.models compiles cleanly', () => {
     const { circuit, facade } = buildBjtCircuit();
-    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
+    const q1 = circuit.elements.find(el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
       { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
@@ -240,7 +249,7 @@ describe('spice-import round-trip MCP surface -- serialize/deserialize preserves
 
   it('deserialized circuit produces same DC result as pre-serialization', () => {
     const { circuit, facade } = buildBjtCircuit();
-    const q1 = circuit.elements.find(el => el.getProperties().get('label') === 'Q1')!;
+    const q1 = circuit.elements.find(el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1')!;
     applySpiceImportResult(
       q1,
       { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },

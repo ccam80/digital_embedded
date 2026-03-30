@@ -12,11 +12,10 @@
 import { describe, it, expect } from 'vitest';
 import { compileUnified } from '../compile.js';
 import { Circuit, Wire } from '../../core/circuit.js';
-import type { Pin, PinDeclaration } from '../../core/pin.js';
+import type { PinDeclaration } from '../../core/pin.js';
 import { PinDirection } from '../../core/pin.js';
-import { PropertyBag } from '../../core/properties.js';
 import { ComponentRegistry } from '../../core/registry.js';
-import type { ComponentDefinition, ExecuteFunction } from '../../core/registry.js';
+import type { ComponentDefinition } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { ConcreteCompiledAnalogCircuit } from '../../solver/analog/compiled-analog-circuit.js';
 import { compileAnalogPartition } from '../../solver/analog/compiler.js';
@@ -35,12 +34,11 @@ function outputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclar
   return { direction: PinDirection.OUTPUT, label, defaultBitWidth: bitWidth, position: { x, y }, isNegatable: false, isClockCapable: false, kind: "signal" };
 }
 
-const noopExecFn: ExecuteFunction = () => {};
 
-function makeDigitalDef(name: string, pins: PinDeclaration[]): Omit<ComponentDefinition, 'typeId'> {
+function makeDigitalDef(name: string, pins: PinDeclaration[]): ComponentDefinition {
   return {
     name,
-    typeId: -1,
+    typeId: -1 as unknown as number,
     factory: (props) => createTestElementFromDecls(name, crypto.randomUUID(), pins, props),
     pinLayout: pins,
     propertyDefs: [],

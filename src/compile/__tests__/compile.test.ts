@@ -40,8 +40,9 @@ function makeAnalogElement(
     position: { x: p.x, y: p.y },
     label: p.label ?? "",
     direction: p.direction ?? PinDirection.BIDIRECTIONAL,
-    isInverted: false,
+    isNegated: false,
     isClock: false,
+    kind: "signal" as const,
     bitWidth: 1,
   }));
 
@@ -68,6 +69,7 @@ function makeAnalogElement(
     draw(_ctx: RenderContext) {},
     serialize() { return serialized; },
     getAttribute(k: string) { return propsMap.get(k); },
+    setAttribute(_k: string, _v: PropertyValue) {},
   };
 }
 
@@ -83,13 +85,13 @@ function twoInputOnePinDecls(): PinDeclaration[] {
   ];
 }
 
-function inPinDecl(label: string, pos: { x: number; y: number }): PinDeclaration[] {
+function inPinDecl(_label: string, pos: { x: number; y: number }): PinDeclaration[] {
   return [
     { direction: PinDirection.OUTPUT, label: "out", defaultBitWidth: 1, position: pos, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
-function outPinDecl(label: string, pos: { x: number; y: number }): PinDeclaration[] {
+function outPinDecl(_label: string, pos: { x: number; y: number }): PinDeclaration[] {
   return [
     { direction: PinDirection.INPUT, label: "in", defaultBitWidth: 1, position: pos, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
@@ -201,14 +203,14 @@ function makeAnalogDef(
     })),
     propertyDefs: [],
     attributeMap: [],
-    category: ComponentCategory.ANALOG,
+    category: ComponentCategory.MISC,
     helpText: "",
     pinElectrical: {},
     defaultModel: 'behavioral',
     models: {
       mnaModels: {
         behavioral: {
-          factory: (pinNodes) => mnaFactory(pinNodes),
+          factory: (pinNodes: ReadonlyMap<string, number>) => mnaFactory(pinNodes),
         },
       },
     },
@@ -231,14 +233,14 @@ function makeGroundDef(): ComponentDefinition {
     }],
     propertyDefs: [],
     attributeMap: [],
-    category: ComponentCategory.ANALOG,
+    category: ComponentCategory.MISC,
     helpText: "",
     pinElectrical: {},
     defaultModel: 'behavioral',
     models: {
       mnaModels: {
         behavioral: {
-          factory: (_pinNodes) => ({
+          factory: (_pinNodes: ReadonlyMap<string, number>) => ({
             pinNodeIds: [],
             allNodeIds: [],
             branchIndex: -1,

@@ -17,7 +17,7 @@ import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 import { PropertyBag } from '../../core/properties.js';
 import type { PropertyBag as PropertyBagType, PropertyValue } from '../../core/properties.js';
 import { ComponentRegistry } from '../../core/registry.js';
-import type { ComponentDefinition, ComponentModels, ExecuteFunction, ModelEntry } from '../../core/registry.js';
+import type { ComponentDefinition, ComponentModels, ModelEntry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { CircuitElement } from '../../core/element.js';
@@ -81,6 +81,7 @@ function makeAnalogElement(
     draw(_ctx: RenderContext) {},
     serialize() { return serialized; },
     getAttribute(k: string) { return propsMap.get(k); },
+    setAttribute(k: string, v: PropertyValue) { propsMap.set(k, v); },
   };
 }
 
@@ -141,10 +142,10 @@ function makeCapacitorElement(nodeA: number, nodeB: number, branchIdx: number): 
 // ---------------------------------------------------------------------------
 
 
-function makeDigitalDef(name: string, pins: PinDeclaration[] = []): Omit<ComponentDefinition, 'typeId'> {
+function makeDigitalDef(name: string, pins: PinDeclaration[] = []): ComponentDefinition {
   return {
     name,
-    typeId: -1,
+    typeId: -1 as unknown as number,
     factory: (props: PropertyBagType) => createTestElementFromDecls(name, crypto.randomUUID(), pins, props),
     pinLayout: pins,
     propertyDefs: [],
@@ -159,9 +160,10 @@ function makeAnalogDef(
   name: string,
   branchCount: boolean,
   factoryFn: (pinNodes: ReadonlyMap<string, number>, _internal: readonly number[], branchIdx: number, _props: PropertyBagType, _getTime: () => number) => AnalogElement,
-): Omit<ComponentDefinition, 'typeId'> {
+): ComponentDefinition {
   return {
     name,
+    typeId: -1 as unknown as number,
     factory: () => { throw new Error('not used'); },
     pinLayout: [],
     propertyDefs: [],
@@ -177,7 +179,7 @@ function makeAnalogDef(
         },
       },
     } as ComponentModels,
-  };
+  } as unknown as ComponentDefinition;
 }
 
 function buildDigitalRegistry(): ComponentRegistry {
@@ -276,7 +278,7 @@ function buildMixedRegistry(): ComponentRegistry {
       mnaModels: {
         behavioral: {
           branchCount: 0,
-          factory: (pinNodes) => {
+          factory: (pinNodes: ReadonlyMap<string, number>) => {
             const [n0, n1] = [...pinNodes.values()];
             return makeResistorElement(n0 ?? 0, n1 ?? 0);
           },
@@ -351,7 +353,7 @@ describe('compileUnified — simple AND gate (digital only)', () => {
     expect(unifiedAddr).toBeDefined();
     expect(unifiedAddr!.domain).toBe('digital');
     if (unifiedAddr!.domain === 'digital') {
-      expect(unifiedAddr.netId).toBe(referenceNetId);
+      expect(unifiedAddr!.netId).toBe(referenceNetId);
     }
   });
 });
@@ -853,7 +855,7 @@ describe('compileUnified — labelSignalMap', () => {
     expect(unifiedAddrA).toBeDefined();
     expect(unifiedAddrA!.domain).toBe('digital');
     if (unifiedAddrA!.domain === 'digital') {
-      expect(unifiedAddrA.netId).toBe(referenceNetIdA);
+      expect(unifiedAddrA!.netId).toBe(referenceNetIdA);
     }
   });
 });
@@ -888,9 +890,9 @@ describe('compileUnified — model resolution', () => {
     const twoIn = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
     const behavioralEntry: ModelEntry = {
       kind: 'inline',
-      factory: (pinNodes: ReadonlyMap<string, number>) => {
+      factory: (pinNodes: ReadonlyMap<string, number>, _internal: readonly number[], _branchIdx: number, _props: PropertyBag, _getTime: () => number) => {
         const [n0, n1] = [...pinNodes.values()];
-        return makeResistorElement(n0 ?? 0, n1 ?? 0);
+        return makeResistorElement(n0 ?? 0, n1 ?? 0) as unknown as import('../../core/analog-types.js').AnalogElementCore;
       },
       paramDefs: [],
       params: {},

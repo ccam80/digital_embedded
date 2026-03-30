@@ -87,7 +87,7 @@ export function resolveModelAssignments(
     // Runtime models from circuit.metadata.models are also valid keys.
     const hasDigital = Boolean(def.models?.digital);
     const registryKeys = def.modelRegistry ? Object.keys(def.modelRegistry) : [];
-    const mnaModelsObj = (def.models as Record<string, unknown>)['mnaModels'];
+    const mnaModelsObj = def.models ? (def.models as Record<string, unknown>)['mnaModels'] : undefined;
     const staticKeys =
       registryKeys.length > 0
         ? registryKeys
@@ -134,7 +134,7 @@ export function resolveModelAssignments(
 
     let model: import('../core/registry.js').DigitalModel | null;
     if (modelKey === 'digital') {
-      model = def.models.digital ?? null;
+      model = def.models?.digital ?? null;
     } else {
       model = null;
     }

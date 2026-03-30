@@ -5,18 +5,18 @@
 import { describe, it, expect, vi } from 'vitest';
 import { DefaultSimulationCoordinator } from '../../solver/coordinator.js';
 import { compileUnified } from '../compile.js';
-import { Circuit, Wire } from '../../core/circuit.js';
+import { Circuit } from '../../core/circuit.js';
 import { PropertyBag, PropertyType } from '../../core/properties.js';
 import { PinDirection } from '../../core/pin.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { FacadeError } from '../../headless/types.js';
 import type { Pin } from '../../core/pin.js';
-import type { PinDeclaration } from '../../core/pin.js';
 import type { ComponentDefinition } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { PropertyValue } from '../../core/properties.js';
 import type { MeasurementObserver } from '../../core/engine-interface.js';
 import type { SerializedElement } from '../../core/element.js';
+import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 import type { AnalogElement } from '../../solver/analog/element.js';
 import type { SparseSolver } from '../../solver/analog/sparse-solver.js';
 import type { SignalAddress, CompiledCircuitUnified } from '../types.js';
@@ -91,7 +91,7 @@ function makeAnalogElementObj(
     position: { x: p.x, y: p.y },
     label: p.label ?? '',
     direction: PinDirection.BIDIRECTIONAL,
-    isInverted: false,
+    isNegated: false,
     isClock: false,
     kind: "signal",
     bitWidth: 1,
@@ -112,6 +112,7 @@ function makeAnalogElementObj(
     draw(_ctx: RenderContext) {},
     serialize() { return serialized; },
     getAttribute(_k: string) { return undefined; },
+    setAttribute(_k: string, _v: PropertyValue) {},
   };
 }
 
@@ -154,11 +155,11 @@ function makeAnalogDef(
     })),
     propertyDefs: [],
     attributeMap: [],
-    category: ComponentCategory.ANALOG,
+    category: ComponentCategory.MISC,
     helpText: '',
     pinElectrical: {},
     defaultModel: 'behavioral',
-    models: { mnaModels: { behavioral: { factory: (pinNodes) => mnaFactory(pinNodes) } } },
+    models: { mnaModels: { behavioral: { factory: (pinNodes: ReadonlyMap<string, number>) => mnaFactory(pinNodes) } } },
   } as unknown as ComponentDefinition;
 }
 
@@ -173,14 +174,14 @@ function makeGroundDef(): ComponentDefinition {
     }],
     propertyDefs: [],
     attributeMap: [],
-    category: ComponentCategory.ANALOG,
+    category: ComponentCategory.MISC,
     helpText: '',
     pinElectrical: {},
     defaultModel: 'behavioral',
     models: {
       mnaModels: {
         behavioral: {
-          factory: (_pinNodes) => ({
+          factory: (_pinNodes: ReadonlyMap<string, number>) => ({
             pinNodeIds: [], allNodeIds: [], branchIndex: -1,
             isNonlinear: false, isReactive: false,
             stamp(_s: SparseSolver) {},
@@ -474,7 +475,6 @@ function buildMinimalAnalogDomain(): ConcreteCompiledAnalogCircuit {
     wireToNodeId: new Map(),
     models: new Map(),
     elementToCircuitElement: new Map(),
-    bridges: [],
   });
 }
 
@@ -498,6 +498,8 @@ function buildMixedCompiledUnified(): CompiledCircuitUnified {
     bridges: [],
     wireSignalMap: new Map([...digitalUnified.wireSignalMap]),
     labelSignalMap: new Map([...digitalUnified.labelSignalMap]),
+    pinSignalMap: new Map([...digitalUnified.pinSignalMap]),
+    allCircuitElements: [...digitalUnified.allCircuitElements],
     diagnostics: [],
   };
 }

@@ -1087,8 +1087,12 @@ export function compileAnalogPartition(
     : {};
   resolveSubcircuitModels(partition, runtimeModels, registry, diagnostics);
 
+  // Extract typed inline runtime models for use in route resolution.
+  const runtimeModelMap: Record<string, Record<string, ModelEntry>> | undefined =
+    outerCircuit?.metadata.models;
+
   // Stage 3 (Pass A): Assign branch indices and allocate internal nodes.
-  const passA = runPassA_partition(partition, externalNodeCount, diagnostics, digitalPinLoading);
+  const passA = runPassA_partition(partition, externalNodeCount, diagnostics, digitalPinLoading, runtimeModelMap);
 
   const elementMeta = passA.elementMeta;
   let branchCount = passA.branchCount;
@@ -1132,7 +1136,7 @@ export function compileAnalogPartition(
     const def = pc.definition;
     const props = el.getProperties();
 
-    const route = resolveComponentRoute(def, pc, digitalPinLoading);
+    const route = resolveComponentRoute(def, pc, digitalPinLoading, runtimeModelMap);
 
     if (route.kind === 'skip') {
       continue;
@@ -1233,11 +1237,21 @@ export function compileAnalogPartition(
       props.set("_pinElectrical", pinElectricalMap as unknown as import("../../core/properties.js").PropertyValue);
     }
 
-    // Populate model params from ModelEntry defaults on first compile only.
-    // If the partition already has keys, the user has set explicit values — preserve them.
+    // Populate model params.
+    // Merge order (lower wins): behavioral defaults → runtime entry params → element's own params.
     const modelEntry = route.entry;
-    if (modelEntry && props.getModelParamKeys().length === 0) {
-      props.replaceModelParams(modelEntry.params);
+    if (modelEntry) {
+      const behavioralDefaults = def.modelRegistry?.["behavioral"]?.params ?? {};
+      const elementOverrides = props.getModelParamKeys().length > 0
+        ? Object.fromEntries(props.getModelParamKeys().map(k => [k, props.getModelParam<number>(k)]))
+        : undefined;
+      const merged: Record<string, number> = { ...behavioralDefaults, ...modelEntry.params };
+      if (elementOverrides) {
+        for (const [k, v] of Object.entries(elementOverrides)) {
+          merged[k] = v as number;
+        }
+      }
+      props.replaceModelParams(merged);
     }
 
     const analogFactory = activeModel.factory;

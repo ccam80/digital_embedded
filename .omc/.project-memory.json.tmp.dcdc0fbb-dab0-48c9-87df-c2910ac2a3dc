@@ -252,87 +252,21 @@
   },
   "hotPaths": [
     {
-      "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 71,
-      "lastAccessed": 1774900831889,
-      "type": "file"
-    },
-    {
       "path": "spec\\bridge-and-hot-loadable-params.md",
-      "accessCount": 54,
-      "lastAccessed": 1774901486819,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 50,
-      "lastAccessed": 1774901769904,
+      "accessCount": 31,
+      "lastAccessed": 1774870741068,
       "type": "file"
     },
     {
       "path": "",
-      "accessCount": 34,
-      "lastAccessed": 1774897644572,
+      "accessCount": 21,
+      "lastAccessed": 1774870696307,
       "type": "directory"
     },
     {
-      "path": "spec\\progress.md",
-      "accessCount": 28,
-      "lastAccessed": 1774901741936,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\__tests__\\compile.test.ts",
-      "accessCount": 27,
-      "lastAccessed": 1774900355626,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 26,
-      "lastAccessed": 1774901057943,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\compile.ts",
-      "accessCount": 25,
-      "lastAccessed": 1774900637691,
-      "type": "file"
-    },
-    {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 24,
-      "lastAccessed": 1774898393058,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 23,
-      "lastAccessed": 1774898405969,
-      "type": "file"
-    },
-    {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 22,
-      "lastAccessed": 1774901722414,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\types.ts",
-      "accessCount": 19,
-      "lastAccessed": 1774872693657,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\analog-fuse.ts",
-      "accessCount": 18,
-      "lastAccessed": 1774872514263,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 17,
-      "lastAccessed": 1774897906892,
+      "accessCount": 16,
+      "lastAccessed": 1774870111843,
       "type": "file"
     },
     {
@@ -354,21 +288,33 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\resistor.ts",
-      "accessCount": 15,
-      "lastAccessed": 1774901038104,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\semiconductors\\triac.ts",
       "accessCount": 14,
       "lastAccessed": 1774869841089,
       "type": "file"
     },
     {
-      "path": "src\\components\\gates\\and.ts",
+      "path": "src\\components\\passives\\resistor.ts",
       "accessCount": 14,
-      "lastAccessed": 1774898802398,
+      "lastAccessed": 1774870590184,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 13,
+      "lastAccessed": 1774870124410,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\digital-pin-model.ts",
+      "accessCount": 13,
+      "lastAccessed": 1774870296222,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 12,
+      "lastAccessed": 1774869523833,
       "type": "file"
     },
     {
@@ -378,15 +324,9 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\bridge-adapter.test.ts",
+      "path": "spec\\progress.md",
       "accessCount": 12,
-      "lastAccessed": 1774872465339,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 12,
-      "lastAccessed": 1774896670715,
+      "lastAccessed": 1774870715359,
       "type": "file"
     },
     {
@@ -396,9 +336,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\schottky.ts",
+      "path": "src\\solver\\analog\\compiler.ts",
       "accessCount": 11,
-      "lastAccessed": 1774872508388,
+      "lastAccessed": 1774870386823,
       "type": "file"
     },
     {
@@ -415,14 +355,8 @@
     },
     {
       "path": "src\\components\\semiconductors\\njfet.ts",
-      "accessCount": 10,
-      "lastAccessed": 1774871264892,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\pjfet.ts",
-      "accessCount": 10,
-      "lastAccessed": 1774898015907,
+      "accessCount": 9,
+      "lastAccessed": 1774869534875,
       "type": "file"
     },
     {
@@ -438,9 +372,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\zener.ts",
-      "accessCount": 9,
-      "lastAccessed": 1774872969441,
+      "path": "src\\compile\\compile.ts",
+      "accessCount": 8,
+      "lastAccessed": 1774867694206,
       "type": "file"
     },
     {
@@ -456,27 +390,39 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\gates\\not.ts",
+      "path": "spec\\test-baseline.md",
       "accessCount": 8,
-      "lastAccessed": 1774872587170,
+      "lastAccessed": 1774870656105,
       "type": "file"
     },
     {
-      "path": "src\\components\\flipflops\\d.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774872593093,
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774868142074,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\and.ts",
+      "accessCount": 7,
+      "lastAccessed": 1774869520044,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\zener.ts",
+      "accessCount": 6,
+      "lastAccessed": 1774868350355,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\tunnel-diode.ts",
-      "accessCount": 8,
-      "lastAccessed": 1774872791541,
+      "accessCount": 6,
+      "lastAccessed": 1774868532763,
       "type": "file"
     },
     {
-      "path": "CLAUDE.md",
+      "path": "src\\components\\semiconductors\\pjfet.ts",
       "accessCount": 6,
-      "lastAccessed": 1774872694715,
+      "lastAccessed": 1774870013837,
       "type": "file"
     },
     {
@@ -510,21 +456,51 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\digital-pin-model.test.ts",
+      "path": "src\\components\\gates\\not.ts",
       "accessCount": 5,
-      "lastAccessed": 1774872464340,
+      "lastAccessed": 1774868374865,
       "type": "file"
     },
     {
-      "path": ".vitest-failures.json",
+      "path": "src\\components\\flipflops\\d.ts",
       "accessCount": 5,
-      "lastAccessed": 1774901657792,
+      "lastAccessed": 1774869663188,
       "type": "file"
     },
     {
-      "path": "src\\core\\pin-electrical.ts",
+      "path": "src\\components\\passives\\analog-fuse.ts",
       "accessCount": 4,
-      "lastAccessed": 1774872485467,
+      "lastAccessed": 1774868020063,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\schottky.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774868474502,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\bridge-adapter.test.ts",
+      "accessCount": 4,
+      "lastAccessed": 1774870359917,
+      "type": "file"
+    },
+    {
+      "path": "CLAUDE.md",
+      "accessCount": 3,
+      "lastAccessed": 1774867539513,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\types.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774867580345,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\digital-pin-model.test.ts",
+      "accessCount": 3,
+      "lastAccessed": 1774868899866,
       "type": "file"
     },
     {
@@ -540,6 +516,24 @@
       "type": "file"
     },
     {
+      "path": "src\\compile\\extract-connectivity.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774867586655,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\__tests__\\compile.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1774867675771,
+      "type": "file"
+    },
+    {
+      "path": ".vitest-failures.json",
+      "accessCount": 1,
+      "lastAccessed": 1774867436181,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\integration.ts",
       "accessCount": 1,
       "lastAccessed": 1774867537773,
@@ -549,6 +543,12 @@
       "path": "src\\solver\\analog\\sparse-solver.ts",
       "accessCount": 1,
       "lastAccessed": 1774867542237,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\pin-electrical.ts",
+      "accessCount": 1,
+      "lastAccessed": 1774867552035,
       "type": "file"
     }
   ],

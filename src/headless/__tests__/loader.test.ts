@@ -134,28 +134,25 @@ describe("Loader", () => {
 
     // Build a simple circuit
     const original = new Circuit({ name: "RoundTrip", description: "Test" });
-    const el1 = new StubElement(
+    const el1 = new TestElement(
       "In",
       crypto.randomUUID(),
       { x: 100, y: 200 },
-      0,
-      false,
+      [],
       new PropertyBag([["label", "A"]]),
     );
-    const el2 = new StubElement(
+    const el2 = new TestElement(
       "And",
       crypto.randomUUID(),
       { x: 300, y: 200 },
-      0,
-      false,
+      [],
       new PropertyBag([["inputCount", 2]]),
     );
-    const el3 = new StubElement(
+    const el3 = new TestElement(
       "Out",
       crypto.randomUUID(),
       { x: 500, y: 200 },
-      0,
-      false,
+      [],
       new PropertyBag([["label", "Y"]]),
     );
     original.addElement(el1);

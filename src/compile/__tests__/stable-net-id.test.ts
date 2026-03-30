@@ -13,13 +13,12 @@ import {
   resolveModelAssignments,
   type PinLoadingOverride,
 } from '../extract-connectivity.js';
-import { Wire } from '../../core/circuit.js';
 import type { CircuitElement } from '../../core/element.js';
-import type { Pin, PinDeclaration } from '../../core/pin.js';
+import type { PinDeclaration } from '../../core/pin.js';
 import { PinDirection } from '../../core/pin.js';
 import { PropertyBag } from '../../core/properties.js';
 import { ComponentRegistry } from '../../core/registry.js';
-import type { ComponentDefinition, ComponentModels } from '../../core/registry.js';
+import type { ComponentDefinition } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { ConnectivityGroup } from '../types.js';
 import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
@@ -64,12 +63,10 @@ function inputPin(x: number, y: number, label: string, bitWidth = 1): PinDeclara
 // Registry helpers
 // ---------------------------------------------------------------------------
 
-const noopExecFn = (() => {}) as unknown as ComponentDefinition['models']['digital'] extends { executeFn: infer F } ? F : never;
-
-function makeBaseDef(name: string, models: ComponentModels): Omit<ComponentDefinition, 'typeId'> {
+function makeBaseDef(name: string, models: object): ComponentDefinition {
   return {
     name,
-    typeId: -1,
+    typeId: -1 as unknown as number,
     factory: (props: PropertyBag) => createTestElementFromDecls(name, crypto.randomUUID(), [], props),
     pinLayout: [],
     propertyDefs: [],
@@ -92,25 +89,6 @@ function buildMixedRegistry(): ComponentRegistry {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: build a ConnectivityGroup with a single pin from a given element
-// ---------------------------------------------------------------------------
-
-function singlePinGroup(
-  groupId: number,
-  elementIndex: number,
-  pinIndex: number,
-  pinLabel: string,
-  domain: string,
-): ConnectivityGroup {
-  return {
-    groupId,
-    pins: [{ elementIndex, pinIndex, pinLabel, direction: PinDirection.OUTPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: null, domain, kind: "signal" }],
-    wires: [],
-    domains: new Set([domain]),
-    bitWidth: 1,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // stableNetId tests
 // ---------------------------------------------------------------------------
@@ -147,7 +125,6 @@ describe('stableNetId', () => {
       ],
       wires: [],
       domains: new Set(),
-      bitWidth: undefined,
     };
 
     expect(stableNetId(group, elements)).toBe('label:DATA');
@@ -163,7 +140,6 @@ describe('stableNetId', () => {
       ],
       wires: [],
       domains: new Set(['analog']),
-      bitWidth: undefined,
     };
 
     expect(stableNetId(group, elements)).toBe('pin:res-abc:p1');
@@ -204,7 +180,6 @@ describe('stableNetId', () => {
       ],
       wires: [],
       domains: new Set(['analog']),
-      bitWidth: undefined,
     };
 
     // Empty label → skip tunnel → fall back to canonical pin

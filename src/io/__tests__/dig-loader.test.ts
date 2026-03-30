@@ -9,8 +9,11 @@ import { parseDigXml } from "../dig-parser.js";
 import { loadDigCircuit, loadDig, loadDigFromParsed, createElementFromDig, createWireFromDig, extractCircuitMetadata, applyInverterConfig, DigParserError } from "../dig-loader.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition, AttributeMapping } from "../../core/registry.js";
-import { PinDirection, makePin } from "../../core/pin.js";
+import { PinDirection, makePin, createInverterConfig } from "../../core/pin.js";
+import type { Pin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
+import { AbstractCircuitElement } from "../../core/element.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { DigCircuit, DigVisualElement } from "../dig-schema.js";
 import { stringConverter, boolConverter, intConverter, testDataConverter } from "../attribute-map.js";
 import { CircuitBuilder } from "../../headless/builder.js";
@@ -492,7 +495,7 @@ describe("DigLoader", () => {
           ? (props.get("bitWidth") as number)
           : DEFAULT_BIT_WIDTH;
         const bag = new PropertyBag([["bitWidth", bitWidth]]);
-        return new TestElement("GateWithDefault", crypto.randomUUID(), { x: 0, y: 0 }, 0, false, bag);
+        return new TestElement("GateWithDefault", crypto.randomUUID(), { x: 0, y: 0 }, [], bag);
       },
       pinLayout: [],
       propertyDefs: [],

@@ -1,36 +1,12 @@
 {
   "summary": {
-    "passed": 9745,
-    "failed": 159,
+    "passed": 9782,
+    "failed": 122,
     "skipped": 0,
     "totalFiles": 333,
-    "durationSeconds": 14.6
+    "durationSeconds": 21.9
   },
   "failures": [
-    {
-      "message": "TestElement is not defined",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\compile\\__tests__\\compile.test.ts",
-          "test": "compiles pure digital circuit correctly",
-          "line": 290,
-          "column": 19
-        },
-        {
-          "file": "src\\compile\\__tests__\\compile.test.ts",
-          "test": "populates wireSignalMap for digital circuit with wires",
-          "line": 312,
-          "column": 18
-        },
-        {
-          "file": "src\\compile\\__tests__\\compile.test.ts",
-          "test": "populates labelSignalMap for labeled In/Out components",
-          "line": 345,
-          "column": 18
-        }
-      ]
-    },
     {
       "message": "expected [] to have a length of 1 but got +0",
       "count": 1,
@@ -40,18 +16,6 @@
           "test": "cross-domain mode produces exactly one bridge for the DABridge element",
           "line": 267,
           "column": 28
-        }
-      ]
-    },
-    {
-      "message": "StubElement is not defined",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\headless\\__tests__\\loader.test.ts",
-          "test": "loadsJsonRoundTrip",
-          "line": 137,
-          "column": 17
         }
       ]
     },
@@ -70,144 +34,6 @@
           "test": "readOutput() via Port label works in a pure analog circuit",
           "line": 238,
           "column": 21
-        }
-      ]
-    },
-    {
-      "message": "expected 2 to be 4 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
-          "test": "parsed .MODEL card applied via applySpiceImportResult: circuit compiles and DC converges",
-          "line": 192,
-          "column": 37
-        }
-      ]
-    },
-    {
-      "message": "expected false to be true // Object.is equality",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
-          "test": "applySpiceImportResult with large IS override changes DC operating point vs default",
-          "line": 139,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\__tests__\\coordinator-capability.test.ts",
-          "test": "snapshotSignals contains non-zero voltages after DC op",
-          "line": 300,
-          "column": 24
-        },
-        {
-          "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
-          "test": "returns finite number for element index 0",
-          "line": 213,
-          "column": 38
-        }
-      ]
-    },
-    {
-      "message": "AbstractCircuitElement is not defined",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\io\\__tests__\\dig-loader.test.ts",
-          "test": "inverterConfigApplied",
-          "line": 177,
-          "column": 33
-        }
-      ]
-    },
-    {
-      "message": "el.getPins is not a function or its return value is not iterable",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\core\\circuit.ts",
-          "test": "missingAttributeUsesDefault",
-          "line": 305,
-          "column": 28
-        }
-      ]
-    },
-    {
-      "message": "this._properties.has is not a function",
-      "count": 10,
-      "locations": [
-        {
-          "file": "src\\core\\element.ts",
-          "test": "resolvesInitCode",
-          "line": 196,
-          "column": 26
-        },
-        {
-          "file": "src\\core\\element.ts",
-          "test": "modifiesComponentAttributes",
-          "line": 196,
-          "column": 26
-        },
-        {
-          "file": "src\\core\\element.ts",
-          "test": "generatesCircuitStructure",
-          "line": 196,
-          "column": 26
-        },
-        {
-          "file": "src\\core\\element.ts",
-          "test": "disabledInitCodeIgnored",
-          "line": 196,
-          "column": 26
-        },
-        {
-          "file": "src\\core\\element.ts",
-          "test": "cachesResults",
-          "line": 196,
-          "column": 26
-        },
-        {
-          "file": "src\\core\\element.ts",
-          "test": "resolveBasic",
-          "line": 196,
-          "column": 26
-        },
-        {
-          "file": "src\\core\\element.ts",
-          "test": "addComponent",
-          "line": 196,
-          "column": 26
-        },
-        {
-          "file": "src\\core\\element.ts",
-          "test": "cacheHit",
-          "line": 196,
-          "column": 26
-        },
-        {
-          "file": "src\\core\\element.ts",
-          "test": "cacheMiss",
-          "line": 196,
-          "column": 26
-        },
-        {
-          "file": "src\\core\\element.ts",
-          "test": "perElementScript",
-          "line": 196,
-          "column": 26
-        }
-      ]
-    },
-    {
-      "message": "circuit.elements.find(...).getProperties(...).getOrDefault is not a function",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\io\\__tests__\\resolve-generics.test.ts",
-          "test": "templateUnmodified",
-          "line": 516,
-          "column": 8
         }
       ]
     },
@@ -286,6 +112,24 @@
           "test": "element params merged with model params in overrides",
           "line": 489,
           "column": 28
+        }
+      ]
+    },
+    {
+      "message": "expected false to be true // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\__tests__\\coordinator-capability.test.ts",
+          "test": "snapshotSignals contains non-zero voltages after DC op",
+          "line": 300,
+          "column": 24
+        },
+        {
+          "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
+          "test": "returns finite number for element index 0",
+          "line": 213,
+          "column": 38
         }
       ]
     },
@@ -694,30 +538,6 @@
           "test": "full pipeline: compile → DC OP → transient → analytical match",
           "line": 592,
           "column": 23
-        }
-      ]
-    },
-    {
-      "message": "Cannot read properties of undefined (reading 'digital')",
-      "count": 3,
-      "locations": [
-        {
-          "file": "src\\compile\\extract-connectivity.ts",
-          "test": "import .MODEL card → store in metadata.models → compile applies IS override",
-          "line": 86,
-          "column": 43
-        },
-        {
-          "file": "src\\compile\\extract-connectivity.ts",
-          "test": "unmodified params stay at NPN defaults when IS is overridden",
-          "line": 86,
-          "column": 43
-        },
-        {
-          "file": "src\\compile\\extract-connectivity.ts",
-          "test": "multiline .MODEL card with continuation is parsed and applied correctly",
-          "line": 86,
-          "column": 43
         }
       ]
     },
