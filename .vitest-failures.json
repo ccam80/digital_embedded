@@ -4,7 +4,7 @@
     "failed": 122,
     "skipped": 0,
     "totalFiles": 333,
-    "durationSeconds": 21.9
+    "durationSeconds": 14.9
   },
   "failures": [
     {
@@ -230,66 +230,6 @@
       ]
     },
     {
-      "message": "expected undefined to be defined",
-      "count": 5,
-      "locations": [
-        {
-          "file": "src\\components\\sensors\\__tests__\\ldr.test.ts",
-          "test": "LDRDefinition has engine type analog",
-          "line": 167,
-          "column": 59
-        },
-        {
-          "file": "src\\components\\sensors\\__tests__\\ntc-thermistor.test.ts",
-          "test": "NTCThermistorDefinition has correct engine type",
-          "line": 222,
-          "column": 69
-        },
-        {
-          "file": "src\\components\\sources\\__tests__\\current-source.test.ts",
-          "test": "definition_engine_type_analog",
-          "line": 93,
-          "column": 67
-        },
-        {
-          "file": "src\\components\\sources\\__tests__\\dc-voltage-source.test.ts",
-          "test": "definition_engine_type_analog",
-          "line": 106,
-          "column": 69
-        },
-        {
-          "file": "src\\components\\sources\\__tests__\\variable-rail.test.ts",
-          "test": "definition_engine_type_analog",
-          "line": 133,
-          "column": 66
-        }
-      ]
-    },
-    {
-      "message": "PropertyBag: model param \"rDark\" not found",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\core\\properties.ts",
-          "test": "analogFactory creates an LDRElement",
-          "line": 121,
-          "column": 13
-        }
-      ]
-    },
-    {
-      "message": "PropertyBag: model param \"r0\" not found",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\core\\properties.ts",
-          "test": "analogFactory creates an NTCThermistorElement",
-          "line": 121,
-          "column": 13
-        }
-      ]
-    },
-    {
       "message": "Cannot read properties of undefined (reading 'behavioral')",
       "count": 15,
       "locations": [
@@ -386,6 +326,42 @@
       ]
     },
     {
+      "message": "expected undefined to be defined",
+      "count": 5,
+      "locations": [
+        {
+          "file": "src\\components\\sources\\__tests__\\current-source.test.ts",
+          "test": "definition_engine_type_analog",
+          "line": 93,
+          "column": 67
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\dc-voltage-source.test.ts",
+          "test": "definition_engine_type_analog",
+          "line": 106,
+          "column": 69
+        },
+        {
+          "file": "src\\components\\sources\\__tests__\\variable-rail.test.ts",
+          "test": "definition_engine_type_analog",
+          "line": 133,
+          "column": 66
+        },
+        {
+          "file": "src\\components\\sensors\\__tests__\\ldr.test.ts",
+          "test": "LDRDefinition has engine type analog",
+          "line": 167,
+          "column": 59
+        },
+        {
+          "file": "src\\components\\sensors\\__tests__\\ntc-thermistor.test.ts",
+          "test": "NTCThermistorDefinition has correct engine type",
+          "line": 222,
+          "column": 69
+        }
+      ]
+    },
+    {
       "message": "expected undefined to be 1 // Object.is equality",
       "count": 2,
       "locations": [
@@ -400,6 +376,30 @@
           "test": "definition_has_requires_branch_row",
           "line": 129,
           "column": 79
+        }
+      ]
+    },
+    {
+      "message": "PropertyBag: model param \"rDark\" not found",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "analogFactory creates an LDRElement",
+          "line": 121,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "PropertyBag: model param \"r0\" not found",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\core\\properties.ts",
+          "test": "analogFactory creates an NTCThermistorElement",
+          "line": 121,
+          "column": 13
         }
       ]
     },

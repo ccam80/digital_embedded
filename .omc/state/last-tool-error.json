@@ -1,7 +1,7 @@
 {
   "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\test-results\\\\test-failures.json\",\"offset\":100,\"limit\":150}",
-  "error": "File does not exist. Note: your current working directory is C:\\local_working_projects\\digital_in_browser.",
-  "timestamp": "2026-03-30T20:03:00.518Z",
-  "retry_count": 1
+  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\spec\\\\progress.md\"}",
+  "error": "File content (33202 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-03-30T20:30:30.563Z",
+  "retry_count": 2
 }

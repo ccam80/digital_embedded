@@ -259,8 +259,8 @@
     },
     {
       "path": "spec\\bridge-and-hot-loadable-params.md",
-      "accessCount": 54,
-      "lastAccessed": 1774901486819,
+      "accessCount": 59,
+      "lastAccessed": 1774902635527,
       "type": "file"
     },
     {
@@ -270,16 +270,16 @@
       "type": "file"
     },
     {
-      "path": "",
-      "accessCount": 34,
-      "lastAccessed": 1774897644572,
-      "type": "directory"
+      "path": "spec\\progress.md",
+      "accessCount": 39,
+      "lastAccessed": 1774902636111,
+      "type": "file"
     },
     {
-      "path": "spec\\progress.md",
-      "accessCount": 28,
-      "lastAccessed": 1774901741936,
-      "type": "file"
+      "path": "",
+      "accessCount": 35,
+      "lastAccessed": 1774902025496,
+      "type": "directory"
     },
     {
       "path": "src\\compile\\__tests__\\compile.test.ts",
@@ -300,21 +300,21 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\digital-pin-model.ts",
+      "accessCount": 25,
+      "lastAccessed": 1774902394813,
+      "type": "file"
+    },
+    {
       "path": "spec\\.context\\rules.md",
       "accessCount": 24,
       "lastAccessed": 1774898393058,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 23,
-      "lastAccessed": 1774898405969,
-      "type": "file"
-    },
-    {
       "path": "spec\\test-baseline.md",
-      "accessCount": 22,
-      "lastAccessed": 1774901722414,
+      "accessCount": 23,
+      "lastAccessed": 1774902444693,
       "type": "file"
     },
     {
@@ -474,6 +474,12 @@
       "type": "file"
     },
     {
+      "path": ".vitest-failures.json",
+      "accessCount": 7,
+      "lastAccessed": 1774901894427,
+      "type": "file"
+    },
+    {
       "path": "CLAUDE.md",
       "accessCount": 6,
       "lastAccessed": 1774872694715,
@@ -513,12 +519,6 @@
       "path": "src\\solver\\analog\\__tests__\\digital-pin-model.test.ts",
       "accessCount": 5,
       "lastAccessed": 1774872464340,
-      "type": "file"
-    },
-    {
-      "path": ".vitest-failures.json",
-      "accessCount": 5,
-      "lastAccessed": 1774901657792,
       "type": "file"
     },
     {

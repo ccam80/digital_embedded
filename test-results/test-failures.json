@@ -1,0 +1,1124 @@
+{
+  "summary": {
+    "vitest": {
+      "passed": 9782,
+      "failed": 122,
+      "skipped": 0,
+      "totalFiles": 333,
+      "durationSeconds": 13.8
+    },
+    "playwright": {
+      "passed": 472,
+      "failed": 70,
+      "skipped": 0,
+      "totalFiles": 22,
+      "durationSeconds": 240.334237
+    },
+    "totalFailed": 192,
+    "totalPassed": 10254
+  },
+  "failures": {
+    "vitest": [
+      {
+        "message": "expected [] to have a length of 1 but got +0",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\compile\\__tests__\\pin-loading-menu.test.ts",
+            "test": "cross-domain mode produces exactly one bridge for the DABridge element",
+            "line": 267,
+            "column": 28
+          }
+        ]
+      },
+      {
+        "message": "expected 0 to be greater than 4.9",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\headless\\__tests__\\port-analog-mixed.test.ts",
+            "test": "Port label appears in readAllSignals() for a pure analog circuit",
+            "line": 207,
+            "column": 32
+          },
+          {
+            "file": "src\\headless\\__tests__\\port-analog-mixed.test.ts",
+            "test": "readOutput() via Port label works in a pure analog circuit",
+            "line": 238,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "message": "expected undefined to be close to 1e-14, received difference is NaN, but expected 0.005",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+            "test": "NpnBJT has model params IS and BF",
+            "line": 237,
+            "column": 29
+          },
+          {
+            "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+            "test": "each NpnBJT has model params IS and BF",
+            "line": 543,
+            "column": 31
+          }
+        ]
+      },
+      {
+        "message": "expected undefined to be close to 2e-14, received difference is NaN, but expected 0.005",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+            "test": "maps Q with PNP model to PnpBJT with pins B, C, E and IS/BF overrides",
+            "line": 259,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "message": "expected undefined to be close to 0.00001, received difference is NaN, but expected 0.005",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+            "test": "NMOS model params contain W, L, VTO",
+            "line": 299,
+            "column": 28
+          }
+        ]
+      },
+      {
+        "message": "expected undefined to be close to 0.000005, received difference is NaN, but expected 0.005",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+            "test": "maps M with PMOS model to PMOS with pins G, D, S and W/L/VTO overrides",
+            "line": 322,
+            "column": 28
+          }
+        ]
+      },
+      {
+        "message": "expected undefined to be close to 2, received difference is NaN, but expected 0.005",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+            "test": "maps J with PJFET model to PJFET with pins G, S, D and VTO override",
+            "line": 377,
+            "column": 30
+          }
+        ]
+      },
+      {
+        "message": "expected undefined to be close to 0.00002, received difference is NaN, but expected 0.005",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\io\\__tests__\\spice-model-builder.test.ts",
+            "test": "element params merged with model params in overrides",
+            "line": 489,
+            "column": 28
+          }
+        ]
+      },
+      {
+        "message": "expected false to be true // Object.is equality",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\solver\\__tests__\\coordinator-capability.test.ts",
+            "test": "snapshotSignals contains non-zero voltages after DC op",
+            "line": 300,
+            "column": 24
+          },
+          {
+            "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
+            "test": "returns finite number for element index 0",
+            "line": 213,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "message": "expected 0 to be greater than 0",
+        "count": 4,
+        "locations": [
+          {
+            "file": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
+            "test": "voltage source pins span a non-zero potential after DC op",
+            "line": 186,
+            "column": 25
+          },
+          {
+            "file": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
+            "test": "voltageRange max is positive after tracking a 5V DC circuit",
+            "line": 266,
+            "column": 24
+          },
+          {
+            "file": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
+            "test": "voltageRange spans a non-zero range for circuit with voltage differences",
+            "line": 282,
+            "column": 37
+          },
+          {
+            "file": "src\\solver\\__tests__\\coordinator-visualization.test.ts",
+            "test": "voltageRange resets to { min: 0, max: 0 } after coordinator.reset()",
+            "line": 289,
+            "column": 43
+          }
+        ]
+      },
+      {
+        "message": "PropertyBag: model param \"BV\" not found",
+        "count": 7,
+        "locations": [
+          {
+            "file": "src\\core\\properties.ts",
+            "test": "forward_bias_stamp",
+            "line": 121,
+            "column": 13
+          },
+          {
+            "file": "src\\core\\properties.ts",
+            "test": "reverse_bias_stamp",
+            "line": 121,
+            "column": 13
+          },
+          {
+            "file": "src\\core\\properties.ts",
+            "test": "voltage_limiting_applied",
+            "line": 121,
+            "column": 13
+          },
+          {
+            "file": "src\\core\\properties.ts",
+            "test": "junction_capacitance_when_cjo_nonzero",
+            "line": 121,
+            "column": 13
+          },
+          {
+            "file": "src\\core\\properties.ts",
+            "test": "isNonlinear_true",
+            "line": 121,
+            "column": 13
+          },
+          {
+            "file": "src\\core\\properties.ts",
+            "test": "isReactive_false_when_cjo_zero",
+            "line": 121,
+            "column": 13
+          },
+          {
+            "file": "src\\core\\properties.ts",
+            "test": "diode_resistor_dc_op",
+            "line": 121,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "message": "PropertyBag: model param \"vOn\" not found",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\core\\properties.ts",
+            "test": "blocks_without_gate",
+            "line": 121,
+            "column": 13
+          },
+          {
+            "file": "src\\core\\properties.ts",
+            "test": "triggers_with_gate_current",
+            "line": 121,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "message": "expected undefined to be defined",
+        "count": 5,
+        "locations": [
+          {
+            "file": "src\\components\\sensors\\__tests__\\ldr.test.ts",
+            "test": "LDRDefinition has engine type analog",
+            "line": 167,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sensors\\__tests__\\ntc-thermistor.test.ts",
+            "test": "NTCThermistorDefinition has correct engine type",
+            "line": 222,
+            "column": 69
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\current-source.test.ts",
+            "test": "definition_engine_type_analog",
+            "line": 93,
+            "column": 67
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\dc-voltage-source.test.ts",
+            "test": "definition_engine_type_analog",
+            "line": 106,
+            "column": 69
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\variable-rail.test.ts",
+            "test": "definition_engine_type_analog",
+            "line": 133,
+            "column": 66
+          }
+        ]
+      },
+      {
+        "message": "PropertyBag: model param \"rDark\" not found",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\core\\properties.ts",
+            "test": "analogFactory creates an LDRElement",
+            "line": 121,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "message": "PropertyBag: model param \"r0\" not found",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\core\\properties.ts",
+            "test": "analogFactory creates an NTCThermistorElement",
+            "line": 121,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading 'behavioral')",
+        "count": 15,
+        "locations": [
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "sine_at_t_zero",
+            "line": 74,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "sine_at_quarter_period",
+            "line": 74,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "square_at_half_period",
+            "line": 74,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "triangle_linearity",
+            "line": 74,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "dc_offset_applied",
+            "line": 74,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "square_wave_breakpoints",
+            "line": 74,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "set_scale_applied",
+            "line": 74,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "rc_lowpass",
+            "line": 238,
+            "column": 64
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "custom_sine",
+            "line": 307,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "ramp",
+            "line": 307,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "invalid_expression_emits_diagnostic",
+            "line": 307,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "expression_parsed_once",
+            "line": 307,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\current-source.test.ts",
+            "test": "default_current_from_analog_factory",
+            "line": 102,
+            "column": 59
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\dc-voltage-source.test.ts",
+            "test": "default_voltage_from_analog_factory",
+            "line": 111,
+            "column": 61
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\variable-rail.test.ts",
+            "test": "analogFactory_creates_element",
+            "line": 140,
+            "column": 58
+          }
+        ]
+      },
+      {
+        "message": "expected undefined to be 1 // Object.is equality",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\components\\sources\\__tests__\\dc-voltage-source.test.ts",
+            "test": "definition_has_requires_branch_row",
+            "line": 102,
+            "column": 82
+          },
+          {
+            "file": "src\\components\\sources\\__tests__\\variable-rail.test.ts",
+            "test": "definition_has_requires_branch_row",
+            "line": 129,
+            "column": 79
+          }
+        ]
+      },
+      {
+        "message": "expected +0 to be close to 2.5, received difference is 2.5, but expected 0.005",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
+            "test": "runner_integration",
+            "line": 605,
+            "column": 18
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+            "test": "resistor_divider_dc_op_via_compiler",
+            "line": 199,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "message": "expected +0 to be 3 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+            "test": "compiles_resistor_divider",
+            "line": 285,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading 'pinNodeIds')",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+            "test": "assigns_ground_node_zero",
+            "line": 303,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "message": "expected +0 to be 2 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+            "test": "detects_voltage_source_loop",
+            "line": 390,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "message": "expected \"spy\" to be called once, but got 0 times",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\compiler.test.ts",
+            "test": "calls_analog_factory_with_correct_args",
+            "line": 455,
+            "column": 24
+          }
+        ]
+      },
+      {
+        "message": "expected 0 to be greater than 0.55",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+            "test": "diode_circuit_dc_op_via_compiler",
+            "line": 249,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "message": "expected +0 to be close to 5, received difference is 5, but expected 0.05",
+        "count": 3,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+            "test": "nmos_common_source_dc_op",
+            "line": 674,
+            "column": 25
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+            "test": "nmos_triode_region_dc_op",
+            "line": 750,
+            "column": 25
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+            "test": "pmos_common_source_dc_op",
+            "line": 829,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "message": "expected +0 to be 1 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
+            "test": "compilation produces correct topology",
+            "line": 419,
+            "column": 34
+          }
+        ]
+      },
+      {
+        "message": "expected 0 to be greater than 0.01",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
+            "test": "transient stepping produces time-varying output",
+            "line": 496,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "message": "expected 0 to be greater than 4.5",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
+            "test": "full pipeline: compile → DC OP → transient → analytical match",
+            "line": 592,
+            "column": 23
+          }
+        ]
+      },
+      {
+        "message": "expected [ { code: 'orphan-node', …(8) }, …(1) ] to have a length of +0 but got 2",
+        "count": 3,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+            "test": "override_merge: IS overridden to 1e-14, other params stay at NPN defaults",
+            "line": 195,
+            "column": 20
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+            "test": "empty_overrides: {} leaves _modelParams equal to raw defaults",
+            "line": 209,
+            "column": 20
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+            "test": "no_overrides_property: _modelParams equals raw defaults",
+            "line": 220,
+            "column": 20
+          }
+        ]
+      },
+      {
+        "message": "expected [ { code: 'orphan-node', …(8) } ] to have a length of +0 but got 1",
+        "count": 4,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+            "test": "schottky_lossy_diff_regression: override IS to DIODE_DEFAULTS.IS preserves that value",
+            "line": 313,
+            "column": 20
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+            "test": "zener_defaults: no overrides resolves ZENER_DEFAULTS, not DIODE_DEFAULTS",
+            "line": 398,
+            "column": 20
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+            "test": "schottky_base_defaults: no overrides resolves SCHOTTKY_DEFAULTS.IS, not DIODE_DEFAULTS.IS",
+            "line": 485,
+            "column": 20
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\spice-model-overrides.test.ts",
+            "test": "tunnel_diode_migration: _modelParams contains IP, VP, IV, VV from TUNNEL_DIODE_DEFAULTS",
+            "line": 569,
+            "column": 20
+          }
+        ]
+      }
+    ],
+    "playwright": [
+      {
+        "message": "Error: At least one probe voltage should change over 20 steps (transient sim)",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-bjt-convergence.spec.ts",
+            "test": "load buckbjt.dig and step 20 times — all voltages finite and evolving",
+            "line": 191,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
+        "count": 18,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RC lowpass: steady-state amplitude matches analytical",
+            "line": 179,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RLC series: resonance frequency f0 = 1/(2pi*sqrt(LC))",
+            "line": 291,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RLC parallel: anti-resonance behavior",
+            "line": 335,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "diode rectifier: output near Vpeak minus Vf with ripple",
+            "line": 384,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "LRC with switch: damped oscillation after closing",
+            "line": 1312,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "555 astable: oscillation at expected frequency",
+            "line": 1722,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "triac dimmer: phase-angle AC control",
+            "line": 1828,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-rc-circuit.spec.ts",
+            "test": "RC lowpass steady-state amplitude matches analytical",
+            "line": 168,
+            "column": 3
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RS_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "T_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "mixed switching transient: D_FF toggles SPDT with LRC load",
+            "line": 818,
+            "column": 5
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL import menu item visible for NPN BJT",
+            "line": 45,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".SUBCKT import menu item visible for component with subcircuitModel support",
+            "line": 132,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".SUBCKT dialog opens and shows parse preview",
+            "line": 143,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-model-panel.spec.ts",
+            "test": "panel visible for NPN BJT in analog mode",
+            "line": 72,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-model-panel.spec.ts",
+            "test": "edited IS value persists after closing and reopening popup",
+            "line": 129,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-model-panel.spec.ts",
+            "test": "IS override affects BJT collector current",
+            "line": 165,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: Vcc: expected 5 ±0.1%, got 0",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "voltage divider: Vout equals Vin × R2/(R1+R2)",
+            "line": 223,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 15,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "RL circuit: current rise with time constant L/R",
+            "line": 257,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "CMOS inverter: Vin=0 gives Vout=Vdd",
+            "line": 740,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "CMOS NAND: truth table at analog voltages",
+            "line": 780,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "switched RC: charge on close, discharge on open",
+            "line": 1272,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "relay-driven LC: relay switches between load paths",
+            "line": 1351,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "SPDT source selector: toggles between two voltage sources",
+            "line": 1448,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT switch with flyback diode: clamps inductive kick",
+            "line": 1496,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "crystal oscillator: oscillation builds at crystal frequency",
+            "line": 1580,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "SCR latch: trigger on and stays latched",
+            "line": 1774,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "LDR voltage divider: output varies with light level",
+            "line": 1876,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-ui-fixup.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 140,
+            "column": 3
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "digital gate driving analog load: And output drives resistor",
+            "line": 218,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "digital-controlled analog switch: In toggles analog path",
+            "line": 722,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "relay from digital logic: And gate drives relay coil",
+            "line": 768,
+            "column": 5
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 635,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: Vsource: expected 10 ±0.1%, got 0",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "zener regulator: output clamps at Vz",
+            "line": 427,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: SPICE parameter \"IS\" input not found in popup",
+        "count": 9,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT common-emitter: DC bias point Vce > 0, Ic > 0",
+            "line": 466,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT differential pair: balanced outputs when inputs equal",
+            "line": 526,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT Darlington pair: high current gain",
+            "line": 586,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT push-pull: complementary output follows input",
+            "line": 639,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "cascode amplifier: two-stage BJT with higher output impedance",
+            "line": 890,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "Wilson current mirror: output current tracks reference",
+            "line": 948,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "Widlar current source: low current output",
+            "line": 1001,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "BJT+MOSFET mixed driver: NPN drives NMOS gate",
+            "line": 1116,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "multi-stage amplifier: three CE stages with overall gain",
+            "line": 1171,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: SPICE parameter \"VTO\" input not found in popup",
+        "count": 4,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "MOSFET common-source: DC bias Vds > Vgs-Vth",
+            "line": 691,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "JFET amplifier: pinch-off region operation",
+            "line": 835,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "MOSFET H-bridge: forward and reverse drive states",
+            "line": 1051,
+            "column": 5
+          },
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "MOSFET PWM into RLC: filtered DC output",
+            "line": 1540,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Status bar shows an error",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "switched capacitor filter: clock-driven analog switches",
+            "line": 1400,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: Vout: expected -9.9989 ±0.1%, got 0",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "op-amp inverting: gain equals -Rf/Rin",
+            "line": 1637,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-circuit-assembly.spec.ts",
+            "test": "op-amp integrator: ramp output for DC input",
+            "line": 1677,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "Error: No node voltages changed after 50 steps",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-rc-circuit.spec.ts",
+            "test": "node voltages change during transient simulation",
+            "line": 144,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 4,
+        "locations": [
+          {
+            "file": "gui/analog-ui-fixup.spec.ts",
+            "test": "capacitor shows property popup with float input",
+            "line": 260,
+            "column": 3
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "comparator to logic: analog threshold drives digital gate",
+            "line": 318,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "555 timer driving digital counter: analog oscillator to digital count",
+            "line": 495,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "mixed transistor + gate: BJT level-shifts into digital And",
+            "line": 657,
+            "column": 5
+          }
+        ]
+      },
+      {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+        "count": 9,
+        "locations": [
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "DAC + RC filter: digital input produces filtered analog voltage",
+            "line": 153,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "PWM to analog voltage: counter-generated PWM filtered to DC",
+            "line": 257,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "ADC readout: analog waveform sampled to digital outputs",
+            "line": 377,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "Schmitt trigger to counter: analog sine drives digital count",
+            "line": 437,
+            "column": 5
+          },
+          {
+            "file": "gui/mixed-circuit-assembly.spec.ts",
+            "test": "digital servo loop: DAC to OpAmp to ADC feedforward",
+            "line": 563,
+            "column": 5
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL import dialog opens with textarea when menu item clicked",
+            "line": 56,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL dialog shows parse preview for valid .MODEL card",
+            "line": 70,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL Apply stores overrides visible in SPICE panel",
+            "line": 91,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/digital-circuit-assembly.spec.ts",
+            "test": "T flip-flop 4-bit ripple counter",
+            "line": 381,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:8080/",
+        "count": 3,
+        "locations": [
+          {
+            "file": "gui/model-selector.spec.ts",
+            "test": "dual-model component shows Model dropdown with labels",
+            "line": 18,
+            "column": 3
+          },
+          {
+            "file": "gui/model-selector.spec.ts",
+            "test": "single-model component does not show Model dropdown",
+            "line": 37,
+            "column": 3
+          },
+          {
+            "file": "gui/model-selector.spec.ts",
+            "test": "selecting Behavioral model shows SPICE parameter panel",
+            "line": 53,
+            "column": 3
+          }
+        ]
+      }
+    ]
+  }
+}
