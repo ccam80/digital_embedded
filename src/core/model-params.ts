@@ -24,31 +24,23 @@ export function defineModelParams(spec: {
   const defaults: Record<string, number> = {};
 
   for (const [key, s] of Object.entries(spec.primary)) {
-    paramDefs.push({
-      key,
-      type: PropertyType.FLOAT,
-      label: key,
-      unit: s.unit,
-      description: s.description,
-      rank: "primary",
-      min: s.min,
-      max: s.max,
-    });
+    const pDef: ParamDef = { key, type: PropertyType.FLOAT, label: key, rank: "primary" };
+    if (s.unit !== undefined) pDef.unit = s.unit;
+    if (s.description !== undefined) pDef.description = s.description;
+    if (s.min !== undefined) pDef.min = s.min;
+    if (s.max !== undefined) pDef.max = s.max;
+    paramDefs.push(pDef);
     defaults[key] = s.default;
   }
 
   if (spec.secondary) {
     for (const [key, s] of Object.entries(spec.secondary)) {
-      paramDefs.push({
-        key,
-        type: PropertyType.FLOAT,
-        label: key,
-        unit: s.unit,
-        description: s.description,
-        rank: "secondary",
-        min: s.min,
-        max: s.max,
-      });
+      const sDef: ParamDef = { key, type: PropertyType.FLOAT, label: key, rank: "secondary" };
+      if (s.unit !== undefined) sDef.unit = s.unit;
+      if (s.description !== undefined) sDef.description = s.description;
+      if (s.min !== undefined) sDef.min = s.min;
+      if (s.max !== undefined) sDef.max = s.max;
+      paramDefs.push(sDef);
       defaults[key] = s.default;
     }
   }

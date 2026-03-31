@@ -21,17 +21,11 @@ import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
-
 // ---------------------------------------------------------------------------
 // Default SCR parameters (matching spec defaults)
 // ---------------------------------------------------------------------------
@@ -57,7 +51,7 @@ function makeScrElement(overrides: Partial<typeof SCR_DEFAULTS> = {}): AnalogEle
   const props = createTestPropertyBag();
   props.replaceModelParams(params);
   // nodeA=1, nodeK=2, nodeG=3
-  return createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, props);
+  return withNodeIds(createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, props), [1, 2, 3]);
 }
 
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
@@ -68,6 +62,8 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolver): void {
       if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
       if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -121,7 +117,8 @@ describe("SCR", () => {
     //   branchRow index = 2 (third row, after 2 node rows)
 
     const matrixSize = 3; // node1, node2, branch
-    const scr = withNodeIds(createScrElement(new Map([["A", 1], ["K", 0], ["G", 0]]), [], -1, new PropertyBag(Object.entries(SCR_DEFAULTS))), [1, 0, 0]);
+    const scrProps0 = new PropertyBag(); scrProps0.replaceModelParams({ ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS });
+    const scr = withNodeIds(createScrElement(new Map([["A", 1], ["K", 0], ["G", 0]]), [], -1, scrProps0), [1, 0, 0]);
     const vs = withNodeIds(makeDcVoltageSource(2, 0, 2, 50), [2, 0]);
     const rLoad = makeResistorElement(2, 1, 10000); // 10kΩ
 
@@ -160,7 +157,8 @@ describe("SCR", () => {
     // → α₂ → ALPHA_MAX = 0.95; α₁+α₂ = 0.5+0.95 = 1.45 > 0.95 → triggers.
 
     // nodeA=1, nodeK=2, nodeG=3
-    const scr = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, new PropertyBag(Object.entries(SCR_DEFAULTS)));
+    const scrProps1 = new PropertyBag(); scrProps1.replaceModelParams({ ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS });
+    const scr = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, scrProps1);
 
     // Drive to operating point: 50V anode, 0V cathode, 0.65V gate
     const voltages = new Float64Array(3);
@@ -295,7 +293,7 @@ describe("SCR", () => {
   it("blocks_reverse", () => {
     // V_AK = -50V — reverse blocking, I_AK ≈ -I_S (small reverse leakage)
     const scr = makeScrElement();
-    const voltages = driveToOp(scr, -50, 0, 0, 100);
+    driveToOp(scr, -50, 0, 0, 100);
 
     const mockCalls: Array<[number, number, number]> = [];
     const mockRhs: Array<[number, number]> = [];
@@ -327,7 +325,7 @@ describe("SCR", () => {
     const scr = makeScrElement({ vBreakover: 100 });
 
     // Drive anode to 110V > V_breakover, gate and cathode at 0V
-    const voltages = driveToOp(scr, 110, 0, 0, 100);
+    driveToOp(scr, 110, 0, 0, 100);
 
     // After breakover, SCR should be in on-state (high conductance)
     const mockCalls: Array<[number, number, number]> = [];

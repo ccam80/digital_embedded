@@ -51,7 +51,7 @@ const EXPECTED_PHASE = -Math.atan(OMEGA_RC);  // ≈ -0.5614 rad
  * Hand-built RC lowpass with AC source.
  * timeRef is a shared mutable object that the engine updates after each step.
  */
-function makeAcRcCircuit(timeRef: { value: number }): ConcreteCompiledAnalogCircuit {
+function makeAcRcCircuit(timeRef: { value: number }): ConcreteCompiledAnalogCircuit & { timeRef: { value: number } } {
   const getTime = () => timeRef.value;
 
   const vs  = makeAcVoltageSource(1, 0, 2, A, F, 0, 0, getTime);
@@ -66,7 +66,6 @@ function makeAcRcCircuit(timeRef: { value: number }): ConcreteCompiledAnalogCirc
     matrixSize: 3,
     elements: [vs, r, cap],
     labelToNodeId: new Map([["Vout", 2]]),
-    wireToNodeId: new Map(),
     timeRef,
   };
 }
@@ -259,7 +258,6 @@ describe("RC lowpass AC transient — hand-built", () => {
       matrixSize: 3,
       elements: [vs, r, cap],
       labelToNodeId: new Map(),
-      wireToNodeId: new Map(),
       timeRef,
     };
 
@@ -321,9 +319,10 @@ function makePin(x: number, y: number, label: string = ""): Pin {
     position: { x, y },
     label,
     direction: PinDirection.BIDIRECTIONAL,
-    isInverted: false,
+    isNegated: false,
     isClock: false,
     bitWidth: 1,
+    kind: "signal" as const,
   };
 }
 
@@ -337,6 +336,9 @@ function makeElement(
   const def = registry?.get(typeId);
   const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
+  const _mp: Record<string, number> = {};
+  for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
+  propertyBag.replaceModelParams(_mp);
 
   const serialized: SerializedElement = {
     typeId,
@@ -359,6 +361,7 @@ function makeElement(
     draw(_ctx: RenderContext) { /* no-op */ },
     serialize() { return serialized; },
     getAttribute(k: string) { return propsMap.get(k); },
+    setAttribute(k: string, v: PropertyValue) { propsMap.set(k, v); },
   };
 }
 

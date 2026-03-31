@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { Circuit, Wire } from "../../../core/circuit.js";
+import { Wire } from "../../../core/circuit.js";
 import type { CircuitElement } from "../../../core/element.js";
 import type { Pin, PinDeclaration } from "../../../core/pin.js";
 import { PinDirection } from "../../../core/pin.js";
@@ -19,7 +19,6 @@ import type { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogElement } from "../element.js";
 import type { SparseSolver } from "../sparse-solver.js";
 import { compileAnalogPartition } from "../compiler.js";
-import { compileUnified } from "../../../compile/compile.js";
 import type { SolverPartition, PartitionedComponent, ConnectivityGroup } from "../../../compile/types.js";
 import { pinWorldPosition } from "../../../core/pin.js";
 
@@ -49,6 +48,9 @@ function makeElement(
   const def = registry?.get(typeId);
   const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || "", p.direction ?? PinDirection.BIDIRECTIONAL));
   const propertyBag = new PropertyBag(propsMap.entries());
+  const _mp: Record<string, number> = {};
+  for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
+  propertyBag.replaceModelParams(_mp);
 
   const serialized: SerializedElement = {
     typeId,
@@ -71,6 +73,7 @@ function makeElement(
     draw(_ctx: RenderContext) { /* no-op */ },
     serialize() { return serialized; },
     getAttribute(k: string) { return propsMap.get(k); },
+    setAttribute(k: string, v: PropertyValue) { propsMap.set(k, v); },
   };
 }
 
@@ -82,22 +85,21 @@ function makeStubElement(nodeIds: number[]): AnalogElement {
     isNonlinear: false,
     isReactive: false,
     stamp(_s: SparseSolver) { /* no-op */ },
+    setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array) { return nodeIds.map(() => 0); },
   };
 }
-
-function noopExecuteFn(): void { /* no-op */ }
 
 function makeBaseDef(name: string) {
   return {
     name,
     typeId: -1,
     pinLayout: [] as PinDeclaration[],
-    propertyDefs: [] as import("../../core/properties.js").PropertyDefinition[],
-    attributeMap: [] as import("../../core/registry.js").AttributeMapping[],
+    propertyDefs: [] as import("../../../core/properties.js").PropertyDefinition[],
+    attributeMap: [] as import("../../../core/registry.js").AttributeMapping[],
     category: "MISC" as unknown as ComponentCategory,
     helpText: "",
-    factory: ((_props: PropertyBag) => makeElement(name, crypto.randomUUID(), [])) as unknown as import("../../core/registry.js").ComponentDefinition["factory"],
+    factory: ((_props: PropertyBag) => makeElement(name, crypto.randomUUID(), [])) as unknown as import("../../../core/registry.js").ComponentDefinition["factory"],
   };
 }
 
@@ -111,6 +113,7 @@ function makeGatePinLayout(inputCount: number): PinDeclaration[] {
       position: { x: 0, y: i },
       isNegatable: false,
       isClockCapable: false,
+      kind: "signal" as const,
     });
   }
   pins.push({
@@ -120,6 +123,7 @@ function makeGatePinLayout(inputCount: number): PinDeclaration[] {
     position: { x: 2, y: 1 },
     isNegatable: false,
     isClockCapable: false,
+    kind: "signal" as const,
   });
   return pins;
 }
@@ -144,7 +148,7 @@ function buildRegistry(factorySpy?: ReturnType<typeof vi.fn>): ComponentRegistry
     modelRegistry: {
       behavioral: {
         kind: "inline" as const,
-        factory: andFactory as unknown as import("../../core/registry.js").AnalogFactory,
+        factory: andFactory as unknown as import("../../../core/registry.js").AnalogFactory,
         paramDefs: [],
         params: {},
       },
@@ -295,6 +299,7 @@ function buildAndGatePartition(propsMap: Map<string, PropertyValue> = new Map())
     worldPosition: pinWorldPosition(andGate, pin),
     wireVertex: pinWorldPosition(andGate, pin),
     domain: "analog" as const,
+    kind: (pin.kind ?? "signal") as "signal" | "power",
   }));
 
   const gndPins = gnd.getPins();
@@ -307,6 +312,7 @@ function buildAndGatePartition(propsMap: Map<string, PropertyValue> = new Map())
     worldPosition: pinWorldPosition(gnd, pin),
     wireVertex: pinWorldPosition(gnd, pin),
     domain: "analog" as const,
+    kind: (pin.kind ?? "signal") as "signal" | "power",
   }));
 
   const andComponent: PartitionedComponent = {
@@ -445,6 +451,7 @@ describe("compileAnalogPartition", () => {
       worldPosition: pinWorldPosition(andGate, pin),
       wireVertex: pinWorldPosition(andGate, pin),
       domain: "analog" as const,
+      kind: (pin.kind ?? "signal") as "signal" | "power",
     }));
 
     // Partition without any Ground component

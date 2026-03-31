@@ -301,7 +301,6 @@ class Parser {
   // unary: '-' unary | primary
   private _parseUnary(): ExprNode {
     if (this._peek().kind === TokenKind.Minus) {
-      const pos = this._peek().pos;
       this._advance();
       const operand = this._parseUnary();
       return unaryOp("-", operand);
@@ -447,9 +446,13 @@ export function evaluateExpression(expr: ExprNode, env: Record<string, number>):
       return impl(...args);
     }
 
-    default: {
-      const exhaustive: never = expr;
-      throw new UnknownNodeKindError((exhaustive as ExprNode).kind);
-    }
+    case "circuit-voltage":
+    case "circuit-current":
+    case "builtin-var":
+    case "builtin-func":
+      throw new ExprParseError(`Cannot evaluate ${expr.kind} without runtime context`, 0);
+
+    default:
+      throw new UnknownNodeKindError((expr as { kind: string }).kind);
   }
 }

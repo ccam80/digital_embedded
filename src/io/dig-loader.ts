@@ -16,7 +16,7 @@
  */
 
 import type { DigCircuit, DigVisualElement, DigWire, DigValue } from "./dig-schema.js";
-import type { AttributeMapping } from "../core/registry.js";
+import type { AttributeMapping, ComponentDefinition } from "../core/registry.js";
 import type { ComponentRegistry } from "../core/registry.js";
 import type { CircuitElement } from "../core/element.js";
 import type { CircuitMetadata, CustomShapeData, CustomDrawable } from "../core/circuit.js";
@@ -156,6 +156,10 @@ export function createElementFromDig(
 
   const props = applyAllMappings(ve, def.attributeMap);
 
+  // Move model param keys from _map to _mparams based on the definition's
+  // modelRegistry paramDefs, so the compiler sees them in the correct partition.
+  migrateModelParams(props, def);
+
   const element = def.factory(props);
 
   element.position = { x: ve.pos.x / DIG_SIZE, y: ve.pos.y / DIG_SIZE };
@@ -171,6 +175,38 @@ export function createElementFromDig(
   }
 
   return element;
+}
+
+/**
+ * Move model parameter keys from the PropertyBag's `_map` to `_mparams`.
+ *
+ * Looks up the component definition's modelRegistry to find paramDefs, then
+ * for each paramDef key that exists in `_map` as a number, moves it to
+ * `_mparams` via setModelParam. This ensures the compiler reads model params
+ * from the correct partition.
+ */
+function migrateModelParams(bag: PropertyBag, def: ComponentDefinition): void {
+  const registry = def.modelRegistry;
+  if (!registry) return;
+
+  // Collect all param keys from all model entries
+  const paramKeys = new Set<string>();
+  for (const entry of Object.values(registry)) {
+    if (entry.paramDefs) {
+      for (const pd of entry.paramDefs) paramKeys.add(pd.key);
+    }
+  }
+
+  if (paramKeys.size === 0) return;
+
+  for (const key of paramKeys) {
+    if (bag.has(key)) {
+      const val = bag.get(key);
+      if (typeof val === 'number') {
+        bag.setModelParam(key, val);
+      }
+    }
+  }
 }
 
 /**

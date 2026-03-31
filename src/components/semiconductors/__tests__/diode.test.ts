@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { DiodeDefinition, createDiodeElement, computeJunctionCapacitance } from "../diode.js";
+import { DiodeDefinition, createDiodeElement, computeJunctionCapacitance, DIODE_PARAM_DEFAULTS } from "../diode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
@@ -20,15 +20,11 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
 
 
 // ---------------------------------------------------------------------------
@@ -40,7 +36,7 @@ const GMIN = 1e-12;
 
 function makeParamBag(params: Record<string, number>): PropertyBag {
   const bag = new PropertyBag();
-  bag.replaceModelParams(params);
+  bag.replaceModelParams({ ...DIODE_PARAM_DEFAULTS, ...params });
   return bag;
 }
 
@@ -70,8 +66,9 @@ function makeDiodeAtVd(
   vd: number,
   modelOverrides?: Record<string, number>,
 ): AnalogElement {
-  const propsObj = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, ...modelOverrides });
-  const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+  const propsObj = makeParamBag({ ...DIODE_PARAM_DEFAULTS, IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, ...modelOverrides });
+  const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+  const element = withNodeIds(core, [1, 2]);
 
   // Drive the element to the operating point by calling updateOperatingPoint
   // multiple times to converge the pnjlim limiting
@@ -146,7 +143,6 @@ describe("Diode", () => {
   it("voltage_limiting_applied", () => {
     const IS = 1e-14;
     const N = 1;
-    const nVt = N * VT;
 
     // Start at vd = 0.3V
     const propsObj = makeParamBag({ IS, N, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
@@ -198,7 +194,6 @@ describe("Diode", () => {
     // Now call stampCompanion
     expect(element.stampCompanion).toBeDefined();
 
-    const solver = makeMockSolver();
     element.stampCompanion!(1e-6, "trapezoidal", voltages);
 
     // Now stamp should include capacitor contributions
@@ -248,6 +243,8 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolverType): void {
       if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
       if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -281,7 +278,7 @@ describe("Integration", () => {
     const branchRow = 2;
 
     // 5V source: node2(+) to ground(-)
-    const vs = makeDcVoltageSource(2, 0, branchRow, 5);
+    const vs = makeDcVoltageSource(2, 0, branchRow, 5) as unknown as AnalogElement;
 
     // 1kΩ resistor: node1 ↔ node2
     const r = makeResistorElement(1, 2, 1000);

@@ -250,9 +250,10 @@ export class UICircuitBuilder {
   /**
    * Set a SPICE model parameter for a semiconductor component through the UI.
    *
-   * Opens the property popup, expands the "SPICE Model Parameters" collapsible
-   * section if needed, finds the parameter row by its SPICE key label (e.g.
-   * "VTO", "KP", "IS", "BF"), fills the value, and commits via Tab.
+   * Opens the property popup, finds the parameter row by its label element
+   * (e.g. "VTO", "KP", "IS", "BF"), fills the value, and commits via Tab.
+   * Primary params (IS, BF) are visible directly; secondary params (VAF, NF,
+   * etc.) are under "▶ Advanced Parameters" which is expanded automatically.
    */
   async setSpiceParameter(
     elementLabel: string,
@@ -263,52 +264,38 @@ export class UICircuitBuilder {
     const el = info.elements.find(e => e.label === elementLabel);
     expect(el, `Element "${elementLabel}" not found`).toBeTruthy();
 
+    // Close any open popup first — an open popup overlays the canvas and
+    // absorbs double-click events, preventing a new popup from opening.
+    const existingPopup = this.page.locator('.prop-popup');
+    if (await existingPopup.isVisible().catch(() => false)) {
+      await existingPopup.locator('.prop-popup-close').click();
+      await existingPopup.waitFor({ state: 'hidden', timeout: 2000 });
+    }
+
     await this._dblClickElementBody(el!);
 
     const popup = this.page.locator('.prop-popup');
     await expect(popup).toBeVisible({ timeout: 3000 });
 
-    // Expand the "SPICE Model Parameters" collapsible section if collapsed,
-    // then locate the input for the given paramKey — all in one evaluate call
-    // to avoid fragile locator chains on custom DOM.
-    await popup.evaluate((popupEl, key) => {
-      // Find the toggle by scanning for the "SPICE Model Parameters" text
-      const allDivs = popupEl.querySelectorAll('div');
-      for (const div of allDivs) {
-        if (div.childNodes.length === 1
-            && div.textContent?.includes('SPICE Model Parameters')) {
-          const content = div.nextElementSibling as HTMLElement | null;
-          if (content && content.style.display === 'none') {
-            div.click();  // expand
-          }
-          break;
-        }
+    // Primary model params are rendered directly in prop-row elements.
+    // Secondary params are under "▶ Advanced Parameters" — expand if needed.
+    let keyLabel = popup.locator(`label`).filter({ hasText: new RegExp(`^${paramKey}$`) });
+    const isVisible = await keyLabel.first().isVisible().catch(() => false);
+    if (!isVisible) {
+      const advToggle = popup.getByText('▶ Advanced Parameters');
+      if (await advToggle.isVisible().catch(() => false)) {
+        await advToggle.click();
+        await popup.getByText('▼ Advanced Parameters').waitFor({ state: 'visible', timeout: 1000 });
       }
-    }, paramKey);
+      keyLabel = popup.locator(`label`).filter({ hasText: new RegExp(`^${paramKey}$`) });
+    }
+    await expect(keyLabel.first(), `SPICE parameter "${paramKey}" label not found in popup`).toBeVisible({ timeout: 2000 });
 
-    // Small wait for the section to expand
-    await this.page.waitForTimeout(100);
-
-    // Now find the input via evaluate — match span text to paramKey
-    const inputHandle = await popup.evaluateHandle((popupEl, key) => {
-      const spans = popupEl.querySelectorAll('span');
-      for (const span of spans) {
-        if (span.textContent?.trim() === key) {
-          const row = span.parentElement;
-          if (row) {
-            const input = row.querySelector('input');
-            if (input) return input;
-          }
-        }
-      }
-      return null;
-    }, paramKey);
-
-    const input = inputHandle.asElement();
-    expect(input, `SPICE parameter "${paramKey}" input not found in popup`).not.toBeNull();
-
-    await input!.fill(String(value));
-    await input!.press('Tab');  // triggers blur → commitOverride
+    const row = keyLabel.first().locator('..');
+    const input = row.locator('input').first();
+    await expect(input).toBeVisible({ timeout: 2000 });
+    await input.fill(String(value));
+    await input.press('Tab');  // triggers blur → commit
 
     await this.page.keyboard.press('Escape');
   }
@@ -526,11 +513,23 @@ export class UICircuitBuilder {
     await this.page.mouse.click(coords.x, coords.y, { button: 'right' });
     await this.page.waitForTimeout(200);
 
-    // Click the trace menu item
-    const menuText = `Trace Voltage: ${label}.${pinLabel}`;
-    const menuItem = this.page.locator('.ctx-menu-item').filter({ hasText: menuText });
-    await expect(menuItem).toBeVisible({ timeout: 3000 });
-    await menuItem.click();
+    // The context menu shows either "Trace Voltage: Label.Pin" (3+ terminal
+    // components) or "Trace Voltage: Label" (2-terminal components like R, C, L).
+    // Try the per-pin format first, then fall back to the label-only format.
+    const menuTextPin = `Trace Voltage: ${label}.${pinLabel}`;
+    const menuTextLabel = `Trace Voltage: ${label}`;
+    // Use exact text matching to avoid matching "Trace Voltage: C1 (New Panel)"
+    // when looking for "Trace Voltage: C1".
+    const menuItemPin = this.page.locator('.ctx-menu-item').filter({ hasText: new RegExp(`^${menuTextPin}$`) });
+    const menuItemLabel = this.page.locator('.ctx-menu-item').filter({ hasText: new RegExp(`^${menuTextLabel}$`) });
+
+    const pinVisible = await menuItemPin.isVisible().catch(() => false);
+    if (pinVisible) {
+      await menuItemPin.click();
+    } else {
+      await expect(menuItemLabel).toBeVisible({ timeout: 3000 });
+      await menuItemLabel.click();
+    }
     await this.page.waitForTimeout(300);
   }
 
@@ -1286,33 +1285,49 @@ export class UICircuitBuilder {
     const el = info.elements.find(e => e.label === elementLabel);
     expect(el, `Element "${elementLabel}" not found`).toBeTruthy();
 
+    // Close any open popup first — an open popup overlays the canvas and
+    // absorbs double-click events, preventing a new popup from opening.
+    const existingPopup = this.page.locator('.prop-popup');
+    if (await existingPopup.isVisible().catch(() => false)) {
+      await existingPopup.locator('.prop-popup-close').click();
+      await existingPopup.waitFor({ state: 'hidden', timeout: 2000 });
+    }
+
     // Double-click to open property popup
     await this._dblClickElementBody(el!);
     const popup = this.page.locator('.prop-popup');
     await expect(popup).toBeVisible({ timeout: 3000 });
 
-    // Expand the SPICE Model Parameters section
-    const toggle = popup.getByText('▶ SPICE Model Parameters');
-    await expect(toggle).toBeVisible({ timeout: 2000 });
-    await toggle.click();
-    await expect(popup.getByText('▼ SPICE Model Parameters')).toBeVisible({ timeout: 1000 });
-
-    // Fill each parameter field.
-    // Each SPICE row is: div[style*=display:flex] > span(key) + input + span(unit)
-    // We locate the span whose exact text matches the param key, then go to its
-    // parent div to find the sibling input. This avoids matching ancestor divs
-    // that also contain the key span as a descendant.
+    // Primary model params (e.g. IS, BF) are rendered directly in prop-row elements.
+    // Secondary params (e.g. VAF, NF) are under "▶ Advanced Parameters" — expand
+    // it first if any secondary param is requested.
+    // Each param row: div.prop-row > label.prop-label(key) + input + span(unit)
     for (const [key, value] of Object.entries(overrides)) {
-      const keySpan = popup.locator(`span:text-is("${key}")`).first();
-      await expect(keySpan).toBeVisible({ timeout: 2000 });
-      const row = keySpan.locator('..');
+      // Try to find the label directly (primary params are always visible).
+      let keyLabel = popup.locator(`label`).filter({ hasText: new RegExp(`^${key}$`) });
+      const isVisible = await keyLabel.first().isVisible().catch(() => false);
+      if (!isVisible) {
+        // May be a secondary param — expand Advanced Parameters if not already open
+        const advToggle = popup.getByText('▶ Advanced Parameters');
+        if (await advToggle.isVisible().catch(() => false)) {
+          await advToggle.click();
+          await popup.getByText('▼ Advanced Parameters').waitFor({ state: 'visible', timeout: 1000 });
+        }
+        keyLabel = popup.locator(`label`).filter({ hasText: new RegExp(`^${key}$`) });
+      }
+      await expect(keyLabel.first()).toBeVisible({ timeout: 2000 });
+      const row = keyLabel.first().locator('..');
       const input = row.locator('input').first();
       await expect(input).toBeVisible({ timeout: 2000 });
       await input.fill(String(value));
       await input.press('Tab');
     }
 
-    // Close popup
-    await this.page.keyboard.press('Escape');
+    // Close popup via close button (Escape does not dismiss the property popup)
+    const closeBtn = popup.locator('.prop-popup-close');
+    if (await closeBtn.isVisible().catch(() => false)) {
+      await closeBtn.click();
+      await popup.waitFor({ state: 'hidden', timeout: 2000 });
+    }
   }
 }

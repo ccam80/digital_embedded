@@ -68,10 +68,18 @@ function serializePropertyValue(value: unknown): unknown {
 
 function serializeProperties(
   entries: IterableIterator<[string, unknown]>,
+  modelParamKeys?: string[],
+  getModelParam?: (key: string) => number,
 ): Record<string, unknown> {
   const raw: Record<string, unknown> = {};
   for (const [k, v] of entries) {
     raw[k] = serializePropertyValue(v);
+  }
+  // Serialize model params under a reserved key
+  if (modelParamKeys && modelParamKeys.length > 0 && getModelParam) {
+    const mp: Record<string, number> = {};
+    for (const k of modelParamKeys) mp[k] = getModelParam(k);
+    raw['_modelParams'] = sortObjectKeys(mp);
   }
   return sortObjectKeys(raw);
 }
@@ -84,8 +92,11 @@ function elementToDtsElement(
   element: CircuitElement,
   circuitModels?: Record<string, Record<string, ModelEntry>>,
 ): DtsElement {
+  const bag = element.getProperties();
   const props = serializeProperties(
-    element.getProperties().entries() as IterableIterator<[string, unknown]>,
+    bag.entries() as IterableIterator<[string, unknown]>,
+    bag.getModelParamKeys(),
+    (k) => bag.getModelParam<number>(k),
   );
   const result: DtsElement = {
     type: element.typeId,
@@ -98,7 +109,6 @@ function elementToDtsElement(
     result.mirror = true;
   }
 
-  const bag = element.getProperties();
   const modelKey = bag.has('model') ? bag.get<string>('model') : undefined;
   if (modelKey !== undefined && modelKey !== '' && circuitModels !== undefined) {
     const componentModels = circuitModels[element.typeId];

@@ -32,9 +32,13 @@ function makeAnalogEl(
     direction: PinDirection.BIDIRECTIONAL,
     isNegated: false,
     isClock: false,
+    kind: "signal" as const,
     bitWidth: 1,
   }));
   const propertyBag = new PropertyBag(propsMap.entries());
+  const _mp: Record<string, number> = {};
+  for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
+  propertyBag.replaceModelParams(_mp);
   const serialized: SerializedElement = {
     typeId, instanceId, position: { x: 0, y: 0 },
     rotation: 0 as SerializedElement['rotation'], mirror: false, properties: {},
@@ -48,6 +52,7 @@ function makeAnalogEl(
     draw(_ctx: RenderContext) {},
     serialize() { return serialized; },
     getAttribute(k: string) { return propsMap.get(k); },
+    setAttribute(_name: string, _value: PropertyValue) {},
   };
 }
 

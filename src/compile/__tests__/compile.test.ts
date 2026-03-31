@@ -47,6 +47,9 @@ function makeAnalogElement(
   }));
 
   const propertyBag = new PropertyBag(propsMap.entries());
+  const _mp: Record<string, number> = {};
+  for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
+  propertyBag.replaceModelParams(_mp);
 
   const serialized: SerializedElement = {
     typeId,
@@ -180,6 +183,7 @@ function makeResistorAnalogEl(
       }
     },
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
+    setParam(_key: string, _value: number): void {},
   };
 }
 

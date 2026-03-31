@@ -21,7 +21,7 @@
  *     sim-test              — run test vectors (tutorial-style, with label validation)
  *     sim-read-output       — read output signal by label
  *     sim-read-all-signals  — snapshot all labeled signals
- *     sim-get-circuit       — export current circuit as base64 .dig XML
+ *     sim-get-circuit       — export current circuit as base64 DTS JSON
  *     sim-set-base          — update resolver base path
  *     sim-set-locked        — enable / disable locked mode
  *     sim-load-memory       — load hex/binary data into RAM/ROM
@@ -79,6 +79,13 @@ export interface PostMessageHooks {
   loadCircuitXml?(xml: string): Promise<void> | void;
 
   /**
+   * Load a Circuit object directly into the editor, preserving all in-memory
+   * state including modelParamDeltas on element PropertyBags.
+   * When provided, used by sim-load-data when the payload is DTS JSON format.
+   */
+  loadCircuitDts?(circuit: import('../core/circuit.js').Circuit): Promise<void> | void;
+
+  /**
    * Return the editor's current live circuit.
    * Required for operations that read or test the circuit the user sees.
    */
@@ -86,8 +93,15 @@ export interface PostMessageHooks {
 
   /**
    * Serialize the current circuit to .dig XML.
+   * Used internally for XML-based operations. For export, serializeDts is preferred.
    */
   serializeCircuit?(): string;
+
+  /**
+   * Serialize the current circuit to DTS JSON format.
+   * Used by sim-get-circuit to produce an export that preserves modelParamDeltas.
+   */
+  serializeDts?(): string;
 
   /** Restrict palette to listed component type names (null = show all). */
   setPalette?(components: string[] | null): void;
@@ -318,8 +332,20 @@ export class PostMessageAdapter {
       this._post({ type: 'sim-error', error: 'No data provided' });
       return;
     }
-    const xml = atob(encoded);
-    await this._loadCircuit(xml);
+    const decoded = atob(encoded);
+    if (decoded.trimStart().startsWith('{')) {
+      const { circuit } = deserializeDts(decoded, this._registry);
+      if (this._hooks.loadCircuitDts) {
+        await this._hooks.loadCircuitDts(circuit);
+      } else if (this._hooks.loadCircuitXml) {
+        const xml = serializeCircuitToDig(circuit, this._registry);
+        await this._hooks.loadCircuitXml(xml);
+      } else {
+        this._getOwnFacade().compile(circuit);
+      }
+    } else {
+      await this._loadCircuit(decoded);
+    }
     this._post({ type: 'sim-loaded' });
   }
 
@@ -501,6 +527,16 @@ export class PostMessageAdapter {
   // -------------------------------------------------------------------------
 
   private _handleGetCircuit(): void {
+    if (this._hooks.serializeDts) {
+      const dtsJson = this._hooks.serializeDts();
+      const encoded = btoa(dtsJson);
+      this._post({
+        type: 'sim-circuit-data',
+        data: encoded,
+        format: 'dts-json-base64',
+      });
+      return;
+    }
     if (!this._hooks.serializeCircuit) {
       throw new Error('Circuit export not available.');
     }

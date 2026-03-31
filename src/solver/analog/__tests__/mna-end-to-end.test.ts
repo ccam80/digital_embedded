@@ -54,9 +54,10 @@ function makePin(x: number, y: number, label: string = ""): Pin {
     position: { x, y },
     label,
     direction: PinDirection.BIDIRECTIONAL,
-    isInverted: false,
+    isNegated: false,
     isClock: false,
     bitWidth: 1,
+    kind: "signal" as const,
   };
 }
 
@@ -70,6 +71,9 @@ function makeElement(
   const def = registry?.get(typeId);
   const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
+  const _mp: Record<string, number> = {};
+  for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
+  propertyBag.replaceModelParams(_mp);
 
   const serialized: SerializedElement = {
     typeId,
@@ -92,6 +96,7 @@ function makeElement(
     draw(_ctx: RenderContext) { /* no-op */ },
     serialize() { return serialized; },
     getAttribute(k: string) { return propsMap.get(k); },
+    setAttribute(k: string, v: PropertyValue) { propsMap.set(k, v); },
   };
 }
 

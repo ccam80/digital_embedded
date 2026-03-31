@@ -15,7 +15,7 @@ import { applySpiceImportResult } from "../../../app/spice-model-apply.js";
 import { compileUnified } from "@/compile/compile.js";
 import { Circuit, Wire } from "../../../core/circuit.js";
 import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js";
-import type { ComponentDefinition, ExecuteFunction, ModelEntry } from "../../../core/registry.js";
+import type { ComponentDefinition } from "../../../core/registry.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { PropertyValue } from "../../../core/properties.js";
 import type { CircuitElement } from "../../../core/element.js";
@@ -64,6 +64,9 @@ function makeElement(
   const def = registry?.get(typeId);
   const resolvedPins = pins.map((p, i) => makePin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
+  const _mp: Record<string, number> = {};
+  for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
+  propertyBag.replaceModelParams(_mp);
   const serialized: SerializedElement = {
     typeId,
     instanceId,
@@ -294,6 +297,8 @@ describe("spice-import-dialog: compile integration", () => {
         isNonlinear: false,
         isReactive: false,
         stamp(_s: SparseSolver) {},
+        setParam(_k: string, _v: number): void {},
+        getPinCurrents(_v: Float64Array): number[] { return []; },
       };
       return stub;
     };
@@ -359,6 +364,7 @@ describe("spice-import-dialog: compile integration", () => {
       const entry: ModelEntry = {
         kind: "inline",
         factory: getFactory(behavioralEntry),
+        paramDefs: [],
         params: { ...behavioralEntry.params, ...modelOverrides },
       };
       circuit.metadata.models = { NpnStub: { imported: entry } };

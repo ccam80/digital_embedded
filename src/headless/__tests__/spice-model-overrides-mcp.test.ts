@@ -15,7 +15,6 @@
 import { describe, it, expect } from 'vitest';
 import { DefaultSimulatorFacade } from '../default-facade.js';
 import { createDefaultRegistry } from '../../components/register-all.js';
-import { BJT_NPN_DEFAULTS } from '../../components/semiconductors/bjt.js';
 import { Circuit, Wire } from '../../core/circuit.js';
 import { PropertyBag } from '../../core/properties.js';
 import type { PropertyValue } from '../../core/properties.js';
@@ -68,8 +67,11 @@ function buildBjtCircuit(): { circuit: Circuit; facade: DefaultSimulatorFacade }
   //   Q1   at {4,12}: B={4,12},  C={8,11}, E={8,13}
   const gnd = createElement('Ground',          { x: 0, y:  0 });
   const vcc = createElement('DcVoltageSource', { x: 0, y:  4 }, { label: 'Vcc', voltage: 5 });
+  vcc.getProperties().replaceModelParams({ voltage: 5 });
   const rc  = createElement('Resistor',        { x: 4, y:  4 }, { label: 'Rc',  resistance: 10000 });
+  rc.getProperties().replaceModelParams({ resistance: 10000 });
   const vb  = createElement('DcVoltageSource', { x: 0, y:  8 }, { label: 'Vb',  voltage: 0.7 });
+  vb.getProperties().replaceModelParams({ voltage: 0.7 });
   const q1  = createElement('NpnBJT',          { x: 4, y: 12 }, { label: 'Q1' });
 
   const circuit = new Circuit();
@@ -133,7 +135,7 @@ describe('spice-model-overrides MCP surface — override via applySpiceImportRes
     const compiledOverridden = facadeOverridden.getCompiledUnified();
     const overriddenDiags = compiledOverridden?.analog?.diagnostics ?? [];
     // No warnings about invalid model key — runtime model recognized.
-    expect(overriddenDiags.filter(d => d.code === 'invalid-simulation-model')).toHaveLength(0);
+    expect(overriddenDiags.filter(d => (d.code as string) === 'invalid-simulation-model')).toHaveLength(0);
 
     // After compile, the element's model params should have IS=1e-18 (merged by compiler).
     // This confirms the override reaches the factory.

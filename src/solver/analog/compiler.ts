@@ -15,11 +15,11 @@
  *  8. Return ConcreteCompiledAnalogCircuit
  */
 
-import { Circuit, Wire } from "../../core/circuit.js";
+import { Circuit } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
 import type { ComponentRegistry } from "../../core/registry.js";
 import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
-import { pinWorldPosition, PinDirection } from "../../core/pin.js";
+import { pinWorldPosition } from "../../core/pin.js";
 import type { ResolvedPin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import { makeDiagnostic } from "./diagnostics.js";
@@ -28,7 +28,7 @@ import {
   ConcreteCompiledAnalogCircuit,
   type DeviceModel,
 } from "./compiled-analog-circuit.js";
-import { defaultLogicFamily, getLogicFamilyPreset } from "../../core/logic-family.js";
+import { defaultLogicFamily } from "../../core/logic-family.js";
 import { resolvePinElectrical } from "../../core/pin-electrical.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import { makeBridgeOutputAdapter, makeBridgeInputAdapter } from "./bridge-adapter.js";
@@ -483,218 +483,50 @@ function detectInductorLoops(
   return false;
 }
 
-// ---------------------------------------------------------------------------
-// buildAnalogNodeMap — internal node-map builder
-// ---------------------------------------------------------------------------
-
 /**
- * Build the MNA node map for a circuit using union-find over wire endpoints
- * and component pin world positions.
+ * Detect nets driven by two or more voltage-source branch equations.
  *
- * Ground elements are always assigned node 0. All other wire groups receive
- * sequential IDs starting at 1.
+ * Returns pairs of component labels that compete on the same node.
+ * Each pair represents one conflict: two components that both impose
+ * a voltage constraint on the same MNA node.
  */
-function buildAnalogNodeMap(
-  circuit: Circuit,
-): {
-  nodeCount: number;
-  diagnostics: SolverDiagnostic[];
-  wireToNodeId: Map<Wire, number>;
-  labelToNodeId: Map<string, number>;
-  positionToNodeId: Map<string, number>;
-} {
-  const diagnostics: SolverDiagnostic[] = [];
-  const { elements, wires } = circuit;
+function detectCompetingVoltageConstraints(
+  elements: Array<{ nodeIds: number[]; isBranch: boolean; typeHint: string; label: string }>,
+): Array<[string, string]> {
+  const vSources = elements.filter((e) => e.isBranch && e.typeHint === "voltage");
+  if (vSources.length < 2) return [];
 
-  // Step 1: Collect all unique endpoint positions across all wires
-  const pointToId = new Map<string, number>();
-  let nextId = 0;
-
-  function getOrCreateId(p: { x: number; y: number }): number {
-    const k = `${p.x},${p.y}`;
-    let id = pointToId.get(k);
-    if (id === undefined) {
-      id = nextId++;
-      pointToId.set(k, id);
+  // Map from node ID → list of component labels that drive that node via a branch equation
+  const nodeDrivers = new Map<number, string[]>();
+  for (const vs of vSources) {
+    for (const nodeId of vs.nodeIds) {
+      if (nodeId <= 0) continue;
+      let drivers = nodeDrivers.get(nodeId);
+      if (!drivers) { drivers = []; nodeDrivers.set(nodeId, drivers); }
+      if (!drivers.includes(vs.label)) drivers.push(vs.label);
     }
-    return id;
   }
 
-  const wireStartIds: number[] = [];
-  const wireEndIds: number[] = [];
-  for (const wire of wires) {
-    wireStartIds.push(getOrCreateId(wire.start));
-    wireEndIds.push(getOrCreateId(wire.end));
-  }
-
-  // Step 2: Union-find — each wire merges its two endpoints
-  const ufSize = Math.max(nextId, 1);
-  const ufParent = Array.from({ length: ufSize }, (_, i) => i);
-  const ufRank = new Array<number>(ufSize).fill(0);
-
-  function ufFind(i: number): number {
-    while (ufParent[i] !== i) {
-      ufParent[i] = ufParent[ufParent[i]!]!;
-      i = ufParent[i]!;
-    }
-    return i;
-  }
-
-  function ufUnion(a: number, b: number): void {
-    const ra = ufFind(a);
-    const rb = ufFind(b);
-    if (ra === rb) return;
-    if (ufRank[ra]! < ufRank[rb]!) { ufParent[ra] = rb; }
-    else if (ufRank[ra]! > ufRank[rb]!) { ufParent[rb] = ra; }
-    else { ufParent[rb] = ra; ufRank[ra]!++; }
-  }
-
-  for (let i = 0; i < wires.length; i++) {
-    ufUnion(wireStartIds[i]!, wireEndIds[i]!);
-  }
-
-  // Add component pin world positions — grow arrays as needed
-  for (const el of elements) {
-    const pins = el.getPins();
-    for (const pin of pins) {
-      const wp = pinWorldPosition(el, pin);
-      const pinId = getOrCreateId(wp);
-      while (ufParent.length <= pinId) {
-        ufParent.push(ufParent.length);
-        ufRank.push(0);
+  const conflicts: Array<[string, string]> = [];
+  const reportedPairs = new Set<string>();
+  for (const drivers of nodeDrivers.values()) {
+    if (drivers.length < 2) continue;
+    for (let i = 0; i < drivers.length - 1; i++) {
+      for (let j = i + 1; j < drivers.length; j++) {
+        const key = `${drivers[i]!}|${drivers[j]!}`;
+        if (!reportedPairs.has(key)) {
+          reportedPairs.add(key);
+          conflicts.push([drivers[i]!, drivers[j]!]);
+        }
       }
     }
   }
-
-  // Step 3: Identify ground group
-  const groundElements = elements.filter(el => el.typeId === "Ground");
-  const groundRoots = new Set<number>();
-  for (const gnd of groundElements) {
-    for (const pin of gnd.getPins()) {
-      const wp = pinWorldPosition(gnd, pin);
-      const id = pointToId.get(`${wp.x},${wp.y}`);
-      if (id !== undefined) {
-        groundRoots.add(ufFind(id));
-      }
-    }
-  }
-
-  // Step 3b: Merge Tunnel components with the same label
-  const tunnelsByLabel = new Map<string, number[]>();
-  for (const el of elements) {
-    if (el.typeId !== "Tunnel") continue;
-    const props = el.getProperties();
-    const netName = props.has("NetName") ? String(props.get("NetName")) : "";
-    if (netName.length === 0) continue;
-    const pins = el.getPins();
-    if (pins.length === 0) continue;
-    const wp = pinWorldPosition(el, pins[0]!);
-    const id = pointToId.get(`${wp.x},${wp.y}`);
-    if (id === undefined) continue;
-    let slots = tunnelsByLabel.get(netName);
-    if (slots === undefined) { slots = []; tunnelsByLabel.set(netName, slots); }
-    slots.push(id);
-  }
-  for (const tunnelIds of tunnelsByLabel.values()) {
-    for (let m = 1; m < tunnelIds.length; m++) {
-      ufUnion(tunnelIds[0]!, tunnelIds[m]!);
-    }
-  }
-
-  if (groundRoots.size === 0 && ufParent.length > 0) {
-    const groupCount = new Map<number, number>();
-    for (let i = 0; i < ufParent.length; i++) {
-      const root = ufFind(i);
-      groupCount.set(root, (groupCount.get(root) ?? 0) + 1);
-    }
-    let bestRoot = 0;
-    let bestCount = 0;
-    for (const [root, count] of groupCount) {
-      if (count > bestCount) { bestCount = count; bestRoot = root; }
-    }
-    groundRoots.add(bestRoot);
-    diagnostics.push(
-      makeDiagnostic("no-ground", "warning", "No Ground element found in circuit", {
-        explanation:
-          "MNA simulation requires a ground reference node. " +
-          "The most-connected wire group has been assigned as ground (node 0). " +
-          "Add a Ground element to suppress this warning.",
-        suggestions: [{ text: "Add a Ground element connected to the reference node.", automatable: false }],
-      }),
-    );
-  }
-
-  // Step 4: Assign MNA node IDs
-  const rootToNodeId = new Map<number, number>();
-  let nextNodeId = 1;
-  for (const gr of groundRoots) {
-    rootToNodeId.set(gr, 0);
-  }
-  for (let i = 0; i < ufParent.length; i++) {
-    const root = ufFind(i);
-    if (!rootToNodeId.has(root)) {
-      rootToNodeId.set(root, nextNodeId++);
-    }
-  }
-  const nodeCount = nextNodeId - 1;
-
-  // Step 5: Build wireToNodeId
-  const wireToNodeId = new Map<Wire, number>();
-  for (let i = 0; i < wires.length; i++) {
-    const root = ufFind(wireStartIds[i]!);
-    wireToNodeId.set(wires[i]!, rootToNodeId.get(root) ?? 0);
-  }
-
-  // Step 6: Build labelToNodeId
-  const labelTypes = new Set(["In", "Out", "Probe", "in", "out", "probe", "Port"]);
-  const labelToNodeId = new Map<string, number>();
-  for (const el of elements) {
-    let label: string | undefined;
-    const props = el.getProperties();
-    if (props.has("label")) { label = String(props.get("label")); }
-    if (!label) continue;
-    if (!labelTypes.has(el.typeId)) continue;
-    for (const pin of el.getPins()) {
-      const wp = pinWorldPosition(el, pin);
-      const id = pointToId.get(`${wp.x},${wp.y}`);
-      if (id !== undefined) {
-        const root = ufFind(id);
-        labelToNodeId.set(label, rootToNodeId.get(root) ?? 0);
-        break;
-      }
-    }
-  }
-
-  // Step 7: Build positionToNodeId
-  const positionToNodeId = new Map<string, number>();
-  for (const [key, id] of pointToId) {
-    const root = ufFind(id);
-    positionToNodeId.set(key, rootToNodeId.get(root) ?? 0);
-  }
-
-  return { nodeCount, diagnostics, wireToNodeId, labelToNodeId, positionToNodeId };
+  return conflicts;
 }
 
 // ---------------------------------------------------------------------------
 // Pipeline stage helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Resolve the circuit's logic family from its metadata.
- *
- * Checks `metadata.logicFamily` first (direct object), then
- * `metadata.logicFamilyKey` (string preset key), then falls back to the
- * default logic family.
- */
-function resolveLogicFamily(
-  circuit: Circuit,
-): import("../../core/logic-family.js").LogicFamilyConfig {
-  return circuit.metadata.logicFamily
-    ? circuit.metadata.logicFamily
-    : (circuit.metadata as Record<string, unknown>)["logicFamilyKey"] !== undefined
-      ? (getLogicFamilyPreset((circuit.metadata as Record<string, unknown>)["logicFamilyKey"] as string) ?? defaultLogicFamily())
-      : defaultLogicFamily();
-}
 
 /**
  * Extract runtime subcircuit netlists from circuit metadata.
@@ -738,7 +570,7 @@ type PassAPartitionResult = {
 function runPassA_partition(
   partition: SolverPartition,
   externalNodeCount: number,
-  diagnostics: SolverDiagnostic[],
+  _diagnostics: SolverDiagnostic[],
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
   runtimeModelMap?: Record<string, Record<string, ModelEntry>>,
 ): PassAPartitionResult {
@@ -790,7 +622,7 @@ function runPassA_partition(
  *  - Inductor loops (degenerate branch equations)
  */
 function validateTopologyAndEmitDiagnostics(
-  topologyInfo: Array<{ nodeIds: number[]; isBranch: boolean; typeHint: string }>,
+  topologyInfo: Array<{ nodeIds: number[]; isBranch: boolean; typeHint: string; label: string }>,
   totalNodeCount: number,
   diagnostics: SolverDiagnostic[],
 ): void {
@@ -881,6 +713,28 @@ function validateTopologyAndEmitDiagnostics(
           suggestions: [
             {
               text: "Add a small series resistance (e.g. 1 mΩ) to one of the inductor branches.",
+              automatable: false,
+            },
+          ],
+        },
+      ),
+    );
+  }
+
+  for (const [comp1, comp2] of detectCompetingVoltageConstraints(topologyInfo)) {
+    diagnostics.push(
+      makeDiagnostic(
+        "competing-voltage-constraints",
+        "error",
+        `Two competing voltage sources are driving the net that connects to ${comp1}, ${comp2} — the circuit design needs to be fixed`,
+        {
+          explanation:
+            `Both "${comp1}" and "${comp2}" impose a voltage constraint (branch equation) ` +
+            `on the same MNA node. Two ideal voltage sources cannot drive the same net — ` +
+            `this makes the MNA matrix singular and prevents the solver from converging.`,
+          suggestions: [
+            {
+              text: `Remove one of the voltage sources (${comp1} or ${comp2}) driving the shared net, or insert a series resistor between them.`,
               automatable: false,
             },
           ],
@@ -1083,7 +937,7 @@ export function compileAnalogPartition(
 
   // Stage 2b: Resolve subcircuit-backed models into MnaModel factories.
   const runtimeModels: Record<string, MnaSubcircuitNetlist> = outerCircuit !== undefined
-    ? extractRuntimeModels(outerCircuit.metadata as Record<string, unknown>)
+    ? extractRuntimeModels(outerCircuit.metadata as unknown as Record<string, unknown>)
     : {};
   resolveSubcircuitModels(partition, runtimeModels, registry, diagnostics);
 
@@ -1119,6 +973,7 @@ export function compileAnalogPartition(
     nodeIds: number[];
     isBranch: boolean;
     typeHint: string;
+    label: string;
   };
   const topologyInfo: ElementTopologyInfo[] = [];
 
@@ -1238,18 +1093,13 @@ export function compileAnalogPartition(
     }
 
     // Populate model params.
-    // Merge order (lower wins): behavioral defaults → runtime entry params → element's own params.
+    // Merge order (lowest wins): behavioral defaults → registry entry params → element _mparams.
     const modelEntry = route.entry;
     if (modelEntry) {
       const behavioralDefaults = def.modelRegistry?.["behavioral"]?.params ?? {};
-      const elementOverrides = props.getModelParamKeys().length > 0
-        ? Object.fromEntries(props.getModelParamKeys().map(k => [k, props.getModelParam<number>(k)]))
-        : undefined;
       const merged: Record<string, number> = { ...behavioralDefaults, ...modelEntry.params };
-      if (elementOverrides) {
-        for (const [k, v] of Object.entries(elementOverrides)) {
-          merged[k] = v as number;
-        }
+      for (const k of props.getModelParamKeys()) {
+        merged[k] = props.getModelParam<number>(k);
       }
       props.replaceModelParams(merged);
     }
@@ -1295,6 +1145,9 @@ export function compileAnalogPartition(
           ? "inductor"
           : "voltage"
         : "other",
+      label: el.getProperties().has("label")
+        ? String(el.getProperties().get("label") ?? el.instanceId)
+        : el.instanceId,
     });
   }
 

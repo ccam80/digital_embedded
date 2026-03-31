@@ -42,11 +42,8 @@ import type {
   CompareResult,
   TextCompareResult,
   ExtentResult,
-  Bounds,
-  TextOverlapResult,
 } from "@/test-utils/shape-rasterizer";
 import { getJavaPinPositions } from "@/test-utils/java-pin-reference";
-import type { JavaPinRef } from "@/test-utils/java-pin-reference";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -635,7 +632,7 @@ describe("shape render audit — pixel + text comparison vs Java Digital", () =>
         // Show position diffs > 0.5 grid units
         for (const m of r.textResult.matched) {
           if (m.posDiff > 0.5) {
-            details += `"${m.text}" Δ${m.posDiff.toFixed(1)} `;
+            details += `"${m.java.text}" Δ${m.posDiff.toFixed(1)} `;
           }
         }
         // Show pin mismatches

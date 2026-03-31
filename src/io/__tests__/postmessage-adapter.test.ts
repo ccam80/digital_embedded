@@ -264,7 +264,26 @@ describe("PostMessageAdapter — sim-set-palette", () => {
 // ---------------------------------------------------------------------------
 
 describe("PostMessageAdapter — sim-get-circuit", () => {
-  it("getCircuit — sim-circuit-data response with base64 XML", async () => {
+  it("getCircuit — serializeDts hook preferred: produces dts-json-base64 format", async () => {
+    const dtsJson = JSON.stringify({ format: "dts", version: 1, circuit: { name: "test", elements: [], wires: [] } });
+    const { sent, dispatch } = makeAdapter({
+      serializeDts: () => dtsJson,
+      serializeCircuit: () => "<circuit>xml</circuit>",
+    });
+
+    await dispatch({ type: "sim-get-circuit" });
+
+    const msg = sent.find((m) => (m as { type: string }).type === "sim-circuit-data") as {
+      type: string;
+      data: string;
+      format: string;
+    };
+    expect(msg).toBeTruthy();
+    expect(msg.format).toBe("dts-json-base64");
+    expect(atob(msg.data)).toBe(dtsJson);
+  });
+
+  it("getCircuit — falls back to dig-xml-base64 when serializeDts not provided", async () => {
     const { sent, dispatch } = makeAdapter({
       serializeCircuit: () => "<circuit>serialized</circuit>",
     });
@@ -279,6 +298,73 @@ describe("PostMessageAdapter — sim-get-circuit", () => {
     expect(msg).toBeTruthy();
     expect(msg.format).toBe("dig-xml-base64");
     expect(atob(msg.data)).toBe("<circuit>serialized</circuit>");
+  });
+
+  it("getCircuit — no hooks at all sends sim-error", async () => {
+    const { sent, dispatch } = makeAdapter({ serializeCircuit: undefined, serializeDts: undefined });
+
+    await dispatch({ type: "sim-get-circuit" });
+
+    expect(sent.some((m) => (m as { type: string }).type === "sim-error")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sim-load-data with DTS JSON format
+// ---------------------------------------------------------------------------
+
+describe("PostMessageAdapter — sim-load-data DTS detection", () => {
+  it("load-data with DTS JSON base64 calls loadCircuitXml (via dig fallback)", async () => {
+    const registry = createDefaultRegistry();
+    const circuit = new Circuit({ name: "dts-load-test" });
+    const { serializeCircuit: serializeDtsCircuit } = await import("../dts-serializer.js");
+    const dtsJson = serializeDtsCircuit(circuit);
+    const b64 = btoa(dtsJson);
+
+    const loadCircuitXml = vi.fn();
+    const sent: unknown[] = [];
+    const target = { postMessage: vi.fn((msg) => sent.push(msg)) };
+    const listeners: Array<(e: MessageEvent) => void> = [];
+    const eventSource = {
+      addEventListener: vi.fn((_type: string, handler: (e: MessageEvent) => void) => {
+        listeners.push(handler);
+      }),
+    };
+
+    const { ChainResolver, HttpResolver, CacheResolver } = await import("../file-resolver.js");
+    const resolver = new ChainResolver([new CacheResolver(), new HttpResolver("./")]);
+
+    const adapter = new PostMessageAdapter({
+      registry,
+      resolver,
+      target,
+      eventSource,
+      hooks: { loadCircuitXml },
+    });
+
+    const dispatch = async (data: unknown) => {
+      const event = { data } as MessageEvent;
+      for (const l of listeners) await l(event);
+      await new Promise((r) => setTimeout(r, 0));
+    };
+
+    void adapter;
+    await dispatch({ type: "sim-load-data", data: b64 });
+
+    expect(sent).toContainEqual({ type: "sim-loaded" });
+    expect(loadCircuitXml).toHaveBeenCalledTimes(1);
+  });
+
+  it("load-data with XML base64 still routes to loadCircuitXml as XML", async () => {
+    const xml = "<circuit>test</circuit>";
+    const b64 = btoa(xml);
+    const loadCircuitXml = vi.fn();
+    const { sent, dispatch } = makeAdapter({ loadCircuitXml });
+
+    await dispatch({ type: "sim-load-data", data: b64 });
+
+    expect(loadCircuitXml).toHaveBeenCalledWith(xml);
+    expect(sent).toContainEqual({ type: "sim-loaded" });
   });
 });
 

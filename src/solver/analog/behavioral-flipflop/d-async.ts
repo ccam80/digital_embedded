@@ -32,7 +32,6 @@ export class BehavioralDAsyncFlipflopElement implements AnalogElementCore {
   private _latchedQ = false;
   private _prevClockVoltage = 0;
   private readonly _vIH: number;
-  private readonly _vIL: number;
 
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
@@ -52,7 +51,7 @@ export class BehavioralDAsyncFlipflopElement implements AnalogElementCore {
     qPin: DigitalOutputPinModel,
     qBarPin: DigitalOutputPinModel,
     vIH: number,
-    vIL: number,
+    _vIL: number,
   ) {
     this._setPin = setPin;
     this._dPin = dPin;
@@ -61,8 +60,6 @@ export class BehavioralDAsyncFlipflopElement implements AnalogElementCore {
     this._qPin = qPin;
     this._qBarPin = qBarPin;
     this._vIH = vIH;
-    this._vIL = vIL;
-
   }
 
   stamp(solver: SparseSolver): void {

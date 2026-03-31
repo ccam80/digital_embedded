@@ -51,10 +51,17 @@ function restorePropertyValue(raw: unknown): PropertyValue {
 
 function restoreProperties(record: Record<string, unknown>): PropertyBag {
   const entries: Array<[string, PropertyValue]> = [];
+  let modelParams: Record<string, number> | undefined;
   for (const [key, raw] of Object.entries(record)) {
+    if (key === '_modelParams' && typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+      modelParams = raw as Record<string, number>;
+      continue; // don't put in _map
+    }
     entries.push([key, restorePropertyValue(raw)]);
   }
-  return new PropertyBag(entries);
+  const bag = new PropertyBag(entries);
+  if (modelParams) bag.replaceModelParams(modelParams);
+  return bag;
 }
 
 // ---------------------------------------------------------------------------

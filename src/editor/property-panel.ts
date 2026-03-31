@@ -421,7 +421,7 @@ export class PropertyPanel {
    * modified indicator, and "Reset to default" button.
    */
   private _buildModelParamRow(
-    element: CircuitElement,
+    _element: CircuitElement,
     _def: ComponentDefinition,
     pd: ParamDef,
     entry: ModelEntry,

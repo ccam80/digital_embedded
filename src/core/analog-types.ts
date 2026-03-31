@@ -198,7 +198,8 @@ export type SolverDiagnosticCode =
   | "ac-linearization-failed"
   | "unsupported-ctz-component"
   | "monte-carlo-trial-failed"
-  | "unconnected-analog-pin";
+  | "unconnected-analog-pin"
+  | "competing-voltage-constraints";
 
 // ---------------------------------------------------------------------------
 // DiagnosticSuggestion — actionable fix hint

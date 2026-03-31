@@ -178,6 +178,13 @@ export function propertyBagToJson(bag: PropertyBag): SerializedPropertyBag {
   for (const [k, v] of bag.entries()) {
     out[k] = typeof v === 'bigint' ? `0n${v.toString()}` : v;
   }
+  // Serialize model params under a reserved key
+  const mparamKeys = bag.getModelParamKeys();
+  if (mparamKeys.length > 0) {
+    const mp: Record<string, number> = {};
+    for (const k of mparamKeys) mp[k] = bag.getModelParam<number>(k);
+    out['_modelParams'] = mp;
+  }
   return out;
 }
 

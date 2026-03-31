@@ -49,16 +49,10 @@ function makeAnalogElement(
   propsMap: Map<string, PropertyValue> = new Map(),
 ): CircuitElement {
   const resolvedPins = pinCoords.map((p) => makeAnalogPin(p.x, p.y));
-  const propertyBag: PropertyBagType = {
-    has(k: string) { return propsMap.has(k); },
-    get<T>(k: string): T { return propsMap.get(k) as T; },
-    set(k: string, v: PropertyValue) { propsMap.set(k, v); },
-    delete(k: string) { propsMap.delete(k); },
-    keys() { return Array.from(propsMap.keys()); },
-    entries() { return Array.from(propsMap.entries()); },
-    clone() { return this; },
-    size: propsMap.size,
-  } as unknown as PropertyBagType;
+  const propertyBag = new PropertyBag(propsMap.entries());
+  const _mp: Record<string, number> = {};
+  for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
+  propertyBag.replaceModelParams(_mp);
 
   const serialized: SerializedElement = {
     typeId,
@@ -110,6 +104,7 @@ function makeResistorElement(nodeA: number, nodeB: number): AnalogElement {
     isReactive: false,
     stamp(_s: SparseSolver) {},
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -122,6 +117,7 @@ function makeVsElement(nodePos: number, nodeNeg: number, branchIdx: number): Ana
     isReactive: false,
     stamp(_s: SparseSolver) {},
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -134,6 +130,7 @@ function makeCapacitorElement(nodeA: number, nodeB: number, branchIdx: number): 
     isReactive: true,
     stamp(_s: SparseSolver) {},
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -934,6 +931,9 @@ describe('compileUnified — model resolution', () => {
 
     const propsMap = new Map<string, PropertyValue>([['model', 'behavioral']]);
     const props = new PropertyBag(propsMap);
+    const _mp2: Record<string, number> = {};
+    for (const [k, v] of propsMap) if (typeof v === 'number') _mp2[k] = v;
+    props.replaceModelParams(_mp2);
     const circuit = new Circuit();
     circuit.addElement(createTestElementFromDecls('DualAnd', 'and-1', twoIn, props));
     circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 0, y: 0 }]));

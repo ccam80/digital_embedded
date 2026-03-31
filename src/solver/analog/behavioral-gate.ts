@@ -15,7 +15,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
+import type { AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {

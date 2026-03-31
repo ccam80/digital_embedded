@@ -38,7 +38,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ export class VariableRailElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return { x: this.position.x, y: this.position.y - 1, width: 4, height: 2 };
+    return { x: this.position.x, y: this.position.y, width: 3, height: 0 };
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
@@ -87,7 +87,7 @@ export class VariableRailElement extends AbstractCircuitElement {
     // Voltage label at right side
     ctx.setColor("TEXT");
     ctx.setLineWidth(1);
-    const voltage = this.props.has("voltage") ? this.props.get<number>("voltage") : 5;
+    const voltage = this._properties.getOrDefault<number>("voltage", 5);
     const label = this._shouldShowValue() ? formatSI(voltage ?? 5, "V") : "";
     ctx.drawText(label, 4, 0, { horizontal: "left", vertical: "middle" } as TextAnchor);
 
@@ -173,7 +173,7 @@ const VARIABLE_RAIL_ATTRIBUTE_MAP: AttributeMapping[] = [
 // VariableRailAnalogElement — AnalogElement with mutable voltage
 // ---------------------------------------------------------------------------
 
-export interface VariableRailAnalogElement extends AnalogElement {
+export interface VariableRailAnalogElement extends AnalogElementCore {
   /** Update the rail voltage. Takes effect from the next stamp() call. */
   setVoltage(v: number): void;
   /** Current rail voltage. */

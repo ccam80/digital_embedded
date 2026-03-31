@@ -52,7 +52,6 @@ import {
   ALL_ANALOG_TYPES,
   falstadWorldPosition,
 } from "@/test-utils/falstad-fixture-reference";
-import type { FalstadPinRef } from "@/test-utils/falstad-fixture-reference";
 
 // ---------------------------------------------------------------------------
 // Thresholds

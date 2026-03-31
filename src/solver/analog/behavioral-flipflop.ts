@@ -14,8 +14,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
-import type { PropertyBag } from "../../core/properties.js";
+import type { AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
@@ -111,9 +110,8 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
    * Override threshold values — called by the factory after construction.
    * Necessary because DigitalInputPinModel keeps spec fields private.
    */
-  _setThresholds(vIH: number, vIL: number): void {
-    (this as { _vIH: number })._vIH = vIH;
-    (this as { _vIL: number })._vIL = vIL;
+  _setThresholds(vIH: number, _vIL: number): void {
+    (this as unknown as { _vIH: number })._vIH = vIH;
   }
 
   /**

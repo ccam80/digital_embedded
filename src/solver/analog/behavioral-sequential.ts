@@ -8,8 +8,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
-import type { PropertyBag } from "../../core/properties.js";
+import type { AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
@@ -64,7 +63,6 @@ export class BehavioralCounterElement implements AnalogElementCore {
   private _count = 0;
   private _prevClockVoltage = 0;
   private readonly _vIH: number;
-  private readonly _vIL: number;
 
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
@@ -83,7 +81,7 @@ export class BehavioralCounterElement implements AnalogElementCore {
     ovfPin: DigitalOutputPinModel,
     bitWidth: number,
     vIH: number,
-    vIL: number,
+    _vIL: number,
   ) {
     this._enPin = enPin;
     this._clockPin = clockPin;
@@ -93,8 +91,6 @@ export class BehavioralCounterElement implements AnalogElementCore {
     this._bitWidth = bitWidth;
     this._maxValue = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
     this._vIH = vIH;
-    this._vIL = vIL;
-
   }
 
   stamp(solver: SparseSolver): void {
@@ -252,7 +248,6 @@ export class BehavioralRegisterElement implements AnalogElementCore {
   private _storedValue = 0;
   private _prevClockVoltage = 0;
   private readonly _vIH: number;
-  private readonly _vIL: number;
 
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
@@ -270,7 +265,7 @@ export class BehavioralRegisterElement implements AnalogElementCore {
     outBitPins: DigitalOutputPinModel[],
     bitWidth: number,
     vIH: number,
-    vIL: number,
+    _vIL: number,
   ) {
     this._dataPins = dataPins;
     this._clockPin = clockPin;
@@ -278,8 +273,6 @@ export class BehavioralRegisterElement implements AnalogElementCore {
     this._outBitPins = outBitPins;
     this._bitWidth = bitWidth;
     this._vIH = vIH;
-    this._vIL = vIL;
-
   }
 
   stamp(solver: SparseSolver): void {
@@ -498,7 +491,6 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
   private _count = 0;
   private _prevClockVoltage = 0;
   private readonly _vIH: number;
-  private readonly _vIL: number;
 
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
@@ -521,7 +513,7 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     bitWidth: number,
     maxValue: number,
     vIH: number,
-    vIL: number,
+    _vIL: number,
   ) {
     this._enPin = enPin;
     this._clockPin = clockPin;
@@ -534,8 +526,6 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     this._bitWidth = bitWidth;
     this._maxValue = maxValue;
     this._vIH = vIH;
-    this._vIL = vIL;
-
   }
 
   stamp(solver: SparseSolver): void {

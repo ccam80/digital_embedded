@@ -43,24 +43,32 @@ async function stepToTimeAndRead(
  * Topology:
  *   Vs(pos) → R1(A) → R1(B) → C1(pos) → C1(neg) → G2(gnd)
  *   Vs(neg) → G1(gnd)
- *   C1(pos) → P1(in)   [probe for output measurement]
+ *   R1(B)/C1(pos) junction → P1(in)   [probe taps the output node directly above]
+ *
+ * P1 is placed at (14, 4) — directly above the R1.B/C1.pos junction at (14, 8).
+ * A vertical wire from R1.B (14, 8) to P1.in (14, 4) avoids all component bodies
+ * and the C1.neg pin at (21, 8), preventing accidental shorts.
  */
 async function buildRcCircuit(builder: UICircuitBuilder): Promise<void> {
   await builder.placeLabeled('AcVoltageSource', 3, 8, 'Vs');
   await builder.placeLabeled('Resistor', 10, 8, 'R1');
   await builder.placeLabeled('Capacitor', 17, 8, 'C1');
-  await builder.placeComponent('Ground', 6, 14);
-  await builder.placeComponent('Ground', 19, 14);
-  await builder.placeLabeled('Probe', 22, 8, 'P1');
+  await builder.placeComponent('Ground', 7, 14);
+  await builder.placeComponent('Ground', 21, 14);
+  // Probe placed above the R1.B/C1.pos junction so the vertical wire connection
+  // cannot accidentally route through C1.neg at (21, 8).
+  await builder.placeLabeled('Probe', 14, 4, 'P1');
 
   // Default AcVoltageSource amplitude is 5V; set frequency to 100 Hz
   await builder.setComponentProperty('Vs', 'frequency', 100);
 
   await builder.drawWire('Vs', 'pos', 'R1', 'A');
   await builder.drawWire('R1', 'B', 'C1', 'pos');
-  await builder.drawWireFromPin('C1', 'neg', 19, 14);
-  await builder.drawWireFromPin('Vs', 'neg', 6, 14);
-  await builder.drawWire('C1', 'pos', 'P1', 'in');
+  await builder.drawWireFromPin('C1', 'neg', 21, 14);
+  await builder.drawWireFromPin('Vs', 'neg', 7, 14);
+  // Connect probe directly to the R1.B junction via a vertical wire — no routing
+  // around the capacitor body needed, no risk of hitting C1.neg.
+  await builder.drawWireFromPin('R1', 'B', 14, 4);
 }
 
 // ---------------------------------------------------------------------------
@@ -172,13 +180,16 @@ test.describe('GUI: analog RC circuit', () => {
     await builder.stepViaUI();
     await builder.verifyNoErrors();
 
-    // Add scope trace via a real analog component (Capacitor) so measureAnalogPeaks has data
-    await builder.addTraceViaContextMenu('C1', 'pos');
+    // Step past transient (5τ = 5ms) before adding traces so the scope buffer
+    // only captures steady-state samples (no early transient overshoot).
+    await stepToTimeAndRead(builder, '5m');
 
-    // Step past transient (5τ = 5ms) then sample one full period (10ms at 100Hz)
-    await stepToTimeAndRead(builder, '10m');
+    // Add scope traces AFTER transient settles so trace buffers only contain
+    // steady-state data — prevents transient overshoot from inflating peak stats.
+    await builder.addTraceViaContextMenu('Vs', 'pos');  // source node
+    await builder.addTraceViaContextMenu('C1', 'pos');  // output node
 
-    // Sample peak/trough via scope trace stats (fast path)
+    // Sample one full period (10ms at 100Hz) of steady-state
     const result = await builder.measureAnalogPeaks('10m');
     expect(result).not.toBeNull();
     expect(result!.nodeCount).toBeGreaterThanOrEqual(1);

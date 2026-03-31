@@ -29,8 +29,6 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
   private readonly _qBarPin: DigitalOutputPinModel;
 
   private _latchedQ = false;
-  private readonly _vIH: number;
-  private readonly _vIL: number;
 
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
@@ -49,16 +47,13 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
     rPin: DigitalInputPinModel,
     qPin: DigitalOutputPinModel,
     qBarPin: DigitalOutputPinModel,
-    vIH: number,
-    vIL: number,
+    _vIH: number,
+    _vIL: number,
   ) {
     this._sPin = sPin;
     this._rPin = rPin;
     this._qPin = qPin;
     this._qBarPin = qBarPin;
-    this._vIH = vIH;
-    this._vIL = vIL;
-
   }
 
   getDiagnostics(): SolverDiagnostic[] {

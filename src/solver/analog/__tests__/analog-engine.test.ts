@@ -62,7 +62,6 @@ function makeResistorDividerCircuit(): ConcreteCompiledAnalogCircuit {
     matrixSize: 3,
     elements: [vs, r1, r2],
     labelToNodeId: new Map([["V_mid", 2]]),
-    wireToNodeId: new Map(),
   };
 }
 
@@ -84,7 +83,6 @@ function makeDiodeCircuit(): ConcreteCompiledAnalogCircuit {
     matrixSize: 3,
     elements: [vs, r, diode],
     labelToNodeId: new Map(),
-    wireToNodeId: new Map(),
   };
 }
 
@@ -113,7 +111,6 @@ function makeRCCircuit(): ConcreteCompiledAnalogCircuit {
     matrixSize: 3,
     elements: [vs, r, cap],
     labelToNodeId: new Map(),
-    wireToNodeId: new Map(),
   };
 }
 
@@ -446,7 +443,7 @@ describe("MNAEngine", () => {
     const circuit: ConcreteCompiledAnalogCircuit = {
       netCount: 2, componentCount: 3, nodeCount: 2, branchCount: 1, matrixSize: 3,
       elements: [vs, fuse, rLoad],
-      labelToNodeId: new Map(), wireToNodeId: new Map(),
+      labelToNodeId: new Map(),
     };
 
     engine.init(circuit);
@@ -480,9 +477,10 @@ function makeAnalogPin(x: number, y: number, label: string = ""): Pin {
     position: { x, y },
     label,
     direction: PinDirection.BIDIRECTIONAL,
-    isInverted: false,
+    isNegated: false,
     isClock: false,
     bitWidth: 1,
+    kind: "signal" as const,
   };
 }
 
@@ -496,6 +494,9 @@ function makeAnalogElement(
   const def = registry?.get(typeId);
   const resolvedPins = pins.map((p, i) => makeAnalogPin(p.x, p.y, p.label || def?.pinLayout[i]?.label || ""));
   const propertyBag = new PropertyBag(propsMap.entries());
+  const _mp: Record<string, number> = {};
+  for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
+  propertyBag.replaceModelParams(_mp);
 
   const serialized: SerializedElement = {
     typeId,
@@ -518,6 +519,7 @@ function makeAnalogElement(
     draw(_ctx: RenderContext) { /* no-op */ },
     serialize() { return serialized; },
     getAttribute(k: string) { return propsMap.get(k); },
+    setAttribute(k: string, v: PropertyValue) { propsMap.set(k, v); },
   };
 }
 

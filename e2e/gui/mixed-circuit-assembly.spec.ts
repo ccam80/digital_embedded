@@ -162,15 +162,15 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.setComponentProperty('DAC1', 'Resolution (bits)', 4);
 
       // VREF source and DAC ground
-      await builder.placeLabeled('DcVoltageSource', 8, 3, 'Vref');
-      await builder.placeComponent('Ground', 8, 18);
+      await builder.placeLabeled('DcVoltageSource', 12, 3, 'Vref');
+      await builder.placeComponent('Ground', 16, 18);
       await builder.placeComponent('Ground', 16, 18);
 
       // RC filter on DAC output
-      await builder.placeLabeled('Resistor', 20, 8, 'R1');
-      await builder.placeLabeled('Capacitor', 26, 8, 'C1');
-      await builder.placeComponent('Ground', 28, 14);
-      await builder.placeLabeled('Probe', 30, 8, 'P1');
+      await builder.placeLabeled('Resistor', 24, 8, 'R1');
+      await builder.placeLabeled('Capacitor', 30, 8, 'C1');
+      await builder.placeComponent('Ground', 34, 14);
+      await builder.placeLabeled('Probe', 36, 8, 'P1');
 
       // Wire digital inputs to DAC
       await builder.drawWire('D0', 'out', 'DAC1', 'D0');
@@ -180,13 +180,13 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
 
       // Wire VREF and GND
       await builder.drawWire('Vref', 'pos', 'DAC1', 'VREF');
-      await builder.drawWireFromPin('Vref', 'neg', 8, 18);
+      await builder.drawWireFromPin('Vref', 'neg', 16, 18);
       await builder.drawWireFromPin('DAC1', 'GND', 16, 18);
 
       // Wire DAC OUT through RC filter
       await builder.drawWire('DAC1', 'OUT', 'R1', 'A');
       await builder.drawWire('R1', 'B', 'C1', 'pos');
-      await builder.drawWireFromPin('C1', 'neg', 28, 14);
+      await builder.drawWireFromPin('C1', 'neg', 34, 14);
       await builder.drawWire('R1', 'B', 'P1', 'in');
 
       // Compile via UI step
@@ -222,9 +222,9 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.placeLabeled('And', 10, 8, 'G1');
 
       // Analog load: resistor to ground with probe
-      await builder.placeLabeled('Resistor', 18, 8, 'R1');
-      await builder.placeComponent('Ground', 22, 14);
-      await builder.placeLabeled('Probe', 24, 8, 'P1');
+      await builder.placeLabeled('Resistor', 22, 8, 'R1');
+      await builder.placeComponent('Ground', 26, 14);
+      await builder.placeLabeled('Probe', 28, 8, 'P1');
 
       // Wire digital logic
       await builder.drawWire('A', 'out', 'G1', 'In_1');
@@ -232,7 +232,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
 
       // Wire gate output to analog load
       await builder.drawWire('G1', 'out', 'R1', 'A');
-      await builder.drawWireFromPin('R1', 'B', 22, 14);
+      await builder.drawWireFromPin('R1', 'B', 26, 14);
       await builder.drawWire('G1', 'out', 'P1', 'in');
 
       await builder.stepViaUI();
@@ -269,10 +269,10 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.placeLabeled('Const', 3, 3, 'EN');
 
       // Analog RC filter
-      await builder.placeLabeled('Resistor', 22, 8, 'R1');
-      await builder.placeLabeled('Capacitor', 28, 8, 'C1');
-      await builder.placeComponent('Ground', 30, 14);
-      await builder.placeLabeled('Probe', 32, 8, 'P1');
+      await builder.placeLabeled('Resistor', 26, 8, 'R1');
+      await builder.placeLabeled('Capacitor', 32, 8, 'C1');
+      await builder.placeComponent('Ground', 36, 14);
+      await builder.placeLabeled('Probe', 38, 8, 'P1');
 
       // Wire clock → counter
       await builder.drawWire('EN', 'out', 'CNT', 'en');
@@ -285,7 +285,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       // Comparator '<' output (PWM high when count < threshold) → RC filter
       await builder.drawWire('CMP', '<', 'R1', 'A');
       await builder.drawWire('R1', 'B', 'C1', 'pos');
-      await builder.drawWireFromPin('C1', 'neg', 30, 14);
+      await builder.drawWireFromPin('C1', 'neg', 36, 14);
       await builder.drawWire('R1', 'B', 'P1', 'in');
 
       await builder.stepViaUI();
@@ -317,14 +317,14 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('comparator to logic: analog threshold drives digital gate', async () => {
       // Analog input stage: voltage divider via potentiometer
-      await builder.placeLabeled('DcVoltageSource', 3, 6, 'Vs');
+      await builder.placeLabeled('DcVoltageSource', 7, 6, 'Vs');
       await builder.placeLabeled('Potentiometer', 10, 6, 'POT');
       await builder.setComponentProperty('POT', 'position', '0.7');
-      await builder.placeComponent('Ground', 6, 14);
+      await builder.placeComponent('Ground', 11, 14);
       await builder.placeComponent('Ground', 14, 14);
 
       // Reference voltage for comparator (2.5V via second divider)
-      await builder.placeLabeled('DcVoltageSource', 3, 18, 'Vref');
+      await builder.placeLabeled('DcVoltageSource', 7, 18, 'Vref');
 
       // Analog comparator
       await builder.placeLabeled('VoltageComparator', 18, 8, 'CMP');
@@ -338,7 +338,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       // Wire source → potentiometer
       await builder.drawWire('Vs', 'pos', 'POT', 'A');
       await builder.drawWireFromPin('POT', 'B', 14, 14);
-      await builder.drawWireFromPin('Vs', 'neg', 6, 14);
+      await builder.drawWireFromPin('Vs', 'neg', 11, 14);
 
       // Wire potentiometer wiper to comparator in+
       await builder.drawWire('POT', 'W', 'CMP', 'in+');
@@ -376,9 +376,9 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('ADC readout: analog waveform sampled to digital outputs', async () => {
       // Analog input: AC source through resistive divider
-      await builder.placeLabeled('AcVoltageSource', 3, 8, 'Vs');
-      await builder.placeLabeled('Resistor', 10, 8, 'R1');
-      await builder.placeComponent('Ground', 6, 16);
+      await builder.placeLabeled('AcVoltageSource', 7, 8, 'Vs');
+      await builder.placeLabeled('Resistor', 14, 8, 'R1');
+      await builder.placeComponent('Ground', 11, 16);
 
       // ADC (4-bit)
       await builder.placeLabeled('ADC', 18, 8, 'ADC1');
@@ -388,8 +388,8 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.placeLabeled('Clock', 14, 3, 'CLK');
 
       // VREF and GND for ADC
-      await builder.placeLabeled('DcVoltageSource', 14, 14, 'Vref');
-      await builder.placeComponent('Ground', 14, 20);
+      await builder.placeLabeled('DcVoltageSource', 18, 14, 'Vref');
+      await builder.placeComponent('Ground', 22, 20);
       await builder.placeComponent('Ground', 22, 16);
 
       // Digital outputs for D0–D3
@@ -401,12 +401,12 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       // Wire analog input path
       await builder.drawWire('Vs', 'pos', 'R1', 'A');
       await builder.drawWire('R1', 'B', 'ADC1', 'VIN');
-      await builder.drawWireFromPin('Vs', 'neg', 6, 16);
+      await builder.drawWireFromPin('Vs', 'neg', 11, 16);
 
       // Wire ADC clock, VREF, GND
       await builder.drawWire('CLK', 'out', 'ADC1', 'CLK');
       await builder.drawWire('Vref', 'pos', 'ADC1', 'VREF');
-      await builder.drawWireFromPin('Vref', 'neg', 14, 20);
+      await builder.drawWireFromPin('Vref', 'neg', 22, 20);
       await builder.drawWireFromPin('ADC1', 'GND', 22, 16);
 
       // Wire ADC digital outputs
@@ -436,9 +436,9 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('Schmitt trigger to counter: analog sine drives digital count', async () => {
       // Analog source
-      await builder.placeLabeled('AcVoltageSource', 3, 8, 'Vs');
-      await builder.placeLabeled('Resistor', 10, 8, 'R1');
-      await builder.placeComponent('Ground', 6, 14);
+      await builder.placeLabeled('AcVoltageSource', 7, 8, 'Vs');
+      await builder.placeLabeled('Resistor', 14, 8, 'R1');
+      await builder.placeComponent('Ground', 11, 14);
 
       // Schmitt trigger (analog → digital bridge)
       await builder.placeLabeled('SchmittInverting', 16, 8, 'SCH');
@@ -454,7 +454,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       // Wire analog input
       await builder.drawWire('Vs', 'pos', 'R1', 'A');
       await builder.drawWire('R1', 'B', 'SCH', 'in');
-      await builder.drawWireFromPin('Vs', 'neg', 6, 14);
+      await builder.drawWireFromPin('Vs', 'neg', 11, 14);
 
       // Wire Schmitt output → counter clock
       await builder.drawWire('SCH', 'out', 'CNT', 'C');
@@ -494,17 +494,17 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('555 timer driving digital counter: analog oscillator to digital count', async () => {
       // Power supply
-      await builder.placeLabeled('DcVoltageSource', 3, 6, 'Vcc');
-      await builder.placeComponent('Ground', 6, 20);
+      await builder.placeLabeled('DcVoltageSource', 7, 6, 'Vcc');
+      await builder.placeComponent('Ground', 11, 20);
 
       // 555 Timer
       await builder.placeLabeled('Timer555', 12, 8, 'T555');
 
       // Timing components: Ra (1kΩ) and Rb (2kΩ) in series, C (1µF)
-      await builder.placeLabeled('Resistor', 8, 3, 'Ra');
-      await builder.placeLabeled('Resistor', 16, 3, 'Rb');
-      await builder.placeLabeled('Capacitor', 18, 14, 'C1');
-      await builder.placeComponent('Ground', 20, 20);
+      await builder.placeLabeled('Resistor', 12, 3, 'Ra');
+      await builder.placeLabeled('Resistor', 20, 3, 'Rb');
+      await builder.placeLabeled('Capacitor', 22, 14, 'C1');
+      await builder.placeComponent('Ground', 26, 20);
       await builder.placeComponent('Ground', 14, 20);
 
       // Digital counter
@@ -517,7 +517,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
 
       // Wire power: VCC and GND to 555
       await builder.drawWire('Vcc', 'pos', 'T555', 'VCC');
-      await builder.drawWireFromPin('Vcc', 'neg', 6, 20);
+      await builder.drawWireFromPin('Vcc', 'neg', 11, 20);
       await builder.drawWireFromPin('T555', 'GND', 14, 20);
 
       // Wire RST high (enable 555)
@@ -530,7 +530,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.drawWire('Rb', 'B', 'T555', 'THR');
       await builder.drawWire('Rb', 'B', 'T555', 'TRIG');
       await builder.drawWire('Rb', 'B', 'C1', 'pos');
-      await builder.drawWireFromPin('C1', 'neg', 20, 20);
+      await builder.drawWireFromPin('C1', 'neg', 26, 20);
 
       // 555 OUT → counter clock
       await builder.drawWire('T555', 'OUT', 'CNT', 'C');
@@ -562,8 +562,8 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('digital servo loop: DAC to OpAmp to ADC feedforward', async () => {
       // Power and reference
-      await builder.placeLabeled('DcVoltageSource', 3, 6, 'Vref');
-      await builder.placeComponent('Ground', 6, 18);
+      await builder.placeLabeled('DcVoltageSource', 7, 6, 'Vref');
+      await builder.placeComponent('Ground', 11, 18);
       await builder.placeComponent('Ground', 14, 18);
 
       // Digital inputs for DAC
@@ -582,15 +582,15 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
 
       // OpAmp voltage follower (buffer)
       await builder.placeLabeled('OpAmp', 18, 10, 'AMP');
-      await builder.placeLabeled('Resistor', 18, 16, 'Rf');
-      await builder.placeLabeled('Resistor', 22, 16, 'Rin');
+      await builder.placeLabeled('Resistor', 22, 16, 'Rf');
+      await builder.placeLabeled('Resistor', 26, 16, 'Rin');
 
       // ADC (4-bit)
       await builder.placeLabeled('ADC', 26, 8, 'ADC1');
       await builder.setComponentProperty('ADC1', 'Resolution (bits)', 4);
       await builder.placeLabeled('Clock', 22, 3, 'CLK');
-      await builder.placeLabeled('DcVoltageSource', 22, 14, 'Vref2');
-      await builder.placeComponent('Ground', 22, 20);
+      await builder.placeLabeled('DcVoltageSource', 26, 14, 'Vref2');
+      await builder.placeComponent('Ground', 30, 20);
       await builder.placeComponent('Ground', 30, 16);
 
       // Digital outputs
@@ -605,7 +605,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.drawWire('D2', 'out', 'DAC1', 'D2');
       await builder.drawWire('D3', 'out', 'DAC1', 'D3');
       await builder.drawWire('Vref', 'pos', 'DAC1', 'VREF');
-      await builder.drawWireFromPin('Vref', 'neg', 6, 18);
+      await builder.drawWireFromPin('Vref', 'neg', 11, 18);
       await builder.drawWireFromPin('DAC1', 'GND', 14, 18);
 
       // Wire DAC → OpAmp in+
@@ -623,7 +623,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       // Wire ADC clock, VREF, GND
       await builder.drawWire('CLK', 'out', 'ADC1', 'CLK');
       await builder.drawWire('Vref2', 'pos', 'ADC1', 'VREF');
-      await builder.drawWireFromPin('Vref2', 'neg', 22, 20);
+      await builder.drawWireFromPin('Vref2', 'neg', 30, 20);
       await builder.drawWireFromPin('ADC1', 'GND', 30, 16);
 
       // Wire ADC digital outputs
@@ -656,15 +656,15 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
     // -----------------------------------------------------------------------
     test('mixed transistor + gate: BJT level-shifts into digital And', async () => {
       // Power supply
-      await builder.placeLabeled('DcVoltageSource', 3, 6, 'Vcc');
-      await builder.placeComponent('Ground', 6, 18);
+      await builder.placeLabeled('DcVoltageSource', 7, 6, 'Vcc');
+      await builder.placeComponent('Ground', 11, 18);
 
       // Base drive resistor and BJT
-      await builder.placeLabeled('Resistor', 8, 6, 'Rb');
+      await builder.placeLabeled('Resistor', 12, 6, 'Rb');
       await builder.placeLabeled('NpnBJT', 12, 10, 'Q1');
 
       // Collector load resistor
-      await builder.placeLabeled('Resistor', 12, 4, 'Rc');
+      await builder.placeLabeled('Resistor', 16, 4, 'Rc');
       await builder.placeComponent('Ground', 14, 18);
 
       // Digital And gate and output
@@ -682,7 +682,7 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
 
       // Wire emitter to ground
       await builder.drawWireFromPin('Q1', 'E', 14, 18);
-      await builder.drawWireFromPin('Vcc', 'neg', 6, 18);
+      await builder.drawWireFromPin('Vcc', 'neg', 11, 18);
 
       // Wire BJT collector to digital And gate input
       await builder.drawWire('Rc', 'B', 'G1d', 'In_1');
@@ -724,16 +724,16 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.placeLabeled('In', 3, 8, 'CTRL');
 
       // Analog source
-      await builder.placeLabeled('DcVoltageSource', 3, 14, 'Vs');
-      await builder.placeComponent('Ground', 6, 20);
+      await builder.placeLabeled('DcVoltageSource', 7, 14, 'Vs');
+      await builder.placeComponent('Ground', 11, 20);
 
       // Analog switch
       await builder.placeLabeled('SwitchSPST', 12, 10, 'SW1');
 
       // Load and probe
-      await builder.placeLabeled('Resistor', 20, 10, 'R1');
-      await builder.placeComponent('Ground', 24, 16);
-      await builder.placeLabeled('Probe', 26, 10, 'P1');
+      await builder.placeLabeled('Resistor', 24, 10, 'R1');
+      await builder.placeComponent('Ground', 28, 16);
+      await builder.placeLabeled('Probe', 30, 10, 'P1');
 
       // Wire digital control to switch
       await builder.drawWire('CTRL', 'out', 'SW1', 'ctrl');
@@ -741,8 +741,8 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       // Wire analog path: source → switch → resistor → ground
       await builder.drawWire('Vs', 'pos', 'SW1', 'in');
       await builder.drawWire('SW1', 'out', 'R1', 'A');
-      await builder.drawWireFromPin('R1', 'B', 24, 16);
-      await builder.drawWireFromPin('Vs', 'neg', 6, 20);
+      await builder.drawWireFromPin('R1', 'B', 28, 16);
+      await builder.drawWireFromPin('Vs', 'neg', 11, 20);
       await builder.drawWire('SW1', 'out', 'P1', 'in');
 
       await builder.stepViaUI();
@@ -775,11 +775,11 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.placeLabeled('Relay', 14, 8, 'RLY');
 
       // Analog source and load on relay contacts
-      await builder.placeLabeled('DcVoltageSource', 8, 16, 'Vs');
-      await builder.placeLabeled('Resistor', 20, 14, 'R1');
-      await builder.placeComponent('Ground', 10, 22);
-      await builder.placeComponent('Ground', 24, 20);
-      await builder.placeLabeled('Probe', 26, 14, 'P1');
+      await builder.placeLabeled('DcVoltageSource', 12, 16, 'Vs');
+      await builder.placeLabeled('Resistor', 24, 14, 'R1');
+      await builder.placeComponent('Ground', 16, 22);
+      await builder.placeComponent('Ground', 28, 20);
+      await builder.placeLabeled('Probe', 30, 14, 'P1');
 
       // Wire digital logic → relay coil
       await builder.drawWire('A', 'out', 'G1', 'In_1');
@@ -788,12 +788,12 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
 
       // Relay in2 to ground (coil return)
       // (Relay coil: in1 = drive, in2 = return)
-      await builder.drawWireFromPin('Vs', 'neg', 10, 22);
+      await builder.drawWireFromPin('Vs', 'neg', 16, 22);
 
       // Wire analog path through relay contacts
       await builder.drawWire('Vs', 'pos', 'RLY', 'A1');
       await builder.drawWire('RLY', 'B1', 'R1', 'A');
-      await builder.drawWireFromPin('R1', 'B', 24, 20);
+      await builder.drawWireFromPin('R1', 'B', 28, 20);
       await builder.drawWire('RLY', 'B1', 'P1', 'in');
 
       await builder.stepViaUI();
@@ -824,17 +824,17 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       await builder.placeLabeled('SwitchSPDT', 16, 10, 'SW1');
 
       // Power supply and inductor
-      await builder.placeLabeled('DcVoltageSource', 3, 14, 'Vs');
-      await builder.placeLabeled('Inductor', 10, 14, 'L1');
-      await builder.placeComponent('Ground', 6, 22);
+      await builder.placeLabeled('DcVoltageSource', 7, 14, 'Vs');
+      await builder.placeLabeled('Inductor', 14, 14, 'L1');
+      await builder.placeComponent('Ground', 11, 22);
 
       // Load paths: NO → R1, NC → R2 + C
-      await builder.placeLabeled('Resistor', 22, 7, 'R1');
-      await builder.placeLabeled('Resistor', 22, 13, 'R2');
-      await builder.placeLabeled('Capacitor', 28, 13, 'C1');
-      await builder.placeComponent('Ground', 26, 20);
+      await builder.placeLabeled('Resistor', 26, 7, 'R1');
+      await builder.placeLabeled('Resistor', 26, 13, 'R2');
+      await builder.placeLabeled('Capacitor', 32, 13, 'C1');
       await builder.placeComponent('Ground', 30, 20);
-      await builder.placeLabeled('Probe', 32, 10, 'P1');
+      await builder.placeComponent('Ground', 36, 20);
+      await builder.placeLabeled('Probe', 38, 10, 'P1');
 
       // Wire D_FF in toggle mode: ~Q → D
       await builder.drawWire('CLK', 'out', 'FF', 'C');
@@ -846,16 +846,16 @@ test.describe('Mixed-mode circuit assembly via UI', () => {
       // Wire power → inductor → switch common
       await builder.drawWire('Vs', 'pos', 'L1', 'A');
       await builder.drawWire('L1', 'B', 'SW1', 'com');
-      await builder.drawWireFromPin('Vs', 'neg', 6, 22);
+      await builder.drawWireFromPin('Vs', 'neg', 11, 22);
 
       // Wire NO path: switch NO → R1 → GND
       await builder.drawWire('SW1', 'no', 'R1', 'A');
-      await builder.drawWireFromPin('R1', 'B', 26, 20);
+      await builder.drawWireFromPin('R1', 'B', 30, 20);
 
       // Wire NC path: switch NC → R2 → C → GND
       await builder.drawWire('SW1', 'nc', 'R2', 'A');
       await builder.drawWire('R2', 'B', 'C1', 'pos');
-      await builder.drawWireFromPin('C1', 'neg', 30, 20);
+      await builder.drawWireFromPin('C1', 'neg', 36, 20);
 
       // Probe at switch output junction
       await builder.drawWire('SW1', 'no', 'P1', 'in');

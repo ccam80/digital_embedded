@@ -17,7 +17,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
+import type { AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -25,10 +25,6 @@ import {
   DigitalOutputPinModel,
   readMnaVoltage,
 } from "./digital-pin-model.js";
-import {
-  capacitorConductance,
-  capacitorHistoryCurrent,
-} from "./integration.js";
 
 // ---------------------------------------------------------------------------
 // Shared electrical fallback spec
@@ -161,12 +157,6 @@ export function createDriverAnalogElement(
       outputPin.stampCompanion(solver, dt, method);
     },
 
-    updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-      inputPin.updateCompanion(dt, method, readMnaVoltage(nodeIn, voltages));
-      selPin.updateCompanion(dt, method, readMnaVoltage(nodeSel, voltages));
-      outputPin.updateCompanion(dt, method, readMnaVoltage(nodeOut, voltages));
-    },
-
     getPinCurrents(voltages: Float64Array): number[] {
       // Pin layout order: in (input), sel (enable input), out (output)
       // Input pins: I = V_node / rIn
@@ -268,12 +258,6 @@ export function createDriverInvAnalogElement(
       outputPin.stampCompanion(solver, dt, method);
     },
 
-    updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-      inputPin.updateCompanion(dt, method, readMnaVoltage(nodeIn, voltages));
-      selPin.updateCompanion(dt, method, readMnaVoltage(nodeSel, voltages));
-      outputPin.updateCompanion(dt, method, readMnaVoltage(nodeOut, voltages));
-    },
-
     getPinCurrents(voltages: Float64Array): number[] {
       // Pin layout order: in (input), sel (enable input), out (output)
       // Input pins: I = V_node / rIn
@@ -348,8 +332,6 @@ export function createSplitterAnalogElement(
     outputPins.push(pin);
   }
 
-  const actualNodeIds = allNodeIds.slice(0, numIn + numOut);
-
   let cachedVoltages = new Float64Array(0);
   let solver: SparseSolver | null = null;
 
@@ -402,15 +384,6 @@ export function createSplitterAnalogElement(
         result.push((v - p.currentVoltage) / p.rOut);
       }
       return result;
-    },
-
-    updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-      for (const p of inputPins) {
-        p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
-      }
-      for (const p of outputPins) {
-        p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
-      }
     },
 
     setParam(_key: string, _value: number) {},
@@ -497,6 +470,8 @@ function createSegmentDiodeElement(
       const I = geq * (va - vc) - ieq;
       return [I, -I];
     },
+
+    setParam(_key: string, _value: number): void {},
   };
 }
 
@@ -610,7 +585,6 @@ export function createRelayAnalogElement(
     return contactClosed ? 1 / RELAY_R_ON : 1 / RELAY_R_OFF;
   }
 
-  const allNodes = [nodeCoil1, nodeCoil2, nodeContactA, nodeContactB];
   const branchRow = branchIdx; // MNA row for inductor branch current
 
   return {

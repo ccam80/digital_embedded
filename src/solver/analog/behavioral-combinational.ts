@@ -13,7 +13,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
+import type { AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -63,11 +63,7 @@ export class BehavioralMuxElement implements AnalogElementCore {
   private readonly _selPins: DigitalInputPinModel[];
   private readonly _dataPins: DigitalInputPinModel[][];
   private readonly _outPins: DigitalOutputPinModel[];
-  private readonly _inputCount: number;
   private readonly _bitWidth: number;
-
-  /** Latched selector value — persists across timesteps. */
-  private _latchedSel = 0;
 
   /** Cached solver reference. */
   private _solver: SparseSolver | null = null;
@@ -85,13 +81,12 @@ export class BehavioralMuxElement implements AnalogElementCore {
     selPins: DigitalInputPinModel[],
     dataPins: DigitalInputPinModel[][],
     outPins: DigitalOutputPinModel[],
-    inputCount: number,
+    _inputCount: number,
     bitWidth: number,
   ) {
     this._selPins = selPins;
     this._dataPins = dataPins;
     this._outPins = outPins;
-    this._inputCount = inputCount;
     this._bitWidth = bitWidth;
   }
 
@@ -118,7 +113,6 @@ export class BehavioralMuxElement implements AnalogElementCore {
         else sel &= ~(1 << b);
       }
     }
-    this._latchedSel = sel;
 
     const selectedGroup = this._dataPins[sel] ?? this._dataPins[0];
 
@@ -216,8 +210,6 @@ export class BehavioralDemuxElement implements AnalogElementCore {
   private readonly _outputCount: number;
 
   /** Latched selector value. */
-  private _latchedSel = 0;
-
   /** Cached solver reference. */
   private _solver: SparseSolver | null = null;
 
@@ -263,7 +255,6 @@ export class BehavioralDemuxElement implements AnalogElementCore {
         else sel &= ~(1 << b);
       }
     }
-    this._latchedSel = sel;
 
     // Read input level
     const inNodeId = this._inPin.nodeId;
@@ -348,8 +339,6 @@ export class BehavioralDecoderElement implements AnalogElementCore {
   private readonly _outputCount: number;
 
   /** Latched selector value. */
-  private _latchedSel = 0;
-
   /** Cached solver reference. */
   private _solver: SparseSolver | null = null;
 
@@ -392,7 +381,6 @@ export class BehavioralDecoderElement implements AnalogElementCore {
         else sel &= ~(1 << b);
       }
     }
-    this._latchedSel = sel;
 
     // One-hot output: only the selected index is HIGH
     for (let i = 0; i < this._outputCount; i++) {

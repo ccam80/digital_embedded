@@ -146,7 +146,6 @@ export class NumberInput implements PropertyInput {
 export class UnitNumberInput implements PropertyInput {
   element: HTMLElement;
   private readonly _input: HTMLInputElement;
-  private readonly _unitLabel: HTMLSpanElement;
   private readonly _unit: string;
   private readonly _min?: number;
   private readonly _max?: number;
@@ -155,8 +154,8 @@ export class UnitNumberInput implements PropertyInput {
 
   constructor(definition: PropertyDefinition, initial: PropertyValue) {
     this._unit = definition.unit!;
-    this._min = definition.min;
-    this._max = definition.max;
+    if (definition.min !== undefined) this._min = definition.min;
+    if (definition.max !== undefined) this._max = definition.max;
     this._value = typeof initial === "number" ? initial : Number(initial);
 
     const wrapper = document.createElement("div");
@@ -212,7 +211,6 @@ export class UnitNumberInput implements PropertyInput {
     });
 
     this._input = input;
-    this._unitLabel = unitLabel;
     wrapper.appendChild(input);
     wrapper.appendChild(unitLabel);
     this.element = wrapper;

@@ -32,7 +32,6 @@ export class BehavioralJKFlipflopElement implements AnalogElementCore {
   private _latchedQ = false;
   private _prevClockVoltage = 0;
   private readonly _vIH: number;
-  private readonly _vIL: number;
 
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
@@ -51,7 +50,7 @@ export class BehavioralJKFlipflopElement implements AnalogElementCore {
     qPin: DigitalOutputPinModel,
     qBarPin: DigitalOutputPinModel,
     vIH: number,
-    vIL: number,
+    _vIL: number,
   ) {
     this._jPin = jPin;
     this._clockPin = clockPin;
@@ -59,7 +58,6 @@ export class BehavioralJKFlipflopElement implements AnalogElementCore {
     this._qPin = qPin;
     this._qBarPin = qBarPin;
     this._vIH = vIH;
-    this._vIL = vIL;
   }
 
   stamp(solver: SparseSolver): void {

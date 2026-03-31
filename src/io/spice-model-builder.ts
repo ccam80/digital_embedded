@@ -39,8 +39,9 @@ function makePin(x: number, y: number, label: string): Pin {
   return {
     position: { x, y },
     label,
+    kind: 'signal' as const,
     direction: PinDirection.BIDIRECTIONAL,
-    isInverted: false,
+    isNegated: false,
     isClock: false,
     bitWidth: 1,
   };
@@ -83,6 +84,7 @@ function makeCircuitElement(
     draw(_ctx: RenderContext) { /* no-op */ },
     serialize() { return serialized; },
     getAttribute(k: string) { return propsMap.get(k); },
+    setAttribute(k: string, v: import('../core/properties.js').PropertyValue) { propsMap.set(k, v); },
   };
 }
 

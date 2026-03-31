@@ -210,7 +210,7 @@ export abstract class AbstractCircuitElement implements CircuitElement {
       position: { x: this.position.x, y: this.position.y },
       rotation: this.rotation,
       mirror: this.mirror,
-      properties: propertyBagToJson(this._properties),
+      properties: propertyBagToJson(this._properties) as SerializedElement["properties"],
     };
   }
 

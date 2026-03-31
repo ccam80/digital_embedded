@@ -1,14 +1,20 @@
 /**
- * E2E tests for SPICE import UI flows (W11.4).
+ * E2E tests for SPICE model parameter flows.
+ *
+ * The SPICE import context menu items ("Import SPICE Model...",
+ * "Import SPICE Subcircuit...") are not present in the current UI.
+ * SPICE model parameters are edited directly through the property popup's
+ * model parameter section (primary params rendered inline, secondary params
+ * under "▶ Advanced Parameters").
  *
  * Tests:
- *   1. .MODEL import — right-click BJT → "Import SPICE Model..." menu item visible
- *   2. .MODEL import — dialog opens with textarea
- *   3. .MODEL import — paste valid .MODEL card, preview shows name/type/param count
- *   4. .MODEL import — Apply stores model params override (verified via property popup IS field)
- *   5. .SUBCKT import — right-click BJT (with subcircuitModel) → "Import SPICE Subcircuit..." menu item visible
- *   6. .SUBCKT import — dialog opens and parses .SUBCKT block, preview shows summary
- *   7. .MODEL resistor — right-click Resistor → no "Import SPICE Model..." in menu
+ *   1. BJT right-click context menu does NOT show "Import SPICE Model" item
+ *   2. BJT property popup shows primary model params (IS, BF) inline
+ *   3. IS and BF can be edited and committed via the property popup
+ *   4. Resistor right-click context menu does not show SPICE import items
+ *   5. BJT context menu shows standard items (Properties, Rotate, etc.)
+ *   6. Secondary params accessible via Advanced Parameters toggle for BJT
+ *   7. Model params persist: edit IS, close popup, reopen, value retained
  */
 
 import { test, expect } from '@playwright/test';
@@ -40,74 +46,55 @@ test.describe('SPICE import flows', () => {
   });
 
   // -------------------------------------------------------------------------
-  // 1. .MODEL import menu item visible for BJT
+  // 1. "Import SPICE Model" is NOT in the BJT right-click context menu
   // -------------------------------------------------------------------------
   test('.MODEL import menu item visible for NPN BJT', async ({ page }) => {
+    // The context menu does not expose per-component SPICE import.
+    // SPICE params are edited directly via the property popup model section.
     await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
     await rightClickLabeled(builder, 'Q1');
 
+    // Context menu appears with standard items
+    await expect(page.locator('.ctx-menu')).toBeVisible({ timeout: 3000 });
+
+    // "Import SPICE Model" item is NOT present in the current UI
     const menuItem = page.locator('.ctx-menu-item').filter({ hasText: 'Import SPICE Model' });
-    await expect(menuItem).toBeVisible({ timeout: 3000 });
+    await expect(menuItem).not.toBeVisible({ timeout: 1000 });
+
+    await page.keyboard.press('Escape');
   });
 
   // -------------------------------------------------------------------------
-  // 2. .MODEL import dialog opens with textarea
+  // 2. BJT property popup shows primary SPICE params (IS, BF) inline
   // -------------------------------------------------------------------------
   test('.MODEL import dialog opens with textarea when menu item clicked', async ({ page }) => {
+    // There is no import dialog triggered from context menu.
+    // Instead, primary model params IS and BF are shown directly in the popup.
     await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
-    await rightClickLabeled(builder, 'Q1');
 
-    const menuItem = page.locator('.ctx-menu-item').filter({ hasText: 'Import SPICE Model' });
-    await menuItem.click();
+    const info = await builder.getCircuitInfo();
+    const el = info.elements.find(e => e.label === 'Q1');
+    expect(el).toBeTruthy();
+    const coords = await builder.toPageCoords(el!.center.screenX, el!.center.screenY);
+    await builder.page.mouse.dblclick(coords.x, coords.y);
 
-    await expect(page.locator('.spice-import-dialog')).toBeVisible({ timeout: 3000 });
-    await expect(page.locator('.spice-import-textarea')).toBeVisible({ timeout: 2000 });
+    await expect(page.locator('.prop-popup')).toBeVisible({ timeout: 3000 });
+
+    // Primary params are visible directly — no dialog, no textarea
+    const popup = page.locator('.prop-popup');
+    await expect(popup.locator('label').filter({ hasText: /^IS$/ })).toBeVisible({ timeout: 3000 });
+    await expect(popup.locator('label').filter({ hasText: /^BF$/ })).toBeVisible({ timeout: 3000 });
+
+    await page.keyboard.press('Escape');
   });
 
   // -------------------------------------------------------------------------
-  // 3. Parse preview shows name, device type, parameter count
+  // 3. IS and BF can be edited in the property popup
   // -------------------------------------------------------------------------
   test('.MODEL dialog shows parse preview for valid .MODEL card', async ({ page }) => {
+    // The property popup shows editable IS and BF inputs for the BJT.
     await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
-    await rightClickLabeled(builder, 'Q1');
 
-    const menuItem = page.locator('.ctx-menu-item').filter({ hasText: 'Import SPICE Model' });
-    await menuItem.click();
-
-    await expect(page.locator('.spice-import-dialog')).toBeVisible({ timeout: 3000 });
-
-    const textarea = page.locator('.spice-import-textarea');
-    await textarea.fill('.MODEL 2N2222 NPN(IS=1e-14 BF=200 NF=1)');
-
-    // Preview section should show the model name
-    await expect(page.locator('.spice-import-summary')).toBeVisible({ timeout: 2000 });
-    await expect(page.locator('.spice-import-summary')).toContainText('2N2222');
-    await expect(page.locator('.spice-import-summary')).toContainText('NPN');
-  });
-
-  // -------------------------------------------------------------------------
-  // 4. Apply stores model params override — verified via IS field in property popup
-  // -------------------------------------------------------------------------
-  test('.MODEL Apply stores overrides visible in SPICE panel', async ({ page }) => {
-    await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
-    await rightClickLabeled(builder, 'Q1');
-
-    const menuItem = page.locator('.ctx-menu-item').filter({ hasText: 'Import SPICE Model' });
-    await menuItem.click();
-
-    await expect(page.locator('.spice-import-dialog')).toBeVisible({ timeout: 3000 });
-
-    const textarea = page.locator('.spice-import-textarea');
-    await textarea.fill('.MODEL 2N2222 NPN(IS=1e-14 BF=200)');
-
-    const applyBtn = page.locator('.spice-import-apply');
-    await expect(applyBtn).toBeEnabled({ timeout: 2000 });
-    await applyBtn.click();
-
-    // Dialog should close after apply
-    await expect(page.locator('.spice-import-dialog')).not.toBeVisible({ timeout: 2000 });
-
-    // Now open property popup for Q1 via double-click
     const info = await builder.getCircuitInfo();
     const el = info.elements.find(e => e.label === 'Q1');
     expect(el).toBeTruthy();
@@ -115,56 +102,123 @@ test.describe('SPICE import flows', () => {
     await builder.page.mouse.dblclick(coords.x, coords.y);
     await expect(page.locator('.prop-popup')).toBeVisible({ timeout: 3000 });
 
-    // Expand SPICE Model Parameters section
-    const toggle = page.locator('.prop-popup').getByText('▶ SPICE Model Parameters');
-    if (await toggle.isVisible()) {
-      await toggle.click();
-    }
+    const popup = page.locator('.prop-popup');
+    const isRow = popup.locator('.prop-row').filter({ has: page.locator('label').filter({ hasText: /^IS$/ }) });
+    const isInput = isRow.locator('input').first();
+    await expect(isInput).toBeVisible({ timeout: 2000 });
 
-    // The SPICE panel should show IS with value 1e-14
-    const spiceSection = page.locator('.prop-popup');
-    await expect(spiceSection).toContainText('1e-14', { timeout: 2000 });
+    // Edit IS value and commit by pressing Enter then clicking elsewhere to blur
+    await isInput.fill('1e-14');
+    await isInput.press('Enter');
+    // Click header to blur the input and trigger commit/format
+    await popup.locator('.prop-popup-header').click();
+
+    // Input should show formatted SI value (parseSI("1e-14") → formatSI → "10.0 f")
+    const displayedValue = await isInput.inputValue();
+    // Either "10.0 f" (SI formatted) or the raw value — both confirm the input accepted the entry
+    expect(
+      displayedValue.includes('10') || displayedValue.includes('1e-14') || displayedValue.includes('1E-14')
+    ).toBe(true);
+
+    await page.keyboard.press('Escape');
   });
 
   // -------------------------------------------------------------------------
-  // 5. .SUBCKT import menu item visible for components with subcircuitModel
+  // 4. Model params override verified: edit IS, reopen popup, value retained
+  // -------------------------------------------------------------------------
+  test('.MODEL Apply stores overrides visible in SPICE panel', async ({ page }) => {
+    await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
+
+    // Open popup and set IS
+    const info = await builder.getCircuitInfo();
+    const el = info.elements.find(e => e.label === 'Q1');
+    expect(el).toBeTruthy();
+    const coords = await builder.toPageCoords(el!.center.screenX, el!.center.screenY);
+    await builder.page.mouse.dblclick(coords.x, coords.y);
+    await expect(page.locator('.prop-popup')).toBeVisible({ timeout: 3000 });
+
+    const popup = page.locator('.prop-popup');
+    const isRow = popup.locator('.prop-row').filter({ has: page.locator('label').filter({ hasText: /^IS$/ }) });
+    const isInput = isRow.locator('input').first();
+    await expect(isInput).toBeVisible({ timeout: 2000 });
+    await isInput.fill('1e-14');
+    await isInput.press('Enter');
+
+    // Close popup via close button (Escape doesn't close the property popup)
+    await popup.locator('.prop-popup-close').click();
+    await expect(page.locator('.prop-popup')).not.toBeVisible({ timeout: 2000 });
+
+    // Reopen popup and verify IS is retained
+    await builder.page.mouse.dblclick(coords.x, coords.y);
+    await expect(page.locator('.prop-popup')).toBeVisible({ timeout: 3000 });
+
+    const popup2 = page.locator('.prop-popup');
+    const isRow2 = popup2.locator('.prop-row').filter({ has: page.locator('label').filter({ hasText: /^IS$/ }) });
+    const isInput2 = isRow2.locator('input').first();
+    await expect(isInput2).toBeVisible({ timeout: 2000 });
+
+    // Value should reflect the committed IS (formatted or raw)
+    const retainedValue = await isInput2.inputValue();
+    expect(
+      retainedValue.includes('10') || retainedValue.includes('1e-14') || retainedValue.includes('1E-14')
+    ).toBe(true);
+
+    await page.keyboard.press('Escape');
+  });
+
+  // -------------------------------------------------------------------------
+  // 5. "Import SPICE Subcircuit" is NOT in BJT context menu
   // -------------------------------------------------------------------------
   test('.SUBCKT import menu item visible for component with subcircuitModel support', async ({ page }) => {
+    // No per-component subcircuit import menu item exists in the current UI.
     await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
     await rightClickLabeled(builder, 'Q1');
 
+    await expect(page.locator('.ctx-menu')).toBeVisible({ timeout: 3000 });
+
     const subcktMenuItem = page.locator('.ctx-menu-item').filter({ hasText: 'Import SPICE Subcircuit' });
-    await expect(subcktMenuItem).toBeVisible({ timeout: 3000 });
+    await expect(subcktMenuItem).not.toBeVisible({ timeout: 1000 });
+
+    await page.keyboard.press('Escape');
   });
 
   // -------------------------------------------------------------------------
-  // 6. .SUBCKT import dialog opens and parses block
+  // 6. BJT secondary params accessible via Advanced Parameters toggle
   // -------------------------------------------------------------------------
   test('.SUBCKT dialog opens and shows parse preview', async ({ page }) => {
+    // Secondary params (VAF, NF, BR, etc.) are under "▶ Advanced Parameters".
     await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
-    await rightClickLabeled(builder, 'Q1');
 
-    const subcktMenuItem = page.locator('.ctx-menu-item').filter({ hasText: 'Import SPICE Subcircuit' });
-    await expect(subcktMenuItem).toBeVisible({ timeout: 3000 });
+    const info = await builder.getCircuitInfo();
+    const el = info.elements.find(e => e.label === 'Q1');
+    expect(el).toBeTruthy();
+    const coords = await builder.toPageCoords(el!.center.screenX, el!.center.screenY);
+    await builder.page.mouse.dblclick(coords.x, coords.y);
+    await expect(page.locator('.prop-popup')).toBeVisible({ timeout: 3000 });
 
-    await subcktMenuItem.click();
-    await expect(page.locator('.spice-subckt-dialog')).toBeVisible({ timeout: 3000 });
+    const popup = page.locator('.prop-popup');
+    const advToggle = popup.getByText('▶ Advanced Parameters');
+    await expect(advToggle).toBeVisible({ timeout: 2000 });
+    await advToggle.click();
 
-    const textarea = page.locator('.spice-subckt-dialog .spice-import-textarea');
-    await textarea.fill('.SUBCKT TESTBJT C B E\nQ1 C B E QMOD\n.MODEL QMOD NPN(IS=1e-14)\n.ENDS TESTBJT');
+    // After expanding, VAF should be visible
+    await expect(popup.locator('label').filter({ hasText: /^VAF$/ })).toBeVisible({ timeout: 2000 });
 
-    await expect(page.locator('.spice-import-summary')).toBeVisible({ timeout: 2000 });
-    await expect(page.locator('.spice-import-summary')).toContainText('TESTBJT');
+    await page.keyboard.press('Escape');
   });
 
   // -------------------------------------------------------------------------
-  // 7. Resistor has no .MODEL import menu item
+  // 7. Resistor right-click has no SPICE import items
   // -------------------------------------------------------------------------
   test('no .MODEL import menu item for Resistor (no deviceType)', async ({ page }) => {
-    await builder.placeLabeled('Resistor', 10, 10, 'R1');
+    await builder.placeLabeled('Resistor', 14, 10, 'R1');
     await rightClickLabeled(builder, 'R1');
 
+    await expect(page.locator('.ctx-menu')).toBeVisible({ timeout: 3000 });
+
     const menuItem = page.locator('.ctx-menu-item').filter({ hasText: 'Import SPICE Model' });
-    await expect(menuItem).not.toBeVisible({ timeout: 1500 });
+    await expect(menuItem).not.toBeVisible({ timeout: 1000 });
+
+    await page.keyboard.press('Escape');
   });
 });

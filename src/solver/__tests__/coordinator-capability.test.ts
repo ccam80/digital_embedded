@@ -27,6 +27,7 @@ import type { SparseSolver } from '../analog/sparse-solver.js';
 import type { CircuitElement } from '../../core/element.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { PropertyValue } from '../../core/properties.js';
+import type { Rect, RenderContext } from '../../core/renderer-interface.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 
 function makeAnalogElementObj(typeId: string, instanceId: string, pinDescs: { x: number; y: number; label: string }[]): TestElement {
@@ -48,6 +49,7 @@ function makeResistorAnalogEl(nodeA: number, nodeB: number, r: number): AnalogEl
       if (nodeA > 0 && nodeB > 0) { s.stamp(nodeA - 1, nodeB - 1, -g); s.stamp(nodeB - 1, nodeA - 1, -g); }
     },
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -66,12 +68,12 @@ function makeAnalogDef(
     })),
     propertyDefs: [],
     attributeMap: [],
-    category: ComponentCategory.PASSIVE,
+    category: ComponentCategory.PASSIVES,
     helpText: '',
     pinElectrical: {},
     defaultModel: 'behavioral',
     models: {},
-    modelRegistry: { behavioral: { kind: 'inline' as const, factory: (pinNodes) => mnaFactory(pinNodes), paramDefs: [], params: {} } },
+    modelRegistry: { behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>) => mnaFactory(pinNodes), paramDefs: [], params: {} } },
   } as unknown as ComponentDefinition;
 }
 
@@ -86,17 +88,18 @@ function makeGroundDef(): ComponentDefinition {
     }],
     propertyDefs: [],
     attributeMap: [],
-    category: ComponentCategory.PASSIVE,
+    category: ComponentCategory.PASSIVES,
     helpText: '',
     pinElectrical: {},
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pinNodes) => ({
-        pinNodeIds: [], allNodeIds: [], branchIndex: -1,
+      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
+        branchIndex: -1 as const,
         isNonlinear: false, isReactive: false,
         stamp(_s: SparseSolver) {},
         getPinCurrents(_v: Float64Array) { return [0]; },
+        setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },
     },
   } as unknown as ComponentDefinition;
@@ -113,7 +116,7 @@ function buildAnalogRegistry(): ComponentRegistry {
   return registry;
 }
 
-function buildAnalogCircuit(registry: ComponentRegistry): Circuit {
+function buildAnalogCircuit(_registry: ComponentRegistry): Circuit {
   const circuit = new Circuit();
   circuit.metadata = { ...circuit.metadata };
   const gndEl = makeAnalogElementObj('Ground', 'gnd-1', [{ x: 0, y: 0, label: 'gnd' }]);
@@ -143,10 +146,13 @@ function makeAnalogEl(
     direction: PinDirection.BIDIRECTIONAL,
     isNegated: false,
     isClock: false,
-    kind: "signal",
+    kind: "signal" as const,
     bitWidth: 1,
   }));
   const propertyBag = new PropertyBag(propsMap.entries());
+  const _mp: Record<string, number> = {};
+  for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
+  propertyBag.replaceModelParams(_mp);
   const serialized: SerializedElement = {
     typeId, instanceId, position: { x: 0, y: 0 },
     rotation: 0 as SerializedElement['rotation'], mirror: false, properties: {},
@@ -160,6 +166,7 @@ function makeAnalogEl(
     draw(_ctx: RenderContext) {},
     serialize() { return serialized; },
     getAttribute(k: string) { return propsMap.get(k); },
+    setAttribute(_name: string, _value: PropertyValue) {},
   };
 }
 
@@ -306,31 +313,31 @@ describe('snapshotSignals and signalCount — analog-only coordinator', () => {
 
 describe('capability queries — digital-only coordinator', () => {
   it('supportsMicroStep returns true', () => {
-    const { coordinator, facade } = buildDigitalCoordinator();
+    const { coordinator } = buildDigitalCoordinator();
     expect(coordinator.supportsMicroStep()).toBe(true);
     coordinator.dispose();
   });
 
   it('supportsRunToBreak returns true', () => {
-    const { coordinator, facade } = buildDigitalCoordinator();
+    const { coordinator } = buildDigitalCoordinator();
     expect(coordinator.supportsRunToBreak()).toBe(true);
     coordinator.dispose();
   });
 
   it('supportsAcSweep returns false', () => {
-    const { coordinator, facade } = buildDigitalCoordinator();
+    const { coordinator } = buildDigitalCoordinator();
     expect(coordinator.supportsAcSweep()).toBe(false);
     coordinator.dispose();
   });
 
   it('supportsDcOp returns false', () => {
-    const { coordinator, facade } = buildDigitalCoordinator();
+    const { coordinator } = buildDigitalCoordinator();
     expect(coordinator.supportsDcOp()).toBe(false);
     coordinator.dispose();
   });
 
   it('timingModel is discrete', () => {
-    const { coordinator, facade } = buildDigitalCoordinator();
+    const { coordinator } = buildDigitalCoordinator();
     expect(coordinator.timingModel).toBe('discrete');
     coordinator.dispose();
   });
@@ -396,49 +403,51 @@ describe('capability queries — analog-only coordinator', () => {
 
 describe('unified execution methods — digital-only coordinator', () => {
   it('microStep executes without throwing', () => {
-    const { coordinator, facade } = buildDigitalCoordinator();
+    const { coordinator } = buildDigitalCoordinator();
     expect(() => coordinator.microStep()).not.toThrow();
     coordinator.dispose();
   });
 
   it('runToBreak executes without throwing', () => {
-    const { coordinator, facade } = buildDigitalCoordinator();
+    const { coordinator } = buildDigitalCoordinator();
     expect(() => coordinator.runToBreak()).not.toThrow();
     coordinator.dispose();
   });
 
   it('dcOperatingPoint returns null for digital-only', () => {
-    const { coordinator, facade } = buildDigitalCoordinator();
+    const { coordinator } = buildDigitalCoordinator();
     expect(coordinator.dcOperatingPoint()).toBeNull();
     coordinator.dispose();
   });
 
   it('acAnalysis returns null for digital-only', () => {
-    const { coordinator, facade } = buildDigitalCoordinator();
+    const { coordinator } = buildDigitalCoordinator();
     const result = coordinator.acAnalysis({
-      startHz: 1,
-      stopHz: 1e6,
-      pointsPerDecade: 10,
-      outputNodeIds: [],
+      type: 'dec',
+      fStart: 1,
+      fStop: 1e6,
+      numPoints: 10,
+      sourceLabel: '',
+      outputNodes: [],
     });
     expect(result).toBeNull();
     coordinator.dispose();
   });
 
   it('simTime is null for digital-only', () => {
-    const { coordinator, facade } = buildDigitalCoordinator();
+    const { coordinator } = buildDigitalCoordinator();
     expect(coordinator.simTime).toBeNull();
     coordinator.dispose();
   });
 
   it('getState returns STOPPED initially', () => {
-    const { coordinator, facade } = buildDigitalCoordinator();
+    const { coordinator } = buildDigitalCoordinator();
     expect(coordinator.getState()).toBe(EngineState.STOPPED);
     coordinator.dispose();
   });
 
   it('getState returns RUNNING after start', () => {
-    const { coordinator, facade } = buildDigitalCoordinator();
+    const { coordinator } = buildDigitalCoordinator();
     coordinator.start();
     expect(coordinator.getState()).toBe(EngineState.RUNNING);
     coordinator.stop();

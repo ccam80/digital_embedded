@@ -195,6 +195,25 @@ export class CircuitBuilder {
       bag.set(key, value);
     }
 
+    // Move model param keys from _map to _mparams based on the definition's
+    // modelRegistry paramDefs, so the compiler sees them in the correct partition.
+    if (definition.modelRegistry) {
+      const paramKeys = new Set<string>();
+      for (const entry of Object.values(definition.modelRegistry)) {
+        if (entry.paramDefs) {
+          for (const pd of entry.paramDefs) paramKeys.add(pd.key);
+        }
+      }
+      for (const key of paramKeys) {
+        if (bag.has(key)) {
+          const val = bag.get(key);
+          if (typeof val === 'number') {
+            bag.setModelParam(key, val);
+          }
+        }
+      }
+    }
+
     // Auto-position unless caller specified position
     // Position stored as [x, y] number array (PropertyValue supports number[])
     if (!bag.has('position')) {
@@ -343,6 +362,9 @@ export class CircuitBuilder {
         }
         const sv = coord.readSignal(addr);
         return sv.type === 'digital' ? sv.value : sv.voltage;
+      },
+      step(coord: SimulationCoordinator, _opts?: { clockAdvance?: boolean }): void {
+        coord.step();
       },
       runToStable(coord: SimulationCoordinator, maxIterations = 1000): void {
         for (let iter = 0; iter < maxIterations; iter++) {

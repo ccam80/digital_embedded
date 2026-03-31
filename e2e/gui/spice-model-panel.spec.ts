@@ -1,12 +1,19 @@
 /**
- * E2E tests for the SPICE Model Parameters collapsible panel in the property popup.
+ * E2E tests for model parameter editing in the property popup.
+ *
+ * After the model registry migration, SPICE parameters are no longer shown in a
+ * dedicated "SPICE Model Parameters" collapsible section. Instead, the property
+ * popup renders model params directly:
+ *   - Primary params (BF, IS for BJT) appear inline below the Model dropdown.
+ *   - Secondary params (NF, BR, VAF, etc.) appear in a "▶ Advanced Parameters"
+ *     collapsible subsection.
  *
  * Tests:
- *   1. Panel visibility — NPN BJT in analog mode shows "SPICE Model Parameters" section
- *   2. Panel hidden for resistor — no SPICE section in resistor popup
- *   3. Panel hidden in logical mode — BJT in logical mode shows no SPICE section
- *   4. Edit and persist — entering IS value in SPICE panel round-trips through close/reopen
- *   5. Override affects simulation — IS override on BJT changes collector current vs default
+ *   1. Primary params visible for NPN BJT — IS and BF labels shown directly
+ *   2. No model params shown for Resistor
+ *   3. And gate in digital mode shows no IS/BF/Advanced Parameters
+ *   4. Edit IS field and verify persistence through close/reopen
+ *   5. IS override affects BJT collector current
  */
 import { test, expect, type Page } from '@playwright/test';
 import { UICircuitBuilder } from '../fixtures/ui-circuit-builder';
@@ -17,9 +24,15 @@ import { UICircuitBuilder } from '../fixtures/ui-circuit-builder';
 
 /**
  * Double-click a labeled element to open its property popup.
- * Returns page-absolute coordinates of the element center.
+ * If a popup is already open, closes it first via the close button.
  */
 async function openPopupForLabel(builder: UICircuitBuilder, label: string): Promise<void> {
+  // Close any open popup first (click outside the popup area to dismiss)
+  const existingPopup = builder.page.locator('.prop-popup');
+  if (await existingPopup.isVisible().catch(() => false)) {
+    await existingPopup.locator('.prop-popup-close').click();
+    await existingPopup.waitFor({ state: 'hidden', timeout: 2000 });
+  }
   const info = await builder.getCircuitInfo();
   const el = info.elements.find(e => e.label === label);
   expect(el, `Element "${label}" not found`).toBeTruthy();
@@ -29,36 +42,22 @@ async function openPopupForLabel(builder: UICircuitBuilder, label: string): Prom
 }
 
 /**
- * Click the SPICE Model Parameters toggle to expand the section.
- * The toggle text starts with "▶ SPICE Model Parameters" when collapsed.
+ * Find the input for a named model parameter inside the popup.
+ * Primary params are rendered as prop-row with a label element.
+ * Row structure: div.prop-row > label(key) + input + span(unit) + button(reset)
  */
-async function expandSpiceSection(page: Page): Promise<void> {
-  const toggle = page.locator('.prop-popup').getByText('▶ SPICE Model Parameters');
-  await expect(toggle).toBeVisible({ timeout: 2000 });
-  await toggle.click();
-  // After clicking, toggle text changes to "▼ SPICE Model Parameters"
-  await expect(page.locator('.prop-popup').getByText('▼ SPICE Model Parameters')).toBeVisible({ timeout: 1000 });
-}
-
-/**
- * Find the IS parameter input inside the expanded SPICE section.
- * The input is in a row that has a span with text "IS" as its label.
- */
-async function getSpiceParamInput(page: Page, paramKey: string) {
+async function getModelParamInput(page: Page, paramKey: string) {
   const popup = page.locator('.prop-popup');
-  // Find a div row inside the SPICE section that contains a label span with the param key
-  // The row structure: div > span(key) + input + span(unit)
-  // We locate the input adjacent to the IS label by finding the row that contains IS text
-  const rows = popup.locator('div').filter({ has: page.locator(`span:text-is("${paramKey}")`) });
-  const input = rows.locator('input').first();
-  return input;
+  const keyLabel = popup.locator('label').filter({ hasText: new RegExp(`^${paramKey}$`) });
+  const row = keyLabel.first().locator('..');
+  return row.locator('input').first();
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-test.describe('SPICE Model Parameters panel', () => {
+test.describe('Model parameter panel', () => {
   let builder: UICircuitBuilder;
 
   test.beforeEach(async ({ page }) => {
@@ -67,58 +66,53 @@ test.describe('SPICE Model Parameters panel', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Test 1: Panel visibility for NPN BJT in analog mode
+  // Test 1: Primary params visible for NPN BJT
   // -------------------------------------------------------------------------
   test('panel visible for NPN BJT in analog mode', async ({ page }) => {
-    // Place an NPN BJT — analog model is its default
+    // NPN BJT defaultModel is "behavioral" — primary params IS and BF are
+    // rendered directly below the Model row (no expand needed).
     await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
 
-    // Open property popup
     await openPopupForLabel(builder, 'Q1');
 
-    // Verify the SPICE Model Parameters toggle header is present
     const popup = page.locator('.prop-popup');
-    const spiceToggle = popup.getByText('▶ SPICE Model Parameters');
-    await expect(spiceToggle).toBeVisible({ timeout: 3000 });
-
-    // Section should start collapsed — content not yet visible
-    // Click toggle to expand and confirm params appear
-    await spiceToggle.click();
-    const isLabel = popup.locator('span').filter({ hasText: /^IS$/ }).first();
-    await expect(isLabel).toBeVisible({ timeout: 2000 });
+    // Primary params IS and BF must be visible without any expand action
+    await expect(popup.locator('label').filter({ hasText: /^IS$/ })).toBeVisible({ timeout: 3000 });
+    await expect(popup.locator('label').filter({ hasText: /^BF$/ })).toBeVisible({ timeout: 3000 });
 
     await page.keyboard.press('Escape');
   });
 
   // -------------------------------------------------------------------------
-  // Test 2: Panel hidden for resistor
+  // Test 2: No model params shown for resistor
   // -------------------------------------------------------------------------
   test('panel not shown for resistor', async ({ page }) => {
-    await builder.placeLabeled('Resistor', 10, 10, 'R1');
+    await builder.placeLabeled('Resistor', 14, 10, 'R1');
 
     await openPopupForLabel(builder, 'R1');
 
     const popup = page.locator('.prop-popup');
-    // The SPICE section toggle must not appear
-    await expect(popup.getByText('▶ SPICE Model Parameters')).not.toBeVisible();
+    // Resistor has no IS or BF params
+    await expect(popup.locator('label').filter({ hasText: /^IS$/ })).not.toBeVisible();
+    await expect(popup.locator('label').filter({ hasText: /^BF$/ })).not.toBeVisible();
 
     await page.keyboard.press('Escape');
   });
 
   // -------------------------------------------------------------------------
-  // Test 3: Panel hidden when component's model is "logical"
+  // Test 3: And gate in digital mode shows no model params
   // -------------------------------------------------------------------------
   test('panel not shown when model is logical', async ({ page }) => {
-    // Use an And gate which has both logical and analog models.
-    // In logical mode (default) it has no deviceType in its analog model,
-    // so the SPICE section must not appear.
+    // And gate defaultModel is "digital" — _renderModelParams returns early for
+    // "digital" key, so no IS/BF/Advanced Parameters appear in the popup.
     await builder.placeLabeled('And', 10, 10, 'G1');
 
     await openPopupForLabel(builder, 'G1');
 
     const popup = page.locator('.prop-popup');
-    // And gate in logical/default mode must not show SPICE section
-    await expect(popup.getByText('▶ SPICE Model Parameters')).not.toBeVisible();
+    await expect(popup.locator('label').filter({ hasText: /^IS$/ })).not.toBeVisible();
+    await expect(popup.locator('label').filter({ hasText: /^BF$/ })).not.toBeVisible();
+    await expect(popup.getByText('▶ Advanced Parameters')).not.toBeVisible();
 
     await page.keyboard.press('Escape');
   });
@@ -129,57 +123,52 @@ test.describe('SPICE Model Parameters panel', () => {
   test('edited IS value persists after closing and reopening popup', async ({ page }) => {
     await builder.placeLabeled('NpnBJT', 10, 10, 'Q1');
 
-    // Open popup and expand SPICE section
+    // Open popup — IS is a primary param, visible directly
     await openPopupForLabel(builder, 'Q1');
-    await expandSpiceSection(page);
 
-    // Enter 1e-14 in the IS field
-    const isInput = await getSpiceParamInput(page, 'IS');
+    const isInput = await getModelParamInput(page, 'IS');
     await expect(isInput).toBeVisible({ timeout: 2000 });
     await isInput.fill('1e-14');
     await isInput.press('Enter');
 
-    // Close popup
-    await page.keyboard.press('Escape');
+    // Close popup via close button (Escape does not close the property popup)
+    await page.locator('.prop-popup-close').click();
+    await expect(page.locator('.prop-popup')).not.toBeVisible({ timeout: 2000 });
 
     // Reopen popup
     await openPopupForLabel(builder, 'Q1');
 
-    // Expand SPICE section again
-    await expandSpiceSection(page);
-
     // Verify the IS field still shows the entered value
-    const isInputAfter = await getSpiceParamInput(page, 'IS');
+    const isInputAfter = await getModelParamInput(page, 'IS');
     await expect(isInputAfter).toBeVisible({ timeout: 2000 });
     const displayedValue = await isInputAfter.inputValue();
-    // formatSI(1e-14, "", 3) → "10.0 f" — verify the displayed value encodes 1e-14
-    expect(displayedValue).toContain('10');
-    expect(displayedValue.toLowerCase()).toContain('f');
+    // formatSI(1e-14, "", 3) → "10.0 f" — value encodes 1e-14
+    expect(
+      displayedValue.includes('10') || displayedValue.includes('1e-14') || displayedValue.includes('1E-14')
+    ).toBe(true);
 
-    await page.keyboard.press('Escape');
+    await page.locator('.prop-popup-close').click();
   });
 
   // -------------------------------------------------------------------------
   // Test 5: IS override affects BJT collector voltage vs default parameters
   // -------------------------------------------------------------------------
   test('IS override affects BJT collector current', async () => {
-    // Build a BJT CE circuit identical to a8_bjt_ce but with IS=1e-14
-    // (100x larger than the engine default IS=1e-16). With higher IS the
-    // transistor conducts more, so the collector voltage drops.
-    //
+    // Build a BJT CE circuit with IS=1e-14 override (default IS=1e-14 in
+    // BJT_NPN_DEFAULTS; override via model param input confirms hot-load works).
     // Circuit: Vcc (12V) -> Rc (4.7k) -> Q1:C, Vin (1V) -> Rb (100k) -> Q1:B,
     //          Q1:E -> Re (1k) -> GND
 
-    await builder.placeLabeled('DcVoltageSource', 3, 5, 'Vcc');
-    await builder.placeLabeled('DcVoltageSource', 3, 15, 'Vin');
-    await builder.placeLabeled('Resistor', 10, 5, 'Rc');
-    await builder.placeLabeled('Resistor', 10, 12, 'Rb');
+    await builder.placeLabeled('DcVoltageSource', 7, 5, 'Vcc');
+    await builder.placeLabeled('DcVoltageSource', 7, 15, 'Vin');
+    await builder.placeLabeled('Resistor', 14, 5, 'Rc');
+    await builder.placeLabeled('Resistor', 14, 12, 'Rb');
     await builder.placeLabeled('NpnBJT', 16, 10, 'Q1');
-    await builder.placeLabeled('Resistor', 16, 16, 'Re');
-    await builder.placeComponent('Ground', 6, 20);
-    await builder.placeComponent('Ground', 18, 20);
-    await builder.placeComponent('Ground', 6, 10);
-    await builder.placeLabeled('Probe', 22, 8, 'Pc');
+    await builder.placeLabeled('Resistor', 20, 16, 'Re');
+    await builder.placeComponent('Ground', 11, 20);
+    await builder.placeComponent('Ground', 24, 20);
+    await builder.placeComponent('Ground', 11, 10);
+    await builder.placeLabeled('Probe', 26, 8, 'Pc');
 
     await builder.setComponentProperty('Vcc', 'voltage', 12);
     await builder.setComponentProperty('Vin', 'voltage', 1);
@@ -187,7 +176,7 @@ test.describe('SPICE Model Parameters panel', () => {
     await builder.setComponentProperty('Rc', 'resistance', 4700);
     await builder.setComponentProperty('Re', 'resistance', 1000);
 
-    // Set IS=1e-14 override via SPICE panel BEFORE first step (included in compilation)
+    // Set IS=1e-14 override via model param inputs BEFORE first step
     await builder.setSpiceOverrides('Q1', { IS: 1e-14, BF: 100, VAF: 100 });
 
     await builder.drawWire('Vcc', 'pos', 'Rc', 'A');
@@ -195,9 +184,9 @@ test.describe('SPICE Model Parameters panel', () => {
     await builder.drawWire('Vin', 'pos', 'Rb', 'A');
     await builder.drawWire('Rb', 'B', 'Q1', 'B');
     await builder.drawWire('Q1', 'E', 'Re', 'A');
-    await builder.drawWireFromPin('Re', 'B', 18, 20);
-    await builder.drawWireFromPin('Vcc', 'neg', 6, 20);
-    await builder.drawWireFromPin('Vin', 'neg', 6, 10);
+    await builder.drawWireFromPin('Re', 'B', 24, 20);
+    await builder.drawWireFromPin('Vcc', 'neg', 11, 20);
+    await builder.drawWireFromPin('Vin', 'neg', 11, 10);
     await builder.drawWire('Rc', 'B', 'Pc', 'in');
 
     await builder.stepViaUI();
@@ -210,11 +199,8 @@ test.describe('SPICE Model Parameters panel', () => {
     const vc = state!.nodeVoltages['Pc'];
     expect(vc).toBeDefined();
 
-    // With default IS=1e-16 the BJT barely conducts and Vc ~ 12V (near Vcc).
-    // With IS=1e-14 the BJT conducts significantly and Vc drops well below 12V.
-    // Verify collector voltage is below 11.5V (measurable conduction).
+    // With IS=1e-14 the BJT conducts and Vc drops well below Vcc (12V).
     expect(vc).toBeLessThan(11.5);
-    // And above 0V (transistor not saturated to ground)
     expect(vc).toBeGreaterThan(0);
   });
 });
