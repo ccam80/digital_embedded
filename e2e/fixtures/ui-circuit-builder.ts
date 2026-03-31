@@ -332,6 +332,54 @@ export class UICircuitBuilder {
   }
 
   /**
+   * Set a Pin Electrical parameter for a component through the UI.
+   *
+   * Opens the property popup, expands the "Pin Electrical" collapsible section,
+   * finds the input row by its field label (e.g. "Rout", "Rin", "Cin"),
+   * fills the value, and commits via Tab.
+   */
+  async setPinElectricalParam(
+    elementLabel: string,
+    fieldLabel: string,
+    value: string | number,
+  ): Promise<void> {
+    const info = await this.getCircuitInfo();
+    const el = info.elements.find(e => e.label === elementLabel);
+    expect(el, `Element "${elementLabel}" not found`).toBeTruthy();
+
+    // Close any open popup first — an open popup overlays the canvas and
+    // absorbs double-click events, preventing a new popup from opening.
+    const existingPopup = this.page.locator('.prop-popup');
+    if (await existingPopup.isVisible().catch(() => false)) {
+      await existingPopup.locator('.prop-popup-close').click();
+      await existingPopup.waitFor({ state: 'hidden', timeout: 2000 });
+    }
+
+    await this._dblClickElementBody(el!);
+
+    const popup = this.page.locator('.prop-popup');
+    await expect(popup).toBeVisible({ timeout: 3000 });
+
+    // Expand the "Pin Electrical" section if it is collapsed.
+    const pinElecToggle = popup.getByText('▶ Pin Electrical');
+    if (await pinElecToggle.isVisible().catch(() => false)) {
+      await pinElecToggle.click();
+      await popup.getByText('▼ Pin Electrical').waitFor({ state: 'visible', timeout: 1000 });
+    }
+
+    const input = popup
+      .locator('div')
+      .filter({ has: this.page.locator(`span:text-is("${fieldLabel}")`) })
+      .locator('input')
+      .first();
+    await expect(input, `Pin Electrical field "${fieldLabel}" not found in popup`).toBeVisible({ timeout: 2000 });
+    await input.fill(String(value));
+    await input.press('Tab');  // triggers blur → commit
+
+    await this.page.keyboard.press('Escape');
+  }
+
+  /**
    * Open the property popup for an element found by type and index.
    * Useful for components like Tunnel that have no label.
    */

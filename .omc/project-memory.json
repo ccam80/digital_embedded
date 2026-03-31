@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1774867146544,
+  "lastScanned": 1774954524188,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -82,7 +82,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1774867146501,
+      "lastAccessed": 1774954524149,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -94,7 +94,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 5,
-      "lastAccessed": 1774867146501,
+      "lastAccessed": 1774954524150,
       "keyFiles": [
         "simulator.html",
         "tutorial-editor.html",
@@ -106,15 +106,18 @@
     "e2e": {
       "path": "e2e",
       "purpose": null,
-      "fileCount": 0,
-      "lastAccessed": 1774867146501,
-      "keyFiles": []
+      "fileCount": 2,
+      "lastAccessed": 1774954524150,
+      "keyFiles": [
+        "pin-map-discovery.spec.ts",
+        "wire-capture.spec.ts"
+      ]
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
-      "fileCount": 10,
-      "lastAccessed": 1774867146502,
+      "fileCount": 11,
+      "lastAccessed": 1774954524150,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -127,54 +130,54 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1774867146524,
+      "lastAccessed": 1774954524151,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774867146524,
+      "lastAccessed": 1774954524151,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774867146524,
+      "lastAccessed": 1774954524151,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 13,
-      "lastAccessed": 1774867146525,
+      "fileCount": 19,
+      "lastAccessed": 1774954524151,
       "keyFiles": [
         "circuit-cli.ts",
         "circuit-mcp-server.ts",
-        "generate-all-components-fixture.ts",
-        "generate-spice-references.sh",
-        "measure-engine-references.ts"
+        "cleanup-unused-imports.mjs",
+        "cleanup-unused-imports2.mjs",
+        "generate-all-components-fixture.ts"
       ]
     },
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
       "fileCount": 11,
-      "lastAccessed": 1774867146525,
+      "lastAccessed": 1774954524152,
       "keyFiles": [
         "analog-snapshot-analysis.md",
         "app-modules-test-plan.md",
-        "bridge-and-hot-loadable-params.md",
-        "hot-loadable-spice-pin-params.md",
-        "model-unification-v2.md"
+        "master-circuit-assertions.md",
+        "ngspice-refs-complete.md",
+        "phase-1-master1-digital.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1774867146526,
+      "lastAccessed": 1774954524152,
       "keyFiles": [
         "main.ts"
       ]
@@ -182,18 +185,15 @@
     "test-results": {
       "path": "test-results",
       "purpose": null,
-      "fileCount": 3,
-      "lastAccessed": 1774867146526,
-      "keyFiles": [
-        "playwright-failures.json",
-        "test-failures.json"
-      ]
+      "fileCount": 1,
+      "lastAccessed": 1774954524152,
+      "keyFiles": []
     },
     "tutorials": {
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1774867146527,
+      "lastAccessed": 1774954524152,
       "keyFiles": [
         "index.json"
       ]
@@ -202,18 +202,18 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1774867146527,
+      "lastAccessed": 1774954524153,
       "keyFiles": [
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js",
-        "simulator-BCMNFszg.js"
+        "simulator-B8q6kG16.js"
       ]
     },
     "e2e\\fixtures": {
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 4,
-      "lastAccessed": 1774867146528,
+      "lastAccessed": 1774954524153,
       "keyFiles": [
         "harness.html",
         "simulator-harness.ts",
@@ -224,7 +224,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 24,
-      "lastAccessed": 1774867146529,
+      "lastAccessed": 1774954524172,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -235,7 +235,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1774867146530,
+      "lastAccessed": 1774954524172,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -246,22 +246,28 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1774867146530,
+      "lastAccessed": 1774954524172,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 169,
-      "lastAccessed": 1774949248485,
+      "accessCount": 195,
+      "lastAccessed": 1774958816002,
       "type": "file"
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 112,
-      "lastAccessed": 1774932181937,
+      "accessCount": 115,
+      "lastAccessed": 1774958793835,
       "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 86,
+      "lastAccessed": 1774954716709,
+      "type": "directory"
     },
     {
       "path": "spec\\bridge-and-hot-loadable-params.md",
@@ -271,50 +277,50 @@
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 70,
-      "lastAccessed": 1774923909815,
+      "accessCount": 71,
+      "lastAccessed": 1774951798824,
       "type": "file"
     },
     {
-      "path": "",
-      "accessCount": 69,
-      "lastAccessed": 1774949926031,
-      "type": "directory"
-    },
-    {
       "path": "src\\compile\\compile.ts",
-      "accessCount": 46,
-      "lastAccessed": 1774933483679,
+      "accessCount": 49,
+      "lastAccessed": 1774953359081,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 44,
-      "lastAccessed": 1774949281139,
+      "accessCount": 48,
+      "lastAccessed": 1774954065615,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 40,
-      "lastAccessed": 1774946510167,
+      "accessCount": 46,
+      "lastAccessed": 1774954970180,
       "type": "file"
     },
     {
       "path": "src\\components\\passives\\resistor.ts",
-      "accessCount": 38,
-      "lastAccessed": 1774950973072,
+      "accessCount": 40,
+      "lastAccessed": 1774954876925,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 35,
-      "lastAccessed": 1774908794934,
+      "accessCount": 37,
+      "lastAccessed": 1774953177982,
       "type": "file"
     },
     {
       "path": "spec\\test-baseline.md",
-      "accessCount": 33,
-      "lastAccessed": 1774910283845,
+      "accessCount": 37,
+      "lastAccessed": 1774953182598,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\and.ts",
+      "accessCount": 37,
+      "lastAccessed": 1774958813666,
       "type": "file"
     },
     {
@@ -339,12 +345,6 @@
       "path": "src\\compile\\types.ts",
       "accessCount": 30,
       "lastAccessed": 1774932347006,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\gates\\and.ts",
-      "accessCount": 30,
-      "lastAccessed": 1774949232023,
       "type": "file"
     },
     {
@@ -384,6 +384,12 @@
       "type": "file"
     },
     {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 22,
+      "lastAccessed": 1774953178374,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\bridge-adapter.test.ts",
       "accessCount": 21,
       "lastAccessed": 1774923708121,
@@ -393,12 +399,6 @@
       "path": "src\\components\\passives\\potentiometer.ts",
       "accessCount": 21,
       "lastAccessed": 1774947287930,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 20,
-      "lastAccessed": 1774908795217,
       "type": "file"
     },
     {
@@ -535,8 +535,8 @@
     },
     {
       "path": "CLAUDE.md",
-      "accessCount": 8,
-      "lastAccessed": 1774908785992,
+      "accessCount": 9,
+      "lastAccessed": 1774951815693,
       "type": "file"
     },
     {

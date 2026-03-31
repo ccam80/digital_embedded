@@ -136,12 +136,49 @@ test.describe('Master circuit assembly via UI', () => {
     expect(cntY).not.toBeNull();
     expect(cntY!).toBeGreaterThanOrEqual(4);
 
-    // --- CMOS model: Phase C (deferred) ---
-    // CMOS subcircuit adds VDD/GND power pins that require wiring to supply
-    // components. In this digital-only circuit, no power sources exist.
-    // Compiler fixes landed (netlist resolution + default MOSFET params),
-    // but test needs VDD/GND wiring before CMOS assertions can be validated.
-    // TODO: Place VDD + Ground, wire to G_AND power pins, then assert CMOS voltages.
+    // --- CMOS model: Phase C — wire VDD/GND to G_AND power pins ---
+    // Set G_AND to CMOS model so VDD/GND power pins appear
+    await builder.setComponentProperty('G_AND', 'model', 'cmos');
+
+    // Ground for G_AND GND pin (~(11.5,6), place Ground 1 grid below at (12,7))
+    await builder.placeComponent('Ground', 12, 7);
+
+    // DC voltage source for VDD rail (unoccupied area at col 24)
+    await builder.placeLabeled('DcVoltageSource', 24, 3, 'VDD_SRC');
+    await builder.setComponentProperty('VDD_SRC', 'voltage', 3.3);
+
+    // Ground for VDD_SRC negative terminal
+    await builder.placeComponent('Ground', 24, 5);
+
+    // Connect VDD_SRC negative to its ground
+    await builder.drawWireFromPinExplicit('VDD_SRC', 'neg', 24, 5);
+
+    // Tunnel at VDD_SRC positive to create VDD net
+    await builder.placeLabeled('Tunnel', 28, 3, 'VDD');
+    await builder.setComponentProperty('VDD', 'NetName', 'VDD');
+    await builder.drawWireExplicit('VDD_SRC', 'pos', 'VDD', 'in');
+
+    // Second VDD tunnel near G_AND VDD pin (~(11.5,3), place at (13,3))
+    await builder.placeLabeled('Tunnel', 13, 3, 'VDD_G');
+    await builder.setComponentProperty('VDD_G', 'NetName', 'VDD');
+
+    // Wire from G_AND VDD pin to the nearby tunnel
+    await builder.drawWireFromPinExplicit('G_AND', 'VDD', 13, 3);
+
+    // Wire from G_AND GND pin to the nearby ground
+    await builder.drawWireFromPinExplicit('G_AND', 'GND', 12, 7);
+
+    // Recompile with CMOS model active
+    await builder.stepViaUI();
+    await builder.verifyNoErrors();
+
+    // --- CMOS model: Phase C — verify analog voltages on CMOS gate ---
+    await builder.stepToTimeViaUI('5m');
+    const cmosState = await builder.getAnalogState();
+    expect(cmosState).not.toBeNull();
+    // VDD should be near 3.3V
+    const sortedV = sortedVoltages(cmosState!);
+    expect(sortedV[0]).toBeGreaterThan(3.0); // VDD rail
   });
 
   // =========================================================================
