@@ -147,7 +147,7 @@ export function executeXNOr(index: number, state: Uint32Array, _highZs: Uint32Ar
 
 const CMOS_XNOR2_NETLIST: MnaSubcircuitNetlist = {
   ports: ["In_1", "In_2", "out", "VDD", "GND"],
-  params: {},
+  params: { W: 10e-6 },
   elements: [
     { typeId: "PMOS", branchCount: 0 }, // inv1_p: invert In_1
     { typeId: "NMOS", branchCount: 0 }, // inv1_n: invert In_1

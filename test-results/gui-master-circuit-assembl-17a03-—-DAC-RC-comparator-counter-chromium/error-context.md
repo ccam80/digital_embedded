@@ -19,7 +19,7 @@
       - button "⏵" [ref=e18] [cursor=pointer]
       - 'textbox "Step to sim-time offset (SI suffixes: s, m=ms, u=µs, n=ns)" [ref=e19]':
         - /placeholder: e.g. 5m, 100u
-        - text: 1m
+        - text: 5m
       - button "▶▶" [ref=e20] [cursor=pointer]
       - button "■" [ref=e21] [cursor=pointer]
       - button "−" [ref=e22] [cursor=pointer]
@@ -37,26 +37,26 @@
         - generic [ref=e35]:
           - generic [ref=e36] [cursor=pointer]: Recent
           - list [ref=e37]:
-            - treeitem "Tunnel" [ref=e38] [cursor=pointer]:
-              - generic [ref=e40]: Tunnel
-            - treeitem "Ground" [ref=e41] [cursor=pointer]:
-              - generic [ref=e43]: Ground
-            - treeitem "DcVoltageSource" [ref=e44] [cursor=pointer]:
-              - generic [ref=e46]: DcVoltageSource
-            - treeitem "Out" [ref=e47] [cursor=pointer]:
-              - generic [ref=e49]: Out
-            - treeitem "Counter" [ref=e50] [cursor=pointer]:
-              - generic [ref=e52]: Counter
-            - treeitem "D_FF" [ref=e53] [cursor=pointer]:
-              - generic [ref=e55]: D_FF
-            - treeitem "Not" [ref=e56] [cursor=pointer]:
-              - generic [ref=e58]: Not
-            - treeitem "XOr" [ref=e59] [cursor=pointer]:
-              - generic [ref=e61]: XOr
-            - treeitem "Or" [ref=e62] [cursor=pointer]:
-              - generic [ref=e64]: Or
-            - treeitem "And" [ref=e65] [cursor=pointer]:
-              - generic [ref=e67]: And
+            - treeitem "Out" [ref=e38] [cursor=pointer]:
+              - generic [ref=e40]: Out
+            - treeitem "Counter" [ref=e41] [cursor=pointer]:
+              - generic [ref=e43]: Counter
+            - treeitem "Clock" [ref=e44] [cursor=pointer]:
+              - generic [ref=e46]: Clock
+            - treeitem "Const" [ref=e47] [cursor=pointer]:
+              - generic [ref=e49]: Const
+            - treeitem "And" [ref=e50] [cursor=pointer]:
+              - generic [ref=e52]: And
+            - treeitem "Ground" [ref=e53] [cursor=pointer]:
+              - generic [ref=e55]: Ground
+            - treeitem "DcVoltageSource" [ref=e56] [cursor=pointer]:
+              - generic [ref=e58]: DcVoltageSource
+            - treeitem "VoltageComparator" [ref=e59] [cursor=pointer]:
+              - generic [ref=e61]: VoltageComparator
+            - treeitem "Probe" [ref=e62] [cursor=pointer]:
+              - generic [ref=e64]: Probe
+            - treeitem "Capacitor" [ref=e65] [cursor=pointer]:
+              - generic [ref=e67]: Capacitor
         - tree [ref=e68]:
           - generic [ref=e69]:
             - generic [ref=e70] [cursor=pointer]:
@@ -280,29 +280,9 @@
                 - generic [ref=e373]: RAMSinglePort
       - button "‹" [ref=e374] [cursor=pointer]
     - generic "Drag to resize palette" [ref=e375]
-    - generic [ref=e376]:
-      - generic "Circuit editor canvas" [ref=e377]
-      - generic [ref=e378]:
-        - generic [ref=e379]:
-          - generic [ref=e380]: Tunnel
-          - button "×" [ref=e381] [cursor=pointer]
-        - generic [ref=e382]:
-          - generic [ref=e383]:
-            - generic [ref=e384]: Net Name
-            - textbox [ref=e386]
-          - generic [ref=e387]:
-            - generic [ref=e388]: Bits
-            - spinbutton [ref=e390]: "1"
-          - generic [ref=e391]:
-            - generic [ref=e392]: Label
-            - generic [ref=e393]:
-              - textbox [ref=e395]: VDD
-              - checkbox "Show on canvas" [checked] [ref=e396]
-          - generic [ref=e397]:
-            - generic [ref=e398]: Show value
-            - checkbox [checked] [ref=e400]
-  - generic [ref=e401]:
-    - generic [ref=e402]: Ready
-    - button "100%" [ref=e404] [cursor=pointer]
-    - generic [ref=e405]: 28.5, 3
+    - generic "Circuit editor canvas" [ref=e377]
+  - generic [ref=e378]:
+    - generic [ref=e379]: Ready
+    - button "100%" [ref=e381] [cursor=pointer]
+    - generic [ref=e382]: 48, 18
 ```

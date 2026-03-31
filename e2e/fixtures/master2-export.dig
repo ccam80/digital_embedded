@@ -1,0 +1,722 @@
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "65191379-1079-47b7-b3c7-d5da08058552",
+        "position": {
+          "x": 3,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "Vs"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "16e0ba80-2512-45af-85f1-54536b197df9",
+        "position": {
+          "x": 3,
+          "y": 7
+        },
+        "properties": {
+          "label": "CTRL"
+        },
+        "rotation": 0,
+        "type": "In"
+      },
+      {
+        "id": "c4acb771-3e6e-4330-a5ba-2f6af85baa90",
+        "position": {
+          "x": 12,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "rOff": 1000000000,
+            "rOn": 10,
+            "threshold": 1.65,
+            "transitionSharpness": 20
+          },
+          "label": "SW"
+        },
+        "rotation": 0,
+        "type": "SwitchSPST"
+      },
+      {
+        "id": "0c0e8803-2646-491a-97fd-9f21bfb24434",
+        "position": {
+          "x": 20,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 10000
+          },
+          "label": "R1"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "115f76eb-69dd-4077-909f-bad0fb914313",
+        "position": {
+          "x": 28,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 10000
+          },
+          "label": "R2"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "0aecdb87-c552-44f8-94b0-32f4313566bd",
+        "position": {
+          "x": 3,
+          "y": 4
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "b7216469-0be0-455e-b8d8-25d03b5ea285",
+        "position": {
+          "x": 32,
+          "y": 8
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "2114d140-25db-4690-bfb4-37870b4de77a",
+        "position": {
+          "x": 26,
+          "y": 1
+        },
+        "properties": {
+          "label": "P_DIV"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      },
+      {
+        "id": "ac22a341-0a82-4a93-97eb-59a78034d083",
+        "position": {
+          "x": 20,
+          "y": 11
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "R3"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "49e1a6aa-499c-45be-8c73-11267c5f74df",
+        "position": {
+          "x": 28,
+          "y": 11
+        },
+        "properties": {
+          "_modelParams": {
+            "capacitance": 0.000001
+          },
+          "label": "C1"
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "32712cf9-0673-4c02-919d-c27f7022f4d5",
+        "position": {
+          "x": 32,
+          "y": 12
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "27944280-d2e6-4b43-bcd0-88112edcca2d",
+        "position": {
+          "x": 26,
+          "y": 9
+        },
+        "properties": {
+          "label": "P_RC"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      },
+      {
+        "id": "e5af6c58-e464-4068-8252-50c5440dd395",
+        "position": {
+          "x": 28,
+          "y": 19
+        },
+        "properties": {
+          "_modelParams": {
+            "gain": 1000000,
+            "rOut": 75
+          },
+          "label": "AMP"
+        },
+        "rotation": 0,
+        "type": "OpAmp"
+      },
+      {
+        "id": "45d6cb2a-3237-4adb-83d6-988be109feb5",
+        "position": {
+          "x": 36,
+          "y": 19
+        },
+        "properties": {
+          "label": "P_AMP"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      },
+      {
+        "id": "3e285bff-f6f2-4264-abdc-2c1a4c185469",
+        "position": {
+          "x": 20,
+          "y": 25
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 100000
+          },
+          "label": "Rb"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "fb61b3d6-5fb5-4cd1-8571-ea132d08d21d",
+        "position": {
+          "x": 28,
+          "y": 25
+        },
+        "properties": {
+          "_modelParams": {
+            "BF": 100,
+            "BR": 1,
+            "IKF": null,
+            "IKR": null,
+            "IS": 1e-14,
+            "ISC": 0,
+            "ISE": 0,
+            "NF": 1,
+            "NR": 1,
+            "VAF": null,
+            "VAR": null
+          },
+          "label": "Q1"
+        },
+        "rotation": 0,
+        "type": "NpnBJT"
+      },
+      {
+        "id": "8ec9dba2-1e6f-4bc0-bb07-54ee11fee230",
+        "position": {
+          "x": 36,
+          "y": 24
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "Rc"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "53471318-5b27-4ee1-a03d-c698167128c6",
+        "position": {
+          "x": 36,
+          "y": 30
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 12
+          },
+          "label": "Vcc"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "056d34fe-5aad-4b4f-883c-b65f697cdd6b",
+        "position": {
+          "x": 32,
+          "y": 30
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "9e0cc7ed-f012-4ab5-a326-33c32a44c54d",
+        "position": {
+          "x": 44,
+          "y": 23
+        },
+        "properties": {
+          "label": "P_CE"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      }
+    ],
+    "name": "Untitled",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 7,
+            "y": 3
+          },
+          {
+            "x": 12,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 7
+          },
+          {
+            "x": 14,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 7
+          },
+          {
+            "x": 14,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 3
+          },
+          {
+            "x": 20,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 3
+          },
+          {
+            "x": 32,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 3
+          },
+          {
+            "x": 3,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 3
+          },
+          {
+            "x": 26,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 3
+          },
+          {
+            "x": 28,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 1
+          },
+          {
+            "x": 26,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 11
+          },
+          {
+            "x": 20,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 7
+          },
+          {
+            "x": 18,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 7
+          },
+          {
+            "x": 26,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 7
+          },
+          {
+            "x": 26,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 11
+          },
+          {
+            "x": 32,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 11
+          },
+          {
+            "x": 26,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 11
+          },
+          {
+            "x": 28,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 9
+          },
+          {
+            "x": 26,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 20
+          },
+          {
+            "x": 28,
+            "y": 20
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 20
+          },
+          {
+            "x": 26,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 18
+          },
+          {
+            "x": 28,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 15
+          },
+          {
+            "x": 27,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 15
+          },
+          {
+            "x": 35,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 35,
+            "y": 15
+          },
+          {
+            "x": 35,
+            "y": 19
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 35,
+            "y": 19
+          },
+          {
+            "x": 32,
+            "y": 19
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 19
+          },
+          {
+            "x": 35,
+            "y": 19
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 19,
+            "y": 25
+          },
+          {
+            "x": 20,
+            "y": 25
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 19,
+            "y": 23
+          },
+          {
+            "x": 19,
+            "y": 25
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 19,
+            "y": 23
+          },
+          {
+            "x": 35,
+            "y": 23
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 35,
+            "y": 23
+          },
+          {
+            "x": 35,
+            "y": 19
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 25
+          },
+          {
+            "x": 28,
+            "y": 25
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 24
+          },
+          {
+            "x": 36,
+            "y": 24
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 23
+          },
+          {
+            "x": 44,
+            "y": 23
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 23
+          },
+          {
+            "x": 36,
+            "y": 24
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 40,
+            "y": 24
+          },
+          {
+            "x": 40,
+            "y": 30
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 26
+          },
+          {
+            "x": 32,
+            "y": 30
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 30
+          },
+          {
+            "x": 32,
+            "y": 30
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

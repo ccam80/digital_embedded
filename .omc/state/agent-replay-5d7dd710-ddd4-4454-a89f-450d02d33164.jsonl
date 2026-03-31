@@ -1,0 +1,6 @@
+{"t":0,"agent":"ae17590","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"ae17590","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":105031}
+{"t":0,"agent":"a425197","agent_type":"architect","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"ac09641","agent_type":"architect","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a425197","agent_type":"architect","event":"agent_stop","success":true,"duration_ms":158249}
+{"t":0,"agent":"ac09641","agent_type":"architect","event":"agent_stop","success":true,"duration_ms":151061}

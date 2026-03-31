@@ -275,7 +275,14 @@ export class UICircuitBuilder {
 
     await this._dblClickElementBody(el!);
     await this._setPopupProperty(propLabel, value);
-    await this.page.keyboard.press('Escape');
+
+    // Close popup explicitly via the close button to trigger any pending
+    // property change commits (blur/change events) before continuing.
+    const popup = this.page.locator('.prop-popup');
+    if (await popup.isVisible().catch(() => false)) {
+      await popup.locator('.prop-popup-close').click();
+      await popup.waitFor({ state: 'hidden', timeout: 2000 });
+    }
   }
 
   /**
@@ -294,14 +301,6 @@ export class UICircuitBuilder {
     const info = await this.getCircuitInfo();
     const el = info.elements.find(e => e.label === elementLabel);
     expect(el, `Element "${elementLabel}" not found`).toBeTruthy();
-
-    // Close any open popup first — an open popup overlays the canvas and
-    // absorbs double-click events, preventing a new popup from opening.
-    const existingPopup = this.page.locator('.prop-popup');
-    if (await existingPopup.isVisible().catch(() => false)) {
-      await existingPopup.locator('.prop-popup-close').click();
-      await existingPopup.waitFor({ state: 'hidden', timeout: 2000 });
-    }
 
     await this._dblClickElementBody(el!);
 
@@ -328,7 +327,9 @@ export class UICircuitBuilder {
     await input.fill(String(value));
     await input.press('Tab');  // triggers blur → commit
 
-    await this.page.keyboard.press('Escape');
+    // Close popup via button to trigger any pending change commits.
+    await popup.locator('.prop-popup-close').click();
+    await popup.waitFor({ state: 'hidden', timeout: 2000 });
   }
 
   /**
@@ -346,14 +347,6 @@ export class UICircuitBuilder {
     const info = await this.getCircuitInfo();
     const el = info.elements.find(e => e.label === elementLabel);
     expect(el, `Element "${elementLabel}" not found`).toBeTruthy();
-
-    // Close any open popup first — an open popup overlays the canvas and
-    // absorbs double-click events, preventing a new popup from opening.
-    const existingPopup = this.page.locator('.prop-popup');
-    if (await existingPopup.isVisible().catch(() => false)) {
-      await existingPopup.locator('.prop-popup-close').click();
-      await existingPopup.waitFor({ state: 'hidden', timeout: 2000 });
-    }
 
     await this._dblClickElementBody(el!);
 
@@ -376,7 +369,9 @@ export class UICircuitBuilder {
     await input.fill(String(value));
     await input.press('Tab');  // triggers blur → commit
 
-    await this.page.keyboard.press('Escape');
+    // Close popup via button to trigger any pending change commits.
+    await popup.locator('.prop-popup-close').click();
+    await popup.waitFor({ state: 'hidden', timeout: 2000 });
   }
 
   /**

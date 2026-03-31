@@ -233,7 +233,7 @@ const NOT_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const CMOS_INVERTER_NETLIST: MnaSubcircuitNetlist = {
   ports: ["in", "out", "VDD", "GND"],
-  params: {},
+  params: { W: 10e-6 },
   elements: [
     { typeId: "PMOS", branchCount: 0 },
     { typeId: "NMOS", branchCount: 0 },

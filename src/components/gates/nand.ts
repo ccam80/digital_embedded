@@ -131,7 +131,7 @@ export function executeNAnd(index: number, state: Uint32Array, _highZs: Uint32Ar
 
 const CMOS_NAND2_NETLIST: MnaSubcircuitNetlist = {
   ports: ["In_1", "In_2", "out", "VDD", "GND"],
-  params: {},
+  params: { W: 10e-6 },
   elements: [
     { typeId: "PMOS", branchCount: 0 },
     { typeId: "PMOS", branchCount: 0 },

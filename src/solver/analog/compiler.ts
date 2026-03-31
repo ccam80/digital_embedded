@@ -202,6 +202,25 @@ function compileSubcircuitToMnaModel(
         return -1;
       }
 
+      // Resolve subcircuit-level params: netlist defaults, then instance overrides.
+      const resolvedSubcktParams = new Map<string, number>();
+      if (netlist.params) {
+        for (const [k, v] of Object.entries(netlist.params)) {
+          resolvedSubcktParams.set(k, v);
+        }
+      }
+      // Instance-level overrides from the outer component's PropertyBag
+      for (const [k] of resolvedSubcktParams) {
+        if (_props.hasModelParam(k)) {
+          resolvedSubcktParams.set(k, _props.getModelParam<number>(k));
+        }
+      }
+
+      // Binding map: subcircuit param name → [{element, elementParamKey}]
+      // Used by setParam to route subcircuit-level changes to the correct
+      // sub-element param (e.g. "WP" → PMOS elements' "W" param).
+      const bindings = new Map<string, Array<{ el: import("../../core/analog-types.js").AnalogElementCore; key: string }>>();
+
       const subElements: import("../../core/analog-types.js").AnalogElementCore[] = [];
       let subBranchOffset = 0;
 
@@ -222,10 +241,15 @@ function compileSubcircuitToMnaModel(
             if (typeof v === "number") subProps.setModelParam(k, v);
           }
         }
-        // Override with subcircuit-specific params
+        // Override with subcircuit-specific params — resolve string references
         if (subEl.params) {
           for (const [k, v] of Object.entries(subEl.params)) {
-            if (typeof v === "number") subProps.setModelParam(k, v);
+            if (typeof v === "number") {
+              subProps.setModelParam(k, v);
+            } else if (typeof v === "string") {
+              const resolved = resolvedSubcktParams.get(v);
+              if (resolved !== undefined) subProps.setModelParam(k, resolved);
+            }
           }
         }
 
@@ -241,6 +265,17 @@ function compileSubcircuitToMnaModel(
         const core = leafFactory(subPinNodes, [], subBranchIdx, subProps, getTime);
         if (core.branchIndex >= 0) subBranchOffset++;
         subElements.push(core);
+
+        // Record string-ref bindings for setParam routing
+        if (subEl.params) {
+          for (const [k, v] of Object.entries(subEl.params)) {
+            if (typeof v === "string") {
+              let arr = bindings.get(v);
+              if (!arr) { arr = []; bindings.set(v, arr); }
+              arr.push({ el: core, key: k });
+            }
+          }
+        }
       }
 
       const anyNonlinear = subElements.some(e => e.isNonlinear);
@@ -265,7 +300,16 @@ function compileSubcircuitToMnaModel(
           return currents;
         },
 
-        setParam(_key: string, _value: number): void {},
+        setParam(key: string, value: number): void {
+          const bound = bindings.get(key);
+          if (bound) {
+            // Subcircuit-level param: route to bound sub-elements
+            for (const { el, key: elKey } of bound) el.setParam(elKey, value);
+          } else {
+            // Direct element param (no binding): broadcast to all
+            for (const sub of subElements) sub.setParam(key, value);
+          }
+        },
       };
 
       if (anyNonlinear) {

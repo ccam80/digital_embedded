@@ -47,7 +47,8 @@ export interface ParamDef {
 
 export type ModelEntry =
   | { kind: "inline"; factory: AnalogFactory; paramDefs: ParamDef[]; params: Record<string, number>; branchCount?: number }
-  | { kind: "netlist"; netlist: MnaSubcircuitNetlist; paramDefs: ParamDef[]; params: Record<string, number> };
+  | { kind: "netlist"; netlist: MnaSubcircuitNetlist; paramDefs: ParamDef[]; params: Record<string, number> }
+  | { kind: "subcircuit-params"; paramDefs: ParamDef[]; params: Record<string, number> };
 
 // ---------------------------------------------------------------------------
 // Well-known property keys

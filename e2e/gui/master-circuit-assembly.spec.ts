@@ -108,6 +108,10 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.drawWireExplicit('G_AND', 'out', 'AND_Y', 'in');
     await builder.drawWireFromPinExplicit('FF', 'D', 17, 5, [[8, 26], [8, 24], [17, 24]]);
 
+    // Export circuit for offline inspection
+    const m1xml = await builder.exportCircuitDigXml();
+    if (m1xml) { const fs = await import('fs'); fs.writeFileSync('e2e/fixtures/master1-export.dig', m1xml); }
+
     // --- Compile and verify ---
     await builder.stepViaUI();
 
@@ -153,14 +157,18 @@ test.describe('Master circuit assembly via UI', () => {
     // Connect VDD_SRC negative to its ground
     await builder.drawWireFromPinExplicit('VDD_SRC', 'neg', 24, 5);
 
+    // Probe on VDD rail so the voltage appears in readAllSignals / getAnalogState
+    await builder.placeLabeled('Probe', 26, 3, 'P_VDD');
+
     // Tunnel at VDD_SRC positive to create VDD net
     await builder.placeLabeled('Tunnel', 28, 3, 'VDD');
-    await builder.setComponentProperty('VDD', 'NetName', 'VDD');
+    await builder.setComponentProperty('VDD', 'Net Name', 'VDD');
     await builder.drawWireExplicit('VDD_SRC', 'pos', 'VDD', 'in');
+    await builder.drawWireExplicit('VDD_SRC', 'pos', 'P_VDD', 'in');
 
     // Second VDD tunnel near G_AND VDD pin (~(11.5,3), place at (13,3))
     await builder.placeLabeled('Tunnel', 13, 3, 'VDD_G');
-    await builder.setComponentProperty('VDD_G', 'NetName', 'VDD');
+    await builder.setComponentProperty('VDD_G', 'Net Name', 'VDD');
 
     // Wire from G_AND VDD pin to the nearby tunnel
     await builder.drawWireFromPinExplicit('G_AND', 'VDD', 13, 3);
@@ -176,9 +184,12 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.stepToTimeViaUI('5m');
     const cmosState = await builder.getAnalogState();
     expect(cmosState).not.toBeNull();
-    // VDD should be near 3.3V
-    const sortedV = sortedVoltages(cmosState!);
-    expect(sortedV[0]).toBeGreaterThan(3.0); // VDD rail
+    // VDD probe should read ~3.3V (analog engine active)
+    const signals = await builder.readAllSignals();
+    expect(signals).not.toBeNull();
+    const vddVoltage = signals!['P_VDD'];
+    expect(vddVoltage).toBeDefined();
+    expect(vddVoltage).toBeGreaterThan(3.0); // VDD rail near 3.3V
   });
 
   // =========================================================================
@@ -201,7 +212,6 @@ test.describe('Master circuit assembly via UI', () => {
     // --- Section A: Power + switch + voltage divider (y=3) ---
     await builder.placeLabeled('DcVoltageSource', 3, 3, 'Vs');
     await builder.placeLabeled('In', 3, 7, 'CTRL');
-    await builder.setComponentProperty('CTRL', 'Default', 1);
     await builder.placeLabeled('SwitchSPST', 12, 3, 'SW');
     await builder.placeLabeled('Resistor', 20, 3, 'R1');
     await builder.setComponentProperty('R1', 'resistance', 10000);
@@ -271,9 +281,19 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.drawWireFromPinExplicit('Q1', 'E', 32, 30);
     await builder.drawWireFromPinExplicit('Vcc', 'neg', 32, 30);
 
-    // --- Compile and verify ---
+    // Export circuit for offline inspection
+    const m2xml = await builder.exportCircuitDigXml();
+    if (m2xml) { const fs = await import('fs'); fs.writeFileSync('e2e/fixtures/master2-export.dig', m2xml); }
+
+    // --- Compile and start simulation ---
     await builder.stepViaUI();
     await builder.verifyNoErrors();
+
+    // Click the CTRL input to toggle it HIGH (like a user would).
+    // Simulation must be running for the click-toggle to register.
+    // Click 1 grid left of placement to avoid the wire connection point.
+    await builder.stepViaUI();
+    await builder.clickGrid(2, 7);
 
     // --- Phase A: DC operating point ---
     // Step to 50ms for full settling
@@ -486,6 +506,10 @@ test.describe('Master circuit assembly via UI', () => {
     // Counter output → Q
     await builder.drawWireExplicit('CNT', 'out', 'Q', 'in');
 
+    // Export circuit for offline inspection
+    const m3xml = await builder.exportCircuitDigXml();
+    if (m3xml) { const fs = await import('fs'); fs.writeFileSync('e2e/fixtures/master3-export.dig', m3xml); }
+
     // --- Compile and verify ---
     await builder.stepViaUI();
     await builder.verifyNoErrors();
@@ -508,6 +532,7 @@ test.describe('Master circuit assembly via UI', () => {
     // ngspice ref at t=5ms: v_rc = 3.121984V (98.94% settled toward 3.125V)
     const pDacA = signalsA!['P_DAC'];
     expect(pDacA).toBeDefined();
+
     expect(Math.abs(pDacA - 3.121984) / 3.121984).toBeLessThan(0.001);
 
     // Comparator polarity: in- gets RC voltage (~3.12V) > in+ gets Vref2 (2.5V)
@@ -550,8 +575,13 @@ test.describe('Master circuit assembly via UI', () => {
     expect(peaks!.nodeCount).toBeGreaterThanOrEqual(1);
 
     // --- Phase E: Pin electrical / rOut override on GA output ---
-    // TODO: Right-click GA output pin, set Rout=75
-    // Pattern from e2e/gui/hotload-params-e2e.spec.ts
-    // Deferred: requires getPinFieldInput helper and pin-level context menu
+    await builder.setPinElectricalParam('GA', 'Rout', 75);
+    await builder.stepToTimeViaUI('65m');  // absolute: 60ms + 5ms settling
+    const stateE = await builder.getAnalogState();
+    expect(stateE).not.toBeNull();
+    // Verify simulation still produces finite voltages after rOut change
+    for (const [node, v] of Object.entries(stateE!.nodeVoltages)) {
+      expect(Number.isFinite(v), `node ${node} voltage is not finite: ${v}`).toBe(true);
+    }
   });
 });

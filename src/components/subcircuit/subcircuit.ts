@@ -27,6 +27,8 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
   type ComponentRegistry,
+  type ModelEntry,
+  type ParamDef,
 } from "../../core/registry.js";
 import type { Circuit, CustomShapeData } from "../../core/circuit.js";
 import type { ShapeMode } from "./shape-renderer.js";
@@ -55,6 +57,12 @@ export interface SubcircuitDefinition {
   shapeMode: ShapeMode;
   /** Display name (typically the filename without extension). */
   name: string;
+  /**
+   * Subcircuit-level parameters with defaults.
+   * Internal components reference these by name (string values in their params).
+   * Exposed to the user as model params in the property popup.
+   */
+  params?: Record<string, number>;
 }
 
 /**
@@ -71,7 +79,7 @@ export function createLiveDefinition(
   shapeMode: ShapeMode,
   name: string,
 ): SubcircuitDefinition {
-  return {
+  const def: SubcircuitDefinition = {
     circuit,
     shapeMode,
     name,
@@ -79,6 +87,11 @@ export function createLiveDefinition(
       return deriveInterfacePins(circuit);
     },
   };
+  // Propagate subcircuit-level params from circuit metadata
+  if (circuit.metadata.params && Object.keys(circuit.metadata.params).length > 0) {
+    def.params = circuit.metadata.params;
+  }
+  return def;
 }
 
 // ---------------------------------------------------------------------------
@@ -541,6 +554,28 @@ export function registerSubcircuit(
     },
   ];
 
+  // Build modelRegistry from subcircuit-level params (if declared).
+  // These behave like model params: stored in _mparams, shown in the property
+  // popup, hot-loadable via setParam routing to bound children.
+  let modelRegistry: Record<string, ModelEntry> | undefined;
+  let defaultModel: string | undefined;
+  if (definition.params && Object.keys(definition.params).length > 0) {
+    const paramDefs: ParamDef[] = Object.entries(definition.params).map(([key]) => ({
+      key,
+      type: PropertyType.FLOAT,
+      label: key,
+      rank: "primary" as const,
+    }));
+    modelRegistry = {
+      default: {
+        kind: "subcircuit-params",
+        paramDefs,
+        params: { ...definition.params },
+      },
+    };
+    defaultModel = "default";
+  }
+
   const componentDef: ComponentDefinition = {
     name,
     typeId: -1,
@@ -563,6 +598,7 @@ export function registerSubcircuit(
       `Pins: ${definition.pinLayout.length} interface pins derived from In/Out components.\n` +
       "This component is flattened into its constituent gates before simulation.",
     models: { digital: { executeFn: executeSubcircuit } },
+    ...(modelRegistry ? { modelRegistry, defaultModel } : {}),
   };
 
   registry.registerOrUpdate(componentDef);

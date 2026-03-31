@@ -147,7 +147,7 @@ export function executeNOr(index: number, state: Uint32Array, _highZs: Uint32Arr
 
 const CMOS_NOR2_NETLIST: MnaSubcircuitNetlist = {
   ports: ["In_1", "In_2", "out", "VDD", "GND"],
-  params: {},
+  params: { W: 10e-6 },
   elements: [
     { typeId: "PMOS", branchCount: 0 },
     { typeId: "PMOS", branchCount: 0 },

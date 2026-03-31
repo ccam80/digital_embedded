@@ -333,8 +333,15 @@ export class PropertyPanel {
     const primaryContainer = document.createElement("div");
     this._container.appendChild(primaryContainer);
 
-    const modelRow = this._buildRow("Model", select as unknown as HTMLElement);
-    this._container.appendChild(modelRow);
+    // Hide model dropdown when there's only one real choice (e.g. subcircuit
+    // params with an implicit digital model — the user doesn't pick a model,
+    // they just see the params).
+    const nonDigitalKeys = allKeys.filter(k => k !== "digital");
+    const showDropdown = nonDigitalKeys.length !== 1 || !hasDigital;
+    if (showDropdown) {
+      const modelRow = this._buildRow("Model", select as unknown as HTMLElement);
+      this._container.appendChild(modelRow);
+    }
 
     // Container for secondary (advanced) params — below the model dropdown
     const secondaryContainer = document.createElement("div");

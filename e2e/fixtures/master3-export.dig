@@ -1,0 +1,762 @@
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "4257a63d-ecfc-4623-adfb-93d976507c8c",
+        "position": {
+          "x": 3,
+          "y": 8
+        },
+        "properties": {
+          "label": "D0",
+          "value": 0
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "6ea4ac41-64a5-4f3b-bf9f-ce4d1f0c75e1",
+        "position": {
+          "x": 3,
+          "y": 11
+        },
+        "properties": {
+          "label": "D1"
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "d84d1dc1-80af-4c68-8ba4-5343cf562132",
+        "position": {
+          "x": 3,
+          "y": 14
+        },
+        "properties": {
+          "label": "D2",
+          "value": 0
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "6040b965-fa50-4c05-8c0f-517d13f12d29",
+        "position": {
+          "x": 3,
+          "y": 17
+        },
+        "properties": {
+          "label": "D3"
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "382bcb2f-80c3-48b8-8f6e-9a85f74845df",
+        "position": {
+          "x": 15,
+          "y": 15
+        },
+        "properties": {
+          "_modelParams": {
+            "rOut": 100,
+            "vRef": 5
+          },
+          "bits": 4,
+          "label": "DAC1"
+        },
+        "rotation": 0,
+        "type": "DAC"
+      },
+      {
+        "id": "fa785698-9153-4684-91fc-96656b5d6d1e",
+        "position": {
+          "x": 8,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "Vref"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "78ca09e0-3dc3-465a-8557-4bd83936842e",
+        "position": {
+          "x": 8,
+          "y": 8
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "5b700786-6815-43f2-b75a-c4e22d60182d",
+        "position": {
+          "x": 17,
+          "y": 22
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "b8c15ce6-e3b4-4e0a-ab89-2dd604c1823f",
+        "position": {
+          "x": 25,
+          "y": 15
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "R1"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "ca0fda7b-22b7-436c-8dd5-4c302a3c7454",
+        "position": {
+          "x": 33,
+          "y": 15
+        },
+        "properties": {
+          "_modelParams": {
+            "capacitance": 0.000001
+          },
+          "label": "C1"
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "4f93ba0b-63e1-460a-ac37-feb6b5992e5c",
+        "position": {
+          "x": 37,
+          "y": 16
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "e7af7913-fab0-48fc-af17-095f475c99a0",
+        "position": {
+          "x": 31,
+          "y": 13
+        },
+        "properties": {
+          "label": "P_DAC"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      },
+      {
+        "id": "4f15d819-a91e-4dc4-9a21-91328e7f4920",
+        "position": {
+          "x": 33,
+          "y": 19
+        },
+        "properties": {
+          "_modelParams": {
+            "hysteresis": 0,
+            "rSat": 50,
+            "responseTime": 0.000001,
+            "vos": 0.001
+          },
+          "label": "CMP",
+          "outputType": "push-pull"
+        },
+        "rotation": 0,
+        "type": "VoltageComparator"
+      },
+      {
+        "id": "91a0d464-39a9-490d-aa15-266cabb2bfd3",
+        "position": {
+          "x": 25,
+          "y": 21
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 2.5
+          },
+          "label": "Vref2"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "be36f02c-a663-40a8-aa27-a78f48a865ac",
+        "position": {
+          "x": 25,
+          "y": 24
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "d3efb183-b3fd-4570-8c9a-328be770173f",
+        "position": {
+          "x": 38,
+          "y": 18
+        },
+        "properties": {
+          "label": "GA"
+        },
+        "rotation": 0,
+        "type": "And"
+      },
+      {
+        "id": "b8e22531-23dc-45e5-be9a-dc593e443494",
+        "position": {
+          "x": 38,
+          "y": 20
+        },
+        "properties": {
+          "label": "C_EN"
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "7dae8c3d-3bd5-4cb3-8572-052c331cc9c1",
+        "position": {
+          "x": 34,
+          "y": 24
+        },
+        "properties": {
+          "label": "CLK"
+        },
+        "rotation": 0,
+        "type": "Clock"
+      },
+      {
+        "id": "951ab5c4-e2ac-4907-bbc9-dd85c81df706",
+        "position": {
+          "x": 44,
+          "y": 18
+        },
+        "properties": {
+          "label": "CNT"
+        },
+        "rotation": 0,
+        "type": "Counter"
+      },
+      {
+        "id": "8445be0d-f8ab-408d-9fd1-dec14e4271b3",
+        "position": {
+          "x": 48,
+          "y": 18
+        },
+        "properties": {
+          "bitWidth": 4,
+          "label": "Q"
+        },
+        "rotation": 0,
+        "type": "Out"
+      }
+    ],
+    "name": "Untitled",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 3
+          },
+          {
+            "x": 8,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 3
+          },
+          {
+            "x": 17,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 3
+          },
+          {
+            "x": 17,
+            "y": 13
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 13
+          },
+          {
+            "x": 18,
+            "y": 13
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 20
+          },
+          {
+            "x": 18,
+            "y": 22
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 22
+          },
+          {
+            "x": 17,
+            "y": 22
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 15,
+            "y": 18
+          },
+          {
+            "x": 9,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 15,
+            "y": 17
+          },
+          {
+            "x": 13,
+            "y": 17
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 13,
+            "y": 17
+          },
+          {
+            "x": 13,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 15
+          },
+          {
+            "x": 13,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 15
+          },
+          {
+            "x": 3,
+            "y": 14
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 15,
+            "y": 16
+          },
+          {
+            "x": 12,
+            "y": 16
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 11
+          },
+          {
+            "x": 12,
+            "y": 16
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 11
+          },
+          {
+            "x": 12,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 8
+          },
+          {
+            "x": 5,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 8
+          },
+          {
+            "x": 5,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 10
+          },
+          {
+            "x": 13,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 13,
+            "y": 10
+          },
+          {
+            "x": 13,
+            "y": 13
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 13,
+            "y": 13
+          },
+          {
+            "x": 15,
+            "y": 13
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 15,
+            "y": 13
+          },
+          {
+            "x": 15,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 25,
+            "y": 15
+          },
+          {
+            "x": 21,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 15
+          },
+          {
+            "x": 21,
+            "y": 16
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 15
+          },
+          {
+            "x": 31,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 15
+          },
+          {
+            "x": 33,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 13
+          },
+          {
+            "x": 31,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 20
+          },
+          {
+            "x": 33,
+            "y": 20
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 20
+          },
+          {
+            "x": 29,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 37,
+            "y": 15
+          },
+          {
+            "x": 37,
+            "y": 16
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 37,
+            "y": 18
+          },
+          {
+            "x": 37,
+            "y": 19
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 37,
+            "y": 18
+          },
+          {
+            "x": 38,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 18
+          },
+          {
+            "x": 33,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 18
+          },
+          {
+            "x": 30,
+            "y": 21
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 21
+          },
+          {
+            "x": 29,
+            "y": 21
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 25,
+            "y": 21
+          },
+          {
+            "x": 25,
+            "y": 24
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 41,
+            "y": 19
+          },
+          {
+            "x": 42,
+            "y": 19
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 18
+          },
+          {
+            "x": 42,
+            "y": 19
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 18
+          },
+          {
+            "x": 44,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 34,
+            "y": 24
+          },
+          {
+            "x": 43,
+            "y": 24
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 19
+          },
+          {
+            "x": 43,
+            "y": 24
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 19
+          },
+          {
+            "x": 44,
+            "y": 19
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 47,
+            "y": 18
+          },
+          {
+            "x": 48,
+            "y": 18
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

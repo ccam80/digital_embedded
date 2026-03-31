@@ -87,6 +87,23 @@ export function initializeCircuit(engine: InitializableEngine): void {
   // Step 1: Set all signals to UNDEFINED (value = 0)
   state.fill(UNDEFINED_VALUE);
 
+  // Step 1.5: Apply default values for In components.
+  // This seeds the starting state before propagation. defaultValue is read
+  // once at init — runtime changes have no effect on the running simulation.
+  {
+    const wt = layout.wiringTable;
+    for (let i = 0; i < typeIds.length; i++) {
+      const defVal = layout.getProperty(i, 'defaultValue');
+      if (defVal !== undefined && typeof defVal === 'number' && defVal !== 0) {
+        const outBase = layout.outputOffset(i);
+        const outCount = layout.outputCount(i);
+        for (let k = 0; k < outCount; k++) {
+          state[wt[outBase + k]!] = defVal;
+        }
+      }
+    }
+  }
+
   // Step 2: Noise propagation — run multiple passes to let circuit settle
   // For feedback SCCs: use noise (shuffled, interleaved). For non-feedback: synchronized.
   runNoisePropagation(state, highZs, snapshotBuffer, typeIds, executeFns, layout, evaluationOrder);

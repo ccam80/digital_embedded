@@ -18,7 +18,7 @@ import type { PinDirection } from '../core/pin.js';
 // ---------------------------------------------------------------------------
 
 export const INFRASTRUCTURE_TYPES = new Set([
-  'Wire', 'Tunnel', 'Ground', 'VDD', 'Const', 'Probe',
+  'Wire', 'Tunnel', 'Ground', 'Probe',
   'Splitter', 'Driver', 'NotConnected', 'ScopeTrigger', 'Port',
 ]);
 

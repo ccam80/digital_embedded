@@ -1,0 +1,139 @@
+{
+  "summary": {
+    "vitest": {
+      "passed": 9926,
+      "failed": 0,
+      "skipped": 0,
+      "totalFiles": 331,
+      "durationSeconds": 11.4
+    },
+    "playwright": {
+      "passed": 465,
+      "failed": 15,
+      "skipped": 0,
+      "totalFiles": 22,
+      "durationSeconds": 161.73808799999998
+    },
+    "totalFailed": 15,
+    "totalPassed": 10391
+  },
+  "failures": {
+    "vitest": [],
+    "playwright": [
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 4,
+        "locations": [
+          {
+            "file": "gui/analog-ui-fixup.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 140,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 635,
+            "column": 3
+          },
+          {
+            "file": "wire-capture.spec.ts",
+            "test": "Master 1: Digital — place, wire manually, capture",
+            "line": 198,
+            "column": 3
+          },
+          {
+            "file": "wire-capture.spec.ts",
+            "test": "Master 2: Analog — place, wire manually, capture",
+            "line": 320,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-ui-fixup.spec.ts",
+            "test": "capacitor shows property popup with float input",
+            "line": 260,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
+        "count": 7,
+        "locations": [
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RS_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "T_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "changing BF on BJT via primary param row changes output voltage",
+            "line": 124,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL dialog shows parse preview for valid .MODEL card",
+            "line": 94,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-import-flows.spec.ts",
+            "test": ".MODEL Apply stores overrides visible in SPICE panel",
+            "line": 129,
+            "column": 3
+          },
+          {
+            "file": "wire-capture.spec.ts",
+            "test": "Master 3: Mixed — place, wire manually, capture",
+            "line": 417,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 3,
+        "locations": [
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "rOut override affects simulation output in mixed-signal mode",
+            "line": 215,
+            "column": 3
+          },
+          {
+            "file": "gui/master-circuit-assembly.spec.ts",
+            "test": "Master 2: analog — switched divider, RC, opamp, BJT",
+            "line": 211,
+            "column": 3
+          },
+          {
+            "file": "gui/master-circuit-assembly.spec.ts",
+            "test": "Master 3: mixed-signal — DAC, RC, comparator, counter",
+            "line": 422,
+            "column": 3
+          }
+        ]
+      }
+    ]
+  }
+}
