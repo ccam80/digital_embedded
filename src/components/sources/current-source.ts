@@ -67,7 +67,9 @@ export class CurrentSourceElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const current = this._properties.getOrDefault<number>("current", 0.01);
+    const current = this._properties.hasModelParam("current")
+      ? this._properties.getModelParam<number>("current")
+      : 0.01;
     const label = this._visibleLabel();
     const vNeg = signals?.getPinVoltage("neg");
     const vPos = signals?.getPinVoltage("pos");
@@ -138,14 +140,6 @@ const CURRENT_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
 
 const CURRENT_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "current",
-    type: PropertyType.FLOAT,
-    label: "Current (A)",
-    unit: "A",
-    defaultValue: 0.01,
-    description: "Source current in amperes (A)",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -159,7 +153,7 @@ const CURRENT_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const CURRENT_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
-  { xmlName: "Current", propertyKey: "current", convert: (v) => parseFloat(v) },
+  { xmlName: "Current", propertyKey: "current", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",   propertyKey: "label",   convert: (v) => v },
 ];
 

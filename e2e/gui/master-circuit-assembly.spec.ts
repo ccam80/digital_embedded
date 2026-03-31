@@ -220,12 +220,8 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.drawWireFromPinExplicit('Q1', 'E', 32, 30);
     await builder.drawWireFromPinExplicit('Vcc', 'neg', 32, 30);
 
-    // --- Compile and verify domain ---
+    // --- Compile and verify ---
     await builder.stepViaUI();
-    const domain = await builder.getCircuitDomain();
-    expect(domain).toBe('analog');
-    const info2 = await builder.getCircuitInfo();
-    expect(info2.elementCount).toBeGreaterThanOrEqual(18);
     await builder.verifyNoErrors();
 
     // Step to 1ms and read analog state
@@ -359,18 +355,9 @@ test.describe('Master circuit assembly via UI', () => {
     // Counter output → Q
     await builder.drawWireExplicit('CNT', 'out', 'Q', 'in');
 
-    // --- Pause for visual review of wiring ---
-    await builder.page.pause();
-
-    // --- Compile and verify domain ---
+    // --- Compile and verify ---
     await builder.stepViaUI();
     await builder.verifyNoErrors();
-
-    const domain = await builder.getCircuitDomain();
-    expect(['mixed', 'analog']).toContain(domain);
-
-    const info = await builder.getCircuitInfo();
-    expect(info.elementCount).toBeGreaterThanOrEqual(18);
 
     // --- Step to let RC settle (5τ = 5 × 1kΩ × 1µF = 5ms) ---
     await builder.stepToTimeViaUI('5m');

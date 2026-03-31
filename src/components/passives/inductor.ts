@@ -98,7 +98,9 @@ export class InductorElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const inductance = this._properties.getOrDefault<number>("inductance", 1e-3);
+    const inductance = this._properties.hasModelParam("inductance")
+      ? this._properties.getModelParam<number>("inductance")
+      : 1e-3;
     const label = this._visibleLabel();
 
     ctx.save();
@@ -223,15 +225,6 @@ function createInductorElement(
 
 const INDUCTOR_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "inductance",
-    type: PropertyType.FLOAT,
-    label: "Inductance (H)",
-    unit: "H",
-    defaultValue: 1e-3,
-    min: 1e-12,
-    description: "Inductance in henries",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -249,6 +242,7 @@ export const INDUCTOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     xmlName: "inductance",
     propertyKey: "inductance",
     convert: (v) => parseFloat(v),
+    modelParam: true,
   },
   {
     xmlName: "Label",

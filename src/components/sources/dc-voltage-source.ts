@@ -69,7 +69,9 @@ export class DcVoltageSourceElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const voltage = this._properties.getOrDefault<number>("voltage", 5);
+    const voltage = this._properties.hasModelParam("voltage")
+      ? this._properties.getModelParam<number>("voltage")
+      : 5;
     const label = this._visibleLabel();
     const vPos = signals?.getPinVoltage("pos");
     const vNeg = signals?.getPinVoltage("neg");
@@ -133,14 +135,6 @@ const DC_VOLTAGE_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
 
 const DC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "voltage",
-    type: PropertyType.FLOAT,
-    label: "Voltage (V)",
-    unit: "V",
-    defaultValue: 5,
-    description: "Source voltage in volts (V)",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -154,7 +148,7 @@ const DC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const DC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
-  { xmlName: "Voltage", propertyKey: "voltage", convert: (v) => parseFloat(v) },
+  { xmlName: "Voltage", propertyKey: "voltage", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",   propertyKey: "label",   convert: (v) => v },
 ];
 

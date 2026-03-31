@@ -96,7 +96,9 @@ export class ResistorElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const resistance = this._properties.getOrDefault<number>("resistance", 1000);
+    const resistance = this._properties.hasModelParam("resistance")
+      ? this._properties.getModelParam<number>("resistance")
+      : 1000;
     const label = this._visibleLabel();
 
     ctx.save();
@@ -201,15 +203,6 @@ function createResistorElement(
 
 const RESISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "resistance",
-    type: PropertyType.FLOAT,
-    label: "Resistance (Ω)",
-    unit: "Ω",
-    defaultValue: 1000,
-    min: 1e-9,
-    description: "Resistance in ohms. Minimum clamped to 1e-9 Ω.",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -227,6 +220,7 @@ export const RESISTOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     xmlName: "resistance",
     propertyKey: "resistance",
     convert: (v) => parseFloat(v),
+    modelParam: true,
   },
   {
     xmlName: "Label",

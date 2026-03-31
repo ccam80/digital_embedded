@@ -23,8 +23,9 @@ import { openSubcircuitDialog } from './subcircuit-dialog.js';
 import { storeSubcircuit } from '../io/subcircuit-store.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
 import { Circuit, Wire } from '../core/circuit.js';
-import { resolveModelAssignments, extractConnectivityGroups, stableNetId } from '../compile/extract-connectivity.js';
+import { resolveModelAssignments, extractConnectivityGroups, stableNetId, applyLoadingDecisions, resolveLoadingOverrides } from '../compile/extract-connectivity.js';
 import type { PinLoadingOverride } from '../compile/extract-connectivity.js';
+import { partitionByDomain } from '../compile/partition.js';
 
 import { darkColorScheme, lightColorScheme, THEME_COLORS } from '../core/renderer-interface.js';
 import { buildColorMap } from '../editor/color-scheme.js';
@@ -1439,6 +1440,24 @@ function refreshOverrideIndicators(ctx: AppContext): void {
     modelAssignments,
   );
 
+  // Apply loading decisions so domain tags match what the compiler sees
+  const { resolved: perNetOverrides } = resolveLoadingOverrides(overrides, groups, ctx.circuit.elements);
+  applyLoadingDecisions(groups, mode, perNetOverrides);
+
+  // Partition to get actual bridge descriptors
+  const { bridges } = partitionByDomain(
+    groups,
+    ctx.circuit.elements,
+    ctx.palette.getRegistry(),
+    modelAssignments,
+  );
+
+  // Only annotate nets that actually have bridges
+  const bridgedGroupIds = new Set<number>();
+  for (const bd of bridges) {
+    bridgedGroupIds.add(bd.boundaryGroup.groupId);
+  }
+
   // Build per-net override lookup
   const netIdToOverride = new Map<string, 'loaded' | 'ideal'>();
   for (const o of overrides) {
@@ -1460,17 +1479,17 @@ function refreshOverrideIndicators(ctx: AppContext): void {
     const netId = stableNetId(group, ctx.circuit.elements);
     const override = netIdToOverride.get(netId);
 
-    const isBoundary = group.domains.has('digital') && group.domains.has('analog');
+    const hasBridge = bridgedGroupIds.has(group.groupId);
 
-    // Determine effective loading for this net
+    // Determine effective loading for this net — only if it has an actual bridge
     let loading: 'loaded' | 'ideal' | undefined;
-    if (override !== undefined) {
+    if (override !== undefined && hasBridge) {
       loading = override;
-    } else if (mode === 'none' && isBoundary) {
+    } else if (mode === 'none' && hasBridge) {
       loading = 'ideal';
-    } else if (mode === 'cross-domain' && isBoundary) {
+    } else if (mode === 'cross-domain' && hasBridge) {
       loading = 'loaded';
-    } else if (mode === 'all' && group.domains.has('digital')) {
+    } else if (mode === 'all' && hasBridge && group.domains.has('digital')) {
       loading = 'loaded';
     }
 

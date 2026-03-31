@@ -249,8 +249,12 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
 
     // Value label below body
     const label = this._visibleLabel();
-    const amplitude = this._properties.getOrDefault<number>("amplitude", 5);
-    const frequency = this._properties.getOrDefault<number>("frequency", 1000);
+    const amplitude = this._properties.hasModelParam("amplitude")
+      ? this._properties.getModelParam<number>("amplitude")
+      : 5;
+    const frequency = this._properties.hasModelParam("frequency")
+      ? this._properties.getModelParam<number>("frequency")
+      : 1000;
     const displayLabel = label.length > 0
       ? label
       : (this._shouldShowValue() ? `${formatSI(amplitude, "V")} ${formatSI(frequency, "Hz")}` : "");
@@ -292,34 +296,6 @@ const AC_VOLTAGE_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
 // ---------------------------------------------------------------------------
 
 const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
-  {
-    key: "amplitude",
-    type: PropertyType.INT,
-    label: "Amplitude (V)",
-    defaultValue: 5,
-    description: "Peak amplitude in volts",
-  },
-  {
-    key: "frequency",
-    type: PropertyType.INT,
-    label: "Frequency (Hz)",
-    defaultValue: 1000,
-    description: "Frequency in Hz",
-  },
-  {
-    key: "phase",
-    type: PropertyType.INT,
-    label: "Phase (rad)",
-    defaultValue: 0,
-    description: "Phase offset in radians",
-  },
-  {
-    key: "dcOffset",
-    type: PropertyType.INT,
-    label: "DC Offset (V)",
-    defaultValue: 0,
-    description: "DC offset added to waveform",
-  },
   {
     key: "waveform",
     type: PropertyType.ENUM,
@@ -407,10 +383,10 @@ const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const AC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
-  { xmlName: "Amplitude", propertyKey: "amplitude", convert: (v) => parseFloat(v) },
-  { xmlName: "Frequency", propertyKey: "frequency", convert: (v) => parseFloat(v) },
-  { xmlName: "Phase",     propertyKey: "phase",     convert: (v) => parseFloat(v) },
-  { xmlName: "DCOffset",  propertyKey: "dcOffset",  convert: (v) => parseFloat(v) },
+  { xmlName: "Amplitude", propertyKey: "amplitude", convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "Frequency", propertyKey: "frequency", convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "Phase",     propertyKey: "phase",     convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "DCOffset",  propertyKey: "dcOffset",  convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Waveform",  propertyKey: "waveform",  convert: (v) => v },
   { xmlName: "Label",     propertyKey: "label",     convert: (v) => v },
 ];

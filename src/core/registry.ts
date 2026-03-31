@@ -111,6 +111,8 @@ export interface AttributeMapping {
   propertyKey: string;
   /** Converts the raw XML string value to the typed PropertyValue. */
   convert: (xmlValue: string) => PropertyValue;
+  /** When true, the value is written to the model-param partition (_mparams). */
+  modelParam?: boolean;
 }
 
 // ---------------------------------------------------------------------------

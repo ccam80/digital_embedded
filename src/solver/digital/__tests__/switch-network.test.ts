@@ -262,9 +262,9 @@ describe("SwitchNetwork", () => {
     expect(highZs[3]).toBe(0xffffffff); // B is highZ (disconnected)
   });
 
-  it("unidirectional_nfet_no_bus_resolver", () => {
+  it("single_driver_nfet_registered_with_bus_resolver", () => {
     // Single-driver NFET circuit: both switch-pair pins connect to single-driver nets.
-    // Compiler should classify as unidirectional (not in switchComponentIndices).
+    // Compiler should still register with bus resolver — switches always need it.
 
     // DriverA at (0,0) with output at relative (2,0) => world (2,0)
     // NFET: G input at (0,1.5), D bidir at (3,0), S bidir at (3,3)
@@ -322,17 +322,17 @@ describe("SwitchNetwork", () => {
 
     const compiled = compileUnified(circuit, registry).digital!;
 
-    // NFET should be classified as unidirectional (1) not bidirectional (2)
-    // since D and S nets each have only one driver
-    expect(compiled.switchComponentIndices.length).toBe(0);
+    // All switches are registered with the bus resolver regardless of driver
+    // count — a switch merges/splits nets, so it always needs bus resolution.
+    expect(compiled.switchComponentIndices.length).toBe(1);
 
-    // Check classification
+    // Check classification — should be bidirectional (2)
     let nfetIdx = -1;
     for (const [idx, el] of compiled.componentToElement) {
       if (el.typeId === "NFET") nfetIdx = idx;
     }
     expect(nfetIdx).toBeGreaterThanOrEqual(0);
-    expect(compiled.switchClassification[nfetIdx]).toBe(1);
+    expect(compiled.switchClassification[nfetIdx]).toBe(2);
   });
 
   it("bidirectional_switch_registered_with_bus_resolver", () => {

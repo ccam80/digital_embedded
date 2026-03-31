@@ -87,7 +87,9 @@ export class VariableRailElement extends AbstractCircuitElement {
     // Voltage label at right side
     ctx.setColor("TEXT");
     ctx.setLineWidth(1);
-    const voltage = this._properties.getOrDefault<number>("voltage", 5);
+    const voltage = this._properties.hasModelParam("voltage")
+      ? this._properties.getModelParam<number>("voltage")
+      : 5;
     const label = this._shouldShowValue() ? formatSI(voltage ?? 5, "V") : "";
     ctx.drawText(label, 4, 0, { horizontal: "left", vertical: "middle" } as TextAnchor);
 
@@ -117,14 +119,6 @@ const VARIABLE_RAIL_PIN_LAYOUT: PinDeclaration[] = [
 
 const VARIABLE_RAIL_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "voltage",
-    type: PropertyType.FLOAT,
-    label: "Voltage (V)",
-    unit: "V",
-    defaultValue: 5,
-    description: "Output voltage in volts",
-  },
-  {
     key: "minVoltage",
     type: PropertyType.FLOAT,
     label: "Min Voltage (V)",
@@ -141,14 +135,6 @@ const VARIABLE_RAIL_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "Maximum slider voltage",
   },
   {
-    key: "resistance",
-    type: PropertyType.FLOAT,
-    label: "Internal Resistance (Ω)",
-    unit: "Ω",
-    defaultValue: 0.01,
-    description: "Internal series resistance (models source impedance)",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -162,10 +148,10 @@ const VARIABLE_RAIL_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const VARIABLE_RAIL_ATTRIBUTE_MAP: AttributeMapping[] = [
-  { xmlName: "Voltage",    propertyKey: "voltage",    convert: (v) => parseFloat(v) },
+  { xmlName: "Voltage",    propertyKey: "voltage",    convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "MinVoltage", propertyKey: "minVoltage", convert: (v) => parseFloat(v) },
   { xmlName: "MaxVoltage", propertyKey: "maxVoltage", convert: (v) => parseFloat(v) },
-  { xmlName: "Resistance", propertyKey: "resistance", convert: (v) => parseFloat(v) },
+  { xmlName: "Resistance", propertyKey: "resistance", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",      propertyKey: "label",      convert: (v) => v },
 ];
 

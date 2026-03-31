@@ -60,12 +60,14 @@ export const { paramDefs: TIMER555_PARAM_DEFS, defaults: TIMER555_DEFAULTS } = d
 //   4: CTRL     5: OUT      6: RST      7: GND
 
 function buildTimer555PinDeclarations(): PinDeclaration[] {
+  // Compact IC layout: body (1,0)→(5,6), VCC top-center, GND bottom-center,
+  // 3 left pins and 3 right pins evenly spaced at y=1,3,5.
   return [
     {
       direction: PinDirection.INPUT,
       label: "DIS",
       defaultBitWidth: 1,
-      position: { x: 0, y: 2 },
+      position: { x: 0, y: 1 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -74,7 +76,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "TRIG",
       defaultBitWidth: 1,
-      position: { x: 0, y: 6 },
+      position: { x: 0, y: 3 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -83,7 +85,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "THR",
       defaultBitWidth: 1,
-      position: { x: 0, y: 8 },
+      position: { x: 0, y: 5 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -92,7 +94,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "VCC",
       defaultBitWidth: 1,
-      position: { x: 4, y: -2 },
+      position: { x: 3, y: -1 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -101,7 +103,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "CTRL",
       defaultBitWidth: 1,
-      position: { x: 4, y: 10 },
+      position: { x: 6, y: 5 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -110,7 +112,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "OUT",
       defaultBitWidth: 1,
-      position: { x: 8, y: 4 },
+      position: { x: 6, y: 3 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -119,7 +121,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "RST",
       defaultBitWidth: 1,
-      position: { x: 8, y: 2 },
+      position: { x: 6, y: 1 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -128,7 +130,7 @@ function buildTimer555PinDeclarations(): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "GND",
       defaultBitWidth: 1,
-      position: { x: 6, y: 10 },
+      position: { x: 3, y: 7 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -158,9 +160,9 @@ export class Timer555Element extends AbstractCircuitElement {
   getBoundingBox(): Rect {
     return {
       x: this.position.x,
-      y: this.position.y - 2,
-      width: 8,
-      height: 12,
+      y: this.position.y - 1,
+      width: 6,
+      height: 8,
     };
   }
 
@@ -177,53 +179,41 @@ export class Timer555Element extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // IC body rectangle: x=1, y=-1, width=6, height=10 (grid units)
+    // IC body rectangle: (1,0) to (5,6), width=4, height=6
     ctx.setColor("COMPONENT");
-    ctx.drawRect(1, -1, 6, 10, false);
+    ctx.drawRect(1, 0, 4, 6, false);
 
-    // DIS lead (west): pin tip (0,2) → body edge (1,2)
-    drawColoredLead(ctx, signals, vDis, 0, 2, 1, 2);
+    // Left-side leads: pin tip (0,y) → body edge (1,y)
+    drawColoredLead(ctx, signals, vDis,  0, 1, 1, 1);
+    drawColoredLead(ctx, signals, vTrig, 0, 3, 1, 3);
+    drawColoredLead(ctx, signals, vThr,  0, 5, 1, 5);
 
-    // TRIG lead (west): pin tip (0,6) → body edge (1,6)
-    drawColoredLead(ctx, signals, vTrig, 0, 6, 1, 6);
+    // Right-side leads: pin tip (6,y) → body edge (5,y)
+    drawColoredLead(ctx, signals, vRst,  6, 1, 5, 1);
+    drawColoredLead(ctx, signals, vOut,  6, 3, 5, 3);
+    drawColoredLead(ctx, signals, vCtrl, 6, 5, 5, 5);
 
-    // THR lead (west): pin tip (0,8) → body edge (1,8)
-    drawColoredLead(ctx, signals, vThr, 0, 8, 1, 8);
+    // VCC lead (north): pin tip (3,-1) → body edge (3,0)
+    drawColoredLead(ctx, signals, vVcc, 3, -1, 3, 0);
 
-    // VCC lead (north): pin tip (4,-2) → body edge (4,-1)
-    drawColoredLead(ctx, signals, vVcc, 4, -2, 4, -1);
+    // GND lead (south): pin tip (3,7) → body edge (3,6)
+    drawColoredLead(ctx, signals, vGnd, 3, 7, 3, 6);
 
-    // CTRL lead (south): pin tip (4,10) → body edge (4,9)
-    drawColoredLead(ctx, signals, vCtrl, 4, 10, 4, 9);
-
-    // OUT lead (east): pin tip (8,4) → body edge (7,4)
-    drawColoredLead(ctx, signals, vOut, 8, 4, 7, 4);
-
-    // RST lead (east): pin tip (8,2) → body edge (7,2)
-    drawColoredLead(ctx, signals, vRst, 8, 2, 7, 2);
-
-    // GND lead (south): pin tip (6,10) → body edge (6,9)
-    drawColoredLead(ctx, signals, vGnd, 6, 10, 6, 9);
+    // Component name centered between top and middle pin rows
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.8 });
+    ctx.drawText("555", 3, 2, { horizontal: "center", vertical: "middle" });
 
     // Pin labels inside IC body
-    ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.65 });
-    // West-side pins: label just inside left body edge
-    ctx.drawText("DIS",  1.2, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("TRIG", 1.2, 6, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("THR",  1.2, 8, { horizontal: "left", vertical: "middle" });
-    // East-side pins: label just inside right body edge
-    ctx.drawText("RST",  6.8, 2, { horizontal: "right", vertical: "middle" });
-    ctx.drawText("OUT",  6.8, 4, { horizontal: "right", vertical: "middle" });
-    // Top pin: label just below body top edge
-    ctx.drawText("VCC",  4, -0.5, { horizontal: "center", vertical: "top" });
-    // Bottom pins: label just above body bottom edge
-    ctx.drawText("CTRL", 4, 8.5, { horizontal: "center", vertical: "bottom" });
-    ctx.drawText("GND",  6, 8.5, { horizontal: "center", vertical: "bottom" });
-
-    // Component name centered
-    ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("555", 4, 4, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("DIS",  1.2, 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("TRIG", 1.2, 3, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("THR",  1.2, 5, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("RST",  4.8, 1, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("OUT",  4.8, 3, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("CTRL", 4.8, 5, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("VCC",  3, 0.4, { horizontal: "center", vertical: "top" });
+    ctx.drawText("GND",  3, 5.6, { horizontal: "center", vertical: "top" });
 
     ctx.restore();
   }

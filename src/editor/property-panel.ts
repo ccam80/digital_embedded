@@ -322,15 +322,19 @@ export class PropertyPanel {
       select.appendChild(opt);
     }
 
+    // Container for primary params — rendered above the model dropdown
+    const primaryContainer = document.createElement("div");
+    this._container.appendChild(primaryContainer);
+
     const modelRow = this._buildRow("Model", select as unknown as HTMLElement);
     this._container.appendChild(modelRow);
 
-    // Container that holds the param section — rebuilt on model switch
-    const paramContainer = document.createElement("div");
-    this._container.appendChild(paramContainer);
+    // Container for secondary (advanced) params — below the model dropdown
+    const secondaryContainer = document.createElement("div");
+    this._container.appendChild(secondaryContainer);
 
-    // Render the initial param section
-    this._renderModelParams(element, def, currentModelKey, registry, runtimeModels, paramContainer);
+    // Render the initial param sections
+    this._renderModelParams(element, def, currentModelKey, registry, runtimeModels, primaryContainer, secondaryContainer);
 
     // Handle model switch
     select.addEventListener("change", () => {
@@ -348,15 +352,16 @@ export class PropertyPanel {
         cb("model", cmd.oldModelKey, newKey);
       }
 
-      // Rebuild the param section
-      paramContainer.innerHTML = "";
-      this._renderModelParams(element, def, newKey, registry, runtimeModels, paramContainer);
+      // Rebuild both param sections
+      primaryContainer.innerHTML = "";
+      secondaryContainer.innerHTML = "";
+      this._renderModelParams(element, def, newKey, registry, runtimeModels, primaryContainer, secondaryContainer);
     });
   }
 
   /**
-   * Render primary and secondary model params into `container`.
-   * Clears `container` first.
+   * Render primary model params into `primaryContainer` and secondary
+   * (advanced) params into `secondaryContainer`.
    */
   private _renderModelParams(
     element: CircuitElement,
@@ -364,7 +369,8 @@ export class PropertyPanel {
     modelKey: string,
     registry: Record<string, ModelEntry>,
     runtimeModels: Record<string, ModelEntry> | undefined,
-    container: HTMLElement,
+    primaryContainer: HTMLElement,
+    secondaryContainer: HTMLElement,
   ): void {
     if (modelKey === "digital") return;
 
@@ -379,13 +385,13 @@ export class PropertyPanel {
     const primary = paramDefs.filter(p => p.rank === "primary");
     const secondary = paramDefs.filter(p => p.rank === "secondary");
 
-    // Render primary params directly into container
+    // Render primary params above the model dropdown
     for (const pd of primary) {
-      const row = this._buildModelParamRow(element, def, pd, entry, bag, modelKey, registry, runtimeModels, container);
-      container.appendChild(row);
+      const row = this._buildModelParamRow(element, def, pd, entry, bag, modelKey, registry, runtimeModels, primaryContainer);
+      primaryContainer.appendChild(row);
     }
 
-    // Secondary params in a collapsed subsection
+    // Secondary params in a collapsed subsection below the model dropdown
     if (secondary.length > 0) {
       const advSection = document.createElement("div");
       advSection.style.marginTop = "6px";
@@ -412,7 +418,7 @@ export class PropertyPanel {
         advContent.appendChild(row);
       }
 
-      container.appendChild(advSection);
+      secondaryContainer.appendChild(advSection);
     }
   }
 

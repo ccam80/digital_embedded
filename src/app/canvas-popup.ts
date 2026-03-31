@@ -62,13 +62,16 @@ export function createPopupController(
     const propsContainer = document.createElement('div');
     popup.appendChild(propsContainer);
     const propertyPopup = new PropertyPanel(propsContainer);
-    propertyPopup.showProperties(elementHit, def.propertyDefs);
 
+    // Model selector first: primary params at top, model dropdown, advanced params
     const family = ctx.circuit.metadata.logicFamily ?? defaultLogicFamily();
     const runtimeModels = ctx.circuit.metadata.models?.[elementHit.typeId];
     if (def.modelRegistry && Object.keys(def.modelRegistry).length > 0) {
       propertyPopup.showModelSelector(elementHit, def, runtimeModels);
     }
+
+    // Regular properties (label etc.) below model params
+    propertyPopup.showProperties(elementHit, def.propertyDefs);
     propertyPopup.showPinElectricalOverrides(elementHit, def, family);
     // Live-update: numeric parameter changes are hot-patched into the running
     // engine via coordinator.setComponentProperty() (updates conductances
@@ -76,8 +79,10 @@ export function createPopupController(
     // are compile-sensitive — recompile and continue automatically.
     propertyPopup.onPropertyChange((key, _oldValue, newValue) => {
       if (ctx.isSimActive()) {
+        // Model param callbacks use "model:key" prefix — strip it for the engine
+        const engineKey = key.startsWith("model:") ? key.slice(6) : key;
         if (typeof newValue === 'number') {
-          ctx.facade.getCoordinator().setComponentProperty(elementHit, key, newValue);
+          ctx.facade.getCoordinator().setComponentProperty(elementHit, engineKey, newValue);
         } else {
           // Compile-sensitive change — recompile and resume simulation
           if (ctx.compileAndBind()) {

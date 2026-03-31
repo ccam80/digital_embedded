@@ -2,7 +2,7 @@
   "circuit": {
     "elements": [
       {
-        "id": "6d4206a4-05a1-43ff-b564-12ca4d46c944",
+        "id": "a0b56875-3759-425b-aafb-bc1f58df2871",
         "position": {
           "x": 3,
           "y": 3
@@ -14,7 +14,7 @@
         "type": "DcVoltageSource"
       },
       {
-        "id": "8f0ed591-3862-488f-8f66-300c2d08e36a",
+        "id": "7441169d-8d82-45e3-a638-51c969911327",
         "position": {
           "x": 3,
           "y": 7
@@ -26,7 +26,7 @@
         "type": "In"
       },
       {
-        "id": "19c0208e-e687-4b58-a49c-76320141b19d",
+        "id": "9bcf0d79-3984-4241-a1f5-627189b97855",
         "position": {
           "x": 12,
           "y": 3
@@ -38,7 +38,7 @@
         "type": "SwitchSPST"
       },
       {
-        "id": "7329cddf-b238-4836-ac95-fbe5173d53e3",
+        "id": "51413974-d196-43e8-a811-f455261cf8c7",
         "position": {
           "x": 20,
           "y": 3
@@ -50,7 +50,7 @@
         "type": "Resistor"
       },
       {
-        "id": "a6af39b1-c0db-4e10-920e-2892ed730c6c",
+        "id": "2f825314-3e23-494d-80b1-870fb95d63b5",
         "position": {
           "x": 28,
           "y": 3
@@ -62,7 +62,7 @@
         "type": "Resistor"
       },
       {
-        "id": "a5a5001a-1764-431c-8c51-e82efcb07e3f",
+        "id": "80bd01eb-aa82-4fcd-9456-ba34b573f507",
         "position": {
           "x": 3,
           "y": 8
@@ -72,7 +72,7 @@
         "type": "Ground"
       },
       {
-        "id": "b96ea8f8-7367-43a5-bbc7-586fe364bc1d",
+        "id": "1aa8a0f9-243f-43e7-93ae-6e1441da00e2",
         "position": {
           "x": 32,
           "y": 8
@@ -82,7 +82,7 @@
         "type": "Ground"
       },
       {
-        "id": "90229576-dfa8-4820-9d39-e7f2907d8d96",
+        "id": "8f656541-d654-4d6f-bf1c-1a6b887620b3",
         "position": {
           "x": 26,
           "y": 1
@@ -94,7 +94,7 @@
         "type": "Probe"
       },
       {
-        "id": "cd5311c2-5ec6-400b-877c-6ec45a46eb51",
+        "id": "22963045-bce0-4cf1-9598-6aac912b357a",
         "position": {
           "x": 20,
           "y": 11
@@ -106,7 +106,7 @@
         "type": "Resistor"
       },
       {
-        "id": "a57e6190-84b6-4712-b01a-9ff6e2aca0cf",
+        "id": "0a591835-ddc2-4e88-80d0-b69044aa86f7",
         "position": {
           "x": 28,
           "y": 11
@@ -118,7 +118,7 @@
         "type": "Capacitor"
       },
       {
-        "id": "513ed4d0-f3b7-4a77-b981-88206e21887b",
+        "id": "4dfee89c-9137-4779-a42d-ae8fd87f709e",
         "position": {
           "x": 32,
           "y": 15
@@ -128,7 +128,7 @@
         "type": "Ground"
       },
       {
-        "id": "e4d81501-973f-4c44-8f3d-6b95904556c9",
+        "id": "de2983df-b40c-4e75-8eb7-982ac001c2e9",
         "position": {
           "x": 26,
           "y": 9
@@ -140,7 +140,7 @@
         "type": "Probe"
       },
       {
-        "id": "d7cabfe0-a9fa-4a7d-8959-066772150c05",
+        "id": "582d03fd-b7ce-404b-b186-59acdb2a3b4d",
         "position": {
           "x": 28,
           "y": 19
@@ -152,7 +152,7 @@
         "type": "OpAmp"
       },
       {
-        "id": "ab3efd5b-2049-44b9-9de0-e0cca4bed736",
+        "id": "3660d6dc-436a-4aee-ac82-a0779b65569d",
         "position": {
           "x": 36,
           "y": 19
@@ -164,7 +164,7 @@
         "type": "Probe"
       },
       {
-        "id": "2a7e4005-5e21-4f29-baad-23c8d8983057",
+        "id": "ab54fa6b-11ce-4cb6-a367-0bf92c444112",
         "position": {
           "x": 20,
           "y": 25
@@ -176,7 +176,7 @@
         "type": "Resistor"
       },
       {
-        "id": "1e5b5f20-480a-4e0e-aea3-bb41c4080d43",
+        "id": "0ad4f2a8-723a-4ecc-87bf-fb4dba87adad",
         "position": {
           "x": 28,
           "y": 25
@@ -188,7 +188,7 @@
         "type": "NpnBJT"
       },
       {
-        "id": "2ccd0a4c-3191-4b5e-aca3-7dfe9333251e",
+        "id": "b21773b1-85ae-44c8-b5df-044d0f6858e0",
         "position": {
           "x": 36,
           "y": 24
@@ -200,7 +200,7 @@
         "type": "Resistor"
       },
       {
-        "id": "73b5fc33-33e9-4eca-842e-fbb681cb8f9b",
+        "id": "93606051-17c9-4d8c-b03a-5db899d7848d",
         "position": {
           "x": 36,
           "y": 30
@@ -212,7 +212,7 @@
         "type": "DcVoltageSource"
       },
       {
-        "id": "67ac63c0-03bb-4992-8331-cdbd7c61f17d",
+        "id": "19bb8dc4-d873-48ac-acbc-c37744a55431",
         "position": {
           "x": 32,
           "y": 30
@@ -222,7 +222,7 @@
         "type": "Ground"
       },
       {
-        "id": "d45dd8b4-55f0-4110-956a-ef8bf726f415",
+        "id": "1499253a-72d0-4974-a5a7-ad0ef990ad6e",
         "position": {
           "x": 44,
           "y": 24

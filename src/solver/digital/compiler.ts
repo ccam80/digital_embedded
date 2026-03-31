@@ -537,11 +537,19 @@ export function compileDigitalPartition(
 
   // -----------------------------------------------------------------------
   // Step 8c: Classify switch components
+  //
+  // A switch merges/splits two nets when it closes/opens. This requires
+  // the BusResolver even when neither net has multiple drivers — the switch
+  // itself creates a cross-link. We ensure the resolver exists and that
+  // both switch nets are registered as bus nets (single-driver bus nets
+  // with a shadow indirection so the resolver can manage them).
   // -----------------------------------------------------------------------
 
   const switchClassification = new Uint8Array(componentCount);
   const bidirectionalSwitchIndices: number[] = [];
 
+  // Collect switch net pairs first so we can create the bus resolver if needed.
+  const switchNetPairs: Array<{ compIdx: number; netA: number; netB: number }> = [];
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
     const def = registry.get(el.typeId)!;
@@ -555,16 +563,56 @@ export function compileDigitalPartition(
 
     const netA = slotToNetId(i, pinAIdx);
     const netB = slotToNetId(i, pinBIdx);
+    switchNetPairs.push({ compIdx: i, netA, netB });
+  }
 
-    if (multiDriverNets.has(netA) && multiDriverNets.has(netB)) {
-      switchClassification[i] = 2;
-      bidirectionalSwitchIndices.push(i);
-      if (busResolver !== null) {
-        busResolver.registerSwitch(i, netA, netB);
+  // Ensure BusResolver exists when switches are present.
+  if (busResolver === null && switchNetPairs.length > 0) {
+    busResolver = new BusResolver();
+  }
+
+  // Register switch nets that aren't already multi-driver bus nets.
+  // Each needs a single-driver shadow so the resolver can manage merging.
+  if (busResolver !== null) {
+    let nextShadow = totalNetCount + shadowNetCount;
+    for (const { netA, netB } of switchNetPairs) {
+      for (const netId of [netA, netB]) {
+        if (multiDriverNets.has(netId)) continue; // already a bus net
+        multiDriverNets.add(netId);
+
+        // Find the single driver for this net and create a shadow.
+        const drivers = netDrivers.get(netId);
+        const shadowNetIds: number[] = [];
+        if (drivers !== undefined) {
+          for (const driverIdx of drivers) {
+            const outNets = componentOutputNets[driverIdx]!;
+            for (let pinIdx = 0; pinIdx < outNets.length; pinIdx++) {
+              if (outNets[pinIdx] === netId) {
+                const shadowId = nextShadow++;
+                shadowNetIds.push(shadowId);
+                wiringTable[outputOffsets[driverIdx]! + pinIdx] = shadowId;
+              }
+            }
+          }
+        }
+        busResolver.addBusNet(netId, shadowNetIds, "none");
       }
-    } else {
-      switchClassification[i] = 1;
     }
+
+    const newShadowCount = nextShadow - totalNetCount - shadowNetCount;
+    if (newShadowCount > 0) {
+      // Shift state offsets by the additional shadow nets.
+      for (let i = 0; i < componentCount; i++) {
+        stateOffsets[i] += newShadowCount;
+      }
+      shadowNetCount += newShadowCount;
+    }
+  }
+
+  for (const { compIdx, netA, netB } of switchNetPairs) {
+    switchClassification[compIdx] = 2;
+    bidirectionalSwitchIndices.push(compIdx);
+    busResolver!.registerSwitch(compIdx, netA, netB);
   }
 
   const switchComponentIndices = new Uint32Array(bidirectionalSwitchIndices);

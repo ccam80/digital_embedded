@@ -20,6 +20,7 @@ import { initFileIOController } from './file-io-controller.js';
 import { initAnalysisDialogs } from './analysis-dialogs.js';
 import { initCanvasInteraction } from './canvas-interaction.js';
 import { initMenuAndToolbar, applyColorScheme } from './menu-toolbar.js';
+import type { MenuToolbarController } from './menu-toolbar.js';
 
 import { createDefaultRegistry } from '../components/register-all.js';
 import { Circuit } from '../core/circuit.js';
@@ -284,8 +285,9 @@ export function initApp(search?: string): void {
 
   let simController: SimulationController = null!;
   let viewerController: ViewerController = null!;
+  let menuToolbar: MenuToolbarController = null!;
 
-  function invalidateCompiled(): void { simController.invalidateCompiled(); }
+  function invalidateCompiled(): void { simController.invalidateCompiled(); menuToolbar.refreshPinLoadingIndicators(); }
   function compileAndBind(): boolean { return simController.compileAndBind(); }
   function isSimActive(): boolean { return simController.isSimActive(); }
 
@@ -387,7 +389,7 @@ export function initApp(search?: string): void {
   });
 
   // Initialize menu and toolbar
-  const menuToolbar = initMenuAndToolbar(
+  menuToolbar = initMenuAndToolbar(
     ctx,
     simController,
     viewerController,

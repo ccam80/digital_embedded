@@ -273,24 +273,6 @@ function createPotentiometerElement(
 
 const POTENTIOMETER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "resistance",
-    type: PropertyType.FLOAT,
-    label: "Resistance (Ω)",
-    unit: "Ω",
-    defaultValue: 10000,
-    min: 1e-9,
-    description: "Total resistance in ohms",
-  },
-  {
-    key: "position",
-    type: PropertyType.FLOAT,
-    label: "Position",
-    defaultValue: 0.5,
-    min: 0,
-    max: 1,
-    description: "Wiper position (0.0 = full bottom, 1.0 = full top)",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -308,11 +290,13 @@ export const POTENTIOMETER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     xmlName: "resistance",
     propertyKey: "resistance",
     convert: (v) => parseFloat(v),
+    modelParam: true,
   },
   {
     xmlName: "position",
     propertyKey: "position",
     convert: (v) => parseFloat(v),
+    modelParam: true,
   },
   {
     xmlName: "Label",

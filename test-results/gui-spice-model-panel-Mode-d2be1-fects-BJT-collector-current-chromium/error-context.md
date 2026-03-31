@@ -16,7 +16,7 @@
       - button "↷" [disabled] [ref=e14]
       - button "⧉" [ref=e15] [cursor=pointer]
       - button "▶" [ref=e17] [cursor=pointer]
-      - button "⏵" [active] [ref=e18] [cursor=pointer]
+      - button "⏵" [ref=e18] [cursor=pointer]
       - 'textbox "Step to sim-time offset (SI suffixes: s, m=ms, u=µs, n=ns)" [ref=e19]':
         - /placeholder: e.g. 5m, 100u
         - text: 1m
@@ -270,9 +270,24 @@
                 - generic [ref=e358]: RAMSinglePort
       - button "‹" [ref=e359] [cursor=pointer]
     - generic "Drag to resize palette" [ref=e360]
-    - generic "Circuit editor canvas" [ref=e362]
-  - generic [ref=e363]:
-    - generic [ref=e364]: Ready
-    - button "100%" [ref=e366] [cursor=pointer]
-    - generic [ref=e367]: 26, 8
+    - generic [ref=e361]:
+      - generic "Circuit editor canvas" [ref=e362]
+      - generic [ref=e363]:
+        - generic [ref=e364]:
+          - generic [ref=e365]: DcVoltageSource
+          - button "×" [ref=e366] [cursor=pointer]
+        - generic [ref=e367]:
+          - generic [ref=e368]:
+            - generic [ref=e369]: Label
+            - generic [ref=e370]:
+              - textbox [ref=e371]: Vcc
+              - checkbox "Show on canvas" [checked] [ref=e372]
+          - generic [ref=e373]:
+            - generic [ref=e374]: Show value
+            - checkbox [checked] [ref=e376]
+          - generic [ref=e378] [cursor=pointer]: ▶ Pin Electrical
+  - generic [ref=e379]:
+    - generic [ref=e380]: Ready
+    - button "100%" [ref=e382] [cursor=pointer]
+    - generic [ref=e383]: 9, 5
 ```

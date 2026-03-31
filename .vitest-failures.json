@@ -1,10 +1,83 @@
 {
   "summary": {
-    "passed": 9926,
-    "failed": 0,
+    "passed": 9918,
+    "failed": 8,
     "skipped": 0,
     "totalFiles": 331,
-    "durationSeconds": 11.7
+    "durationSeconds": 18.7
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "expected 0 to be greater than 0",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
+          "test": "returns non-empty array for analog resistor element",
+          "line": 134,
+          "column": 65
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'elementIndex')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
+          "test": "descriptor has non-negative integer elementIndex",
+          "line": 141,
+          "column": 31
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be defined",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
+          "test": "descriptor for resistor includes resistance property",
+          "line": 149,
+          "column": 19
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'currentValue')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
+          "test": "descriptor currentValue matches element property value",
+          "line": 156,
+          "column": 18
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'label')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
+          "test": "descriptor has non-empty label",
+          "line": 162,
+          "column": 58
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'logScale')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
+          "test": "descriptor logScale is a boolean",
+          "line": 168,
+          "column": 65
+        }
+      ]
+    }
+  ]
 }

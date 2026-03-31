@@ -99,12 +99,18 @@ const OUTPUT_PIN_SPEC: ResolvedPinElectrical = {
 // ---------------------------------------------------------------------------
 
 function buildADCPinDeclarations(bits: number): PinDeclaration[] {
+  // Layout: right side has EOC + D0..D(N-1) at y=0..N (N+1 pins).
+  // Left side has VIN, CLK, VREF centered vertically against right side.
+  // GND at bottom center. Body: (1,-1) to (5, N+1), width=4.
+  const rightCount = bits + 1; // EOC + D0..D(N-1)
+  const mid = Math.floor((rightCount - 1) / 2);
+
   const pins: PinDeclaration[] = [
     {
       direction: PinDirection.INPUT,
       label: "VIN",
       defaultBitWidth: 1,
-      position: { x: 0, y: 0 },
+      position: { x: 0, y: mid - 1 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -113,7 +119,7 @@ function buildADCPinDeclarations(bits: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "CLK",
       defaultBitWidth: 1,
-      position: { x: 0, y: 1 },
+      position: { x: 0, y: mid },
       isNegatable: false,
       isClockCapable: true,
       kind: "signal",
@@ -122,16 +128,7 @@ function buildADCPinDeclarations(bits: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: "VREF",
       defaultBitWidth: 1,
-      position: { x: 0, y: 2 },
-      isNegatable: false,
-      isClockCapable: false,
-      kind: "signal",
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "GND",
-      defaultBitWidth: 1,
-      position: { x: 0, y: 3 },
+      position: { x: 0, y: mid + 1 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -140,7 +137,7 @@ function buildADCPinDeclarations(bits: number): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: "EOC",
       defaultBitWidth: 1,
-      position: { x: 4, y: 0 },
+      position: { x: 6, y: 0 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
@@ -152,12 +149,23 @@ function buildADCPinDeclarations(bits: number): PinDeclaration[] {
       direction: PinDirection.OUTPUT,
       label: `D${i}`,
       defaultBitWidth: 1,
-      position: { x: 4, y: i + 1 },
+      position: { x: 6, y: i + 1 },
       isNegatable: false,
       isClockCapable: false,
       kind: "signal",
     });
   }
+
+  // GND — bottom center
+  pins.push({
+    direction: PinDirection.INPUT,
+    label: "GND",
+    defaultBitWidth: 1,
+    position: { x: 3, y: rightCount + 1 },
+    isNegatable: false,
+    isClockCapable: false,
+    kind: "signal",
+  });
 
   return pins;
 }
@@ -185,48 +193,60 @@ export class ADCElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
+    const rightCount = this._bits + 1; // EOC + D0..D(N-1)
     return {
       x: this.position.x,
-      y: this.position.y,
-      width: 4,
-      height: this._bits + 2,
+      y: this.position.y - 1,
+      width: 6,
+      height: rightCount + 2,
     };
   }
 
   draw(ctx: RenderContext, _signals?: PinVoltageAccess): void {
     const label = this._visibleLabel();
     const bits = this._bits;
+    const rightCount = bits + 1; // EOC + D0..D(N-1)
+    const mid = Math.floor((rightCount - 1) / 2);
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    const h = bits + 2;
-    ctx.drawLine(0, 0, 4, 0);
-    ctx.drawLine(4, 0, 4, h);
-    ctx.drawLine(4, h, 0, h);
-    ctx.drawLine(0, h, 0, 0);
+    // Body rectangle: (1, -1) to (5, rightCount), width=4
+    ctx.drawRect(1, -1, 4, rightCount + 1, false);
 
+    // Left-side leads: VIN, CLK, VREF centered at mid-1, mid, mid+1
+    ctx.drawLine(0, mid - 1, 1, mid - 1);
+    ctx.drawLine(0, mid, 1, mid);
+    ctx.drawLine(0, mid + 1, 1, mid + 1);
+
+    // Right-side leads: EOC at y=0, D0..D(N-1) at y=1..N
+    for (let i = 0; i < rightCount; i++) {
+      ctx.drawLine(5, i, 6, i);
+    }
+
+    // GND lead (south): pin tip (3, rightCount+1) → body edge (3, rightCount)
+    ctx.drawLine(3, rightCount + 1, 3, rightCount);
+
+    // Component name centered
     ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("ADC", 2, h / 2, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("ADC", 3, (rightCount - 1) / 2, { horizontal: "center", vertical: "middle" });
 
     // Pin labels
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.55 });
-    // Left-side input pins
-    ctx.drawText("VIN",  0.15, 0, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("CLK",  0.15, 1, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("VREF", 0.15, 2, { horizontal: "left", vertical: "middle" });
-    ctx.drawText("GND",  0.15, 3, { horizontal: "left", vertical: "middle" });
-    // Right-side output pins
-    ctx.drawText("EOC", 3.85, 0, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("VIN",  1.15, mid - 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("CLK",  1.15, mid, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("VREF", 1.15, mid + 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("EOC",  4.85, 0, { horizontal: "right", vertical: "middle" });
     for (let i = 0; i < bits; i++) {
-      ctx.drawText(`D${i}`, 3.85, i + 1, { horizontal: "right", vertical: "middle" });
+      ctx.drawText(`D${i}`, 4.85, i + 1, { horizontal: "right", vertical: "middle" });
     }
+    ctx.drawText("GND", 3, rightCount - 0.5, { horizontal: "center", vertical: "bottom" });
 
     if (label.length > 0) {
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 2, -0.3, { horizontal: "center", vertical: "bottom" });
+      ctx.drawText(label, 3, -1.5, { horizontal: "center", vertical: "bottom" });
     }
 
     ctx.restore();

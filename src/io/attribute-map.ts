@@ -69,7 +69,12 @@ export function applyAttributeMappings(
   for (const entry of entries) {
     const mapping = mappingByName.get(entry.key);
     if (mapping !== undefined) {
-      bag.set(mapping.propertyKey, mapping.convertDigValue(entry.value));
+      const value = mapping.convertDigValue(entry.value);
+      if (mapping.modelParam) {
+        bag.setModelParam(mapping.propertyKey, value);
+      } else {
+        bag.set(mapping.propertyKey, value);
+      }
     } else {
       unmapped.set(entry.key, entry.value);
     }

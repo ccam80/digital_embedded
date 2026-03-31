@@ -253,8 +253,8 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 162,
-      "lastAccessed": 1774932080612,
+      "accessCount": 168,
+      "lastAccessed": 1774948494674,
       "type": "file"
     },
     {
@@ -277,8 +277,8 @@
     },
     {
       "path": "",
-      "accessCount": 63,
-      "lastAccessed": 1774927794246,
+      "accessCount": 65,
+      "lastAccessed": 1774948463201,
       "type": "directory"
     },
     {
@@ -295,8 +295,8 @@
     },
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 39,
-      "lastAccessed": 1774945023509,
+      "accessCount": 40,
+      "lastAccessed": 1774946510167,
       "type": "file"
     },
     {
@@ -318,6 +318,12 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\passives\\resistor.ts",
+      "accessCount": 33,
+      "lastAccessed": 1774947271902,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\passives\\analog-fuse.ts",
       "accessCount": 30,
       "lastAccessed": 1774911492113,
@@ -330,9 +336,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\resistor.ts",
+      "path": "src\\components\\gates\\and.ts",
       "accessCount": 29,
-      "lastAccessed": 1774945092725,
+      "lastAccessed": 1774948470566,
       "type": "file"
     },
     {
@@ -342,9 +348,15 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\gates\\and.ts",
+      "path": "src\\components\\passives\\capacitor.ts",
+      "accessCount": 27,
+      "lastAccessed": 1774947273944,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\inductor.ts",
       "accessCount": 26,
-      "lastAccessed": 1774908275238,
+      "lastAccessed": 1774947275298,
       "type": "file"
     },
     {
@@ -355,8 +367,14 @@
     },
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 21,
-      "lastAccessed": 1774912934799,
+      "accessCount": 22,
+      "lastAccessed": 1774946501061,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\flipflops\\d.ts",
+      "accessCount": 22,
+      "lastAccessed": 1774947881926,
       "type": "file"
     },
     {
@@ -366,9 +384,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\flipflops\\d.ts",
-      "accessCount": 20,
-      "lastAccessed": 1774908281806,
+      "path": "src\\components\\passives\\potentiometer.ts",
+      "accessCount": 21,
+      "lastAccessed": 1774947287930,
       "type": "file"
     },
     {
@@ -390,27 +408,21 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\capacitor.ts",
-      "accessCount": 18,
-      "lastAccessed": 1774915476168,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\inductor.ts",
-      "accessCount": 17,
-      "lastAccessed": 1774911509522,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\gates\\not.ts",
-      "accessCount": 17,
-      "lastAccessed": 1774944994220,
+      "accessCount": 19,
+      "lastAccessed": 1774947872396,
       "type": "file"
     },
     {
       "path": ".vitest-failures.json",
+      "accessCount": 16,
+      "lastAccessed": 1774947645558,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\or.ts",
       "accessCount": 15,
-      "lastAccessed": 1774932831052,
+      "lastAccessed": 1774947870428,
       "type": "file"
     },
     {
@@ -420,21 +432,33 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\gates\\or.ts",
-      "accessCount": 14,
-      "lastAccessed": 1774908276568,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\potentiometer.ts",
-      "accessCount": 14,
-      "lastAccessed": 1774910346331,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\semiconductors\\pjfet.ts",
       "accessCount": 14,
       "lastAccessed": 1774910392285,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\nand.ts",
+      "accessCount": 14,
+      "lastAccessed": 1774947870623,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\nor.ts",
+      "accessCount": 14,
+      "lastAccessed": 1774947870833,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\xor.ts",
+      "accessCount": 14,
+      "lastAccessed": 1774947871068,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\gates\\xnor.ts",
+      "accessCount": 14,
+      "lastAccessed": 1774947871286,
       "type": "file"
     },
     {
@@ -444,39 +468,15 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\gates\\nand.ts",
+      "path": "src\\components\\flipflops\\jk.ts",
       "accessCount": 13,
-      "lastAccessed": 1774908277357,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\gates\\nor.ts",
-      "accessCount": 13,
-      "lastAccessed": 1774908278174,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\gates\\xor.ts",
-      "accessCount": 13,
-      "lastAccessed": 1774908278833,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\gates\\xnor.ts",
-      "accessCount": 13,
-      "lastAccessed": 1774908279408,
+      "lastAccessed": 1774947877721,
       "type": "file"
     },
     {
       "path": "src\\components\\flipflops\\d-async.ts",
       "accessCount": 12,
       "lastAccessed": 1774908282575,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\flipflops\\jk.ts",
-      "accessCount": 12,
-      "lastAccessed": 1774908283759,
       "type": "file"
     },
     {

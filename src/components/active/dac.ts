@@ -66,6 +66,9 @@ export const { paramDefs: DAC_PARAM_DEFS, defaults: DAC_DEFAULTS } = defineModel
  *   GND        — ground reference
  */
 function buildDACPinDeclarations(bits: number): PinDeclaration[] {
+  // Layout: D pins on left at y=0..N-1, OUT right-center,
+  // VREF top-center, GND bottom-center.
+  // Body: (1, -1) to (5, N), width=4, height=N+1.
   const pins: PinDeclaration[] = [];
 
   // Digital input pins D0..D(N-1) on the left, evenly spaced
@@ -75,41 +78,41 @@ function buildDACPinDeclarations(bits: number): PinDeclaration[] {
       direction: PinDirection.INPUT,
       label: `D${i}`,
       defaultBitWidth: 1,
-      position: { x: 0, y: i - Math.floor(bits / 2) },
+      position: { x: 0, y: i },
       isNegatable: false,
       isClockCapable: false,
     });
   }
 
-  // VREF — reference voltage input
+  // VREF — top center
   pins.push({
     kind: "signal",
     direction: PinDirection.INPUT,
     label: "VREF",
     defaultBitWidth: 1,
-    position: { x: 2, y: -Math.floor(bits / 2) - 1 },
+    position: { x: 3, y: -2 },
     isNegatable: false,
     isClockCapable: false,
   });
 
-  // OUT — analog output
+  // OUT — right side, vertically centered
   pins.push({
     kind: "signal",
     direction: PinDirection.OUTPUT,
     label: "OUT",
     defaultBitWidth: 1,
-    position: { x: 4, y: 0 },
+    position: { x: 6, y: Math.floor((bits - 1) / 2) },
     isNegatable: false,
     isClockCapable: false,
   });
 
-  // GND — ground reference
+  // GND — bottom center
   pins.push({
     kind: "signal",
     direction: PinDirection.INPUT,
     label: "GND",
     defaultBitWidth: 1,
-    position: { x: 2, y: Math.floor(bits / 2) + 1 },
+    position: { x: 3, y: bits + 1 },
     isNegatable: false,
     isClockCapable: false,
   });
@@ -139,53 +142,62 @@ export class DACElement extends AbstractCircuitElement {
 
   getBoundingBox(): Rect {
     const bits = this._properties.getOrDefault<number>("bits", 8);
-    const height = Math.max(bits + 2, 4);
     return {
       x: this.position.x,
-      y: this.position.y - Math.floor(height / 2),
-      width: 4,
-      height,
+      y: this.position.y - 2,
+      width: 6,
+      height: bits + 3,
     };
   }
 
   draw(ctx: RenderContext, _signals?: PinVoltageAccess): void {
     const bits = this._properties.getOrDefault<number>("bits", 8);
     const label = this._visibleLabel();
-    const halfH = Math.floor(bits / 2) + 1;
+    const outY = Math.floor((bits - 1) / 2);
 
     ctx.save();
     ctx.setColor("COMPONENT");
     ctx.setLineWidth(1);
 
-    // Rectangular body
-    ctx.drawRect(0, -halfH, 4, halfH * 2, false);
+    // Body rectangle: (1, -1) to (5, bits), width=4, height=bits+1
+    ctx.drawRect(1, -1, 4, bits + 1, false);
+
+    // Left-side leads: D0..D(N-1) pin tip (0,i) → body edge (1,i)
+    // (leads drawn as simple lines in COMPONENT color — no voltage coloring for digital inputs)
+    for (let i = 0; i < bits; i++) {
+      ctx.drawLine(0, i, 1, i);
+    }
+
+    // VREF lead (north): pin tip (3,-2) → body edge (3,-1)
+    ctx.drawLine(3, -2, 3, -1);
+
+    // OUT lead (east): pin tip (6,outY) → body edge (5,outY)
+    ctx.drawLine(6, outY, 5, outY);
+
+    // GND lead (south): pin tip (3,bits+1) → body edge (3,bits)
+    ctx.drawLine(3, bits + 1, 3, bits);
 
     // Label "DAC" centered inside
     ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("DAC", 2, 0, { horizontal: "center", vertical: "middle" });
+    ctx.drawText("DAC", 3, (bits - 1) / 2, { horizontal: "center", vertical: "middle" });
 
     // Bit count label
     ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText(`${bits}-bit`, 2, 0.8, { horizontal: "center", vertical: "middle" });
+    ctx.drawText(`${bits}-bit`, 3, (bits - 1) / 2 + 0.8, { horizontal: "center", vertical: "middle" });
 
     // Pin labels
     ctx.setColor("TEXT");
     ctx.setFont({ family: "sans-serif", size: 0.55 });
-    // Digital input pins D0..D(N-1) on the left
     for (let i = 0; i < bits; i++) {
-      const y = i - Math.floor(bits / 2);
-      ctx.drawText(`D${i}`, 0.15, y, { horizontal: "left", vertical: "middle" });
+      ctx.drawText(`D${i}`, 1.15, i, { horizontal: "left", vertical: "middle" });
     }
-    // VREF at top
-    ctx.drawText("VREF", 2, -halfH + 0.15, { horizontal: "center", vertical: "top" });
-    // OUT on the right
-    ctx.drawText("OUT", 3.85, 0, { horizontal: "right", vertical: "middle" });
-    // GND at bottom
-    ctx.drawText("GND", 2, halfH - 0.15, { horizontal: "center", vertical: "bottom" });
+    ctx.drawText("VREF", 3, -0.5, { horizontal: "center", vertical: "top" });
+    ctx.drawText("OUT",  4.85, outY, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("GND",  3, bits - 0.5, { horizontal: "center", vertical: "bottom" });
 
     if (label.length > 0) {
       ctx.setFont({ family: "sans-serif", size: 0.8 });
-      ctx.drawText(label, 2, -halfH - 0.5, { horizontal: "center", vertical: "bottom" });
+      ctx.drawText(label, 3, -1.5, { horizontal: "center", vertical: "bottom" });
     }
 
     ctx.restore();

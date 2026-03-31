@@ -529,23 +529,48 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     const elementIndex = this._resolveElementIndex(element);
     if (elementIndex === -1) return [];
     const def = this._registry.get(element.typeId);
-    if (!def?.propertyDefs) return [];
+    if (!def) return [];
+    const bag = element.getProperties();
     const result: SliderPropertyDescriptor[] = [];
-    for (const propDef of def.propertyDefs) {
-      if (propDef.type !== PropertyType.FLOAT) continue;
-      const currentValue = element.getProperties().getOrDefault<number>(
-        propDef.key,
-        (propDef.defaultValue as number) ?? 0,
-      );
-      result.push({
-        elementIndex,
-        key: propDef.key,
-        label: propDef.label,
-        currentValue,
-        unit: ANALOG_PROPERTY_UNITS[propDef.key] ?? '',
-        logScale: true,
-      });
+
+    // Model params (primary source of tunable analog parameters)
+    const modelKey = bag.has("model") ? bag.get<string>("model") : (def.defaultModel ?? "behavioral");
+    const entry = def.modelRegistry?.[modelKey];
+    if (entry?.paramDefs) {
+      for (const pd of entry.paramDefs) {
+        const currentValue = bag.hasModelParam(pd.key)
+          ? bag.getModelParam<number>(pd.key)
+          : ((entry.params as Record<string, number>)[pd.key] ?? 0);
+        result.push({
+          elementIndex,
+          key: pd.key,
+          label: pd.label,
+          currentValue,
+          unit: pd.unit ?? ANALOG_PROPERTY_UNITS[pd.key] ?? '',
+          logScale: true,
+        });
+      }
     }
+
+    // Regular property defs (non-model numeric properties)
+    if (def.propertyDefs) {
+      for (const propDef of def.propertyDefs) {
+        if (propDef.type !== PropertyType.FLOAT) continue;
+        const currentValue = bag.getOrDefault<number>(
+          propDef.key,
+          (propDef.defaultValue as number) ?? 0,
+        );
+        result.push({
+          elementIndex,
+          key: propDef.key,
+          label: propDef.label,
+          currentValue,
+          unit: ANALOG_PROPERTY_UNITS[propDef.key] ?? '',
+          logScale: true,
+        });
+      }
+    }
+
     return result;
   }
 

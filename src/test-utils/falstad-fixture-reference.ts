@@ -233,6 +233,50 @@ const PIN_POSITION_OVERRIDES: Record<string, Record<string, { x: number; y: numb
     collector: { x: 4, y: -1 },
     emitter:   { x: 4, y:  1 },
   },
+  // Timer555: compact IC layout with VCC top-center, GND bottom-center,
+  // 3 left pins and 3 right pins evenly spaced at y=1,3,5.
+  Timer555: {
+    DIS:  { x: 0, y: 1 },
+    TRIG: { x: 0, y: 3 },
+    THR:  { x: 0, y: 5 },
+    VCC:  { x: 3, y: -1 },
+    CTRL: { x: 6, y: 5 },
+    OUT:  { x: 6, y: 3 },
+    RST:  { x: 6, y: 1 },
+    GND:  { x: 3, y: 7 },
+  },
+  // DAC: D pins left at y=0..N-1, VREF top-center, OUT right-center, GND bottom-center.
+  // Default 8-bit layout.
+  DAC: {
+    D0:   { x: 0, y: 0 },
+    D1:   { x: 0, y: 1 },
+    D2:   { x: 0, y: 2 },
+    D3:   { x: 0, y: 3 },
+    D4:   { x: 0, y: 4 },
+    D5:   { x: 0, y: 5 },
+    D6:   { x: 0, y: 6 },
+    D7:   { x: 0, y: 7 },
+    VREF: { x: 3, y: -2 },
+    OUT:  { x: 6, y: 3 },
+    GND:  { x: 3, y: 9 },
+  },
+  // ADC: VIN/CLK/VREF centered on left, EOC+D0..D7 on right, GND bottom-center.
+  // Default 8-bit layout: right side has 9 pins (EOC+D0..D7), mid=4.
+  ADC: {
+    VIN:  { x: 0, y: 3 },
+    CLK:  { x: 0, y: 4 },
+    VREF: { x: 0, y: 5 },
+    EOC:  { x: 6, y: 0 },
+    D0:   { x: 6, y: 1 },
+    D1:   { x: 6, y: 2 },
+    D2:   { x: 6, y: 3 },
+    D3:   { x: 6, y: 4 },
+    D4:   { x: 6, y: 5 },
+    D5:   { x: 6, y: 6 },
+    D6:   { x: 6, y: 7 },
+    D7:   { x: 6, y: 8 },
+    GND:  { x: 3, y: 10 },
+  },
 };
 
 // ---------------------------------------------------------------------------
