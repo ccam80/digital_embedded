@@ -238,16 +238,6 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.stepViaUI();
     await builder.verifyNoErrors();
 
-    // Drive CTRL=1 via the postMessage API so the switch closes.
-    // The In component's defaultValue=1 is stored in the property bag but the
-    // digital engine initializes all signals to 0. The postMessage sim-set-input
-    // path calls facade.setInput which writes directly to the signal array.
-    await builder.page.evaluate(() => {
-      window.postMessage({ type: 'sim-set-input', label: 'CTRL', value: 1 }, '*');
-    });
-    await builder.page.waitForTimeout(200);
-    await builder.stepViaUI(2);
-
     // --- Phase A: DC operating point ---
     // Step to 50ms for full settling
     await builder.stepToTimeViaUI('50m');
@@ -463,39 +453,68 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.stepViaUI();
     await builder.verifyNoErrors();
 
-    // --- Step to let RC settle (5τ = 5 × 1kΩ × 1µF = 5ms) ---
+    // --- Phase A: DC operating point at t=5ms ---
     await builder.stepToTimeViaUI('5m');
-    const state = await builder.getAnalogState();
-    expect(state).not.toBeNull();
-    expect(state!.simTime).toBeGreaterThan(0);
-    expect(state!.nodeCount).toBeGreaterThanOrEqual(2);
+    const stateA = await builder.getAnalogState();
+    expect(stateA).not.toBeNull();
+    expect(stateA!.simTime).toBeGreaterThan(0);
 
     // All voltages must be finite
-    for (const [node, v] of Object.entries(state!.nodeVoltages)) {
+    for (const [node, v] of Object.entries(stateA!.nodeVoltages)) {
       expect(Number.isFinite(v), `node ${node} voltage is not finite: ${v}`).toBe(true);
     }
 
-    const volts = sortedVoltages(state!);
+    const signalsA = await builder.readAllSignals();
+    expect(signalsA).not.toBeNull();
 
-    // VREF ≈ 5V should be highest analog node
-    expect(volts[0]).toBeGreaterThan(4.0);
-    expect(volts[0]).toBeLessThan(6.0);
+    // P_DAC probe reads the RC node (DAC output through R1)
+    // ngspice ref at t=5ms: v_rc = 3.121984V (98.94% settled toward 3.125V)
+    const pDacA = signalsA!['P_DAC'];
+    expect(pDacA).toBeDefined();
+    expect(Math.abs(pDacA - 3.121984) / 3.121984).toBeLessThan(0.001);
 
-    // DAC output: code 1010 = 10/16 × 5V ≈ 3.125V
-    // After RC filter settles, RC node should approach this
-    const dacVolt = volts.find((v: number) => v > 2.5 && v < 3.5);
-    expect(dacVolt).toBeDefined();
-    expect(dacVolt!).toBeGreaterThan(2.8);
-    expect(dacVolt!).toBeLessThan(3.5);
+    // Comparator polarity: in- gets RC voltage (~3.12V) > in+ gets Vref2 (2.5V)
+    // → comparator output LOW → AND gate output = 0
+    const gaA = await builder.readOutput('GA');
+    expect(gaA).toBe(0);
 
-    // --- Trace/scope: add trace on R1 and measure peaks ---
+    // --- Phase B: Modify Vref 5V → 3.3V ---
+    await builder.setComponentProperty('Vref', 'voltage', 3.3);
+    await builder.stepToTimeViaUI('10m');  // absolute: 5ms + 5ms settling
+
+    const signalsB = await builder.readAllSignals();
+    expect(signalsB).not.toBeNull();
+
+    // ngspice ref at t=5ms after change: v_rc = 2.060510V
+    const pDacB = signalsB!['P_DAC'];
+    expect(pDacB).toBeDefined();
+    expect(Math.abs(pDacB - 2.060510) / 2.060510).toBeLessThan(0.001);
+
+    // Comparator flips: in+ (2.5V) > in- (~2.06V) → output HIGH → counter counts
+    const gaB = await builder.readOutput('GA');
+    expect(gaB).toBe(1);
+
+    // --- Phase C: Modify R1 1k → 10k (τ = 10.1ms, settle at 50ms) ---
+    await builder.setComponentProperty('R1', 'resistance', 10000);
+    await builder.stepToTimeViaUI('60m');  // absolute: 10ms + 50ms settling
+
+    const signalsC = await builder.readAllSignals();
+    expect(signalsC).not.toBeNull();
+
+    // ngspice ref at t=50ms: v_rc = 2.062355V (99.29% settled)
+    const pDacC = signalsC!['P_DAC'];
+    expect(pDacC).toBeDefined();
+    expect(Math.abs(pDacC - 2.062355) / 2.062355).toBeLessThan(0.001);
+
+    // --- Phase D: Trace/scope on R1 ---
     await builder.addTraceViaContextMenu('R1', 'A');
     const peaks = await builder.measureAnalogPeaks('2m');
     expect(peaks).not.toBeNull();
     expect(peaks!.nodeCount).toBeGreaterThanOrEqual(1);
-    // DAC steady-state: peak should be near 3.125V
-    const maxPeak = Math.max(...peaks!.peaks);
-    expect(maxPeak).toBeGreaterThan(2.5);
-    expect(maxPeak).toBeLessThan(4.0);
+
+    // --- Phase E: Pin electrical / rOut override on GA output ---
+    // TODO: Right-click GA output pin, set Rout=75
+    // Pattern from e2e/gui/hotload-params-e2e.spec.ts
+    // Deferred: requires getPinFieldInput helper and pin-level context menu
   });
 });
