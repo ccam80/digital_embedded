@@ -29,7 +29,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
 import type { ExprNode } from "../../solver/analog/expression.js";
@@ -419,7 +419,7 @@ const AC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 // AcVoltageSourceAnalogElement — AnalogElement with time-varying stamp
 // ---------------------------------------------------------------------------
 
-export interface AcVoltageSourceAnalogElement extends AnalogElement {
+export interface AcVoltageSourceAnalogElement extends AnalogElementCore {
   /** Returns transition times within [tStart, tEnd] for square waveforms. */
   getBreakpoints(tStart: number, tEnd: number): number[];
   /**

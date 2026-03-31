@@ -305,13 +305,13 @@ describe("SparseSolver", () => {
     for (let i = 0; i < n; i++) solver.stampRHS(i, rhs[i]);
     solver.finalize(); // topology unchanged — skips symbolic
 
-    const tw1 = performance.now();
+    performance.now();
     solver.factor();
-    const tWarmFactor = performance.now() - tw1;
+    performance.now();
 
-    const tw2 = performance.now();
+    performance.now();
     solver.solve(x);
-    const tWarmSolve = performance.now() - tw2;
+    performance.now();
 
     // Verify solution is correct: A*x should equal b within tolerance
     // (residual check using original entries)
@@ -437,19 +437,19 @@ describe("SparseSolver real MNA circuit", () => {
       if (el.isNonlinear && el.stampNonlinear) el.stampNonlinear(rawSolver);
     }
 
-    const ts0 = performance.now();
+    performance.now();
     rawSolver.finalize();
-    const tRawSymbolic = performance.now() - ts0;
+    performance.now();
 
-    const ts1 = performance.now();
+    performance.now();
     const fResult = rawSolver.factor();
-    const tRawFactor = performance.now() - ts1;
+    performance.now();
     expect(fResult.success).toBe(true);
 
-    const ts2 = performance.now();
+    performance.now();
     const xRaw = new Float64Array(matrixSize);
     rawSolver.solve(xRaw);
-    const tRawSolve = performance.now() - ts2;
+    performance.now();
 
     // Warm run: re-stamp and re-factor (simulates NR iteration 2+)
     rawSolver.beginAssembly(matrixSize);
@@ -459,13 +459,13 @@ describe("SparseSolver real MNA circuit", () => {
     }
     rawSolver.finalize(); // topology unchanged — skips symbolic
 
-    const tw1 = performance.now();
+    performance.now();
     rawSolver.factor();
-    const tWarmFactor = performance.now() - tw1;
+    performance.now();
 
-    const tw2 = performance.now();
+    performance.now();
     rawSolver.solve(xRaw);
-    const tWarmSolve = performance.now() - tw2;
+    performance.now();
 
     // Performance targets for a 52×52 real MNA matrix:
     // DC OP: < 20ms (multiple NR iterations with 7 nonlinear diodes)

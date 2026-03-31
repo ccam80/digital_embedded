@@ -34,7 +34,7 @@ function makeLayout(
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
     getProperty: opts?.props
-      ? (_index: number, key: string) => (opts.props as Record<string, unknown>)[key]
+      ? (_index: number, key: string) => (opts.props as Record<string, unknown>)[key] as import('../../core/properties.js').PropertyValue | undefined
       : () => undefined,
   };
 }

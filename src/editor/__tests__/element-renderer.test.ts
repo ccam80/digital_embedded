@@ -55,10 +55,10 @@ function makeStubElement(opts: StubElementOptions = {}): TestElement {
     opts.pins ?? [],
     undefined,
     {
-      rotation: opts.rotation,
-      mirror: opts.mirror,
+      ...(opts.rotation !== undefined ? { rotation: opts.rotation } : {}),
+      ...(opts.mirror !== undefined ? { mirror: opts.mirror } : {}),
       boundingBox: bb,
-      drawFn: opts.drawFn,
+      ...(opts.drawFn !== undefined ? { drawFn: opts.drawFn } : {}),
     },
   );
 }

@@ -21,18 +21,12 @@ import { newtonRaphson } from "../../../solver/analog/newton-raphson.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
-
 // ---------------------------------------------------------------------------
 // Default tunnel diode parameters
 // ---------------------------------------------------------------------------
@@ -64,7 +58,7 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
 function makeTunnelDiode(overrides: Partial<typeof TD_MODEL_PARAMS> = {}): AnalogElement {
   const modelParams = { ...TD_MODEL_PARAMS, ...overrides };
   // nodeAnode=1, nodeCathode=2
-  return createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, makeParamBag(modelParams));
+  return withNodeIds(createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, makeParamBag(modelParams)), [1, 2]);
 }
 
 /**
@@ -168,7 +162,7 @@ describe("TunnelDiode", () => {
     const { ip, vp, iv, vv } = TD_DEFAULTS;
     const vMid = (vp + vv) / 2;
 
-    const { dIdV } = tunnelDiodeIV(vMid, ip, vp, iv, vv);
+    const { dIdV: _dIdV } = tunnelDiodeIV(vMid, ip, vp, iv, vv);
 
     // In NDR region, dI/dV < 0 (negative differential resistance)
     // GMIN is added to prevent singular matrix, so check dIdV < GMIN
@@ -269,6 +263,8 @@ describe("TunnelDiode", () => {
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,
+      setParam(_key: string, _value: number): void {},
+      getPinCurrents(_v: Float64Array): number[] { return []; },
       stamp(solver: SparseSolverType): void {
         solver.stamp(0, 0, G); // node1 diagonal
         solver.stamp(1, 1, G); // node2 diagonal
@@ -284,6 +280,8 @@ describe("TunnelDiode", () => {
       branchIndex: 2,
       isNonlinear: false,
       isReactive: false,
+      setParam(_key: string, _value: number): void {},
+      getPinCurrents(_v: Float64Array): number[] { return []; },
       stamp(solver: SparseSolverType): void {
         // KCL: add/subtract branch current from node1
         solver.stamp(0, 2, 1);  // node1 row, branch col

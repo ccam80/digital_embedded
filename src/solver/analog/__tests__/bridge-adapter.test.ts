@@ -13,8 +13,6 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  BridgeOutputAdapter,
-  BridgeInputAdapter,
   makeBridgeOutputAdapter,
   makeBridgeInputAdapter,
 } from "../bridge-adapter.js";

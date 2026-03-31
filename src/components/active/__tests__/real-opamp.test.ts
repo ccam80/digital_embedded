@@ -21,16 +21,6 @@ import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -103,6 +93,8 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(): number[] { return []; },
     stamp(solver: SparseSolver): void {
       if (nodeA > 0) solver.stamp(nodeA - 1, nodeA - 1, G);
       if (nodeB > 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -126,6 +118,8 @@ function makeDcSource(nodePos: number, nodeNeg: number, branchRow: number, volta
     isNonlinear: false,
     isReactive: false,
     setSourceScale(f: number): void { scale = f; },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(): number[] { return []; },
     stamp(solver: SparseSolver): void {
       const k = branchRow;
       if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
@@ -602,7 +596,7 @@ describe("RealOpAmp", () => {
     expect(RealOpAmpDefinition.modelRegistry?.["behavioral"]).toBeDefined();
     expect(RealOpAmpDefinition.name).toBe("RealOpAmp");
     expect(RealOpAmpDefinition.pinLayout).toHaveLength(5);
-    expect((RealOpAmpDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
+    expect((RealOpAmpDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:import("../../../core/registry.js").AnalogFactory}|undefined)?.factory).toBeDefined();
     expect(RealOpAmpDefinition.factory).toBeDefined();
   });
 });

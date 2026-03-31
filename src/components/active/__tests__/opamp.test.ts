@@ -63,8 +63,8 @@ function makeOpAmp(opts: {
     nInp = 1,
     nInn = 2,
     nOut = 3,
-    nVccP = 4,
-    nVccN = 5,
+    nVccP: _nVccP = 4,
+    nVccN: _nVccN = 5,
     gain = 1e6,
     rOut = 75,
   } = opts;
@@ -76,7 +76,7 @@ function makeOpAmp(opts: {
     -1,
     props,
     () => 0,
-  );
+  ) as unknown as AnalogElement;
 }
 
 /**
@@ -221,6 +221,8 @@ describe("OpAmp", () => {
       pinNodeIds: [nOut, 0],
       allNodeIds: [nOut, 0],
       branchIndex: -1, isNonlinear: false, isReactive: false,
+      setParam(_key: string, _value: number): void {},
+      getPinCurrents(): number[] { return []; },
       stamp(solver: SparseSolver): void {
         solver.stamp(nOut - 1, nOut - 1, G_load);
       },
@@ -235,7 +237,7 @@ describe("OpAmp", () => {
     const diagnostics = new DiagnosticCollector();
     const result = solveDcOperatingPoint({
       solver,
-      elements: [opampEl, rLoadEl, vinSource, vinnSource, vccPSource, vccNSource],
+      elements: [opampEl, rLoadEl, vinSource as unknown as AnalogElement, vinnSource as unknown as AnalogElement, vccPSource as unknown as AnalogElement, vccNSource as unknown as AnalogElement],
       matrixSize,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
@@ -259,6 +261,8 @@ describe("Integration", () => {
       pinNodeIds: [nodeA, nodeB],
       allNodeIds: [nodeA, nodeB],
       branchIndex: -1, isNonlinear: false, isReactive: false,
+      setParam(_key: string, _value: number): void {},
+      getPinCurrents(): number[] { return []; },
       stamp(solver: SparseSolver): void {
         if (nodeA > 0) solver.stamp(nodeA - 1, nodeA - 1, G);
         if (nodeB > 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -304,7 +308,7 @@ describe("Integration", () => {
     const diagnostics = new DiagnosticCollector();
     const result = solveDcOperatingPoint({
       solver,
-      elements: [opampEl, rin, rf, vsVin, vsInp, vsVccP, vsVccN],
+      elements: [opampEl, rin, rf, vsVin as unknown as AnalogElement, vsInp as unknown as AnalogElement, vsVccP as unknown as AnalogElement, vsVccN as unknown as AnalogElement],
       matrixSize,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
@@ -341,7 +345,7 @@ describe("Integration", () => {
     const diagnostics = new DiagnosticCollector();
     const result = solveDcOperatingPoint({
       solver,
-      elements: [opampEl, vsVin, vsVccP, vsVccN],
+      elements: [opampEl, vsVin as unknown as AnalogElement, vsVccP as unknown as AnalogElement, vsVccN as unknown as AnalogElement],
       matrixSize,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,

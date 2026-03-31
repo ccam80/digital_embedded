@@ -21,7 +21,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
@@ -140,7 +140,6 @@ class AnalogCapacitorElement implements AnalogElementCore {
   private geq: number = 0;
   private ieq: number = 0;
   private vPrev: number = 0;
-  private vPrevPrev: number = 0;
 
   constructor(capacitance: number) {
     this.C = capacitance;
@@ -187,7 +186,6 @@ class AnalogCapacitorElement implements AnalogElementCore {
     this.geq = capacitorConductance(this.C, dt, method);
     this.ieq = capacitorHistoryCurrent(this.C, dt, method, vNow, this.vPrev, iNow);
 
-    this.vPrevPrev = this.vPrev;
     this.vPrev = vNow;
   }
 }

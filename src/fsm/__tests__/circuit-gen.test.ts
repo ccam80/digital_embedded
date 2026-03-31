@@ -8,7 +8,7 @@ import {
 import { fsmToCircuit } from '../circuit-gen.js';
 import { fsmToTransitionTable } from '../table-creator.js';
 import { ComponentRegistry } from '../../core/registry.js';
-import { PropertyBag, PropertyType } from '../../core/properties.js';
+import { PropertyType } from '../../core/properties.js';
 import type { Pin } from '../../core/pin.js';
 import { PinDirection } from '../../core/pin.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';

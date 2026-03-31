@@ -64,11 +64,12 @@ function makeCircuitWithInputs(inputCount: number, ...testcases: TestcaseElement
       getPins: () => [],
       getProperties: () => new PropertyBag(),
       getAttribute: () => undefined,
+      setAttribute: () => {},
       getBoundingBox: () => ({ x: 0, y: 0, width: 1, height: 1 }),
       draw: () => {},
       serialize: () => ({ typeId: 'In', instanceId: `in-${i}`, position: { x: i, y: 0 }, rotation: 0 as const, mirror: false, properties: {} }),
-    };
-    circuit.addElement(stub as import('../../core/element.js').CircuitElement);
+    } as import('../../core/element.js').CircuitElement;
+    circuit.addElement(stub);
   }
   for (const tc of testcases) {
     circuit.addElement(tc);
@@ -97,6 +98,7 @@ function makeFacade(outputValues: Record<string, number> = {}): RunnerFacade {
     runToStable(_coordinator: SimulationCoordinator): void {
       // no-op
     },
+    step(_coordinator: SimulationCoordinator): void {},
   };
 }
 
@@ -147,6 +149,7 @@ describe('runAllTests', () => {
         return 0;
       },
       runToStable() {},
+      step() {},
     };
 
     const tc1 = makeTestcase(BUFFER_TEST);  // 2 rows, both pass

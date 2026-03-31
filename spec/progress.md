@@ -415,3 +415,11 @@ Spec requires one setParam per factory. Caused by incomplete mnaModels migration
 ### Deviation 4: Task 4.1 — BJT pnjlim classified as solver convergence bug to fix
 **Agent claim**: Fix requires detecting voltage-source-constrained nodes in updateOperatingPoint and skipping pnjlim.
 **Correction**: You can't plug a voltage source into the base of a BJT — this is an invalid circuit. The correct fix is a **compile-time diagnostic** that detects two voltage constraints driving the same net and surfaces a plain-language error: *"Two competing voltage sources are driving the net that connects to NPN_1, DC_source — the circuit design needs to be fixed"*. **Action**: Add compile-time diagnostic for competing voltage constraints on the same net.
+
+## Task 4.4: Migrate sim-get-circuit to preserve modelParamDeltas
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: spec/reviews/task-4-4-delta-export.md
+- **Files modified**: src/io/postmessage-adapter.ts, src/app/app-init.ts, src/app/tutorial/types.ts, src/io/__tests__/postmessage-adapter.test.ts, e2e/parity/load-and-simulate.spec.ts
+- **Tests**: 62/62 passing (48 headless postmessage-adapter + 7 dts-delta-mcp + 7 E2E parity)
+- **Summary**: Added serializeDts and loadCircuitDts hooks to PostMessageHooks. sim-get-circuit now exports dts-json-base64 (DTS JSON) instead of dig-xml-base64 (dig XML). sim-load-data auto-detects DTS JSON by { prefix and routes to loadCircuitDts hook which loads Circuit objects directly (bypassing dig XML conversion) to preserve modelParamDeltas on PropertyBags. app-init.ts wires both hooks. tutorial/types.ts format union updated. Full round-trip verified: modelParamDeltas survive sim-get-circuit → sim-load-data in browser E2E test.

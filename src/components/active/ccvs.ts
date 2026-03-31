@@ -54,7 +54,6 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
@@ -142,8 +141,6 @@ class CCVSAnalogElement extends ControlledSourceElement {
   private readonly _senseBranch: number; // absolute MNA row for 0V sense source
   private readonly _outBranch: number;   // absolute MNA row for output voltage source
 
-  private _transresistance: number;
-
   constructor(
     nSenseP: number,
     nSenseN: number,
@@ -166,13 +163,10 @@ class CCVSAnalogElement extends ControlledSourceElement {
     this._nOutN = nOutN;
     this._senseBranch = senseBranchIdx;
     this._outBranch = senseBranchIdx + 1;
-    this._transresistance = transresistance;
-
     this.branchIndex = senseBranchIdx;
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "transresistance") this._transresistance = value;
+  setParam(_key: string, _value: number): void {
   }
 
   /**
@@ -315,6 +309,14 @@ export class CCVSElement extends AbstractCircuitElement {
 
     // out- lead: x=5 to x=6, y=2
     drawColoredLead(ctx, signals, vOutN, 5, 2, 6, 2);
+
+    // Pin labels inside body
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.6 });
+    ctx.drawText("sense+", 1.2, 0, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("sense\u2212", 1.2, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("out+",   4.8, 0, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("out\u2212",   4.8, 2, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }

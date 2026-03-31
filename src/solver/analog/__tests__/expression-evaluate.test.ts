@@ -17,7 +17,7 @@ function mkCtx(opts: {
   time?: number;
   freq?: number;
 }): ExpressionContext {
-  return {
+  const ctx: ExpressionContext = {
     getNodeVoltage: (label) => {
       const v = opts.voltages?.[label];
       if (v === undefined) throw new Error(`Unknown node voltage: ${label}`);
@@ -29,8 +29,9 @@ function mkCtx(opts: {
       return i;
     },
     time: opts.time ?? 0,
-    freq: opts.freq,
   };
+  if (opts.freq !== undefined) ctx.freq = opts.freq;
+  return ctx;
 }
 
 // ===========================================================================

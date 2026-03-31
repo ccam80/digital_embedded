@@ -134,15 +134,16 @@ export function makeDiagnostic(
   summary: string,
   opts?: Partial<SolverDiagnostic>
 ): SolverDiagnostic {
-  return {
+  const diag: SolverDiagnostic = {
     code,
     severity,
     summary,
     explanation: opts?.explanation ?? "",
     suggestions: opts?.suggestions ?? [],
-    involvedNodes: opts?.involvedNodes,
-    involvedElements: opts?.involvedElements,
-    simTime: opts?.simTime,
-    detail: opts?.detail,
   };
+  if (opts?.involvedNodes !== undefined) diag.involvedNodes = opts.involvedNodes;
+  if (opts?.involvedElements !== undefined) diag.involvedElements = opts.involvedElements;
+  if (opts?.simTime !== undefined) diag.simTime = opts.simTime;
+  if (opts?.detail !== undefined) diag.detail = opts.detail;
+  return diag;
 }

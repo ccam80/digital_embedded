@@ -28,6 +28,7 @@ import type { SolverDiagnostic } from "../../../core/analog-engine-interface.js"
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
@@ -110,7 +111,7 @@ describe("PolarizedCap", () => {
       const esr = 0.1;
       const C = 100e-6;
 
-      const vs = makeDcVoltageSource(1, 0, 2, V);
+      const vs = makeDcVoltageSource(1, 0, 2, V) as unknown as AnalogElement;
       const cap = makeCapElement({ capacitance: C, esr, rLeak });
 
       const solver = new SparseSolver();
@@ -153,7 +154,7 @@ describe("PolarizedCap", () => {
       const C = 100e-6;
       const rLeak = 25e6;
 
-      const vs = makeDcVoltageSource(1, 0, 2, V_step);
+      const vs = makeDcVoltageSource(1, 0, 2, V_step) as unknown as AnalogElement;
       const cap = makeCapElement({ capacitance: C, esr, rLeak });
 
       // Tiny timestep: geq = C/dt = 100e-6 / 1e-9 = 1e5 >> G_esr
@@ -246,18 +247,6 @@ describe("PolarizedCap", () => {
   describe("reverse_bias_emits_diagnostic", () => {
     it("emits reverse-biased-cap diagnostic when V(pos) < V(neg) - reverseMax", () => {
       const diagnostics: SolverDiagnostic[] = [];
-      const cap = makeCapElement({
-        capacitance: 100e-6,
-        esr: 0.1,
-        rLeak: 25e6,
-        reverseMax: 1.0,
-        emitDiagnostic: (d) => diagnostics.push(d),
-      });
-
-      // Simulate -5V across cap: V(pos)=0, V(neg)=5 → vDiff = -5V < -reverseMax
-      const voltages = new Float64Array([0, 5]);
-      // pinNodeIds = [1, 0, 2]: n_pos=1 → voltages[0]=0, n_neg=0 (ground)=0
-      // Reuse the element with n_neg=ground but apply voltages as if n_pos=-5
       // Build a cap where node 1 = pos (solver idx 0) and ground = neg
       const capReverse = new AnalogPolarizedCapElement(
         [1, 0, 2],

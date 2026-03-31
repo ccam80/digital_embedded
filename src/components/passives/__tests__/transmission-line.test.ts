@@ -15,16 +15,15 @@
 import { describe, it, expect } from "vitest";
 import {
   TransmissionLineDefinition,
-  TransmissionLineElement,
   TRANSMISSION_LINE_ATTRIBUTE_MAPPINGS,
 } from "../transmission-line.js";
-import { PropertyBag, PropertyType } from "../../../core/properties.js";
+import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { EngineState } from "../../../core/engine-interface.js";
 import { makeVoltageSource, makeResistor } from "../../../solver/analog/__tests__/test-helpers.js";
-import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import type { SparseSolverStamp } from "../../../core/analog-types.js";
 import { makeDiagnostic } from "../../../solver/analog/diagnostics.js";
 
 // ---------------------------------------------------------------------------
@@ -52,16 +51,13 @@ interface RHSCall {
   value: number;
 }
 
-function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamps: RHSCall[] } {
+function makeStubSolver(): { solver: SparseSolverStamp; stamps: StampCall[]; rhsStamps: RHSCall[] } {
   const stamps: StampCall[] = [];
   const rhsStamps: RHSCall[] = [];
 
-  const solver: SparseSolver = {
+  const solver: SparseSolverStamp = {
     stamp: (row, col, value) => { stamps.push({ row, col, value }); },
     stampRHS: (row, value) => { rhsStamps.push({ row, value }); },
-    beginAssembly: () => {},
-    finalize: () => {},
-    solve: () => new Float64Array([]),
   };
 
   return { solver, stamps, rhsStamps };
@@ -70,12 +66,12 @@ function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamp
 function buildTLineCircuit(opts: {
   nodeCount: number;
   branchCount: number;
-  elements: import("../../../analog/element.js").AnalogElement[];
+  elements: (import("../../../solver/analog/element.js").AnalogElement | import("../../../core/analog-types.js").AnalogElementCore)[];
 }): ConcreteCompiledAnalogCircuit {
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: opts.nodeCount,
     branchCount: opts.branchCount,
-    elements: opts.elements,
+    elements: opts.elements as import("../../../solver/analog/element.js").AnalogElement[],
     labelToNodeId: new Map(),
     wireToNodeId: new Map(),
     models: new Map(),
@@ -369,22 +365,13 @@ describe("TLine", () => {
       const Z0 = 50;
       const tau = 5e-9;
       const N = 10;
-      const internalCount = 2 * (N - 1);
-      const nodeCount = 2 + internalCount;
-      const vsBranchIdx = nodeCount;
-      const firstLBranch = nodeCount + 1;
 
-      const nodeIds = buildNodeIds(1, 2, 3, N);
       const props = new PropertyBag();
       props.setModelParam("impedance", Z0);
       props.setModelParam("delay", tau);
       props.setModelParam("lossPerMeter", 0);
       props.setModelParam("length", 1.0);
       props.setModelParam("segments", N);
-
-      const tlineEl = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(
-        new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstLBranch, props, () => 0,
-      );
 
       // Source with series resistance Z0 (Thevenin equivalent)
       // node1 = source node, node2 = Port1, node3..end = internal + Port2
@@ -398,7 +385,6 @@ describe("TLine", () => {
       const firstInt = 4;
 
       const nodeIds2 = [port1, port2, ...Array.from({ length: 2 * (N - 1) }, (_, k) => firstInt + k)];
-      const nc = 1 + 1 + 2 * (N - 1); // nodeVs + port1..port2 (port2 is counted) - actually:
       // Solver nodes: nodeVs=1, port1=2, port2=3, internals=4..4+2*(N-1)-1
       // nodeCount = 3 + 2*(N-1) = 3 + 18 = 21 for N=10
       const nc2 = 3 + 2 * (N - 1);

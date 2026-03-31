@@ -275,7 +275,7 @@ export function computeGmbs(
 export function limitVoltages(
   vgsOld: number,
   vgsNew: number,
-  vdsOld: number,
+  _vdsOld: number,
   vdsNew: number,
   vto: number,
 ): { vgs: number; vds: number; swapped: boolean } {
@@ -712,11 +712,11 @@ export class PmosfetElement extends AbstractCircuitElement {
 
     // Line 11: arrow (COMPONENT color)
     ctx.setColor("COMPONENT");
-    ctx.fillPolygon([
+    ctx.drawPolygon([
       { x: 4, y: 0 },
       { x: 3.25, y: -0.3125 },
       { x: 3.25, y: 0.3125 },
-    ]);
+    ], true);
 
     // Line 12: gate lead (signal G color)
     drawColoredLead(ctx, signals, vG, 0, 0, gateBarX, 0);

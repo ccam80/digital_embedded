@@ -128,11 +128,11 @@ export function evaluate(expr: ExprNode, ctx: ExpressionContext): number {
     case "builtin-var":
       if (expr.name === "time") return ctx.time;
       if (expr.name === "freq") return ctx.freq ?? 0;
-      throw new UnknownNodeKindError(expr.name);
+      throw new UnknownNodeKindError((expr as { name: string }).name);
 
     case "builtin-func":
       if (expr.name === "random") return Math.random();
-      throw new UnknownNodeKindError(expr.name);
+      throw new UnknownNodeKindError((expr as { name: string }).name);
 
     default: {
       const exhaustive: never = expr;
@@ -219,7 +219,7 @@ export function compileExpression(expr: ExprNode): (ctx: ExpressionContext) => n
 
     case "builtin-func": {
       if (expr.name === "random") return () => Math.random();
-      const name = expr.name;
+      const name = (expr as { name: string }).name;
       return () => { throw new UnknownNodeKindError(name); };
     }
 

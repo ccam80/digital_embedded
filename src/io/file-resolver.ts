@@ -217,7 +217,7 @@ export class NodeResolver implements FileResolver {
   ) {
     this._basePath = basePath;
     this._readFileFn = readFileFn;
-    this._readdirFn = readdirFn;
+    if (readdirFn !== undefined) this._readdirFn = readdirFn;
   }
 
   async resolve(name: string): Promise<string> {

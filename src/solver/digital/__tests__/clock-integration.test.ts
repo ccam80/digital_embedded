@@ -56,6 +56,7 @@ class StubElement implements CircuitElement {
       properties: {},
     };
   }
+  setAttribute(_key: string, _value: PropertyValue): void {}
 }
 
 // ---------------------------------------------------------------------------
@@ -260,6 +261,7 @@ function buildClockDFFCircuit(
     busResolver: null,
     switchComponentIndices: new Uint32Array(0),
     switchClassification: new Uint8Array(0),
+    shadowNetCount: 0,
   };
 
   return { circuit, clockNetIds, dffQNetIds, dffDNetIds };

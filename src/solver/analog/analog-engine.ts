@@ -18,7 +18,6 @@ import { DEFAULT_SIMULATION_PARAMS } from "../../core/analog-engine-interface.js
 import { AcAnalysis } from "./ac-analysis.js";
 import type { AcParams, AcResult } from "./ac-analysis.js";
 import { SparseSolver } from "./sparse-solver.js";
-import { MNAAssembler } from "./mna-assembler.js";
 import { TimestepController } from "./timestep.js";
 import { HistoryStore } from "./integration.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
@@ -69,7 +68,6 @@ export class MNAEngine implements AnalogEngine {
   // Solver infrastructure (allocated in init)
   // -------------------------------------------------------------------------
   private _solver: SparseSolver = new SparseSolver();
-  private _assembler: MNAAssembler = new MNAAssembler(this._solver);
   private _timestep: TimestepController = new TimestepController(DEFAULT_SIMULATION_PARAMS);
   private _history: HistoryStore = new HistoryStore(0);
   private _diagnostics: DiagnosticCollector = new DiagnosticCollector();
@@ -124,7 +122,6 @@ export class MNAEngine implements AnalogEngine {
     this._prevVoltages = new Float64Array(matrixSize);
 
     this._solver = new SparseSolver();
-    this._assembler = new MNAAssembler(this._solver);
     this._timestep = new TimestepController(this._params);
     this._history = new HistoryStore(elements.length);
     this._diagnostics = new DiagnosticCollector();

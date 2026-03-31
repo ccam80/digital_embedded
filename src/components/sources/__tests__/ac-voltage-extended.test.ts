@@ -28,7 +28,7 @@ describe("Sweep", () => {
     // We check that sin(2π * f(t) * t) at t near 1/(2*100) ≈ 5ms is near zero
     // (half-period crossing at ~5ms for 100Hz).
     const halfPeriodStart = 1 / (2 * 100); // 5ms
-    const vAtHalfPeriod = computeWaveformValue("sweep", 1, 100, 0, 0, halfPeriodStart, ext);
+    computeWaveformValue("sweep", 1, 100, 0, 0, halfPeriodStart, ext);
     // sin(2π * 100 * 0.005) = sin(π) ≈ 0 (but sweep uses f(t)*t not integral)
     // At t=5ms, f(t)=100+9900*0.005=149.5 Hz, so phase=2π*149.5*0.005=4.70 rad
     // This is approximately -1 (sin(4.7)≈-1). The point is the value is NOT zero at 5ms
@@ -91,7 +91,7 @@ describe("AM", () => {
     // At t where sin(2π*100*t) = -1: 2π*100*t = -π/2 → t = -1/400s (invalid)
     // Easier: at t where sin(2π*100*t) = 1: t = 1/400 = 2.5ms
     const tPeak = 1 / 400; // sin(2π*100*2.5ms) = sin(π/2) = 1 → envelope = 2A
-    const vPeak = computeWaveformValue("am", A, 1000, 0, 0, tPeak, ext);
+    computeWaveformValue("am", A, 1000, 0, 0, tPeak, ext);
     // vPeak = (1+1) * A * sin(2π*1000*2.5ms) = 2A * sin(2π*2.5) = 2A * 0 ≈ 0
     // (carrier crosses zero at this exact t for 1kHz with 400 mod cycles per second)
     // Find a time where both carrier and envelope are at their peaks simultaneously.

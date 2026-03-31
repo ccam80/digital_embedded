@@ -20,7 +20,6 @@ import {
 import {
   PJfetDefinition,
   createPJfetElement,
-  PJfetAnalogElement,
 } from "../pjfet.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
@@ -32,16 +31,7 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
-
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
+import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Default model parameters
@@ -89,38 +79,6 @@ function makeMockSolver() {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: create NJFET at a given operating point
-//
-// nodeG=1, nodeD=2, nodeS=3 (or nodeS=0 for ground source)
-// ---------------------------------------------------------------------------
-
-function makeNJfetAt(
-  vgs: number,
-  vds: number,
-  params: Record<string, number> = NJFET_PARAMS,
-  sourceNode: number = 0,
-): NJfetAnalogElement {
-  const nodeG = 1;
-  const nodeD = 2;
-  const nodeS = sourceNode;
-  const propsObj = createTestPropertyBag();
-  propsObj.replaceModelParams(params);
-  const element = createNJfetElement(new Map([["G", nodeG], ["S", nodeS], ["D", nodeD]]), [], -1, propsObj) as NJfetAnalogElement;
-
-  // Build voltage vector: node1=G=vgs, node2=D=vds (with S at 0)
-  const maxNode = Math.max(nodeG, nodeD, nodeS);
-  const voltages = new Float64Array(maxNode > 0 ? maxNode : 2);
-  if (nodeG > 0) voltages[nodeG - 1] = vgs;
-  if (nodeD > 0) voltages[nodeD - 1] = vds;
-  if (nodeS > 0) voltages[nodeS - 1] = 0;
-
-  for (let i = 0; i < 50; i++) {
-    element.updateOperatingPoint!(voltages);
-  }
-  return element;
-}
-
-// ---------------------------------------------------------------------------
 // Helper: inline resistor
 // ---------------------------------------------------------------------------
 
@@ -132,6 +90,8 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolverType): void {
       if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
       if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -389,8 +349,8 @@ describe("NR", () => {
     propsObj.replaceModelParams(NJFET_PARAMS);
     const jfet = withNodeIds(createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]);
     const rd = makeResistorElement(2, 1, 10000); // Rd=10kΩ from Vdd to drain
-    const vdd = makeDcVoltageSource(2, 0, 3, 10.0); // Vdd=10V
-    const vgate = makeDcVoltageSource(3, 0, 4, 0.0); // Vg=0V
+    const vdd = makeDcVoltageSource(2, 0, 3, 10.0) as unknown as AnalogElement; // Vdd=10V
+    const vgate = makeDcVoltageSource(3, 0, 4, 0.0) as unknown as AnalogElement; // Vg=0V
 
     const result = solveDcOperatingPoint({
       solver,

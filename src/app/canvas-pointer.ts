@@ -137,7 +137,7 @@ function finishPointerDrag(
 export function registerPointerHandlers(
   ctx: AppContext,
   renderPipeline: RenderPipeline,
-  deps: CanvasInteractionDeps,
+  _deps: CanvasInteractionDeps,
   state: CanvasState,
   closePopup: () => void,
 ): void {
@@ -145,6 +145,10 @@ export function registerPointerHandlers(
   const HIT_THRESHOLD = 0.5;
   const TOUCH_HIT_THRESHOLD = 1.5;
   const TOUCH_HIT_MARGIN = 0.5;
+
+  // Snapshot of wire endpoints connected to selected elements at drag start.
+  // Only these wires follow during drag — prevents picking up unrelated wires.
+  let dragConnectedWires: Map<Wire, Array<'start' | 'end'>> = new Map();
 
   function cancelLongPress(): void {
     if (state.longPressTimer !== null) {
@@ -246,90 +250,52 @@ export function registerPointerHandlers(
     }
 
     if (ctx.isSimActive()) {
-      if (ctx.facade.getCoordinator().timingModel !== 'discrete') {
-        const elementHit = hitTestElements(worldPt, ctx.circuit.elements, hitMargin);
-        if (elementHit) {
-          ctx.selection.clear();
-          ctx.selection.select(elementHit);
-
-          if (elementHit.typeId === 'Switch' || elementHit.typeId === 'SwitchDT') {
-            const momentary = (elementHit.getAttribute('momentary') as boolean | undefined) ?? false;
-            if (momentary) {
-              elementHit.setAttribute('closed', true);
-              const onPointerUp = (): void => {
-                elementHit.setAttribute('closed', false);
-                ctx.compiledDirty = true;
-                if (deps.compileAndBind()) {
-                  deps.startSimulation();
-                }
-                renderPipeline.scheduleRender();
-              };
-              document.addEventListener('pointerup', onPointerUp, { once: true });
-            } else {
-              const current = (elementHit.getAttribute('closed') as boolean | undefined) ?? false;
-              elementHit.setAttribute('closed', !current);
-            }
-            ctx.compiledDirty = true;
-            if (deps.compileAndBind()) {
-              deps.startSimulation();
-            }
-          } else if (elementHit.typeId === 'In' || elementHit.typeId === 'Clock' || elementHit.typeId === 'Port') {
-            const bitWidth = (elementHit.getAttribute('bitWidth') as number | undefined) ?? 1;
-            const current = (elementHit.getAttribute('defaultValue') as number | undefined) ?? 0;
-            const newVal = bitWidth === 1
-              ? (current === 0 ? 1 : 0)
-              : ((current + 1) & ((1 << bitWidth) - 1));
-            elementHit.setAttribute('defaultValue', newVal);
-            ctx.compiledDirty = true;
-            if (deps.compileAndBind()) {
-              deps.startSimulation();
-            }
-          }
-        } else {
-          ctx.selection.clear();
-        }
-        renderPipeline.scheduleRender();
-        return;
-      }
-
       const elementHit = hitTestElements(worldPt, ctx.circuit.elements, hitMargin);
-      if (elementHit && (elementHit.typeId === 'In' || elementHit.typeId === 'Clock' || elementHit.typeId === 'Port')) {
-        const bitWidth = (elementHit.getAttribute('bitWidth') as number | undefined) ?? 1;
-        const current = ctx.binding.getPinValue(elementHit, 'out');
-        const newVal = bitWidth === 1
-          ? (current === 0 ? 1 : 0)
-          : ((current + 1) & ((1 << bitWidth) - 1));
-        ctx.binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
-        const eng = ctx.facade.getCoordinator();
-        if (eng.getState() !== EngineState.RUNNING) {
-          ctx.facade.step(eng, { clockAdvance: elementHit.typeId !== 'Clock' && elementHit.typeId !== 'Port' });
-        }
-        renderPipeline.scheduleRender();
-      }
+      if (elementHit) {
+        ctx.selection.clear();
+        ctx.selection.select(elementHit);
 
-      if (elementHit && (elementHit.typeId === 'Switch' || elementHit.typeId === 'SwitchDT')) {
-        const momentary = (elementHit.getAttribute('momentary') as boolean | undefined) ?? false;
-        if (momentary) {
-          elementHit.setAttribute('closed', true);
-          const onPointerUp = (): void => {
-            elementHit.setAttribute('closed', false);
-            const eng = ctx.facade.getCoordinator();
+        const eng = ctx.facade.getCoordinator();
+
+        if (elementHit.typeId === 'Switch' || elementHit.typeId === 'SwitchDT') {
+          // Hot-load switch state via setComponentProperty (analog: setParam→setClosed,
+          // digital: layout.setProperty). No recompile needed.
+          const toggleSwitch = (closed: boolean): void => {
+            elementHit.setAttribute('closed', closed);
+            eng.setComponentProperty(elementHit, 'closed', closed ? 1 : 0);
             if (eng.getState() !== EngineState.RUNNING) {
-              ctx.facade.step(eng, { clockAdvance: true });
+              ctx.facade.step(eng, { clockAdvance: false });
             }
             renderPipeline.scheduleRender();
           };
-          document.addEventListener('pointerup', onPointerUp, { once: true });
-        } else {
-          const current = (elementHit.getAttribute('closed') as boolean | undefined) ?? false;
-          elementHit.setAttribute('closed', !current);
+          const momentary = (elementHit.getAttribute('momentary') as boolean | undefined) ?? false;
+          if (momentary) {
+            toggleSwitch(true);
+            document.addEventListener('pointerup', () => toggleSwitch(false), { once: true });
+          } else {
+            const current = (elementHit.getAttribute('closed') as boolean | undefined) ?? false;
+            toggleSwitch(!current);
+          }
+        } else if (elementHit.typeId === 'In' || elementHit.typeId === 'Clock' || elementHit.typeId === 'Port') {
+          // Hot-load digital input via binding.setInput (writes directly to signal
+          // array, equivalent to analog setParam). No recompile needed.
+          const bitWidth = (elementHit.getAttribute('bitWidth') as number | undefined) ?? 1;
+          const current = ctx.binding.isBound
+            ? ctx.binding.getPinValue(elementHit, 'out')
+            : ((elementHit.getAttribute('defaultValue') as number | undefined) ?? 0);
+          const newVal = bitWidth === 1
+            ? (current === 0 ? 1 : 0)
+            : ((current + 1) & ((1 << bitWidth) - 1));
+          elementHit.setAttribute('defaultValue', newVal);
+          ctx.binding.setInput(elementHit, 'out', BitVector.fromNumber(newVal, bitWidth));
+          if (eng.getState() !== EngineState.RUNNING) {
+            ctx.facade.step(eng, { clockAdvance: elementHit.typeId !== 'Clock' && elementHit.typeId !== 'Port' });
+          }
         }
-        const eng = ctx.facade.getCoordinator();
-        if (eng.getState() !== EngineState.RUNNING) {
-          ctx.facade.step(eng, { clockAdvance: true });
-        }
-        renderPipeline.scheduleRender();
+      } else {
+        ctx.selection.clear();
       }
+      renderPipeline.scheduleRender();
       return;
     }
 
@@ -339,11 +305,19 @@ export function registerPointerHandlers(
         tryCompleteWire(() => ctx.wireDrawing.completeToPin(pinHit.element, pinHit.pin, ctx.circuit, ctx.analogTypeIds), ctx);
       } else {
         const snappedPt = snapToGrid(worldPt, 1);
-        const tappedPoint = splitWiresAtPoint(snappedPt, ctx.circuit);
-        if (tappedPoint !== undefined) {
-          tryCompleteWire(() => ctx.wireDrawing.completeToPoint(tappedPoint, ctx.circuit, ctx.analogTypeIds), ctx);
-        } else if (isWireEndpoint(snappedPt, ctx.circuit)) {
-          tryCompleteWire(() => ctx.wireDrawing.completeToPoint(snappedPt, ctx.circuit, ctx.analogTypeIds), ctx);
+        // Only auto-complete to a wire if the user actually clicked near it
+        // (hit-test on raw worldPt), not just because the grid-snapped point
+        // coincidentally lands on a wire's geometry.
+        const wireUnderClick = hitTestWires(worldPt, ctx.circuit.wires, hitThreshold);
+        if (wireUnderClick) {
+          const tappedPoint = splitWiresAtPoint(snappedPt, ctx.circuit);
+          if (tappedPoint !== undefined) {
+            tryCompleteWire(() => ctx.wireDrawing.completeToPoint(tappedPoint, ctx.circuit, ctx.analogTypeIds), ctx);
+          } else if (isWireEndpoint(snappedPt, ctx.circuit)) {
+            tryCompleteWire(() => ctx.wireDrawing.completeToPoint(snappedPt, ctx.circuit, ctx.analogTypeIds), ctx);
+          } else {
+            ctx.wireDrawing.addWaypoint();
+          }
         } else if (ctx.wireDrawing.isSameAsLastWaypoint(snappedPt)) {
           tryCompleteWire(() => ctx.wireDrawing.completeToPoint(snappedPt, ctx.circuit, ctx.analogTypeIds), ctx);
         } else {
@@ -370,6 +344,28 @@ export function registerPointerHandlers(
       }
       state.dragMode = 'select-drag';
       state.dragStart = worldPt;
+      // Snapshot which wire endpoints are connected to selected elements' pins
+      // at drag start. Only these wires should follow during drag — prevents
+      // unrelated wires from being picked up as pins sweep through other joins.
+      dragConnectedWires = new Map();
+      const selectedElements = ctx.selection.getSelectedElements();
+      const pinPosSet = new Set<string>();
+      for (const el of selectedElements) {
+        for (const pin of el.getPins()) {
+          const wp = pinWorldPosition(el, pin);
+          pinPosSet.add(`${wp.x},${wp.y}`);
+        }
+      }
+      const selectedWires = ctx.selection.getSelectedWires();
+      for (const wire of ctx.circuit.wires) {
+        if (selectedWires.has(wire)) continue;
+        const sk = `${wire.start.x},${wire.start.y}`;
+        const ek = `${wire.end.x},${wire.end.y}`;
+        const ends: Array<'start' | 'end'> = [];
+        if (pinPosSet.has(sk)) ends.push('start');
+        if (pinPosSet.has(ek)) ends.push('end');
+        if (ends.length > 0) dragConnectedWires.set(wire, ends);
+      }
       renderPipeline.scheduleRender();
       return;
     }
@@ -473,27 +469,19 @@ export function registerPointerHandlers(
         const selectedElements = ctx.selection.getSelectedElements();
         const selectedWires = ctx.selection.getSelectedWires();
 
-        const pinPositions = new Set<string>();
-        for (const el of selectedElements) {
-          for (const pin of el.getPins()) {
-            const wp = pinWorldPosition(el, pin);
-            pinPositions.add(`${wp.x},${wp.y}`);
-          }
-        }
-
         for (const el of selectedElements) {
           el.position = { x: el.position.x + dx, y: el.position.y + dy };
         }
 
-        for (const wire of ctx.circuit.wires) {
-          if (selectedWires.has(wire)) continue;
-          const startKey = `${wire.start.x},${wire.start.y}`;
-          const endKey = `${wire.end.x},${wire.end.y}`;
-          if (pinPositions.has(startKey)) {
-            wire.start = { x: wire.start.x + dx, y: wire.start.y + dy };
-          }
-          if (pinPositions.has(endKey)) {
-            wire.end = { x: wire.end.x + dx, y: wire.end.y + dy };
+        // Move only wires that were connected at drag start (snapshot),
+        // not wires that happen to be at the current pin position.
+        for (const [wire, ends] of dragConnectedWires) {
+          for (const which of ends) {
+            if (which === 'start') {
+              wire.start = { x: wire.start.x + dx, y: wire.start.y + dy };
+            } else {
+              wire.end = { x: wire.end.x + dx, y: wire.end.y + dy };
+            }
           }
         }
 

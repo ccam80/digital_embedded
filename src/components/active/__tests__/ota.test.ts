@@ -20,7 +20,7 @@
 import { describe, it, expect } from "vitest";
 import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
-import { makeResistor, makeVoltageSource, makeCurrentSource, withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeResistor, makeVoltageSource, withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import { OTADefinition } from "../ota.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";

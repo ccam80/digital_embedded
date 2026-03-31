@@ -8,7 +8,7 @@
  *  - Breakpoint clamping and removal
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { TimestepController } from "../timestep.js";
 import { HistoryStore } from "../integration.js";
 import type { AnalogElement } from "../element.js";
@@ -47,31 +47,9 @@ function makeReactiveElement(truncationError: number): AnalogElement {
     getLteEstimate(_dt: number): { truncationError: number } {
       return { truncationError };
     },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
   };
-}
-
-/**
- * Create a non-reactive element — isReactive = false, no getLteEstimate.
- */
-function makeNonReactiveElement(): AnalogElement {
-  return {
-    pinNodeIds: [1, 0],
-    allNodeIds: [1, 0],
-    branchIndex: -1,
-    isNonlinear: false,
-    isReactive: false,
-    stamp(_solver: SparseSolver): void {},
-  };
-}
-
-/**
- * Create a HistoryStore pre-populated so that get(elementIndex, 0) returns
- * the given value. Uses push() to load the value into slot 0.
- */
-function makeHistoryWithValue(elementCount: number, elementIndex: number, value: number): HistoryStore {
-  const h = new HistoryStore(elementCount);
-  h.push(elementIndex, value);
-  return h;
 }
 
 // ---------------------------------------------------------------------------

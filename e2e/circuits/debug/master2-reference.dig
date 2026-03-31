@@ -1,0 +1,242 @@
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "6d4206a4-05a1-43ff-b564-12ca4d46c944",
+        "position": {
+          "x": 3,
+          "y": 3
+        },
+        "properties": {
+          "label": "Vs"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "8f0ed591-3862-488f-8f66-300c2d08e36a",
+        "position": {
+          "x": 3,
+          "y": 7
+        },
+        "properties": {
+          "label": "CTRL"
+        },
+        "rotation": 0,
+        "type": "In"
+      },
+      {
+        "id": "19c0208e-e687-4b58-a49c-76320141b19d",
+        "position": {
+          "x": 12,
+          "y": 3
+        },
+        "properties": {
+          "label": "SW"
+        },
+        "rotation": 0,
+        "type": "SwitchSPST"
+      },
+      {
+        "id": "7329cddf-b238-4836-ac95-fbe5173d53e3",
+        "position": {
+          "x": 20,
+          "y": 3
+        },
+        "properties": {
+          "label": "R1"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "a6af39b1-c0db-4e10-920e-2892ed730c6c",
+        "position": {
+          "x": 28,
+          "y": 3
+        },
+        "properties": {
+          "label": "R2"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "a5a5001a-1764-431c-8c51-e82efcb07e3f",
+        "position": {
+          "x": 3,
+          "y": 8
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "b96ea8f8-7367-43a5-bbc7-586fe364bc1d",
+        "position": {
+          "x": 32,
+          "y": 8
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "90229576-dfa8-4820-9d39-e7f2907d8d96",
+        "position": {
+          "x": 26,
+          "y": 1
+        },
+        "properties": {
+          "label": "P_DIV"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      },
+      {
+        "id": "cd5311c2-5ec6-400b-877c-6ec45a46eb51",
+        "position": {
+          "x": 20,
+          "y": 11
+        },
+        "properties": {
+          "label": "R3"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "a57e6190-84b6-4712-b01a-9ff6e2aca0cf",
+        "position": {
+          "x": 28,
+          "y": 11
+        },
+        "properties": {
+          "label": "C1"
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "513ed4d0-f3b7-4a77-b981-88206e21887b",
+        "position": {
+          "x": 32,
+          "y": 15
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "e4d81501-973f-4c44-8f3d-6b95904556c9",
+        "position": {
+          "x": 26,
+          "y": 9
+        },
+        "properties": {
+          "label": "P_RC"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      },
+      {
+        "id": "d7cabfe0-a9fa-4a7d-8959-066772150c05",
+        "position": {
+          "x": 28,
+          "y": 19
+        },
+        "properties": {
+          "label": "AMP"
+        },
+        "rotation": 0,
+        "type": "OpAmp"
+      },
+      {
+        "id": "ab3efd5b-2049-44b9-9de0-e0cca4bed736",
+        "position": {
+          "x": 36,
+          "y": 19
+        },
+        "properties": {
+          "label": "P_AMP"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      },
+      {
+        "id": "2a7e4005-5e21-4f29-baad-23c8d8983057",
+        "position": {
+          "x": 20,
+          "y": 25
+        },
+        "properties": {
+          "label": "Rb"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "1e5b5f20-480a-4e0e-aea3-bb41c4080d43",
+        "position": {
+          "x": 28,
+          "y": 25
+        },
+        "properties": {
+          "label": "Q1"
+        },
+        "rotation": 0,
+        "type": "NpnBJT"
+      },
+      {
+        "id": "2ccd0a4c-3191-4b5e-aca3-7dfe9333251e",
+        "position": {
+          "x": 36,
+          "y": 24
+        },
+        "properties": {
+          "label": "Rc"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "73b5fc33-33e9-4eca-842e-fbb681cb8f9b",
+        "position": {
+          "x": 36,
+          "y": 30
+        },
+        "properties": {
+          "label": "Vcc"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "67ac63c0-03bb-4992-8331-cdbd7c61f17d",
+        "position": {
+          "x": 32,
+          "y": 30
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "d45dd8b4-55f0-4110-956a-ef8bf726f415",
+        "position": {
+          "x": 44,
+          "y": 24
+        },
+        "properties": {
+          "label": "P_CE"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      }
+    ],
+    "name": "Untitled",
+    "wires": []
+  },
+  "format": "dts",
+  "version": 1
+}

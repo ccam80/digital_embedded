@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { partitionByDomain } from "../partition.js";
-import type { ModelAssignment } from "../partition.js";
+import type { ModelAssignment } from "../extract-connectivity.js";
 import type { ConnectivityGroup, ResolvedGroupPin } from "../types.js";
 import { PinDirection } from "@/core/pin.js";
 import type { CircuitElement } from "@/core/element.js";
-import type { ComponentDefinition, ComponentRegistry, DigitalModel, MnaModel } from "@/core/registry.js";
+import type { ComponentDefinition, ComponentRegistry, DigitalModel } from "@/core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Minimal stubs
@@ -29,7 +29,7 @@ const DIGITAL_MODEL: DigitalModel = {
   executeFn: () => {},
 };
 
-const ANALOG_MODEL: MnaModel = {};
+
 
 function makeDigitalDef(name: string): ComponentDefinition {
   return {
@@ -61,21 +61,6 @@ function makeAnalogDef(name: string): ComponentDefinition {
   };
 }
 
-function makeBothDef(name: string): ComponentDefinition {
-  return {
-    name,
-    typeId: 0,
-    factory: () => { throw new Error("not used"); },
-    pinLayout: [],
-    propertyDefs: [],
-    attributeMap: [],
-    category: "SEMICONDUCTORS" as never,
-    helpText: "",
-    pinElectrical: { vOH: 3.3, vOL: 0, vIH: 2.0, vIL: 0.8 },
-    models: { digital: DIGITAL_MODEL },
-    modelRegistry: { behavioral: { kind: 'inline' as const, factory: () => { throw new Error("not used"); }, paramDefs: [], params: {} } },
-  };
-}
 
 function makeRegistry(defs: ComponentDefinition[]): ComponentRegistry {
   const map = new Map<string, ComponentDefinition>();
@@ -111,7 +96,9 @@ function makeGroup(
   bitWidth?: number,
 ): ConnectivityGroup {
   const domains = new Set(pins.map((p) => p.domain));
-  return { groupId, pins, wires: [], domains, bitWidth };
+  const group: ConnectivityGroup = { groupId, pins, wires: [], domains };
+  if (bitWidth !== undefined) group.bitWidth = bitWidth;
+  return group;
 }
 
 
@@ -184,8 +171,8 @@ describe("partitionByDomain", () => {
         makePin(1, 0, "analog", PinDirection.BIDIRECTIONAL),
       ]);
       const assignments: ModelAssignment[] = [
-        { elementIndex: 0, modelKey: "analog", model: ANALOG_MODEL },
-        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
+        { elementIndex: 0, modelKey: "analog", model: null },
+        { elementIndex: 1, modelKey: "analog", model: null },
       ];
 
       const result = partitionByDomain([group], [el0, el1], registry, assignments);
@@ -199,7 +186,7 @@ describe("partitionByDomain", () => {
       const registry = makeRegistry([makeAnalogDef("Resistor")]);
       const group = makeGroup(0, [makePin(0, 0, "analog")]);
       const assignments: ModelAssignment[] = [
-        { elementIndex: 0, modelKey: "analog", model: ANALOG_MODEL },
+        { elementIndex: 0, modelKey: "analog", model: null },
       ];
 
       const result = partitionByDomain([group], [el0], registry, assignments);
@@ -229,7 +216,7 @@ describe("partitionByDomain", () => {
 
       const assignments: ModelAssignment[] = [
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
-        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
+        { elementIndex: 1, modelKey: "analog", model: null },
       ];
 
       const result = partitionByDomain(
@@ -256,7 +243,7 @@ describe("partitionByDomain", () => {
 
       const assignments: ModelAssignment[] = [
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
-        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
+        { elementIndex: 1, modelKey: "analog", model: null },
       ];
 
       const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
@@ -277,7 +264,7 @@ describe("partitionByDomain", () => {
 
       const assignments: ModelAssignment[] = [
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
-        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
+        { elementIndex: 1, modelKey: "analog", model: null },
       ];
 
       const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
@@ -297,7 +284,7 @@ describe("partitionByDomain", () => {
 
       const assignments: ModelAssignment[] = [
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
-        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
+        { elementIndex: 1, modelKey: "analog", model: null },
       ];
 
       const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
@@ -320,7 +307,7 @@ describe("partitionByDomain", () => {
 
       const assignments: ModelAssignment[] = [
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
-        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
+        { elementIndex: 1, modelKey: "analog", model: null },
       ];
 
       const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
@@ -340,7 +327,7 @@ describe("partitionByDomain", () => {
 
       const assignments: ModelAssignment[] = [
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
-        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
+        { elementIndex: 1, modelKey: "analog", model: null },
       ];
 
       const result = partitionByDomain([gBoundary], [elD, elA], registry, assignments);
@@ -409,7 +396,7 @@ describe("partitionByDomain", () => {
       const registry = makeRegistry([makeAnalogDef("Resistor")]);
       const group = makeGroup(0, [makePin(0, 0, "analog")]);
       const assignments: ModelAssignment[] = [
-        { elementIndex: 0, modelKey: "somethingElse", model: ANALOG_MODEL },
+        { elementIndex: 0, modelKey: "somethingElse", model: null },
       ];
 
       const result = partitionByDomain([group], [el0], registry, assignments);
@@ -435,7 +422,6 @@ describe("partitionByDomain", () => {
 
   describe("electrical spec on bridge", () => {
     it("picks electricalSpec from component definition pinElectrical", () => {
-      const analogModel: MnaModel = {};
       const analogDef: ComponentDefinition = {
         name: "SpecResistor",
         typeId: 0,
@@ -459,7 +445,7 @@ describe("partitionByDomain", () => {
       ]);
       const assignments: ModelAssignment[] = [
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
-        { elementIndex: 1, modelKey: "analog", model: analogModel },
+        { elementIndex: 1, modelKey: "analog", model: null },
       ];
 
       const result = partitionByDomain([gBoundary], [el0, el1], registry, assignments);
@@ -478,7 +464,7 @@ describe("partitionByDomain", () => {
       ]);
       const assignments: ModelAssignment[] = [
         { elementIndex: 0, modelKey: "digital", model: DIGITAL_MODEL },
-        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
+        { elementIndex: 1, modelKey: "analog", model: null },
       ];
 
       const result = partitionByDomain([gBoundary], [el0, el1], registry, assignments);
@@ -540,7 +526,7 @@ describe("partitionByDomain", () => {
 
       const assignments: ModelAssignment[] = [
         { elementIndex: 0, modelKey: "neutral", model: null as never },
-        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
+        { elementIndex: 1, modelKey: "analog", model: null },
       ];
 
       const result = partitionByDomain([gAnalog], [elNeutral, elAnalog], registry, assignments);
@@ -591,7 +577,7 @@ describe("partitionByDomain", () => {
 
       const assignments: ModelAssignment[] = [
         { elementIndex: 0, modelKey: "neutral", model: null as never },
-        { elementIndex: 1, modelKey: "analog", model: ANALOG_MODEL },
+        { elementIndex: 1, modelKey: "analog", model: null },
         { elementIndex: 2, modelKey: "digital", model: DIGITAL_MODEL },
       ];
 

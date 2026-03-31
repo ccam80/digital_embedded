@@ -111,12 +111,12 @@ function solveDac(
     const nDi = i + 1;  // node for Di
     const branchRow = nNodes + i;  // branch rows start after node rows
     const vHigh = inputBits[i] ? vRef : 0.0;
-    elements.push(makeDcVoltageSource(nDi, 0, branchRow, vHigh));
+    elements.push(makeDcVoltageSource(nDi, 0, branchRow, vHigh) as unknown as AnalogElement);
   }
 
   // VREF voltage source
   const vRefBranchRow = nNodes + BITS;
-  elements.push(makeDcVoltageSource(nVRefNode, 0, vRefBranchRow, vRef));
+  elements.push(makeDcVoltageSource(nVRefNode, 0, vRefBranchRow, vRef) as unknown as AnalogElement);
 
   const solver = new SparseSolver();
   const diagnostics = new DiagnosticCollector();

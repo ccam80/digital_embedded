@@ -113,6 +113,8 @@ export interface ConcreteCompiledCircuit extends CompiledCircuit {
   /** Number of shadow driver nets for multi-driver bus resolution.
    *  Shadow nets occupy [netCount, netCount + shadowNetCount) and must start as high-Z. */
   readonly shadowNetCount: number;
+  /** Human-readable type name per type ID, for memory component initialization. */
+  readonly typeNames?: string[];
 }
 
 function isConcreteCompiledCircuit(c: CompiledCircuit): c is ConcreteCompiledCircuit {

@@ -16,7 +16,7 @@
       - button "↷" [disabled] [ref=e14]
       - button "⧉" [ref=e15] [cursor=pointer]
       - button "▶" [ref=e17] [cursor=pointer]
-      - button "⏵" [ref=e18] [cursor=pointer]
+      - button "⏵" [active] [ref=e18] [cursor=pointer]
       - 'textbox "Step to sim-time offset (SI suffixes: s, m=ms, u=µs, n=ns)" [ref=e19]':
         - /placeholder: e.g. 5m, 100u
         - text: 1m
@@ -272,40 +272,9 @@
                 - generic [ref=e361]: RAMSinglePort
       - button "‹" [ref=e362] [cursor=pointer]
     - generic "Drag to resize palette" [ref=e363]
-    - generic [ref=e364]:
-      - generic "Circuit editor canvas" [ref=e365]
-      - generic [ref=e366]:
-        - generic [ref=e367]:
-          - generic [ref=e368]: NpnBJT
-          - button "×" [ref=e369] [cursor=pointer]
-        - generic [ref=e370]:
-          - generic [ref=e371]:
-            - generic [ref=e372]: Model
-            - textbox [ref=e374]: behavioral
-          - generic [ref=e375]:
-            - generic [ref=e376]: Label
-            - generic [ref=e377]:
-              - textbox [ref=e378]: Q1
-              - checkbox "Show on canvas" [checked] [ref=e379]
-          - generic [ref=e380]:
-            - generic [ref=e381]: Show value
-            - checkbox [checked] [ref=e383]
-          - generic [ref=e384]:
-            - generic [ref=e385]: Model
-            - combobox [ref=e386]:
-              - option "Behavioral (MNA)" [selected]
-          - generic [ref=e387]:
-            - generic [ref=e388]:
-              - generic "Forward current gain" [ref=e389]: BF
-              - textbox [ref=e390]: "100"
-            - generic [ref=e391]:
-              - generic "Saturation current" [ref=e392]: IS
-              - textbox [ref=e393]: 10.0 f
-              - generic [ref=e394]: A
-            - generic [ref=e396] [cursor=pointer]: ▶ Advanced Parameters
-          - generic [ref=e398] [cursor=pointer]: ▶ Pin Electrical
-  - generic [ref=e399]:
-    - generic [ref=e400]: Ready
-    - button "100%" [ref=e402] [cursor=pointer]
-    - generic [ref=e403]: 16, 7
+    - generic "Circuit editor canvas" [ref=e365]
+  - generic [ref=e366]:
+    - generic [ref=e367]: Ready
+    - button "100%" [ref=e369] [cursor=pointer]
+    - generic [ref=e370]: 28, 11
 ```

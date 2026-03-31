@@ -31,8 +31,6 @@ import {
 // → COMP_WIDTH=3, COMP_HEIGHT=2
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3;
-const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin layout — Java GenericShape(2 inputs, 0 outputs, width=3):

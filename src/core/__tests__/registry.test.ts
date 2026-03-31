@@ -9,7 +9,6 @@ import type {
   AttributeMapping,
   ComponentLayout,
   ExecuteFunction,
-  DigitalModel,
   ComponentModels,
 } from "../registry.js";
 import { PropertyBag } from "../properties.js";
@@ -56,6 +55,7 @@ function makeMockElement(typeId: string, instanceId: string): CircuitElement {
     getAttribute(_name: string): PropertyValue | undefined {
       return undefined;
     },
+    setAttribute(_name: string, _value: PropertyValue): void {},
   };
 }
 
@@ -325,9 +325,6 @@ describe("ComponentRegistry", () => {
   });
 
   describe("ComponentModels types and utilities (P1-1 through P1-5)", () => {
-    const stubAnalogFactory = () =>
-      ({ stamp: () => {}, stampHistory: () => {}, stampInitial: () => {} } as any);
-
     it("hasDigitalModel returns true when models.digital is defined", () => {
       const def = makeDefinition("DigOnly");
       registry.register(def);

@@ -11,8 +11,8 @@
  *   - DDefinition has analogFactory registered
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
-import { BehavioralDFlipflopElement, makeDFlipflopAnalogFactory } from "../behavioral-flipflop.js";
+import { describe, it, expect } from "vitest";
+import { BehavioralDFlipflopElement } from "../behavioral-flipflop.js";
 import { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { DDefinition } from "../../../components/flipflops/d.js";
@@ -46,10 +46,10 @@ function buildDff(withReset = false): {
   qBarPin: DigitalOutputPinModel;
   resetPin: DigitalInputPinModel | null;
 } {
-  const clockPin = new DigitalInputPinModel(CMOS33);
+  const clockPin = new DigitalInputPinModel(CMOS33, true);
   clockPin.init(1, 0);
 
-  const dPin = new DigitalInputPinModel(CMOS33);
+  const dPin = new DigitalInputPinModel(CMOS33, true);
   dPin.init(2, 0);
 
   const qPin = new DigitalOutputPinModel(CMOS33);
@@ -60,7 +60,7 @@ function buildDff(withReset = false): {
 
   let resetPin: DigitalInputPinModel | null = null;
   if (withReset) {
-    resetPin = new DigitalInputPinModel(CMOS33);
+    resetPin = new DigitalInputPinModel(CMOS33, true);
     resetPin.init(5, 0);
   }
 
@@ -99,7 +99,7 @@ function voltages(clock: number, d: number, q = 0, qBar = 0, reset = 0): Float64
  * We use 5 solver rows (MNA nodes 1-5 → solver indices 0-4).
  */
 function makeSolver(): SparseSolver {
-  return new SparseSolver(5, 0);
+  return new SparseSolver();
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ describe("DFF", () => {
     const solver = makeSolver();
 
     // Initial stamp so solver ref is set
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -130,7 +130,7 @@ describe("DFF", () => {
 
     // After rising edge with D=3.3V (> vIH=2.0), Q should be latched HIGH
     // Verify by checking that stampNonlinear stamps vOH on Q node
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -144,7 +144,7 @@ describe("DFF", () => {
     const { element, qPin } = buildDff();
     const solver = makeSolver();
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -155,7 +155,7 @@ describe("DFF", () => {
     // Falling edge with D=low — Q must NOT change
     element.updateCompanion(1e-9, 'bdf1', voltages(0.0, 0.0));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -168,7 +168,7 @@ describe("DFF", () => {
     const solver = makeSolver();
 
     // Initial state: Q=false (default)
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -179,7 +179,7 @@ describe("DFF", () => {
     element.updateCompanion(1e-9, 'bdf1', voltages(0.0, 3.3));
     element.updateCompanion(1e-9, 'bdf1', voltages(3.3, 3.3));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -196,7 +196,7 @@ describe("DFF", () => {
     const solver = makeSolver();
 
     // Latch Q=false initially (default)
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -208,7 +208,7 @@ describe("DFF", () => {
     // Q should remain unchanged through all NR iterations
     for (let iter = 0; iter < 10; iter++) {
       element.updateOperatingPoint(voltages(3.3, 3.3));
-      solver.beginAssembly();
+      solver.beginAssembly(32);
       element.stamp(solver);
       element.stampNonlinear(solver);
       // Q must still be LOW — no edge detection happened
@@ -219,7 +219,7 @@ describe("DFF", () => {
     element.updateCompanion(1e-9, 'bdf1', voltages(0.0, 3.3));  // prev: clock low
     element.updateCompanion(1e-9, 'bdf1', voltages(3.3, 3.3));  // curr: rising edge
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
@@ -235,7 +235,7 @@ describe("DFF", () => {
     element.updateCompanion(1e-9, 'bdf1', voltages(0.0, 3.3, 0, 0, 3.3)); // clock low
     element.updateCompanion(1e-9, 'bdf1', voltages(3.3, 3.3, 3.3, 0, 3.3)); // rising edge, reset HIGH (inactive for active-low)
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5); // Q=high
@@ -243,7 +243,7 @@ describe("DFF", () => {
     // Now apply reset (active-low: reset voltage < vIL=0.8 → force Q=false)
     element.updateCompanion(1e-9, 'bdf1', voltages(3.3, 3.3, 3.3, 0, 0.0)); // reset = 0V < vIL
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5); // Q forced low
@@ -300,7 +300,7 @@ describe("DFF", () => {
     const solver = makeSolver();
     el.updateCompanion(dt, 'trapezoidal', voltages(0.0, 3.3));
     el.updateCompanion(dt, 'trapezoidal', voltages(3.3, 3.3));
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     el.stamp(solver);
     el.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);

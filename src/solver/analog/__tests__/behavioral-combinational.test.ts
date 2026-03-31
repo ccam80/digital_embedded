@@ -32,21 +32,12 @@ import {
   DigitalOutputPinModel,
 } from "../digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../element.js";
 import { MuxDefinition } from "../../../components/wiring/mux.js";
 import { DemuxDefinition } from "../../../components/wiring/demux.js";
 import { DecoderDefinition } from "../../../components/wiring/decoder.js";
-
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -104,15 +95,15 @@ describe("Mux", () => {
     const vSel1 = ((selVal >> 1) & 1) === 1 ? VDD : GND;
 
     // Selector pin models — MNA node IDs 1 and 2 (1-based)
-    const selPin0 = new DigitalInputPinModel(CMOS_3V3);
+    const selPin0 = new DigitalInputPinModel(CMOS_3V3, true);
     selPin0.init(1, 0);
-    const selPin1 = new DigitalInputPinModel(CMOS_3V3);
+    const selPin1 = new DigitalInputPinModel(CMOS_3V3, true);
     selPin1.init(2, 0);
 
     // Data input pin models — MNA node IDs 3..6 (1-based)
     const dataPins: DigitalInputPinModel[][] = [];
     for (let i = 0; i < 4; i++) {
-      const pin = new DigitalInputPinModel(CMOS_3V3);
+      const pin = new DigitalInputPinModel(CMOS_3V3, true);
       pin.init(3 + i, 0);
       dataPins.push([pin]);
     }
@@ -195,9 +186,9 @@ describe("Demux", () => {
     const vSel0 = ((selVal >> 0) & 1) === 1 ? VDD : GND;
     const vSel1 = ((selVal >> 1) & 1) === 1 ? VDD : GND;
 
-    const selPin0 = new DigitalInputPinModel(CMOS_3V3);
+    const selPin0 = new DigitalInputPinModel(CMOS_3V3, true);
     selPin0.init(1, 0);
-    const selPin1 = new DigitalInputPinModel(CMOS_3V3);
+    const selPin1 = new DigitalInputPinModel(CMOS_3V3, true);
     selPin1.init(2, 0);
 
     const outPins: DigitalOutputPinModel[] = [];
@@ -207,7 +198,7 @@ describe("Demux", () => {
       outPins.push(pin);
     }
 
-    const inPin = new DigitalInputPinModel(CMOS_3V3);
+    const inPin = new DigitalInputPinModel(CMOS_3V3, true);
     inPin.init(7, 0);
 
     const demux = new BehavioralDemuxElement([selPin0, selPin1], inPin, outPins, 4);
@@ -292,9 +283,9 @@ describe("Decoder", () => {
     const vSel0 = ((selVal >> 0) & 1) === 1 ? VDD : GND;
     const vSel1 = ((selVal >> 1) & 1) === 1 ? VDD : GND;
 
-    const selPin0 = new DigitalInputPinModel(CMOS_3V3);
+    const selPin0 = new DigitalInputPinModel(CMOS_3V3, true);
     selPin0.init(1, 0);
-    const selPin1 = new DigitalInputPinModel(CMOS_3V3);
+    const selPin1 = new DigitalInputPinModel(CMOS_3V3, true);
     selPin1.init(2, 0);
 
     const outPins: DigitalOutputPinModel[] = [];

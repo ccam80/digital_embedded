@@ -13,6 +13,7 @@ import { describe, it, expect } from "vitest";
 import { CoupledInductorPair } from "../coupled-inductor.js";
 import type { CoupledInductorState } from "../coupled-inductor.js";
 import type { SparseSolver } from "../sparse-solver.js";
+import type { SparseSolverStamp } from "../../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Stub solver
@@ -32,13 +33,11 @@ interface RHSCall {
 function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhs: RHSCall[] } {
   const stamps: StampCall[] = [];
   const rhs: RHSCall[] = [];
-  const solver: SparseSolver = {
-    stamp: (row, col, value) => stamps.push({ row, col, value }),
-    stampRHS: (row, value) => rhs.push({ row, value }),
-    beginAssembly: () => {},
-    finalize: () => {},
-    solve: () => new Float64Array(0),
+  const stub: SparseSolverStamp = {
+    stamp: (row, col, value) => { stamps.push({ row, col, value }); },
+    stampRHS: (row, value) => { rhs.push({ row, value }); },
   };
+  const solver = stub as unknown as SparseSolver;
   return { solver, stamps, rhs };
 }
 

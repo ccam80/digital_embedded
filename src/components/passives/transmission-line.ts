@@ -294,7 +294,6 @@ class SegmentInductorElement implements AnalogElement {
   private geq: number = 0;
   private ieq: number = 0;
   private iPrev: number = 0;
-  private companionActive: boolean = false;
 
   constructor(nA: number, nB: number, branchIdx: number, inductance: number) {
     this.pinNodeIds = [nA, nB];
@@ -414,7 +413,6 @@ class CombinedRLElement implements AnalogElement {
   private geqL: number = 0;
   private ieq: number = 0;
   private iPrev: number = 0;
-  private companionActive: boolean = false;
 
   constructor(nA: number, nB: number, branchIdx: number, resistance: number, inductance: number) {
     this.pinNodeIds = [nA, nB];

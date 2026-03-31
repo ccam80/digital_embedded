@@ -25,7 +25,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -376,7 +376,11 @@ function createSwitchDTAnalogElement(
       return [iAB + iAC, -iAB, -iAC];
     },
 
-    setParam(_key: string, _value: number) {},
+    setParam(key: string, value: number) {
+      if (key === 'closed') {
+        this.setClosed(!!value);
+      }
+    },
   };
 }
 

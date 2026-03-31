@@ -41,6 +41,7 @@ import { ColorSchemeManager } from '../editor/color-scheme.js';
 import { ContextMenu } from '../editor/context-menu.js';
 import type { ClipboardData } from '../editor/edit-operations.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
+import { serializeCircuit as serializeDts } from '../io/dts-serializer.js';
 import { loadAllSubcircuits } from '../io/subcircuit-store.js';
 import { loadWithSubcircuits } from '../io/subcircuit-loader.js';
 import { PostMessageAdapter } from '../io/postmessage-adapter.js';
@@ -52,7 +53,6 @@ import type { TutorialManifest } from './tutorial/types.js';
 import { createTestBridge } from './test-bridge.js';
 import { DefaultSimulatorFacade } from '../headless/default-facade.js';
 import { createEditorBinding } from '../integration/editor-binding.js';
-import type { Point } from '../core/renderer-interface.js';
 import type { AcParams } from '../solver/analog/ac-analysis.js';
 import { initViewerController } from './viewer-controller.js';
 import type { ViewerController } from './viewer-controller.js';
@@ -171,8 +171,6 @@ export function initApp(search?: string): void {
   // Interaction state
   // -------------------------------------------------------------------------
 
-  let clipboard: ClipboardData = { entries: [], wires: [] };
-  let lastWorldPt: Point = { x: 0, y: 0 };
 
   // -------------------------------------------------------------------------
   // AC Sweep dialog + Bode plot
@@ -440,8 +438,13 @@ export function initApp(search?: string): void {
     eventSource: window,
     hooks: {
       loadCircuitXml: (xml) => fileIOController.loadCircuitFromXml(xml),
+      loadCircuitDts: (loaded) => {
+        fileIOController.applyLoadedCircuit(loaded);
+        facade.compile(ctx.getCircuit());
+      },
       getCircuit: () => circuit,
       serializeCircuit: () => serializeCircuitToDig(circuit, registry),
+      serializeDts: () => serializeDts(circuit),
       getFacade: () => facade,
       step: () => {
         const engine = facade.getActiveCoordinator();

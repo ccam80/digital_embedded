@@ -210,7 +210,6 @@ export class AnalogCrystalElement implements AnalogElement {
   private geqL: number = 0;
   private ieqL: number = 0;
   private iPrevL: number = 0;
-  private vPrevL: number = 0;
 
   // Motional capacitance (C_s) companion model
   private C_s: number;
@@ -332,7 +331,7 @@ export class AnalogCrystalElement implements AnalogElement {
     this.geqL = inductorConductance(this.L_s, dt, method);
     this.ieqL = inductorHistoryCurrent(this.L_s, dt, method, iNowL, this.iPrevL, vNowL);
     this.iPrevL = iNowL;
-    this.vPrevL = vNowL;
+    void vNowL; // vPrevL removed (unused in BDF-1)
 
     // C_s companion model — voltage across n2 and n_B
     const vCs_now = vN2 - (nB > 0 ? voltages[nB - 1] : 0);

@@ -21,7 +21,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import {
   inductorConductance,
@@ -155,8 +155,6 @@ class AnalogInductorElement implements AnalogElementCore {
   private geq: number = 0;
   private ieq: number = 0;
   private iPrev: number = 0;
-  private iPrevPrev: number = 0;
-  private vPrev: number = 0;
 
   constructor(branchIdx: number, inductance: number) {
     this.branchIndex = branchIdx;
@@ -204,9 +202,8 @@ class AnalogInductorElement implements AnalogElementCore {
     this.geq = inductorConductance(this.L, dt, method);
     this.ieq = inductorHistoryCurrent(this.L, dt, method, iNow, this.iPrev, vNow);
 
-    this.iPrevPrev = this.iPrev;
     this.iPrev = iNow;
-    this.vPrev = vNow;
+    void vNow; // vPrev removed (unused)
   }
 }
 

@@ -91,7 +91,7 @@ export class DigitalOutputPinModel {
   /** Hot-update a single electrical parameter on this pin model. */
   setParam(key: string, value: number): void {
     if (key in this._spec) {
-      (this._spec as Record<string, number>)[key] = value;
+      (this._spec as unknown as Record<string, number>)[key] = value;
     }
   }
 
@@ -274,7 +274,7 @@ export class DigitalInputPinModel {
   private _prevVoltage = 0;
   private _prevCurrent = 0;
 
-  constructor(spec: ResolvedPinElectrical, loaded = true) {
+  constructor(spec: ResolvedPinElectrical, loaded: boolean) {
     this._spec = { ...spec };
     this._loaded = loaded;
   }
@@ -289,7 +289,7 @@ export class DigitalInputPinModel {
   /** Hot-update a single electrical parameter on this pin model. */
   setParam(key: string, value: number): void {
     if (key in this._spec) {
-      (this._spec as Record<string, number>)[key] = value;
+      (this._spec as unknown as Record<string, number>)[key] = value;
     }
   }
 

@@ -128,7 +128,6 @@ export class ProgramCounterElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 8);
     return this.derivePins(PROGRAM_COUNTER_PIN_DECLARATIONS, ["C"]);
   }
 

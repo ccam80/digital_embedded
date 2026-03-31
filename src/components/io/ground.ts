@@ -25,7 +25,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ function createGroundAnalogElement(
   _branchIdx: number,
   _props: PropertyBag,
 ): AnalogElementCore {
-  const n0 = pinNodes.get("out")!;
+  pinNodes.get("out");
   return {
     branchIndex: -1,
     isNonlinear: false,

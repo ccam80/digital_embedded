@@ -15,7 +15,7 @@
  *
  */
 
-import type { Circuit, Wire } from "@/core/circuit";
+import type { Wire } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
 import type { ComponentRegistry, ExecuteFunction } from "@/core/registry";
 import { PropertyBag } from "@/core/properties";
@@ -27,8 +27,6 @@ import { findSCCs, hasSelfLoop } from "./tarjan.js";
 import { topologicalSort } from "./topological-sort.js";
 import { BusResolver } from "./bus-resolution.js";
 import type { PullResistor } from "./bus-resolution.js";
-import { resolveModelAssignments, extractConnectivityGroups, INFRASTRUCTURE_TYPES } from "@/compile/extract-connectivity.js";
-import { partitionByDomain } from "@/compile/partition.js";
 import type { SolverPartition } from "@/compile/types.js";
 
 // ---------------------------------------------------------------------------
@@ -58,28 +56,6 @@ export interface CompilationWarning {
 // Engine-neutral infrastructure types — Port is registered in the component
 // registry but has no simulation model; the rest are never registered at all.
 // None of these must trigger "unknown component" errors during compilation.
-
-function compileCircuit(
-  circuit: Circuit,
-  registry: ComponentRegistry,
-): CompiledCircuitImpl {
-  // Validate that all non-infrastructure components are registered.
-  for (const el of circuit.elements) {
-    if (INFRASTRUCTURE_TYPES.has(el.typeId)) continue;
-    if (registry.get(el.typeId) === undefined) {
-      throw new Error(
-        `Compiler: unknown component type "${el.typeId}". ` +
-        `Register this component type before compiling.`,
-      );
-    }
-  }
-
-  const [assignments] = resolveModelAssignments(circuit.elements, registry);
-  const [groups] = extractConnectivityGroups(circuit.elements, circuit.wires, registry, assignments);
-  const { digital: partition } = partitionByDomain(groups, circuit.elements, registry, assignments, []);
-  return compileDigitalPartition(partition, registry);
-}
-
 
 // ---------------------------------------------------------------------------
 // compileDigitalPartition — entry point for the unified netlist pipeline

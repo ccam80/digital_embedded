@@ -1,0 +1,202 @@
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "e63c2139-ed5c-4322-9e7e-c3948eae50d6",
+        "position": {
+          "x": 3,
+          "y": 4
+        },
+        "properties": {
+          "label": "A"
+        },
+        "rotation": 0,
+        "type": "In"
+      },
+      {
+        "id": "ab98cfcf-bc60-483c-96cf-ff71806c8221",
+        "position": {
+          "x": 3,
+          "y": 8
+        },
+        "properties": {
+          "label": "B"
+        },
+        "rotation": 0,
+        "type": "In"
+      },
+      {
+        "id": "17877116-aa7a-43ba-8002-f7ac92282dd6",
+        "position": {
+          "x": 3,
+          "y": 27
+        },
+        "properties": {
+          "label": "CLK"
+        },
+        "rotation": 0,
+        "type": "Clock"
+      },
+      {
+        "id": "c290cb40-4382-4056-8950-f444d57cf7a6",
+        "position": {
+          "x": 3,
+          "y": 32
+        },
+        "properties": {
+          "label": "EN"
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "c528bf7d-07e9-4afd-832a-6526b59c3862",
+        "position": {
+          "x": 10,
+          "y": 4
+        },
+        "properties": {
+          "label": "G_AND"
+        },
+        "rotation": 0,
+        "type": "And"
+      },
+      {
+        "id": "b17fdac1-cfa2-49f9-9be1-7d7460cd5880",
+        "position": {
+          "x": 10,
+          "y": 10
+        },
+        "properties": {
+          "label": "G_OR"
+        },
+        "rotation": 0,
+        "type": "Or"
+      },
+      {
+        "id": "1fa0e73f-d0be-4826-887e-e13bb9ebe924",
+        "position": {
+          "x": 10,
+          "y": 16
+        },
+        "properties": {
+          "label": "G_XOR"
+        },
+        "rotation": 0,
+        "type": "XOr"
+      },
+      {
+        "id": "89ff495c-0b17-4d44-bad0-f5087d08c743",
+        "position": {
+          "x": 10,
+          "y": 22
+        },
+        "properties": {
+          "label": "G_NOT"
+        },
+        "rotation": 0,
+        "type": "Not"
+      },
+      {
+        "id": "26b5f3e6-97d2-4418-84e5-1c86b4382540",
+        "position": {
+          "x": 10,
+          "y": 26
+        },
+        "properties": {
+          "label": "FF"
+        },
+        "rotation": 0,
+        "type": "D_FF"
+      },
+      {
+        "id": "be097ee7-579b-4894-88a2-416a2f7fb717",
+        "position": {
+          "x": 10,
+          "y": 32
+        },
+        "properties": {
+          "label": "CNT"
+        },
+        "rotation": 0,
+        "type": "Counter"
+      },
+      {
+        "id": "b65bfd0c-f41e-4492-9bff-453e2e0be654",
+        "position": {
+          "x": 20,
+          "y": 5
+        },
+        "properties": {
+          "label": "AND_Y"
+        },
+        "rotation": 0,
+        "type": "Out"
+      },
+      {
+        "id": "70415300-6fb8-4606-aa54-934dd6444fe4",
+        "position": {
+          "x": 20,
+          "y": 11
+        },
+        "properties": {
+          "label": "OR_Y"
+        },
+        "rotation": 0,
+        "type": "Out"
+      },
+      {
+        "id": "af441864-4887-4765-bad5-306f855412ad",
+        "position": {
+          "x": 20,
+          "y": 17
+        },
+        "properties": {
+          "label": "XOR_Y"
+        },
+        "rotation": 0,
+        "type": "Out"
+      },
+      {
+        "id": "46402363-5b88-4c72-81af-132d834e6770",
+        "position": {
+          "x": 20,
+          "y": 22
+        },
+        "properties": {
+          "label": "NOT_Y"
+        },
+        "rotation": 0,
+        "type": "Out"
+      },
+      {
+        "id": "6ff1fb4c-05b6-4bf1-9020-7602c5ed4f71",
+        "position": {
+          "x": 20,
+          "y": 26
+        },
+        "properties": {
+          "label": "Q"
+        },
+        "rotation": 0,
+        "type": "Out"
+      },
+      {
+        "id": "17a05f9a-f08d-4e31-9d65-98836ab0ca1d",
+        "position": {
+          "x": 20,
+          "y": 32
+        },
+        "properties": {
+          "label": "CNT_Y"
+        },
+        "rotation": 0,
+        "type": "Out"
+      }
+    ],
+    "name": "Untitled",
+    "wires": []
+  },
+  "format": "dts",
+  "version": 1
+}

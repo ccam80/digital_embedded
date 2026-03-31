@@ -23,14 +23,14 @@ import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
-import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
+import { PropertyBag, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";

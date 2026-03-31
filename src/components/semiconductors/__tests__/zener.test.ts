@@ -18,17 +18,11 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
-
 // ---------------------------------------------------------------------------
 // Physical constants
 // ---------------------------------------------------------------------------
@@ -56,7 +50,7 @@ function makeZenerAtVd(
     IBV: 1e-3,
     ...modelOverrides,
   });
-  const element = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+  const element = withNodeIds(createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj), [1, 2]);
 
   // Drive to operating point
   const voltages = new Float64Array(2);
@@ -77,6 +71,8 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolverType): void {
       if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
       if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -138,7 +134,7 @@ describe("Zener", () => {
     const nVt = N * VT;
     const vd = 0.65;
 
-    const element = makeZenerAtVd(vd, { IS, N });
+    makeZenerAtVd(vd, { IS, N });
 
     // Expected forward current: Id = IS * (exp(Vd/nVt) - 1) >> 0
     const expVal = Math.exp(vd / nVt);

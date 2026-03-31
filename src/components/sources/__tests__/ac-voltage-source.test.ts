@@ -17,7 +17,6 @@ import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import {
   makeResistor,
   makeCapacitor,
-  makeVoltageSource,
 } from "../../../solver/analog/__tests__/test-helpers.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
@@ -95,10 +94,6 @@ function makeAcElement(
   };
 
   return el;
-}
-
-function setTime(el: AcVoltageSourceAnalogElement, t: number): void {
-  (el as unknown as { _setTime: (t: number) => void })._setTime(t);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,9 +257,8 @@ describe("Integration", () => {
       nodeCount: 2,
       branchCount: 1,
       matrixSize: 3,
-      elements: [acSrc, r, cap],
+      elements: [acSrc as unknown as import("../../../solver/analog/element.js").AnalogElement, r, cap],
       labelToNodeId: new Map(),
-      wireToNodeId: new Map(),
     };
 
     const engine = new MNAEngine();
@@ -282,7 +276,7 @@ describe("Integration", () => {
 
     for (let i = 0; i < steps; i++) {
       simTime = (i + 1) * dt;
-      engine.step(dt);
+      engine.step();
 
       if (simTime > settleTime) {
         const vcap = Math.abs(engine.getNodeVoltage(2)); // node2 = MNA node ID 2

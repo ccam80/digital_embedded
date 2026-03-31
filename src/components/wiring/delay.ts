@@ -36,7 +36,6 @@ import {
 
 // Java DelayShape: in(0,0), out(SIZE*2,0)=(2,0); SIZE=1 grid unit
 const COMP_WIDTH = 2;
-const COMP_HEIGHT = 1;
 
 // ---------------------------------------------------------------------------
 // Pin layout

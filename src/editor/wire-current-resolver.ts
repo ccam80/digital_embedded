@@ -12,7 +12,6 @@
  */
 
 import type { Wire } from "@/core/circuit";
-import type { CircuitElement } from "@/core/element";
 import { pinWorldPosition } from "@/core/pin";
 import type { CurrentResolverContext } from "@/solver/coordinator-types";
 

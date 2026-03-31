@@ -104,7 +104,8 @@ describe("Ground", () => {
       () => 0,
     );
     Object.assign(element, { pinNodeIds: [5], allNodeIds: [5] });
+    const elementWithPins = element as typeof element & { pinNodeIds: number[] };
 
-    expect(element.pinNodeIds).toEqual([5]);
+    expect(elementWithPins.pinNodeIds).toEqual([5]);
   });
 });

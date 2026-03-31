@@ -92,7 +92,6 @@ export class PFETElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     return this.derivePins(PFET_PIN_DECLARATIONS, []);
   }
 

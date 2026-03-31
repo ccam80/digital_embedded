@@ -1,135 +1,259 @@
-<?xml version="1.0" encoding="utf-8"?>
-<circuit>
-  <version>2</version>
-  <attributes>
-    <entry>
-      <string>romContent</string>
-      <romList>
-        <roms/>
-      </romList>
-    </entry>
-  </attributes>
-  <visualElements>
-    <visualElement>
-      <elementName>In</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>CTRL</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="160"/>
-    </visualElement>
-    <visualElement>
-      <elementName>DcVoltageSource</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>Vs</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="280"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Ground</elementName>
-      <elementAttributes>
-      </elementAttributes>
-      <pos x="120" y="400"/>
-    </visualElement>
-    <visualElement>
-      <elementName>SwitchSPST</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>SW1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="240" y="200"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Resistor</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>R1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="400" y="200"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Ground</elementName>
-      <elementAttributes>
-      </elementAttributes>
-      <pos x="480" y="320"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Probe</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>P1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="520" y="200"/>
-    </visualElement>
-  </visualElements>
-  <wires>
-    <wire>
-      <p1 x="60" y="160"/>
-      <p2 x="280" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="280" y="160"/>
-      <p2 x="280" y="220"/>
-    </wire>
-    <wire>
-      <p1 x="280" y="220"/>
-      <p2 x="280" y="240"/>
-    </wire>
-    <wire>
-      <p1 x="140" y="280"/>
-      <p2 x="220" y="280"/>
-    </wire>
-    <wire>
-      <p1 x="220" y="200"/>
-      <p2 x="220" y="280"/>
-    </wire>
-    <wire>
-      <p1 x="220" y="200"/>
-      <p2 x="240" y="200"/>
-    </wire>
-    <wire>
-      <p1 x="320" y="200"/>
-      <p2 x="400" y="200"/>
-    </wire>
-    <wire>
-      <p1 x="480" y="200"/>
-      <p2 x="480" y="320"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="280"/>
-      <p2 x="60" y="400"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="400"/>
-      <p2 x="120" y="400"/>
-    </wire>
-    <wire>
-      <p1 x="320" y="180"/>
-      <p2 x="320" y="200"/>
-    </wire>
-    <wire>
-      <p1 x="320" y="180"/>
-      <p2 x="500" y="180"/>
-    </wire>
-    <wire>
-      <p1 x="500" y="180"/>
-      <p2 x="500" y="200"/>
-    </wire>
-    <wire>
-      <p1 x="500" y="200"/>
-      <p2 x="520" y="200"/>
-    </wire>
-  </wires>
-  <measurementOrdering/>
-</circuit>
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "5a83c4ef-9863-45bb-84e4-bae2f83f471e",
+        "position": {
+          "x": 3,
+          "y": 8
+        },
+        "properties": {
+          "label": "CTRL"
+        },
+        "rotation": 0,
+        "type": "In"
+      },
+      {
+        "id": "b159e903-e61f-4245-a65d-b4e2f45cf692",
+        "position": {
+          "x": 7,
+          "y": 14
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "Vs"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "4ea91432-ff4a-4679-97d2-896b100a285d",
+        "position": {
+          "x": 11,
+          "y": 20
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "b6a45f9c-8394-4df8-96d3-397b17583606",
+        "position": {
+          "x": 12,
+          "y": 10
+        },
+        "properties": {
+          "_modelParams": {
+            "rOff": 1000000000,
+            "rOn": 10,
+            "threshold": 1.65,
+            "transitionSharpness": 20
+          },
+          "label": "SW1"
+        },
+        "rotation": 0,
+        "type": "SwitchSPST"
+      },
+      {
+        "id": "2024d7ed-7ebd-4d19-8d07-1caaca9e0d20",
+        "position": {
+          "x": 24,
+          "y": 10
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "R1"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "24b10d08-c987-4cf1-bd23-7e5fd1a30b4f",
+        "position": {
+          "x": 28,
+          "y": 16
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "684d42e8-601a-4109-894c-3a120fd72b21",
+        "position": {
+          "x": 30,
+          "y": 10
+        },
+        "properties": {
+          "label": "P1"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      }
+    ],
+    "name": "Untitled",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 8
+          },
+          {
+            "x": 14,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 8
+          },
+          {
+            "x": 14,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 11
+          },
+          {
+            "x": 14,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 14
+          },
+          {
+            "x": 12,
+            "y": 14
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 14
+          },
+          {
+            "x": 12,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 10
+          },
+          {
+            "x": 24,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 10
+          },
+          {
+            "x": 28,
+            "y": 16
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 7,
+            "y": 14
+          },
+          {
+            "x": 7,
+            "y": 20
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 7,
+            "y": 20
+          },
+          {
+            "x": 11,
+            "y": 20
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 9
+          },
+          {
+            "x": 16,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 9
+          },
+          {
+            "x": 29,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 9
+          },
+          {
+            "x": 29,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 10
+          },
+          {
+            "x": 30,
+            "y": 10
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

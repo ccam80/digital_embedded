@@ -170,3 +170,137 @@ describe('digitalPinLoading MCP surface — mode none', () => {
     expect(adapterCount).toBeGreaterThanOrEqual(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Test 3: bridge behavioral verification — step and verify signal flow
+//
+// Uses facade.build() (the MCP/CircuitSpec path) to construct a pure digital
+// circuit: In → And gate → Out. Drives inputs, steps, and verifies that the
+// digital output signal correctly reflects the gate logic.
+//
+// The And gate in digital mode creates no analog bridges (pure-digital
+// circuit). A separate test verifies that a mixed digital+analog circuit
+// (And gate in digital mode → Resistor → Ground) compiles, steps, and
+// produces a non-zero voltage on the analog side when inputs are HIGH.
+// ---------------------------------------------------------------------------
+
+describe('digitalPinLoading MCP surface — bridge behavioral verification', () => {
+  it('digital In → And → Out: step produces correct logic values (facade.build path)', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+
+    // Use facade.build() — the path the MCP server uses (circuit_build tool).
+    const circuit = facade.build({
+      components: [
+        { id: 'inA',  type: 'In',  props: { label: 'A', bitWidth: 1 } },
+        { id: 'inB',  type: 'In',  props: { label: 'B', bitWidth: 1 } },
+        { id: 'gate', type: 'And' },
+        { id: 'out',  type: 'Out', props: { label: 'Y', bitWidth: 1 } },
+      ],
+      connections: [
+        ['inA:out',  'gate:In_1'],
+        ['inB:out',  'gate:In_2'],
+        ['gate:out', 'out:in'],
+      ],
+    });
+
+    const engine = facade.compile(circuit);
+
+    // A=0 B=0 → Y=0
+    facade.setInput(engine, 'A', 0);
+    facade.setInput(engine, 'B', 0);
+    facade.step(engine);
+    expect(facade.readOutput(engine, 'Y')).toBe(0);
+
+    // A=1 B=1 → Y=1
+    facade.setInput(engine, 'A', 1);
+    facade.setInput(engine, 'B', 1);
+    facade.step(engine);
+    expect(facade.readOutput(engine, 'Y')).toBe(1);
+
+    // A=1 B=0 → Y=0
+    facade.setInput(engine, 'B', 0);
+    facade.step(engine);
+    expect(facade.readOutput(engine, 'Y')).toBe(0);
+  });
+
+  it('mixed digital→analog: And gate (digital mode) output drives Resistor via bridge — analog voltage present', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+
+    // Build: In_A, In_B → And (digital) → Port (BIDIR) → Resistor → Ground
+    // A Port is used at the bridge boundary because its pin is BIDIRECTIONAL,
+    // allowing it to connect to both the digital OUTPUT and the analog INPUT.
+    // Only In/Out/Probe/Port labels appear in readAllSignals.
+    const circuit = facade.build({
+      components: [
+        { id: 'inA',  type: 'In',       props: { label: 'A', bitWidth: 1 } },
+        { id: 'inB',  type: 'In',       props: { label: 'B', bitWidth: 1 } },
+        { id: 'gate', type: 'And',      props: { model: 'digital' } },
+        { id: 'port', type: 'Port',     props: { label: 'V_R1', bitWidth: 1 } },
+        { id: 'r1',   type: 'Resistor', props: { label: 'R1', resistance: 1000 } },
+        { id: 'gnd',  type: 'Ground' },
+      ],
+      connections: [
+        ['inA:out',   'gate:In_1'],
+        ['inB:out',   'gate:In_2'],
+        ['gate:out',  'port:port'],
+        ['port:port', 'r1:A'],
+        ['r1:B',      'gnd:out'],
+      ],
+    });
+
+    const compiled = facade.compile(circuit);
+    const unified = facade.getCompiledUnified();
+    expect(unified).not.toBeNull();
+
+    // Verify bridge adapters were created at the digital→analog boundary.
+    const bridgeCount = countBridgeAdapters(facade);
+    expect(bridgeCount).toBeGreaterThan(0);
+
+    // Drive both inputs HIGH → And output = HIGH → bridge propagates HIGH voltage.
+    facade.setInput(compiled, 'A', 1);
+    facade.setInput(compiled, 'B', 1);
+    facade.step(compiled);
+
+    // The Port at the bridge boundary reads the analog node voltage.
+    // With vOH=3.3 through a 1kΩ resistor to ground, expect voltage near vOH.
+    const signals = facade.readAllSignals(compiled);
+    const portVoltage = signals['V_R1'];
+    expect(portVoltage).toBeDefined();
+    expect(portVoltage).toBeGreaterThan(2.0);
+  });
+
+  it('mixed digital→analog: And gate output = LOW → analog voltage near zero', () => {
+    const facade = new DefaultSimulatorFacade(registry);
+
+    const circuit = facade.build({
+      components: [
+        { id: 'inA',  type: 'In',       props: { label: 'A', bitWidth: 1 } },
+        { id: 'inB',  type: 'In',       props: { label: 'B', bitWidth: 1 } },
+        { id: 'gate', type: 'And',      props: { model: 'digital' } },
+        { id: 'port', type: 'Port',     props: { label: 'V_R1', bitWidth: 1 } },
+        { id: 'r1',   type: 'Resistor', props: { label: 'R1', resistance: 1000 } },
+        { id: 'gnd',  type: 'Ground' },
+      ],
+      connections: [
+        ['inA:out',   'gate:In_1'],
+        ['inB:out',   'gate:In_2'],
+        ['gate:out',  'port:port'],
+        ['port:port', 'r1:A'],
+        ['r1:B',      'gnd:out'],
+      ],
+    });
+
+    const compiled = facade.compile(circuit);
+
+    // A=1 B=0 → And output = LOW → bridge outputs VOL (≈0V).
+    facade.setInput(compiled, 'A', 1);
+    facade.setInput(compiled, 'B', 0);
+    facade.step(compiled);
+
+    const signals = facade.readAllSignals(compiled);
+    const portVoltage = signals['V_R1'];
+    expect(portVoltage).toBeDefined();
+    // LOW output → vOL (0V) through resistor to ground. Must be well below vIL (0.8).
+    expect(portVoltage).toBeLessThan(0.5);
+  });
+});

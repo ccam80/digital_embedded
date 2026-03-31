@@ -27,7 +27,7 @@ import { Circuit, Wire } from "../../../core/circuit.js";
 import type { CircuitElement } from "../../../core/element.js";
 import type { Pin, PinDeclaration } from "../../../core/pin.js";
 import { PinDirection } from "../../../core/pin.js";
-import { PropertyBag } from "../../../core/properties.js";
+import { PropertyBag, PropertyType } from "../../../core/properties.js";
 import type { PropertyValue } from "../../../core/properties.js";
 import type { Rect, RenderContext } from "../../../core/renderer-interface.js";
 import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js";
@@ -57,7 +57,7 @@ function makeStubElFactory(typeId: string, pinsFn: (props: PropertyBag) => Pin[]
     draw(_ctx: RenderContext) {},
     getBoundingBox(): Rect { return { x: 0, y: 0, width: 4, height: 4 }; },
     serialize() {
-      return { typeId, instanceId: this.instanceId, position: this.position, rotation: 0, mirror: false, properties: {} };
+      return { typeId, instanceId: (this as unknown as { instanceId: string }).instanceId ?? '', position: { x: 0, y: 0 }, rotation: 0, mirror: false, properties: {} };
     },
   } as unknown as CircuitElement);
 }
@@ -70,6 +70,8 @@ function makeStubAnalogElement(pinNodes: ReadonlyMap<string, number>): AnalogEle
     isNonlinear: false,
     isReactive: false,
     stamp(_s: SparseSolver) {},
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
   };
 }
 
@@ -106,6 +108,8 @@ function buildRegistry(
         isNonlinear: false,
         isReactive: false,
         stamp() {},
+        setParam(_k: string, _v: number): void {},
+        getPinCurrents(_v: Float64Array): number[] { return []; },
       }), paramDefs: [], params: {} },
     },
   });
@@ -131,7 +135,7 @@ function buildRegistry(
       isClockCapable: false,
       kind: "signal",
     }],
-    propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
+    propertyDefs: [{ key: "label", type: PropertyType.STRING, label: "Label", defaultValue: "" }, { key: "bitWidth", type: PropertyType.INT, label: "Bit Width", defaultValue: 1 }],
     attributeMap: [],
     category: ComponentCategory.IO,
     helpText: "",
@@ -159,7 +163,7 @@ function buildRegistry(
       isClockCapable: false,
       kind: "signal",
     }],
-    propertyDefs: [{ key: "label", defaultValue: "" }, { key: "bitWidth", defaultValue: 1 }],
+    propertyDefs: [{ key: "label", type: PropertyType.STRING, label: "Label", defaultValue: "" }, { key: "bitWidth", type: PropertyType.INT, label: "Bit Width", defaultValue: 1 }],
     attributeMap: [],
     category: ComponentCategory.IO,
     helpText: "",
@@ -178,9 +182,9 @@ function buildRegistry(
       { label: "A", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
       { label: "B", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ],
-    propertyDefs: [{ key: "resistance", defaultValue: 1000 }],
+    propertyDefs: [{ key: "resistance", type: PropertyType.FLOAT, label: "Resistance", defaultValue: 1000 }],
     attributeMap: [],
-    category: ComponentCategory.PASSIVE,
+    category: ComponentCategory.PASSIVES,
     helpText: "",
     defaultModel: "behavioral",
     models: {},
@@ -211,7 +215,7 @@ function buildRegistry(
       digital: { executeFn: noopExecuteFn as unknown as ExecuteFunction },
     },
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (analogFactory ?? makeStubAnalogElement) as import("../../core/registry.js").AnalogFactory, paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (analogFactory ?? makeStubAnalogElement) as import("../../../core/registry.js").AnalogFactory, paramDefs: [], params: {} },
     },
   });
 

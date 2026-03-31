@@ -6,7 +6,7 @@
  * logic-only tests (wire voltage, component current/power, delay, leave).
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { AnalogTooltip } from "@/editor/analog-tooltip";
 import { MockCoordinator } from "@/test-utils/mock-coordinator";
 import type { HitResult } from "@/editor/hit-test";
@@ -32,45 +32,6 @@ function makeCircuitElement(): CircuitElement {
     rotation: 0,
     mirror: false,
   } as unknown as CircuitElement;
-}
-
-function makeCoordinator(opts: {
-  wire?: Wire;
-  wireNodeId?: number;
-  element?: CircuitElement;
-  elementIndex?: number;
-  elementCurrent?: number;
-  elementPower?: number;
-  pinVoltages?: Map<string, number>;
-  wireVoltage?: number;
-}): MockCoordinator {
-  const coord = new MockCoordinator();
-
-  if (opts.wire !== undefined && opts.wireNodeId !== undefined && opts.wireVoltage !== undefined) {
-    const addr: SignalAddress = { domain: 'analog', nodeId: opts.wireNodeId };
-    coord.compiled.wireSignalMap.set(opts.wire, addr);
-    coord.setSignal(addr, { type: 'analog', voltage: opts.wireVoltage });
-  }
-
-  if (opts.element !== undefined && opts.pinVoltages !== undefined) {
-    (coord as any)._pinVoltages = new Map([[opts.element, opts.pinVoltages]]);
-  }
-
-  if (opts.element !== undefined && opts.elementIndex !== undefined) {
-    const elementMap = new Map<number, CircuitElement>([[opts.elementIndex, opts.element]]);
-    const resolverCtx: CurrentResolverContext = {
-      wireToNodeId: new Map(),
-      elements: [] as unknown as readonly AnalogElement[],
-      elementToCircuitElement: elementMap,
-      circuitElements: [opts.element],
-      getElementPinCurrents: () => [],
-    };
-    (coord as any)._resolverCtx = resolverCtx;
-    (coord as any)._elementCurrents = new Map([[opts.elementIndex, opts.elementCurrent ?? 0]]);
-    (coord as any)._elementPowers = new Map([[opts.elementIndex, opts.elementPower ?? 0]]);
-  }
-
-  return coord;
 }
 
 class TestCoordinator extends MockCoordinator {

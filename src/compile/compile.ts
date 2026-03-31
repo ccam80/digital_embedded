@@ -355,7 +355,7 @@ export function compileUnified(
     for (const d of compiledAnalog.diagnostics) {
       diagnostics.push({
         severity: d.severity === "error" ? "error" : "warning",
-        code: d.code,
+        code: d.code as unknown as import('./types.js').DiagnosticCode,
         message: d.summary,
       });
     }

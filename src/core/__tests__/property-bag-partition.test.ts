@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { PropertyBag } from "../properties.js";
 import {
   createTestPropertyBag,
   RESISTOR_MODEL_ENTRY,

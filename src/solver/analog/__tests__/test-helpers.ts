@@ -108,6 +108,8 @@ export function makeResistor(
       G(solver, nodeB, nodeB, G_val);
     },
 
+    setParam(_key: string, _value: number): void {},
+
     getPinCurrents(voltages: Float64Array): number[] {
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
@@ -160,6 +162,7 @@ export function makeVoltageSource(
     setSourceScale(factor: number): void {
       scale = factor;
     },
+    setParam(_key: string, _value: number): void {},
     stamp(solver: SparseSolver): void {
       // The branch row is an absolute 0-based solver index supplied by the
       // caller via branchIdx. We do NOT offset by nodeCount here — the caller
@@ -218,6 +221,7 @@ export function makeCurrentSource(
     setSourceScale(factor: number): void {
       scale = factor;
     },
+    setParam(_key: string, _value: number): void {},
     stamp(solver: SparseSolver): void {
       RHS(solver, nodePos, current * scale);
       RHS(solver, nodeNeg, -(current * scale));
@@ -278,6 +282,7 @@ export function makeDiode(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
 
     stamp(_solver: SparseSolver): void {
       // No linear (topology-constant) contributions for a diode.
@@ -390,6 +395,7 @@ export function makeCapacitor(
     branchIndex: -1,
     isNonlinear: false,
     isReactive: true,
+    setParam(_key: string, _value: number): void {},
 
     stamp(solver: SparseSolver): void {
       // Stamp Norton companion model: conductance geq + history current source ieq.
@@ -483,6 +489,7 @@ export function makeInductor(
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: true,
+    setParam(_key: string, _value: number): void {},
 
     stamp(solver: SparseSolver): void {
       const k = branchIdx;
@@ -576,6 +583,7 @@ export function makeAcVoltageSource(
     setSourceScale(factor: number): void {
       scale = factor;
     },
+    setParam(_key: string, _value: number): void {},
     stamp(solver: SparseSolver): void {
       const k = branchIdx;
       const t = getTime();

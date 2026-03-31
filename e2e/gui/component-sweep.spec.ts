@@ -571,7 +571,7 @@ test.describe('Component sweep tests', () => {
           }
           if (entry.type === 'DAC') {
             // VREF and GND must be driven for the DAC analog model to compile
-            await builder.placeLabeled('DcVoltageSource', 3, 14, 'VREF_SRC');
+            await builder.placeLabeled('DcVoltageSource', 7, 14, 'VREF_SRC');
             await builder.drawWire('VREF_SRC', 'pos', 'DUT', 'VREF');
             await builder.placeLabeled('Ground', 3, 18, 'GND_TIE');
             await builder.drawWire('GND_TIE', 'out', 'DUT', 'GND');

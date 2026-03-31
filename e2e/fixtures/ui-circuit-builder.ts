@@ -428,6 +428,77 @@ export class UICircuitBuilder {
   }
 
   /**
+   * Draw a wire along an explicit path of grid waypoints from a labeled pin
+   * to another labeled pin. No autorouting — every click is specified by the
+   * test author. The app's Manhattan routing handles each click-to-click segment.
+   *
+   * @param fromLabel - Source component label
+   * @param fromPin - Source pin name
+   * @param toLabel - Destination component label
+   * @param toPin - Destination pin name
+   * @param waypoints - Intermediate grid coordinates [[x,y], ...] between the pins
+   */
+  async drawWireExplicit(
+    fromLabel: string,
+    fromPin: string,
+    toLabel: string,
+    toPin: string,
+    waypoints: [number, number][] = [],
+  ): Promise<void> {
+    const fromPage = await this.getPinPagePosition(fromLabel, fromPin);
+    await this.page.mouse.click(fromPage.x, fromPage.y);
+    for (const [gx, gy] of waypoints) {
+      const wp = await this.getGridPagePosition(gx, gy);
+      await this.page.mouse.click(wp.x, wp.y);
+    }
+    const toPage = await this.getPinPagePosition(toLabel, toPin);
+    await this.page.mouse.click(toPage.x, toPage.y);
+    await this.page.keyboard.press('Escape');
+  }
+
+  /**
+   * Draw a wire from a labeled pin to a grid coordinate (e.g. Ground) along
+   * an explicit path. No autorouting.
+   *
+   * @param fromLabel - Source component label
+   * @param fromPin - Source pin name
+   * @param toGridX - Destination grid X
+   * @param toGridY - Destination grid Y
+   * @param waypoints - Intermediate grid coordinates [[x,y], ...]
+   */
+  async drawWireFromPinExplicit(
+    fromLabel: string,
+    fromPin: string,
+    toGridX: number,
+    toGridY: number,
+    waypoints: [number, number][] = [],
+  ): Promise<void> {
+    const fromPage = await this.getPinPagePosition(fromLabel, fromPin);
+    await this.page.mouse.click(fromPage.x, fromPage.y);
+    for (const [gx, gy] of waypoints) {
+      const wp = await this.getGridPagePosition(gx, gy);
+      await this.page.mouse.click(wp.x, wp.y);
+    }
+    const toPage = await this.getGridPagePosition(toGridX, toGridY);
+    await this.page.mouse.click(toPage.x, toPage.y);
+    await this.page.keyboard.press('Escape');
+  }
+
+  /**
+   * Draw a wire along an explicit path of grid coordinates.
+   * First point starts wire drawing, last point ends it.
+   * Use for wiring between unlabeled components or arbitrary grid positions.
+   */
+  async drawWireByPath(points: [number, number][]): Promise<void> {
+    expect(points.length, 'drawWireByPath needs at least 2 points').toBeGreaterThanOrEqual(2);
+    for (const [gx, gy] of points) {
+      const pos = await this.getGridPagePosition(gx, gy);
+      await this.page.mouse.click(pos.x, pos.y);
+    }
+    await this.page.keyboard.press('Escape');
+  }
+
+  /**
    * Draw a wire between two page-absolute coordinates.
    * Useful when pin positions are already known (e.g. from circuit info).
    */

@@ -17,7 +17,7 @@
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
-import type { RenderContext, Rect, TextAnchor } from "../../core/renderer-interface.js";
+import type { RenderContext, Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
@@ -29,7 +29,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -124,6 +124,7 @@ export class OpAmpElement extends AbstractCircuitElement {
 
     // +/- labels inside triangle body
     ctx.setColor("COMPONENT");
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText("-", 1.0, -1.125, { horizontal: "center", vertical: "middle" });
     ctx.drawText("+", 1.0, 1.0, { horizontal: "center", vertical: "middle" });
 

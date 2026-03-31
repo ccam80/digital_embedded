@@ -45,83 +45,6 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 
-// ---------------------------------------------------------------------------
-// Transient simulation helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Run N transient timesteps with the given elements and return the final
- * solution vector.
- *
- * @param elements  - All elements to stamp (including the transformer)
- * @param reactive  - Subset of elements that have stampCompanion (must be called first)
- * @param matrixSize - Total MNA matrix dimension (nodes + branches)
- * @param initVoltages - Initial solution vector (length = matrixSize)
- * @param dt        - Timestep in seconds
- * @param steps     - Number of steps to run
- */
-function runTransient(
-  elements: Array<{ stamp(s: SparseSolver): void }>,
-  reactive: Array<{ stampCompanion(dt: number, method: "trapezoidal", voltages: Float64Array): void }>,
-  matrixSize: number,
-  initVoltages: Float64Array,
-  dt: number,
-  steps: number,
-): Float64Array {
-  const solver = new SparseSolver();
-  let voltages = new Float64Array(initVoltages);
-
-  for (let i = 0; i < steps; i++) {
-    for (const el of reactive) {
-      el.stampCompanion(dt, "trapezoidal", voltages);
-    }
-    solver.beginAssembly(matrixSize);
-    for (const el of elements) {
-      el.stamp(solver);
-    }
-    solver.finalize();
-    const result = solver.factor();
-    if (!result.success) throw new Error(`Singular matrix at step ${i}`);
-    solver.solve(voltages);
-  }
-  return voltages;
-}
-
-/**
- * Run a time-varying simulation where the source voltage changes each step.
- * Returns an array of solution vectors (one per step).
- */
-function runTransientAC(
-  makeElements: (t: number) => Array<{ stamp(s: SparseSolver): void }>,
-  reactive: Array<{ stampCompanion(dt: number, method: "trapezoidal", voltages: Float64Array): void }>,
-  matrixSize: number,
-  initVoltages: Float64Array,
-  dt: number,
-  steps: number,
-): Float64Array[] {
-  const solver = new SparseSolver();
-  let voltages = new Float64Array(initVoltages);
-  const results: Float64Array[] = [];
-
-  for (let i = 0; i < steps; i++) {
-    const t = i * dt;
-    const elements = makeElements(t);
-
-    for (const el of reactive) {
-      el.stampCompanion(dt, "trapezoidal", voltages);
-    }
-    solver.beginAssembly(matrixSize);
-    for (const el of elements) {
-      el.stamp(solver);
-    }
-    solver.finalize();
-    const result = solver.factor();
-    if (!result.success) throw new Error(`Singular matrix at step ${i} (t=${t.toExponential(3)})`);
-    solver.solve(voltages);
-    results.push(new Float64Array(voltages));
-  }
-  return results;
-}
 
 // ---------------------------------------------------------------------------
 // Transformer element construction helper
@@ -187,7 +110,6 @@ describe("Transformer", () => {
     // Branch layout: b0=Vsrc, b1=transformer_primary, b2=transformer_secondary
     const bVsrc = nodeCount + 0;
     const bTx1 = nodeCount + 1;
-    const bTx2 = nodeCount + 2;
     const matrixSize = nodeCount + 3;
 
     const transformer = makeTransformerElement({
@@ -411,7 +333,6 @@ describe("Transformer", () => {
       const nodeCount = 2;
       const bVsrc = nodeCount + 0;
       const bTx1 = nodeCount + 1;
-      const bTx2 = nodeCount + 2;
       const matrixSize = nodeCount + 3;
 
       const transformer = makeTransformerElement({
@@ -483,7 +404,6 @@ describe("Transformer", () => {
     const nodeCount = 2;
     const bVsrc = nodeCount + 0;
     const bTx1 = nodeCount + 1;
-    const bTx2 = nodeCount + 2;
     const matrixSize = nodeCount + 3;
 
     const transformer = makeTransformerElement({

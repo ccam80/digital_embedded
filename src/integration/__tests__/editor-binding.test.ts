@@ -38,6 +38,7 @@ class StubElement implements CircuitElement {
     return { typeId: this.typeId, instanceId: this.instanceId, position: this.position, rotation: this.rotation, mirror: this.mirror, properties: {} };
   }
   getAttribute(_name: string): PropertyValue | undefined { return undefined; }
+  setAttribute(_name: string, _value: PropertyValue): void {}
 }
 
 // ---------------------------------------------------------------------------

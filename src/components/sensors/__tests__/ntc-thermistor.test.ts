@@ -19,6 +19,7 @@ import {
 } from "../ntc-thermistor.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -206,7 +207,7 @@ describe("NTC", () => {
       const mockSolver = {
         stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
         stampRHS: () => {},
-      } as unknown as import("../../../analog/sparse-solver.js").SparseSolver;
+      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
 
       ntc.stampNonlinear(mockSolver);
 

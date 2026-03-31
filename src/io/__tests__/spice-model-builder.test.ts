@@ -3,7 +3,7 @@ import { buildSpiceSubcircuit } from "../spice-model-builder.js";
 import { parseSubcircuit } from "../../solver/analog/model-parser.js";
 import type { ParsedSubcircuit } from "../../solver/analog/model-parser.js";
 
-function getModelParams(el: { getProperties(): { getModelParamKeys(): string[]; getModelParam<T>(k: string): T } }): Record<string, number> {
+function getModelParams(el: import("../../core/element.js").CircuitElement): Record<string, number> {
   return Object.fromEntries(
     el.getProperties().getModelParamKeys().map(k => [k, el.getProperties().getModelParam<number>(k)])
   );

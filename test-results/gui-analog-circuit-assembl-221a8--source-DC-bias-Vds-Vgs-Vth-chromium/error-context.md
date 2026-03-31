@@ -16,7 +16,7 @@
       - button "↷" [disabled] [ref=e14]
       - button "⧉" [ref=e15] [cursor=pointer]
       - button "▶" [ref=e17] [cursor=pointer]
-      - button "⏵" [ref=e18] [cursor=pointer]
+      - button "⏵" [active] [ref=e18] [cursor=pointer]
       - 'textbox "Step to sim-time offset (SI suffixes: s, m=ms, u=µs, n=ns)" [ref=e19]':
         - /placeholder: e.g. 5m, 100u
         - text: 1m
@@ -270,59 +270,9 @@
                 - generic [ref=e358]: RAMSinglePort
       - button "‹" [ref=e359] [cursor=pointer]
     - generic "Drag to resize palette" [ref=e360]
-    - generic [ref=e361]:
-      - generic "Circuit editor canvas" [ref=e362]
-      - generic [ref=e363]:
-        - generic [ref=e364]:
-          - generic [ref=e365]: NMOS
-          - button "×" [ref=e366] [cursor=pointer]
-        - generic [ref=e367]:
-          - generic [ref=e368]:
-            - generic [ref=e369]: Model
-            - textbox [ref=e371]: behavioral
-          - generic [ref=e372]:
-            - generic [ref=e373]: Width
-            - spinbutton [ref=e375]: "0.000001"
-          - generic [ref=e376]:
-            - generic [ref=e377]: Length
-            - spinbutton [ref=e379]: "0.000001"
-          - generic [ref=e380]:
-            - generic [ref=e381]: Label
-            - generic [ref=e382]:
-              - textbox [ref=e383]: M1
-              - checkbox "Show on canvas" [checked] [ref=e384]
-          - generic [ref=e385]:
-            - generic [ref=e386]: Show value
-            - checkbox [checked] [ref=e388]
-          - generic [ref=e389]:
-            - generic [ref=e390]: Model
-            - combobox [ref=e391]:
-              - option "Behavioral (MNA)" [selected]
-          - generic [ref=e392]:
-            - generic [ref=e393]:
-              - generic "Threshold voltage" [ref=e394]: VTO
-              - textbox [ref=e395]: "1.00"
-              - generic [ref=e396]: V
-            - generic [ref=e397]:
-              - generic "Process transconductance parameter" [ref=e398]: KP
-              - textbox [ref=e399]: 20.0 µ
-              - generic [ref=e400]: A/V²
-            - generic [ref=e401]:
-              - generic "Channel-length modulation" [ref=e402]: LAMBDA
-              - textbox [ref=e403]: 10.0 m
-              - generic [ref=e404]: 1/V
-            - generic [ref=e405]:
-              - generic "Channel width" [ref=e406]: W
-              - textbox [ref=e407]: 1.00 µ
-              - generic [ref=e408]: m
-            - generic [ref=e409]:
-              - generic "Channel length" [ref=e410]: L
-              - textbox [ref=e411]: 1.00 µ
-              - generic [ref=e412]: m
-            - generic [ref=e414] [cursor=pointer]: ▶ Advanced Parameters
-          - generic [ref=e416] [cursor=pointer]: ▶ Pin Electrical
-  - generic [ref=e417]:
-    - generic [ref=e418]: Ready
-    - button "100%" [ref=e420] [cursor=pointer]
-    - generic [ref=e421]: 18, 10
+    - generic "Circuit editor canvas" [ref=e362]
+  - generic [ref=e363]:
+    - generic [ref=e364]: Ready
+    - button "100%" [ref=e366] [cursor=pointer]
+    - generic [ref=e367]: 26, 14
 ```

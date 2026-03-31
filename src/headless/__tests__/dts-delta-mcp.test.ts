@@ -100,7 +100,7 @@ describe("dts-delta MCP surface � per-element modelParamDeltas round-trip", ()
     expect(restored.elements).toHaveLength(1);
     const restoredEl = restored.elements[0]!;
     expect(restoredEl.getProperties().getModelParam<number>("BF")).toBe(250);
-    expect(restoredEl.getProperties().getModelParam<number>("IS")).toBeCloseTo(BJT_FINITE_PARAMS["IS"]!, 20);
+    expect(restoredEl.getProperties().getModelParam<number>("IS")).toBe(BJT_FINITE_PARAMS["IS"]!);
   });
 
   it("only modified params are stored in the serialized delta", () => {

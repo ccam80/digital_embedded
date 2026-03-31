@@ -1,0 +1,248 @@
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "a74b883d-aa47-4145-8473-08ca1c5851ff",
+        "position": {
+          "x": 3,
+          "y": 8
+        },
+        "properties": {
+          "label": "D0",
+          "value": 0
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "ee8b09c5-eca9-42cb-871b-d566f68b2752",
+        "position": {
+          "x": 3,
+          "y": 11
+        },
+        "properties": {
+          "label": "D1"
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "e55e53c5-0692-4aa9-8d20-30ec9c633d85",
+        "position": {
+          "x": 3,
+          "y": 14
+        },
+        "properties": {
+          "label": "D2",
+          "value": 0
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "63bf5c23-9f8d-4ee8-b0b9-68d841220838",
+        "position": {
+          "x": 3,
+          "y": 17
+        },
+        "properties": {
+          "label": "D3"
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "00aae942-2ef3-49c0-9f99-39f3dcbd987d",
+        "position": {
+          "x": 15,
+          "y": 15
+        },
+        "properties": {
+          "bits": 4,
+          "label": "DAC1"
+        },
+        "rotation": 0,
+        "type": "DAC"
+      },
+      {
+        "id": "a83ebb90-f25e-4800-8f29-93b59ab2f355",
+        "position": {
+          "x": 8,
+          "y": 3
+        },
+        "properties": {
+          "label": "Vref"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "e4d53929-c856-4404-b447-5c38958b3901",
+        "position": {
+          "x": 8,
+          "y": 8
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "0f04fe6e-5700-4ee0-90a5-c5cb0ca51e55",
+        "position": {
+          "x": 17,
+          "y": 22
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "1766775d-6ddf-487f-9704-03d326948c95",
+        "position": {
+          "x": 25,
+          "y": 15
+        },
+        "properties": {
+          "label": "R1"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "4a8c054c-3a0f-4b02-96ce-3f3bf33501fb",
+        "position": {
+          "x": 33,
+          "y": 15
+        },
+        "properties": {
+          "label": "C1"
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "12e8a5d6-05ea-4770-8586-7582fc29bb47",
+        "position": {
+          "x": 37,
+          "y": 16
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "4f5b2679-9d68-48e4-b022-1278a7c1ed52",
+        "position": {
+          "x": 31,
+          "y": 13
+        },
+        "properties": {
+          "label": "P_DAC"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      },
+      {
+        "id": "a2f01520-47b9-40c0-a222-1b408af83ffe",
+        "position": {
+          "x": 33,
+          "y": 19
+        },
+        "properties": {
+          "label": "CMP",
+          "outputType": "push-pull"
+        },
+        "rotation": 0,
+        "type": "VoltageComparator"
+      },
+      {
+        "id": "e29f27b7-4c17-4ca2-b63b-0fa60116f8a6",
+        "position": {
+          "x": 25,
+          "y": 21
+        },
+        "properties": {
+          "label": "Vref2",
+          "voltage": 2.5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "ab3af241-97c0-4a82-890a-6a33bdedf4c7",
+        "position": {
+          "x": 25,
+          "y": 24
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "1aabba56-e219-4f91-ae65-242db36b06b7",
+        "position": {
+          "x": 38,
+          "y": 18
+        },
+        "properties": {
+          "label": "GA"
+        },
+        "rotation": 0,
+        "type": "And"
+      },
+      {
+        "id": "1c0193dd-21a3-4d3a-960d-e92ad1725be6",
+        "position": {
+          "x": 38,
+          "y": 20
+        },
+        "properties": {
+          "label": "C_EN"
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "a693ac3b-4a87-4246-ba2f-0c5716b71247",
+        "position": {
+          "x": 34,
+          "y": 24
+        },
+        "properties": {
+          "label": "CLK"
+        },
+        "rotation": 0,
+        "type": "Clock"
+      },
+      {
+        "id": "95173bee-b8b1-4fb3-8c4b-1b5b859c84cb",
+        "position": {
+          "x": 44,
+          "y": 18
+        },
+        "properties": {
+          "label": "CNT"
+        },
+        "rotation": 0,
+        "type": "Counter"
+      },
+      {
+        "id": "307acb99-f2f5-458a-a8d8-263761c45d42",
+        "position": {
+          "x": 48,
+          "y": 18
+        },
+        "properties": {
+          "bitWidth": 4,
+          "label": "Q"
+        },
+        "rotation": 0,
+        "type": "Out"
+      }
+    ],
+    "name": "Untitled",
+    "wires": []
+  },
+  "format": "dts",
+  "version": 1
+}

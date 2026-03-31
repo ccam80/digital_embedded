@@ -86,7 +86,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -370,6 +370,14 @@ export class OptocouplerElement extends AbstractCircuitElement {
 
     // emitter lead
     drawColoredLead(ctx, signals, vEmitter, 2.75, 0.5, 4, 1);
+
+    // Pin labels outside body near pin tips
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.5 });
+    ctx.drawText("A", 0.15, -1.4, { horizontal: "left", vertical: "bottom" });
+    ctx.drawText("K", 0.15, 1.4, { horizontal: "left", vertical: "top" });
+    ctx.drawText("C", 3.85, -1.4, { horizontal: "right", vertical: "bottom" });
+    ctx.drawText("E", 3.85, 1.4, { horizontal: "right", vertical: "top" });
 
     ctx.restore();
   }

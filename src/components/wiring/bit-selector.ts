@@ -35,7 +35,6 @@ import {
 
 // Java BitSelShape: width=2, in@(0,0), sel@(1,flip?-1:1), out@(2,0)
 const COMP_WIDTH = 2;
-const COMP_HEIGHT = 1;
 
 // ---------------------------------------------------------------------------
 // Pin layout — y-positions shifted down by 1 from previous layout

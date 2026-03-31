@@ -27,7 +27,6 @@ import {
 
 // Component spans x:[-0.5,0.5] (centered on x=0), y:[0,4]
 // Pins: A at (0,0), K at (0,4)
-const COMP_WIDTH = 1;
 const COMP_HEIGHT = 4;
 
 // ---------------------------------------------------------------------------

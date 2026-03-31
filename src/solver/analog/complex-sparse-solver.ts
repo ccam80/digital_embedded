@@ -43,9 +43,6 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
   private _perm: Int32Array = new Int32Array(0);
   private _permInv: Int32Array = new Int32Array(0);
 
-  // -- Elimination tree --
-  private _etree: Int32Array = new Int32Array(0);
-
   // -- Sparse L (CSC, unit lower triangular, complex) --
   private _lColPtr: Int32Array = new Int32Array(0);
   private _lRowIdx: Int32Array = new Int32Array(0);
@@ -399,7 +396,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
       }
     }
 
-    this._etree = etree;
+    void etree; // _etree removed (unused)
   }
 
   private _symbolicLU(): void {

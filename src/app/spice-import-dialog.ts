@@ -26,7 +26,7 @@ import type { SubcircuitElement, MnaSubcircuitNetlist } from '../core/mna-subcir
  * Returns "subckt" if the first non-blank line starts with .SUBCKT (case-insensitive),
  * or "model" otherwise.
  */
-function detectFormat(text: string): "subckt" | "model" {
+export function detectFormat(text: string): "subckt" | "model" {
   const lines = text.split("\n");
   for (const line of lines) {
     const trimmed = line.trim();

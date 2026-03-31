@@ -7,7 +7,7 @@ import "../../test-utils/decompress-polyfill.js";
 
 import { describe, it, expect } from "vitest";
 import { parseCtzUrl, parseCtzCircuitFromText } from "../ctz-parser.js";
-import { parseCtzText, mapCtzToCircuit, CTZ_TYPE_MAP } from "../ctz-format.js";
+import { CTZ_TYPE_MAP } from "../ctz-format.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition } from "../../core/registry.js";
 import { PropertyBag } from "../../core/properties.js";

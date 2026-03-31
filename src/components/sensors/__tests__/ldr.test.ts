@@ -14,6 +14,7 @@ import { describe, it, expect } from "vitest";
 import { LDRElement, LDRDefinition, createLDRElement, LDR_DEFAULTS } from "../ldr.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -117,7 +118,7 @@ describe("LDR", () => {
       const mockSolver = {
         stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
         stampRHS: () => {},
-      } as unknown as import("../../../analog/sparse-solver.js").SparseSolver;
+      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
 
       ldr.stampNonlinear(mockSolver);
 
@@ -135,7 +136,7 @@ describe("LDR", () => {
       const mockSolver = {
         stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
         stampRHS: () => {},
-      } as unknown as import("../../../analog/sparse-solver.js").SparseSolver;
+      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
 
       ldr.stampNonlinear(mockSolver);
 
@@ -153,7 +154,7 @@ describe("LDR", () => {
       const mockSolver = {
         stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
         stampRHS: () => {},
-      } as unknown as import("../../../analog/sparse-solver.js").SparseSolver;
+      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
 
       ldr.stampNonlinear(mockSolver);
 

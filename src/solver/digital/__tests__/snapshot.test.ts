@@ -83,6 +83,7 @@ function buildCircuit(
     switchClassification: new Uint8Array(0),
     totalStateSlots: 0,
     signalArraySize: netCount,
+    shadowNetCount: 0,
   };
 }
 

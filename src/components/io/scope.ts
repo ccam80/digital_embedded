@@ -23,7 +23,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -52,13 +51,6 @@ const COMP_WIDTH = 4;   // outer rect right edge at x=4
 const MAX_CHANNELS = 8;
 const MAX_SAMPLES = 1024;
 
-// Java ScopeShape has a fixed single-pin layout (clock at 0,0) and fixed shape.
-// componentHeight is not variable for the default 1-channel scope.
-function componentHeight(_channelCount: number): number {
-  // Java outer: y from -2 to +0.5 = height 2.5; but pin is at y=0 which is inside.
-  // We keep this for compatibility but the shape is fixed.
-  return 2.5;
-}
 
 // ---------------------------------------------------------------------------
 // WaveformChannel — per-channel sample buffer

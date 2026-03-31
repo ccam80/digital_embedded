@@ -12,14 +12,12 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  CapacitorElement,
   CapacitorDefinition,
   CAPACITOR_ATTRIBUTE_MAPPINGS,
 } from "../capacitor.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { PinDirection } from "../../../core/pin.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import type { SparseSolverStamp } from "../../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -46,20 +44,17 @@ interface RHSCall {
   value: number;
 }
 
-function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhsStamps: RHSCall[] } {
+function makeStubSolver(): { solver: SparseSolverStamp; stamps: StampCall[]; rhsStamps: RHSCall[] } {
   const stamps: StampCall[] = [];
   const rhsStamps: RHSCall[] = [];
 
-  const solver: SparseSolver = {
+  const solver: SparseSolverStamp = {
     stamp: (row: number, col: number, value: number) => {
       stamps.push({ row, col, value });
     },
     stampRHS: (row: number, value: number) => {
       rhsStamps.push({ row, value });
     },
-    beginAssembly: () => {},
-    finalize: () => {},
-    solve: () => new Float64Array([]),
   };
 
   return { solver, stamps, rhsStamps };
@@ -91,7 +86,7 @@ describe("Capacitor", () => {
       analogElement.stampCompanion!(1e-6, "trapezoidal", voltages);
 
       // For trapezoidal: geq = 2C/h = 2 * 1e-6 / 1e-6 = 2.0
-      const { solver, stamps, rhsStamps } = makeStubSolver();
+      const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
 
       const geqStamps = stamps.filter((s) => s.value > 0);

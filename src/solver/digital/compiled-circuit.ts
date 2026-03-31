@@ -88,6 +88,14 @@ export class FlatComponentLayout implements ComponentLayout {
   getProperty(componentIndex: number, key: string): PropertyValue | undefined {
     return this._componentProperties[componentIndex]?.get(key);
   }
+
+  setProperty(componentIndex: number, key: string, value: PropertyValue): void {
+    const map = this._componentProperties[componentIndex];
+    if (map === undefined) return;
+    // The underlying maps are mutable Map instances created by the compiler;
+    // the ReadonlyMap typing is just a compile-time guard.
+    (map as Map<string, PropertyValue>).set(key, value);
+  }
 }
 
 // ---------------------------------------------------------------------------

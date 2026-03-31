@@ -43,7 +43,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -152,6 +152,7 @@ export class ComparatorElement extends AbstractCircuitElement {
     // Text labels — body decoration, stays COMPONENT color
     ctx.setLineWidth(1);
     ctx.setColor("COMPONENT");
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText("-", 1.0, -1.125, { horizontal: "center", vertical: "middle" });
     ctx.drawText("+", 1.0, 1.0, { horizontal: "center", vertical: "middle" });
     ctx.drawText("≥?", 2.0, 0.0, { horizontal: "center", vertical: "middle" });

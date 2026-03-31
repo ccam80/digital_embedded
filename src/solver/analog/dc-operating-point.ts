@@ -72,6 +72,7 @@ function makeGminShunt(nodeId: number, gmin: number): AnalogElement {
       const I = gmin * v;
       return [I, -I];
     },
+    setParam(_key: string, _value: number): void {},
   };
 }
 
@@ -169,7 +170,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   const gminSteps = _buildGminSteps(params.gmin);
 
   let gminConverged = false;
-  let gminVoltages = new Float64Array(matrixSize);
+  let gminVoltages: Float64Array = new Float64Array(matrixSize);
 
   for (const gminVal of gminSteps) {
     // Update all shunt elements to the current gmin value
@@ -182,7 +183,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
     const result = newtonRaphson({
       ...nrBase,
       elements: augmented,
-      initialGuess: gminConverged ? gminVoltages : undefined,
+      ...(gminConverged ? { initialGuess: gminVoltages } : {}),
     });
 
     totalIterations += result.iterations;
@@ -239,7 +240,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   lastTrace = zeroResult.trace;
 
   if (zeroResult.converged) {
-    sourceVoltages = zeroResult.voltages;
+    sourceVoltages = zeroResult.voltages as Float64Array<ArrayBuffer>;
     sourceConverged = true;
 
     // Ramp sources in 10% increments: 10%, 20%, ..., 100%
@@ -256,7 +257,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
       lastTrace = stepResult.trace;
 
       if (stepResult.converged) {
-        sourceVoltages = stepResult.voltages;
+        sourceVoltages = stepResult.voltages as Float64Array<ArrayBuffer>;
       } else {
         sourceConverged = false;
       }

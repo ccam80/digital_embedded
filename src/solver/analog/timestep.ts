@@ -98,7 +98,7 @@ export class TimestepController {
    */
   computeNewDt(
     elements: readonly AnalogElement[],
-    history: HistoryStore,
+    _history: HistoryStore,
     simTime: number = 0,
   ): number {
     const dt = this.currentDt;

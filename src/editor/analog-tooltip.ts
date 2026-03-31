@@ -23,7 +23,6 @@ import type { WireCurrentResolver } from "@/editor/wire-current-resolver";
 
 export class AnalogTooltip {
   private readonly _coordinator: SimulationCoordinator;
-  private readonly _resolver: WireCurrentResolver;
 
   /**
    * Cached inverted map: CircuitElement → element index.
@@ -54,10 +53,9 @@ export class AnalogTooltip {
 
   constructor(
     coordinator: SimulationCoordinator,
-    resolver: WireCurrentResolver,
+    _resolver: WireCurrentResolver,
   ) {
     this._coordinator = coordinator;
-    this._resolver = resolver;
   }
 
   /**

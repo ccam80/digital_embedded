@@ -14,9 +14,9 @@
 
 import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
-import { DiagnosticCollector, makeDiagnostic } from "../diagnostics.js";
+import { DiagnosticCollector } from "../diagnostics.js";
 import { solveDcOperatingPoint } from "../dc-operating-point.js";
-import { makeResistor, makeVoltageSource, makeCurrentSource, makeDiode } from "./test-helpers.js";
+import { makeResistor, makeVoltageSource, makeDiode } from "./test-helpers.js";
 import type { AnalogElement } from "../element.js";
 import type { SimulationParams } from "../../../core/analog-engine-interface.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
@@ -63,31 +63,8 @@ function makeScalableVoltageSource(
       if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
       solver.stampRHS(k, voltage * scale);
     },
-  };
-}
-
-/**
- * Create a scalable current source element that supports setSourceScale().
- */
-function makeScalableCurrentSource(
-  nodePos: number,
-  nodeNeg: number,
-  current: number,
-): AnalogElement {
-  let scale = 1;
-  return {
-    pinNodeIds: [nodePos, nodeNeg],
-    allNodeIds: [nodePos, nodeNeg],
-    branchIndex: -1,
-    isNonlinear: false,
-    isReactive: false,
-    setSourceScale(factor: number): void {
-      scale = factor;
-    },
-    stamp(solver: SparseSolver): void {
-      if (nodePos !== 0) solver.stampRHS(nodePos - 1, current * scale);
-      if (nodeNeg !== 0) solver.stampRHS(nodeNeg - 1, -(current * scale));
-    },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
   };
 }
 

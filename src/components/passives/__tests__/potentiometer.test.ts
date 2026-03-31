@@ -12,13 +12,12 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  PotentiometerElement,
   PotentiometerDefinition,
   POTENTIOMETER_ATTRIBUTE_MAPPINGS,
 } from "../potentiometer.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import type { SparseSolverStamp } from "../../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -40,17 +39,14 @@ interface StampCall {
   value: number;
 }
 
-function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[] } {
+function makeStubSolver(): { solver: SparseSolverStamp; stamps: StampCall[] } {
   const stamps: StampCall[] = [];
 
-  const solver: SparseSolver = {
+  const solver: SparseSolverStamp = {
     stamp: (row: number, col: number, value: number) => {
       stamps.push({ row, col, value });
     },
     stampRHS: () => {},
-    beginAssembly: () => {},
-    finalize: () => {},
-    solve: () => new Float64Array([]),
   };
 
   return { solver, stamps };

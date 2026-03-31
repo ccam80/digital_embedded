@@ -17,7 +17,6 @@ import {
   BehavioralJKFlipflopElement,
   BehavioralRSFlipflopElement,
   BehavioralTFlipflopElement,
-  BehavioralRSAsyncLatchElement,
 } from "../behavioral-flipflop-variants.js";
 import {
   DigitalInputPinModel,
@@ -57,7 +56,7 @@ const VIH = CMOS33.vIH;
 // ---------------------------------------------------------------------------
 
 function makeInputPin(nodeId: number): DigitalInputPinModel {
-  const pin = new DigitalInputPinModel(CMOS33);
+  const pin = new DigitalInputPinModel(CMOS33, true);
   pin.init(nodeId, 0);
   return pin;
 }
@@ -68,8 +67,8 @@ function makeOutputPin(nodeId: number): DigitalOutputPinModel {
   return pin;
 }
 
-function makeSolver(size: number): SparseSolver {
-  return new SparseSolver(size, 0);
+function makeSolver(_size: number): SparseSolver {
+  return new SparseSolver();
 }
 
 /**
@@ -145,28 +144,6 @@ function buildT(): {
   return { element, tPin, clockPin, qPin, qBarPin };
 }
 
-/**
- * Build a level-sensitive RS latch (no clock).
- * Node layout: ground=0, S=1, R=2, Q=3, ~Q=4
- */
-function buildRSLatch(): {
-  element: BehavioralRSAsyncLatchElement;
-  sPin: DigitalInputPinModel;
-  rPin: DigitalInputPinModel;
-  qPin: DigitalOutputPinModel;
-  qBarPin: DigitalOutputPinModel;
-} {
-  const sPin = makeInputPin(1);
-  const rPin = makeInputPin(2);
-  const qPin = makeOutputPin(3);
-  const qBarPin = makeOutputPin(4);
-
-  const element = new BehavioralRSAsyncLatchElement(
-    sPin, rPin, qPin, qBarPin,
-    VIH, CMOS33.vIL,
-  );
-  return { element, sPin, rPin, qPin, qBarPin };
-}
 
 /**
  * Build a voltages array for MNA nodes 1-5 (1-based).
@@ -197,46 +174,6 @@ function v5(n1: number, n2: number, n3: number, n4: number): Float64Array {
   return arr;
 }
 
-/**
- * Simulate a rising clock edge on a JK element.
- * Calls updateCompanion with clock-low voltages then clock-high voltages.
- * Returns the Q output voltage after the edge.
- */
-function applyJKRisingEdge(
-  element: BehavioralJKFlipflopElement,
-  j: number,
-  k: number,
-): number {
-  const solver = makeSolver(5);
-  solver.beginAssembly();
-  element.stamp(solver);
-  element.stampNonlinear(solver);
-
-  // First call: clock low (no edge yet)
-  element.updateCompanion(1e-9, 'bdf1', v6(j, V_LOW, k, V_LOW, V_LOW));
-  // Second call: clock rises (rising edge detected)
-  element.updateCompanion(1e-9, 'bdf1', v6(j, V_HIGH, k, V_LOW, V_LOW));
-
-  solver.beginAssembly();
-  element.stamp(solver);
-  element.stampNonlinear(solver);
-
-  // The qPin is at nodeId=4, so read currentVoltage directly
-  return element.pinNodeIds[3] === 4
-    ? (element as unknown as { _qPin: DigitalOutputPinModel })._qPin?.currentVoltage ?? V_LOW
-    : V_LOW;
-}
-
-/**
- * Get Q voltage by stampNonlinear inspection after update.
- */
-function getQVoltage(qPin: DigitalOutputPinModel, element: { stamp: (s: SparseSolver) => void; stampNonlinear: (s: SparseSolver) => void }, size: number): number {
-  const solver = makeSolver(size);
-  solver.beginAssembly();
-  element.stamp(solver);
-  element.stampNonlinear(solver);
-  return qPin.currentVoltage;
-}
 
 // ---------------------------------------------------------------------------
 // JK tests
@@ -248,7 +185,7 @@ describe("JK", () => {
     const { element, qPin, qBarPin } = buildJK();
     const solver = makeSolver(5);
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -260,7 +197,7 @@ describe("JK", () => {
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_HIGH, V_LOW, V_LOW));
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
@@ -269,7 +206,7 @@ describe("JK", () => {
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_HIGH, V_LOW, V_LOW));
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
@@ -280,14 +217,14 @@ describe("JK", () => {
     const { element, qPin } = buildJK();
     const solver = makeSolver(5);
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_LOW, V_LOW, V_LOW));
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
@@ -299,7 +236,7 @@ describe("JK", () => {
     const { element, qPin } = buildJK();
     const solver = makeSolver(5);
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -307,7 +244,7 @@ describe("JK", () => {
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_LOW, V_LOW, V_LOW));
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
@@ -316,7 +253,7 @@ describe("JK", () => {
     element.updateCompanion(1e-9, 'bdf1', v6(V_LOW, V_LOW, V_HIGH, V_LOW, V_LOW));
     element.updateCompanion(1e-9, 'bdf1', v6(V_LOW, V_HIGH, V_HIGH, V_LOW, V_LOW));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
@@ -333,7 +270,7 @@ describe("RS", () => {
     const { element, qPin } = buildRS();
     const solver = makeSolver(5);
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -341,7 +278,7 @@ describe("RS", () => {
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_LOW, V_LOW, V_LOW));
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
@@ -350,7 +287,7 @@ describe("RS", () => {
     element.updateCompanion(1e-9, 'bdf1', v6(V_LOW, V_LOW, V_HIGH, V_LOW, V_LOW));
     element.updateCompanion(1e-9, 'bdf1', v6(V_LOW, V_HIGH, V_HIGH, V_LOW, V_LOW));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
@@ -362,7 +299,7 @@ describe("RS", () => {
     const { element, qPin } = buildRS();
     const solver = makeSolver(5);
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -370,7 +307,7 @@ describe("RS", () => {
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_LOW, V_LOW, V_LOW));
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     const qBefore = qPin.currentVoltage;
@@ -380,7 +317,7 @@ describe("RS", () => {
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_HIGH, V_LOW, V_LOW));
     element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(qBefore, 5);
@@ -397,7 +334,7 @@ describe("T", () => {
     const { element, qPin } = buildT();
     const solver = makeSolver(4);
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -408,7 +345,7 @@ describe("T", () => {
     element.updateCompanion(1e-9, 'bdf1', v5(V_HIGH, V_LOW, V_LOW, V_LOW));
     element.updateCompanion(1e-9, 'bdf1', v5(V_HIGH, V_HIGH, V_LOW, V_LOW));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
@@ -417,7 +354,7 @@ describe("T", () => {
     element.updateCompanion(1e-9, 'bdf1', v5(V_HIGH, V_LOW, V_LOW, V_LOW));
     element.updateCompanion(1e-9, 'bdf1', v5(V_HIGH, V_HIGH, V_LOW, V_LOW));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
@@ -426,7 +363,7 @@ describe("T", () => {
     element.updateCompanion(1e-9, 'bdf1', v5(V_HIGH, V_LOW, V_LOW, V_LOW));
     element.updateCompanion(1e-9, 'bdf1', v5(V_HIGH, V_HIGH, V_LOW, V_LOW));
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
@@ -462,7 +399,7 @@ describe("RS_FF", () => {
     const { element } = buildRS();
     const solver = makeSolver(5);
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 

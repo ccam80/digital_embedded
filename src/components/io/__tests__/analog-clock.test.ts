@@ -21,11 +21,12 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // Mock solver
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function makeMockSolver() {
   const stamps: Array<{ row: number; col: number; value: number }> = [];
   const rhs: Array<{ row: number; value: number }> = [];
 
-  const solver = {
+  return {
     stamp: vi.fn((row: number, col: number, value: number) => {
       stamps.push({ row, col, value });
     }),
@@ -34,14 +35,7 @@ function makeMockSolver() {
     }),
     _stamps: stamps,
     _rhs: rhs,
-  } as unknown as SparseSolver & {
-    stamp: ReturnType<typeof vi.fn>;
-    stampRHS: ReturnType<typeof vi.fn>;
-    _stamps: typeof stamps;
-    _rhs: typeof rhs;
   };
-
-  return solver;
 }
 
 // ===========================================================================
@@ -60,19 +54,19 @@ describe("AnalogClock", () => {
     const solver = makeMockSolver();
 
     // At t=0: first half-period → vdd
-    clk.stampAtTime(solver, 0);
+    clk.stampAtTime(solver as unknown as SparseSolver, 0);
     expect(solver.stampRHS).toHaveBeenLastCalledWith(branchIdx, vdd);
 
     // At t=0.5ms: second half-period (halfPeriod = 0.5ms) → 0
-    clk.stampAtTime(solver, 0.0005);
+    clk.stampAtTime(solver as unknown as SparseSolver, 0.0005);
     expect(solver.stampRHS).toHaveBeenLastCalledWith(branchIdx, 0);
 
     // At t=1ms: third half-period (back to high) → vdd
-    clk.stampAtTime(solver, 0.001);
+    clk.stampAtTime(solver as unknown as SparseSolver, 0.001);
     expect(solver.stampRHS).toHaveBeenLastCalledWith(branchIdx, vdd);
 
     // At t=1.5ms: fourth half-period → 0
-    clk.stampAtTime(solver, 0.0015);
+    clk.stampAtTime(solver as unknown as SparseSolver, 0.0015);
     expect(solver.stampRHS).toHaveBeenLastCalledWith(branchIdx, 0);
   });
 
@@ -84,16 +78,16 @@ describe("AnalogClock", () => {
     const solver = makeMockSolver();
 
     // Measure transitions: output should be high at t=0, low at t=halfPeriod
-    clk.stampAtTime(solver, 0);
+    clk.stampAtTime(solver as unknown as SparseSolver, 0);
     const firstCall = solver._rhs[solver._rhs.length - 1];
     expect(firstCall.value).toBeCloseTo(3.3, 10);
 
-    clk.stampAtTime(solver, halfPeriod);
+    clk.stampAtTime(solver as unknown as SparseSolver, halfPeriod);
     const secondCall = solver._rhs[solver._rhs.length - 1];
     expect(secondCall.value).toBeCloseTo(0, 10);
 
     // Period = 2 * halfPeriod = 1ms; verify at t=period it's high again
-    clk.stampAtTime(solver, 2 * halfPeriod);
+    clk.stampAtTime(solver as unknown as SparseSolver, 2 * halfPeriod);
     const thirdCall = solver._rhs[solver._rhs.length - 1];
     expect(thirdCall.value).toBeCloseTo(3.3, 10);
   });
@@ -144,7 +138,7 @@ describe("AnalogClock", () => {
 
   it("has both digital and analog models — clock appears in both palettes", () => {
     expect(ClockDefinition.models.digital).toBeDefined();
-    expect(ClockDefinition.modelRegistry.behavioral).toBeDefined();
+    expect(ClockDefinition.modelRegistry?.behavioral).toBeDefined();
   });
 
   it("has digital model — logical clock behavior preserved", () => {
@@ -165,7 +159,7 @@ describe("AnalogClock", () => {
   it("stamp_produces_incidence_entries — voltage source topology", () => {
     const clk = makeAnalogClockElement(1, 0, 1, 1000, 3.3);
     const solver = makeMockSolver();
-    clk.stamp(solver);
+    clk.stamp(solver as unknown as SparseSolver);
     // nodePos=1, nodeNeg=0 (ground), branchIdx=1
     // B[1,1] = stamp(0, 1, 1); C[1,1] = stamp(1, 0, 1)
     // nodeNeg=0 stamps suppressed

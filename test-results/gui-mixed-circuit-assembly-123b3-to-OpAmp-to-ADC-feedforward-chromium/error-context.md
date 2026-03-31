@@ -280,7 +280,9 @@
     - generic "Drag to resize palette" [ref=e372]
     - generic "Circuit editor canvas" [ref=e374]
   - generic [ref=e375]:
-    - generic [ref=e376]: Ready
-    - button "100%" [ref=e378] [cursor=pointer]
-    - generic [ref=e379]: 34, 14
+    - generic [ref=e376]: ⚠️
+    - generic [ref=e377]: "Circuit problem: Voltage source loop detected — two or more voltage sources form a loop with no resistance"
+    - button "×" [ref=e378] [cursor=pointer]
+    - button "100%" [ref=e380] [cursor=pointer]
+    - generic [ref=e381]: 34, 14
 ```

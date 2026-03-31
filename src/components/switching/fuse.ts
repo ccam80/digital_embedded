@@ -236,7 +236,6 @@ export class FuseElement extends AbstractCircuitElement {
     }
     // Droop the break end downward
     const leftEnd = pts[mid - 1];
-    const breakGap = 0.08;
     ctx.drawLine(
       leftEnd.x, leftEnd.y,
       leftEnd.x + 0.02, leftEnd.y + 0.12,

@@ -720,6 +720,8 @@ function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: num
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolverType): void {
       if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
       if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -734,7 +736,7 @@ function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: num
 describe("AnalogLED", () => {
   it("definition_has_engine_type_both", () => {
     expect(LedDefinition.models.digital).toBeDefined();
-    expect(LedDefinition.modelRegistry.behavioral).toBeDefined();
+    expect(LedDefinition.modelRegistry?.behavioral).toBeDefined();
   });
 
   it("digital_behavior_unchanged", () => {

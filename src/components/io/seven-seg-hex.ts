@@ -34,7 +34,6 @@ import { createSevenSegAnalogElement } from "../../solver/analog/behavioral-rema
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 4;
-const COMP_HEIGHT = 7;
 
 // ---------------------------------------------------------------------------
 // 7-segment decoder table for hex digits 0–F

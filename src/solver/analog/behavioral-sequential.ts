@@ -426,13 +426,13 @@ export function makeBehavioralCounterAnalogFactory(): AnalogElementFactory {
     const outSpec = pinSpecs?.["out"] ?? FALLBACK_SPEC;
     const ovfSpec = pinSpecs?.["ovf"] ?? FALLBACK_SPEC;
 
-    const enPin = new DigitalInputPinModel(enSpec);
+    const enPin = new DigitalInputPinModel(enSpec, true);
     enPin.init(pinNodes.get("en") ?? 0, 0);
 
-    const clockPin = new DigitalInputPinModel(cSpec);
+    const clockPin = new DigitalInputPinModel(cSpec, true);
     clockPin.init(pinNodes.get("C") ?? 0, 0);
 
-    const clrPin = new DigitalInputPinModel(clrSpec);
+    const clrPin = new DigitalInputPinModel(clrSpec, true);
     clrPin.init(pinNodes.get("clr") ?? 0, 0);
 
     const outBitPins: DigitalOutputPinModel[] = [];
@@ -724,28 +724,28 @@ export function makeBehavioralCounterPresetAnalogFactory(): AnalogElementFactory
     const outSpec = pinSpecs?.["out"] ?? FALLBACK_SPEC;
     const ovfSpec = pinSpecs?.["ovf"] ?? FALLBACK_SPEC;
 
-    const enPin = new DigitalInputPinModel(enSpec);
+    const enPin = new DigitalInputPinModel(enSpec, true);
     enPin.init(pinNodes.get("en") ?? 0, 0);
 
-    const clockPin = new DigitalInputPinModel(cSpec);
+    const clockPin = new DigitalInputPinModel(cSpec, true);
     clockPin.init(pinNodes.get("C") ?? 0, 0);
 
-    const dirPin = new DigitalInputPinModel(dirSpec);
+    const dirPin = new DigitalInputPinModel(dirSpec, true);
     dirPin.init(pinNodes.get("dir") ?? 0, 0);
 
     // All in-bit pins share the single "in" bus node
     const inBitPins: DigitalInputPinModel[] = [];
     const inNodeId = pinNodes.get("in") ?? 0;
     for (let bit = 0; bit < bitWidth; bit++) {
-      const pin = new DigitalInputPinModel(inSpec);
+      const pin = new DigitalInputPinModel(inSpec, true);
       pin.init(inNodeId, 0);
       inBitPins.push(pin);
     }
 
-    const ldPin = new DigitalInputPinModel(ldSpec);
+    const ldPin = new DigitalInputPinModel(ldSpec, true);
     ldPin.init(pinNodes.get("ld") ?? 0, 0);
 
-    const clrPin = new DigitalInputPinModel(clrSpec);
+    const clrPin = new DigitalInputPinModel(clrSpec, true);
     clrPin.init(pinNodes.get("clr") ?? 0, 0);
 
     // All out-bit pins share the single "out" bus node
@@ -806,15 +806,15 @@ export function makeBehavioralRegisterAnalogFactory(): AnalogElementFactory {
     const dataPins: DigitalInputPinModel[] = [];
     const dNodeId = pinNodes.get("D") ?? 0;
     for (let bit = 0; bit < bitWidth; bit++) {
-      const pin = new DigitalInputPinModel(dSpec);
+      const pin = new DigitalInputPinModel(dSpec, true);
       pin.init(dNodeId, 0);
       dataPins.push(pin);
     }
 
-    const clockPin = new DigitalInputPinModel(cSpec);
+    const clockPin = new DigitalInputPinModel(cSpec, true);
     clockPin.init(pinNodes.get("C") ?? 0, 0);
 
-    const enPin = new DigitalInputPinModel(enSpec);
+    const enPin = new DigitalInputPinModel(enSpec, true);
     enPin.init(pinNodes.get("en") ?? 0, 0);
 
     // All output-bit pins share the single "Q" bus node

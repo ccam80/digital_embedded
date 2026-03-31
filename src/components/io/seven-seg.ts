@@ -38,7 +38,6 @@ import { createSevenSegAnalogElement } from "../../solver/analog/behavioral-rema
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 4;
-const COMP_HEIGHT = 7;
 
 // ---------------------------------------------------------------------------
 // Segment polygon data (grid coordinates, matching Java Digital reference)

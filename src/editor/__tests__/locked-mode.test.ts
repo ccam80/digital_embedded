@@ -41,6 +41,7 @@ function makeElement(typeId: string): CircuitElement {
     getAttribute(_name: string): PropertyValue | undefined {
       return undefined;
     },
+    setAttribute(_name: string, _value: PropertyValue): void {},
   };
 }
 

@@ -34,7 +34,8 @@ export type DiagnosticCode =
   | 'unsupported-ctz-component'
   | 'orphaned-pin-loading-override'
   | 'invalid-simulation-model'
-  | 'unresolved-model-ref';
+  | 'unresolved-model-ref'
+  | 'competing-voltage-constraints';
 
 /**
  * A single diagnostic: an error, warning, or informational note about

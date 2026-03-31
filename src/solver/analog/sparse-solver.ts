@@ -50,9 +50,6 @@ export class SparseSolver {
   private _perm: Int32Array = new Int32Array(0);
   private _permInv: Int32Array = new Int32Array(0);
 
-  // -- Elimination tree (parent pointers in AMD-permuted space) --
-  private _etree: Int32Array = new Int32Array(0);
-
   // -- Sparse L (CSC, unit lower triangular) --
   // Row indices are in ORIGINAL AMD-row space (not pivot-position space).
   private _lColPtr: Int32Array = new Int32Array(0);
@@ -386,7 +383,7 @@ export class SparseSolver {
       }
     }
 
-    this._etree = etree;
+    void etree; // _etree removed (unused)
   }
 
   /**
@@ -628,7 +625,7 @@ export class SparseSolver {
       // We store U entries found among tracked nonzeros. The solve requires
       // U rows stored with the diagonal as the LAST entry in each column.
       // Non-diagonal U entries have pinv[i] < k; diagonal has pinv = k.
-      let uStart = unz;
+      void unz; // uStart was unused
       for (let idx = 0; idx < xNzCount; idx++) {
         const i = xNzIdx[idx];
         if (x[i] === 0) continue;

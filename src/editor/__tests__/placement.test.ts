@@ -33,6 +33,7 @@ function makeStubElement(position: Point = { x: 0, y: 0 }): CircuitElement {
     getBoundingBox: (): Rect => ({ x: position.x, y: position.y, width: 4, height: 4 }),
     serialize: (): SerializedElement => ({} as SerializedElement),
     getAttribute: (_name: string): PropertyValue | undefined => undefined,
+    setAttribute: (_name: string, _value: PropertyValue): void => {},
   };
 }
 
@@ -46,6 +47,7 @@ function makeMockDefinition(): ComponentDefinition {
     attributeMap: [],
     category: ComponentCategory.LOGIC,
     helpText: "A mock component for testing",
+    models: {},
   };
 }
 

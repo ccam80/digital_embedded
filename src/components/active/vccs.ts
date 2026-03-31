@@ -46,7 +46,6 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
@@ -131,8 +130,6 @@ class VCCSAnalogElement extends ControlledSourceElement {
   private readonly _nOutP: number;
   private readonly _nOutN: number;
 
-  private _transconductance: number;
-
   constructor(
     nCtrlP: number,
     nCtrlN: number,
@@ -153,11 +150,9 @@ class VCCSAnalogElement extends ControlledSourceElement {
     this._nCtrlN = nCtrlN;
     this._nOutP = nOutP;
     this._nOutN = nOutN;
-    this._transconductance = transconductance;
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "transconductance") this._transconductance = value;
+  setParam(_key: string, _value: number): void {
   }
 
   protected override _bindContext(voltages: Float64Array): void {
@@ -289,6 +284,14 @@ export class VCCSElement extends AbstractCircuitElement {
 
     // out- lead
     drawColoredLead(ctx, signals, vOutN, 6, 1, 5, 1);
+
+    // Pin labels inside body
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.6 });
+    ctx.drawText("ctrl+", 1.2, -1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("ctrl\u2212", 1.2, 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("out+",  4.8, -1, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("out\u2212",  4.8, 1, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }

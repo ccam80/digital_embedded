@@ -115,6 +115,8 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolver): void {
       if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1,  G);
       if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1,  G);
@@ -149,7 +151,7 @@ describe("Integration", () => {
     const matrixSize = 3;
     const branchRow = 2; // absolute 0-based solver row for branch current
 
-    const vs = makeDcVoltageSource(2, 0, branchRow, 10); // 10V: node2(+) to gnd(-)
+    const vs = makeDcVoltageSource(2, 0, branchRow, 10) as unknown as AnalogElement; // 10V: node2(+) to gnd(-)
     const r1 = makeResistor(1, 2, 1000);                  // 1kΩ: node1 ↔ node2
     const r2 = makeResistor(1, 0, 2000);                  // 2kΩ: node1 ↔ ground
 

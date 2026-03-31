@@ -406,7 +406,7 @@ function parseElementLine(line: string): ParsedElement | null {
         name,
         type,
         nodes: [positional[0], positional[1]],
-        value: isNaN(value) ? undefined : value,
+        ...(isNaN(value) ? {} : { value }),
       };
       if (hasParams) element.params = params;
       return element;
@@ -484,7 +484,7 @@ function parseElementLine(line: string): ParsedElement | null {
         name,
         type,
         nodes: [positional[0], positional[1]],
-        value,
+        ...(value !== undefined ? { value } : {}),
       };
       if (hasParams) element.params = params;
       return element;

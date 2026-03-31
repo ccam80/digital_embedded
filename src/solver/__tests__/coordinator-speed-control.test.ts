@@ -13,7 +13,11 @@ import { ComponentRegistry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { Pin } from '../../core/pin.js';
 import type { ComponentDefinition } from '../../core/registry.js';
-import type { SerializedElement } from '../../core/element.js';
+import type { SerializedElement, CircuitElement } from '../../core/element.js';
+import type { PropertyValue } from '../../core/properties.js';
+import type { Rect, RenderContext } from '../../core/renderer-interface.js';
+import type { AnalogElement } from '../analog/element.js';
+import type { SparseSolverStamp } from '../../core/analog-types.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 import { noopExecFn, executePassThrough } from '../../test-fixtures/execute-stubs.js';
 
@@ -23,10 +27,10 @@ function makePropBag(entries: Record<string, string | number | boolean> = {}): P
   return bag;
 }
 
-function makeAnalogElementObj(typeId: string, instanceId: string, pins: Array<{ x: number; y: number; label?: string }>) {
+function makeAnalogElementObj(typeId: string, instanceId: string, pins: Array<{ x: number; y: number; label?: string }>): CircuitElement {
   const resolvedPins: Pin[] = pins.map((p) => ({
     position: { x: p.x, y: p.y }, label: p.label ?? '',
-    direction: PinDirection.BIDIRECTIONAL, isInverted: false, isClock: false, bitWidth: 1,
+    direction: PinDirection.BIDIRECTIONAL, isNegated: false, isClock: false, kind: "signal" as const, bitWidth: 1,
   }));
   const propertyBag = new PropertyBag();
   const serialized: SerializedElement = {
@@ -42,6 +46,7 @@ function makeAnalogElementObj(typeId: string, instanceId: string, pins: Array<{ 
     draw(_ctx: RenderContext) {},
     serialize() { return serialized; },
     getAttribute(_k: string) { return undefined; },
+    setAttribute(_name: string, _value: PropertyValue) {},
   };
 }
 
@@ -49,13 +54,14 @@ function makeResistorAnalogEl(n1: number, n2: number, resistance: number): Analo
   return {
     pinNodeIds: [n1, n2], allNodeIds: [n1, n2], branchIndex: -1,
     isNonlinear: false, isReactive: false,
-    stamp(solver: SparseSolver): void {
+    stamp(solver: SparseSolverStamp): void {
       const g = 1 / resistance;
       if (n1 !== 0) { solver.stamp(n1 - 1, n1 - 1, g); }
       if (n2 !== 0) { solver.stamp(n2 - 1, n2 - 1, g); }
       if (n1 !== 0 && n2 !== 0) { solver.stamp(n1 - 1, n2 - 1, -g); solver.stamp(n2 - 1, n1 - 1, -g); }
     },
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -93,16 +99,17 @@ function makeGroundDef(): ComponentDefinition {
     name: 'Ground', typeId: -1 as unknown as number,
     factory: () => makeAnalogElementObj('Ground', crypto.randomUUID(), [{ x: 0, y: 0, label: 'gnd' }]),
     pinLayout: [{ direction: PinDirection.BIDIRECTIONAL, label: 'gnd', defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false }],
-    propertyDefs: [], attributeMap: [], category: ComponentCategory.ANALOG, helpText: '',
+    propertyDefs: [], attributeMap: [], category: ComponentCategory.PASSIVES, helpText: '',
     pinElectrical: {},
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pinNodes) => ({
-        pinNodeIds: [], allNodeIds: [], branchIndex: -1,
+      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
+        branchIndex: -1 as const,
         isNonlinear: false, isReactive: false,
-        stamp(_s: SparseSolver) {},
+        stamp(_s: SparseSolverStamp) {},
         getPinCurrents(_v: Float64Array) { return [0]; },
+        setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },
     },
   } as unknown as ComponentDefinition;
@@ -116,12 +123,12 @@ function makeResistorDef(): ComponentDefinition {
       { direction: PinDirection.BIDIRECTIONAL, label: 'p1', defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false },
       { direction: PinDirection.BIDIRECTIONAL, label: 'p2', defaultBitWidth: 1, position: { x: 0, y: 4 }, isNegatable: false, isClockCapable: false },
     ],
-    propertyDefs: [], attributeMap: [], category: ComponentCategory.ANALOG, helpText: '',
+    propertyDefs: [], attributeMap: [], category: ComponentCategory.PASSIVES, helpText: '',
     pinElectrical: {},
     defaultModel: 'behavioral',
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (pinNodes) => makeResistorAnalogEl(pinNodes.get('p1') ?? 0, pinNodes.get('p2') ?? 0, 1000), paramDefs: [], params: {} },
+      behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>) => makeResistorAnalogEl(pinNodes.get('p1') ?? 0, pinNodes.get('p2') ?? 0, 1000), paramDefs: [], params: {} },
     },
   } as unknown as ComponentDefinition;
 }

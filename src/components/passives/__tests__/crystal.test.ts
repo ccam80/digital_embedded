@@ -14,7 +14,6 @@ import { describe, it, expect } from "vitest";
 import {
   CrystalDefinition,
   CrystalCircuitElement,
-  AnalogCrystalElement,
   crystalMotionalInductance,
   crystalSeriesResistance,
   createCrystalElement,
@@ -32,6 +31,7 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
@@ -78,23 +78,6 @@ function bvdImpedanceMagnitude(
   const Y_mag2 = Y_re * Y_re + Y_im * Y_im;
 
   return 1 / Math.sqrt(Y_mag2);
-}
-
-// ---------------------------------------------------------------------------
-// Helper to build a crystal element from spec parameters
-// ---------------------------------------------------------------------------
-
-function makeCrystalElement(opts: {
-  freqHz: number;
-  Q: number;
-  Cs: number;
-  C0: number;
-}): AnalogCrystalElement {
-  const { freqHz, Q, Cs, C0 } = opts;
-  const Ls = crystalMotionalInductance(freqHz, Cs);
-  const Rs = crystalSeriesResistance(freqHz, Ls, Q);
-  // pinNodeIds: [nA=1, nB=0(gnd), n1=2, n2=3], branchIndex=3 (solver row 3)
-  return new AnalogCrystalElement([1, 0, 2, 3], 3, Rs, Ls, Cs, C0);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,18 +223,20 @@ describe("Crystal", () => {
       props.setModelParam("motionalCapacitance", Cs);
       props.setModelParam("shuntCapacitance", C0);
 
-      const crystal = createCrystalElement(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props);
-      const vs = makeDcVoltageSource(1, 0, 4, 1.0);
+      const crystal = createCrystalElement(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props) as unknown as AnalogElement;
+      const vs = makeDcVoltageSource(1, 0, 4, 1.0) as unknown as AnalogElement;
 
       // 1GΩ gmin shunts on all non-ground nodes (1,2,3) to prevent floating nodes
       // at DC where all capacitors have geq=0.
       const G_bleed = 1e-9; // 1nS = 1GΩ
-      const gminShunts = {
+      const gminShunts: AnalogElement = {
         pinNodeIds: [1, 2, 3] as readonly number[],
         allNodeIds: [1, 2, 3] as readonly number[],
         branchIndex: -1,
         isNonlinear: false,
         isReactive: false,
+        setParam(_key: string, _value: number): void {},
+        getPinCurrents(_v: Float64Array): number[] { return []; },
         stamp(solver: SparseSolver): void {
           solver.stamp(0, 0, G_bleed); // node1 → solver[0]
           solver.stamp(1, 1, G_bleed); // node2 → solver[1]
@@ -313,7 +298,7 @@ describe("Crystal", () => {
       const N = 10000;
       const sweepRange = 0.01; // ±1%
 
-      for (const [Q, Rs, refBw] of [[Q_high, Rs_high, 'high'], [Q_low, Rs_low, 'low']] as [number, number, string][]) {
+      for (const [_Q, Rs, refBw] of [[Q_high, Rs_high, 'high'], [Q_low, Rs_low, 'low']] as [number, number, string][]) {
         const Z_ref = Rs; // approx Z at series resonance
         const target = Z_ref * Math.SQRT2;
         let f_lower = f_s;

@@ -189,6 +189,7 @@ describe("DigLoader", () => {
             position: { x: 0, y: 1 },
             isNegatable: true,
             isClockCapable: false,
+            kind: "signal" as const,
           },
           { x: 0, y: 1 },
           createInverterConfig([]),

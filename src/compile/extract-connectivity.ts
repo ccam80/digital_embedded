@@ -80,8 +80,6 @@ export function resolveModelAssignments(
     const staticKeys = def.modelRegistry ? Object.keys(def.modelRegistry) : [];
     const runtimeKeys = runtimeModels?.[el.typeId] ? Object.keys(runtimeModels[el.typeId]!) : [];
     const mnaKeys = runtimeKeys.length > 0 ? [...new Set([...staticKeys, ...runtimeKeys])] : staticKeys;
-    const hasAnalogModel = mnaKeys.length > 0;
-
     // Determine the default model key for this component:
     //   1. Explicit defaultModel from definition.
     //   2. "digital" when a digital model exists.
@@ -171,7 +169,7 @@ function resolveDomainFromModelKey(modelKey: string): string {
 export function extractConnectivityGroups(
   elements: readonly CircuitElement[],
   wires: readonly Wire[],
-  registry: ComponentRegistry,
+  _registry: ComponentRegistry,
   modelAssignments: ModelAssignment[],
 ): [ConnectivityGroup[], Diagnostic[]] {
   const diagnostics: Diagnostic[] = [];
@@ -427,13 +425,14 @@ export function extractConnectivityGroups(
       });
     }
 
-    groups.push({
+    const group: import('./types.js').ConnectivityGroup = {
       groupId,
       pins,
       wires: groupWires,
       domains,
-      bitWidth: widthMismatch ? undefined : groupBitWidth,
-    });
+      ...(!widthMismatch && groupBitWidth !== undefined ? { bitWidth: groupBitWidth } : {}),
+    };
+    groups.push(group);
   }
 
   return [groups, diagnostics];

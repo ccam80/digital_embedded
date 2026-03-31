@@ -1,18 +1,11 @@
 /**
  * Tests for noise-mode evaluation and circuit initialization.
- *
- * Ported from the deleted noise-mode.test.ts (Wave 3 cleanup).
- * Tests evaluateSynchronized and initializeCircuit with low-level
- * InitializableEngine setups.
- *
- * Note: shuffleArray is not exported from noise-mode.ts so the
- * shuffleProducesPermutation test is not included here.
  */
 
 import { describe, it, expect } from "vitest";
 import { evaluateSynchronized } from "../noise-mode.js";
 import { initializeCircuit } from "../init-sequence.js";
-import type { EvaluationGroup, InitializableEngine } from "../init-sequence.js";
+import type { InitializableEngine } from "../init-sequence.js";
 import type { ExecuteFunction, ComponentLayout } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------

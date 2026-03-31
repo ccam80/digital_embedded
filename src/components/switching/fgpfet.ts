@@ -85,7 +85,6 @@ export class FGPFETElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     return this.derivePins(FGPFET_PIN_DECLARATIONS, []);
   }
 

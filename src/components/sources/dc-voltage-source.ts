@@ -26,7 +26,7 @@ import {
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------

@@ -49,6 +49,7 @@ function makeStubElement(
     getBoundingBox: (): Rect => ({ x: posX, y: posY, width: 4, height: 4 }),
     serialize: (): SerializedElement => ({} as SerializedElement),
     getAttribute: (_name: string): PropertyValue | undefined => undefined,
+    setAttribute: (_name: string, _value: PropertyValue): void => {},
   };
 }
 
@@ -70,6 +71,7 @@ function makeDefinition(typeId: string = "StubComp"): ComponentDefinition {
         getBoundingBox: (): Rect => ({ x: 0, y: 0, width: 4, height: 4 }),
         serialize: (): SerializedElement => ({} as SerializedElement),
         getAttribute: (_name: string): PropertyValue | undefined => undefined,
+        setAttribute: (_name: string, _value: PropertyValue): void => {},
       };
     },
     pinLayout: [],

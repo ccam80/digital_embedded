@@ -104,6 +104,7 @@ function buildCircuit(
     busResolver: null,
     switchComponentIndices: new Uint32Array(0),
     switchClassification: new Uint8Array(0),
+    shadowNetCount: 0,
   };
 }
 

@@ -233,9 +233,6 @@ export class AnalogTappedTransformerElement implements AnalogElement {
   private _prevI1: number = 0;
   private _prevI2: number = 0;
   private _prevI3: number = 0;
-  private _prevV1: number = 0;
-  private _prevV2: number = 0;
-  private _prevV3: number = 0;
 
   constructor(
     pinNodeIds: number[],
@@ -418,9 +415,7 @@ export class AnalogTappedTransformerElement implements AnalogElement {
     this._prevI1 = i1Now;
     this._prevI2 = i2Now;
     this._prevI3 = i3Now;
-    this._prevV1 = v1Now;
-    this._prevV2 = v2Now;
-    this._prevV3 = v3Now;
+    void v1Now; void v2Now; void v3Now; // _prevV fields removed (unused)
   }
 
   getPinCurrents(voltages: Float64Array): number[] {

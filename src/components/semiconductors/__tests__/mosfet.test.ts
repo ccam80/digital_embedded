@@ -32,16 +32,11 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
 
 // ---------------------------------------------------------------------------
 // Default NMOS parameters (W=1µ, L=1µ, KP=120µA/V², VTO=0.7, LAMBDA=0.02)
@@ -60,9 +55,6 @@ const NMOS_DEFAULTS = {
   W: 1e-6,
   L: 1e-6,
 };
-
-// Default NMOS with W=10µ, L=1µ for integration test
-const NMOS_10U_1U = { ...NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
 
 // ---------------------------------------------------------------------------
 // Mock SparseSolver
@@ -99,6 +91,7 @@ function makeNmosAtVgs_Vds(
   const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
   // pinNodeIds: pinLayout order [G, D, S, B]; B=S for 3-terminal → [2, 1, 3, 3]
   Object.assign(element, { pinNodeIds: [2, 1, 3, 3], allNodeIds: [2, 1, 3, 3] });
+  const elementWithPins = element as unknown as AnalogElement;
 
   // Drive to operating point: vG=vgs+vS, vD=vds+vS, vS=0
   const voltages = new Float64Array(3);
@@ -113,7 +106,7 @@ function makeNmosAtVgs_Vds(
     voltages[1] = vgs;
     voltages[2] = 0;
   }
-  return element;
+  return elementWithPins;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,9 +117,12 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
   const G = 1 / resistance;
   return {
     pinNodeIds: [nodeA, nodeB],
+    allNodeIds: [nodeA, nodeB],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolverType): void {
       if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
       if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -523,10 +519,10 @@ describe("Integration", () => {
     const matrixSize = 5;
 
     // Vdd=5V: node2(+) to ground, branch at row 3
-    const vdd = makeDcVoltageSource(2, 0, 3, 5);
+    const vdd = makeDcVoltageSource(2, 0, 3, 5) as unknown as AnalogElement;
 
     // Vgate=3V: node3(+) to ground, branch at row 4
-    const vgate = makeDcVoltageSource(3, 0, 4, 3);
+    const vgate = makeDcVoltageSource(3, 0, 4, 3) as unknown as AnalogElement;
 
     // Rd=1kΩ: between node2 (Vdd) and node1 (drain)
     const rd = makeResistorElement(2, 1, 1000);

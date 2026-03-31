@@ -11,19 +11,16 @@
 import { describe, it, expect } from "vitest";
 import { createDiacElement, DiacDefinition, DIAC_PARAM_DEFAULTS } from "../diac.js";
 import { createTriacElement, TRIAC_PARAM_DEFAULTS } from "../triac.js";
-import { PropertyBag } from "../../../core/properties.js";
+import { PropertyBag as _PropertyBag } from "../../../core/properties.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
 
 
 // ---------------------------------------------------------------------------
@@ -47,7 +44,7 @@ function makeDiac(overrides: Partial<typeof DIAC_DEFAULTS> = {}): AnalogElement 
   const props = createTestPropertyBag();
   props.replaceModelParams(params);
   // nodeA=1, nodeB=2
-  return createDiacElement(new Map([["A", 1], ["B", 2]]), [], -1, props);
+  return withNodeIds(createDiacElement(new Map([["A", 1], ["B", 2]]), [], -1, props), [1, 2]);
 }
 
 /**

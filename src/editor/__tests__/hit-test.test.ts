@@ -40,6 +40,7 @@ function makeElement(bb: Rect, pins: Pin[] = []): CircuitElement {
     getBoundingBox: () => bb,
     serialize: () => ({} as SerializedElement),
     getAttribute: (_name: string): PropertyValue | undefined => undefined,
+    setAttribute: (_name: string, _value: PropertyValue): void => {},
   };
 }
 

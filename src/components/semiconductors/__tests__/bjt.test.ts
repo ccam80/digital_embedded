@@ -77,7 +77,8 @@ function makeBjtAtOp(
   modelParams?: Record<string, number>,
 ): AnalogElement {
   const propsObj = makeBjtProps(modelParams);
-  const element = createBjtElement(polarity, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
+  const core = createBjtElement(polarity, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
+  const element = withNodeIds(core, [2, 1, 3]);
 
   const voltages = new Float64Array(3);
 
@@ -109,6 +110,8 @@ function makeResistor(nodeA: number, nodeB: number, R: number): AnalogElement {
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolverType): void {
       if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
       if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -554,8 +557,8 @@ describe("Integration", () => {
     const branchRowVbb = 5;
 
     // Sources
-    const vcc = makeDcVoltageSource(4, 0, branchRowVcc, 5); // 5V supply
-    const vbb = makeDcVoltageSource(3, 0, branchRowVbb, 5); // 5V base supply
+    const vcc = makeDcVoltageSource(4, 0, branchRowVcc, 5) as unknown as AnalogElement; // 5V supply
+    const vbb = makeDcVoltageSource(3, 0, branchRowVbb, 5) as unknown as AnalogElement; // 5V base supply
 
     // Resistors
     const rc = makeResistor(4, 1, 1000);     // Rc=1kΩ from Vcc to collector
@@ -622,7 +625,7 @@ describe("Integration", () => {
     const matrixSize = 3; // nodes: 1=collector, 2=Vcc; branch: row 2
     const branchRowVcc = 2;
 
-    const vcc = makeDcVoltageSource(2, 0, branchRowVcc, 5);
+    const vcc = makeDcVoltageSource(2, 0, branchRowVcc, 5) as unknown as AnalogElement;
     const rc = makeResistor(2, 1, 1000);
 
     // BJT: B=gnd, C=node1, E=gnd → base=0=ground, emitter=0=ground

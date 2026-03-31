@@ -15,14 +15,14 @@ import { Circuit, Wire } from "@/core/circuit";
 import { ComponentRegistry } from "@/core/registry";
 import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
-import type { Pin, PinDeclaration } from "@/core/pin";
+import type { PinDeclaration } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
 import type { } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
 import type { PropertyBag as PropertyBagType } from "@/core/properties";
 import { BitsException } from "@/core/errors";
 import type { SolverPartition, ConnectivityGroup, PartitionedComponent, ResolvedGroupPin } from "@/compile/types";
-import { createTestElementFromDecls } from '@/test-fixtures/test-element.js';
+import { createTestElementFromDecls, TestElement } from '@/test-fixtures/test-element.js';
 import { noopExecFn } from '@/test-fixtures/execute-stubs.js';
 
 // ---------------------------------------------------------------------------
@@ -615,6 +615,7 @@ function buildPartition(
         worldPosition: { x: el.position.x + decl.position.x, y: el.position.y + decl.position.y },
         wireVertex: null,
         domain: "digital",
+        kind: "signal" as const,
       });
     }
   }
@@ -640,7 +641,6 @@ function buildPartition(
   const partitionedComponents: PartitionedComponent[] = elements.map((el, i) => {
     const def = registry.get(el.typeId)!;
     const decls = pinDeclarationsList[i]!;
-    const assignments = groupAssignments[i]!;
     const resolvedPins: ResolvedGroupPin[] = decls.map((decl, j) => ({
       elementIndex: i,
       pinIndex: j,
@@ -650,11 +650,13 @@ function buildPartition(
       worldPosition: { x: el.position.x + decl.position.x, y: el.position.y + decl.position.y },
       wireVertex: null,
       domain: "digital",
+      kind: "signal" as const,
     }));
     return {
       element: el,
       definition: def as ComponentDefinition,
       model: def.models!.digital! as import("@/core/registry").DigitalModel,
+      modelKey: "digital",
       resolvedPins,
     };
   });

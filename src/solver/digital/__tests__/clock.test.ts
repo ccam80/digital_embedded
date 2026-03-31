@@ -61,6 +61,7 @@ class StubElement implements CircuitElement {
       properties: {},
     };
   }
+  setAttribute(_key: string, _value: PropertyValue): void {}
 }
 
 // ---------------------------------------------------------------------------
@@ -152,6 +153,7 @@ function buildClockCircuit(
     switchClassification: new Uint8Array(0),
     totalStateSlots: 0,
     signalArraySize: netCount,
+    shadowNetCount: 0,
   };
 }
 

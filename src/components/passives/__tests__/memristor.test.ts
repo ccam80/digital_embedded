@@ -13,13 +13,7 @@ import { describe, it, expect } from "vitest";
 import { MemristorElement, MemristorDefinition, createMemristorElement, MEMRISTOR_DEFAULTS } from "../memristor.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
-
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
+import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Test defaults matching MemristorDefinition
@@ -274,7 +268,7 @@ describe("Memristor", () => {
       const mockSolver = {
         stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
         stampRHS: (r: number, v: number) => rhsStamps.push([r, v]),
-      } as unknown as import("../../../analog/sparse-solver.js").SparseSolver;
+      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
 
       mem.stampNonlinear(mockSolver);
 

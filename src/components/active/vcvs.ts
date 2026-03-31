@@ -44,7 +44,6 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { parseExpression } from "../../solver/analog/expression.js";
 import { differentiate, simplify } from "../../solver/analog/expression-differentiate.js";
@@ -130,8 +129,6 @@ class VCVSAnalogElement extends ControlledSourceElement {
   private readonly _nOutN: number;
   private readonly _k: number; // branch row (absolute 0-based)
 
-  private _gain: number;
-
   constructor(
     nCtrlP: number,
     nCtrlN: number,
@@ -154,13 +151,10 @@ class VCVSAnalogElement extends ControlledSourceElement {
     this._nOutP = nOutP;
     this._nOutN = nOutN;
     this._k = branchIdx;
-    this._gain = gain;
-
     this.branchIndex = branchIdx;
   }
 
-  setParam(key: string, value: number): void {
-    if (key === "gain") this._gain = value;
+  setParam(_key: string, _value: number): void {
   }
 
   /** Stamp the linear B/C incidence for the output voltage source branch. */
@@ -284,6 +278,14 @@ export class VCVSElement extends AbstractCircuitElement {
 
     // out- lead
     drawColoredLead(ctx, signals, vOutN, 5, 2, 6, 2);
+
+    // Pin labels inside body
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.6 });
+    ctx.drawText("ctrl+", 1.2, 0, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("ctrl\u2212", 1.2, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("out+",  4.8, 0, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("out\u2212",  4.8, 2, { horizontal: "right", vertical: "middle" });
 
     ctx.restore();
   }

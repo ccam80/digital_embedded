@@ -46,60 +46,6 @@ export const { paramDefs: POTENTIOMETER_PARAM_DEFS, defaults: POTENTIOMETER_DEFA
 // Inline geometry helpers (Falstad coordinate system)
 // ---------------------------------------------------------------------------
 
-const PX = 1 / 16;
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-function distance(a: Point, b: Point): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
-}
-
-function calcLeads(
-  p1: Point,
-  p2: Point,
-  bodyLen: number,
-): { lead1: Point; lead2: Point } {
-  const dn = distance(p1, p2);
-  const f = (1 - bodyLen / dn) / 2;
-  return {
-    lead1: { x: p1.x + (p2.x - p1.x) * f, y: p1.y + (p2.y - p1.y) * f },
-    lead2: { x: p1.x + (p2.x - p1.x) * (1 - f), y: p1.y + (p2.y - p1.y) * (1 - f) },
-  };
-}
-
-function interpPoint(p1: Point, p2: Point, f: number): Point {
-  return { x: p1.x + (p2.x - p1.x) * f, y: p1.y + (p2.y - p1.y) * f };
-}
-
-function interpPointSingle(p1: Point, p2: Point, f: number, g: number): Point {
-  const dn = distance(p1, p2);
-  const dx = (p2.x - p1.x) / dn;
-  const dy = (p2.y - p1.y) / dn;
-  return {
-    x: p1.x + (p2.x - p1.x) * f + dy * g,
-    y: p1.y + (p2.y - p1.y) * f - dx * g,
-  };
-}
-
-function interpPoint2(
-  p1: Point,
-  p2: Point,
-  f: number,
-  g: number,
-): [Point, Point] {
-  const dn = distance(p1, p2);
-  const dx = (p2.x - p1.x) / dn;
-  const dy = (p2.y - p1.y) / dn;
-  const bx = p1.x + (p2.x - p1.x) * f;
-  const by = p1.y + (p2.y - p1.y) * f;
-  return [
-    { x: bx + dy * g, y: by - dx * g },
-    { x: bx - dy * g, y: by + dx * g },
-  ];
-}
 
 // ---------------------------------------------------------------------------
 // Pin layout

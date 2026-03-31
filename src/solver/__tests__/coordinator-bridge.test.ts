@@ -20,6 +20,46 @@ const CMOS: ResolvedPinElectrical = {
   vOH: 3.3, vOL: 0.0, vIH: 2.0, vIL: 0.8, rHiZ: 1e9,
 };
 
+// Adapter node and branch assignments used throughout
+const NODE_ID = 1;
+const BRANCH_IDX = 2;
+
+// ---------------------------------------------------------------------------
+// MockSolver — records stamp/stampRHS calls for behavioral assertions
+// ---------------------------------------------------------------------------
+
+interface StampCall { row: number; col: number; value: number }
+interface RhsCall   { row: number; value: number }
+
+class MockSolver {
+  readonly stamps: StampCall[] = [];
+  readonly rhs: RhsCall[] = [];
+
+  stamp(row: number, col: number, value: number): void {
+    this.stamps.push({ row, col, value });
+  }
+
+  stampRHS(row: number, value: number): void {
+    this.rhs.push({ row, value });
+  }
+
+  reset(): void {
+    this.stamps.length = 0;
+    this.rhs.length = 0;
+  }
+
+  sumStamp(row: number, col: number): number {
+    return this.stamps
+      .filter((s) => s.row === row && s.col === col)
+      .reduce((acc, s) => acc + s.value, 0);
+  }
+
+  lastRhs(row: number): number | undefined {
+    const hits = this.rhs.filter((r) => r.row === row);
+    return hits.length > 0 ? hits[hits.length - 1]!.value : undefined;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Minimal mock engines
 // ---------------------------------------------------------------------------
@@ -100,7 +140,7 @@ function buildBridgeFixture(
   const ANALOG_NODE_ID = 1;
   const BIT_WIDTH = 1;
 
-  const outputAdapter = makeBridgeOutputAdapter(CMOS, ANALOG_NODE_ID, 1, false);
+  const outputAdapter = makeBridgeOutputAdapter(CMOS, ANALOG_NODE_ID, BRANCH_IDX, false);
   const inputAdapter = makeBridgeInputAdapter(CMOS, ANALOG_NODE_ID, false);
 
   const adapters: Array<BridgeOutputAdapter | BridgeInputAdapter> =
@@ -221,9 +261,12 @@ class TestableCoordinator extends DefaultSimulationCoordinator {
 // ---------------------------------------------------------------------------
 
 describe('bridge adapter: digital output drives analog node', () => {
-  it('outputAdapter.setLogicLevel(true) does not throw', () => {
+  it('outputAdapter.setLogicLevel(true) drives vOH on the branch RHS', () => {
     const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    expect(() => outputAdapter.setLogicLevel(true)).not.toThrow();
+    const solver = new MockSolver();
+    outputAdapter.setLogicLevel(true);
+    outputAdapter.stamp(solver as any);
+    expect(solver.lastRhs(BRANCH_IDX)).toBeCloseTo(CMOS.vOH, 10);
   });
 
   it('outputAdapter rOut matches CMOS spec (drive impedance for vOH)', () => {
@@ -233,15 +276,15 @@ describe('bridge adapter: digital output drives analog node', () => {
 
   it('outputAdapter outputNodeId matches analog node ID assigned at construction', () => {
     const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    expect(outputAdapter.outputNodeId).toBe(1);
+    expect(outputAdapter.outputNodeId).toBe(NODE_ID);
   });
 
-  it('outputAdapter is found in bridgeAdaptersByGroupId via "setLogicLevel" discriminant', () => {
-    const { unified } = buildBridgeFixture('digital-to-analog');
+  it('outputAdapter in bridgeAdaptersByGroupId is the exact same instance', () => {
+    const { unified, outputAdapter } = buildBridgeFixture('digital-to-analog');
     const compiledAnalog = unified.analog as ConcreteCompiledAnalogCircuit;
     const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(42)!;
     const found = adapters.find((a): a is BridgeOutputAdapter => 'setLogicLevel' in a);
-    expect(found).toBeDefined();
+    expect(found).toBe(outputAdapter);
   });
 });
 
@@ -266,12 +309,12 @@ describe('bridge adapter: analog voltage thresholds to digital via inputAdapter'
     expect(inputAdapter.readLogicLevel(midVoltage)).toBeUndefined();
   });
 
-  it('inputAdapter is found in bridgeAdaptersByGroupId via "readLogicLevel" discriminant', () => {
-    const { unified } = buildBridgeFixture('analog-to-digital');
+  it('inputAdapter in bridgeAdaptersByGroupId is the exact same instance', () => {
+    const { unified, inputAdapter } = buildBridgeFixture('analog-to-digital');
     const compiledAnalog = unified.analog as ConcreteCompiledAnalogCircuit;
     const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(42)!;
     const found = adapters.find((a): a is BridgeInputAdapter => 'readLogicLevel' in a);
-    expect(found).toBeDefined();
+    expect(found).toBe(inputAdapter);
   });
 });
 
@@ -294,19 +337,22 @@ describe('bridge adapter: setParam updates electrical parameters', () => {
     expect(inputAdapter.rIn).toBe(5e6);
   });
 
-  it('setParam is available on both output and input adapters', () => {
+  it('setParam("vOH") on outputAdapter changes the branch RHS when stamped high', () => {
     const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    const { inputAdapter } = buildBridgeFixture('analog-to-digital');
-    expect(typeof outputAdapter.setParam).toBe('function');
-    expect(typeof inputAdapter.setParam).toBe('function');
+    const solver = new MockSolver();
+    outputAdapter.setLogicLevel(true);
+    outputAdapter.setParam('vOH', 5.0);
+    outputAdapter.stamp(solver as any);
+    expect(solver.lastRhs(BRANCH_IDX)).toBeCloseTo(5.0, 10);
   });
 
-  it('coordinator constructor resolves adapters from bridgeAdaptersByGroupId without throwing', () => {
-    const { unified } = buildBridgeFixture('digital-to-analog');
-    expect(() => {
-      const coordinator = new TestableCoordinator(unified);
-      coordinator.dispose();
-    }).not.toThrow();
+  it('coordinator constructor resolves bridge adapters from bridgeAdaptersByGroupId', () => {
+    const { unified, outputAdapter } = buildBridgeFixture('digital-to-analog');
+    const coordinator = new TestableCoordinator(unified);
+    const compiledAnalog = coordinator.compiled.analog as ConcreteCompiledAnalogCircuit;
+    const adapters = compiledAnalog.bridgeAdaptersByGroupId.get(42)!;
+    expect(adapters).toContain(outputAdapter);
+    coordinator.dispose();
   });
 });
 
@@ -315,20 +361,36 @@ describe('bridge adapter: setParam updates electrical parameters', () => {
 // ---------------------------------------------------------------------------
 
 describe('bridge adapter: hi-z output stops driving analog node', () => {
-  it('setHighZ(true) does not throw', () => {
-    const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    expect(() => outputAdapter.setHighZ(true)).not.toThrow();
-  });
-
-  it('setHighZ(true) then setLogicLevel(false) does not throw', () => {
+  it('setHighZ(true) switches branch equation to I=0 mode', () => {
     const { outputAdapter } = buildBridgeFixture('digital-to-analog');
     outputAdapter.setHighZ(true);
-    expect(() => outputAdapter.setLogicLevel(false)).not.toThrow();
+    const solver = new MockSolver();
+    outputAdapter.stamp(solver as any);
+    // Hi-Z mode: branch RHS must be 0
+    expect(solver.lastRhs(BRANCH_IDX)).toBe(0);
+    // Hi-Z mode: stamp(branchIdx, branchIdx, 1)
+    expect(solver.stamps.some(s => s.row === BRANCH_IDX && s.col === BRANCH_IDX && s.value === 1)).toBe(true);
   });
 
-  it('setHighZ is available on outputAdapter', () => {
+  it('setHighZ(true) then setLogicLevel(false) keeps branch RHS at 0 while hi-z', () => {
     const { outputAdapter } = buildBridgeFixture('digital-to-analog');
-    expect(typeof outputAdapter.setHighZ).toBe('function');
+    outputAdapter.setHighZ(true);
+    outputAdapter.setLogicLevel(false);
+    const solver = new MockSolver();
+    outputAdapter.stamp(solver as any);
+    // Hi-Z overrides logic level — branch RHS stays 0
+    expect(solver.lastRhs(BRANCH_IDX)).toBe(0);
+  });
+
+  it('setHighZ(false) after setHighZ(true) restores driven mode', () => {
+    const { outputAdapter } = buildBridgeFixture('digital-to-analog');
+    outputAdapter.setHighZ(true);
+    outputAdapter.setHighZ(false);
+    outputAdapter.setLogicLevel(false);
+    const solver = new MockSolver();
+    outputAdapter.stamp(solver as any);
+    // Drive mode restored: branch RHS must be vOL
+    expect(solver.lastRhs(BRANCH_IDX)).toBeCloseTo(CMOS.vOL, 10);
   });
 
   it('after setHighZ(true), rOut is unchanged (hi-z uses rHiZ from spec internally)', () => {

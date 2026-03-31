@@ -98,7 +98,7 @@ export class DipSwitchElement extends AbstractCircuitElement {
     const bitCount = this._properties.getOrDefault<number>("bitCount", 1);
     const defaultValue = this._properties.getOrDefault<number>("defaultValue", 0);
     const label = this._visibleLabel();
-    const w = componentWidth(bitCount);
+    componentWidth(bitCount);
 
     // Java DipSwitchShape: body is LEFT of pin at (0,0).
     // Outer rect: (-0.05, 0.5) → (-w-0.05, 0.5) → (-w-0.05, -0.5) → (-0.05, -0.5)

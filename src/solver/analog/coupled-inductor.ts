@@ -232,8 +232,8 @@ export class CoupledInductorPair {
    * @param state  - State object to mutate in place
    */
   updateState(
-    dt: number,
-    method: IntegrationMethod,
+    _dt: number,
+    _method: IntegrationMethod,
     i1: number,
     i2: number,
     v1: number,

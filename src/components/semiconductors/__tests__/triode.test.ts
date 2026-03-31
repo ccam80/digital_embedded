@@ -10,13 +10,12 @@
  *   - NR convergence at a typical operating point
  */
 
-import { describe, it, expect, vi } from "vitest";
-import { createTriodeElement, TriodeDefinition, TriodeCircuitElement, TRIODE_PARAM_DEFAULTS } from "../triode.js";
+import { describe, it, expect } from "vitest";
+import { createTriodeElement, TriodeDefinition, TRIODE_PARAM_DEFAULTS } from "../triode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Default 12AX7 parameters
@@ -340,9 +339,10 @@ describe("Triode", () => {
       const props = makeProps();
       const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, props);
       Object.assign(elem, { pinNodeIds: [1, 2, 0], allNodeIds: [1, 2, 0] });
+      const elemWithPins = elem as typeof elem & { pinNodeIds: number[] };
       expect(elem.isNonlinear).toBe(true);
       expect(elem.isReactive).toBe(false);
-      expect(elem.pinNodeIds).toEqual([1, 2, 0]);
+      expect(elemWithPins.pinNodeIds).toEqual([1, 2, 0]);
     });
   });
 });

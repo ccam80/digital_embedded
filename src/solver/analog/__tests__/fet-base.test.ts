@@ -92,20 +92,9 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
         solver.stamp(nodeB - 1, nodeA - 1, -G);
       }
     },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
   };
-}
-
-// ---------------------------------------------------------------------------
-// Helper: drive element to operating point
-// ---------------------------------------------------------------------------
-
-function driveToOperatingPoint(
-  element: AnalogElement,
-  voltages: Float64Array,
-): void {
-  for (let i = 0; i < 50; i++) {
-    element.updateOperatingPoint!(voltages);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -130,8 +119,8 @@ describe("Refactor", () => {
       propsObj,
     ), [3, 0, 1]); // pinLayout order: [G, S, D]
 
-    const vddSource = makeDcVoltageSource(2, 0, 3, 5.0);  // Vdd=5V, branch index 3
-    const vgateSource = makeDcVoltageSource(3, 0, 4, 3.0); // Vgate=3V, branch index 4
+    const vddSource = withNodeIds(makeDcVoltageSource(2, 0, 3, 5.0), [2, 0]);
+    const vgateSource = withNodeIds(makeDcVoltageSource(3, 0, 4, 3.0), [3, 0]);
     const rdElement = makeResistorElement(2, 1, 1000);     // Rd between Vdd and drain
 
     const elements: AnalogElement[] = [vddSource, vgateSource, rdElement, nmosElement];
@@ -181,8 +170,8 @@ describe("Refactor", () => {
     ), [3, 1, 2]); // pinLayout order: [G, D, S] for PMOS
 
     const rdElement = makeResistorElement(1, 0, 1000); // Rd from drain to GND
-    const vssSource = makeDcVoltageSource(2, 0, 3, 5.0); // Vss=5V, branch index 3
-    const vgateSource = makeDcVoltageSource(3, 0, 4, 2.0); // Vg=2V, branch index 4
+    const vssSource = withNodeIds(makeDcVoltageSource(2, 0, 3, 5.0), [2, 0]);
+    const vgateSource = withNodeIds(makeDcVoltageSource(3, 0, 4, 2.0), [3, 0]);
 
     const elements: AnalogElement[] = [vssSource, vgateSource, rdElement, pmosElement];
 

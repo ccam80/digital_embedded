@@ -72,7 +72,7 @@ function makeComparator(
     -1,
     makeProps(overrides),
     () => 0,
-  );
+  ) as unknown as AnalogElement;
 }
 
 function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float64Array {
@@ -82,19 +82,6 @@ function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float
     if (n > 0 && n <= size) v[n - 1] = voltage;
   }
   return v;
-}
-
-/**
- * Read the effective output conductance from a stamp call on the output node.
- * Returns the sum of all conductance values stamped at [nOut-1, nOut-1].
- */
-function readOutputConductance(element: AnalogElement, nOut: number): number {
-  const solver = makeMockSolver();
-  element.stamp(solver);
-  const calls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls as number[][];
-  return calls
-    .filter((c) => c[0] === nOut - 1 && c[1] === nOut - 1)
-    .reduce((sum, c) => sum + c[2], 0);
 }
 
 /**

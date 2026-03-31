@@ -13,14 +13,11 @@ import { compileUnified } from '../../compile/compile.js';
 import { DefaultSimulatorFacade } from '../../headless/default-facade.js';
 import { createDefaultRegistry } from '../../components/register-all.js';
 import { Circuit } from '../../core/circuit.js';
-import { PropertyBag } from '../../core/properties.js';
 import { PinDirection } from '../../core/pin.js';
 import { ComponentRegistry } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
-import type { Pin } from '../../core/pin.js';
-import type { ComponentDefinition, AnalogFactory } from '../../core/registry.js';
-import type { AnalogElement } from '../analog/element.js';
-import type { SparseSolver } from '../analog/sparse-solver.js';
+import type { ComponentDefinition } from '../../core/registry.js';
+import type { SparseSolverStamp } from '../../core/analog-types.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 
 function makeAnalogElementObj(
@@ -49,40 +46,20 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
     }],
     propertyDefs: [],
     attributeMap: [],
-    category: ComponentCategory.PASSIVE,
+    category: ComponentCategory.PASSIVES,
     helpText: '',
     pinElectrical: {},
     models: {},
     modelRegistry: {
-      behavioral: { kind: 'inline' as const, factory: (_pinNodes) => ({
-        pinNodeIds: [], allNodeIds: [], branchIndex: -1,
+      behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
+        branchIndex: -1 as const,
         isNonlinear: false, isReactive: false,
-        stamp(_s: SparseSolver) {},
+        stamp(_s: SparseSolverStamp) {},
         getPinCurrents(_v: Float64Array) { return [0]; },
+        setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },
     },
   } as unknown as ComponentDefinition;
-
-  const resistorFactory: AnalogFactory = (
-    _el: unknown, pinNodes: number[], _props: unknown,
-  ) => {
-    const nodeA = pinNodes[0] ?? 0;
-    const nodeB = pinNodes[1] ?? 0;
-    const g = 1 / 1000;
-    return {
-      pinNodeIds: [nodeA, nodeB],
-      allNodeIds: [nodeA, nodeB],
-      branchIndex: -1,
-      isNonlinear: false,
-      isReactive: false,
-      stamp(s: SparseSolver) {
-        if (nodeA > 0) s.addG(nodeA, nodeA, g);
-        if (nodeB > 0) s.addG(nodeB, nodeB, g);
-        if (nodeA > 0 && nodeB > 0) { s.addG(nodeA, nodeB, -g); s.addG(nodeB, nodeA, -g); }
-      },
-      getPinCurrents(_v: Float64Array) { return [0, 0]; },
-    } as AnalogElement;
-  };
 
   const resistorDef: ComponentDefinition = {
     name: 'Resistor',
@@ -96,10 +73,28 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
     ],
     propertyDefs: [],
     attributeMap: [],
-    category: ComponentCategory.PASSIVE,
+    category: ComponentCategory.PASSIVES,
     helpText: '',
     pinElectrical: {},
-    models: { analog: { analogFactory: resistorFactory as AnalogFactory } },
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: 'inline' as const, factory: (pinNodes: ReadonlyMap<string, number>) => {
+        const nodeA = pinNodes.get('p1') ?? 0;
+        const nodeB = pinNodes.get('p2') ?? 0;
+        const g = 1 / 1000;
+        return {
+          branchIndex: -1 as const,
+          isNonlinear: false, isReactive: false,
+          stamp(s: SparseSolverStamp) {
+            if (nodeA > 0) s.stamp(nodeA - 1, nodeA - 1, g);
+            if (nodeB > 0) s.stamp(nodeB - 1, nodeB - 1, g);
+            if (nodeA > 0 && nodeB > 0) { s.stamp(nodeA - 1, nodeB - 1, -g); s.stamp(nodeB - 1, nodeA - 1, -g); }
+          },
+          getPinCurrents(_v: Float64Array) { return [0, 0]; },
+          setParam(_key: string, _value: number) {},
+        };
+      }, paramDefs: [], params: {} },
+    },
   } as unknown as ComponentDefinition;
 
   registry.register(groundDef);

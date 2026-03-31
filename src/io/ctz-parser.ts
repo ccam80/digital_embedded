@@ -69,7 +69,7 @@ async function decompressRawDeflate(compressed: Uint8Array): Promise<string> {
     ds = new DecompressionStream("deflate");
   }
 
-  const stream = new Blob([compressed]).stream().pipeThrough(ds);
+  const stream = new Blob([compressed as BlobPart]).stream().pipeThrough(ds);
   const reader = stream.getReader();
 
   const chunks: Uint8Array[] = [];

@@ -39,12 +39,7 @@ import { createRelayDTAnalogElement } from "../../solver/analog/behavioral-remai
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 4;
-const POLE_HEIGHT = 3;
-const COIL_HEIGHT = 2;
 
-function componentHeight(poles: number): number {
-  return Math.max(poles * POLE_HEIGHT, COIL_HEIGHT) + COIL_HEIGHT;
-}
 
 // ---------------------------------------------------------------------------
 // Pin layout helper

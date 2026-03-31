@@ -194,6 +194,7 @@ describe("AnalogEngineTypes", () => {
       },
       addMeasurementObserver(_observer: MeasurementObserver): void {},
       removeMeasurementObserver(_observer: MeasurementObserver): void {},
+      getElementPinCurrents(_elementId: number): number[] { return []; },
     };
 
     // Assignment to Engine base must be valid

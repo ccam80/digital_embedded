@@ -35,7 +35,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { DigitalOutputPinModel } from "../../solver/analog/digital-pin-model.js";
@@ -204,6 +204,26 @@ export class Timer555Element extends AbstractCircuitElement {
 
     // GND lead (south): pin tip (6,10) → body edge (6,9)
     drawColoredLead(ctx, signals, vGnd, 6, 10, 6, 9);
+
+    // Pin labels inside IC body
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.65 });
+    // West-side pins: label just inside left body edge
+    ctx.drawText("DIS",  1.2, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("TRIG", 1.2, 6, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("THR",  1.2, 8, { horizontal: "left", vertical: "middle" });
+    // East-side pins: label just inside right body edge
+    ctx.drawText("RST",  6.8, 2, { horizontal: "right", vertical: "middle" });
+    ctx.drawText("OUT",  6.8, 4, { horizontal: "right", vertical: "middle" });
+    // Top pin: label just below body top edge
+    ctx.drawText("VCC",  4, -0.5, { horizontal: "center", vertical: "top" });
+    // Bottom pins: label just above body bottom edge
+    ctx.drawText("CTRL", 4, 8.5, { horizontal: "center", vertical: "bottom" });
+    ctx.drawText("GND",  6, 8.5, { horizontal: "center", vertical: "bottom" });
+
+    // Component name centered
+    ctx.setFont({ family: "sans-serif", size: 0.8 });
+    ctx.drawText("555", 4, 4, { horizontal: "center", vertical: "middle" });
 
     ctx.restore();
   }

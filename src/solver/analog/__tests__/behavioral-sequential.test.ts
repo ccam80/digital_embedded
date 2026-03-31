@@ -15,7 +15,6 @@ import {
   BehavioralCounterElement,
   BehavioralRegisterElement,
   makeBehavioralCounterAnalogFactory,
-  makeBehavioralRegisterAnalogFactory,
 } from "../behavioral-sequential.js";
 import { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import { SparseSolver } from "../sparse-solver.js";
@@ -72,11 +71,11 @@ function buildCounter(bitWidth = 4): {
   solver: SparseSolver;
   makeVoltages: (en: number, clock: number, clr: number) => Float64Array;
 } {
-  const enPin = new DigitalInputPinModel(CMOS33);
+  const enPin = new DigitalInputPinModel(CMOS33, true);
   enPin.init(1, 0);
-  const clockPin = new DigitalInputPinModel(CMOS33);
+  const clockPin = new DigitalInputPinModel(CMOS33, true);
   clockPin.init(2, 0);
-  const clrPin = new DigitalInputPinModel(CMOS33);
+  const clrPin = new DigitalInputPinModel(CMOS33, true);
   clrPin.init(3, 0);
 
   const outBitPins: DigitalOutputPinModel[] = [];
@@ -102,7 +101,7 @@ function buildCounter(bitWidth = 4): {
 
   // Max MNA node = 4 + bitWidth (ovf pin). Solver size = max node ID.
   const solverSize = 4 + bitWidth; // nodes 1=en, 2=clock, 3=clr, 4..3+bitWidth=bits, 4+bitWidth=ovf
-  const solver = new SparseSolver(solverSize, 0);
+  const solver = new SparseSolver();
 
   const makeVoltages = (en: number, clock: number, clr: number): Float64Array => {
     // MNA node IDs are 1-based; readMnaVoltage(nodeId, v) reads v[nodeId-1]
@@ -135,15 +134,15 @@ function buildRegister(bitWidth = 8): {
 } {
   const dataPins: DigitalInputPinModel[] = [];
   for (let bit = 0; bit < bitWidth; bit++) {
-    const pin = new DigitalInputPinModel(CMOS33);
+    const pin = new DigitalInputPinModel(CMOS33, true);
     pin.init(1 + bit, 0);
     dataPins.push(pin);
   }
 
-  const clockPin = new DigitalInputPinModel(CMOS33);
+  const clockPin = new DigitalInputPinModel(CMOS33, true);
   clockPin.init(1 + bitWidth, 0);
 
-  const enPin = new DigitalInputPinModel(CMOS33);
+  const enPin = new DigitalInputPinModel(CMOS33, true);
   enPin.init(1 + bitWidth + 1, 0);
 
   const outBitPins: DigitalOutputPinModel[] = [];
@@ -165,7 +164,7 @@ function buildRegister(bitWidth = 8): {
 
   // Max MNA node = 1 + bitWidth + 2 + bitWidth - 1 = 2*bitWidth + 2 (last Q bit)
   const solverSize = 2 * bitWidth + 2;
-  const solver = new SparseSolver(solverSize, 0);
+  const solver = new SparseSolver();
 
   const makeVoltages = (data: number, en: number, clock: number): Float64Array => {
     // MNA node IDs are 1-based; readMnaVoltage(nodeId, v) reads v[nodeId-1]
@@ -206,7 +205,7 @@ describe("Counter", () => {
   it("counts_on_clock_edges", () => {
     const { element, solver, makeVoltages } = buildCounter(4);
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -219,7 +218,7 @@ describe("Counter", () => {
     expect(element.count).toBe(5);
 
     // Verify via stampNonlinear output levels
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -258,8 +257,8 @@ describe("Counter", () => {
       [], -1, props, () => 0,
     ) as BehavioralCounterElement;
 
-    const solver = new SparseSolver(nodeCount, 0);
-    solver.beginAssembly();
+    const solver = new SparseSolver();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -276,7 +275,7 @@ describe("Counter", () => {
       element.updateCompanion(1e-9, 'bdf1', makeV(V_HIGH, V_HIGH, V_LOW));
     }
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -311,7 +310,7 @@ describe("Register", () => {
   it("latches_all_bits", () => {
     const { element, solver, makeVoltages, outBitPins } = buildRegister(8);
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -325,7 +324,7 @@ describe("Register", () => {
     // Stored value should now be 0xA5
     expect(element.storedValue).toBe(0xA5);
 
-    solver.beginAssembly();
+    solver.beginAssembly(32);
     element.stamp(solver);
     element.stampNonlinear(solver);
 
@@ -421,11 +420,11 @@ describe("Registration", () => {
       new Map([["en", 1], ["C", 2], ["clr", 3], ["out", 4], ["ovf", 5]]),
       [], -1, props, () => 0,
     );
-    Object.assign(element, { pinNodeIds: [1, 2, 3, 4, 5], allNodeIds: [1, 2, 3, 4, 5] });
-    expect(element.isNonlinear).toBe(true);
-    expect(element.isReactive).toBe(true);
-    expect(element.branchIndex).toBe(-1);
-    expect(element.pinNodeIds.length).toBe(5);
+    const el1 = Object.assign(element, { pinNodeIds: [1, 2, 3, 4, 5], allNodeIds: [1, 2, 3, 4, 5] });
+    expect(el1.isNonlinear).toBe(true);
+    expect(el1.isReactive).toBe(true);
+    expect(el1.branchIndex).toBe(-1);
+    expect(el1.pinNodeIds.length).toBe(5);
   });
 
   it("register_analog_factory_returns_analog_element", () => {
@@ -440,10 +439,10 @@ describe("Registration", () => {
       new Map([["D", 1], ["C", 2], ["en", 3], ["Q", 4]]),
       [], -1, props, () => 0,
     );
-    Object.assign(element, { pinNodeIds: [1, 2, 3, 4], allNodeIds: [1, 2, 3, 4] });
-    expect(element.isNonlinear).toBe(true);
-    expect(element.isReactive).toBe(true);
-    expect(element.branchIndex).toBe(-1);
-    expect(element.pinNodeIds.length).toBe(4);
+    const el2 = Object.assign(element, { pinNodeIds: [1, 2, 3, 4], allNodeIds: [1, 2, 3, 4] });
+    expect(el2.isNonlinear).toBe(true);
+    expect(el2.isReactive).toBe(true);
+    expect(el2.branchIndex).toBe(-1);
+    expect(el2.pinNodeIds.length).toBe(4);
   });
 });

@@ -16,7 +16,6 @@ import {
   rotateSelection,
   mirrorSelection,
   copyToClipboard,
-  pasteFromClipboard,
 } from '../editor/edit-operations.js';
 import type { Wire } from '../core/circuit.js';
 import { snapToGrid } from '../editor/coordinates.js';

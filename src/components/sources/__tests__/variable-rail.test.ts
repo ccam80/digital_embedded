@@ -34,6 +34,8 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     isNonlinear: false,
     isReactive: false,
     setSourceScale: () => {},
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolver): void {
       if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
       if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -83,7 +85,7 @@ describe("VariableRail", () => {
     // No load — add a large bleed resistor to ground to ensure solvability (1MΩ)
     const bleed = makeResistorElement(nodeOut, 0, 1e6);
 
-    const solution = solveCircuit([rail, bleed], 2, 1);
+    const solution = solveCircuit([rail as unknown as AnalogElement, bleed], 2, 1);
     // solution[0] = node1 (internal), solution[1] = node2 (output), solution[2] = branch current
     const vOut = solution[nodeOut - 1]; // node2 = index 1
     expect(vOut).toBeCloseTo(12, 1); // ± 0.01V
@@ -98,11 +100,11 @@ describe("VariableRail", () => {
     const rail = makeVariableRailElement(nodeOut, nodeNeg, nodeInt, branchIdx, 5, 0.01);
     const bleed = makeResistorElement(nodeOut, 0, 1e6);
 
-    const sol1 = solveCircuit([rail, bleed], 2, 1);
+    const sol1 = solveCircuit([rail as unknown as AnalogElement, bleed], 2, 1);
     expect(sol1[nodeOut - 1]).toBeCloseTo(5, 1);
 
     rail.setVoltage(10);
-    const sol2 = solveCircuit([rail, bleed], 2, 1);
+    const sol2 = solveCircuit([rail as unknown as AnalogElement, bleed], 2, 1);
     expect(sol2[nodeOut - 1]).toBeCloseTo(10, 1);
   });
 
@@ -116,7 +118,7 @@ describe("VariableRail", () => {
     const rail = makeVariableRailElement(nodeOut, nodeNeg, nodeInt, branchIdx, 12, 0.1);
     const load = makeResistorElement(nodeOut, 0, 1.0);
 
-    const solution = solveCircuit([rail, load], 2, 1);
+    const solution = solveCircuit([rail as unknown as AnalogElement, load], 2, 1);
     const vOut = solution[nodeOut - 1];
     const expected = 12 * 1.0 / (1.0 + 0.1);
     expect(vOut).toBeCloseTo(expected, 3);

@@ -177,7 +177,7 @@ export function showHelpDialog(content: HelpContent): HelpDialog {
 
   const helpSection = el("section", { class: "help-text" });
   helpSection.appendChild(el("h3", {}, "Notes"));
-  helpSection.appendChild(el("p", {}, content.helpText));
+  helpSection.appendChild(el("p", {}, content.description));
 
   dialog.append(closeBtn, title, descSection, pinsSection, propsSection, helpSection);
   backdrop.appendChild(dialog);

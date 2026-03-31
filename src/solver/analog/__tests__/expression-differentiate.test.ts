@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { parseExpression } from "../expression.js";
 import { differentiate, simplify } from "../expression-differentiate.js";
 import { evaluate } from "../expression-evaluate.js";
-import { numNode, varNode, binOp, callNode } from "../expression.js";
+import { numNode, varNode, binOp } from "../expression.js";
 
 // ---------------------------------------------------------------------------
 // Helper: parse an expression, differentiate w.r.t. variable, evaluate result

@@ -23,7 +23,7 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import type { ComponentLayout } from "../../../core/registry.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
-import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import type { SparseSolverStamp } from "../../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -365,12 +365,9 @@ describe("Probe", () => {
       const props = new PropertyBag();
       const stampCalls: string[] = [];
 
-      const mockSolver: SparseSolver = {
-        stamp: () => stampCalls.push("stamp"),
-        stampRHS: () => stampCalls.push("stampRHS"),
-        beginAssembly: () => {},
-        finalize: () => {},
-        solve: () => new Float64Array([]),
+      const mockSolver: SparseSolverStamp = {
+        stamp: () => { stampCalls.push("stamp"); },
+        stampRHS: () => { stampCalls.push("stampRHS"); },
       };
 
       const analogElement = getFactory(ProbeDefinition.modelRegistry!.behavioral!)(
@@ -434,8 +431,9 @@ describe("Probe", () => {
         () => 0,
       );
       Object.assign(analogElement, { pinNodeIds: [5], allNodeIds: [5] });
+      const elWithPins = analogElement as typeof analogElement & { pinNodeIds: number[] };
 
-      expect(analogElement.pinNodeIds).toEqual([5]);
+      expect(elWithPins.pinNodeIds).toEqual([5]);
       expect(analogElement.branchIndex).toBe(-1);
       expect(analogElement.isNonlinear).toBe(false);
       expect(analogElement.isReactive).toBe(false);

@@ -22,12 +22,11 @@ import type { PropertyDefinition } from "@/core/properties";
 let _idCounter = 0;
 
 function makeElementWithPins(
-  helpText: string,
+  _helpText: string,
   pins: Pin[],
 ): InstanceType<typeof AbstractCircuitElement> {
   const id = `el-${++_idCounter}`;
   const capturedPins = pins;
-  const capturedHelp = helpText;
 
   return new (class extends AbstractCircuitElement {
     constructor() {

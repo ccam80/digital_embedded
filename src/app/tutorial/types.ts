@@ -407,7 +407,7 @@ export type TutorialIframeMessage =
   | { type: 'sim-test-result'; passed: number; failed: number; total: number;
       details: Array<{ passed: boolean; inputs: Record<string, number>;
                        expected: Record<string, number>; actual: Record<string, number> }> }
-  | { type: 'sim-circuit-data'; data: string; format: 'dig-xml-base64' }
+  | { type: 'sim-circuit-data'; data: string; format: 'dig-xml-base64' | 'dts-json-base64' }
   | { type: 'sim-error'; error: string };
 
 // ---------------------------------------------------------------------------

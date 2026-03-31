@@ -151,9 +151,9 @@ function solve(
 function make2InputGate(
   truthTable: (inputs: boolean[]) => boolean,
 ): BehavioralGateElement {
-  const inA = new DigitalInputPinModel(CMOS_3V3);
+  const inA = new DigitalInputPinModel(CMOS_3V3, true);
   inA.init(1, -1); // MNA node 1 = circuit node 1
-  const inB = new DigitalInputPinModel(CMOS_3V3);
+  const inB = new DigitalInputPinModel(CMOS_3V3, true);
   inB.init(2, -1); // MNA node 2 = circuit node 2
   const out = new DigitalOutputPinModel(CMOS_3V3);
   out.init(3, -1); // MNA node 3 = circuit node 3
@@ -163,7 +163,7 @@ function make2InputGate(
 function make1InputGate(
   truthTable: (inputs: boolean[]) => boolean,
 ): BehavioralGateElement {
-  const inp = new DigitalInputPinModel(CMOS_3V3);
+  const inp = new DigitalInputPinModel(CMOS_3V3, true);
   inp.init(1, -1); // MNA node 1 = circuit node 1
   const out = new DigitalOutputPinModel(CMOS_3V3);
   out.init(2, -1); // MNA node 2 = circuit node 2
@@ -368,7 +368,7 @@ describe("Loading", () => {
     //   branch row 3 = VS branch
     // matrixSize = 4 (3 node rows + 1 branch row)
 
-    const inA = new DigitalInputPinModel(CMOS_3V3);
+    const inA = new DigitalInputPinModel(CMOS_3V3, true);
     inA.init(1, -1); // MNA node 1
     const out = new DigitalOutputPinModel(CMOS_3V3);
     out.init(2, -1); // MNA node 2
@@ -445,9 +445,9 @@ describe("Factory", () => {
     ) as unknown as BehavioralGateElement;
 
     // Build a circuit, drive both inputs HIGH, expect LOW output
-    const inA = new DigitalInputPinModel(CMOS_3V3);
+    const inA = new DigitalInputPinModel(CMOS_3V3, true);
     inA.init(1, -1);
-    const inB = new DigitalInputPinModel(CMOS_3V3);
+    const inB = new DigitalInputPinModel(CMOS_3V3, true);
     inB.init(2, -1);
     const outPin = new DigitalOutputPinModel(CMOS_3V3);
     outPin.init(3, -1);

@@ -16,7 +16,6 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
-  layoutPinsOnFace,
 } from "../../core/pin.js";
 import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -32,11 +31,6 @@ import { makeBehavioralDecoderAnalogFactory } from "../../solver/analog/behavior
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 4;
-
-function componentHeight(outputCount: number): number {
-  return Math.max(outputCount * 2, 4);
-}
 
 // ---------------------------------------------------------------------------
 // Pin layout

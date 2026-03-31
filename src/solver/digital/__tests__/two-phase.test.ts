@@ -17,7 +17,7 @@ import { BitVector } from "@/core/signal";
 import { ComponentRegistry } from "@/core/registry";
 import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
 import { ComponentCategory } from "@/core/registry";
-import type { Pin, PinDeclaration } from "@/core/pin";
+import type { PinDeclaration } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
 import type { } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";

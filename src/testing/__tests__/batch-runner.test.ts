@@ -13,7 +13,7 @@ import { runBatchTests } from '../batch-runner.js';
 import type { BatchTestResults } from '../batch-runner.js';
 import type { SimulatorFacade } from '../../headless/facade.js';
 import type { Circuit } from '../../core/circuit.js';
-import type { SimulationEngine } from '../../core/engine-interface.js';
+import type { SimulationCoordinator } from '../../solver/coordinator-types.js';
 import type { TestResults } from '../../headless/types.js';
 
 // ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ function makeBatchFacade(options: {
   let lastContent = '';
 
   const facade: Partial<SimulatorFacade> = {
-    loadDig(content: string): Circuit {
+    loadDigXml(content: string): Circuit {
       if (loadErrors.has(content)) {
         throw new Error(`XML parse error: invalid content for ${content}`);
       }
@@ -71,14 +71,14 @@ function makeBatchFacade(options: {
       return {} as Circuit;
     },
 
-    compile(_circuit: Circuit): SimulationEngine {
+    compile(_circuit: Circuit): SimulationCoordinator {
       if (compileErrors.has(lastContent)) {
         throw new Error(`Compile error for: ${lastContent}`);
       }
-      return {} as SimulationEngine;
+      return {} as SimulationCoordinator;
     },
 
-    runTests(_engine: SimulationEngine, _circuit: Circuit, testData?: string): TestResults {
+    runTests(_engine: SimulationCoordinator, _circuit: Circuit, testData?: string): TestResults {
       if (capturedTestData !== undefined) {
         capturedTestData.value = testData;
       }

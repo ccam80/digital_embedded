@@ -1,211 +1,402 @@
-<?xml version="1.0" encoding="utf-8"?>
-<circuit>
-  <version>2</version>
-  <attributes>
-    <entry>
-      <string>romContent</string>
-      <romList>
-        <roms/>
-      </romList>
-    </entry>
-  </attributes>
-  <visualElements>
-    <visualElement>
-      <elementName>Clock</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>CLK</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="120"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Counter</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>CNT</string>
-        </entry>
-      </elementAttributes>
-      <pos x="160" y="120"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Const</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>THR</string>
-        </entry>
-        <entry>
-          <string>Bits</string>
-          <int>4</int>
-        </entry>
-        <entry>
-          <string>Value</string>
-          <int>8</int>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="240"/>
-    </visualElement>
-    <visualElement>
-      <elementName>MagnitudeComparator</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>CMP</string>
-        </entry>
-        <entry>
-          <string>Bits</string>
-          <int>4</int>
-        </entry>
-      </elementAttributes>
-      <pos x="280" y="160"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Const</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>EN</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="60"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Resistor</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>R1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="440" y="160"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Capacitor</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>C1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="560" y="160"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Ground</elementName>
-      <elementAttributes>
-      </elementAttributes>
-      <pos x="600" y="280"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Probe</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>P1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="640" y="160"/>
-    </visualElement>
-  </visualElements>
-  <wires>
-    <wire>
-      <p1 x="40" y="60"/>
-      <p2 x="60" y="60"/>
-    </wire>
-    <wire>
-      <p1 x="40" y="60"/>
-      <p2 x="40" y="80"/>
-    </wire>
-    <wire>
-      <p1 x="40" y="80"/>
-      <p2 x="140" y="80"/>
-    </wire>
-    <wire>
-      <p1 x="140" y="80"/>
-      <p2 x="140" y="120"/>
-    </wire>
-    <wire>
-      <p1 x="140" y="120"/>
-      <p2 x="160" y="120"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="120"/>
-      <p2 x="80" y="120"/>
-    </wire>
-    <wire>
-      <p1 x="80" y="120"/>
-      <p2 x="80" y="140"/>
-    </wire>
-    <wire>
-      <p1 x="80" y="140"/>
-      <p2 x="160" y="140"/>
-    </wire>
-    <wire>
-      <p1 x="220" y="120"/>
-      <p2 x="260" y="120"/>
-    </wire>
-    <wire>
-      <p1 x="260" y="120"/>
-      <p2 x="260" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="260" y="160"/>
-      <p2 x="280" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="40" y="240"/>
-      <p2 x="60" y="240"/>
-    </wire>
-    <wire>
-      <p1 x="40" y="180"/>
-      <p2 x="40" y="240"/>
-    </wire>
-    <wire>
-      <p1 x="40" y="180"/>
-      <p2 x="280" y="180"/>
-    </wire>
-    <wire>
-      <p1 x="340" y="200"/>
-      <p2 x="420" y="200"/>
-    </wire>
-    <wire>
-      <p1 x="420" y="160"/>
-      <p2 x="420" y="200"/>
-    </wire>
-    <wire>
-      <p1 x="420" y="160"/>
-      <p2 x="440" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="520" y="160"/>
-      <p2 x="560" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="640" y="160"/>
-      <p2 x="640" y="280"/>
-    </wire>
-    <wire>
-      <p1 x="640" y="280"/>
-      <p2 x="600" y="280"/>
-    </wire>
-    <wire>
-      <p1 x="520" y="140"/>
-      <p2 x="520" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="520" y="140"/>
-      <p2 x="620" y="140"/>
-    </wire>
-    <wire>
-      <p1 x="620" y="140"/>
-      <p2 x="620" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="620" y="160"/>
-      <p2 x="640" y="160"/>
-    </wire>
-  </wires>
-  <measurementOrdering/>
-</circuit>
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "26e0e1aa-5568-414f-bb16-a5fecc701dfa",
+        "position": {
+          "x": 3,
+          "y": 6
+        },
+        "properties": {
+          "label": "CLK"
+        },
+        "rotation": 0,
+        "type": "Clock"
+      },
+      {
+        "id": "e309f243-e68e-4e0d-a91e-fbcd2f972c5b",
+        "position": {
+          "x": 8,
+          "y": 6
+        },
+        "properties": {
+          "label": "CNT"
+        },
+        "rotation": 0,
+        "type": "Counter"
+      },
+      {
+        "id": "238522ed-1a29-49cb-9e91-906eaa0b9eeb",
+        "position": {
+          "x": 3,
+          "y": 12
+        },
+        "properties": {
+          "bitWidth": 4,
+          "label": "THR",
+          "value": 8
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "15e93a1c-21c1-455a-8e6b-2847430e888a",
+        "position": {
+          "x": 14,
+          "y": 8
+        },
+        "properties": {
+          "bitWidth": 4,
+          "label": "CMP"
+        },
+        "rotation": 0,
+        "type": "MagnitudeComparator"
+      },
+      {
+        "id": "dec92d77-80dd-4bf6-a59c-1ec9d05d991d",
+        "position": {
+          "x": 3,
+          "y": 3
+        },
+        "properties": {
+          "label": "EN"
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "cdd16e76-5126-46e4-9205-29a9ae9649d5",
+        "position": {
+          "x": 26,
+          "y": 8
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "R1"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "4e400faf-5d0a-4981-a268-349d68436f64",
+        "position": {
+          "x": 32,
+          "y": 8
+        },
+        "properties": {
+          "_modelParams": {
+            "capacitance": 0.000001
+          },
+          "label": "C1"
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "e95e3450-5bad-490a-9e9f-f5ba0b4e4efa",
+        "position": {
+          "x": 36,
+          "y": 14
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "f9ab0e9f-779b-4d14-a45a-a7260829c597",
+        "position": {
+          "x": 38,
+          "y": 8
+        },
+        "properties": {
+          "label": "P1"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      }
+    ],
+    "name": "Untitled",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": 3
+          },
+          {
+            "x": 3,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": 3
+          },
+          {
+            "x": 2,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": 4
+          },
+          {
+            "x": 7,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 7,
+            "y": 4
+          },
+          {
+            "x": 7,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 7,
+            "y": 6
+          },
+          {
+            "x": 8,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 6
+          },
+          {
+            "x": 4,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 6
+          },
+          {
+            "x": 4,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 7
+          },
+          {
+            "x": 8,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 6
+          },
+          {
+            "x": 13,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 13,
+            "y": 6
+          },
+          {
+            "x": 13,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 13,
+            "y": 8
+          },
+          {
+            "x": 14,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": 12
+          },
+          {
+            "x": 3,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": 9
+          },
+          {
+            "x": 2,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 2,
+            "y": 9
+          },
+          {
+            "x": 14,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 10
+          },
+          {
+            "x": 25,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 25,
+            "y": 8
+          },
+          {
+            "x": 25,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 25,
+            "y": 8
+          },
+          {
+            "x": 26,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 8
+          },
+          {
+            "x": 32,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 8
+          },
+          {
+            "x": 36,
+            "y": 14
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 7
+          },
+          {
+            "x": 30,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 7
+          },
+          {
+            "x": 37,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 37,
+            "y": 7
+          },
+          {
+            "x": 37,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 37,
+            "y": 8
+          },
+          {
+            "x": 38,
+            "y": 8
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

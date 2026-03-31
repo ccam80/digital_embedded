@@ -35,7 +35,6 @@ import type { FETLayout } from "./nfet.js";
 
 // Java TransGateShape: p1(SIZE,−SIZE)=(1,−1), p2(SIZE,SIZE)=(1,1), out1(0,0), out2(SIZE*2,0)=(2,0)
 const COMP_WIDTH = 2;
-const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin declarations
@@ -96,7 +95,6 @@ export class TransGateElement extends AbstractCircuitElement {
   }
 
   getPins(): readonly Pin[] {
-    const bitWidth = this._properties.getOrDefault<number>("bitWidth", 1);
     return this.derivePins(TRANS_GATE_PIN_DECLARATIONS, []);
   }
 

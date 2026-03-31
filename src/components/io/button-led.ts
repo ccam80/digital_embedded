@@ -28,8 +28,6 @@ import { createButtonLEDAnalogElement } from "../../solver/analog/behavioral-rem
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 2;
-const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin layout

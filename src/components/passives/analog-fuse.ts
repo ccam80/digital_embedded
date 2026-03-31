@@ -102,8 +102,6 @@ export class AnalogFuseElement implements AnalogElement {
   private _blown: boolean = false;
   private _blownDiagEmitted: boolean = false;
 
-  private _currentVoltage: number = 0;
-
   private readonly _emitDiagnostic: (diag: SolverDiagnostic) => void;
   private readonly _onStateChange: ((blown: boolean, thermalRatio: number) => void) | null;
 
@@ -156,11 +154,7 @@ export class AnalogFuseElement implements AnalogElement {
   }
 
   updateOperatingPoint(voltages: Float64Array): void {
-    const nPos = this.pinNodeIds[0];
-    const nNeg = this.pinNodeIds[1];
-    const vPos = nPos > 0 ? voltages[nPos - 1] : 0;
-    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
-    this._currentVoltage = vPos - vNeg;
+    void voltages;
   }
 
   updateState(dt: number, voltages: Float64Array): void {

@@ -60,7 +60,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -235,11 +235,6 @@ export class RealOpAmpElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const PX = 1 / 16;
-
-    const vInp  = signals?.getPinVoltage("in+");
-    const vInn  = signals?.getPinVoltage("in-");
-    const vOut  = signals?.getPinVoltage("out");
     const vVccP = signals?.getPinVoltage("Vcc+");
     const vVccN = signals?.getPinVoltage("Vcc-");
 
@@ -264,8 +259,15 @@ export class RealOpAmpElement extends AbstractCircuitElement {
 
     // +/- signs — body decoration, stays COMPONENT color
     ctx.setColor("COMPONENT");
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText('-', 13 / 16, -18 / 16, { horizontal: "center", vertical: "middle" });
     ctx.drawText('+', 13 / 16, 16 / 16, { horizontal: "center", vertical: "middle" });
+
+    // Supply pin labels
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.5 });
+    ctx.drawText("V+", 2.4, -1.0, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("V\u2212", 2.4, 1.0, { horizontal: "left", vertical: "middle" });
 
     ctx.restore();
   }
@@ -381,7 +383,7 @@ export function createRealOpAmpElement(
 
   // Slew rate limiting state (transient only)
   let slewLimited = false;
-  let vOutPrev = 0;      // output voltage at previous accepted timestep
+  let _vOutPrev = 0; void _vOutPrev;      // output voltage at previous accepted timestep
 
   // Source scale for source-stepping DC convergence
   let scale = 1;
@@ -442,7 +444,7 @@ export function createRealOpAmpElement(
       // Record the previous accepted-timestep vInt and output voltage, and set
       // up the companion conductance geq_int = tau/dt for the gain-stage integrator.
       vIntPrev = vInt;
-      vOutPrev = readNode(voltages, nOut);
+      _vOutPrev = readNode(voltages, nOut);
       const tau = Math.max(p.aol, 1) / (2 * Math.PI * Math.max(p.gbw, 1));
       geq_int  = tau / dt;
     },
@@ -605,7 +607,7 @@ export function createRealOpAmpElement(
       }
     },
 
-    getPinCurrents(voltages: Float64Array): number[] {
+    getPinCurrents(_voltages: Float64Array): number[] {
       // pinLayout order: in-, in+, out, Vcc+, Vcc-
       //
       // Input resistance G_in is stamped between nInp and nInn.

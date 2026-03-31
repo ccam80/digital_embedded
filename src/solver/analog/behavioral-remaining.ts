@@ -100,10 +100,10 @@ export function createDriverAnalogElement(
   const selSpec = getPinSpec(props, "sel");
   const outSpec = getPinSpec(props, "out");
 
-  const inputPin = new DigitalInputPinModel(inSpec);
+  const inputPin = new DigitalInputPinModel(inSpec, true);
   inputPin.init(nodeIn, 0);
 
-  const selPin = new DigitalInputPinModel(selSpec);
+  const selPin = new DigitalInputPinModel(selSpec, true);
   selPin.init(nodeSel, 0);
 
   const outputPin = new DigitalOutputPinModel(outSpec);
@@ -200,10 +200,10 @@ export function createDriverInvAnalogElement(
   const selSpec = getPinSpec(props, "sel");
   const outSpec = getPinSpec(props, "out");
 
-  const inputPin = new DigitalInputPinModel(inSpec);
+  const inputPin = new DigitalInputPinModel(inSpec, true);
   inputPin.init(nodeIn, 0);
 
-  const selPin = new DigitalInputPinModel(selSpec);
+  const selPin = new DigitalInputPinModel(selSpec, true);
   selPin.init(nodeSel, 0);
 
   const outputPin = new DigitalOutputPinModel(outSpec);
@@ -316,7 +316,7 @@ export function createSplitterAnalogElement(
   for (let i = 0; i < numIn; i++) {
     const label = allLabels[i] ?? `in${i}`;
     const spec = getPinSpec(props, label);
-    const pin = new DigitalInputPinModel(spec);
+    const pin = new DigitalInputPinModel(spec, true);
     pin.init(allNodeIds[i] ?? 0, 0);
     inputPins.push(pin);
   }

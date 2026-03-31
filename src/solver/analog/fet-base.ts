@@ -16,7 +16,7 @@
  *   Norton current = ids - gm*vgs_op - gds*vds_op
  */
 
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "./element.js";
+import type { AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { SparseSolver } from "./sparse-solver.js";
 import { stampG, stampRHS } from "./stamp-helpers.js";
 import {

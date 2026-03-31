@@ -107,10 +107,10 @@ function buildAndGateCircuit(
   spec: ResolvedPinElectrical = CMOS_3V3,
 ): ConcreteCompiledAnalogCircuit {
   // Input pin models: MNA node IDs 1 and 2 (1-based)
-  const inA = new DigitalInputPinModel(spec);
+  const inA = new DigitalInputPinModel(spec, true);
   inA.init(1, 0);
 
-  const inB = new DigitalInputPinModel(spec);
+  const inB = new DigitalInputPinModel(spec, true);
   inB.init(2, 0);
 
   // Output pin model: MNA node ID 3 (1-based)
@@ -140,7 +140,6 @@ function buildAndGateCircuit(
     matrixSize: 5,
     elements,
     labelToNodeId: new Map([["out", 3]]),
-    wireToNodeId: new Map(),
   };
 }
 
@@ -164,10 +163,10 @@ function buildAndGateCircuit(
  *   matrixSize = 6
  */
 function buildHighImpedanceSourceCircuit(): ConcreteCompiledAnalogCircuit {
-  const inA = new DigitalInputPinModel(CMOS_3V3);
+  const inA = new DigitalInputPinModel(CMOS_3V3, true);
   inA.init(1, 0); // MNA node 1 = circuit node 1
 
-  const inB = new DigitalInputPinModel(CMOS_3V3);
+  const inB = new DigitalInputPinModel(CMOS_3V3, true);
   inB.init(2, 0); // MNA node 2 = circuit node 2
 
   const outPin = new DigitalOutputPinModel(CMOS_3V3);
@@ -200,7 +199,6 @@ function buildHighImpedanceSourceCircuit(): ConcreteCompiledAnalogCircuit {
     matrixSize: 6,
     elements,
     labelToNodeId: new Map(),
-    wireToNodeId: new Map(),
   };
 }
 
@@ -229,11 +227,11 @@ function buildDffToggleCircuit(): {
   qBarPin: DigitalOutputPinModel;
   element: BehavioralDFlipflopElement;
 } {
-  const clockPin = new DigitalInputPinModel(CMOS_3V3);
+  const clockPin = new DigitalInputPinModel(CMOS_3V3, true);
   clockPin.init(1, 0); // MNA node 1 = clock
 
   // D and ~Q share MNA node 4: feedback topology
-  const dPin = new DigitalInputPinModel(CMOS_3V3);
+  const dPin = new DigitalInputPinModel(CMOS_3V3, true);
   dPin.init(4, 0); // MNA node 4 = ~Q = D (toggling feedback)
 
   const qPin = new DigitalOutputPinModel(CMOS_3V3);
@@ -255,7 +253,6 @@ function buildDffToggleCircuit(): {
 
   // Load resistors on Q and ~Q for stable node voltages
   const rLoadQ = makeResistor(3, 0, LOAD_R);    // 10kΩ from ~Q to ground
-  const rLoadQBar = makeResistor(3, 0, LOAD_R); // duplicate for symmetry (reuse node 3)
 
   const elements: AnalogElement[] = [rLoadQ, withNodeIds(element, [1, 4, 3, 4])];
 
@@ -267,7 +264,6 @@ function buildDffToggleCircuit(): {
     matrixSize: 4,
     elements,
     labelToNodeId: new Map([["Q", 3], ["QB", 4]]),
-    wireToNodeId: new Map(),
   };
 
   return { circuit, clockPin, dPin, qPin, qBarPin, element };
@@ -399,10 +395,10 @@ describe("Integration", () => {
     // Input A at 1.5V: between vIL=0.8 and vIH=2.0 → indeterminate.
     // Initial latched level is false, so AND gate output should be LOW.
     // This also verifies that TTL output levels (vOH=3.4V) are different from CMOS.
-    const inA = new DigitalInputPinModel(TTL);
+    const inA = new DigitalInputPinModel(TTL, true);
     inA.init(1, 0);
 
-    const inB = new DigitalInputPinModel(TTL);
+    const inB = new DigitalInputPinModel(TTL, true);
     inB.init(2, 0);
 
     const outPin = new DigitalOutputPinModel(TTL);
@@ -427,7 +423,6 @@ describe("Integration", () => {
       matrixSize: 5,
       elements: [vsA, vsB, rLoad, withNodeIds(andGate, [1, 2, 3])],
       labelToNodeId: new Map(),
-      wireToNodeId: new Map(),
     };
 
     engine.init(circuit);
@@ -564,7 +559,6 @@ describe("Integration", () => {
       matrixSize: 5,
       elements: [vsA, vsB, rLoad, andGate],
       labelToNodeId: new Map(),
-      wireToNodeId: new Map(),
     };
 
     engine.init(circuit);
@@ -605,7 +599,6 @@ describe("Integration", () => {
       matrixSize: 4,
       elements: [rLoadQ, rLoadQBar, dff],
       labelToNodeId: new Map(),
-      wireToNodeId: new Map(),
     };
 
     engine.init(circuit);

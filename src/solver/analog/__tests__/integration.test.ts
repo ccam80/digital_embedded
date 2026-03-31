@@ -19,7 +19,6 @@ import {
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { makeResistor, makeVoltageSource, makeCapacitor, makeInductor } from "./test-helpers.js";
-import { newtonRaphson } from "../newton-raphson.js";
 
 // ---------------------------------------------------------------------------
 // Companion model coefficient tests
@@ -214,12 +213,12 @@ function runRcDecay(
   // RC = 1 ms; steps * dt should reach ~RC
 
   const solver = new SparseSolver();
-  const diagnostics = new DiagnosticCollector();
+  new DiagnosticCollector();
 
   // Circuit: R and C both between node 1 and ground
   const resistor = makeResistor(1, 0, R);
   const capacitor = makeCapacitor(1, 0, C);
-  const elements = [resistor, capacitor];
+  void [resistor, capacitor];
   const matrixSize = 1; // 1 non-ground node
 
   // Initial condition: V(node1) = 5.0V
@@ -308,7 +307,7 @@ function runRlRise(steps: number, dt: number): number {
   // That's fine.
 
   const solver = new SparseSolver();
-  const diagnostics = new DiagnosticCollector();
+  new DiagnosticCollector();
 
   // matrixSize = 2 nodes + 2 branches = 4
   // node 1 = 0-based index 0; node 2 = 0-based index 1
@@ -318,7 +317,7 @@ function runRlRise(steps: number, dt: number): number {
   const vsource = makeVoltageSource(1, 0, 2, Vs); // branch row 2 (absolute)
   const resistor = makeResistor(1, 2, R);
   const inductor = makeInductor(2, 0, 3, L);      // branch row 3 (absolute)
-  const elements = [vsource, resistor, inductor];
+  void [vsource, resistor, inductor];
 
   let voltages = new Float64Array(matrixSize);
 

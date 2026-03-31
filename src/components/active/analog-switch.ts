@@ -32,7 +32,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -371,7 +371,6 @@ export class SwitchSPDTElement extends AbstractCircuitElement {
     const vCom  = signals?.getPinVoltage("com");
     const vNo   = signals?.getPinVoltage("no");
     const vNc   = signals?.getPinVoltage("nc");
-    const vCtrl = signals?.getPinVoltage("ctrl");
 
     ctx.save();
     ctx.setLineWidth(1);

@@ -42,6 +42,7 @@ function makeStubElement(
     bitWidth: 1,
     isNegated: false,
     isClock: false,
+    kind: 'signal' as const,
   }));
 
   return {
@@ -56,6 +57,7 @@ function makeStubElement(
     getBoundingBox: (): Rect => ({ x: posX, y: posY, width: 4, height: 4 }),
     serialize: (): SerializedElement => ({} as SerializedElement),
     getAttribute: (_name: string): PropertyValue | undefined => undefined,
+    setAttribute: (_name: string, _value: PropertyValue): void => {},
   };
 }
 

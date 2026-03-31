@@ -31,6 +31,7 @@ function makeElement(): CircuitElement {
     getBoundingBox: (): Rect => ({ x: 0, y: 0, width: 4, height: 4 }),
     serialize: () => ({} as SerializedElement),
     getAttribute: (_name: string): PropertyValue | undefined => undefined,
+    setAttribute: (_name: string, _value: PropertyValue): void => {},
   };
 }
 

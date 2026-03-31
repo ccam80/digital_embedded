@@ -14,7 +14,6 @@
 import { describe, it, expect } from "vitest";
 import {
   MonteCarloRunner,
-  ParameterVariation,
   MonteCarloConfig,
   SeededRng,
   computeOutputStatistics,
@@ -27,7 +26,7 @@ import {
   type SweepCircuitFactory,
 } from "../parameter-sweep.js";
 import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
-import { makeResistor, makeVoltageSource, makeCapacitor } from "./test-helpers.js";
+import { makeResistor, makeVoltageSource } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Circuit factory helpers
@@ -80,36 +79,6 @@ function buildDividerCircuit(
   });
 }
 
-/**
- * Build a single-resistor circuit: Vs=5V, one resistor to ground.
- * Useful for testing resistance distribution.
- *
- * overrides: { "R1" => { "resistance" => multiplier } }
- */
-function buildSingleResistorCircuit(
-  overrides: Map<string, Map<string, number>>,
-  nominalR: number = 1000,
-  voltage: number = 5,
-): ConcreteCompiledAnalogCircuit {
-  const rMult = overrides.get("R1")?.get("resistance") ?? 1;
-  const r = nominalR * rMult;
-
-  // node1 = top (Vs+), branch index 1 (nodeCount=1, absolute row=1)
-  const vs = makeVoltageSource(1, 0, 1, voltage);
-  const resistor = makeResistor(1, 0, r);
-
-  const labelToNodeId = new Map<string, number>([["top", 1]]);
-
-  return new ConcreteCompiledAnalogCircuit({
-    nodeCount: 1,
-    branchCount: 1,
-    elements: [vs, resistor],
-    labelToNodeId,
-    wireToNodeId: new Map(),
-    models: new Map(),
-    elementToCircuitElement: new Map(),
-  });
-}
 
 /**
  * Build a sweep-compatible voltage-divider factory that uses absolute property
@@ -160,7 +129,7 @@ function buildSweepDividerFactory(nominalR2: number = 1000): SweepCircuitFactory
  * Better: use a pure resistor divider sweep where changing R1 changes Vmid.
  * overrides: { "R" => { "resistance" => absoluteValue } }
  */
-function buildRcSweepFactory(c: number = 1e-9): SweepCircuitFactory {
+function buildRcSweepFactory(_c: number = 1e-9): SweepCircuitFactory {
   return (overrides) => {
     const rAbs = overrides.get("R")?.get("resistance") ?? 1000;
 

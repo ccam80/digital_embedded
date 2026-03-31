@@ -97,8 +97,8 @@ export function partitionByDomain(
   elements: readonly CircuitElement[],
   registry: ComponentRegistry,
   modelAssignments: ModelAssignment[],
-  digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
-  perNetLoadingOverrides?: ReadonlyMap<number, "loaded" | "ideal">,
+  _digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
+  _perNetLoadingOverrides?: ReadonlyMap<number, "loaded" | "ideal">,
 ): PartitionResult {
   // -------------------------------------------------------------------------
   // Step 1: Build lookup from elementIndex → ModelAssignment

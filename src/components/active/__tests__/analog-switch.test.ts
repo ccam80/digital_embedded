@@ -107,30 +107,6 @@ function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float
   return v;
 }
 
-/**
- * Extract the effective conductance stamped between two nodes by reading
- * the off-diagonal stamp entries for nIn and nOut.
- *
- * Returns G = |stamp(nIn-1, nOut-1)| from the mock solver calls.
- */
-function extractStampedConductance(
-  element: AnalogElement,
-  nIn: number,
-  nOut: number,
-  voltages: Float64Array,
-): number {
-  element.updateOperatingPoint!(voltages);
-  const solver = makeMockSolver();
-  element.stampNonlinear!(solver);
-  const calls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls as number[][];
-  // Off-diagonal entry: stamp(nIn-1, nOut-1, -G)
-  const offDiag = calls.find(
-    (c) => c[0] === nIn - 1 && c[1] === nOut - 1,
-  );
-  if (!offDiag) return 0;
-  return -offDiag[2]; // conductance is positive; stamp places -G off-diagonal
-}
-
 // ---------------------------------------------------------------------------
 // SPST tests
 // ---------------------------------------------------------------------------
@@ -225,6 +201,8 @@ describe("SPST", () => {
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,
+      setParam(_key: string, _value: number): void {},
+      getPinCurrents(): number[] { return []; },
       stamp(solver: SparseSolver): void {
         solver.stamp(nOut - 1, nOut - 1, 1 / 1000);
       },
@@ -237,7 +215,7 @@ describe("SPST", () => {
     const diagnostics = new DiagnosticCollector();
     const result = solveDcOperatingPoint({
       solver,
-      elements: [sw, rLoad, vsCtrl, vsIn],
+      elements: [sw, rLoad, vsCtrl as unknown as AnalogElement, vsIn as unknown as AnalogElement],
       matrixSize,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
@@ -265,6 +243,8 @@ describe("SPST", () => {
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,
+      setParam(_key: string, _value: number): void {},
+      getPinCurrents(): number[] { return []; },
       stamp(solver: SparseSolver): void {
         solver.stamp(nOut - 1, nOut - 1, 1 / 1000);
       },
@@ -277,7 +257,7 @@ describe("SPST", () => {
     const diagnostics = new DiagnosticCollector();
     const result = solveDcOperatingPoint({
       solver,
-      elements: [sw, rLoad, vsCtrl, vsIn],
+      elements: [sw, rLoad, vsCtrl as unknown as AnalogElement, vsIn as unknown as AnalogElement],
       matrixSize,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,

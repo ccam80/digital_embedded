@@ -24,13 +24,14 @@ function makeGroup(
   domains: string[],
   bitWidth?: number,
 ): ConnectivityGroup {
-  return {
+  const group: ConnectivityGroup = {
     groupId,
     pins: [],
     wires: [],
     domains: new Set(domains),
-    bitWidth,
   };
+  if (bitWidth !== undefined) group.bitWidth = bitWidth;
+  return group;
 }
 
 // ---------------------------------------------------------------------------

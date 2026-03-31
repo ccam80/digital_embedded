@@ -181,6 +181,8 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(): number[] { return []; },
     stamp(solver: SparseSolverType): void {
       if (nodeA > 0) solver.stamp(nodeA - 1, nodeA - 1, G);
       if (nodeB > 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -711,6 +713,8 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
     branchIndex: brTrig,
     isNonlinear: false,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolverType): void {
       const k = brTrig;
       if (nTrig > 0) {

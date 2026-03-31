@@ -33,7 +33,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { DigitalOutputPinModel, DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
@@ -124,7 +124,7 @@ function createSchmittTriggerElement(
   const inputSpec  = buildInputSpec(p);
 
   const outModel = new DigitalOutputPinModel(outputSpec);
-  const inModel  = new DigitalInputPinModel(inputSpec);
+  const inModel  = new DigitalInputPinModel(inputSpec, true);
 
   // DigitalOutputPinModel.init / DigitalInputPinModel.init expect 1-based MNA node IDs
   if (nOut > 0) outModel.init(nOut, -1);

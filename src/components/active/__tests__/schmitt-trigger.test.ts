@@ -82,7 +82,7 @@ function makeSchmittInverting(
     -1,
     makeProps(overrides),
     () => 0,
-  );
+  ) as unknown as AnalogElement;
 }
 
 function makeSchmittNonInverting(
@@ -96,7 +96,7 @@ function makeSchmittNonInverting(
     -1,
     makeProps(overrides),
     () => 0,
-  );
+  ) as unknown as AnalogElement;
 }
 
 function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float64Array {

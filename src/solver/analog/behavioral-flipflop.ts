@@ -337,10 +337,10 @@ export function makeDFlipflopAnalogFactory(): AnalogElementFactory {
     const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
     const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-    const dPin = new DigitalInputPinModel(dSpec);
+    const dPin = new DigitalInputPinModel(dSpec, true);
     dPin.init(pinNodes.get("D") ?? 0, 0);
 
-    const clockPin = new DigitalInputPinModel(cSpec);
+    const clockPin = new DigitalInputPinModel(cSpec, true);
     clockPin.init(pinNodes.get("C") ?? 0, 0);
 
     const qPin = new DigitalOutputPinModel(qSpec);

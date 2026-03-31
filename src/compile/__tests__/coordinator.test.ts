@@ -133,6 +133,7 @@ function makeResistorAnalogEl(n1: number, n2: number, resistance: number): Analo
       }
     },
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
+    setParam(_key: string, _value: number): void {},
   };
 }
 

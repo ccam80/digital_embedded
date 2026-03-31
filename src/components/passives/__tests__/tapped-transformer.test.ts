@@ -99,8 +99,6 @@ describe("TappedTransformer", () => {
     const nodeCount = 4;
     const bVsrc = nodeCount + 0;
     const bTx1 = nodeCount + 1;
-    const bTx2 = nodeCount + 2;
-    const bTx3 = nodeCount + 3;
     const matrixSize = nodeCount + 4;
 
     // pinNodeIds: [p1, p2, s1, ct, s2]
@@ -188,8 +186,6 @@ describe("TappedTransformer", () => {
     const nodeCount = 4;
     const bVsrc = nodeCount + 0;
     const bTx1 = nodeCount + 1;
-    const bTx2 = nodeCount + 2;
-    const bTx3 = nodeCount + 3;
     const matrixSize = nodeCount + 4;
 
     const tx = makeTappedTransformer({
@@ -275,8 +271,6 @@ describe("TappedTransformer", () => {
     const nodeCount = 5;
     const bVsrc = nodeCount + 0;
     const bTx1 = nodeCount + 1;
-    const bTx2 = nodeCount + 2;
-    const bTx3 = nodeCount + 3;
     const matrixSize = nodeCount + 4;
 
     const tx = makeTappedTransformer({
@@ -307,7 +301,7 @@ describe("TappedTransformer", () => {
       const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
       tx.stampCompanion(dt, "trapezoidal", voltages);
-      cFilter.stampCompanion(dt, "trapezoidal", voltages);
+      cFilter.stampCompanion?.(dt, "trapezoidal", voltages);
 
       // NR loop for diodes (up to 50 iterations per timestep)
       for (let nr = 0; nr < 50; nr++) {

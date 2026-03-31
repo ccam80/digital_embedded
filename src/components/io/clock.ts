@@ -21,7 +21,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { squareWaveBreakpoints } from "../sources/ac-voltage-source.js";
 
@@ -29,8 +29,7 @@ import { squareWaveBreakpoints } from "../sources/ac-voltage-source.js";
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 2;
-const COMP_HEIGHT = 2;
+// COMP_WIDTH and COMP_HEIGHT removed (unused)
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -232,7 +231,7 @@ function clockFactory(props: PropertyBag): ClockElement {
 // Analog clock element factory
 // ---------------------------------------------------------------------------
 
-export interface AnalogClockElement extends AnalogElement {
+export interface AnalogClockElement extends AnalogElementCore {
   /** Returns edge breakpoints within [tStart, tEnd] for the timestep controller. */
   getBreakpoints(tStart: number, tEnd: number): number[];
 }
@@ -242,16 +241,16 @@ function createAnalogClockElement(
   nodeNeg: number,
   branchIdx: number,
   frequency: number,
-  vdd: number,
+  _vdd: number,
   addBreakpoint?: (t: number) => void,
 ): AnalogClockElement {
-  const period = 1 / frequency;
-  const halfPeriod = period / 2;
+  void (1 / frequency); // period unused
 
   const element: AnalogClockElement = {
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
+    setParam(_key: string, _value: number): void {},
 
     setSourceScale(_factor: number): void {
       // Square wave, no source stepping needed.

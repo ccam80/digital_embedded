@@ -23,7 +23,7 @@
  *   updateState     — integrates thermal ODE if selfHeating enabled
  */
 
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
@@ -424,7 +424,7 @@ const NTC_PROPERTY_DEFS: PropertyDefinition[] = [
   },
   {
     key: "selfHeating",
-    type: PropertyType.BOOL,
+    type: PropertyType.BOOLEAN,
     label: "Self-Heating",
     defaultValue: false,
     description: "Enable thermal self-heating model",

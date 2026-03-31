@@ -1,221 +1,403 @@
-<?xml version="1.0" encoding="utf-8"?>
-<circuit>
-  <version>2</version>
-  <attributes>
-    <entry>
-      <string>romContent</string>
-      <romList>
-        <roms/>
-      </romList>
-    </entry>
-  </attributes>
-  <visualElements>
-    <visualElement>
-      <elementName>In</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>D0</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="80"/>
-    </visualElement>
-    <visualElement>
-      <elementName>In</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>D1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="140"/>
-    </visualElement>
-    <visualElement>
-      <elementName>In</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>D2</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="200"/>
-    </visualElement>
-    <visualElement>
-      <elementName>In</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>D3</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="260"/>
-    </visualElement>
-    <visualElement>
-      <elementName>DAC</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>DAC1</string>
-        </entry>
-        <entry>
-          <string>Bits</string>
-          <int>4</int>
-        </entry>
-      </elementAttributes>
-      <pos x="240" y="160"/>
-    </visualElement>
-    <visualElement>
-      <elementName>DcVoltageSource</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>Vref</string>
-        </entry>
-      </elementAttributes>
-      <pos x="160" y="60"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Ground</elementName>
-      <elementAttributes>
-      </elementAttributes>
-      <pos x="160" y="360"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Ground</elementName>
-      <elementAttributes>
-      </elementAttributes>
-      <pos x="320" y="360"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Resistor</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>R1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="400" y="160"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Capacitor</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>C1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="520" y="160"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Ground</elementName>
-      <elementAttributes>
-      </elementAttributes>
-      <pos x="560" y="280"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Probe</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>P1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="600" y="160"/>
-    </visualElement>
-  </visualElements>
-  <wires>
-    <wire>
-      <p1 x="60" y="80"/>
-      <p2 x="220" y="80"/>
-    </wire>
-    <wire>
-      <p1 x="220" y="80"/>
-      <p2 x="220" y="120"/>
-    </wire>
-    <wire>
-      <p1 x="220" y="120"/>
-      <p2 x="240" y="120"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="140"/>
-      <p2 x="240" y="140"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="200"/>
-      <p2 x="220" y="200"/>
-    </wire>
-    <wire>
-      <p1 x="220" y="160"/>
-      <p2 x="220" y="200"/>
-    </wire>
-    <wire>
-      <p1 x="220" y="160"/>
-      <p2 x="240" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="260"/>
-      <p2 x="200" y="260"/>
-    </wire>
-    <wire>
-      <p1 x="200" y="180"/>
-      <p2 x="200" y="260"/>
-    </wire>
-    <wire>
-      <p1 x="200" y="180"/>
-      <p2 x="240" y="180"/>
-    </wire>
-    <wire>
-      <p1 x="240" y="60"/>
-      <p2 x="280" y="60"/>
-    </wire>
-    <wire>
-      <p1 x="280" y="60"/>
-      <p2 x="280" y="100"/>
-    </wire>
-    <wire>
-      <p1 x="160" y="60"/>
-      <p2 x="160" y="360"/>
-    </wire>
-    <wire>
-      <p1 x="280" y="220"/>
-      <p2 x="280" y="360"/>
-    </wire>
-    <wire>
-      <p1 x="280" y="360"/>
-      <p2 x="320" y="360"/>
-    </wire>
-    <wire>
-      <p1 x="320" y="160"/>
-      <p2 x="400" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="480" y="160"/>
-      <p2 x="520" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="600" y="160"/>
-      <p2 x="600" y="280"/>
-    </wire>
-    <wire>
-      <p1 x="600" y="280"/>
-      <p2 x="560" y="280"/>
-    </wire>
-    <wire>
-      <p1 x="480" y="140"/>
-      <p2 x="480" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="480" y="140"/>
-      <p2 x="580" y="140"/>
-    </wire>
-    <wire>
-      <p1 x="580" y="140"/>
-      <p2 x="580" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="580" y="160"/>
-      <p2 x="600" y="160"/>
-    </wire>
-  </wires>
-  <measurementOrdering/>
-</circuit>
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "7a9eb256-7bef-4fd8-8857-eb02d62c947e",
+        "position": {
+          "x": 3,
+          "y": 4
+        },
+        "properties": {
+          "label": "D0"
+        },
+        "rotation": 0,
+        "type": "In"
+      },
+      {
+        "id": "34a7a94c-e790-4d81-bcf6-8c901692197a",
+        "position": {
+          "x": 3,
+          "y": 7
+        },
+        "properties": {
+          "label": "D1"
+        },
+        "rotation": 0,
+        "type": "In"
+      },
+      {
+        "id": "edf63479-8a77-4b17-95dd-149aa6df7139",
+        "position": {
+          "x": 3,
+          "y": 10
+        },
+        "properties": {
+          "label": "D2"
+        },
+        "rotation": 0,
+        "type": "In"
+      },
+      {
+        "id": "441c2c73-89c0-4171-b097-62d71b7e7982",
+        "position": {
+          "x": 3,
+          "y": 13
+        },
+        "properties": {
+          "label": "D3"
+        },
+        "rotation": 0,
+        "type": "In"
+      },
+      {
+        "id": "0fca81b0-63d4-47e4-b01c-fa580ada0918",
+        "position": {
+          "x": 12,
+          "y": 8
+        },
+        "properties": {
+          "_modelParams": {
+            "rOut": 100,
+            "vRef": 5
+          },
+          "bits": 4,
+          "label": "DAC1"
+        },
+        "rotation": 0,
+        "type": "DAC"
+      },
+      {
+        "id": "0ef9e34d-e224-415b-9bf4-0d48c52dc5c3",
+        "position": {
+          "x": 12,
+          "y": 3
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "Vref"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "a7e71019-df0d-46dc-8ca0-e97975f76320",
+        "position": {
+          "x": 16,
+          "y": 18
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "06c4e027-3a66-48ba-b366-33b0e7b45d29",
+        "position": {
+          "x": 16,
+          "y": 18
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "9e5ec55c-3869-4a07-95e6-077656bc3477",
+        "position": {
+          "x": 24,
+          "y": 8
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "R1"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "9c9c5894-6db7-48f6-b9ab-f5e33fd7c5b5",
+        "position": {
+          "x": 30,
+          "y": 8
+        },
+        "properties": {
+          "_modelParams": {
+            "capacitance": 0.000001
+          },
+          "label": "C1"
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "64c940dc-c8ee-4f38-8dfb-93947721749c",
+        "position": {
+          "x": 34,
+          "y": 14
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "569c944d-f6c1-4577-a6fb-b811324d3214",
+        "position": {
+          "x": 36,
+          "y": 8
+        },
+        "properties": {
+          "label": "P1"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      }
+    ],
+    "name": "Untitled",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 4
+          },
+          {
+            "x": 11,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 4
+          },
+          {
+            "x": 11,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 10
+          },
+          {
+            "x": 11,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 8
+          },
+          {
+            "x": 11,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 13
+          },
+          {
+            "x": 10,
+            "y": 13
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 9
+          },
+          {
+            "x": 10,
+            "y": 13
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 9
+          },
+          {
+            "x": 12,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 3
+          },
+          {
+            "x": 17,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 3
+          },
+          {
+            "x": 17,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 4
+          },
+          {
+            "x": 17,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 4
+          },
+          {
+            "x": 14,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 3
+          },
+          {
+            "x": 12,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 7
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 9
+          },
+          {
+            "x": 12,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 18
+          },
+          {
+            "x": 16,
+            "y": 18
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

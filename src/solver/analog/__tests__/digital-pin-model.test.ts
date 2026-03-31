@@ -17,7 +17,7 @@
  *  - setParam("rIn", 1e6) takes effect on next stamp
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   DigitalOutputPinModel,
   DigitalInputPinModel,

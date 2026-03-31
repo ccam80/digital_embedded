@@ -15,21 +15,15 @@ import {
   VaractorDefinition,
   VARACTOR_PARAM_DEFAULTS,
 } from "../varactor.js";
-import { PropertyBag } from "../../../core/properties.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
+import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
-
-
 // ---------------------------------------------------------------------------
 // Default varactor parameters
 // ---------------------------------------------------------------------------
@@ -50,7 +44,7 @@ function makeVaractor(overrides: Partial<typeof VARACTOR_DEFAULTS> = {}): Analog
   const props = createTestPropertyBag();
   props.replaceModelParams(params);
   // nodeAnode=1, nodeCathode=2
-  return createVaractorElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+  return withNodeIds(createVaractorElement(new Map([["A", 1], ["K", 2]]), [], -1, props), [1, 2]);
 }
 
 /**

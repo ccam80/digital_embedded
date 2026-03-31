@@ -22,18 +22,12 @@ import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SolverDiagnostic } from "../../../core/analog-engine-interface.js";
-import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
+import { ComponentRegistry } from "../../../core/registry.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 import { FuseDefinition } from "../../switching/fuse.js";
 
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
-import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
-function getFactory(entry: ModelEntry): AnalogFactory {
-  if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
-  return entry.factory;
-}
 
 
 // ---------------------------------------------------------------------------
@@ -283,7 +277,7 @@ describe("AnalogFuseElement", () => {
     it("stamps conductance into MNA solver when intact", () => {
       const rCold = 1.0;
       const fuse = new AnalogFuseElement([1, 0], rCold, 1e9, 100.0);
-      const vs = makeDcVoltageSource(1, 0, 1, 1.0);
+      const vs = makeDcVoltageSource(1, 0, 1, 1.0) as unknown as AnalogElement;
 
       const solver = new SparseSolver();
       const diagnostics = new DiagnosticCollector();
@@ -318,7 +312,7 @@ describe("AnalogFuseElement", () => {
       const rCold = 1.0;
       const rLoad = 9.0;
       const fuse = new AnalogFuseElement([1, 2], rCold, 1e9, 100.0);
-      const vs = makeDcVoltageSource(1, 0, 2, 1.0);
+      const vs = makeDcVoltageSource(1, 0, 2, 1.0) as unknown as AnalogElement;
 
       const G_load = 1 / rLoad;
       const loadResistor = {
@@ -327,6 +321,8 @@ describe("AnalogFuseElement", () => {
         branchIndex: -1,
         isNonlinear: false,
         isReactive: false,
+        setParam(_key: string, _value: number): void {},
+        getPinCurrents(_v: Float64Array): number[] { return []; },
         stamp(solver: SparseSolver): void {
           solver.stamp(1, 1, G_load);
         },

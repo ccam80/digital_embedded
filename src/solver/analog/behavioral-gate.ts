@@ -311,7 +311,7 @@ function buildGateElement(
   for (let i = 0; i < inputCount; i++) {
     const label = `In_${i + 1}`;
     const spec = pinSpecs?.[label] ?? fallback;
-    const pin = new DigitalInputPinModel(spec);
+    const pin = new DigitalInputPinModel(spec, true);
     pin.init(pinNodes.get(label) ?? 0, 0);
     inputPins.push(pin);
   }

@@ -12,7 +12,9 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { DefaultSimulatorFacade } from '../../../headless/default-facade.js';
 import { createDefaultRegistry } from '../../../components/register-all.js';
-import type { AnalogEngine, DcOpResult } from '../../../core/analog-engine-interface.js';
+import type { AnalogEngine } from '../../../core/analog-engine-interface.js';
+import { DefaultSimulationCoordinator } from '../../../solver/coordinator.js';
+import { EngineState } from '../../../core/engine-interface.js';
 
 const registry = createDefaultRegistry();
 
@@ -56,19 +58,19 @@ describe('buckbjt.dig convergence', () => {
     }
 
     // The analog backend should still be functional (not in ERROR state)
-    const analog = coordinator.getAnalogEngine() as AnalogEngine;
+    const analog = (coordinator as DefaultSimulationCoordinator).getAnalogEngine() as AnalogEngine;
     expect(analog).not.toBeNull();
     expect(analog.simTime).toBeGreaterThan(0);
   });
 
   it('survives 2000 transient steps without ERROR state', () => {
     const coordinator = loadBuckBjt();
-    const analog = coordinator.getAnalogEngine() as AnalogEngine;
+    const analog = (coordinator as DefaultSimulationCoordinator).getAnalogEngine() as AnalogEngine;
     expect(analog).not.toBeNull();
 
     for (let i = 0; i < 2000; i++) {
       coordinator.step();
-      if (analog.getState() === 3 /* EngineState.ERROR */) {
+      if (analog.getState() === EngineState.ERROR) {
         throw new Error(
           `Engine entered ERROR state at step ${i + 1}, simTime=${analog.simTime}`,
         );
@@ -82,7 +84,7 @@ describe('buckbjt.dig convergence', () => {
     // The UI run loop targets analogTargetRate=1e-3 sim-s/wall-s.
     // A 600ms wall-clock run ≈ 600µs of sim time.
     const coordinator = loadBuckBjt();
-    const analog = coordinator.getAnalogEngine() as AnalogEngine;
+    const analog = (coordinator as DefaultSimulationCoordinator).getAnalogEngine() as AnalogEngine;
     expect(analog).not.toBeNull();
 
     const targetSimTime = 600e-6; // 600µs
@@ -92,7 +94,7 @@ describe('buckbjt.dig convergence', () => {
     while (analog.simTime < targetSimTime && stepCount < maxSteps) {
       coordinator.step();
       stepCount++;
-      if (analog.getState() === 3 /* EngineState.ERROR */) {
+      if (analog.getState() === EngineState.ERROR) {
         throw new Error(
           `Engine ERROR at step ${stepCount}, simTime=${analog.simTime.toExponential(3)}`,
         );

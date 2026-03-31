@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
 import { PortDefinition, PortElement, PORT_ATTRIBUTE_MAPPINGS } from "../port.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
-import { ComponentRegistry } from "../../../core/registry.js";
+import { ComponentRegistry as _ComponentRegistry } from "../../../core/registry.js";
 import { Circuit } from "../../../core/circuit.js";
 import { deriveInterfacePins } from "../../subcircuit/pin-derivation.js";
 import { resolveModelAssignments } from "../../../compile/extract-connectivity.js";

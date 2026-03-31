@@ -115,7 +115,7 @@ function runSingleFile(
 ): FileTestResult {
   let circuit;
   try {
-    circuit = facade.loadDig(content);
+    circuit = facade.loadDigXml(content);
   } catch (err) {
     return {
       fileName,

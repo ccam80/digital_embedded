@@ -13,7 +13,6 @@ import {
   buildControlledSourceContext,
 } from "../controlled-source-base.js";
 import type { SparseSolver } from "../sparse-solver.js";
-import type { ExpressionContext } from "../expression-evaluate.js";
 
 // ---------------------------------------------------------------------------
 // Concrete test subclass
@@ -48,6 +47,8 @@ class TestControlledSource extends ControlledSourceElement {
     this.lastDerivative = derivative;
     this.lastCtrlValue = ctrlValue;
   }
+
+  getPinCurrents(_voltages: Float64Array): number[] { return [0, 0]; }
 }
 
 // ---------------------------------------------------------------------------

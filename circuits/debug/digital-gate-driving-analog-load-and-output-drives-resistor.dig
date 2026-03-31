@@ -1,121 +1,228 @@
-<?xml version="1.0" encoding="utf-8"?>
-<circuit>
-  <version>2</version>
-  <attributes>
-    <entry>
-      <string>romContent</string>
-      <romList>
-        <roms/>
-      </romList>
-    </entry>
-  </attributes>
-  <visualElements>
-    <visualElement>
-      <elementName>In</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>A</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="120"/>
-    </visualElement>
-    <visualElement>
-      <elementName>In</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>B</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="200"/>
-    </visualElement>
-    <visualElement>
-      <elementName>And</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>G1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="200" y="160"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Resistor</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>R1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="360" y="160"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Ground</elementName>
-      <elementAttributes>
-      </elementAttributes>
-      <pos x="440" y="280"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Probe</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>P1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="480" y="160"/>
-    </visualElement>
-  </visualElements>
-  <wires>
-    <wire>
-      <p1 x="60" y="120"/>
-      <p2 x="180" y="120"/>
-    </wire>
-    <wire>
-      <p1 x="180" y="120"/>
-      <p2 x="180" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="180" y="160"/>
-      <p2 x="200" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="200"/>
-      <p2 x="200" y="200"/>
-    </wire>
-    <wire>
-      <p1 x="260" y="180"/>
-      <p2 x="340" y="180"/>
-    </wire>
-    <wire>
-      <p1 x="340" y="160"/>
-      <p2 x="340" y="180"/>
-    </wire>
-    <wire>
-      <p1 x="340" y="160"/>
-      <p2 x="360" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="440" y="160"/>
-      <p2 x="440" y="280"/>
-    </wire>
-    <wire>
-      <p1 x="260" y="140"/>
-      <p2 x="260" y="180"/>
-    </wire>
-    <wire>
-      <p1 x="260" y="140"/>
-      <p2 x="460" y="140"/>
-    </wire>
-    <wire>
-      <p1 x="460" y="140"/>
-      <p2 x="460" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="460" y="160"/>
-      <p2 x="480" y="160"/>
-    </wire>
-  </wires>
-  <measurementOrdering/>
-</circuit>
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "f5955c72-8ae0-41b5-98cc-27ba8179bf5f",
+        "position": {
+          "x": 3,
+          "y": 6
+        },
+        "properties": {
+          "label": "A"
+        },
+        "rotation": 0,
+        "type": "In"
+      },
+      {
+        "id": "9ed33c52-9fe4-4203-a9d4-718051418074",
+        "position": {
+          "x": 3,
+          "y": 10
+        },
+        "properties": {
+          "label": "B"
+        },
+        "rotation": 0,
+        "type": "In"
+      },
+      {
+        "id": "af903c85-487f-40f2-bcfe-3219e006f5b2",
+        "position": {
+          "x": 10,
+          "y": 8
+        },
+        "properties": {
+          "label": "G1"
+        },
+        "rotation": 0,
+        "type": "And"
+      },
+      {
+        "id": "80dc6f2a-12e9-419a-8247-658218ad97e2",
+        "position": {
+          "x": 22,
+          "y": 8
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "label": "R1"
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "9692a8e6-af84-42c2-8f4c-86be0b147933",
+        "position": {
+          "x": 26,
+          "y": 14
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "e1b4a05c-0908-4898-bf0c-6873dd6d6f82",
+        "position": {
+          "x": 28,
+          "y": 8
+        },
+        "properties": {
+          "label": "P1"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      }
+    ],
+    "name": "Untitled",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 6
+          },
+          {
+            "x": 9,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 6
+          },
+          {
+            "x": 9,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 8
+          },
+          {
+            "x": 10,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 3,
+            "y": 10
+          },
+          {
+            "x": 10,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 13,
+            "y": 9
+          },
+          {
+            "x": 21,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 8
+          },
+          {
+            "x": 21,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 8
+          },
+          {
+            "x": 22,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 8
+          },
+          {
+            "x": 26,
+            "y": 14
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 13,
+            "y": 7
+          },
+          {
+            "x": 13,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 13,
+            "y": 7
+          },
+          {
+            "x": 27,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 7
+          },
+          {
+            "x": 27,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 8
+          },
+          {
+            "x": 28,
+            "y": 8
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

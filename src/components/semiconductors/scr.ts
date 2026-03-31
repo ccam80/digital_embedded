@@ -301,7 +301,7 @@ export function createScrElement(
     get _latchedState(): boolean {
       return _latched;
     },
-  } as AnalogElement & { _latchedState: boolean };
+  } as AnalogElementCore & { _latchedState: boolean };
 }
 
 // ---------------------------------------------------------------------------

@@ -34,6 +34,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import type { ComponentLayout } from "../../../core/registry.js";
+import type { PropertyValue } from "../../../core/properties.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 
@@ -53,7 +54,7 @@ function makeLayout(
     outputCount: () => outputCount,
     outputOffset: () => inputCount,
     stateOffset: () => inputCount + outputCount,
-    getProperty: (_index: number, key: string) => propOverrides?.[key],
+    getProperty: (_index: number, key: string): PropertyValue | undefined => propOverrides?.[key] as PropertyValue | undefined,
   };
 }
 
@@ -954,9 +955,8 @@ describe("Integration", () => {
       nodeCount: 2,
       branchCount: 1,
       matrixSize: 3,
-      elements: [vs, swEl, r],
+      elements: [vs, swEl as unknown as import("../../../solver/analog/element.js").AnalogElement, r],
       labelToNodeId: new Map(),
-      wireToNodeId: new Map(),
     };
 
     const engine = new MNAEngine();

@@ -36,8 +36,6 @@ import {
 // Width = 3.9, height = 2.5, origin at pin position (0,0) which is at left edge
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 3.9;
-const COMP_HEIGHT = 2.5;
 
 // ---------------------------------------------------------------------------
 // Trigger mode

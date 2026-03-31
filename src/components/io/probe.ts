@@ -24,7 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -236,7 +236,7 @@ class AnalogProbeElement implements AnalogElementCore {
 }
 
 function probeAnalogFactory(
-  pinNodes: ReadonlyMap<string, number>,
+  _pinNodes: ReadonlyMap<string, number>,
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   _props: PropertyBag,

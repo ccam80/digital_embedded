@@ -36,7 +36,7 @@ export function getPinSpecs(props: PropertyBag): Record<string, ResolvedPinElect
 }
 
 export function makeInputPin(spec: ResolvedPinElectrical, nodeId: number): DigitalInputPinModel {
-  const pin = new DigitalInputPinModel(spec);
+  const pin = new DigitalInputPinModel(spec, true);
   pin.init(nodeId, 0);
   return pin;
 }

@@ -101,27 +101,8 @@ function makeContainer(): StubElement {
   return installStubDocument();
 }
 
-function makePanel(container?: StubElement): SliderPanel {
-  const c = container ?? makeContainer();
-  return new SliderPanel(c as unknown as HTMLElement);
-}
 
-function getRangeInput(container: StubElement): StubElement | undefined {
-  return container.children.find(
-    (child) =>
-      child.children.some((grandchild) => grandchild.type === "range") ||
-      child.type === "range",
-  );
-}
 
-function findRangeInputDeep(container: StubElement): StubElement | undefined {
-  for (const row of container.children) {
-    for (const child of row.children) {
-      if (child.type === "range") return child;
-    }
-  }
-  return undefined;
-}
 
 // ---------------------------------------------------------------------------
 // si-format tests (included in slider-panel.test.ts per spec requirement)

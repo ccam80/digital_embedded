@@ -31,6 +31,7 @@ function makeMockElement(x: number, y: number, w: number, h: number): CircuitEle
       };
     },
     getAttribute(_name: string): PropertyValue | undefined { return undefined; },
+    setAttribute(_name: string, _value: PropertyValue): void {},
   };
 }
 

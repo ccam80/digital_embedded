@@ -13,7 +13,7 @@ import { PinDirection } from "@/core/pin";
 import type { Rect, RenderContext } from "@/core/renderer-interface";
 import type { SerializedElement } from "@/core/element";
 import { MNAEngine } from "@/solver/analog/analog-engine";
-import type { ConcreteCompiledAnalogCircuit } from "@/solver/analog/analog-engine";
+import type { ConcreteCompiledAnalogCircuit } from "@/solver/analog/compiled-analog-circuit";
 import {
   makeResistor,
   makeVoltageSource,
@@ -57,6 +57,7 @@ function makeCE(pins: Array<{ x: number; y: number }>): CircuitElement {
     isNegated: false,
     isClock: false,
     bitWidth: 1,
+    kind: 'signal' as const,
   }));
 
   const serialized: SerializedElement = {
@@ -1475,23 +1476,6 @@ describe("WireCurrentResolver — misaligned pin snap (mock)", () => {
     const vs = makeVoltageSource(1, 0, 2, VS); // branch index = nodeCount
     const r1 = makeResistor(1, 2, R1v);
     const r2 = makeResistor(2, 0, R2v);
-
-    // R1: pins aligned with wire endpoints
-    const ceR1 = makeCE([{ x: 0, y: 0 }, { x: 4, y: 0 }]);
-    // R2: pin A at (6, 0) — on wire endpoint ✓
-    //     pin B at (10, 3) — BETWEEN wire endpoints (10,0) and (10,6) ✗
-    //     This simulates the rotation-induced misalignment from lrctest.dig
-    const ceR2 = makeCE([{ x: 6, y: 0 }, { x: 10, y: 3 }]);
-    // Vs: pins aligned
-    const ceVs = makeCE([{ x: 0, y: -2 }, { x: 0, y: 0 }]);
-
-    // Wires: node 1 connects Vs.pos to R1.A
-    const w_n1 = makeWire(0, -2, 0, 0);   // Vs.pos to junction
-    // Actually make it simpler:
-    const w1 = makeWire(0, 0, 0, -2);      // node1: Vs.pos(-2) → R1.A(0)...
-    // Let me use a horizontal layout:
-    // Vs.pos at (0,0), R1.A at (2,0), R1.B at (6,0), R2.A at (6,0), R2.B at (10,3)
-    // Gnd wires: Vs.neg at (0,-4), R2 side at (10,0)→(10,6) with pin at (10,3)
 
     // Simpler: just 3 nodes in a line
     // node 1: Vs.pos(0,0) ——wire——> R1.A(2,0)

@@ -9,7 +9,7 @@
  * Spec: unified-component-architecture.md Section 5 (Phase 4).
  */
 
-import type { SimulationEngine, MeasurementObserver, SnapshotId } from "../core/engine-interface.js";
+import type { MeasurementObserver, SnapshotId } from "../core/engine-interface.js";
 import { EngineState } from "../core/engine-interface.js";
 import type { DcOpResult } from "../core/analog-engine-interface.js";
 import type { Diagnostic, SignalAddress, SignalValue } from "../compile/types.js";
@@ -238,8 +238,8 @@ export interface SimulationCoordinator {
 
   /**
    * Update a component property at runtime (hot-patching the engine).
-   * Calls setParam() on the element if supported, then triggers engine re-stamp.
-   * No-op if the element is not in the analog domain or the engine is absent.
+   * Routes to setParam() for analog elements and layout.setProperty() for
+   * digital components. Triggers engine re-stamp for analog domain.
    */
   setComponentProperty(element: CircuitElement, key: string, value: number): void;
 

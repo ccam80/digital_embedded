@@ -53,8 +53,8 @@ export class TestElement extends AbstractCircuitElement {
       props ?? new PropertyBag(),
     );
     this._pins = pins;
-    this._bb = options?.boundingBox;
-    this._drawFn = options?.drawFn;
+    if (options?.boundingBox !== undefined) this._bb = options.boundingBox;
+    if (options?.drawFn !== undefined) this._drawFn = options.drawFn;
   }
 
   getPins(): readonly Pin[] {

@@ -12,16 +12,14 @@ import { PinDirection } from "@/core/pin";
 import type { Pin } from "@/core/pin";
 import { PropertyBag } from "@/core/properties";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
-import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
+import type { ComponentDefinition } from "@/core/registry";
 import { flattenCircuit, isSubcircuitHost } from "@/solver/digital/flatten";
-import type { SubcircuitHost } from "@/solver/digital/flatten";
 import {
   TestLeafElement,
   TestSubcircuitElement,
   makeLeafElement,
   makeInElement,
   makeOutElement,
-  makeLeafPin,
 } from "@/test-fixtures/subcircuit-elements";
 
 // ---------------------------------------------------------------------------

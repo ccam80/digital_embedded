@@ -17,6 +17,7 @@ import type { AnalogEngine, DcOpResult } from '../core/analog-engine-interface.j
 import { DigitalEngine } from './digital/digital-engine.js';
 import type { ConcreteCompiledCircuit } from './digital/digital-engine.js';
 import { ClockManager } from './digital/clock.js';
+import type { CompiledCircuitImpl as CompiledDigitalDomain } from './digital/compiled-circuit.js';
 import { MNAEngine } from './analog/analog-engine.js';
 import { BitVector } from '../core/signal.js';
 import { FacadeError } from '../headless/types.js';
@@ -75,8 +76,10 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private _voltageMax: number = -Infinity;
   private readonly _registry: ComponentRegistry | null;
   private _cachedDcOpResult: DcOpResult | null = null;
-  /** Lazily-built inverted index: CircuitElement → element index. */
+  /** Lazily-built inverted index: CircuitElement → analog element index. */
   private _elementIndexCache: Map<CircuitElement, number> | null = null;
+  /** Lazily-built inverted index: CircuitElement → digital component index. */
+  private _digitalElementIndexCache: Map<CircuitElement, number> | null = null;
   /** Reusable Map for getPinVoltages() to avoid per-call allocation. */
   private readonly _pinVoltageResult = new Map<string, number>();
 
@@ -547,35 +550,64 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   }
 
   setComponentProperty(element: CircuitElement, key: string, value: number): void {
-    if (this._analog === null) return;
-    const elementIndex = this._resolveElementIndex(element);
-    if (elementIndex === -1) return;
-    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
+    let handled = false;
 
-    // Composite pin-param key (e.g. "A.rOut") → route to bridge adapters via
-    // bridgeAdaptersByGroupId. We find adapters whose label ends with the pin
-    // label suffix so that "A.rOut" routes to the adapter for pin "A".
-    const dotIdx = key.indexOf('.');
-    if (dotIdx !== -1) {
-      const pinLabel = key.slice(0, dotIdx);
-      const paramName = key.slice(dotIdx + 1);
-      for (const adapters of compiledAnalog.bridgeAdaptersByGroupId.values()) {
-        for (const adapter of adapters) {
-          if (adapter.label?.endsWith(`:${pinLabel}`)) {
-            adapter.setParam(paramName, value);
+    // --- Digital domain: update the layout property so executeFns see the change ---
+    if (this._digital !== null && this._compiled.digital !== null) {
+      const digIdx = this._resolveDigitalElementIndex(element);
+      if (digIdx !== -1) {
+        (this._compiled.digital as CompiledDigitalDomain).layout.setProperty(digIdx, key, value);
+        handled = true;
+      }
+    }
+
+    // --- Analog domain: route through setParam / bridge adapters ---
+    if (this._analog !== null) {
+      const elementIndex = this._resolveElementIndex(element);
+      if (elementIndex !== -1) {
+        const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
+
+        // Composite pin-param key (e.g. "A.rOut") → route to bridge adapters via
+        // bridgeAdaptersByGroupId. We find adapters whose label ends with the pin
+        // label suffix so that "A.rOut" routes to the adapter for pin "A".
+        const dotIdx = key.indexOf('.');
+        if (dotIdx !== -1) {
+          const pinLabel = key.slice(0, dotIdx);
+          const paramName = key.slice(dotIdx + 1);
+          for (const adapters of compiledAnalog.bridgeAdaptersByGroupId.values()) {
+            for (const adapter of adapters) {
+              if (adapter.label?.endsWith(`:${pinLabel}`)) {
+                adapter.setParam(paramName, value);
+              }
+            }
           }
+          this._analog.configure({});
+          return;
+        }
+
+        const el = compiledAnalog.elements[elementIndex];
+        if (el !== undefined && el.setParam) {
+          el.setParam(key, value);
+        }
+        this._analog.configure({});
+        handled = true;
+      }
+    }
+
+    if (!handled) return;
+  }
+
+  /** Resolve CircuitElement → compiled digital component index via cached inverted map. */
+  private _resolveDigitalElementIndex(element: CircuitElement): number {
+    if (this._digitalElementIndexCache === null) {
+      this._digitalElementIndexCache = new Map();
+      if (this._compiled.digital !== null) {
+        for (const [idx, el] of (this._compiled.digital as CompiledDigitalDomain).componentToElement) {
+          this._digitalElementIndexCache.set(el, idx);
         }
       }
-      this._analog.configure({});
-      return;
     }
-
-    const el = compiledAnalog.elements[elementIndex];
-    if (el === undefined) return;
-    if (el.setParam) {
-      el.setParam(key, value);
-    }
-    this._analog.configure({});
+    return this._digitalElementIndexCache.get(element) ?? -1;
   }
 
   readElementCurrent(elementIndex: number): number | null {

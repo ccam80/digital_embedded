@@ -51,6 +51,8 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
     stamp(_solver: SparseSolver): void {
       // Real-domain stamp (not used in AC path)
     },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
     stampAc(solver: ComplexSparseSolver, _omega: number): void {
       const a = nodeA > 0 ? nodeA - 1 : -1;
       const b = nodeB > 0 ? nodeB - 1 : -1;
@@ -76,6 +78,8 @@ function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): Ana
     isNonlinear: false,
     isReactive: true,
     stamp(_solver: SparseSolver): void {},
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
     stampAc(solver: ComplexSparseSolver, omega: number): void {
       const jOmegaC = omega * capacitance; // imaginary part of admittance
       const a = nodeA > 0 ? nodeA - 1 : -1;
@@ -102,6 +106,8 @@ function makeAcInductor(nodeA: number, nodeB: number, inductance: number): Analo
     isNonlinear: false,
     isReactive: true,
     stamp(_solver: SparseSolver): void {},
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
     stampAc(solver: ComplexSparseSolver, omega: number): void {
       // Y_L = 1/(jωL) = -j/(ωL)
       const admIm = -1 / (omega * inductance);

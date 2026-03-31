@@ -1,53 +1,47 @@
-<?xml version="1.0" encoding="utf-8"?>
-<circuit>
-  <version>2</version>
-  <attributes>
-    <entry>
-      <string>romContent</string>
-      <romList>
-        <roms/>
-      </romList>
-    </entry>
-  </attributes>
-  <visualElements>
-    <visualElement>
-      <elementName>In</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>D</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="140"/>
-    </visualElement>
-    <visualElement>
-      <elementName>BusSplitter</elementName>
-      <elementAttributes>
-      </elementAttributes>
-      <pos x="200" y="140"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Out</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>Lo</string>
-        </entry>
-      </elementAttributes>
-      <pos x="360" y="100"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Out</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>Hi</string>
-        </entry>
-      </elementAttributes>
-      <pos x="360" y="200"/>
-    </visualElement>
-  </visualElements>
-  <wires>
-  </wires>
-  <measurementOrdering/>
-</circuit>
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "db808d66-96b3-42dc-af16-1b43268b200f",
+        "position": {
+          "x": 10,
+          "y": 7
+        },
+        "properties": {
+          "input splitting": "8",
+          "output splitting": "4,4"
+        },
+        "rotation": 0,
+        "type": "Splitter"
+      },
+      {
+        "id": "3c2a2c7e-fce6-46bf-b102-cd16359f3abf",
+        "position": {
+          "x": 18,
+          "y": 5
+        },
+        "properties": {
+          "label": "Lo"
+        },
+        "rotation": 0,
+        "type": "Out"
+      },
+      {
+        "id": "d57c0676-0b83-4b8f-b11f-44f726553958",
+        "position": {
+          "x": 18,
+          "y": 10
+        },
+        "properties": {
+          "label": "Hi"
+        },
+        "rotation": 0,
+        "type": "Out"
+      }
+    ],
+    "name": "Untitled",
+    "wires": []
+  },
+  "format": "dts",
+  "version": 1
+}

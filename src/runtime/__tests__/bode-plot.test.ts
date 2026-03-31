@@ -23,7 +23,7 @@ interface DrawCall {
 function makeMockCtx(): { ctx: CanvasRenderingContext2D; calls: DrawCall[] } {
   const calls: DrawCall[] = [];
 
-  const handler: ProxyHandler<object> = {
+  const handler: ProxyHandler<CanvasRenderingContext2D> = {
     get(_target, prop: string) {
       if (prop === "calls") return calls;
 
@@ -47,7 +47,7 @@ function makeMockCtx(): { ctx: CanvasRenderingContext2D; calls: DrawCall[] } {
     },
   };
 
-  const ctx = new Proxy({} as CanvasRenderingContext2D, handler);
+  const ctx = new Proxy<CanvasRenderingContext2D>({} as unknown as CanvasRenderingContext2D, handler);
   return { ctx, calls };
 }
 

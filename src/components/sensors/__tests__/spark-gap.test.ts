@@ -15,6 +15,7 @@ import { describe, it, expect } from "vitest";
 import { SparkGapElement, SparkGapDefinition, createSparkGapElement } from "../spark-gap.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
+import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -210,7 +211,7 @@ describe("SparkGap", () => {
       const mockSolver = {
         stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
         stampRHS: () => {},
-      } as unknown as import("../../../analog/sparse-solver.js").SparseSolver;
+      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
 
       gap.stampNonlinear(mockSolver);
 
@@ -230,7 +231,7 @@ describe("SparkGap", () => {
       const solver1 = {
         stamp: (r: number, c: number, v: number) => stamps1.push([r, c, v]),
         stampRHS: () => {},
-      } as unknown as import("../../../analog/sparse-solver.js").SparseSolver;
+      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
       gap.stampNonlinear(solver1);
       const G_off = stamps1.find(([r, c]) => r === 0 && c === 0)![2];
 
@@ -240,7 +241,7 @@ describe("SparkGap", () => {
       const solver2 = {
         stamp: (r: number, c: number, v: number) => stamps2.push([r, c, v]),
         stampRHS: () => {},
-      } as unknown as import("../../../analog/sparse-solver.js").SparseSolver;
+      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
       gap.stampNonlinear(solver2);
       const G_on = stamps2.find(([r, c]) => r === 0 && c === 0)![2];
 

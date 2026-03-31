@@ -58,6 +58,7 @@ function makeResistorElement(nodeA: number, nodeB: number): AnalogElement {
     isReactive: false,
     stamp(_s: SparseSolver) {},
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
+    setParam(_key: string, _value: number) {},
   };
 }
 
@@ -212,31 +213,36 @@ function buildMixedRegistry(): ComponentRegistry {
 // Pins at integer coords so connectivity groups form correctly.
 // ---------------------------------------------------------------------------
 //
-// Layout (x coords):
-//   And: a=(0,0), b=(0,1), out=(2,0)
-//   DABridge: din=(4,0), aout=(5,0)
-//   AnalogR: A=(5,0), B=(10,0)
-//   Ground: pin=(10,0)
+// Layout (world coords, all elements at position (0,0)):
+//   And: a=(-2,0), b=(-2,1), out=(0,0)
+//   DABridge: din=(0,0), aout=(1,0)
+//   AnalogR: A=(1,0), B=(3,0)
+//   Ground: pin=(3,0)
 //
-// Wires:
-//   (2,0)→(4,0)  : And.out → DABridge.din  (digital group)
-//   (5,0)→(5,0)  : DABridge.aout / R.A     (analog group, point wire)
-//   (10,0)→(10,0): R.B / Ground             (analog group, point wire)
+// Connectivity:
+//   And.out(0,0) ↔ DABridge.din(0,0)    — shared position → digital group
+//   DABridge.aout(1,0) ↔ AnalogR.A(1,0) — shared position → boundary group (digital+analog)
+//   AnalogR.B(3,0) ↔ Ground(3,0)        — shared position → analog group
 
 function buildMixedCircuit(): { circuit: Circuit; registry: ComponentRegistry } {
   const registry = buildMixedRegistry();
+  // DABridge pins: din at (0,0), aout at (1,0) — element at default position (0,0)
+  // so world positions are din=(0,0), aout=(1,0).
+  // AnalogR pins at world (1,0) and (3,0) so AnalogR.A touches DABridge.aout.
   const bridgePins = [inputPin(0, 0, 'din'), outputPin(1, 0, 'aout')];
-  const andPins = [inputPin(0, 0, 'a'), inputPin(0, 1, 'b'), outputPin(2, 0, 'out')];
+  const andPins = [inputPin(-2, 0, 'a'), inputPin(-2, 1, 'b'), outputPin(0, 0, 'out')];
 
   const circuit = new Circuit();
   circuit.addElement(createTestElementFromDecls('And', 'and-1', andPins));
   circuit.addElement(createTestElementFromDecls('DABridge', 'bridge-1', bridgePins));
-  circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 5, y: 0 }, { x: 10, y: 0 }]));
-  circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 10, y: 0 }]));
+  circuit.addElement(makeAnalogElement('AnalogR', 'r1', [{ x: 1, y: 0 }, { x: 3, y: 0 }]));
+  circuit.addElement(makeAnalogElement('Ground', 'gnd1', [{ x: 3, y: 0 }]));
 
-  circuit.addWire(new Wire({ x: 2, y: 0 }, { x: 4, y: 0 }));
-  circuit.addWire(new Wire({ x: 5, y: 0 }, { x: 5, y: 0 }));
-  circuit.addWire(new Wire({ x: 10, y: 0 }, { x: 10, y: 0 }));
+  // And.out(0,0) → DABridge.din(0,0): same position, no wire needed but add one
+  circuit.addWire(new Wire({ x: -2, y: 0 }, { x: -2, y: 0 }));  // And.a stub
+  circuit.addWire(new Wire({ x: -2, y: 1 }, { x: -2, y: 1 }));  // And.b stub
+  circuit.addWire(new Wire({ x: 1, y: 0 }, { x: 1, y: 0 }));    // DABridge.aout ↔ AnalogR.A
+  circuit.addWire(new Wire({ x: 3, y: 0 }, { x: 3, y: 0 }));    // AnalogR.B ↔ Ground
 
   return { circuit, registry };
 }

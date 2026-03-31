@@ -1,195 +1,432 @@
-<?xml version="1.0" encoding="utf-8"?>
-<circuit>
-  <version>2</version>
-  <attributes>
-    <entry>
-      <string>romContent</string>
-      <romList>
-        <roms/>
-      </romList>
-    </entry>
-  </attributes>
-  <visualElements>
-    <visualElement>
-      <elementName>DcVoltageSource</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>Vs</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="120"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Potentiometer</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>POT</string>
-        </entry>
-      </elementAttributes>
-      <pos x="200" y="120"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Ground</elementName>
-      <elementAttributes>
-      </elementAttributes>
-      <pos x="120" y="280"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Ground</elementName>
-      <elementAttributes>
-      </elementAttributes>
-      <pos x="280" y="280"/>
-    </visualElement>
-    <visualElement>
-      <elementName>DcVoltageSource</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>Vref</string>
-        </entry>
-      </elementAttributes>
-      <pos x="60" y="360"/>
-    </visualElement>
-    <visualElement>
-      <elementName>VoltageComparator</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>CMP</string>
-        </entry>
-        <entry>
-          <string>outputType</string>
-          <string>push-pull</string>
-        </entry>
-      </elementAttributes>
-      <pos x="360" y="160"/>
-    </visualElement>
-    <visualElement>
-      <elementName>And</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>GA</string>
-        </entry>
-      </elementAttributes>
-      <pos x="480" y="160"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Const</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>C1</string>
-        </entry>
-      </elementAttributes>
-      <pos x="400" y="80"/>
-    </visualElement>
-    <visualElement>
-      <elementName>Out</elementName>
-      <elementAttributes>
-        <entry>
-          <string>Label</string>
-          <string>Y</string>
-        </entry>
-      </elementAttributes>
-      <pos x="600" y="160"/>
-    </visualElement>
-  </visualElements>
-  <wires>
-    <wire>
-      <p1 x="140" y="120"/>
-      <p2 x="200" y="120"/>
-    </wire>
-    <wire>
-      <p1 x="280" y="120"/>
-      <p2 x="280" y="280"/>
-    </wire>
-    <wire>
-      <p1 x="280" y="280"/>
-      <p2 x="280" y="360"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="120"/>
-      <p2 x="60" y="280"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="280"/>
-      <p2 x="120" y="280"/>
-    </wire>
-    <wire>
-      <p1 x="240" y="80"/>
-      <p2 x="240" y="100"/>
-    </wire>
-    <wire>
-      <p1 x="240" y="80"/>
-      <p2 x="340" y="80"/>
-    </wire>
-    <wire>
-      <p1 x="340" y="80"/>
-      <p2 x="340" y="140"/>
-    </wire>
-    <wire>
-      <p1 x="340" y="140"/>
-      <p2 x="360" y="140"/>
-    </wire>
-    <wire>
-      <p1 x="60" y="360"/>
-      <p2 x="140" y="360"/>
-    </wire>
-    <wire>
-      <p1 x="140" y="360"/>
-      <p2 x="280" y="360"/>
-    </wire>
-    <wire>
-      <p1 x="280" y="360"/>
-      <p2 x="340" y="360"/>
-    </wire>
-    <wire>
-      <p1 x="340" y="180"/>
-      <p2 x="340" y="360"/>
-    </wire>
-    <wire>
-      <p1 x="340" y="180"/>
-      <p2 x="360" y="180"/>
-    </wire>
-    <wire>
-      <p1 x="440" y="160"/>
-      <p2 x="480" y="160"/>
-    </wire>
-    <wire>
-      <p1 x="380" y="80"/>
-      <p2 x="400" y="80"/>
-    </wire>
-    <wire>
-      <p1 x="380" y="80"/>
-      <p2 x="380" y="100"/>
-    </wire>
-    <wire>
-      <p1 x="380" y="100"/>
-      <p2 x="460" y="100"/>
-    </wire>
-    <wire>
-      <p1 x="460" y="100"/>
-      <p2 x="460" y="200"/>
-    </wire>
-    <wire>
-      <p1 x="460" y="200"/>
-      <p2 x="480" y="200"/>
-    </wire>
-    <wire>
-      <p1 x="540" y="180"/>
-      <p2 x="580" y="180"/>
-    </wire>
-    <wire>
-      <p1 x="580" y="160"/>
-      <p2 x="580" y="180"/>
-    </wire>
-    <wire>
-      <p1 x="580" y="160"/>
-      <p2 x="600" y="160"/>
-    </wire>
-  </wires>
-  <measurementOrdering/>
-</circuit>
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "e1347809-f124-4f95-bd82-e6f6b0fb88b9",
+        "position": {
+          "x": 7,
+          "y": 6
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "Vs"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "d056219a-b333-40ce-900e-464dc30031b5",
+        "position": {
+          "x": 10,
+          "y": 6
+        },
+        "properties": {
+          "_modelParams": {
+            "position": 0.7,
+            "resistance": 10000
+          },
+          "label": "POT"
+        },
+        "rotation": 0,
+        "type": "Potentiometer"
+      },
+      {
+        "id": "6c5683fe-65bb-4ff5-afe2-60a924a6903b",
+        "position": {
+          "x": 11,
+          "y": 14
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "009f2ece-105a-4508-a530-1119deffb2ea",
+        "position": {
+          "x": 14,
+          "y": 14
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "6195b7ce-d83f-46e6-bd71-c1e5ef4ffe97",
+        "position": {
+          "x": 7,
+          "y": 18
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "label": "Vref"
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "7b74f10f-cb5a-4795-b030-d5a5a6251d04",
+        "position": {
+          "x": 18,
+          "y": 8
+        },
+        "properties": {
+          "_modelParams": {
+            "hysteresis": 0,
+            "rSat": 50,
+            "responseTime": 0.000001,
+            "vos": 0.001
+          },
+          "label": "CMP",
+          "outputType": "push-pull"
+        },
+        "rotation": 0,
+        "type": "VoltageComparator"
+      },
+      {
+        "id": "18d5221b-99ae-48a0-ac06-f0e9188705e8",
+        "position": {
+          "x": 24,
+          "y": 8
+        },
+        "properties": {
+          "label": "GA"
+        },
+        "rotation": 0,
+        "type": "And"
+      },
+      {
+        "id": "2d06fef0-97a2-4397-8382-ed20d9055144",
+        "position": {
+          "x": 20,
+          "y": 4
+        },
+        "properties": {
+          "label": "C1"
+        },
+        "rotation": 0,
+        "type": "Const"
+      },
+      {
+        "id": "4c7bb4d3-a78e-4f14-a434-114b476937a4",
+        "position": {
+          "x": 30,
+          "y": 8
+        },
+        "properties": {
+          "label": "Y"
+        },
+        "rotation": 0,
+        "type": "Out"
+      }
+    ],
+    "name": "Untitled",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 6
+          },
+          {
+            "x": 10,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 6
+          },
+          {
+            "x": 11,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 6
+          },
+          {
+            "x": 12,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 6
+          },
+          {
+            "x": 14,
+            "y": 14
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 14
+          },
+          {
+            "x": 14,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 7,
+            "y": 6
+          },
+          {
+            "x": 7,
+            "y": 14
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 7,
+            "y": 14
+          },
+          {
+            "x": 11,
+            "y": 14
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 12,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 17,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 4
+          },
+          {
+            "x": 17,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 7
+          },
+          {
+            "x": 18,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 7,
+            "y": 18
+          },
+          {
+            "x": 11,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 18
+          },
+          {
+            "x": 14,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 18
+          },
+          {
+            "x": 17,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 9
+          },
+          {
+            "x": 17,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 9
+          },
+          {
+            "x": 18,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 8
+          },
+          {
+            "x": 24,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 19,
+            "y": 4
+          },
+          {
+            "x": 20,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 19,
+            "y": 4
+          },
+          {
+            "x": 19,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 19,
+            "y": 5
+          },
+          {
+            "x": 23,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 5
+          },
+          {
+            "x": 23,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 23,
+            "y": 10
+          },
+          {
+            "x": 24,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 27,
+            "y": 9
+          },
+          {
+            "x": 29,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 8
+          },
+          {
+            "x": 29,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 8
+          },
+          {
+            "x": 30,
+            "y": 8
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

@@ -29,9 +29,10 @@ function makePin(x: number, y: number, label = ""): Pin {
     position: { x, y },
     label,
     direction: PinDirection.BIDIRECTIONAL,
-    isInverted: false,
+    isNegated: false,
     isClock: false,
     bitWidth: 1,
+    kind: "signal" as const,
   };
 }
 
@@ -82,6 +83,7 @@ function makeElement(
     draw(_ctx: RenderContext) { /* no-op */ },
     serialize() { return serialized; },
     getAttribute(k: string) { return propsMap.get(k); },
+    setAttribute(k: string, v: PropertyValue) { propsMap.set(k, v); },
   };
 }
 
@@ -97,6 +99,8 @@ function makeTestResistorElement(nodeA: number, nodeB: number): AnalogElement {
     isNonlinear: false,
     isReactive: false,
     stamp(_s: SparseSolver) { /* no-op */ },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
   };
 }
 
@@ -108,6 +112,8 @@ function makeTestVsElement(nodePos: number, nodeNeg: number, branchIdx: number):
     isNonlinear: false,
     isReactive: false,
     stamp(_s: SparseSolver) { /* no-op */ },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
   };
 }
 
@@ -119,6 +125,8 @@ function makeTestInductorElement(nodeA: number, nodeB: number, branchIdx: number
     isNonlinear: false,
     isReactive: true,
     stamp(_s: SparseSolver) { /* no-op */ },
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
   };
 }
 
@@ -132,12 +140,12 @@ function makeBaseDef(name: string) {
   return {
     name,
     typeId: -1,
-    pinLayout: [] as import("../../core/pin.js").PinDeclaration[],
-    propertyDefs: [] as import("../../core/properties.js").PropertyDefinition[],
-    attributeMap: [] as import("../../core/registry.js").AttributeMapping[],
+    pinLayout: [] as import("../../../core/pin.js").PinDeclaration[],
+    propertyDefs: [] as import("../../../core/properties.js").PropertyDefinition[],
+    attributeMap: [] as import("../../../core/registry.js").AttributeMapping[],
     category: "MISC" as unknown as ComponentCategory,
     helpText: "",
-    factory: ((_props: PropertyBag) => { throw new Error("not used in tests"); }) as unknown as import("../../core/registry.js").ComponentDefinition["factory"],
+    factory: ((_props: PropertyBag) => { throw new Error("not used in tests"); }) as unknown as import("../../../core/registry.js").ComponentDefinition["factory"],
   };
 }
 
@@ -219,7 +227,7 @@ function buildTestRegistry(): ComponentRegistry {
       { label: "In_1", direction: PinDirection.INPUT, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
       { label: "out", direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 1, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
     ],
-    models: { digital: { executeFn: noopExecuteFn as unknown as import("../../core/registry.js").ExecuteFunction } },
+    models: { digital: { executeFn: noopExecuteFn as unknown as import("../../../core/registry.js").ExecuteFunction } },
   });
 
   return registry;

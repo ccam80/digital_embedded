@@ -20,7 +20,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 
@@ -28,9 +28,6 @@ import { pnjlim } from "../../solver/analog/newton-raphson.js";
 // Layout constants
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 2;
-const COMP_HEIGHT = 2;
-const LED_RADIUS = 0.7;
 
 // ---------------------------------------------------------------------------
 // Pin layout

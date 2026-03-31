@@ -28,7 +28,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
@@ -138,7 +138,7 @@ export function createDiodeElement(
   let vdPrev = NaN;
   let capFirstCall = true;
 
-  const element: AnalogElement = {
+  const element: AnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: hasCapacitance,

@@ -30,8 +30,6 @@ import { createDriverInvAnalogElement } from "../../solver/analog/behavioral-rem
 // Layout constants — same as Driver (origin-centred)
 // ---------------------------------------------------------------------------
 
-const COMP_WIDTH = 2;
-const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -93,7 +91,6 @@ export class DriverInvSelElement extends AbstractCircuitElement {
       0,
       createInverterConfig(["sel"]),
       { clockPins: new Set<string>() },
-      bitWidth,
     );
   }
 

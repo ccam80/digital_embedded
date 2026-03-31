@@ -33,6 +33,7 @@ function makeElement(typeId: 'In' | 'Out', label: string): CircuitElement {
     getPins: () => [],
     getProperties: () => props,
     getAttribute: (name: string) => props.has(name) ? props.get(name) : undefined,
+    setAttribute: (_name: string, _value: import('../../core/properties.js').PropertyValue) => {},
     getBoundingBox: () => ({ x: 0, y: 0, width: 1, height: 1 }),
     draw: () => {},
     serialize: () => ({

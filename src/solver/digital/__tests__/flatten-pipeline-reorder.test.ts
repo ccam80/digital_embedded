@@ -12,19 +12,17 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { Circuit, Wire } from "@/core/circuit";
+import { Circuit } from "@/core/circuit";
 import type { Pin } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
 import { PropertyBag } from "@/core/properties";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
 import type { ComponentDefinition } from "@/core/registry";
 import { flattenCircuit } from "@/solver/digital/flatten";
-import type { SubcircuitHost } from "@/solver/digital/flatten";
 import { resolveModelAssignments } from "@/compile/extract-connectivity";
 import {
   TestLeafElement,
   TestSubcircuitElement,
-  makeLeafElement,
 } from "@/test-fixtures/subcircuit-elements";
 import { noopExecFn } from "@/test-fixtures/execute-stubs";
 
@@ -34,16 +32,6 @@ import { noopExecFn } from "@/test-fixtures/execute-stubs";
 
 function noopAnalogFactory() {
   return { branchIndex: -1 as const, isNonlinear: false, isReactive: false, stamp: () => {}, getPinCurrents: () => [] as number[], setParam: (_k: string, _v: number) => {} };
-}
-
-function makeDigitalDef(typeId: string): ComponentDefinition {
-  return {
-    name: typeId, typeId: -1,
-    factory: (props) => new TestLeafElement(typeId, "auto", { x: 0, y: 0 }, props, []),
-    pinLayout: [], propertyDefs: [], attributeMap: [],
-    category: ComponentCategory.MISC, helpText: typeId,
-    models: { digital: { executeFn: noopExecFn } },
-  };
 }
 
 function makeAnalogDef(typeId: string): ComponentDefinition {

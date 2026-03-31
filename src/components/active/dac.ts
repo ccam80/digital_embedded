@@ -35,7 +35,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
@@ -158,15 +158,30 @@ export class DACElement extends AbstractCircuitElement {
     ctx.setLineWidth(1);
 
     // Rectangular body
-    ctx.drawRect(0, -halfH, 4, halfH * 2);
+    ctx.drawRect(0, -halfH, 4, halfH * 2, false);
 
     // Label "DAC" centered inside
     ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("DAC", 2, 0, { horizontal: "center", vertical: "center" });
+    ctx.drawText("DAC", 2, 0, { horizontal: "center", vertical: "middle" });
 
     // Bit count label
     ctx.setFont({ family: "sans-serif", size: 0.6 });
-    ctx.drawText(`${bits}-bit`, 2, 0.8, { horizontal: "center", vertical: "center" });
+    ctx.drawText(`${bits}-bit`, 2, 0.8, { horizontal: "center", vertical: "middle" });
+
+    // Pin labels
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.55 });
+    // Digital input pins D0..D(N-1) on the left
+    for (let i = 0; i < bits; i++) {
+      const y = i - Math.floor(bits / 2);
+      ctx.drawText(`D${i}`, 0.15, y, { horizontal: "left", vertical: "middle" });
+    }
+    // VREF at top
+    ctx.drawText("VREF", 2, -halfH + 0.15, { horizontal: "center", vertical: "top" });
+    // OUT on the right
+    ctx.drawText("OUT", 3.85, 0, { horizontal: "right", vertical: "middle" });
+    // GND at bottom
+    ctx.drawText("GND", 2, halfH - 0.15, { horizontal: "center", vertical: "bottom" });
 
     if (label.length > 0) {
       ctx.setFont({ family: "sans-serif", size: 0.8 });
@@ -241,7 +256,7 @@ function createDACElement(
     nDigitalBits.push(pinNodes.get(`D${i}`) ?? 0);
   }
   for (let i = 0; i < bits; i++) {
-    const model = new DigitalInputPinModel(inputSpec);
+    const model = new DigitalInputPinModel(inputSpec, true);
     const nD = nDigitalBits[i];
     if (nD > 0) {
       model.init(nD, 0);

@@ -18,7 +18,6 @@ import { readFileSync, readdirSync, statSync, existsSync } from "fs";
 import { join, relative, dirname, basename } from "path";
 
 import { createDefaultRegistry } from "@/components/register-all";
-import type { ComponentRegistry } from "@/core/registry";
 import { loadWithSubcircuits, clearSubcircuitCache } from "@/io/subcircuit-loader";
 import type { FileResolver } from "@/io/file-resolver";
 import { ResolverNotFoundError } from "@/io/file-resolver";

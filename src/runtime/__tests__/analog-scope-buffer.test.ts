@@ -10,7 +10,6 @@ describe("ScopeBuffer", () => {
 
   it("push_and_query_range", () => {
     // Push 100 samples at non-uniform times
-    const rng = { v: 1 };
     let t = 0;
     for (let i = 0; i < 100; i++) {
       t += 0.001 + (i % 7) * 0.0001; // non-uniform spacing

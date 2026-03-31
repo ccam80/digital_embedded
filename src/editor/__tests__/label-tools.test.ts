@@ -1,10 +1,5 @@
 /**
  * Tests for label-tools: autoNumberLabels.
- *
- * Ported from the deleted label-tools.test.ts (Wave 3 cleanup).
- * Only autoNumberLabels tests are included — the other functions
- * (addLabelPrefix, removeLabelPrefix, renameTunnel) were removed from
- * label-tools.ts and are not tested here.
  */
 
 import { describe, it, expect } from 'vitest';

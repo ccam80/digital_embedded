@@ -34,7 +34,6 @@ import { NJfetAnalogElement } from "./njfet.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import type { FetCapacitances } from "../../solver/analog/fet-base.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------

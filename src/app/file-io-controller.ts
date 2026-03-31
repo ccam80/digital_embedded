@@ -524,7 +524,7 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
   gifMenuItem?.addEventListener('click', () => {
     const gifEng = facade.getCoordinator();
     if (!gifEng || gifEng.getState() === EngineState.STOPPED) return;
-    downloadExport(exportGif(ctx.getCircuit(), gifEng), `${circuitBaseName()}.gif`, 'GIF');
+    downloadExport(exportGif(ctx.getCircuit(), gifEng as unknown as import('../core/engine-interface.js').SimulationEngine), `${circuitBaseName()}.gif`, 'GIF');
   });
 
   function updateGifMenuState(): void {

@@ -46,7 +46,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import {
   DigitalInputPinModel,
@@ -208,9 +208,24 @@ export class ADCElement extends AbstractCircuitElement {
     ctx.drawLine(0, h, 0, 0);
 
     ctx.setFont({ family: "sans-serif", size: 0.8 });
-    ctx.drawText("ADC", 2, h / 2, { horizontal: "center", vertical: "center" });
+    ctx.drawText("ADC", 2, h / 2, { horizontal: "center", vertical: "middle" });
+
+    // Pin labels
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.55 });
+    // Left-side input pins
+    ctx.drawText("VIN",  0.15, 0, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("CLK",  0.15, 1, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("VREF", 0.15, 2, { horizontal: "left", vertical: "middle" });
+    ctx.drawText("GND",  0.15, 3, { horizontal: "left", vertical: "middle" });
+    // Right-side output pins
+    ctx.drawText("EOC", 3.85, 0, { horizontal: "right", vertical: "middle" });
+    for (let i = 0; i < bits; i++) {
+      ctx.drawText(`D${i}`, 3.85, i + 1, { horizontal: "right", vertical: "middle" });
+    }
 
     if (label.length > 0) {
+      ctx.setFont({ family: "sans-serif", size: 0.8 });
       ctx.drawText(label, 2, -0.3, { horizontal: "center", vertical: "bottom" });
     }
 
@@ -264,8 +279,8 @@ function createADCElement(
   }
 
   // Build pin models
-  const vinPin = new DigitalInputPinModel(INPUT_PIN_SPEC);
-  const clkPin = new DigitalInputPinModel(INPUT_PIN_SPEC);
+  const vinPin = new DigitalInputPinModel(INPUT_PIN_SPEC, true);
+  const clkPin = new DigitalInputPinModel(INPUT_PIN_SPEC, true);
   const eocPin = new DigitalOutputPinModel(OUTPUT_PIN_SPEC);
   const digitalPins: DigitalOutputPinModel[] = nDigital.map(
     () => new DigitalOutputPinModel(OUTPUT_PIN_SPEC),

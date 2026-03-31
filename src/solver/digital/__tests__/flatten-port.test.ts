@@ -11,9 +11,8 @@ import type { Pin } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
 import { PropertyBag } from "@/core/properties";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
-import type { ComponentDefinition, ExecuteFunction } from "@/core/registry";
+import type { ComponentDefinition } from "@/core/registry";
 import { flattenCircuit } from "@/solver/digital/flatten";
-import type { SubcircuitHost } from "@/solver/digital/flatten";
 import {
   TestLeafElement,
   TestSubcircuitElement,

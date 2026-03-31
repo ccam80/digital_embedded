@@ -51,6 +51,7 @@ function makeElement(
     getAttribute(name: string): PropertyValue | undefined {
       return bag.has(name) ? bag.get(name) : undefined;
     },
+    setAttribute(_name: string, _value: PropertyValue): void {},
   };
 }
 

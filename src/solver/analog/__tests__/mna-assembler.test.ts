@@ -15,7 +15,6 @@ import {
   makeVoltageSource,
   makeCurrentSource,
 } from "./test-helpers.js";
-import type { AnalogElement } from "../element.js";
 
 // ---------------------------------------------------------------------------
 // Stamping tests — full solve

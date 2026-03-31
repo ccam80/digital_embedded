@@ -23,8 +23,8 @@ import { DigitalEngine } from "../digital-engine.js";
 import { BusResolver } from "../bus-resolution.js";
 import { Circuit, Wire } from "@/core/circuit";
 import { ComponentRegistry, ComponentCategory } from "@/core/registry";
-import type { ComponentDefinition } from "@/core/registry";
-import type { Pin, PinDeclaration } from "@/core/pin";
+import type { ComponentDefinition, DigitalModel } from "@/core/registry";
+import type { PinDeclaration } from "@/core/pin";
 import { PinDirection } from "@/core/pin";
 import type { } from "@/core/renderer-interface";
 import { PropertyBag } from "@/core/properties";
@@ -94,11 +94,13 @@ function nfetPins(): PinDeclaration[] {
   ];
 }
 
+type ExtraDefFields = Partial<ComponentDefinition> & Pick<DigitalModel, 'stateSlotCount' | 'switchPins' | 'defaultDelay'>;
+
 function makeDefinition(
   name: string,
   pins: PinDeclaration[],
   executeFn: ExecuteFunction = noopExecFn,
-  extra?: Partial<ComponentDefinition>,
+  extra?: ExtraDefFields,
 ): ComponentDefinition {
   const { stateSlotCount, switchPins, defaultDelay, ...restExtra } = extra ?? {};
   return {

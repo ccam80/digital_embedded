@@ -1,6 +1,6 @@
-import { PropertyBag, PropertyType } from "../core/properties.js";
+import { PropertyBag } from "../core/properties.js";
 import { defineModelParams } from "../core/model-params.js";
-import type { AnalogFactory, ModelEntry, ParamDef } from "../core/registry.js";
+import type { AnalogFactory, ModelEntry } from "../core/registry.js";
 
 /**
  * Stub AnalogFactory that returns a minimal AnalogElementCore.

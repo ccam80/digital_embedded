@@ -99,7 +99,7 @@ describe('spice-import round-trip MCP surface -- parseModelCard to circuit.metad
     const parsed = result as Exclude<typeof result, { message: string }>;
     expect(parsed.name).toBe('Q2N2222');
     expect(parsed.deviceType).toBe('NPN');
-    expect(parsed.params['IS']).toBeCloseTo(1e-14, 20);
+    expect(parsed.params['IS']).toBe(1e-14);
     expect(parsed.params['BF']).toBe(200);
     expect(parsed.params['VAF']).toBe(100);
     expect(parsed.params['IKF']).toBeCloseTo(0.3, 5);
@@ -119,7 +119,7 @@ describe('spice-import round-trip MCP surface -- parseModelCard to circuit.metad
     const entry = circuit.metadata.models!['NpnBJT']?.['Q2N2222'];
     expect(entry).toBeDefined();
     expect(entry!.kind).toBe('inline');
-    expect(entry!.params['IS']).toBeCloseTo(1e-14, 20);
+    expect(entry!.params['IS']).toBe(1e-14);
     expect(entry!.params['BF']).toBe(200);
   });
 
@@ -146,7 +146,7 @@ describe('spice-import round-trip MCP surface -- parseModelCard to circuit.metad
       registry,
     );
     const bag = q1.getProperties();
-    expect(bag.getModelParam<number>('IS')).toBeCloseTo(1e-14, 20);
+    expect(bag.getModelParam<number>('IS')).toBe(1e-14);
     expect(bag.getModelParam<number>('BF')).toBe(200);
   });
 });
@@ -193,7 +193,7 @@ describe('spice-import round-trip MCP surface -- apply then compile', () => {
     // Override params were stored in circuit.metadata.models
     const entry = circuit.metadata.models!['NpnBJT']?.['Q2N2222'];
     expect(entry).toBeDefined();
-    expect(entry!.params['IS']).toBeCloseTo(1e-14, 20);
+    expect(entry!.params['IS']).toBe(1e-14);
     expect(entry!.params['BF']).toBe(200);
     // Simulation must converge with the override active
     const dc = facade.getDcOpResult();
@@ -284,7 +284,7 @@ describe('spice-import round-trip MCP surface -- serialize/deserialize preserves
     const entry = reloaded.metadata.models!['NpnBJT']?.['Q2N2222'];
     expect(entry).toBeDefined();
     expect(entry!.kind).toBe('inline');
-    expect(entry!.params['IS']).toBeCloseTo(1e-14, 20);
+    expect(entry!.params['IS']).toBe(1e-14);
     expect(entry!.params['BF']).toBe(200);
     expect(entry!.params['VAF']).toBe(100);
   });
@@ -333,5 +333,119 @@ describe('spice-import round-trip MCP surface -- serialize/deserialize preserves
     for (let i = 0; i < voltagesOriginal.length; i++) {
       expect(voltagesReloaded[i]).toBeCloseTo(voltagesOriginal[i]!, 6);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test suite 4: SPICE import via facade — the MCP tool path
+//
+// The MCP server calls facade methods (compile, getDcOpResult, serialize,
+// deserialize) after applying SPICE models. These tests exercise the full
+// import path using buildBjtCircuit() (position-based wiring, same topology
+// as the manual tests above) and then facade-level compile/query methods.
+// ---------------------------------------------------------------------------
+
+describe('spice-import MCP tool path — applySpiceImportResult + facade compile/query', () => {
+  it('applySpiceImportResult then facade.compile succeeds with zero error diagnostics', () => {
+    const { circuit, facade } = buildBjtCircuit();
+
+    const q1 = circuit.elements.find(
+      el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1'
+    )!;
+    expect(q1).toBeDefined();
+
+    applySpiceImportResult(
+      q1,
+      { overrides: { IS: 1e-14, BF: 200 }, modelName: 'Q2N2222', deviceType: 'NPN' },
+      circuit,
+      registry,
+    );
+
+    facade.compile(circuit);
+    const compiled = facade.getCompiledUnified();
+    expect(compiled).not.toBeNull();
+    expect(compiled!.analog).not.toBeNull();
+
+    const errorDiags = compiled!.analog!.diagnostics.filter(d => d.severity === 'error');
+    expect(errorDiags).toHaveLength(0);
+  });
+
+  it('parseModelCard then applySpiceImportResult stores params and DC converges', () => {
+    const { circuit, facade } = buildBjtCircuit();
+
+    const modelText = '.MODEL Q2N2222A NPN (IS=3.108e-14 BF=217 VAF=113.7)';
+    const parsed = parseModelCard(modelText);
+    expect('message' in parsed).toBe(false);
+    const parsedModel = parsed as Exclude<typeof parsed, { message: string }>;
+
+    const q1 = circuit.elements.find(
+      el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1'
+    )!;
+
+    applySpiceImportResult(
+      q1,
+      { overrides: parsedModel.params, modelName: parsedModel.name, deviceType: parsedModel.deviceType },
+      circuit,
+      registry,
+    );
+
+    // Verify metadata was written.
+    const entry = circuit.metadata.models?.['NpnBJT']?.['Q2N2222A'];
+    expect(entry).toBeDefined();
+    expect(entry!.params['IS']).toBe(3.108e-14);
+    expect(entry!.params['BF']).toBe(217);
+
+    // Compile and verify DC operating point converges.
+    facade.compile(circuit);
+    const dc = facade.getDcOpResult();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+  });
+
+  it('IS=1e-20 override: BJT in cutoff, DC converges with ≥3 node voltages', () => {
+    const { circuit, facade } = buildBjtCircuit();
+
+    const q1 = circuit.elements.find(
+      el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1'
+    )!;
+
+    applySpiceImportResult(
+      q1,
+      { overrides: { IS: 1e-20 }, modelName: 'Q_CUTOFF', deviceType: 'NPN' },
+      circuit,
+      registry,
+    );
+
+    facade.compile(circuit);
+    const dc = facade.getDcOpResult();
+    expect(dc).not.toBeNull();
+    expect(dc!.converged).toBe(true);
+    expect(dc!.nodeVoltages.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('serialize → deserialize preserves SPICE model name and params', () => {
+    const { circuit, facade } = buildBjtCircuit();
+
+    const q1 = circuit.elements.find(
+      el => el.getProperties().has('label') && el.getProperties().get('label') === 'Q1'
+    )!;
+
+    applySpiceImportResult(
+      q1,
+      { overrides: { IS: 1e-14, BF: 200, VAF: 100 }, modelName: 'Q2N2222', deviceType: 'NPN' },
+      circuit,
+      registry,
+    );
+
+    const json = facade.serialize(circuit);
+    expect(json).toContain('Q2N2222');
+
+    const reloaded = facade.deserialize(json);
+    const entry = reloaded.metadata.models?.['NpnBJT']?.['Q2N2222'];
+    expect(entry).toBeDefined();
+    expect(entry!.kind).toBe('inline');
+    expect(entry!.params['IS']).toBe(1e-14);
+    expect(entry!.params['BF']).toBe(200);
+    expect(entry!.params['VAF']).toBe(100);
   });
 });

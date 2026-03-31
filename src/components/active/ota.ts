@@ -70,7 +70,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -324,8 +324,16 @@ export class OTAElement extends AbstractCircuitElement {
     ctx.drawCircle(4.5625, 0, 0.55125, false);
 
     // Text labels
+    ctx.setFont({ family: "sans-serif", size: 0.7 });
     ctx.drawText("+", 0.5625, -2.125, { horizontal: "center", vertical: "middle" });
     ctx.drawText("-", 0.5625, 2.0, { horizontal: "center", vertical: "middle" });
+
+    // Pin labels
+    ctx.setColor("TEXT");
+    ctx.setFont({ family: "sans-serif", size: 0.5 });
+    ctx.drawText("Iabc", 0.2, 0, { horizontal: "left", vertical: "bottom" });
+    ctx.drawText("OUT+", 4.875, -1.6, { horizontal: "center", vertical: "bottom" });
+    ctx.drawText("OUT", 5.875, -0.4, { horizontal: "center", vertical: "bottom" });
 
     ctx.restore();
     void vVp; void vVm; void vIabc; void vOutP; void vOut;

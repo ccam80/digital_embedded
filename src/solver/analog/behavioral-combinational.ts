@@ -477,7 +477,7 @@ export function makeBehavioralMuxAnalogFactory(selectorBits: number): AnalogElem
     const selSpec = resolveSpec(props, "sel");
     const selPins: DigitalInputPinModel[] = [];
     for (let b = 0; b < selectorBits; b++) {
-      const pin = new DigitalInputPinModel(selSpec);
+      const pin = new DigitalInputPinModel(selSpec, true);
       pin.init(selNodeId, 0);
       selPins.push(pin);
     }
@@ -489,7 +489,7 @@ export function makeBehavioralMuxAnalogFactory(selectorBits: number): AnalogElem
       const spec = resolveSpec(props, `in_${i}`);
       const group: DigitalInputPinModel[] = [];
       for (let bit = 0; bit < bitWidth; bit++) {
-        const pin = new DigitalInputPinModel(spec);
+        const pin = new DigitalInputPinModel(spec, true);
         pin.init(inNodeId, 0);
         group.push(pin);
       }
@@ -533,7 +533,7 @@ export function makeBehavioralDemuxAnalogFactory(selectorBits: number): AnalogEl
     const selSpec = resolveSpec(props, "sel");
     const selPins: DigitalInputPinModel[] = [];
     for (let b = 0; b < selectorBits; b++) {
-      const pin = new DigitalInputPinModel(selSpec);
+      const pin = new DigitalInputPinModel(selSpec, true);
       pin.init(selNodeId, 0);
       selPins.push(pin);
     }
@@ -549,7 +549,7 @@ export function makeBehavioralDemuxAnalogFactory(selectorBits: number): AnalogEl
 
     // Input pin
     const inSpec = resolveSpec(props, "in");
-    const inPin = new DigitalInputPinModel(inSpec);
+    const inPin = new DigitalInputPinModel(inSpec, true);
     inPin.init(pinNodes.get("in") ?? 0, 0);
 
     return new BehavioralDemuxElement(selPins, inPin, outPins, outputCount);
@@ -579,7 +579,7 @@ export function makeBehavioralDecoderAnalogFactory(selectorBits: number): Analog
     const selSpec = resolveSpec(props, "sel");
     const selPins: DigitalInputPinModel[] = [];
     for (let b = 0; b < selectorBits; b++) {
-      const pin = new DigitalInputPinModel(selSpec);
+      const pin = new DigitalInputPinModel(selSpec, true);
       pin.init(selNodeId, 0);
       selPins.push(pin);
     }

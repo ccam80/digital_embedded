@@ -1,7 +1,7 @@
 {
   "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"/tmp/tserrors.txt\",\"limit\":200}",
-  "error": "File does not exist. Note: your current working directory is C:\\local_working_projects\\digital_in_browser.",
-  "timestamp": "2026-03-30T22:08:15.942Z",
-  "retry_count": 1
+  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\e2e\\\\gui\\\\mixed-circuit-assembly.spec.ts\",\"limit\":2000}",
+  "error": "File content (12987 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-03-31T08:14:11.554Z",
+  "retry_count": 3
 }

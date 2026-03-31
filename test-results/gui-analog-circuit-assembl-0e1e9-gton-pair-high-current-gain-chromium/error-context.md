@@ -16,7 +16,7 @@
       - button "↷" [disabled] [ref=e14]
       - button "⧉" [ref=e15] [cursor=pointer]
       - button "▶" [ref=e17] [cursor=pointer]
-      - button "⏵" [ref=e18] [cursor=pointer]
+      - button "⏵" [active] [ref=e18] [cursor=pointer]
       - 'textbox "Step to sim-time offset (SI suffixes: s, m=ms, u=µs, n=ns)" [ref=e19]':
         - /placeholder: e.g. 5m, 100u
         - text: 1m
@@ -270,38 +270,9 @@
                 - generic [ref=e358]: RAMSinglePort
       - button "‹" [ref=e359] [cursor=pointer]
     - generic "Drag to resize palette" [ref=e360]
-    - generic [ref=e361]:
-      - generic "Circuit editor canvas" [ref=e362]
-      - generic [ref=e363]:
-        - generic [ref=e364]:
-          - generic [ref=e365]: Resistor
-          - button "×" [ref=e366] [cursor=pointer]
-        - generic [ref=e367]:
-          - generic [ref=e368]:
-            - generic [ref=e369]: Resistance (Ω)
-            - generic [ref=e370]:
-              - textbox [ref=e371]: 1.00 k
-              - generic [ref=e372]: Ω
-          - generic [ref=e373]:
-            - generic [ref=e374]: Label
-            - generic [ref=e375]:
-              - textbox [ref=e376]: Rc
-              - checkbox "Show on canvas" [checked] [ref=e377]
-          - generic [ref=e378]:
-            - generic [ref=e379]: Show value
-            - checkbox [checked] [ref=e381]
-          - generic [ref=e382]:
-            - generic [ref=e383]: Model
-            - combobox [ref=e384]:
-              - option "Behavioral (MNA)" [selected]
-          - generic [ref=e386]:
-            - generic "Resistance in ohms. Minimum clamped to 1e-9 Ω." [ref=e387]: resistance
-            - textbox [ref=e388]: "100"
-            - generic [ref=e389]: Ω
-            - button "↺" [ref=e390] [cursor=pointer]
-          - generic [ref=e392] [cursor=pointer]: ▶ Pin Electrical
-  - generic [ref=e393]:
-    - generic [ref=e394]: Ready
-    - button "100%" [ref=e396] [cursor=pointer]
-    - generic [ref=e397]: 12, 5
+    - generic "Circuit editor canvas" [ref=e362]
+  - generic [ref=e363]:
+    - generic [ref=e364]: Ready
+    - button "100%" [ref=e366] [cursor=pointer]
+    - generic [ref=e367]: 26, 14
 ```

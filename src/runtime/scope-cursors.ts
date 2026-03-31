@@ -81,7 +81,7 @@ export class ScopeCursors {
     const deltaT = tB - tA;
 
     // Get samples between the cursors
-    const { time, value } = buffer.getSamplesInRange(tMin, tMax);
+    const { value } = buffer.getSamplesInRange(tMin, tMax);
 
     // deltaV: value at cursor B minus value at cursor A (nearest samples)
     const vA = this._nearestValue(buffer, tA);

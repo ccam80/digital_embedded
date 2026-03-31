@@ -20,7 +20,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement, AnalogElementCore } from "./element.js";
+import type { AnalogElementCore } from "./element.js";
 import type { ExprNode } from "./expression.js";
 import { compileExpression } from "./expression-evaluate.js";
 import type { ExpressionContext } from "./expression-evaluate.js";
@@ -37,7 +37,7 @@ export class MutableExpressionContext implements ExpressionContext {
   private readonly _voltageMap: Map<string, number> = new Map();
   private readonly _currentMap: Map<string, number> = new Map();
   time = 0;
-  freq: number | undefined = undefined;
+  freq?: number;
 
   setNodeVoltage(label: string, value: number): void {
     this._voltageMap.set(label, value);

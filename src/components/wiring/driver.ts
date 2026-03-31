@@ -37,8 +37,6 @@ import { createDriverAnalogElement } from "../../solver/analog/behavioral-remain
  * Triangle from roughly (-1, -0.6) → (1, 0) → (-1, 0.6).
  * Component origin is at the center (where the sel pin stem meets the triangle).
  */
-const COMP_WIDTH = 2;   // from input pin x=-1 to output pin x=1
-const COMP_HEIGHT = 2;  // from sel pin y=-1 to y=+1 (or 0 to 2 with bottom sel)
 
 // ---------------------------------------------------------------------------
 // Pin layout
