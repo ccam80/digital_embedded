@@ -167,7 +167,9 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.setComponentProperty('CTRL', 'Default', 1);
     await builder.placeLabeled('SwitchSPST', 12, 3, 'SW');
     await builder.placeLabeled('Resistor', 20, 3, 'R1');
+    await builder.setComponentProperty('R1', 'resistance', 10000);
     await builder.placeLabeled('Resistor', 28, 3, 'R2');
+    await builder.setComponentProperty('R2', 'resistance', 10000);
     await builder.placeComponent('Ground', 3, 4);    // Vs.neg — moved up to avoid CTRL at (3,7)
     await builder.placeComponent('Ground', 32, 8);
     await builder.placeLabeled('Probe', 26, 1, 'P_DIV');
@@ -184,12 +186,14 @@ test.describe('Master circuit assembly via UI', () => {
 
     // --- Section D: BJT CE amplifier (y=25) ---
     await builder.placeLabeled('Resistor', 20, 25, 'Rb');
+    await builder.setComponentProperty('Rb', 'resistance', 100000);
     await builder.placeLabeled('NpnBJT', 28, 25, 'Q1');
     await builder.placeLabeled('Resistor', 36, 24, 'Rc');
+    await builder.setComponentProperty('Rc', 'resistance', 1000);
     await builder.placeLabeled('DcVoltageSource', 36, 30, 'Vcc');
+    await builder.setComponentProperty('Vcc', 'voltage', 12);
     await builder.placeComponent('Ground', 32, 30);                 // shared GND for BJT.E and Vcc.neg
-    await builder.placeLabeled('Probe', 44, 24, 'P_CE');
-
+    await builder.placeLabeled('Probe', 44, 23, 'P_CE');
     // --- WIRING (captured from manual session) ---
     // Section A: power → switch → divider
     await builder.drawWireExplicit('Vs', 'pos', 'SW', 'in');
@@ -223,7 +227,7 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.drawWireExplicit('Rb', 'B', 'Q1', 'B');
     // Collector: Q1.C → Rc.A, P_CE taps collector wire
     await builder.drawWireExplicit('Q1', 'C', 'Rc', 'A');
-    await builder.drawWireFromPinExplicit('P_CE', 'in', 36, 24);    // horizontal to collector wire
+    await builder.drawWireFromPinExplicit('P_CE', 'in', 36, 24, [[36, 23]]);  // above Rc, dogleg down to Rc.A pin
     // Vcc.pos → Rc.B: straight down same column x=40
     await builder.drawWireExplicit('Rc', 'B', 'Vcc', 'pos');
     // Grounds: Q1.E → GND(32,30), Vcc.neg → GND(32,30)
@@ -234,30 +238,120 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.stepViaUI();
     await builder.verifyNoErrors();
 
-    // Step to 1ms and read analog state
-    await builder.stepToTimeViaUI('1m');
-    const state = await builder.getAnalogState();
-    expect(state).not.toBeNull();
-    expect(state!.simTime).toBeGreaterThan(0);
-    expect(state!.nodeCount).toBeGreaterThanOrEqual(4);
+    // Drive CTRL=1 via the postMessage API so the switch closes.
+    // The In component's defaultValue=1 is stored in the property bag but the
+    // digital engine initializes all signals to 0. The postMessage sim-set-input
+    // path calls facade.setInput which writes directly to the signal array.
+    await builder.page.evaluate(() => {
+      window.postMessage({ type: 'sim-set-input', label: 'CTRL', value: 1 }, '*');
+    });
+    await builder.page.waitForTimeout(200);
+    await builder.stepViaUI(2);
+
+    // --- Phase A: DC operating point ---
+    // Step to 50ms for full settling
+    await builder.stepToTimeViaUI('50m');
+    const stateA = await builder.getAnalogState();
+    expect(stateA).not.toBeNull();
+    expect(stateA!.simTime).toBeGreaterThan(0);
+    expect(stateA!.nodeCount).toBeGreaterThanOrEqual(4);
 
     // All voltages must be finite
-    for (const [node, v] of Object.entries(state!.nodeVoltages)) {
+    for (const [node, v] of Object.entries(stateA!.nodeVoltages)) {
       expect(Number.isFinite(v), `node ${node} voltage is not finite: ${v}`).toBe(true);
     }
 
-    // Add a trace on R1 to get voltage data via scope
+    // Assert DC operating point at 0.1% relative tolerance
+    // ngspice refs: v_div=2.5V, v_rc=2.5V, v_amp=2.499998V, v_col=10.00008V
+    const signalsA = await builder.readAllSignals();
+    expect(signalsA).not.toBeNull();
+
+    const pDivA = signalsA!['P_DIV'];
+    const pRcA = signalsA!['P_RC'];
+    const pAmpA = signalsA!['P_AMP'];
+    const pCeA = signalsA!['P_CE'];
+
+    expect(pDivA).toBeDefined();
+    expect(pRcA).toBeDefined();
+    expect(pAmpA).toBeDefined();
+    expect(pCeA).toBeDefined();
+
+    expect(Math.abs(pDivA - 2.500000) / 2.500000).toBeLessThan(0.001);
+    expect(Math.abs(pRcA - 2.500000) / 2.500000).toBeLessThan(0.001);
+    expect(Math.abs(pAmpA - 2.499998) / 2.499998).toBeLessThan(0.001);
+    // P_CE has wider tolerance (2%) because the switch rOn=10Ω reduces divider
+    // voltage slightly, and the BJT CE amplifier magnifies this small offset.
+    expect(Math.abs(pCeA - 10.00008) / 10.00008).toBeLessThan(0.02);
+
+    // --- Phase B: Modify R1 resistance 10k → 20k ---
+    await builder.setComponentProperty('R1', 'resistance', 20000);
+    await builder.stepToTimeViaUI('60m');  // absolute: 50ms + 10ms settling
+    const stateB = await builder.getAnalogState();
+    expect(stateB).not.toBeNull();
+
+    const signalsB = await builder.readAllSignals();
+    expect(signalsB).not.toBeNull();
+
+    const pDivB = signalsB!['P_DIV'];
+    const pRcB = signalsB!['P_RC'];
+    const pAmpB = signalsB!['P_AMP'];
+    const pCeB = signalsB!['P_CE'];
+
+    // ngspice refs: v_div=1.666667V, v_rc=1.666667V, v_amp=1.666665V, v_col=10.88529V
+    expect(Math.abs(pDivB - 1.666667) / 1.666667).toBeLessThan(0.001);
+    expect(Math.abs(pRcB - 1.666667) / 1.666667).toBeLessThan(0.001);
+    expect(Math.abs(pAmpB - 1.666665) / 1.666665).toBeLessThan(0.001);
+    expect(Math.abs(pCeB - 10.88529) / 10.88529).toBeLessThan(0.02);
+
+    // --- Phase C: Modify BJT BF 100 → 50 ---
+    await builder.setSpiceParameter('Q1', 'BF', 50);
+    await builder.stepToTimeViaUI('65m');  // absolute: 60ms + 5ms settling
+    const stateC = await builder.getAnalogState();
+    expect(stateC).not.toBeNull();
+
+    const signalsC = await builder.readAllSignals();
+    expect(signalsC).not.toBeNull();
+
+    const pCeC = signalsC!['P_CE'];
+
+    // ngspice ref: v_col=11.43012V (lower gain → higher Vce)
+    expect(Math.abs(pCeC - 11.43012) / 11.43012).toBeLessThan(0.02);
+
+    // --- Phase D: Trace/scope on R1 ---
     await builder.addTraceViaContextMenu('R1', 'A');
+    const peaks = await builder.measureAnalogPeaks('2m');
+    expect(peaks).not.toBeNull();
+    expect(peaks!.nodeCount).toBeGreaterThanOrEqual(1);
+    // After Phase C: P_DIV is near 1.667V (new divider with R1=20k)
+    const maxPeak = Math.max(...peaks!.peaks);
+    expect(maxPeak).toBeGreaterThan(1.0);
+    expect(maxPeak).toBeLessThan(3.0);
 
-    // Step to 5ms (5τ for RC at 1kΩ × 1µF) to let circuits settle
-    const result = await builder.measureAnalogPeaks('5m');
-    expect(result).not.toBeNull();
-    expect(result!.nodeCount).toBeGreaterThanOrEqual(1);
+    // --- Phase E: Pin loading on R1-R2 junction ---
+    // Reset R1 back to 10k and BF back to 100 for clean pin-loading measurement
+    await builder.setComponentProperty('R1', 'resistance', 10000);
+    await builder.setSpiceParameter('Q1', 'BF', 100);
 
-    // Vs = 5V, switch closed, divider R1=R2 → junction peak ≈ 2.5V
-    const maxPeak = Math.max(...result!.peaks);
-    expect(maxPeak).toBeGreaterThan(2.0);
-    expect(maxPeak).toBeLessThan(6.0);
+    // Right-click wire near the R1.B pin (R1-R2 junction) to set pin loading
+    const junctionPos = await builder.getPinPagePosition('R1', 'B');
+    await builder.page.mouse.click(junctionPos.x + 5, junctionPos.y, { button: 'right' });
+    await builder.page.waitForTimeout(200);
+    const loadedItem = builder.page.locator('.ctx-menu-item .ctx-menu-label')
+      .filter({ hasText: 'Pin Loading: Loaded' });
+    await expect(loadedItem).toBeVisible({ timeout: 3000 });
+    await loadedItem.click();
+    await builder.page.waitForTimeout(300);
+
+    await builder.stepToTimeViaUI('75m');  // absolute: ~70ms + 5ms settling
+    const stateE = await builder.getAnalogState();
+    expect(stateE).not.toBeNull();
+
+    const signalsE = await builder.readAllSignals();
+    expect(signalsE).not.toBeNull();
+
+    const pDivE = signalsE!['P_DIV'];
+    // ngspice ref: loaded V(div) = 2.498751V (delta = 1.249mV, 0.05% drop vs unloaded 2.5V)
+    expect(Math.abs(pDivE - 2.498751) / 2.498751).toBeLessThan(0.001);
   });
 
   // =========================================================================
