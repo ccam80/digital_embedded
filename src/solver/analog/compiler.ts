@@ -128,7 +128,7 @@ function resolveSubcircuitModels(
     if (!entry || entry.kind !== 'netlist') continue;
     const defName = pc.modelKey;
 
-    const netlist = runtimeModels[defName];
+    const netlist = entry.netlist ?? runtimeModels[defName];
     if (!netlist) {
       diagnostics.push(
         makeDiagnostic(
@@ -216,6 +216,13 @@ function compileSubcircuitToMnaModel(
         const leafFactory = leafEntry.factory;
 
         const subProps = new PropertyBag();
+        // Seed with leaf definition's default model params (e.g. MOSFET VTO, KP, LAMBDA)
+        if (leafEntry.params) {
+          for (const [k, v] of Object.entries(leafEntry.params)) {
+            if (typeof v === "number") subProps.setModelParam(k, v);
+          }
+        }
+        // Override with subcircuit-specific params
         if (subEl.params) {
           for (const [k, v] of Object.entries(subEl.params)) {
             if (typeof v === "number") subProps.setModelParam(k, v);

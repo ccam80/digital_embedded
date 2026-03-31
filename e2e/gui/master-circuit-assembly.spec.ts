@@ -125,13 +125,23 @@ test.describe('Master circuit assembly via UI', () => {
     expect(truthTable.failed).toBe(0);
 
     // --- Sequential: D flip-flop latches AND output ---
-    // Set A=1, B=1 → AND=1, then clock → Q should latch to 1
-    // (runTestVectors steps the clock between rows, so Q tracks AND_Y
-    //  delayed by one clock cycle)
+    // After truth table, inputs are A=1, B=1 from last row (AND=1).
+    // Step enough times to produce at least 4 rising clock edges and latch Q.
+    await builder.stepViaUI(10);
+    const q = await builder.readOutput('Q');
+    expect(q).toBe(1);
 
-    // --- Counter: should increment on clock edges ---
-    // After running truth table vectors (4 rows = 4 clock edges),
-    // the counter should have advanced
+    // --- Counter: should have incremented at least 4 times ---
+    const cntY = await builder.readOutput('CNT_Y');
+    expect(cntY).not.toBeNull();
+    expect(cntY!).toBeGreaterThanOrEqual(4);
+
+    // --- CMOS model: Phase C (deferred) ---
+    // CMOS subcircuit adds VDD/GND power pins that require wiring to supply
+    // components. In this digital-only circuit, no power sources exist.
+    // Compiler fixes landed (netlist resolution + default MOSFET params),
+    // but test needs VDD/GND wiring before CMOS assertions can be validated.
+    // TODO: Place VDD + Ground, wire to G_AND power pins, then assert CMOS voltages.
   });
 
   // =========================================================================
@@ -298,7 +308,7 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.placeLabeled('VoltageComparator', 33, 19, 'CMP');
     await builder.setComponentProperty('CMP', 'Output type', 'push-pull');
     await builder.placeLabeled('DcVoltageSource', 25, 21, 'Vref2');
-    await builder.setComponentProperty('Vref2', 'Voltage (V)', 2.5);
+    await builder.setComponentProperty('Vref2', 'voltage', 2.5);
     await builder.placeComponent('Ground', 25, 24);
 
     // --- Digital output chain ---

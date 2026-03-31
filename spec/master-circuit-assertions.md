@@ -294,7 +294,7 @@ DAC Thevenin: Vdac in series with Rdac=100. Tau = (Rdac+R1)*C1.
 ## Property Labels (for setComponentProperty)
 | Component | Property | UI Label |
 |-----------|----------|----------|
-| DcVoltageSource | voltage | `"Voltage (V)"` |
+| DcVoltageSource | voltage | `"voltage"` (model param label = key) |
 | Resistor | resistance | `"resistance"` |
 | Capacitor | capacitance | `"capacitance"` |
 | VoltageComparator | outputType | `"Output type"` |

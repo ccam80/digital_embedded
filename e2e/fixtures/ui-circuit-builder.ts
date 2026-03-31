@@ -1307,13 +1307,15 @@ export class UICircuitBuilder {
     const popup = this.page.locator('.prop-popup');
     await expect(popup).toBeVisible({ timeout: 3000 });
 
-    // Try exact text-is match first, then fall back to case-insensitive prefix match
-    let row = popup.locator(`.prop-row:has(.prop-label:text-is("${propLabel}"))`);
+    // Try exact text-is match first in both .prop-row (regular properties) and
+    // .prop-row-inline (model parameters), then fall back to case-insensitive prefix match.
+    const rowSelector = `.prop-row:has(.prop-label:text-is("${propLabel}")), .prop-row-inline:has(.prop-label:text-is("${propLabel}"))`;
+    let row = popup.locator(rowSelector);
     const exactCount = await row.count();
     if (exactCount === 0) {
       // Case-insensitive prefix fallback: find the row whose label starts with the given text
       const lowerLabel = propLabel.toLowerCase();
-      const allRows = popup.locator('.prop-row');
+      const allRows = popup.locator('.prop-row, .prop-row-inline');
       const count = await allRows.count();
       for (let i = 0; i < count; i++) {
         const rowEl = allRows.nth(i);
