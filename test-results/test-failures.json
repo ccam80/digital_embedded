@@ -1,101 +1,28 @@
 {
   "summary": {
     "vitest": {
-      "passed": 9918,
-      "failed": 8,
+      "passed": 9926,
+      "failed": 0,
       "skipped": 0,
       "totalFiles": 331,
-      "durationSeconds": 18.7
+      "durationSeconds": 13
     },
     "playwright": {
-      "passed": 446,
-      "failed": 34,
+      "passed": 467,
+      "failed": 13,
       "skipped": 0,
       "totalFiles": 22,
-      "durationSeconds": 283.77850200000006
+      "durationSeconds": 195.81739800000003
     },
-    "totalFailed": 42,
-    "totalPassed": 10364
+    "totalFailed": 13,
+    "totalPassed": 10393
   },
   "failures": {
-    "vitest": [
-      {
-        "message": "expected 0 to be greater than 0",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
-            "test": "returns non-empty array for analog resistor element",
-            "line": 134,
-            "column": 65
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of undefined (reading 'elementIndex')",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
-            "test": "descriptor has non-negative integer elementIndex",
-            "line": 141,
-            "column": 31
-          }
-        ]
-      },
-      {
-        "message": "expected undefined to be defined",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
-            "test": "descriptor for resistor includes resistance property",
-            "line": 149,
-            "column": 19
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of undefined (reading 'currentValue')",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
-            "test": "descriptor currentValue matches element property value",
-            "line": 156,
-            "column": 18
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of undefined (reading 'label')",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
-            "test": "descriptor has non-empty label",
-            "line": 162,
-            "column": 58
-          }
-        ]
-      },
-      {
-        "message": "Cannot read properties of undefined (reading 'logScale')",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
-            "test": "descriptor logScale is a boolean",
-            "line": 168,
-            "column": 65
-          }
-        ]
-      }
-    ],
+    "vitest": [],
     "playwright": [
       {
         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
-        "count": 5,
+        "count": 4,
         "locations": [
           {
             "file": "gui/analog-ui-fixup.spec.ts",
@@ -113,12 +40,6 @@
             "file": "gui/workflow-tests.spec.ts",
             "test": "speed control affects analog simulation rate",
             "line": 635,
-            "column": 3
-          },
-          {
-            "file": "wire-capture.spec.ts",
-            "test": "Master 1: Digital — place, wire manually, capture",
-            "line": 198,
             "column": 3
           },
           {
@@ -142,115 +63,13 @@
         ]
       },
       {
-        "message": "Error: page.evaluate: Execution context was destroyed, most likely because of a navigation",
-        "count": 1,
-        "locations": [
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "IO/ButtonLED can be placed from palette",
-            "line": 500,
-            "column": 7
-          }
-        ]
-      },
-      {
         "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
-        "count": 27,
+        "count": 4,
         "locations": [
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "And works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Or works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Not works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "NAnd works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "NOr works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "XOr works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "XNOr works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "D_FF works in behavioral mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "JK_FF works in behavioral mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "RS_FF works in behavioral mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "T_FF works in behavioral mode",
-            "line": 766,
-            "column": 9
-          },
           {
             "file": "gui/hotload-params-e2e.spec.ts",
             "test": "changing BF on BJT via primary param row changes output voltage",
             "line": 124,
-            "column": 3
-          },
-          {
-            "file": "gui/hotload-params-e2e.spec.ts",
-            "test": "rOut override affects simulation output in mixed-signal mode",
-            "line": 215,
-            "column": 3
-          },
-          {
-            "file": "gui/hotload-params-e2e.spec.ts",
-            "test": "context menu on digital-to-analog wire shows all three Pin Loading options",
-            "line": 277,
-            "column": 3
-          },
-          {
-            "file": "gui/hotload-params-e2e.spec.ts",
-            "test": "selecting Pin Loading: Loaded shows checkmark and simulation continues without error",
-            "line": 299,
-            "column": 3
-          },
-          {
-            "file": "gui/hotload-params-e2e.spec.ts",
-            "test": "switching to Pin Loading: Ideal produces valid finite simulation output",
-            "line": 341,
             "column": 3
           },
           {
@@ -260,57 +79,9 @@
             "column": 3
           },
           {
-            "file": "gui/model-selector.spec.ts",
-            "test": "multi-model component shows Model dropdown with labels",
-            "line": 23,
-            "column": 3
-          },
-          {
-            "file": "gui/model-selector.spec.ts",
-            "test": "BJT shows primary model params (IS, BF) directly in popup",
-            "line": 71,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL import dialog opens with textarea when menu item clicked",
-            "line": 70,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL dialog shows parse preview for valid .MODEL card",
-            "line": 94,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL Apply stores overrides visible in SPICE panel",
-            "line": 129,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".SUBCKT dialog opens and shows parse preview",
-            "line": 188,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-model-panel.spec.ts",
-            "test": "panel visible for NPN BJT in analog mode",
-            "line": 71,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-model-panel.spec.ts",
-            "test": "edited IS value persists after closing and reopening popup",
-            "line": 123,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-model-panel.spec.ts",
-            "test": "IS override affects BJT collector current",
-            "line": 156,
+            "file": "wire-capture.spec.ts",
+            "test": "Master 1: Digital — place, wire manually, capture",
+            "line": 198,
             "column": 3
           },
           {
@@ -318,6 +89,54 @@
             "test": "Master 3: Mixed — place, wire manually, capture",
             "line": 417,
             "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "rOut override affects simulation output in mixed-signal mode",
+            "line": 215,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoBeNull\u001b[2m()\u001b[22m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/spice-model-panel.spec.ts",
+            "test": "IS override affects BJT collector current",
+            "line": 156,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: page.evaluate: TypeError: Cannot read properties of undefined (reading 'getCircuitInfo')",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "place component, undo removes it, redo restores it",
+            "line": 356,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "pin-map-discovery.spec.ts",
+            "test": "discover pin maps for all assembly component types",
+            "line": 42,
+            "column": 1
           }
         ]
       }

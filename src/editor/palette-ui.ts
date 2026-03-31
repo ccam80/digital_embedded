@@ -6,12 +6,11 @@
  * Separated from palette.ts so the logic layer is testable without DOM.
  */
 
-import type { ComponentDefinition } from "@/core/registry";
+import { createSeededBag, type ComponentDefinition } from "@/core/registry";
 import type { ComponentCategory } from "@/core/registry";
 import type { ComponentPalette, PaletteNode } from "./palette.js";
 import type { ColorScheme, Point } from "@/core/renderer-interface";
 import { CanvasRenderer } from "./canvas-renderer.js";
-import { PropertyBag } from "@/core/properties.js";
 import { PaletteDragController } from "./palette-drag.js";
 import type { Viewport } from "./viewport.js";
 
@@ -452,7 +451,7 @@ export class PaletteUI {
     }
 
     try {
-      const element = def.factory(new PropertyBag());
+      const element = def.factory(createSeededBag(def));
       const bb = element.getBoundingBox();
       const maxDim = Math.max(bb.width, bb.height, 1);
       const scale = (size * dpr * 0.8) / maxDim;

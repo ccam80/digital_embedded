@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { SparkGapElement, SparkGapDefinition, createSparkGapElement } from "../spark-gap.js";
+import { SparkGapElement, SparkGapDefinition, createSparkGapElement, SPARK_GAP_DEFAULTS } from "../spark-gap.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogFactory } from "../../../core/registry.js";
@@ -259,13 +259,14 @@ describe("SparkGap", () => {
     });
 
     it("SparkGapDefinition has vBreakdown default 1000", () => {
-      const prop = SparkGapDefinition.propertyDefs.find((p) => p.key === "vBreakdown");
-      expect(prop).toBeDefined();
-      expect(prop!.defaultValue).toBe(1000);
+      const params = SparkGapDefinition.modelRegistry?.behavioral?.params;
+      expect(params).toBeDefined();
+      expect(params!["vBreakdown"]).toBe(1000);
     });
 
     it("analogFactory creates a SparkGapElement", () => {
-      const props = new PropertyBag(new Map<string, import("../../../core/properties.js").PropertyValue>().entries());
+      const props = new PropertyBag();
+      props.replaceModelParams(SPARK_GAP_DEFAULTS);
       const element = createSparkGapElement(new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0);
       expect(element).toBeInstanceOf(SparkGapElement);
       expect(element.isNonlinear).toBe(true);

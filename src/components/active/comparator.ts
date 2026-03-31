@@ -334,42 +334,11 @@ function createComparatorElement(
 
 const COMPARATOR_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "hysteresis",
-    type: PropertyType.INT,
-    label: "Hysteresis (V)",
-    defaultValue: 0,
-    min: 0,
-    description: "Hysteresis band width in volts (0 = no hysteresis). Default 0 V.",
-  },
-  {
-    key: "vos",
-    type: PropertyType.INT,
-    label: "Input offset voltage (V)",
-    defaultValue: 0.001,
-    description: "Input offset voltage in volts. Default 1 mV.",
-  },
-  {
-    key: "rSat",
-    type: PropertyType.INT,
-    label: "Saturation resistance (Ω)",
-    defaultValue: 50,
-    min: 1e-9,
-    description: "Output saturation resistance in ohms (open-collector on-state). Default 50 Ω.",
-  },
-  {
     key: "outputType",
     type: PropertyType.STRING,
     label: "Output type",
     defaultValue: "open-collector",
     description: "Output topology: 'open-collector' or 'push-pull'. Default open-collector.",
-  },
-  {
-    key: "responseTime",
-    type: PropertyType.INT,
-    label: "Response time (s)",
-    defaultValue: 1e-6,
-    min: 1e-12,
-    description: "Propagation delay modelled as first-order filter time constant. Default 1 µs.",
   },
   {
     key: "label",
@@ -385,11 +354,11 @@ const COMPARATOR_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const COMPARATOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "hysteresis",   propertyKey: "hysteresis",   convert: (v) => parseFloat(v) },
-  { xmlName: "vos",          propertyKey: "vos",          convert: (v) => parseFloat(v) },
-  { xmlName: "rSat",         propertyKey: "rSat",         convert: (v) => parseFloat(v) },
+  { xmlName: "hysteresis",   propertyKey: "hysteresis",   convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "vos",          propertyKey: "vos",          convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "rSat",         propertyKey: "rSat",         convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "outputType",   propertyKey: "outputType",   convert: (v) => v },
-  { xmlName: "responseTime", propertyKey: "responseTime", convert: (v) => parseFloat(v) },
+  { xmlName: "responseTime", propertyKey: "responseTime", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",        propertyKey: "label",        convert: (v) => v },
 ];
 

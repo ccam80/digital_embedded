@@ -391,42 +391,6 @@ export class SchmittNonInvertingElement extends AbstractCircuitElement {
 
 const SCHMITT_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "vTH",
-    type: PropertyType.INT,
-    label: "Upper threshold V_TH (V)",
-    defaultValue: 2.0,
-    description: "Rising input threshold. Output switches when V_in rises above this. Default 2.0 V.",
-  },
-  {
-    key: "vTL",
-    type: PropertyType.INT,
-    label: "Lower threshold V_TL (V)",
-    defaultValue: 1.0,
-    description: "Falling input threshold. Output switches when V_in falls below this. Default 1.0 V.",
-  },
-  {
-    key: "vOH",
-    type: PropertyType.INT,
-    label: "Output high voltage V_OH (V)",
-    defaultValue: 3.3,
-    description: "Output voltage in high state. Default 3.3 V.",
-  },
-  {
-    key: "vOL",
-    type: PropertyType.INT,
-    label: "Output low voltage V_OL (V)",
-    defaultValue: 0.0,
-    description: "Output voltage in low state. Default 0 V.",
-  },
-  {
-    key: "rOut",
-    type: PropertyType.INT,
-    label: "Output impedance (Ω)",
-    defaultValue: 50,
-    min: 1e-9,
-    description: "Output resistance. Default 50 Ω.",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -440,11 +404,11 @@ const SCHMITT_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const SCHMITT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "vTH",   propertyKey: "vTH",   convert: (v) => parseFloat(v) },
-  { xmlName: "vTL",   propertyKey: "vTL",   convert: (v) => parseFloat(v) },
-  { xmlName: "vOH",   propertyKey: "vOH",   convert: (v) => parseFloat(v) },
-  { xmlName: "vOL",   propertyKey: "vOL",   convert: (v) => parseFloat(v) },
-  { xmlName: "rOut",  propertyKey: "rOut",  convert: (v) => parseFloat(v) },
+  { xmlName: "vTH",   propertyKey: "vTH",   convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "vTL",   propertyKey: "vTL",   convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "vOH",   propertyKey: "vOH",   convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "vOL",   propertyKey: "vOL",   convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "rOut",  propertyKey: "rOut",  convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
 ];
 

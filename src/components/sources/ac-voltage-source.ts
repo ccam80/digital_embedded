@@ -249,12 +249,8 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
 
     // Value label below body
     const label = this._visibleLabel();
-    const amplitude = this._properties.hasModelParam("amplitude")
-      ? this._properties.getModelParam<number>("amplitude")
-      : 5;
-    const frequency = this._properties.hasModelParam("frequency")
-      ? this._properties.getModelParam<number>("frequency")
-      : 1000;
+    const amplitude = this._properties.getModelParam<number>("amplitude");
+    const frequency = this._properties.getModelParam<number>("frequency");
     const displayLabel = label.length > 0
       ? label
       : (this._shouldShowValue() ? `${formatSI(amplitude, "V")} ${formatSI(frequency, "Hz")}` : "");

@@ -150,6 +150,37 @@ export class UICircuitBuilder {
   }
 
   /**
+   * Read a single labeled output's numeric value. Works for both digital
+   * (returns bit-vector as number) and analog (returns voltage) domains.
+   * Returns null if the label is not found or simulation hasn't been compiled.
+   */
+  async readOutput(label: string): Promise<number | null> {
+    const sv = await this.bridge<{ type: string; value?: number; voltage?: number } | null>(
+      `bridge.readSignalByLabel("${label}")`,
+    );
+    if (!sv) return null;
+    return sv.type === 'digital' ? sv.value! : sv.voltage!;
+  }
+
+  /**
+   * Read all labeled signals as a flat record of label → numeric value.
+   * Digital signals return their bit-vector as a number, analog signals
+   * return their voltage. Works regardless of circuit domain (digital,
+   * analog, or mixed). Returns null if simulation hasn't been compiled.
+   */
+  async readAllSignals(): Promise<Record<string, number> | null> {
+    const all = await this.bridge<Record<string, { type: string; value?: number; voltage?: number }> | null>(
+      'bridge.readAllSignalValues()',
+    );
+    if (!all) return null;
+    const result: Record<string, number> = {};
+    for (const [label, sv] of Object.entries(all)) {
+      result[label] = sv.type === 'digital' ? sv.value! : sv.voltage!;
+    }
+    return result;
+  }
+
+  /**
    * Get screen position of a pin on a labeled element.
    * Returns page-absolute coordinates ready for Playwright mouse actions.
    */

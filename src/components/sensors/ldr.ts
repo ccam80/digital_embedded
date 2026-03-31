@@ -306,14 +306,6 @@ export class LDRCircuitElement extends AbstractCircuitElement {
 
 const LDR_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "rDark",
-    type: PropertyType.FLOAT,
-    label: "Dark Resistance (Ω)",
-    defaultValue: 1e6,
-    min: 1e-6,
-    description: "Resistance in darkness (lux = 0)",
-  },
-  {
     key: "luxRef",
     type: PropertyType.FLOAT,
     label: "Reference Lux",
@@ -351,10 +343,10 @@ const LDR_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 export const LDR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "rDark", propertyKey: "rDark", convert: (v) => parseFloat(v) },
+  { xmlName: "rDark", propertyKey: "rDark", modelParam: true, convert: (v) => parseFloat(v) },
   { xmlName: "luxRef", propertyKey: "luxRef", convert: (v) => parseFloat(v) },
   { xmlName: "gamma", propertyKey: "gamma", convert: (v) => parseFloat(v) },
-  { xmlName: "lux", propertyKey: "lux", convert: (v) => parseFloat(v) },
+  { xmlName: "lux", propertyKey: "lux", modelParam: true, convert: (v) => parseFloat(v) },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
 ];
 

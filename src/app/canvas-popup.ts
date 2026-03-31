@@ -63,16 +63,22 @@ export function createPopupController(
     popup.appendChild(propsContainer);
     const propertyPopup = new PropertyPanel(propsContainer);
 
-    // Model selector first: primary params at top, model dropdown, advanced params
+    // Regular properties (label etc.) first
+    propertyPopup.showProperties(elementHit, def.propertyDefs);
+
+    // Model selector: primary params, model dropdown, advanced params
     const family = ctx.circuit.metadata.logicFamily ?? defaultLogicFamily();
     const runtimeModels = ctx.circuit.metadata.models?.[elementHit.typeId];
     if (def.modelRegistry && Object.keys(def.modelRegistry).length > 0) {
       propertyPopup.showModelSelector(elementHit, def, runtimeModels);
     }
 
-    // Regular properties (label etc.) below model params
-    propertyPopup.showProperties(elementHit, def.propertyDefs);
-    propertyPopup.showPinElectricalOverrides(elementHit, def, family);
+    // Pin electrical overrides only when the component is currently using the digital model
+    const bag = elementHit.getProperties();
+    const activeModel = bag.has("model") ? bag.get<string>("model") : (def.defaultModel ?? "");
+    if (activeModel === "digital") {
+      propertyPopup.showPinElectricalOverrides(elementHit, def, family);
+    }
     // Live-update: numeric parameter changes are hot-patched into the running
     // engine via coordinator.setComponentProperty() (updates conductances
     // in-place, no recompile). Non-numeric changes (waveform, expression, etc.)

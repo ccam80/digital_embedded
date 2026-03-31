@@ -173,6 +173,17 @@ function computeExpectedOp(
   return { ic, ib, gm, go, gpi, gmu };
 }
 
+/** Assert actual ≈ expected within 0.1% relative tolerance (ngspice reference). */
+function expectSpiceRef(actual: number, expected: number, label: string) {
+  const rel = Math.abs((actual - expected) / expected);
+  if (rel >= 0.001) {
+    throw new Error(
+      `${label}: relative error ${(rel * 100).toFixed(4)}% exceeds 0.1% ` +
+      `(actual=${actual}, expected=${expected})`
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // NPN tests
 // ---------------------------------------------------------------------------
@@ -592,31 +603,14 @@ describe("Integration", () => {
     expect(vVcc).toBeCloseTo(5, 3);
     expect(vVbb).toBeCloseTo(5, 3);
 
-    // Vce ≈ 2.8V ± 5% (SPICE reference for IS=1e-16, BF=100, Vcc=5V, Rc=1kΩ, Rb=100kΩ)
-    // With Vbb=5V and Rb=100kΩ: Ib ≈ (5 - 0.7) / 100kΩ ≈ 43µA (ignoring base current loading)
-    // Ic ≈ BF * Ib ≈ 100 * 43µA = 4.3mA → Vc = 5 - 4.3mA * 1kΩ = 0.7V (saturation)
-    // Actually with IS=1e-16: Vbe is higher (~0.95V) so let's use a wider range
-    expect(vCollector).toBeGreaterThan(0.1);  // Not fully saturated to 0
-    expect(vCollector).toBeLessThan(5.0);     // Not at Vcc
+    // ngspice reference: IS=1e-14, BF=100 → deep saturation (Vc ≈ Vbe)
+    expectSpiceRef(vCollector, 6.928910e-01, "V(collector)");
+    expectSpiceRef(vBase, 6.928910e-01, "V(base)");
 
-    // Base voltage should be above 0 (BJT conducting)
-    expect(vBase).toBeGreaterThan(0.5);
-    expect(vBase).toBeLessThan(1.5);
-
-    // Collector current = (Vcc - Vc) / Rc
     const ic = (vVcc - vCollector) / 1000;
-    // Base current ≈ (Vbb - Vb) / Rb
     const ib = (vVbb - vBase) / 100_000;
-
-    // Both currents — exact DC operating point values (IS=1e-14, BF=100)
-    expect(ic).toBeCloseTo(0.004307509615241744, 8);
-    expect(ib).toBeCloseTo(0.00004307509614279056, 12);
-
-    // Ic / Ib ratio should be bounded by BF=100 (in saturation or active)
-    // In active region: Ic/Ib ≈ BF. In saturation Ic/Ib < BF.
-    const beta = ic / ib;
-    expect(beta).toBeGreaterThan(1);  // BJT amplifying
-    expect(beta).toBeLessThan(105);   // Not exceeding BF by more than 5%
+    expectSpiceRef(ic, 4.307675e-03, "Ic");
+    expectSpiceRef(ib, 4.307675e-05, "Ib");
   });
 
   it("npn_cutoff_with_zero_base_drive", () => {
@@ -660,82 +654,72 @@ describe("Integration", () => {
 // setParam behavioral verification — reads mutable params object, not captured locals
 // ---------------------------------------------------------------------------
 
-describe("setParam mutates params object (not captured locals)", () => {
-  it("setParam('BF', newValue) changes RHS Norton current on next stampNonlinear", () => {
-    // Drive BJT into active region at Vbe=0.7V, Vce=5V
-    const vbe = 0.7;
-    const vbc = vbe - 5;
-    const element = makeBjtAtOp(1, vbe, vbc);
+describe("setParam shifts DC OP to match SPICE reference", () => {
+  it("setParam('BF', 50) shifts DC OP to match SPICE reference", () => {
+    const matrixSize = 6;
+    const branchRowVcc = 4;
+    const branchRowVbb = 5;
+    const vcc = makeDcVoltageSource(4, 0, branchRowVcc, 5) as unknown as AnalogElement;
+    const vbb = makeDcVoltageSource(3, 0, branchRowVbb, 5) as unknown as AnalogElement;
+    const rc = makeResistor(4, 1, 1000);
+    const rb = makeResistor(3, 2, 100_000);
+    const bjtProps = makeBjtProps();
+    const bjt = withNodeIds(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 0]]), -1, bjtProps), [2, 1, 0]);
 
-    // Capture RHS before setParam
-    const solverBefore = makeMockSolver();
-    element.stampNonlinear!(solverBefore);
-    const rhsBefore = (solverBefore.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[1] as number
-    );
+    const solver = new SparseSolver();
+    const diagnostics = new DiagnosticCollector();
+    const elements = [vcc, vbb, rc, rb, bjt];
 
-    // Change BF: higher BF means lower base current → different Norton currents
-    element.setParam("BF", 50); // was ~200 in defaults
+    // Before: BF=100
+    const before = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    expect(before.converged).toBe(true);
+    expectSpiceRef(before.nodeVoltages[0], 6.928910e-01, "V(collector) before");
+    expectSpiceRef(before.nodeVoltages[1], 6.928910e-01, "V(base) before");
 
-    // Re-drive operating point so internal state updates use new BF
-    const voltages = new Float64Array(3);
-    voltages[0] = vbe - 5; // Vc
-    voltages[1] = vbe;     // Vb
-    voltages[2] = 0;       // Ve
-    for (let i = 0; i < 100; i++) {
-      element.updateOperatingPoint!(voltages);
-      voltages[0] = vbe - 5;
-      voltages[1] = vbe;
-      voltages[2] = 0;
-    }
+    // setParam and re-solve
+    bjt.setParam("BF", 50);
+    const after = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    expect(after.converged).toBe(true);
+    expectSpiceRef(after.nodeVoltages[0], 2.837533e+00, "V(collector) after BF=50");
+    expectSpiceRef(after.nodeVoltages[1], 6.750668e-01, "V(base) after BF=50");
 
-    const solverAfter = makeMockSolver();
-    element.stampNonlinear!(solverAfter);
-    const rhsAfter = (solverAfter.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[1] as number
-    );
-
-    // At least one RHS entry must differ — BF change alters Ib Norton current
-    const anyDiffers = rhsBefore.some(
-      (val: number, i: number) => Math.abs(val - rhsAfter[i]) > 1e-12
-    );
-    expect(anyDiffers).toBe(true);
+    const icAfter = (after.nodeVoltages[3] - after.nodeVoltages[0]) / 1000;
+    const ibAfter = (after.nodeVoltages[2] - after.nodeVoltages[1]) / 100_000;
+    expectSpiceRef(icAfter, 2.162520e-03, "Ic after BF=50");
+    expectSpiceRef(ibAfter, 4.325039e-05, "Ib after BF=50");
   });
 
-  it("setParam('IS', newValue) changes conductance stamps on next stampNonlinear", () => {
-    const vbe = 0.7;
-    const vbc = vbe - 5;
-    const element = makeBjtAtOp(1, vbe, vbc);
+  it("setParam('IS', 1e-12) shifts DC OP to match SPICE reference", () => {
+    const matrixSize = 6;
+    const branchRowVcc = 4;
+    const branchRowVbb = 5;
+    const vcc = makeDcVoltageSource(4, 0, branchRowVcc, 5) as unknown as AnalogElement;
+    const vbb = makeDcVoltageSource(3, 0, branchRowVbb, 5) as unknown as AnalogElement;
+    const rc = makeResistor(4, 1, 1000);
+    const rb = makeResistor(3, 2, 100_000);
+    const bjtProps = makeBjtProps();
+    const bjt = withNodeIds(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 0]]), -1, bjtProps), [2, 1, 0]);
 
-    const solverBefore = makeMockSolver();
-    element.stampNonlinear!(solverBefore);
-    const stampsBefore = (solverBefore.stamp as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[2] as number
-    );
+    const solver = new SparseSolver();
+    const diagnostics = new DiagnosticCollector();
+    const elements = [vcc, vbb, rc, rb, bjt];
 
-    // Change IS by 100×: conductances gm, gpi, gmu all scale with IS
-    element.setParam("IS", BJT_NPN_DEFAULTS.IS * 100);
+    // Before: IS=1e-14
+    const before = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    expect(before.converged).toBe(true);
+    expectSpiceRef(before.nodeVoltages[0], 6.928910e-01, "V(collector) before");
+    expectSpiceRef(before.nodeVoltages[1], 6.928910e-01, "V(base) before");
 
-    const voltages = new Float64Array(3);
-    voltages[0] = vbe - 5;
-    voltages[1] = vbe;
-    voltages[2] = 0;
-    for (let i = 0; i < 100; i++) {
-      element.updateOperatingPoint!(voltages);
-      voltages[0] = vbe - 5;
-      voltages[1] = vbe;
-      voltages[2] = 0;
-    }
+    // setParam and re-solve
+    bjt.setParam("IS", 1e-12);
+    const after = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    expect(after.converged).toBe(true);
+    expectSpiceRef(after.nodeVoltages[0], 5.744795e-01, "V(collector) after IS=1e-12");
+    expectSpiceRef(after.nodeVoltages[1], 5.744795e-01, "V(base) after IS=1e-12");
 
-    const solverAfter = makeMockSolver();
-    element.stampNonlinear!(solverAfter);
-    const stampsAfter = (solverAfter.stamp as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[2] as number
-    );
-
-    const anyDiffers = stampsBefore.some(
-      (val: number, i: number) => Math.abs(val - stampsAfter[i]) > 1e-15
-    );
-    expect(anyDiffers).toBe(true);
+    const icAfter = (after.nodeVoltages[3] - after.nodeVoltages[0]) / 1000;
+    const ibAfter = (after.nodeVoltages[2] - after.nodeVoltages[1]) / 100_000;
+    expectSpiceRef(icAfter, 4.425990e-03, "Ic after IS=1e-12");
+    expectSpiceRef(ibAfter, 4.425990e-05, "Ib after IS=1e-12");
   });
 });

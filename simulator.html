@@ -1563,8 +1563,34 @@
       text-transform: uppercase;
       letter-spacing: 0.03em;
     }
-    .prop-row input, .prop-row select {
+    .prop-row input:not([type="checkbox"]), .prop-row select {
       width: 100%;
+      padding: 2px 4px;
+      background: var(--bg);
+      border: 1px solid var(--panel-border);
+      color: var(--fg);
+      border-radius: 3px;
+      font-size: 12px;
+    }
+    .prop-row input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+    }
+    .prop-row-inline {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-bottom: 1px solid var(--panel-border);
+    }
+    .prop-row-inline .prop-label {
+      margin-bottom: 0;
+      min-width: 50px;
+    }
+    .prop-row-inline input:not([type="checkbox"]) {
+      flex: 1;
+      min-width: 0;
       padding: 2px 4px;
       background: var(--bg);
       border: 1px solid var(--panel-border);

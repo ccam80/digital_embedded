@@ -98,9 +98,7 @@ export class InductorElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const inductance = this._properties.hasModelParam("inductance")
-      ? this._properties.getModelParam<number>("inductance")
-      : 1e-3;
+    const inductance = this._properties.getModelParam<number>("inductance");
     const label = this._visibleLabel();
 
     ctx.save();

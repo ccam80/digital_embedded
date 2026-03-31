@@ -276,20 +276,27 @@
       - generic "Circuit editor canvas" [ref=e365]
       - generic [ref=e366]:
         - generic [ref=e367]:
-          - generic [ref=e368]: DcVoltageSource
+          - generic [ref=e368]: CurrentSource
           - button "×" [ref=e369] [cursor=pointer]
         - generic [ref=e370]:
-          - generic [ref=e371]:
-            - generic [ref=e372]: Label
-            - generic [ref=e373]:
-              - textbox [ref=e374]: Vcc
-              - checkbox "Show on canvas" [checked] [ref=e375]
+          - generic [ref=e372]:
+            - generic "Source current in amperes" [ref=e373]: current
+            - textbox [ref=e374]: 10.0 m
+            - generic [ref=e375]: A
           - generic [ref=e376]:
-            - generic [ref=e377]: Show value
-            - checkbox [checked] [ref=e379]
-          - generic [ref=e381] [cursor=pointer]: ▶ Pin Electrical
-  - generic [ref=e382]:
-    - generic [ref=e383]: Ready
-    - button "100%" [ref=e385] [cursor=pointer]
-    - generic [ref=e386]: 9, 5
+            - generic [ref=e377]: Model
+            - combobox [ref=e378]:
+              - option "Behavioral (MNA)" [selected]
+          - generic [ref=e379]:
+            - generic [ref=e380]: Label
+            - generic [ref=e381]:
+              - textbox [ref=e382]: Ib
+              - checkbox "Show on canvas" [checked] [ref=e383]
+          - generic [ref=e384]:
+            - generic [ref=e385]: Show value
+            - checkbox [checked] [ref=e387]
+  - generic [ref=e388]:
+    - generic [ref=e389]: Ready
+    - button "100%" [ref=e391] [cursor=pointer]
+    - generic [ref=e392]: 9, 12
 ```

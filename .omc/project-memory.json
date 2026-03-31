@@ -253,8 +253,8 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 168,
-      "lastAccessed": 1774948494674,
+      "accessCount": 169,
+      "lastAccessed": 1774949248485,
       "type": "file"
     },
     {
@@ -277,8 +277,8 @@
     },
     {
       "path": "",
-      "accessCount": 65,
-      "lastAccessed": 1774948463201,
+      "accessCount": 69,
+      "lastAccessed": 1774949926031,
       "type": "directory"
     },
     {
@@ -289,14 +289,20 @@
     },
     {
       "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 43,
-      "lastAccessed": 1774927811309,
+      "accessCount": 44,
+      "lastAccessed": 1774949281139,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
       "accessCount": 40,
       "lastAccessed": 1774946510167,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\resistor.ts",
+      "accessCount": 38,
+      "lastAccessed": 1774950973072,
       "type": "file"
     },
     {
@@ -318,9 +324,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\resistor.ts",
-      "accessCount": 33,
-      "lastAccessed": 1774947271902,
+      "path": "src\\components\\passives\\crystal.ts",
+      "accessCount": 31,
+      "lastAccessed": 1774949441859,
       "type": "file"
     },
     {
@@ -337,32 +343,26 @@
     },
     {
       "path": "src\\components\\gates\\and.ts",
-      "accessCount": 29,
-      "lastAccessed": 1774948470566,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\crystal.ts",
-      "accessCount": 27,
-      "lastAccessed": 1774911509222,
+      "accessCount": 30,
+      "lastAccessed": 1774949232023,
       "type": "file"
     },
     {
       "path": "src\\components\\passives\\capacitor.ts",
-      "accessCount": 27,
-      "lastAccessed": 1774947273944,
+      "accessCount": 29,
+      "lastAccessed": 1774950875892,
       "type": "file"
     },
     {
       "path": "src\\components\\passives\\inductor.ts",
-      "accessCount": 26,
-      "lastAccessed": 1774947275298,
+      "accessCount": 27,
+      "lastAccessed": 1774949249849,
       "type": "file"
     },
     {
       "path": "src\\components\\passives\\tapped-transformer.ts",
-      "accessCount": 24,
-      "lastAccessed": 1774911510608,
+      "accessCount": 27,
+      "lastAccessed": 1774949458794,
       "type": "file"
     },
     {
@@ -375,6 +375,12 @@
       "path": "src\\components\\flipflops\\d.ts",
       "accessCount": 22,
       "lastAccessed": 1774947881926,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\polarized-cap.ts",
+      "accessCount": 22,
+      "lastAccessed": 1774949430593,
       "type": "file"
     },
     {
@@ -396,12 +402,6 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\polarized-cap.ts",
-      "accessCount": 19,
-      "lastAccessed": 1774908096583,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\semiconductors\\scr.ts",
       "accessCount": 19,
       "lastAccessed": 1774911180230,
@@ -415,14 +415,20 @@
     },
     {
       "path": ".vitest-failures.json",
-      "accessCount": 16,
-      "lastAccessed": 1774947645558,
+      "accessCount": 17,
+      "lastAccessed": 1774949842728,
       "type": "file"
     },
     {
       "path": "src\\components\\gates\\or.ts",
       "accessCount": 15,
       "lastAccessed": 1774947870428,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\memristor.ts",
+      "accessCount": 15,
+      "lastAccessed": 1774949433476,
       "type": "file"
     },
     {
@@ -477,12 +483,6 @@
       "path": "src\\components\\flipflops\\d-async.ts",
       "accessCount": 12,
       "lastAccessed": 1774908282575,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\memristor.ts",
-      "accessCount": 12,
-      "lastAccessed": 1774910326535,
       "type": "file"
     },
     {
@@ -541,8 +541,8 @@
     },
     {
       "path": "src\\core\\pin-electrical.ts",
-      "accessCount": 4,
-      "lastAccessed": 1774872485467,
+      "accessCount": 5,
+      "lastAccessed": 1774949258645,
       "type": "file"
     },
     {

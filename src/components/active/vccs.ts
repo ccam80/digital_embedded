@@ -310,13 +310,6 @@ const VCCS_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "Expression defining output current as function of V(ctrl). Default: V(ctrl) (unity transconductance).",
   },
   {
-    key: "transconductance",
-    type: PropertyType.FLOAT,
-    label: "Transconductance gm (S)",
-    defaultValue: 0.001,
-    description: "Linear transconductance in siemens. Used when expression is the default 'V(ctrl)'. Default: 1mS.",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -331,7 +324,7 @@ const VCCS_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const VCCS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "expression",       propertyKey: "expression",       convert: (v) => v },
-  { xmlName: "transconductance", propertyKey: "transconductance", convert: (v) => parseFloat(v) },
+  { xmlName: "transconductance", propertyKey: "transconductance", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",            propertyKey: "label",            convert: (v) => v },
 ];
 

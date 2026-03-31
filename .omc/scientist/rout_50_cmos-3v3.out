@@ -1,0 +1,81 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: rout override default(50)
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+
+No. of Data Rows : 1
+	Node                                  Voltage
+	----                                  -------
+	----	-------
+	junction                         3.283582e+00
+	source                           3.300000e+00
+
+	Source	Current
+	------	-------
+
+	voh#branch                       -3.28358e-04
+
+ Resistor models (Simple linear resistor)
+      model                     R
+
+        rsh                     0
+     narrow                     0
+      short                     0
+        tc1                     0
+        tc2                     0
+        tce                     0
+       defw                 1e-05
+          l                 1e-05
+         kf                     0
+         af                     0
+          r                     0
+     bv_max                 1e+99
+         lf                     1
+         wf                     1
+         ef                     1
+
+ Resistor: Simple linear resistor
+     device                 rload                  rout
+      model                     R                     R
+ resistance                 10000                    50
+         ac                 10000                    50
+      dtemp                     0                     0
+     bv_max                 1e+99                 1e+99
+      noisy                     1                     1
+          i           0.000328358           0.000328358
+          p            0.00107819           5.39096e-06
+
+ Vsource: Independent voltage source
+     device                   voh
+         dc                   3.3
+      acmag                     0
+      pulse         -
+        sin         -
+        exp         -
+        pwl         -
+       sffm         -
+         am         -
+    trnoise         -
+   trrandom         -
+    portnum                     0
+         z0                     0
+        pwr                     0
+       freq                     0
+      phase                     0
+          i          -0.000328358
+          p           -0.00108358
+
+
+Total analysis time (seconds) = 0.002
+
+Total elapsed time (seconds) = 0.044 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 8179.238 MB.
+Maximum ngspice program size =   15.910 MB.
+Current ngspice program size =   15.910 MB.
+

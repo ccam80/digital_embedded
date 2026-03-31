@@ -96,9 +96,7 @@ export class CapacitorElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const capacitance = this._properties.hasModelParam("capacitance")
-      ? this._properties.getModelParam<number>("capacitance")
-      : 1e-6;
+    const capacitance = this._properties.getModelParam<number>("capacitance");
     const label = this._visibleLabel();
 
     ctx.save();

@@ -432,25 +432,6 @@ function createTimer555Element(
 
 const TIMER555_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "vDrop",
-    type: PropertyType.INT,
-    label: "Output voltage drop (V)",
-    defaultValue: 1.5,
-    min: 0,
-    description:
-      "Voltage drop from VCC for high output state. " +
-      "1.5V for bipolar NE555, 0.1V for CMOS TLC555. Default 1.5V.",
-  },
-  {
-    key: "rDischarge",
-    type: PropertyType.INT,
-    label: "Discharge resistance (Ω)",
-    defaultValue: 10,
-    min: 1e-3,
-    description:
-      "Saturation resistance of the discharge transistor when active. Default 10Ω.",
-  },
-  {
     key: "variant",
     type: PropertyType.STRING,
     label: "Variant",
@@ -471,8 +452,8 @@ const TIMER555_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const TIMER555_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "vDrop",      propertyKey: "vDrop",      convert: (v) => parseFloat(v) },
-  { xmlName: "rDischarge", propertyKey: "rDischarge", convert: (v) => parseFloat(v) },
+  { xmlName: "vDrop",      propertyKey: "vDrop",      convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "rDischarge", propertyKey: "rDischarge", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "variant",    propertyKey: "variant",    convert: (v) => v },
   { xmlName: "Label",      propertyKey: "label",      convert: (v) => v },
 ];

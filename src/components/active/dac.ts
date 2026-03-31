@@ -402,26 +402,11 @@ const DAC_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "Number of digital input bits N. Output has 2^N levels. Default 8.",
   },
   {
-    key: "vRef",
-    type: PropertyType.INT,
-    label: "Reference voltage V_ref (V)",
-    defaultValue: 5.0,
-    description: "Full-scale reference voltage. Default 5.0 V.",
-  },
-  {
     key: "mode",
     type: PropertyType.STRING,
     label: "Mode",
     defaultValue: "unipolar",
     description: "'unipolar' (0 to V_ref) or 'bipolar' (−V_ref to +V_ref). Default 'unipolar'.",
-  },
-  {
-    key: "rOut",
-    type: PropertyType.INT,
-    label: "Output resistance R_out (Ω)",
-    defaultValue: 100,
-    min: 1e-9,
-    description: "Output impedance of the DAC drive circuit. Default 100 Ω.",
   },
   {
     key: "settlingTime",
@@ -445,9 +430,9 @@ const DAC_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const DAC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits",    propertyKey: "bits",        convert: (v) => parseInt(v, 10) },
-  { xmlName: "VRef",    propertyKey: "vRef",        convert: (v) => parseFloat(v) },
+  { xmlName: "VRef",    propertyKey: "vRef",        convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Mode",    propertyKey: "mode",        convert: (v) => v },
-  { xmlName: "ROut",    propertyKey: "rOut",        convert: (v) => parseFloat(v) },
+  { xmlName: "ROut",    propertyKey: "rOut",        convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",   propertyKey: "label",       convert: (v) => v },
 ];
 

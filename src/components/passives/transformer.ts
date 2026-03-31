@@ -440,32 +440,6 @@ function createTransformerElement(
 
 const TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "turnsRatio",
-    type: PropertyType.FLOAT,
-    label: "Turns Ratio (N)",
-    defaultValue: 1.0,
-    min: 0.001,
-    description: "Secondary to primary turns ratio N (output/input)",
-  },
-  {
-    key: "primaryInductance",
-    type: PropertyType.FLOAT,
-    label: "Primary Inductance (H)",
-    unit: "H",
-    defaultValue: 10e-3,
-    min: 1e-12,
-    description: "Primary winding self-inductance in henries",
-  },
-  {
-    key: "couplingCoefficient",
-    type: PropertyType.FLOAT,
-    label: "Coupling Coefficient (k)",
-    defaultValue: 0.99,
-    min: 0,
-    max: 1,
-    description: "Magnetic coupling coefficient (0 = no coupling, 1 = ideal)",
-  },
-  {
     key: "primaryResistance",
     type: PropertyType.FLOAT,
     label: "Primary Resistance (Ω)",
@@ -497,15 +471,17 @@ const TRANSFORMER_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 export const TRANSFORMER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "turnsRatio", propertyKey: "turnsRatio", convert: (v) => parseFloat(v) },
+  { xmlName: "turnsRatio", propertyKey: "turnsRatio", modelParam: true, convert: (v) => parseFloat(v) },
   {
     xmlName: "primaryInductance",
     propertyKey: "primaryInductance",
+    modelParam: true,
     convert: (v) => parseFloat(v),
   },
   {
     xmlName: "couplingCoefficient",
     propertyKey: "couplingCoefficient",
+    modelParam: true,
     convert: (v) => parseFloat(v),
   },
   {

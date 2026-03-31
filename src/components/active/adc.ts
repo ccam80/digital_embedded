@@ -501,15 +501,6 @@ const ADC_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "Number of output bits N. Output codes span [0, 2^N - 1].",
   },
   {
-    key: "vRef",
-    type: PropertyType.FLOAT,
-    label: "Reference voltage (V)",
-    defaultValue: 5.0,
-    min: 0.001,
-    description:
-      "Full-scale reference voltage. Ignored when VREF pin is connected to a non-zero node.",
-  },
-  {
     key: "mode",
     type: PropertyType.STRING,
     label: "Conversion mode",
@@ -541,7 +532,7 @@ const ADC_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const ADC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits",           propertyKey: "bits",           convert: (v) => parseInt(v, 10) },
-  { xmlName: "VRef",           propertyKey: "vRef",           convert: (v) => parseFloat(v) },
+  { xmlName: "VRef",           propertyKey: "vRef",           convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "mode",           propertyKey: "mode",           convert: (v) => v },
   { xmlName: "conversionType", propertyKey: "conversionType", convert: (v) => v },
   { xmlName: "Label",          propertyKey: "label",          convert: (v) => v },

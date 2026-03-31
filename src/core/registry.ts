@@ -8,8 +8,8 @@
 
 import type { CircuitElement } from "./element.js";
 import type { PinDeclaration } from "./pin.js";
-import { PropertyType } from "./properties.js";
-import type { PropertyBag, PropertyDefinition, PropertyValue } from "./properties.js";
+import { PropertyBag, PropertyType } from "./properties.js";
+import type { PropertyDefinition, PropertyValue } from "./properties.js";
 import type { AnalogElementCore } from "./analog-types.js";
 import type { MnaSubcircuitNetlist } from "./mna-subcircuit-netlist.js";
 import type { PinElectricalSpec } from "./pin-electrical.js";
@@ -432,10 +432,35 @@ export class ComponentRegistry {
     });
   }
 
+  /**
+   * Create an element with a PropertyBag pre-seeded with model param defaults.
+   * Callers should use this instead of `def.factory(new PropertyBag())`.
+   */
+  createElement(name: string): CircuitElement {
+    const def = this.get(name);
+    if (!def) throw new Error(`ComponentRegistry: "${name}" is not registered`);
+    return def.factory(createSeededBag(def));
+  }
+
   /** Total number of registered component types. */
   get size(): number {
     return this._byName.size;
   }
+}
+
+// ---------------------------------------------------------------------------
+// createSeededBag — PropertyBag with model param defaults from a definition
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a PropertyBag pre-seeded with model param defaults from the
+ * definition's default model entry.
+ */
+export function createSeededBag(def: ComponentDefinition): PropertyBag {
+  const bag = new PropertyBag();
+  const entry = def.modelRegistry?.[def.defaultModel ?? ""];
+  if (entry?.params) bag.replaceModelParams({ ...entry.params });
+  return bag;
 }
 
 // ---------------------------------------------------------------------------

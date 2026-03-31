@@ -1,0 +1,29 @@
+
+Note: No compatibility mode selected!
+
+
+Circuit: m3 dc
+
+Doing analysis at TEMP = 27.000000 and TNOM = 27.000000
+
+Using transient initial conditions
+
+No. of Data Rows : 5011
+
+  Measurements for Transient Analysis
+
+v_vref              =  5.000000e+00
+v_rc                =  3.121984e+00
+v_cap               =  3.091827e+00
+v_vref2             =  2.500000e+00
+
+
+Total analysis time (seconds) = 0.02
+
+Total elapsed time (seconds) = 0.067 
+
+Total DRAM available = 32452.422 MB.
+DRAM currently available = 7138.512 MB.
+Maximum ngspice program size =   16.188 MB.
+Current ngspice program size =   16.188 MB.
+

@@ -74,6 +74,12 @@ export interface TestBridge {
     nodeCount: number;
   } | null;
 
+  /** Read a single labeled signal value. Works for both digital and analog domains. */
+  readSignalByLabel(label: string): { type: 'digital'; value: number } | { type: 'analog'; voltage: number } | null;
+
+  /** Read all labeled signal values. Works regardless of circuit domain. */
+  readAllSignalValues(): Record<string, { type: 'digital'; value: number } | { type: 'analog'; voltage: number }> | null;
+
   /** Get the exit direction unit vector for a pin (points away from component body). */
   getPinExitDirection(elementLabel: string, pinLabel: string): { dx: number; dy: number } | null;
 
@@ -254,6 +260,34 @@ export function createTestBridge(
         nodeVoltages,
         nodeCount: Object.keys(nodeVoltages).length,
       };
+    },
+
+    readSignalByLabel(label: string): { type: 'digital'; value: number } | { type: 'analog'; voltage: number } | null {
+      const coordinator = coordinatorGetter();
+      try {
+        const sv = coordinator.readByLabel(label);
+        return sv.type === 'digital'
+          ? { type: 'digital', value: sv.value }
+          : { type: 'analog', voltage: sv.voltage };
+      } catch {
+        return null;
+      }
+    },
+
+    readAllSignalValues(): Record<string, { type: 'digital'; value: number } | { type: 'analog'; voltage: number }> | null {
+      const coordinator = coordinatorGetter();
+      try {
+        const all = coordinator.readAllSignals();
+        const result: Record<string, { type: 'digital'; value: number } | { type: 'analog'; voltage: number }> = {};
+        for (const [label, sv] of all) {
+          result[label] = sv.type === 'digital'
+            ? { type: 'digital', value: sv.value }
+            : { type: 'analog', voltage: sv.voltage };
+        }
+        return result;
+      } catch {
+        return null;
+      }
     },
 
     getPinExitDirection(elementLabel: string, pinLabel: string) {

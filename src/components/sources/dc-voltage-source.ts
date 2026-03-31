@@ -69,9 +69,7 @@ export class DcVoltageSourceElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const voltage = this._properties.hasModelParam("voltage")
-      ? this._properties.getModelParam<number>("voltage")
-      : 5;
+    const voltage = this._properties.getModelParam<number>("voltage");
     const label = this._visibleLabel();
     const vPos = signals?.getPinVoltage("pos");
     const vNeg = signals?.getPinVoltage("neg");

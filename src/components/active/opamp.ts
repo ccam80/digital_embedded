@@ -294,22 +294,6 @@ function createOpAmpElement(
 
 const OPAMP_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "gain",
-    type: PropertyType.INT,
-    label: "Open-loop gain",
-    defaultValue: 1e6,
-    min: 1,
-    description: "Open-loop voltage gain A (dimensionless). Default 1e6.",
-  },
-  {
-    key: "rOut",
-    type: PropertyType.INT,
-    label: "Output impedance (Ω)",
-    defaultValue: 75,
-    min: 1e-9,
-    description: "Output resistance in ohms. Default 75 Ω.",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -323,8 +307,8 @@ const OPAMP_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const OPAMP_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "gain",  propertyKey: "gain",  convert: (v) => parseFloat(v) },
-  { xmlName: "rOut",  propertyKey: "rOut",  convert: (v) => parseFloat(v) },
+  { xmlName: "gain",  propertyKey: "gain",  convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "rOut",  propertyKey: "rOut",  convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
 ];
 

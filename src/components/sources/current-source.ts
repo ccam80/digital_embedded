@@ -67,9 +67,7 @@ export class CurrentSourceElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const current = this._properties.hasModelParam("current")
-      ? this._properties.getModelParam<number>("current")
-      : 0.01;
+    const current = this._properties.getModelParam<number>("current");
     const label = this._visibleLabel();
     const vNeg = signals?.getPinVoltage("neg");
     const vPos = signals?.getPinVoltage("pos");

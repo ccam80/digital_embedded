@@ -229,9 +229,9 @@ describe("NTC", () => {
     });
 
     it("NTCThermistorDefinition r0 default is 10000", () => {
-      const prop = NTCThermistorDefinition.propertyDefs.find((p) => p.key === "r0");
-      expect(prop).toBeDefined();
-      expect(prop!.defaultValue).toBe(10000);
+      const params = NTCThermistorDefinition.modelRegistry?.behavioral?.params;
+      expect(params).toBeDefined();
+      expect(params!["r0"]).toBe(10000);
     });
 
     it("analogFactory creates an NTCThermistorElement", () => {

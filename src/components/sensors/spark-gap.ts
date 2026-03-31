@@ -227,8 +227,8 @@ export function createSparkGapElement(
   _getTime: () => number,
 ): AnalogElementCore {
   const p: Record<string, number> = {
-    vBreakdown: props.getOrDefault<number>("vBreakdown", SPARK_GAP_DEFAULTS.vBreakdown),
-    rOn:        props.getOrDefault<number>("rOn",        SPARK_GAP_DEFAULTS.rOn),
+    vBreakdown: props.getModelParam<number>("vBreakdown"),
+    rOn:        props.getModelParam<number>("rOn"),
     rOff:       props.getOrDefault<number>("rOff",       SPARK_GAP_DEFAULTS.rOff),
     iHold:      props.getOrDefault<number>("iHold",      SPARK_GAP_DEFAULTS.iHold),
   };
@@ -332,22 +332,6 @@ export class SparkGapCircuitElement extends AbstractCircuitElement {
 
 const SPARK_GAP_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "vBreakdown",
-    type: PropertyType.FLOAT,
-    label: "Breakdown Voltage (V)",
-    defaultValue: 1000,
-    min: 1e-3,
-    description: "Voltage at which the spark gap fires",
-  },
-  {
-    key: "rOn",
-    type: PropertyType.FLOAT,
-    label: "On Resistance (Ω)",
-    defaultValue: 5,
-    min: MIN_RESISTANCE,
-    description: "Resistance when gap is conducting",
-  },
-  {
     key: "rOff",
     type: PropertyType.FLOAT,
     label: "Off Resistance (Ω)",
@@ -377,8 +361,8 @@ const SPARK_GAP_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 export const SPARK_GAP_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "vBreakdown", propertyKey: "vBreakdown", convert: (v) => parseFloat(v) },
-  { xmlName: "rOn", propertyKey: "rOn", convert: (v) => parseFloat(v) },
+  { xmlName: "vBreakdown", propertyKey: "vBreakdown", modelParam: true, convert: (v) => parseFloat(v) },
+  { xmlName: "rOn", propertyKey: "rOn", modelParam: true, convert: (v) => parseFloat(v) },
   { xmlName: "rOff", propertyKey: "rOff", convert: (v) => parseFloat(v) },
   { xmlName: "iHold", propertyKey: "iHold", convert: (v) => parseFloat(v) },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },

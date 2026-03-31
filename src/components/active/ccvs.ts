@@ -335,13 +335,6 @@ const CCVS_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "Expression defining output voltage as function of I(sense). Default: I(sense).",
   },
   {
-    key: "transresistance",
-    type: PropertyType.FLOAT,
-    label: "Transresistance (Ω)",
-    defaultValue: 1000,
-    description: "Linear transresistance in ohms. Used when expression is the default 'I(sense)'. Default: 1kΩ.",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -356,7 +349,7 @@ const CCVS_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const CCVS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "expression",     propertyKey: "expression",     convert: (v) => v },
-  { xmlName: "transresistance",propertyKey: "transresistance",convert: (v) => parseFloat(v) },
+  { xmlName: "transresistance",propertyKey: "transresistance",convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",          propertyKey: "label",          convert: (v) => v },
 ];
 

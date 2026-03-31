@@ -173,9 +173,9 @@ describe("LDR", () => {
     });
 
     it("LDRDefinition has rDark default 1e6", () => {
-      const prop = LDRDefinition.propertyDefs.find((p) => p.key === "rDark");
-      expect(prop).toBeDefined();
-      expect(prop!.defaultValue).toBe(1e6);
+      const params = LDRDefinition.modelRegistry?.behavioral?.params;
+      expect(params).toBeDefined();
+      expect(params!["rDark"]).toBe(1e6);
     });
 
     it("analogFactory creates an LDRElement", () => {

@@ -195,8 +195,13 @@ export class CircuitBuilder {
       bag.set(key, value);
     }
 
-    // Move model param keys from _map to _mparams based on the definition's
-    // modelRegistry paramDefs, so the compiler sees them in the correct partition.
+    // Seed model param defaults from the default model entry, then overlay
+    // any caller-specified values that were placed in _map.
+    const defaultModelKey = definition.defaultModel ?? "";
+    const defaultEntry = definition.modelRegistry?.[defaultModelKey];
+    if (defaultEntry?.params) {
+      bag.replaceModelParams({ ...defaultEntry.params });
+    }
     if (definition.modelRegistry) {
       const paramKeys = new Set<string>();
       for (const entry of Object.values(definition.modelRegistry)) {

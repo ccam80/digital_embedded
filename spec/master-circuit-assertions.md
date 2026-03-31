@@ -6,7 +6,7 @@
 - **Master 2 (Analog)**: Wiring PASSING, assertions placeholder (switch bug blocks voltage verification — being fixed in parallel session)
 - **Master 3 (Mixed)**: Wiring PASSING (captured from manual session), assertions placeholder (voltage reads as 1V, needs debug)
 - **Tier 4 tests**: DELETED (digital-circuit-assembly, analog-circuit-assembly, mixed-circuit-assembly, analog-rc-circuit)
-- **`getCircuitDomain()`**: Test bridge heuristic only (returns 'analog' or 'digital', never 'mixed'). Removed from all masters. Located at `src/app/test-bridge.ts:228`. Consider deleting the method entirely.
+- **`getCircuitDomain()`**: Test bridge heuristic only (returns 'analog' or 'digital', never 'mixed'). Removed from all masters. Located at `src/app/test-bridge.ts:228`.
 
 ## ngspice Reference Values (Corrected OpAmp Feedback)
 
@@ -38,31 +38,78 @@ v_base: 6.379227e-01
 ```
 
 ### Master 3 — m3_dc (Vref=5V, DAC code=10, 4-bit, R1=1k, C1=1µF)
-At t=5ms (5τ for τ=1.1ms), RC settled:
+At t=5ms (4.5τ for τ=1.1ms), RC 98.94% settled (ngspice .measure confirmed):
 ```
 v_vref:    5.000000e+00
-v_rc:      3.125000e+00   (10/16 × 5V, via R_dac=100Ω + R1=1k)
-v_cap:     3.125000e+00   (settled)
+v_rc:      3.121984e+00   (DAC output node, Thevenin Vdac=3.125V via Rdac=100)
+v_cap:     3.091827e+00   (capacitor node, still charging)
 v_vref2:   2.500000e+00
 ```
-Note: .tran output wasn't captured in last run — need `.print tran` or `.measure` directives. Values above are analytical (confirmed by the steady-state math: no DC current through C → V_cap = V_dac × R1/(R_dac+R1) ≈ 3.125 × 1000/1100 ≈ 2.841V at DC with R_dac load, BUT at full settle V_cap → V_dac since C blocks DC through R1). Rerun with proper .print needed.
+At t=10ms (99.99% settled):
+```
+v_rc:      3.124968e+00
+v_cap:     3.124648e+00
+```
+Steady-state (t=inf): v_rc = v_cap = 3.125000e+00.
+Note: The earlier contradictory 2.841V value was the initial transient V(rc_node) at t~0,
+when maximum current flows through Rdac: 3.125 - 3.125*100/1100 = 2.841V. At steady state
+no current flows and both nodes settle to Vdac = 3.125V.
 
 ### Master 3 — m3_vref33 (Vref=3.3V → DAC=10/16×3.3=2.0625V)
+At t=5ms (ngspice .measure confirmed):
 ```
 v_vref:  3.300000e+00
-v_rc:    2.062500e+00
-v_cap:   2.062500e+00
+v_rc:    2.060510e+00   (98.94% settled toward 2.0625V)
+v_cap:   2.040606e+00
 v_vref2: 2.500000e+00
 ```
-Note: Comparator flips (2.0625 < 2.5) → output LOW → counter stops.
+At t=10ms (99.99% settled): v_rc = 2.062479e+00, v_cap = 2.062268e+00.
+Steady-state: v_rc = v_cap = 2.062500e+00.
+Note: Comparator in- (2.061V) < in+ (2.5V) → output HIGH → counter counts.
 
 ### Master 3 — m3_r1_10k (R1=10k, τ=10.1ms, settle at 50ms)
+At t=50ms (4.95τ, 99.29% settled, ngspice .measure confirmed):
 ```
-v_rc:    2.062500e+00   (same DAC voltage, just slower settle)
+v_rc:    2.062355e+00   (same DAC voltage, slower settle)
+v_cap:   2.047898e+00
+```
+At t=100ms (99.99% settled): v_rc = 2.062499e+00, v_cap = 2.062397e+00.
+Steady-state: v_rc = v_cap = 2.062500e+00.
+
+### Master 1 — m1_cmos_and (CMOS AND2 gate, VDD=5V)
+ngspice .op with NMOS(VTO=1, KP=2e-5, LAMBDA=0.01) and PMOS(VTO=-1, KP=1e-5, LAMBDA=0.01),
+W=L=1um, matching CMOS_AND2_NETLIST topology in src/components/gates/and.ts:130.
+```
+m1_cmos_and_high (both inputs = 5V):
+  V(out):      5.000000e+00   (effectively VDD)
+  V(nand_out): 2.505000e-07   (effectively 0V)
+
+m1_cmos_and_low (one input = 0V):
+  V(out):      6.262500e-08   (effectively 0V)
+  V(nand_out): 5.000000e+00   (effectively VDD)
+
+m1_cmos_and_low_ll (both inputs = 0V):
+  V(out):      6.262500e-08   (effectively 0V)
+  V(nand_out): 5.000000e+00   (effectively VDD)
 ```
 
-### Still needed
-- **m1_cmos_and_high/low**: CMOS AND gate voltages. Analytically: output ≈ VDD when both inputs high, ≈ 0V when any input low. Need ngspice subcircuit run for exact values with NMOS/PMOS models matching our `CMOS_AND2_NETLIST` in `src/components/gates/and.ts`.
+### Master 2 — Pin Loading (m2_pin_loading, R1=R2=10k, Vs=5V)
+BridgeInputAdapter stamps 1/rIn (10M ohm) to GND when loaded=true.
+```
+Unloaded: V(div) = 2.500000e+00
+Loaded:   V(div) = 2.498751e+00
+Delta:    1.249e-03 V (0.0500%)
+```
+
+### Pin Electrical / rOut Override (VOH=5V, Rload=10k)
+Gate output modeled as VOH in series with rOut driving Rload to GND.
+V_junction = VOH * Rload / (rOut + Rload).
+```
+rOut=50 (default):  V_junction = 4.975124e+00  (drop = 2.488e-02 V)
+rOut=75:            V_junction = 4.962779e+00  (drop = 3.722e-02 V)
+rOut=100k:          V_junction = 4.545455e-01  (drop = 4.545e+00 V)
+```
+Full details in spec/ngspice-refs-complete.md.
 
 ## Assertion Flows Per Master
 
@@ -101,7 +148,7 @@ v_rc:    2.062500e+00   (same DAC voltage, just slower settle)
   - `P_RC ≈ 2.500000` (v_rc)  
   - `P_AMP ≈ 2.499998` (v_amp)
   - `P_CE ≈ 10.00008` (v_col — BJT collector)
-- **Blocker**: Switch CTRL not toggling (voltages ≈ 0). Being fixed in parallel session.
+- Switch CTRL toggling fix has landed — no longer blocked.
 
 #### Phase B — Modify R1 resistance (10k→20k) (TODO)
 - `setComponentProperty('R1', 'resistance', 20000)`
@@ -135,22 +182,7 @@ v_rc:    2.062500e+00   (same DAC voltage, just slower settle)
   await loadedItem.click();
   ```
 - `stepToTimeViaUI('5m')` → `getAnalogState()`
-- Assert: voltage at P_DIV changes from ideal value (parasitic loading effect)
-- **Note**: Need to determine expected voltage shift. May need ngspice ref with loading model, or just assert `P_DIV !== previousValue` (qualitative check).
-
-#### Phase F — Pin electrical / rOut override (TODO)
-- Right-click AND gate output pin → change Rout
-- Pattern from `e2e/gui/hotload-params-e2e.spec.ts`:
-  ```typescript
-  // Open pin electrical popup
-  await page.mouse.click(pinX, pinY, { button: 'right' });
-  // Find and click "Pin Electrical" or similar menu item
-  const rOutInput = await getPinFieldInput(page, 'Rout');
-  await rOutInput.fill('75');
-  await rOutInput.press('Tab');
-  ```
-- This flow fits better on Master 3 (mixed-signal) where digital pins drive analog loads
-- Assert: voltage at analog node changes with different rOut
+- Assert at 0.1%: `P_DIV ≈ 2.498751V` (loaded, vs 2.500000V unloaded; delta = 1.249mV)
 
 ### Master 3: Mixed-Signal
 
@@ -158,26 +190,31 @@ v_rc:    2.062500e+00   (same DAC voltage, just slower settle)
 - `stepViaUI()` → `verifyNoErrors()`
 - `stepToTimeViaUI('5m')` → `getAnalogState()`
 - Assert all voltages finite
-- Assert at 0.1%:
+- Assert at 0.1% (ngspice transient values at t=5ms, not steady-state):
   - VREF node ≈ 5.0V
-  - RC node ≈ 3.125V (DAC output after settling)
+  - RC node ≈ 3.121984V (98.94% settled toward 3.125V)
+  - Cap node ≈ 3.091827V (still charging)
   - Vref2 node ≈ 2.5V
-- Note: Comparator in- gets RC voltage (3.125V), in+ gets Vref2 (2.5V). Since in+ < in-, comparator output is LOW with this wiring. Counter should NOT count.
+- Comparator polarity check: in- gets RC voltage (~3.12V), in+ gets Vref2 (2.5V). Since in+ < in-, comparator output must be LOW:
+  - `readOutput('GA')` → assert output is 0 (AND gate driven by LOW comparator)
+  - This confirms wiring polarity before Phase B tests the flip
 
 #### Phase B — Modify Vref (5V→3.3V) (TODO)
 - `setComponentProperty('Vref', 'Voltage (V)', 3.3)`
 - `stepToTimeViaUI('5m')` → `getAnalogState()`
-- Assert at 0.1%:
+- Assert at 0.1% (ngspice transient values at t=5ms):
   - VREF ≈ 3.3V
-  - RC node ≈ 2.0625V (10/16 × 3.3V)
-- Comparator: 2.5V (in+) > 2.0625V (in-) → output HIGH → counter should count
+  - RC node ≈ 2.060510V (98.94% settled toward 2.0625V)
+  - Cap node ≈ 2.040606V
+- Comparator: 2.5V (in+) > 2.061V (in-) → output HIGH → counter should count
 - This is a digital behavioral change driven by analog param modification
 
 #### Phase C — Modify R1 (1k→10k) (TODO)
 - `setComponentProperty('R1', 'resistance', 10000)`
 - `stepToTimeViaUI('50m')` (new τ = 10.1ms)
-- Assert at 0.1%:
-  - RC node ≈ 2.0625V (same steady-state, different time constant)
+- Assert at 0.1% (ngspice transient values at t=50ms):
+  - RC node ≈ 2.062355V (99.29% settled toward 2.0625V)
+  - Cap node ≈ 2.047898V
 
 #### Phase D — Trace/scope (TODO — expand current placeholder)
 - `addTraceViaContextMenu('R1', 'A')`
@@ -187,8 +224,15 @@ v_rc:    2.062500e+00   (same DAC voltage, just slower settle)
 #### Phase E — Pin electrical / rOut override (TODO)
 - On the AND gate (GA) output pin, override Rout
 - This changes the source impedance driving CNT.en
+- Pattern from `e2e/gui/hotload-params-e2e.spec.ts`:
+  ```typescript
+  await page.mouse.click(pinX, pinY, { button: 'right' });
+  const rOutInput = await getPinFieldInput(page, 'Rout');
+  await rOutInput.fill('75');
+  await rOutInput.press('Tab');
+  ```
 - `stepToTimeViaUI('5m')` → `getAnalogState()`
-- Assert: measurable voltage change at the gate-to-counter junction
+- Assert at 0.1%: with rOut=75, `V_junction ≈ 4.962779V` (vs default rOut=50: 4.975124V)
 
 ## UI Methods Inventory
 
@@ -207,40 +251,40 @@ v_rc:    2.062500e+00   (same DAC voltage, just slower settle)
 - `verifyNoErrors()`
 - `toPageCoords(screenX, screenY)` — for manual click targeting
 
-### Missing / May Need
-- **readOutput(label)** — read a single digital Out component value. Needed for Master 1 Phase B (D_FF, Counter).
-- **readAllSignals()** — read all signal values. Alternative to readOutput.
+### Recently Added
+- **readOutput(label)** — read a single labeled output's numeric value (digital or analog). Added to UICircuitBuilder, delegates to `test-bridge.readSignalByLabel`.
+- **readAllSignals()** — read all labeled signals as `Record<string, number>`. Added to UICircuitBuilder, delegates to `test-bridge.readAllSignalValues`.
+
+### Still Manual
 - **Right-click wire / pin** — for pin loading and pin electrical flows. Currently done via raw `page.mouse.click(..., { button: 'right' })` in existing tests.
 
-## ngspice Netlists Still Needed
+## ngspice Reference Netlists (COMPLETED)
 
-### CMOS AND gate (for Master 1 Phase C)
-Need to match the `CMOS_AND2_NETLIST` in `src/components/gates/and.ts:130`:
-- Topology: CMOS NAND2 driving a CMOS inverter
-- Ports: In_1, In_2, out, VDD, GND
-- Need NMOS/PMOS model params matching our defaults
-- Simulate: both inputs high → V(out); one input low → V(out)
+All values confirmed via ngspice batch-mode simulation and analytical cross-verification.
+Full details with netlists in `spec/ngspice-refs-complete.md`.
 
-### Pin electrical / rOut override (for Master 2 Phase F / Master 3 Phase E)
-Need reference values for voltage shift when rOut is changed on a digital gate output driving an analog load:
-- Baseline: default rOut (check `src/components/gates/and.ts` for default, likely 50-100Ω)
-- Override: rOut=100kΩ with RL (load resistor in circuit)
-- V_junction = Voh × RL / (rOut + RL) — significant drop when rOut >> RL
-- Need ngspice runs for: default rOut, rOut=75Ω, rOut=100kΩ with representative load
+### CMOS AND gate (Master 1 Phase C) -- DONE
+NMOS(VTO=1, KP=2e-5, LAMBDA=0.01), PMOS(VTO=-1, KP=1e-5, LAMBDA=0.01), W=L=1um.
+- Both HIGH: V(out) = 5.000000e+00 (VDD), V(nand) = 2.505000e-07
+- One LOW:   V(out) = 6.262500e-08 (0V),  V(nand) = 5.000000e+00
 
-### Pin loading (for Master 2 Phase E)
-Need reference values for voltage change when pin loading is applied:
-- "Loaded" mode adds parasitic capacitance/resistance to the pin
-- Check `src/solver/analog/compiler.ts` for the loading model (what parasitics are added)
-- Run ngspice with and without the parasitic model to get expected voltage delta
+### Pin loading (Master 2 Phase E) -- DONE
+BridgeInputAdapter stamps 1/rIn = 1/10M to GND when loaded=true.
+- Unloaded: V(div) = 2.500000e+00
+- Loaded:   V(div) = 2.498751e+00 (delta = 1.249e-03 V, 0.05%)
 
-### Master 3 transient (need .print tran directive)
-The m3 .cir files ran but didn't output values — need `.print tran v(rc_node) v(cap_pos)` and read last line. Rerun with:
-```spice
-.tran 1u 5m
-.print tran v(vref) v(rc_node) v(cap_pos) v(vref2)
-.end
-```
+### Pin electrical / rOut override (Master 2 Phase F / Master 3 Phase E) -- DONE
+Default rOut = 50 ohm (cmos-3v3 and cmos-5v). VOH=5V, Rload=10k.
+- rOut=50:   V_junction = 4.975124e+00
+- rOut=75:   V_junction = 4.962779e+00
+- rOut=100k: V_junction = 4.545455e-01
+
+### Master 3 transient -- DONE
+DAC Thevenin: Vdac in series with Rdac=100. Tau = (Rdac+R1)*C1.
+- m3_dc (t=5ms):      v_rc = 3.121984e+00, v_cap = 3.091827e+00
+- m3_vref33 (t=5ms):   v_rc = 2.060510e+00, v_cap = 2.040606e+00
+- m3_r1_10k (t=50ms):  v_rc = 2.062355e+00, v_cap = 2.047898e+00
+- All settle to Vdac at t=inf (confirmed at t=10ms/100ms within 0.01%)
 
 ## Wire Capture Files
 - `e2e/circuits/debug/master3-wiring-code.ts` — captured wiring from manual session

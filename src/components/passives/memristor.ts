@@ -323,32 +323,6 @@ export function createMemristorElement(
 
 const MEMRISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "rOn",
-    type: PropertyType.FLOAT,
-    label: "R_on (Ω)",
-    unit: "Ω",
-    defaultValue: 100,
-    min: 1e-3,
-    description: "Resistance of fully doped (on) state in ohms",
-  },
-  {
-    key: "rOff",
-    type: PropertyType.FLOAT,
-    label: "R_off (Ω)",
-    unit: "Ω",
-    defaultValue: 16000,
-    min: 1e-3,
-    description: "Resistance of fully undoped (off) state in ohms",
-  },
-  {
-    key: "initialState",
-    type: PropertyType.FLOAT,
-    label: "Initial state w₀",
-    defaultValue: 0.5,
-    min: 0,
-    description: "Initial normalised doped-region boundary (0=undoped, 1=fully doped)",
-  },
-  {
     key: "mobility",
     type: PropertyType.FLOAT,
     label: "Mobility µ_v (m²/V·s)",
@@ -386,9 +360,9 @@ const MEMRISTOR_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 export const MEMRISTOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "rOn",          propertyKey: "rOn",          convert: (v) => parseFloat(v) },
-  { xmlName: "rOff",         propertyKey: "rOff",         convert: (v) => parseFloat(v) },
-  { xmlName: "initialState", propertyKey: "initialState", convert: (v) => parseFloat(v) },
+  { xmlName: "rOn",          propertyKey: "rOn",          modelParam: true, convert: (v) => parseFloat(v) },
+  { xmlName: "rOff",         propertyKey: "rOff",         modelParam: true, convert: (v) => parseFloat(v) },
+  { xmlName: "initialState", propertyKey: "initialState", modelParam: true, convert: (v) => parseFloat(v) },
   { xmlName: "mobility",     propertyKey: "mobility",     convert: (v) => parseFloat(v) },
   { xmlName: "deviceLength", propertyKey: "deviceLength", convert: (v) => parseFloat(v) },
   { xmlName: "windowOrder",  propertyKey: "windowOrder",  convert: (v) => parseInt(v, 10) },

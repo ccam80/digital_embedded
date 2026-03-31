@@ -23,6 +23,18 @@ import type { AnalogFactory } from "../../../core/registry.js";
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
+
+/** Assert actual ≈ expected within 0.1% relative tolerance (ngspice reference). */
+function expectSpiceRef(actual: number, expected: number, label: string) {
+  const rel = Math.abs((actual - expected) / expected);
+  if (rel >= 0.001) {
+    throw new Error(
+      `${label}: relative error ${(rel * 100).toFixed(4)}% exceeds 0.1% ` +
+      `(actual=${actual}, expected=${expected})`
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Physical constants
 // ---------------------------------------------------------------------------
@@ -215,8 +227,12 @@ describe("Integration", () => {
 
     expect(vSource).toBeCloseTo(12, 3);
 
-    // Zener regulates to ≈ BV = 5.1V ± 0.05V
-    expect(vZener).toBeGreaterThan(5.05);
-    expect(vZener).toBeLessThan(5.15);
+    // ngspice reference: BV=5.1, IS=1e-14, N=1, IBV=1e-3 → Vz=5.149965V
+    // (breakdown is an exponential knee, not a hard clamp at BV)
+    expectSpiceRef(vZener, 5.149965e+00, "V(zener)");
+
+    // Zener current: Iz = (Vs - Vz) / R = (12 - 5.15) / 1000
+    const iZener = (vSource - vZener) / 1000;
+    expectSpiceRef(iZener, 6.850035e-03, "I(zener)");
   });
 });

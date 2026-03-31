@@ -346,22 +346,6 @@ export class OTAElement extends AbstractCircuitElement {
 
 const OTA_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "gmMax",
-    type: PropertyType.FLOAT,
-    label: "Max transconductance (S)",
-    defaultValue: 0.01,
-    min: 1e-12,
-    description: "Maximum transconductance in siemens. Hard saturation clamp at high bias. Default: 0.01 S.",
-  },
-  {
-    key: "vt",
-    type: PropertyType.FLOAT,
-    label: "Thermal voltage V_T (V)",
-    defaultValue: 0.026,
-    min: 1e-6,
-    description: "Thermal voltage in volts. Default: 26 mV (room temperature).",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -375,8 +359,8 @@ const OTA_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const OTA_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "gmMax", propertyKey: "gmMax", convert: (v) => parseFloat(v) },
-  { xmlName: "vt",    propertyKey: "vt",    convert: (v) => parseFloat(v) },
+  { xmlName: "gmMax", propertyKey: "gmMax", convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "vt",    propertyKey: "vt",    convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label", propertyKey: "label", convert: (v) => v },
 ];
 

@@ -32,7 +32,7 @@ import { buildColorMap } from '../editor/color-scheme.js';
 import { hitTestElements, hitTestWires } from '../editor/hit-test.js';
 import { snapToGrid } from '../editor/coordinates.js';
 import { LOGIC_FAMILY_PRESETS, getLogicFamilyPreset, defaultLogicFamily } from '../core/logic-family.js';
-import { PropertyBag } from '../core/properties.js';
+import { createSeededBag } from '../core/registry.js';
 import { deriveInterfacePins } from '../components/subcircuit/pin-derivation.js';
 import { openSpiceModelLibraryDialog } from './spice-model-library-dialog.js';
 
@@ -668,7 +668,7 @@ function buildPaletteHandlers(ctx: AppContext, deps: MTDeps): void {
         paletteUI.setLoading(def.name, false);
       }
     }
-    const element = activeDef.factory(new PropertyBag());
+    const element = activeDef.factory(createSeededBag(activeDef));
     element.position = worldPt;
     ctx.circuit.addElement(element);
     ctx.invalidateCompiled();

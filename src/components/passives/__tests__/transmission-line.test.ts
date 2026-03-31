@@ -660,11 +660,14 @@ describe("TransmissionLine", () => {
 
     it("has all required property definitions", () => {
       const keys = TransmissionLineDefinition.propertyDefs.map((p) => p.key);
-      expect(keys).toContain("impedance");
-      expect(keys).toContain("delay");
       expect(keys).toContain("lossPerMeter");
       expect(keys).toContain("length");
       expect(keys).toContain("segments");
+      // impedance and delay are model params
+      const params = TransmissionLineDefinition.modelRegistry?.behavioral?.params;
+      expect(params).toBeDefined();
+      expect(params!["impedance"]).toBeDefined();
+      expect(params!["delay"]).toBeDefined();
     });
 
     it("segments property has min=2 and max=100", () => {

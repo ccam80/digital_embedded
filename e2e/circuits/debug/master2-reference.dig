@@ -2,19 +2,22 @@
   "circuit": {
     "elements": [
       {
-        "id": "a0b56875-3759-425b-aafb-bc1f58df2871",
+        "id": "19344582-d862-44c0-830a-6588ab713668",
         "position": {
           "x": 3,
           "y": 3
         },
         "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
           "label": "Vs"
         },
         "rotation": 0,
         "type": "DcVoltageSource"
       },
       {
-        "id": "7441169d-8d82-45e3-a638-51c969911327",
+        "id": "7b609c6a-3284-4f6c-9094-e151bc7e84c3",
         "position": {
           "x": 3,
           "y": 7
@@ -26,43 +29,55 @@
         "type": "In"
       },
       {
-        "id": "9bcf0d79-3984-4241-a1f5-627189b97855",
+        "id": "5bdfc1c0-fa61-436f-8665-5d7a96f59a30",
         "position": {
           "x": 12,
           "y": 3
         },
         "properties": {
+          "_modelParams": {
+            "rOff": 1000000000,
+            "rOn": 10,
+            "threshold": 1.65,
+            "transitionSharpness": 20
+          },
           "label": "SW"
         },
         "rotation": 0,
         "type": "SwitchSPST"
       },
       {
-        "id": "51413974-d196-43e8-a811-f455261cf8c7",
+        "id": "d645d406-ad81-451f-a5f0-23e238d79f40",
         "position": {
           "x": 20,
           "y": 3
         },
         "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
           "label": "R1"
         },
         "rotation": 0,
         "type": "Resistor"
       },
       {
-        "id": "2f825314-3e23-494d-80b1-870fb95d63b5",
+        "id": "766ffa07-ea63-4147-9efd-ff85bb15526a",
         "position": {
           "x": 28,
           "y": 3
         },
         "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
           "label": "R2"
         },
         "rotation": 0,
         "type": "Resistor"
       },
       {
-        "id": "80bd01eb-aa82-4fcd-9456-ba34b573f507",
+        "id": "ca32c188-e630-42c4-baa2-28e2aae7df33",
         "position": {
           "x": 3,
           "y": 8
@@ -72,7 +87,7 @@
         "type": "Ground"
       },
       {
-        "id": "1aa8a0f9-243f-43e7-93ae-6e1441da00e2",
+        "id": "dca87082-0722-48eb-b933-2ebbdedb4383",
         "position": {
           "x": 32,
           "y": 8
@@ -82,7 +97,7 @@
         "type": "Ground"
       },
       {
-        "id": "8f656541-d654-4d6f-bf1c-1a6b887620b3",
+        "id": "62ba110f-3521-491e-b6a2-fa2da9ce27c9",
         "position": {
           "x": 26,
           "y": 1
@@ -94,31 +109,37 @@
         "type": "Probe"
       },
       {
-        "id": "22963045-bce0-4cf1-9598-6aac912b357a",
+        "id": "14104f2c-9080-4a06-9b35-873bac92e982",
         "position": {
           "x": 20,
           "y": 11
         },
         "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
           "label": "R3"
         },
         "rotation": 0,
         "type": "Resistor"
       },
       {
-        "id": "0a591835-ddc2-4e88-80d0-b69044aa86f7",
+        "id": "e255cead-ecc0-46fa-b399-fd4dc7bf5777",
         "position": {
           "x": 28,
           "y": 11
         },
         "properties": {
+          "_modelParams": {
+            "capacitance": 0.000001
+          },
           "label": "C1"
         },
         "rotation": 0,
         "type": "Capacitor"
       },
       {
-        "id": "4dfee89c-9137-4779-a42d-ae8fd87f709e",
+        "id": "68abbaf5-923a-420d-8d6b-43cbbcf9eb21",
         "position": {
           "x": 32,
           "y": 15
@@ -128,7 +149,7 @@
         "type": "Ground"
       },
       {
-        "id": "de2983df-b40c-4e75-8eb7-982ac001c2e9",
+        "id": "b01abcc9-5451-47e7-b210-294178aebdf5",
         "position": {
           "x": 26,
           "y": 9
@@ -140,19 +161,23 @@
         "type": "Probe"
       },
       {
-        "id": "582d03fd-b7ce-404b-b186-59acdb2a3b4d",
+        "id": "a4770ff6-92e8-4a98-acef-89d737c4f1b7",
         "position": {
           "x": 28,
           "y": 19
         },
         "properties": {
+          "_modelParams": {
+            "gain": 1000000,
+            "rOut": 75
+          },
           "label": "AMP"
         },
         "rotation": 0,
         "type": "OpAmp"
       },
       {
-        "id": "3660d6dc-436a-4aee-ac82-a0779b65569d",
+        "id": "fc0f2725-a4c0-4bea-842d-a1152f6b0863",
         "position": {
           "x": 36,
           "y": 19
@@ -164,55 +189,77 @@
         "type": "Probe"
       },
       {
-        "id": "ab54fa6b-11ce-4cb6-a367-0bf92c444112",
+        "id": "bf3fa5b7-7190-4bd1-9e7e-9aa3d8a3dd28",
         "position": {
           "x": 20,
           "y": 25
         },
         "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
           "label": "Rb"
         },
         "rotation": 0,
         "type": "Resistor"
       },
       {
-        "id": "0ad4f2a8-723a-4ecc-87bf-fb4dba87adad",
+        "id": "c53b36f8-72ee-4e7a-b781-551831319942",
         "position": {
           "x": 28,
           "y": 25
         },
         "properties": {
+          "_modelParams": {
+            "BF": 100,
+            "BR": 1,
+            "IKF": null,
+            "IKR": null,
+            "IS": 1e-14,
+            "ISC": 0,
+            "ISE": 0,
+            "NF": 1,
+            "NR": 1,
+            "VAF": null,
+            "VAR": null
+          },
           "label": "Q1"
         },
         "rotation": 0,
         "type": "NpnBJT"
       },
       {
-        "id": "b21773b1-85ae-44c8-b5df-044d0f6858e0",
+        "id": "8ed92900-8350-43ee-89b2-1a3348e8218c",
         "position": {
           "x": 36,
           "y": 24
         },
         "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
           "label": "Rc"
         },
         "rotation": 0,
         "type": "Resistor"
       },
       {
-        "id": "93606051-17c9-4d8c-b03a-5db899d7848d",
+        "id": "22866d8b-d1eb-4f94-84ac-031e2ae26fc8",
         "position": {
           "x": 36,
           "y": 30
         },
         "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
           "label": "Vcc"
         },
         "rotation": 0,
         "type": "DcVoltageSource"
       },
       {
-        "id": "19bb8dc4-d873-48ac-acbc-c37744a55431",
+        "id": "88472395-54b5-435a-92ad-3847cd549643",
         "position": {
           "x": 32,
           "y": 30
@@ -222,7 +269,7 @@
         "type": "Ground"
       },
       {
-        "id": "1499253a-72d0-4974-a5a7-ad0ef990ad6e",
+        "id": "e4b842db-1297-4ba2-ad67-fd34f207e54d",
         "position": {
           "x": 44,
           "y": 24

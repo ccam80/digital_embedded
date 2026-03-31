@@ -652,23 +652,6 @@ function createTransmissionLineElement(
 
 const TRANSMISSION_LINE_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "impedance",
-    type: PropertyType.FLOAT,
-    label: "Characteristic Impedance (\u03A9)",
-    defaultValue: 50,
-    min: 1,
-    description: "Characteristic impedance Z\u2080 in ohms",
-  },
-  {
-    key: "delay",
-    type: PropertyType.FLOAT,
-    label: "Propagation Delay (s)",
-    unit: "s",
-    defaultValue: 1e-9,
-    min: 1e-15,
-    description: "Total one-way propagation delay in seconds",
-  },
-  {
     key: "lossPerMeter",
     type: PropertyType.FLOAT,
     label: "Loss (dB/m)",
@@ -710,11 +693,13 @@ export const TRANSMISSION_LINE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   {
     xmlName: "impedance",
     propertyKey: "impedance",
+    modelParam: true,
     convert: (v) => parseFloat(v),
   },
   {
     xmlName: "delay",
     propertyKey: "delay",
+    modelParam: true,
     convert: (v) => parseFloat(v),
   },
   {

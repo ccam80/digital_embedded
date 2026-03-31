@@ -34,9 +34,16 @@ import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sp
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
+/** Assert actual ≈ expected within 0.1% relative tolerance (ngspice reference). */
+function expectSpiceRef(actual: number, expected: number, label: string) {
+  const rel = Math.abs((actual - expected) / expected);
+  if (rel >= 0.001) {
+    throw new Error(
+      `${label}: relative error ${(rel * 100).toFixed(4)}% exceeds 0.1% ` +
+      `(actual=${actual}, expected=${expected})`
+    );
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Default NMOS parameters (W=1µ, L=1µ, KP=120µA/V², VTO=0.7, LAMBDA=0.02)
@@ -485,25 +492,8 @@ describe("NmosfetDefinition", () => {
 // NMOS model: KP=120µA/V², VTO=0.7V, LAMBDA=0.02, W=10µ, L=1µ
 //
 // Expected operating point (ngspice reference):
-//   Vds ≈ 2.5V ± 5%
-//   Id  ≈ 2.5mA ± 5%
-//
-// Manual calculation:
-//   Vth = 0.7V, Vgst = 3 - 0.7 = 2.3V
-//   If in saturation: Id = KP/2*(W/L)*(Vgst)² = 120e-6/2*10*(2.3)² = 3.174mA
-//   Vds = 5 - Id*Rd = 5 - 3.174 = 1.826V < Vgst = 2.3V → NOT saturation
-//   So check linear region:
-//   With LAMBDA: must solve Id = KP*(W/L)*((Vgst)*Vds - Vds²/2)*(1+LAMBDA*Vds)
-//   and Vds = 5 - Id*1000
-//   Approximate (ignore LAMBDA): Id ≈ 1200µA/V * (2.3*Vds - Vds²/2), Vds = 5 - Id*1000
-//   Substituting: let x = Vds
-//   Id = 1200e-6*(2.3x - x²/2), 5-x = Id*1000 → 5-x = 1.2*(2.3x - x²/2) = 2.76x - 0.6x²
-//   0.6x² - 3.76x + 5 = 0 → x = (3.76 ± sqrt(14.14-12))/1.2 = (3.76 ± 1.46)/1.2
-//   x = 1.92V or x = 4.35V → x=1.92V (physical solution)
-//   Id = (5-1.92)/1000 = 3.08mA
-//   With LAMBDA correction: slight shift. SPICE gives Vds≈2.5V, Id≈2.5mA for KP=120µ, W=10µ, L=1µ
-//   (The 2.5V/2.5mA reference comes from KP*W/L=1200µ with Vgst=2.3 giving saturation at Vds≈2.3V,
-//   LAMBDA modulation pushes it slightly higher. The ±5% tolerance accommodates model differences.)
+//   Vds ≈ 1.84V
+//   Id  ≈ 3.16mA
 // ---------------------------------------------------------------------------
 
 describe("Integration", () => {
@@ -557,22 +547,11 @@ describe("Integration", () => {
     // Vgate should be 3V (enforced by source)
     expect(vGate).toBeCloseTo(3, 2);
 
-    // Vds = Vdrain (source at gnd) — SPICE reference: ≈2.5V ± 5%
-    // Broader tolerance to accommodate the exact W/L=10 model behavior
-    expect(vDrain).toBeGreaterThan(1.0);
-    expect(vDrain).toBeLessThan(5.0);
+    // ngspice reference: VTO=0.7, KP=120µ, W=10µ, L=1µ, LAMBDA=0.02
+    expectSpiceRef(vDrain, 1.840508e+00, "V(drain)");
 
-    // Id = (Vdd - Vdrain) / Rd
     const id = (vDd - vDrain) / 1000;
-    expect(id).toBeGreaterThan(0.5e-3); // at least 0.5mA
-    expect(id).toBeLessThan(5e-3);      // at most 5mA
-
-    // Vds within the 5% tolerance band of the SPICE reference (2.5V)
-    // ngspice with KP=120µA/V², VTO=0.7V, W=10µ, L=1µ, Vgs=3V, Rd=1kΩ, Vdd=5V
-    // gives Vds ≈ 1.92V (linear region) with exact Level 2 no-LAMBDA,
-    // or ≈ 2.0–2.5V with LAMBDA=0.02. Accept the 1.5–3.0V range.
-    expect(vDrain).toBeGreaterThan(1.5);
-    expect(vDrain).toBeLessThan(3.5);
+    expectSpiceRef(id, 3.159492e-03, "Id");
   });
 });
 
@@ -580,86 +559,56 @@ describe("Integration", () => {
 // setParam behavioral verification — reads mutable params object, not captured locals
 // ---------------------------------------------------------------------------
 
-describe("setParam mutates params object (not captured locals)", () => {
-  it("setParam('VTO', newValue) changes conductance stamps on next stampNonlinear", () => {
-    // Drive NMOS into saturation: Vgs=3V > VTO=0.7V, Vds=5V
-    const element = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+describe("setParam shifts DC OP to match SPICE reference", () => {
+  it("setParam('VTO', 2.5) shifts DC OP to match SPICE reference", () => {
+    const matrixSize = 5;
+    const vdd = makeDcVoltageSource(2, 0, 3, 5) as unknown as AnalogElement;
+    const vgate = makeDcVoltageSource(3, 0, 4, 3) as unknown as AnalogElement;
+    const rd = makeResistorElement(2, 1, 1000);
+    const nmosParams = { ...NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
+    const propsObj = makeParamBag(nmosParams);
+    const nmos = withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]);
 
-    const solverBefore = makeMockSolver();
-    element.stampNonlinear!(solverBefore);
-    const stampsBefore = (solverBefore.stamp as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[2] as number
-    );
-    const rhsBefore = (solverBefore.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[1] as number
-    );
+    const solver = new SparseSolver();
+    const diagnostics = new DiagnosticCollector();
+    const elements = [vdd, vgate, rd, nmos];
 
-    // Raise VTO to 2.5V: device becomes weakly on (Vgst = 3-2.5 = 0.5V vs 3-0.7=2.3V before)
-    element.setParam("VTO", 2.5);
+    // Before: VTO=0.7
+    const before = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    expect(before.converged).toBe(true);
+    expectSpiceRef(before.nodeVoltages[0], 1.840508e+00, "V(drain) before");
 
-    // Re-drive to same voltages so updateOperatingPoint reads new VTO from params
-    const voltages = new Float64Array(3);
-    voltages[0] = 5;  // Vds (node1=D)
-    voltages[1] = 3;  // Vgs (node2=G)
-    voltages[2] = 0;  // Vs  (node3=S)
-    for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
-      voltages[0] = 5;
-      voltages[1] = 3;
-      voltages[2] = 0;
-    }
-
-    const solverAfter = makeMockSolver();
-    element.stampNonlinear!(solverAfter);
-    const stampsAfter = (solverAfter.stamp as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[2] as number
-    );
-    const rhsAfter = (solverAfter.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[1] as number
-    );
-
-    // VTO change must cause at least one stamp or RHS entry to differ
-    const stampsDiffer = stampsBefore.some(
-      (val: number, i: number) => Math.abs(val - stampsAfter[i]) > 1e-15
-    );
-    const rhsDiffer = rhsBefore.some(
-      (val: number, i: number) => Math.abs(val - rhsAfter[i]) > 1e-15
-    );
-    expect(stampsDiffer || rhsDiffer).toBe(true);
+    // setParam and re-solve
+    nmos.setParam("VTO", 2.5);
+    const after = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    expect(after.converged).toBe(true);
+    expectSpiceRef(after.nodeVoltages[0], 4.835494e+00, "V(drain) after VTO=2.5");
+    expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 1.645065e-04, "Id after VTO=2.5");
   });
 
-  it("setParam('KP', newValue) changes drain current Norton stamps on next stampNonlinear", () => {
-    const element = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+  it("setParam('KP', 240µ) shifts DC OP to match SPICE reference", () => {
+    const matrixSize = 5;
+    const vdd = makeDcVoltageSource(2, 0, 3, 5) as unknown as AnalogElement;
+    const vgate = makeDcVoltageSource(3, 0, 4, 3) as unknown as AnalogElement;
+    const rd = makeResistorElement(2, 1, 1000);
+    const nmosParams = { ...NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
+    const propsObj = makeParamBag(nmosParams);
+    const nmos = withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]);
 
-    const solverBefore = makeMockSolver();
-    element.stampNonlinear!(solverBefore);
-    const rhsBefore = (solverBefore.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[1] as number
-    );
+    const solver = new SparseSolver();
+    const diagnostics = new DiagnosticCollector();
+    const elements = [vdd, vgate, rd, nmos];
 
-    // Double KP: Id doubles in saturation (Id = KP/2 * W/L * Vgst²)
-    element.setParam("KP", NMOS_DEFAULTS.KP * 2);
+    // Before: KP=120µ
+    const before = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    expect(before.converged).toBe(true);
+    expectSpiceRef(before.nodeVoltages[0], 1.840508e+00, "V(drain) before");
 
-    const voltages = new Float64Array(3);
-    voltages[0] = 5;
-    voltages[1] = 3;
-    voltages[2] = 0;
-    for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
-      voltages[0] = 5;
-      voltages[1] = 3;
-      voltages[2] = 0;
-    }
-
-    const solverAfter = makeMockSolver();
-    element.stampNonlinear!(solverAfter);
-    const rhsAfter = (solverAfter.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[1] as number
-    );
-
-    const anyDiffers = rhsBefore.some(
-      (val: number, i: number) => Math.abs(val - rhsAfter[i]) > 1e-15
-    );
-    expect(anyDiffers).toBe(true);
+    // setParam and re-solve
+    nmos.setParam("KP", 240e-6);
+    const after = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    expect(after.converged).toBe(true);
+    expectSpiceRef(after.nodeVoltages[0], 9.071396e-01, "V(drain) after KP=240µ");
+    expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 4.092860e-03, "Id after KP=240µ");
   });
 });

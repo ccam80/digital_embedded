@@ -146,7 +146,7 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const freq = this._properties.getOrDefault<number>("frequency", 32768);
+    const freq = this._properties.getModelParam<number>("frequency");
     const label = this._visibleLabel();
 
     ctx.save();
@@ -405,23 +405,6 @@ export function createCrystalElement(
 
 const CRYSTAL_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "frequency",
-    type: PropertyType.FLOAT,
-    label: "Frequency (Hz)",
-    unit: "Hz",
-    defaultValue: 32768,
-    min: 1,
-    description: "Series resonant frequency in hertz",
-  },
-  {
-    key: "qualityFactor",
-    type: PropertyType.FLOAT,
-    label: "Quality Factor (Q)",
-    defaultValue: 50000,
-    min: 1,
-    description: "Quality factor controlling resonance bandwidth",
-  },
-  {
     key: "motionalCapacitance",
     type: PropertyType.FLOAT,
     label: "Motional Capacitance C_s (F)",
@@ -456,11 +439,13 @@ export const CRYSTAL_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   {
     xmlName: "frequency",
     propertyKey: "frequency",
+    modelParam: true,
     convert: (v) => parseFloat(v),
   },
   {
     xmlName: "qualityFactor",
     propertyKey: "qualityFactor",
+    modelParam: true,
     convert: (v) => parseFloat(v),
   },
   {

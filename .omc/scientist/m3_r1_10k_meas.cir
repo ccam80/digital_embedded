@@ -1,0 +1,9 @@
+M3 R1 10k
+Vdac dac_int 0 2.0625
+Rdac dac_int rc_node 100
+R1 rc_node cap_pos 10k
+C1 cap_pos 0 1u IC=0
+.tran 10u 50m UIC
+.measure tran v_rc FIND v(rc_node) AT=50m
+.measure tran v_cap FIND v(cap_pos) AT=50m
+.end

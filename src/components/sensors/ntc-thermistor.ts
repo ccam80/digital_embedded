@@ -391,36 +391,12 @@ export class NTCThermistorCircuitElement extends AbstractCircuitElement {
 
 const NTC_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "r0",
-    type: PropertyType.FLOAT,
-    label: "R₀ (Ω)",
-    defaultValue: 10000,
-    min: 1e-6,
-    description: "Resistance at reference temperature T₀",
-  },
-  {
-    key: "beta",
-    type: PropertyType.FLOAT,
-    label: "Beta (K)",
-    defaultValue: 3950,
-    min: 1,
-    description: "B-parameter (material constant) in Kelvin",
-  },
-  {
     key: "t0",
     type: PropertyType.FLOAT,
     label: "T₀ (K)",
     defaultValue: 298.15,
     min: 1,
     description: "Reference temperature in Kelvin (default 25°C = 298.15 K)",
-  },
-  {
-    key: "temperature",
-    type: PropertyType.FLOAT,
-    label: "Temperature (K)",
-    defaultValue: 298.15,
-    min: 1,
-    description: "Operating temperature in Kelvin (used when self-heating is disabled)",
   },
   {
     key: "selfHeating",
@@ -459,10 +435,10 @@ const NTC_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 export const NTC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "r0", propertyKey: "r0", convert: (v) => parseFloat(v) },
-  { xmlName: "beta", propertyKey: "beta", convert: (v) => parseFloat(v) },
+  { xmlName: "r0", propertyKey: "r0", modelParam: true, convert: (v) => parseFloat(v) },
+  { xmlName: "beta", propertyKey: "beta", modelParam: true, convert: (v) => parseFloat(v) },
   { xmlName: "t0", propertyKey: "t0", convert: (v) => parseFloat(v) },
-  { xmlName: "temperature", propertyKey: "temperature", convert: (v) => parseFloat(v) },
+  { xmlName: "temperature", propertyKey: "temperature", modelParam: true, convert: (v) => parseFloat(v) },
   { xmlName: "selfHeating", propertyKey: "selfHeating", convert: (v) => v === "true" },
   { xmlName: "thermalResistance", propertyKey: "thermalResistance", convert: (v) => parseFloat(v) },
   { xmlName: "thermalCapacitance", propertyKey: "thermalCapacitance", convert: (v) => parseFloat(v) },

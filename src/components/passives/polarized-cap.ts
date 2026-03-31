@@ -407,24 +407,6 @@ function createPolarizedCapElement(
 
 const POLARIZED_CAP_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "capacitance",
-    type: PropertyType.FLOAT,
-    label: "Capacitance (F)",
-    unit: "F",
-    defaultValue: 100e-6,
-    min: 1e-12,
-    description: "Capacitance in farads",
-  },
-  {
-    key: "esr",
-    type: PropertyType.FLOAT,
-    label: "ESR (Ω)",
-    unit: "Ω",
-    defaultValue: 0.1,
-    min: 0,
-    description: "Equivalent series resistance in ohms",
-  },
-  {
     key: "leakageCurrent",
     type: PropertyType.FLOAT,
     label: "Leakage Current (A)",
@@ -468,11 +450,13 @@ export const POLARIZED_CAP_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   {
     xmlName: "capacitance",
     propertyKey: "capacitance",
+    modelParam: true,
     convert: (v) => parseFloat(v),
   },
   {
     xmlName: "esr",
     propertyKey: "esr",
+    modelParam: true,
     convert: (v) => parseFloat(v),
   },
   {

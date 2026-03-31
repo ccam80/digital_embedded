@@ -290,15 +290,15 @@ describe("Memristor", () => {
     });
 
     it("MemristorDefinition has rOn default 100", () => {
-      const prop = MemristorDefinition.propertyDefs.find((p) => p.key === "rOn");
-      expect(prop).toBeDefined();
-      expect(prop!.defaultValue).toBe(100);
+      const params = MemristorDefinition.modelRegistry?.behavioral?.params;
+      expect(params).toBeDefined();
+      expect(params!["rOn"]).toBe(100);
     });
 
     it("MemristorDefinition has rOff default 16000", () => {
-      const prop = MemristorDefinition.propertyDefs.find((p) => p.key === "rOff");
-      expect(prop).toBeDefined();
-      expect(prop!.defaultValue).toBe(16000);
+      const params = MemristorDefinition.modelRegistry?.behavioral?.params;
+      expect(params).toBeDefined();
+      expect(params!["rOff"]).toBe(16000);
     });
 
     it("analogFactory creates a MemristorElement", () => {

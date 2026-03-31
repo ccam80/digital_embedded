@@ -389,30 +389,6 @@ export class OptocouplerElement extends AbstractCircuitElement {
 
 const OPTOCOUPLER_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "ctr",
-    type: PropertyType.FLOAT,
-    label: "Current Transfer Ratio",
-    defaultValue: 1.0,
-    min: 0,
-    description: "Current transfer ratio CTR = I_collector / I_LED. Default: 1.0 (100%).",
-  },
-  {
-    key: "vForward",
-    type: PropertyType.FLOAT,
-    label: "LED forward voltage (V)",
-    defaultValue: 1.2,
-    min: 0,
-    description: "LED forward voltage in volts. Default: 1.2 V.",
-  },
-  {
-    key: "rLed",
-    type: PropertyType.FLOAT,
-    label: "LED series resistance (Ω)",
-    defaultValue: 10,
-    min: 1e-9,
-    description: "LED series resistance in ohms. Default: 10 Ω.",
-  },
-  {
     key: "vceSat",
     type: PropertyType.FLOAT,
     label: "V_CE saturation (V)",
@@ -442,9 +418,9 @@ const OPTOCOUPLER_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const OPTOCOUPLER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "ctr",       propertyKey: "ctr",       convert: (v) => parseFloat(v) },
-  { xmlName: "vForward",  propertyKey: "vForward",  convert: (v) => parseFloat(v) },
-  { xmlName: "rLed",      propertyKey: "rLed",      convert: (v) => parseFloat(v) },
+  { xmlName: "ctr",       propertyKey: "ctr",       convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "vForward",  propertyKey: "vForward",  convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "rLed",      propertyKey: "rLed",      convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "vceSat",    propertyKey: "vceSat",    convert: (v) => parseFloat(v) },
   { xmlName: "bandwidth", propertyKey: "bandwidth", convert: (v) => parseFloat(v) },
   { xmlName: "Label",     propertyKey: "label",     convert: (v) => v },

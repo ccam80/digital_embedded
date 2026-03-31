@@ -283,17 +283,24 @@
           - generic [ref=e374]: DcVoltageSource
           - button "×" [ref=e375] [cursor=pointer]
         - generic [ref=e376]:
-          - generic [ref=e377]:
-            - generic [ref=e378]: Label
-            - generic [ref=e379]:
-              - textbox [ref=e380]: Vref2
-              - checkbox "Show on canvas" [checked] [ref=e381]
+          - generic [ref=e378]:
+            - generic "Source voltage in volts" [ref=e379]: voltage
+            - textbox [ref=e380]: "5.00"
+            - generic [ref=e381]: V
           - generic [ref=e382]:
-            - generic [ref=e383]: Show value
-            - checkbox [checked] [ref=e385]
-          - generic [ref=e387] [cursor=pointer]: ▶ Pin Electrical
-  - generic [ref=e388]:
-    - generic [ref=e389]: Ready
-    - button "100%" [ref=e391] [cursor=pointer]
-    - generic [ref=e392]: 27, 21
+            - generic [ref=e383]: Model
+            - combobox [ref=e384]:
+              - option "Behavioral (MNA)" [selected]
+          - generic [ref=e385]:
+            - generic [ref=e386]: Label
+            - generic [ref=e387]:
+              - textbox [ref=e388]: Vref2
+              - checkbox "Show on canvas" [checked] [ref=e389]
+          - generic [ref=e390]:
+            - generic [ref=e391]: Show value
+            - checkbox [checked] [ref=e393]
+  - generic [ref=e394]:
+    - generic [ref=e395]: Ready
+    - button "100%" [ref=e397] [cursor=pointer]
+    - generic [ref=e398]: 27, 21
 ```

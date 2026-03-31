@@ -347,13 +347,6 @@ const CCCS_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "Expression defining output current as function of I(sense). Default: I(sense).",
   },
   {
-    key: "currentGain",
-    type: PropertyType.FLOAT,
-    label: "Current gain (β)",
-    defaultValue: 1.0,
-    description: "Linear current gain. Used when expression is the default 'I(sense)'. Default: 1.0.",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -368,7 +361,7 @@ const CCCS_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const CCCS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "expression",  propertyKey: "expression",  convert: (v) => v },
-  { xmlName: "currentGain", propertyKey: "currentGain", convert: (v) => parseFloat(v) },
+  { xmlName: "currentGain", propertyKey: "currentGain", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",       propertyKey: "label",       convert: (v) => v },
 ];
 

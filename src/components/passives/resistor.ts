@@ -96,9 +96,7 @@ export class ResistorElement extends AbstractCircuitElement {
   }
 
   draw(ctx: RenderContext, signals?: PinVoltageAccess): void {
-    const resistance = this._properties.hasModelParam("resistance")
-      ? this._properties.getModelParam<number>("resistance")
-      : 1000;
+    const resistance = this._properties.getModelParam<number>("resistance");
     const label = this._visibleLabel();
 
     ctx.save();

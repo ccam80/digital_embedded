@@ -60,6 +60,8 @@ export class PropertyPanel {
   private _element: CircuitElement | null = null;
   /** Property definitions for the current element (needed for commit). */
   private _definitions: PropertyDefinition[] = [];
+  /** True when showModelSelector() rendered show-value into param rows. */
+  private _showValueInModelParams = false;
 
   constructor(container: HTMLElement) {
     this._container = container;
@@ -77,9 +79,13 @@ export class PropertyPanel {
     element: CircuitElement,
     definitions: PropertyDefinition[],
   ): void {
-    this._clear();
+    // Don't clear the container — showModelSelector() may have already
+    // populated it above us.  Just reset internal tracking state.
+    this._inputs.clear();
     this._element = element;
     this._definitions = definitions;
+    // _showValueInModelParams is NOT reset here — it was set by showModelSelector
+    // which runs before us, and we need to read it below.
 
     const bag = element.getProperties();
     /** Rows with conditional visibility, keyed by the property they depend on. */
@@ -158,8 +164,9 @@ export class PropertyPanel {
     }
 
     // Add standalone "Show value" checkbox row if the definition set includes it
+    // (skip when model param rows already contain the show-value checkbox)
     const showValueDef = definitions.find(d => d.key === "showValue");
-    if (showValueDef) {
+    if (showValueDef && !this._showValueInModelParams) {
       const showValueVal = bag.has("showValue") ? bag.get<boolean>("showValue") : true;
       const cb = document.createElement("input");
       cb.type = "checkbox";
@@ -385,9 +392,24 @@ export class PropertyPanel {
     const primary = paramDefs.filter(p => p.rank === "primary");
     const secondary = paramDefs.filter(p => p.rank === "secondary");
 
-    // Render primary params above the model dropdown
+    // Render primary params above the model dropdown, with show-value checkbox
     for (const pd of primary) {
       const row = this._buildModelParamRow(element, def, pd, entry, bag, modelKey, registry, runtimeModels, primaryContainer);
+
+      // Append show-value checkbox inline with the primary param
+      const showValueVal = bag.has("showValue") ? bag.get<boolean>("showValue") : true;
+      const svCb = document.createElement("input");
+      svCb.type = "checkbox";
+      svCb.checked = Boolean(showValueVal);
+      svCb.title = "Show value on canvas";
+      svCb.addEventListener("change", () => {
+        const old = bag.has("showValue") ? bag.get("showValue") : true;
+        bag.set("showValue", svCb.checked);
+        for (const cb of this._changeCallbacks) cb("showValue", old, svCb.checked);
+      });
+      row.appendChild(svCb);
+      this._showValueInModelParams = true;
+
       primaryContainer.appendChild(row);
     }
 
@@ -443,10 +465,7 @@ export class PropertyPanel {
       : defaultValue;
 
     const row = document.createElement("div");
-    row.className = "prop-row";
-    row.style.display = "flex";
-    row.style.alignItems = "center";
-    row.style.gap = "4px";
+    row.className = "prop-row-inline";
 
     const labelEl = document.createElement("label");
     labelEl.className = "prop-label";
@@ -456,8 +475,6 @@ export class PropertyPanel {
 
     const inputEl = document.createElement("input");
     inputEl.type = "text";
-    inputEl.style.cssText =
-      "flex:1;min-width:0;padding:2px 4px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:3px;font-size:11px;";
 
     const isModified = currentValue !== defaultValue;
 
@@ -699,6 +716,7 @@ export class PropertyPanel {
     this._inputs.clear();
     this._element = null;
     this._definitions = [];
+    this._showValueInModelParams = false;
   }
 
   private _buildRow(label: string, inputEl: HTMLElement): HTMLElement {

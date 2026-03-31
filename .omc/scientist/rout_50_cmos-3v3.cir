@@ -1,0 +1,6 @@
+rOut Override default(50)
+Voh source 0 3.3
+Rout source junction 50
+Rload junction 0 10k
+.op
+.end

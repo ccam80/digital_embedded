@@ -26,6 +26,17 @@ import type { AnalogFactory } from "../../../core/registry.js";
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
 
+/** Assert actual ≈ expected within 0.1% relative tolerance (ngspice reference). */
+function expectSpiceRef(actual: number, expected: number, label: string) {
+  const rel = Math.abs((actual - expected) / expected);
+  if (rel >= 0.001) {
+    throw new Error(
+      `${label}: relative error ${(rel * 100).toFixed(4)}% exceeds 0.1% ` +
+      `(actual=${actual}, expected=${expected})`
+    );
+  }
+}
+
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -307,16 +318,11 @@ describe("Integration", () => {
     // Voltage source enforces V(node2) = 5V
     expect(vSource).toBeCloseTo(5, 3);
 
-    // Diode forward voltage: with IS=1e-14, N=1, Vd ≈ 0.692V ± 0.01V
-    // (SPICE reference with IS=1e-14 gives ~0.692V, not 0.665V which uses a
-    // higher IS typical of silicon signal diodes)
-    expect(vDiode).toBeGreaterThan(0.682);
-    expect(vDiode).toBeLessThan(0.703);
+    // ngspice reference: IS=1e-14, N=1 → Vd=0.6928910V, Id=4.307675mA
+    expectSpiceRef(vDiode, 6.928910e-01, "V(diode)");
 
-    // Diode current = (5 - Vd) / 1000 ≈ 4.308mA ± 0.05mA
     const iDiode = (vSource - vDiode) / 1000;
-    expect(iDiode).toBeGreaterThan(0.00420);
-    expect(iDiode).toBeLessThan(0.00440);
+    expectSpiceRef(iDiode, 4.307675e-03, "I(diode)");
   });
 });
 
@@ -325,71 +331,55 @@ describe("Integration", () => {
 // ---------------------------------------------------------------------------
 
 describe("setParam mutates params object (not captured locals)", () => {
-  it("setParam('IS', newValue) changes conductance stamps on next stampNonlinear", () => {
-    // Forward-biased diode at Vd=0.7V — include all required params to satisfy getModelParam
-    const element = makeDiodeAtVd(0.7, { IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, BV: Infinity, IBV: 1e-3 });
+  it("setParam('IS', 1e-11) shifts DC OP to match SPICE reference", () => {
+    const matrixSize = 3;
+    const branchRow = 2;
+    const vs = makeDcVoltageSource(2, 0, branchRow, 5) as unknown as AnalogElement;
+    const r = makeResistorElement(1, 2, 1000);
+    const diodeProps = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
+    const d = withNodeIds(createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps), [1, 0]);
 
-    const solverBefore = makeMockSolver();
-    element.stampNonlinear!(solverBefore);
-    // Collect all conductance stamp values at (0,0) — diagonal anode entry
-    const stampsBefore = (solverBefore.stamp as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[2] as number
-    );
+    const solver = new SparseSolver();
+    const diagnostics = new DiagnosticCollector();
+    const elements = [vs, r, d];
 
-    // Multiply IS by 1000: geq = IS*exp(Vd/nVt)/nVt changes proportionally
-    element.setParam("IS", 1e-11);
+    // Before: default IS=1e-14
+    const before = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    expect(before.converged).toBe(true);
+    expectSpiceRef(before.nodeVoltages[0], 6.928910e-01, "V(diode) before");
+    expectSpiceRef((before.nodeVoltages[1] - before.nodeVoltages[0]) / 1000, 4.307675e-03, "I(diode) before");
 
-    // Re-converge to same Vd with new IS so internal op is updated
-    const voltages = new Float64Array(2);
-    voltages[0] = 0.7;
-    voltages[1] = 0;
-    for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
-      voltages[0] = 0.7;
-    }
-
-    const solverAfter = makeMockSolver();
-    element.stampNonlinear!(solverAfter);
-    const stampsAfter = (solverAfter.stamp as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[2] as number
-    );
-
-    // IS changed by 1000×: at least one stamp must differ
-    const anyDiffers = stampsBefore.some(
-      (val: number, i: number) => Math.abs(val - stampsAfter[i]) > 1e-15
-    );
-    expect(anyDiffers).toBe(true);
+    // setParam and re-solve
+    d.setParam("IS", 1e-11);
+    const after = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    expect(after.converged).toBe(true);
+    expectSpiceRef(after.nodeVoltages[0], 5.152668e-01, "V(diode) after IS=1e-11");
+    expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 4.485160e-03, "I(diode) after IS=1e-11");
   });
 
-  it("setParam('N', newValue) changes RHS Norton current on next stampNonlinear", () => {
-    const element = makeDiodeAtVd(0.7, { IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, BV: Infinity, IBV: 1e-3 });
+  it("setParam('N', 2) shifts DC OP to match SPICE reference", () => {
+    const matrixSize = 3;
+    const branchRow = 2;
+    const vs = makeDcVoltageSource(2, 0, branchRow, 5) as unknown as AnalogElement;
+    const r = makeResistorElement(1, 2, 1000);
+    const diodeProps = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
+    const d = withNodeIds(createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps), [1, 0]);
 
-    const solverBefore = makeMockSolver();
-    element.stampNonlinear!(solverBefore);
-    const rhsBefore = (solverBefore.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[1] as number
-    );
+    const solver = new SparseSolver();
+    const diagnostics = new DiagnosticCollector();
+    const elements = [vs, r, d];
 
-    // Change emission coefficient N: changes nVt denominator in exp
-    element.setParam("N", 2);
+    // Before: default N=1
+    const before = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    expect(before.converged).toBe(true);
+    expectSpiceRef(before.nodeVoltages[0], 6.928910e-01, "V(diode) before");
+    expectSpiceRef((before.nodeVoltages[1] - before.nodeVoltages[0]) / 1000, 4.307675e-03, "I(diode) before");
 
-    const voltages = new Float64Array(2);
-    voltages[0] = 0.7;
-    voltages[1] = 0;
-    for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
-      voltages[0] = 0.7;
-    }
-
-    const solverAfter = makeMockSolver();
-    element.stampNonlinear!(solverAfter);
-    const rhsAfter = (solverAfter.stampRHS as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[1] as number
-    );
-
-    const anyDiffers = rhsBefore.some(
-      (val: number, i: number) => Math.abs(val - rhsAfter[i]) > 1e-15
-    );
-    expect(anyDiffers).toBe(true);
+    // setParam and re-solve
+    d.setParam("N", 2);
+    const after = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    expect(after.converged).toBe(true);
+    expectSpiceRef(after.nodeVoltages[0], 1.376835e+00, "V(diode) after N=2");
+    expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 3.623504e-03, "I(diode) after N=2");
   });
 });

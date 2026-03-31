@@ -398,37 +398,6 @@ export class SwitchSPDTElement extends AbstractCircuitElement {
 
 const ANALOG_SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "rOn",
-    type: PropertyType.INT,
-    label: "On resistance (Ω)",
-    defaultValue: 10,
-    min: 1e-6,
-    description: "Resistance when fully on (V_ctrl >> V_th). Default 10 Ω.",
-  },
-  {
-    key: "rOff",
-    type: PropertyType.INT,
-    label: "Off resistance (Ω)",
-    defaultValue: 1e9,
-    min: 1,
-    description: "Resistance when fully off (V_ctrl << V_th). Default 1 GΩ.",
-  },
-  {
-    key: "threshold",
-    type: PropertyType.INT,
-    label: "Threshold voltage (V)",
-    defaultValue: 1.65,
-    description: "Control voltage at midpoint of transition. Default 1.65 V (VDD/2 for 3.3 V CMOS).",
-  },
-  {
-    key: "transitionSharpness",
-    type: PropertyType.INT,
-    label: "Transition sharpness (1/V)",
-    defaultValue: 20,
-    min: 1e-6,
-    description: "Controls how sharply resistance transitions. Default 20 V⁻¹ (~0.2 V transition range).",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -442,10 +411,10 @@ const ANALOG_SWITCH_PROPERTY_DEFS: PropertyDefinition[] = [
 // ---------------------------------------------------------------------------
 
 const ANALOG_SWITCH_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  { xmlName: "rOn",                 propertyKey: "rOn",                 convert: (v) => parseFloat(v) },
-  { xmlName: "rOff",                propertyKey: "rOff",                convert: (v) => parseFloat(v) },
-  { xmlName: "threshold",           propertyKey: "threshold",           convert: (v) => parseFloat(v) },
-  { xmlName: "transitionSharpness", propertyKey: "transitionSharpness", convert: (v) => parseFloat(v) },
+  { xmlName: "rOn",                 propertyKey: "rOn",                 convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "rOff",                propertyKey: "rOff",                convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "threshold",           propertyKey: "threshold",           convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "transitionSharpness", propertyKey: "transitionSharpness", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",               propertyKey: "label",               convert: (v) => v },
 ];
 

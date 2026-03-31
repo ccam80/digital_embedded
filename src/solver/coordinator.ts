@@ -575,6 +575,12 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   }
 
   setComponentProperty(element: CircuitElement, key: string, value: number): void {
+    // Keep the PropertyBag in sync so draw() renders the updated value
+    const bag = element.getProperties();
+    if (bag.hasModelParam(key)) {
+      bag.setModelParam(key, value);
+    }
+
     let handled = false;
 
     // --- Digital domain: update the layout property so executeFns see the change ---

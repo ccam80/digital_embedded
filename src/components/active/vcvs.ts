@@ -304,13 +304,6 @@ const VCVS_PROPERTY_DEFS: PropertyDefinition[] = [
     description: "Expression defining output voltage as function of V(ctrl). Default: V(ctrl) (unity gain).",
   },
   {
-    key: "gain",
-    type: PropertyType.FLOAT,
-    label: "Gain (linear shortcut)",
-    defaultValue: 1.0,
-    description: "Linear voltage gain. Used when expression is the default 'V(ctrl)'. Default: 1.0.",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -325,7 +318,7 @@ const VCVS_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const VCVS_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "expression", propertyKey: "expression", convert: (v) => v },
-  { xmlName: "gain",       propertyKey: "gain",       convert: (v) => parseFloat(v) },
+  { xmlName: "gain",       propertyKey: "gain",       convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",      propertyKey: "label",      convert: (v) => v },
 ];
 
