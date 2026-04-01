@@ -263,6 +263,7 @@ const RELAY_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width of each switched signal",
+    structural: true,
   },
   {
     key: "normallyClosed",

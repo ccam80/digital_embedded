@@ -206,7 +206,7 @@ export const PRNG_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 ];
 
 const PRNG_PROPERTY_DEFS: PropertyDefinition[] = [
-  { key: "bitWidth", type: PropertyType.BIT_WIDTH, label: "Bits", defaultValue: 8, min: 1, max: 32 },
+  { key: "bitWidth", type: PropertyType.BIT_WIDTH, label: "Bits", defaultValue: 8, min: 1, max: 32, structural: true },
   { key: "label", type: PropertyType.STRING, label: "Label", defaultValue: "" },
 ];
 

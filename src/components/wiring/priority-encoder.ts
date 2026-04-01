@@ -214,6 +214,7 @@ const PRIORITY_ENCODER_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 4,
     description: "Number of output bits (input count = 2^selectorBits)",
+    structural: true,
   },
   LABEL_PROPERTY_DEF,
 ];

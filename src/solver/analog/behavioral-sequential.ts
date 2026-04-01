@@ -14,6 +14,7 @@ import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
   readMnaVoltage,
+  delegatePinSetParam,
 } from "./digital-pin-model.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
 
@@ -67,6 +68,8 @@ export class BehavioralCounterElement implements AnalogElementCore {
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
+  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
+
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
@@ -82,6 +85,7 @@ export class BehavioralCounterElement implements AnalogElementCore {
     bitWidth: number,
     vIH: number,
     _vIL: number,
+    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
     this._enPin = enPin;
     this._clockPin = clockPin;
@@ -91,6 +95,7 @@ export class BehavioralCounterElement implements AnalogElementCore {
     this._bitWidth = bitWidth;
     this._maxValue = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
     this._vIH = vIH;
+    this._pinModelsByLabel = pinModelsByLabel;
   }
 
   stamp(solver: SparseSolver): void {
@@ -222,7 +227,9 @@ export class BehavioralCounterElement implements AnalogElementCore {
     return this._outBitPins[0]?.currentVoltage ?? FALLBACK_SPEC.vOH;
   }
 
-  setParam(_key: string, _value: number): void {}
+  setParam(key: string, value: number): void {
+    delegatePinSetParam(this._pinModelsByLabel, key, value);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -252,6 +259,8 @@ export class BehavioralRegisterElement implements AnalogElementCore {
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
+  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
+
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
@@ -266,6 +275,7 @@ export class BehavioralRegisterElement implements AnalogElementCore {
     bitWidth: number,
     vIH: number,
     _vIL: number,
+    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
     this._dataPins = dataPins;
     this._clockPin = clockPin;
@@ -273,6 +283,7 @@ export class BehavioralRegisterElement implements AnalogElementCore {
     this._outBitPins = outBitPins;
     this._bitWidth = bitWidth;
     this._vIH = vIH;
+    this._pinModelsByLabel = pinModelsByLabel;
   }
 
   stamp(solver: SparseSolver): void {
@@ -369,7 +380,9 @@ export class BehavioralRegisterElement implements AnalogElementCore {
     return this._storedValue;
   }
 
-  setParam(_key: string, _value: number): void {}
+  setParam(key: string, value: number): void {
+    delegatePinSetParam(this._pinModelsByLabel, key, value);
+  }
 
   getPinCurrents(voltages: Float64Array): number[] {
     // Pin layout order: D (bus input), C (clock input), en (enable input), Q (bus output)
@@ -445,6 +458,16 @@ export function makeBehavioralCounterAnalogFactory(): AnalogElementFactory {
     const ovfPin = new DigitalOutputPinModel(ovfSpec);
     ovfPin.init(pinNodes.get("ovf") ?? 0, -1);
 
+    const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
+      ["en", enPin],
+      ["C", clockPin],
+      ["clr", clrPin],
+      ["ovf", ovfPin],
+    ]);
+    for (let bit = 0; bit < bitWidth; bit++) {
+      pinModelsByLabel.set(`out_${bit}`, outBitPins[bit]);
+    }
+
     return new BehavioralCounterElement(
       enPin,
       clockPin,
@@ -454,6 +477,7 @@ export function makeBehavioralCounterAnalogFactory(): AnalogElementFactory {
       bitWidth,
       cSpec.vIH,
       cSpec.vIL,
+      pinModelsByLabel,
     );
   };
 }
@@ -495,6 +519,8 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
+  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
+
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
@@ -514,6 +540,7 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     maxValue: number,
     vIH: number,
     _vIL: number,
+    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
     this._enPin = enPin;
     this._clockPin = clockPin;
@@ -526,6 +553,7 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     this._bitWidth = bitWidth;
     this._maxValue = maxValue;
     this._vIH = vIH;
+    this._pinModelsByLabel = pinModelsByLabel;
   }
 
   stamp(solver: SparseSolver): void {
@@ -686,7 +714,9 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     return this._count;
   }
 
-  setParam(_key: string, _value: number): void {}
+  setParam(key: string, value: number): void {
+    delegatePinSetParam(this._pinModelsByLabel, key, value);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -760,6 +790,19 @@ export function makeBehavioralCounterPresetAnalogFactory(): AnalogElementFactory
     const ovfPin = new DigitalOutputPinModel(ovfSpec);
     ovfPin.init(pinNodes.get("ovf") ?? 0, -1);
 
+    const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
+      ["en", enPin],
+      ["C", clockPin],
+      ["dir", dirPin],
+      ["ld", ldPin],
+      ["clr", clrPin],
+      ["ovf", ovfPin],
+    ]);
+    for (let bit = 0; bit < bitWidth; bit++) {
+      pinModelsByLabel.set(`in_${bit}`, inBitPins[bit]);
+      pinModelsByLabel.set(`out_${bit}`, outBitPins[bit]);
+    }
+
     return new BehavioralCounterPresetElement(
       enPin,
       clockPin,
@@ -773,6 +816,7 @@ export function makeBehavioralCounterPresetAnalogFactory(): AnalogElementFactory
       maxValue,
       cSpec.vIH,
       cSpec.vIL,
+      pinModelsByLabel,
     );
   };
 }
@@ -826,6 +870,15 @@ export function makeBehavioralRegisterAnalogFactory(): AnalogElementFactory {
       outBitPins.push(pin);
     }
 
+    const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
+      ["C", clockPin],
+      ["en", enPin],
+    ]);
+    for (let bit = 0; bit < bitWidth; bit++) {
+      pinModelsByLabel.set(`D_${bit}`, dataPins[bit]);
+      pinModelsByLabel.set(`Q_${bit}`, outBitPins[bit]);
+    }
+
     return new BehavioralRegisterElement(
       dataPins,
       clockPin,
@@ -834,6 +887,7 @@ export function makeBehavioralRegisterAnalogFactory(): AnalogElementFactory {
       bitWidth,
       cSpec.vIH,
       cSpec.vIL,
+      pinModelsByLabel,
     );
   };
 }

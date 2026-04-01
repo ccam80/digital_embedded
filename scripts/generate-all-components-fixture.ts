@@ -4,7 +4,7 @@
  * Used to run shape/pin/orphan audits across the full library.
  *
  * Usage: npx tsx scripts/generate-all-components-fixture.ts
- * Output: fixtures/Sim/all-components.dig
+ * Output: fixtures/Sim/all-components.dts
  */
 
 import { writeFileSync, readFileSync, readdirSync, statSync } from "fs";
@@ -12,7 +12,7 @@ import { join } from "path";
 import { scan74xxPinMap } from "../src/io/dig-pin-scanner.js";
 import { createDefaultRegistry } from "../src/components/register-all.js";
 import { CircuitBuilder } from "../src/headless/builder.js";
-import { serializeCircuitToDig } from "../src/io/dig-serializer.js";
+import { serializeCircuit } from "../src/io/dts-serializer.js";
 import { LIBRARY_74XX } from "../src/components/library-74xx.js";
 import { loadWithSubcircuits } from "../src/io/subcircuit-loader.js";
 import { NodeResolver } from "../src/io/file-resolver.js";
@@ -74,9 +74,9 @@ console.log(`Native: placed ${placed} component types`);
 // 4. Save
 // ---------------------------------------------------------------------------
 
-const outPath = join(process.cwd(), "fixtures", "Sim", "all-components.dig");
-const xml = serializeCircuitToDig(circuit, registry);
-writeFileSync(outPath, xml, "utf-8");
+const outPath = join(process.cwd(), "fixtures", "Sim", "all-components.dts");
+const json = serializeCircuit(circuit);
+writeFileSync(outPath, json, "utf-8");
 
 console.log(`Total: ${placed} components`);
 if (skipped.length > 0) {

@@ -1,7 +1,7 @@
 {
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"npx tsx scripts/re-export-fixtures.ts\",\"timeout\":30000,\"description\":\"Run fixture re-export script\"}",
-  "error": "Exit code 1\nC:\\local_working_projects\\digital_in_browser\\src\\io\\dts-deserializer.ts:217\r\n  const def = registry.get(savedEl.type);\r\n                       ^\r\n\r\nTypeError: Cannot read properties of undefined (reading 'get')\r\n    at createElement (C:\\local_working_projects\\digital_in_browser\\src\\io\\dts-deserializer.ts:217:24)\r\n    at deserializeDtsCircuit (C:\\local_working_projects\\digital_in_browser\\src\\io\\dts-deserializer.ts:200:21)\r\n    at deserializeDts (C:\\local_working_projects\\digital_in_br...",
-  "timestamp": "2026-04-01T01:49:30.026Z",
-  "retry_count": 1
+  "tool_name": "mcp__plugin_oh-my-claudecode_t__lsp_diagnostics",
+  "tool_input_preview": "{\"file\":\"C:/local_working_projects/digital_in_browser/src/solver/analog/behavioral-flipflop/t.ts\",\"severity\":\"error\"}",
+  "error": "Language server 'typescript-language-server' not found.\nInstall with: npm install -g typescript-language-server typescript",
+  "timestamp": "2026-04-01T02:36:12.793Z",
+  "retry_count": 8
 }

@@ -1,10 +1,53 @@
 {
   "summary": {
-    "passed": 9936,
-    "failed": 0,
+    "passed": 9929,
+    "failed": 7,
     "skipped": 0,
     "totalFiles": 331,
-    "durationSeconds": 11.9
+    "durationSeconds": 20.8
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "expected [Function] to not throw an error but 'Error: ENOENT: no such file or direct…' was thrown",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
+          "test": "compiles without throwing",
+          "line": 30,
+          "column": 37
+        }
+      ]
+    },
+    {
+      "message": "ENOENT: no such file or directory, open 'C:\\local_working_projects\\digital_in_browser\\fixtures\\buckbjt.dig'",
+      "count": 4,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
+          "test": "DC operating point converges",
+          "line": 35,
+          "column": 17
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
+          "test": "transient stepping does not error after 50 steps",
+          "line": 23,
+          "column": 15
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
+          "test": "survives 2000 transient steps without ERROR state",
+          "line": 23,
+          "column": 15
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
+          "test": "survives 600µs of sim time (matches UI run duration)",
+          "line": 23,
+          "column": 15
+        }
+      ]
+    }
+  ]
 }

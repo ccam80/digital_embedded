@@ -321,8 +321,12 @@ export class PostMessageAdapter {
     if (!response.ok) {
       throw new Error(`Failed to fetch circuit: ${url}`);
     }
-    const xml = await response.text();
-    await this._loadCircuit(xml);
+    const text = await response.text();
+    if (text.trimStart().startsWith('{')) {
+      await this._loadCircuitDts(text);
+    } else {
+      await this._loadCircuit(text);
+    }
     this._post({ type: 'sim-loaded' });
   }
 
@@ -334,15 +338,7 @@ export class PostMessageAdapter {
     }
     const decoded = atob(encoded);
     if (decoded.trimStart().startsWith('{')) {
-      const { circuit } = deserializeDts(decoded, this._registry);
-      if (this._hooks.loadCircuitDts) {
-        await this._hooks.loadCircuitDts(circuit);
-      } else if (this._hooks.loadCircuitXml) {
-        const xml = serializeCircuitToDig(circuit, this._registry);
-        await this._hooks.loadCircuitXml(xml);
-      } else {
-        this._getOwnFacade().compile(circuit);
-      }
+      await this._loadCircuitDts(decoded);
     } else {
       await this._loadCircuit(decoded);
     }
@@ -350,13 +346,7 @@ export class PostMessageAdapter {
   }
 
   private async _handleLoadJson(msg: { data?: unknown }): Promise<void> {
-    const { circuit } = deserializeDts(String(msg.data ?? ''), this._registry);
-    if (this._hooks.loadCircuitXml) {
-      const xml = serializeCircuitToDig(circuit, this._registry);
-      await this._hooks.loadCircuitXml(xml);
-    } else {
-      this._getOwnFacade().compile(circuit);
-    }
+    await this._loadCircuitDts(String(msg.data ?? ''));
     this._post({ type: 'sim-loaded' });
   }
 
@@ -639,6 +629,18 @@ export class PostMessageAdapter {
    * Load a circuit from XML. Uses the GUI hook if available (so the editor
    * shows the circuit), otherwise falls back to headless compilation.
    */
+  private async _loadCircuitDts(json: string): Promise<void> {
+    const { circuit } = deserializeDts(json, this._registry);
+    if (this._hooks.loadCircuitDts) {
+      await this._hooks.loadCircuitDts(circuit);
+    } else if (this._hooks.loadCircuitXml) {
+      const xml = serializeCircuitToDig(circuit, this._registry);
+      await this._hooks.loadCircuitXml(xml);
+    } else {
+      this._getOwnFacade().compile(circuit);
+    }
+  }
+
   private async _loadCircuit(xml: string): Promise<void> {
     if (this._hooks.loadCircuitXml) {
       await this._hooks.loadCircuitXml(xml);

@@ -57,6 +57,17 @@ export interface PropertyDefinition {
    * setComponentProperty / serialization.
    */
   hidden?: boolean;
+
+  /**
+   * When true, changing this property alters circuit topology (pin count,
+   * net allocation, MNA matrix structure) and always requires recompilation.
+   * When false or absent, numeric values are hot-loaded via setParam.
+   *
+   * Used by the canvas-popup dispatch to override the typeof heuristic:
+   * a numeric property marked structural will trigger recompilation even
+   * though it is a number.
+   */
+  structural?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +120,11 @@ export class PropertyBag {
 
   has(key: string): boolean {
     return this._map.has(key);
+  }
+
+  /** Remove a key from the regular property partition. */
+  delete(key: string): boolean {
+    return this._map.delete(key);
   }
 
   // -------------------------------------------------------------------------

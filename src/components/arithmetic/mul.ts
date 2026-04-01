@@ -222,6 +222,7 @@ const MUL_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width of the operands (product is 2x this width)",
+    structural: true,
   },
   {
     key: "signed",

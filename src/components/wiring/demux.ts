@@ -253,6 +253,7 @@ const DEMUX_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 4,
     description: "Number of selector bits (determines number of outputs: 2^selectorBits)",
+    structural: true,
   },
   {
     key: "bitWidth",
@@ -262,6 +263,7 @@ const DEMUX_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width of each data signal",
+    structural: true,
   },
   LABEL_PROPERTY_DEF,
 ];

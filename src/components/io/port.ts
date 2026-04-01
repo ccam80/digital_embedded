@@ -155,6 +155,7 @@ const PORT_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width (only meaningful for digital buses; analog is always 1)",
+    structural: true,
   },
   {
     key: "face",

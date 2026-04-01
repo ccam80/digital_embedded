@@ -10,6 +10,7 @@ import type { RenderPipeline } from './render-pipeline.js';
 import type { CanvasInteractionDeps } from './canvas-interaction.js';
 import { PropertyPanel } from '../editor/property-panel.js';
 import { defaultLogicFamily } from '../core/logic-family.js';
+import { WELL_KNOWN_PROPERTY_KEYS } from '../core/registry.js';
 
 // ---------------------------------------------------------------------------
 // PopupController
@@ -79,17 +80,28 @@ export function createPopupController(
     if (activeModel === "digital") {
       propertyPopup.showPinElectricalOverrides(elementHit, def, family);
     }
-    // Live-update: numeric parameter changes are hot-patched into the running
-    // engine via coordinator.setComponentProperty() (updates conductances
-    // in-place, no recompile). Non-numeric changes (waveform, expression, etc.)
-    // are compile-sensitive — recompile and continue automatically.
+    // Live-update property changes:
+    //   - Render-only keys (label, showLabel, showValue) → just re-render
+    //   - Structural properties (inputCount, bitWidth, model, etc.) → recompile
+    //   - Numeric non-structural → hot-patch via coordinator.setComponentProperty()
+    //   - Non-numeric non-structural → recompile (waveform, expression, etc.)
     propertyPopup.onPropertyChange((key, _oldValue, newValue) => {
       const engineKey = key.startsWith("model:") ? key.slice(6) : key;
-      if (typeof newValue === 'number') {
-        ctx.facade.getCoordinator().setComponentProperty(elementHit, engineKey, newValue);
+      if (WELL_KNOWN_PROPERTY_KEYS.has(engineKey)) {
+        // Render-only — no simulation effect, skip hot-load and recompile
       } else {
-        if (ctx.compileAndBind()) {
-          if (ctx.isSimActive()) deps.startSimulation();
+        const propDef = def.propertyDefs?.find(p => p.key === engineKey);
+        if (propDef?.structural) {
+          // Structural change — always recompile even if numeric
+          if (ctx.compileAndBind()) {
+            if (ctx.isSimActive()) deps.startSimulation();
+          }
+        } else if (typeof newValue === 'number') {
+          ctx.facade.getCoordinator().setComponentProperty(elementHit, engineKey, newValue);
+        } else {
+          if (ctx.compileAndBind()) {
+            if (ctx.isSimActive()) deps.startSimulation();
+          }
         }
       }
       renderPipeline.scheduleRender();

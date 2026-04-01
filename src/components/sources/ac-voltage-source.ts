@@ -299,6 +299,7 @@ const AC_VOLTAGE_SOURCE_PROPERTY_DEFS: PropertyDefinition[] = [
     defaultValue: "sine",
     enumValues: ["sine", "square", "triangle", "sawtooth", "expression", "sweep", "am", "fm", "noise"],
     description: "Waveform shape",
+    structural: true,
   },
   {
     key: "expression",

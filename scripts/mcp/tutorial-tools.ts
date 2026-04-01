@@ -9,7 +9,7 @@ import { resolve } from "path";
 import type { DefaultSimulatorFacade } from "../../src/headless/default-facade.js";
 import type { ComponentRegistry } from "../../src/core/registry.js";
 import type { SessionState } from "./tool-helpers.js";
-import { serializeCircuitToDig } from "../../src/io/dig-serializer.js";
+import { serializeCircuit } from "../../src/io/dts-serializer.js";
 import type { TutorialManifest } from "../../src/app/tutorial/types.js";
 import { validateManifest } from "../../src/app/tutorial/validate.js";
 import { listPresets, resolvePaletteSpec } from "../../src/app/tutorial/presets.js";
@@ -126,8 +126,8 @@ export function registerTutorialTools(
         "and writes all files to the output directory.\n\n" +
         "Output structure:\n" +
         "  <outputDir>/manifest.json     — the validated manifest\n" +
-        "  <outputDir>/step-id-goal.dig  — goal circuit for each step (if CircuitSpec provided)\n" +
-        "  <outputDir>/step-id-start.dig — start circuit for each step (if CircuitSpec provided)\n\n" +
+        "  <outputDir>/step-id-goal.dts  — goal circuit for each step (if CircuitSpec provided)\n" +
+        "  <outputDir>/step-id-start.dts — start circuit for each step (if CircuitSpec provided)\n\n" +
         "Template manifest:\n" +
         '{\n' +
         '  "id": "my-tutorial",\n' +
@@ -210,9 +210,9 @@ export function registerTutorialTools(
             const goalHandle = session.store(goalCircuit);
 
             // Save goal circuit
-            const goalXml = serializeCircuitToDig(goalCircuit, registry);
-            const goalPath = `${outputDir}/${step.id}-goal.dig`;
-            await writeFile(goalPath, goalXml, "utf-8");
+            const goalJson = serializeCircuit(goalCircuit);
+            const goalPath = `${outputDir}/${step.id}-goal.dts`;
+            await writeFile(goalPath, goalJson, "utf-8");
             lines.push(`  Goal circuit built and saved: ${goalPath}`);
 
             // Verify test vectors against goal circuit
@@ -243,8 +243,8 @@ export function registerTutorialTools(
               }
             }
 
-            // Update manifest to reference the .dig file instead of inline spec
-            (step as Record<string, unknown>)["goalCircuitFile"] = `${step.id}-goal.dig`;
+            // Update manifest to reference the .dts file instead of inline spec
+            (step as Record<string, unknown>)["goalCircuitFile"] = `${step.id}-goal.dts`;
           } catch (err) {
             lines.push(
               `  ERROR building goal circuit: ${err instanceof Error ? err.message : String(err)}`,
@@ -256,11 +256,11 @@ export function registerTutorialTools(
         if (step.startCircuit && typeof step.startCircuit !== "string") {
           try {
             const startCircuit = facade.build(step.startCircuit as CircuitSpec);
-            const startXml = serializeCircuitToDig(startCircuit, registry);
-            const startPath = `${outputDir}/${step.id}-start.dig`;
-            await writeFile(startPath, startXml, "utf-8");
+            const startJson = serializeCircuit(startCircuit);
+            const startPath = `${outputDir}/${step.id}-start.dts`;
+            await writeFile(startPath, startJson, "utf-8");
             lines.push(`  Start circuit built and saved: ${startPath}`);
-            (step as Record<string, unknown>)["startCircuitFile"] = `${step.id}-start.dig`;
+            (step as Record<string, unknown>)["startCircuitFile"] = `${step.id}-start.dts`;
           } catch (err) {
             lines.push(
               `  ERROR building start circuit: ${err instanceof Error ? err.message : String(err)}`,

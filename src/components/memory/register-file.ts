@@ -268,6 +268,7 @@ const REGISTER_FILE_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width of each register",
+    structural: true,
   },
   {
     key: "addrBits",
@@ -277,6 +278,7 @@ const REGISTER_FILE_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 8,
     description: "Number of address bits (register count = 2^addrBits)",
+    structural: true,
   },
   LABEL_PROPERTY_DEF,
 ];

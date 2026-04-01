@@ -258,6 +258,7 @@ const JK_FF_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width of J, K, and Q signals",
+    structural: true,
   },
   LABEL_PROPERTY_DEF,
 ];

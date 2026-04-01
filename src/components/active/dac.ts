@@ -416,6 +416,7 @@ const DAC_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Number of digital input bits N. Output has 2^N levels. Default 8.",
+    structural: true,
   },
   {
     key: "mode",

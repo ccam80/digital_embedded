@@ -53,6 +53,8 @@ const PARSE_PREFIX_MAP: Record<string, number> = {
 export function parseSI(text: string): number {
   const s = text.trim();
   if (s === "") return NaN;
+  if (s === '∞' || s.toLowerCase() === 'inf' || s.toLowerCase() === 'infinity') return Infinity;
+  if (s === '-∞' || s.toLowerCase() === '-inf' || s.toLowerCase() === '-infinity') return -Infinity;
 
   // Try "meg" / "MEG" (SPICE-style mega) before single-char prefix parsing
   const megMatch = s.match(/^([+-]?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)\s*[mM][eE][gG]/);
@@ -96,6 +98,9 @@ export function parseSI(text: string): number {
  * formatSI(1e-14, "A")    → "10.0 fA"
  */
 export function formatSI(value: number, unit: string, precision: number = 3): string {
+  if (!Number.isFinite(value)) {
+    return value === Infinity ? `∞ ${unit}` : `-∞ ${unit}`;
+  }
   if (value === 0) {
     return `0.00 ${unit}`;
   }

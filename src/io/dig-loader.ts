@@ -204,6 +204,7 @@ function migrateModelParams(bag: PropertyBag, def: ComponentDefinition): void {
       const val = bag.get(key);
       if (typeof val === 'number') {
         bag.setModelParam(key, val);
+        bag.delete(key);
       }
     }
   }

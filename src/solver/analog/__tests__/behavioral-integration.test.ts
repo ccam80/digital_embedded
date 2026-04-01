@@ -121,6 +121,7 @@ function buildAndGateCircuit(
     [inA, inB],
     outPin,
     (inputs) => inputs[0] && inputs[1],
+    new Map(),
   );
 
   // Ideal voltage sources driving input nodes (branch rows are absolute 0-based)
@@ -176,6 +177,7 @@ function buildHighImpedanceSourceCircuit(): ConcreteCompiledAnalogCircuit {
     [inA, inB],
     outPin,
     (inputs) => inputs[0] && inputs[1],
+    new Map(),
   );
 
   // Ideal 3.3V source at node 4 (solver node 3), branch row 4 (absolute)
@@ -408,6 +410,7 @@ describe("Integration", () => {
       [inA, inB],
       outPin,
       (inputs) => inputs[0] && inputs[1],
+      new Map(),
     );
 
     // Input A = 1.5V (indeterminate), Input B = 3.3V (HIGH for TTL)

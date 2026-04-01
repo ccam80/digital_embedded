@@ -192,6 +192,7 @@ const DRIVER_INV_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width of the data signal",
+    structural: true,
   },
   {
     key: "flipSelPos",

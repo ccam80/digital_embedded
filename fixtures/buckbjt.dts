@@ -1,0 +1,741 @@
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "ef2c4416-2778-453f-90ad-8642d14c5e99",
+        "position": {
+          "x": 29,
+          "y": 22
+        },
+        "properties": {},
+        "rotation": 90,
+        "type": "NMOS"
+      },
+      {
+        "id": "92b77cc4-d4d6-4a8d-9688-bc47ac692eb2",
+        "position": {
+          "x": 6,
+          "y": 30
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "NpnBJT"
+      },
+      {
+        "id": "4670b04c-fd8b-46de-8a3d-b0ca52c1c668",
+        "position": {
+          "x": 18,
+          "y": 25
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "PnpBJT"
+      },
+      {
+        "id": "12736966-6ee7-4ebb-9d57-0a47bced6f6e",
+        "position": {
+          "x": 10,
+          "y": 27
+        },
+        "properties": {},
+        "rotation": 90,
+        "type": "Resistor"
+      },
+      {
+        "id": "54b13319-4f5f-4a6c-af45-af1e54e9ba69",
+        "position": {
+          "x": 22,
+          "y": 32
+        },
+        "properties": {},
+        "rotation": 90,
+        "type": "Resistor"
+      },
+      {
+        "id": "33a9f50d-8233-4580-be4a-53f671b4e93e",
+        "position": {
+          "x": -5,
+          "y": 30
+        },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 2
+          }
+        },
+        "rotation": 90,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "3d823343-105a-489e-89b7-ffb371e3c68b",
+        "position": {
+          "x": -5,
+          "y": 22
+        },
+        "properties": {
+          "NetName": "DRV"
+        },
+        "rotation": 90,
+        "type": "Tunnel"
+      },
+      {
+        "id": "de39e6d7-6ab2-4e74-88c6-58bf5cd33791",
+        "position": {
+          "x": 2,
+          "y": 30
+        },
+        "properties": {
+          "NetName": "DRV"
+        },
+        "rotation": 180,
+        "type": "Tunnel"
+      },
+      {
+        "id": "f126c458-c0f8-403d-933e-bf3a7f1fc3a0",
+        "position": {
+          "x": 46,
+          "y": 22
+        },
+        "properties": {},
+        "rotation": 90,
+        "type": "Resistor"
+      },
+      {
+        "id": "3d3cb150-566a-4880-a437-22ded1614a3d",
+        "position": {
+          "x": 2,
+          "y": 30
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "6d609e33-ec59-4361-bb3c-d10498f6ddf9",
+        "position": {
+          "x": 14,
+          "y": 25
+        },
+        "properties": {
+          "NetName": "DRV"
+        },
+        "rotation": 180,
+        "type": "Tunnel"
+      },
+      {
+        "id": "35dec281-3e04-4164-aa78-4e997a28c87d",
+        "position": {
+          "x": 14,
+          "y": 25
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "df7d3b5d-c15d-43ee-96f4-bd1bc270974d",
+        "position": {
+          "x": 35,
+          "y": 18
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Inductor"
+      },
+      {
+        "id": "a55cf38a-d3cb-4949-b6d8-a97c6f9e9ea7",
+        "position": {
+          "x": 33,
+          "y": 22
+        },
+        "properties": {},
+        "rotation": 90,
+        "type": "Diode"
+      },
+      {
+        "id": "0adb148c-6909-48e7-b93b-9116d8e03bb4",
+        "position": {
+          "x": 41,
+          "y": 18
+        },
+        "properties": {},
+        "rotation": 270,
+        "type": "Capacitor"
+      },
+      {
+        "id": "693bfc2a-9a44-4b15-bd0f-13f07b7652de",
+        "position": {
+          "x": 12,
+          "y": 28
+        },
+        "properties": {
+          "NetName": "NDRV"
+        },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "2e262de0-dd56-432b-a9db-40c5f6244db8",
+        "position": {
+          "x": 24,
+          "y": 27
+        },
+        "properties": {
+          "NetName": "PDRV"
+        },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "ac79b897-9ffa-4801-94bd-a6a19e2d4fe8",
+        "position": {
+          "x": 24,
+          "y": 18
+        },
+        "properties": {
+          "NetName": "10V"
+        },
+        "rotation": 180,
+        "type": "Tunnel"
+      },
+      {
+        "id": "d1847553-0b3e-4c2e-bae1-8e151c06c541",
+        "position": {
+          "x": 29,
+          "y": 24
+        },
+        "properties": {
+          "NetName": "NDRV"
+        },
+        "rotation": 270,
+        "type": "Tunnel"
+      },
+      {
+        "id": "1abe30e5-402d-44c9-99b2-7f1a7eeec959",
+        "position": {
+          "x": -2,
+          "y": 26
+        },
+        "properties": {},
+        "rotation": 90,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "a0b41bd3-6711-4aff-9186-e353d6fefc6e",
+        "position": {
+          "x": 10,
+          "y": 20
+        },
+        "properties": {
+          "NetName": "10V"
+        },
+        "rotation": 90,
+        "type": "Tunnel"
+      },
+      {
+        "id": "d70b4e46-2ad8-488c-858d-2b897c7bd246",
+        "position": {
+          "x": 10,
+          "y": 38
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "72d110ce-7e18-4585-8d82-57a64ab5ed93",
+        "position": {
+          "x": 41,
+          "y": 24
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "a73febb2-6bd2-4c3e-b6cb-9a7948a0e14e",
+        "position": {
+          "x": 31,
+          "y": 14
+        },
+        "properties": {
+          "label": "V_SWITCH"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      },
+      {
+        "id": "08b4a3cb-f693-45bd-89d1-946cced8a880",
+        "position": {
+          "x": 43,
+          "y": 14
+        },
+        "properties": {
+          "label": "V_OUT"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      },
+      {
+        "id": "1e8732db-8401-4aa6-bfa8-ceda2213769a",
+        "position": {
+          "x": 26,
+          "y": 14
+        },
+        "properties": {
+          "label": "V_SUPPLY"
+        },
+        "rotation": 0,
+        "type": "Probe"
+      }
+    ],
+    "name": "Untitled",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 32
+          },
+          {
+            "x": 22,
+            "y": 35
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -7,
+            "y": 35
+          },
+          {
+            "x": -5,
+            "y": 35
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -5,
+            "y": 35
+          },
+          {
+            "x": -2,
+            "y": 35
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 35
+          },
+          {
+            "x": 10,
+            "y": 35
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 35
+          },
+          {
+            "x": 22,
+            "y": 35
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 22
+          },
+          {
+            "x": -2,
+            "y": 23
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 22
+          },
+          {
+            "x": 10,
+            "y": 22
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 22
+          },
+          {
+            "x": 22,
+            "y": 22
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -5,
+            "y": 30
+          },
+          {
+            "x": -5,
+            "y": 35
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -5,
+            "y": 26
+          },
+          {
+            "x": -5,
+            "y": 22
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 20
+          },
+          {
+            "x": 10,
+            "y": 22
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 22
+          },
+          {
+            "x": 10,
+            "y": 23
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 27
+          },
+          {
+            "x": 10,
+            "y": 28
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 28
+          },
+          {
+            "x": 10,
+            "y": 29
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 28
+          },
+          {
+            "x": 10,
+            "y": 28
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 26
+          },
+          {
+            "x": 22,
+            "y": 27
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 27
+          },
+          {
+            "x": 22,
+            "y": 28
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 27
+          },
+          {
+            "x": 22,
+            "y": 27
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 39,
+            "y": 18
+          },
+          {
+            "x": 41,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 41,
+            "y": 18
+          },
+          {
+            "x": 43,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 18
+          },
+          {
+            "x": 46,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 22
+          },
+          {
+            "x": 41,
+            "y": 22
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 41,
+            "y": 22
+          },
+          {
+            "x": 46,
+            "y": 22
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 22
+          },
+          {
+            "x": 29,
+            "y": 24
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 22,
+            "y": 22
+          },
+          {
+            "x": 22,
+            "y": 24
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 31
+          },
+          {
+            "x": 10,
+            "y": 35
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 10,
+            "y": 35
+          },
+          {
+            "x": 10,
+            "y": 38
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 18
+          },
+          {
+            "x": 31,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 18
+          },
+          {
+            "x": 33,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 18
+          },
+          {
+            "x": 35,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 18
+          },
+          {
+            "x": 26,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 18
+          },
+          {
+            "x": 28,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 26
+          },
+          {
+            "x": -2,
+            "y": 35
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 41,
+            "y": 24
+          },
+          {
+            "x": 41,
+            "y": 22
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 31,
+            "y": 14
+          },
+          {
+            "x": 31,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 14
+          },
+          {
+            "x": 43,
+            "y": 18
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 26,
+            "y": 14
+          },
+          {
+            "x": 26,
+            "y": 18
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

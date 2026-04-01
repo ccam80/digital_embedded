@@ -170,6 +170,7 @@ const IN_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width of the output signal",
+    structural: true,
   },
   {
     key: "defaultValue",

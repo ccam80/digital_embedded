@@ -378,6 +378,7 @@ const BOOLEAN_FUNCTION_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 8,
     description: "Number of input variables (1–8). Truth table has 2^n rows.",
+    structural: true,
   },
   {
     key: "outputCount",
@@ -387,6 +388,7 @@ const BOOLEAN_FUNCTION_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Number of output bits per row",
+    structural: true,
   },
   {
     key: "truthTable",

@@ -213,15 +213,15 @@
           "_modelParams": {
             "BF": 100,
             "BR": 1,
-            "IKF": null,
-            "IKR": null,
+            "IKF": "_inf",
+            "IKR": "_inf",
             "IS": 1e-14,
             "ISC": 0,
             "ISE": 0,
             "NF": 1,
             "NR": 1,
-            "VAF": null,
-            "VAR": null
+            "VAF": "_inf",
+            "VAR": "_inf"
           },
           "label": "Q1"
         },

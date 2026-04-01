@@ -91,7 +91,7 @@ function buildJK(): {
 
   const element = new BehavioralJKFlipflopElement(
     jPin, clockPin, kPin, qPin, qBarPin,
-    VIH, CMOS33.vIL,
+    VIH, CMOS33.vIL, new Map(),
   );
   return { element, jPin, clockPin, kPin, qPin, qBarPin };
 }
@@ -116,7 +116,7 @@ function buildRS(): {
 
   const element = new BehavioralRSFlipflopElement(
     sPin, clockPin, rPin, qPin, qBarPin,
-    VIH, CMOS33.vIL,
+    VIH, CMOS33.vIL, new Map(),
   );
   return { element, sPin, clockPin, rPin, qPin, qBarPin };
 }
@@ -139,7 +139,7 @@ function buildT(): {
 
   const element = new BehavioralTFlipflopElement(
     tPin, clockPin, qPin, qBarPin,
-    VIH, CMOS33.vIL,
+    VIH, CMOS33.vIL, new Map(),
   );
   return { element, tPin, clockPin, qPin, qBarPin };
 }

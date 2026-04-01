@@ -605,15 +605,26 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
         if (dotIdx !== -1) {
           const pinLabel = key.slice(0, dotIdx);
           const paramName = key.slice(dotIdx + 1);
+          let bridgeHandled = false;
           for (const adapters of compiledAnalog.bridgeAdaptersByGroupId.values()) {
             for (const adapter of adapters) {
               if (adapter.label?.endsWith(`:${pinLabel}`)) {
                 adapter.setParam(paramName, value);
+                bridgeHandled = true;
               }
             }
           }
+          if (!bridgeHandled) {
+            // No bridge adapter matched — the element may hold pin models
+            // internally (e.g. behavioral analog models). Forward the full
+            // composite key so the element can route it via delegatePinSetParam.
+            const el = compiledAnalog.elements[elementIndex];
+            if (el !== undefined && el.setParam) {
+              el.setParam(key, value);
+            }
+          }
           this._analog.configure({});
-          return;
+          handled = true;
         }
 
         const el = compiledAnalog.elements[elementIndex];

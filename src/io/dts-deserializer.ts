@@ -24,11 +24,13 @@ const BIGINT_PREFIX = '_bigint:';
 const POS_INF = '_inf';
 const NEG_INF = '-_inf';
 
-/** Decode Infinity sentinels in a model params record back to numeric Infinity. */
+/** Decode Infinity sentinels in a model params record back to numeric Infinity.
+ *  Also recovers `null` values — these are legacy artifacts from JSON.stringify
+ *  silently nullifying Infinity before the sentinel encoding was introduced. */
 function decodeModelParams(params: Record<string, number>): Record<string, number> {
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(params)) {
-    if ((v as unknown) === POS_INF) out[k] = Infinity;
+    if ((v as unknown) === POS_INF || v === null) out[k] = Infinity;
     else if ((v as unknown) === NEG_INF) out[k] = -Infinity;
     else out[k] = v;
   }

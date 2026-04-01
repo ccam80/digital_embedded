@@ -157,7 +157,7 @@ function make2InputGate(
   inB.init(2, -1); // MNA node 2 = circuit node 2
   const out = new DigitalOutputPinModel(CMOS_3V3);
   out.init(3, -1); // MNA node 3 = circuit node 3
-  return new BehavioralGateElement([inA, inB], out, truthTable);
+  return new BehavioralGateElement([inA, inB], out, truthTable, new Map());
 }
 
 function make1InputGate(
@@ -167,7 +167,7 @@ function make1InputGate(
   inp.init(1, -1); // MNA node 1 = circuit node 1
   const out = new DigitalOutputPinModel(CMOS_3V3);
   out.init(2, -1); // MNA node 2 = circuit node 2
-  return new BehavioralGateElement([inp], out, truthTable);
+  return new BehavioralGateElement([inp], out, truthTable, new Map());
 }
 
 // ---------------------------------------------------------------------------
@@ -372,7 +372,7 @@ describe("Loading", () => {
     inA.init(1, -1); // MNA node 1
     const out = new DigitalOutputPinModel(CMOS_3V3);
     out.init(2, -1); // MNA node 2
-    const gate = new BehavioralGateElement([inA], out, (inputs) => !inputs[0]);
+    const gate = new BehavioralGateElement([inA], out, (inputs) => !inputs[0], new Map());
 
     // 3.3V ideal source at circuit node 3 (solver node 2, branch row 3)
     const vs = makeVoltageSource(3, 0, 3, VDD);
@@ -455,6 +455,7 @@ describe("Factory", () => {
       [inA, inB],
       outPin,
       (inputs) => !(inputs[0] && inputs[1]),
+      new Map(),
     );
 
     const { solver, diagnostics, elements, matrixSize } =

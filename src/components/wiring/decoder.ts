@@ -196,6 +196,7 @@ const DECODER_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 4,
     description: "Number of input bits (determines number of outputs: 2^selectorBits)",
+    structural: true,
   },
   LABEL_PROPERTY_DEF,
 ];

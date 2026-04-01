@@ -210,7 +210,7 @@ export const BARREL_SHIFTER_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 ];
 
 const BARREL_SHIFTER_PROPERTY_DEFS: PropertyDefinition[] = [
-  { key: "bitWidth", type: PropertyType.BIT_WIDTH, label: "Bits", defaultValue: 8, min: 1, max: 32 },
+  { key: "bitWidth", type: PropertyType.BIT_WIDTH, label: "Bits", defaultValue: 8, min: 1, max: 32, structural: true },
   { key: "signed", type: PropertyType.BOOLEAN, label: "Signed shift", defaultValue: false },
   { key: "direction", type: PropertyType.ENUM, label: "Direction", defaultValue: "left", enumValues: ["left", "right"] },
   { key: "mode", type: PropertyType.ENUM, label: "Mode", defaultValue: "logical", enumValues: ["logical", "rotate", "arithmetic"] },

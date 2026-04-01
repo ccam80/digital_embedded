@@ -102,7 +102,7 @@ export const BIT_COUNT_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 ];
 
 const BIT_COUNT_PROPERTY_DEFS: PropertyDefinition[] = [
-  { key: "bitWidth", type: PropertyType.BIT_WIDTH, label: "Bits", defaultValue: 8, min: 1, max: 32 },
+  { key: "bitWidth", type: PropertyType.BIT_WIDTH, label: "Bits", defaultValue: 8, min: 1, max: 32, structural: true },
 ];
 
 export const BitCountDefinition: ComponentDefinition = {

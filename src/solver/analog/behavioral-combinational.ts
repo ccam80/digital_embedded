@@ -20,6 +20,7 @@ import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
   readMnaVoltage,
+  delegatePinSetParam,
 } from "./digital-pin-model.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
 
@@ -64,6 +65,7 @@ export class BehavioralMuxElement implements AnalogElementCore {
   private readonly _dataPins: DigitalInputPinModel[][];
   private readonly _outPins: DigitalOutputPinModel[];
   private readonly _bitWidth: number;
+  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   /** Cached solver reference. */
   private _solver: SparseSolver | null = null;
@@ -83,11 +85,13 @@ export class BehavioralMuxElement implements AnalogElementCore {
     outPins: DigitalOutputPinModel[],
     _inputCount: number,
     bitWidth: number,
+    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
     this._selPins = selPins;
     this._dataPins = dataPins;
     this._outPins = outPins;
     this._bitWidth = bitWidth;
+    this._pinModelsByLabel = pinModelsByLabel;
   }
 
   stamp(solver: SparseSolver): void {
@@ -185,7 +189,9 @@ export class BehavioralMuxElement implements AnalogElementCore {
     return result;
   }
 
-  setParam(_key: string, _value: number): void {}
+  setParam(key: string, value: number): void {
+    delegatePinSetParam(this._pinModelsByLabel, key, value);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +214,7 @@ export class BehavioralDemuxElement implements AnalogElementCore {
   private readonly _inPin: DigitalInputPinModel;
   private readonly _outPins: DigitalOutputPinModel[];
   private readonly _outputCount: number;
+  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   /** Latched selector value. */
   /** Cached solver reference. */
@@ -227,11 +234,13 @@ export class BehavioralDemuxElement implements AnalogElementCore {
     inPin: DigitalInputPinModel,
     outPins: DigitalOutputPinModel[],
     outputCount: number,
+    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
     this._selPins = selPins;
     this._inPin = inPin;
     this._outPins = outPins;
     this._outputCount = outputCount;
+    this._pinModelsByLabel = pinModelsByLabel;
   }
 
   stamp(solver: SparseSolver): void {
@@ -316,7 +325,9 @@ export class BehavioralDemuxElement implements AnalogElementCore {
     return result;
   }
 
-  setParam(_key: string, _value: number): void {}
+  setParam(key: string, value: number): void {
+    delegatePinSetParam(this._pinModelsByLabel, key, value);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -337,6 +348,7 @@ export class BehavioralDecoderElement implements AnalogElementCore {
   private readonly _selPins: DigitalInputPinModel[];
   private readonly _outPins: DigitalOutputPinModel[];
   private readonly _outputCount: number;
+  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   /** Latched selector value. */
   /** Cached solver reference. */
@@ -355,10 +367,12 @@ export class BehavioralDecoderElement implements AnalogElementCore {
     selPins: DigitalInputPinModel[],
     outPins: DigitalOutputPinModel[],
     outputCount: number,
+    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
     this._selPins = selPins;
     this._outPins = outPins;
     this._outputCount = outputCount;
+    this._pinModelsByLabel = pinModelsByLabel;
   }
 
   stamp(solver: SparseSolver): void {
@@ -436,7 +450,9 @@ export class BehavioralDecoderElement implements AnalogElementCore {
     return result;
   }
 
-  setParam(_key: string, _value: number): void {}
+  setParam(key: string, value: number): void {
+    delegatePinSetParam(this._pinModelsByLabel, key, value);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -506,7 +522,14 @@ export function makeBehavioralMuxAnalogFactory(selectorBits: number): AnalogElem
       outPins.push(pin);
     }
 
-    return new BehavioralMuxElement(selPins, dataPins, outPins, inputCount, bitWidth);
+    const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>();
+    pinModelsByLabel.set("sel", selPins[0]);
+    for (let i = 0; i < inputCount; i++) {
+      pinModelsByLabel.set(`in_${i}`, dataPins[i][0]);
+    }
+    pinModelsByLabel.set("out", outPins[0]);
+
+    return new BehavioralMuxElement(selPins, dataPins, outPins, inputCount, bitWidth, pinModelsByLabel);
   };
 }
 
@@ -552,7 +575,14 @@ export function makeBehavioralDemuxAnalogFactory(selectorBits: number): AnalogEl
     const inPin = new DigitalInputPinModel(inSpec, true);
     inPin.init(pinNodes.get("in") ?? 0, 0);
 
-    return new BehavioralDemuxElement(selPins, inPin, outPins, outputCount);
+    const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>();
+    pinModelsByLabel.set("sel", selPins[0]);
+    pinModelsByLabel.set("in", inPin);
+    for (let i = 0; i < outputCount; i++) {
+      pinModelsByLabel.set(`out_${i}`, outPins[i]);
+    }
+
+    return new BehavioralDemuxElement(selPins, inPin, outPins, outputCount, pinModelsByLabel);
   };
 }
 
@@ -593,6 +623,12 @@ export function makeBehavioralDecoderAnalogFactory(selectorBits: number): Analog
       outPins.push(pin);
     }
 
-    return new BehavioralDecoderElement(selPins, outPins, outputCount);
+    const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>();
+    pinModelsByLabel.set("sel", selPins[0]);
+    for (let i = 0; i < outputCount; i++) {
+      pinModelsByLabel.set(`out_${i}`, outPins[i]);
+    }
+
+    return new BehavioralDecoderElement(selPins, outPins, outputCount, pinModelsByLabel);
   };
 }

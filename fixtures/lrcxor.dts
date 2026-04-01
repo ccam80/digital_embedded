@@ -1,0 +1,297 @@
+{
+  "circuit": {
+    "elements": [
+      {
+        "id": "7296fb05-371a-4708-ac87-7e5449f3c5e6",
+        "position": {
+          "x": 14,
+          "y": 6
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 100
+          }
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "c307a2a1-7532-4b86-8151-9a9a682f2214",
+        "position": {
+          "x": 11,
+          "y": 13
+        },
+        "properties": {
+          "_modelParams": {
+            "capacitance": 0.0001
+          }
+        },
+        "rotation": 90,
+        "type": "Capacitor"
+      },
+      {
+        "id": "39c67afc-a295-4587-b500-111f4ba1db24",
+        "position": {
+          "x": 21,
+          "y": 12
+        },
+        "properties": {
+          "_modelParams": {
+            "inductance": 0.1
+          }
+        },
+        "rotation": 90,
+        "type": "Inductor"
+      },
+      {
+        "id": "d061180d-59e1-4f8e-95ce-cedbd4a19652",
+        "position": {
+          "x": 25,
+          "y": 6
+        },
+        "properties": {},
+        "rotation": 180,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "fe2471eb-e7f6-4e22-bb4a-ea0e9728b6d0",
+        "position": {
+          "x": 21,
+          "y": 17
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "91fbcd52-7700-4ac1-9327-cc6829f1ccd4",
+        "position": {
+          "x": 34,
+          "y": 4
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "XOr"
+      },
+      {
+        "id": "b64d9fd8-8264-43de-9ea7-fc588b4966e1",
+        "position": {
+          "x": 40,
+          "y": 9
+        },
+        "properties": {},
+        "rotation": 90,
+        "type": "Resistor"
+      }
+    ],
+    "name": "Untitled",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 6
+          },
+          {
+            "x": 21,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 14,
+            "y": 6
+          },
+          {
+            "x": 11,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 6
+          },
+          {
+            "x": 11,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 13
+          },
+          {
+            "x": 11,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 15
+          },
+          {
+            "x": 21,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 15
+          },
+          {
+            "x": 28,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 15
+          },
+          {
+            "x": 40,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 12
+          },
+          {
+            "x": 21,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 15
+          },
+          {
+            "x": 21,
+            "y": 17
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 25,
+            "y": 6
+          },
+          {
+            "x": 28,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 6
+          },
+          {
+            "x": 34,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 15
+          },
+          {
+            "x": 28,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 4
+          },
+          {
+            "x": 21,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 6
+          },
+          {
+            "x": 21,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 4
+          },
+          {
+            "x": 34,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 37,
+            "y": 5
+          },
+          {
+            "x": 40,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 40,
+            "y": 9
+          },
+          {
+            "x": 40,
+            "y": 15
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

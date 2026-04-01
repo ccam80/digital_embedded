@@ -116,6 +116,7 @@ export function buildStandardGatePropertyDefs(wideShapeDescription: string): Pro
       min: 2,
       max: 5,
       description: "Number of input pins (2–5)",
+      structural: true,
     },
     {
       key: "bitWidth",
@@ -125,6 +126,7 @@ export function buildStandardGatePropertyDefs(wideShapeDescription: string): Pro
       min: 1,
       max: 32,
       description: "Bit width of each signal",
+      structural: true,
     },
     {
       key: "wideShape",
@@ -132,6 +134,7 @@ export function buildStandardGatePropertyDefs(wideShapeDescription: string): Pro
       label: "Wide shape",
       defaultValue: false,
       description: wideShapeDescription,
+      structural: true,
     },
     {
       key: "_inverterLabels",

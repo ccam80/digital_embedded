@@ -524,6 +524,7 @@ const ADC_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Number of output bits N. Output codes span [0, 2^N - 1].",
+    structural: true,
   },
   {
     key: "mode",

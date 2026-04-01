@@ -97,6 +97,7 @@ function buildCounter(bitWidth = 4): {
     bitWidth,
     CMOS33.vIH,
     CMOS33.vIL,
+    new Map(),
   );
 
   // Max MNA node = 4 + bitWidth (ovf pin). Solver size = max node ID.
@@ -160,6 +161,7 @@ function buildRegister(bitWidth = 8): {
     bitWidth,
     CMOS33.vIH,
     CMOS33.vIL,
+    new Map(),
   );
 
   // Max MNA node = 1 + bitWidth + 2 + bitWidth - 1 = 2*bitWidth + 2 (last Q bit)

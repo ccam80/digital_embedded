@@ -21,6 +21,7 @@ import type { AnalogElementCore, IntegrationMethod } from "./element.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
+  delegatePinSetParam,
   DigitalInputPinModel,
   DigitalOutputPinModel,
   readMnaVoltage,
@@ -115,6 +116,12 @@ export function createDriverAnalogElement(
   let latchedSel = false;
   let solver: SparseSolver | null = null;
 
+  const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
+    ["in", inputPin],
+    ["sel", selPin],
+    ["out", outputPin],
+  ]);
+
   return {
     branchIndex: -1,
     isNonlinear: true,
@@ -175,7 +182,7 @@ export function createDriverAnalogElement(
       return [iIn, iSel, iOut];
     },
 
-    setParam(_key: string, _value: number) {},
+    setParam(key: string, value: number) { delegatePinSetParam(pinModelsByLabel, key, value); },
   };
 }
 
@@ -214,6 +221,12 @@ export function createDriverInvAnalogElement(
   let latchedIn = false;
   let latchedSel = false;
   let solver: SparseSolver | null = null;
+
+  const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
+    ["in", inputPin],
+    ["sel", selPin],
+    ["out", outputPin],
+  ]);
 
   return {
     branchIndex: -1,
@@ -276,7 +289,7 @@ export function createDriverInvAnalogElement(
       return [iIn, iSel, iOut];
     },
 
-    setParam(_key: string, _value: number) {},
+    setParam(key: string, value: number) { delegatePinSetParam(pinModelsByLabel, key, value); },
   };
 }
 
@@ -800,6 +813,10 @@ export function createButtonLEDAnalogElement(
 
   const ledDiode = createSegmentDiodeElement(nodeLedIn, 0);
 
+  const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
+    ["out", outputPin],
+  ]);
+
   return {
     branchIndex: -1,
     isNonlinear: true,
@@ -835,7 +852,7 @@ export function createButtonLEDAnalogElement(
       return [iOut, iLed];
     },
 
-    setParam(_key: string, _value: number) {},
+    setParam(key: string, value: number) { delegatePinSetParam(pinModelsByLabel, key, value); },
   };
 }
 

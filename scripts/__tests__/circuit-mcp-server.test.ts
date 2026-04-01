@@ -30,7 +30,7 @@ import type { ComponentRegistry } from '../../src/core/registry.js';
 import type { Circuit } from '../../src/core/circuit.js';
 import type { CircuitSpec, PatchOp } from '../../src/headless/netlist-types.js';
 import { extractEmbeddedTestData } from '../../src/headless/test-runner.js';
-import { serializeCircuitToDig } from '../../src/io/dig-serializer.js';
+import { serializeCircuit } from '../../src/io/dts-serializer.js';
 
 // ---------------------------------------------------------------------------
 // Shared state — mirrors the MCP server's session pattern
@@ -807,27 +807,27 @@ describe('circuit_test_equivalence', () => {
 // ===========================================================================
 
 describe('circuit_save', () => {
-  it('serializes a circuit to .dig XML', () => {
+  it('serializes a circuit to .dts JSON', () => {
     const circuit = facade.build(andGateSpec());
-    const xml = serializeCircuitToDig(circuit, registry);
+    const json = serializeCircuit(circuit);
 
-    expect(typeof xml).toBe('string');
-    expect(xml.length).toBeGreaterThan(0);
-    expect(xml).toContain('<?xml');
+    expect(typeof json).toBe('string');
+    expect(json.length).toBeGreaterThan(0);
+    expect(() => JSON.parse(json)).not.toThrow();
   });
 
-  it('serialized XML can be loaded back', () => {
+  it('serialized JSON can be loaded back', () => {
     const circuit = facade.build(andGateSpec());
-    const xml = serializeCircuitToDig(circuit, registry);
+    const json = serializeCircuit(circuit);
 
-    const reloaded = facade.loadDigXml(xml);
+    const reloaded = facade.deserialize(json);
     expect(reloaded.elements.length).toBe(circuit.elements.length);
   });
 
   it('round-trip preserves circuit behavior', () => {
     const circuit = facade.build(andGateSpec());
-    const xml = serializeCircuitToDig(circuit, registry);
-    const reloaded = facade.loadDigXml(xml);
+    const json = serializeCircuit(circuit);
+    const reloaded = facade.deserialize(json);
 
     const engine = facade.compile(reloaded);
     facade.setInput(engine, 'A', 1);

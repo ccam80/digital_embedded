@@ -22,6 +22,7 @@ import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
   readMnaVoltage,
+  delegatePinSetParam,
 } from "./digital-pin-model.js";
 
 // ---------------------------------------------------------------------------
@@ -72,6 +73,7 @@ export class BehavioralGateElement implements AnalogElementCore {
   private readonly _inputs: DigitalInputPinModel[];
   private readonly _output: DigitalOutputPinModel;
   private readonly _truthTable: GateTruthTable;
+  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   /** Latched logic levels per input — persist across timesteps. */
   private readonly _latchedLevels: boolean[];
@@ -96,11 +98,13 @@ export class BehavioralGateElement implements AnalogElementCore {
     inputs: DigitalInputPinModel[],
     output: DigitalOutputPinModel,
     truthTable: GateTruthTable,
+    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
     this._inputs = inputs;
     this._output = output;
     this._truthTable = truthTable;
     this._latchedLevels = new Array<boolean>(inputs.length).fill(false);
+    this._pinModelsByLabel = pinModelsByLabel;
   }
 
   /**
@@ -222,7 +226,9 @@ export class BehavioralGateElement implements AnalogElementCore {
     this._output.updateCompanion(dt, method, vOut);
   }
 
-  setParam(_key: string, _value: number): void {}
+  setParam(key: string, value: number): void {
+    delegatePinSetParam(this._pinModelsByLabel, key, value);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -307,6 +313,8 @@ function buildGateElement(
     rHiZ: 1e7,
   };
 
+  const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>();
+
   const inputPins: DigitalInputPinModel[] = [];
   for (let i = 0; i < inputCount; i++) {
     const label = `In_${i + 1}`;
@@ -314,13 +322,15 @@ function buildGateElement(
     const pin = new DigitalInputPinModel(spec, true);
     pin.init(pinNodes.get(label) ?? 0, 0);
     inputPins.push(pin);
+    pinModelsByLabel.set(label, pin);
   }
 
   const outSpec = pinSpecs?.["out"] ?? fallback;
   const outputPin = new DigitalOutputPinModel(outSpec);
   outputPin.init(pinNodes.get("out") ?? 0, -1);
+  pinModelsByLabel.set("out", outputPin);
 
-  return new BehavioralGateElement(inputPins, outputPin, truthTable);
+  return new BehavioralGateElement(inputPins, outputPin, truthTable, pinModelsByLabel);
 }
 
 // ---------------------------------------------------------------------------

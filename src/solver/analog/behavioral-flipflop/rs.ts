@@ -4,7 +4,7 @@
 
 import type { SparseSolver } from "../sparse-solver.js";
 import type { AnalogElementCore, IntegrationMethod } from "../element.js";
-import { readMnaVoltage } from "../digital-pin-model.js";
+import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
 import type { SolverDiagnostic } from "../../../core/analog-engine-interface.js";
@@ -41,11 +41,12 @@ export class BehavioralRSFlipflopElement implements AnalogElementCore {
   /** Collected diagnostics — read by tests via getDiagnostics(). */
   private _diagnostics: SolverDiagnostic[] = [];
 
+  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
+
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
-  setParam(_key: string, _value: number): void {}
   label?: string;
 
   constructor(
@@ -56,6 +57,7 @@ export class BehavioralRSFlipflopElement implements AnalogElementCore {
     qBarPin: DigitalOutputPinModel,
     vIH: number,
     _vIL: number,
+    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
     this._sPin = sPin;
     this._clockPin = clockPin;
@@ -63,6 +65,11 @@ export class BehavioralRSFlipflopElement implements AnalogElementCore {
     this._qPin = qPin;
     this._qBarPin = qBarPin;
     this._vIH = vIH;
+    this._pinModelsByLabel = pinModelsByLabel;
+  }
+
+  setParam(key: string, value: number): void {
+    delegatePinSetParam(this._pinModelsByLabel, key, value);
   }
 
   getDiagnostics(): SolverDiagnostic[] {
@@ -193,9 +200,17 @@ export function makeRSFlipflopAnalogFactory(): AnalogElementFactory {
     const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
     const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
 
+    const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
+      ["S", sPin],
+      ["C", clockPin],
+      ["R", rPin],
+      ["Q", qPin],
+      ["~Q", qBarPin],
+    ]);
+
     return new BehavioralRSFlipflopElement(
       sPin, clockPin, rPin, qPin, qBarPin,
-      cSpec.vIH, cSpec.vIL,
+      cSpec.vIH, cSpec.vIL, pinModelsByLabel,
     );
   };
 }

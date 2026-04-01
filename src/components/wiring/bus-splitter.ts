@@ -219,6 +219,7 @@ const BUS_SPLITTER_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Bits",
     defaultValue: 1,
     description: "Number of bits in the common bus",
+    structural: true,
   },
   {
     key: "spreading",

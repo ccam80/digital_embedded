@@ -213,6 +213,7 @@ const NOT_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width of each signal",
+    structural: true,
   },
   {
     key: "wideShape",
@@ -220,6 +221,7 @@ const NOT_PROPERTY_DEFS: PropertyDefinition[] = [
     label: "Wide shape",
     defaultValue: false,
     description: "Use IEEE/US (triangle with bubble) shape instead of IEC/DIN (rectangular)",
+    structural: true,
   },
   LABEL_PROPERTY_DEF,
 ];

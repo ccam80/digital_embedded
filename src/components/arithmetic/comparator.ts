@@ -135,7 +135,7 @@ export const COMPARATOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 ];
 
 const COMPARATOR_PROPERTY_DEFS: PropertyDefinition[] = [
-  { key: "bitWidth", type: PropertyType.BIT_WIDTH, label: "Bits", defaultValue: 1, min: 1, max: 32 },
+  { key: "bitWidth", type: PropertyType.BIT_WIDTH, label: "Bits", defaultValue: 1, min: 1, max: 32, structural: true },
   { key: "signed", type: PropertyType.BOOLEAN, label: "Signed", defaultValue: false },
   { key: "label", type: PropertyType.STRING, label: "Label", defaultValue: "" },
 ];

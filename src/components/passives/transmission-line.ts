@@ -675,6 +675,7 @@ const TRANSMISSION_LINE_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 2,
     max: 100,
     description: "Number of lumped RLCG segments (more segments = more accurate, slower)",
+    structural: true,
   },
   {
     key: "label",

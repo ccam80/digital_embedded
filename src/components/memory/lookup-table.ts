@@ -189,6 +189,7 @@ const LUT_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 8,
     description: "Number of 1-bit input pins (table has 2^inputCount entries)",
+    structural: true,
   },
   {
     key: "dataBits",

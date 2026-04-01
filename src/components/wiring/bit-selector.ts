@@ -185,6 +185,7 @@ const BIT_SELECTOR_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 5,
     description: "Number of selector bits (input width = 2^selectorBits)",
+    structural: true,
   },
   LABEL_PROPERTY_DEF,
 ];

@@ -80,7 +80,7 @@ export const NEG_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
 ];
 
 const NEG_PROPERTY_DEFS: PropertyDefinition[] = [
-  { key: "bitWidth", type: PropertyType.BIT_WIDTH, label: "Bits", defaultValue: 1, min: 1, max: 32 },
+  { key: "bitWidth", type: PropertyType.BIT_WIDTH, label: "Bits", defaultValue: 1, min: 1, max: 32, structural: true },
 ];
 
 export const NegDefinition: ComponentDefinition = {

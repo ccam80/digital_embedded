@@ -265,8 +265,8 @@
     },
     {
       "path": "",
-      "accessCount": 110,
-      "lastAccessed": 1775007416061,
+      "accessCount": 112,
+      "lastAccessed": 1775009913781,
       "type": "directory"
     },
     {
@@ -282,6 +282,12 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\digital-pin-model.ts",
+      "accessCount": 66,
+      "lastAccessed": 1775010747014,
+      "type": "file"
+    },
+    {
       "path": "src\\compile\\compile.ts",
       "accessCount": 60,
       "lastAccessed": 1775001653394,
@@ -289,14 +295,8 @@
     },
     {
       "path": "src\\components\\gates\\and.ts",
-      "accessCount": 59,
-      "lastAccessed": 1775007441555,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 59,
-      "lastAccessed": 1775008308089,
+      "accessCount": 60,
+      "lastAccessed": 1775009120241,
       "type": "file"
     },
     {
@@ -342,6 +342,12 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\gates\\not.ts",
+      "accessCount": 31,
+      "lastAccessed": 1775009896515,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\passives\\analog-fuse.ts",
       "accessCount": 30,
       "lastAccessed": 1774911492113,
@@ -351,12 +357,6 @@
       "path": "src\\components\\passives\\capacitor.ts",
       "accessCount": 30,
       "lastAccessed": 1775008168609,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\gates\\not.ts",
-      "accessCount": 29,
-      "lastAccessed": 1774998339255,
       "type": "file"
     },
     {
@@ -384,6 +384,12 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\flipflops\\d.ts",
+      "accessCount": 24,
+      "lastAccessed": 1775010116790,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\gates\\nor.ts",
       "accessCount": 23,
       "lastAccessed": 1774998335036,
@@ -405,12 +411,6 @@
       "path": "src\\components\\semiconductors\\diode.ts",
       "accessCount": 22,
       "lastAccessed": 1774946501061,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\flipflops\\d.ts",
-      "accessCount": 22,
-      "lastAccessed": 1774947881926,
       "type": "file"
     },
     {
@@ -456,6 +456,12 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\flipflops\\jk.ts",
+      "accessCount": 15,
+      "lastAccessed": 1775010120071,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\triac.ts",
       "accessCount": 14,
       "lastAccessed": 1774869841089,
@@ -468,21 +474,15 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\flipflops\\d-async.ts",
+      "accessCount": 14,
+      "lastAccessed": 1775010118470,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\schottky.ts",
       "accessCount": 13,
       "lastAccessed": 1774902816051,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\flipflops\\jk.ts",
-      "accessCount": 13,
-      "lastAccessed": 1774947877721,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\flipflops\\d-async.ts",
-      "accessCount": 12,
-      "lastAccessed": 1774908282575,
       "type": "file"
     },
     {

@@ -20,6 +20,7 @@ import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
   readMnaVoltage,
+  delegatePinSetParam,
 } from "./digital-pin-model.js";
 import type { AnalogElementFactory } from "./behavioral-gate.js";
 
@@ -79,6 +80,8 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
   /** Cached operating-point voltages from the last updateOperatingPoint call. */
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
+  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
+
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
@@ -93,6 +96,7 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
     setPin: DigitalInputPinModel | null,
     resetPin: DigitalInputPinModel | null,
     resetActiveLevel: 'high' | 'low' = 'low',
+    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel> = new Map(),
   ) {
     this._clockPin = clockPin;
     this._dPin = dPin;
@@ -101,6 +105,7 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
     this._setPin = setPin;
     this._resetPin = resetPin;
     this._resetActiveLevel = resetActiveLevel;
+    this._pinModelsByLabel = pinModelsByLabel;
 
     this._vIH = 2.0; // overwritten by factory via _setThresholds
     this._vIL = 0.8;
@@ -288,7 +293,9 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
     return result;
   }
 
-  setParam(_key: string, _value: number): void {}
+  setParam(key: string, value: number): void {
+    delegatePinSetParam(this._pinModelsByLabel, key, value);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -349,6 +356,13 @@ export function makeDFlipflopAnalogFactory(): AnalogElementFactory {
     const qBarPin = new DigitalOutputPinModel(qBarSpec);
     qBarPin.init(pinNodes.get("~Q") ?? 0, -1);
 
+    const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
+      ["D", dPin],
+      ["C", clockPin],
+      ["Q", qPin],
+      ["~Q", qBarPin],
+    ]);
+
     const element = new BehavioralDFlipflopElement(
       clockPin,
       dPin,
@@ -357,6 +371,7 @@ export function makeDFlipflopAnalogFactory(): AnalogElementFactory {
       null,
       null,
       'low',
+      pinModelsByLabel,
     );
     element._setThresholds(cSpec.vIH, cSpec.vIL);
     return element;

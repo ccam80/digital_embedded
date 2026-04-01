@@ -112,7 +112,7 @@ describe("Mux", () => {
     const outPin = new DigitalOutputPinModel(CMOS_3V3);
     outPin.init(7, -1);
 
-    const mux = new BehavioralMuxElement([selPin0, selPin1], dataPins, [outPin], 4, 1);
+    const mux = new BehavioralMuxElement([selPin0, selPin1], dataPins, [outPin], 4, 1, new Map());
 
     // Voltage sources — 1-based circuit nodes, branch indices 7..12 (0-based)
     const vsSel0 = makeVoltageSource(1, 0, 7, vSel0);   // circuit node 1, branch row 7
@@ -201,7 +201,7 @@ describe("Demux", () => {
     const inPin = new DigitalInputPinModel(CMOS_3V3, true);
     inPin.init(7, 0);
 
-    const demux = new BehavioralDemuxElement([selPin0, selPin1], inPin, outPins, 4);
+    const demux = new BehavioralDemuxElement([selPin0, selPin1], inPin, outPins, 4, new Map());
 
     const vsSel0 = makeVoltageSource(1, 0, 7, vSel0);
     const vsSel1 = makeVoltageSource(2, 0, 8, vSel1);
@@ -295,7 +295,7 @@ describe("Decoder", () => {
       outPins.push(pin);
     }
 
-    const decoder = new BehavioralDecoderElement([selPin0, selPin1], outPins, 4);
+    const decoder = new BehavioralDecoderElement([selPin0, selPin1], outPins, 4, new Map());
 
     const vsSel0 = makeVoltageSource(1, 0, 6, vSel0);
     const vsSel1 = makeVoltageSource(2, 0, 7, vSel1);

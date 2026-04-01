@@ -162,6 +162,7 @@ const PULL_UP_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width of the pulled net",
+    structural: true,
   },
   {
     key: "label",

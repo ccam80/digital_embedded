@@ -387,3 +387,35 @@ export class DigitalInputPinModel {
     return this._spec.cIn;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Shared delegation helper for elements that own pin models
+// ---------------------------------------------------------------------------
+
+/**
+ * Route a composite pin-param key ("A.rOut", "D.vIH") to the correct
+ * pin model's setParam. Returns true if the key was handled.
+ *
+ * Elements that hold DigitalInputPinModel / DigitalOutputPinModel instances
+ * build a label→model map at construction time and delegate from setParam:
+ *
+ *   setParam(key: string, value: number): void {
+ *     delegatePinSetParam(this._pinModelsByLabel, key, value);
+ *   }
+ */
+export function delegatePinSetParam(
+  pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
+  key: string,
+  value: number,
+): boolean {
+  const dot = key.indexOf('.');
+  if (dot === -1) return false;
+  const pinLabel = key.slice(0, dot);
+  const paramName = key.slice(dot + 1);
+  const model = pinModelsByLabel.get(pinLabel);
+  if (model !== undefined) {
+    model.setParam(paramName, value);
+    return true;
+  }
+  return false;
+}

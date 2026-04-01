@@ -232,6 +232,7 @@ const DIV_PROPERTY_DEFS: PropertyDefinition[] = [
     min: 1,
     max: 32,
     description: "Bit width of the operands and results",
+    structural: true,
   },
   {
     key: "signed",

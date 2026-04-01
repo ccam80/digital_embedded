@@ -11,7 +11,7 @@ import type { ComponentRegistry } from "../../src/core/registry.js";
 import type { ComponentDefinition } from "../../src/core/registry.js";
 import type { CircuitSpec, PatchOp, ComponentDescriptor } from "../../src/headless/netlist-types.js";
 import { extractEmbeddedTestData } from "../../src/headless/test-runner.js";
-import { serializeCircuitToDig } from "../../src/io/dig-serializer.js";
+import { serializeCircuit } from "../../src/io/dts-serializer.js";
 import { loadWithSubcircuits } from "../../src/io/subcircuit-loader.js";
 import { scanDigPins } from "../../src/io/dig-pin-scanner.js";
 import { registerSubcircuit, createLiveDefinition } from "../../src/components/subcircuit/subcircuit.js";
@@ -776,17 +776,17 @@ export function registerCircuitTools(
     {
       title: "Save Circuit",
       description:
-        "Serialize a circuit to .dig XML format (Digital's native format) and write it to a file. " +
-        "When save_all is true, also copies all .dig subcircuit files from the source directory " +
+        "Serialize a circuit to .dts JSON format and write it to a file. " +
+        "When save_all is true, also copies all .dts subcircuit files from the source directory " +
         "into the output directory, so the full circuit hierarchy is self-contained.",
       inputSchema: {
         handle: z.string().describe("Circuit handle"),
-        path: z.string().describe("Output file path (e.g. 'output/my-circuit.dig')"),
+        path: z.string().describe("Output file path (e.g. 'output/my-circuit.dts')"),
         save_all: z
           .boolean()
           .optional()
           .describe(
-            "When true, also copies all .dig files from the circuit's source directory " +
+            "When true, also copies all .dts files from the circuit's source directory " +
               "into the output directory. Use this to save a complete circuit hierarchy.",
           ),
       },
@@ -794,12 +794,12 @@ export function registerCircuitTools(
     async ({ handle, path: filePath, save_all }) => {
       try {
         const circuit = session.getCircuit(handle);
-        const xml = serializeCircuitToDig(circuit, registry);
-        await writeFile(filePath, xml, "utf-8");
+        const json = serializeCircuit(circuit);
+        await writeFile(filePath, json, "utf-8");
 
         const lines = [
           `Circuit saved to: ${filePath}`,
-          `Format: .dig XML (${xml.length} bytes)`,
+          `Format: .dts JSON (${json.length} bytes)`,
         ];
 
         if (save_all) {
@@ -812,11 +812,11 @@ export function registerCircuitTools(
             );
           } else {
             const entries = await readdir(sourceDir);
-            const digFiles = entries.filter(
-              (f) => f.endsWith(".dig") && f !== filePath.split(/[/\\]/).pop(),
+            const dtsFiles = entries.filter(
+              (f) => f.endsWith(".dts") && f !== filePath.split(/[/\\]/).pop(),
             );
             let copied = 0;
-            for (const f of digFiles) {
+            for (const f of dtsFiles) {
               const srcPath = sourceDir + "/" + f;
               const dstPath = outDir + "/" + f;
               if (dstPath === filePath) continue;

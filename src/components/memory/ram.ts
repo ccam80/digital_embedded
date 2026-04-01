@@ -178,6 +178,7 @@ const ADDR_BITS_DEF: PropertyDefinition = {
   min: 1,
   max: 24,
   description: "Number of address bits (memory size = 2^addrBits words)",
+  structural: true,
 };
 
 const DATA_BITS_DEF: PropertyDefinition = {
@@ -188,6 +189,7 @@ const DATA_BITS_DEF: PropertyDefinition = {
   min: 1,
   max: 32,
   description: "Bit width of each memory word",
+  structural: true,
 };
 
 const IS_PROGRAM_MEMORY_DEF: PropertyDefinition = {

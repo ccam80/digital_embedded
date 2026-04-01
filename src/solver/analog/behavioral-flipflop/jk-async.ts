@@ -4,7 +4,7 @@
 
 import type { SparseSolver } from "../sparse-solver.js";
 import type { AnalogElementCore, IntegrationMethod } from "../element.js";
-import { readMnaVoltage } from "../digital-pin-model.js";
+import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
 import { FALLBACK_SPEC, getPinSpecs, makeInputPin, makeOutputPin } from "./shared.js";
@@ -36,11 +36,12 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElementCore {
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
+  private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
+
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: true = true;
-  setParam(_key: string, _value: number): void {}
   label?: string;
 
   constructor(
@@ -53,6 +54,7 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElementCore {
     qBarPin: DigitalOutputPinModel,
     vIH: number,
     _vIL: number,
+    pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>,
   ) {
     this._setPin = setPin;
     this._jPin = jPin;
@@ -62,6 +64,11 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElementCore {
     this._qPin = qPin;
     this._qBarPin = qBarPin;
     this._vIH = vIH;
+    this._pinModelsByLabel = pinModelsByLabel;
+  }
+
+  setParam(key: string, value: number): void {
+    delegatePinSetParam(this._pinModelsByLabel, key, value);
   }
 
   stamp(solver: SparseSolver): void {
@@ -200,9 +207,19 @@ export function makeJKAsyncFlipflopAnalogFactory(): AnalogElementFactory {
     const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
     const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
 
+    const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
+      ["Set", setPin],
+      ["J", jPin],
+      ["C", clockPin],
+      ["K", kPin],
+      ["Clr", clrPin],
+      ["Q", qPin],
+      ["~Q", qBarPin],
+    ]);
+
     return new BehavioralJKAsyncFlipflopElement(
       setPin, jPin, clockPin, kPin, clrPin, qPin, qBarPin,
-      cSpec.vIH, cSpec.vIL,
+      cSpec.vIH, cSpec.vIL, pinModelsByLabel,
     );
   };
 }

@@ -506,7 +506,7 @@ export class PropertyPanel {
 
     const commitParam = () => {
       const raw = inputEl.value.trim();
-      const parsed = pd.unit ? parseSI(raw) : parseFloat(raw);
+      const parsed = pd.unit ? parseSI(raw) : parseSI(raw);
       if (isNaN(parsed)) {
         inputEl.value = pd.unit
           ? formatSI(bag.getModelParam<number>(pd.key), "", 3).trim()
