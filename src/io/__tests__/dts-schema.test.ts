@@ -323,11 +323,11 @@ describe('models_field', () => {
       circuit: { name: 'Test', elements: [], wires: [] },
       models: {
         NpnBJT: {
-          '2N2222': { kind: 'inline', params: { BF: 'bad' } },
+          '2N2222': { kind: 'inline', params: { BF: true } },
         },
       },
     };
-    expect(() => validateDtsDocument(doc)).toThrow(/params\["BF"\].*must be a number/);
+    expect(() => validateDtsDocument(doc)).toThrow(/params\["BF"\].*must be a number or string/);
   });
 
   it('absent_models_not_serialized', () => {

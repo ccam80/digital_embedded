@@ -143,7 +143,7 @@ test.describe('Hot-loading model params via property popup', () => {
     await builder.placeLabeled('Probe', 22, 7, 'Pc');
 
     await builder.setComponentProperty('Vcc', 'voltage', 12);
-    await builder.setComponentProperty('Ib', 'Current (A)', 0.00005);
+    await builder.setComponentProperty('Ib', 'current', 0.00005);
     await builder.setComponentProperty('Rc', 'resistance', 10000);
 
     await builder.drawWire('Vcc', 'pos', 'Rc', 'A');

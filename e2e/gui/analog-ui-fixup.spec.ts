@@ -140,8 +140,16 @@ test.describe('Analog UI fixes', () => {
   test('speed control affects analog simulation rate', async () => {
     await buildAndCompileRc(harness);
 
-    // Run at speed=1 (slowest) for 500ms, capture simTime BEFORE stopping
-    await setSpeed(harness, 1);
+    // Analog speed is sim-seconds per wall-second (not Hz like digital).
+    // The MNA solver always takes at least one step per frame (~5µs of sim
+    // time with maxTimeStep=5e-6), so the floor is 1 step/frame regardless
+    // of how low you set the speed. The ceiling is the 12ms CPU frame budget.
+    //
+    // slow = 1e-6: simTimeGoal/frame = 1.6e-8, under one maxTimeStep → 1 step/frame.
+    // fast = 1: simTimeGoal/frame = 16ms → thousands requested → budget-limited.
+
+    // Run at speed=1e-6 (1 step per frame) for 500ms
+    await setSpeed(harness, 1e-6);
     await clickIframeButton(harness, 'btn-run');
     await harness.page.waitForTimeout(500);
     const slowTime = await bridgeEval<number>(
@@ -153,8 +161,8 @@ test.describe('Analog UI fixes', () => {
     // Rebuild and recompile for the fast run
     await buildAndCompileRc(harness);
 
-    // Run at speed=10000000 (fastest) for 500ms, capture simTime BEFORE stopping
-    await setSpeed(harness, 10000000);
+    // Run at speed=1 (budget-saturating) for 500ms
+    await setSpeed(harness, 1);
     await clickIframeButton(harness, 'btn-run');
     await harness.page.waitForTimeout(500);
     const fastTime = await bridgeEval<number>(
@@ -162,9 +170,7 @@ test.describe('Analog UI fixes', () => {
     );
     await clickIframeButton(harness, 'btn-stop');
 
-    // The fast run should have advanced much more simulation time
-    // At speed=1 we get ~1 step per frame ≈ 30 steps in 500ms
-    // At speed=10M we burn full 12ms budget ≈ thousands of steps
+    // Fast saturates 12ms budget (~24-120 steps/frame) vs slow's 1 step/frame.
     expect(slowTime).toBeGreaterThan(0);
     expect(fastTime).toBeGreaterThan(0);
     expect(fastTime).toBeGreaterThan(slowTime * 5);
@@ -287,18 +293,13 @@ test.describe('Analog UI fixes', () => {
     });
 
     expect(coords).not.toBeNull();
-    await page.mouse.click(coords!.pageX, coords!.pageY);
+    await page.mouse.dblclick(coords!.pageX, coords!.pageY);
     await page.waitForTimeout(300);
 
-    // Property panel should show capacitance as a number input with step="any"
-    const propInputs = page.locator('.prop-popup input[type="number"]');
+    // Property panel should show capacitance as a text input (model params use
+    // type="text" because values can contain SI prefix characters like "1µ")
+    const propInputs = page.locator('.prop-popup input[type="text"]');
     const inputCount = await propInputs.count();
     expect(inputCount).toBeGreaterThanOrEqual(1);
-
-    // Check that it accepts float values (step="any")
-    if (inputCount > 0) {
-      const step = await propInputs.first().getAttribute('step');
-      expect(step).toBe('any');
-    }
   });
 });

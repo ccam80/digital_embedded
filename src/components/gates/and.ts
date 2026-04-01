@@ -13,7 +13,7 @@ import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, Rotation } from "../../core/pin.js";
 import { gateBodyMetrics } from "../../core/pin.js";
-import { PropertyBag } from "../../core/properties.js";
+import { PropertyBag, PropertyType } from "../../core/properties.js";
 import {
   ComponentCategory,
   type ComponentDefinition,
@@ -193,8 +193,12 @@ export const AndDefinition: ComponentDefinition = {
     cmos: {
       kind: "netlist",
       netlist: CMOS_AND2_NETLIST,
-      paramDefs: [],
-      params: {},
+      paramDefs: [
+        { key: "WP", type: PropertyType.FLOAT, label: "WP", rank: "primary" },
+        { key: "WN", type: PropertyType.FLOAT, label: "WN", rank: "primary" },
+        { key: "L", type: PropertyType.FLOAT, label: "L", rank: "primary" },
+      ],
+      params: { WP: 20e-6, WN: 10e-6, L: 1e-6 },
     },
   },
   models: {

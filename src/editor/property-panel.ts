@@ -144,9 +144,12 @@ export class PropertyPanel {
       // Capture key at callback registration time.
       const capturedKey = def.key;
       input.onChange((newValue) => {
-        // Commit value to the PropertyBag immediately
-        const oldValue = bag.has(capturedKey) ? bag.get(capturedKey) : def.defaultValue;
-        if (!_valuesEqual(oldValue, newValue)) {
+        // Commit value to the PropertyBag immediately.
+        // When the key is absent from the bag, always write — even if newValue
+        // equals the schema default — so the value is explicitly stored.
+        const hadKey = bag.has(capturedKey);
+        const oldValue = hadKey ? bag.get(capturedKey) : def.defaultValue;
+        if (!hadKey || !_valuesEqual(oldValue, newValue)) {
           bag.set(capturedKey, newValue);
           for (const cb of this._changeCallbacks) {
             cb(capturedKey, oldValue ?? newValue, newValue);
@@ -333,15 +336,8 @@ export class PropertyPanel {
     const primaryContainer = document.createElement("div");
     this._container.appendChild(primaryContainer);
 
-    // Hide model dropdown when there's only one real choice (e.g. subcircuit
-    // params with an implicit digital model — the user doesn't pick a model,
-    // they just see the params).
-    const nonDigitalKeys = allKeys.filter(k => k !== "digital");
-    const showDropdown = nonDigitalKeys.length !== 1 || !hasDigital;
-    if (showDropdown) {
-      const modelRow = this._buildRow("Model", select as unknown as HTMLElement);
-      this._container.appendChild(modelRow);
-    }
+    const modelRow = this._buildRow("Model", select as unknown as HTMLElement);
+    this._container.appendChild(modelRow);
 
     // Container for secondary (advanced) params — below the model dropdown
     const secondaryContainer = document.createElement("div");

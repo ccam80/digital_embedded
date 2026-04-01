@@ -84,16 +84,12 @@ export function createPopupController(
     // in-place, no recompile). Non-numeric changes (waveform, expression, etc.)
     // are compile-sensitive — recompile and continue automatically.
     propertyPopup.onPropertyChange((key, _oldValue, newValue) => {
-      if (ctx.isSimActive()) {
-        // Model param callbacks use "model:key" prefix — strip it for the engine
-        const engineKey = key.startsWith("model:") ? key.slice(6) : key;
-        if (typeof newValue === 'number') {
-          ctx.facade.getCoordinator().setComponentProperty(elementHit, engineKey, newValue);
-        } else {
-          // Compile-sensitive change — recompile and resume simulation
-          if (ctx.compileAndBind()) {
-            deps.startSimulation();
-          }
+      const engineKey = key.startsWith("model:") ? key.slice(6) : key;
+      if (typeof newValue === 'number') {
+        ctx.facade.getCoordinator().setComponentProperty(elementHit, engineKey, newValue);
+      } else {
+        if (ctx.compileAndBind()) {
+          if (ctx.isSimActive()) deps.startSimulation();
         }
       }
       renderPipeline.scheduleRender();

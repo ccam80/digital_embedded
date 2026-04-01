@@ -233,10 +233,10 @@ const NOT_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const CMOS_INVERTER_NETLIST: MnaSubcircuitNetlist = {
   ports: ["in", "out", "VDD", "GND"],
-  params: { W: 10e-6 },
+  params: { WP: 20e-6, WN: 10e-6, L: 1e-6 },
   elements: [
-    { typeId: "PMOS", branchCount: 0 },
-    { typeId: "NMOS", branchCount: 0 },
+    { typeId: "PMOS", branchCount: 0, params: { W: "WP", L: "L" } },
+    { typeId: "NMOS", branchCount: 0, params: { W: "WN", L: "L" } },
   ],
   internalNetCount: 0,
   // Nets 0..3 = ports [in, out, VDD, GND]
@@ -283,8 +283,12 @@ export const NotDefinition: ComponentDefinition = {
     cmos: {
       kind: "netlist",
       netlist: CMOS_INVERTER_NETLIST,
-      paramDefs: [],
-      params: {},
+      paramDefs: [
+        { key: "WP", type: PropertyType.FLOAT, label: "WP", rank: "primary" },
+        { key: "WN", type: PropertyType.FLOAT, label: "WN", rank: "primary" },
+        { key: "L", type: PropertyType.FLOAT, label: "L", rank: "primary" },
+      ],
+      params: { WP: 20e-6, WN: 10e-6, L: 1e-6 },
     },
   },
   models: {

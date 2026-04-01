@@ -47,8 +47,13 @@ import { defineModelParams } from "../../core/model-params.js";
 
 export const { paramDefs: DAC_PARAM_DEFS, defaults: DAC_DEFAULTS } = defineModelParams({
   primary: {
-    vRef: { default: 5.0, unit: "V", description: "Full-scale reference voltage" },
+    vIH: { default: 2.0, unit: "V", description: "Input HIGH threshold voltage" },
+    vIL: { default: 0.8, unit: "V", description: "Input LOW threshold voltage" },
     rOut: { default: 100, unit: "Ω", description: "Output impedance" },
+  },
+  secondary: {
+    rIn: { default: 1e7, unit: "Ω", description: "Digital input impedance" },
+    cIn: { default: 5e-12, unit: "F", description: "Digital input capacitance" },
   },
 });
 
@@ -208,20 +213,22 @@ export class DACElement extends AbstractCircuitElement {
 // Default pin electrical spec for digital inputs
 // ---------------------------------------------------------------------------
 
-/** CMOS 3.3V default pin electrical for DAC digital inputs. */
-function makeInputPinSpec(vRef: number): ResolvedPinElectrical {
-  const vIH = vRef * 0.7;
-  const vIL = vRef * 0.3;
+/** Build the input pin spec from model params.
+ *  Thresholds (vIH/vIL) and impedances (rIn/cIn) come from model params
+ *  so they are hot-loadable. Output-side fields are zeroed — unused by
+ *  DigitalInputPinModel.
+ */
+function buildInputPinSpec(p: Record<string, number>): ResolvedPinElectrical {
   return {
-    rOut:  50,
-    cOut:  5e-12,
-    rIn:   1e7,
-    cIn:   5e-12,
-    vOH:   vRef,
-    vOL:   0.0,
-    vIH,
-    vIL,
-    rHiZ:  1e7,
+    rOut:  0,
+    cOut:  0,
+    rIn:   p.rIn,
+    cIn:   p.cIn,
+    vOH:   0,
+    vOL:   0,
+    vIH:   p.vIH,
+    vIL:   p.vIL,
+    rHiZ:  0,
   };
 }
 
@@ -246,8 +253,11 @@ function createDACElement(
 ): AnalogElementCore {
   const bits   = Math.max(1, Math.min(32, props.getOrDefault<number>("bits", 8)));
   const p: Record<string, number> = {
-    vRef: props.getModelParam<number>("vRef"),
+    vIH:  props.getModelParam<number>("vIH"),
+    vIL:  props.getModelParam<number>("vIL"),
     rOut: props.getModelParam<number>("rOut"),
+    rIn:  props.getModelParam<number>("rIn"),
+    cIn:  props.getModelParam<number>("cIn"),
   };
   const mode   = props.getOrDefault<string>("mode", "unipolar");
   const G_out  = 1 / Math.max(p.rOut, 1e-9);
@@ -260,7 +270,7 @@ function createDACElement(
   // GND node — not directly stamped (MNA ground handled implicitly)
 
   // DigitalInputPinModel instances — one per bit
-  const inputSpec = makeInputPinSpec(p.vRef);
+  const inputSpec = buildInputPinSpec(p);
   const inputModels: DigitalInputPinModel[] = [];
   // Collect digital bit node IDs in order D0..D(N-1)
   const nDigitalBits: number[] = [];
@@ -347,7 +357,7 @@ function createDACElement(
 
       // D0..D(N-1): DigitalInputPinModel — loading conductance 1/rIn to ground
       // I = V_pin / rIn  (positive = into element)
-      const rIn = inputSpec.rIn;
+      const rIn = p.rIn;
       for (let i = 0; i < bits; i++) {
         const v = readNode(voltages, nDigitalBits[i]);
         currents.push(nDigitalBits[i] > 0 ? v / rIn : 0);
@@ -382,7 +392,13 @@ function createDACElement(
     },
 
     setParam(key: string, value: number): void {
-      if (key in p) p[key] = value;
+      if (key in p) {
+        p[key] = value;
+        // Forward input threshold/impedance changes to all pin models
+        if (key === "vIH" || key === "vIL" || key === "rIn" || key === "cIn") {
+          for (const m of inputModels) m.setParam(key, value);
+        }
+      }
     },
   };
 }
@@ -430,9 +446,12 @@ const DAC_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const DAC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits",    propertyKey: "bits",        convert: (v) => parseInt(v, 10) },
-  { xmlName: "VRef",    propertyKey: "vRef",        convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Mode",    propertyKey: "mode",        convert: (v) => v },
+  { xmlName: "VIH",     propertyKey: "vIH",         convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "VIL",     propertyKey: "vIL",         convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "ROut",    propertyKey: "rOut",        convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "RIn",     propertyKey: "rIn",         convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "CIn",     propertyKey: "cIn",         convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",   propertyKey: "label",       convert: (v) => v },
 ];
 

@@ -60,7 +60,16 @@ import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 
 export const { paramDefs: ADC_PARAM_DEFS, defaults: ADC_DEFAULTS } = defineModelParams({
   primary: {
-    vRef: { default: 5.0, unit: "V", description: "Full-scale reference voltage" },
+    vIH: { default: 2.0, unit: "V", description: "Input HIGH threshold voltage (CLK edge detection)" },
+    vIL: { default: 0.8, unit: "V", description: "Input LOW threshold voltage" },
+    vOH: { default: 3.3, unit: "V", description: "Digital output HIGH voltage" },
+    vOL: { default: 0.0, unit: "V", description: "Digital output LOW voltage" },
+  },
+  secondary: {
+    rIn:  { default: 1e7,  unit: "Ω", description: "Analog input impedance" },
+    cIn:  { default: 5e-12, unit: "F", description: "Analog input capacitance" },
+    rOut: { default: 50,   unit: "Ω", description: "Digital output impedance" },
+    rHiZ: { default: 1e7,  unit: "Ω", description: "Hi-Z output impedance" },
   },
 });
 
@@ -68,31 +77,27 @@ export const { paramDefs: ADC_PARAM_DEFS, defaults: ADC_DEFAULTS } = defineModel
 // Pin electrical specs
 // ---------------------------------------------------------------------------
 
-/** CMOS 3.3V-style electrical spec for input pins (loading only). */
-const INPUT_PIN_SPEC: ResolvedPinElectrical = {
-  rOut: 50,
-  cOut: 5e-12,
-  rIn: 1e7,
-  cIn: 5e-12,
-  vOH: 3.3,
-  vOL: 0.0,
-  vIH: 2.0,
-  vIL: 0.8,
-  rHiZ: 1e7,
-};
+/** Build input pin spec from model params. Output-side fields zeroed (unused). */
+function buildInputPinSpec(p: Record<string, number>): ResolvedPinElectrical {
+  return {
+    rOut: 0, cOut: 0,
+    rIn: p.rIn, cIn: p.cIn,
+    vOH: 0, vOL: 0,
+    vIH: p.vIH, vIL: p.vIL,
+    rHiZ: 0,
+  };
+}
 
-/** CMOS 3.3V-style electrical spec for digital output pins. */
-const OUTPUT_PIN_SPEC: ResolvedPinElectrical = {
-  rOut: 50,
-  cOut: 5e-12,
-  rIn: 1e7,
-  cIn: 5e-12,
-  vOH: 3.3,
-  vOL: 0.0,
-  vIH: 2.0,
-  vIL: 0.8,
-  rHiZ: 1e7,
-};
+/** Build output pin spec from model params. Input-side fields zeroed (unused). */
+function buildOutputPinSpec(p: Record<string, number>): ResolvedPinElectrical {
+  return {
+    rOut: p.rOut, cOut: 0,
+    rIn: 0, cIn: 0,
+    vOH: p.vOH, vOL: p.vOL,
+    vIH: 0, vIL: 0,
+    rHiZ: p.rHiZ,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // buildADCPinDeclarations
@@ -278,7 +283,14 @@ function createADCElement(
 ): AnalogElementCore {
   const bits = Math.max(1, Math.min(32, props.getOrDefault<number>("bits", 8)));
   const p: Record<string, number> = {
-    vRef: props.getModelParam<number>("vRef"),
+    vIH:  props.getModelParam<number>("vIH"),
+    vIL:  props.getModelParam<number>("vIL"),
+    vOH:  props.getModelParam<number>("vOH"),
+    vOL:  props.getModelParam<number>("vOL"),
+    rIn:  props.getModelParam<number>("rIn"),
+    cIn:  props.getModelParam<number>("cIn"),
+    rOut: props.getModelParam<number>("rOut"),
+    rHiZ: props.getModelParam<number>("rHiZ"),
   };
   const mode = props.getOrDefault<string>("mode", "unipolar") as "unipolar" | "bipolar";
   const conversionType = props.getOrDefault<string>("conversionType", "instant") as
@@ -298,12 +310,14 @@ function createADCElement(
     nDigital.push(pinNodes.get(`D${i}`) ?? 0);
   }
 
-  // Build pin models
-  const vinPin = new DigitalInputPinModel(INPUT_PIN_SPEC, true);
-  const clkPin = new DigitalInputPinModel(INPUT_PIN_SPEC, true);
-  const eocPin = new DigitalOutputPinModel(OUTPUT_PIN_SPEC);
+  // Build pin models from current params
+  const inputSpec = buildInputPinSpec(p);
+  const outputSpec = buildOutputPinSpec(p);
+  const vinPin = new DigitalInputPinModel(inputSpec, true);
+  const clkPin = new DigitalInputPinModel(inputSpec, true);
+  const eocPin = new DigitalOutputPinModel(outputSpec);
   const digitalPins: DigitalOutputPinModel[] = nDigital.map(
-    () => new DigitalOutputPinModel(OUTPUT_PIN_SPEC),
+    () => new DigitalOutputPinModel(outputSpec),
   );
 
   // Initialise pin node IDs — init() takes 1-based MNA node IDs
@@ -319,7 +333,6 @@ function createADCElement(
   let _solver: SparseSolver | null = null;
 
   // Clock edge detection state
-  const VIH = INPUT_PIN_SPEC.vIH;
   let prevClkVoltage = 0;
 
   // SAR conversion state: clock cycles remaining until EOC asserts
@@ -342,7 +355,7 @@ function createADCElement(
 
   function computeCode(voltages: Float64Array): number {
     const vIn = readVoltage(voltages, nVin);
-    const vRef = nVref > 0 ? readVoltage(voltages, nVref) : p.vRef;
+    const vRef = readVoltage(voltages, nVref);
     const vGnd = readVoltage(voltages, nGnd);
 
     const span = vRef - vGnd;
@@ -403,8 +416,8 @@ function createADCElement(
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
-      const rIn = INPUT_PIN_SPEC.rIn;
-      const rOut = OUTPUT_PIN_SPEC.rOut;
+      const rIn = p.rIn;
+      const rOut = p.rOut;
 
       // VIN: DigitalInputPinModel — loading conductance 1/rIn to ground
       const iVin = nVin > 0 ? readVoltage(voltages, nVin) / rIn : 0;
@@ -433,7 +446,7 @@ function createADCElement(
 
     updateState(dt: number, voltages: Float64Array): void {
       const clkVoltage = readVoltage(voltages, nClk);
-      const risingEdge = prevClkVoltage < VIH && clkVoltage >= VIH;
+      const risingEdge = prevClkVoltage < p.vIH && clkVoltage >= p.vIH;
       prevClkVoltage = clkVoltage;
 
       if (risingEdge) {
@@ -481,7 +494,19 @@ function createADCElement(
     },
 
     setParam(key: string, value: number): void {
-      if (key in p) p[key] = value;
+      if (key in p) {
+        p[key] = value;
+        // Forward input params to input pin models
+        if (key === "vIH" || key === "vIL" || key === "rIn" || key === "cIn") {
+          vinPin.setParam(key, value);
+          clkPin.setParam(key, value);
+        }
+        // Forward output params to output pin models
+        if (key === "vOH" || key === "vOL" || key === "rOut" || key === "rHiZ") {
+          eocPin.setParam(key, value);
+          for (const dp of digitalPins) dp.setParam(key, value);
+        }
+      }
     },
   } as AnalogElementCore & { latchedCode: number; eocActive: boolean };
 }
@@ -532,9 +557,16 @@ const ADC_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const ADC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits",           propertyKey: "bits",           convert: (v) => parseInt(v, 10) },
-  { xmlName: "VRef",           propertyKey: "vRef",           convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "mode",           propertyKey: "mode",           convert: (v) => v },
   { xmlName: "conversionType", propertyKey: "conversionType", convert: (v) => v },
+  { xmlName: "VIH",            propertyKey: "vIH",            convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "VIL",            propertyKey: "vIL",            convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "VOH",            propertyKey: "vOH",            convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "VOL",            propertyKey: "vOL",            convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "RIn",            propertyKey: "rIn",            convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "CIn",            propertyKey: "cIn",            convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "ROut",           propertyKey: "rOut",           convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "RHiZ",           propertyKey: "rHiZ",           convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",          propertyKey: "label",          convert: (v) => v },
 ];
 

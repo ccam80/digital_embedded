@@ -13,7 +13,7 @@ import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, Rotation } from "../../core/pin.js";
 import { gateBodyMetrics } from "../../core/pin.js";
-import { PropertyBag } from "../../core/properties.js";
+import { PropertyBag, PropertyType } from "../../core/properties.js";
 import {
   ComponentCategory,
   type ComponentDefinition,
@@ -139,16 +139,16 @@ export function executeXOr(index: number, state: Uint32Array, _highZs: Uint32Arr
 
 const CMOS_XOR2_NETLIST: MnaSubcircuitNetlist = {
   ports: ["In_1", "In_2", "out", "VDD", "GND"],
-  params: { W: 10e-6 },
+  params: { WP: 20e-6, WN: 10e-6, L: 1e-6 },
   elements: [
-    { typeId: "PMOS", branchCount: 0 }, // inv1_p: invert In_1
-    { typeId: "NMOS", branchCount: 0 }, // inv1_n: invert In_1
-    { typeId: "PMOS", branchCount: 0 }, // inv2_p: invert In_2
-    { typeId: "NMOS", branchCount: 0 }, // inv2_n: invert In_2
-    { typeId: "PMOS", branchCount: 0 }, // tg1_p: transmission gate 1 PMOS
-    { typeId: "NMOS", branchCount: 0 }, // tg1_n: transmission gate 1 NMOS
-    { typeId: "PMOS", branchCount: 0 }, // tg2_p: transmission gate 2 PMOS
-    { typeId: "NMOS", branchCount: 0 }, // tg2_n: transmission gate 2 NMOS
+    { typeId: "PMOS", branchCount: 0, params: { W: "WP", L: "L" } }, // inv1_p: invert In_1
+    { typeId: "NMOS", branchCount: 0, params: { W: "WN", L: "L" } }, // inv1_n: invert In_1
+    { typeId: "PMOS", branchCount: 0, params: { W: "WP", L: "L" } }, // inv2_p: invert In_2
+    { typeId: "NMOS", branchCount: 0, params: { W: "WN", L: "L" } }, // inv2_n: invert In_2
+    { typeId: "PMOS", branchCount: 0, params: { W: "WP", L: "L" } }, // tg1_p: transmission gate 1 PMOS
+    { typeId: "NMOS", branchCount: 0, params: { W: "WN", L: "L" } }, // tg1_n: transmission gate 1 NMOS
+    { typeId: "PMOS", branchCount: 0, params: { W: "WP", L: "L" } }, // tg2_p: transmission gate 2 PMOS
+    { typeId: "NMOS", branchCount: 0, params: { W: "WN", L: "L" } }, // tg2_n: transmission gate 2 NMOS
   ],
   internalNetCount: 3,
   // Nets 0..4 = ports [In_1, In_2, out, VDD, GND]
@@ -203,8 +203,12 @@ export const XOrDefinition: ComponentDefinition = {
     cmos: {
       kind: "netlist",
       netlist: CMOS_XOR2_NETLIST,
-      paramDefs: [],
-      params: {},
+      paramDefs: [
+        { key: "WP", type: PropertyType.FLOAT, label: "WP", rank: "primary" },
+        { key: "WN", type: PropertyType.FLOAT, label: "WN", rank: "primary" },
+        { key: "L", type: PropertyType.FLOAT, label: "L", rank: "primary" },
+      ],
+      params: { WP: 20e-6, WN: 10e-6, L: 1e-6 },
     },
   },
   models: {

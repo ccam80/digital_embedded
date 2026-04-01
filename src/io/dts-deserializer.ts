@@ -20,6 +20,21 @@ import type { DtsCircuit, DtsElement, DtsWire, DtsSerializedModelEntry } from '.
 
 const BIGINT_PREFIX = '_bigint:';
 
+/** Sentinel strings for Infinity values (mirrors dts-serializer encoding). */
+const POS_INF = '_inf';
+const NEG_INF = '-_inf';
+
+/** Decode Infinity sentinels in a model params record back to numeric Infinity. */
+function decodeModelParams(params: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(params)) {
+    if ((v as unknown) === POS_INF) out[k] = Infinity;
+    else if ((v as unknown) === NEG_INF) out[k] = -Infinity;
+    else out[k] = v;
+  }
+  return out;
+}
+
 /**
  * Decode a bigint-encoded string back to bigint.
  * Returns null if the string does not carry the sentinel prefix.
@@ -60,7 +75,7 @@ function restoreProperties(record: Record<string, unknown>): PropertyBag {
     entries.push([key, restorePropertyValue(raw)]);
   }
   const bag = new PropertyBag(entries);
-  if (modelParams) bag.replaceModelParams(modelParams);
+  if (modelParams) bag.replaceModelParams(decodeModelParams(modelParams));
   return bag;
 }
 
@@ -113,14 +128,14 @@ function rehydrateModels(
           kind: 'inline',
           factory: baseEntry.factory,
           paramDefs: baseEntry.paramDefs,
-          params: entry.params,
+          params: decodeModelParams(entry.params),
         };
       } else {
         result[compType][modelName] = {
           kind: 'netlist',
           netlist: entry.netlist,
           paramDefs: entry.paramDefs,
-          params: entry.params,
+          params: decodeModelParams(entry.params),
         };
       }
     }
@@ -218,7 +233,7 @@ function createElement(
     const { model: modelKey, params: deltaParams } = savedEl.modelParamDeltas;
     const entry = circuitModels[savedEl.type]?.[modelKey];
     if (entry !== undefined) {
-      const merged: Record<string, number> = { ...entry.params, ...deltaParams };
+      const merged: Record<string, number> = { ...entry.params, ...decodeModelParams(deltaParams) };
       props.replaceModelParams(merged);
     }
   }

@@ -108,10 +108,6 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.drawWireExplicit('G_AND', 'out', 'AND_Y', 'in');
     await builder.drawWireFromPinExplicit('FF', 'D', 17, 5, [[8, 26], [8, 24], [17, 24]]);
 
-    // Export circuit for offline inspection
-    const m1xml = await builder.exportCircuitDigXml();
-    if (m1xml) { const fs = await import('fs'); fs.writeFileSync('e2e/fixtures/master1-export.dig', m1xml); }
-
     // --- Compile and verify ---
     await builder.stepViaUI();
 
@@ -280,10 +276,6 @@ test.describe('Master circuit assembly via UI', () => {
     // Grounds: Q1.E → GND(32,30), Vcc.neg → GND(32,30)
     await builder.drawWireFromPinExplicit('Q1', 'E', 32, 30);
     await builder.drawWireFromPinExplicit('Vcc', 'neg', 32, 30);
-
-    // Export circuit for offline inspection
-    const m2xml = await builder.exportCircuitDigXml();
-    if (m2xml) { const fs = await import('fs'); fs.writeFileSync('e2e/fixtures/master2-export.dig', m2xml); }
 
     // --- Compile and start simulation ---
     await builder.stepViaUI();
@@ -505,10 +497,6 @@ test.describe('Master circuit assembly via UI', () => {
 
     // Counter output → Q
     await builder.drawWireExplicit('CNT', 'out', 'Q', 'in');
-
-    // Export circuit for offline inspection
-    const m3xml = await builder.exportCircuitDigXml();
-    if (m3xml) { const fs = await import('fs'); fs.writeFileSync('e2e/fixtures/master3-export.dig', m3xml); }
 
     // --- Compile and verify ---
     await builder.stepViaUI();

@@ -1227,11 +1227,16 @@ export function compileAnalogPartition(
       const branchIdx = totalNodeCount + branchCount;
       branchCount++;
       const adapter = makeBridgeOutputAdapter(spec, nodeId, branchIdx, loaded);
+      // Label for coordinator pin-param dispatch (e.g. "out.rOut" → endsWith(":out"))
+      const driverPin = descriptor.boundaryGroup.pins.find(p => p.domain === "digital");
+      if (driverPin) adapter.label = `bridge-${boundaryGroupId}:${driverPin.pinLabel}`;
       analogElements.push(adapter);
       adapters.push(adapter);
     } else {
       // Analog voltage drives digital input — BridgeInputAdapter (loading sense)
       const adapter = makeBridgeInputAdapter(spec, nodeId, loaded);
+      const sensePin = descriptor.boundaryGroup.pins.find(p => p.domain === "digital");
+      if (sensePin) adapter.label = `bridge-${boundaryGroupId}:${sensePin.pinLabel}`;
       analogElements.push(adapter);
       adapters.push(adapter);
     }

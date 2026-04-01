@@ -1,7 +1,7 @@
 {
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\src\\\\solver\\\\analog\\\\compiler.ts\"}",
-  "error": "File content (14150 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
-  "timestamp": "2026-03-31T21:44:56.832Z",
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"npx tsx scripts/re-export-fixtures.ts\",\"timeout\":30000,\"description\":\"Run fixture re-export script\"}",
+  "error": "Exit code 1\nC:\\local_working_projects\\digital_in_browser\\src\\io\\dts-deserializer.ts:217\r\n  const def = registry.get(savedEl.type);\r\n                       ^\r\n\r\nTypeError: Cannot read properties of undefined (reading 'get')\r\n    at createElement (C:\\local_working_projects\\digital_in_browser\\src\\io\\dts-deserializer.ts:217:24)\r\n    at deserializeDtsCircuit (C:\\local_working_projects\\digital_in_browser\\src\\io\\dts-deserializer.ts:200:21)\r\n    at deserializeDts (C:\\local_working_projects\\digital_in_br...",
+  "timestamp": "2026-04-01T01:49:30.026Z",
   "retry_count": 1
 }

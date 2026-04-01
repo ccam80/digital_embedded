@@ -25,7 +25,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ADCDefinition } from "../adc.js";
+import { ADCDefinition, ADC_DEFAULTS } from "../adc.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
@@ -46,8 +46,6 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 const BITS = 8;
 const V_REF = 5.0;
 const MAX_CODE = (1 << BITS) - 1; // 255
-const V_IH = 2.0; // clock high threshold (CMOS 3.3V family)
-const V_IL = 0.8; // clock low threshold
 
 // ---------------------------------------------------------------------------
 // Node layout (1-based MNA node IDs)
@@ -95,23 +93,21 @@ function makeVoltages(overrides: Partial<Record<string, number>> = {}): Float64A
 // ADC factory helper
 // ---------------------------------------------------------------------------
 
-type ADCElement = AnalogElement & { latchedCode: number; eocActive: boolean };
+type ADCElementExt = AnalogElement & { latchedCode: number; eocActive: boolean };
 
-function makeAdc(props: Record<string, number | string> = {}): ADCElement {
-  const defaults: [string, number | string][] = [
+function makeAdc(
+  componentProps?: Record<string, number | string>,
+  paramOverrides?: Record<string, number>,
+): ADCElementExt {
+  const bag = new PropertyBag([
     ["bits",           BITS],
-    ["vRef",           V_REF],
     ["mode",           "unipolar"],
-    ["conversionType", "instant"],
-  ];
-  const merged = new Map<string, number | string>(defaults);
-  for (const [k, v] of Object.entries(props)) merged.set(k, v);
-
-  const modelParams: Record<string, number> = { vRef: merged.get("vRef") as number ?? V_REF };
-  merged.delete("vRef");
-  const bag = new PropertyBag(Array.from(merged.entries()));
-  bag.replaceModelParams(modelParams);
-  return getFactory(ADCDefinition.modelRegistry!["behavioral"]!)(makeNodeIds(), [], -1, bag, () => 0) as ADCElement;
+    ["conversionType", componentProps?.conversionType ?? "instant"],
+  ]);
+  bag.replaceModelParams({ ...ADC_DEFAULTS, ...paramOverrides });
+  return getFactory(ADCDefinition.modelRegistry!["behavioral"]!)(
+    makeNodeIds(), [], -1, bag, () => 0,
+  ) as ADCElementExt;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,15 +121,22 @@ function makeAdc(props: Record<string, number | string> = {}): ADCElement {
  *   1. Drive CLK LOW with the target V_in set — updateState() sees prev=LOW.
  *   2. Drive CLK HIGH — updateState() detects the rising edge and converts.
  */
-function applyClockEdge(adc: ADCElement, vIn: number): void {
+function applyClockEdge(
+  adc: ADCElementExt,
+  vIn: number,
+  vRef: number = V_REF,
+  clkHigh?: number,
+): void {
   const dt = 1e-6; // 1 µs timestep
+  const vIL = ADC_DEFAULTS.vIL;
+  const vIH = clkHigh ?? (ADC_DEFAULTS.vIH + 0.1);
 
   // Step 1: CLK low — initialise prevClkVoltage to LOW
-  const vLow = makeVoltages({ [N_VIN]: vIn, [N_CLK]: V_IL, [N_VREF]: V_REF });
+  const vLow = makeVoltages({ [N_VIN]: vIn, [N_CLK]: vIL, [N_VREF]: vRef });
   adc.updateState!(dt, vLow);
 
   // Step 2: CLK high — rising edge detected, conversion fires
-  const vHigh = makeVoltages({ [N_VIN]: vIn, [N_CLK]: V_IH + 0.1, [N_VREF]: V_REF });
+  const vHigh = makeVoltages({ [N_VIN]: vIn, [N_CLK]: vIH, [N_VREF]: vRef });
   adc.updateState!(dt, vHigh);
 }
 
@@ -151,7 +154,6 @@ describe("ADC", () => {
 
   it("full_scale", () => {
     // V_in = V_ref - 1 LSB = V_ref × (1 - 1/2^N) → code = 2^N - 1 = 255
-    // floor((255/256) × 256) = floor(255) = 255
     const vIn = V_REF * (MAX_CODE / (1 << BITS));
     const adc = makeAdc();
     applyClockEdge(adc, vIn);
@@ -167,7 +169,6 @@ describe("ADC", () => {
 
   it("ramp_test", () => {
     // Sweep V_in from 0 to V_ref in 17 steps; assert codes are non-decreasing.
-    // We use a fresh ADC for each step (each edge is independent).
     const steps = 17;
     const codes: number[] = [];
 
@@ -178,12 +179,12 @@ describe("ADC", () => {
       codes.push(adc.latchedCode);
     }
 
-    // Assert monotonically non-decreasing
+    // Monotonically non-decreasing
     for (let i = 1; i < codes.length; i++) {
-      expect(codes[i]).toBeGreaterThanOrEqual(codes[i - 1]);
+      expect(codes[i]).toBeGreaterThanOrEqual(codes[i - 1]!);
     }
 
-    // Additionally verify the span: first code = 0, last code = MAX_CODE
+    // Span: first code = 0, last code = MAX_CODE
     expect(codes[0]).toBe(0);
     expect(codes[codes.length - 1]).toBe(MAX_CODE);
   });
@@ -197,6 +198,64 @@ describe("ADC", () => {
 
     applyClockEdge(adc, V_REF / 2);
 
+    expect(adc.eocActive).toBe(true);
+  });
+
+  it("output scales with VREF from wire", () => {
+    // Same V_in ratio, different VREF — code should be the same
+    const adc3 = makeAdc();
+    applyClockEdge(adc3, 1.65, 3.3);  // 1.65/3.3 = 0.5 → code 128
+
+    const adc5 = makeAdc();
+    applyClockEdge(adc5, 2.5, 5.0);   // 2.5/5.0 = 0.5 → code 128
+
+    expect(adc3.latchedCode).toBe(128);
+    expect(adc5.latchedCode).toBe(128);
+  });
+
+  it("3.3V clock triggers edge detection with default thresholds", () => {
+    // Default vIH = 2.0V. A 3.3V clock signal should trigger conversion.
+    const adc = makeAdc();
+    applyClockEdge(adc, V_REF / 2, V_REF, 3.3);
+    expect(adc.latchedCode).toBe(128);
+  });
+
+  it("clock below vIH does not trigger conversion", () => {
+    // Drive clock to 1.5V — below default vIH=2.0V. No conversion should fire.
+    const adc = makeAdc();
+    const dt = 1e-6;
+
+    // Step 1: CLK low
+    const vLow = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 0.0, [N_VREF]: V_REF });
+    adc.updateState!(dt, vLow);
+
+    // Step 2: CLK to 1.5V — still below vIH=2.0V
+    const vMid = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 1.5, [N_VREF]: V_REF });
+    adc.updateState!(dt, vMid);
+
+    expect(adc.latchedCode).toBe(0);  // no conversion fired
+    expect(adc.eocActive).toBe(false);
+  });
+
+  it("custom vIH threshold changes clock sensitivity", () => {
+    // Set vIH = 4.0V. 3.3V clock should NOT trigger conversion.
+    const adc = makeAdc(undefined, { vIH: 4.0 });
+    const dt = 1e-6;
+
+    const vLow = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 0.0, [N_VREF]: V_REF });
+    adc.updateState!(dt, vLow);
+
+    const vHigh = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 3.3, [N_VREF]: V_REF });
+    adc.updateState!(dt, vHigh);
+
+    expect(adc.latchedCode).toBe(0);  // 3.3V < 4.0V → no edge
+    expect(adc.eocActive).toBe(false);
+
+    // Now drive above 4.0V — should trigger
+    const vHigher = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 4.5, [N_VREF]: V_REF });
+    adc.updateState!(dt, vHigher);
+
+    expect(adc.latchedCode).toBe(128);
     expect(adc.eocActive).toBe(true);
   });
 });

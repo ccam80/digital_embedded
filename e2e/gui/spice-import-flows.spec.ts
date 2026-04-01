@@ -103,7 +103,7 @@ test.describe('SPICE import flows', () => {
     await expect(page.locator('.prop-popup')).toBeVisible({ timeout: 3000 });
 
     const popup = page.locator('.prop-popup');
-    const isRow = popup.locator('.prop-row').filter({ has: page.locator('label').filter({ hasText: /^IS$/ }) });
+    const isRow = popup.locator('.prop-row, .prop-row-inline').filter({ has: page.locator('label').filter({ hasText: /^IS$/ }) });
     const isInput = isRow.locator('input').first();
     await expect(isInput).toBeVisible({ timeout: 2000 });
 
@@ -138,7 +138,7 @@ test.describe('SPICE import flows', () => {
     await expect(page.locator('.prop-popup')).toBeVisible({ timeout: 3000 });
 
     const popup = page.locator('.prop-popup');
-    const isRow = popup.locator('.prop-row').filter({ has: page.locator('label').filter({ hasText: /^IS$/ }) });
+    const isRow = popup.locator('.prop-row, .prop-row-inline').filter({ has: page.locator('label').filter({ hasText: /^IS$/ }) });
     const isInput = isRow.locator('input').first();
     await expect(isInput).toBeVisible({ timeout: 2000 });
     await isInput.fill('1e-14');
@@ -153,7 +153,7 @@ test.describe('SPICE import flows', () => {
     await expect(page.locator('.prop-popup')).toBeVisible({ timeout: 3000 });
 
     const popup2 = page.locator('.prop-popup');
-    const isRow2 = popup2.locator('.prop-row').filter({ has: page.locator('label').filter({ hasText: /^IS$/ }) });
+    const isRow2 = popup2.locator('.prop-row, .prop-row-inline').filter({ has: page.locator('label').filter({ hasText: /^IS$/ }) });
     const isInput2 = isRow2.locator('input').first();
     await expect(isInput2).toBeVisible({ timeout: 2000 });
 

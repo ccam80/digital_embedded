@@ -24,6 +24,24 @@ import type {
 /** Sentinel prefix for bigint-encoded string values. */
 const BIGINT_PREFIX = '_bigint:';
 
+/** Sentinel strings for Infinity values that JSON.stringify would nullify. */
+const POS_INF = '_inf';
+const NEG_INF = '-_inf';
+
+/** Encode Infinity/-Infinity as a JSON-safe sentinel. Finite values pass through. */
+function encodeInfinity(value: number): number | string {
+  if (value === Infinity) return POS_INF;
+  if (value === -Infinity) return NEG_INF;
+  return value;
+}
+
+/** Encode all values in a model params record, converting Infinity to sentinels. */
+function encodeModelParams(params: Record<string, number>): Record<string, number | string> {
+  const out: Record<string, number | string> = {};
+  for (const [k, v] of Object.entries(params)) out[k] = encodeInfinity(v);
+  return out;
+}
+
 /**
  * Encode a bigint as a JSON-safe string.
  * Decoded by the deserializer back to bigint.
@@ -75,10 +93,10 @@ function serializeProperties(
   for (const [k, v] of entries) {
     raw[k] = serializePropertyValue(v);
   }
-  // Serialize model params under a reserved key
+  // Serialize model params under a reserved key (Infinity → sentinel)
   if (modelParamKeys && modelParamKeys.length > 0 && getModelParam) {
-    const mp: Record<string, number> = {};
-    for (const k of modelParamKeys) mp[k] = getModelParam(k);
+    const mp: Record<string, number | string> = {};
+    for (const k of modelParamKeys) mp[k] = encodeInfinity(getModelParam(k));
     raw['_modelParams'] = sortObjectKeys(mp);
   }
   return sortObjectKeys(raw);
@@ -115,11 +133,11 @@ function elementToDtsElement(
     const entry = componentModels?.[modelKey];
     if (entry !== undefined) {
       const defaults = entry.params;
-      const deltaParams: Record<string, number> = {};
+      const deltaParams: Record<string, number | string> = {};
       for (const key of bag.getModelParamKeys()) {
         const current = bag.getModelParam<number>(key);
-        if (current !== defaults[key] && Number.isFinite(current)) {
-          deltaParams[key] = current;
+        if (current !== defaults[key]) {
+          deltaParams[key] = encodeInfinity(current);
         }
       }
       result.modelParamDeltas = {
@@ -205,9 +223,9 @@ function circuitToDtsCircuit(circuit: Circuit): DtsCircuit {
  */
 function serializeModelEntry(entry: ModelEntry): DtsSerializedModelEntry {
   if (entry.kind === 'inline') {
-    return { kind: 'inline', params: entry.params };
+    return { kind: 'inline', params: encodeModelParams(entry.params) as Record<string, number> };
   }
-  return { kind: 'netlist', netlist: entry.netlist, paramDefs: entry.paramDefs, params: entry.params };
+  return { kind: 'netlist', netlist: entry.netlist, paramDefs: entry.paramDefs, params: encodeModelParams(entry.params) as Record<string, number> };
 }
 
 /**

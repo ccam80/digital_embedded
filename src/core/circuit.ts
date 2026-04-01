@@ -177,14 +177,6 @@ export interface CircuitMetadata {
    * Each entry is a full ModelEntry with factory refs — runtime only, never serialized directly.
    */
   models?: Record<string, Record<string, ModelEntry>>;
-
-  /**
-   * Subcircuit-level parameters with defaults.
-   * When this circuit is used as a subcircuit, these params are exposed to the
-   * user as model params. Internal components reference them by name (string
-   * values in their element params).
-   */
-  params?: Record<string, number>;
 }
 
 function defaultCircuitMetadata(): CircuitMetadata {

@@ -24,7 +24,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { DACDefinition } from "../dac.js";
+import { DACDefinition, DAC_DEFAULTS } from "../dac.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
@@ -55,14 +55,20 @@ const MAX_CODE = Math.pow(2, BITS); // 256
 /**
  * Build a full 8-bit DAC test circuit and solve the DC operating point.
  *
- * @param inputBits  Array of BITS boolean values (true=HIGH, false=LOW)
- * @param vRef       Reference voltage (default V_REF)
+ * @param inputBits    Array of BITS boolean values (true=HIGH, false=LOW)
+ * @param vRef         Reference voltage (default V_REF)
+ * @param vHigh        Voltage driven for a HIGH bit (default vRef)
+ * @param paramOverrides  Model param overrides (merged with DAC_DEFAULTS)
  * @returns  { converged, vOut }
  */
 function solveDac(
   inputBits: boolean[],
   vRef: number = V_REF,
+  vHigh?: number,
+  paramOverrides?: Record<string, number>,
 ): { converged: boolean; vOut: number } {
+  const driveHigh = vHigh ?? vRef;
+
   // Node layout:
   //   nodes 1..BITS  → digital input nodes D0..D(BITS-1)
   //   node BITS+1    → VREF node
@@ -93,7 +99,7 @@ function solveDac(
     ["bits",  BITS],
     ["mode",  "unipolar"],
   ]);
-  props.replaceModelParams({ vRef, rOut: 100 });
+  props.replaceModelParams({ ...DAC_DEFAULTS, ...paramOverrides });
 
   const dacPinNodeIds: number[] = [];
   for (let i = 0; i < BITS; i++) dacPinNodeIds.push(i + 1);  // D0=1..D7=8
@@ -105,13 +111,13 @@ function solveDac(
     dacPinNodeIds,
   );
 
-  // Digital input voltage sources: HIGH = vRef, LOW = 0
+  // Digital input voltage sources: HIGH = driveHigh, LOW = 0
   const elements: AnalogElement[] = [dacEl];
   for (let i = 0; i < BITS; i++) {
     const nDi = i + 1;  // node for Di
     const branchRow = nNodes + i;  // branch rows start after node rows
-    const vHigh = inputBits[i] ? vRef : 0.0;
-    elements.push(makeDcVoltageSource(nDi, 0, branchRow, vHigh) as unknown as AnalogElement);
+    const v = inputBits[i] ? driveHigh : 0.0;
+    elements.push(makeDcVoltageSource(nDi, 0, branchRow, v) as unknown as AnalogElement);
   }
 
   // VREF voltage source
@@ -194,7 +200,7 @@ describe("DAC", () => {
 
     // Assert monotonically increasing
     for (let i = 1; i < voltages.length; i++) {
-      expect(voltages[i]).toBeGreaterThan(voltages[i - 1]);
+      expect(voltages[i]).toBeGreaterThan(voltages[i - 1]!);
     }
   });
 
@@ -213,5 +219,66 @@ describe("DAC", () => {
     expect(v1 - v0).toBeCloseTo(expectedLsb, 4);
     expect(v2 - v1).toBeCloseTo(expectedLsb, 4);
     expect(v128 - v127).toBeCloseTo(expectedLsb, 4);
+  });
+
+  it("3.3V CMOS driving 5V VREF — default thresholds detect HIGH correctly", () => {
+    // Default vIH=2.0V. CMOS 3.3V gates output vOH=3.3V.
+    // 3.3V > 2.0V → all bits read as HIGH → full-scale output.
+    const allHigh = Array(BITS).fill(true);
+    const { converged, vOut } = solveDac(allHigh, 5.0, 3.3);
+
+    expect(converged).toBe(true);
+    const expected = 5.0 * (MAX_CODE - 1) / MAX_CODE;
+    expect(vOut).toBeCloseTo(expected, 3);
+  });
+
+  it("3.3V CMOS driving 5V VREF — LOW correctly detected", () => {
+    // 0V < vIL=0.8V → all bits read as LOW → output 0V.
+    const allLow = Array(BITS).fill(false);
+    const { converged, vOut } = solveDac(allLow, 5.0, 0.0);
+
+    expect(converged).toBe(true);
+    expect(vOut).toBeCloseTo(0.0, 4);
+  });
+
+  it("voltage between thresholds reads as LOW (indeterminate → 0)", () => {
+    // Drive all bits at 1.5V — between vIL=0.8V and vIH=2.0V.
+    // Indeterminate is treated as LOW by the DAC → code=0 → output 0V.
+    const allHigh = Array(BITS).fill(true);
+    const { converged, vOut } = solveDac(allHigh, 5.0, 1.5);
+
+    expect(converged).toBe(true);
+    expect(vOut).toBeCloseTo(0.0, 4);
+  });
+
+  it("custom vIH/vIL thresholds are respected", () => {
+    // Set vIH=4.0V. Drive at 3.3V → below threshold → reads as indeterminate → LOW.
+    const allHigh = Array(BITS).fill(true);
+    const { converged, vOut } = solveDac(allHigh, 5.0, 3.3, { vIH: 4.0, vIL: 2.0 });
+
+    expect(converged).toBe(true);
+    expect(vOut).toBeCloseTo(0.0, 4);
+  });
+
+  it("custom vIH/vIL — drive above custom threshold reads HIGH", () => {
+    // Set vIH=1.0V, vIL=0.5V. Drive at 1.5V → above 1.0V → HIGH.
+    const allHigh = Array(BITS).fill(true);
+    const { converged, vOut } = solveDac(allHigh, 5.0, 1.5, { vIH: 1.0, vIL: 0.5 });
+
+    expect(converged).toBe(true);
+    const expected = 5.0 * (MAX_CODE - 1) / MAX_CODE;
+    expect(vOut).toBeCloseTo(expected, 3);
+  });
+
+  it("output scales with VREF from wire", () => {
+    // Same code (all HIGH), two different VREF values.
+    // Output should scale proportionally.
+    const allHigh = Array(BITS).fill(true);
+    const { vOut: v5 } = solveDac(allHigh, 5.0);
+    const { vOut: v3 } = solveDac(allHigh, 3.3);
+
+    const scale = (MAX_CODE - 1) / MAX_CODE;
+    expect(v5).toBeCloseTo(5.0 * scale, 3);
+    expect(v3).toBeCloseTo(3.3 * scale, 3);
   });
 });

@@ -266,9 +266,9 @@ function validateDtsSerializedModelEntry(value: unknown, path: string): void {
     throw new Error(`Invalid .dts document: "${path}.params" must be an object`);
   }
   for (const [pk, pv] of Object.entries(entry['params'] as Record<string, unknown>)) {
-    if (typeof pv !== 'number') {
+    if (typeof pv !== 'number' && typeof pv !== 'string') {
       throw new Error(
-        `Invalid .dts document: "${path}.params["${pk}"]" must be a number`,
+        `Invalid .dts document: "${path}.params["${pk}"]" must be a number or string`,
       );
     }
   }
@@ -433,9 +433,9 @@ function validateDtsElement(value: unknown, path: string): void {
       throw new Error(`Invalid .dts document: "${path}.modelParamDeltas.params" must be an object`);
     }
     for (const [pk, pv] of Object.entries(d['params'] as Record<string, unknown>)) {
-      if (typeof pv !== 'number') {
+      if (typeof pv !== 'number' && typeof pv !== 'string') {
         throw new Error(
-          `Invalid .dts document: "${path}.modelParamDeltas.params["${pk}"]" must be a number`,
+          `Invalid .dts document: "${path}.modelParamDeltas.params["${pk}"]" must be a number or string`,
         );
       }
     }

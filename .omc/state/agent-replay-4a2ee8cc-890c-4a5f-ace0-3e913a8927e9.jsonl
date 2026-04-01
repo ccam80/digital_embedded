@@ -1,0 +1,4 @@
+{"t":0,"agent":"a012e7e","agent_type":"architect","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a9b27c9","agent_type":"architect","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a012e7e","agent_type":"architect","event":"agent_stop","success":true,"duration_ms":111041}
+{"t":0,"agent":"a9b27c9","agent_type":"architect","event":"agent_stop","success":true,"duration_ms":103751}

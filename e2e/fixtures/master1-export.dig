@@ -2,7 +2,7 @@
   "circuit": {
     "elements": [
       {
-        "id": "aa6f8836-7ecc-44a0-bdd4-ffd2b0797f4c",
+        "id": "814fdad2-6831-4144-a858-253e7e29c1ef",
         "position": {
           "x": 3,
           "y": 4
@@ -14,7 +14,7 @@
         "type": "In"
       },
       {
-        "id": "7dc83868-f281-4f55-92d1-1210af20bcc4",
+        "id": "0080f3a4-c54b-402e-a930-9c9df83f83fe",
         "position": {
           "x": 3,
           "y": 8
@@ -26,7 +26,7 @@
         "type": "In"
       },
       {
-        "id": "ec9ee7cf-dfea-414d-bae7-85ab5b4e6a13",
+        "id": "73fdf45d-26ce-48d2-a5e1-69f5f905feb0",
         "position": {
           "x": 3,
           "y": 27
@@ -38,7 +38,7 @@
         "type": "Clock"
       },
       {
-        "id": "7f584c87-c38e-448a-ae48-0ee34b591dc6",
+        "id": "32ab4ffe-f0d7-47dd-8b19-315b7fafed79",
         "position": {
           "x": 3,
           "y": 32
@@ -50,7 +50,7 @@
         "type": "Const"
       },
       {
-        "id": "5df9530c-7836-4b12-a57d-ffa4b523b456",
+        "id": "e5b39b76-6731-4aac-9c29-45d2ed9e8edc",
         "position": {
           "x": 10,
           "y": 4
@@ -62,7 +62,7 @@
         "type": "And"
       },
       {
-        "id": "21a93b92-b59e-4d8a-9b65-e4bec49325e3",
+        "id": "cbf0517f-cbb1-433b-b21f-f2771a4ecffa",
         "position": {
           "x": 10,
           "y": 10
@@ -74,7 +74,7 @@
         "type": "Or"
       },
       {
-        "id": "1351c777-1a9f-402c-9e68-697a1b8bb5b3",
+        "id": "945a4a68-4a79-44d8-b4db-24e743746c65",
         "position": {
           "x": 10,
           "y": 16
@@ -86,7 +86,7 @@
         "type": "XOr"
       },
       {
-        "id": "47063490-745b-41ad-9200-935d4fa087b5",
+        "id": "fcfe7f9b-e75e-422d-b6f8-66e606c2e884",
         "position": {
           "x": 10,
           "y": 22
@@ -98,7 +98,7 @@
         "type": "Not"
       },
       {
-        "id": "98ff60d0-5e18-4281-9566-08b40aa392a1",
+        "id": "73ded3af-60ce-4544-bcee-190d95d12b95",
         "position": {
           "x": 10,
           "y": 26
@@ -110,7 +110,7 @@
         "type": "D_FF"
       },
       {
-        "id": "bdc14be7-ed27-49b9-9e8f-7d9a85434823",
+        "id": "895fc6fa-43d6-40d6-aa36-ac0f4aff1005",
         "position": {
           "x": 10,
           "y": 32
@@ -122,7 +122,7 @@
         "type": "Counter"
       },
       {
-        "id": "4cebbd40-2149-4158-8fdc-3107122eb9ca",
+        "id": "15086bf0-8ab9-44b5-9451-552c6634af20",
         "position": {
           "x": 20,
           "y": 5
@@ -134,7 +134,7 @@
         "type": "Out"
       },
       {
-        "id": "d0c947a0-3a59-41fa-aa6a-c633505dbef0",
+        "id": "39f8f2ea-1f8b-4fcd-b7c2-66ce7d119f46",
         "position": {
           "x": 20,
           "y": 11
@@ -146,7 +146,7 @@
         "type": "Out"
       },
       {
-        "id": "2bc46c62-fa7d-4aaf-87d5-d357a41a81ea",
+        "id": "4ef927ab-8e7b-4b88-995e-efcaf8a4c9bb",
         "position": {
           "x": 20,
           "y": 17
@@ -158,7 +158,7 @@
         "type": "Out"
       },
       {
-        "id": "acb51ca7-f56a-4bea-8306-f22dbeb6a681",
+        "id": "c2a511f1-6104-4223-a79f-2be41b0de781",
         "position": {
           "x": 20,
           "y": 22
@@ -170,7 +170,7 @@
         "type": "Out"
       },
       {
-        "id": "b625068c-e5f1-4337-a600-6ad9a27e7c30",
+        "id": "869684af-937d-43e4-870c-7d53377e144a",
         "position": {
           "x": 20,
           "y": 26
@@ -182,7 +182,7 @@
         "type": "Out"
       },
       {
-        "id": "785bb810-cd9a-42b9-ba33-4f662b282472",
+        "id": "8ab65323-1e45-4c7a-b65a-e0b1c7bbd2c5",
         "position": {
           "x": 20,
           "y": 32

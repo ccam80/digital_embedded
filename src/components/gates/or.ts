@@ -13,7 +13,7 @@ import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
 import type { Pin, Rotation } from "../../core/pin.js";
 import { gateBodyMetrics } from "../../core/pin.js";
-import { PropertyBag } from "../../core/properties.js";
+import { PropertyBag, PropertyType } from "../../core/properties.js";
 import {
   ComponentCategory,
   type ComponentDefinition,
@@ -141,14 +141,14 @@ export function executeOr(index: number, state: Uint32Array, _highZs: Uint32Arra
 
 const CMOS_OR2_NETLIST: MnaSubcircuitNetlist = {
   ports: ["In_1", "In_2", "out", "VDD", "GND"],
-  params: { W: 10e-6 },
+  params: { WP: 20e-6, WN: 10e-6, L: 1e-6 },
   elements: [
-    { typeId: "PMOS", branchCount: 0 },
-    { typeId: "PMOS", branchCount: 0 },
-    { typeId: "NMOS", branchCount: 0 },
-    { typeId: "NMOS", branchCount: 0 },
-    { typeId: "PMOS", branchCount: 0 },
-    { typeId: "NMOS", branchCount: 0 },
+    { typeId: "PMOS", branchCount: 0, params: { W: "WP", L: "L" } },
+    { typeId: "PMOS", branchCount: 0, params: { W: "WP", L: "L" } },
+    { typeId: "NMOS", branchCount: 0, params: { W: "WN", L: "L" } },
+    { typeId: "NMOS", branchCount: 0, params: { W: "WN", L: "L" } },
+    { typeId: "PMOS", branchCount: 0, params: { W: "WP", L: "L" } },
+    { typeId: "NMOS", branchCount: 0, params: { W: "WN", L: "L" } },
   ],
   internalNetCount: 2,
   // Nets 0..4 = ports [In_1, In_2, out, VDD, GND], nets 5,6 = internal [nor_out, series_node]
@@ -203,8 +203,12 @@ export const OrDefinition: ComponentDefinition = {
     cmos: {
       kind: "netlist",
       netlist: CMOS_OR2_NETLIST,
-      paramDefs: [],
-      params: {},
+      paramDefs: [
+        { key: "WP", type: PropertyType.FLOAT, label: "WP", rank: "primary" },
+        { key: "WN", type: PropertyType.FLOAT, label: "WN", rank: "primary" },
+        { key: "L", type: PropertyType.FLOAT, label: "L", rank: "primary" },
+      ],
+      params: { WP: 20e-6, WN: 10e-6, L: 1e-6 },
     },
   },
   models: {
