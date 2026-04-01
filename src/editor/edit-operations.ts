@@ -9,6 +9,7 @@
 
 import type { CircuitElement } from "@/core/element";
 import type { Rotation } from "@/core/pin";
+import { pinWorldPosition } from "@/core/pin";
 import { Wire, Circuit } from "@/core/circuit";
 import type { ComponentDefinition } from "@/core/registry";
 import { PropertyBag } from "@/core/properties";
@@ -335,23 +336,125 @@ export function pasteFromClipboard(
 }
 
 // ---------------------------------------------------------------------------
+// Wire punch-out — remove wire segments that pass under a placed component
+// ---------------------------------------------------------------------------
+
+/**
+ * Detect wires that should be "punched out" when a component is placed.
+ *
+ * When 2+ pins of a newly placed component land on the same wire, the segment
+ * between those pins is redundant (the component body bridges them). This
+ * function finds such wires and returns the replacement: the original wire is
+ * removed and stub segments connecting to the outermost pins are added.
+ *
+ * Only considers axis-aligned wires where pins lie strictly on the wire's
+ * interior or endpoints.
+ */
+function computeWirePunchOuts(
+  circuit: Circuit,
+  element: CircuitElement,
+): { removed: Wire[]; added: Wire[] } {
+  const pins = element.getPins();
+  if (pins.length < 2) return { removed: [], added: [] };
+
+  // Collect world-space pin positions
+  const pinPositions = pins.map(pin => pinWorldPosition(element, pin));
+
+  const removed: Wire[] = [];
+  const added: Wire[] = [];
+
+  for (const wire of circuit.wires) {
+    const sx = wire.start.x, sy = wire.start.y;
+    const ex = wire.end.x, ey = wire.end.y;
+    const isH = sy === ey;
+    const isV = sx === ex;
+    if (!isH && !isV) continue;
+
+    // Find all pins that lie on this wire (on its interior or endpoints)
+    const pinsOnWire: { x: number; y: number }[] = [];
+    for (const pp of pinPositions) {
+      if (isH && pp.y === sy) {
+        const minX = Math.min(sx, ex), maxX = Math.max(sx, ex);
+        if (pp.x >= minX && pp.x <= maxX) {
+          pinsOnWire.push(pp);
+        }
+      } else if (isV && pp.x === sx) {
+        const minY = Math.min(sy, ey), maxY = Math.max(sy, ey);
+        if (pp.y >= minY && pp.y <= maxY) {
+          pinsOnWire.push(pp);
+        }
+      }
+    }
+
+    if (pinsOnWire.length < 2) continue;
+
+    // 2+ pins on this wire — punch out the segment between outermost pins.
+    // Keep stubs from wire endpoints to the outermost pins.
+    removed.push(wire);
+
+    if (isH) {
+      const pinXs = pinsOnWire.map(p => p.x).sort((a, b) => a - b);
+      const innerMin = pinXs[0]!;
+      const innerMax = pinXs[pinXs.length - 1]!;
+      const wireMin = Math.min(sx, ex);
+      const wireMax = Math.max(sx, ex);
+
+      // Left stub: wire start → first pin
+      if (wireMin < innerMin) {
+        added.push(new Wire({ x: wireMin, y: sy }, { x: innerMin, y: sy }, wire.bitWidth));
+      }
+      // Right stub: last pin → wire end
+      if (innerMax < wireMax) {
+        added.push(new Wire({ x: innerMax, y: sy }, { x: wireMax, y: sy }, wire.bitWidth));
+      }
+    } else {
+      const pinYs = pinsOnWire.map(p => p.y).sort((a, b) => a - b);
+      const innerMin = pinYs[0]!;
+      const innerMax = pinYs[pinYs.length - 1]!;
+      const wireMin = Math.min(sy, ey);
+      const wireMax = Math.max(sy, ey);
+
+      // Top stub: wire start → first pin
+      if (wireMin < innerMin) {
+        added.push(new Wire({ x: sx, y: wireMin }, { x: sx, y: innerMin }, wire.bitWidth));
+      }
+      // Bottom stub: last pin → wire end
+      if (innerMax < wireMax) {
+        added.push(new Wire({ x: sx, y: innerMax }, { x: sx, y: wireMax }, wire.bitWidth));
+      }
+    }
+  }
+
+  return { removed, added };
+}
+
+// ---------------------------------------------------------------------------
 // placeComponent
 // ---------------------------------------------------------------------------
 
 /**
  * Place a new component in the circuit.
+ * If the component's pins straddle a wire (2+ pins on the same wire),
+ * the wire segment between those pins is punched out automatically.
  * Returns a reversible EditCommand.
  */
 export function placeComponent(
   circuit: Circuit,
   element: CircuitElement,
 ): EditCommand {
+  let punchOut: { removed: Wire[]; added: Wire[] } = { removed: [], added: [] };
+
   return {
     description: "Place component",
     execute(): void {
       circuit.addElement(element);
+      punchOut = computeWirePunchOuts(circuit, element);
+      for (const w of punchOut.removed) circuit.removeWire(w);
+      for (const w of punchOut.added) circuit.addWire(w);
     },
     undo(): void {
+      for (const w of punchOut.added) circuit.removeWire(w);
+      for (const w of punchOut.removed) circuit.addWire(w);
       circuit.removeElement(element);
     },
   };

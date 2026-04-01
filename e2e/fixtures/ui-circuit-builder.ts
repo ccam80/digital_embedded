@@ -770,8 +770,20 @@ export class UICircuitBuilder {
     await input.press('Enter');
     // Close dropdown, then click fast-forward
     await this.page.locator('#btn-step-ff').click();
-    // Wait for the async stepToTime to complete
-    await this.page.waitForTimeout(200);
+
+    // Poll until the analog engine reaches the target sim-time.
+    // _executeStepFf is async (fire-and-forget from the click handler),
+    // so we must wait for coordinator.stepToTime() to actually finish.
+    const pollTimeout = 5_000; // matches coordinator.stepToTime budget
+    const pollInterval = 50;
+    const deadline = Date.now() + pollTimeout;
+    while (Date.now() < deadline) {
+      const simTime = await this.bridge<number>(
+        'bridge.getAnalogState()?.simTime ?? 0',
+      );
+      if (simTime >= targetSec - 1e-15) break; // within floating-point tolerance
+      await this.page.waitForTimeout(pollInterval);
+    }
   }
 
   /**

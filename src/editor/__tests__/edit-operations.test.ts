@@ -8,11 +8,12 @@ import {
   deleteSelection,
   copyToClipboard,
   pasteFromClipboard,
+  placeComponent,
 } from "@/editor/edit-operations";
 import { renameLabelsOnCopy } from "@/editor/label-renamer";
 import { Wire, Circuit } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
-import type { Pin, Rotation } from "@/core/pin";
+import type { Pin, Rotation, PinDirection } from "@/core/pin";
 import type { RenderContext, Rect } from "@/core/renderer-interface";
 import type { SerializedElement } from "@/core/element";
 import type { ComponentDefinition } from "@/core/registry";
@@ -141,6 +142,138 @@ describe("EditOps", () => {
     expect(circuit.elements[0]!.instanceId).not.toBe(circuit.elements[1]!.instanceId);
   });
 
+});
+
+// ---------------------------------------------------------------------------
+// Wire punch-out tests
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a stub element with pins at specified LOCAL positions.
+ * Pin world positions = element.position + pin.position (rotation=0, mirror=false).
+ */
+function makeStubWithPins(
+  posX: number,
+  posY: number,
+  pinOffsets: Array<{ x: number; y: number }>,
+): CircuitElement {
+  const id = `el-${++_idCounter}`;
+  const props = new PropertyBag();
+  const pins: Pin[] = pinOffsets.map((off, i) => ({
+    direction: "INPUT" as PinDirection,
+    position: { x: off.x, y: off.y },
+    label: `P${i}`,
+    bitWidth: 1,
+    isNegated: false,
+    isClock: false,
+    kind: "signal" as const,
+  }));
+
+  return {
+    typeId: "StubComp",
+    instanceId: id,
+    position: { x: posX, y: posY },
+    rotation: 0 as Rotation,
+    mirror: false,
+    getPins: (): readonly Pin[] => pins,
+    getProperties: (): PropertyBag => props,
+    draw: (_ctx: RenderContext): void => {},
+    getBoundingBox: (): Rect => ({ x: posX, y: posY, width: 4, height: 4 }),
+    serialize: (): SerializedElement => ({} as SerializedElement),
+    getAttribute: (_name: string): PropertyValue | undefined => undefined,
+    setAttribute: (_name: string, _value: PropertyValue): void => {},
+  };
+}
+
+describe("Wire punch-out on placeComponent", () => {
+  it("punches out a horizontal wire when 2 pins straddle it", () => {
+    const circuit = new Circuit();
+    // Horizontal wire from (0,5) to (10,5)
+    circuit.addWire(new Wire({ x: 0, y: 5 }, { x: 10, y: 5 }));
+
+    // Component at (3,5) with pins at local (0,0) and (4,0)
+    // → world pins at (3,5) and (7,5), both on the wire
+    const el = makeStubWithPins(3, 5, [{ x: 0, y: 0 }, { x: 4, y: 0 }]);
+
+    const cmd = placeComponent(circuit, el);
+    cmd.execute();
+
+    // Original wire removed, replaced by two stubs
+    expect(circuit.wires).toHaveLength(2);
+    // Left stub: (0,5)→(3,5)
+    const left = circuit.wires.find(w => w.start.x === 0 && w.end.x === 3);
+    expect(left).toBeDefined();
+    // Right stub: (7,5)→(10,5)
+    const right = circuit.wires.find(w => w.start.x === 7 && w.end.x === 10);
+    expect(right).toBeDefined();
+  });
+
+  it("punches out a vertical wire when 2 pins straddle it", () => {
+    const circuit = new Circuit();
+    // Vertical wire from (5,0) to (5,10)
+    circuit.addWire(new Wire({ x: 5, y: 0 }, { x: 5, y: 10 }));
+
+    // Component at (5,2) with pins at local (0,0) and (0,6)
+    // → world pins at (5,2) and (5,8)
+    const el = makeStubWithPins(5, 2, [{ x: 0, y: 0 }, { x: 0, y: 6 }]);
+
+    const cmd = placeComponent(circuit, el);
+    cmd.execute();
+
+    expect(circuit.wires).toHaveLength(2);
+    const top = circuit.wires.find(w => w.start.y === 0 && w.end.y === 2);
+    expect(top).toBeDefined();
+    const bottom = circuit.wires.find(w => w.start.y === 8 && w.end.y === 10);
+    expect(bottom).toBeDefined();
+  });
+
+  it("does nothing when only 1 pin touches a wire", () => {
+    const circuit = new Circuit();
+    circuit.addWire(new Wire({ x: 0, y: 5 }, { x: 10, y: 5 }));
+
+    // Only one pin on the wire
+    const el = makeStubWithPins(3, 5, [{ x: 0, y: 0 }, { x: 0, y: -3 }]);
+
+    const cmd = placeComponent(circuit, el);
+    cmd.execute();
+
+    // Wire untouched
+    expect(circuit.wires).toHaveLength(1);
+    expect(circuit.wires[0]!.start).toEqual({ x: 0, y: 5 });
+    expect(circuit.wires[0]!.end).toEqual({ x: 10, y: 5 });
+  });
+
+  it("pins at wire endpoints produce no stubs (full consumption)", () => {
+    const circuit = new Circuit();
+    // Wire from (3,5) to (7,5) — exactly matching the pin positions
+    circuit.addWire(new Wire({ x: 3, y: 5 }, { x: 7, y: 5 }));
+
+    const el = makeStubWithPins(3, 5, [{ x: 0, y: 0 }, { x: 4, y: 0 }]);
+
+    const cmd = placeComponent(circuit, el);
+    cmd.execute();
+
+    // Entire wire consumed, no stubs (stubs would be zero-length, filtered by addWire)
+    expect(circuit.wires).toHaveLength(0);
+  });
+
+  it("undo restores the original wire", () => {
+    const circuit = new Circuit();
+    const origWire = new Wire({ x: 0, y: 5 }, { x: 10, y: 5 });
+    circuit.addWire(origWire);
+
+    const el = makeStubWithPins(3, 5, [{ x: 0, y: 0 }, { x: 4, y: 0 }]);
+
+    const cmd = placeComponent(circuit, el);
+    cmd.execute();
+    expect(circuit.wires).toHaveLength(2);
+    expect(circuit.elements).toHaveLength(1);
+
+    cmd.undo();
+    expect(circuit.elements).toHaveLength(0);
+    expect(circuit.wires).toHaveLength(1);
+    expect(circuit.wires[0]).toBe(origWire);
+  });
 });
 
 // ---------------------------------------------------------------------------

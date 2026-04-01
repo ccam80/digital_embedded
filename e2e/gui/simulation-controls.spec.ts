@@ -12,8 +12,8 @@ test.describe('GUI: simulation controls', () => {
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
   });
 
-  test('Step-by button is clickable and does not crash', async ({ page }) => {
-    const stepBtn = page.locator('#btn-step-by');
+  test('Step-time dropdown button is clickable and shows dropdown', async ({ page }) => {
+    const stepBtn = page.locator('#btn-step-time');
     await expect(stepBtn).toBeVisible();
     await stepBtn.click();
 
@@ -59,8 +59,12 @@ test.describe('GUI: simulation controls', () => {
 
   test('Speed controls exist', async ({ page }) => {
     const speedInput = page.locator('#speed-input');
-    const stepByBtn = page.locator('#btn-step-by');
+    const stepTimeBtn = page.locator('#btn-step-time');
+    const stepToBtn = page.locator('#btn-step-to');
+    const stepFfBtn = page.locator('#btn-step-ff');
     await expect(speedInput).toBeVisible();
-    await expect(stepByBtn).toBeVisible();
+    await expect(stepTimeBtn).toBeVisible();
+    await expect(stepToBtn).toBeVisible();
+    await expect(stepFfBtn).toBeVisible();
   });
 });

@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1774954524188,
+  "lastScanned": 1775040969991,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -82,7 +82,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1774954524149,
+      "lastAccessed": 1775040969927,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -94,7 +94,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 5,
-      "lastAccessed": 1774954524150,
+      "lastAccessed": 1775040969927,
       "keyFiles": [
         "simulator.html",
         "tutorial-editor.html",
@@ -106,22 +106,21 @@
     "e2e": {
       "path": "e2e",
       "purpose": null,
-      "fileCount": 2,
-      "lastAccessed": 1774954524150,
+      "fileCount": 1,
+      "lastAccessed": 1775040969928,
       "keyFiles": [
-        "pin-map-discovery.spec.ts",
-        "wire-capture.spec.ts"
+        "pin-map-discovery.spec.ts"
       ]
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 11,
-      "lastAccessed": 1774954524150,
+      "lastAccessed": 1775040969928,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
-        "buckbjt.dig",
+        "buckbjt.dts",
         "chained_inverters.dig",
         "dcswitchlrc.dig"
       ]
@@ -130,28 +129,28 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1774954524151,
+      "lastAccessed": 1775040969929,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774954524151,
+      "lastAccessed": 1775040969929,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1774954524151,
+      "lastAccessed": 1775040969967,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 19,
-      "lastAccessed": 1774954524151,
+      "lastAccessed": 1775040969968,
       "keyFiles": [
         "circuit-cli.ts",
         "circuit-mcp-server.ts",
@@ -163,21 +162,21 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 11,
-      "lastAccessed": 1774954524152,
+      "fileCount": 12,
+      "lastAccessed": 1775040969968,
       "keyFiles": [
         "analog-snapshot-analysis.md",
         "app-modules-test-plan.md",
+        "e2e-fix-plan.md",
         "master-circuit-assertions.md",
-        "ngspice-refs-complete.md",
-        "phase-1-master1-digital.md"
+        "ngspice-refs-complete.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1774954524152,
+      "lastAccessed": 1775040969968,
       "keyFiles": [
         "main.ts"
       ]
@@ -186,14 +185,14 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1774954524152,
+      "lastAccessed": 1775040969969,
       "keyFiles": []
     },
     "tutorials": {
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1774954524152,
+      "lastAccessed": 1775040969969,
       "keyFiles": [
         "index.json"
       ]
@@ -202,29 +201,29 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1774954524153,
+      "lastAccessed": 1775040969970,
       "keyFiles": [
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js",
-        "simulator-B8q6kG16.js"
+        "simulator-BEf2mJxI.js"
       ]
     },
     "e2e\\fixtures": {
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
-      "fileCount": 4,
-      "lastAccessed": 1774954524153,
+      "fileCount": 8,
+      "lastAccessed": 1775040969970,
       "keyFiles": [
         "harness.html",
-        "simulator-harness.ts",
-        "spice-reference-values.json"
+        "master1-digital.dts",
+        "master1-export.dts"
       ]
     },
     "src\\app": {
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 24,
-      "lastAccessed": 1774954524172,
+      "lastAccessed": 1775040969972,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -235,7 +234,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1774954524172,
+      "lastAccessed": 1775040969973,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -246,39 +245,39 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1774954524172,
+      "lastAccessed": 1775040969973,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 295,
-      "lastAccessed": 1775016759583,
+      "accessCount": 296,
+      "lastAccessed": 1775041803305,
       "type": "file"
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 162,
-      "lastAccessed": 1775032112384,
+      "accessCount": 165,
+      "lastAccessed": 1775041918704,
       "type": "file"
     },
     {
       "path": "",
-      "accessCount": 132,
-      "lastAccessed": 1775037817008,
+      "accessCount": 133,
+      "lastAccessed": 1775041733943,
       "type": "directory"
+    },
+    {
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 82,
+      "lastAccessed": 1775041830801,
+      "type": "file"
     },
     {
       "path": "spec\\bridge-and-hot-loadable-params.md",
       "accessCount": 80,
       "lastAccessed": 1774907196293,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 77,
-      "lastAccessed": 1775021359634,
       "type": "file"
     },
     {
@@ -288,15 +287,15 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 66,
-      "lastAccessed": 1775010747014,
+      "path": "src\\compile\\compile.ts",
+      "accessCount": 67,
+      "lastAccessed": 1775041937639,
       "type": "file"
     },
     {
-      "path": "src\\compile\\compile.ts",
-      "accessCount": 64,
-      "lastAccessed": 1775022342786,
+      "path": "src\\solver\\analog\\digital-pin-model.ts",
+      "accessCount": 66,
+      "lastAccessed": 1775010747014,
       "type": "file"
     },
     {
@@ -312,6 +311,12 @@
       "type": "file"
     },
     {
+      "path": "src\\compile\\types.ts",
+      "accessCount": 38,
+      "lastAccessed": 1775041971692,
+      "type": "file"
+    },
+    {
       "path": "spec\\.context\\rules.md",
       "accessCount": 37,
       "lastAccessed": 1774953177982,
@@ -321,12 +326,6 @@
       "path": "spec\\test-baseline.md",
       "accessCount": 37,
       "lastAccessed": 1774953182598,
-      "type": "file"
-    },
-    {
-      "path": "src\\compile\\types.ts",
-      "accessCount": 35,
-      "lastAccessed": 1775016157490,
       "type": "file"
     },
     {

@@ -65,7 +65,8 @@
       "WebFetch(domain:maker.pro)",
       "WebFetch(domain:newscienceview.blogspot.com)",
       "WebFetch(domain:forum.allaboutcircuits.com)",
-      "WebFetch(domain:www.vishay.com)"
+      "WebFetch(domain:www.vishay.com)",
+      "mcp__circuit-simulator__circuit_describe_file"
     ]
   },
   "enableAllProjectMcpServers": true,

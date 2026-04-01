@@ -58,7 +58,9 @@ test.describe('GUI: application loads', () => {
       'btn-tb-fit',
       'btn-tb-run',
       'btn-tb-stop',
-      'btn-step-by',
+      'btn-step-to',
+      'btn-step-time',
+      'btn-step-ff',
     ]) {
       await expect(page.locator(`#${id}`)).toBeVisible();
     }

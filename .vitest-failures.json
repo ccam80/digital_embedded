@@ -1,47 +1,10 @@
 {
   "summary": {
-    "passed": 9908,
-    "failed": 7,
+    "passed": 15,
+    "failed": 0,
     "skipped": 0,
-    "totalFiles": 330,
-    "durationSeconds": 11.5
+    "totalFiles": 1,
+    "durationSeconds": 0.4
   },
-  "failures": [
-    {
-      "message": "expected [ { type: 'sim-signals', …(2) } ] to deep equally contain { type: 'sim-signals', …(1) }",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\io\\__tests__\\postmessage-adapter.test.ts",
-          "test": "sim-read-all-signals delegates to hooks.readAllSignals when provided",
-          "line": 542,
-          "column": 18
-        }
-      ]
-    },
-    {
-      "message": "expected null to be type of 'number'",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-          "test": "returns continuous-style frame result with simTimeGoal",
-          "line": 179,
-          "column": 32
-        }
-      ]
-    },
-    {
-      "message": "expected null to be close to 0.0001, received difference is 0.0001, but expected 5e-16",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
-          "test": "speed change is reflected in simTimeGoal",
-          "line": 192,
-          "column": 32
-        }
-      ]
-    }
-  ]
+  "failures": []
 }
