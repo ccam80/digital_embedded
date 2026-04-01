@@ -419,7 +419,7 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.setComponentProperty('D1', 'value', 1);
     await builder.placeLabeled('Const', 3, 14, 'D2');
     await builder.setComponentProperty('D2', 'value', 0);
-    await builder.placeLabeled('Const', 3, 17, 'D3');
+    await builder.placeLabeled('Const', 3, 18, 'D3');
     await builder.setComponentProperty('D3', 'value', 1);
 
     // --- DAC (4-bit) ---
@@ -462,7 +462,7 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.drawWireFromPinExplicit('DAC1', 'GND', 17, 22);
 
     // Digital const inputs → DAC data pins
-    await builder.drawWireExplicit('DAC1', 'D3', 'D3', 'out', [[9, 16], [9, 17]]);
+    await builder.drawWireExplicit('D3', 'out', 'DAC1', 'D3');
     await builder.drawWireExplicit('DAC1', 'D2', 'D2', 'out', [[13, 15], [11, 14], [11, 15]]);
     await builder.drawWireExplicit('DAC1', 'D1', 'D1', 'out', [[12, 14], [12, 11]]);
     await builder.drawWireExplicit('D0', 'out', 'DAC1', 'D0', [[5, 8], [5, 10], [13, 10], [13, 13]]);

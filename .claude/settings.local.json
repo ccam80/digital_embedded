@@ -39,7 +39,12 @@
       "mcp__plugin_oh-my-claudecode_t__state_write",
       "mcp__plugin_oh-my-claudecode_t__lsp_document_symbols",
       "mcp__circuit-simulator__circuit_dc_op",
-      "Skill(claude-orchestrator:review-spec)"
+      "Skill(claude-orchestrator:review-spec)",
+      "WebFetch(domain:ltwiki.org)",
+      "WebFetch(domain:www.ti.com)",
+      "WebFetch(domain:www2.seas.gwu.edu)",
+      "WebFetch(domain:www.onsemi.com)",
+      "WebFetch(domain:physics.uncg.edu)"
     ]
   },
   "enableAllProjectMcpServers": true,

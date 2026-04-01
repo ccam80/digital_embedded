@@ -22,7 +22,7 @@ import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
-import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
+import { PropertyBag, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -84,6 +84,62 @@ export const { defaults: BJT_PNP_DEFAULTS } = defineModelParams({
     VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
   },
 });
+
+// ---------------------------------------------------------------------------
+// Built-in NPN model presets (SPICE parameters from datasheets)
+// ---------------------------------------------------------------------------
+
+/** Small signal general purpose NPN. */
+const NPN_2N3904: Record<string, number> = {
+  IS: 6.734e-15, BF: 416.4, NF: 1.002, BR: 0.7389, NR: 1,
+  VAF: 74.03, IKF: 0.06678, IKR: 0, ISE: 6.734e-15, ISC: 0, VAR: 28,
+};
+
+/** Small signal NPN (European). */
+const NPN_BC547: Record<string, number> = {
+  IS: 1.8e-14, BF: 400, NF: 0.9955, BR: 35.5, NR: 1.005,
+  VAF: 80, IKF: 0.2, IKR: 0.003, ISE: 5.0e-14, ISC: 0, VAR: Infinity,
+};
+
+/** General purpose NPN. */
+const NPN_2N2222: Record<string, number> = {
+  IS: 14.34e-15, BF: 255.9, NF: 1, BR: 6.092, NR: 1,
+  VAF: 74.03, IKF: 0.2847, IKR: 0, ISE: 14.34e-15, ISC: 0, VAR: 28,
+};
+
+/** Medium power NPN. */
+const NPN_2N2219A: Record<string, number> = {
+  IS: 14.34e-15, BF: 150, NF: 1, BR: 7.5, NR: 1,
+  VAF: 100, IKF: 0.3, IKR: 0, ISE: 0, ISC: 0, VAR: Infinity,
+};
+
+// ---------------------------------------------------------------------------
+// Built-in PNP model presets
+// ---------------------------------------------------------------------------
+
+/** Small signal general purpose PNP (complement of 2N3904). */
+const PNP_2N3906: Record<string, number> = {
+  IS: 1.41e-15, BF: 180.7, NF: 1, BR: 4.977, NR: 1,
+  VAF: 18.7, IKF: 0.08, IKR: 0, ISE: 0, ISC: 0, VAR: Infinity,
+};
+
+/** Small signal PNP (complement of BC547). */
+const PNP_BC557: Record<string, number> = {
+  IS: 2.0e-14, BF: 330, NF: 1, BR: 20, NR: 1,
+  VAF: 50, IKF: 0.1, IKR: 0.005, ISE: 3.2e-14, ISC: 0, VAR: Infinity,
+};
+
+/** General purpose PNP (complement of 2N2222). */
+const PNP_2N2907: Record<string, number> = {
+  IS: 6.5e-15, BF: 200, NF: 1, BR: 4, NR: 1,
+  VAF: 115, IKF: 0.3, IKR: 0, ISE: 0, ISC: 0, VAR: Infinity,
+};
+
+/** Medium power PNP. */
+const PNP_TIP32C: Record<string, number> = {
+  IS: 1.2e-12, BF: 50, NF: 1, BR: 4, NR: 1,
+  VAF: 60, IKF: 3, IKR: 0, ISE: 1e-10, ISC: 0, VAR: Infinity,
+};
 
 // ---------------------------------------------------------------------------
 // Stamp helpers — node 0 is ground (skipped)
@@ -632,6 +688,34 @@ export const NpnBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_PARAM_DEFS,
       params: BJT_NPN_DEFAULTS,
     },
+    "2N3904": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+        createBjtElement(1, pinNodes, branchIdx, props),
+      paramDefs: BJT_PARAM_DEFS,
+      params: NPN_2N3904,
+    },
+    "BC547": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+        createBjtElement(1, pinNodes, branchIdx, props),
+      paramDefs: BJT_PARAM_DEFS,
+      params: NPN_BC547,
+    },
+    "2N2222": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+        createBjtElement(1, pinNodes, branchIdx, props),
+      paramDefs: BJT_PARAM_DEFS,
+      params: NPN_2N2222,
+    },
+    "2N2219A": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+        createBjtElement(1, pinNodes, branchIdx, props),
+      paramDefs: BJT_PARAM_DEFS,
+      params: NPN_2N2219A,
+    },
   },
   defaultModel: "behavioral",
 };
@@ -656,6 +740,34 @@ export const PnpBjtDefinition: ComponentDefinition = {
         createBjtElement(-1, pinNodes, branchIdx, props),
       paramDefs: BJT_PARAM_DEFS,
       params: BJT_PNP_DEFAULTS,
+    },
+    "2N3906": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+        createBjtElement(-1, pinNodes, branchIdx, props),
+      paramDefs: BJT_PARAM_DEFS,
+      params: PNP_2N3906,
+    },
+    "BC557": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+        createBjtElement(-1, pinNodes, branchIdx, props),
+      paramDefs: BJT_PARAM_DEFS,
+      params: PNP_BC557,
+    },
+    "2N2907": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+        createBjtElement(-1, pinNodes, branchIdx, props),
+      paramDefs: BJT_PARAM_DEFS,
+      params: PNP_2N2907,
+    },
+    "TIP32C": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
+        createBjtElement(-1, pinNodes, branchIdx, props),
+      paramDefs: BJT_PARAM_DEFS,
+      params: PNP_TIP32C,
     },
   },
   defaultModel: "behavioral",

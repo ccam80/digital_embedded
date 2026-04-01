@@ -1,8 +1,7 @@
 /**
  * Tests for createTestBridge — lightweight coordinate and state API for E2E tests.
  *
- * Covers the renamed getCircuitDomain() method (was getEngineType) and the
- * updated getAnalogState() that reads from the SimulationCoordinator.
+ * Covers getAnalogState() that reads from the SimulationCoordinator.
  */
 
 import { describe, it, expect } from "vitest";
@@ -43,66 +42,7 @@ function makePalette(): ComponentPalette {
   return {} as unknown as ComponentPalette;
 }
 
-// ---------------------------------------------------------------------------
-// getCircuitDomain tests
-// ---------------------------------------------------------------------------
-
 describe("createTestBridge", () => {
-  describe("getCircuitDomain", () => {
-    it("returns 'digital' when all circuit elements have only digital models", () => {
-      const circuit = new Circuit();
-      const coordinator = new MockCoordinator();
-
-      const bridge: TestBridge = createTestBridge(
-        circuit,
-        makeViewport(),
-        makeCanvas(),
-        makePalette(),
-        makeRegistry(),
-        () => coordinator,
-      );
-
-      expect(bridge.getCircuitDomain()).toBe('digital');
-    });
-
-    it("returns 'digital' for empty circuit", () => {
-      const circuit = new Circuit();
-      const coordinator = new MockCoordinator();
-
-      const bridge: TestBridge = createTestBridge(
-        circuit,
-        makeViewport(),
-        makeCanvas(),
-        makePalette(),
-        makeRegistry(),
-        () => coordinator,
-      );
-
-      expect(bridge.getCircuitDomain()).toBe('digital');
-    });
-
-    it("TestBridge interface has getCircuitDomain, not getEngineType", () => {
-      const circuit = new Circuit();
-      const coordinator = new MockCoordinator();
-
-      const bridge: TestBridge = createTestBridge(
-        circuit,
-        makeViewport(),
-        makeCanvas(),
-        makePalette(),
-        makeRegistry(),
-        () => coordinator,
-      );
-
-      expect(typeof bridge.getCircuitDomain).toBe('function');
-      expect('getEngineType' in bridge).toBe(false);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // getAnalogState tests
-  // -------------------------------------------------------------------------
-
   describe("getAnalogState", () => {
     it("returns null when no circuit is compiled (NullSimulationCoordinator)", () => {
       const circuit = new Circuit();

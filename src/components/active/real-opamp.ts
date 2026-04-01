@@ -682,14 +682,6 @@ export function createRealOpAmpElement(
 
 const REAL_OPAMP_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "model",
-    type: PropertyType.STRING,
-    label: "Model",
-    defaultValue: "",
-    description:
-      "Named op-amp model (741, LM358, TL072, OPA2134). When set, overrides aol/gbw/slewRate/vos/iBias.",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -754,6 +746,18 @@ export const RealOpAmpDefinition: ComponentDefinition = {
       paramDefs: REAL_OPAMP_PARAM_DEFS,
       params: REAL_OPAMP_DEFAULTS,
     },
+    ...Object.fromEntries(
+      Object.entries(REAL_OPAMP_MODELS).map(([name, params]) => [
+        name,
+        {
+          kind: "inline" as const,
+          factory: (pinNodes: number[], _internalNodeIds: number[], _branchIdx: number, props: PropertyBag) =>
+            createRealOpAmpElement(pinNodes, props),
+          paramDefs: REAL_OPAMP_PARAM_DEFS,
+          params,
+        },
+      ]),
+    ),
   },
   defaultModel: "behavioral",
 };

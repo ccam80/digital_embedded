@@ -393,6 +393,9 @@ export function initSimulationController(
             _lastSpeedWarningTime = now2;
             ctx.showStatus('Simulation running slower than requested speed');
           }
+        } else if (_lastSpeedWarningTime > 0) {
+          _lastSpeedWarningTime = 0;
+          ctx.clearStatus();
         }
       } catch (err) {
         ctx.showStatus(`Simulation error: ${err instanceof Error ? err.message : String(err)}`, true);

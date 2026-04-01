@@ -6,7 +6,7 @@
  * - All circuit mutations use real mouse/keyboard events via Playwright
  * - The test bridge (`window.__test`) is used ONLY for:
  *     - Coordinate queries (worldToScreen, getPinPosition, getCanvasRect)
- *     - Circuit state reads (getCircuitInfo, getAnalogState, getCircuitDomain)
+ *     - Circuit state reads (getCircuitInfo, getAnalogState)
  *   It is NEVER used to mutate circuit state.
  * - No `page.evaluate(() => button.click())` — use Playwright locators/mouse
  * - No conditional fallbacks that silently pass on failure
@@ -113,10 +113,6 @@ export class UICircuitBuilder {
   }
 
   /** Get circuit domain derived from circuit component models ('analog' | 'digital'). */
-  async getCircuitDomain(): Promise<string> {
-    return this.bridge('bridge.getCircuitDomain()');
-  }
-
   /**
    * Describe a component type from the registry.
    * Returns null if the type is not registered.
@@ -621,24 +617,27 @@ export class UICircuitBuilder {
   // Simulation controls
   // =========================================================================
 
-  /** Click the Step menu item (single step, in Simulation menu). */
+  /** Click the Step menu item (single step, via the Simulation menu). */
   async stepViaUI(count = 1): Promise<void> {
     for (let i = 0; i < count; i++) {
+      // Open the Simulation menu dropdown, click Step, then dismiss
+      await this.page.locator('[data-menu="sim"]').click();
       await this.page.locator('#btn-step').click();
     }
   }
 
   /**
-   * Step the simulation N times via toolbar clicks and return the final
-   * analog engine state. Each step clicks the real Step button — the same
-   * code path a user would use. Returns null if no analog engine is active.
+   * Step the simulation N times via the test bridge and return the final
+   * analog engine state. Uses the bridge's stepN for efficiency (avoids
+   * opening the Simulation menu N times). Returns null if no analog engine
+   * is active.
    */
   async stepAndReadAnalog(steps: number): Promise<{
     simTime: number;
     nodeVoltages: Record<string, number>;
     nodeCount: number;
   } | null> {
-    await this.stepViaUI(steps);
+    await this.page.evaluate((n) => (window as any).__test?.stepN(n), steps);
     return this.getAnalogState();
   }
 

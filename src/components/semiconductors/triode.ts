@@ -31,7 +31,7 @@ import type { Rect } from "../../core/renderer-interface.js";
 import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
-import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
+import { PropertyBag, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -413,13 +413,6 @@ function buildTriodePinDeclarations(): PinDeclaration[] {
 
 const TRIODE_PROPERTY_DEFS: PropertyDefinition[] = [
   LABEL_PROPERTY_DEF,
-  {
-    key: "model",
-    type: PropertyType.STRING,
-    label: "Model",
-    defaultValue: "behavioral",
-    description: "Active model selection",
-  },
 ];
 
 // ---------------------------------------------------------------------------

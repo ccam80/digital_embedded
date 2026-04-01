@@ -61,9 +61,6 @@ export interface TestBridge {
   /** Get current viewport state. */
   getViewport(): { zoom: number; panX: number; panY: number };
 
-  /** Get circuit domain derived from circuit component models ('analog' | 'digital'). */
-  getCircuitDomain(): string;
-
   /**
    * Get analog engine state: simTime, node voltages by label and index.
    * Returns null if no analog engine is active.
@@ -104,6 +101,9 @@ export interface TestBridge {
    * Returns null if no scope panel is active or no data has been collected.
    */
   getTraceStats(): Array<{ label: string; min: number; max: number; mean: number }> | null;
+
+  /** Step the simulation N times directly (no UI interaction). */
+  stepN(count: number): void;
 
   /** Resolve a component name or alias to its canonical registry name. Returns null if not found. */
   resolveComponentName(nameOrAlias: string): string | null;
@@ -226,22 +226,17 @@ export function createTestBridge(
       return allStats.length === 0 ? null : allStats;
     },
 
+    stepN(count: number): void {
+      const coordinator = coordinatorGetter();
+      for (let i = 0; i < count; i++) {
+        coordinator.advanceClocks();
+        coordinator.step();
+      }
+    },
+
     resolveComponentName(nameOrAlias: string): string | null {
       const def = registry.get(nameOrAlias);
       return def ? def.name : null;
-    },
-
-    getCircuitDomain() {
-      const hasAnalogOnly = circuit.elements.some(el => {
-        const def = registry.get(el.typeId);
-        if (def === undefined) return false;
-        try {
-          return def.models?.digital === undefined;
-        } catch {
-          return false;
-        }
-      });
-      return hasAnalogOnly ? 'analog' : 'digital';
     },
 
     getAnalogState() {

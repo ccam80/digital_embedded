@@ -23,7 +23,7 @@ import type { PinVoltageAccess } from "../../core/pin-voltage-access.js";
 import { drawColoredLead } from "../draw-helpers.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import { PinDirection } from "../../core/pin.js";
-import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
+import { PropertyBag, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
   ComponentCategory,
@@ -335,13 +335,6 @@ function buildPJfetPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 const JFET_PROPERTY_DEFS: PropertyDefinition[] = [
-  {
-    key: "model",
-    type: PropertyType.STRING,
-    label: "Model",
-    defaultValue: "behavioral",
-    description: "Active model selection",
-  },
   LABEL_PROPERTY_DEF,
 ];
 
