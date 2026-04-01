@@ -86,59 +86,61 @@ export const { defaults: BJT_PNP_DEFAULTS } = defineModelParams({
 });
 
 // ---------------------------------------------------------------------------
-// Built-in NPN model presets (SPICE parameters from datasheets)
+// Built-in NPN model presets
+// Sources: Fairchild/Philips/NXP extracted models from LTspice standard.bjt
 // ---------------------------------------------------------------------------
 
-/** Small signal general purpose NPN. */
+/** Small signal general purpose NPN. Source: Fairchild extracted. */
 const NPN_2N3904: Record<string, number> = {
-  IS: 6.734e-15, BF: 416.4, NF: 1.002, BR: 0.7389, NR: 1,
-  VAF: 74.03, IKF: 0.06678, IKR: 0, ISE: 6.734e-15, ISC: 0, VAR: 28,
+  IS: 6.734e-15, BF: 416.4, NF: 1.0, BR: 0.7371, NR: 1.0,
+  VAF: 74.03, IKF: 0.06678, IKR: 0, ISE: 6.734e-15, ISC: 0, VAR: 100,
 };
 
-/** Small signal NPN (European). */
-const NPN_BC547: Record<string, number> = {
-  IS: 1.8e-14, BF: 400, NF: 0.9955, BR: 35.5, NR: 1.005,
-  VAF: 80, IKF: 0.2, IKR: 0.003, ISE: 5.0e-14, ISC: 0, VAR: Infinity,
+/** Small signal NPN (European, B-grade). Source: NXP extracted. */
+const NPN_BC547B: Record<string, number> = {
+  IS: 2.39e-14, BF: 294.3, NF: 1.008, BR: 7.946, NR: 1.004,
+  VAF: 63.2, IKF: 0.1357, IKR: 0.1144, ISE: 3.545e-15, ISC: 6.272e-14, VAR: 25.9,
 };
 
-/** General purpose NPN. */
-const NPN_2N2222: Record<string, number> = {
-  IS: 14.34e-15, BF: 255.9, NF: 1, BR: 6.092, NR: 1,
-  VAF: 74.03, IKF: 0.2847, IKR: 0, ISE: 14.34e-15, ISC: 0, VAR: 28,
+/** General purpose NPN. Source: Fairchild extracted. */
+const NPN_2N2222A: Record<string, number> = {
+  IS: 14.34e-15, BF: 255.9, NF: 1.0, BR: 6.092, NR: 1.0,
+  VAF: 74.03, IKF: 0.2847, IKR: 0, ISE: 14.34e-15, ISC: 0, VAR: 100,
 };
 
-/** Medium power NPN. */
+/** Medium power NPN (TO-39, same die as 2N2222A). Source: Philips/LTspice. */
 const NPN_2N2219A: Record<string, number> = {
-  IS: 14.34e-15, BF: 150, NF: 1, BR: 7.5, NR: 1,
-  VAF: 100, IKF: 0.3, IKR: 0, ISE: 0, ISC: 0, VAR: Infinity,
+  IS: 14.34e-15, BF: 255.9, NF: 1.0, BR: 6.092, NR: 1.0,
+  VAF: 74.03, IKF: 0.2847, IKR: 0, ISE: 14.34e-15, ISC: 0, VAR: 100,
 };
 
 // ---------------------------------------------------------------------------
 // Built-in PNP model presets
+// Sources: Fairchild/Philips/NXP extracted models, Central Semiconductor
 // ---------------------------------------------------------------------------
 
-/** Small signal general purpose PNP (complement of 2N3904). */
+/** Small signal PNP (complement of 2N3904). Source: Fairchild extracted. */
 const PNP_2N3906: Record<string, number> = {
-  IS: 1.41e-15, BF: 180.7, NF: 1, BR: 4.977, NR: 1,
-  VAF: 18.7, IKF: 0.08, IKR: 0, ISE: 0, ISC: 0, VAR: Infinity,
+  IS: 1.41e-15, BF: 180.7, NF: 1.0, BR: 4.977, NR: 1.0,
+  VAF: 18.7, IKF: 0.08, IKR: 0, ISE: 0, ISC: 0, VAR: 100,
 };
 
-/** Small signal PNP (complement of BC547). */
-const PNP_BC557: Record<string, number> = {
-  IS: 2.0e-14, BF: 330, NF: 1, BR: 20, NR: 1,
-  VAF: 50, IKF: 0.1, IKR: 0.005, ISE: 3.2e-14, ISC: 0, VAR: Infinity,
+/** Small signal PNP (European, B-grade, complement of BC547B). Source: NXP extracted. */
+const PNP_BC557B: Record<string, number> = {
+  IS: 3.83e-14, BF: 344.4, NF: 1.008, BR: 14.84, NR: 1.005,
+  VAF: 21.11, IKF: 0.08039, IKR: 0.047, ISE: 1.22e-14, ISC: 2.85e-13, VAR: 32.02,
 };
 
-/** General purpose PNP (complement of 2N2222). */
-const PNP_2N2907: Record<string, number> = {
-  IS: 6.5e-15, BF: 200, NF: 1, BR: 4, NR: 1,
-  VAF: 115, IKF: 0.3, IKR: 0, ISE: 0, ISC: 0, VAR: Infinity,
+/** General purpose PNP (complement of 2N2222). Source: Philips extracted. */
+const PNP_2N2907A: Record<string, number> = {
+  IS: 650.6e-18, BF: 231.7, NF: 1.0, BR: 3.563, NR: 1.0,
+  VAF: 115.7, IKF: 1.079, IKR: 0, ISE: 54.81e-15, ISC: 0, VAR: 100,
 };
 
-/** Medium power PNP. */
+/** Medium power PNP. Source: Central Semiconductor Corp TIP32C.LIB. */
 const PNP_TIP32C: Record<string, number> = {
-  IS: 1.2e-12, BF: 50, NF: 1, BR: 4, NR: 1,
-  VAF: 60, IKF: 3, IKR: 0, ISE: 1e-10, ISC: 0, VAR: Infinity,
+  IS: 1.8111e-12, BF: 526.98, NF: 1.0, BR: 1.1294, NR: 1.0,
+  VAF: 100, IKF: 0.95034, IKR: 0.15869, ISE: 68.670e-12, ISC: 409.26e-9, VAR: 100,
 };
 
 // ---------------------------------------------------------------------------
@@ -695,19 +697,19 @@ export const NpnBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_PARAM_DEFS,
       params: NPN_2N3904,
     },
-    "BC547": {
+    "BC547B": {
       kind: "inline",
       factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
         createBjtElement(1, pinNodes, branchIdx, props),
       paramDefs: BJT_PARAM_DEFS,
-      params: NPN_BC547,
+      params: NPN_BC547B,
     },
-    "2N2222": {
+    "2N2222A": {
       kind: "inline",
       factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
         createBjtElement(1, pinNodes, branchIdx, props),
       paramDefs: BJT_PARAM_DEFS,
-      params: NPN_2N2222,
+      params: NPN_2N2222A,
     },
     "2N2219A": {
       kind: "inline",
@@ -748,19 +750,19 @@ export const PnpBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_PARAM_DEFS,
       params: PNP_2N3906,
     },
-    "BC557": {
+    "BC557B": {
       kind: "inline",
       factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
         createBjtElement(-1, pinNodes, branchIdx, props),
       paramDefs: BJT_PARAM_DEFS,
-      params: PNP_BC557,
+      params: PNP_BC557B,
     },
-    "2N2907": {
+    "2N2907A": {
       kind: "inline",
       factory: (pinNodes, _internalNodeIds, branchIdx, props, _getTime) =>
         createBjtElement(-1, pinNodes, branchIdx, props),
       paramDefs: BJT_PARAM_DEFS,
-      params: PNP_2N2907,
+      params: PNP_2N2907A,
     },
     "TIP32C": {
       kind: "inline",

@@ -541,7 +541,7 @@ describe("RealOpAmp", () => {
     expect(preset.aol).toBe(200000);
     expect(preset.gbw).toBe(1e6);
     expect(preset.slewRate).toBe(0.5e6);
-    expect(preset.vos).toBe(1e-3);
+    expect(preset.vos).toBe(2e-3);
 
     // Verify that creating an element with model="741" uses the preset values.
     const props = new PropertyBag([["model", "741"]]);

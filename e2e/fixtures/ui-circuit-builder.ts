@@ -617,27 +617,29 @@ export class UICircuitBuilder {
   // Simulation controls
   // =========================================================================
 
-  /** Click the Step menu item (single step, via the Simulation menu). */
+  /** Open the Simulation menu and click Step (single step). */
   async stepViaUI(count = 1): Promise<void> {
     for (let i = 0; i < count; i++) {
-      // Open the Simulation menu dropdown, click Step, then dismiss
       await this.page.locator('[data-menu="sim"]').click();
       await this.page.locator('#btn-step').click();
     }
   }
 
   /**
-   * Step the simulation N times via the test bridge and return the final
-   * analog engine state. Uses the bridge's stepN for efficiency (avoids
-   * opening the Simulation menu N times). Returns null if no analog engine
-   * is active.
+   * Advance analog simulation via the step-by UI and return the final
+   * analog engine state. Uses the step-by dropdown with a time delta,
+   * which is how a user would advance an analog circuit.
+   * @param timeOrSteps SI time string (e.g. "5m") or legacy step count (converted to 1ms)
    */
-  async stepAndReadAnalog(steps: number): Promise<{
+  async stepAndReadAnalog(timeOrSteps: number | string): Promise<{
     simTime: number;
     nodeVoltages: Record<string, number>;
     nodeCount: number;
   } | null> {
-    await this.page.evaluate((n) => (window as any).__test?.stepN(n), steps);
+    const time = typeof timeOrSteps === 'string'
+      ? timeOrSteps
+      : `${timeOrSteps * 0.005}`;  // legacy: N steps ≈ N×5µs
+    await this.stepToTimeViaUI(time);
     return this.getAnalogState();
   }
 
@@ -723,13 +725,35 @@ export class UICircuitBuilder {
    * @param targetTime - Time offset string with SI suffix (e.g. "5m", "100u", "1n")
    */
   async stepToTimeViaUI(targetTime: string): Promise<void> {
-    // Open dropdown, type custom value, press Enter
-    await this.page.locator('#btn-step-by').click();
-    await this.page.locator('#step-custom-toggle').click();
-    const input = this.page.locator('#step-custom-input');
-    await input.fill(targetTime);
-    await input.press('Enter');
-    await this.page.waitForTimeout(500);
+    // Parse target to seconds
+    const suffixes: Record<string, number> = {
+      p: 1e-12, n: 1e-9, u: 1e-6, m: 1e-3, s: 1,
+    };
+    const match = targetTime.match(/^([0-9.]+)\s*([a-z]?)$/i);
+    const targetSec = match
+      ? parseFloat(match[1]) * (suffixes[match[2].toLowerCase()] ?? 1)
+      : parseFloat(targetTime);
+
+    // Presets as [seconds, data-time attribute string]
+    const presets: [number, string][] = [
+      [1e-9, '1e-9'], [1e-8, '1e-8'], [1e-7, '1e-7'],
+      [1e-6, '1e-6'], [1e-5, '1e-5'], [1e-4, '1e-4'],
+      [1e-3, '1e-3'], [1e-2, '1e-2'], [1e-1, '1e-1'], [1, '1'],
+    ];
+
+    // Pick the largest preset <= target (or smallest if target is tiny)
+    let best = presets[0]!;
+    for (const p of presets) {
+      if (p[0] <= targetSec) best = p;
+    }
+    const clicks = Math.max(1, Math.round(targetSec / best[0]));
+
+    // Each click: open dropdown → click preset → step executes
+    for (let i = 0; i < clicks; i++) {
+      await this.page.locator('#btn-step-by').click();
+      await this.page.locator(`.step-preset[data-time="${best[1]}"]`).click();
+      await this.page.waitForTimeout(100);
+    }
   }
 
   /**

@@ -216,41 +216,79 @@ test.describe('Debug: Master 3 circuit layout', () => {
 });
 
 test.describe('Debug: Master 2 circuit layout', () => {
-  test('Master 2 — pause after wiring to verify layout', async ({ page }) => {
+  test('Master 2 — pause before assertions to verify layout', async ({ page }) => {
     const builder = new UICircuitBuilder(page);
     await builder.load();
 
-    // Copy Master 2 circuit from the spec
-    await builder.placeLabeled('DcVoltageSource', 5, 5, 'V1');
-    await builder.setComponentProperty('V1', 'voltage', 5);
-    await builder.placeLabeled('Resistor', 12, 3, 'R1');
+    // Full Master 2: switched divider, RC, opamp, BJT
+    await builder.placeLabeled('DcVoltageSource', 3, 3, 'Vs');
+    await builder.placeLabeled('In', 3, 7, 'CTRL');
+    await builder.placeLabeled('SwitchSPST', 12, 3, 'SW');
+    await builder.placeLabeled('Resistor', 20, 3, 'R1');
     await builder.setComponentProperty('R1', 'resistance', 10000);
-    await builder.placeLabeled('Resistor', 12, 8, 'R2');
+    await builder.placeLabeled('Resistor', 28, 3, 'R2');
     await builder.setComponentProperty('R2', 'resistance', 10000);
-    await builder.placeLabeled('Probe', 18, 5, 'P_DIV');
-    await builder.placeComponent('Ground', 5, 10);
-    await builder.placeComponent('Ground', 14, 10);
+    await builder.placeComponent('Ground', 3, 4);
+    await builder.placeComponent('Ground', 32, 8);
+    await builder.placeLabeled('Probe', 26, 1, 'P_DIV');
 
-    console.log('=== PAUSING: Verify Master 2 circuit layout ===');
+    await builder.placeLabeled('Resistor', 20, 11, 'R3');
+    await builder.placeLabeled('Capacitor', 28, 11, 'C1');
+    await builder.placeComponent('Ground', 32, 12);
+    await builder.placeLabeled('Probe', 26, 9, 'P_RC');
+
+    await builder.placeLabeled('OpAmp', 28, 19, 'AMP');
+    await builder.placeLabeled('Probe', 36, 19, 'P_AMP');
+
+    await builder.placeLabeled('Resistor', 20, 25, 'Rb');
+    await builder.setComponentProperty('Rb', 'resistance', 100000);
+    await builder.placeLabeled('NpnBJT', 28, 25, 'Q1');
+    await builder.placeLabeled('Resistor', 36, 24, 'Rc');
+    await builder.setComponentProperty('Rc', 'resistance', 1000);
+    await builder.placeLabeled('DcVoltageSource', 36, 30, 'Vcc');
+    await builder.setComponentProperty('Vcc', 'voltage', 12);
+    await builder.placeComponent('Ground', 32, 30);
+    await builder.placeLabeled('Probe', 44, 23, 'P_CE');
+
+    // Wiring
+    await builder.drawWireExplicit('Vs', 'pos', 'SW', 'in');
+    await builder.drawWireExplicit('CTRL', 'out', 'SW', 'ctrl', [[14, 7]]);
+    await builder.drawWireExplicit('SW', 'out', 'R1', 'A');
+    await builder.drawWireFromPinExplicit('R2', 'B', 32, 8);
+    await builder.drawWireFromPinExplicit('Vs', 'neg', 3, 4);
+    await builder.drawWireExplicit('R1', 'B', 'R2', 'A');
+    await builder.drawWireFromPinExplicit('P_DIV', 'in', 26, 3);
+    await builder.drawWireFromPinExplicit('R3', 'A', 26, 3, [[18, 11], [18, 7], [26, 7]]);
+    await builder.drawWireExplicit('R3', 'B', 'C1', 'pos');
+    await builder.drawWireFromPinExplicit('C1', 'neg', 32, 12);
+    await builder.drawWireFromPinExplicit('P_RC', 'in', 26, 11);
+    await builder.drawWireFromPinExplicit('AMP', 'in+', 26, 11, [[26, 20]]);
+    await builder.drawWireExplicit('AMP', 'in-', 'AMP', 'out', [[27, 18], [27, 15], [35, 15], [35, 19]]);
+    await builder.drawWireFromPinExplicit('P_AMP', 'in', 35, 19);
+    await builder.drawWireFromPinExplicit('Rb', 'A', 35, 19, [[19, 25], [19, 23], [35, 23]]);
+    await builder.drawWireExplicit('Rb', 'B', 'Q1', 'B');
+    await builder.drawWireExplicit('Q1', 'C', 'Rc', 'A');
+    await builder.drawWireFromPinExplicit('P_CE', 'in', 36, 24, [[36, 23]]);
+    await builder.drawWireExplicit('Rc', 'B', 'Vcc', 'pos');
+    await builder.drawWireFromPinExplicit('Q1', 'E', 32, 30);
+    await builder.drawWireFromPinExplicit('Vcc', 'neg', 32, 30);
+
+    // Compile
+    await builder.stepViaUI();
+    await builder.verifyNoErrors();
+
+    // Toggle CTRL
+    await builder.stepViaUI();
+    await builder.clickGrid(2, 7);
+
+    // Step to 50ms
+    await builder.stepToTimeViaUI('50m');
+
+    const signals = await builder.readAllSignals();
+    console.log('Master 2 signals:', JSON.stringify(signals));
+
+    console.log('=== PAUSING: Verify Master 2 circuit and voltages ===');
     await page.pause();
   });
 });
 
-test.describe('Debug: Speed button (Cat G)', () => {
-  test('speed buttons — pause to inspect UI', async ({ page }) => {
-    const builder = new UICircuitBuilder(page);
-    await builder.load();
-
-    // Place minimal circuit so we can compile
-    await builder.placeLabeled('In', 5, 5, 'A');
-    await builder.placeLabeled('Out', 15, 5, 'B');
-    await builder.drawWire('A', 'out', 'B', 'in');
-
-    // Start simulation
-    await page.locator('#btn-step').click();
-
-    // PAUSE HERE — inspect speed controls
-    console.log('=== PAUSING: Check speed UI controls ===');
-    await page.pause();
-  });
-});

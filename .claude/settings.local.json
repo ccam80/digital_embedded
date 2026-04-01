@@ -44,7 +44,19 @@
       "WebFetch(domain:www.ti.com)",
       "WebFetch(domain:www2.seas.gwu.edu)",
       "WebFetch(domain:www.onsemi.com)",
-      "WebFetch(domain:physics.uncg.edu)"
+      "WebFetch(domain:physics.uncg.edu)",
+      "WebFetch(domain:www.st.com)",
+      "WebFetch(domain:www.ele.uri.edu)",
+      "WebFetch(domain:web.ece.ucsb.edu)",
+      "WebFetch(domain:nic.vajn.icu)",
+      "WebFetch(domain:ecelabs.njit.edu)",
+      "WebFetch(domain:www.physics.wisc.edu)",
+      "WebFetch(domain:www.centralsemi.com)",
+      "WebFetch(domain:components101.com)",
+      "WebFetch(domain:www.mouser.com)",
+      "WebFetch(domain:www.diodes.com)",
+      "WebFetch(domain:www.flywing-tech.com)",
+      "WebFetch(domain:datasheet.octopart.com)"
     ]
   },
   "enableAllProjectMcpServers": true,
