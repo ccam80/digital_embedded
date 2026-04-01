@@ -250,6 +250,7 @@ function createDACElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
+  bipolar: boolean,
 ): AnalogElementCore {
   const bits   = Math.max(1, Math.min(32, props.getOrDefault<number>("bits", 8)));
   const p: Record<string, number> = {
@@ -259,7 +260,6 @@ function createDACElement(
     rIn:  props.getModelParam<number>("rIn"),
     cIn:  props.getModelParam<number>("cIn"),
   };
-  const mode   = props.getOrDefault<string>("mode", "unipolar");
   const G_out  = 1 / Math.max(p.rOut, 1e-9);
 
   const maxCode = Math.pow(2, bits);
@@ -310,7 +310,7 @@ function createDACElement(
       code |= (bit << i);
     }
 
-    if (mode === "bipolar") {
+    if (bipolar) {
       // Bipolar: symmetric, range [-vRef, +vRef]
       // V_out = vRef · (2·code/2^N - 1)
       return vRefNow * (2 * code / maxCode - 1);
@@ -419,13 +419,6 @@ const DAC_PROPERTY_DEFS: PropertyDefinition[] = [
     structural: true,
   },
   {
-    key: "mode",
-    type: PropertyType.STRING,
-    label: "Mode",
-    defaultValue: "unipolar",
-    description: "'unipolar' (0 to V_ref) or 'bipolar' (−V_ref to +V_ref). Default 'unipolar'.",
-  },
-  {
     key: "settlingTime",
     type: PropertyType.INT,
     label: "Settling time (s)",
@@ -447,7 +440,6 @@ const DAC_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const DAC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits",    propertyKey: "bits",        convert: (v) => parseInt(v, 10) },
-  { xmlName: "Mode",    propertyKey: "mode",        convert: (v) => v },
   { xmlName: "VIH",     propertyKey: "vIH",         convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "VIL",     propertyKey: "vIL",         convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "ROut",    propertyKey: "rOut",        convert: (v) => parseFloat(v), modelParam: true },
@@ -479,13 +471,20 @@ export const DACDefinition: ComponentDefinition = {
 
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "unipolar": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props) =>
-        createDACElement(pinNodes, internalNodeIds, branchIdx, props),
+        createDACElement(pinNodes, internalNodeIds, branchIdx, props, false),
+      paramDefs: DAC_PARAM_DEFS,
+      params: DAC_DEFAULTS,
+    },
+    "bipolar": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createDACElement(pinNodes, internalNodeIds, branchIdx, props, true),
       paramDefs: DAC_PARAM_DEFS,
       params: DAC_DEFAULTS,
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "unipolar",
 };

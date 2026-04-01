@@ -100,6 +100,42 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
   },
 });
 
+// ---------------------------------------------------------------------------
+// Built-in NMOS model presets
+// Sources: ON Semi MODPEX 2004, Zetex 1985, IR/Symmetry MODPEX 1996
+// All values extracted from published .SUBCKT Level 1 .MODEL MM NMOS lines.
+// ---------------------------------------------------------------------------
+
+/** Small signal NMOS (TO-92, 60V/200mA). Source: ON Semi 2N7000.REV0.LIB (Symmetry MODPEX 2004-03-31). */
+const NMOS_2N7000: Record<string, number> = {
+  VTO: 2.236, KP: 0.0932174, LAMBDA: 0, W: 1e-6, L: 1e-6,
+  PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1.0724e-11, CGSO: 1.79115e-7,
+};
+
+/** Small signal NMOS (TO-92, 60V/500mA). Source: Zetex BS170/ZTX model (rev 12/85). */
+const NMOS_BS170: Record<string, number> = {
+  VTO: 1.824, KP: 0.1233, LAMBDA: 0, W: 1e-6, L: 1e-6,
+  PHI: 0.6, GAMMA: 0, CBD: 35e-12, CBS: 0, CGDO: 3e-12, CGSO: 28e-12,
+};
+
+/** Medium power NMOS (TO-220, 100V/17A). Source: IR irf530n_IR (Symmetry MODPEX 1996-04-24). */
+const NMOS_IRF530N: Record<string, number> = {
+  VTO: 3.63019, KP: 17.6091, LAMBDA: 0.00363922, W: 100e-6, L: 100e-6,
+  PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 2.4372e-7, CGSO: 5.59846e-6,
+};
+
+/** High power NMOS (TO-220, 100V/33A). Source: IR irf540n_IR (Symmetry MODPEX 1996-04-24). */
+const NMOS_IRF540N: Record<string, number> = {
+  VTO: 3.55958, KP: 28.379, LAMBDA: 0.000888191, W: 100e-6, L: 100e-6,
+  PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1.77276e-8, CGSO: 1.23576e-5,
+};
+
+/** High power NMOS (TO-220, 55V/49A). Source: IR irfz44n_IR (Symmetry MODPEX 1996-04-24). */
+const NMOS_IRFZ44N: Record<string, number> = {
+  VTO: 3.56214, KP: 39.3974, LAMBDA: 0, W: 100e-6, L: 100e-6,
+  PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 2.2826e-7, CGSO: 1.25255e-5,
+};
+
 export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS } = defineModelParams({
   primary: {
     VTO:    { default: -1.0, unit: "V",      description: "Threshold voltage" },
@@ -117,6 +153,42 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     CGSO:   { default: 0,    unit: "F/m",    description: "Gate-source overlap capacitance per unit width" },
   },
 });
+
+// ---------------------------------------------------------------------------
+// Built-in PMOS model presets
+// Sources: Zetex/Diodes Inc., IR/Symmetry MODPEX (KiCad-Spice-Library irf.lib)
+// All values extracted from published .SUBCKT Level 1 .MODEL MM PMOS lines.
+// ---------------------------------------------------------------------------
+
+/** Small signal PMOS (TO-92, -45V/230mA). Source: Zetex/Diodes Inc. BS250P v1.0 (2003-03-19). */
+const PMOS_BS250: Record<string, number> = {
+  VTO: -3.193, KP: 0.277, LAMBDA: 0.012, W: 1e-6, L: 1e-6,
+  PHI: 0.6, GAMMA: 0, CBD: 105e-12, CBS: 0, CGDO: 0, CGSO: 0,
+};
+
+/** Medium power PMOS (TO-220, -100V/6.8A). Source: IR irf9520_IR (KiCad-Spice-Library irf.lib). */
+const PMOS_IRF9520: Record<string, number> = {
+  VTO: -3.41185, KP: 3.46967, LAMBDA: 0.0289226, W: 100e-6, L: 100e-6,
+  PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 3.45033e-6,
+};
+
+/** High power PMOS (TO-247, -200V/12A). Source: IR irfp9240_IR (KiCad-Spice-Library irf.lib). */
+const PMOS_IRFP9240: Record<string, number> = {
+  VTO: -3.67839, KP: 6.41634, LAMBDA: 0.0117285, W: 100e-6, L: 100e-6,
+  PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 1.08446e-5,
+};
+
+/** High power PMOS (TO-220, -100V/40A). Source: IR irf5210_IR (KiCad-Spice-Library irf.lib). */
+const PMOS_IRF5210: Record<string, number> = {
+  VTO: -3.79917, KP: 12.9564, LAMBDA: 0.00220079, W: 100e-6, L: 100e-6,
+  PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 2.34655e-5,
+};
+
+/** High power PMOS (TO-220, -55V/74A). Source: IR irf4905_IR (ngspice/KiCad-Spice-Library). */
+const PMOS_IRF4905: Record<string, number> = {
+  VTO: -3.53713, KP: 23.3701, LAMBDA: 0.00549383, W: 100e-6, L: 100e-6,
+  PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 2.84439e-5,
+};
 
 // ---------------------------------------------------------------------------
 // computeIds — drain current for three operating regions
@@ -858,6 +930,41 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: MOSFET_NMOS_DEFAULTS,
     },
+    "2N7000": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: MOSFET_NMOS_PARAM_DEFS,
+      params: NMOS_2N7000,
+    },
+    "BS170": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: MOSFET_NMOS_PARAM_DEFS,
+      params: NMOS_BS170,
+    },
+    "IRF530N": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: MOSFET_NMOS_PARAM_DEFS,
+      params: NMOS_IRF530N,
+    },
+    "IRF540N": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: MOSFET_NMOS_PARAM_DEFS,
+      params: NMOS_IRF540N,
+    },
+    "IRFZ44N": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: MOSFET_NMOS_PARAM_DEFS,
+      params: NMOS_IRFZ44N,
+    },
   },
   defaultModel: "behavioral",
 };
@@ -882,6 +989,41 @@ export const PmosfetDefinition: ComponentDefinition = {
         createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: MOSFET_PMOS_DEFAULTS,
+    },
+    "BS250": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: MOSFET_PMOS_PARAM_DEFS,
+      params: PMOS_BS250,
+    },
+    "IRF9520": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: MOSFET_PMOS_PARAM_DEFS,
+      params: PMOS_IRF9520,
+    },
+    "IRFP9240": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: MOSFET_PMOS_PARAM_DEFS,
+      params: PMOS_IRFP9240,
+    },
+    "IRF5210": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: MOSFET_PMOS_PARAM_DEFS,
+      params: PMOS_IRF5210,
+    },
+    "IRF4905": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
+        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: MOSFET_PMOS_PARAM_DEFS,
+      params: PMOS_IRF4905,
     },
   },
   defaultModel: "behavioral",

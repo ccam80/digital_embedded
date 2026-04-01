@@ -67,7 +67,7 @@ const TIMER555_MODEL_PARAM_KEYS = new Set(["vDrop", "rDischarge"]);
 
 function makeProps(overrides: Record<string, number | string> = {}): PropertyBag {
   const modelParams: Record<string, number> = { vDrop: 1.5, rDischarge: 10 };
-  const staticEntries: [string, number | string][] = [["variant", "bipolar"]];
+  const staticEntries: [string, number | string][] = [["model", "bipolar"]];
   for (const [k, v] of Object.entries(overrides)) {
     if (TIMER555_MODEL_PARAM_KEYS.has(k)) {
       modelParams[k] = v as number;
@@ -90,7 +90,7 @@ function make555(
 ): AnalogElement {
   // pinLayout order: [DIS, TRIG, THR, VCC, CTRL, OUT, RST, GND]
   return withNodeIds(
-    getFactory(Timer555Definition.modelRegistry!["behavioral"]!)(
+    getFactory(Timer555Definition.modelRegistry!["bipolar"]!)(
       new Map([
         ["DIS",  nodes.dis],
         ["TRIG", nodes.trig],

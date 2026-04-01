@@ -157,7 +157,7 @@ test.describe('Hot-loading model params via property popup', () => {
     // Baseline step with DEFAULT BF=100: BJT saturated, Vc ≈ 0V
     await builder.stepViaUI();
     await builder.verifyNoErrors();
-    const defaultState = await builder.stepAndReadAnalog(200);
+    const defaultState = await builder.stepAndReadAnalog('5m');
     expect(defaultState).not.toBeNull();
     const vcDefault = defaultState!.nodeVoltages['Pc'];
     expect(vcDefault).toBeDefined();
@@ -169,7 +169,7 @@ test.describe('Hot-loading model params via property popup', () => {
     await page.keyboard.press("Escape");
 
     // Step again to pick up hot-loaded BF change
-    const hotState = await builder.stepAndReadAnalog(200);
+    const hotState = await builder.stepAndReadAnalog('10m');
     expect(hotState).not.toBeNull();
     const vcHot = hotState!.nodeVoltages['Pc'];
     expect(vcHot).toBeDefined();
@@ -238,7 +238,7 @@ test.describe('Hot-loading pin electrical params via property popup', () => {
     // Baseline measurement with default rOut
     await builder.stepViaUI();
     await builder.verifyNoErrors();
-    const defaultState = await builder.stepAndReadAnalog(50);
+    const defaultState = await builder.stepAndReadAnalog('5m');
     expect(defaultState).not.toBeNull();
     const vDefault = defaultState!.nodeVoltages['P1'];
     expect(vDefault).toBeDefined();
@@ -257,7 +257,7 @@ test.describe('Hot-loading pin electrical params via property popup', () => {
     // Step with hot-loaded rOut override
     await builder.stepViaUI();
     await builder.verifyNoErrors();
-    const overrideState = await builder.stepAndReadAnalog(50);
+    const overrideState = await builder.stepAndReadAnalog('10m');
     expect(overrideState).not.toBeNull();
     const vOverride = overrideState!.nodeVoltages['P1'];
     expect(vOverride).toBeDefined();
@@ -347,7 +347,7 @@ test.describe('Pin loading mode switch via UI context menu', () => {
     // Baseline with Default loading
     await builder.stepViaUI();
     await builder.verifyNoErrors();
-    const defaultState = await builder.stepAndReadAnalog(100);
+    const defaultState = await builder.stepAndReadAnalog('5m');
     expect(defaultState).not.toBeNull();
     const vDefault = defaultState!.nodeVoltages['P1'];
     expect(vDefault).toBeDefined();
@@ -366,7 +366,7 @@ test.describe('Pin loading mode switch via UI context menu', () => {
 
     await builder.stepViaUI();
     await builder.verifyNoErrors();
-    const idealState = await builder.stepAndReadAnalog(100);
+    const idealState = await builder.stepAndReadAnalog('10m');
     expect(idealState).not.toBeNull();
     const vIdeal = idealState!.nodeVoltages['P1'];
     expect(vIdeal).toBeDefined();

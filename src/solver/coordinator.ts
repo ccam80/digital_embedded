@@ -70,6 +70,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private readonly _timingModel: 'discrete' | 'continuous' | 'mixed';
   /** Simulation speed in sim-s/wall-s. */
   private _analogSpeed: number = 1e-3;
+  private _simTimeTarget: number = 0;
   private _voltageMin: number = Infinity;
   private _voltageMax: number = -Infinity;
   private readonly _registry: ComponentRegistry | null;
@@ -151,7 +152,10 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
    */
   getAnalogEngine(): AnalogEngine | null { return this._analog; }
 
-  start(): void { this._digital?.start(); this._analog?.start(); }
+  start(): void {
+    this._digital?.start();
+    this._analog?.start();
+  }
   stop(): void { this._digital?.stop(); this._analog?.stop(); }
 
   reset(): void {
@@ -410,11 +414,15 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   }
 
   computeFrameSteps(wallDtSeconds: number): FrameStepResult {
+    if (this._analog === null) {
+      // Digital-only: no continuous time model, step once per frame
+      return { steps: 0, simTimeGoal: null, budgetMs: 12, missed: false };
+    }
     const clampedDt = Math.min(wallDtSeconds, 0.1);
-    const simTime = this._analog?.simTime ?? 0;
+    this._simTimeTarget += this._analogSpeed * clampedDt;
     return {
       steps: 0,
-      simTimeGoal: simTime + this._analogSpeed * clampedDt,
+      simTimeGoal: this._simTimeTarget,
       budgetMs: 12,
       missed: false,
     };

@@ -374,7 +374,6 @@ export function initSimulationController(
 
       try {
         const stepStart = performance.now();
-        facade.step(coordinator);
         if (frame.simTimeGoal !== null) {
           while (coordinator.simTime! < frame.simTimeGoal) {
             if (performance.now() - stepStart > frame.budgetMs) break;
@@ -385,6 +384,8 @@ export function initSimulationController(
               return;
             }
           }
+        } else {
+          facade.step(coordinator);
         }
         // Speed warning: detect when we couldn't keep up with the target
         if (frame.simTimeGoal !== null && coordinator.simTime! < frame.simTimeGoal) {

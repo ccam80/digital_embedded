@@ -23,6 +23,7 @@ import {
 import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -123,22 +124,15 @@ export function executeLed(
 }
 
 // ---------------------------------------------------------------------------
-// LED color model parameters
-// Color-specific IS/N values produce correct forward voltages at 20mA:
-//   Red:   Vf ≈ 1.8V at 20mA → IS=1e-20, N=1.8
-//   Green: Vf ≈ 2.1V at 20mA → IS=1e-22, N=2.0
-//   Blue:  Vf ≈ 3.2V at 20mA → IS=1e-26, N=2.5
+// LED model parameter declarations
 // ---------------------------------------------------------------------------
 
-const LED_COLOR_MODELS: Record<string, { IS: number; N: number }> = {
-  red:    { IS: 3.17e-19, N: 1.8 },
-  green:  { IS: 1e-21,   N: 2.0 },
-  blue:   { IS: 6.26e-24, N: 2.5 },
-  yellow: { IS: 1e-20,   N: 1.9 },
-  white:  { IS: 6.26e-24, N: 2.5 },
-};
-
-const LED_DEFAULT_MODEL = { IS: 3.17e-19, N: 1.8 };
+export const { paramDefs: LED_PARAM_DEFS, defaults: LED_DEFAULTS } = defineModelParams({
+  primary: {
+    IS: { default: 3.17e-19, unit: "A", description: "Saturation current" },
+    N:  { default: 1.8,      unit: "",  description: "Ideality factor" },
+  },
+});
 
 /** Thermal voltage at 300 K (kT/q). */
 const LED_VT = 0.02585;
@@ -159,10 +153,8 @@ function createLedAnalogElement(
   // Single-pin LED: cathode is implicitly ground (node 0)
   const nodeCathode = 0;
 
-  const color = props.getOrDefault<string>("color", "red").toLowerCase();
-  const colorModel = LED_COLOR_MODELS[color] ?? LED_DEFAULT_MODEL;
-  const IS = colorModel.IS;
-  const N = colorModel.N;
+  const IS = props.getModelParam<number>("IS");
+  const N = props.getModelParam<number>("N");
   const nVt = N * LED_VT;
   const vcrit = nVt * Math.log(nVt / (IS * Math.SQRT2));
 
@@ -259,6 +251,11 @@ export const LED_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     propertyKey: "color",
     convert: (v) => v,
   },
+  {
+    xmlName: "Color",
+    propertyKey: "model",
+    convert: (v) => v.toLowerCase(),
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -306,12 +303,11 @@ export const LedDefinition: ComponentDefinition = {
     digital: { executeFn: executeLed, inputSchema: ["in"], outputSchema: [] },
   },
   modelRegistry: {
-    behavioral: {
-      kind: "inline",
-      factory: createLedAnalogElement,
-      paramDefs: [],
-      params: {},
-    },
+    red:    { kind: "inline", factory: createLedAnalogElement, paramDefs: LED_PARAM_DEFS, params: { IS: 3.17e-19, N: 1.8 } },
+    green:  { kind: "inline", factory: createLedAnalogElement, paramDefs: LED_PARAM_DEFS, params: { IS: 1e-21,    N: 2.0 } },
+    blue:   { kind: "inline", factory: createLedAnalogElement, paramDefs: LED_PARAM_DEFS, params: { IS: 6.26e-24, N: 2.5 } },
+    yellow: { kind: "inline", factory: createLedAnalogElement, paramDefs: LED_PARAM_DEFS, params: { IS: 1e-20,    N: 1.9 } },
+    white:  { kind: "inline", factory: createLedAnalogElement, paramDefs: LED_PARAM_DEFS, params: { IS: 6.26e-24, N: 2.5 } },
   },
   defaultModel: "digital",
 };

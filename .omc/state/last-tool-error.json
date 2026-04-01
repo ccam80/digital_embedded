@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"npm run test:q 2>&1\",\"timeout\":300000,\"description\":\"Run all tests in quiet mode\"}",
+  "error": "Exit code 1\n\n> digits-sim@0.1.0 test:q\n> node scripts/run-all-tests.mjs -q\n\nFAIL 9901 passed, 14 failed, 0 skipped (12.2s, 330 files)\nDetails: .vitest-failures.json\n\nCOMBINED: 10380 passed, 17 failed (vitest: 9901/9915 12.2s, playwright: 479/482 172.2s)\nDetails: test-results/test-failures.json",
+  "timestamp": "2026-04-01T09:21:47.950Z",
+  "retry_count": 1
+}

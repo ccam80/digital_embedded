@@ -97,7 +97,7 @@ function solveDac(
 
   const props = new PropertyBag([
     ["bits",  BITS],
-    ["mode",  "unipolar"],
+    ["model", "unipolar"],
   ]);
   props.replaceModelParams({ ...DAC_DEFAULTS, ...paramOverrides });
 
@@ -107,7 +107,7 @@ function solveDac(
   dacPinNodeIds.push(nOutNode);   // OUT
   dacPinNodeIds.push(0);          // GND
   const dacEl = withNodeIds(
-    getFactory(DACDefinition.modelRegistry!["behavioral"]!)(dacPinNodes, [], -1, props, () => 0),
+    getFactory(DACDefinition.modelRegistry!["unipolar"]!)(dacPinNodes, [], -1, props, () => 0),
     dacPinNodeIds,
   );
 

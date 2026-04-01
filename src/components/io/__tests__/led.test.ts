@@ -736,7 +736,7 @@ function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: num
 describe("AnalogLED", () => {
   it("definition_has_engine_type_both", () => {
     expect(LedDefinition.models.digital).toBeDefined();
-    expect(LedDefinition.modelRegistry?.behavioral).toBeDefined();
+    expect(LedDefinition.modelRegistry?.red).toBeDefined();
   });
 
   it("digital_behavior_unchanged", () => {
@@ -754,13 +754,14 @@ describe("AnalogLED", () => {
   });
 
   it("analog_factory_defined", () => {
-    expect(getFactory(LedDefinition.modelRegistry!.behavioral!)).toBeDefined();
+    expect(getFactory(LedDefinition.modelRegistry!.red!)).toBeDefined();
   });
 
   it("analog_factory_produces_nonlinear_element", () => {
     const props = new PropertyBag();
     props.set("color", "red");
-    const element = getFactory(LedDefinition.modelRegistry!.behavioral!)!(new Map([["in", 1]]), [], -1, props, () => 0);
+    props.replaceModelParams({ IS: 3.17e-19, N: 1.8 });
+    const element = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(false);
   });
@@ -782,7 +783,8 @@ describe("AnalogLED", () => {
 
     const props = new PropertyBag();
     props.set("color", "red");
-    const led = withNodeIds(getFactory(LedDefinition.modelRegistry!.behavioral!)!(new Map([["in", 1]]), [], -1, props, () => 0), [1, 0]);
+    props.replaceModelParams({ IS: 3.17e-19, N: 1.8 });
+    const led = withNodeIds(getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0), [1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
@@ -815,7 +817,8 @@ describe("AnalogLED", () => {
 
     const props = new PropertyBag();
     props.set("color", "blue");
-    const led = withNodeIds(getFactory(LedDefinition.modelRegistry!.behavioral!)!(new Map([["in", 1]]), [], -1, props, () => 0), [1, 0]);
+    props.replaceModelParams({ IS: 6.26e-24, N: 2.5 });
+    const led = withNodeIds(getFactory(LedDefinition.modelRegistry!.blue!)!(new Map([["in", 1]]), [], -1, props, () => 0), [1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

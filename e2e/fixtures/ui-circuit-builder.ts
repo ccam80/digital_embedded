@@ -47,6 +47,15 @@ type Dir = { dx: number; dy: number };
 type Box = { x: number; y: number; w: number; h: number };
 type WireSeg = { x1: number; y1: number; x2: number; y2: number };
 
+/** Format a duration in seconds as an SI-suffixed string for parseTimeValue. */
+function formatSecondsAsSI(sec: number): string {
+  if (sec >= 1) return `${sec}s`;
+  if (sec >= 1e-3) return `${sec * 1e3}m`;
+  if (sec >= 1e-6) return `${sec * 1e6}u`;
+  if (sec >= 1e-9) return `${sec * 1e9}n`;
+  return `${sec * 1e12}p`;
+}
+
 // ---------------------------------------------------------------------------
 // UICircuitBuilder
 // ---------------------------------------------------------------------------
@@ -626,20 +635,16 @@ export class UICircuitBuilder {
   }
 
   /**
-   * Advance analog simulation via the step-by UI and return the final
-   * analog engine state. Uses the step-by dropdown with a time delta,
-   * which is how a user would advance an analog circuit.
-   * @param timeOrSteps SI time string (e.g. "5m") or legacy step count (converted to 1ms)
+   * Advance analog simulation to an absolute sim-time target and return
+   * the final analog engine state.
+   * @param targetTime SI time string (e.g. "5m" = 5ms absolute sim-time)
    */
-  async stepAndReadAnalog(timeOrSteps: number | string): Promise<{
+  async stepAndReadAnalog(targetTime: string): Promise<{
     simTime: number;
     nodeVoltages: Record<string, number>;
     nodeCount: number;
   } | null> {
-    const time = typeof timeOrSteps === 'string'
-      ? timeOrSteps
-      : `${timeOrSteps * 0.005}`;  // legacy: N steps ≈ N×5µs
-    await this.stepToTimeViaUI(time);
+    await this.stepToTimeViaUI(targetTime);
     return this.getAnalogState();
   }
 
@@ -720,9 +725,15 @@ export class UICircuitBuilder {
   }
 
   /**
-   * Use the step-by dropdown to step by a preset time value.
-   * Opens the dropdown, clicks the matching preset, and waits for completion.
-   * @param targetTime - Time offset string with SI suffix (e.g. "5m", "100u", "1n")
+   * Step the analog simulation to an absolute sim-time target via the
+   * step-by dropdown's custom time input.
+   *
+   * Reads the current simTime from the bridge, computes the delta needed
+   * to reach targetTime, then enters that delta into the custom input.
+   * This is how a real user would advance: open dropdown → Custom → type
+   * a time value → press Enter.
+   *
+   * @param targetTime - Absolute target as SI string (e.g. "50m" = 50ms)
    */
   async stepToTimeViaUI(targetTime: string): Promise<void> {
     // Parse target to seconds
@@ -734,26 +745,32 @@ export class UICircuitBuilder {
       ? parseFloat(match[1]) * (suffixes[match[2].toLowerCase()] ?? 1)
       : parseFloat(targetTime);
 
-    // Presets as [seconds, data-time attribute string]
-    const presets: [number, string][] = [
-      [1e-9, '1e-9'], [1e-8, '1e-8'], [1e-7, '1e-7'],
-      [1e-6, '1e-6'], [1e-5, '1e-5'], [1e-4, '1e-4'],
-      [1e-3, '1e-3'], [1e-2, '1e-2'], [1e-1, '1e-1'], [1, '1'],
-    ];
+    // Read current simTime from bridge
+    const currentSec = await this.bridge<number>(
+      'bridge.getAnalogState()?.simTime ?? 0',
+    );
 
-    // Pick the largest preset <= target (or smallest if target is tiny)
-    let best = presets[0]!;
-    for (const p of presets) {
-      if (p[0] <= targetSec) best = p;
-    }
-    const clicks = Math.max(1, Math.round(targetSec / best[0]));
+    const deltaSec = targetSec - currentSec;
+    if (deltaSec <= 0) return; // already at or past target
 
-    // Each click: open dropdown → click preset → step executes
-    for (let i = 0; i < clicks; i++) {
-      await this.page.locator('#btn-step-by').click();
-      await this.page.locator(`.step-preset[data-time="${best[1]}"]`).click();
-      await this.page.waitForTimeout(100);
+    // Format delta as an SI string that parseTimeValue understands
+    const deltaStr = formatSecondsAsSI(deltaSec);
+
+    // Open the step-by dropdown
+    await this.page.locator('#btn-step-by').click();
+    // Reveal the custom input row if it's hidden (toggle is idempotent,
+    // so only click if the row is currently hidden to avoid toggling it off)
+    const customRow = this.page.locator('#step-custom-row');
+    const isVisible = await customRow.isVisible();
+    if (!isVisible) {
+      await this.page.locator('#step-custom-toggle').click();
     }
+    // Fill the custom input and press Enter to trigger the step
+    const input = this.page.locator('#step-custom-input');
+    await input.fill(deltaStr);
+    await input.press('Enter');
+    // Wait for the async stepToTime to complete
+    await this.page.waitForTimeout(200);
   }
 
   /**

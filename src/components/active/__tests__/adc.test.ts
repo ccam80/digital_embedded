@@ -99,13 +99,13 @@ function makeAdc(
   componentProps?: Record<string, number | string>,
   paramOverrides?: Record<string, number>,
 ): ADCElementExt {
+  const modelKey = (componentProps?.model as string) ?? "unipolar-instant";
   const bag = new PropertyBag([
     ["bits",           BITS],
-    ["mode",           "unipolar"],
-    ["conversionType", componentProps?.conversionType ?? "instant"],
+    ["model",          modelKey],
   ]);
   bag.replaceModelParams({ ...ADC_DEFAULTS, ...paramOverrides });
-  return getFactory(ADCDefinition.modelRegistry!["behavioral"]!)(
+  return getFactory(ADCDefinition.modelRegistry![modelKey]!)(
     makeNodeIds(), [], -1, bag, () => 0,
   ) as ADCElementExt;
 }
@@ -192,7 +192,7 @@ describe("ADC", () => {
   it("eoc_pulses_after_conversion", () => {
     // Before any clock edge EOC should be inactive.
     // After one clock edge EOC should be active (instant conversion type).
-    const adc = makeAdc({ conversionType: "instant" });
+    const adc = makeAdc({ model: "unipolar-instant" });
 
     expect(adc.eocActive).toBe(false);
 

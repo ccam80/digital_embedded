@@ -259,14 +259,14 @@
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 160,
-      "lastAccessed": 1775017727209,
+      "accessCount": 162,
+      "lastAccessed": 1775032112384,
       "type": "file"
     },
     {
       "path": "",
-      "accessCount": 130,
-      "lastAccessed": 1775016143384,
+      "accessCount": 131,
+      "lastAccessed": 1775020519513,
       "type": "directory"
     },
     {
@@ -276,15 +276,15 @@
       "type": "file"
     },
     {
-      "path": "spec\\progress.md",
-      "accessCount": 71,
-      "lastAccessed": 1774951798824,
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 77,
+      "lastAccessed": 1775021359634,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 69,
-      "lastAccessed": 1775018183475,
+      "path": "spec\\progress.md",
+      "accessCount": 71,
+      "lastAccessed": 1774951798824,
       "type": "file"
     },
     {
@@ -294,15 +294,15 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\gates\\and.ts",
-      "accessCount": 61,
-      "lastAccessed": 1775012588248,
+      "path": "src\\compile\\compile.ts",
+      "accessCount": 64,
+      "lastAccessed": 1775022342786,
       "type": "file"
     },
     {
-      "path": "src\\compile\\compile.ts",
+      "path": "src\\components\\gates\\and.ts",
       "accessCount": 61,
-      "lastAccessed": 1775016192878,
+      "lastAccessed": 1775012588248,
       "type": "file"
     },
     {
@@ -445,8 +445,8 @@
     },
     {
       "path": ".vitest-failures.json",
-      "accessCount": 19,
-      "lastAccessed": 1775011665151,
+      "accessCount": 21,
+      "lastAccessed": 1775035312021,
       "type": "file"
     },
     {

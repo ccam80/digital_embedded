@@ -57,6 +57,8 @@ export const { paramDefs: COMPARATOR_PARAM_DEFS, defaults: COMPARATOR_DEFAULTS }
     vos:          { default: 0.001, unit: "V", description: "Input offset voltage" },
     rSat:         { default: 50,   unit: "Ω", description: "Output saturation resistance" },
     responseTime: { default: 1e-6, unit: "s", description: "Propagation delay time constant" },
+    vOH:          { default: 3.3,  unit: "V", description: "Output HIGH voltage" },
+    vOL:          { default: 0.0,  unit: "V", description: "Output LOW voltage" },
   },
 });
 
@@ -181,7 +183,7 @@ export class ComparatorElement extends AbstractCircuitElement {
  *
  * Node IDs are 1-based; solver rows/cols are 0-based (nodeId - 1).
  */
-function createComparatorElement(
+function createOpenCollectorComparatorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ): AnalogElementCore {
@@ -191,7 +193,6 @@ function createComparatorElement(
     rSat:         Math.max(props.getModelParam<number>("rSat"),   1e-9),
     responseTime: Math.max(props.getModelParam<number>("responseTime"), 1e-12),
   };
-  const outputType = props.getOrDefault<string>("outputType", "open-collector");
 
   const R_OFF = 1e9; // open-collector off-state impedance (1 GΩ)
   const G_off = 1 / R_OFF;
@@ -247,12 +248,6 @@ function createComparatorElement(
         solver.stamp(nOut - 1, nOut - 1, gNew - _gEff);
       }
       _gEff = gNew;
-
-      // Push-pull: add Norton current source to drive output toward V_OH or V_OL.
-      if (outputType === "push-pull" && nOut > 0) {
-        const vTarget = _outputActive ? 0.0 : 3.3;
-        solver.stampRHS(nOut - 1, vTarget * _gEff);
-      }
     },
 
     updateOperatingPoint(voltages: Float64Array): void {
@@ -292,13 +287,7 @@ function createComparatorElement(
       const vOut = readNode(voltages, nOut);
       let iOut = 0;
       if (nOut > 0) {
-        if (outputType === "push-pull") {
-          const vTarget = _outputActive ? 0.0 : 3.3;
-          iOut = (vOut - vTarget) * _gEff;
-        } else {
-          // Open-collector: output conductance to ground only
-          iOut = vOut * _gEff;
-        }
+        iOut = vOut * _gEff;
       }
 
       // pinLayout order: in+, in-, out
@@ -329,17 +318,116 @@ function createComparatorElement(
 }
 
 // ---------------------------------------------------------------------------
+// createPushPullComparatorElement — push-pull output factory
+// ---------------------------------------------------------------------------
+
+function createPushPullComparatorElement(
+  pinNodes: ReadonlyMap<string, number>,
+  props: PropertyBag,
+): AnalogElementCore {
+  const p: Record<string, number> = {
+    hysteresis:   Math.max(props.getModelParam<number>("hysteresis"),   0),
+    vos:          props.getModelParam<number>("vos"),
+    rSat:         Math.max(props.getModelParam<number>("rSat"),   1e-9),
+    responseTime: Math.max(props.getModelParam<number>("responseTime"), 1e-12),
+    vOH:          props.getModelParam<number>("vOH"),
+    vOL:          props.getModelParam<number>("vOL"),
+  };
+
+  const R_OFF = 1e9;
+  const G_off = 1 / R_OFF;
+
+  const nInp = pinNodes.get("in+")!;
+  const nInn = pinNodes.get("in-")!;
+  const nOut = pinNodes.get("out")!;
+
+  let _outputActive = false;
+  let _outputWeight = 0.0;
+  let _gEff = G_off;
+  let _solver: SparseSolver | null = null;
+
+  function readNode(voltages: Float64Array, n: number): number {
+    return n > 0 ? voltages[n - 1] : 0;
+  }
+
+  function computeGeff(): number {
+    const G_sat = 1 / Math.max(p.rSat, 1e-9);
+    return G_off + _outputWeight * (G_sat - G_off);
+  }
+
+  return {
+    branchIndex: -1,
+    isNonlinear: true,
+    isReactive: false,
+
+    stamp(solver: SparseSolver): void {
+      _solver = solver;
+      if (nOut > 0) solver.stamp(nOut - 1, nOut - 1, _gEff);
+    },
+
+    stampNonlinear(solver: SparseSolver): void {
+      const gNew = computeGeff();
+      if (nOut > 0) solver.stamp(nOut - 1, nOut - 1, gNew - _gEff);
+      _gEff = gNew;
+
+      // Norton current source drives output toward vOH or vOL
+      if (nOut > 0) {
+        const vTarget = _outputActive ? p.vOL : p.vOH;
+        solver.stampRHS(nOut - 1, vTarget * _gEff);
+      }
+    },
+
+    updateOperatingPoint(voltages: Float64Array): void {
+      const vInp = readNode(voltages, nInp);
+      const vInn = readNode(voltages, nInn);
+      const vDiff = vInp - vInn - p.vos;
+
+      const halfHyst = p.hysteresis / 2;
+      if (_outputActive) {
+        if (vDiff < -halfHyst) { _outputActive = false; _outputWeight = 0.0; }
+      } else {
+        if (vDiff > halfHyst) { _outputActive = true; _outputWeight = 1.0; }
+      }
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      const R_IN = 1e7;
+      const vInp = readNode(voltages, nInp);
+      const vInn = readNode(voltages, nInn);
+      const iInp = nInp > 0 ? vInp / R_IN : 0;
+      const iInn = nInn > 0 ? vInn / R_IN : 0;
+
+      const vOut = readNode(voltages, nOut);
+      let iOut = 0;
+      if (nOut > 0) {
+        const vTarget = _outputActive ? p.vOL : p.vOH;
+        iOut = (vOut - vTarget) * _gEff;
+      }
+      return [iInp, iInn, iOut];
+    },
+
+    stampCompanion(dt: number, _method: IntegrationMethod, _voltages: Float64Array): void {
+      const target = _outputActive ? 1.0 : 0.0;
+      const tau = Math.max(p.responseTime, 1e-12);
+      const alpha = dt / (tau + dt);
+      _outputWeight = _outputWeight + alpha * (target - _outputWeight);
+
+      const gNew = computeGeff();
+      if (nOut > 0 && _solver !== null) _solver.stamp(nOut - 1, nOut - 1, gNew - _gEff);
+      _gEff = gNew;
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in p) (p as Record<string, number>)[key] = value;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Property definitions
 // ---------------------------------------------------------------------------
 
 const COMPARATOR_PROPERTY_DEFS: PropertyDefinition[] = [
-  {
-    key: "outputType",
-    type: PropertyType.STRING,
-    label: "Output type",
-    defaultValue: "open-collector",
-    description: "Output topology: 'open-collector' or 'push-pull'. Default open-collector.",
-  },
   {
     key: "label",
     type: PropertyType.STRING,
@@ -357,7 +445,7 @@ const COMPARATOR_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "hysteresis",   propertyKey: "hysteresis",   convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "vos",          propertyKey: "vos",          convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "rSat",         propertyKey: "rSat",         convert: (v) => parseFloat(v), modelParam: true },
-  { xmlName: "outputType",   propertyKey: "outputType",   convert: (v) => v },
+  { xmlName: "outputType",   propertyKey: "model",         convert: (v) => v },
   { xmlName: "responseTime", propertyKey: "responseTime", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "Label",        propertyKey: "label",        convert: (v) => v },
 ];
@@ -386,13 +474,20 @@ export const VoltageComparatorDefinition: ComponentDefinition = {
 
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "open-collector": {
       kind: "inline",
       factory: (pinNodes, _internalNodeIds, _branchIdx, props) =>
-        createComparatorElement(pinNodes, props),
+        createOpenCollectorComparatorElement(pinNodes, props),
+      paramDefs: COMPARATOR_PARAM_DEFS,
+      params: COMPARATOR_DEFAULTS,
+    },
+    "push-pull": {
+      kind: "inline",
+      factory: (pinNodes, _internalNodeIds, _branchIdx, props) =>
+        createPushPullComparatorElement(pinNodes, props),
       paramDefs: COMPARATOR_PARAM_DEFS,
       params: COMPARATOR_DEFAULTS,
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "open-collector",
 };

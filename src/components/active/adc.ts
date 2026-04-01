@@ -280,6 +280,8 @@ function createADCElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
+  bipolar: boolean,
+  sar: boolean,
 ): AnalogElementCore {
   const bits = Math.max(1, Math.min(32, props.getOrDefault<number>("bits", 8)));
   const p: Record<string, number> = {
@@ -292,10 +294,6 @@ function createADCElement(
     rOut: props.getModelParam<number>("rOut"),
     rHiZ: props.getModelParam<number>("rHiZ"),
   };
-  const mode = props.getOrDefault<string>("mode", "unipolar") as "unipolar" | "bipolar";
-  const conversionType = props.getOrDefault<string>("conversionType", "instant") as
-    | "instant"
-    | "sar";
 
   const maxCode = (1 << bits) - 1;
 
@@ -362,7 +360,7 @@ function createADCElement(
     if (span <= 0) return 0;
 
     let normalised: number;
-    if (mode === "bipolar") {
+    if (bipolar) {
       normalised = (vIn - vGnd + span / 2) / span;
     } else {
       normalised = (vIn - vGnd) / span;
@@ -450,7 +448,7 @@ function createADCElement(
       prevClkVoltage = clkVoltage;
 
       if (risingEdge) {
-        if (conversionType === "instant") {
+        if (!sar) {
           const code = computeCode(voltages);
           setOutputCode(code);
           eocActive = true;
@@ -527,23 +525,6 @@ const ADC_PROPERTY_DEFS: PropertyDefinition[] = [
     structural: true,
   },
   {
-    key: "mode",
-    type: PropertyType.STRING,
-    label: "Conversion mode",
-    defaultValue: "unipolar",
-    description:
-      "unipolar: input range [0, V_ref]; bipolar: input range [-V_ref/2, +V_ref/2].",
-  },
-  {
-    key: "conversionType",
-    type: PropertyType.STRING,
-    label: "Conversion type",
-    defaultValue: "instant",
-    description:
-      "instant: output updates on the same clock edge as sampling; " +
-      "sar: output updates after N additional clock edges (SAR pipeline).",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -558,8 +539,6 @@ const ADC_PROPERTY_DEFS: PropertyDefinition[] = [
 
 const ADC_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "Bits",           propertyKey: "bits",           convert: (v) => parseInt(v, 10) },
-  { xmlName: "mode",           propertyKey: "mode",           convert: (v) => v },
-  { xmlName: "conversionType", propertyKey: "conversionType", convert: (v) => v },
   { xmlName: "VIH",            propertyKey: "vIH",            convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "VIL",            propertyKey: "vIL",            convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "VOH",            propertyKey: "vOH",            convert: (v) => parseFloat(v), modelParam: true },
@@ -594,13 +573,34 @@ export const ADCDefinition: ComponentDefinition = {
 
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "unipolar-instant": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props) =>
-        createADCElement(pinNodes, internalNodeIds, branchIdx, props),
+        createADCElement(pinNodes, internalNodeIds, branchIdx, props, false, false),
+      paramDefs: ADC_PARAM_DEFS,
+      params: ADC_DEFAULTS,
+    },
+    "unipolar-sar": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createADCElement(pinNodes, internalNodeIds, branchIdx, props, false, true),
+      paramDefs: ADC_PARAM_DEFS,
+      params: ADC_DEFAULTS,
+    },
+    "bipolar-instant": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createADCElement(pinNodes, internalNodeIds, branchIdx, props, true, false),
+      paramDefs: ADC_PARAM_DEFS,
+      params: ADC_DEFAULTS,
+    },
+    "bipolar-sar": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createADCElement(pinNodes, internalNodeIds, branchIdx, props, true, true),
       paramDefs: ADC_PARAM_DEFS,
       params: ADC_DEFAULTS,
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "unipolar-instant",
 };

@@ -432,13 +432,6 @@ function createTimer555Element(
 
 const TIMER555_PROPERTY_DEFS: PropertyDefinition[] = [
   {
-    key: "variant",
-    type: PropertyType.STRING,
-    label: "Variant",
-    defaultValue: "bipolar",
-    description: "IC variant: 'bipolar' (NE555, vDrop≈1.5V) or 'cmos' (TLC555, vDrop≈0.1V).",
-  },
-  {
     key: "label",
     type: PropertyType.STRING,
     label: "Label",
@@ -454,7 +447,7 @@ const TIMER555_PROPERTY_DEFS: PropertyDefinition[] = [
 const TIMER555_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   { xmlName: "vDrop",      propertyKey: "vDrop",      convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "rDischarge", propertyKey: "rDischarge", convert: (v) => parseFloat(v), modelParam: true },
-  { xmlName: "variant",    propertyKey: "variant",    convert: (v) => v },
+  { xmlName: "variant",    propertyKey: "model",      convert: (v) => v },
   { xmlName: "Label",      propertyKey: "label",      convert: (v) => v },
 ];
 
@@ -481,13 +474,20 @@ export const Timer555Definition: ComponentDefinition = {
 
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "bipolar": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props) =>
         createTimer555Element(pinNodes, internalNodeIds, branchIdx, props),
       paramDefs: TIMER555_PARAM_DEFS,
-      params: TIMER555_DEFAULTS,
+      params: { vDrop: 1.5, rDischarge: 10 },
+    },
+    "cmos": {
+      kind: "inline",
+      factory: (pinNodes, internalNodeIds, branchIdx, props) =>
+        createTimer555Element(pinNodes, internalNodeIds, branchIdx, props),
+      paramDefs: TIMER555_PARAM_DEFS,
+      params: { vDrop: 0.1, rDischarge: 10 },
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "bipolar",
 };

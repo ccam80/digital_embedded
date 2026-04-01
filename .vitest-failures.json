@@ -1,10 +1,35 @@
 {
   "summary": {
-    "passed": 165,
-    "failed": 0,
+    "passed": 9911,
+    "failed": 4,
     "skipped": 0,
-    "totalFiles": 8,
-    "durationSeconds": 2.1
+    "totalFiles": 330,
+    "durationSeconds": 11.5
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "expected null to be type of 'number'",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
+          "test": "returns continuous-style frame result with simTimeGoal",
+          "line": 179,
+          "column": 32
+        }
+      ]
+    },
+    {
+      "message": "expected null to be close to 0.0001, received difference is 0.0001, but expected 5e-16",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\__tests__\\coordinator-speed-control.test.ts",
+          "test": "speed change is reflected in simTimeGoal",
+          "line": 192,
+          "column": 32
+        }
+      ]
+    }
+  ]
 }

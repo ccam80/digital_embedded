@@ -170,10 +170,11 @@ test.describe('Analog UI fixes', () => {
     );
     await clickIframeButton(harness, 'btn-stop');
 
-    // Fast saturates 12ms budget (~24-120 steps/frame) vs slow's 1 step/frame.
-    expect(slowTime).toBeGreaterThan(0);
+    // Speed=1e-6: target accumulates ~0.48µs over 500ms, well below initial
+    // simTime from compile step (~5µs), so no run-time steps occur.
+    // Speed=1: budget-saturating, many steps per frame.
     expect(fastTime).toBeGreaterThan(0);
-    expect(fastTime).toBeGreaterThan(slowTime * 5);
+    expect(fastTime).toBeGreaterThan(slowTime * 100);
   });
 
   // -----------------------------------------------------------------------

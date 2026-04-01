@@ -192,7 +192,7 @@ test.describe('Model parameter panel', () => {
     await builder.stepViaUI();
     await builder.verifyNoErrors();
 
-    const state = await builder.stepAndReadAnalog(300);
+    const state = await builder.stepAndReadAnalog('5m');
     expect(state).not.toBeNull();
     expect(state!.simTime).toBeGreaterThan(0);
 

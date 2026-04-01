@@ -193,9 +193,10 @@ describe("LED", () => {
    */
   it("forward_current_lights", () => {
     const props = new PropertyBag();
+    props.replaceModelParams({ IS: 3.17e-19, N: 1.8 });
 
     // LED: anode = circuit node 2, cathode = ground (0)
-    const led = getFactory(LedDefinition.modelRegistry!.behavioral!)(new Map([["in", 2]]), [], -1, props, () => 0);
+    const led = getFactory(LedDefinition.modelRegistry!.red!)(new Map([["in", 2]]), [], -1, props, () => 0);
 
     // VS at circuit node 1 (solver row 0), branch row 2 (absolute)
     const vs = makeVoltageSource(1, 0, 2, VDD);
@@ -423,10 +424,11 @@ describe("Registration", () => {
         def.models?.digital,
         `${def.name} should have a digital model`,
       ).toBeDefined();
+      const registry = def.modelRegistry ?? {};
       expect(
-        def.modelRegistry?.behavioral,
+        Object.keys(registry).length > 0,
         `${def.name} should have an analog model`,
-      ).toBeDefined();
+      ).toBe(true);
     }
   });
 });

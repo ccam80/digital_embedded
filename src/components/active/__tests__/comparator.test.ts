@@ -47,7 +47,7 @@ function makeProps(overrides: Record<string, number | string> = {}): PropertyBag
   const modelParams: Record<string, number> = {
     hysteresis: 0, vos: 0.001, rSat: 50, responseTime: 1e-6,
   };
-  const staticEntries: [string, number | string][] = [["outputType", "open-collector"]];
+  const staticEntries: [string, number | string][] = [["model", "open-collector"]];
   for (const [k, v] of Object.entries(overrides)) {
     if (COMPARATOR_MODEL_PARAM_KEYS.has(k)) {
       modelParams[k] = v as number;
@@ -66,7 +66,7 @@ function makeComparator(
   nOut: number,
   overrides: Record<string, number | string> = {},
 ): AnalogElement {
-  return getFactory(VoltageComparatorDefinition.modelRegistry!["behavioral"]!)(
+  return getFactory(VoltageComparatorDefinition.modelRegistry!["open-collector"]!)(
     new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]),
     [],
     -1,

@@ -652,6 +652,6 @@ test.describe('Workflow: analog simulation with sliders', () => {
 
     expect(slowTime).toBeGreaterThan(0);
     expect(fastTime).toBeGreaterThan(0);
-    expect(fastTime).toBeGreaterThan(slowTime * 5);
+    expect(fastTime).toBeGreaterThan(slowTime * 100);
   });
 });

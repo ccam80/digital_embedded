@@ -138,7 +138,7 @@ test.describe('Debug: Hotload params analog null (Cat C)', () => {
     console.log('Pre-state (after 1 step):', JSON.stringify(preState));
 
     // Now do the 200 steps
-    const result = await builder.stepAndReadAnalog(200);
+    const result = await builder.stepAndReadAnalog('5m');
     console.log('stepAndReadAnalog(200) result:', JSON.stringify(result));
 
     // PAUSE — inspect console for null vs valid state
