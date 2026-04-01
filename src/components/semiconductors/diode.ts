@@ -353,13 +353,6 @@ function buildDiodePinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 const DIODE_PROPERTY_DEFS: PropertyDefinition[] = [
-  {
-    key: "model",
-    type: PropertyType.STRING,
-    label: "Model",
-    defaultValue: "",
-    description: "SPICE model name (blank = use built-in defaults)",
-  },
   LABEL_PROPERTY_DEF,
 ];
 

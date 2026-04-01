@@ -579,13 +579,6 @@ function buildPnpPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 const BJT_PROPERTY_DEFS: PropertyDefinition[] = [
-  {
-    key: "model",
-    type: PropertyType.STRING,
-    label: "Model",
-    defaultValue: "behavioral",
-    description: "Active model selection",
-  },
   LABEL_PROPERTY_DEF,
 ];
 

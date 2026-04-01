@@ -621,10 +621,10 @@ export class UICircuitBuilder {
   // Simulation controls
   // =========================================================================
 
-  /** Click the Step button on the toolbar. */
+  /** Click the Step menu item (single step, in Simulation menu). */
   async stepViaUI(count = 1): Promise<void> {
     for (let i = 0; i < count; i++) {
-      await this.page.locator('#btn-tb-step').click();
+      await this.page.locator('#btn-step').click();
     }
   }
 
@@ -719,16 +719,18 @@ export class UICircuitBuilder {
   }
 
   /**
-   * Set the step-to-time input and click the step-to-time button.
-   * Waits briefly for stepping to complete.
+   * Use the step-by dropdown to step by a preset time value.
+   * Opens the dropdown, clicks the matching preset, and waits for completion.
    * @param targetTime - Time offset string with SI suffix (e.g. "5m", "100u", "1n")
    */
   async stepToTimeViaUI(targetTime: string): Promise<void> {
-    const input = this.page.locator('#step-to-time-input');
-    const btn = this.page.locator('#btn-step-to-time');
+    // Open dropdown, type custom value, press Enter
+    await this.page.locator('#btn-step-by').click();
+    await this.page.locator('#step-custom-toggle').click();
+    const input = this.page.locator('#step-custom-input');
     await input.fill(targetTime);
-    await btn.click();
-    await expect(btn).toBeEnabled({ timeout: 30000 });
+    await input.press('Enter');
+    await this.page.waitForTimeout(500);
   }
 
   /**
@@ -749,10 +751,10 @@ export class UICircuitBuilder {
     await this.page.locator('#btn-tb-stop').click();
   }
 
-  /** Set the simulation speed via the speed input field. */
-  async setSpeed(stepsPerSec: number): Promise<void> {
+  /** Set the simulation speed via the speed input field (sim-seconds per wall-second). */
+  async setSpeed(simSecondsPerWallSecond: number): Promise<void> {
     const speedInput = this.page.locator('#speed-input');
-    await speedInput.fill(String(stepsPerSec));
+    await speedInput.fill(String(simSecondsPerWallSecond));
     await speedInput.press('Tab'); // triggers change event naturally
   }
 

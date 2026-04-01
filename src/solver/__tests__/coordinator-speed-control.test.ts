@@ -164,7 +164,7 @@ describe('DefaultSimulationCoordinator -- timingModel', () => {
   });
 });
 
-describe('DefaultSimulationCoordinator -- computeFrameSteps (discrete)', () => {
+describe('DefaultSimulationCoordinator -- computeFrameSteps (digital-only circuit)', () => {
   let coord: DefaultSimulationCoordinator;
   beforeEach(() => {
     const registry = buildDigitalRegistry();
@@ -172,35 +172,24 @@ describe('DefaultSimulationCoordinator -- computeFrameSteps (discrete)', () => {
     const unified = compileUnified(circuit, registry);
     coord = new DefaultSimulationCoordinator(unified);
   });
-  it('returns steps = round(speed * wallDt) for default speed', () => {
+  it('returns continuous-style frame result with simTimeGoal', () => {
+    coord.speed = 1e-3;
     const result = coord.computeFrameSteps(0.016);
-    expect(result.steps).toBe(Math.round(1000 * 0.016));
-    expect(result.simTimeGoal).toBeNull();
-    expect(result.budgetMs).toBe(Infinity);
+    expect(result.steps).toBe(0);
+    expect(result.simTimeGoal).toBeTypeOf('number');
+    expect(result.budgetMs).toBe(12);
     expect(result.missed).toBe(false);
   });
   it('clamps wallDt to 0.1s to prevent huge jumps', () => {
+    coord.speed = 1e-3;
     const resultClamped = coord.computeFrameSteps(1.0);
     const resultRef = coord.computeFrameSteps(0.1);
-    expect(resultClamped.steps).toBe(resultRef.steps);
+    expect(resultClamped.simTimeGoal).toBe(resultRef.simTimeGoal);
   });
-  it('rounds step count correctly for fractional result', () => {
-    coord.speed = 100;
-    const result = coord.computeFrameSteps(0.016);
-    expect(result.steps).toBe(2);
-  });
-  it('simTimeGoal is null for discrete', () => {
-    expect(coord.computeFrameSteps(0.05).simTimeGoal).toBeNull();
-  });
-  it('budgetMs is Infinity for discrete', () => {
-    expect(coord.computeFrameSteps(0.05).budgetMs).toBe(Infinity);
-  });
-  it('missed is false for discrete', () => {
-    expect(coord.computeFrameSteps(0.05).missed).toBe(false);
-  });
-  it('speed change is reflected in computeFrameSteps', () => {
-    coord.speed = 10000;
-    expect(coord.computeFrameSteps(0.01).steps).toBe(100);
+  it('speed change is reflected in simTimeGoal', () => {
+    coord.speed = 1e-2;
+    const result = coord.computeFrameSteps(0.01);
+    expect(result.simTimeGoal).toBeCloseTo(1e-2 * 0.01, 15);
   });
 });
 
@@ -233,7 +222,7 @@ describe('DefaultSimulationCoordinator -- computeFrameSteps (continuous)', () =>
   });
 });
 
-describe('DefaultSimulationCoordinator -- speed control (discrete)', () => {
+describe('DefaultSimulationCoordinator -- speed control (digital-only uses analog speed)', () => {
   let coord: DefaultSimulationCoordinator;
   beforeEach(() => {
     const registry = buildDigitalRegistry();
@@ -241,27 +230,16 @@ describe('DefaultSimulationCoordinator -- speed control (discrete)', () => {
     const unified = compileUnified(circuit, registry);
     coord = new DefaultSimulationCoordinator(unified);
   });
-  it('default speed is 1000', () => { expect(coord.speed).toBe(1000); });
-  it('speed setter updates speed', () => { coord.speed = 5000; expect(coord.speed).toBe(5000); });
-  it('speed setter clamps to MIN_SPEED of 1', () => { coord.speed = 0; expect(coord.speed).toBe(1); });
-  it('speed setter clamps to MAX_SPEED of 10_000_000', () => { coord.speed = 100_000_000; expect(coord.speed).toBe(10_000_000); });
-  it('adjustSpeed multiplies by factor', () => { coord.speed = 1000; coord.adjustSpeed(10); expect(coord.speed).toBe(10_000); });
-  it('adjustSpeed clamps to MAX_SPEED', () => { coord.speed = 10_000_000; coord.adjustSpeed(2); expect(coord.speed).toBe(10_000_000); });
-  it('adjustSpeed with factor less than 1 reduces speed', () => { coord.speed = 1000; coord.adjustSpeed(0.5); expect(coord.speed).toBe(500); });
-  it('parseSpeed parses integer text', () => { coord.parseSpeed('5000'); expect(coord.speed).toBe(5000); });
-  it('parseSpeed parses scientific notation', () => { coord.parseSpeed('1e6'); expect(coord.speed).toBe(1_000_000); });
+  it('default speed is 1e-3 (1ms/s)', () => { expect(coord.speed).toBe(1e-3); });
+  it('speed setter updates speed', () => { coord.speed = 0.5; expect(coord.speed).toBe(0.5); });
+  it('speed setter clamps to 1e-9 floor', () => { coord.speed = -1; expect(coord.speed).toBe(1e-9); });
+  it('adjustSpeed multiplies by factor', () => { coord.speed = 1e-3; coord.adjustSpeed(10); expect(coord.speed).toBeCloseTo(1e-2, 15); });
+  it('parseSpeed parses float text', () => { coord.parseSpeed('0.005'); expect(coord.speed).toBeCloseTo(0.005, 10); });
+  it('parseSpeed parses scientific notation', () => { coord.parseSpeed('1e-6'); expect(coord.speed).toBeCloseTo(1e-6, 20); });
   it('parseSpeed ignores invalid text', () => { const prev = coord.speed; coord.parseSpeed('abc'); expect(coord.speed).toBe(prev); });
-  it('formatSpeed returns Hz for speed below 1000', () => {
-    coord.speed = 500; const fmt = coord.formatSpeed();
-    expect(fmt.unit).toBe('Hz'); expect(fmt.value).toBe('500');
-  });
-  it('formatSpeed returns kHz for speed in 1000 to 999999 range', () => {
-    coord.speed = 5000; const fmt = coord.formatSpeed();
-    expect(fmt.unit).toBe('kHz'); expect(fmt.value).toBe('5');
-  });
-  it('formatSpeed returns MHz for speed at or above 1_000_000', () => {
-    coord.speed = 2_000_000; const fmt = coord.formatSpeed();
-    expect(fmt.unit).toBe('MHz'); expect(fmt.value).toBe('2');
+  it('formatSpeed returns ms/s for default speed', () => {
+    const fmt = coord.formatSpeed();
+    expect(fmt.unit).toBe('ms/s'); expect(fmt.value).toBe('1');
   });
 });
 

@@ -34,7 +34,6 @@ import type {
 } from '../compile/types.js';
 import type { ConcreteCompiledAnalogCircuit } from './analog/compiled-analog-circuit.js';
 import type { BridgeOutputAdapter, BridgeInputAdapter } from './analog/bridge-adapter.js';
-import { SpeedControl } from '../integration/speed-control.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import { PropertyType } from '../core/properties.js';
 
@@ -69,8 +68,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private readonly _observers: Set<MeasurementObserver> = new Set();
   private _stepCount = 0;
   private readonly _timingModel: 'discrete' | 'continuous' | 'mixed';
-  private readonly _speedControl: SpeedControl;
-  /** Analog speed in sim-s/wall-s. Used when timingModel is continuous or mixed. */
+  /** Simulation speed in sim-s/wall-s. */
   private _analogSpeed: number = 1e-3;
   private _voltageMin: number = Infinity;
   private _voltageMax: number = -Infinity;
@@ -130,8 +128,6 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     this._clockManager = compiled.digital !== null
       ? new ClockManager(compiled.digital as ConcreteCompiledCircuit)
       : null;
-
-    this._speedControl = new SpeedControl();
 
     if (this._analog !== null) {
       const mnaEngine = this._analog as MNAEngine;
@@ -387,63 +383,35 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   }
 
   get speed(): number {
-    return this._timingModel === 'discrete'
-      ? this._speedControl.speed
-      : this._analogSpeed;
+    return this._analogSpeed;
   }
 
   set speed(value: number) {
-    if (this._timingModel === 'discrete') {
-      this._speedControl.speed = value;
-    } else {
-      this._analogSpeed = Math.max(1e-9, value);
-    }
+    this._analogSpeed = Math.max(1e-9, value);
   }
 
   adjustSpeed(factor: number): void {
-    if (this._timingModel === 'discrete') {
-      this._speedControl.speed = this._speedControl.speed * factor;
-    } else {
-      this._analogSpeed = Math.max(1e-9, this._analogSpeed * factor);
-    }
+    this._analogSpeed = Math.max(1e-9, this._analogSpeed * factor);
   }
 
   parseSpeed(text: string): void {
-    if (this._timingModel === 'discrete') {
-      this._speedControl.parseText(text);
-    } else {
-      const parsed = Number(text);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        this._analogSpeed = parsed;
-      }
+    const parsed = Number(text);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      this._analogSpeed = parsed;
     }
   }
 
   formatSpeed(): { value: string; unit: string } {
-    if (this._timingModel === 'discrete') {
-      const s = this._speedControl.speed;
-      if (s >= 1_000_000) return { value: String(s / 1_000_000), unit: 'MHz' };
-      if (s >= 1_000) return { value: String(s / 1_000), unit: 'kHz' };
-      return { value: String(s), unit: 'Hz' };
-    }
     const rate = this._analogSpeed;
     if (rate >= 1) return { value: String(rate), unit: 's/s' };
     if (rate >= 1e-3) return { value: String(rate * 1_000), unit: 'ms/s' };
-    if (rate >= 1e-6) return { value: String(rate * 1_000_000), unit: 'µs/s' };
+    if (rate >= 1e-6) return { value: String(rate * 1_000_000), unit: '\u00b5s/s' };
     return { value: String(rate * 1e9), unit: 'ns/s' };
   }
 
   computeFrameSteps(wallDtSeconds: number): FrameStepResult {
     const clampedDt = Math.min(wallDtSeconds, 0.1);
-    if (this._timingModel === 'discrete') {
-      return {
-        steps: Math.max(1, Math.round(this._speedControl.speed * clampedDt)),
-        simTimeGoal: null,
-        budgetMs: Infinity,
-        missed: false,
-      };
-    }
-    const simTime = this._analog!.simTime;
+    const simTime = this._analog?.simTime ?? 0;
     return {
       steps: 0,
       simTimeGoal: simTime + this._analogSpeed * clampedDt,

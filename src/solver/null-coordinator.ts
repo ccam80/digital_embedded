@@ -107,24 +107,24 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   // -------------------------------------------------------------------------
 
   readonly simTime: number | null = null;
-  readonly timingModel: 'discrete' | 'continuous' | 'mixed' = 'discrete';
+  readonly timingModel: 'discrete' | 'continuous' | 'mixed' = 'continuous';
 
   snapshotSignals(): Float64Array { return new Float64Array(0); }
   readonly signalCount: number = 0;
 
   computeFrameSteps(_wallDtSeconds: number): FrameStepResult {
-    return { steps: 0, simTimeGoal: null, budgetMs: Infinity, missed: false };
+    return { steps: 0, simTimeGoal: null, budgetMs: 12, missed: false };
   }
 
   // -------------------------------------------------------------------------
   // Speed — neutral defaults
   // -------------------------------------------------------------------------
 
-  speed: number = 1000;
+  speed: number = 1e-3;
 
   adjustSpeed(_factor: number): void { /* no-op */ }
   parseSpeed(_text: string): void { /* no-op */ }
-  formatSpeed(): { value: string; unit: string } { return { value: '1000', unit: 'Hz' }; }
+  formatSpeed(): { value: string; unit: string } { return { value: '1', unit: 'ms/s' }; }
 
   // -------------------------------------------------------------------------
   // Clock management

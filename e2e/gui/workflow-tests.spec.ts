@@ -462,30 +462,14 @@ test.describe('Workflow: speed control', () => {
     await page.waitForTimeout(200);
   });
 
-  test('speed buttons change the displayed value', async ({ page }) => {
-    const speedInput = page.locator('#speed-input');
-    const initial = Number(await speedInput.inputValue());
-    expect(initial).toBe(1000);
-
-    // Speed up
-    await page.locator('#btn-speed-up').click();
-    const faster = Number(await speedInput.inputValue());
-    expect(faster).toBeGreaterThan(initial);
-
-    // Speed down twice
-    await page.locator('#btn-speed-down').click();
-    await page.locator('#btn-speed-down').click();
-    const slower = Number(await speedInput.inputValue());
-    expect(slower).toBeLessThan(initial);
-  });
-
   test('manual speed entry via text field', async ({ page }) => {
     const speedInput = page.locator('#speed-input');
-    await speedInput.fill('5000');
+    await speedInput.fill('0.01');
     await speedInput.press('Tab');
     await page.waitForTimeout(100);
 
-    expect(Number(await speedInput.inputValue())).toBe(5000);
+    // After parsing, formatSpeed should show 10 ms/s
+    expect(Number(await speedInput.inputValue())).toBe(10);
   });
 });
 
@@ -506,8 +490,8 @@ test.describe('Workflow: digital simulation', () => {
     await clickGrid(page, 10, 10);
     await page.keyboard.press('Escape');
 
-    // Step via toolbar
-    await toolbarClick(page, 'btn-tb-step');
+    // Step via menu (single step kept in menu only)
+    await menuAction(page, 'btn-step');
     await page.waitForTimeout(200);
     await expect(page.locator('#sim-canvas')).toBeVisible();
 

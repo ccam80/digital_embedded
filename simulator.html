@@ -231,6 +231,46 @@
       white-space: nowrap;
     }
     .zoom-preset:hover { background: var(--accent); color: #fff; }
+    /* ---- Step-by dropdown ---- */
+    .step-dropdown-container {
+      position: relative;
+    }
+    #btn-step-by {
+      font-size: 11px;
+      padding: 1px 6px;
+      background: transparent;
+      border: 1px solid var(--toolbar-border);
+      color: var(--fg);
+      cursor: pointer;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+    #btn-step-by:hover { background: var(--panel-border); }
+    .step-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      min-width: 100px;
+      z-index: 200;
+      padding: 4px 0;
+    }
+    .step-dropdown.open { display: block; }
+    .step-preset {
+      padding: 4px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .step-preset:hover { background: var(--accent); color: #fff; }
+    .step-preset-separator {
+      height: 1px;
+      background: var(--panel-border);
+      margin: 4px 0;
+    }
     /* ---- Color scheme dialog ---- */
     .scheme-dialog-overlay {
       position: fixed;
@@ -343,14 +383,20 @@
     }
     .scheme-dialog-footer button:hover { background: var(--accent); color: #fff; }
     .scheme-dialog-footer button.primary { background: var(--accent); color: #fff; }
+    .speed-label {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-right: 3px;
+      white-space: nowrap;
+    }
     .speed-unit {
-      font-size: 10px;
-      opacity: 0.5;
-      margin-left: 2px;
+      font-size: 11px;
+      opacity: 0.7;
+      margin-left: 3px;
       white-space: nowrap;
     }
     .menubar-speed input {
-      width: 60px;
+      width: 50px;
       padding: 1px 3px;
       background: var(--panel-bg);
       border: 1px solid var(--panel-border);
@@ -1665,7 +1711,8 @@
       }
       /* Hide speed display on tablets */
       .menubar-speed #speed-input,
-      .menubar-speed .speed-unit {
+      .menubar-speed .speed-unit,
+      .menubar-speed .speed-label {
         display: none;
       }
       #circuit-name {
@@ -1716,7 +1763,8 @@
       flex-shrink: 0;
     }
     .tablet-mode .menubar-speed #speed-input,
-    .tablet-mode .menubar-speed .speed-unit {
+    .tablet-mode .menubar-speed .speed-unit,
+    .tablet-mode .menubar-speed .speed-label {
       display: none;
     }
     .tablet-mode #circuit-name {
@@ -1822,12 +1870,14 @@
       #circuit-name {
         display: none;
       }
-      /* Hide separators and speed +/- on mobile */
+      /* Hide separators and speed on mobile */
       .menubar-speed > span[style*="width:1px"],
       .menubar-speed #btn-speed-down,
       .menubar-speed #btn-speed-up,
       .menubar-speed #speed-input,
-      .menubar-speed .speed-unit {
+      .menubar-speed .speed-unit,
+      .menubar-speed .speed-label,
+      .menubar-speed #btn-step-by span {
         display: none;
       }
       .menu-drawer {
@@ -2273,13 +2323,33 @@
         <button id="btn-tb-fit" title="Fit to content (Ctrl+Shift+F)">&#10697;</button>
         <span style="width:1px;height:16px;background:var(--toolbar-border);margin:0 6px;"></span>
         <button id="btn-tb-run" title="Start simulation">&#9654;</button>
-        <button id="btn-tb-step" title="Single step">&#9205;</button>
-        <input id="step-to-time-input" type="text" value="1m" placeholder="e.g. 5m, 100u" title="Step to sim-time offset (SI suffixes: s, m=ms, u=µs, n=ns)" style="width:60px;padding:2px 4px;font-size:12px;background:var(--bg);border:1px solid var(--toolbar-border);color:var(--fg);border-radius:3px;" />
-        <button id="btn-step-to-time" title="Step to sim-time">&#9654;&#9654;</button>
-        <button id="btn-tb-stop" title="Stop simulation">&#9632;</button>
-        <button id="btn-speed-down" title="Speed / 10">&#8722;</button>
-        <input id="speed-input" type="text" value="1000" title="Steps per second" />
-        <button id="btn-speed-up" title="Speed x 10">+</button><span class="speed-unit">steps/s</span>
+        <button id="btn-tb-stop" title="Stop &amp; reset simulation">&#9632;</button>
+        <div class="step-dropdown-container">
+          <button id="btn-step-by" title="Step by time increment">Step: <span id="step-by-label">1ms</span> &#9662;</button>
+          <div class="step-dropdown" id="step-dropdown">
+            <div class="step-preset" data-time="1e-9">1ns</div>
+            <div class="step-preset" data-time="1e-8">10ns</div>
+            <div class="step-preset" data-time="1e-7">100ns</div>
+            <div class="step-preset" data-time="1e-6">1&#181;s</div>
+            <div class="step-preset" data-time="1e-5">10&#181;s</div>
+            <div class="step-preset" data-time="1e-4">100&#181;s</div>
+            <div class="step-preset" data-time="1e-3">1ms</div>
+            <div class="step-preset" data-time="1e-2">10ms</div>
+            <div class="step-preset" data-time="1e-1">100ms</div>
+            <div class="step-preset" data-time="1">1s</div>
+            <div class="step-preset-separator"></div>
+            <div class="step-preset" id="step-custom-toggle">Custom&#8230;</div>
+            <div id="step-custom-row" style="display:none;padding:4px 8px;">
+              <input id="step-custom-input" type="text" placeholder="e.g. 5m, 47u" style="width:80px;padding:2px 4px;font-size:11px;background:var(--bg);border:1px solid var(--toolbar-border);color:var(--fg);border-radius:3px;" />
+            </div>
+          </div>
+        </div>
+        <span style="width:1px;height:16px;background:var(--toolbar-border);margin:0 6px;"></span>
+        <label class="speed-label" for="speed-input">Speed:</label>
+        <button id="btn-speed-down" title="Speed ÷ 10">&#8722;</button>
+        <input id="speed-input" type="text" value="1" title="Simulation speed (sim-time per wall-second)" />
+        <button id="btn-speed-up" title="Speed × 10">+</button>
+        <span class="speed-unit">ms/s</span>
         <span style="width:1px;height:16px;background:var(--toolbar-border);margin:0 6px;"></span>
         <button id="btn-dark-mode" title="Toggle light/dark mode" aria-label="Toggle light/dark mode">&#9790;</button>
       </div>

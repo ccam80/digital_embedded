@@ -1,0 +1,1315 @@
+{
+  "summary": {
+    "vitest": {
+      "passed": 9919,
+      "failed": 0,
+      "skipped": 0,
+      "totalFiles": 330,
+      "durationSeconds": 16.2
+    },
+    "playwright": {
+      "passed": 264,
+      "failed": 212,
+      "skipped": 0,
+      "totalFiles": 21,
+      "durationSeconds": 786.0619370000001
+    },
+    "totalFailed": 212,
+    "totalPassed": 10183
+  },
+  "failures": {
+    "vitest": [],
+    "playwright": [
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 2,
+        "locations": [
+          {
+            "file": "gui/analog-ui-fixup.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 140,
+            "column": 3
+          },
+          {
+            "file": "gui/workflow-tests.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 619,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+        "count": 209,
+        "locations": [
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "In at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "In at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "In at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "In at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "In at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "In at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Out at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Out at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Out at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Out at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Out at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Out at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Add at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Add at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Add at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Add at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Add at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Sub at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Sub at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Sub at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Sub at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Sub at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Mul at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Mul at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Mul at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Mul at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Mul at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Div at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Div at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Div at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Div at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Div at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "MagnitudeComparator at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "MagnitudeComparator at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "MagnitudeComparator at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "MagnitudeComparator at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Counter at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Counter at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Counter at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Counter at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "CounterPreset at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "CounterPreset at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "CounterPreset at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "CounterPreset at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Register at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Register at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Register at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Register at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Register at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF_AS at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF_AS at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF_AS at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF_AS at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF_AS at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF_AS at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Decoder at selectorBits=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Decoder at selectorBits=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Decoder at selectorBits=3: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Decoder at selectorBits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitSelector at selectorBits=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitSelector at selectorBits=3: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitSelector at selectorBits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitSelector at selectorBits=5: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "PriorityEncoder at selectorBits=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "PriorityEncoder at selectorBits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BarrelShifter at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BarrelShifter at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BarrelShifter at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BarrelShifter at bitWidth=32: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Driver at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Driver at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Driver at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Driver at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DriverInvSel at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DriverInvSel at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DriverInvSel at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DriverInvSel at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Delay at bitWidth=1: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Delay at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Delay at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Delay at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BusSplitter at bitWidth=2: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BusSplitter at bitWidth=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BusSplitter at bitWidth=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BusSplitter at bitWidth=16: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC at bits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC at bits=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ADC at bits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ADC at bits=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=1 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=1 data=4: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=1 data=8: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=2 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=2 data=4: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=3 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Multiplexer sel=4 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Demultiplexer sel=1 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Demultiplexer sel=1 data=4: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Demultiplexer sel=2 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Demultiplexer sel=2 data=4: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Demultiplexer sel=3 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Demultiplexer sel=4 data=1: set properties and compile",
+            "line": 604,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ROM addr=2 data=4: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ROM addr=4 data=8: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ROM addr=8 data=16: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ROMDualPort addr=2 data=8: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ROMDualPort addr=4 data=16: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMSinglePort addr=2 data=4: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMSinglePort addr=4 data=8: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMSinglePort addr=8 data=16: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMDualPort addr=2 data=8: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMDualPort addr=4 data=16: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMAsync addr=2 data=4: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RAMAsync addr=4 data=8: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "EEPROM addr=2 data=4: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "EEPROM addr=4 data=8: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "EEPROM addr=8 data=16: set properties and compile",
+            "line": 646,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitExtender 4→8: set properties and compile",
+            "line": 680,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitExtender 8→16: set properties and compile",
+            "line": 680,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "BitExtender 16→32: set properties and compile",
+            "line": 680,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Splitter 4,4→8: set properties and compile",
+            "line": 707,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Splitter 8,8→16: set properties and compile",
+            "line": 707,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Splitter 4,4,4,4→16: set properties and compile",
+            "line": 707,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Splitter 16,16→32: set properties and compile",
+            "line": 707,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Tunnel at bitWidth=1: set property and compile",
+            "line": 724,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Tunnel at bitWidth=4: set property and compile",
+            "line": 724,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Tunnel at bitWidth=8: set property and compile",
+            "line": 724,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Tunnel at bitWidth=16: set property and compile",
+            "line": 724,
+            "column": 7
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "And works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Or works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "Not works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NAnd works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "NOr works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XOr works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "XNOr works in cmos mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "D_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "JK_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RS_FF works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "RS_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "T_FF works in digital mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "T_FF works in behavioral mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "VoltageComparator works in analog mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "VoltageComparator works in mixed mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC works in mixed mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ADC works in mixed mode",
+            "line": 766,
+            "column": 9
+          },
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "changing BF on BJT via primary param row changes output voltage",
+            "line": 124,
+            "column": 3
+          },
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "rOut override affects simulation output in mixed-signal mode",
+            "line": 215,
+            "column": 3
+          },
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "selecting Pin Loading: Loaded shows checkmark and simulation continues without error",
+            "line": 299,
+            "column": 3
+          },
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "switching to Pin Loading: Ideal produces valid finite simulation output",
+            "line": 341,
+            "column": 3
+          },
+          {
+            "file": "gui/master-circuit-assembly.spec.ts",
+            "test": "Master 1: digital logic — gates, flip-flop, counter",
+            "line": 46,
+            "column": 3
+          },
+          {
+            "file": "gui/master-circuit-assembly.spec.ts",
+            "test": "Master 2: analog — switched divider, RC, opamp, BJT",
+            "line": 207,
+            "column": 3
+          },
+          {
+            "file": "gui/spice-model-panel.spec.ts",
+            "test": "IS override affects BJT collector current",
+            "line": 156,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/master-circuit-assembly.spec.ts",
+            "test": "Master 3: mixed-signal — DAC, RC, comparator, counter",
+            "line": 414,
+            "column": 3
+          }
+        ]
+      }
+    ]
+  }
+}

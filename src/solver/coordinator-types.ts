@@ -22,17 +22,16 @@ import type { ResolvedPin } from "../core/pin.js";
 /**
  * Result of computeFrameSteps — describes how to advance simulation this frame.
  *
- * For discrete timing: steps > 0, simTimeGoal is null, budgetMs is Infinity.
- * For continuous timing: steps is 0, simTimeGoal is the target simTime, budgetMs limits wall time.
+ * simTimeGoal is the target simTime to reach; budgetMs limits wall time per frame.
  */
 export interface FrameStepResult {
-  /** How many coordinator.step() calls to make this frame (discrete only). */
+  /** Reserved (always 0 in continuous mode). */
   steps: number;
-  /** For continuous: the simTime goal to reach. Null for discrete. */
+  /** The simTime goal to reach this frame. */
   simTimeGoal: number | null;
-  /** Wall-clock budget in ms (for continuous time-limited stepping). */
+  /** Wall-clock budget in ms for stepping. */
   budgetMs: number;
-  /** Whether the frame missed its target (continuous only). */
+  /** Whether the frame missed its target (couldn't keep up with requested speed). */
   missed: boolean;
 }
 
@@ -160,20 +159,19 @@ export interface SimulationCoordinator {
 
   /**
    * Timing model active in this coordinator.
-   * - 'discrete': steps are unitless counts (digital). Speed = steps/s.
-   * - 'continuous': steps advance simTime in seconds (analog). Speed = sim-s/wall-s.
-   * - 'mixed': both timing models active; continuous dominates the render loop.
+   * - 'discrete': digital-only (legacy, not used in UI).
+   * - 'continuous': analog or mixed-signal. Speed = sim-s/wall-s.
+   * - 'mixed': both digital and analog backends active.
    */
   readonly timingModel: 'discrete' | 'continuous' | 'mixed';
 
   /**
-   * Compute how many steps to execute this frame given wall-clock delta.
-   * For discrete: uses steps/s rate.
-   * For continuous/mixed: uses sim-s/wall-s rate + budget limiting.
+   * Compute how to advance simulation this frame given wall-clock delta.
+   * Uses sim-s/wall-s rate with budget limiting.
    */
   computeFrameSteps(wallDtSeconds: number): FrameStepResult;
 
-  /** Current speed setting. Units depend on timingModel (steps/s or sim-s/wall-s). */
+  /** Current speed setting in sim-seconds per wall-second. */
   speed: number;
 
   /** Multiply speed by factor, clamped to valid range. */

@@ -12,12 +12,15 @@ test.describe('GUI: simulation controls', () => {
     await page.locator('#sim-canvas').waitFor({ state: 'visible' });
   });
 
-  test('Step button is clickable and does not crash', async ({ page }) => {
-    const stepBtn = page.locator('#btn-tb-step');
+  test('Step-by button is clickable and does not crash', async ({ page }) => {
+    const stepBtn = page.locator('#btn-step-by');
     await expect(stepBtn).toBeVisible();
     await stepBtn.click();
 
-    // App should still be functional after stepping with no circuit
+    // Dropdown should appear
+    await expect(page.locator('#step-dropdown')).toBeVisible();
+
+    // App should still be functional
     await expect(page.locator('#sim-canvas')).toBeVisible();
   });
 
@@ -56,10 +59,8 @@ test.describe('GUI: simulation controls', () => {
 
   test('Speed controls exist', async ({ page }) => {
     const speedInput = page.locator('#speed-input');
-    const speedDown = page.locator('#btn-speed-down');
-    const speedUp = page.locator('#btn-speed-up');
+    const stepByBtn = page.locator('#btn-step-by');
     await expect(speedInput).toBeVisible();
-    await expect(speedDown).toBeVisible();
-    await expect(speedUp).toBeVisible();
+    await expect(stepByBtn).toBeVisible();
   });
 });

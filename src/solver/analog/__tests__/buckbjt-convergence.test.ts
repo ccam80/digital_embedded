@@ -1,5 +1,5 @@
 /**
- * Headless convergence regression test for fixtures/buckbjt.dig.
+ * Headless convergence regression test for fixtures/buckbjt.dts.
  *
  * This circuit is a BJT buck converter: NPN + PNP push-pull driver, NMOS
  * power switch, inductor, freewheeling diode, output capacitor, and
@@ -20,20 +20,20 @@ const registry = createDefaultRegistry();
 
 function loadBuckBjt(): ReturnType<DefaultSimulatorFacade['compile']> {
   const facade = new DefaultSimulatorFacade(registry);
-  const xml = readFileSync(resolve(__dirname, '../../../../fixtures/buckbjt.dig'), 'utf-8');
-  const circuit = facade.loadDigXml(xml);
+  const json = readFileSync(resolve(__dirname, '../../../../fixtures/buckbjt.dts'), 'utf-8');
+  const circuit = facade.deserialize(json);
   return facade.compile(circuit);
 }
 
-describe('buckbjt.dig convergence', () => {
+describe('buckbjt.dts convergence', () => {
   it('compiles without throwing', () => {
     expect(() => loadBuckBjt()).not.toThrow();
   });
 
   it('DC operating point converges', () => {
     const facade = new DefaultSimulatorFacade(registry);
-    const xml = readFileSync(resolve(__dirname, '../../../../fixtures/buckbjt.dig'), 'utf-8');
-    const circuit = facade.loadDigXml(xml);
+    const json = readFileSync(resolve(__dirname, '../../../../fixtures/buckbjt.dts'), 'utf-8');
+    const circuit = facade.deserialize(json);
     facade.compile(circuit);
 
     const dcOp = facade.getDcOpResult();

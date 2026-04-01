@@ -1,7 +1,7 @@
 /**
  * E2E regression test — BJT buck converter convergence.
  *
- * Loads fixtures/buckbjt.dig via postMessage (same as a user opening a file),
+ * Loads fixtures/buckbjt.dts via postMessage (same as a user opening a file),
  * clicks Step (which triggers compileAndBind + coordinator.step), and verifies
  * that no convergence error appears in the status bar.
  *
@@ -24,7 +24,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const fixturesDir = resolve(__dirname, '../../fixtures');
 
-/** Probe labels present in the buckbjt.dig fixture. */
+/** Probe labels present in the buckbjt.dts fixture. */
 const PROBE_LABELS = ['V_SUPPLY', 'V_SWITCH', 'V_OUT'] as const;
 
 /**
@@ -108,9 +108,9 @@ test.describe('BJT buck converter convergence', () => {
     await page.waitForTimeout(500);
   });
 
-  test('load buckbjt.dig and step — no convergence error, voltages sane', async () => {
+  test('load buckbjt.dts and step — no convergence error, voltages sane', async () => {
     // Load the fixture exactly as a user would (via postMessage)
-    const xml = readFileSync(resolve(fixturesDir, 'buckbjt.dig'), 'utf-8');
+    const xml = readFileSync(resolve(fixturesDir, 'buckbjt.dts'), 'utf-8');
     await harness.loadDigXml(xml);
 
     // Click Step — this triggers compileAndBind() then coordinator.step()
@@ -147,8 +147,8 @@ test.describe('BJT buck converter convergence', () => {
     }
   });
 
-  test('load buckbjt.dig and run briefly — voltages remain bounded', async () => {
-    const xml = readFileSync(resolve(fixturesDir, 'buckbjt.dig'), 'utf-8');
+  test('load buckbjt.dts and run briefly — voltages remain bounded', async () => {
+    const xml = readFileSync(resolve(fixturesDir, 'buckbjt.dts'), 'utf-8');
     await harness.loadDigXml(xml);
 
     // Step once first to trigger compilation (same pattern as analog-ui-fixup)
@@ -188,8 +188,8 @@ test.describe('BJT buck converter convergence', () => {
     }
   });
 
-  test('load buckbjt.dig and step 20 times — all voltages finite and evolving', async () => {
-    const xml = readFileSync(resolve(fixturesDir, 'buckbjt.dig'), 'utf-8');
+  test('load buckbjt.dts and step 20 times — all voltages finite and evolving', async () => {
+    const xml = readFileSync(resolve(fixturesDir, 'buckbjt.dts'), 'utf-8');
     await harness.loadDigXml(xml);
 
     // Step once to compile, then read initial state

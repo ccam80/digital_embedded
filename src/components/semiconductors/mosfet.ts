@@ -803,27 +803,6 @@ function buildPmosPinDeclarations(): PinDeclaration[] {
 // ---------------------------------------------------------------------------
 
 const MOSFET_PROPERTY_DEFS: PropertyDefinition[] = [
-  {
-    key: "model",
-    type: PropertyType.STRING,
-    label: "Model",
-    defaultValue: "behavioral",
-    description: "Active model selection",
-  },
-  {
-    key: "W",
-    type: PropertyType.INT,
-    label: "Width",
-    defaultValue: 1e-6,
-    description: "Channel width in meters",
-  },
-  {
-    key: "L",
-    type: PropertyType.INT,
-    label: "Length",
-    defaultValue: 1e-6,
-    description: "Channel length in meters",
-  },
   LABEL_PROPERTY_DEF,
 ];
 
@@ -837,16 +816,8 @@ export const MOSFET_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
     propertyKey: "model",
     convert: (v) => v,
   },
-  {
-    xmlName: "W",
-    propertyKey: "W",
-    convert: (v) => parseFloat(v),
-  },
-  {
-    xmlName: "L",
-    propertyKey: "L",
-    convert: (v) => parseFloat(v),
-  },
+  { xmlName: "W", propertyKey: "W", convert: (v) => parseFloat(v), modelParam: true },
+  { xmlName: "L", propertyKey: "L", convert: (v) => parseFloat(v), modelParam: true },
   {
     xmlName: "Label",
     propertyKey: "label",

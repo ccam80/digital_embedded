@@ -88,14 +88,14 @@ export class MockCoordinator implements SimulationCoordinator {
   get simTime(): number | null { return null; }
   getState(): EngineState { return EngineState.STOPPED; }
 
-  get timingModel(): 'discrete' | 'continuous' | 'mixed' { return 'discrete'; }
-  get speed(): number { return 1000; }
+  get timingModel(): 'discrete' | 'continuous' | 'mixed' { return 'continuous'; }
+  get speed(): number { return 1e-3; }
   set speed(_value: number) { /* no-op */ }
   adjustSpeed(_factor: number): void { /* no-op */ }
   parseSpeed(_text: string): void { /* no-op */ }
-  formatSpeed(): { value: string; unit: string } { return { value: '1', unit: 'kHz' }; }
+  formatSpeed(): { value: string; unit: string } { return { value: '1', unit: 'ms/s' }; }
   computeFrameSteps(_wallDtSeconds: number): FrameStepResult {
-    return { steps: 1, simTimeGoal: null, budgetMs: Infinity, missed: false };
+    return { steps: 0, simTimeGoal: 0.001, budgetMs: 12, missed: false };
   }
 
   advanceClocks(): void { /* no-op */ }

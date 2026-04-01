@@ -38,12 +38,16 @@ export interface SimulationController {
   invalidateCompiled(): void;
   startSimulation(): void;
   stopSimulation(): void;
+  /** Pause simulation without destroying compiled state (resumable). */
+  pauseSimulation(): void;
   isSimActive(): boolean;
   loadEngineSettings(): EngineSettings;
   saveEngineSettings(settings: EngineSettings): void;
   applyCurrentVizSettings(s: EngineSettings): void;
   /** Sync the speed display DOM elements to the current coordinator speed. */
   updateSpeedDisplay(): void;
+  /** Sync the play/pause button icon to the current engine state. */
+  updateRunButtonIcon(): void;
   /** Exposed for selection onChange and context menu in app-init */
   activeSliderPanel: SliderPanel | null;
 }
@@ -352,6 +356,8 @@ export function initSimulationController(
   // Simulation loop
   // -------------------------------------------------------------------------
 
+  let _lastSpeedWarningTime = 0;
+
   function _startRenderLoop(coordinator: SimulationCoordinator): void {
     let lastTime = performance.now();
 
@@ -367,9 +373,9 @@ export function initSimulationController(
       const frame = coordinator.computeFrameSteps(wallDt);
 
       try {
+        const stepStart = performance.now();
+        facade.step(coordinator);
         if (frame.simTimeGoal !== null) {
-          const stepStart = performance.now();
-          facade.step(coordinator);
           while (coordinator.simTime! < frame.simTimeGoal) {
             if (performance.now() - stepStart > frame.budgetMs) break;
             facade.step(coordinator);
@@ -379,9 +385,13 @@ export function initSimulationController(
               return;
             }
           }
-        } else {
-          for (let i = 0; i < frame.steps; i++) {
-            facade.step(coordinator);
+        }
+        // Speed warning: detect when we couldn't keep up with the target
+        if (frame.simTimeGoal !== null && coordinator.simTime! < frame.simTimeGoal) {
+          const now2 = performance.now();
+          if (now2 - _lastSpeedWarningTime > 2000) {
+            _lastSpeedWarningTime = now2;
+            ctx.showStatus('Simulation running slower than requested speed');
           }
         }
       } catch (err) {
@@ -390,9 +400,7 @@ export function initSimulationController(
         return;
       }
 
-      if (coordinator.timingModel !== 'discrete') {
-        _updateAnalogVisualization(coordinator, wallDt);
-      }
+      _updateAnalogVisualization(coordinator, wallDt);
 
       renderPipeline.scheduleRender();
       runRafHandle = requestAnimationFrame(tick);
@@ -407,9 +415,7 @@ export function initSimulationController(
     ctx.selection.clear();
     coordinator.start();
 
-    if (coordinator.timingModel !== 'discrete') {
-      _activateAnalogVisualization(coordinator);
-    }
+    _activateAnalogVisualization(coordinator);
 
     _startRenderLoop(coordinator);
   }
@@ -433,9 +439,14 @@ export function initSimulationController(
   function updateSpeedDisplay(): void {
     if (!speedInput) return;
     const fmt = facade.getCoordinator().formatSpeed();
-    speedInput.value = String(facade.getCoordinator().speed);
+    speedInput.value = fmt.value;
     if (speedUnitEl) speedUnitEl.textContent = fmt.unit;
   }
+
+  speedInput?.addEventListener('change', () => {
+    facade.getCoordinator().parseSpeed(speedInput.value);
+    updateSpeedDisplay();
+  });
 
   document.getElementById('btn-speed-down')?.addEventListener('click', () => {
     facade.getCoordinator().adjustSpeed(0.1);
@@ -444,11 +455,6 @@ export function initSimulationController(
 
   document.getElementById('btn-speed-up')?.addEventListener('click', () => {
     facade.getCoordinator().adjustSpeed(10);
-    updateSpeedDisplay();
-  });
-
-  speedInput?.addEventListener('change', () => {
-    facade.getCoordinator().parseSpeed(speedInput.value);
     updateSpeedDisplay();
   });
 
@@ -501,32 +507,6 @@ export function initSimulationController(
     renderPipeline.scheduleRender();
   });
 
-  document.getElementById('btn-step-to-time')?.addEventListener('click', async () => {
-    if (!ctx.ensureCompiled()) return;
-    const coordinator = facade.getCoordinator();
-    if (coordinator.getState() === EngineState.RUNNING) coordinator.stop();
-    const input = document.getElementById('step-to-time-input') as HTMLInputElement | null;
-    const btn = document.getElementById('btn-step-to-time') as HTMLButtonElement | null;
-    const raw = input?.value ?? '1m';
-    const delta = parseTimeValue(raw);
-    if (delta <= 0 || !isFinite(delta)) {
-      ctx.showStatus(`Invalid time value: "${raw}". Use SI suffixes: 1m, 100u, 1n.`, true);
-      return;
-    }
-    const currentTime = coordinator.simTime ?? 0;
-    if (btn) btn.disabled = true;
-    try {
-      await coordinator.stepToTime(currentTime + delta);
-      ctx.clearStatus();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      ctx.showStatus(`Simulation error: ${msg}`, true);
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-    renderPipeline.scheduleRender();
-  });
-
   document.getElementById('btn-run-to-break')?.addEventListener('click', () => {
     if (!ctx.ensureCompiled()) return;
     const coordinator = facade.getCoordinator();
@@ -545,16 +525,123 @@ export function initSimulationController(
     renderPipeline.scheduleRender();
   });
 
-  // Toolbar mirror buttons
-  document.getElementById('btn-tb-step')?.addEventListener('click', () => {
-    document.getElementById('btn-step')?.click();
+  // -------------------------------------------------------------------------
+  // Play/Pause toggle
+  // -------------------------------------------------------------------------
+
+  const runBtn = document.getElementById('btn-tb-run') as HTMLButtonElement | null;
+
+  function updateRunButtonIcon(): void {
+    if (!runBtn) return;
+    if (isSimActive()) {
+      runBtn.innerHTML = '&#10074;&#10074;';  // ❚❚ pause
+      runBtn.title = 'Pause simulation';
+    } else {
+      runBtn.innerHTML = '&#9654;';  // ▶ play
+      runBtn.title = 'Start simulation';
+    }
+  }
+
+  function pauseSimulation(): void {
+    if (runRafHandle !== -1) {
+      cancelAnimationFrame(runRafHandle);
+      runRafHandle = -1;
+    }
+    facade.getCoordinator().stop();
+    updateRunButtonIcon();
+    renderPipeline.scheduleRender();
+  }
+
+  runBtn?.addEventListener('click', () => {
+    if (isSimActive()) {
+      pauseSimulation();
+    } else {
+      if (!ctx.ensureCompiled()) return;
+      startSimulation();
+      updateRunButtonIcon();
+    }
   });
-  document.getElementById('btn-tb-run')?.addEventListener('click', () => {
-    document.getElementById('btn-run')?.click();
-  });
+
+  // Stop = destructive reset
   document.getElementById('btn-tb-stop')?.addEventListener('click', () => {
     document.getElementById('btn-stop')?.click();
+    updateRunButtonIcon();
   });
+
+  // -------------------------------------------------------------------------
+  // Step-by dropdown
+  // -------------------------------------------------------------------------
+
+  let currentStepDelta = 1e-3; // default 1ms
+  const stepByLabel = document.getElementById('step-by-label');
+  const stepDropdown = document.getElementById('step-dropdown');
+  const stepBtn = document.getElementById('btn-step-by');
+
+  // Toggle dropdown
+  stepBtn?.addEventListener('click', () => {
+    stepDropdown?.classList.toggle('open');
+  });
+
+  // Close on click outside
+  document.addEventListener('click', (e) => {
+    if (stepDropdown?.classList.contains('open') &&
+        !(e.target as HTMLElement)?.closest('.step-dropdown-container')) {
+      stepDropdown.classList.remove('open');
+    }
+  });
+
+  // Preset click handler
+  stepDropdown?.addEventListener('click', async (e) => {
+    const target = (e.target as HTMLElement).closest('.step-preset') as HTMLElement | null;
+    if (!target) return;
+
+    // Custom toggle
+    if (target.id === 'step-custom-toggle') {
+      const row = document.getElementById('step-custom-row');
+      if (row) row.style.display = row.style.display === 'none' ? 'block' : 'none';
+      return;
+    }
+
+    const timeStr = target.dataset.time;
+    if (!timeStr) return;
+
+    currentStepDelta = parseFloat(timeStr);
+    if (stepByLabel) stepByLabel.textContent = target.textContent ?? '';
+    stepDropdown.classList.remove('open');
+
+    // Immediately step by the selected amount
+    await _executeStepBy(currentStepDelta);
+  });
+
+  // Custom input
+  document.getElementById('step-custom-input')?.addEventListener('keydown', async (e) => {
+    if (e.key !== 'Enter') return;
+    const input = e.target as HTMLInputElement;
+    const delta = parseTimeValue(input.value);
+    if (delta <= 0 || !isFinite(delta)) {
+      ctx.showStatus(`Invalid time: "${input.value}". Use SI suffixes: 1m, 100u, 1n.`, true);
+      return;
+    }
+    currentStepDelta = delta;
+    if (stepByLabel) stepByLabel.textContent = input.value;
+    stepDropdown?.classList.remove('open');
+    await _executeStepBy(delta);
+  });
+
+  async function _executeStepBy(delta: number): Promise<void> {
+    if (!ctx.ensureCompiled()) return;
+    const coordinator = facade.getCoordinator();
+    if (coordinator.getState() === EngineState.RUNNING) pauseSimulation();
+    const currentTime = coordinator.simTime ?? 0;
+    try {
+      await coordinator.stepToTime(currentTime + delta);
+      ctx.clearStatus();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      ctx.showStatus(`Simulation error: ${msg}`, true);
+    }
+    renderPipeline.scheduleRender();
+  }
 
   // -------------------------------------------------------------------------
   // Return controller interface
@@ -565,11 +652,13 @@ export function initSimulationController(
     invalidateCompiled,
     startSimulation,
     stopSimulation,
+    pauseSimulation,
     isSimActive,
     loadEngineSettings,
     saveEngineSettings,
     applyCurrentVizSettings,
     updateSpeedDisplay,
+    updateRunButtonIcon,
     get activeSliderPanel() { return activeSliderPanel; },
     set activeSliderPanel(v) { activeSliderPanel = v; },
   };
