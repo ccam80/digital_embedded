@@ -235,17 +235,24 @@
     .step-dropdown-container {
       position: relative;
     }
-    #btn-step-by {
+    .step-btn-group {
+      display: inline-flex;
+      border: 1px solid var(--toolbar-border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .step-btn-group button {
       font-size: 11px;
       padding: 1px 6px;
       background: transparent;
-      border: 1px solid var(--toolbar-border);
+      border: none;
       color: var(--fg);
       cursor: pointer;
-      border-radius: 3px;
       white-space: nowrap;
+      border-right: 1px solid var(--toolbar-border);
     }
-    #btn-step-by:hover { background: var(--panel-border); }
+    .step-btn-group button:last-child { border-right: none; }
+    .step-btn-group button:hover { background: var(--panel-border); }
     .step-dropdown {
       display: none;
       position: absolute;
@@ -613,11 +620,25 @@
       height: 100%;
     }
     #viewer-timing-container.active { display: flex; }
-    #viewer-timing-container canvas {
+    .scope-panel-wrapper {
+      flex: 1 1 0;
+      min-width: 50px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+    }
+    .scope-panel-wrapper canvas {
       flex: 1;
       min-width: 0;
       height: 100%;
     }
+    .panel-splitter {
+      width: 4px;
+      flex-shrink: 0;
+      cursor: col-resize;
+      background: #333;
+    }
+    .panel-splitter:hover { background: var(--accent); }
     #viewer-values {
       display: none;
       width: 100%;
@@ -1877,7 +1898,7 @@
       .menubar-speed #speed-input,
       .menubar-speed .speed-unit,
       .menubar-speed .speed-label,
-      .menubar-speed #btn-step-by span {
+      .menubar-speed #btn-step-time span {
         display: none;
       }
       .menu-drawer {
@@ -2325,7 +2346,11 @@
         <button id="btn-tb-run" title="Start simulation">&#9654;</button>
         <button id="btn-tb-stop" title="Stop &amp; reset simulation">&#9632;</button>
         <div class="step-dropdown-container">
-          <button id="btn-step-by" title="Step by time increment">Step: <span id="step-by-label">1ms</span> &#9662;</button>
+          <span class="step-btn-group">
+            <button id="btn-step-to" title="Advance by time at current speed">&#9654;&#10073;</button>
+            <button id="btn-step-time" title="Select time increment"><span id="step-by-label">1ms</span> &#9662;</button>
+            <button id="btn-step-ff" title="Fast-forward to time (max speed)">&#9193;</button>
+          </span>
           <div class="step-dropdown" id="step-dropdown">
             <div class="step-preset" data-time="1e-9">1ns</div>
             <div class="step-preset" data-time="1e-8">10ns</div>

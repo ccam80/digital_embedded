@@ -84,6 +84,8 @@ export class MockCoordinator implements SimulationCoordinator {
   dcOperatingPoint(): DcOpResult | null { return null; }
   acAnalysis(_params: AcParams): AcResult | null { return null; }
   async stepToTime(_targetSimTime: number, _budgetMs?: number): Promise<number> { return 0; }
+  syncTimeTarget(): void { /* no-op */ }
+  addTimeBreakpoint(_time: number): void { /* no-op */ }
 
   get simTime(): number | null { return null; }
   getState(): EngineState { return EngineState.STOPPED; }

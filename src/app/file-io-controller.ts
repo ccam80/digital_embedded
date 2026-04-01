@@ -278,7 +278,6 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
 
     const root: DirNode = { files: [], children: new Map() };
     for (const key of files.keys()) {
-      if (key.endsWith('.dig')) continue;
       const parts = key.split('/');
       const fileName = parts.pop()!;
       let node = root;
@@ -324,7 +323,7 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
         const fullKey = pathPrefix ? `${pathPrefix}/${name}` : name;
         const item = document.createElement('div');
         item.className = 'menu-action';
-        item.textContent = name + '.dig';
+        item.textContent = name;
         item.addEventListener('click', () => {
           openFromStoredFolder(fullKey);
         });
@@ -349,7 +348,7 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
     if (!currentFolderFiles) return;
     const xml = currentFolderFiles.get(name);
     if (!xml) {
-      ctx.showStatus(`File "${name}.dig" not found in folder`, true);
+      ctx.showStatus(`File "${name}" not found in folder`, true);
       return;
     }
     try {
@@ -364,12 +363,20 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
         new EmbeddedResolver(siblingMap),
         httpResolver,
       ]);
-      const loaded = await loadWithSubcircuits(xml, folderResolver, registry);
+      // Format detection — same logic as direct file open
+      let loaded: Circuit;
+      const firstChar = xml.replace(/^\s+/, '').charAt(0);
+      if (firstChar === '{' || firstChar === '[') {
+        const result = deserializeDts(xml, registry);
+        loaded = result.circuit;
+      } else {
+        loaded = await loadWithSubcircuits(xml, folderResolver, registry);
+      }
       applyLoadedCircuit(loaded);
       ctx.getCircuit().metadata.name = name.split('/').pop() || name;
       updateCircuitName();
       const scCount = siblingMap.size / 2;
-      ctx.showStatus(`Loaded ${name}.dig (${scCount} subcircuit file${scCount !== 1 ? 's' : ''} available)`);
+      ctx.showStatus(`Loaded ${name} (${scCount} sibling file${scCount !== 1 ? 's' : ''} available)`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('Failed to load circuit from folder:', msg);
@@ -405,7 +412,7 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
 
       const item = document.createElement('div');
       item.className = 'circuit-picker-item';
-      item.textContent = fileName + '.dig';
+      item.textContent = fileName;
       item.addEventListener('click', () => {
         overlay.remove();
         openFromStoredFolder(key);
@@ -422,21 +429,30 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
 
     const digFiles = new Map<string, string>();
     let folderName = '';
+    const CIRCUIT_EXTS = ['.dig', '.dts', '.json'];
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
-      if (f.name.endsWith('.dig')) {
-        const name = f.name.replace(/\.dig$/, '');
+      const ext = CIRCUIT_EXTS.find(e => f.name.endsWith(e));
+      if (ext) {
         const relPath = (f as File & { webkitRelativePath?: string }).webkitRelativePath;
-        if (relPath && !folderName) {
-          folderName = relPath.split('/')[0] || name;
+        // Use relative path (minus root folder) to preserve directory structure;
+        // fall back to bare filename if webkitRelativePath is unavailable.
+        let key: string;
+        if (relPath) {
+          // relPath = "rootFolder/sub/file.dig" → strip root folder + extension
+          const parts = relPath.split('/');
+          if (!folderName) folderName = parts[0] || f.name.replace(/\.[^.]+$/, '');
+          key = parts.slice(1).join('/').replace(/\.[^.]+$/, '');
+        } else {
+          key = f.name.replace(/\.[^.]+$/, '');
         }
         const content = await f.text();
-        digFiles.set(name, content);
+        digFiles.set(key, content);
       }
     }
 
     if (digFiles.size === 0) {
-      ctx.showStatus('No .dig files found in selected folder', true);
+      ctx.showStatus('No circuit files found in selected folder', true);
       return;
     }
 

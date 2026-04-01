@@ -171,6 +171,18 @@ export interface SimulationCoordinator {
    */
   computeFrameSteps(wallDtSeconds: number): FrameStepResult;
 
+  /**
+   * Ensure _simTimeTarget >= simTime so the render loop does not stall
+   * after a stepToTime() call that jumped ahead of the accumulated target.
+   */
+  syncTimeTarget(): void;
+
+  /**
+   * Register a breakpoint at the given simulation time so the analog engine
+   * lands exactly on it during normal render-loop stepping.
+   */
+  addTimeBreakpoint(time: number): void;
+
   /** Current speed setting in sim-seconds per wall-second. */
   speed: number;
 

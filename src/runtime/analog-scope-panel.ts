@@ -69,6 +69,9 @@ const CHANNEL_COLORS = [
   "#aaaa44",
 ];
 
+/** Digital traces always render in this colour. */
+const DIGITAL_TRACE_COLOR = "#4488ff";
+
 // ---------------------------------------------------------------------------
 // Layout constants
 // ---------------------------------------------------------------------------
@@ -195,7 +198,7 @@ export class ScopePanel implements MeasurementObserver {
   }
 
   addDigitalChannel(addr: SignalAddress, label: string, opts?: { vdd?: number; color?: string }): void {
-    const ch = this._makeChannel(label, "digital", addr, 0, opts?.color);
+    const ch = this._makeChannel(label, "digital", addr, 0, opts?.color ?? DIGITAL_TRACE_COLOR);
     ch.vdd = opts?.vdd ?? 5.0;
     this._channels.push(ch);
   }
@@ -371,55 +374,124 @@ export class ScopePanel implements MeasurementObserver {
     offsetY: number,
   ): void {
     const drawW = W - LEFT_MARGIN - RIGHT_MARGIN;
-    const drawH = H - TOP_MARGIN - BOTTOM_MARGIN;
-    if (drawW <= 0 || drawH <= 0) return;
+    const totalDrawH = H - TOP_MARGIN - BOTTOM_MARGIN;
+    if (drawW <= 0 || totalDrawH <= 0) return;
 
     const tEnd = this._viewEnd;
-    const tStart = tEnd - this._viewDuration;
+    const tStart = Math.max(0, tEnd - this._viewDuration);
 
-    // Draw grid and time axis
-    this._drawTimeGrid(ctx, tStart, tEnd, LEFT_MARGIN, offsetY + TOP_MARGIN, drawW, drawH);
+    // Separate analog and digital channels
+    const analogChannels = this._channels.filter(c => c.kind !== "digital");
+    const digitalChannels = this._channels.filter(c => c.kind === "digital");
 
-    // Compute shared Y range across all channels so traces are comparable
-    const sharedRange = this._computeSharedYRange(tStart, tEnd);
+    // Layout: digital strips stack below the analog region
+    const numDigital = digitalChannels.length;
+    const hasAnalog = analogChannels.length > 0;
+    let digitalStripH = 0;
+    let analogH = totalDrawH;
 
-    // Draw each channel using the shared viewport
-    const sharedVp: ScopeViewport = {
-      x: LEFT_MARGIN,
-      y: offsetY + TOP_MARGIN,
-      width: drawW,
-      height: drawH,
-      tStart,
-      tEnd,
-      yMin: sharedRange.yMin,
-      yMax: sharedRange.yMax,
-    };
-
-    for (const ch of this._channels) {
-      const samples = ch.buffer.getSamplesInRange(tStart, tEnd);
-
-      if (samples.time.length >= ENVELOPE_THRESHOLD) {
-        const env = ch.buffer.getEnvelope(tStart, tEnd, Math.min(drawW, 512));
-        drawEnvelopeTrace(ctx, env, sharedVp, ch.color);
+    if (numDigital > 0) {
+      if (hasAnalog) {
+        const idealStripH = totalDrawH / 4;
+        const minStripH = totalDrawH / 8;
+        const maxDigitalTotal = totalDrawH * 0.75;
+        digitalStripH = Math.max(minStripH, Math.min(idealStripH, maxDigitalTotal / numDigital));
+        analogH = totalDrawH - numDigital * digitalStripH;
       } else {
-        drawPolylineTrace(ctx, samples, sharedVp, ch.color);
-      }
-
-      // Draw stat overlay lines
-      if (ch.overlays.size > 0 && samples.value.length > 0) {
-        this._drawOverlays(ctx, ch, samples.value, sharedVp);
+        // Digital-only panel: strips fill entire area
+        digitalStripH = totalDrawH / numDigital;
+        analogH = 0;
       }
     }
 
-    // Single shared Y-axis
-    const hasCurrent = this._channels.some(c => c.kind === "current" || c.kind === "elementCurrent");
-    const hasAnalog = this._channels.some(c => c.kind === "voltage");
-    const hasDigital = this._channels.some(c => c.kind === "digital");
-    const unit = hasCurrent ? "V/A" : (hasAnalog || hasDigital) ? "V" : "";
-    drawYAxis(ctx, [sharedRange.yMin, sharedRange.yMax], sharedVp, unit, "left");
+    // Draw time grid across full area
+    this._drawTimeGrid(ctx, tStart, tEnd, LEFT_MARGIN, offsetY + TOP_MARGIN, drawW, totalDrawH);
 
-    // Channel legend
-    this._drawLegend(ctx, W, offsetY + TOP_MARGIN);
+    // --- Analog region ---
+    if (hasAnalog && analogH > 0) {
+      const sharedRange = this._computeSharedYRange(tStart, tEnd, analogChannels);
+      const analogVp: ScopeViewport = {
+        x: LEFT_MARGIN,
+        y: offsetY + TOP_MARGIN,
+        width: drawW,
+        height: analogH,
+        tStart,
+        tEnd,
+        yMin: sharedRange.yMin,
+        yMax: sharedRange.yMax,
+      };
+
+      for (const ch of analogChannels) {
+        const samples = ch.buffer.getSamplesInRange(tStart, tEnd);
+        if (samples.time.length >= ENVELOPE_THRESHOLD) {
+          const env = ch.buffer.getEnvelope(tStart, tEnd, Math.min(drawW, 512));
+          drawEnvelopeTrace(ctx, env, analogVp, ch.color);
+        } else {
+          drawPolylineTrace(ctx, samples, analogVp, ch.color);
+        }
+        if (ch.overlays.size > 0 && samples.value.length > 0) {
+          this._drawOverlays(ctx, ch, samples.value, analogVp);
+        }
+      }
+
+      const hasCurrent = analogChannels.some(c => c.kind === "current" || c.kind === "elementCurrent");
+      const unit = hasCurrent ? "V/A" : "V";
+      drawYAxis(ctx, [sharedRange.yMin, sharedRange.yMax], analogVp, unit, "left");
+    }
+
+    // --- Digital strips ---
+    if (numDigital > 0) {
+      const digitalStartY = offsetY + TOP_MARGIN + analogH;
+      for (let i = 0; i < digitalChannels.length; i++) {
+        const ch = digitalChannels[i];
+        const stripY = digitalStartY + i * digitalStripH;
+
+        // Separator line
+        ctx.save();
+        ctx.strokeStyle = "#444";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(LEFT_MARGIN, stripY);
+        ctx.lineTo(LEFT_MARGIN + drawW, stripY);
+        ctx.stroke();
+        ctx.restore();
+
+        const vdd = ch.vdd ?? 5.0;
+        const pad = Math.max(2, digitalStripH * 0.1);
+        const stripVp: ScopeViewport = {
+          x: LEFT_MARGIN,
+          y: stripY + pad,
+          width: drawW,
+          height: digitalStripH - 2 * pad,
+          tStart,
+          tEnd,
+          yMin: 0,
+          yMax: vdd,
+        };
+
+        const samples = ch.buffer.getSamplesInRange(tStart, tEnd);
+        this._drawDigitalTrace(ctx, samples, stripVp);
+
+        // Draw stat overlay lines (if any enabled on this digital channel)
+        if (ch.overlays.size > 0 && samples.value.length > 0) {
+          this._drawOverlays(ctx, ch, samples.value, stripVp);
+        }
+
+        // Label on Y-axis (signal name, no numerical scale)
+        ctx.save();
+        ctx.fillStyle = DIGITAL_TRACE_COLOR;
+        ctx.font = "10px monospace";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.fillText(ch.label, LEFT_MARGIN - 4, stripY + digitalStripH / 2);
+        ctx.restore();
+      }
+    }
+
+    // Channel legend (analog channels only)
+    if (hasAnalog) {
+      this._drawLegend(ctx, W, offsetY + TOP_MARGIN);
+    }
 
     // Time axis labels
     this._drawTimeAxisLabels(
@@ -427,9 +499,58 @@ export class ScopePanel implements MeasurementObserver {
       tStart,
       tEnd,
       LEFT_MARGIN,
-      offsetY + TOP_MARGIN + drawH,
+      offsetY + TOP_MARGIN + totalDrawH,
       drawW,
     );
+  }
+
+  /** Draw a digital signal as a step-function waveform (blue, filled). */
+  private _drawDigitalTrace(
+    ctx: CanvasRenderingContext2D,
+    samples: { time: Float64Array; value: Float64Array },
+    vp: ScopeViewport,
+  ): void {
+    const { time, value } = samples;
+    if (time.length === 0) return;
+
+    const tRange = vp.tEnd - vp.tStart;
+    const yRange = vp.yMax - vp.yMin;
+    if (tRange <= 0 || yRange <= 0) return;
+
+    ctx.save();
+
+    // Step-function trace
+    ctx.strokeStyle = DIGITAL_TRACE_COLOR;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+
+    let prevPy = 0;
+    for (let i = 0; i < time.length; i++) {
+      const px = vp.x + ((time[i] - vp.tStart) / tRange) * vp.width;
+      const py = vp.y + (1 - (value[i] - vp.yMin) / yRange) * vp.height;
+      if (i === 0) {
+        ctx.moveTo(px, py);
+      } else {
+        ctx.lineTo(px, prevPy); // horizontal at previous level
+        ctx.lineTo(px, py);     // vertical transition
+      }
+      prevPy = py;
+    }
+    // Extend to right edge at last level
+    if (time.length > 0) {
+      ctx.lineTo(vp.x + vp.width, prevPy);
+    }
+    ctx.stroke();
+
+    // Translucent fill under the trace
+    ctx.lineTo(vp.x + vp.width, vp.y + vp.height);
+    ctx.lineTo(vp.x, vp.y + vp.height);
+    ctx.closePath();
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = DIGITAL_TRACE_COLOR;
+    ctx.fill();
+
+    ctx.restore();
   }
 
   private _drawOverlays(
@@ -577,16 +698,23 @@ export class ScopePanel implements MeasurementObserver {
   private _computeSharedYRange(
     tStart: number,
     tEnd: number,
+    channels?: ScopeChannel[],
   ): { yMin: number; yMax: number } {
     let globalMin = Infinity;
     let globalMax = -Infinity;
 
-    for (const ch of this._channels) {
-      const samples = ch.buffer.getSamplesInRange(tStart, tEnd);
-      for (let i = 0; i < samples.value.length; i++) {
-        const v = samples.value[i];
-        if (v < globalMin) globalMin = v;
-        if (v > globalMax) globalMax = v;
+    for (const ch of (channels ?? this._channels)) {
+      if (!ch.autoRange) {
+        // Use the fixed range set by the user
+        if (ch.yMin < globalMin) globalMin = ch.yMin;
+        if (ch.yMax > globalMax) globalMax = ch.yMax;
+      } else {
+        const samples = ch.buffer.getSamplesInRange(tStart, tEnd);
+        for (let i = 0; i < samples.value.length; i++) {
+          const v = samples.value[i];
+          if (v < globalMin) globalMin = v;
+          if (v > globalMax) globalMax = v;
+        }
       }
     }
 

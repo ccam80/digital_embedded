@@ -321,6 +321,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
   async stepToTime(targetSimTime: number, budgetMs = 5000): Promise<number> {
     if (this._analog === null) return 0;
+    this._analog.addBreakpoint(targetSimTime);
     const wallStart = performance.now();
     let count = 0;
     const FRAME_BUDGET_MS = 12;
@@ -392,16 +393,27 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
   set speed(value: number) {
     this._analogSpeed = Math.max(1e-9, value);
+    this._syncTargetOnSpeedChange();
   }
 
   adjustSpeed(factor: number): void {
     this._analogSpeed = Math.max(1e-9, this._analogSpeed * factor);
+    this._syncTargetOnSpeedChange();
   }
 
   parseSpeed(text: string): void {
     const parsed = Number(text);
     if (Number.isFinite(parsed) && parsed > 0) {
       this._analogSpeed = parsed;
+      this._syncTargetOnSpeedChange();
+    }
+  }
+
+  /** Reset accumulated time target on speed change so debt doesn't carry over. */
+  private _syncTargetOnSpeedChange(): void {
+    const simTime = this._analog?.simTime ?? 0;
+    if (this._simTimeTarget > simTime) {
+      this._simTimeTarget = simTime;
     }
   }
 
@@ -426,6 +438,17 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       budgetMs: 12,
       missed: false,
     };
+  }
+
+  syncTimeTarget(): void {
+    const simTime = this._analog?.simTime ?? 0;
+    if (simTime > this._simTimeTarget) {
+      this._simTimeTarget = simTime;
+    }
+  }
+
+  addTimeBreakpoint(time: number): void {
+    this._analog?.addBreakpoint(time);
   }
 
   advanceClocks(): void {

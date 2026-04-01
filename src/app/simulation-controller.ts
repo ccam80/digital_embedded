@@ -357,6 +357,7 @@ export function initSimulationController(
   // -------------------------------------------------------------------------
 
   let _lastSpeedWarningTime = 0;
+  let _stepByGoal: number | null = null;
 
   function _startRenderLoop(coordinator: SimulationCoordinator): void {
     let lastTime = performance.now();
@@ -405,6 +406,14 @@ export function initSimulationController(
       }
 
       _updateAnalogVisualization(coordinator, wallDt);
+
+      // Auto-pause at step-to goal
+      if (_stepByGoal !== null && coordinator.simTime !== null && coordinator.simTime >= _stepByGoal) {
+        _stepByGoal = null;
+        coordinator.syncTimeTarget();
+        pauseSimulation();
+        return;
+      }
 
       renderPipeline.scheduleRender();
       runRafHandle = requestAnimationFrame(tick);
@@ -486,11 +495,11 @@ export function initSimulationController(
   });
 
   document.getElementById('btn-stop')?.addEventListener('click', () => {
-    if (!isSimActive()) return;
     stopSimulation();
     binding.unbind();
     facade.invalidate();
     ctx.compiledDirty = true;
+    ctx.clearStatus();
     renderPipeline.scheduleRender();
   });
 
@@ -579,11 +588,20 @@ export function initSimulationController(
   let currentStepDelta = 1e-3; // default 1ms
   const stepByLabel = document.getElementById('step-by-label');
   const stepDropdown = document.getElementById('step-dropdown');
-  const stepBtn = document.getElementById('btn-step-by');
 
-  // Toggle dropdown
-  stepBtn?.addEventListener('click', () => {
+  // Step-to: advance at current speed, auto-pause at goal
+  document.getElementById('btn-step-to')?.addEventListener('click', () => {
+    _executeStepTo(currentStepDelta);
+  });
+
+  // Time dropdown toggle
+  document.getElementById('btn-step-time')?.addEventListener('click', () => {
     stepDropdown?.classList.toggle('open');
+  });
+
+  // Fast-forward: reach target time as fast as possible
+  document.getElementById('btn-step-ff')?.addEventListener('click', () => {
+    _executeStepFf(currentStepDelta);
   });
 
   // Close on click outside
@@ -594,8 +612,8 @@ export function initSimulationController(
     }
   });
 
-  // Preset click handler
-  stepDropdown?.addEventListener('click', async (e) => {
+  // Preset click handler — selects time only, does not step
+  stepDropdown?.addEventListener('click', (e) => {
     const target = (e.target as HTMLElement).closest('.step-preset') as HTMLElement | null;
     if (!target) return;
 
@@ -612,13 +630,10 @@ export function initSimulationController(
     currentStepDelta = parseFloat(timeStr);
     if (stepByLabel) stepByLabel.textContent = target.textContent ?? '';
     stepDropdown.classList.remove('open');
-
-    // Immediately step by the selected amount
-    await _executeStepBy(currentStepDelta);
   });
 
   // Custom input
-  document.getElementById('step-custom-input')?.addEventListener('keydown', async (e) => {
+  document.getElementById('step-custom-input')?.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter') return;
     const input = e.target as HTMLInputElement;
     const delta = parseTimeValue(input.value);
@@ -629,20 +644,42 @@ export function initSimulationController(
     currentStepDelta = delta;
     if (stepByLabel) stepByLabel.textContent = input.value;
     stepDropdown?.classList.remove('open');
-    await _executeStepBy(delta);
   });
 
-  async function _executeStepBy(delta: number): Promise<void> {
+  /** Step-to: advance at current speed via the render loop, auto-pause at goal. */
+  function _executeStepTo(delta: number): void {
     if (!ctx.ensureCompiled()) return;
     const coordinator = facade.getCoordinator();
-    if (coordinator.getState() === EngineState.RUNNING) pauseSimulation();
+    const currentTime = coordinator.simTime ?? 0;
+    _stepByGoal = currentTime + delta;
+    coordinator.syncTimeTarget();
+    coordinator.addTimeBreakpoint(_stepByGoal);
+    if (coordinator.getState() !== EngineState.RUNNING) {
+      startSimulation();
+      updateRunButtonIcon();
+    }
+  }
+
+  /** Fast-forward: reach target time as fast as possible, then restore prior state. */
+  async function _executeStepFf(delta: number): Promise<void> {
+    if (!ctx.ensureCompiled()) return;
+    const coordinator = facade.getCoordinator();
+    const wasRunning = coordinator.getState() === EngineState.RUNNING;
+    if (!wasRunning) {
+      startSimulation();
+      updateRunButtonIcon();
+    }
     const currentTime = coordinator.simTime ?? 0;
     try {
       await coordinator.stepToTime(currentTime + delta);
+      coordinator.syncTimeTarget();
       ctx.clearStatus();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       ctx.showStatus(`Simulation error: ${msg}`, true);
+    }
+    if (!wasRunning) {
+      pauseSimulation();
     }
     renderPipeline.scheduleRender();
   }

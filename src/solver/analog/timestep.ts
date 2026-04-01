@@ -148,6 +148,22 @@ export class TimestepController {
     return newDt;
   }
 
+  /**
+   * Return currentDt clamped to the next breakpoint so the current step
+   * cannot overshoot a registered target time.  Called at the top of
+   * AnalogEngine.step() instead of reading `currentDt` directly.
+   */
+  getClampedDt(simTime: number): number {
+    let dt = this.currentDt;
+    if (this._breakpoints.length > 0) {
+      const remaining = this._breakpoints[0] - simTime;
+      if (remaining > 0 && dt > remaining) {
+        dt = remaining;
+      }
+    }
+    return dt;
+  }
+
   // -------------------------------------------------------------------------
   // Rejection
   // -------------------------------------------------------------------------

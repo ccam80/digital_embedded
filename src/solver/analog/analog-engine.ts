@@ -180,7 +180,7 @@ export class MNAEngine implements AnalogEngine {
 
     this._prevVoltages.set(this._voltages);
 
-    let dt = this._timestep.currentDt;
+    let dt = this._timestep.getClampedDt(this._simTime);
     const method = this._timestep.currentMethod;
 
     // Stamp companion models for reactive elements

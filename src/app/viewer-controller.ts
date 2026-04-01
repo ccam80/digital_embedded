@@ -10,6 +10,7 @@
 import type { AppContext } from './app-context.js';
 import type { RenderPipeline } from './render-pipeline.js';
 import { ScopePanel } from '../runtime/analog-scope-panel.js';
+import type { OverlayKind } from '../runtime/analog-scope-panel.js';
 import { DataTablePanel } from '../runtime/data-table.js';
 import type { SignalDescriptor, SignalGroup } from '../runtime/data-table.js';
 import type { Wire } from '../core/circuit.js';
@@ -157,13 +158,14 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
 
       // Create a canvas + ScopePanel per panel group
       const sortedIndices = [...panelGroups.keys()].sort((a, b) => a - b);
+      const wrappers: HTMLElement[] = [];
       for (const idx of sortedIndices) {
         const signals = panelGroups.get(idx)!;
 
         // Wrapper div with close button
         const wrapper = document.createElement('div');
         wrapper.className = 'scope-panel-wrapper';
-        wrapper.style.position = 'relative';
+        wrapper.style.cssText = 'flex:1 1 0;min-width:50px;position:relative;overflow:hidden;display:flex;';
 
         const closeBtn = document.createElement('button');
         closeBtn.className = 'scope-panel-close';
@@ -185,9 +187,11 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
         });
 
         const cvs = document.createElement('canvas');
+        cvs.style.cssText = 'flex:1;min-width:0;height:100%;';
         wrapper.appendChild(closeBtn);
         wrapper.appendChild(cvs);
         viewerTimingContainer.appendChild(wrapper);
+        wrappers.push(wrapper);
         // Size after DOM insertion so clientWidth/Height are available
         requestAnimationFrame(() => renderPipeline.sizeCanvasInContainer(cvs));
         const panel = new ScopePanel(cvs, coordinator);
@@ -202,6 +206,45 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
         }
         attachScopeContextMenu(cvs, panel);
         renderPipeline.state.scopePanels.push({ canvas: cvs, panel });
+      }
+
+      // Insert draggable splitters between panel wrappers
+      for (let i = 0; i < wrappers.length - 1; i++) {
+        const splitter = document.createElement('div');
+        splitter.className = 'panel-splitter';
+        splitter.style.cssText = 'width:4px;flex-shrink:0;cursor:col-resize;background:#333;';
+        wrappers[i].after(splitter);
+
+        const leftW = wrappers[i];
+        const rightW = wrappers[i + 1];
+        splitter.addEventListener('mousedown', (e: MouseEvent) => {
+          e.preventDefault();
+          const startX = e.clientX;
+          const leftRect = leftW.getBoundingClientRect();
+          const rightRect = rightW.getBoundingClientRect();
+
+          const onMove = (ev: MouseEvent) => {
+            const dx = ev.clientX - startX;
+            const newLeftPx = Math.max(50, leftRect.width + dx);
+            const newRightPx = Math.max(50, rightRect.width - dx);
+            leftW.style.flexGrow = String(newLeftPx);
+            rightW.style.flexGrow = String(newRightPx);
+            // Re-size canvases on next frame
+            requestAnimationFrame(() => {
+              for (const sp of renderPipeline.state.scopePanels) {
+                renderPipeline.sizeCanvasInContainer(sp.canvas);
+                sp.panel.render();
+              }
+            });
+          };
+
+          const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          };
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
       }
     }
 
@@ -524,102 +567,227 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
 
       const items: MenuItem[] = [];
       const channels = panel.getChannelDescriptors();
-      const fftOn = panel.isFftEnabled();
 
-      // Toggle FFT / time-domain view
-      items.push({
-        label: fftOn ? 'Switch to Time Domain' : 'Switch to Spectrum (FFT)',
-        action: () => {
-          panel.setFftEnabled(!fftOn);
-          if (!fftOn && channels.length > 0) {
-            panel.setFftChannel(channels[0].label);
-          }
-          panel.render();
-        },
-        enabled: true,
-      });
-
-      // Stat overlays — toggle for all channels at once
-      items.push(separator());
-      const overlayOpts: Array<{ kind: import('../runtime/analog-scope-panel.js').OverlayKind; label: string }> = [
-        { kind: 'mean', label: 'Mean' },
-        { kind: 'max', label: 'Max' },
-        { kind: 'min', label: 'Min' },
-        { kind: 'rms', label: 'RMS' },
-      ];
-      for (const ov of overlayOpts) {
-        // Check if any channel has this overlay active
-        const anyActive = channels.some(ch => ch.overlays.has(ov.kind));
+      // Remove channels
+      for (const ch of channels) {
         items.push({
-          label: `${anyActive ? '\u2713 ' : ''}Overlay ${ov.label}`,
+          label: `Remove "${ch.label}"`,
           action: () => {
-            for (const ch of channels) { panel.toggleOverlay(ch.label, ov.kind); }
-            panel.render();
+            panel.removeChannel(ch.label);
+            const sigIdx = watchedSignals.findIndex(s => s.name === ch.label);
+            if (sigIdx >= 0) watchedSignals.splice(sigIdx, 1);
+            _syncTracesToMetadata();
+            const remaining = panel.getChannelDescriptors();
+            if (remaining.length === 0 && watchedSignals.length === 0) {
+              closeViewer();
+            } else {
+              panel.render();
+            }
           },
-          enabled: channels.length > 0,
+          enabled: true,
         });
       }
 
-      // Per-channel Y range
+      // Trace Properties modal
       if (channels.length > 0) {
         items.push(separator());
-        for (const ch of channels) {
-          if (ch.autoRange) {
-            items.push({
-              label: `${ch.label}: Set Y Range\u2026`,
-              action: () => {
-                const input = prompt(`Y range for "${ch.label}" (min, max):`, `${ch.yMin.toPrecision(3)}, ${ch.yMax.toPrecision(3)}`);
-                if (!input) return;
-                const parts = input.split(',').map(s => parseFloat(s.trim()));
-                if (parts.length === 2 && isFinite(parts[0]) && isFinite(parts[1])) {
-                  panel.setYRange(ch.label, parts[0], parts[1]);
-                  panel.render();
-                }
-              },
-              enabled: true,
-            });
-          } else {
-            items.push({
-              label: `${ch.label}: Auto Y Range`,
-              action: () => {
-                panel.setAutoYRange(ch.label);
-                panel.render();
-              },
-              enabled: true,
-            });
-          }
-        }
-      }
-
-      // Remove channels
-      if (channels.length > 0) {
-        items.push(separator());
-        for (const ch of channels) {
-          items.push({
-            label: `Remove "${ch.label}"`,
-            action: () => {
-              panel.removeChannel(ch.label);
-              // Remove matching entry from watchedSignals (voltage or current)
-              const sigIdx = watchedSignals.findIndex(s => s.name === ch.label);
-              if (sigIdx >= 0) watchedSignals.splice(sigIdx, 1);
-              _syncTracesToMetadata();
-              // Close viewer only when no channels remain at all
-              const remaining = panel.getChannelDescriptors();
-              if (remaining.length === 0 && watchedSignals.length === 0) {
-                closeViewer();
-              } else {
-                panel.render();
-              }
-            },
-            enabled: true,
-          });
-        }
+        items.push({
+          label: 'Trace Properties\u2026',
+          action: () => _showTracePropertiesModal(panel),
+          enabled: true,
+        });
       }
 
       if (items.length > 0) {
         contextMenu.showItems(e.clientX, e.clientY, items);
       }
     });
+  }
+
+  // -----------------------------------------------------------------------
+  // Trace Properties modal (replaces browser prompt for Y-range etc.)
+  // -----------------------------------------------------------------------
+
+  function _showTracePropertiesModal(panel: ScopePanel): void {
+    const channels = panel.getChannelDescriptors();
+    const fftOn = panel.isFftEnabled();
+
+    // --- Overlay ---
+    const overlay = document.createElement('div');
+    overlay.className = 'scheme-dialog-overlay';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'scheme-dialog';
+    dialog.style.width = '380px';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'scheme-dialog-header';
+    header.innerHTML = 'Trace Properties';
+    const closeX = document.createElement('button');
+    closeX.className = 'scheme-dialog-close';
+    closeX.textContent = '\u00d7';
+    closeX.style.cssText = 'background:none;border:none;color:var(--fg);font-size:18px;cursor:pointer;padding:0 4px;';
+    closeX.addEventListener('click', () => overlay.remove());
+    header.appendChild(closeX);
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'scheme-dialog-body';
+
+    // --- Per-channel Y-range sections (analog only) ---
+    interface ChannelSection { label: string; autoCheck: HTMLInputElement; yMinInput: HTMLInputElement; yMaxInput: HTMLInputElement }
+    const channelSections: ChannelSection[] = [];
+
+    for (const ch of channels) {
+      if (ch.kind === 'digital') continue;
+
+      const section = document.createElement('div');
+      section.style.cssText = 'border:1px solid var(--panel-border);border-radius:4px;padding:8px;';
+
+      const title = document.createElement('div');
+      title.style.cssText = 'font-weight:600;font-size:12px;margin-bottom:6px;';
+      title.textContent = ch.label;
+      section.appendChild(title);
+
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;';
+
+      const yLabel = document.createElement('span');
+      yLabel.style.cssText = 'font-size:11px;opacity:0.7;';
+      yLabel.textContent = 'Y Range';
+
+      const autoLabel = document.createElement('label');
+      autoLabel.style.cssText = 'font-size:11px;display:flex;align-items:center;gap:3px;';
+      const autoCheck = document.createElement('input');
+      autoCheck.type = 'checkbox';
+      autoCheck.checked = ch.autoRange;
+      autoLabel.appendChild(autoCheck);
+      autoLabel.appendChild(document.createTextNode('Auto'));
+
+      const inputCss = 'width:68px;padding:2px 4px;background:var(--bg);border:1px solid var(--panel-border);color:var(--fg);border-radius:2px;font-size:11px;font-family:monospace;';
+      const yMinInput = document.createElement('input');
+      yMinInput.type = 'number';
+      yMinInput.step = 'any';
+      yMinInput.style.cssText = inputCss;
+      yMinInput.value = ch.yMin.toPrecision(3);
+      yMinInput.disabled = ch.autoRange;
+
+      const toSpan = document.createElement('span');
+      toSpan.style.cssText = 'font-size:11px;opacity:0.7;';
+      toSpan.textContent = 'to';
+
+      const yMaxInput = document.createElement('input');
+      yMaxInput.type = 'number';
+      yMaxInput.step = 'any';
+      yMaxInput.style.cssText = inputCss;
+      yMaxInput.value = ch.yMax.toPrecision(3);
+      yMaxInput.disabled = ch.autoRange;
+
+      autoCheck.addEventListener('change', () => {
+        yMinInput.disabled = autoCheck.checked;
+        yMaxInput.disabled = autoCheck.checked;
+      });
+
+      row.append(yLabel, autoLabel, yMinInput, toSpan, yMaxInput);
+      section.appendChild(row);
+      body.appendChild(section);
+
+      channelSections.push({ label: ch.label, autoCheck, yMinInput, yMaxInput });
+    }
+
+    // --- Spectrum toggle ---
+    const specRow = document.createElement('label');
+    specRow.style.cssText = 'font-size:12px;display:flex;align-items:center;gap:6px;';
+    const specCheck = document.createElement('input');
+    specCheck.type = 'checkbox';
+    specCheck.checked = fftOn;
+    specRow.appendChild(specCheck);
+    specRow.appendChild(document.createTextNode('Show Spectrum (FFT)'));
+    body.appendChild(specRow);
+
+    // --- Overlay checkboxes ---
+    const overlayDiv = document.createElement('div');
+    const overlayTitle = document.createElement('div');
+    overlayTitle.style.cssText = 'font-size:11px;opacity:0.7;margin-bottom:4px;';
+    overlayTitle.textContent = 'Stat Overlays';
+    overlayDiv.appendChild(overlayTitle);
+
+    const overlayKinds: Array<{ kind: OverlayKind; label: string }> = [
+      { kind: 'min', label: 'Min' },
+      { kind: 'max', label: 'Max' },
+      { kind: 'mean', label: 'Mean' },
+      { kind: 'rms', label: 'RMS' },
+    ];
+    const overlayChecks = new Map<OverlayKind, HTMLInputElement>();
+    for (const ov of overlayKinds) {
+      const anyActive = channels.some(ch => ch.overlays.has(ov.kind));
+      const lbl = document.createElement('label');
+      lbl.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;margin-bottom:2px;';
+      const chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.checked = anyActive;
+      lbl.appendChild(chk);
+      lbl.appendChild(document.createTextNode(ov.label));
+      overlayDiv.appendChild(lbl);
+      overlayChecks.set(ov.kind, chk);
+    }
+    body.appendChild(overlayDiv);
+
+    // --- Footer ---
+    const footer = document.createElement('div');
+    footer.className = 'scheme-dialog-footer';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', () => overlay.remove());
+
+    const okBtn = document.createElement('button');
+    okBtn.textContent = 'OK';
+    okBtn.className = 'primary';
+    okBtn.addEventListener('click', () => {
+      // Apply Y-range
+      for (const sec of channelSections) {
+        if (sec.autoCheck.checked) {
+          panel.setAutoYRange(sec.label);
+        } else {
+          const mn = parseFloat(sec.yMinInput.value);
+          const mx = parseFloat(sec.yMaxInput.value);
+          if (isFinite(mn) && isFinite(mx) && mn < mx) {
+            panel.setYRange(sec.label, mn, mx);
+          }
+        }
+      }
+      // Spectrum
+      panel.setFftEnabled(specCheck.checked);
+      if (specCheck.checked) {
+        const descs = panel.getChannelDescriptors();
+        if (descs.length > 0) panel.setFftChannel(descs[0].label);
+      }
+      // Overlays
+      for (const [kind, chk] of overlayChecks) {
+        const wasActive = channels.some(ch => ch.overlays.has(kind));
+        if (chk.checked !== wasActive) {
+          for (const ch of channels) panel.toggleOverlay(ch.label, kind);
+        }
+      }
+      panel.render();
+      overlay.remove();
+    });
+
+    footer.append(cancelBtn, okBtn);
+
+    dialog.append(header, body, footer);
+    overlay.appendChild(dialog);
+
+    // Dismiss on backdrop click or Escape
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onEsc); }
+    };
+    document.addEventListener('keydown', onEsc);
+
+    document.body.appendChild(overlay);
   }
 
   // -------------------------------------------------------------------------

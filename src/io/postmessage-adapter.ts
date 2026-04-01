@@ -398,7 +398,8 @@ export class PostMessageAdapter {
       const facade = this._facade!;
       signals = facade.readAllSignals(facade.getCoordinator());
     }
-    this._post({ type: 'sim-signals', signals });
+    const simTime = this._facade?.getCoordinator().simTime ?? null;
+    this._post({ type: 'sim-signals', signals, simTime });
   }
 
   // -------------------------------------------------------------------------

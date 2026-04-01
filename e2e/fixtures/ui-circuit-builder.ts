@@ -756,19 +756,20 @@ export class UICircuitBuilder {
     // Format delta as an SI string that parseTimeValue understands
     const deltaStr = formatSecondsAsSI(deltaSec);
 
-    // Open the step-by dropdown
-    await this.page.locator('#btn-step-by').click();
-    // Reveal the custom input row if it's hidden (toggle is idempotent,
-    // so only click if the row is currently hidden to avoid toggling it off)
+    // Open the time dropdown, set custom time, then fast-forward
+    await this.page.locator('#btn-step-time').click();
+    // Reveal the custom input row if it's hidden
     const customRow = this.page.locator('#step-custom-row');
     const isVisible = await customRow.isVisible();
     if (!isVisible) {
       await this.page.locator('#step-custom-toggle').click();
     }
-    // Fill the custom input and press Enter to trigger the step
+    // Fill the custom input and press Enter to set the delta
     const input = this.page.locator('#step-custom-input');
     await input.fill(deltaStr);
     await input.press('Enter');
+    // Close dropdown, then click fast-forward
+    await this.page.locator('#btn-step-ff').click();
     // Wait for the async stepToTime to complete
     await this.page.waitForTimeout(200);
   }
