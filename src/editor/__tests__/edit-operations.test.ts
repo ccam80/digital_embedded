@@ -149,13 +149,15 @@ describe("EditOps", () => {
 // ---------------------------------------------------------------------------
 
 /**
- * Create a stub element with pins at specified LOCAL positions.
- * Pin world positions = element.position + pin.position (rotation=0, mirror=false).
+ * Create a stub element with pins at specified LOCAL positions and a
+ * configurable bounding box. Pin world positions = element.position +
+ * pin.position (rotation=0, mirror=false).
  */
 function makeStubWithPins(
   posX: number,
   posY: number,
   pinOffsets: Array<{ x: number; y: number }>,
+  bboxOverride?: Rect,
 ): CircuitElement {
   const id = `el-${++_idCounter}`;
   const props = new PropertyBag();
@@ -169,6 +171,10 @@ function makeStubWithPins(
     kind: "signal" as const,
   }));
 
+  // Default bbox: centered on the pin span with 1-unit padding
+  const defaultBbox: Rect = { x: posX - 1, y: posY - 1, width: 6, height: 6 };
+  const bbox = bboxOverride ?? defaultBbox;
+
   return {
     typeId: "StubComp",
     instanceId: id,
@@ -178,7 +184,7 @@ function makeStubWithPins(
     getPins: (): readonly Pin[] => pins,
     getProperties: (): PropertyBag => props,
     draw: (_ctx: RenderContext): void => {},
-    getBoundingBox: (): Rect => ({ x: posX, y: posY, width: 4, height: 4 }),
+    getBoundingBox: (): Rect => bbox,
     serialize: (): SerializedElement => ({} as SerializedElement),
     getAttribute: (_name: string): PropertyValue | undefined => undefined,
     setAttribute: (_name: string, _value: PropertyValue): void => {},
@@ -186,36 +192,42 @@ function makeStubWithPins(
 }
 
 describe("Wire punch-out on placeComponent", () => {
-  it("punches out a horizontal wire when 2 pins straddle it", () => {
+  it("punches out a horizontal wire that passes through the body", () => {
     const circuit = new Circuit();
     // Horizontal wire from (0,5) to (10,5)
     circuit.addWire(new Wire({ x: 0, y: 5 }, { x: 10, y: 5 }));
 
     // Component at (3,5) with pins at local (0,0) and (4,0)
     // → world pins at (3,5) and (7,5), both on the wire
-    const el = makeStubWithPins(3, 5, [{ x: 0, y: 0 }, { x: 4, y: 0 }]);
+    // Bbox: body spans y=3→7, so wire at y=5 is strictly inside
+    const el = makeStubWithPins(3, 5,
+      [{ x: 0, y: 0 }, { x: 4, y: 0 }],
+      { x: 2, y: 3, width: 6, height: 4 },
+    );
 
     const cmd = placeComponent(circuit, el);
     cmd.execute();
 
     // Original wire removed, replaced by two stubs
     expect(circuit.wires).toHaveLength(2);
-    // Left stub: (0,5)→(3,5)
     const left = circuit.wires.find(w => w.start.x === 0 && w.end.x === 3);
     expect(left).toBeDefined();
-    // Right stub: (7,5)→(10,5)
     const right = circuit.wires.find(w => w.start.x === 7 && w.end.x === 10);
     expect(right).toBeDefined();
   });
 
-  it("punches out a vertical wire when 2 pins straddle it", () => {
+  it("punches out a vertical wire that passes through the body", () => {
     const circuit = new Circuit();
     // Vertical wire from (5,0) to (5,10)
     circuit.addWire(new Wire({ x: 5, y: 0 }, { x: 5, y: 10 }));
 
     // Component at (5,2) with pins at local (0,0) and (0,6)
     // → world pins at (5,2) and (5,8)
-    const el = makeStubWithPins(5, 2, [{ x: 0, y: 0 }, { x: 0, y: 6 }]);
+    // Bbox: body spans x=3→7, so wire at x=5 is strictly inside
+    const el = makeStubWithPins(5, 2,
+      [{ x: 0, y: 0 }, { x: 0, y: 6 }],
+      { x: 3, y: 1, width: 4, height: 8 },
+    );
 
     const cmd = placeComponent(circuit, el);
     cmd.execute();
@@ -227,17 +239,37 @@ describe("Wire punch-out on placeComponent", () => {
     expect(bottom).toBeDefined();
   });
 
+  it("does NOT punch out a wire running along an edge (ground rail)", () => {
+    const circuit = new Circuit();
+    // Ground rail: horizontal wire at y=10
+    circuit.addWire(new Wire({ x: 0, y: 10 }, { x: 20, y: 10 }));
+
+    // Component body from y=4 to y=10 (bbox.y=4, height=6).
+    // Two south-face pins at world (5,10) and (8,10) sit ON the bbox edge.
+    // Wire at y=10 is NOT strictly inside (10 >= 4+6=10), so no punch-out.
+    const el = makeStubWithPins(5, 4,
+      [{ x: 0, y: 6 }, { x: 3, y: 6 }],
+      { x: 4, y: 4, width: 5, height: 6 },
+    );
+
+    const cmd = placeComponent(circuit, el);
+    cmd.execute();
+
+    // Wire must be untouched
+    expect(circuit.wires).toHaveLength(1);
+    expect(circuit.wires[0]!.start).toEqual({ x: 0, y: 10 });
+    expect(circuit.wires[0]!.end).toEqual({ x: 20, y: 10 });
+  });
+
   it("does nothing when only 1 pin touches a wire", () => {
     const circuit = new Circuit();
     circuit.addWire(new Wire({ x: 0, y: 5 }, { x: 10, y: 5 }));
 
-    // Only one pin on the wire
     const el = makeStubWithPins(3, 5, [{ x: 0, y: 0 }, { x: 0, y: -3 }]);
 
     const cmd = placeComponent(circuit, el);
     cmd.execute();
 
-    // Wire untouched
     expect(circuit.wires).toHaveLength(1);
     expect(circuit.wires[0]!.start).toEqual({ x: 0, y: 5 });
     expect(circuit.wires[0]!.end).toEqual({ x: 10, y: 5 });
@@ -248,12 +280,16 @@ describe("Wire punch-out on placeComponent", () => {
     // Wire from (3,5) to (7,5) — exactly matching the pin positions
     circuit.addWire(new Wire({ x: 3, y: 5 }, { x: 7, y: 5 }));
 
-    const el = makeStubWithPins(3, 5, [{ x: 0, y: 0 }, { x: 4, y: 0 }]);
+    // Bbox encloses the wire strictly in y
+    const el = makeStubWithPins(3, 5,
+      [{ x: 0, y: 0 }, { x: 4, y: 0 }],
+      { x: 2, y: 3, width: 6, height: 4 },
+    );
 
     const cmd = placeComponent(circuit, el);
     cmd.execute();
 
-    // Entire wire consumed, no stubs (stubs would be zero-length, filtered by addWire)
+    // Entire wire consumed, no stubs (zero-length filtered by addWire)
     expect(circuit.wires).toHaveLength(0);
   });
 
@@ -262,7 +298,10 @@ describe("Wire punch-out on placeComponent", () => {
     const origWire = new Wire({ x: 0, y: 5 }, { x: 10, y: 5 });
     circuit.addWire(origWire);
 
-    const el = makeStubWithPins(3, 5, [{ x: 0, y: 0 }, { x: 4, y: 0 }]);
+    const el = makeStubWithPins(3, 5,
+      [{ x: 0, y: 0 }, { x: 4, y: 0 }],
+      { x: 2, y: 3, width: 6, height: 4 },
+    );
 
     const cmd = placeComponent(circuit, el);
     cmd.execute();

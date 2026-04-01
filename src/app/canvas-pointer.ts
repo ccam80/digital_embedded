@@ -76,7 +76,7 @@ function tryCompleteWire(
   try {
     const wires = fn();
     removeDeadEndStubs(wires, ctx.circuit);
-    ctx.invalidateCompiled();
+    ctx.hotRecompile();
   } catch (err) {
     ctx.showStatus(err instanceof Error ? err.message : 'Wire connection failed', true);
     ctx.wireDrawing.cancel();
@@ -94,7 +94,7 @@ function finishPointerDrag(
 ): void {
   if (state.dragMode === 'wire-drag') {
     ctx.wireDrag.finish(ctx.circuit);
-    ctx.invalidateCompiled();
+    ctx.hotRecompile();
     renderPipeline.scheduleRender();
   }
 
@@ -214,7 +214,7 @@ export function registerPointerHandlers(
     if (e.button !== 0 && e.pointerType !== 'touch') return;
 
     if (ctx.placement.isActive() && ctx.placement.isPasteMode()) {
-      ctx.invalidateCompiled();
+      ctx.hotRecompile();
       ctx.placement.updateCursor(worldPt);
       const transformed = ctx.placement.getTransformedClipboard();
       const cmd = pasteFromClipboard(ctx.circuit, transformed, worldPt);
@@ -230,7 +230,7 @@ export function registerPointerHandlers(
         const elemHit = !pinHit && hitTestElements(worldPt, [lastPlaced]);
         if (pinHit || elemHit) {
           ctx.placement.cancel();
-          ctx.invalidateCompiled();
+          ctx.hotRecompile();
           renderPipeline.scheduleRender();
           if (pinHit) {
             ctx.wireDrawing.startFromPin(pinHit.element, pinHit.pin);
@@ -242,7 +242,7 @@ export function registerPointerHandlers(
           return;
         }
       }
-      ctx.invalidateCompiled();
+      ctx.hotRecompile();
       ctx.placement.updateCursor(worldPt);
       const placed = ctx.placement.place(ctx.circuit);
       ctx.undoStack.push(placeComponent(ctx.circuit, placed));
@@ -491,14 +491,14 @@ export function registerPointerHandlers(
         }
 
         state.dragStart = snappedWorld;
-        ctx.invalidateCompiled();
+        ctx.hotRecompile();
       }
       return;
     }
 
     if (state.dragMode === 'wire-drag') {
       if (ctx.wireDrag.update(worldPt)) {
-        ctx.invalidateCompiled();
+        ctx.hotRecompile();
       }
       return;
     }

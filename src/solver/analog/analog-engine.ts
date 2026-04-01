@@ -465,6 +465,13 @@ export class MNAEngine implements AnalogEngine {
     return this._simTime;
   }
 
+  /** Restore simulation time (used by hot-recompile). */
+  set simTime(t: number) {
+    this._simTime = t;
+    const cac = this._compiled as CompiledWithBridges | undefined;
+    if (cac?.timeRef) cac.timeRef.value = t;
+  }
+
   /** Last accepted timestep in seconds. */
   get lastDt(): number {
     return this._lastDt;
@@ -485,6 +492,14 @@ export class MNAEngine implements AnalogEngine {
     const idx = nodeId - 1;
     if (idx >= this._voltages.length) return 0;
     return this._voltages[idx];
+  }
+
+  setNodeVoltage(nodeId: number, voltage: number): void {
+    if (nodeId <= 0) return;
+    const idx = nodeId - 1;
+    if (idx >= this._voltages.length) return;
+    this._voltages[idx] = voltage;
+    this._prevVoltages[idx] = voltage;
   }
 
   /**

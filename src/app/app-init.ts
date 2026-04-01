@@ -288,6 +288,7 @@ export function initApp(search?: string): void {
   let menuToolbar: MenuToolbarController = null!;
 
   function invalidateCompiled(): void { simController.invalidateCompiled(); menuToolbar.refreshPinLoadingIndicators(); }
+  function hotRecompile(): void { simController.hotRecompile(); menuToolbar.refreshPinLoadingIndicators(); }
   function compileAndBind(): boolean { return simController.compileAndBind(); }
   function isSimActive(): boolean { return simController.isSimActive(); }
 
@@ -340,6 +341,7 @@ export function initApp(search?: string): void {
     // Helper methods
     scheduleRender(): void { renderPipeline.scheduleRender(); },
     invalidateCompiled,
+    hotRecompile,
     compileAndBind,
     ensureCompiled(): boolean {
       if (compiledDirty && !compileAndBind()) return false;
@@ -403,6 +405,7 @@ export function initApp(search?: string): void {
     startSimulation(): void { simController.startSimulation(); },
     stopSimulation(): void { simController.stopSimulation(); },
     invalidateCompiled,
+    hotRecompile,
     closePopup(): void { canvasInteraction.closePopup(); },
     openSearchBar(): void { menuToolbar.openSearchBar(); },
     togglePresentation(): void { menuToolbar.togglePresentation(); },

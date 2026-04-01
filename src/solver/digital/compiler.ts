@@ -28,6 +28,7 @@ import { topologicalSort } from "./topological-sort.js";
 import { BusResolver } from "./bus-resolution.js";
 import type { PullResistor } from "./bus-resolution.js";
 import type { SolverPartition } from "@/compile/types.js";
+import { INFRASTRUCTURE_TYPES } from "@/compile/extract-connectivity.js";
 
 // ---------------------------------------------------------------------------
 // CompilationWarning — non-fatal issue found during compilation
@@ -293,17 +294,17 @@ export function compileDigitalPartition(
       );
     }
 
-    if (!def.models?.digital) {
+    if (INFRASTRUCTURE_TYPES.has(el.typeId)) {
       // Neutral infrastructure (Port, etc.) — no inputs, no outputs; pure wire identity.
       componentInputNets.push([]);
       componentOutputNets.push([]);
     } else {
       // Resolve schema — may be a static array or a function of the element's properties.
       const elProps = new PropertyBag(componentPropertiesList[i]!);
-      const rawInputSchema = def.models.digital.inputSchema;
+      const rawInputSchema = def.models!.digital!.inputSchema;
       const resolvedInputSchema = typeof rawInputSchema === 'function'
         ? rawInputSchema(elProps) : rawInputSchema;
-      const rawOutputSchema = def.models.digital.outputSchema;
+      const rawOutputSchema = def.models!.digital!.outputSchema;
       const resolvedOutputSchema = typeof rawOutputSchema === 'function'
         ? rawOutputSchema(elProps) : rawOutputSchema;
 
@@ -418,7 +419,7 @@ export function compileDigitalPartition(
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
     const def = registry.get(el.typeId)!;
-    const slotSpec = def.models?.digital?.stateSlotCount;
+    const slotSpec = INFRASTRUCTURE_TYPES.has(el.typeId) ? undefined : def.models!.digital!.stateSlotCount;
     let resolvedSlots = 0;
     if (typeof slotSpec === "function") {
       const props = new PropertyBag(componentPropertiesList[i]!);
@@ -553,7 +554,8 @@ export function compileDigitalPartition(
   for (let i = 0; i < componentCount; i++) {
     const el = elements[i]!;
     const def = registry.get(el.typeId)!;
-    const sp = def.models?.digital?.switchPins;
+    if (INFRASTRUCTURE_TYPES.has(el.typeId)) continue;
+    const sp = def.models!.digital!.switchPins;
     if (sp === undefined) continue;
 
     const refs = allPinRefs[i]!;
@@ -686,7 +688,7 @@ export function compileDigitalPartition(
     const el = elements[i]!;
     const def = registry.get(el.typeId)!;
     typeIds[i] = def.typeId;
-    if (!def.models?.digital) {
+    if (INFRASTRUCTURE_TYPES.has(el.typeId)) {
       if (!executeFnsMap.has(def.typeId)) {
         executeFnsMap.set(def.typeId, noopExecute);
         typeNameMap.set(def.typeId, def.name);
@@ -694,10 +696,10 @@ export function compileDigitalPartition(
       continue;
     }
     if (!executeFnsMap.has(def.typeId)) {
-      executeFnsMap.set(def.typeId, def.models.digital.executeFn);
+      executeFnsMap.set(def.typeId, def.models!.digital!.executeFn);
       typeNameMap.set(def.typeId, def.name);
-      if (def.models.digital.sampleFn !== undefined) {
-        sampleFnsMap.set(def.typeId, def.models.digital.sampleFn);
+      if (def.models!.digital!.sampleFn !== undefined) {
+        sampleFnsMap.set(def.typeId, def.models!.digital!.sampleFn);
       }
     }
   }
@@ -723,7 +725,7 @@ export function compileDigitalPartition(
     if (typeof instanceDelay === "number") {
       delays[i] = instanceDelay;
     } else {
-      const defDelay = def.models?.digital?.defaultDelay;
+      const defDelay = INFRASTRUCTURE_TYPES.has(el.typeId) ? undefined : def.models!.digital!.defaultDelay;
       delays[i] = typeof defDelay === "number" ? defDelay : DEFAULT_GATE_DELAY;
     }
   }

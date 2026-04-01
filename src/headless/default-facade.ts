@@ -167,7 +167,10 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
         `Label "${label}" not found in compiled circuit. Available labels: ${available || '(none)'}`,
       );
     }
-    this._coordinator.writeSignal(addr, { type: 'digital', value });
+    const sv = addr.domain === 'analog'
+      ? { type: 'analog' as const, voltage: value }
+      : { type: 'digital' as const, value };
+    this._coordinator.writeSignal(addr, sv);
   }
 
   readOutput(_coordinator: SimulationCoordinator, label: string): number {

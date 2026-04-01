@@ -734,7 +734,7 @@ export function initAnalysisDialogs(ctx: AppContext): void {
           circuit.addElement(el);
         }
       }
-      ctx.invalidateCompiled();
+      ctx.hotRecompile();
       overlay.remove();
       if (isJsTestScript(rawText)) {
         ctx.showStatus(`Test script evaluated: ${testData.split('\n').length - 1} test vectors generated`);

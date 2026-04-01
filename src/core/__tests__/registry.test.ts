@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   ComponentRegistry,
   ComponentCategory,
-  hasDigitalModel,
 } from "../registry.js";
 import type {
   ComponentDefinition,
@@ -325,23 +324,6 @@ describe("ComponentRegistry", () => {
   });
 
   describe("ComponentModels types and utilities (P1-1 through P1-5)", () => {
-    it("hasDigitalModel returns true when models.digital is defined", () => {
-      const def = makeDefinition("DigOnly");
-      registry.register(def);
-      const stored = registry.get("DigOnly")!;
-      expect(hasDigitalModel(stored)).toBe(true);
-    });
-
-    it("hasDigitalModel returns false for pure-analog component", () => {
-      const def: ComponentDefinition = {
-        ...makeDefinition("PureA"),
-        models: {},
-      };
-      registry.register(def);
-      const stored = registry.get("PureA")!;
-      expect(hasDigitalModel(stored)).toBe(false);
-    });
-
     it("models field is preserved through register()", () => {
       const def = makeDefinition("AutoPop");
       registry.register(def);

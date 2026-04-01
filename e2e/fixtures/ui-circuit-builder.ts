@@ -93,6 +93,32 @@ export class UICircuitBuilder {
   /** No-op — kept for backward compatibility with existing tests. */
   resetWireState(): void { /* obstacles are fetched live from the bridge */ }
 
+  /**
+   * Load a .dts JSON string into the simulator via postMessage.
+   * Equivalent to a user opening a .dts file via File > Open.
+   * Waits for the 'sim-loaded' response before returning.
+   */
+  async loadDtsJson(dtsJson: string): Promise<void> {
+    await this.page.evaluate((json) => {
+      return new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('sim-loaded timeout')), 10_000);
+        const handler = (e: MessageEvent) => {
+          if (e.data?.type === 'sim-loaded') {
+            clearTimeout(timeout);
+            window.removeEventListener('message', handler);
+            resolve();
+          } else if (e.data?.type === 'sim-error') {
+            clearTimeout(timeout);
+            window.removeEventListener('message', handler);
+            reject(new Error(e.data.error ?? 'sim-error'));
+          }
+        };
+        window.addEventListener('message', handler);
+        window.postMessage({ type: 'sim-load-json', data: json }, '*');
+      });
+    }, dtsJson);
+  }
+
   // =========================================================================
   // Bridge queries (read-only)
   // =========================================================================
@@ -219,12 +245,21 @@ export class UICircuitBuilder {
    * would), clicks it, then clicks the canvas at the given grid coordinates.
    * Presses Escape to exit placement mode.
    */
-  async placeComponent(typeName: string, gridX: number, gridY: number): Promise<void> {
+  async placeComponent(typeName: string, gridX: number, gridY: number, rotationDeg = 0): Promise<void> {
     await this._clickPaletteItem(typeName);
     await this.page.waitForFunction(
       () => !!(window as any).__test?.isPlacementActive?.(),
       { timeout: 5000 },
     );
+    const presses = Math.round(rotationDeg / 90) % 4;
+    if (presses > 0) {
+      // Blur any focused input (e.g. palette search) so 'r' reaches the
+      // document keydown handler instead of being swallowed by the input guard.
+      await this.page.evaluate(() => (document.activeElement as HTMLElement)?.blur?.());
+      for (let i = 0; i < presses; i++) {
+        await this.page.keyboard.press('r');
+      }
+    }
     const coords = await this.getGridPagePosition(gridX, gridY);
     await this.page.mouse.click(coords.x, coords.y);
     await this.page.keyboard.press('Escape');
@@ -242,18 +277,19 @@ export class UICircuitBuilder {
     gridX: number,
     gridY: number,
     label: string,
+    rotationDeg = 0,
   ): Promise<void> {
     const before = await this.getCircuitInfo();
     const beforeCount = before.elementCount;
 
-    await this.placeComponent(typeName, gridX, gridY);
+    await this.placeComponent(typeName, gridX, gridY, rotationDeg);
 
     // Find the newly placed element
     const after = await this.getCircuitInfo();
     expect(after.elementCount).toBe(beforeCount + 1);
-    const newEl = after.elements[after.elements.length - 1];
 
-    // Double-click body center to open property popup
+    // Double-click body center to open property popup (rotation-aware).
+    const newEl = after.elements[after.elements.length - 1];
     await this._dblClickElementBody(newEl);
 
     // Set the label in the popup, then close it
@@ -1385,8 +1421,22 @@ export class UICircuitBuilder {
     await this.page.mouse.dblclick(coords.x, coords.y);
   }
 
-  /** Get page-absolute coordinates for the bounding-box center of an element. */
+  /**
+   * Get page-absolute coordinates for the body center of an element.
+   * Uses pin midpoint (rotation-aware) for multi-pin components, falling
+   * back to the bounding-box center for single-pin components.
+   */
   private async _elementBodyPageCoords(el: CircuitInfo['elements'][0]): Promise<{ x: number; y: number }> {
+    if (el.pins.length >= 2) {
+      const cx = el.pins.reduce((s, p) => s + p.screenX, 0) / el.pins.length;
+      const cy = el.pins.reduce((s, p) => s + p.screenY, 0) / el.pins.length;
+      return this.toPageCoords(cx, cy);
+    }
+    if (el.pins.length === 1) {
+      // Single-pin components (Tunnel, Ground, Probe): use pin position,
+      // which is always at the component origin regardless of rotation.
+      return this.toPageCoords(el.pins[0].screenX, el.pins[0].screenY);
+    }
     return this.toPageCoords(el.center.screenX, el.center.screenY);
   }
 

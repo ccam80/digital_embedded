@@ -33,8 +33,15 @@ export function formatNetlist(netlist: Netlist): string {
   lines.push(`Components (${netlist.components.length}):`);
   for (const comp of netlist.components) {
     const label = comp.label ? ` "${comp.label}"` : "";
+    const isAnalogOnly = comp.availableModels.length > 0
+      && comp.availableModels.includes("analog")
+      && !comp.availableModels.includes("digital");
     const pinSummary = comp.pins
-      .map((p: PinDescriptor) => `${p.label}[${p.bitWidth}-bit, ${p.direction}]`)
+      .map((p: PinDescriptor) =>
+        isAnalogOnly
+          ? `${p.label}[terminal]`
+          : `${p.label}[${p.bitWidth}-bit, ${p.direction}]`,
+      )
       .join(", ");
 
     // Show non-trivial properties (skip label — already shown — and position)
@@ -128,10 +135,17 @@ export function formatComponentDefinition(def: ComponentDefinition): string {
       }
     }
 
+    const defIsAnalogOnly = !def.models?.digital
+      && def.modelRegistry != null
+      && Object.keys(def.modelRegistry).length > 0;
     lines.push(`\nPins (${def.pinLayout.length}):`);
     for (const pin of def.pinLayout) {
-      const scaleNote = scalingPins.has(pin.label) ? " (scales with bitWidth)" : "";
-      lines.push(`  ${pin.label} [${pin.defaultBitWidth}-bit, ${pin.direction}]${scaleNote}`);
+      if (defIsAnalogOnly) {
+        lines.push(`  ${pin.label} [terminal, ${pin.direction}]`);
+      } else {
+        const scaleNote = scalingPins.has(pin.label) ? " (scales with bitWidth)" : "";
+        lines.push(`  ${pin.label} [${pin.defaultBitWidth}-bit, ${pin.direction}]${scaleNote}`);
+      }
     }
   }
 

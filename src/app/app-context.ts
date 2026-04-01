@@ -80,6 +80,9 @@ export interface AppContext {
   /** Mark compiled state dirty and tear down the running engine. */
   invalidateCompiled(): void;
 
+  /** Hot-recompile: preserve simulation state across a recompile if running. */
+  hotRecompile(): void;
+
   /**
    * Compile the current circuit and bind the editor to the new engine.
    * Returns true on success, false if compilation failed (status bar updated).

@@ -355,7 +355,8 @@ test.describe('Master circuit assembly via UI', () => {
 
     // --- Phase D: Trace/scope on R3 (RC filter input, at divider junction) ---
     await builder.addTraceViaContextMenu('R3', 'A');
-    const peaks = await builder.measureAnalogPeaks('5m');
+    // Absolute target: current simTime is ~150ms, step 5ms more to collect trace data
+    const peaks = await builder.measureAnalogPeaks('155m');
     expect(peaks).not.toBeNull();
     expect(peaks!.nodeCount).toBeGreaterThanOrEqual(1);
     // R3 traces the divider junction or RC node (~1.667V with R1=20k)
@@ -366,6 +367,9 @@ test.describe('Master circuit assembly via UI', () => {
     await builder.page.waitForTimeout(500);
 
     // --- Phase E: Pin loading on R1-R2 junction ---
+    // Close the viewer panel opened by Phase D so it doesn't cover components
+    await builder.page.locator('#btn-viewer-close').click();
+    await builder.page.waitForTimeout(200);
     // Reset R1 back to 10k and BF back to 100 for clean pin-loading measurement
     await builder.setComponentProperty('R1', 'resistance', 10000);
     await builder.setSpiceParameter('Q1', 'BF', 100);
@@ -438,7 +442,7 @@ test.describe('Master circuit assembly via UI', () => {
 
     // --- Voltage Comparator (keep all within y≤24 visible area) ---
     await builder.placeLabeled('VoltageComparator', 33, 19, 'CMP');
-    await builder.setComponentProperty('CMP', 'Output type', 'push-pull');
+    await builder.setComponentProperty('CMP', 'model', 'push-pull');
     await builder.placeLabeled('DcVoltageSource', 25, 21, 'Vref2');
     await builder.setComponentProperty('Vref2', 'voltage', 2.5);
     await builder.placeComponent('Ground', 25, 24);

@@ -133,26 +133,46 @@ test.describe('Hot-loading model params via property popup', () => {
     // With BF=10 (hot-loaded): Ic = 10*50µA = 0.5mA < 1.2mA → active,
     //   Vc = 12V - 0.5mA*10kΩ = 7V
     // Difference: ~7V >> 0.5V threshold → test will pass.
+    // Build BJT CE amplifier via clicks with explicit waypoints.
+    // Layout (all rot=0):
+    //   DcVoltageSource Vcc@(7,5):  neg(7,5), pos(11,5)   voltage=12V
+    //   Resistor Rc@(14,5):         A(14,5),  B(18,5)     resistance=10kΩ
+    //   NpnBJT Q1@(16,9):          B(16,9),  C(20,8), E(20,10)
+    //   CurrentSource Ib@(7,12):    pos(7,12), neg(11,12)  current=50µA
+    //   Probe Pc@(22,8)
+    //   Grounds at (5,5), (11,14), (20,12) — all off the Ib→Q1.B wire path
+    //
+    // Key routing constraint: Ib.pos(7,12) → Q1.B(16,9) routes via
+    // waypoints (7,7)→(16,7) to avoid crossing any ground positions.
     await builder.placeLabeled('DcVoltageSource', 7, 5, 'Vcc');
-    await builder.placeLabeled('CurrentSource', 7, 12, 'Ib');
-    await builder.placeLabeled('Resistor', 14, 5, 'Rc');
-    await builder.placeLabeled('NpnBJT', 16, 9, 'Q1');
-    await builder.placeComponent('Ground', 11, 16);
-    await builder.placeComponent('Ground', 18, 16);
-    await builder.placeComponent('Ground', 11, 9);
-    await builder.placeLabeled('Probe', 22, 7, 'Pc');
-
     await builder.setComponentProperty('Vcc', 'voltage', 12);
-    await builder.setComponentProperty('Ib', 'current', 0.00005);
+    await builder.placeLabeled('Resistor', 14, 5, 'Rc');
     await builder.setComponentProperty('Rc', 'resistance', 10000);
+    await builder.placeLabeled('NpnBJT', 16, 9, 'Q1');
+    await builder.placeLabeled('CurrentSource', 7, 12, 'Ib');
+    await builder.setComponentProperty('Ib', 'current', 0.00005);
+    await builder.placeLabeled('Probe', 22, 8, 'Pc');
 
-    await builder.drawWire('Vcc', 'pos', 'Rc', 'A');
-    await builder.drawWire('Rc', 'B', 'Q1', 'C');
-    await builder.drawWire('Ib', 'pos', 'Q1', 'B');
-    await builder.drawWireFromPin('Q1', 'E', 18, 16);
-    await builder.drawWireFromPin('Vcc', 'neg', 11, 16);
-    await builder.drawWireFromPin('Ib', 'neg', 11, 9);
-    await builder.drawWire('Rc', 'B', 'Pc', 'in');
+    // Grounds — placed away from the Ib→Q1.B wire path
+    await builder.placeComponent('Ground', 5, 5);    // Vcc.neg ground
+    await builder.placeComponent('Ground', 11, 14);   // Ib.neg ground
+    await builder.placeComponent('Ground', 20, 12);   // Q1.E ground
+
+    // Wiring with explicit waypoints — no autorouter
+    // Vcc.pos(11,5) → Rc.A(14,5): straight horizontal
+    await builder.drawWireExplicit('Vcc', 'pos', 'Rc', 'A');
+    // Rc.B(18,5) → Q1.C(20,8): L-shape via (20,5)
+    await builder.drawWireExplicit('Rc', 'B', 'Q1', 'C', [[20, 5]]);
+    // Ib.pos(7,12) → Q1.B(16,9): L-route avoiding grounds via (7,7)→(16,7)
+    await builder.drawWireExplicit('Ib', 'pos', 'Q1', 'B', [[7, 7], [16, 7]]);
+    // Probe Pc taps collector node at Q1.C(20,8)
+    await builder.drawWireFromPinExplicit('Pc', 'in', 20, 8);
+    // Vcc.neg(7,5) → Ground(5,5)
+    await builder.drawWireFromPinExplicit('Vcc', 'neg', 5, 5);
+    // Ib.neg(11,12) → Ground(11,14)
+    await builder.drawWireFromPinExplicit('Ib', 'neg', 11, 14);
+    // Q1.E(20,10) → Ground(20,12)
+    await builder.drawWireFromPinExplicit('Q1', 'E', 20, 12);
 
     // Baseline step with DEFAULT BF=100: BJT saturated, Vc ≈ 0V
     await builder.stepViaUI();

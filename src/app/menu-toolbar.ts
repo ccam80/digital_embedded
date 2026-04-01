@@ -162,26 +162,6 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
       { label: 'Insert Clock', type: 'Clock' },
     ];
 
-    const hasAnalogOnlyComponents = ctx.circuit.elements.some(el => {
-      const def = registry.get(el.typeId);
-      if (def === undefined) return false;
-      try {
-        return def.models?.digital === undefined;
-      } catch {
-        return false;
-      }
-    });
-    if (hasAnalogOnlyComponents) {
-      QUICK_INSERT.length = 0;
-      QUICK_INSERT.push(
-        { label: 'Insert Resistor', type: 'Resistor' },
-        { label: 'Insert Capacitor', type: 'Capacitor' },
-        { label: 'Insert Inductor', type: 'Inductor' },
-        { label: 'Insert DC Voltage Source', type: 'VoltageSource' },
-        { label: 'Insert Ground', type: 'Ground' },
-        { label: 'Insert Diode', type: 'Diode' },
-      );
-    }
 
     for (const qi of QUICK_INSERT) {
       const def = registry.get(qi.type);
@@ -222,12 +202,12 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
           { label: 'Rotate', shortcut: 'R', action: () => {
             const cmd = rotateSelection([...selection.getSelectedElements()]);
             undoStack.push(cmd);
-            ctx.invalidateCompiled();
+            ctx.hotRecompile();
           }, enabled: true },
           { label: 'Mirror', shortcut: 'M', action: () => {
             const cmd = mirrorSelection([...selection.getSelectedElements()]);
             undoStack.push(cmd);
-            ctx.invalidateCompiled();
+            ctx.hotRecompile();
           }, enabled: true },
           separator(),
           { label: 'Copy', shortcut: 'Ctrl+C', action: () => {
@@ -277,7 +257,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
 
                 undoStack.push(command);
                 selection.clear();
-                ctx.invalidateCompiled();
+                ctx.hotRecompile();
 
                 // Persist the extracted subcircuit to IndexedDB.
                 const xml = serializeCircuitToDig(subcircuit, registry);
@@ -336,7 +316,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
                 const xml = serializeCircuitToDig(subDef.circuit, registry);
                 void storeSubcircuit(subDef.name, xml).catch(() => {});
 
-                ctx.invalidateCompiled();
+                ctx.hotRecompile();
                 ctx.scheduleRender();
                 ctx.showStatus(`Updated symbol for "${subDef.name}"`);
               });
@@ -377,15 +357,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
       }
 
       // "Add to Traces"
-      if (facade.getCoordinator()?.supportsAcSweep() ?? ctx.circuit.elements.some(el => {
-        const def = registry.get(el.typeId);
-        if (def === undefined) return false;
-        try {
-          return def.models?.digital === undefined;
-        } catch {
-          return false;
-        }
-      })) {
+      if (facade.getCoordinator()?.supportsAcSweep()) {
         const resolverCtx = facade.getCoordinator()?.getCurrentResolverContext() ?? null;
         viewerController.appendComponentTraceItems(items, elementHit, resolverCtx);
       }
@@ -449,7 +421,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
                 },
               };
               undoStack.push(cmd);
-              ctx.invalidateCompiled();
+              ctx.hotRecompile();
             }, enabled: true,
           });
         }
@@ -510,7 +482,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
                   delete ctx.circuit.metadata.digitalPinLoadingOverrides;
                 }
                 refreshOverrideIndicators(ctx);
-                simController.invalidateCompiled();
+                simController.hotRecompile();
                 ctx.scheduleRender();
               },
               undo() {
@@ -520,7 +492,7 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
                   delete ctx.circuit.metadata.digitalPinLoadingOverrides;
                 }
                 refreshOverrideIndicators(ctx);
-                simController.invalidateCompiled();
+                simController.hotRecompile();
                 ctx.scheduleRender();
               },
             };
@@ -671,7 +643,7 @@ function buildPaletteHandlers(ctx: AppContext, deps: MTDeps): void {
     const element = activeDef.factory(createSeededBag(activeDef));
     element.position = worldPt;
     ctx.circuit.addElement(element);
-    ctx.invalidateCompiled();
+    ctx.hotRecompile();
     renderPipeline.scheduleRender();
   });
   paletteUI.render();
@@ -822,13 +794,13 @@ function buildUndoRedoButtons(ctx: AppContext, _deps: MTDeps): void {
 
   tbUndoBtn?.addEventListener('click', () => {
     undoStack.undo();
-    ctx.invalidateCompiled();
+    ctx.hotRecompile();
     updateUndoRedoButtons();
   });
 
   tbRedoBtn?.addEventListener('click', () => {
     undoStack.redo();
-    ctx.invalidateCompiled();
+    ctx.hotRecompile();
     updateUndoRedoButtons();
   });
 }
@@ -1132,7 +1104,7 @@ function buildSettingsDialog(ctx: AppContext, deps: MTDeps): void {
         const prev = ctx.circuit.metadata.logicFamily;
         const changed = !prev || prev.name !== preset.name;
         ctx.circuit.metadata.logicFamily = preset;
-        if (changed) simController.invalidateCompiled();
+        if (changed) simController.hotRecompile();
       }
     }
     closeSettingsDialog();
@@ -1154,12 +1126,12 @@ function buildMenuEditActions(ctx: AppContext, deps: MTDeps): void {
 
   document.getElementById('btn-undo')?.addEventListener('click', () => {
     undoStack.undo();
-    ctx.invalidateCompiled();
+    ctx.hotRecompile();
   });
 
   document.getElementById('btn-redo')?.addEventListener('click', () => {
     undoStack.redo();
-    ctx.invalidateCompiled();
+    ctx.hotRecompile();
   });
 
   document.getElementById('btn-delete')?.addEventListener('click', () => {
@@ -1169,7 +1141,7 @@ function buildMenuEditActions(ctx: AppContext, deps: MTDeps): void {
       const cmd = deleteSelection(ctx.circuit, elements, wires);
       undoStack.push(cmd);
       selection.clear();
-      ctx.invalidateCompiled();
+      ctx.hotRecompile();
     }
   });
 
@@ -1542,7 +1514,7 @@ function buildSimulationPinLoadingMenu(ctx: AppContext, deps: MTDeps): void {
           ctx.circuit.metadata.digitalPinLoading = next;
           updateCheckmarks();
           refreshOverrideIndicators(ctx);
-          simController.invalidateCompiled();
+          simController.hotRecompile();
         },
         undo() {
           if (prev === 'cross-domain') {
@@ -1552,7 +1524,7 @@ function buildSimulationPinLoadingMenu(ctx: AppContext, deps: MTDeps): void {
           }
           updateCheckmarks();
           refreshOverrideIndicators(ctx);
-          simController.invalidateCompiled();
+          simController.hotRecompile();
         },
       };
       undoStack.push(cmd);
@@ -1572,7 +1544,7 @@ function buildSpiceModelLibrary(ctx: AppContext, _deps: MTDeps): void {
       ctx.circuit,
       ctx.canvas.parentElement ?? document.body,
       () => {
-        ctx.invalidateCompiled();
+        ctx.hotRecompile();
         ctx.showStatus('SPICE model library updated');
       },
     );

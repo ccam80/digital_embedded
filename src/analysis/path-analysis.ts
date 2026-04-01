@@ -16,6 +16,7 @@ import type { Circuit } from '../core/circuit.js';
 import type { CircuitElement } from '../core/element.js';
 import { PinDirection, pinWorldPosition } from '../core/pin.js';
 import type { ComponentRegistry } from '../core/registry.js';
+import { resolveModelAssignments } from '../compile/extract-connectivity.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -195,10 +196,12 @@ function pointKey(x: number, y: number): string {
 // ---------------------------------------------------------------------------
 
 function buildDelayMap(circuit: Circuit, registry: ComponentRegistry): Map<string, number> {
+  const [assignments] = resolveModelAssignments(circuit.elements, registry);
   const map = new Map<string, number>();
-  for (const el of circuit.elements) {
-    const def = registry.get(el.typeId);
-    const delay = def?.models?.digital?.defaultDelay ?? DEFAULT_DELAY_NS;
+  for (let i = 0; i < circuit.elements.length; i++) {
+    const el = circuit.elements[i]!;
+    const assignment = assignments[i]!;
+    const delay = assignment.model?.defaultDelay ?? DEFAULT_DELAY_NS;
     map.set(el.instanceId, delay);
   }
   return map;

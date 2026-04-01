@@ -858,7 +858,8 @@ export function registerCircuitTools(
     {
       title: "Test Circuit Equivalence",
       description:
-        "Check if two circuits are behaviorally equivalent by exhaustively testing all input combinations. " +
+        "Check if two digital circuits are behaviorally equivalent by exhaustively testing all input combinations. " +
+        "Digital-only: uses binary exhaustive search over In/Clock/Out components. Not applicable to analog or mixed-signal circuits. " +
         "Both circuits must have the same In/Out labels. Practical for circuits with up to ~16 total input bits. " +
         "Returns whether they match, with details of the first mismatch if they don't.",
       inputSchema: {

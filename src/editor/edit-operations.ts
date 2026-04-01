@@ -342,13 +342,12 @@ export function pasteFromClipboard(
 /**
  * Detect wires that should be "punched out" when a component is placed.
  *
- * When 2+ pins of a newly placed component land on the same wire, the segment
- * between those pins is redundant (the component body bridges them). This
- * function finds such wires and returns the replacement: the original wire is
- * removed and stub segments connecting to the outermost pins are added.
+ * When 2+ pins of a newly placed component land on the same wire AND the
+ * wire segment between those pins passes through the component's bounding
+ * box, the segment is punched out. Wires that run along an edge (e.g. a
+ * ground/VDD rail that pins tap off of) are left intact.
  *
- * Only considers axis-aligned wires where pins lie strictly on the wire's
- * interior or endpoints.
+ * Only considers axis-aligned wires where pins lie on the wire.
  */
 function computeWirePunchOuts(
   circuit: Circuit,
@@ -357,8 +356,8 @@ function computeWirePunchOuts(
   const pins = element.getPins();
   if (pins.length < 2) return { removed: [], added: [] };
 
-  // Collect world-space pin positions
   const pinPositions = pins.map(pin => pinWorldPosition(element, pin));
+  const bbox = element.getBoundingBox();
 
   const removed: Wire[] = [];
   const added: Wire[] = [];
@@ -388,8 +387,18 @@ function computeWirePunchOuts(
 
     if (pinsOnWire.length < 2) continue;
 
-    // 2+ pins on this wire — punch out the segment between outermost pins.
-    // Keep stubs from wire endpoints to the outermost pins.
+    // Bounding-box gate: only punch out if the wire segment between the
+    // outermost pins passes through the INTERIOR of the component body.
+    // A wire running along an edge (ground/VDD rail) is not punched out.
+    if (isH) {
+      // Horizontal wire at y=sy — must be strictly inside bbox vertically
+      if (sy <= bbox.y || sy >= bbox.y + bbox.height) continue;
+    } else {
+      // Vertical wire at x=sx — must be strictly inside bbox horizontally
+      if (sx <= bbox.x || sx >= bbox.x + bbox.width) continue;
+    }
+
+    // Wire passes through the body — punch out between outermost pins.
     removed.push(wire);
 
     if (isH) {
@@ -399,11 +408,9 @@ function computeWirePunchOuts(
       const wireMin = Math.min(sx, ex);
       const wireMax = Math.max(sx, ex);
 
-      // Left stub: wire start → first pin
       if (wireMin < innerMin) {
         added.push(new Wire({ x: wireMin, y: sy }, { x: innerMin, y: sy }, wire.bitWidth));
       }
-      // Right stub: last pin → wire end
       if (innerMax < wireMax) {
         added.push(new Wire({ x: innerMax, y: sy }, { x: wireMax, y: sy }, wire.bitWidth));
       }
@@ -414,11 +421,9 @@ function computeWirePunchOuts(
       const wireMin = Math.min(sy, ey);
       const wireMax = Math.max(sy, ey);
 
-      // Top stub: wire start → first pin
       if (wireMin < innerMin) {
         added.push(new Wire({ x: sx, y: wireMin }, { x: sx, y: innerMin }, wire.bitWidth));
       }
-      // Bottom stub: last pin → wire end
       if (innerMax < wireMax) {
         added.push(new Wire({ x: sx, y: innerMax }, { x: sx, y: wireMax }, wire.bitWidth));
       }

@@ -152,7 +152,6 @@
       "fileCount": 19,
       "lastAccessed": 1775040969968,
       "keyFiles": [
-        "circuit-cli.ts",
         "circuit-mcp-server.ts",
         "cleanup-unused-imports.mjs",
         "cleanup-unused-imports2.mjs",
@@ -252,26 +251,26 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 296,
-      "lastAccessed": 1775041803305,
+      "accessCount": 303,
+      "lastAccessed": 1775076665132,
       "type": "file"
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 165,
-      "lastAccessed": 1775041918704,
+      "accessCount": 167,
+      "lastAccessed": 1775070918248,
       "type": "file"
     },
     {
       "path": "",
-      "accessCount": 133,
-      "lastAccessed": 1775041733943,
+      "accessCount": 144,
+      "lastAccessed": 1775077160349,
       "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 82,
-      "lastAccessed": 1775041830801,
+      "accessCount": 84,
+      "lastAccessed": 1775074641358,
       "type": "file"
     },
     {
@@ -288,8 +287,8 @@
     },
     {
       "path": "src\\compile\\compile.ts",
-      "accessCount": 67,
-      "lastAccessed": 1775041937639,
+      "accessCount": 70,
+      "lastAccessed": 1775076638133,
       "type": "file"
     },
     {
@@ -300,20 +299,20 @@
     },
     {
       "path": "src\\components\\gates\\and.ts",
-      "accessCount": 61,
-      "lastAccessed": 1775012588248,
+      "accessCount": 62,
+      "lastAccessed": 1775070927495,
       "type": "file"
     },
     {
       "path": "src\\components\\passives\\resistor.ts",
-      "accessCount": 47,
-      "lastAccessed": 1775015382001,
+      "accessCount": 49,
+      "lastAccessed": 1775076291722,
       "type": "file"
     },
     {
       "path": "src\\compile\\types.ts",
-      "accessCount": 38,
-      "lastAccessed": 1775041971692,
+      "accessCount": 48,
+      "lastAccessed": 1775076623928,
       "type": "file"
     },
     {
@@ -347,21 +346,21 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\passives\\capacitor.ts",
+      "accessCount": 31,
+      "lastAccessed": 1775072716183,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\passives\\analog-fuse.ts",
       "accessCount": 30,
       "lastAccessed": 1774911492113,
       "type": "file"
     },
     {
-      "path": "src\\components\\passives\\capacitor.ts",
-      "accessCount": 30,
-      "lastAccessed": 1775008168609,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\passives\\inductor.ts",
-      "accessCount": 28,
-      "lastAccessed": 1775008169001,
+      "accessCount": 29,
+      "lastAccessed": 1775072715909,
       "type": "file"
     },
     {
@@ -522,8 +521,14 @@
     },
     {
       "path": "src\\components\\semiconductors\\tunnel-diode.ts",
+      "accessCount": 12,
+      "lastAccessed": 1775072715473,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\pin-electrical.ts",
       "accessCount": 11,
-      "lastAccessed": 1774910397441,
+      "lastAccessed": 1775070902616,
       "type": "file"
     },
     {
@@ -533,21 +538,15 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\pin-electrical.ts",
-      "accessCount": 10,
-      "lastAccessed": 1775007423737,
-      "type": "file"
-    },
-    {
       "path": "CLAUDE.md",
-      "accessCount": 9,
-      "lastAccessed": 1774951815693,
+      "accessCount": 10,
+      "lastAccessed": 1775071474330,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\integration.ts",
-      "accessCount": 1,
-      "lastAccessed": 1774867537773,
+      "accessCount": 2,
+      "lastAccessed": 1775069300739,
       "type": "file"
     }
   ],

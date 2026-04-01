@@ -269,15 +269,6 @@ export interface ComponentDefinition {
 }
 
 // ---------------------------------------------------------------------------
-// ComponentModels utility functions
-// ---------------------------------------------------------------------------
-
-/** Returns true if the component definition has a digital simulation model. */
-export function hasDigitalModel(def: ComponentDefinition): boolean {
-  return def.models?.digital !== undefined;
-}
-
-// ---------------------------------------------------------------------------
 // ComponentRegistry
 // ---------------------------------------------------------------------------
 

@@ -11,7 +11,7 @@ import type { AppContext } from './app-context.js';
 import type { RenderPipeline } from './render-pipeline.js';
 import { EngineState } from '../core/engine-interface.js';
 import { WireCurrentResolver } from '../editor/wire-current-resolver.js';
-import type { CompiledCircuitUnified } from '../compile/types.js';
+import type { CompiledCircuitUnified, SignalValue } from '../compile/types.js';
 import { CurrentFlowAnimator } from '../editor/current-animation.js';
 import { VoltageRangeTracker } from '../editor/voltage-range.js';
 import { voltageToColor } from '../editor/voltage-color.js';
@@ -36,6 +36,12 @@ export interface EngineSettings {
 export interface SimulationController {
   compileAndBind(): boolean;
   invalidateCompiled(): void;
+  /**
+   * Hot-recompile: if the sim is running, snapshot signals, recompile,
+   * restore surviving signals, and resume. If not running, delegates to
+   * invalidateCompiled().
+   */
+  hotRecompile(): void;
   startSimulation(): void;
   stopSimulation(): void;
   /** Pause simulation without destroying compiled state (resumable). */
@@ -350,6 +356,81 @@ export function initSimulationController(
     disposeAnalog();
     callbacks.disposeViewers();
     renderPipeline.scheduleRender();
+  }
+
+  // -------------------------------------------------------------------------
+  // hotRecompile — recompile without killing a running simulation
+  // -------------------------------------------------------------------------
+
+  function hotRecompile(): void {
+    const coordinator = facade.getCoordinator();
+    const wasRunning = coordinator.getState() === EngineState.RUNNING;
+
+    // If sim isn't running, nothing to preserve — just invalidate.
+    if (!wasRunning) {
+      invalidateCompiled();
+      return;
+    }
+
+    // 1. Snapshot all signal state by stable keys (labels + pins).
+    const savedLabels = new Map<string, SignalValue>();
+    for (const [label, addr] of coordinator.compiled.labelSignalMap) {
+      try { savedLabels.set(label, coordinator.readSignal(addr)); } catch { /* skip */ }
+    }
+
+    const savedPins = new Map<string, SignalValue>();
+    const fullUnified = coordinator.compiled as unknown as CompiledCircuitUnified;
+    if (fullUnified.pinSignalMap) {
+      for (const [pinKey, addr] of fullUnified.pinSignalMap) {
+        try { savedPins.set(pinKey, coordinator.readSignal(addr)); } catch { /* skip */ }
+      }
+    }
+
+    const savedSimTime = coordinator.simTime;
+
+    // 2. Pause the render loop (don't destroy state yet).
+    if (runRafHandle !== -1) {
+      cancelAnimationFrame(runRafHandle);
+      runRafHandle = -1;
+    }
+    coordinator.stop();
+
+    // 3. Recompile. On failure, fall back to full invalidation.
+    if (!compileAndBind()) {
+      ctx.showStatus('Quick restart after making changes failed, trying a more serious reset', true);
+      invalidateCompiled();
+      return;
+    }
+
+    // 4. Restore surviving signals in the new coordinator.
+    const newCoordinator = facade.getCoordinator();
+    const newCompiled = newCoordinator.compiled as unknown as CompiledCircuitUnified;
+
+    // Restore labeled signals.
+    for (const [label, value] of savedLabels) {
+      const addr = newCompiled.labelSignalMap.get(label);
+      if (addr) {
+        try { newCoordinator.writeSignal(addr, value); } catch { /* net gone or type mismatch */ }
+      }
+    }
+
+    // Restore pin-level signals (covers unlabeled components too).
+    if (newCompiled.pinSignalMap) {
+      for (const [pinKey, value] of savedPins) {
+        const addr = newCompiled.pinSignalMap.get(pinKey);
+        if (addr) {
+          try { newCoordinator.writeSignal(addr, value); } catch { /* pin gone or type mismatch */ }
+        }
+      }
+    }
+
+    // Restore sim time if analog is present.
+    if (savedSimTime !== null) {
+      (newCoordinator as unknown as { setSimTime(t: number): void }).setSimTime(savedSimTime);
+    }
+
+    // 5. Resume.
+    startSimulation();
   }
 
   // -------------------------------------------------------------------------
@@ -691,6 +772,7 @@ export function initSimulationController(
   return {
     compileAndBind,
     invalidateCompiled,
+    hotRecompile,
     startSimulation,
     stopSimulation,
     pauseSimulation,

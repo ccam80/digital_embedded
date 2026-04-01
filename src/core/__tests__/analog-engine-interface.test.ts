@@ -175,6 +175,7 @@ describe("AnalogEngineTypes", () => {
       get simTime(): number { return 0; },
       get lastDt(): number { return 1e-6; },
       getNodeVoltage(_nodeId: number): number { return 0; },
+      setNodeVoltage(_nodeId: number, _voltage: number): void {},
       getBranchCurrent(_branchId: number): number { return 0; },
       getElementCurrent(_elementId: number): number { return 0; },
       getElementPower(_elementId: number): number { return 0; },

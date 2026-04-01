@@ -155,6 +155,13 @@ export interface AnalogEngine extends Engine {
   getNodeVoltage(nodeId: number): number;
 
   /**
+   * Set the voltage at MNA node `nodeId`.
+   * Used by hot-recompile state restoration. Sets both current and
+   * previous voltage to avoid false transients.
+   */
+  setNodeVoltage(nodeId: number, voltage: number): void;
+
+  /**
    * Return the current through the branch-current row `branchId` in the MNA
    * matrix. Used for voltage sources and inductors which introduce extra rows.
    */

@@ -1110,7 +1110,7 @@ export function compileAnalogPartition(
     const absoluteBranchIdx =
       meta.branchIdx >= 0 ? totalNodeCount + meta.branchIdx : -1;
 
-    if (def.models?.digital !== undefined && activeModel.factory !== undefined) {
+    if (activeModel.factory !== undefined) {
       const flatOverrides: Record<string, number> = props.has("_pinElectricalOverrides")
         ? props.get<Record<string, number>>("_pinElectricalOverrides")
         : {};

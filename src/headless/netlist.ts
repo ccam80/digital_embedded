@@ -321,7 +321,7 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
             `"${np.componentLabel}" (${np.componentType})`,
           netId,
           pins: [np],
-          fix: `Connect this input pin to a signal source, or tie it to VDD/GND.`,
+          fix: `Connect this input pin to a signal source.`,
         });
       }
     }
@@ -340,10 +340,10 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
         code: "multi-driver-no-tristate",
         message:
           `Net ${netId} has ${outputPins.length} output drivers. ` +
-          `This is valid only when all drivers support tri-state (high-Z) output.`,
+          `This is valid only when all drivers support tri-state (high-Z) output or the net is an analog node.`,
         netId,
         pins: netPins,
-        fix: `Use tri-state outputs, or ensure only one driver is active at a time.`,
+        fix: `For digital: use tri-state outputs or ensure only one driver is active. For analog: this is normal (node sums currents).`,
       });
     }
   }

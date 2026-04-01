@@ -273,7 +273,9 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       this._digital.setSignalValue(addr.netId, BitVector.fromNumber(value.value, addr.bitWidth));
       return;
     }
-    throw new FacadeError('Setting analog node voltages via writeSignal is not yet supported');
+    if (this._analog === null) throw new FacadeError('No analog backend available for writeSignal');
+    if (value.type !== 'analog') throw new FacadeError('Cannot write digital SignalValue to analog address');
+    this._analog.setNodeVoltage(addr.nodeId, value.voltage);
   }
 
   readByLabel(label: string): SignalValue {
@@ -346,6 +348,13 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
 
   get simTime(): number | null {
     return this._analog !== null ? this._analog.simTime : null;
+  }
+
+  /** Restore analog sim time (used by hot-recompile). No-op if no analog engine. */
+  setSimTime(t: number): void {
+    if (this._analog === null) return;
+    (this._analog as unknown as { simTime: number }).simTime = t;
+    this._simTimeTarget = t;
   }
 
   getState(): EngineState {

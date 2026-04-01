@@ -24,6 +24,7 @@ export interface KeyboardDeps {
   startSimulation(): void;
   stopSimulation(): void;
   invalidateCompiled(): void;
+  hotRecompile(): void;
   closePopup(): void;
   openSearchBar(): void;
   togglePresentation(): void;
@@ -86,7 +87,7 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
       } else if (ctx.wireDrag.isActive()) {
         ctx.wireDrag.cancel();
         deps.clearDragMode();
-        deps.invalidateCompiled();
+        deps.hotRecompile();
         ctx.scheduleRender();
       } else {
         deps.navigateBack();
@@ -194,7 +195,7 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
         if (elements.length > 0) {
           const cmd = rotateSelection(elements);
           ctx.undoStack.push(cmd);
-          deps.invalidateCompiled();
+          deps.hotRecompile();
         }
       }
       return;
@@ -210,7 +211,7 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
         if (elements.length > 0) {
           const cmd = mirrorSelection(elements);
           ctx.undoStack.push(cmd);
-          deps.invalidateCompiled();
+          deps.hotRecompile();
         }
       }
       return;
@@ -224,7 +225,7 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
         const cmd = deleteSelection(ctx.circuit, elements, wires);
         ctx.undoStack.push(cmd);
         ctx.selection.clear();
-        deps.invalidateCompiled();
+        deps.hotRecompile();
       }
       return;
     }
@@ -232,14 +233,14 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
     // --- Ctrl+Z: undo ---
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
       ctx.undoStack.undo();
-      deps.invalidateCompiled();
+      deps.hotRecompile();
       return;
     }
 
     // --- Ctrl+Shift+Z / Ctrl+Y: redo ---
     if ((e.ctrlKey || e.metaKey) && (e.key === 'Z' || e.key === 'y')) {
       ctx.undoStack.redo();
-      deps.invalidateCompiled();
+      deps.hotRecompile();
       return;
     }
 
@@ -270,7 +271,7 @@ export function initKeyboardHandler(ctx: AppContext, deps: KeyboardDeps): void {
         const cmd = deleteSelection(ctx.circuit, elements, wires);
         ctx.undoStack.push(cmd);
         ctx.selection.clear();
-        deps.invalidateCompiled();
+        deps.hotRecompile();
       }
       return;
     }

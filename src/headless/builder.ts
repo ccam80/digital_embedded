@@ -273,8 +273,8 @@ export class CircuitBuilder {
       );
     }
 
-    // Validate pin directions
-    this.validatePinConnection(srcPin, dstPin);
+    // Validate pin directions (skip for analog terminals — direction is meaningless)
+    this.validatePinConnection(src, srcPin, dst, dstPin);
 
     // Validate bit width match
     if (srcPin.bitWidth !== dstPin.bitWidth) {
@@ -355,7 +355,10 @@ export class CircuitBuilder {
             `Label "${label}" not found in compiled circuit. Available labels: ${available || '(none)'}`,
           );
         }
-        coord.writeSignal(addr, { type: 'digital', value });
+        const sv = addr.domain === 'analog'
+          ? { type: 'analog' as const, voltage: value }
+          : { type: 'digital' as const, value };
+        coord.writeSignal(addr, sv);
       },
       readOutput(coord: SimulationCoordinator, label: string): number {
         const addr = coord.compiled.labelSignalMap.get(label);
@@ -837,8 +840,19 @@ export class CircuitBuilder {
    * multiple drivers share a net (e.g. bidirectional data buses with
    * tri-state buffers). The multi-driver diagnostic in net resolution
    * will flag cases that aren't legitimate tri-state usage.
+   *
+   * Skips direction validation entirely when either component has analog
+   * models — analog terminals are electrically bidirectional regardless
+   * of their declared pin direction.
    */
-  private validatePinConnection(srcPin: Pin, dstPin: Pin): void {
+  private validatePinConnection(src: CircuitElement, srcPin: Pin, dst: CircuitElement, dstPin: Pin): void {
+    // Analog components have arbitrary pin directions — skip validation
+    const srcDef = this.registry.get(src.typeId);
+    const dstDef = this.registry.get(dst.typeId);
+    const srcHasAnalog = srcDef?.modelRegistry != null && Object.keys(srcDef.modelRegistry).length > 0;
+    const dstHasAnalog = dstDef?.modelRegistry != null && Object.keys(dstDef.modelRegistry).length > 0;
+    if (srcHasAnalog || dstHasAnalog) return;
+
     const srcOut = srcPin.direction === 'OUTPUT' || srcPin.direction === 'BIDIRECTIONAL';
     const dstOut = dstPin.direction === 'OUTPUT' || dstPin.direction === 'BIDIRECTIONAL';
     const dstIn = dstPin.direction === 'INPUT' || dstPin.direction === 'BIDIRECTIONAL';
