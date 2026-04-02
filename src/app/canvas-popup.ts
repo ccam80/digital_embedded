@@ -76,7 +76,7 @@ export function createPopupController(
 
     // Pin electrical overrides only when the component is currently using the digital model
     const bag = elementHit.getProperties();
-    const activeModel = bag.has("model") ? bag.get<string>("model") : (def.defaultModel ?? "");
+    const activeModel = bag.has("model") ? bag.get<string>("model") : "";
     if (activeModel === "digital") {
       propertyPopup.showPinElectricalOverrides(elementHit, def, family);
     }

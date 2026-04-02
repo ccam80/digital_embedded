@@ -46,7 +46,7 @@ const SEMICONDUCTOR_DEFS: ComponentDefinition[] = [
 
 describe("modelRegistry on semiconductor components", () => {
   for (const def of SEMICONDUCTOR_DEFS) {
-    const modelKey = def.defaultModel ?? "behavioral";
+    const modelKey = def.defaultModel!;
 
     it(`${def.name}: has modelRegistry with default model entry`, () => {
       expect(def.modelRegistry).toBeDefined();

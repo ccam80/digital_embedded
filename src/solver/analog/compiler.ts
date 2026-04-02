@@ -234,7 +234,8 @@ function compileSubcircuitToMnaModel(
         const remappedNodes = connectivity.map(remapNet);
 
         const leafDef = registry.get(subEl.typeId);
-        const leafEntry = leafDef ? resolveModelEntry(leafDef, leafDef.defaultModel ?? "behavioral") : null;
+        const leafModelKey = subEl.params?.model as string | undefined ?? leafDef?.defaultModel ?? "";
+        const leafEntry = leafDef ? resolveModelEntry(leafDef, leafModelKey) : null;
         if (!leafEntry || leafEntry.kind !== "inline") continue;
         const leafFactory = leafEntry.factory;
 

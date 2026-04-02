@@ -32,19 +32,32 @@ export function applySpiceImportResult(
   registry?: ComponentRegistry,
 ): void {
   const def = registry?.get(element.typeId);
-  const defaultKey = def?.defaultModel ?? "behavioral";
-  const behavioralEntry = def?.modelRegistry?.[defaultKey];
 
-  if (!behavioralEntry || behavioralEntry.kind !== "inline") {
+  // Find the inline factory from the static model registry. The element's
+  // current model may be an imported runtime model, so we look up by
+  // defaultModel first, then fall back to the first inline entry.
+  let baseEntry: ModelEntry | undefined;
+  if (def?.modelRegistry) {
+    const preferredKey = def.defaultModel ?? "";
+    if (def.modelRegistry[preferredKey]?.kind === "inline") {
+      baseEntry = def.modelRegistry[preferredKey];
+    } else {
+      for (const e of Object.values(def.modelRegistry)) {
+        if (e.kind === "inline") { baseEntry = e; break; }
+      }
+    }
+  }
+
+  if (!baseEntry || baseEntry.kind !== "inline") {
     throw new Error(
-      `applySpiceImportResult: component "${element.typeId}" has no "${defaultKey}" inline model entry in its modelRegistry`,
+      `applySpiceImportResult: component "${element.typeId}" has no inline model entry in its modelRegistry`,
     );
   }
 
   const entry: ModelEntry = {
     kind: "inline",
-    factory: behavioralEntry.factory,
-    paramDefs: behavioralEntry.paramDefs,
+    factory: baseEntry.factory,
+    paramDefs: baseEntry.paramDefs,
     params: { ...result.overrides },
   };
 
@@ -57,7 +70,7 @@ export function applySpiceImportResult(
   circuit.metadata.models[element.typeId]![result.modelName] = entry;
 
   element.getProperties().set("model", result.modelName);
-  element.getProperties().replaceModelParams({ ...behavioralEntry.params, ...result.overrides });
+  element.getProperties().replaceModelParams({ ...baseEntry.params, ...result.overrides });
 }
 
 /** The result produced by the .SUBCKT import dialog. */

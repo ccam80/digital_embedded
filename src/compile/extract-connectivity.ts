@@ -80,18 +80,10 @@ export function resolveModelAssignments(
     const staticKeys = def.modelRegistry ? Object.keys(def.modelRegistry) : [];
     const runtimeKeys = runtimeModels?.[el.typeId] ? Object.keys(runtimeModels[el.typeId]!) : [];
     const mnaKeys = runtimeKeys.length > 0 ? [...new Set([...staticKeys, ...runtimeKeys])] : staticKeys;
-    // Determine the default model key for this component:
-    //   1. Explicit defaultModel from definition.
-    //   2. "digital" when a digital model exists.
-    //   3. First analog model key when only analog models exist.
-    //   4. "neutral" as final fallback (infrastructure-like).
-    const defaultKey =
-      def.defaultModel ??
-      (hasDigital ? 'digital' : undefined) ??
-      mnaKeys[0] ??
-      'neutral';
-
-    const candidateKey = requestedKey ?? defaultKey;
+    // The element's "model" property is the source of truth (set at creation).
+    // requestedKey comes from the element's bag. Fall back to definition only
+    // for legacy circuits that predate model-property-at-creation.
+    const candidateKey = requestedKey ?? def.defaultModel ?? (hasDigital ? 'digital' : mnaKeys[0] ?? 'neutral');
 
     // Validate the candidate key against available models.
     // Valid keys: "digital" (when digital model exists), any key in mnaKeys,

@@ -52,9 +52,12 @@ function makeElement(
   instanceId: string,
   pinLabels: string[],
   initialProps: Map<string, PropertyValue> = new Map(),
+  model: string = "behavioral",
 ): CircuitElement {
   const pins = pinLabels.map((label, i) => makePin(i, 0, label));
-  const bag = new PropertyBag(initialProps.entries());
+  const propsMap = new Map(initialProps.entries());
+  if (!propsMap.has("model")) propsMap.set("model", model);
+  const bag = new PropertyBag(propsMap.entries());
   const serialized: SerializedElement = {
     typeId,
     instanceId,
@@ -225,7 +228,7 @@ describe("applySpiceImportResult", () => {
     expect(circuit.metadata.models).toBeDefined();
   });
 
-  it("throws when the component has no behavioral model entry", () => {
+  it("throws when the component has no inline model entry", () => {
     const element = makeElement("NoModelComp", "x1", ["A", "B"]);
     const circuit = new Circuit();
 
@@ -244,7 +247,7 @@ describe("applySpiceImportResult", () => {
 
     expect(() =>
       applySpiceImportResult(element, { overrides: {}, modelName: "M1", deviceType: "X" }, circuit, reg),
-    ).toThrow(/behavioral/);
+    ).toThrow(/no inline model entry/);
   });
 
   it("stores multiple models for different component types independently", () => {
