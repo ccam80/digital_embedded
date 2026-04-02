@@ -8,10 +8,10 @@ import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import { pinWorldPosition } from '../core/pin.js';
+import { PinDirection } from '../core/pin.js';
 import { UnionFind } from './union-find.js';
 import type { ConnectivityGroup, ResolvedGroupPin } from './types.js';
 import type { Diagnostic } from './types.js';
-import type { PinDirection } from '../core/pin.js';
 
 // ---------------------------------------------------------------------------
 // Infrastructure component types — engine-neutral, carry no domain signal
@@ -404,17 +404,41 @@ export function extractConnectivityGroups(
     }
 
     if (widthMismatch) {
-      // Collect the conflicting widths for the diagnostic message
-      const widths = new Set<number>();
-      for (const pin of pins) {
-        if (pin.domain === 'digital') widths.add(pin.bitWidth);
+      const digitalPins = pins.filter((p) => p.domain === 'digital');
+      const analogPins = pins.filter((p) => p.domain === 'analog');
+
+      // Suppress when both sides are analog (both will be 1-bit nominal)
+      if (analogPins.length > 0 && digitalPins.length === 0) {
+        // purely analog mismatch — suppress
+      } else if (analogPins.length > 0 && digitalPins.length > 0) {
+        // Analog terminal connected to multi-bit digital bus
+        const multiBitDigital = digitalPins.find((p) => p.bitWidth > 1);
+        if (multiBitDigital !== undefined) {
+          const elLabel = (elements[multiBitDigital.elementIndex]?.getProperties().getOrDefault<string>('label', '') || elements[multiBitDigital.elementIndex]?.instanceId) ?? 'unknown';
+          diagnostics.push({
+            severity: 'error',
+            code: 'width-mismatch',
+            message: `Analog terminal connected to multi-bit digital bus at ${elLabel}:${multiBitDigital.pinLabel} [${multiBitDigital.bitWidth}-bit]`,
+            netId: groupId,
+            involvedPositions: digitalPins.concat(analogPins).map((p) => p.worldPosition),
+            suggestions: [{ text: 'Use a single-bit digital signal to interface with an analog terminal.', automatable: false }],
+          });
+        }
+      } else {
+        // Pure digital width mismatch — name the pins
+        const pinDescs = digitalPins.map((p) => {
+          const elLabel = (elements[p.elementIndex]?.getProperties().getOrDefault<string>('label', '') || elements[p.elementIndex]?.instanceId) ?? 'unknown';
+          return `${elLabel}:${p.pinLabel} [${p.bitWidth}-bit]`;
+        });
+        diagnostics.push({
+          severity: 'error',
+          code: 'width-mismatch',
+          message: `Bit-width mismatch: ${pinDescs.join(' \u2194 ')}`,
+          netId: groupId,
+          involvedPositions: digitalPins.map((p) => p.worldPosition),
+          suggestions: [{ text: `Ensure all pins on this net have the same bit width.`, automatable: false }],
+        });
       }
-      diagnostics.push({
-        severity: 'error',
-        code: 'width-mismatch',
-        message: `Net ${groupId}: connected digital pins have mismatched bit widths: ${[...widths].join(', ')}`,
-        netId: groupId,
-      });
     }
 
     const group: import('./types.js').ConnectivityGroup = {
@@ -425,6 +449,77 @@ export function extractConnectivityGroups(
       ...(!widthMismatch && groupBitWidth !== undefined ? { bitWidth: groupBitWidth } : {}),
     };
     groups.push(group);
+  }
+
+  // -------------------------------------------------------------------------
+  // Step 7: Post-group diagnostics — unconnected input, floating terminal,
+  // multi-driver
+  // -------------------------------------------------------------------------
+
+  for (const group of groups) {
+    const pins = group.pins;
+
+    // Skip infrastructure-only groups (no domain tags means all neutral)
+    if (group.domains.size === 0) continue;
+
+    // -----------------------------------------------------------------------
+    // Unconnected input / floating terminal: single-pin groups
+    // -----------------------------------------------------------------------
+    if (pins.length === 1) {
+      const pin = pins[0]!;
+
+      if (pin.domain === 'digital' && pin.direction === PinDirection.INPUT) {
+        // Skip infrastructure components (Tunnels, Ports, etc.) that are
+        // legitimately undriven at this level
+        const el = elements[pin.elementIndex];
+        if (el === undefined || INFRASTRUCTURE_TYPES.has(el.typeId)) continue;
+
+        const elLabel = (el.getProperties().getOrDefault<string>('label', '') || el.instanceId);
+        diagnostics.push({
+          severity: 'warning',
+          code: 'unconnected-input',
+          message: `Unconnected input: ${elLabel}:${pin.pinLabel}`,
+          netId: group.groupId,
+          involvedPositions: [pin.worldPosition],
+          suggestions: [{ text: `Connect this input pin to a signal source.`, automatable: false }],
+        });
+      } else if (pin.domain === 'analog') {
+        const el = elements[pin.elementIndex];
+        if (el === undefined || INFRASTRUCTURE_TYPES.has(el.typeId)) continue;
+
+        const elLabel = (el.getProperties().getOrDefault<string>('label', '') || el.instanceId);
+        diagnostics.push({
+          severity: 'warning',
+          code: 'floating-terminal',
+          message: `Floating terminal: ${elLabel}:${pin.pinLabel}`,
+          netId: group.groupId,
+          involvedPositions: [pin.worldPosition],
+          suggestions: [{ text: `Connect this terminal to a net.`, automatable: false }],
+        });
+      }
+
+      continue;
+    }
+
+    // -----------------------------------------------------------------------
+    // Multi-driver: suppress when all pins on the group are analog-domain
+    // -----------------------------------------------------------------------
+    const allAnalog = pins.every((p) => p.domain === 'analog');
+    if (allAnalog) continue;
+
+    const outputDigitalPins = pins.filter(
+      (p) => p.domain === 'digital' && p.direction === PinDirection.OUTPUT,
+    );
+    if (outputDigitalPins.length > 1) {
+      diagnostics.push({
+        severity: 'warning',
+        code: 'multi-driver-no-tristate',
+        message: `Net ${group.groupId} has ${outputDigitalPins.length} output drivers. Valid only when all drivers support tri-state (high-Z) output.`,
+        netId: group.groupId,
+        involvedPositions: outputDigitalPins.map((p) => p.worldPosition),
+        suggestions: [{ text: `Use tri-state outputs or ensure only one driver is active at a time.`, automatable: false }],
+      });
+    }
   }
 
   return [groups, diagnostics];

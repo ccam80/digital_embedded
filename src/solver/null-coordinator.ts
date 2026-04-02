@@ -150,7 +150,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
 
   getSliderProperties(_element: CircuitElement): SliderPropertyDescriptor[] { return []; }
   setComponentProperty(_element: CircuitElement, _key: string, _value: number): void { /* no-op */ }
-  setSourceByLabel(_label: string, _value: number): void { /* no-op */ }
+  setSourceByLabel(_label: string, _paramKey: string, _value: number): void { /* no-op */ }
 
   // -------------------------------------------------------------------------
   // Measurement signal reading

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseTestData, type ParsedTestData, type TestValue } from '../parser.js';
+import { parseTestData, parseSIValue, type ParsedTestData, type TestValue } from '../parser.js';
 
 describe('parser', () => {
   describe('simpleTable', () => {
@@ -252,6 +252,136 @@ describe('parser', () => {
       const text = 'A\nz';
       const result = parseTestData(text);
       expect(result.vectors[0].inputs.get('A')).toEqual({ kind: 'highZ' });
+    });
+  });
+
+  describe('parseSIValue', () => {
+    it('parses plain number', () => {
+      expect(parseSIValue('3.3')).toBeCloseTo(3.3);
+    });
+
+    it('parses k suffix', () => {
+      expect(parseSIValue('4.7k')).toBeCloseTo(4700);
+    });
+
+    it('parses n suffix', () => {
+      expect(parseSIValue('100n')).toBeCloseTo(1e-7);
+    });
+
+    it('parses u suffix', () => {
+      expect(parseSIValue('10u')).toBeCloseTo(1e-5);
+    });
+
+    it('parses m suffix', () => {
+      expect(parseSIValue('470m')).toBeCloseTo(0.47);
+    });
+
+    it('parses M suffix', () => {
+      expect(parseSIValue('1M')).toBeCloseTo(1e6);
+    });
+
+    it('parses G suffix', () => {
+      expect(parseSIValue('2G')).toBeCloseTo(2e9);
+    });
+
+    it('parses p suffix', () => {
+      expect(parseSIValue('100p')).toBeCloseTo(1e-10);
+    });
+
+    it('parses f suffix', () => {
+      expect(parseSIValue('10f')).toBeCloseTo(1e-14);
+    });
+
+    it('throws on non-numeric input', () => {
+      expect(() => parseSIValue('abc')).toThrow();
+    });
+  });
+
+  describe('analogDomain', () => {
+    it('parses float value as analogValue when domain is analog', () => {
+      const domains = new Map([['Vout', 'analog' as const]]);
+      const text = 'Vin Vout\n5 3.3';
+      const result = parseTestData(text, 1, domains);
+      expect(result.vectors[0].outputs.get('Vout')).toEqual({ kind: 'analogValue', value: 3.3 });
+    });
+
+    it('parses SI suffix value in analog domain', () => {
+      const domains = new Map([['Vout', 'analog' as const]]);
+      const text = 'Vin Vout\n5 4.7k';
+      const result = parseTestData(text, 1, domains);
+      const v = result.vectors[0].outputs.get('Vout');
+      expect(v?.kind).toBe('analogValue');
+      if (v?.kind === 'analogValue') expect(v.value).toBeCloseTo(4700);
+    });
+
+    it('parses analog value with relative tolerance', () => {
+      const domains = new Map([['Vout', 'analog' as const]]);
+      const text = 'Vin Vout\n5 3.3~5%';
+      const result = parseTestData(text, 1, domains);
+      const v = result.vectors[0].outputs.get('Vout');
+      expect(v?.kind).toBe('analogValue');
+      if (v?.kind === 'analogValue') {
+        expect(v.value).toBeCloseTo(3.3);
+        expect(v.tolerance).toEqual({ relative: 0.05 });
+      }
+    });
+
+    it('parses analog value with absolute tolerance', () => {
+      const domains = new Map([['Vout', 'analog' as const]]);
+      const text = 'Vin Vout\n5 3.3~100m';
+      const result = parseTestData(text, 1, domains);
+      const v = result.vectors[0].outputs.get('Vout');
+      expect(v?.kind).toBe('analogValue');
+      if (v?.kind === 'analogValue') {
+        expect(v.value).toBeCloseTo(3.3);
+        expect(v.tolerance?.absolute).toBeCloseTo(0.1);
+      }
+    });
+
+    it('parses X as dontCare in analog domain', () => {
+      const domains = new Map([['Vout', 'analog' as const]]);
+      const text = 'Vin Vout\n5 X';
+      const result = parseTestData(text, 1, domains);
+      expect(result.vectors[0].outputs.get('Vout')).toEqual({ kind: 'dontCare' });
+    });
+
+    it('rejects C in analog domain', () => {
+      const domains = new Map([['CLK', 'analog' as const]]);
+      const text = 'CLK Vout\nC 3.3';
+      expect(() => parseTestData(text, 1, domains)).toThrow();
+    });
+
+    it('rejects Z in analog domain', () => {
+      const domains = new Map([['Vout', 'analog' as const]]);
+      const text = 'Vin Vout\n5 Z';
+      expect(() => parseTestData(text, 1, domains)).toThrow();
+    });
+  });
+
+  describe('analogPragmas', () => {
+    it('parses #analog:tolerance relative pragma', () => {
+      const text = '#analog:tolerance 5%\nA B\n0 1';
+      const result = parseTestData(text, 1);
+      expect(result.analogPragmas?.tolerance).toEqual({ relative: 0.05 });
+    });
+
+    it('parses #analog:abstol pragma', () => {
+      const text = '#analog:abstol 1m\nA B\n0 1';
+      const result = parseTestData(text, 1);
+      expect(result.analogPragmas?.abstol).toBeCloseTo(0.001);
+    });
+
+    it('parses #analog:settle pragma', () => {
+      const text = '#analog:settle 10m\nA B\n0 1';
+      const result = parseTestData(text, 1);
+      expect(result.analogPragmas?.settle).toBeCloseTo(0.01);
+    });
+
+    it('returns empty analogPragmas when no pragmas present', () => {
+      const text = 'A B\n0 1';
+      const result = parseTestData(text, 1);
+      expect(result.analogPragmas).toBeDefined();
+      expect(result.analogPragmas?.tolerance).toBeUndefined();
     });
   });
 });

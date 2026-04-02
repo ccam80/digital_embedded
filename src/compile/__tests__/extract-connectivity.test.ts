@@ -193,7 +193,8 @@ describe('extractConnectivityGroups — pure digital', () => {
     const [assignments] = resolveModelAssignments(elements, registry);
     const [groups, diags] = extractConnectivityGroups(elements, [], registry, assignments);
 
-    expect(diags).toHaveLength(0);
+    // Unconnected-input warnings are emitted for the 2 disconnected input pins (A, B)
+    expect(diags.filter((d) => d.code !== 'unconnected-input')).toHaveLength(0);
     expect(groups).toHaveLength(3); // 3 pins, 0 wires, 0 connections
   });
 
@@ -245,7 +246,8 @@ describe('extractConnectivityGroups — pure digital', () => {
     const [assignments] = resolveModelAssignments(elements, registry);
     const [groups, diags] = extractConnectivityGroups(elements, [wire], registry, assignments);
 
-    expect(diags).toHaveLength(0);
+    // Unconnected-input warnings for And gate inputs A and B (disconnected)
+    expect(diags.filter((d) => d.code !== 'unconnected-input')).toHaveLength(0);
 
     // And gate: A(0,0), B(0,1) = 2 groups; out(2,0)+probeIn(4,0)+wire = 1 group
     // Total: 3 groups

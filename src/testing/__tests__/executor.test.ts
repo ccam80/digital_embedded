@@ -14,8 +14,9 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { executeTests } from "../executor.js";
+import { executeTests, withinTolerance } from "../executor.js";
 import type { ParsedTestData, ParsedVector, TestValue } from "../executor.js";
+import type { Tolerance } from "../parser.js";
 import type { SimulatorFacade } from "@/headless/facade";
 import type { SimulationCoordinator } from "@/solver/coordinator-types";
 import type { Circuit } from "@/core/circuit";
@@ -275,5 +276,159 @@ describe("executeTests", () => {
     expect(results.vectors[2].passed).toBe(true);
     expect(results.vectors[3].passed).toBe(true);
     expect(results.vectors[4].passed).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// withinTolerance unit tests
+// ---------------------------------------------------------------------------
+
+describe("withinTolerance", () => {
+  it("passes when actual equals expected (no tolerance)", () => {
+    expect(withinTolerance(3.3, 3.3, {})).toBe(true);
+  });
+
+  it("fails when actual differs and no tolerance specified", () => {
+    expect(withinTolerance(3.0, 3.3, {})).toBe(false);
+  });
+
+  it("passes within absolute tolerance", () => {
+    const tol: Tolerance = { absolute: 0.1 };
+    expect(withinTolerance(3.25, 3.3, tol)).toBe(true);
+  });
+
+  it("fails outside absolute tolerance", () => {
+    const tol: Tolerance = { absolute: 0.1 };
+    expect(withinTolerance(3.0, 3.3, tol)).toBe(false);
+  });
+
+  it("passes within relative tolerance", () => {
+    const tol: Tolerance = { relative: 0.05 }; // 5%
+    expect(withinTolerance(3.15, 3.3, tol)).toBe(true); // 4.5% error
+  });
+
+  it("fails outside relative tolerance", () => {
+    const tol: Tolerance = { relative: 0.05 }; // 5%
+    expect(withinTolerance(2.8, 3.3, tol)).toBe(false); // ~15% error
+  });
+
+  it("passes when either absolute or relative is satisfied (both specified)", () => {
+    const tol: Tolerance = { absolute: 0.5, relative: 0.01 }; // 1% relative, 0.5 absolute
+    // 2.8 vs 3.3: delta=0.5 — passes absolute even though relative fails
+    expect(withinTolerance(2.8, 3.3, tol)).toBe(true);
+  });
+
+  it("fails when both tolerances are missed", () => {
+    const tol: Tolerance = { absolute: 0.1, relative: 0.01 };
+    expect(withinTolerance(2.8, 3.3, tol)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Analog vector execution tests
+// ---------------------------------------------------------------------------
+
+describe("executeTests — analog", () => {
+  it("passes analog output within tolerance", async () => {
+    const { facade } = makeMockFacade({ Vout: 3.28 });
+
+    const testData: ParsedTestData = {
+      inputNames: [],
+      outputNames: ["Vout"],
+      vectors: [
+        {
+          inputs: new Map(),
+          outputs: new Map<string, TestValue>([
+            ["Vout", { kind: "analogValue", value: 3.3, tolerance: { relative: 0.05 } }],
+          ]),
+        },
+      ],
+    };
+
+    const results = await executeTests(facade, stubEngine, stubCircuit, testData);
+    expect(results.passed).toBe(1);
+    expect(results.failed).toBe(0);
+  });
+
+  it("fails analog output outside tolerance", async () => {
+    const { facade } = makeMockFacade({ Vout: 2.8 });
+
+    const testData: ParsedTestData = {
+      inputNames: [],
+      outputNames: ["Vout"],
+      vectors: [
+        {
+          inputs: new Map(),
+          outputs: new Map<string, TestValue>([
+            ["Vout", { kind: "analogValue", value: 3.3, tolerance: { relative: 0.05 } }],
+          ]),
+        },
+      ],
+    };
+
+    const results = await executeTests(facade, stubEngine, stubCircuit, testData);
+    expect(results.passed).toBe(0);
+    expect(results.failed).toBe(1);
+  });
+
+  it("uses analogPragmas tolerance when no per-value tolerance", async () => {
+    const { facade } = makeMockFacade({ Vout: 3.28 });
+
+    const testData: ParsedTestData = {
+      inputNames: [],
+      outputNames: ["Vout"],
+      vectors: [
+        {
+          inputs: new Map(),
+          outputs: new Map<string, TestValue>([
+            ["Vout", { kind: "analogValue", value: 3.3 }], // no tolerance on value
+          ]),
+        },
+      ],
+      analogPragmas: { tolerance: { relative: 0.05 } },
+    };
+
+    const results = await executeTests(facade, stubEngine, stubCircuit, testData);
+    expect(results.passed).toBe(1);
+  });
+
+  it("passes settle time from analogPragmas to facade.settle", async () => {
+    const calls: number[] = [];
+    const facade = {
+      setSignal: vi.fn(),
+      readSignal: vi.fn(() => 3.3),
+      settle: vi.fn((_coord: SimulationCoordinator, settleTime?: number) => {
+        calls.push(settleTime ?? -1);
+        return Promise.resolve();
+      }),
+      step: vi.fn(),
+      createCircuit: vi.fn(),
+      addComponent: vi.fn(),
+      connect: vi.fn(),
+      compile: vi.fn(),
+      run: vi.fn(),
+      readAllSignals: vi.fn(),
+      runTests: vi.fn(),
+      loadDig: vi.fn(),
+      serialize: vi.fn(),
+      deserialize: vi.fn(),
+    } as unknown as SimulatorFacade;
+
+    const testData: ParsedTestData = {
+      inputNames: [],
+      outputNames: ["Vout"],
+      vectors: [
+        {
+          inputs: new Map(),
+          outputs: new Map<string, TestValue>([
+            ["Vout", { kind: "analogValue", value: 3.3 }],
+          ]),
+        },
+      ],
+      analogPragmas: { settle: 0.01 },
+    };
+
+    await executeTests(facade, stubEngine, stubCircuit, testData);
+    expect(calls[0]).toBe(0.01);
   });
 });

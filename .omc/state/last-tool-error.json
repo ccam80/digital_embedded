@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && node -e \\\"\\nconst {McpServer} = require('@modelcontextprotocol/sdk/server/mcp.js');\\nconst {z} = require('zod');\\nconst s = new McpSe...",
-  "error": "Exit code 1\n[\"test_foo\"]\n[\n  'title',       'description',\n  'inputSchema', 'outputSchema',\n  'annotations', 'execution',\n  '_meta',       'handler',\n  'enabled',     'disable',\n  'enable',      'remove',\n  'update'\n]\nC:\\local_working_projects\\digital_in_browser\\node_modules\\@modelcontextprotocol\\sdk\\dist\\cjs\\server\\mcp.js:216\r\n        const isTaskHandler = 'createTask' in handler;\r\n                                           ^\r\n\r\nTypeError: Cannot use 'in' operator to search for 'createTask' in ...",
-  "timestamp": "2026-04-02T12:14:29.769Z",
+  "tool_input_preview": "{\"command\":\"cd /C/local_working_projects/digital_in_browser && npx vitest run src/testing/__tests__/parser.test.ts src/testing/__tests__/executor.test.ts 2>&1\",\"timeout\":60000}",
+  "error": "Exit code 1\n.....................FF...................................................F.FFF...FFFF.\n\n============================================================\n  77 passed  10 failed  0 skipped  (1.3s)\n  2 test files\n============================================================\n\nFailures grouped by error:\n\n  [1] Not a valid test value: 'k' (line 2)  (x1)\n      src\\testing\\parser.ts:586:11  \"parses SI suffix value in analog domain\"\n\n  [2] Unexpected token '~' in data row (line 2)  (x2)\n      src...",
+  "timestamp": "2026-04-02T20:25:07.320Z",
   "retry_count": 2
 }

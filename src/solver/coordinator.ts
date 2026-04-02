@@ -582,7 +582,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     return result;
   }
 
-  setSourceByLabel(label: string, value: number): void {
+  setSourceByLabel(label: string, paramKey: string, value: number): void {
     // Resolve label → CircuitElement via labelToCircuitElement when available,
     // falling back to walking allCircuitElements.
     let element: CircuitElement | undefined;
@@ -598,18 +598,20 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     }
     if (element === undefined) return;
 
-    // Determine primary parameter key from the model registry entry
-    let paramKey = 'voltage';
-    if (this._registry !== null) {
+    // Determine resolved parameter key: use provided paramKey, falling back to
+    // the primary parameter from modelRegistry.behavioral.paramDefs[0].
+    let resolvedParamKey = paramKey;
+    if (!resolvedParamKey && this._registry !== null) {
       const def = this._registry.get(element.typeId);
-      const modelKey = element.getProperties().get<string>('model');
-      const entry = modelKey ? def?.modelRegistry?.[modelKey] : undefined;
+      const entry = def?.modelRegistry?.['behavioral'];
       if (entry?.paramDefs && entry.paramDefs.length > 0) {
-        paramKey = entry.paramDefs[0].key;
+        resolvedParamKey = entry.paramDefs[0].key;
+      } else {
+        resolvedParamKey = 'voltage';
       }
     }
 
-    this.setComponentProperty(element, paramKey, value);
+    this.setComponentProperty(element, resolvedParamKey, value);
   }
 
   setComponentProperty(element: CircuitElement, key: string, value: number): void {

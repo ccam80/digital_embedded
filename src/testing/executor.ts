@@ -13,7 +13,7 @@
 import type { Circuit } from '../core/circuit.js';
 import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { TestResults, TestVector } from '../headless/types.js';
-import type { ParsedTestData, ParsedVector } from './parser.js';
+import type { ParsedTestData, ParsedVector, Tolerance } from './parser.js';
 
 export type { ParsedTestData, ParsedVector };
 export type { TestValue } from './parser.js';
@@ -47,6 +47,55 @@ export interface RunnerFacade {
  * when a 1-bit signal is fully HIGH_Z.
  */
 const HIGH_Z_SENTINEL = 0xFFFFFFFF;
+
+// ---------------------------------------------------------------------------
+// Tolerance comparison
+// ---------------------------------------------------------------------------
+
+/**
+ * Check whether `actual` is within tolerance of `expected`.
+ * If both absolute and relative tolerances are specified, passing either is sufficient.
+ */
+export function withinTolerance(actual: number, expected: number, tol: Tolerance): boolean {
+  const delta = Math.abs(actual - expected);
+  if (tol.absolute !== undefined && delta <= tol.absolute) return true;
+  if (tol.relative !== undefined && delta <= Math.abs(expected) * tol.relative) return true;
+  // If no tolerance fields were set at all, fall back to exact match
+  if (tol.absolute === undefined && tol.relative === undefined) return actual === expected;
+  return false;
+}
+
+/**
+ * Format an analog failure message.
+ * E.g. `Expected 3.3V ±5% at "Vout", got 2.8V (delta: 500mV)`
+ */
+function formatAnalogFailure(
+  signalName: string,
+  expected: number,
+  actual: number,
+  tol?: Tolerance,
+): string {
+  const delta = Math.abs(actual - expected);
+  const tolStr = tol?.relative !== undefined
+    ? ` ±${(tol.relative * 100).toFixed(0)}%`
+    : tol?.absolute !== undefined
+      ? ` ±${formatSI(tol.absolute)}V`
+      : '';
+  return `Expected ${formatSI(expected)}V${tolStr} at "${signalName}", got ${formatSI(actual)}V (delta: ${formatSI(delta)}V)`;
+}
+
+function formatSI(value: number): string {
+  const abs = Math.abs(value);
+  if (abs === 0) return '0';
+  if (abs >= 1e9) return `${+(value / 1e9).toPrecision(3)}G`;
+  if (abs >= 1e6) return `${+(value / 1e6).toPrecision(3)}M`;
+  if (abs >= 1e3) return `${+(value / 1e3).toPrecision(3)}k`;
+  if (abs >= 1)   return `${+value.toPrecision(3)}`;
+  if (abs >= 1e-3) return `${+(value * 1e3).toPrecision(3)}m`;
+  if (abs >= 1e-6) return `${+(value * 1e6).toPrecision(3)}u`;
+  if (abs >= 1e-9) return `${+(value * 1e9).toPrecision(3)}n`;
+  return `${+(value * 1e12).toPrecision(3)}p`;
+}
 
 // ---------------------------------------------------------------------------
 // executeTests
@@ -147,7 +196,8 @@ async function executeVector(
   // Propagate regular inputs so combinational paths (decoders, enables,
   // muxes) settle before any clock edge arrives.  Without this, sequential
   // components' sampleFns would see stale enable/data signals.
-  await facade.settle(coordinator);
+  const settleTime = testData.analogPragmas?.settle;
+  await facade.settle(coordinator, settleTime);
 
   // Handle clock inputs: toggle high → settle → low → settle
   // Use settle() to allow ripple propagation through cascaded sequential elements.
@@ -182,6 +232,18 @@ async function executeVector(
       expectedOutputs[name] = HIGH_Z_SENTINEL;
       if (actual !== HIGH_Z_SENTINEL) {
         vectorPassed = false;
+      }
+      continue;
+    }
+
+    if (expected.kind === 'analogValue') {
+      // Analog comparison: use tolerance if specified, otherwise exact float match
+      expectedOutputs[name] = expected.value;
+      const tol: Tolerance = expected.tolerance ?? testData.analogPragmas?.tolerance ?? {};
+      if (!withinTolerance(actual, expected.value, tol)) {
+        vectorPassed = false;
+        // Attach failure detail to the vector (stored in actualOutputs for now — message is informational)
+        void formatAnalogFailure(name, expected.value, actual, expected.tolerance ?? testData.analogPragmas?.tolerance);
       }
       continue;
     }

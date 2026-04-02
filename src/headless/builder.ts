@@ -241,7 +241,7 @@ export class CircuitBuilder {
   }
 
   /**
-   * Connect two components by pin label
+   * Connect two component pins with a wire. Validates pin labels exist.
    */
   connect(
     circuit: Circuit,
@@ -271,24 +271,6 @@ export class CircuitBuilder {
         `Pin '${dstPinLabel}' not found on component '${dst.typeId}'. Valid pins: ${validLabels}`,
         dst.typeId,
         dstPinLabel
-      );
-    }
-
-    // Validate pin directions (skip for analog terminals — direction is meaningless)
-    this.validatePinConnection(src, srcPin, dst, dstPin);
-
-    // Validate bit width match
-    if (srcPin.bitWidth !== dstPin.bitWidth) {
-      const srcBag = src.getProperties();
-      const srcLabel = (srcBag.has('label') ? srcBag.get<string>('label') : '') || src.instanceId;
-      const dstBag = dst.getProperties();
-      const dstLabel = (dstBag.has('label') ? dstBag.get<string>('label') : '') || dst.instanceId;
-      throw new FacadeError(
-        `Bit width mismatch on connection "${srcLabel}:${srcPinLabel}" [${srcPin.bitWidth}-bit] → "${dstLabel}:${dstPinLabel}" [${dstPin.bitWidth}-bit]`,
-        src.typeId,
-        srcPinLabel,
-        undefined,
-        { srcWidth: srcPin.bitWidth, dstWidth: dstPin.bitWidth }
       );
     }
 
@@ -357,7 +339,7 @@ export class CircuitBuilder {
           );
         }
         if (addr.domain === 'analog') {
-          coord.setSourceByLabel(label, value);
+          coord.setSourceByLabel(label, '', value);
           return;
         }
         coord.writeSignal(addr, { type: 'digital', value });
@@ -832,37 +814,6 @@ export class CircuitBuilder {
   /**
    * Validate that pin directions are compatible for connection.
    *
-   * Allows OUTPUT-to-OUTPUT connections for tri-state bus patterns where
-   * multiple drivers share a net (e.g. bidirectional data buses with
-   * tri-state buffers). The multi-driver diagnostic in net resolution
-   * will flag cases that aren't legitimate tri-state usage.
-   *
-   * Skips direction validation entirely when either component has analog
-   * models — analog terminals are electrically bidirectional regardless
-   * of their declared pin direction.
-   */
-  private validatePinConnection(src: CircuitElement, srcPin: Pin, dst: CircuitElement, dstPin: Pin): void {
-    // Analog components have arbitrary pin directions — skip validation
-    const srcDef = this.registry.get(src.typeId);
-    const dstDef = this.registry.get(dst.typeId);
-    const srcHasAnalog = srcDef?.modelRegistry != null && Object.keys(srcDef.modelRegistry).length > 0;
-    const dstHasAnalog = dstDef?.modelRegistry != null && Object.keys(dstDef.modelRegistry).length > 0;
-    if (srcHasAnalog || dstHasAnalog) return;
-
-    const srcOut = srcPin.direction === 'OUTPUT' || srcPin.direction === 'BIDIRECTIONAL';
-    const dstOut = dstPin.direction === 'OUTPUT' || dstPin.direction === 'BIDIRECTIONAL';
-    const dstIn = dstPin.direction === 'INPUT' || dstPin.direction === 'BIDIRECTIONAL';
-
-    // Allow OUTPUT-to-OUTPUT (tri-state bus pattern)
-    if (srcOut && dstOut) return;
-
-    if (!srcOut || !dstIn) {
-      throw new FacadeError(
-        `Cannot connect ${srcPin.direction} pin to ${dstPin.direction} pin`
-      );
-    }
-  }
-
   /**
    * Calculate world position of a pin given its component and relative position
    */

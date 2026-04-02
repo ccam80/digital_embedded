@@ -258,14 +258,15 @@ export interface SimulationCoordinator {
    *
    * Resolves the label to a CircuitElement via labelToCircuitElement,
    * then calls setComponentProperty to re-stamp the MNA matrix.
-   * The paramKey is the primary parameter of the source (e.g. "voltage",
-   * "current"). If the label is not found or has no analog representation,
-   * this is a no-op.
+   * If paramKey is not provided, the primary parameter is determined from
+   * modelRegistry.behavioral.paramDefs[0]. If the label is not found or
+   * has no analog representation, this is a no-op.
    *
-   * @param label    Component label (e.g. "Vdc", "Iin")
-   * @param value    New parameter value
+   * @param label     Component label (e.g. "Vdc", "Iin")
+   * @param paramKey  Parameter key to set (e.g. "voltage", "current")
+   * @param value     New parameter value
    */
-  setSourceByLabel(label: string, value: number): void;
+  setSourceByLabel(label: string, paramKey: string, value: number): void;
 
   // -------------------------------------------------------------------------
   // §1.8 Measurement signal reading (for ScopePanel)

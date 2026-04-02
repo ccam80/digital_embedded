@@ -53,6 +53,7 @@ export interface SimulatorFacade {
 
   /**
    * Connect two component pins with a wire. Validates pin labels exist.
+   * Direction and bit-width validation is deferred to netlist()/compile().
    *
    * @param circuit - The circuit
    * @param srcComponent - Source component

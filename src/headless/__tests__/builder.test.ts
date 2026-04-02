@@ -236,56 +236,5 @@ describe('CircuitBuilder', () => {
     });
   });
 
-  describe('rejectsBitWidthMismatch', () => {
-    it('connect pins with different bit widths throws error', () => {
-      registry.register({
-        name: 'Wide',
-        typeId: -1,
-        factory: (props: PropertyBag) => {
-          const pos = props.has('position') ? (props.get('position') as number[]) : [0, 0];
-          const position = { x: pos[0] ?? 0, y: pos[1] ?? 0 };
-          const pins: Pin[] = [
-            {
-              label: 'in',
-              direction: PinDirection.INPUT,
-              position: { x: -2, y: 0 },
-              bitWidth: 8,
-              isNegated: false,
-              isClock: false,
-              kind: "signal",
-            },
-          ];
-          return new MockCircuitElement('Wide', position, pins);
-        },
-        pinLayout: [],
-        propertyDefs: [],
-        attributeMap: [],
-        category: 'LOGIC' as any,
-        helpText: 'Wide',
-        models: {
-          digital: { executeFn: () => {} },
-        },
-      });
-
-      const circuit = builder.createCircuit();
-      const narrow = builder.addComponent(circuit, 'Mock'); // 1-bit output
-      const wide = builder.addComponent(circuit, 'Wide'); // 8-bit input
-
-      expect(() => builder.connect(circuit, narrow, 'out', wide, 'in')).toThrow(
-        FacadeError
-      );
-    });
-  });
-
-  describe('rejectsInputToInput', () => {
-    it('connect two input pins throws FacadeError', () => {
-      const circuit = builder.createCircuit();
-      const el1 = builder.addComponent(circuit, 'Mock');
-      const el2 = builder.addComponent(circuit, 'Mock');
-
-      expect(() => builder.connect(circuit, el1, 'in', el2, 'in')).toThrow(
-        FacadeError
-      );
-    });
-  });
 });
+

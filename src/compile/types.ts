@@ -63,7 +63,8 @@ export type DiagnosticCode =
   | 'ac-no-source'
   | 'ac-linearization-failed'
   | 'monte-carlo-trial-failed'
-  | 'unconnected-analog-pin';
+  | 'unconnected-analog-pin'
+  | 'floating-terminal';
 
 /**
  * A concrete suggestion attached to a `Diagnostic`.

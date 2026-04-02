@@ -65,7 +65,18 @@ export function formatNetlist(netlist: Netlist): string {
       : `${net.pins.length} pins`;
     lines.push(`  Net #${net.netId} [${header}]:`);
     for (const pin of net.pins) {
-      const pinDetail = pin.domain === 'analog' ? `[terminal]` : `[digital]`;
+      let pinDetail: string;
+      if (pin.domain === 'analog') {
+        pinDetail = `[terminal]`;
+      } else {
+        const compDesc = netlist.components[pin.componentIndex];
+        const pinDesc = compDesc?.pins.find((p: PinDescriptor) => p.label === pin.pinLabel);
+        if (pinDesc?.bitWidth !== undefined && pinDesc?.direction !== undefined) {
+          pinDetail = `[${pinDesc.bitWidth}-bit, ${pinDesc.direction}]`;
+        } else {
+          pinDetail = `[digital]`;
+        }
+      }
       lines.push(`    ${pin.componentLabel}:${pin.pinLabel} ${pinDetail}`);
     }
   }

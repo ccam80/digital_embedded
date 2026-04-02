@@ -157,7 +157,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
       );
     }
     if (addr.domain === 'analog') {
-      this._coordinator.setSourceByLabel(label, value);
+      this._coordinator.setSourceByLabel(label, '', value);
       return;
     }
     this._coordinator.writeSignal(addr, { type: 'digital', value });

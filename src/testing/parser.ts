@@ -20,9 +20,15 @@
 
 export type TestValue =
   | { kind: 'value'; value: bigint }
+  | { kind: 'analogValue'; value: number; tolerance?: Tolerance }
   | { kind: 'dontCare' }
   | { kind: 'clock' }
   | { kind: 'highZ' };
+
+export interface Tolerance {
+  absolute?: number;
+  relative?: number;
+}
 
 export interface ParsedVector {
   inputs: Map<string, TestValue>;
@@ -33,6 +39,8 @@ export interface ParsedTestData {
   inputNames: string[];
   outputNames: string[];
   vectors: ParsedVector[];
+  analogPragmas?: { tolerance?: Tolerance; abstol?: number; settle?: number };
+  signalDomains?: Map<string, 'digital' | 'analog'>;
 }
 
 // ---------------------------------------------------------------------------
@@ -496,8 +504,79 @@ function expectToken(tok: Tokenizer, expected: TK, contextLine: number): TokenIn
   return t;
 }
 
-function parseTestValue(text: string, line: number): TestValue {
+// ---------------------------------------------------------------------------
+// SI value parser
+// ---------------------------------------------------------------------------
+
+const SI_SUFFIXES: Record<string, number> = {
+  f: 1e-15,
+  p: 1e-12,
+  n: 1e-9,
+  u: 1e-6,
+  m: 1e-3,
+  k: 1e3,
+  M: 1e6,
+  G: 1e9,
+};
+
+/**
+ * Parse a numeric string with optional SI suffix into a number.
+ * E.g. "4.7k" → 4700, "100n" → 1e-7, "3.3" → 3.3
+ */
+export function parseSIValue(text: string): number {
+  if (text.length === 0) throw new Error('Empty value');
+  const lastChar = text[text.length - 1];
+  const multiplier = SI_SUFFIXES[lastChar];
+  if (multiplier !== undefined) {
+    const numStr = text.slice(0, -1);
+    const num = Number(numStr);
+    if (isNaN(num)) throw new Error(`Not a valid SI value: '${text}'`);
+    return num * multiplier;
+  }
+  const num = Number(text);
+  if (isNaN(num)) throw new Error(`Not a valid number: '${text}'`);
+  return num;
+}
+
+function parseTestValue(text: string, line: number, domain?: 'digital' | 'analog'): TestValue {
   const upper = text.toUpperCase();
+
+  if (domain === 'analog') {
+    if (upper === 'C') throw new ParseError(`'C' (clock) is not valid in analog domain`, line);
+    if (upper === 'Z') throw new ParseError(`'Z' (highZ) is not valid in analog domain`, line);
+    if (upper === 'X') return { kind: 'dontCare' };
+
+    // Check for ~tolerance suffix: "3.3~0.1" or "3.3~5%"
+    const tildeIdx = text.indexOf('~');
+    if (tildeIdx !== -1) {
+      const valuePart = text.slice(0, tildeIdx);
+      const tolPart = text.slice(tildeIdx + 1);
+      let value: number;
+      try { value = parseSIValue(valuePart); } catch {
+        throw new ParseError(`Not a valid analog value: '${text}'`, line);
+      }
+      let tolerance: Tolerance;
+      if (tolPart.endsWith('%')) {
+        const pct = Number(tolPart.slice(0, -1));
+        if (isNaN(pct)) throw new ParseError(`Not a valid tolerance: '${tolPart}'`, line);
+        tolerance = { relative: pct / 100 };
+      } else {
+        let absVal: number;
+        try { absVal = parseSIValue(tolPart); } catch {
+          throw new ParseError(`Not a valid tolerance: '${tolPart}'`, line);
+        }
+        tolerance = { absolute: absVal };
+      }
+      return { kind: 'analogValue', value, tolerance };
+    }
+
+    try {
+      return { kind: 'analogValue', value: parseSIValue(text) };
+    } catch {
+      throw new ParseError(`Not a valid analog value: '${text}'`, line);
+    }
+  }
+
   if (upper === 'X') return { kind: 'dontCare' };
   if (upper === 'C') return { kind: 'clock' };
   if (upper === 'Z') return { kind: 'highZ' };
@@ -566,7 +645,13 @@ function parseHeader(tok: Tokenizer): { names: string[]; separatorIndex: number 
   }
 }
 
-function parseRows(tok: Tokenizer, columnCount: number, endKeyword: TK | null): Block[] {
+function parseRows(
+  tok: Tokenizer,
+  columnCount: number,
+  endKeyword: TK | null,
+  columnNames?: string[],
+  signalDomains?: Map<string, 'digital' | 'analog'>,
+): Block[] {
   const blocks: Block[] = [];
 
   while (true) {
@@ -607,7 +692,7 @@ function parseRows(tok: Tokenizer, columnCount: number, endKeyword: TK | null): 
       const count = Number(countExpr(new Map()));
       // consume the EOL after loop(...)
       if (tok.peek().type === TK.EOL) tok.consume();
-      const body = parseRows(tok, columnCount, TK.KW_LOOP);
+      const body = parseRows(tok, columnCount, TK.KW_LOOP, columnNames, signalDomains);
       blocks.push({ kind: 'loop', varName: varTok.text, count, body });
       continue;
     }
@@ -618,7 +703,7 @@ function parseRows(tok: Tokenizer, columnCount: number, endKeyword: TK | null): 
       const countExpr = new ExprParser(tok).parseExpr();
       expectToken(tok, TK.CLOSE, t.line);
       const count = Number(countExpr(new Map()));
-      const row = parseDataRow(tok, columnCount);
+      const row = parseDataRow(tok, columnCount, columnNames, signalDomains);
       blocks.push({ kind: 'repeat', count, row });
       continue;
     }
@@ -630,7 +715,7 @@ function parseRows(tok: Tokenizer, columnCount: number, endKeyword: TK | null): 
       t.type === TK.OPEN ||
       t.type === TK.KW_BITS
     ) {
-      const row = parseDataRow(tok, columnCount);
+      const row = parseDataRow(tok, columnCount, columnNames, signalDomains);
       blocks.push({ kind: 'row', row });
       continue;
     }
@@ -657,7 +742,12 @@ function parseRows(tok: Tokenizer, columnCount: number, endKeyword: TK | null): 
   }
 }
 
-function parseDataRow(tok: Tokenizer, columnCount: number): ExpandedRow {
+function parseDataRow(
+  tok: Tokenizer,
+  columnCount: number,
+  columnNames?: string[],
+  signalDomains?: Map<string, 'digital' | 'analog'>,
+): ExpandedRow {
   const row: ExpandedRow = new Map();
   let col = 0;
   const startLine = tok.peek().line;
@@ -672,13 +762,50 @@ function parseDataRow(tok: Tokenizer, columnCount: number): ExpandedRow {
 
     if (t.type === TK.NUMBER) {
       tok.consume();
-      row.set(col++, parseTestValue(t.text, t.line));
+      const colName = columnNames?.[col];
+      const domain = colName !== undefined ? signalDomains?.get(colName) : undefined;
+      if (domain === 'analog') {
+        // Reassemble analog token: NUMBER [IDENT(SI suffix)] [~ tolerance]
+        let rawText = t.text;
+        // Optional SI suffix: next token is an IDENT with a single SI letter
+        const maybeSuffix = tok.peek();
+        if (maybeSuffix.type === TK.IDENT && maybeSuffix.text.length === 1 && SI_SUFFIXES[maybeSuffix.text] !== undefined) {
+          tok.consume();
+          rawText += maybeSuffix.text;
+        }
+        // Optional tolerance: ~ <number> [% | SI-suffix]
+        const maybeTilde = tok.peek();
+        if (maybeTilde.type === TK.BIN_NOT) {
+          tok.consume();
+          const tolNumTok = tok.peek();
+          if (tolNumTok.type !== TK.NUMBER) {
+            throw new ParseError(`Expected tolerance value after '~'`, t.line);
+          }
+          tok.consume();
+          let tolText = tolNumTok.text;
+          // Check for % (MOD token) or SI suffix (IDENT)
+          const tolSuffix = tok.peek();
+          if (tolSuffix.type === TK.MOD) {
+            tok.consume();
+            tolText += '%';
+          } else if (tolSuffix.type === TK.IDENT && tolSuffix.text.length === 1 && SI_SUFFIXES[tolSuffix.text] !== undefined) {
+            tok.consume();
+            tolText += tolSuffix.text;
+          }
+          rawText += '~' + tolText;
+        }
+        row.set(col++, parseTestValue(rawText, t.line, domain));
+      } else {
+        row.set(col++, parseTestValue(t.text, t.line, domain));
+      }
       continue;
     }
 
     if (t.type === TK.IDENT) {
       tok.consume();
-      row.set(col++, parseTestValue(t.text, t.line));
+      const colName = columnNames?.[col];
+      const domain = colName !== undefined ? signalDomains?.get(colName) : undefined;
+      row.set(col++, parseTestValue(t.text, t.line, domain));
       continue;
     }
 
@@ -751,18 +878,67 @@ function expandBlocks(blocks: Block[], vars: Map<string, bigint>): ExpandedRow[]
 // Public API
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Analog pragma pre-pass
+// ---------------------------------------------------------------------------
+
+/**
+ * Scan raw text for `#analog:` pragma lines before tokenization.
+ * Returns parsed analog pragma values. The pragma lines remain in the text
+ * as comment lines so the tokenizer ignores them naturally.
+ */
+function extractAnalogPragmas(text: string): { tolerance?: Tolerance; abstol?: number; settle?: number } {
+  const pragmas: { tolerance?: Tolerance; abstol?: number; settle?: number } = {};
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('#analog:')) continue;
+    const rest = trimmed.slice('#analog:'.length).trim();
+
+    if (rest.startsWith('tolerance ')) {
+      const valStr = rest.slice('tolerance '.length).trim();
+      if (valStr.endsWith('%')) {
+        const pct = Number(valStr.slice(0, -1));
+        if (!isNaN(pct)) pragmas.tolerance = { relative: pct / 100 };
+      } else {
+        try { pragmas.tolerance = { absolute: parseSIValue(valStr) }; } catch { /* ignore malformed */ }
+      }
+    } else if (rest.startsWith('abstol ')) {
+      const valStr = rest.slice('abstol '.length).trim();
+      try { pragmas.abstol = parseSIValue(valStr); } catch { /* ignore malformed */ }
+    } else if (rest.startsWith('settle ')) {
+      const valStr = rest.slice('settle '.length).trim();
+      try { pragmas.settle = parseSIValue(valStr); } catch { /* ignore malformed */ }
+    }
+  }
+  return pragmas;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
 /**
  * Parse a Digital test vector string.
  *
- * @param text       The test data string (signal header + data rows).
- * @param inputCount Optional: number of leading signal names that are inputs.
- *                   The remaining names are outputs. If omitted, all names
- *                   are treated as inputs and outputNames is empty.
+ * @param text          The test data string (signal header + data rows).
+ * @param inputCount    Optional: number of leading signal names that are inputs.
+ *                      The remaining names are outputs. If omitted, all names
+ *                      are treated as inputs and outputNames is empty.
+ * @param signalDomains Optional: map from signal name to domain. When a signal
+ *                      is 'analog', its values are parsed as floats with optional
+ *                      SI suffixes and tolerance.
  */
-export function parseTestData(text: string, inputCount?: number): ParsedTestData {
+export function parseTestData(
+  text: string,
+  inputCount?: number,
+  signalDomains?: Map<string, 'digital' | 'analog'>,
+): ParsedTestData {
   if (text.trim().length === 0) {
     throw new ParseError('Test data is empty — no signal header found', 1);
   }
+
+  const analogPragmas = extractAnalogPragmas(text);
+  const domains: Map<string, 'digital' | 'analog'> = signalDomains ?? new Map();
 
   const tok = new Tokenizer(text);
   tok.skipEmptyLines();
@@ -774,7 +950,7 @@ export function parseTestData(text: string, inputCount?: number): ParsedTestData
   }
 
   const columnCount = names.length;
-  const blocks = parseRows(tok, columnCount, null);
+  const blocks = parseRows(tok, columnCount, null, names, domains);
   const expandedRows = expandBlocks(blocks, new Map());
 
   // Split names into inputs/outputs.
@@ -802,5 +978,5 @@ export function parseTestData(text: string, inputCount?: number): ParsedTestData
     return { inputs, outputs };
   });
 
-  return { inputNames, outputNames, vectors };
+  return { inputNames, outputNames, vectors, analogPragmas, signalDomains: domains };
 }
