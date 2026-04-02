@@ -265,9 +265,15 @@
   "hotPaths": [
     {
       "path": "scripts\\__tests__\\circuit-mcp-server.test.ts",
-      "accessCount": 17,
-      "lastAccessed": 1775131495548,
+      "accessCount": 19,
+      "lastAccessed": 1775131869531,
       "type": "directory"
+    },
+    {
+      "path": "scripts\\mcp\\circuit-tools.ts",
+      "accessCount": 18,
+      "lastAccessed": 1775132314860,
+      "type": "file"
     },
     {
       "path": "src\\testing\\__tests__\\comparison.test.ts",
@@ -294,9 +300,33 @@
       "type": "directory"
     },
     {
+      "path": "e2e\\parity\\headless-simulation.spec.ts",
+      "accessCount": 8,
+      "lastAccessed": 1775131914222,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 8,
+      "lastAccessed": 1775132009913,
+      "type": "directory"
+    },
+    {
+      "path": "src\\io\\postmessage-adapter.ts",
+      "accessCount": 8,
+      "lastAccessed": 1775132062280,
+      "type": "directory"
+    },
+    {
       "path": "src\\testing\\__tests__\\batch-runner.test.ts",
       "accessCount": 7,
       "lastAccessed": 1775130301630,
+      "type": "file"
+    },
+    {
+      "path": "scripts\\mcp\\formatters.ts",
+      "accessCount": 7,
+      "lastAccessed": 1775131817539,
       "type": "file"
     },
     {
@@ -306,9 +336,33 @@
       "type": "directory"
     },
     {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 4,
+      "lastAccessed": 1775131728458,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 4,
+      "lastAccessed": 1775131728820,
+      "type": "file"
+    },
+    {
+      "path": "spec\\domain-leak-fix.md",
+      "accessCount": 4,
+      "lastAccessed": 1775131732001,
+      "type": "file"
+    },
+    {
       "path": "src\\testing\\comparison.ts",
-      "accessCount": 3,
-      "lastAccessed": 1775130381109,
+      "accessCount": 4,
+      "lastAccessed": 1775131753170,
+      "type": "file"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 4,
+      "lastAccessed": 1775132370811,
       "type": "file"
     },
     {
@@ -330,6 +384,30 @@
       "type": "directory"
     },
     {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 3,
+      "lastAccessed": 1775131725315,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless\\netlist-types.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775131848037,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\types.ts",
+      "accessCount": 3,
+      "lastAccessed": 1775131869821,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 3,
+      "lastAccessed": 1775132212368,
+      "type": "directory"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\diagnostics.test.ts",
       "accessCount": 2,
       "lastAccessed": 1775130205340,
@@ -339,12 +417,6 @@
       "path": "src\\testing\\batch-runner.ts",
       "accessCount": 2,
       "lastAccessed": 1775130219291,
-      "type": "directory"
-    },
-    {
-      "path": "src\\io\\postmessage-adapter.ts",
-      "accessCount": 2,
-      "lastAccessed": 1775130350302,
       "type": "directory"
     },
     {
@@ -360,6 +432,42 @@
       "type": "directory"
     },
     {
+      "path": "src\\testing\\run-all.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775131753029,
+      "type": "directory"
+    },
+    {
+      "path": "src\\headless\\default-facade.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775131759675,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless\\__tests__\\port-mcp.test.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775131765053,
+      "type": "directory"
+    },
+    {
+      "path": "e2e\\fixtures\\simulator-harness.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775131830342,
+      "type": "file"
+    },
+    {
+      "path": "src\\integration\\editor-binding.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775131849571,
+      "type": "file"
+    },
+    {
+      "path": "src\\io\\dig-pin-scanner.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775132350587,
+      "type": "file"
+    },
+    {
       "path": "src\\solver",
       "accessCount": 1,
       "lastAccessed": 1775130185157,
@@ -370,12 +478,6 @@
       "accessCount": 1,
       "lastAccessed": 1775130189479,
       "type": "directory"
-    },
-    {
-      "path": "src\\headless\\default-facade.ts",
-      "accessCount": 1,
-      "lastAccessed": 1775130194503,
-      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\competing-voltage-constraints.test.ts",
@@ -420,15 +522,45 @@
       "type": "file"
     },
     {
-      "path": "src\\compile\\types.ts",
+      "path": "CLAUDE.md",
       "accessCount": 1,
-      "lastAccessed": 1775130331540,
+      "lastAccessed": 1775131731792,
       "type": "file"
     },
     {
-      "path": "src\\testing\\run-all.ts",
+      "path": "src\\analysis\\model-analyser.ts",
       "accessCount": 1,
-      "lastAccessed": 1775130367591,
+      "lastAccessed": 1775131753308,
+      "type": "file"
+    },
+    {
+      "path": "scripts\\verify-fixes.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775131753312,
+      "type": "file"
+    },
+    {
+      "path": "src\\headless",
+      "accessCount": 1,
+      "lastAccessed": 1775131754985,
+      "type": "directory"
+    },
+    {
+      "path": "src\\analysis\\__tests__\\state-transition.test.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775131832110,
+      "type": "file"
+    },
+    {
+      "path": "src\\analysis\\state-transition.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775131837353,
+      "type": "file"
+    },
+    {
+      "path": "scripts",
+      "accessCount": 1,
+      "lastAccessed": 1775131852701,
       "type": "directory"
     }
   ],

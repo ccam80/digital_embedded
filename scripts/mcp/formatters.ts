@@ -2,7 +2,8 @@
  * Formatting helpers for MCP tool output.
  */
 
-import type { Diagnostic, Netlist, PinDescriptor, NetDescriptor } from "../../src/headless/netlist-types.js";
+import type { Netlist, PinDescriptor, NetDescriptor } from "../../src/headless/netlist-types.js";
+import type { Diagnostic } from "../../src/compile/types.js";
 import type { ComponentDefinition } from "../../src/core/registry.js";
 import { PropertyBag } from "../../src/core/properties.js";
 
@@ -13,14 +14,13 @@ export function formatDiagnostics(diagnostics: Diagnostic[]): string {
   for (const d of diagnostics) {
     const severity = d.severity.toUpperCase();
     lines.push(`  ${severity} ${d.code}: ${d.message}`);
-    if (d.fix) {
-      lines.push(`    -> Fix: ${d.fix}`);
+    if (d.explanation) {
+      lines.push(`    ${d.explanation}`);
     }
-    if (d.pins && d.pins.length > 0) {
-      const pinList = d.pins
-        .map((p) => `${p.componentLabel}:${p.pinLabel} [${p.declaredWidth}-bit, ${p.pinDirection}]`)
-        .join(", ");
-      lines.push(`    -> Pins: ${pinList}`);
+    if (d.suggestions && d.suggestions.length > 0) {
+      for (const s of d.suggestions) {
+        lines.push(`    -> ${s.text}`);
+      }
     }
   }
   return lines.join("\n");
@@ -33,12 +33,9 @@ export function formatNetlist(netlist: Netlist): string {
   lines.push(`Components (${netlist.components.length}):`);
   for (const comp of netlist.components) {
     const label = comp.label ? ` "${comp.label}"` : "";
-    const isAnalogOnly = comp.availableModels.length > 0
-      && comp.availableModels.includes("analog")
-      && !comp.availableModels.includes("digital");
     const pinSummary = comp.pins
       .map((p: PinDescriptor) =>
-        isAnalogOnly
+        p.domain === 'analog'
           ? `${p.label}[terminal]`
           : `${p.label}[${p.bitWidth}-bit, ${p.direction}]`,
       )
@@ -53,10 +50,7 @@ export function formatNetlist(netlist: Netlist): string {
         ? ` {${propEntries.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(", ")}}`
         : "";
 
-    const modelTag =
-      comp.availableModels.length === 0 ? "" :
-      comp.availableModels.includes("digital") && comp.availableModels.includes("analog") ? " [mixed]" :
-      comp.availableModels.includes("analog") ? " [analog]" : " [digital]";
+    const modelTag = comp.modelKey ? ` [${comp.modelKey}]` : "";
     lines.push(`  [${comp.index}] ${comp.typeId}${modelTag}${label}${propSuffix} — pins: ${pinSummary}`);
   }
 
@@ -66,12 +60,13 @@ export function formatNetlist(netlist: Netlist): string {
   const connectedNets = netlist.nets.filter((n: NetDescriptor) => n.pins.length > 0);
   lines.push(`Nets (${connectedNets.length}):`);
   for (const net of connectedNets) {
-    const width = net.inferredWidth !== null ? `${net.inferredWidth}-bit` : "width-conflict";
-    lines.push(`  Net #${net.netId} [${width}, ${net.pins.length} pins]:`);
+    const header = net.bitWidth !== undefined
+      ? `${net.bitWidth}-bit, ${net.pins.length} pins`
+      : `${net.pins.length} pins`;
+    lines.push(`  Net #${net.netId} [${header}]:`);
     for (const pin of net.pins) {
-      lines.push(
-        `    ${pin.componentLabel}:${pin.pinLabel} [${pin.declaredWidth}-bit, ${pin.pinDirection}]`,
-      );
+      const pinDetail = pin.domain === 'analog' ? `[terminal]` : `[digital]`;
+      lines.push(`    ${pin.componentLabel}:${pin.pinLabel} ${pinDetail}`);
     }
   }
 
@@ -135,17 +130,10 @@ export function formatComponentDefinition(def: ComponentDefinition): string {
       }
     }
 
-    const defIsAnalogOnly = !def.models?.digital
-      && def.modelRegistry != null
-      && Object.keys(def.modelRegistry).length > 0;
     lines.push(`\nPins (${def.pinLayout.length}):`);
     for (const pin of def.pinLayout) {
-      if (defIsAnalogOnly) {
-        lines.push(`  ${pin.label} [terminal, ${pin.direction}]`);
-      } else {
-        const scaleNote = scalingPins.has(pin.label) ? " (scales with bitWidth)" : "";
-        lines.push(`  ${pin.label} [${pin.defaultBitWidth}-bit, ${pin.direction}]${scaleNote}`);
-      }
+      const scaleNote = scalingPins.has(pin.label) ? " (scales with bitWidth)" : "";
+      lines.push(`  ${pin.label} [${pin.defaultBitWidth}-bit, ${pin.direction}]${scaleNote}`);
     }
   }
 

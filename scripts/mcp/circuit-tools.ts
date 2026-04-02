@@ -13,7 +13,6 @@ import type { CircuitSpec, PatchOp, ComponentDescriptor } from "../../src/headle
 import { extractEmbeddedTestData } from "../../src/headless/test-runner.js";
 import { serializeCircuit } from "../../src/io/dts-serializer.js";
 import { loadWithSubcircuits } from "../../src/io/subcircuit-loader.js";
-import { scanDigPins } from "../../src/io/dig-pin-scanner.js";
 import { registerSubcircuit, createLiveDefinition } from "../../src/components/subcircuit/subcircuit.js";
 import type { SubcircuitDefinition } from "../../src/components/subcircuit/subcircuit.js";
 import { testEquivalence } from "../../src/headless/equivalence.js";
@@ -239,70 +238,6 @@ export function registerCircuitTools(
   );
 
   // ---------------------------------------------------------------------------
-  // circuit_describe_file
-  // ---------------------------------------------------------------------------
-
-  server.registerTool(
-    "circuit_describe_file",
-    {
-      title: "Describe .dig File Pins",
-      description:
-        "Lightweight scan of a .dig file to extract its external pin interface " +
-        "(In/Out components with labels, bit widths, and directions) without " +
-        "loading the full circuit. Much faster than circuit_load for inspecting " +
-        "subcircuit interfaces or unknown .dig files.",
-      inputSchema: {
-        path: z.string().describe("Absolute or relative path to a .dig circuit file"),
-      },
-    },
-    async ({ path: filePath }) => {
-      try {
-        const xml = await readFile(filePath, "utf-8");
-        const pins = scanDigPins(xml);
-
-        if (pins.length === 0) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `No In/Out pins found in "${filePath}". The file may be a top-level circuit (not a subcircuit) or contain no I/O components.`,
-              },
-            ],
-          };
-        }
-
-        const inputs = pins.filter((p) => p.direction === "INPUT");
-        const outputs = pins.filter((p) => p.direction === "OUTPUT");
-
-        const lines = [
-          `File: ${filePath}`,
-          `Pins: ${pins.length} (${inputs.length} inputs, ${outputs.length} outputs)`,
-          ``,
-          `Inputs:`,
-          ...inputs.map((p) => `  ${p.label} [${p.defaultBitWidth}-bit]`),
-          ``,
-          `Outputs:`,
-          ...outputs.map((p) => `  ${p.label} [${p.defaultBitWidth}-bit]`),
-        ];
-
-        return {
-          content: [{ type: "text" as const, text: lines.join("\n") }],
-        };
-      } catch (err) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Error scanning file: ${err instanceof Error ? err.message : String(err)}`,
-            },
-          ],
-          isError: true as const,
-        };
-      }
-    },
-  );
-
-  // ---------------------------------------------------------------------------
   // circuit_list
   // ---------------------------------------------------------------------------
 
@@ -320,13 +255,13 @@ export function registerCircuitTools(
           .string()
           .optional()
           .describe(
-            'Optional category filter, e.g. "LOGIC", "IO", "MEMORY", "WIRING". Omit to list all.',
+            'Optional category filter, e.g. "LOGIC", "IO", "MEMORY", "WIRING", "ANALOG". Omit to list all.',
           ),
         include_pins: z
           .boolean()
           .optional()
           .describe(
-            "When true, include pin labels and directions for each component type inline. " +
+            "When true, include pin labels for each component type inline. " +
             "Collapses the list+describe workflow into one call.",
           ),
       },
@@ -357,12 +292,7 @@ export function registerCircuitTools(
         if (include_pins) {
           const parts = defs.sort((a, b) => a.name.localeCompare(b.name)).map((def) => {
             if (!def.pinLayout || def.pinLayout.length === 0) return def.name;
-            const pinStr = def.pinLayout
-              .map((p) => {
-                const arrow = p.direction === "INPUT" ? "↓" : p.direction === "OUTPUT" ? "↑" : "↕";
-                return `${p.label}${arrow}`;
-              })
-              .join(" ");
+            const pinStr = def.pinLayout.map((p) => p.label).join(" ");
             return `${def.name} (${pinStr})`;
           });
           lines.push(`${cat}: ${parts.join(", ")}`);
@@ -403,6 +333,7 @@ export function registerCircuitTools(
               "'set' | 'add' | 'remove' | 'connect' | 'disconnect' | 'replace'. " +
               "Examples: " +
               "{op:'set', target:'gate1', props:{bitWidth:16}} | " +
+              "{op:'set', target:'R1', props:{resistance:10000}} | " +
               "{op:'add', spec:{id:'g2',type:'And'}, connect:{A:'in1:out'}} | " +
               "{op:'remove', target:'gate1'} | " +
               "{op:'connect', from:'in1:out', to:'gate:A'} | " +
@@ -600,6 +531,10 @@ export function registerCircuitTools(
         const signalCount = Object.keys(signals).length;
 
         const netlist = facade.netlist(circuit);
+        const hasAnalog = coordinator.supportsDcOp() || coordinator.supportsAcSweep();
+        const simTools = hasAnalog
+          ? `Use circuit_step, circuit_set_signal, circuit_read_signal for interactive simulation. For analog analysis: circuit_dc_op, circuit_ac_sweep.`
+          : `Use circuit_step, circuit_set_signal, circuit_read_signal for interactive simulation.`;
         const lines = [
           `Circuit compiled successfully.`,
           `Components: ${netlist.components.length}`,
@@ -609,7 +544,7 @@ export function registerCircuitTools(
           `DC op available: ${coordinator.supportsDcOp()}`,
           `AC sweep available: ${coordinator.supportsAcSweep()}`,
           ``,
-          `Engine stored. Use circuit_step, circuit_set_input, circuit_read_output for interactive simulation.`,
+          simTools,
         ];
         return {
           content: [{ type: "text" as const, text: lines.join("\n") }],
@@ -638,7 +573,7 @@ export function registerCircuitTools(
       title: "Run Circuit Tests",
       description:
         "Compile the circuit and run test vectors. " +
-        "If testData is provided, it is used as the test vector source (Digital test format). " +
+        "If testData is provided, it is used as the test vector source (test vector format). " +
         "Otherwise, test data is extracted from Testcase components embedded in the circuit. " +
         "Returns pass/fail counts and details of any failing vectors.",
       inputSchema: {
@@ -647,7 +582,7 @@ export function registerCircuitTools(
           .string()
           .optional()
           .describe(
-            "Optional test vector string in Digital test format. " +
+            "Optional test vector string in test vector format. " +
               "If omitted, uses Testcase components embedded in the circuit.",
           ),
       },
@@ -726,22 +661,37 @@ export function registerCircuitTools(
                 lines.push(`  ${outLabel}: component not found in netlist`);
                 continue;
               }
-              const inPin = outComp.pins.find(p => p.direction === 'INPUT');
-              if (!inPin || inPin.connectedTo.length === 0) {
-                lines.push(`  ${outLabel}: unconnected input`);
-                continue;
+              const isAnalogComp = outComp.pins.every(p => p.domain === 'analog');
+              if (isAnalogComp) {
+                // Analog: show all connected components without directional language
+                const connectedPins = outComp.pins.flatMap(p => p.connectedTo);
+                if (connectedPins.length === 0) {
+                  lines.push(`  ${outLabel}: no connected components`);
+                } else {
+                  const connected = connectedPins
+                    .map(p => `${p.componentLabel} (${p.componentType})`)
+                    .join(', ');
+                  lines.push(`  ${outLabel}: connected to ${connected}`);
+                }
+              } else {
+                // Digital: trace INPUT pin to its driver one hop
+                const inPin = outComp.pins.find(p => p.direction === 'INPUT');
+                if (!inPin || inPin.connectedTo.length === 0) {
+                  lines.push(`  ${outLabel}: unconnected input`);
+                  continue;
+                }
+                const driver = inPin.connectedTo[0]!;
+                const driverComp = netlist.components[driver.componentIndex];
+                const driverInputs = driverComp?.pins
+                  .filter(p => p.direction === 'INPUT' && p.connectedTo.length > 0)
+                  .map(p => `${p.label}←${p.connectedTo[0]!.componentLabel}`)
+                  .join(', ');
+                lines.push(
+                  `  ${outLabel} ← ${driver.componentLabel}:${driver.pinLabel}` +
+                  ` (${driverComp?.typeId ?? driver.componentType}` +
+                  `${driverInputs ? ', inputs: ' + driverInputs : ''})`,
+                );
               }
-              const driver = inPin.connectedTo[0]!;
-              const driverComp = netlist.components[driver.componentIndex];
-              const driverInputs = driverComp?.pins
-                .filter(p => p.direction === 'INPUT' && p.connectedTo.length > 0)
-                .map(p => `${p.label}←${p.connectedTo[0]!.componentLabel}`)
-                .join(', ');
-              lines.push(
-                `  ${outLabel} ← ${driver.componentLabel}:${driver.pinLabel}` +
-                ` (${driverComp?.typeId ?? driver.componentType}` +
-                `${driverInputs ? ', inputs: ' + driverInputs : ''})`,
-              );
             }
           }
         }

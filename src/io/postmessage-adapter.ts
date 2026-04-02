@@ -15,11 +15,11 @@
  *     sim-load-url          — fetch URL then load circuit
  *     sim-load-data         — base64-decode then load circuit
  *     sim-load-json         — deserialize DTS then load circuit
- *     sim-set-signal        — write a signal value by label
+ *     sim-set-signal        — write a signal value by label (analog or digital)
  *     sim-step              — single propagation step
  *     sim-run-tests         — run test vectors (headless runner)
  *     sim-test              — run test vectors (tutorial-style, with label validation)
- *     sim-read-signal       — read a signal value by label
+ *     sim-read-signal       — read a signal value by label (analog or digital)
  *     sim-read-all-signals  — snapshot all labeled signals
  *     sim-get-circuit       — export current circuit as base64 DTS JSON
  *     sim-set-base          — update resolver base path
@@ -453,38 +453,46 @@ export class PostMessageAdapter {
 
     const circuit = this._getCircuit();
 
-    // Collect input/output labels from circuit
-    const circuitInputLabels = new Set<string>();
-    const circuitOutputLabels = new Set<string>();
-    for (const el of circuit.elements) {
-      const def = this._registry.get(el.typeId);
-      if (!def) continue;
-      const lbl = el.getProperties().getOrDefault('label', '') as string;
-      if (!lbl) continue;
-      if (def.name === 'In' || def.name === 'Clock' || def.name === 'Port') circuitInputLabels.add(lbl);
-      else if (def.name === 'Out' || def.name === 'Port') circuitOutputLabels.add(lbl);
-    }
-
-    // Validate signal names
-    const hdrLine = testDataStr.split('\n').find(
-      (l) => l.trim().length > 0 && !l.trim().startsWith('#'),
-    ) ?? '';
-    const hdrNames = hdrLine.trim().split(/\s+/).filter((n) => n.length > 0);
-    const missingLabels = hdrNames.filter(
-      (n) => !circuitInputLabels.has(n) && !circuitOutputLabels.has(n),
-    );
-    if (missingLabels.length > 0) {
-      const errorMsg =
-        `Test signals not found in circuit: ${missingLabels.join(', ')}. ` +
-        `Make sure your In/Out components have labels that match the test vector signal names ` +
-        `(${hdrNames.join(', ')}). Double-click a component to set its label.`;
-      this._post({ type: 'sim-error', error: errorMsg });
-      return;
-    }
-
     try {
       const facade = this._hooks.getFacade?.() ?? this._getOwnFacade();
       const coordinator = facade.compile(circuit);
+
+      // Determine input/output labels from compiled labelSignalMap domain.
+      // Analog-domain entries are inputs (sources). For digital, use element
+      // typeId to distinguish inputs (In, Clock, Port) from outputs (Out, Port).
+      const circuitInputLabels = new Set<string>();
+      const circuitOutputLabels = new Set<string>();
+      for (const el of circuit.elements) {
+        const lbl = el.getProperties().getOrDefault('label', '') as string;
+        if (!lbl) continue;
+        const addr = coordinator.compiled.labelSignalMap.get(lbl);
+        if (!addr) continue;
+        if (addr.domain === 'analog') {
+          circuitInputLabels.add(lbl);
+        } else if (el.typeId === 'In' || el.typeId === 'Clock' || el.typeId === 'Port') {
+          circuitInputLabels.add(lbl);
+        } else {
+          circuitOutputLabels.add(lbl);
+        }
+      }
+
+      // Validate signal names against collected labels
+      const hdrLine = testDataStr.split('\n').find(
+        (l) => l.trim().length > 0 && !l.trim().startsWith('#'),
+      ) ?? '';
+      const hdrNames = hdrLine.trim().split(/\s+/).filter((n) => n.length > 0 && n !== '|');
+      const missingLabels = hdrNames.filter(
+        (n) => !circuitInputLabels.has(n) && !circuitOutputLabels.has(n),
+      );
+      if (missingLabels.length > 0) {
+        const errorMsg =
+          `Test signals not found in circuit: ${missingLabels.join(', ')}. ` +
+          `Make sure your components have labels that match the test vector signal names ` +
+          `(${hdrNames.join(', ')}). Double-click a component to set its label.`;
+        this._post({ type: 'sim-error', error: errorMsg });
+        return;
+      }
+
       let detectedInputCount = 0;
       for (const n of hdrNames) {
         if (circuitInputLabels.has(n)) detectedInputCount++;

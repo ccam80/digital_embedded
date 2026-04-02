@@ -9,9 +9,7 @@
  *   - sim-set-base, sim-set-locked, sim-set-palette → sim-loaded
  *   - sim-highlight, sim-clear-highlight
  *   - sim-set-readonly-components, sim-set-instructions
- *
- * NOTE: sim-set-input, sim-step, sim-read-output, sim-read-all-signals
- * are defined in PostMessageAdapter but NOT wired in app-init.ts.
+ *   - sim-set-signal, sim-step, sim-read-signal, sim-read-all-signals
  */
 import type { Page } from '@playwright/test';
 

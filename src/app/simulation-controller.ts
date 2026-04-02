@@ -305,10 +305,7 @@ export function initSimulationController(
           for (const [wire, addr] of unified.wireSignalMap) {
             if (addr.domain === 'analog') wireToNodeId.set(wire, addr.nodeId);
           }
-          renderPipeline.populateDiagnosticOverlays(
-            allDiags as unknown as import('../core/analog-engine-interface.js').SolverDiagnostic[],
-            wireToNodeId,
-          );
+          renderPipeline.populateDiagnosticOverlays(allDiags, wireToNodeId);
         }
         renderPipeline.scheduleRender();
       }

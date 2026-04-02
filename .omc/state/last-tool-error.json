@@ -1,7 +1,7 @@
 {
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\src\\\\testing\\\\run-all.test.ts\",\"offset\":250}",
-  "error": "File does not exist. Note: your current working directory is C:\\local_working_projects\\digital_in_browser.",
-  "timestamp": "2026-04-02T11:43:53.563Z",
-  "retry_count": 1
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && node -e \\\"\\nconst {McpServer} = require('@modelcontextprotocol/sdk/server/mcp.js');\\nconst {z} = require('zod');\\nconst s = new McpSe...",
+  "error": "Exit code 1\n[\"test_foo\"]\n[\n  'title',       'description',\n  'inputSchema', 'outputSchema',\n  'annotations', 'execution',\n  '_meta',       'handler',\n  'enabled',     'disable',\n  'enable',      'remove',\n  'update'\n]\nC:\\local_working_projects\\digital_in_browser\\node_modules\\@modelcontextprotocol\\sdk\\dist\\cjs\\server\\mcp.js:216\r\n        const isTaskHandler = 'createTask' in handler;\r\n                                           ^\r\n\r\nTypeError: Cannot use 'in' operator to search for 'createTask' in ...",
+  "timestamp": "2026-04-02T12:14:29.769Z",
+  "retry_count": 2
 }

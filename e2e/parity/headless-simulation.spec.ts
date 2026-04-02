@@ -1,10 +1,9 @@
 /**
  * Parity tests — headless simulation operations via postMessage.
  *
- * These test the newly wired-up operations that the PostMessageAdapter
- * supports: sim-set-input, sim-step, sim-read-output,
- * sim-read-all-signals. Previously these were only in the adapter
- * class but never wired into the app.
+ * These test the wired-up operations that the PostMessageAdapter
+ * supports: sim-set-signal, sim-step, sim-read-signal,
+ * sim-read-all-signals.
  */
 import { test, expect } from '@playwright/test';
 import { SimulatorHarness } from '../fixtures/simulator-harness';
@@ -24,7 +23,7 @@ test.describe('Parity: headless simulation via postMessage', () => {
     await harness.load();
   });
 
-  test('set-input + step + read-output — AND gate truth table', async () => {
+  test('set-signal + step + read-signal — AND gate truth table', async () => {
     const xml = readFileSync(resolve(circuitsDir, 'and-gate.dig'), 'utf-8');
     await harness.loadDigXml(xml);
 
@@ -39,10 +38,10 @@ test.describe('Parity: headless simulation via postMessage', () => {
       // Reload to reset state
       await harness.loadDigXml(xml);
 
-      await harness.postToSim({ type: 'sim-set-input', label: 'A', value: a });
-      await harness.postToSim({ type: 'sim-set-input', label: 'B', value: b });
+      await harness.postToSim({ type: 'sim-set-signal', label: 'A', value: a });
+      await harness.postToSim({ type: 'sim-set-signal', label: 'B', value: b });
       await harness.postToSim({ type: 'sim-step' });
-      await harness.postToSim({ type: 'sim-read-output', label: 'Y' });
+      await harness.postToSim({ type: 'sim-read-signal', label: 'Y' });
 
       const msg = await harness.waitForMessage<{ type: string; label: string; value: number }>(
         'sim-output',
@@ -55,8 +54,8 @@ test.describe('Parity: headless simulation via postMessage', () => {
     const xml = readFileSync(resolve(circuitsDir, 'and-gate.dig'), 'utf-8');
     await harness.loadDigXml(xml);
 
-    await harness.postToSim({ type: 'sim-set-input', label: 'A', value: 1 });
-    await harness.postToSim({ type: 'sim-set-input', label: 'B', value: 1 });
+    await harness.postToSim({ type: 'sim-set-signal', label: 'A', value: 1 });
+    await harness.postToSim({ type: 'sim-set-signal', label: 'B', value: 1 });
     await harness.postToSim({ type: 'sim-step' });
     await harness.postToSim({ type: 'sim-read-all-signals' });
 
@@ -82,14 +81,14 @@ test.describe('Parity: headless simulation via postMessage', () => {
     for (const [a, b, expectedS, expectedCout] of cases) {
       await harness.loadDigXml(xml);
 
-      await harness.postToSim({ type: 'sim-set-input', label: 'A', value: a });
-      await harness.postToSim({ type: 'sim-set-input', label: 'B', value: b });
+      await harness.postToSim({ type: 'sim-set-signal', label: 'A', value: a });
+      await harness.postToSim({ type: 'sim-set-signal', label: 'B', value: b });
       await harness.postToSim({ type: 'sim-step' });
 
-      await harness.postToSim({ type: 'sim-read-output', label: 'S' });
+      await harness.postToSim({ type: 'sim-read-signal', label: 'S' });
       const sMsg = await harness.waitForMessage<{ value: number }>('sim-output');
 
-      await harness.postToSim({ type: 'sim-read-output', label: 'Cout' });
+      await harness.postToSim({ type: 'sim-read-signal', label: 'Cout' });
       const coutMsg = await harness.waitForMessage<{ value: number }>('sim-output');
 
       expect(sMsg.value, `A=${a} B=${b} → S`).toBe(expectedS);
@@ -97,8 +96,8 @@ test.describe('Parity: headless simulation via postMessage', () => {
     }
   });
 
-  test('set-input without loaded circuit returns error', async () => {
-    await harness.postToSim({ type: 'sim-set-input', label: 'A', value: 1 });
+  test('set-signal without loaded circuit returns error', async () => {
+    await harness.postToSim({ type: 'sim-set-signal', label: 'A', value: 1 });
     const msg = await harness.waitForMessage<{ type: string; error: string }>('sim-error');
     expect(msg.error).toContain('No circuit loaded');
   });

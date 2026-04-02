@@ -1,21 +1,21 @@
 {
   "summary": {
     "vitest": {
-      "passed": 9932,
+      "passed": 9976,
       "failed": 0,
       "skipped": 0,
-      "totalFiles": 330,
-      "durationSeconds": 11.9
+      "totalFiles": 332,
+      "durationSeconds": 11
     },
     "playwright": {
-      "passed": 482,
-      "failed": 7,
+      "passed": 486,
+      "failed": 3,
       "skipped": 0,
       "totalFiles": 24,
-      "durationSeconds": 166.00845700000002
+      "durationSeconds": 156.87507300000001
     },
-    "totalFailed": 7,
-    "totalPassed": 10414
+    "totalFailed": 3,
+    "totalPassed": 10462
   },
   "failures": {
     "vitest": [],
@@ -52,48 +52,6 @@
             "file": "gui/hotload-params-e2e.spec.ts",
             "test": "changing BF on BJT via primary param row changes output voltage",
             "line": 103,
-            "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: page.evaluate: Error: Timed out waiting for message: sim-output",
-        "count": 2,
-        "locations": [
-          {
-            "file": "parity/headless-simulation.spec.ts",
-            "test": "set-input + step + read-output — AND gate truth table",
-            "line": 27,
-            "column": 3
-          },
-          {
-            "file": "parity/headless-simulation.spec.ts",
-            "test": "half adder — step-by-step signal verification",
-            "line": 72,
-            "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m",
-        "count": 1,
-        "locations": [
-          {
-            "file": "parity/headless-simulation.spec.ts",
-            "test": "read-all-signals returns labeled signals",
-            "line": 54,
-            "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: page.evaluate: Error: Timed out waiting for message: sim-error",
-        "count": 1,
-        "locations": [
-          {
-            "file": "parity/headless-simulation.spec.ts",
-            "test": "set-input without loaded circuit returns error",
-            "line": 100,
             "column": 3
           }
         ]

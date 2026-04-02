@@ -13,7 +13,7 @@ import type { Wire } from '../core/circuit.js';
 import type { WireSignalAccess } from '../editor/wire-signal-access.js';
 import type { CurrentFlowAnimator } from '../editor/current-animation.js';
 import type { ScopePanel } from '../runtime/analog-scope-panel.js';
-import type { SolverDiagnostic } from '../core/analog-engine-interface.js';
+import type { Diagnostic } from '../compile/types.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -44,7 +44,7 @@ export interface RenderPipeline {
   canvasToScreen(e: { clientX: number; clientY: number }): Point;
   invalidateCanvasRect(): void;
   sizeCanvasInContainer(cvs: HTMLCanvasElement): boolean;
-  populateDiagnosticOverlays(diags: SolverDiagnostic[], wireToNodeId: Map<Wire, number>): void;
+  populateDiagnosticOverlays(diags: Diagnostic[], wireToNodeId: Map<Wire, number>): void;
   clearDiagnosticOverlays(): void;
   readonly state: RenderState;
 }
@@ -340,12 +340,13 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
   // -------------------------------------------------------------------------
 
   /**
-   * Populate diagnosticOverlays from solver diagnostics that carry involvedNodes.
-   * Reverse-lookups wireToNodeId to find world-space positions for each node.
-   * Handles both errors and warnings in a single pass (fixes D4).
+   * Populate diagnosticOverlays from diagnostics that carry involvedNodes or
+   * involvedPositions. Solver diagnostics use involvedNodes (reverse-looked up
+   * via wireToNodeId); connectivity diagnostics use involvedPositions directly.
+   * Handles both errors and warnings in a single pass.
    */
   function populateDiagnosticOverlays(
-    diags: SolverDiagnostic[],
+    diags: Diagnostic[],
     wireToNodeId: Map<Wire, number>,
   ): void {
     // Build reverse map: nodeId → first wire endpoint position (world coords)
@@ -357,11 +358,19 @@ export function initRenderPipeline(ctx: AppContext, search?: string): RenderPipe
     }
 
     for (const diag of diags) {
-      if (!diag.involvedNodes || diag.involvedNodes.length === 0) continue;
       const severity = diag.severity === 'error' ? 'error' as const : 'warning' as const;
-      for (const nodeId of diag.involvedNodes) {
-        const pos = nodeIdToPosition.get(nodeId);
-        if (pos) {
+
+      if (diag.involvedNodes && diag.involvedNodes.length > 0) {
+        for (const nodeId of diag.involvedNodes) {
+          const pos = nodeIdToPosition.get(nodeId);
+          if (pos) {
+            state.diagnosticOverlays.push({ x: pos.x, y: pos.y, severity });
+          }
+        }
+      }
+
+      if (diag.involvedPositions && diag.involvedPositions.length > 0) {
+        for (const pos of diag.involvedPositions) {
           state.diagnosticOverlays.push({ x: pos.x, y: pos.y, severity });
         }
       }
