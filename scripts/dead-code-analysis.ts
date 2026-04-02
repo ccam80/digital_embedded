@@ -20,7 +20,7 @@
 
 import ts from "typescript";
 import { resolve, relative, join } from "path";
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync, statSync } from "fs";
 
 // ---------------------------------------------------------------------------
 // CLI flags
@@ -37,6 +37,22 @@ const VERBOSE = args.includes("--verbose");
 const ROOT = resolve(import.meta.dirname ?? ".", "..");
 const TSCONFIG_PATH = join(ROOT, "tsconfig.json");
 
+/** Recursively collect .ts files under a directory. */
+function collectTsFiles(dir: string): string[] {
+  const results: string[] = [];
+  try {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory() && entry.name !== "node_modules") {
+        results.push(...collectTsFiles(full));
+      } else if (entry.isFile() && entry.name.endsWith(".ts") && !entry.name.endsWith(".d.ts")) {
+        results.push(full);
+      }
+    }
+  } catch { /* skip inaccessible dirs */ }
+  return results;
+}
+
 function loadProgram(): ts.Program {
   const configFile = ts.readConfigFile(TSCONFIG_PATH, (p) =>
     readFileSync(p, "utf-8"),
@@ -51,7 +67,10 @@ function loadProgram(): ts.Program {
     ts.sys,
     ROOT,
   );
-  return ts.createProgram(parsed.fileNames, parsed.options);
+  // Also include scripts/ files so their imports from src/ are tracked as references
+  const scriptFiles = collectTsFiles(join(ROOT, "scripts"));
+  const allFiles = [...new Set([...parsed.fileNames, ...scriptFiles])];
+  return ts.createProgram(allFiles, parsed.options);
 }
 
 console.error("Loading TypeScript program...");

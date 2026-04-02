@@ -43,7 +43,6 @@ const COMP_WIDTH = 3;
 // Java Mul uses GenericShape: 2 inputs (a, b), 1 output (mul), width=3
 // Inputs a@(0,0), b@(0,2) [even gap], output mul@(3,1) [offs=1]
 // Java rect: (0.05,-0.5)→(2.95,2.5) = height 3
-const COMP_HEIGHT = 3;
 
 // ---------------------------------------------------------------------------
 // Pin layout

@@ -2,11 +2,39 @@
 
 ## Overview
 
-Fix all 36 domain leak findings from `docs/domain-leak-inventory.md` in a single parallel burst. The root cause is that the netlist data model was designed for digital circuits and has no domain concept. The fix has three structural pillars:
+Fix all 36 domain leak findings from `docs/domain-leak-inventory.md`. The root cause is that the netlist data model was designed for digital circuits and has no domain concept. The fix has three structural pillars:
 
 1. **Rebuild `resolveNets()`** on top of the compilation infrastructure (`resolveModelAssignments` + `extractConnectivityGroups`) instead of maintaining a parallel reimplementation
 2. **Unify diagnostics** — merge `Diagnostic` and `SolverDiagnostic` into one rich type used by both UI and MCP
 3. **Domain-aware formatting and validation** — all consumers branch on the `domain` field populated from `ModelAssignment.modelKey`, never from `availableModels` or `modelRegistry` introspection
+
+### Wave ordering
+
+Two waves, maximum parallelism within each:
+
+**Wave 1 — Type foundations + algorithm rebuilds** (all parallel):
+- `src/compile/types.ts` — unified `Diagnostic`, `labelToCircuitElement`
+- `src/core/analog-types.ts` — delete `SolverDiagnostic`, re-export unified type; update `AcResult.diagnostics` to `Diagnostic[]`
+- `src/headless/netlist-types.ts` — reshape types
+- `src/compile/extract-connectivity.ts` — move diagnostics here
+- `src/compile/compile.ts` — pass solver diagnostics through
+- `src/solver/analog/compiler.ts` — remove label whitelist
+- `src/solver/coordinator.ts` + `src/solver/coordinator-types.ts` — add `setSourceByLabel`
+- `src/headless/netlist.ts` — delete `resolveNets` body, rebuild on infrastructure
+- `src/headless/builder.ts` — delete `validatePinConnection`, width check
+- `src/headless/facade.ts` + `src/headless/default-facade.ts` — renames, `settle`, `setSignal` routing, `runTests` async
+- `src/testing/executor.ts` + `src/testing/parser.ts` — async, tolerance, SI suffixes
+- `src/headless/equivalence.ts` — vacuous result fix, settle
+
+**Wave 2 — Consumers + formatting** (all parallel, after Wave 1 compiles clean):
+- `scripts/mcp/formatters.ts` — domain-aware formatting
+- `scripts/mcp/circuit-tools.ts` — MCP tool fixes, delete `circuit_describe_file`
+- `src/io/postmessage-adapter.ts` — wire protocol rename, signal detection
+- `src/app/render-pipeline.ts` + `src/app/simulation-controller.ts` — unified diagnostic overlays
+- All rename-only files (`comparison.ts`, `run-all.ts`, `model-analyser.ts`, `verify-fixes.ts`, test files)
+- `src/io/dig-pin-scanner.ts` — delete (only consumer is `circuit_describe_file` at `circuit-tools.ts:16`)
+
+Each wave is independently verifiable: Wave 1 must compile and pass `npm run test:q` before Wave 2 starts.
 
 Organized by file.
 
@@ -49,6 +77,17 @@ export type DiagnosticCode =
   | 'dc-op-gmin'
   | 'dc-op-source-step'
   | 'dc-op-failed'
+  | 'model-param-ignored'
+  | 'model-level-unsupported'
+  | 'bridge-inner-compile-error'
+  | 'bridge-unconnected-pin'
+  | 'bridge-missing-inner-pin'
+  | 'bridge-indeterminate-input'
+  | 'bridge-oscillating-input'
+  | 'bridge-impedance-mismatch'
+  | 'transmission-line-low-segments'
+  | 'reverse-biased-cap'
+  | 'fuse-blown'
   | 'ndr-convergence-assist'
   | 'rs-flipflop-both-set'
   | 'ac-no-source'
@@ -81,7 +120,8 @@ export interface Diagnostic {
 
 - **Files to modify:**
   - `src/compile/types.ts` — replace `DiagnosticCode` and `Diagnostic` with the unified versions above; add `DiagnosticSuggestion`; remove `import type { NetPin }` (no longer needed)
-  - `src/core/analog-types.ts` — delete `SolverDiagnosticCode`, `DiagnosticSuggestion`, `SolverDiagnostic`; re-export `Diagnostic`, `DiagnosticCode`, `DiagnosticSuggestion` from `compile/types.ts`
+  - `src/core/analog-types.ts` — delete `SolverDiagnosticCode`, `DiagnosticSuggestion`, `SolverDiagnostic`; re-export `Diagnostic`, `DiagnosticCode`, `DiagnosticSuggestion` from `compile/types.ts`; update `AcResult.diagnostics` from `SolverDiagnostic[]` to `Diagnostic[]`
+  - `src/core/analog-engine-interface.ts` — update re-exports of `SolverDiagnostic` to re-export `Diagnostic` from the unified location
   - `src/solver/analog/diagnostics.ts` — update `makeDiagnostic` to return `Diagnostic` instead of `SolverDiagnostic`; field rename `summary` → `message`
   - `src/compile/compile.ts:354-361` — stop stripping: pass all fields through from analog diagnostics (explanation, suggestions, involvedNodes, etc.)
   - All files importing `SolverDiagnostic` — update to import `Diagnostic` from the unified location
@@ -120,8 +160,10 @@ export interface NetPin {
 export interface PinDescriptor {
   readonly label: string;
   readonly domain: string;
-  readonly direction: PinDirection;
-  readonly bitWidth: number;
+  /** Pin direction. Omitted for analog-domain pins (terminals are non-directional). */
+  readonly direction?: PinDirection;
+  /** Bit width. Omitted for analog-domain pins. */
+  readonly bitWidth?: number;
   readonly netId: number;
   readonly connectedTo: NetPin[];
 }
@@ -230,8 +272,7 @@ Unconnected-input and multi-driver checks currently live only in the deleted `re
 ### Consume unified diagnostics for overlays
 
 - **Files to modify:**
-  - `src/app/render-pipeline.ts` — change `populateDiagnosticOverlays` to accept `Diagnostic[]` instead of `SolverDiagnostic[]`. Read both `involvedNodes` (from solver diagnostics, reverse-lookup via `wireToNodeId`) and `involvedPositions` (from connectivity diagnostics, used directly)
-- **Files to modify:**
+  - `src/app/render-pipeline.ts` — change `populateDiagnosticOverlays` to accept `Diagnostic[]` instead of `SolverDiagnostic[]`; update import from `'../core/analog-engine-interface.js'` to `'../compile/types.js'`; read both `involvedNodes` (from solver diagnostics, reverse-lookup via `wireToNodeId`) and `involvedPositions` (from connectivity diagnostics, used directly)
   - `src/app/simulation-controller.ts:308-309` — remove the forced `as unknown as SolverDiagnostic[]` cast; pass `Diagnostic[]` directly
 - **Acceptance criteria:**
   - Compilation diagnostics (width-mismatch, unconnected-input, multi-driver) produce visual overlay circles at the involved positions
@@ -283,7 +324,7 @@ Unconnected-input and multi-driver checks currently live only in the deleted `re
 
 - **Files to modify:**
   - `scripts/mcp/circuit-tools.ts` — all changes above
-  - `src/io/dig-pin-scanner.ts` — check if any other consumer exists; if not, delete
+  - `src/io/dig-pin-scanner.ts` — delete (only consumer is `circuit_describe_file` at `circuit-tools.ts:16`, which is also being deleted)
 - **Acceptance criteria:**
   - `circuit_describe_file` tool no longer registered
   - `circuit_list` pin display has no directional arrows
@@ -324,15 +365,16 @@ Hard cut, no aliases. Old names deleted.
 
 ### `setSignal` auto-routes for analog sources
 
-When the signal's domain (from `labelSignalMap`) is analog, `setSignal` looks up the element in `labelToCircuitElement`, resolves the primary parameter from the active model's `paramDefs`, and calls `coordinator.setComponentProperty` to re-stamp the MNA matrix. For digital signals, existing `writeSignal` path. The caller doesn't need to know the domain.
+When the signal's domain (from `labelSignalMap`) is analog, `setSignal` calls `coordinator.setSourceByLabel(label, paramKey, value)` which resolves label → element via `labelToCircuitElement`, determines the primary parameter key from `modelRegistry.behavioral.paramDefs[0]` (e.g., `voltage` for DcVoltageSource, `current` for CurrentSource), and calls `setComponentProperty` to re-stamp the MNA matrix. For digital signals, existing `writeSignal` path. The caller doesn't need to know the domain.
 
 ### Replace `runToStable` with `settle`
 
 - `runToStable` removed from `SimulatorFacade` interface
-- New method: `settle(coordinator, opts?): Promise<void>`
-  - Pure digital: snapshot-comparison loop (existing `runToStable` logic)
-  - Analog/mixed: `coordinator.stepToTime(currentTime + settleTime)`
-  - `settleTime` from opts or a default
+- New method: `settle(coordinator: SimulationCoordinator, settleTime?: number): Promise<void>`
+  - Default `settleTime`: `0.01` (10ms of sim time)
+  - Pure digital (`coordinator.simTime === null`): single `this.step(coordinator, { clockAdvance: false })` then return. The digital engine evaluates the full topological sort in one step — no iteration loop needed.
+  - Analog/mixed: `await this.stepToTime(coordinator, coordinator.simTime + settleTime)` — same path the UI uses
+  - No `maxIterations`, no `SettleOptions` type. Just a settle time.
 - All callers switch to `await facade.settle(coordinator)`
 
 ### `step()` JSDoc (#26)
@@ -354,8 +396,8 @@ Honest description: "Write a signal value by label" / "Read a signal value by la
   - `src/headless/default-facade.ts` — rename implementations, add `settle` implementation, add analog auto-routing in `setSignal`, update `runTests` to async, remove analog guard
 - **Acceptance criteria:**
   - `setInput`/`readOutput` do not exist on the interface or implementation
-  - `setSignal` correctly routes analog sources through `setComponentProperty`
-  - `settle` uses `stepToTime` for analog/mixed, snapshot comparison for pure digital
+  - `setSignal` correctly routes analog sources through `coordinator.setSourceByLabel`
+  - `settle` uses `stepToTime` for analog/mixed, single `step()` for pure digital
   - `runTests` is async and does not reject analog-only circuits
 
 ---
@@ -364,9 +406,9 @@ Honest description: "Write a signal value by label" / "Read a signal value by la
 
 ### Async executor using `settle`
 
-- `RunnerFacade` interface: rename `setInput` → `setSignal`, `readOutput` → `readSignal`, replace `runToStable` with `settle`
+- `RunnerFacade` interface: rename `setInput` → `setSignal`, `readOutput` → `readSignal`, replace `runToStable` with `settle(coordinator: SimulationCoordinator, settleTime?: number): Promise<void>`
 - `executeTests` becomes async
-- `executeVector` becomes async, calls `await facade.settle(coordinator)` instead of `facade.runToStable(coordinator)`
+- `executeVector` becomes async, calls `await facade.settle(coordinator)` instead of `facade.runToStable(coordinator)`. For analog test vectors with `#analog:settle` pragma, passes the pragma's settle time.
 
 ### TestValue extension
 
@@ -411,11 +453,11 @@ export interface Tolerance {
 
 ### Remove label whitelist
 
-- **Delete `labelTypesPartition`** at line 925
+- **Delete `labelTypesPartition`** at line 938
 - Any component in the analog partition with a non-empty `label` gets an entry in `labelToNodeId`
 
 - **Files to modify:**
-  - `src/solver/analog/compiler.ts:924-931` — delete the `labelTypesPartition` set and the `if (!labelTypesPartition.has(...))` guard
+  - `src/solver/analog/compiler.ts:938-944` — delete the `labelTypesPartition` set and the `if (!labelTypesPartition.has(...))` guard
 - **Acceptance criteria:**
   - A labeled resistor's node voltage is discoverable via `labelToNodeId`
   - No hardcoded type whitelist for label discovery
@@ -426,11 +468,11 @@ export interface Tolerance {
 
 ### Add `setSourceByLabel`
 
-New method: `setSourceByLabel(label: string, paramKey: string, value: number)` — resolves label → element via `labelToCircuitElement`, calls `setComponentProperty`.
+New method: `setSourceByLabel(label: string, paramKey: string, value: number)` — resolves label → element via `labelToCircuitElement`, determines the primary parameter from `modelRegistry.behavioral.paramDefs[0]` when `paramKey` is not provided, calls `setComponentProperty` to re-stamp the MNA matrix. This is the method `facade.setSignal` delegates to for analog signals.
 
 - **Files to modify:**
   - `src/solver/coordinator.ts` — add method
-  - `src/solver/coordinator-types.ts` — add to interface if needed
+  - `src/solver/coordinator-types.ts` — add `setSourceByLabel` to `SimulationCoordinator` interface
 - **Acceptance criteria:**
   - `setSourceByLabel("Vdc", "voltage", 5.0)` correctly re-stamps the MNA matrix
 
@@ -486,7 +528,6 @@ These files need `setInput` → `setSignal`, `readOutput` → `readSignal`, `run
 - `src/analysis/model-analyser.ts`
 - `scripts/verify-fixes.ts`
 - All test files that reference renamed methods or deleted types
-- `src/headless/builder.ts` (internal `runToStable` call in build validation)
 
 ---
 
@@ -495,7 +536,7 @@ These files need `setInput` → `setSignal`, `readOutput` → `readSignal`, `run
 | Item | Action |
 |---|---|
 | `circuit_describe_file` tool registration | Delete from `circuit-tools.ts` |
-| `src/io/dig-pin-scanner.ts` | Delete if no other consumers |
+| `src/io/dig-pin-scanner.ts` | Delete (only consumer is `circuit_describe_file`) |
 | `SolverDiagnostic` type | Delete from `core/analog-types.ts` |
 | `SolverDiagnosticCode` type | Delete from `core/analog-types.ts` |
 | `validatePinConnection` method | Delete from `builder.ts` |

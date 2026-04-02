@@ -38,7 +38,6 @@ function outBitsFor(bitWidth: number): number {
 }
 
 const COMP_WIDTH = 3;
-const COMP_HEIGHT = 1;
 
 // GenericShape: 1 input, 1 output, symmetric=true, even=false, offs=0
 // in@(0,0), out@(3,0)

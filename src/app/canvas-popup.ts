@@ -72,13 +72,13 @@ export function createPopupController(
     const runtimeModels = ctx.circuit.metadata.models?.[elementHit.typeId];
     if (def.modelRegistry && Object.keys(def.modelRegistry).length > 0) {
       propertyPopup.showModelSelector(elementHit, def, runtimeModels);
-    }
 
-    // Pin electrical overrides only when the component is currently using the digital model
-    const bag = elementHit.getProperties();
-    const activeModel = bag.get<string>("model");
-    if (activeModel === "digital") {
-      propertyPopup.showPinElectricalOverrides(elementHit, def, family);
+      // Pin electrical overrides only when the component is currently using the digital model
+      const bag = elementHit.getProperties();
+      const activeModel = bag.has("model") ? bag.get<string>("model") : undefined;
+      if (activeModel === "digital") {
+        propertyPopup.showPinElectricalOverrides(elementHit, def, family);
+      }
     }
     // Live-update property changes:
     //   - Render-only keys (label, showLabel, showValue) → just re-render

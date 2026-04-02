@@ -17,7 +17,7 @@ import type { ComponentRegistry } from '../core/registry.js';
 
 import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { ScopePanel } from '../runtime/analog-scope-panel.js';
-import { pinWorldPosition } from '../core/pin.js';
+import { pinWorldPosition, rotatePoint } from '../core/pin.js';
 import { GRID_SPACING } from '../editor/coordinates.js';
 
 export interface TestBridge {
@@ -203,7 +203,12 @@ export function createTestBridge(
         elements: circuit.elements.map(el => {
           const label = el.getProperties().getOrDefault('label', '') as string;
           const bb = el.getBoundingBox();
-          const centerScreen = worldToScreen(bb.x + bb.width / 2, bb.y + bb.height / 2);
+          // getBoundingBox() is NOT rotation-aware — compute center in local
+          // space, rotate, then translate, matching pinWorldPosition's transform.
+          const localCx = bb.x - el.position.x + bb.width / 2;
+          const localCy = bb.y - el.position.y + bb.height / 2;
+          const rotated = rotatePoint({ x: localCx, y: localCy }, el.rotation);
+          const centerScreen = worldToScreen(el.position.x + rotated.x, el.position.y + rotated.y);
           return {
             label,
             typeId: el.typeId,

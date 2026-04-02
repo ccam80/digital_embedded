@@ -79,7 +79,6 @@ function makeAdapter(
   const hooks: PostMessageHooks = {
     loadCircuitXml: vi.fn(),
     getCircuit: vi.fn().mockReturnValue(stubCircuit),
-    serializeCircuit: vi.fn().mockReturnValue("<circuit/>"),
     setBasePath: vi.fn(),
     setLocked: vi.fn(),
     setPalette: vi.fn(),
@@ -301,7 +300,7 @@ describe("PostMessageAdapter — sim-get-circuit", () => {
   });
 
   it("getCircuit — no hooks at all sends sim-error", async () => {
-    const { sent, dispatch } = makeAdapter({ serializeCircuit: undefined, serializeDts: undefined });
+    const { sent, dispatch } = makeAdapter({});
 
     await dispatch({ type: "sim-get-circuit" });
 
@@ -539,7 +538,7 @@ describe("PostMessageAdapter — sim-step delegation", () => {
     await dispatch({ type: "sim-read-all-signals" });
 
     expect(readAllHook).toHaveBeenCalledTimes(1);
-    expect(sent).toContainEqual({ type: "sim-signals", signals: { A: 1, B: 0 } });
+    expect(sent).toContainEqual({ type: "sim-signals", signals: { A: 1, B: 0 }, simTime: null });
   });
 });
 

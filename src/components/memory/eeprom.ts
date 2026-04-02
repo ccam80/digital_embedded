@@ -53,7 +53,6 @@ export type { RAMLayout } from "./ram.js";
 
 const COMP_WIDTH = 3;
 // 5-input variants (odd, symmetric): offs=2; inputs y=0,1,2,3,4; output y=2; maxPinY=4; bodyHeight=5
-const COMP_HEIGHT = 5;
 
 // ---------------------------------------------------------------------------
 // Shared property definitions

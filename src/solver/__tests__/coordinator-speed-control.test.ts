@@ -172,24 +172,25 @@ describe('DefaultSimulationCoordinator -- computeFrameSteps (digital-only circui
     const unified = compileUnified(circuit, registry);
     coord = new DefaultSimulationCoordinator(unified);
   });
-  it('returns continuous-style frame result with simTimeGoal', () => {
+  it('returns null simTimeGoal — no continuous time model', () => {
     coord.speed = 1e-3;
     const result = coord.computeFrameSteps(0.016);
     expect(result.steps).toBe(0);
-    expect(result.simTimeGoal).toBeTypeOf('number');
+    expect(result.simTimeGoal).toBeNull();
     expect(result.budgetMs).toBe(12);
     expect(result.missed).toBe(false);
   });
-  it('clamps wallDt to 0.1s to prevent huge jumps', () => {
+  it('simTimeGoal stays null regardless of wallDt', () => {
     coord.speed = 1e-3;
     const resultClamped = coord.computeFrameSteps(1.0);
     const resultRef = coord.computeFrameSteps(0.1);
-    expect(resultClamped.simTimeGoal).toBe(resultRef.simTimeGoal);
+    expect(resultClamped.simTimeGoal).toBeNull();
+    expect(resultRef.simTimeGoal).toBeNull();
   });
-  it('speed change is reflected in simTimeGoal', () => {
+  it('speed has no effect on simTimeGoal for digital-only', () => {
     coord.speed = 1e-2;
     const result = coord.computeFrameSteps(0.01);
-    expect(result.simTimeGoal).toBeCloseTo(1e-2 * 0.01, 15);
+    expect(result.simTimeGoal).toBeNull();
   });
 });
 

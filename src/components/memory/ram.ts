@@ -161,11 +161,6 @@ const COMP_WIDTH = 3;
 // 5-input variant (RAMDualPort): maxPinY=4, bodyHeight=5
 // 6-input variant (RAMDualAccess): maxPinY=6, bodyHeight=7
 // 3-input variant (RAMAsync): maxPinY=2, bodyHeight=3
-const COMP_HEIGHT_4IN = 5;   // 4-input variants: Java rect height = 5 (y=-0.5 to 4.5)
-const COMP_HEIGHT_5IN = 5;   // RAMDualPort: max(5,1)=5
-const COMP_HEIGHT_6IN = 6;   // RAMDualAccess: max(6,2)=6
-const COMP_HEIGHT_3IN = 3;   // RAMAsync: max(3,1)=3
-
 // ---------------------------------------------------------------------------
 // Shared property definitions and attribute mappings
 // ---------------------------------------------------------------------------

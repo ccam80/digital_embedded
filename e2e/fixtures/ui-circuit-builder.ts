@@ -749,6 +749,27 @@ export class UICircuitBuilder {
   }
 
   /**
+   * Right-click a labeled component and add a current trace to the viewer.
+   * This mimics the user action of right-clicking → "Trace Current: label".
+   * The simulation must be running (or at least compiled) for trace items to appear.
+   */
+  async addCurrentTraceViaContextMenu(label: string): Promise<void> {
+    const info = await this.getCircuitInfo();
+    const el = info.elements.find(e => e.label === label);
+    if (!el) throw new Error(`Element with label "${label}" not found`);
+
+    const coords = await this.toPageCoords(el.center.screenX, el.center.screenY);
+    await this.page.mouse.click(coords.x, coords.y, { button: 'right' });
+    await this.page.waitForTimeout(200);
+
+    const menuText = `Trace Current: ${label}`;
+    const menuItem = this.page.locator('.ctx-menu-item').filter({ hasText: new RegExp(`^${menuText}$`) });
+    await expect(menuItem).toBeVisible({ timeout: 3000 });
+    await menuItem.click();
+    await this.page.waitForTimeout(300);
+  }
+
+  /**
    * Step to a sim-time offset and read peak/trough statistics from the scope
    * panel trace buffers. Uses stepToTimeViaUI for efficient bulk stepping and
    * getTraceStats to read pre-computed min/max/mean from scope channels.
@@ -1472,18 +1493,13 @@ export class UICircuitBuilder {
   /**
    * Get page-absolute coordinates for the body center of an element.
    * Uses pin midpoint (rotation-aware) for multi-pin components, falling
-   * back to the bounding-box center for single-pin components.
+   * back to the rotation-aware bounding-box center for single/zero-pin.
    */
   private async _elementBodyPageCoords(el: CircuitInfo['elements'][0]): Promise<{ x: number; y: number }> {
     if (el.pins.length >= 2) {
       const cx = el.pins.reduce((s, p) => s + p.screenX, 0) / el.pins.length;
       const cy = el.pins.reduce((s, p) => s + p.screenY, 0) / el.pins.length;
       return this.toPageCoords(cx, cy);
-    }
-    if (el.pins.length === 1) {
-      // Single-pin components (Tunnel, Ground, Probe): use pin position,
-      // which is always at the component origin regardless of rotation.
-      return this.toPageCoords(el.pins[0].screenX, el.pins[0].screenY);
     }
     return this.toPageCoords(el.center.screenX, el.center.screenY);
   }

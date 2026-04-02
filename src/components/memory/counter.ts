@@ -36,7 +36,6 @@ import { makeBehavioralCounterAnalogFactory } from "../../solver/analog/behavior
 const COMP_WIDTH = 3;
 // Java GenericShape: 3 inputs, 2 outputs, non-symmetric (offs=0)
 // en@y=0, C@y=1, clr@y=2; out@y=0, ovf@y=1
-const COMP_HEIGHT = 3;
 
 // ---------------------------------------------------------------------------
 // Pin declarations — matching Java GenericShape layout

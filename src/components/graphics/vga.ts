@@ -51,7 +51,6 @@ import {
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
-const COMP_HEIGHT = 6;
 
 const DEFAULT_COLOR_BITS = 4;
 const DEFAULT_WIDTH = 640;

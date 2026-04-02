@@ -54,7 +54,6 @@ import {
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
-const COMP_HEIGHT = 5;
 
 const DEFAULT_DATA_BITS = 8;
 const DEFAULT_GRAPHIC_WIDTH = 160;

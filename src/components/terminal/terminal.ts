@@ -52,7 +52,6 @@ import {
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
 const MAX_BUFFER_CHARS = 4096;
 const MAX_KEY_QUEUE = 64;
 

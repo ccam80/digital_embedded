@@ -38,7 +38,6 @@ const COMP_WIDTH = 4;
 // GenericShape: 6 inputs, 2 outputs, width=4, symmetric=false (2 outputs)
 // offs=0; Din@0,we@1,Rw@2,C@3,Ra@4,Rb@5; Da@(4,0),Db@(4,1)
 // bodyHeight = max(6,2) = 6
-const COMP_HEIGHT = 6;
 
 // ---------------------------------------------------------------------------
 // Pin declarations — y-positions shifted down by 1 from previous layout

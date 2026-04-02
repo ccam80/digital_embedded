@@ -751,7 +751,7 @@ export const RealOpAmpDefinition: ComponentDefinition = {
         name,
         {
           kind: "inline" as const,
-          factory: (pinNodes: number[], _internalNodeIds: number[], _branchIdx: number, props: PropertyBag) =>
+          factory: (pinNodes: ReadonlyMap<string, number>, _internalNodeIds: readonly number[], _branchIdx: number, props: PropertyBag) =>
             createRealOpAmpElement(pinNodes, props),
           paramDefs: REAL_OPAMP_PARAM_DEFS,
           params,

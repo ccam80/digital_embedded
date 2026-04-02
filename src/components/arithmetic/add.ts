@@ -37,7 +37,6 @@ const COMP_WIDTH = 3;
 // inputs: a@y=0, b@y=1, c_i@y=2
 // outputs: s@y=0, c_o@y=1
 // bodyHeight = max(3,2)=3, yBottom=(3-1)+0.5=2.5, height=2.5+0.5=3
-const COMP_HEIGHT = 3;
 
 // ---------------------------------------------------------------------------
 // Pin layout — GenericShape positions (symmetric=false, 3 inputs, 2 outputs)

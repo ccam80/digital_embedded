@@ -1,5 +1,6 @@
 * Buck BJT converter — matches digiTS buckbjt circuit exactly
 * 10kHz square wave -> push-pull BJT buffer -> NMOS switch -> LC filter -> load
+* Drive signal: unipolar 0V to 4.984V square wave (matches digiTS dcOffset mode)
 
 * Model params match digiTS models exactly
 * NPN/PNP: BF=100, IS=1e-14, NF=1, BR=1, NR=1, VAF=0(inf), IKF=0(inf), ISE=0, ISC=0
@@ -13,6 +14,7 @@
 
 * Power supplies
 Vdc  vcc 0 10
+* Unipolar square wave 0V to 4.984V, 10kHz, 50% duty
 Vac  drv 0 PULSE(0 4.983907855756475 0 1n 1n 50u 100u)
 
 * NPN driver with collector current sense
@@ -46,11 +48,17 @@ Rload out 0 50
 .control
 tran 1u 500m
 
-* === Phase 1: BJT driver at 1ms ===
-meas tran vcol_npn_1ms FIND v(col_npn) AT=1m
-meas tran vcol_pnp_1ms FIND v(col_pnp) AT=1m
-meas tran ic_npn_1ms FIND i(Vic_npn) AT=1m
-meas tran ic_pnp_1ms FIND i(Vic_pnp) AT=1m
+* === Phase 1: BJT driver at 1.025ms (1/4 through cycle — drive high) ===
+meas tran vcol_npn_hi FIND v(col_npn) AT=1.025m
+meas tran vcol_pnp_hi FIND v(col_pnp) AT=1.025m
+meas tran ic_npn_hi FIND i(Vic_npn) AT=1.025m
+meas tran ic_pnp_hi FIND i(Vic_pnp) AT=1.025m
+
+* === Phase 1b: BJT driver at 1.075ms (3/4 through cycle — drive low) ===
+meas tran vcol_npn_lo FIND v(col_npn) AT=1.075m
+meas tran vcol_pnp_lo FIND v(col_pnp) AT=1.075m
+meas tran ic_npn_lo FIND i(Vic_npn) AT=1.075m
+meas tran ic_pnp_lo FIND i(Vic_pnp) AT=1.075m
 
 * === Phase 2: Steady state — last 2 cycles (499.8ms to 500ms) ===
 * Switch node

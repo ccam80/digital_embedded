@@ -47,7 +47,6 @@ function shiftBitsFor(bitWidth: number): number {
 }
 
 const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;
 
 // GenericShape: 2 inputs, 1 output, symmetric=true, even=true, offs=floor(2/2)=1
 // in@(0,0), shift@(0,2) [gap at i=1], out@(3,1)

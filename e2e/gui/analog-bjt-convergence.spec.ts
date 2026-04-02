@@ -22,6 +22,16 @@ import { test, expect } from '@playwright/test';
 import { UICircuitBuilder } from '../fixtures/ui-circuit-builder';
 
 // ---------------------------------------------------------------------------
+// Tolerance helper
+// ---------------------------------------------------------------------------
+
+function expectClose(actual: number, expected: number, rtol = 1e-6, atol = 1e-9) {
+  const err = Math.abs(actual - expected);
+  const limit = Math.max(atol, Math.abs(expected) * rtol);
+  expect(err, `Expected ${actual} to be close to ${expected} (err=${err}, limit=${limit})`).toBeLessThan(limit);
+}
+
+// ---------------------------------------------------------------------------
 // Circuit builder helper
 // ---------------------------------------------------------------------------
 
@@ -71,9 +81,10 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
   await builder.setComponentProperty('Vdc', 'voltage', 10);
 
   await builder.placeLabeled('AcVoltageSource', 4, 15, 'Vac', 90);
-  await builder.setComponentProperty('Vac', 'amplitude', 4.983907855756475);
+  await builder.setComponentProperty('Vac', 'amplitude', 2.4919539278782376);
   await builder.setComponentProperty('Vac', 'frequency', 10000);
   await builder.setComponentProperty('Vac', 'waveform', 'square');
+  await builder.setSpiceParameter('Vac', 'dcOffset', 2.4919539278782376);
 
   await builder.placeComponent('Ground', 20, 16);
 
@@ -282,7 +293,59 @@ test.describe('BJT buck converter convergence', () => {
     await builder.stepViaUI();
     await builder.verifyNoErrors();
 
-    // TODO: assertions will be added after circuit layout is finalized
+    // --- Phase 1: BJT drivers at 1.025ms ---
+    await builder.addTraceViaContextMenu('Q1', 'C');
+    await builder.addTraceViaContextMenu('Q2', 'C');
+    await builder.addCurrentTraceViaContextMenu('Q1');
+    await builder.addCurrentTraceViaContextMenu('Q2');
+
+    // Measure at 1.025ms — 1/4 through cycle, drive HIGH, NPN on
+    await builder.stepToTimeViaUI('1.025m');
+    const vals = await builder.getTraceValues();
+    expect(vals).not.toBeNull();
+    expect(vals!.length).toBeGreaterThanOrEqual(4);
+
+    // Dump full analog state to diagnose
+    const analogState = await builder.getAnalogState();
+    console.log(`[buckbjt] analogState:`, JSON.stringify(analogState));
+
+    const [vQ1c, vQ2c, iQ1, iQ2] = vals!.map(v => v.value);
+    console.log(`[buckbjt] 1.025ms: V(Q1.C)=${vQ1c}, V(Q2.C)=${vQ2c}, Ic_Q1=${iQ1}, Ic_Q2=${iQ2}`);
+    expectClose(vQ1c, 2.084652e-02);      // NPN saturated, collector low
+    expectClose(vQ2c, 9.979174e+00);      // PNP collector near VCC
+    expectClose(iQ1, 9.979153e-04);       // NPN Ic ≈ 998µA
+    expectClose(iQ2, -9.979174e-04);      // PNP Ic ≈ -998µA
+
+    // --- Phase 2: Steady state — last 2 switching cycles (499.8ms–500ms) ---
+    await builder.addTraceViaContextMenu('M1', 'S');    // switch node
+    await builder.addTraceViaContextMenu('Rload', 'B'); // output node
+    await builder.addCurrentTraceViaContextMenu('TD');   // diode current
+
+    await builder.stepToTimeViaUI('500m');
+    const ss = await builder.getTraceStatsInRange(0.4998, 0.5);
+    expect(ss).not.toBeNull();
+
+    // Traces order: [Q1.C, Q2.C, Q1 I, Q2 I, M1.S, Rload.B, TD I]
+    const swStats = ss![4];
+    const outStats = ss![5];
+    const diodeStats = ss![6];
+
+    console.log(`[buckbjt] SS: V(sw) min=${swStats.min} max=${swStats.max} mean=${swStats.mean}`);
+    console.log(`[buckbjt] SS: V(out) min=${outStats.min} max=${outStats.max} mean=${outStats.mean}`);
+    console.log(`[buckbjt] SS: I(TD) min=${diodeStats.min} max=${diodeStats.max} mean=${diodeStats.mean}`);
+
+    // ngspice refs: steady state 499.8ms–500ms
+    expectClose(swStats.min, -7.611475e-01);
+    expectClose(swStats.max, 6.643749e+00);
+    expectClose(swStats.mean, 2.940029e+00);
+
+    expectClose(outStats.min, 2.939642e+00);
+    expectClose(outStats.max, 2.940413e+00);
+    expectClose(outStats.mean, 2.940027e+00);
+
+    expectClose(diodeStats.min, -5.910892e-02);
+    expectClose(diodeStats.max, 6.653749e-12);
+    expectClose(diodeStats.mean, -2.940124e-02);
   });
 
   // =========================================================================
@@ -326,6 +389,36 @@ test.describe('BJT buck converter convergence', () => {
     await builder.stepViaUI();
     await builder.verifyNoErrors();
 
-    // TODO: assertions will be added after circuit layout is finalized
+    // Add traces on output and switch node
+    await builder.addTraceViaContextMenu('Rload', 'B');  // output
+    await builder.addTraceViaContextMenu('M1', 'S');     // switch node
+
+    // Step to 1ms — early snapshot
+    await builder.stepToTimeViaUI('1m');
+    const early = await builder.getTraceValues();
+    expect(early).not.toBeNull();
+    const vOutEarly = early![0].value;
+    console.log(`[buckbjt-t3] 1ms: V(out)=${vOutEarly}`);
+
+    // Step to 5ms — late snapshot
+    await builder.stepToTimeViaUI('5m');
+    const late = await builder.getTraceValues();
+    expect(late).not.toBeNull();
+    const vOutLate = late![0].value;
+    const vSwLate = late![1].value;
+    console.log(`[buckbjt-t3] 5ms: V(out)=${vOutLate}, V(sw)=${vSwLate}`);
+
+    // Output must have evolved (LC filter transient)
+    expect(vOutEarly).not.toBeCloseTo(vOutLate, 1);
+
+    // ngspice refs at 5ms
+    expectClose(vOutLate, 4.259786e+00);
+    expectClose(vSwLate, 6.430716e+00);
+
+    // Trace stats over 4.9ms–5ms (last cycle) — switch node should swing
+    const stats = await builder.getTraceStatsInRange(0.0049, 0.005);
+    expect(stats).not.toBeNull();
+    const swStats = stats![1];
+    expect(swStats.max).toBeGreaterThan(swStats.min + 1.0);  // switch node swings > 1V
   });
 });

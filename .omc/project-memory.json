@@ -251,26 +251,26 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 326,
-      "lastAccessed": 1775108540687,
+      "accessCount": 329,
+      "lastAccessed": 1775124960421,
       "type": "file"
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 182,
-      "lastAccessed": 1775108557027,
+      "accessCount": 188,
+      "lastAccessed": 1775123904595,
       "type": "file"
     },
     {
       "path": "",
-      "accessCount": 167,
-      "lastAccessed": 1775108601121,
+      "accessCount": 169,
+      "lastAccessed": 1775125041479,
       "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 129,
-      "lastAccessed": 1775107767614,
+      "accessCount": 136,
+      "lastAccessed": 1775125258361,
       "type": "file"
     },
     {
@@ -292,21 +292,21 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\gates\\and.ts",
+      "accessCount": 67,
+      "lastAccessed": 1775123598248,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\digital-pin-model.ts",
       "accessCount": 66,
       "lastAccessed": 1775010747014,
       "type": "file"
     },
     {
-      "path": "src\\components\\gates\\and.ts",
-      "accessCount": 65,
-      "lastAccessed": 1775104115619,
-      "type": "file"
-    },
-    {
       "path": "src\\compile\\types.ts",
-      "accessCount": 60,
-      "lastAccessed": 1775108600323,
+      "accessCount": 61,
+      "lastAccessed": 1775124966236,
       "type": "file"
     },
     {
@@ -328,15 +328,15 @@
       "type": "file"
     },
     {
-      "path": "src\\compile\\__tests__\\compile.test.ts",
-      "accessCount": 33,
-      "lastAccessed": 1774914088511,
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 35,
+      "lastAccessed": 1775125242239,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 32,
-      "lastAccessed": 1775107362640,
+      "path": "src\\compile\\__tests__\\compile.test.ts",
+      "accessCount": 33,
+      "lastAccessed": 1774914088511,
       "type": "file"
     },
     {
@@ -382,6 +382,18 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\semiconductors\\scr.ts",
+      "accessCount": 26,
+      "lastAccessed": 1775125110948,
+      "type": "file"
+    },
+    {
+      "path": ".vitest-failures.json",
+      "accessCount": 25,
+      "lastAccessed": 1775123540497,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\gates\\or.ts",
       "accessCount": 24,
       "lastAccessed": 1774998337447,
@@ -391,18 +403,6 @@
       "path": "src\\components\\gates\\nand.ts",
       "accessCount": 24,
       "lastAccessed": 1774999821346,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\scr.ts",
-      "accessCount": 24,
-      "lastAccessed": 1775103861574,
-      "type": "file"
-    },
-    {
-      "path": ".vitest-failures.json",
-      "accessCount": 24,
-      "lastAccessed": 1775109260681,
       "type": "file"
     },
     {
@@ -436,6 +436,12 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\flipflops\\jk.ts",
+      "accessCount": 22,
+      "lastAccessed": 1775122225899,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\bridge-adapter.test.ts",
       "accessCount": 21,
       "lastAccessed": 1774923708121,
@@ -454,75 +460,69 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\flipflops\\jk.ts",
-      "accessCount": 20,
-      "lastAccessed": 1775109018837,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\semiconductors\\pjfet.ts",
-      "accessCount": 18,
-      "lastAccessed": 1775103426523,
+      "accessCount": 20,
+      "lastAccessed": 1775125110092,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\triac.ts",
-      "accessCount": 18,
-      "lastAccessed": 1775103427936,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\schottky.ts",
-      "accessCount": 17,
-      "lastAccessed": 1775103425322,
+      "accessCount": 20,
+      "lastAccessed": 1775125114274,
       "type": "file"
     },
     {
       "path": "src\\components\\flipflops\\d-async.ts",
+      "accessCount": 19,
+      "lastAccessed": 1775122224319,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\schottky.ts",
+      "accessCount": 19,
+      "lastAccessed": 1775125109386,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\njfet.ts",
+      "accessCount": 18,
+      "lastAccessed": 1775125242679,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\varactor.ts",
+      "accessCount": 18,
+      "lastAccessed": 1775125246260,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\triode.ts",
       "accessCount": 17,
-      "lastAccessed": 1775109012912,
+      "lastAccessed": 1775125244886,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\diac.ts",
+      "accessCount": 16,
+      "lastAccessed": 1775125114703,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\zener.ts",
+      "accessCount": 16,
+      "lastAccessed": 1775125243621,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\tunnel-diode.ts",
+      "accessCount": 16,
+      "lastAccessed": 1775125245760,
       "type": "file"
     },
     {
       "path": "src\\components\\passives\\memristor.ts",
       "accessCount": 15,
       "lastAccessed": 1774949433476,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\njfet.ts",
-      "accessCount": 15,
-      "lastAccessed": 1775103425687,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\varactor.ts",
-      "accessCount": 15,
-      "lastAccessed": 1775103428871,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\triode.ts",
-      "accessCount": 14,
-      "lastAccessed": 1775103427000,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\diac.ts",
-      "accessCount": 14,
-      "lastAccessed": 1775103428263,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\zener.ts",
-      "accessCount": 13,
-      "lastAccessed": 1775103425193,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\tunnel-diode.ts",
-      "accessCount": 13,
-      "lastAccessed": 1775103427037,
       "type": "file"
     },
     {

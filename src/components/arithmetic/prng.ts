@@ -88,7 +88,6 @@ function lfsrNext(state: number, taps: number, mask: number): number {
 }
 
 const COMP_WIDTH = 3;
-const COMP_HEIGHT = 5;
 
 // GenericShape: 4 inputs, 1 output, symmetric=true, even=true (4 inputs), offs=floor(4/2)=2
 // i=0: y=0, i=1: y=1, i=2: y=2+1=3 (gap), i=3: y=3+1=4

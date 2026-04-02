@@ -44,10 +44,6 @@ import {
 
 const COMP_WIDTH = 3;
 
-function componentHeight(): number {
-  return 2;
-}
-
 // ---------------------------------------------------------------------------
 // Pin layout — Java GenericShape(2 inputs, 0 outputs, width=3):
 //   r-data at (0, 0)

@@ -56,8 +56,6 @@ export { registerBackingStore, clearBackingStores } from "./ram.js";
 // ---------------------------------------------------------------------------
 
 const COMP_WIDTH = 3;
-const COMP_HEIGHT = 3;         // ROM: Java rect height = 3 (y=-0.5 to 2.5)
-const COMP_HEIGHT_DUAL = 4;    // ROMDualPort: max(4 inputs, 2 outputs) = 4
 
 // ---------------------------------------------------------------------------
 // Shared property definitions

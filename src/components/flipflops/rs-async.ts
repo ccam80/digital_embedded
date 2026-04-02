@@ -38,7 +38,6 @@ const COMP_WIDTH = 3;
 // 2 inputs, 2 outputs, symmetric=false: offs=0, no even correction
 // inputs: S@y=0, R@y=1; outputs: Q@y=0, ~Q@y=1
 // max(2,2)=2, yBottom=(2-1)+0.5=1.5, height=1.5+0.5=2
-const COMP_HEIGHT = 2;
 
 // ---------------------------------------------------------------------------
 // Pin declarations — GenericShape positions (symmetric=false, 2 inputs, 2 outputs)
