@@ -451,6 +451,7 @@ export function createSeededBag(def: ComponentDefinition): PropertyBag {
   const bag = new PropertyBag();
   const entry = def.modelRegistry?.[def.defaultModel ?? ""];
   if (entry?.params) bag.replaceModelParams({ ...entry.params });
+  if (def.defaultModel) bag.set("model", def.defaultModel);
   return bag;
 }
 
