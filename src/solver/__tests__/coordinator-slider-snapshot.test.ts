@@ -36,6 +36,7 @@ function makeAnalogEl(
     bitWidth: 1,
   }));
   const propertyBag = new PropertyBag(propsMap.entries());
+  if (!propertyBag.has("model")) propertyBag.set("model", "behavioral");
   const _mp: Record<string, number> = {};
   for (const [k, v] of propsMap) if (typeof v === 'number') _mp[k] = v;
   propertyBag.replaceModelParams(_mp);

@@ -542,8 +542,8 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     const result: SliderPropertyDescriptor[] = [];
 
     // Model params (primary source of tunable analog parameters)
-    const modelKey = bag.has("model") ? bag.get<string>("model") : def.defaultModel;
-    const entry = modelKey ? def.modelRegistry?.[modelKey] : undefined;
+    const modelKey = bag.get<string>("model");
+    const entry = def.modelRegistry?.[modelKey];
     if (entry?.paramDefs) {
       for (const pd of entry.paramDefs) {
         const currentValue = bag.hasModelParam(pd.key)
