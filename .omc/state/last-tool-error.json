@@ -1,7 +1,7 @@
 {
-  "tool_name": "mcp__codebase-memory-mcp__get_graph_schema",
-  "tool_input_preview": "{\"project\":\"digital_in_browser\"}",
-  "error": "{\"error\":\"project not found or not indexed\",\"hint\":\"Use list_projects to see all indexed projects, then pass the project name.\",\"available_projects\":[\"C-local_working_projects-claude_moodle_maker\",\"C-local_working_projects-digital_in_browser\"],\"count\":2}",
-  "timestamp": "2026-04-02T01:40:34.198Z",
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npx tsc --noEmit --pretty 2>&1 | grep -E \\\"analog-scope-panel|test-bridge|ui-circuit-builder\\\" && echo \\\"---\\\" && npx playwright test...",
+  "error": "Exit code 1",
+  "timestamp": "2026-04-02T05:53:25.531Z",
   "retry_count": 1
 }

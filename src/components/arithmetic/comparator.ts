@@ -16,7 +16,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
 } from "../../core/pin.js";
-import { drawGenericShape } from "../generic-shape.js";
+import { drawGenericShape, genericShapeBounds } from "../generic-shape.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -60,10 +60,8 @@ export class ComparatorElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // Java GenericShape: max(2,3)=3, non-symmetric (3 outputs), no even-input gap
-    // yBottom = (3-1) + 0.5 = 2.5, height = 2.5 + 0.5 = 3
-    const TOP = 0.5;
-    return { x: this.position.x + 0.05, y: this.position.y - TOP, width: (COMP_WIDTH - 0.05) - 0.05, height: 3 };
+    const b = genericShapeBounds(2, 3, COMP_WIDTH);
+    return { x: this.position.x + b.localX, y: this.position.y + b.localY, width: b.width, height: b.height };
   }
 
   draw(ctx: RenderContext): void {

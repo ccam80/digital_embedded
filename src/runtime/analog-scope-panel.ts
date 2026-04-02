@@ -172,6 +172,28 @@ export class ScopePanel implements MeasurementObserver {
   }
 
   /**
+   * Compute min/max/mean statistics for all channels within a time window.
+   * Returns one entry per channel. Returns an empty array if no data in range.
+   */
+  getTraceStatsInRange(
+    tStart: number,
+    tEnd: number,
+  ): Array<{ label: string; min: number; max: number; mean: number }> {
+    return this._channels.map(ch => {
+      const { value } = ch.buffer.getSamplesInRange(tStart, tEnd);
+      if (value.length === 0) return { label: ch.label, min: 0, max: 0, mean: 0 };
+      let mn = value[0], mx = value[0], sum = 0;
+      for (let i = 0; i < value.length; i++) {
+        const v = value[i];
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+        sum += v;
+      }
+      return { label: ch.label, min: mn, max: mx, mean: sum / value.length };
+    });
+  }
+
+  /**
    * Read the most recent (instantaneous) value for each channel.
    * Returns one entry per channel. Returns an empty array if no data has been collected.
    */

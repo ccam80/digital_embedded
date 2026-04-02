@@ -68,34 +68,6 @@ export interface ModuleConfig {
   panels?: 'default' | 'none';
   /** Circuit file to auto-load on startup (relative to module directory). */
   file?: string;
-  /**
-   * Available circuits — listed in UI for loading.
-   * Paths are relative to the module directory.
-   */
-  circuits?: ModuleCircuit[];
-  /**
-   * Available tutorials — listed in UI for selection.
-   * Paths are relative to the module directory.
-   */
-  tutorials?: ModuleTutorial[];
-}
-
-export interface ModuleCircuit {
-  /** Display name. */
-  title: string;
-  /** Path to .dig file, relative to the module directory. */
-  file: string;
-  /** Optional description. */
-  description?: string;
-}
-
-export interface ModuleTutorial {
-  /** Display name. */
-  title: string;
-  /** Path to tutorial manifest.json, relative to the module directory. */
-  manifest: string;
-  /** Optional description. */
-  description?: string;
 }
 
 // ---------------------------------------------------------------------------

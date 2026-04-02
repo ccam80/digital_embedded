@@ -1,24 +1,12 @@
 {
   "summary": {
-    "passed": 9910,
-    "failed": 10,
+    "passed": 9925,
+    "failed": 7,
     "skipped": 0,
     "totalFiles": 330,
-    "durationSeconds": 25.3
+    "durationSeconds": 12.1
   },
   "failures": [
-    {
-      "message": "Test timed out in 5000ms.",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\editor\\__tests__\\wire-current-resolver.test.ts",
-          "test": "cross-component current equality through real compiled lrctest.dig",
-          "line": null,
-          "column": null
-        }
-      ]
-    },
     {
       "message": "expected [ { type: 'sim-signals', …(2) } ] to deep equally contain { type: 'sim-signals', …(1) }",
       "count": 1,

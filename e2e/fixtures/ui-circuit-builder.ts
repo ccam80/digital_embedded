@@ -866,6 +866,18 @@ export class UICircuitBuilder {
     return this.bridge('bridge.getTraceValues()');
   }
 
+  /**
+   * Read trace statistics (min/max/mean) within a time window for each scope trace channel.
+   * @param tStart - Window start time in seconds
+   * @param tEnd - Window end time in seconds
+   */
+  async getTraceStatsInRange(
+    tStart: number,
+    tEnd: number,
+  ): Promise<Array<{ label: string; min: number; max: number; mean: number }> | null> {
+    return this.bridge(`bridge.getTraceStatsInRange(${tStart}, ${tEnd})`);
+  }
+
   /** Click the Run button on the toolbar. */
   async runViaUI(): Promise<void> {
     await this.page.locator('#btn-tb-run').click();

@@ -30,7 +30,7 @@
 import { AbstractCircuitElement } from "../../core/element.js";
 import type { RenderContext } from "../../core/renderer-interface.js";
 import type { Rect } from "../../core/renderer-interface.js";
-import { drawGenericShape } from "../generic-shape.js";
+import { drawGenericShape, genericShapeBounds } from "../generic-shape.js";
 import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
@@ -193,12 +193,8 @@ export class MidiElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    return {
-      x: this.position.x + 0.05,
-      y: this.position.y - 0.5,
-      width: (COMP_WIDTH - 0.05) - 0.05,
-      height: COMP_HEIGHT,
-    };
+    const b = genericShapeBounds(5, 0, COMP_WIDTH);
+    return { x: this.position.x + b.localX, y: this.position.y + b.localY, width: b.width, height: b.height };
   }
 
   draw(ctx: RenderContext): void {

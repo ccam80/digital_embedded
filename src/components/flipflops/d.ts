@@ -19,7 +19,7 @@ import type { Pin, PinDeclaration, Rotation } from "../../core/pin.js";
 import {
   PinDirection,
 } from "../../core/pin.js";
-import { drawGenericShape } from "../generic-shape.js";
+import { drawGenericShape, genericShapeBounds } from "../generic-shape.js";
 import { PropertyBag, PropertyType, LABEL_PROPERTY_DEF } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -167,14 +167,8 @@ export class DElement extends AbstractCircuitElement {
   }
 
   getBoundingBox(): Rect {
-    // Java GenericShape: symmetric=false, max(2,2)=2, yBottom=(2-1)+0.5=1.5, height=1.5+0.5=2
-    const TOP = 0.5;
-    return {
-      x: this.position.x + 0.05,
-      y: this.position.y - TOP,
-      width: (COMP_WIDTH - 0.05) - 0.05,
-      height: 2,
-    };
+    const b = genericShapeBounds(2, 2, COMP_WIDTH);
+    return { x: this.position.x + b.localX, y: this.position.y + b.localY, width: b.width, height: b.height };
   }
 
   draw(ctx: RenderContext): void {

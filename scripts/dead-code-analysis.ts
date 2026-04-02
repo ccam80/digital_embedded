@@ -92,6 +92,8 @@ function isSrcProd(fileName: string): boolean {
 interface RefInfo {
   prodFiles: Set<string>; // rel paths of prod files that reference this symbol
   testFiles: Set<string>; // rel paths of test files that reference this symbol
+  /** Per-file reference counts. Used to distinguish declaration-only from internal usage. */
+  fileCounts: Map<string, number>;
 }
 
 /**
@@ -103,11 +105,26 @@ function buildGlobalRefMap(): Map<ts.Symbol, RefInfo> {
   const refMap = new Map<ts.Symbol, RefInfo>();
   let identCount = 0;
 
+  function recordRef(resolved: ts.Symbol, fileRel: string, isTest: boolean): void {
+    let info = refMap.get(resolved);
+    if (!info) {
+      info = { prodFiles: new Set(), testFiles: new Set(), fileCounts: new Map() };
+      refMap.set(resolved, info);
+    }
+    if (isTest) {
+      info.testFiles.add(fileRel);
+    } else {
+      info.prodFiles.add(fileRel);
+    }
+    info.fileCounts.set(fileRel, (info.fileCounts.get(fileRel) ?? 0) + 1);
+  }
+
   for (const sf of sourceFiles) {
     const fileRel = rel(sf.fileName);
     const isTest = isTestFile(sf.fileName);
 
     ts.forEachChild(sf, function visit(node) {
+      // Track regular identifiers
       if (ts.isIdentifier(node)) {
         identCount++;
         try {
@@ -117,20 +134,29 @@ function buildGlobalRefMap(): Map<ts.Symbol, RefInfo> {
               nodeSym.flags & ts.SymbolFlags.Alias
                 ? checker.getAliasedSymbol(nodeSym)
                 : nodeSym;
-
-            let info = refMap.get(resolved);
-            if (!info) {
-              info = { prodFiles: new Set(), testFiles: new Set() };
-              refMap.set(resolved, info);
-            }
-            if (isTest) {
-              info.testFiles.add(fileRel);
-            } else {
-              info.prodFiles.add(fileRel);
-            }
+            recordRef(resolved, fileRel, isTest);
           }
         } catch {
           // Alias resolution can fail on complex expressions
+        }
+      }
+      // Also track type references (e.g. `import type { Foo }` usages in
+      // type annotations, return types, generics). The TS checker sometimes
+      // fails to resolve these through type-only imports when walking plain
+      // identifiers, so we handle TypeReferenceNodes explicitly.
+      if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
+        identCount++;
+        try {
+          const nodeSym = checker.getSymbolAtLocation(node.typeName);
+          if (nodeSym) {
+            const resolved =
+              nodeSym.flags & ts.SymbolFlags.Alias
+                ? checker.getAliasedSymbol(nodeSym)
+                : nodeSym;
+            recordRef(resolved, fileRel, isTest);
+          }
+        } catch {
+          // skip
         }
       }
       ts.forEachChild(node, visit);
@@ -150,6 +176,56 @@ function collectRegistryFactories(): Set<ts.Symbol> {
   console.error("\nPass 1: Registry pattern...");
   const result = new Set<ts.Symbol>();
 
+  /**
+   * Recursively walk an object literal and mark every identifier reference
+   * as reachable. This catches deeply nested structures like:
+   *   models: { digital: { executeFn: executeAnd, sampleFn: sampleD } }
+   *   modelRegistry: { behavioral: { factory: makeAndAnalogFactory(0) } }
+   */
+  function walkObjectTree(obj: ts.ObjectLiteralExpression): void {
+    for (const prop of obj.properties) {
+      if (ts.isPropertyAssignment(prop)) {
+        const init = prop.initializer;
+        if (ts.isIdentifier(init)) {
+          const sym = checker.getSymbolAtLocation(init);
+          if (sym) result.add(sym);
+        } else if (ts.isObjectLiteralExpression(init)) {
+          walkObjectTree(init);
+        } else if (ts.isArrayLiteralExpression(init)) {
+          for (const el of init.elements) {
+            if (ts.isIdentifier(el)) {
+              const sym = checker.getSymbolAtLocation(el);
+              if (sym) result.add(sym);
+            } else if (ts.isObjectLiteralExpression(el)) {
+              walkObjectTree(el);
+            }
+          }
+        } else if (ts.isCallExpression(init)) {
+          // e.g. factory: makeAndAnalogFactory(0) — mark the called function
+          if (ts.isIdentifier(init.expression)) {
+            const sym = checker.getSymbolAtLocation(init.expression);
+            if (sym) result.add(sym);
+          }
+          // Also mark any identifier arguments
+          for (const arg of init.arguments) {
+            if (ts.isIdentifier(arg)) {
+              const sym = checker.getSymbolAtLocation(arg);
+              if (sym) result.add(sym);
+            }
+          }
+        }
+      } else if (ts.isShorthandPropertyAssignment(prop)) {
+        const sym = checker.getSymbolAtLocation(prop.name);
+        if (sym) result.add(sym);
+      } else if (ts.isSpreadAssignment(prop)) {
+        if (ts.isIdentifier(prop.expression)) {
+          const sym = checker.getSymbolAtLocation(prop.expression);
+          if (sym) result.add(sym);
+        }
+      }
+    }
+  }
+
   for (const sf of sourceFiles) {
     if (!isSrcProd(sf.fileName)) continue;
 
@@ -167,27 +243,8 @@ function collectRegistryFactories(): Set<ts.Symbol> {
           const defSym = checker.getSymbolAtLocation(decl.name);
           if (defSym) result.add(defSym);
 
-          // Find the `factory` property and mark the factory fn as reachable
-          for (const prop of decl.initializer.properties) {
-            if (
-              ts.isPropertyAssignment(prop) &&
-              ts.isIdentifier(prop.name) &&
-              prop.name.text === "factory" &&
-              ts.isIdentifier(prop.initializer)
-            ) {
-              const factSym = checker.getSymbolAtLocation(prop.initializer);
-              if (factSym) result.add(factSym);
-            }
-          }
-
-          // Also mark all other identifier values in the definition as reachable
-          // (renders, truth tables, model refs, etc.)
-          for (const prop of decl.initializer.properties) {
-            if (ts.isPropertyAssignment(prop) && ts.isIdentifier(prop.initializer)) {
-              const sym = checker.getSymbolAtLocation(prop.initializer);
-              if (sym) result.add(sym);
-            }
-          }
+          // Walk the entire object tree to find all referenced symbols
+          walkObjectTree(decl.initializer);
         }
       }
       ts.forEachChild(node, visit);
@@ -432,39 +489,86 @@ function collectCallbackEntryPoints(): {
     // inline arrow/function expressions are anonymous — no symbol to track
   }
 
+  /**
+   * Recursively walk an object literal marking all identifier values as
+   * reachable. Handles nested objects, call expressions, shorthand props,
+   * spreads, and arrays — the same patterns used in hook objects and
+   * options bags passed to constructors and init functions.
+   */
   function markHookObject(obj: ts.ObjectLiteralExpression): void {
     for (const prop of obj.properties) {
       if (ts.isPropertyAssignment(prop)) {
-        if (ts.isObjectLiteralExpression(prop.initializer)) {
-          markHookObject(prop.initializer); // nested: { hooks: { ... } }
-        } else if (ts.isIdentifier(prop.initializer)) {
-          const sym = checker.getSymbolAtLocation(prop.initializer);
+        const init = prop.initializer;
+        if (ts.isObjectLiteralExpression(init)) {
+          markHookObject(init);
+        } else if (ts.isIdentifier(init)) {
+          const sym = checker.getSymbolAtLocation(init);
           if (sym) { reachableSymbols.add(sym); count++; }
+        } else if (ts.isCallExpression(init) && ts.isIdentifier(init.expression)) {
+          // { factory: makeFoo(args) } — mark makeFoo as reachable
+          const sym = checker.getSymbolAtLocation(init.expression);
+          if (sym) { reachableSymbols.add(sym); count++; }
+        } else if (ts.isArrayLiteralExpression(init)) {
+          for (const el of init.elements) {
+            if (ts.isIdentifier(el)) {
+              const sym = checker.getSymbolAtLocation(el);
+              if (sym) { reachableSymbols.add(sym); count++; }
+            } else if (ts.isObjectLiteralExpression(el)) {
+              markHookObject(el);
+            }
+          }
         }
-        // inline arrow/fn in hook object — anonymous, skip
+        // inline arrow/fn — anonymous, no symbol to track
+      } else if (ts.isShorthandPropertyAssignment(prop)) {
+        // { myHandler } shorthand — the name IS the value
+        const sym = checker.getSymbolAtLocation(prop.name);
+        if (sym) { reachableSymbols.add(sym); count++; }
+      } else if (ts.isSpreadAssignment(prop) && ts.isIdentifier(prop.expression)) {
+        const sym = checker.getSymbolAtLocation(prop.expression);
+        if (sym) { reachableSymbols.add(sym); count++; }
       }
-      // shorthand methods in object literal — anonymous, skip
+      // shorthand methods — anonymous, skip
     }
   }
+
+  /**
+   * Detect whether a function call looks like an initialization / wiring
+   * function that receives option bags with callbacks. Heuristic: any
+   * function call whose name starts with "init", "setup", "configure",
+   * "create", or "register" and receives an object literal argument.
+   */
+  const INIT_FN_PATTERN = /^(?:init|setup|configure|create|register|build|make)/i;
 
   for (const sf of sourceFiles) {
     ts.forEachChild(sf, function visit(node) {
       if (ts.isCallExpression(node)) {
         let isSink = false;
+        let calleeName: string | undefined;
 
         if (ts.isPropertyAccessExpression(node.expression)) {
           const name = node.expression.name.text;
+          calleeName = name;
           if (CALLBACK_SINKS.has(name) || ON_CALLBACK_PATTERN.test(name)) {
             isSink = true;
           }
         } else if (ts.isIdentifier(node.expression)) {
-          if (CALLBACK_SINKS.has(node.expression.text)) {
+          calleeName = node.expression.text;
+          if (CALLBACK_SINKS.has(calleeName)) {
             isSink = true;
           }
         }
 
         if (isSink) {
           for (const arg of node.arguments) markExpr(arg);
+        }
+
+        // Object-literal args to init/setup/create functions → treat as hook objects
+        if (calleeName && INIT_FN_PATTERN.test(calleeName)) {
+          for (const arg of node.arguments) {
+            if (ts.isObjectLiteralExpression(arg)) {
+              markHookObject(arg);
+            }
+          }
         }
       }
 
@@ -509,7 +613,14 @@ function collectExportedSymbols(): ExportedSymbolInfo[] {
 
     const exports = checker.getExportsOfModule(sfSymbol);
     for (const exp of exports) {
-      const decls = exp.getDeclarations();
+      // Resolve export aliases to the underlying declaration symbol so that
+      // Set<Symbol> comparisons against registry/callback passes match.
+      const resolved =
+        exp.flags & ts.SymbolFlags.Alias
+          ? checker.getAliasedSymbol(exp)
+          : exp;
+
+      const decls = resolved.getDeclarations();
       if (!decls || decls.length === 0) continue;
       const decl = decls[0];
       const { line } = sf.getLineAndCharacterOfPosition(decl.getStart());
@@ -527,7 +638,7 @@ function collectExportedSymbols(): ExportedSymbolInfo[] {
           kind,
           file: rel(sf.fileName),
           line: line + 1,
-          symbol: exp,
+          symbol: resolved,
         });
       }
     }
@@ -538,12 +649,213 @@ function collectExportedSymbols(): ExportedSymbolInfo[] {
 }
 
 // ---------------------------------------------------------------------------
+// Pass 6: Dead methods on exported classes
+//
+// For each exported class, enumerate its methods and check whether each one
+// is referenced outside its defining file. Skip methods that are interface
+// implementations (already covered by the polymorphic dispatch pass).
+// ---------------------------------------------------------------------------
+
+interface DeadMethodInfo {
+  className: string;
+  methodName: string;
+  file: string;
+  line: number;
+  visibility: "public" | "protected" | "private";
+  reason: "dead" | "test-only";
+  testFiles?: string[];
+}
+
+function collectDeadClassMethods(
+  globalRefs: Map<ts.Symbol, RefInfo>,
+  polyReachable: Set<string>,
+  implementsMap: Map<string, Set<string>>,
+): { deadMethods: DeadMethodInfo[]; totalChecked: number } {
+  console.error("\nPass 6: Dead class methods...");
+  const deadMethods: DeadMethodInfo[] = [];
+  let totalChecked = 0;
+
+  // Build reverse implements map: className → Set<interfaceName>
+  const classInterfaces = new Map<string, Set<string>>();
+  for (const [ifaceName, classNames] of implementsMap) {
+    for (const cn of classNames) {
+      if (!classInterfaces.has(cn)) classInterfaces.set(cn, new Set());
+      classInterfaces.get(cn)!.add(ifaceName);
+    }
+  }
+
+  // Collect all interface method names per interface for quick lookup
+  const interfaceMethodNames = new Map<string, Set<string>>();
+  for (const sf of sourceFiles) {
+    if (!isSrcProd(sf.fileName)) continue;
+    ts.forEachChild(sf, function visit(node) {
+      if (ts.isInterfaceDeclaration(node)) {
+        const methods = new Set<string>();
+        for (const member of node.members) {
+          if (member.name && ts.isIdentifier(member.name)) {
+            methods.add(member.name.text);
+          }
+        }
+        if (methods.size > 0) {
+          const existing = interfaceMethodNames.get(node.name.text);
+          if (existing) {
+            for (const m of methods) existing.add(m);
+          } else {
+            interfaceMethodNames.set(node.name.text, methods);
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    });
+  }
+
+  for (const sf of sourceFiles) {
+    if (!isSrcProd(sf.fileName)) continue;
+    const fileRel = rel(sf.fileName);
+
+    ts.forEachChild(sf, function visit(node) {
+      if (!ts.isClassDeclaration(node) || !node.name) {
+        ts.forEachChild(node, visit);
+        return;
+      }
+
+      // Only check exported classes (non-exported are caught by noUnusedLocals)
+      const isExported = node.modifiers?.some(
+        (m) => m.kind === ts.SyntaxKind.ExportKeyword,
+      );
+      if (!isExported) return;
+
+      const className = node.name.text;
+
+      // Which interfaces does this class implement?
+      const ifaces = classInterfaces.get(className) ?? new Set<string>();
+
+      // Collect all interface method names this class must implement
+      const ifaceMethodSet = new Set<string>();
+      for (const iface of ifaces) {
+        const methods = interfaceMethodNames.get(iface);
+        if (methods) {
+          for (const m of methods) ifaceMethodSet.add(m);
+        }
+      }
+
+      for (const member of node.members) {
+        // Only check methods (including getters/setters)
+        if (
+          !ts.isMethodDeclaration(member) &&
+          !ts.isGetAccessorDeclaration(member) &&
+          !ts.isSetAccessorDeclaration(member)
+        ) continue;
+
+        if (!member.name || !ts.isIdentifier(member.name)) continue;
+        const methodName = member.name.text;
+
+        // Skip constructor
+        if (methodName === "constructor") continue;
+
+        // Skip interface implementations — handled by polymorphic pass
+        if (ifaceMethodSet.has(methodName)) continue;
+
+        // Skip if already marked reachable by polymorphic dispatch
+        if (polyReachable.has(`${className}.${methodName}`)) continue;
+
+        totalChecked++;
+
+        // Determine visibility
+        let visibility: DeadMethodInfo["visibility"] = "public";
+        if (member.modifiers) {
+          for (const mod of member.modifiers) {
+            if (mod.kind === ts.SyntaxKind.PrivateKeyword) visibility = "private";
+            else if (mod.kind === ts.SyntaxKind.ProtectedKeyword) visibility = "protected";
+          }
+        }
+        // Also treat JS private fields (#name) and TS private as private
+        if (ts.isPrivateIdentifier(member.name)) visibility = "private";
+
+        // Resolve the method's symbol. Call sites like `obj.method()` resolve
+        // to the *type property* symbol, not the declaration symbol. We need
+        // to check both, plus the symbol obtained via the class type's property.
+        const declSym = checker.getSymbolAtLocation(member.name);
+
+        // Also resolve through the class type — this is what call sites see.
+        // We need both the static type (ClassName) and instance type (what
+        // `this` resolves to inside the class / what `new Class()` produces),
+        // since call sites may use either depending on context.
+        const typePropSyms: ts.Symbol[] = [];
+        try {
+          const classType = checker.getTypeAtLocation(node.name!);
+          // Static type property (covers ClassName.staticMethod())
+          const staticProp = classType.getProperty(methodName);
+          if (staticProp) typePropSyms.push(staticProp);
+          // Instance type property (covers this.method() and obj.method())
+          const ctorSigs = classType.getConstructSignatures();
+          if (ctorSigs.length > 0) {
+            const instanceType = ctorSigs[0].getReturnType();
+            const instanceProp = instanceType.getProperty(methodName);
+            if (instanceProp) typePropSyms.push(instanceProp);
+          }
+          // Also try getDeclaredType for classes without explicit constructors
+          const declaredType = checker.getDeclaredTypeOfSymbol(classType.symbol);
+          const declaredProp = declaredType.getProperty(methodName);
+          if (declaredProp) typePropSyms.push(declaredProp);
+        } catch { /* skip */ }
+
+        // Merge refs from all symbol identities
+        const prodFiles = new Set<string>();
+        const testFiles = new Set<string>();
+
+        for (const sym of [declSym, ...typePropSyms]) {
+          if (!sym) continue;
+          const refs = globalRefs.get(sym);
+          if (!refs) continue;
+          for (const f of refs.prodFiles) prodFiles.add(f);
+          for (const f of refs.testFiles) testFiles.add(f);
+        }
+
+        // Filter self-file references — but for private methods, same-file
+        // is the ONLY place they can be called from, so a self-file reference
+        // proves they're alive.
+        if (visibility !== "private") {
+          prodFiles.delete(fileRel);
+          testFiles.delete(fileRel);
+        }
+
+        const line = sf.getLineAndCharacterOfPosition(member.getStart()).line + 1;
+
+        if (prodFiles.size === 0 && testFiles.size === 0) {
+          deadMethods.push({
+            className, methodName, file: fileRel, line,
+            visibility, reason: "dead",
+          });
+        } else if (prodFiles.size === 0 && testFiles.size > 0) {
+          deadMethods.push({
+            className, methodName, file: fileRel, line,
+            visibility, reason: "test-only",
+            testFiles: [...testFiles],
+          });
+        }
+      }
+    });
+  }
+
+  const dead = deadMethods.filter((m) => m.reason === "dead").length;
+  const testOnly = deadMethods.filter((m) => m.reason === "test-only").length;
+  console.error(`  ${totalChecked} methods checked on exported classes`);
+  console.error(`  ${dead} dead, ${testOnly} test-only`);
+
+  return { deadMethods, totalChecked };
+}
+
+// ---------------------------------------------------------------------------
 // Main: combine all passes with O(1) reference lookups
 // ---------------------------------------------------------------------------
 
 interface DeadCodeResult {
   genuinelyDead: Array<{ name: string; kind: string; file: string; line: number }>;
+  unexportCandidates: Array<{ name: string; kind: string; file: string; line: number }>;
   testOnly: Array<{ name: string; kind: string; file: string; line: number; testFiles: string[] }>;
+  deadClassMethods: DeadMethodInfo[];
+  totalClassMethodsChecked: number;
   registryReachable: number;
   polymorphicReachable: number;
   callbackReachable: number;
@@ -563,9 +875,18 @@ function runAnalysis(): DeadCodeResult {
   // Collect what we're checking
   const allExports = collectExportedSymbols();
 
+  // Dead class methods (uses polyResult.reachable and the implementsMap)
+  const implementsMap = buildImplementsMap(); // already fast, cached internally
+  const classMethodResult = collectDeadClassMethods(
+    globalRefs,
+    polyResult.reachable,
+    implementsMap,
+  );
+
   // Classify each export using O(1) map lookups
   console.error("\nPass 5: Classifying exports...");
   const genuinelyDead: DeadCodeResult["genuinelyDead"] = [];
+  const unexportCandidates: DeadCodeResult["unexportCandidates"] = [];
   const testOnly: DeadCodeResult["testOnly"] = [];
   let registryReachable = 0;
   let polymorphicReachable = 0;
@@ -607,14 +928,28 @@ function runAnalysis(): DeadCodeResult {
       continue;
     }
 
-    // Filter: remove self-file references
+    // Filter: remove self-file references for external reachability check
     const prodOther = new Set(refs.prodFiles);
     prodOther.delete(exp.file);
     const testOther = new Set(refs.testFiles);
     testOther.delete(exp.file);
 
+    // Check if this symbol is referenced within its own file beyond its declaration.
+    // The declaration itself counts as 1 reference. If the file has >1 refs, the
+    // symbol is called/used internally — only the export keyword is dead.
+    // For types/interfaces that appear in other declarations in the same file
+    // (e.g. as a parameter type), the count will also be >1.
+    const sameFileCount = refs.fileCounts.get(exp.file) ?? 0;
+    const usedInternally = sameFileCount > 1;
+
     if (prodOther.size === 0 && testOther.size === 0) {
-      genuinelyDead.push({ name: exp.name, kind: exp.kind, file: exp.file, line: exp.line });
+      if (usedInternally) {
+        // Referenced within its own file but nowhere else — the export is dead,
+        // but the symbol itself is used internally. Candidate for unexport.
+        unexportCandidates.push({ name: exp.name, kind: exp.kind, file: exp.file, line: exp.line });
+      } else {
+        genuinelyDead.push({ name: exp.name, kind: exp.kind, file: exp.file, line: exp.line });
+      }
     } else if (prodOther.size === 0 && testOther.size > 0) {
       testOnly.push({
         name: exp.name,
@@ -627,11 +962,14 @@ function runAnalysis(): DeadCodeResult {
     // else: used in prod → alive, skip
   }
 
-  console.error(`  Done. ${genuinelyDead.length} dead, ${testOnly.length} test-only.`);
+  console.error(`  Done. ${genuinelyDead.length} dead, ${unexportCandidates.length} unexport-candidates, ${testOnly.length} test-only.`);
 
   return {
     genuinelyDead,
+    unexportCandidates,
     testOnly,
+    deadClassMethods: classMethodResult.deadMethods,
+    totalClassMethodsChecked: classMethodResult.totalChecked,
     registryReachable,
     polymorphicReachable,
     callbackReachable,
@@ -665,6 +1003,15 @@ if (JSON_OUTPUT) {
     console.log(`  [${d.kind}] ${d.name}  →  ${d.file}:${d.line}`);
   }
 
+  if (result.unexportCandidates.length > 0) {
+    console.log(`\n${"─".repeat(70)}`);
+    console.log(`UNEXPORT CANDIDATES (${result.unexportCandidates.length} symbols — used internally, export is dead)`);
+    console.log(`${"─".repeat(70)}`);
+    for (const u of result.unexportCandidates) {
+      console.log(`  [${u.kind}] ${u.name}  →  ${u.file}:${u.line}`);
+    }
+  }
+
   console.log(`\n${"─".repeat(70)}`);
   console.log(`TEST-ONLY (${result.testOnly.length} symbols — used only by tests)`);
   console.log(`${"─".repeat(70)}`);
@@ -673,6 +1020,38 @@ if (JSON_OUTPUT) {
     if (VERBOSE) {
       for (const tf of t.testFiles) {
         console.log(`      tested in: ${tf}`);
+      }
+    }
+  }
+
+  const deadMethods = result.deadClassMethods.filter((m) => m.reason === "dead");
+  const testOnlyMethods = result.deadClassMethods.filter((m) => m.reason === "test-only");
+
+  if (deadMethods.length > 0) {
+    console.log(`\n${"─".repeat(70)}`);
+    console.log(
+      `DEAD CLASS METHODS (${deadMethods.length} — on exported classes, never called)`,
+    );
+    console.log(`${"─".repeat(70)}`);
+    for (const m of deadMethods) {
+      const vis = m.visibility !== "public" ? `${m.visibility} ` : "";
+      console.log(`  ${vis}${m.className}.${m.methodName}  →  ${m.file}:${m.line}`);
+    }
+  }
+
+  if (testOnlyMethods.length > 0) {
+    console.log(`\n${"─".repeat(70)}`);
+    console.log(
+      `TEST-ONLY CLASS METHODS (${testOnlyMethods.length} — called only from tests)`,
+    );
+    console.log(`${"─".repeat(70)}`);
+    for (const m of testOnlyMethods) {
+      const vis = m.visibility !== "public" ? `${m.visibility} ` : "";
+      console.log(`  ${vis}${m.className}.${m.methodName}  →  ${m.file}:${m.line}`);
+      if (VERBOSE && m.testFiles) {
+        for (const tf of m.testFiles) {
+          console.log(`      tested in: ${tf}`);
+        }
       }
     }
   }
@@ -693,7 +1072,9 @@ if (JSON_OUTPUT) {
   console.log(`${"=".repeat(70)}`);
   const eliminated = result.registryReachable + result.polymorphicReachable + result.callbackReachable;
   console.log(`  Genuinely dead exports:     ${result.genuinelyDead.length}`);
+  console.log(`  Unexport candidates:        ${result.unexportCandidates.length}`);
   console.log(`  Test-only exports:          ${result.testOnly.length}`);
+  console.log(`  Dead class methods:         ${deadMethods.length} dead, ${testOnlyMethods.length} test-only (of ${result.totalClassMethodsChecked} checked)`);
   console.log(`  Dead interface methods:     ${result.deadInterfaceMethods.length}`);
   console.log(`  False positives eliminated: ${eliminated}`);
   console.log(`    via registry:             ${result.registryReachable}`);
