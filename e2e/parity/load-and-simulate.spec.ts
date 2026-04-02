@@ -103,7 +103,17 @@ test.describe('Parity: load and simulate via postMessage', () => {
         NpnBJT: {
           '2N2222': {
             kind: 'inline',
-            params: { BF: 100, IS: 1e-14, NF: 1, BR: 1, VAF: 100 },
+            // Full spice-l1 param set — use '_inf' sentinel for Infinity
+            // (JSON.stringify nullifies Infinity; the DTS deserializer decodes
+            // both '_inf' and null back to Infinity).
+            params: {
+              BF: 100, IS: 1e-14, NF: 1, BR: 1, NR: 1,
+              ISE: 0, ISC: 0, NE: 1.5, NC: 2,
+              VAF: '_inf', VAR: '_inf', IKF: '_inf', IKR: '_inf',
+              RB: 0, RC: 0, RE: 0, CJE: 0, CJC: 0,
+              VJE: 0.75, VJC: 0.75, MJE: 0.33, MJC: 0.33,
+              TF: 0, TR: 0, EG: 1.11, XTB: 0, XTI: 3,
+            },
           },
         },
       },

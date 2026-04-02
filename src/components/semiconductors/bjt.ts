@@ -111,7 +111,9 @@ export const { paramDefs: BJT_SPICE_L1_PARAM_DEFS, defaults: BJT_SPICE_L1_NPN_DE
     VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
     NE:  { default: 1.5,    description: "B-E leakage emission coefficient" },
     NC:  { default: 2,      description: "B-C leakage emission coefficient" },
-    RB:  { default: 0,      unit: "Ω", description: "Base resistance" },
+    RB:  { default: 0,      unit: "Ω", description: "Zero-bias base resistance" },
+    IRB: { default: 0,      unit: "A", description: "Current where base resistance falls halfway to minimum" },
+    RBM: { default: 0,      unit: "Ω", description: "Minimum base resistance at high currents" },
     RC:  { default: 0,      unit: "Ω", description: "Collector resistance" },
     RE:  { default: 0,      unit: "Ω", description: "Emitter resistance" },
     CJE: { default: 0,      unit: "F", description: "B-E zero-bias junction capacitance" },
@@ -120,9 +122,22 @@ export const { paramDefs: BJT_SPICE_L1_PARAM_DEFS, defaults: BJT_SPICE_L1_NPN_DE
     CJC: { default: 0,      unit: "F", description: "B-C zero-bias junction capacitance" },
     VJC: { default: 0.75,   unit: "V", description: "B-C built-in potential" },
     MJC: { default: 0.33,   description: "B-C grading coefficient" },
+    XCJC: { default: 1,     description: "Fraction of B-C capacitance connected to internal base" },
     FC:  { default: 0.5,    description: "Forward-bias capacitance coefficient" },
     TF:  { default: 0,      unit: "s", description: "Forward transit time" },
+    XTF: { default: 0,      description: "Transit time bias dependence coefficient" },
+    VTF: { default: Infinity, unit: "V", description: "Transit time dependency on Vbc" },
+    ITF: { default: 0,      unit: "A", description: "Transit time dependency on Ic" },
+    PTF: { default: 0,      unit: "°", description: "Excess phase at freq=1/(2π·TF)" },
     TR:  { default: 0,      unit: "s", description: "Reverse transit time" },
+    CJS: { default: 0,      unit: "F", description: "Collector-substrate zero-bias capacitance" },
+    VJS: { default: 0.75,   unit: "V", description: "Substrate junction built-in potential" },
+    MJS: { default: 0,      description: "Substrate junction exponential factor" },
+    XTB: { default: 0,      description: "Forward/reverse beta temperature exponent" },
+    EG:  { default: 1.11,   unit: "eV", description: "Energy gap for temperature effect on IS" },
+    XTI: { default: 3,      description: "Saturation current temperature exponent" },
+    KF:  { default: 0,      description: "Flicker noise coefficient" },
+    AF:  { default: 1,      description: "Flicker noise exponent" },
   },
 });
 
@@ -143,7 +158,9 @@ export const { defaults: BJT_SPICE_L1_PNP_DEFAULTS } = defineModelParams({
     VAR: { default: Infinity, unit: "V", description: "Reverse Early voltage" },
     NE:  { default: 1.5,    description: "B-E leakage emission coefficient" },
     NC:  { default: 2,      description: "B-C leakage emission coefficient" },
-    RB:  { default: 0,      unit: "Ω", description: "Base resistance" },
+    RB:  { default: 0,      unit: "Ω", description: "Zero-bias base resistance" },
+    IRB: { default: 0,      unit: "A", description: "Current where base resistance falls halfway to minimum" },
+    RBM: { default: 0,      unit: "Ω", description: "Minimum base resistance at high currents" },
     RC:  { default: 0,      unit: "Ω", description: "Collector resistance" },
     RE:  { default: 0,      unit: "Ω", description: "Emitter resistance" },
     CJE: { default: 0,      unit: "F", description: "B-E zero-bias junction capacitance" },
@@ -152,9 +169,22 @@ export const { defaults: BJT_SPICE_L1_PNP_DEFAULTS } = defineModelParams({
     CJC: { default: 0,      unit: "F", description: "B-C zero-bias junction capacitance" },
     VJC: { default: 0.75,   unit: "V", description: "B-C built-in potential" },
     MJC: { default: 0.33,   description: "B-C grading coefficient" },
+    XCJC: { default: 1,     description: "Fraction of B-C capacitance connected to internal base" },
     FC:  { default: 0.5,    description: "Forward-bias capacitance coefficient" },
     TF:  { default: 0,      unit: "s", description: "Forward transit time" },
+    XTF: { default: 0,      description: "Transit time bias dependence coefficient" },
+    VTF: { default: Infinity, unit: "V", description: "Transit time dependency on Vbc" },
+    ITF: { default: 0,      unit: "A", description: "Transit time dependency on Ic" },
+    PTF: { default: 0,      unit: "°", description: "Excess phase at freq=1/(2π·TF)" },
     TR:  { default: 0,      unit: "s", description: "Reverse transit time" },
+    CJS: { default: 0,      unit: "F", description: "Collector-substrate zero-bias capacitance" },
+    VJS: { default: 0.75,   unit: "V", description: "Substrate junction built-in potential" },
+    MJS: { default: 0,      description: "Substrate junction exponential factor" },
+    XTB: { default: 0,      description: "Forward/reverse beta temperature exponent" },
+    EG:  { default: 1.11,   unit: "eV", description: "Energy gap for temperature effect on IS" },
+    XTI: { default: 3,      description: "Saturation current temperature exponent" },
+    KF:  { default: 0,      description: "Flicker noise coefficient" },
+    AF:  { default: 1,      description: "Flicker noise exponent" },
   },
 });
 
@@ -623,6 +653,8 @@ export function createSpiceL1BjtElement(
     IKF: props.getModelParam<number>("IKF"),
     IKR: props.getModelParam<number>("IKR"),
     RB: props.getModelParam<number>("RB"),
+    IRB: props.getModelParam<number>("IRB"),
+    RBM: props.getModelParam<number>("RBM"),
     RC: props.getModelParam<number>("RC"),
     RE: props.getModelParam<number>("RE"),
     CJE: props.getModelParam<number>("CJE"),
@@ -631,9 +663,22 @@ export function createSpiceL1BjtElement(
     CJC: props.getModelParam<number>("CJC"),
     VJC: props.getModelParam<number>("VJC"),
     MJC: props.getModelParam<number>("MJC"),
+    XCJC: props.getModelParam<number>("XCJC"),
     FC: props.getModelParam<number>("FC"),
     TF: props.getModelParam<number>("TF"),
+    XTF: props.getModelParam<number>("XTF"),
+    VTF: props.getModelParam<number>("VTF"),
+    ITF: props.getModelParam<number>("ITF"),
+    PTF: props.getModelParam<number>("PTF"),
     TR: props.getModelParam<number>("TR"),
+    CJS: props.getModelParam<number>("CJS"),
+    VJS: props.getModelParam<number>("VJS"),
+    MJS: props.getModelParam<number>("MJS"),
+    XTB: props.getModelParam<number>("XTB"),
+    EG: props.getModelParam<number>("EG"),
+    XTI: props.getModelParam<number>("XTI"),
+    KF: props.getModelParam<number>("KF"),
+    AF: props.getModelParam<number>("AF"),
   };
 
   // Internal nodes: if resistance > 0, use allocated internal node; else short to external
@@ -642,7 +687,7 @@ export function createSpiceL1BjtElement(
   const nodeC_int = params.RC > 0 && internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeC_ext;
   const nodeE_int = params.RE > 0 && internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeE_ext;
 
-  const hasCapacitance = params.CJE > 0 || params.CJC > 0 || params.TF > 0 || params.TR > 0;
+  const hasCapacitance = params.CJE > 0 || params.CJC > 0 || params.TF > 0 || params.TR > 0 || params.CJS > 0;
 
   let vbe = 0;
   let vbc = 0;
@@ -656,11 +701,19 @@ export function createSpiceL1BjtElement(
   // Junction capacitance companion model state
   let capGeqBE = 0;
   let capIeqBE = 0;
-  let capGeqBC = 0;
-  let capIeqBC = 0;
+  let capGeqBC_int = 0;   // XCJC fraction: internal base to internal collector
+  let capIeqBC_int = 0;
+  let capGeqBC_ext = 0;   // (1-XCJC) fraction: external base to external collector
+  let capIeqBC_ext = 0;
+  let capGeqCS = 0;       // collector-substrate capacitance
+  let capIeqCS = 0;
   let vbePrev = NaN;
   let vbcPrev = NaN;
+  let vcsPrev = NaN;      // collector-substrate voltage (Vc - Vsubstrate=0)
   let capFirstCall = true;
+
+  // Current-dependent base resistance (updated in updateOperatingPoint).
+  let rbEff = params.RB;
 
   const element: AnalogElementCore = {
     branchIndex: -1,
@@ -668,9 +721,10 @@ export function createSpiceL1BjtElement(
     isReactive: hasCapacitance,
 
     stamp(solver: SparseSolver): void {
-      // Stamp terminal resistances (constant, topology-only)
+      // Stamp terminal resistances.
+      // RB is current-dependent (IRB/RBM), computed in updateOperatingPoint; use rbEff.
       if (params.RB > 0 && nodeB_int !== nodeB_ext) {
-        const gRB = 1 / params.RB;
+        const gRB = 1 / rbEff;
         stampG(solver, nodeB_ext, nodeB_ext, gRB);
         stampG(solver, nodeB_ext, nodeB_int, -gRB);
         stampG(solver, nodeB_int, nodeB_ext, -gRB);
@@ -691,7 +745,7 @@ export function createSpiceL1BjtElement(
         stampG(solver, nodeE_int, nodeE_int, gRE);
       }
 
-      // Stamp junction capacitance companion models when active
+      // Stamp junction capacitance companion models when active.
       if (capGeqBE !== 0 || capIeqBE !== 0) {
         stampG(solver, nodeB_int, nodeB_int, capGeqBE);
         stampG(solver, nodeB_int, nodeE_int, -capGeqBE);
@@ -700,13 +754,28 @@ export function createSpiceL1BjtElement(
         stampRHS(solver, nodeB_int, -capIeqBE);
         stampRHS(solver, nodeE_int, capIeqBE);
       }
-      if (capGeqBC !== 0 || capIeqBC !== 0) {
-        stampG(solver, nodeB_int, nodeB_int, capGeqBC);
-        stampG(solver, nodeB_int, nodeC_int, -capGeqBC);
-        stampG(solver, nodeC_int, nodeB_int, -capGeqBC);
-        stampG(solver, nodeC_int, nodeC_int, capGeqBC);
-        stampRHS(solver, nodeB_int, -capIeqBC);
-        stampRHS(solver, nodeC_int, capIeqBC);
+      // B-C capacitance: XCJC fraction between internal nodes, (1-XCJC) between external nodes.
+      if (capGeqBC_int !== 0 || capIeqBC_int !== 0) {
+        stampG(solver, nodeB_int, nodeB_int, capGeqBC_int);
+        stampG(solver, nodeB_int, nodeC_int, -capGeqBC_int);
+        stampG(solver, nodeC_int, nodeB_int, -capGeqBC_int);
+        stampG(solver, nodeC_int, nodeC_int, capGeqBC_int);
+        stampRHS(solver, nodeB_int, -capIeqBC_int);
+        stampRHS(solver, nodeC_int, capIeqBC_int);
+      }
+      if (capGeqBC_ext !== 0 || capIeqBC_ext !== 0) {
+        stampG(solver, nodeB_ext, nodeB_ext, capGeqBC_ext);
+        stampG(solver, nodeB_ext, nodeC_ext, -capGeqBC_ext);
+        stampG(solver, nodeC_ext, nodeB_ext, -capGeqBC_ext);
+        stampG(solver, nodeC_ext, nodeC_ext, capGeqBC_ext);
+        stampRHS(solver, nodeB_ext, -capIeqBC_ext);
+        stampRHS(solver, nodeC_ext, capIeqBC_ext);
+      }
+      // Collector-substrate capacitance: between external collector and ground.
+      if (capGeqCS !== 0 || capIeqCS !== 0) {
+        stampG(solver, nodeC_ext, nodeC_ext, capGeqCS);
+        // ground node = 0, skipped per MNA convention
+        stampRHS(solver, nodeC_ext, -capIeqCS);
       }
     },
 
@@ -784,6 +853,23 @@ export function createSpiceL1BjtElement(
         params.ISE, params.ISC, params.NE, params.NC,
         params.VAF, params.VAR, params.IKF, params.IKR,
       );
+
+      // Update current-dependent base resistance (IRB/RBM).
+      // When IRB > 0 and RBM < RB, Rb varies with base current magnitude.
+      // Formula from ngspice/SPICE3: Rb(Ib) = RBM + 3*(RB-RBM)*(tan(z)-z)/(z*tan²(z))
+      // where z = (-1 + sqrt(1 + 14.59*|Ib|/IRB)) / (2.4 * sqrt(|Ib|/IRB + 1e-30))
+      if (params.IRB > 0 && params.RBM > 0 && params.RBM < params.RB) {
+        // Current-dependent base resistance: Rb(Ib) = RBM + (RB-RBM)*f(Ib)
+        // where f(Ib) = 3*(tan(z)-z)/(z*tan²(z)), z from SPICE3 formula.
+        const Ib_abs = Math.abs(op.ib) + 1e-30;
+        const x = Ib_abs / params.IRB;
+        const z = (-1 + Math.sqrt(1 + 14.59265 * x)) / (2.4494897 * Math.sqrt(x + 1e-30));
+        const tanz = Math.tan(z);
+        const factor = (tanz > 1e-10 && z > 1e-10) ? 3 * (tanz - z) / (z * tanz * tanz) : 1;
+        rbEff = Math.max(params.RBM, params.RBM + (params.RB - params.RBM) * factor);
+      } else {
+        rbEff = params.RB;
+      }
     },
 
     checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
@@ -829,36 +915,89 @@ export function createSpiceL1BjtElement(
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
       const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
       const vEi = nodeE_int > 0 ? voltages[nodeE_int - 1] : 0;
+      const vBe = nodeB_ext > 0 ? voltages[nodeB_ext - 1] : 0;
+      const vCe = nodeC_ext > 0 ? voltages[nodeC_ext - 1] : 0;
 
       const vbeNow = polarity * (vBi - vEi);
       const vbcNow = polarity * (vBi - vCi);
+      // Collector-substrate voltage: Vc_ext referenced to substrate (ground = 0).
+      const vcsNow = polarity * vCe;
 
       const prevVbe = capFirstCall ? vbeNow : vbePrev;
       const prevVbc = capFirstCall ? vbcNow : vbcPrev;
+      const prevVcs = capFirstCall ? vcsNow : vcsPrev;
       vbePrev = vbeNow;
       vbcPrev = vbcNow;
+      vcsPrev = vcsNow;
       capFirstCall = false;
 
-      // B-E junction: depletion + transit-time diffusion capacitance
+      // B-E junction: depletion + transit-time diffusion capacitance.
+      // Transit time modulation: TF_eff = TF * (1 + XTF*(Ic/(Ic+ITF))^2 * exp(Vbc/(1.44*VTF)))
+      let TF_eff = params.TF;
+      if (params.TF > 0 && params.XTF > 0) {
+        const Ic = op.ic;
+        const ITF_safe = params.ITF > 0 ? params.ITF : 1e-30;
+        const icRatio = Ic / (Ic + ITF_safe);
+        const VTF_safe = params.VTF === Infinity ? 1e30 : params.VTF;
+        const expTerm = Math.exp(Math.min(vbcNow / (1.44 * VTF_safe), 700));
+        TF_eff = params.TF * (1 + params.XTF * icRatio * icRatio * expTerm);
+      }
+
       const CjBE = computeJunctionCapacitance(vbeNow, params.CJE, params.VJE, params.MJE, params.FC);
-      const CdBE = params.TF * op.gm; // forward transit time diffusion
+      const CdBE = TF_eff * op.gm;
       const CtotalBE = CjBE + CdBE;
 
       if (CtotalBE > 0) {
         const iBE = capGeqBE * vbeNow + capIeqBE;
         capGeqBE = capacitorConductance(CtotalBE, dt, method);
         capIeqBE = capacitorHistoryCurrent(CtotalBE, dt, method, vbeNow, prevVbe, iBE);
+      } else {
+        capGeqBE = 0;
+        capIeqBE = 0;
       }
 
-      // B-C junction: depletion + reverse transit-time diffusion capacitance
+      // B-C junction: depletion + reverse transit-time diffusion capacitance.
+      // Split by XCJC: internal fraction goes to internal B-C nodes, rest to external.
       const CjBC = computeJunctionCapacitance(vbcNow, params.CJC, params.VJC, params.MJC, params.FC);
-      const CdBC = params.TR * op.gmu; // reverse transit time diffusion
+      const CdBC = params.TR * op.gmu;
       const CtotalBC = CjBC + CdBC;
 
-      if (CtotalBC > 0) {
-        const iBC = capGeqBC * vbcNow + capIeqBC;
-        capGeqBC = capacitorConductance(CtotalBC, dt, method);
-        capIeqBC = capacitorHistoryCurrent(CtotalBC, dt, method, vbcNow, prevVbc, iBC);
+      const xcjc = Math.min(Math.max(params.XCJC, 0), 1);
+      const CtotalBC_int = xcjc * CtotalBC;
+      const CtotalBC_ext = (1 - xcjc) * CtotalBC;
+
+      if (CtotalBC_int > 0) {
+        const iBC_int = capGeqBC_int * vbcNow + capIeqBC_int;
+        capGeqBC_int = capacitorConductance(CtotalBC_int, dt, method);
+        capIeqBC_int = capacitorHistoryCurrent(CtotalBC_int, dt, method, vbcNow, prevVbc, iBC_int);
+      } else {
+        capGeqBC_int = 0;
+        capIeqBC_int = 0;
+      }
+
+      if (CtotalBC_ext > 0) {
+        // External B-C uses external node voltages for Vbc; prevVbc tracks the internal vbc
+        // which is equivalent to external when XCJC < 1 (both driven by same junction).
+        const vbcExt = polarity * (vBe - vCe);
+        const iBC_ext = capGeqBC_ext * vbcExt + capIeqBC_ext;
+        capGeqBC_ext = capacitorConductance(CtotalBC_ext, dt, method);
+        capIeqBC_ext = capacitorHistoryCurrent(CtotalBC_ext, dt, method, vbcExt, prevVbc, iBC_ext);
+      } else {
+        capGeqBC_ext = 0;
+        capIeqBC_ext = 0;
+      }
+
+      // Collector-substrate capacitance (CJS): between external collector and ground.
+      if (params.CJS > 0) {
+        const CjCS = computeJunctionCapacitance(vcsNow, params.CJS, params.VJS, params.MJS, params.FC);
+        if (CjCS > 0) {
+          const iCS = capGeqCS * vcsNow + capIeqCS;
+          capGeqCS = capacitorConductance(CjCS, dt, method);
+          capIeqCS = capacitorHistoryCurrent(CjCS, dt, method, vcsNow, prevVcs, iCS);
+        } else {
+          capGeqCS = 0;
+          capIeqCS = 0;
+        }
       }
     };
   }
@@ -1134,7 +1273,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_PARAM_DEFS,
       params: BJT_NPN_DEFAULTS,
     },
-    "spice-l1": {
+    "spice": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createSpiceL1BjtElement(1, pinNodes, internalNodeIds, branchIdx, props),
@@ -1175,7 +1314,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
       getInternalNodeCount: getSpiceL1InternalNodeCount,
     },
   },
-  defaultModel: "spice-l1",
+  defaultModel: "spice",
 };
 
 export const PnpBjtDefinition: ComponentDefinition = {
@@ -1199,7 +1338,7 @@ export const PnpBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_PARAM_DEFS,
       params: BJT_PNP_DEFAULTS,
     },
-    "spice-l1": {
+    "spice": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createSpiceL1BjtElement(-1, pinNodes, internalNodeIds, branchIdx, props),
@@ -1240,5 +1379,5 @@ export const PnpBjtDefinition: ComponentDefinition = {
       getInternalNodeCount: getSpiceL1InternalNodeCount,
     },
   },
-  defaultModel: "spice-l1",
+  defaultModel: "spice",
 };

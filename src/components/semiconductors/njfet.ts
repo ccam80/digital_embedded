@@ -58,20 +58,22 @@ const GMIN = 1e-12;
 
 export const { paramDefs: NJFET_PARAM_DEFS, defaults: NJFET_PARAM_DEFAULTS } = defineModelParams({
   primary: {
-    VTO:    { default: -2.0,  unit: "V", description: "Pinch-off (threshold) voltage" },
+    VTO:    { default: -2.0,  unit: "V",    description: "Pinch-off (threshold) voltage" },
     BETA:   { default: 1e-4,  unit: "A/V²", description: "Transconductance coefficient" },
-    LAMBDA: { default: 0.0,   unit: "1/V", description: "Channel-length modulation" },
+    LAMBDA: { default: 0.0,   unit: "1/V",  description: "Channel-length modulation" },
   },
   secondary: {
-    IS:  { default: 1e-14, unit: "A", description: "Gate junction saturation current" },
-    CGS: { default: 0,     unit: "F", description: "Gate-source capacitance" },
-    CGD: { default: 0,     unit: "F", description: "Gate-drain capacitance" },
-    PB:  { default: 1.0,   unit: "V", description: "Gate junction built-in potential" },
-    FC:  { default: 0.5,              description: "Forward-bias capacitance coefficient" },
-    RD:  { default: 0,     unit: "Ω", description: "Drain ohmic resistance" },
-    RS:  { default: 0,     unit: "Ω", description: "Source ohmic resistance" },
-    KF:  { default: 0,                description: "Flicker noise coefficient" },
-    AF:  { default: 1,                description: "Flicker noise exponent" },
+    IS:   { default: 1e-14, unit: "A",  description: "Gate junction saturation current" },
+    N:    { default: 1.0,               description: "Gate junction emission coefficient" },
+    CGS:  { default: 0,     unit: "F",  description: "Gate-source zero-bias capacitance" },
+    CGD:  { default: 0,     unit: "F",  description: "Gate-drain zero-bias capacitance" },
+    PB:   { default: 1.0,   unit: "V",  description: "Gate junction built-in potential" },
+    FC:   { default: 0.5,               description: "Forward-bias capacitance coefficient" },
+    RD:   { default: 0,     unit: "Ω",  description: "Drain ohmic resistance" },
+    RS:   { default: 0,     unit: "Ω",  description: "Source ohmic resistance" },
+    KF:   { default: 0,                 description: "Flicker noise coefficient" },
+    AF:   { default: 1,                 description: "Flicker noise exponent" },
+    TNOM: { default: 27,    unit: "°C", description: "Nominal temperature for parameters" },
   },
 });
 
@@ -84,6 +86,7 @@ interface JfetParams {
   BETA: number;
   LAMBDA: number;
   IS: number;
+  N: number;
   CGS: number;
   CGD: number;
   PB: number;
@@ -92,6 +95,7 @@ interface JfetParams {
   RS: number;
   KF: number;
   AF: number;
+  TNOM: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -133,8 +137,9 @@ export class NJfetAnalogElement extends AbstractFetElement {
     vgsNew: number,
     vdsNew: number,
   ): { vgs: number; vds: number; swapped?: boolean } {
-    const vcrit = VT * Math.log(VT / (Math.SQRT2 * this._p.IS));
-    const vgsLimited = pnjlim(vgsNew, vgsOld, VT, vcrit);
+    const vt_n = VT * this._p.N;
+    const vcrit = vt_n * Math.log(vt_n / (Math.SQRT2 * this._p.IS));
+    const vgsLimited = pnjlim(vgsNew, vgsOld, vt_n, vcrit);
 
     // Clamp Vds to prevent huge steps
     let vds = vdsNew;
@@ -238,13 +243,14 @@ export class NJfetAnalogElement extends AbstractFetElement {
     this._gds = this.computeGds(this._vgs, this._vds);
 
     // Gate junction diode: limit V_GS for junction
-    const vcrit = VT * Math.log(VT / (Math.SQRT2 * this._p.IS));
-    this._vgs_junction = pnjlim(vGraw, this._vgs_junction, VT, vcrit);
+    const vt_n = VT * this._p.N;
+    const vcrit = vt_n * Math.log(vt_n / (Math.SQRT2 * this._p.IS));
+    this._vgs_junction = pnjlim(vGraw, this._vgs_junction, vt_n, vcrit);
 
-    // Gate junction I-V (Shockley): Ig = IS*(exp(Vgs/(Vt)) - 1)
-    const expArg = Math.min(this._vgs_junction / VT, 80);
+    // Gate junction I-V (Shockley): Ig = IS*(exp(Vgs/(N*Vt)) - 1)
+    const expArg = Math.min(this._vgs_junction / vt_n, 80);
     const igJunction = this._p.IS * (Math.exp(expArg) - 1);
-    this._gd_junction = (this._p.IS / VT) * Math.exp(expArg) + GMIN;
+    this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
     this._id_junction = igJunction;
   }
 
@@ -307,6 +313,7 @@ export function createNJfetElement(
     BETA:   props.getModelParam<number>("BETA"),
     LAMBDA: props.getModelParam<number>("LAMBDA"),
     IS:     props.getModelParam<number>("IS"),
+    N:      props.getModelParam<number>("N"),
     CGS:    props.getModelParam<number>("CGS"),
     CGD:    props.getModelParam<number>("CGD"),
     PB:     props.getModelParam<number>("PB"),
@@ -315,6 +322,7 @@ export function createNJfetElement(
     RS:     props.getModelParam<number>("RS"),
     KF:     props.getModelParam<number>("KF"),
     AF:     props.getModelParam<number>("AF"),
+    TNOM:   props.getModelParam<number>("TNOM"),
   };
   return new NJfetAnalogElement(nodeG, nodeD, nodeS, p);
 }
@@ -468,7 +476,7 @@ export const NJfetDefinition: ComponentDefinition = {
     "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD.",
   models: {},
   modelRegistry: {
-    "spice-l1": {
+    "spice": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createNJfetElement(pinNodes, internalNodeIds, branchIdx, props),
@@ -476,5 +484,5 @@ export const NJfetDefinition: ComponentDefinition = {
       params: NJFET_PARAM_DEFAULTS,
     },
   },
-  defaultModel: "spice-l1",
+  defaultModel: "spice",
 };

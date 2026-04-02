@@ -1,7 +1,7 @@
 # Page snapshot
 
 ```yaml
-- iframe [ref=e2]:
+- iframe [active] [ref=e2]:
   - generic [ref=f1e2]:
     - menubar [ref=f1e3]:
       - menuitem "File" [ref=f1e4] [cursor=pointer]: File ▶ ▶
@@ -11,7 +11,7 @@
       - menuitem "Simulation" [ref=f1e8] [cursor=pointer]
       - generic [ref=f1e9] [cursor=pointer]: Analysis
       - generic [ref=f1e10] [cursor=pointer]: Tutorials
-      - textbox "Circuit name" [ref=f1e11]: BF Delta Test
+      - textbox "Circuit name" [ref=f1e11]: Untitled
       - generic [ref=f1e12]:
         - button "↶" [disabled] [ref=f1e13]
         - button "↷" [disabled] [ref=f1e14]
@@ -25,8 +25,8 @@
         - generic [ref=f1e25]: "Speed:"
         - button "−" [ref=f1e26] [cursor=pointer]
         - textbox "Speed:" [ref=f1e27]: "1"
-        - button "+" [ref=f1e28] [cursor=pointer]
-        - generic [ref=f1e29]: ms/s
+        - button "+" [active] [ref=f1e28] [cursor=pointer]
+        - generic [ref=f1e29]: µs/s
         - button "Toggle light/dark mode" [ref=f1e31] [cursor=pointer]: ☽
     - generic [ref=f1e32]:
       - generic [ref=f1e33]:

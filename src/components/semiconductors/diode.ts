@@ -58,6 +58,7 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     N:   { default: 1,                 description: "Emission coefficient" },
   },
   secondary: {
+    RS:  { default: 0,    unit: "Ω",  description: "Ohmic (series) resistance" },
     CJO: { default: 0,    unit: "F",  description: "Zero-bias junction capacitance" },
     VJ:  { default: 1,    unit: "V",  description: "Junction built-in potential" },
     M:   { default: 0.5,              description: "Grading coefficient" },
@@ -65,6 +66,10 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     FC:  { default: 0.5,              description: "Forward-bias capacitance coefficient" },
     BV:  { default: Infinity, unit: "V", description: "Reverse breakdown voltage" },
     IBV: { default: 1e-3, unit: "A",  description: "Reverse breakdown current" },
+    EG:  { default: 1.11, unit: "eV", description: "Activation energy" },
+    XTI: { default: 3,                description: "Saturation current temperature exponent" },
+    KF:  { default: 0,                description: "Flicker noise coefficient" },
+    AF:  { default: 1,                description: "Flicker noise exponent" },
   },
 });
 
@@ -105,7 +110,7 @@ export function computeJunctionCapacitance(
 
 export function createDiodeElement(
   pinNodes: ReadonlyMap<string, number>,
-  _internalNodeIds: readonly number[],
+  internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
@@ -115,6 +120,7 @@ export function createDiodeElement(
   const params: Record<string, number> = {
     IS:  props.getModelParam<number>("IS"),
     N:   props.getModelParam<number>("N"),
+    RS:  props.getModelParam<number>("RS"),
     CJO: props.getModelParam<number>("CJO"),
     VJ:  props.getModelParam<number>("VJ"),
     M:   props.getModelParam<number>("M"),
@@ -122,7 +128,17 @@ export function createDiodeElement(
     FC:  props.getModelParam<number>("FC"),
     BV:  props.getModelParam<number>("BV"),
     IBV: props.getModelParam<number>("IBV"),
+    EG:  props.getModelParam<number>("EG"),
+    XTI: props.getModelParam<number>("XTI"),
+    KF:  props.getModelParam<number>("KF"),
+    AF:  props.getModelParam<number>("AF"),
   };
+
+  // When RS > 0, use an internal node between the anode pin and the junction.
+  // nodeJunction is the node the Shockley junction connects from (internal side of RS).
+  const nodeJunction = params.RS > 0 && internalNodeIds.length > 0
+    ? internalNodeIds[0]
+    : nodeAnode;
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
@@ -144,30 +160,39 @@ export function createDiodeElement(
     isReactive: hasCapacitance,
 
     stamp(solver: SparseSolver): void {
+      // Stamp series resistance RS between anode pin and internal junction node
+      if (params.RS > 0 && nodeJunction !== nodeAnode) {
+        const gRS = 1 / params.RS;
+        stampG(solver, nodeAnode, nodeAnode, gRS);
+        stampG(solver, nodeAnode, nodeJunction, -gRS);
+        stampG(solver, nodeJunction, nodeAnode, -gRS);
+        stampG(solver, nodeJunction, nodeJunction, gRS);
+      }
       // Stamp junction capacitance companion model when active
       if (capGeq !== 0 || capIeq !== 0) {
-        stampG(solver, nodeAnode, nodeAnode, capGeq);
-        stampG(solver, nodeAnode, nodeCathode, -capGeq);
-        stampG(solver, nodeCathode, nodeAnode, -capGeq);
+        stampG(solver, nodeJunction, nodeJunction, capGeq);
+        stampG(solver, nodeJunction, nodeCathode, -capGeq);
+        stampG(solver, nodeCathode, nodeJunction, -capGeq);
         stampG(solver, nodeCathode, nodeCathode, capGeq);
-        stampRHS(solver, nodeAnode, -capIeq);
+        stampRHS(solver, nodeJunction, -capIeq);
         stampRHS(solver, nodeCathode, capIeq);
       }
     },
 
     stampNonlinear(solver: SparseSolver): void {
       // Stamp companion model: conductance geq in parallel, Norton offset ieq
-      stampG(solver, nodeAnode, nodeAnode, geq);
-      stampG(solver, nodeAnode, nodeCathode, -geq);
-      stampG(solver, nodeCathode, nodeAnode, -geq);
+      // Junction is between nodeJunction and nodeCathode
+      stampG(solver, nodeJunction, nodeJunction, geq);
+      stampG(solver, nodeJunction, nodeCathode, -geq);
+      stampG(solver, nodeCathode, nodeJunction, -geq);
       stampG(solver, nodeCathode, nodeCathode, geq);
       // RHS: Norton current source
-      stampRHS(solver, nodeAnode, -ieq);
+      stampRHS(solver, nodeJunction, -ieq);
       stampRHS(solver, nodeCathode, ieq);
     },
 
     updateOperatingPoint(voltages: Float64Array): void {
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
+      const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
 
@@ -179,27 +204,37 @@ export function createDiodeElement(
       const vdLimited = pnjlim(vdRaw, vd, nVt, vcrit);
 
       // Write limited junction voltage back into voltages[]
-      if (nodeAnode > 0) {
-        voltages[nodeAnode - 1] = vc + vdLimited;
+      if (nodeJunction > 0) {
+        voltages[nodeJunction - 1] = vc + vdLimited;
       }
 
       vd = vdLimited;
 
       // Shockley equation and NR linearization at limited operating point
-      const expArg = Math.min(vd / nVt, 700);
-      const expVal = Math.exp(expArg);
-      const id = params.IS * (expVal - 1);
-      _id = id;
-      geq = (params.IS * expVal) / nVt + GMIN;
-      ieq = id - geq * vd;
+      if (params.BV < Infinity && vd < -params.BV) {
+        // Reverse breakdown region: Id = -IBV * exp(-(Vd + BV) / (N*Vt))
+        const bdExpArg = Math.min(-(vd + params.BV) / nVt, 700);
+        const bdExpVal = Math.exp(bdExpArg);
+        const id = -params.IBV * bdExpVal;
+        _id = id;
+        geq = (params.IBV * bdExpVal) / nVt + GMIN;
+        ieq = id - geq * vd;
+      } else {
+        const expArg = Math.min(vd / nVt, 700);
+        const expVal = Math.exp(expArg);
+        const id = params.IS * (expVal - 1);
+        _id = id;
+        geq = (params.IS * expVal) / nVt + GMIN;
+        ieq = id - geq * vd;
+      }
     },
 
     checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
+      const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdNew = va - vc;
 
-      const vaPrev = nodeAnode > 0 ? prevVoltages[nodeAnode - 1] : 0;
+      const vaPrev = nodeJunction > 0 ? prevVoltages[nodeJunction - 1] : 0;
       const vcPrev = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
       const vdPrevVal = vaPrev - vcPrev;
 
@@ -225,7 +260,7 @@ export function createDiodeElement(
       method: IntegrationMethod,
       voltages: Float64Array,
     ): void {
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
+      const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vNow = va - vc;
 
@@ -253,6 +288,14 @@ export function createDiodeElement(
   }
 
   return element;
+}
+
+// ---------------------------------------------------------------------------
+// getDiodeInternalNodeCount — returns 1 when RS > 0, else 0
+// ---------------------------------------------------------------------------
+
+export function getDiodeInternalNodeCount(props: PropertyBag): number {
+  return props.getModelParam<number>("RS") > 0 ? 1 : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -395,12 +438,13 @@ export const DiodeDefinition: ComponentDefinition = {
     "Model parameters: IS, N, CJO, VJ, M, TT, FC.",
   models: {},
   modelRegistry: {
-    "spice-l1": {
+    "spice": {
       kind: "inline",
       factory: createDiodeElement,
       paramDefs: DIODE_PARAM_DEFS,
       params: DIODE_PARAM_DEFAULTS,
+      getInternalNodeCount: getDiodeInternalNodeCount,
     },
   },
-  defaultModel: "spice-l1",
+  defaultModel: "spice",
 };

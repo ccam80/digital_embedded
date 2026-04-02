@@ -1,13 +1,16 @@
 /**
  * MOSFET analog components — N-channel and P-channel MOSFETs.
  *
- * Implements the Level 2 SPICE MOSFET model with:
+ * Implements the Level 1 SPICE MOSFET model (Shichman-Hodges) with:
  *   - Three operating regions: cutoff, linear (triode), saturation
  *   - Body effect via GAMMA and PHI parameters
  *   - Channel-length modulation via LAMBDA
  *   - Gate-source voltage limiting via fetlim()
  *   - Source/drain swap detection for symmetric device
- *   - Junction capacitances (CBD, CBS) and overlap capacitances (CGDO, CGSO)
+ *   - Junction capacitances (CBD, CBS) and overlap capacitances (CGDO, CGSO, CGBO)
+ *   - Drain/source ohmic resistances (RD, RS) via internal nodes
+ *   - Process parameter derivation: KP from UO/TOX, GAMMA from NSUB/TOX, PHI from NSUB
+ *   - Area-based junction caps: CJ, CJSW with grading and FC linearization
  *
  * PMOS is implemented as the NMOS model with polarity = -1, which inverts
  * all junction voltage signs and current directions.
@@ -55,6 +58,21 @@ import { defineModelParams } from "../../core/model-params.js";
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
 
+/** Boltzmann's constant (J/K). */
+const KB = 1.38064852e-23;
+/** Elementary charge (C). */
+const Q = 1.60217663e-19;
+/** Permittivity of free space (F/m). */
+const EPS0 = 8.854187817e-12;
+/** Relative permittivity of SiO2. */
+const EPS_OX = 3.9;
+/** Relative permittivity of Si. */
+const EPS_SI = 11.7;
+/** Intrinsic carrier concentration of Si at 300K (cm⁻³). */
+const NI = 1.45e10;
+/** Thermal voltage at 300K (V). */
+const VT = KB * 300 / Q;
+
 // ---------------------------------------------------------------------------
 // Stamp helpers — node 0 is ground (skipped)
 // ---------------------------------------------------------------------------
@@ -65,17 +83,78 @@ const GMIN = 1e-12;
 // ---------------------------------------------------------------------------
 
 interface MosfetParams {
+  // Primary I-V params (always required)
   VTO: number;
   KP: number;
   LAMBDA: number;
   PHI: number;
   GAMMA: number;
+  W: number;
+  L: number;
+  // Capacitance params (optional, default 0)
+  CBD?: number;
+  CBS?: number;
+  CGDO?: number;
+  CGSO?: number;
+  CGBO?: number;
+  // Terminal resistance params (optional, default 0)
+  RD?: number;
+  RS?: number;
+  // Junction params (optional, with SPICE defaults)
+  IS?: number;
+  PB?: number;
+  CJ?: number;
+  MJ?: number;
+  CJSW?: number;
+  MJSW?: number;
+  JS?: number;
+  RSH?: number;
+  FC?: number;
+  // Process params (optional, default 0/off)
+  TOX?: number;
+  NSUB?: number;
+  NSS?: number;
+  TPG?: number;
+  LD?: number;
+  UO?: number;
+  // Noise params (optional, default 0/1)
+  KF?: number;
+  AF?: number;
+}
+
+/** MosfetParams with all fields guaranteed present (after resolveParams). */
+interface ResolvedMosfetParams {
+  VTO: number;
+  KP: number;
+  LAMBDA: number;
+  PHI: number;
+  GAMMA: number;
+  W: number;
+  L: number;
   CBD: number;
   CBS: number;
   CGDO: number;
   CGSO: number;
-  W: number;
-  L: number;
+  CGBO: number;
+  RD: number;
+  RS: number;
+  IS: number;
+  PB: number;
+  CJ: number;
+  MJ: number;
+  CJSW: number;
+  MJSW: number;
+  JS: number;
+  RSH: number;
+  FC: number;
+  TOX: number;
+  NSUB: number;
+  NSS: number;
+  TPG: number;
+  LD: number;
+  UO: number;
+  KF: number;
+  AF: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -97,6 +176,26 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     CBS:    { default: 0,    unit: "F",      description: "Source-bulk junction capacitance" },
     CGDO:   { default: 0,    unit: "F/m",    description: "Gate-drain overlap capacitance per unit width" },
     CGSO:   { default: 0,    unit: "F/m",    description: "Gate-source overlap capacitance per unit width" },
+    CGBO:   { default: 0,    unit: "F/m",    description: "Gate-bulk overlap capacitance per unit length" },
+    RD:     { default: 0,    unit: "Ω",      description: "Drain ohmic resistance" },
+    RS:     { default: 0,    unit: "Ω",      description: "Source ohmic resistance" },
+    IS:     { default: 1e-14, unit: "A",     description: "Bulk junction saturation current" },
+    PB:     { default: 0.8,  unit: "V",      description: "Bulk junction potential" },
+    CJ:     { default: 0,    unit: "F/m²",   description: "Zero-bias bulk junction bottom capacitance per unit area" },
+    MJ:     { default: 0.5,                  description: "Bulk junction bottom grading coefficient" },
+    CJSW:   { default: 0,    unit: "F/m",    description: "Zero-bias junction sidewall capacitance per unit length" },
+    MJSW:   { default: 0.33,                 description: "Bulk junction sidewall grading coefficient" },
+    JS:     { default: 0,    unit: "A/m²",   description: "Bulk junction saturation current density" },
+    RSH:    { default: 0,    unit: "Ω/sq",   description: "Drain/source diffusion sheet resistance" },
+    TOX:    { default: 1e-7, unit: "m",      description: "Oxide thickness" },
+    NSUB:   { default: 0,    unit: "cm⁻³",   description: "Substrate doping" },
+    NSS:    { default: 0,    unit: "cm⁻²",   description: "Surface state density" },
+    TPG:    { default: 1,                    description: "Gate type: 1=opposite, -1=same, 0=Al gate" },
+    LD:     { default: 0,    unit: "m",      description: "Lateral diffusion" },
+    UO:     { default: 600,  unit: "cm²/Vs", description: "Surface mobility" },
+    KF:     { default: 0,                    description: "Flicker noise coefficient" },
+    AF:     { default: 1,                    description: "Flicker noise exponent" },
+    FC:     { default: 0.5,                  description: "Forward-bias depletion capacitance coefficient" },
   },
 });
 
@@ -110,30 +209,45 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
 const NMOS_2N7000: Record<string, number> = {
   VTO: 2.236, KP: 0.0932174, LAMBDA: 0, W: 1e-6, L: 1e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1.0724e-11, CGSO: 1.79115e-7,
+  CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
+  CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
+  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 };
 
 /** Small signal NMOS (TO-92, 60V/500mA). Source: Zetex BS170/ZTX model (rev 12/85). */
 const NMOS_BS170: Record<string, number> = {
   VTO: 1.824, KP: 0.1233, LAMBDA: 0, W: 1e-6, L: 1e-6,
   PHI: 0.6, GAMMA: 0, CBD: 35e-12, CBS: 0, CGDO: 3e-12, CGSO: 28e-12,
+  CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
+  CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
+  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 };
 
 /** Medium power NMOS (TO-220, 100V/17A). Source: IR irf530n_IR (Symmetry MODPEX 1996-04-24). */
 const NMOS_IRF530N: Record<string, number> = {
   VTO: 3.63019, KP: 17.6091, LAMBDA: 0.00363922, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 2.4372e-7, CGSO: 5.59846e-6,
+  CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
+  CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
+  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 };
 
 /** High power NMOS (TO-220, 100V/33A). Source: IR irf540n_IR (Symmetry MODPEX 1996-04-24). */
 const NMOS_IRF540N: Record<string, number> = {
   VTO: 3.55958, KP: 28.379, LAMBDA: 0.000888191, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1.77276e-8, CGSO: 1.23576e-5,
+  CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
+  CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
+  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 };
 
 /** High power NMOS (TO-220, 55V/49A). Source: IR irfz44n_IR (Symmetry MODPEX 1996-04-24). */
 const NMOS_IRFZ44N: Record<string, number> = {
   VTO: 3.56214, KP: 39.3974, LAMBDA: 0, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 2.2826e-7, CGSO: 1.25255e-5,
+  CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
+  CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
+  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 };
 
 export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS } = defineModelParams({
@@ -151,6 +265,26 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     CBS:    { default: 0,    unit: "F",      description: "Source-bulk junction capacitance" },
     CGDO:   { default: 0,    unit: "F/m",    description: "Gate-drain overlap capacitance per unit width" },
     CGSO:   { default: 0,    unit: "F/m",    description: "Gate-source overlap capacitance per unit width" },
+    CGBO:   { default: 0,    unit: "F/m",    description: "Gate-bulk overlap capacitance per unit length" },
+    RD:     { default: 0,    unit: "Ω",      description: "Drain ohmic resistance" },
+    RS:     { default: 0,    unit: "Ω",      description: "Source ohmic resistance" },
+    IS:     { default: 1e-14, unit: "A",     description: "Bulk junction saturation current" },
+    PB:     { default: 0.8,  unit: "V",      description: "Bulk junction potential" },
+    CJ:     { default: 0,    unit: "F/m²",   description: "Zero-bias bulk junction bottom capacitance per unit area" },
+    MJ:     { default: 0.5,                  description: "Bulk junction bottom grading coefficient" },
+    CJSW:   { default: 0,    unit: "F/m",    description: "Zero-bias junction sidewall capacitance per unit length" },
+    MJSW:   { default: 0.33,                 description: "Bulk junction sidewall grading coefficient" },
+    JS:     { default: 0,    unit: "A/m²",   description: "Bulk junction saturation current density" },
+    RSH:    { default: 0,    unit: "Ω/sq",   description: "Drain/source diffusion sheet resistance" },
+    TOX:    { default: 1e-7, unit: "m",      description: "Oxide thickness" },
+    NSUB:   { default: 0,    unit: "cm⁻³",   description: "Substrate doping" },
+    NSS:    { default: 0,    unit: "cm⁻²",   description: "Surface state density" },
+    TPG:    { default: 1,                    description: "Gate type: 1=opposite, -1=same, 0=Al gate" },
+    LD:     { default: 0,    unit: "m",      description: "Lateral diffusion" },
+    UO:     { default: 250,  unit: "cm²/Vs", description: "Surface mobility (PMOS default 250)" },
+    KF:     { default: 0,                    description: "Flicker noise coefficient" },
+    AF:     { default: 1,                    description: "Flicker noise exponent" },
+    FC:     { default: 0.5,                  description: "Forward-bias depletion capacitance coefficient" },
   },
 });
 
@@ -164,31 +298,145 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
 const PMOS_BS250: Record<string, number> = {
   VTO: -3.193, KP: 0.277, LAMBDA: 0.012, W: 1e-6, L: 1e-6,
   PHI: 0.6, GAMMA: 0, CBD: 105e-12, CBS: 0, CGDO: 0, CGSO: 0,
+  CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
+  CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
+  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 };
 
 /** Medium power PMOS (TO-220, -100V/6.8A). Source: IR irf9520_IR (KiCad-Spice-Library irf.lib). */
 const PMOS_IRF9520: Record<string, number> = {
   VTO: -3.41185, KP: 3.46967, LAMBDA: 0.0289226, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 3.45033e-6,
+  CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
+  CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
+  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 };
 
 /** High power PMOS (TO-247, -200V/12A). Source: IR irfp9240_IR (KiCad-Spice-Library irf.lib). */
 const PMOS_IRFP9240: Record<string, number> = {
   VTO: -3.67839, KP: 6.41634, LAMBDA: 0.0117285, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 1.08446e-5,
+  CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
+  CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
+  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 };
 
 /** High power PMOS (TO-220, -100V/40A). Source: IR irf5210_IR (KiCad-Spice-Library irf.lib). */
 const PMOS_IRF5210: Record<string, number> = {
   VTO: -3.79917, KP: 12.9564, LAMBDA: 0.00220079, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 2.34655e-5,
+  CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
+  CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
+  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 };
 
 /** High power PMOS (TO-220, -55V/74A). Source: IR irf4905_IR (ngspice/KiCad-Spice-Library). */
 const PMOS_IRF4905: Record<string, number> = {
   VTO: -3.53713, KP: 23.3701, LAMBDA: 0.00549383, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 2.84439e-5,
+  CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
+  CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
+  TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 };
+
+// ---------------------------------------------------------------------------
+// resolveParams — derive process parameters when NSUB/TOX are specified
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive KP, GAMMA, and PHI from process parameters when NSUB > 0 and TOX > 0.
+ *
+ * This mirrors the standard ngspice/SPICE Level 1 derivation:
+ *   Cox  = εox / TOX
+ *   KP   = UO * 1e-4 * Cox            (UO in cm²/Vs → m²/Vs via *1e-4)
+ *   GAMMA = sqrt(2 * q * εsi * NSUB*1e6) / Cox  (NSUB in cm⁻³ → m⁻³ via *1e6)
+ *   PHI  = 2 * Vt * ln(NSUB / ni)
+ *
+ * Only derived when the user hasn't explicitly set the params (i.e., they're at
+ * their default values: KP_default for the polarity, GAMMA=0, PHI=0.6).
+ *
+ * Area-based junction caps (CJ, CJSW) are resolved here too:
+ *   CBD = CJ * W*L + CJSW * 2*(W+L)   (when CJ > 0 and CBD = 0)
+ *   CBS = same formula
+ *
+ * @param raw - Raw params from PropertyBag
+ * @param kpDefault - Default KP for this polarity (2e-5 NMOS, 1e-5 PMOS)
+ * @returns Resolved MosfetParams with any derived values applied
+ */
+function resolveParams(raw: MosfetParams, kpDefault: number): ResolvedMosfetParams {
+  // Expand optional fields to full resolved params with SPICE defaults
+  const p: ResolvedMosfetParams = {
+    VTO:  raw.VTO,
+    KP:   raw.KP,
+    LAMBDA: raw.LAMBDA,
+    PHI:  raw.PHI,
+    GAMMA: raw.GAMMA,
+    W:    raw.W,
+    L:    raw.L,
+    CBD:  raw.CBD  ?? 0,
+    CBS:  raw.CBS  ?? 0,
+    CGDO: raw.CGDO ?? 0,
+    CGSO: raw.CGSO ?? 0,
+    CGBO: raw.CGBO ?? 0,
+    RD:   raw.RD   ?? 0,
+    RS:   raw.RS   ?? 0,
+    IS:   raw.IS   ?? 1e-14,
+    PB:   raw.PB   ?? 0.8,
+    CJ:   raw.CJ   ?? 0,
+    MJ:   raw.MJ   ?? 0.5,
+    CJSW: raw.CJSW ?? 0,
+    MJSW: raw.MJSW ?? 0.33,
+    JS:   raw.JS   ?? 0,
+    RSH:  raw.RSH  ?? 0,
+    FC:   raw.FC   ?? 0.5,
+    TOX:  raw.TOX  ?? 1e-7,
+    NSUB: raw.NSUB ?? 0,
+    NSS:  raw.NSS  ?? 0,
+    TPG:  raw.TPG  ?? 1,
+    LD:   raw.LD   ?? 0,
+    UO:   raw.UO   ?? 600,
+    KF:   raw.KF   ?? 0,
+    AF:   raw.AF   ?? 1,
+  };
+
+  if (p.NSUB > 0 && p.TOX > 0) {
+    const cox = (EPS_OX * EPS0) / p.TOX;
+    const epsSi = EPS_SI * EPS0;
+    // cm⁻³ → m⁻³ multiply by 1e6
+    const nsubM3 = p.NSUB * 1e6;
+
+    // Derive KP if still at default
+    if (p.KP === kpDefault) {
+      p.KP = (p.UO * 1e-4) * cox;
+    }
+
+    // Derive GAMMA if still at default (0)
+    if (p.GAMMA === 0) {
+      p.GAMMA = Math.sqrt(2 * Q * epsSi * nsubM3) / cox;
+    }
+
+    // Derive PHI if still at default (0.6)
+    if (p.PHI === 0.6) {
+      const phi = 2 * VT * Math.log(p.NSUB / NI);
+      if (phi > 0.1) p.PHI = phi;
+    }
+  }
+
+  // Area-based junction capacitance: CJ per unit area, CJSW per unit perimeter
+  // Approximate AD ≈ W*L, PD ≈ 2*(W+L) since we don't have layout info
+  if (p.CJ > 0) {
+    const ad = p.W * p.L;
+    const pd = 2 * (p.W + p.L);
+    if (p.CBD === 0) {
+      p.CBD = p.CJ * ad + p.CJSW * pd;
+    }
+    if (p.CBS === 0) {
+      p.CBS = p.CJ * ad + p.CJSW * pd;
+    }
+  }
+
+  return p;
+}
 
 // ---------------------------------------------------------------------------
 // computeIds — drain current for three operating regions
@@ -373,17 +621,53 @@ export function limitVoltages(
  * Compute gate and junction capacitances from model parameters.
  *
  * Returns zero for all capacitances when the relevant parameters are zero.
- * Overlap capacitances scale with channel width W.
+ * Overlap capacitances scale with channel width W (CGDO, CGSO) or length L (CGBO).
+ *
+ * Junction capacitances (CBD, CBS) are returned directly — any CJ/CJSW area
+ * derivation was already done in resolveParams before the element is constructed.
+ *
+ * The FC parameter linearizes junction caps in forward bias (standard SPICE):
+ *   For V < FC*PB: C = C0 * (1 - V/PB)^(-MJ)
+ *   For V >= FC*PB: C = C0 * (1 - FC*(1+MJ) + MJ*V/PB) / (1 - FC)^(1+MJ)
+ * This function returns the zero-bias value; linearization is applied in
+ * stampCompanion when vdb/vsb voltages are available.
  */
 export function computeCapacitances(
-  p: MosfetParams,
-): { cgs: number; cgd: number; cbd: number; cbs: number } {
+  p: MosfetParams | ResolvedMosfetParams,
+): { cgs: number; cgd: number; cgb: number; cbd: number; cbs: number } {
   return {
-    cgs: p.CGSO * p.W,
-    cgd: p.CGDO * p.W,
-    cbd: p.CBD,
-    cbs: p.CBS,
+    cgs: (p.CGSO ?? 0) * p.W,
+    cgd: (p.CGDO ?? 0) * p.W,
+    cgb: (p.CGBO ?? 0) * p.L,
+    cbd: p.CBD ?? 0,
+    cbs: p.CBS ?? 0,
   };
+}
+
+/**
+ * Evaluate junction capacitance at voltage V across the junction.
+ *
+ * Uses the standard SPICE FC linearization:
+ *   For V < FC*PB: C = C0 * (1 - V/PB)^(-MJ)
+ *   For V >= FC*PB: linear extension from FC*PB tangent
+ *
+ * @param c0   Zero-bias capacitance (F)
+ * @param v    Voltage across junction (positive = forward bias)
+ * @param pb   Junction built-in potential (PB)
+ * @param mj   Grading coefficient (MJ or MJSW)
+ * @param fc   Forward-bias coefficient (FC)
+ */
+export function junctionCap(c0: number, v: number, pb: number, mj: number, fc: number): number {
+  if (c0 === 0) return 0;
+  const pbSafe = Math.max(pb, 0.1);
+  const vBound = fc * pbSafe;
+  if (v < vBound) {
+    return c0 * Math.pow(1 - v / pbSafe, -mj);
+  } else {
+    // Linearized above FC*PB to avoid divergence
+    const f2 = Math.pow(1 - fc, 1 + mj);
+    return c0 * (1 - fc * (1 + mj) + mj * v / pbSafe) / f2;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +683,7 @@ export function computeCapacitances(
 class MosfetAnalogElement extends AbstractFetElement {
   readonly polaritySign: 1 | -1;
 
-  private readonly _p: MosfetParams;
+  private readonly _p: ResolvedMosfetParams;
   private readonly _nodeB: number;
 
   // Body-effect state
@@ -415,19 +699,34 @@ class MosfetAnalogElement extends AbstractFetElement {
   private _vsbCapPrev: number = NaN;
   private _capJunctionFirstCall: boolean = true;
 
+  // Gate-bulk overlap capacitance companion model state
+  private _capGeqGB: number = 0;
+  private _capIeqGB: number = 0;
+  private _vgbPrev: number = NaN;
+  private _capGbFirstCall: boolean = true;
+
+  private readonly _nodeDext: number;
+  private readonly _nodeSext: number;
+
   constructor(
     polarity: 1 | -1,
     nodeD: number,
     nodeG: number,
     nodeS: number,
     nodeB: number,
-    p: MosfetParams,
+    p: ResolvedMosfetParams,
+    nodeDint: number,
+    nodeSint: number,
   ) {
-    // Pass nodeB as extra node so pinNodeIds = [D, G, S, B] (bulk always included)
-    super(nodeG, nodeD, nodeS, [nodeB]);
+    // The base class drainNode/sourceNode refer to the internal nodes (after RD/RS).
+    // When RD=0/RS=0, nodeDint==nodeD and nodeSint==nodeS (no internal nodes allocated).
+    // Pass nodeB as extra node so pinNodeIds = [G, Dint, Sint, B] (bulk always included).
+    super(nodeG, nodeDint, nodeSint, [nodeB]);
     this.polaritySign = polarity;
     this._p = p;
     this._nodeB = nodeB;
+    this._nodeDext = nodeD;
+    this._nodeSext = nodeS;
 
     // For PMOS, VTO is stored as magnitude; polarity inversion applies sign during I-V evaluation
     if (polarity === -1) {
@@ -435,7 +734,7 @@ class MosfetAnalogElement extends AbstractFetElement {
     }
 
     const caps = computeCapacitances(p);
-    const hasCaps = caps.cbd > 0 || caps.cbs > 0 || caps.cgs > 0 || caps.cgd > 0;
+    const hasCaps = caps.cbd > 0 || caps.cbs > 0 || caps.cgs > 0 || caps.cgd > 0 || caps.cgb > 0;
     this._initReactive(hasCaps);
   }
 
@@ -542,6 +841,36 @@ class MosfetAnalogElement extends AbstractFetElement {
     // Stamp base gate overlap capacitances (Cgs, Cgd)
     super.stamp(solver);
 
+    // Drain ohmic resistance RD between external drain pin and internal drain node
+    if (this._p.RD > 0 && this.drainNode !== this._nodeDext) {
+      const gRD = 1 / this._p.RD;
+      stampG(solver, this._nodeDext, this._nodeDext, gRD);
+      stampG(solver, this._nodeDext, this.drainNode, -gRD);
+      stampG(solver, this.drainNode, this._nodeDext, -gRD);
+      stampG(solver, this.drainNode, this.drainNode, gRD);
+    }
+
+    // Source ohmic resistance RS between external source pin and internal source node
+    if (this._p.RS > 0 && this.sourceNode !== this._nodeSext) {
+      const gRS = 1 / this._p.RS;
+      stampG(solver, this._nodeSext, this._nodeSext, gRS);
+      stampG(solver, this._nodeSext, this.sourceNode, -gRS);
+      stampG(solver, this.sourceNode, this._nodeSext, -gRS);
+      stampG(solver, this.sourceNode, this.sourceNode, gRS);
+    }
+
+    // Gate-bulk overlap capacitance (CGBO * L)
+    if (this._capGeqGB !== 0 || this._capIeqGB !== 0) {
+      const nodeG = this.gateNode;
+      const nodeB = this._nodeB;
+      stampG(solver, nodeG, nodeG, this._capGeqGB);
+      stampG(solver, nodeG, nodeB, -this._capGeqGB);
+      stampG(solver, nodeB, nodeG, -this._capGeqGB);
+      stampG(solver, nodeB, nodeB, this._capGeqGB);
+      stampRHS(solver, nodeG, -this._capIeqGB);
+      stampRHS(solver, nodeB, this._capIeqGB);
+    }
+
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
     const nodeB = this._nodeB;
@@ -577,35 +906,64 @@ class MosfetAnalogElement extends AbstractFetElement {
 
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
+    const nodeG = this.gateNode;
     const nodeB = this._nodeB;
 
     const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
     const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
+    const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
     const vBulkV = nodeB > 0 ? voltages[nodeB - 1] : 0;
 
     const vdb = vD - vBulkV;
     const vsbCap = vS - vBulkV;
+    const vgb = vG - vBulkV;
 
     const prevVdb = this._capJunctionFirstCall ? vdb : this._vdbPrev;
     const prevVsb = this._capJunctionFirstCall ? vsbCap : this._vsbCapPrev;
+    const prevVgb = this._capGbFirstCall ? vgb : this._vgbPrev;
 
     const iDB = this._capGeqDB * vdb + this._capIeqDB;
     const iSB = this._capGeqSB * vsbCap + this._capIeqSB;
+    const iGB = this._capGeqGB * vgb + this._capIeqGB;
 
     this._vdbPrev = vdb;
     this._vsbCapPrev = vsbCap;
+    this._vgbPrev = vgb;
     this._capJunctionFirstCall = false;
+    this._capGbFirstCall = false;
 
     const caps = computeCapacitances(this._p);
+    const pb = this._p.PB;
+    const mj = this._p.MJ;
+    const fc = this._p.FC;
 
+    // Drain-bulk junction capacitance with FC linearization
     if (caps.cbd > 0) {
-      this._capGeqDB = capacitorConductance(caps.cbd, dt, method);
-      this._capIeqDB = capacitorHistoryCurrent(caps.cbd, dt, method, vdb, prevVdb, iDB);
+      const cbdEff = junctionCap(caps.cbd, vdb, pb, mj, fc);
+      this._capGeqDB = capacitorConductance(cbdEff, dt, method);
+      this._capIeqDB = capacitorHistoryCurrent(cbdEff, dt, method, vdb, prevVdb, iDB);
+    } else {
+      this._capGeqDB = 0;
+      this._capIeqDB = 0;
     }
 
+    // Source-bulk junction capacitance with FC linearization
     if (caps.cbs > 0) {
-      this._capGeqSB = capacitorConductance(caps.cbs, dt, method);
-      this._capIeqSB = capacitorHistoryCurrent(caps.cbs, dt, method, vsbCap, prevVsb, iSB);
+      const cbsEff = junctionCap(caps.cbs, vsbCap, pb, mj, fc);
+      this._capGeqSB = capacitorConductance(cbsEff, dt, method);
+      this._capIeqSB = capacitorHistoryCurrent(cbsEff, dt, method, vsbCap, prevVsb, iSB);
+    } else {
+      this._capGeqSB = 0;
+      this._capIeqSB = 0;
+    }
+
+    // Gate-bulk overlap capacitance (CGBO * L), no voltage dependence
+    if (caps.cgb > 0) {
+      this._capGeqGB = capacitorConductance(caps.cgb, dt, method);
+      this._capIeqGB = capacitorHistoryCurrent(caps.cgb, dt, method, vgb, prevVgb, iGB);
+    } else {
+      this._capGeqGB = 0;
+      this._capIeqGB = 0;
     }
   }
 
@@ -621,28 +979,80 @@ export function createMosfetElement(
   internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
+  kpDefault: number = 2e-5,
 ): MosfetAnalogElement {
   const nodeG = pinNodes.get("G")!; // gate
   const nodeS = pinNodes.get("S")!; // source
   const nodeD = pinNodes.get("D")!; // drain
-  // Bulk node: use internalNodeIds[0] if provided (4-terminal body), else treat bulk = source
-  const nodeB = internalNodeIds.length >= 1 ? internalNodeIds[0] : nodeS;
 
-  const p: MosfetParams = {
+  const rawRD = props.hasModelParam("RD") ? props.getModelParam<number>("RD") : 0;
+  const rawRS = props.hasModelParam("RS") ? props.getModelParam<number>("RS") : 0;
+
+  // Internal node allocation: [bulk?, Dint?, Sint?]
+  // Bulk is always first (index 0), then RD internal node, then RS internal node.
+  let intIdx = 0;
+  const nodeB = internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeS;
+  const nodeDint = rawRD > 0 && internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeD;
+  const nodeSint = rawRS > 0 && internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeS;
+
+  /** Read a model param, returning `fallback` if the key is absent (backward compat). */
+  function mp(key: string, fallback: number): number {
+    return props.hasModelParam(key) ? props.getModelParam<number>(key) : fallback;
+  }
+
+  const rawParams: MosfetParams = {
     VTO:    props.getModelParam<number>("VTO"),
     KP:     props.getModelParam<number>("KP"),
     LAMBDA: props.getModelParam<number>("LAMBDA"),
     PHI:    props.getModelParam<number>("PHI"),
     GAMMA:  props.getModelParam<number>("GAMMA"),
-    CBD:    props.getModelParam<number>("CBD"),
-    CBS:    props.getModelParam<number>("CBS"),
-    CGDO:   props.getModelParam<number>("CGDO"),
-    CGSO:   props.getModelParam<number>("CGSO"),
+    CBD:    mp("CBD", 0),
+    CBS:    mp("CBS", 0),
+    CGDO:   mp("CGDO", 0),
+    CGSO:   mp("CGSO", 0),
+    CGBO:   mp("CGBO", 0),
     W:      props.getModelParam<number>("W"),
     L:      props.getModelParam<number>("L"),
+    RD:     rawRD,
+    RS:     rawRS,
+    IS:     mp("IS", 1e-14),
+    PB:     mp("PB", 0.8),
+    CJ:     mp("CJ", 0),
+    MJ:     mp("MJ", 0.5),
+    CJSW:   mp("CJSW", 0),
+    MJSW:   mp("MJSW", 0.33),
+    JS:     mp("JS", 0),
+    RSH:    mp("RSH", 0),
+    TOX:    mp("TOX", 1e-7),
+    NSUB:   mp("NSUB", 0),
+    NSS:    mp("NSS", 0),
+    TPG:    mp("TPG", 1),
+    LD:     mp("LD", 0),
+    UO:     mp("UO", 600),
+    KF:     mp("KF", 0),
+    AF:     mp("AF", 1),
+    FC:     mp("FC", 0.5),
   };
 
-  return new MosfetAnalogElement(polarity, nodeD, nodeG, nodeS, nodeB, p);
+  const p = resolveParams(rawParams, kpDefault);
+
+  return new MosfetAnalogElement(polarity, nodeD, nodeG, nodeS, nodeB, p, nodeDint, nodeSint);
+}
+
+// ---------------------------------------------------------------------------
+// getMosfetInternalNodeCount — bulk node + optional RD/RS internal nodes
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the number of internal nodes needed for this MOSFET instance.
+ *
+ * Always 1 for the bulk node, plus 1 for RD > 0, plus 1 for RS > 0.
+ */
+export function getMosfetInternalNodeCount(props: PropertyBag): number {
+  let count = 1; // always need bulk node
+  if (props.hasModelParam("RD") && props.getModelParam<number>("RD") > 0) count++;
+  if (props.hasModelParam("RS") && props.getModelParam<number>("RS") > 0) count++;
+  return count;
 }
 
 // ---------------------------------------------------------------------------
@@ -918,52 +1328,59 @@ export const NmosfetDefinition: ComponentDefinition = {
   attributeMap: MOSFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "N-channel MOSFET — Level 2 model with body effect and channel-length modulation.\n" +
+    "N-channel MOSFET — Level 1 SPICE model (Shichman-Hodges) with body effect and channel-length modulation.\n" +
     "Pins: D (drain), G (gate), S (source).\n" +
-    "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
+    "Primary: VTO, KP, LAMBDA, W, L.\n" +
+    "Secondary: PHI, GAMMA, CBD, CBS, CGDO, CGSO, CGBO, RD, RS, CJ, MJ, CJSW, MJSW, TOX, NSUB, UO, FC, and more.",
   models: {},
   modelRegistry: {
     "spice-l1": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props, 2e-5),
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: MOSFET_NMOS_DEFAULTS,
+      getInternalNodeCount: getMosfetInternalNodeCount,
     },
     "2N7000": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props, 2e-5),
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_2N7000,
+      getInternalNodeCount: getMosfetInternalNodeCount,
     },
     "BS170": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props, 2e-5),
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_BS170,
+      getInternalNodeCount: getMosfetInternalNodeCount,
     },
     "IRF530N": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props, 2e-5),
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRF530N,
+      getInternalNodeCount: getMosfetInternalNodeCount,
     },
     "IRF540N": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props, 2e-5),
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRF540N,
+      getInternalNodeCount: getMosfetInternalNodeCount,
     },
     "IRFZ44N": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
+        createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props, 2e-5),
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRFZ44N,
+      getInternalNodeCount: getMosfetInternalNodeCount,
     },
   },
   defaultModel: "spice-l1",
@@ -978,52 +1395,59 @@ export const PmosfetDefinition: ComponentDefinition = {
   attributeMap: MOSFET_ATTRIBUTE_MAPPINGS,
   category: ComponentCategory.SEMICONDUCTORS,
   helpText:
-    "P-channel MOSFET — Level 2 model with body effect and channel-length modulation (PMOS polarity).\n" +
+    "P-channel MOSFET — Level 1 SPICE model (Shichman-Hodges) with body effect and channel-length modulation.\n" +
     "Pins: D (drain), G (gate), S (source).\n" +
-    "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
+    "Primary: VTO, KP, LAMBDA, W, L.\n" +
+    "Secondary: PHI, GAMMA, CBD, CBS, CGDO, CGSO, CGBO, RD, RS, CJ, MJ, CJSW, MJSW, TOX, NSUB, UO, FC, and more.",
   models: {},
   modelRegistry: {
     "spice-l1": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props, 1e-5),
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: MOSFET_PMOS_DEFAULTS,
+      getInternalNodeCount: getMosfetInternalNodeCount,
     },
     "BS250": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props, 1e-5),
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_BS250,
+      getInternalNodeCount: getMosfetInternalNodeCount,
     },
     "IRF9520": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props, 1e-5),
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF9520,
+      getInternalNodeCount: getMosfetInternalNodeCount,
     },
     "IRFP9240": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props, 1e-5),
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRFP9240,
+      getInternalNodeCount: getMosfetInternalNodeCount,
     },
     "IRF5210": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props, 1e-5),
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF5210,
+      getInternalNodeCount: getMosfetInternalNodeCount,
     },
     "IRF4905": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
-        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
+        createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props, 1e-5),
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF4905,
+      getInternalNodeCount: getMosfetInternalNodeCount,
     },
   },
   defaultModel: "spice-l1",

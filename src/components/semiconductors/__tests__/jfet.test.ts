@@ -376,9 +376,9 @@ describe("Registration", () => {
 
     const def = registry.get("NJFET");
     expect(def).toBeDefined();
-    expect(def!.modelRegistry?.["spice-l1"]).toBeDefined();
+    expect(def!.modelRegistry?.["spice"]).toBeDefined();
     expect(def!.category).toBeDefined();
-    expect((def!.modelRegistry?.["spice-l1"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
+    expect((def!.modelRegistry?.["spice"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
   it("pjfet_registered", () => {
@@ -387,8 +387,8 @@ describe("Registration", () => {
 
     const def = registry.get("PJFET");
     expect(def).toBeDefined();
-    expect(def!.modelRegistry?.["spice-l1"]).toBeDefined();
-    expect((def!.modelRegistry?.["spice-l1"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
+    expect(def!.modelRegistry?.["spice"]).toBeDefined();
+    expect((def!.modelRegistry?.["spice"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
   it("njfet_pin_layout_has_three_pins", () => {

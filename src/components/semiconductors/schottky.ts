@@ -23,7 +23,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore } from "../../solver/analog/element.js";
-import { createDiodeElement } from "./diode.js";
+import { createDiodeElement, getDiodeInternalNodeCount } from "./diode.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -36,6 +36,7 @@ export const { paramDefs: SCHOTTKY_PARAM_DEFS, defaults: SCHOTTKY_PARAM_DEFAULTS
     N:   { default: 1.05,             description: "Emission coefficient" },
   },
   secondary: {
+    RS:  { default: 1,     unit: "Ω", description: "Ohmic (series) resistance" },
     CJO: { default: 1e-12, unit: "F", description: "Zero-bias junction capacitance" },
     VJ:  { default: 0.6,   unit: "V", description: "Junction built-in potential" },
     M:   { default: 0.5,              description: "Grading coefficient" },
@@ -43,6 +44,10 @@ export const { paramDefs: SCHOTTKY_PARAM_DEFS, defaults: SCHOTTKY_PARAM_DEFAULTS
     FC:  { default: 0.5,              description: "Forward-bias capacitance coefficient" },
     BV:  { default: 40,    unit: "V", description: "Reverse breakdown voltage" },
     IBV: { default: 1e-3,  unit: "A", description: "Reverse breakdown current" },
+    EG:  { default: 0.69,  unit: "eV", description: "Activation energy (Schottky barrier)" },
+    XTI: { default: 2,                description: "Saturation current temperature exponent" },
+    KF:  { default: 0,                description: "Flicker noise coefficient" },
+    AF:  { default: 1,                description: "Flicker noise exponent" },
   },
 });
 
@@ -211,12 +216,13 @@ export const SchottkyDiodeDefinition: ComponentDefinition = {
     "IS=1e-8, N=1.05, BV=40V, RS=1\u03A9, CJO=1pF.",
   models: {},
   modelRegistry: {
-    "spice-l1": {
+    "spice": {
       kind: "inline",
       factory: createSchottkyElement,
       paramDefs: SCHOTTKY_PARAM_DEFS,
       params: SCHOTTKY_PARAM_DEFAULTS,
+      getInternalNodeCount: getDiodeInternalNodeCount,
     },
   },
-  defaultModel: "spice-l1",
+  defaultModel: "spice",
 };

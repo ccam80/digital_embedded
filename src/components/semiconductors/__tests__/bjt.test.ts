@@ -425,34 +425,34 @@ describe("PNP", () => {
 describe("Definitions", () => {
   it("npn_definition_fields", () => {
     expect(NpnBjtDefinition.name).toBe("NpnBJT");
-    expect(NpnBjtDefinition.modelRegistry!["spice-l1"].kind).toBe("inline");
-    expect(NpnBjtDefinition.modelRegistry!["spice-l1"].paramDefs).toBe(BJT_SPICE_L1_PARAM_DEFS);
-    expect(NpnBjtDefinition.defaultModel).toBe("spice-l1");
+    expect(NpnBjtDefinition.modelRegistry!["spice"].kind).toBe("inline");
+    expect(NpnBjtDefinition.modelRegistry!["spice"].paramDefs).toBe(BJT_SPICE_L1_PARAM_DEFS);
+    expect(NpnBjtDefinition.defaultModel).toBe("spice");
     expect(NpnBjtDefinition.pinLayout).toHaveLength(3);
   });
 
   it("pnp_definition_fields", () => {
     expect(PnpBjtDefinition.name).toBe("PnpBJT");
-    expect(PnpBjtDefinition.modelRegistry!["spice-l1"].kind).toBe("inline");
-    expect(PnpBjtDefinition.modelRegistry!["spice-l1"].paramDefs).toBe(BJT_SPICE_L1_PARAM_DEFS);
-    expect(PnpBjtDefinition.defaultModel).toBe("spice-l1");
+    expect(PnpBjtDefinition.modelRegistry!["spice"].kind).toBe("inline");
+    expect(PnpBjtDefinition.modelRegistry!["spice"].paramDefs).toBe(BJT_SPICE_L1_PARAM_DEFS);
+    expect(PnpBjtDefinition.defaultModel).toBe("spice");
     expect(PnpBjtDefinition.pinLayout).toHaveLength(3);
   });
 
   it("npn_modelRegistry_has_both_simple_and_spice_l1", () => {
     const registry = NpnBjtDefinition.modelRegistry!;
     expect(registry["simple"]).toBeDefined();
-    expect(registry["spice-l1"]).toBeDefined();
+    expect(registry["spice"]).toBeDefined();
     expect(registry["simple"].kind).toBe("inline");
-    expect(registry["spice-l1"].kind).toBe("inline");
+    expect(registry["spice"].kind).toBe("inline");
   });
 
   it("pnp_modelRegistry_has_both_simple_and_spice_l1", () => {
     const registry = PnpBjtDefinition.modelRegistry!;
     expect(registry["simple"]).toBeDefined();
-    expect(registry["spice-l1"]).toBeDefined();
+    expect(registry["spice"]).toBeDefined();
     expect(registry["simple"].kind).toBe("inline");
-    expect(registry["spice-l1"].kind).toBe("inline");
+    expect(registry["spice"].kind).toBe("inline");
   });
 
   it("simple_model_uses_original_param_defs", () => {
@@ -461,8 +461,8 @@ describe("Definitions", () => {
   });
 
   it("spice_l1_model_uses_full_param_defs", () => {
-    expect(NpnBjtDefinition.modelRegistry!["spice-l1"].paramDefs).toBe(BJT_SPICE_L1_PARAM_DEFS);
-    expect(PnpBjtDefinition.modelRegistry!["spice-l1"].paramDefs).toBe(BJT_SPICE_L1_PARAM_DEFS);
+    expect(NpnBjtDefinition.modelRegistry!["spice"].paramDefs).toBe(BJT_SPICE_L1_PARAM_DEFS);
+    expect(PnpBjtDefinition.modelRegistry!["spice"].paramDefs).toBe(BJT_SPICE_L1_PARAM_DEFS);
   });
 
   it("npn_pin_labels", () => {
@@ -499,7 +499,7 @@ describe("Definitions", () => {
 
   it("npn_spice_l1_modelRegistry_factory_creates_element", () => {
     const propsObj = makeSpiceL1Props();
-    const entry = NpnBjtDefinition.modelRegistry!["spice-l1"];
+    const entry = NpnBjtDefinition.modelRegistry!["spice"];
     if (entry.kind !== "inline") throw new Error("expected inline");
     const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
@@ -508,7 +508,7 @@ describe("Definitions", () => {
 
   it("pnp_spice_l1_modelRegistry_factory_creates_element", () => {
     const propsObj = makeSpiceL1Props();
-    const entry = PnpBjtDefinition.modelRegistry!["spice-l1"];
+    const entry = PnpBjtDefinition.modelRegistry!["spice"];
     if (entry.kind !== "inline") throw new Error("expected inline");
     const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);

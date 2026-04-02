@@ -358,7 +358,7 @@ export const VaractorDefinition: ComponentDefinition = {
     "Used for voltage-controlled oscillators and tuned circuits.",
   models: {},
   modelRegistry: {
-    "spice-l1": {
+    "simplified": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createVaractorElement(pinNodes, internalNodeIds, branchIdx, props),
@@ -366,5 +366,5 @@ export const VaractorDefinition: ComponentDefinition = {
       params: VARACTOR_PARAM_DEFAULTS,
     },
   },
-  defaultModel: "spice-l1",
+  defaultModel: "simplified",
 };

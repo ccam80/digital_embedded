@@ -185,9 +185,9 @@ describe("Varactor", () => {
 
   it("definition_has_correct_fields", () => {
     expect(VaractorDefinition.name).toBe("VaractorDiode");
-    expect(VaractorDefinition.modelRegistry?.["spice-l1"]).toBeDefined();
-    expect(VaractorDefinition.modelRegistry?.["spice-l1"]?.kind).toBe("inline");
-    expect((VaractorDefinition.modelRegistry?.["spice-l1"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
+    expect(VaractorDefinition.modelRegistry?.["simplified"]).toBeDefined();
+    expect(VaractorDefinition.modelRegistry?.["simplified"]?.kind).toBe("inline");
+    expect((VaractorDefinition.modelRegistry?.["simplified"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     expect(VaractorDefinition.category).toBe("SEMICONDUCTORS");
   });
 

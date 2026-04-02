@@ -309,8 +309,8 @@ describe("Triode", () => {
 
   describe("definition", () => {
     it("TriodeDefinition has correct engine type", () => {
-      expect(TriodeDefinition.modelRegistry?.["spice-l1"]).toBeDefined();
-      expect(TriodeDefinition.modelRegistry?.["spice-l1"]?.kind).toBe("inline");
+      expect(TriodeDefinition.modelRegistry?.["koren"]).toBeDefined();
+      expect(TriodeDefinition.modelRegistry?.["koren"]?.kind).toBe("inline");
     });
 
     it("TriodeDefinition is in SEMICONDUCTORS category", () => {
@@ -318,19 +318,19 @@ describe("Triode", () => {
     });
 
     it("TriodeDefinition has mu default 100", () => {
-      const entry = TriodeDefinition.modelRegistry?.["spice-l1"];
+      const entry = TriodeDefinition.modelRegistry?.["koren"];
       expect(entry).toBeDefined();
       expect(entry!.params["mu"]).toBe(100);
     });
 
     it("TriodeDefinition has kp default 600", () => {
-      const entry = TriodeDefinition.modelRegistry?.["spice-l1"];
+      const entry = TriodeDefinition.modelRegistry?.["koren"];
       expect(entry).toBeDefined();
       expect(entry!.params["kp"]).toBe(600);
     });
 
     it("TriodeDefinition has kg1 default 1060", () => {
-      const entry = TriodeDefinition.modelRegistry?.["spice-l1"];
+      const entry = TriodeDefinition.modelRegistry?.["koren"];
       expect(entry).toBeDefined();
       expect(entry!.params["kg1"]).toBe(1060);
     });

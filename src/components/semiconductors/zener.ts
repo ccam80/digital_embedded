@@ -26,6 +26,7 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
+import { createDiodeElement, getDiodeInternalNodeCount } from "./diode.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -47,6 +48,28 @@ export const { paramDefs: ZENER_PARAM_DEFS, defaults: ZENER_PARAM_DEFAULTS } = d
     N:   { default: 1,                description: "Emission coefficient" },
     BV:  { default: 5.1,  unit: "V", description: "Reverse breakdown voltage" },
     IBV: { default: 1e-3, unit: "A", description: "Reverse breakdown current" },
+  },
+});
+
+// Full SPICE L1 zener param declarations (diode superset with BV as primary)
+export const { paramDefs: ZENER_SPICE_L1_PARAM_DEFS, defaults: ZENER_SPICE_L1_DEFAULTS } = defineModelParams({
+  primary: {
+    BV:  { default: 5.1,      unit: "V", description: "Reverse breakdown voltage" },
+    IS:  { default: 1e-14,    unit: "A", description: "Saturation current" },
+    N:   { default: 1,                   description: "Emission coefficient" },
+  },
+  secondary: {
+    RS:  { default: 0,        unit: "Ω",  description: "Ohmic (series) resistance" },
+    CJO: { default: 0,        unit: "F",  description: "Zero-bias junction capacitance" },
+    VJ:  { default: 1,        unit: "V",  description: "Junction built-in potential" },
+    M:   { default: 0.5,                  description: "Grading coefficient" },
+    TT:  { default: 0,        unit: "s",  description: "Transit time" },
+    FC:  { default: 0.5,                  description: "Forward-bias capacitance coefficient" },
+    IBV: { default: 1e-3,     unit: "A",  description: "Reverse breakdown current" },
+    EG:  { default: 1.11,     unit: "eV", description: "Activation energy" },
+    XTI: { default: 3,                    description: "Saturation current temperature exponent" },
+    KF:  { default: 0,                    description: "Flicker noise coefficient" },
+    AF:  { default: 1,                    description: "Flicker noise exponent" },
   },
 });
 
@@ -326,12 +349,19 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
     "Reverse breakdown (Vd < -BV): Id = -IS * exp(-(Vd+BV)/(N*Vt))",
   models: {},
   modelRegistry: {
-    "spice-l1": {
+    "spice": {
+      kind: "inline",
+      factory: createDiodeElement,
+      paramDefs: ZENER_SPICE_L1_PARAM_DEFS,
+      params: ZENER_SPICE_L1_DEFAULTS,
+      getInternalNodeCount: getDiodeInternalNodeCount,
+    },
+    "simplified": {
       kind: "inline",
       factory: createZenerElement,
       paramDefs: ZENER_PARAM_DEFS,
       params: ZENER_PARAM_DEFAULTS,
     },
   },
-  defaultModel: "spice-l1",
+  defaultModel: "spice",
 };

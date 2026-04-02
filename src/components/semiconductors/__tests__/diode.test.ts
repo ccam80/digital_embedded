@@ -236,9 +236,9 @@ describe("Diode", () => {
 
   it("definition_has_correct_fields", () => {
     expect(DiodeDefinition.name).toBe("Diode");
-    expect(DiodeDefinition.modelRegistry?.["spice-l1"]).toBeDefined();
-    expect(DiodeDefinition.modelRegistry?.["spice-l1"]?.kind).toBe("inline");
-    expect((DiodeDefinition.modelRegistry?.["spice-l1"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
+    expect(DiodeDefinition.modelRegistry?.["spice"]).toBeDefined();
+    expect(DiodeDefinition.modelRegistry?.["spice"]?.kind).toBe("inline");
+    expect((DiodeDefinition.modelRegistry?.["spice"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 });
 
