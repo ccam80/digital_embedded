@@ -282,13 +282,13 @@ The netlist data model was designed for digital circuits and has **no domain con
 - **Callers:** `src/testing/executor.ts`, `src/testing/comparison.ts`, `src/testing/run-all.ts`, `src/headless/equivalence.ts`, `src/headless/builder.ts`, `src/analysis/model-analyser.ts`, `scripts/verify-fixes.ts` — 7 production callers, all using it as "set stuff then find steady state."
 - **Fix:** For mixed/analog circuits, replace all `runToStable` calls with `stepToTime(currentTime + settleTime)` — the same coordination path the UI uses. `stepToTime` already handles mixed-mode bridge sync per step. For pure-digital circuits, `runToStable` remains correct. The `SimulatorFacade` interface should expose a single settling method that picks the right strategy based on whether analog is present.
 
-## Investigation: Analog/Mixed Test Execution (#16, #28)
+## Design: Analog/Mixed Test Execution (#16, #27, #28, #36)
 
 ### Current Pipeline Limitations
 
 The test pipeline has 5 coupled digital assumptions:
 1. **Parser** (`src/testing/parser.ts:21-25`) — `TestValue` is `bigint` only, no float support
-2. **Executor** (`src/testing/executor.ts:143-165`) — uses `runToStable` (digital fixed-point iteration), not time-based settling
+2. **Executor** (`src/testing/executor.ts`) — uses `runToStable` (digital propagation settler), not `stepToTime` (the production mixed-mode coordination path the UI uses)
 3. **Comparator** (`src/testing/executor.ts:189-194`) — exact equality, no tolerance
 4. **Label whitelist** (`src/solver/analog/compiler.ts:925`) — `labelToNodeId` only includes `["In", "Out", "Probe", "in", "out", "probe", "Port"]`, excluding all analog source types
 5. **Facade guard** (`src/headless/default-facade.ts:243-245`) — hard-rejects analog-only circuits from test execution
@@ -300,24 +300,109 @@ The test pipeline has 5 coupled digital assumptions:
 | Test inputs | `DcVoltageSource`, `AcVoltageSource`, `CurrentSource`, `VariableRail` | All labelable, all have `modelRegistry.behavioral` |
 | Test outputs | `Probe`, `Out` (when in analog partition), any labeled analog component | `Probe` is already in the label whitelist |
 
-### MVP Approach (~200 lines, 4 files)
+### 1. Remove label whitelist entirely
 
-1. **Expand label whitelist** — `src/solver/analog/compiler.ts:925`: add source typeIds to `labelTypesPartition`. Trivial, high impact — makes analog sources addressable by label.
-2. **Add float TestValue** — `src/testing/parser.ts`: add `{ kind: 'float'; value: number; tolerance?: number }` variant. Detect decimal points in `parseTestValue`. Add `@tolerance` and `@settle` pragma parsing.
-3. **Time-based settling** — `src/testing/executor.ts`: detect analog engine, use `coordinator.stepToTime(settleTime)` instead of `runToStable()`. Approximate comparison for float values.
-4. **Remove hard guard** — `src/headless/default-facade.ts:243-245`: replace with analog-aware path selection.
+**`src/solver/analog/compiler.ts:925`** — Delete `labelTypesPartition`. Any component in the analog partition with a non-empty `label` gets an entry in `labelToNodeId`. Future component types are automatically included. A labeled resistor's node voltage is a valid measurement point — if test I/O should be restricted to ports, that filtering belongs in the test system, not the compiler.
 
-### Known MVP Limitation
+### 2. Source value control via `setComponentProperty`
 
-`writeByLabel` sets node voltage directly, bypassing MNA source stamps. For sources with internal impedance (`VariableRail`), this gives incorrect results. Proper fix needs a `setSourceValue(label, voltage)` API that routes through `setComponentProperty` — defer to second iteration.
+`writeByLabel` → `writeSignal` → `setNodeVoltage` directly overwrites the MNA voltage vector. The solver immediately overwrites it on the next step because voltage source branch constraints dominate. For `VariableRail` with internal resistance, it bypasses the voltage divider entirely. This is physically wrong.
 
-### Not Covered by MVP (Full Redesign Territory)
+**Correct path:** Set the source's *parameter* via `coordinator.setComponentProperty(element, paramKey, value)` which calls `el.setParam()` then `engine.configure({})` to re-stamp the MNA matrix.
 
-- Time-series test vectors (multiple readings at different sim times per test)
-- Transient waveform matching (expected voltage trajectory over time)
-- AC analysis test vectors (frequency response assertions)
-- Per-row time advancement
-- Current measurement assertions
+**New infrastructure:**
+- Add `labelToCircuitElement: Map<string, CircuitElement>` to `CompiledCircuitUnified` (`src/compile/types.ts`), built in `src/compile/compile.ts` step 9 alongside `labelSignalMap`
+- New coordinator method: `setSourceByLabel(label, paramKey, value)` — resolves label → element → `setComponentProperty`
+- New facade method: `setAnalogSource(coordinator, label, value)` — looks up element, auto-resolves primary param from `modelRegistry.behavioral.paramDefs[0]` (e.g., `voltage` for DcVoltageSource, `current` for CurrentSource), calls `setSourceByLabel`
+
+### 3. Test vector format extension
+
+Backward-compatible with existing digital format. Analog values detected by decimal point or SI suffix.
+
+**Pragmas** (`#analog:` lines):
+```
+#analog:tolerance 5%        # global relative tolerance (default: 1%)
+#analog:abstol 0.01V        # global absolute tolerance (default: 10mV)
+#analog:settle 1ms          # sim time to advance after setting inputs (default: 10ms)
+```
+
+**Value syntax:**
+```
+Vin   Iload    | Vout      Vprobe
+5.0   10m      | 3.3~5%    1.65~0.1V
+12.0  0.0      | 5.0~1%    2.5~50mV
+```
+
+- Floats: `5.0`, `-12.5`. SI suffixes: `10m`, `1.5k`, `100u`
+- Per-cell tolerance: `3.3~5%` (relative), `3.3~0.1V` (absolute)
+- `X` = don't-care (both domains). `C`/`Z` = digital-only, error on analog signal
+- Mixed rows: digital integers + analog floats, domain resolved from `labelSignalMap`
+
+### 4. TestValue type extension
+
+```typescript
+export type TestValue =
+  | { kind: 'value'; value: bigint }
+  | { kind: 'analogValue'; value: number; tolerance?: Tolerance }
+  | { kind: 'dontCare' }
+  | { kind: 'clock' }
+  | { kind: 'highZ' };
+
+export interface Tolerance {
+  absolute?: number;  // native unit (V or A)
+  relative?: number;  // fraction (0.05 = 5%)
+}
+```
+
+### 5. Execution model: reuse the production simulation path
+
+The UI simulation uses `facade.step()` / `coordinator.stepToTime()` — the mixed-mode coordination that syncs bridges between digital and analog engines every tick. The test executor must use the same path, not `runToStable` (which is a digital-only propagation settler that is nonsensical for analog — see #36).
+
+**Per test vector:**
+1. **Set all inputs** — digital via `writeSignal`, analog sources via `setComponentProperty` (re-stamps MNA matrix)
+2. **Clock toggle** — if any clock inputs: set high, step, set low, step (via `stepToTime`)
+3. **`stepToTime(currentTime + settleTime)`** — the same mixed-mode coordination the UI uses. Bridges sync both directions per tick. Digital propagation and analog transient advancement happen together.
+4. **Read & compare** — digital: exact equality. Analog: tolerance comparison.
+
+This is the same loop the UI runs. No separate digital/analog settling phases. No `runToStable`.
+
+### 6. Parser changes (`src/testing/parser.ts`)
+
+- Add `AnalogPragmas` type: `toleranceRelative`, `toleranceAbsolute`, `settleTime`
+- Parse `#analog:` pragma lines
+- `parseTestValue` gets `domain` parameter — when `'analog'`, parse as float with optional `~tolerance`, reject `C`/`Z`
+- `parseSIValue` helper for `f/p/n/u/m/k/M/G` suffixes
+- `ParsedTestData` extended with `analogPragmas` and `signalDomains: Map<string, 'digital' | 'analog'>` (populated by caller from `labelSignalMap`)
+
+### 7. Executor changes (`src/testing/executor.ts`)
+
+- `executeTests` becomes async (because `stepToTime` is async)
+- Replace `runToStable` with `stepToTime(currentTime + settleTime)`
+- Tolerance comparison: `withinTolerance(actual, expected, tol)` — if both absolute and relative specified, passing either is sufficient
+
+### 8. Facade changes (`src/headless/default-facade.ts`)
+
+- Remove hard guard at line 243 rejecting analog-only circuits
+- `runTests` becomes async, builds `signalDomains` from `labelSignalMap`
+- Expand input detection (line 215-219) to include source typeIds
+- Implement `setAnalogSource` method
+
+### 9. Error messages
+
+Analog test failures: `Expected 3.3V ±5% at "Vout", got 2.8V (delta: 500mV)`
+
+### Files touched
+
+| File | Changes |
+|------|---------|
+| `src/solver/analog/compiler.ts` | Remove label whitelist |
+| `src/compile/types.ts` | Add `labelToCircuitElement` to `CompiledCircuitUnified` |
+| `src/compile/compile.ts` | Build `labelToCircuitElement` in step 9 |
+| `src/solver/coordinator.ts` | Add `setSourceByLabel` |
+| `src/testing/parser.ts` | `analogValue` TestValue, pragmas, SI suffixes, domain-aware parsing |
+| `src/testing/executor.ts` | Async, `stepToTime` instead of `runToStable`, tolerance comparison |
+| `src/headless/default-facade.ts` | Remove guard, async `runTests`, `setAnalogSource` |
+| `src/headless/facade.ts` | Update interface (async `runTests`, new methods) |
 
 ## Proposed Structural Fix
 

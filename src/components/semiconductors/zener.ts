@@ -326,12 +326,12 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
     "Reverse breakdown (Vd < -BV): Id = -IS * exp(-(Vd+BV)/(N*Vt))",
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "spice-l1": {
       kind: "inline",
       factory: createZenerElement,
       paramDefs: ZENER_PARAM_DEFS,
       params: ZENER_PARAM_DEFAULTS,
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "spice-l1",
 };

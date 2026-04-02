@@ -1,0 +1,34 @@
+* Verify ngspice defaults by measuring known circuits
+* Test 1: BJT IS — measure Vbe at known Ib to back-calculate IS
+* Test 2: MOSFET VTO/KP — measure Id at known Vgs to verify threshold
+* Test 3: Diode IS — measure Vd at known Id
+
+* BJT with default model
+.model DEFNPN NPN()
+Vcc1 10 0 5
+Rc1 10 11 10k
+Rb1 10 12 100k
+Q1 11 12 0 DEFNPN
+
+* MOSFET with default model, W/L = 1
+.model DEFNMOS NMOS()
+Vd2 20 0 5
+Vg2 21 0 5
+M1 20 21 0 0 DEFNMOS W=1e-4 L=1e-4
+
+* Diode with default model
+.model DEFD D()
+Vs3 30 0 1
+Rs3 30 31 1k
+D1 31 0 DEFD
+
+.op
+
+.control
+op
+set wr_singlescale
+set wr_vecnames
+wrdata defaults_probe.txt v(11) v(12) i(Vcc1) v(20) i(Vd2) v(31) i(Vs3)
+quit
+.endc
+.end

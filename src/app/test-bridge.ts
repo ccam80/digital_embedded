@@ -102,6 +102,12 @@ export interface TestBridge {
    */
   getTraceStats(): Array<{ label: string; min: number; max: number; mean: number }> | null;
 
+  /**
+   * Get the most recent (instantaneous) value for all scope panel channels.
+   * Returns null if no scope panel is active or no data has been collected.
+   */
+  getTraceValues(): Array<{ label: string; value: number }> | null;
+
   /** Resolve a component name or alias to its canonical registry name. Returns null if not found. */
   resolveComponentName(nameOrAlias: string): string | null;
 
@@ -221,6 +227,13 @@ export function createTestBridge(
       if (panels.length === 0) return null;
       const allStats = panels.flatMap(p => p.getTraceStats());
       return allStats.length === 0 ? null : allStats;
+    },
+
+    getTraceValues() {
+      const panels = scopeGetter();
+      if (panels.length === 0) return null;
+      const allValues = panels.flatMap(p => p.getTraceValues());
+      return allValues.length === 0 ? null : allValues;
     },
 
     resolveComponentName(nameOrAlias: string): string | null {

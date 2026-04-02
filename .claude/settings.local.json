@@ -66,7 +66,15 @@
       "WebFetch(domain:newscienceview.blogspot.com)",
       "WebFetch(domain:forum.allaboutcircuits.com)",
       "WebFetch(domain:www.vishay.com)",
-      "mcp__circuit-simulator__circuit_describe_file"
+      "mcp__circuit-simulator__circuit_describe_file",
+      "mcp__codebase-memory-mcp__index_repository",
+      "mcp__codebase-memory-mcp__get_architecture",
+      "mcp__codebase-memory-mcp__search_graph",
+      "mcp__codebase-memory-mcp__query_graph",
+      "mcp__codebase-memory-mcp__get_graph_schema",
+      "mcp__codebase-memory-mcp__list_projects",
+      "mcp__codebase-memory-mcp__search_code",
+      "mcp__codebase-memory-mcp__trace_call_path"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -211,12 +211,12 @@ export const SchottkyDiodeDefinition: ComponentDefinition = {
     "IS=1e-8, N=1.05, BV=40V, RS=1\u03A9, CJO=1pF.",
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "spice-l1": {
       kind: "inline",
       factory: createSchottkyElement,
       paramDefs: SCHOTTKY_PARAM_DEFS,
       params: SCHOTTKY_PARAM_DEFAULTS,
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "spice-l1",
 };

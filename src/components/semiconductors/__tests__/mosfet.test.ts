@@ -430,8 +430,8 @@ describe("PMOS", () => {
   });
 
   it("pmos_definition_has_correct_device_type", () => {
-    expect(PmosfetDefinition.modelRegistry?.["behavioral"]).toBeDefined();
-    expect(PmosfetDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
+    expect(PmosfetDefinition.modelRegistry?.["spice-l1"]).toBeDefined();
+    expect(PmosfetDefinition.modelRegistry?.["spice-l1"]?.kind).toBe("inline");
   });
 });
 
@@ -471,9 +471,9 @@ describe("computeCapacitances", () => {
 describe("NmosfetDefinition", () => {
   it("has_correct_fields", () => {
     expect(NmosfetDefinition.name).toBe("NMOS");
-    expect(NmosfetDefinition.modelRegistry?.["behavioral"]).toBeDefined();
-    expect(NmosfetDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
-    expect((NmosfetDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
+    expect(NmosfetDefinition.modelRegistry?.["spice-l1"]).toBeDefined();
+    expect(NmosfetDefinition.modelRegistry?.["spice-l1"]?.kind).toBe("inline");
+    expect((NmosfetDefinition.modelRegistry?.["spice-l1"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 
   it("pin_layout_has_three_pins", () => {

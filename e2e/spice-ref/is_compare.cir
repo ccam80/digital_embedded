@@ -1,0 +1,32 @@
+* Compare IS values to find ngspice default
+.model NPN_14 NPN(IS=1e-14)
+.model NPN_16 NPN(IS=1e-16)
+.model NPN_DEF NPN()
+
+Vcc 10 0 5
+
+* IS=1e-14
+Rc1 10 11 10k
+Rb1 10 12 100k
+Q1 11 12 0 NPN_14
+
+* IS=1e-16
+Rc2 10 21 10k
+Rb2 10 22 100k
+Q2 21 22 0 NPN_16
+
+* Default
+Rc3 10 31 10k
+Rb3 10 32 100k
+Q3 31 32 0 NPN_DEF
+
+.op
+
+.control
+op
+set wr_singlescale
+set wr_vecnames
+wrdata is_compare.txt v(11) v(12) v(21) v(22) v(31) v(32)
+quit
+.endc
+.end

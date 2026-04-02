@@ -468,7 +468,7 @@ export const NJfetDefinition: ComponentDefinition = {
     "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD.",
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "spice-l1": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createNJfetElement(pinNodes, internalNodeIds, branchIdx, props),
@@ -476,5 +476,5 @@ export const NJfetDefinition: ComponentDefinition = {
       params: NJFET_PARAM_DEFAULTS,
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "spice-l1",
 };

@@ -168,9 +168,9 @@ describe("Zener", () => {
 
   it("definition_has_correct_fields", () => {
     expect(ZenerDiodeDefinition.name).toBe("ZenerDiode");
-    expect(ZenerDiodeDefinition.modelRegistry?.["behavioral"]).toBeDefined();
-    expect(ZenerDiodeDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
-    expect((ZenerDiodeDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
+    expect(ZenerDiodeDefinition.modelRegistry?.["spice-l1"]).toBeDefined();
+    expect(ZenerDiodeDefinition.modelRegistry?.["spice-l1"]?.kind).toBe("inline");
+    expect((ZenerDiodeDefinition.modelRegistry?.["spice-l1"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
 });
 

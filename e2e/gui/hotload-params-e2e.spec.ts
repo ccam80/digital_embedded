@@ -11,8 +11,18 @@
  *   4. Pin loading mode Ideal -- verify valid finite output after mode change.
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { UICircuitBuilder } from '../fixtures/ui-circuit-builder';
+
+// ---------------------------------------------------------------------------
+// Tolerance helper
+// ---------------------------------------------------------------------------
+
+function expectClose(actual: number, expected: number, rtol = 1e-6, atol = 1e-9) {
+  const err = Math.abs(actual - expected);
+  const limit = Math.max(atol, Math.abs(expected) * rtol);
+  expect(err, `Expected ${actual} to be close to ${expected} (err=${err}, limit=${limit})`).toBeLessThan(limit);
+}
 
 // ---------------------------------------------------------------------------
 // Shared helper: open property popup for a labeled element by double-click
@@ -25,37 +35,6 @@ async function openPopupForLabel(builder: UICircuitBuilder, label: string): Prom
   const coords = await builder.toPageCoords(el!.center.screenX, el!.center.screenY);
   await builder.page.mouse.dblclick(coords.x, coords.y);
   await expect(builder.page.locator('.prop-popup')).toBeVisible({ timeout: 3000 });
-}
-
-/**
- * Set a model parameter value in the property popup by finding the row whose
- * label span exactly matches paramKey and filling the adjacent input.
- * Works for both primary params (visible immediately) and secondary params
- * (inside the Advanced Parameters section -- expand first if needed).
- */
-async function setModelParamInPopup(
-  page: Page,
-  paramKey: string,
-  value: string | number,
-): Promise<void> {
-  const popup = page.locator('.prop-popup');
-  const inputHandle = await popup.evaluateHandle((popupEl, key) => {
-    const spans = popupEl.querySelectorAll("label, span");
-    for (const span of spans) {
-      if (span.textContent?.trim() === key) {
-        const row = span.parentElement;
-        if (row) {
-          const input = row.querySelector("input");
-          if (input) return input;
-        }
-      }
-    }
-    return null;
-  }, paramKey);
-  const input = inputHandle.asElement();
-  expect(input, `Model param "${paramKey}" input not found`).not.toBeNull();
-  await input!.fill(String(value));
-  await input!.press('Tab');
 }
 
 /**
@@ -125,77 +104,79 @@ test.describe('Hot-loading model params via property popup', () => {
     const builder = new UICircuitBuilder(page);
     await builder.load();
 
-    // BJT common-emitter: Vcc(12V)->Rc(10k)->Q1:C, Ib(50µA)->Q1:B,
-    // Q1:E->GND, Probe Pc on collector.
+    // BJT common-emitter: Vcc(12V)->Rc(10k)->Q1:C, Vb(5V)->Rb(100k)->Q1:B,
+    // Q1:E->GND.
     //
-    // Physics: saturation threshold Ic_sat = Vcc/Rc = 12/10k = 1.2mA
-    // With BF=100 (default): Ic = 100*50µA = 5mA >> 1.2mA → saturated, Vc ≈ 0V
-    // With BF=10 (hot-loaded): Ic = 10*50µA = 0.5mA < 1.2mA → active,
-    //   Vc = 12V - 0.5mA*10kΩ = 7V
+    // Physics: Vbe≈0.7V, Ib=(Vb-0.7)/Rb=(5-0.7)/100k≈43µA
+    // Ic_sat = Vcc/Rc = 12/10k = 1.2mA
+    // With BF=100 (default): Ic = 100*43µA = 4.3mA >> 1.2mA → saturated, Vc ≈ 0V
+    // With BF=10 (hot-loaded): Ic = 10*43µA = 0.43mA < 1.2mA → active,
+    //   Vc = 12V - 0.43mA*10kΩ ≈ 7.7V
     // Difference: ~7V >> 0.5V threshold → test will pass.
-    // Build BJT CE amplifier via clicks with explicit waypoints.
+    //
     // Layout (all rot=0):
     //   DcVoltageSource Vcc@(7,5):  neg(7,5), pos(11,5)   voltage=12V
     //   Resistor Rc@(14,5):         A(14,5),  B(18,5)     resistance=10kΩ
     //   NpnBJT Q1@(16,9):          B(16,9),  C(20,8), E(20,10)
-    //   CurrentSource Ib@(7,12):    pos(7,12), neg(11,12)  current=50µA
-    //   Probe Pc@(22,8)
-    //   Grounds at (5,5), (11,14), (20,12) — all off the Ib→Q1.B wire path
-    //
-    // Key routing constraint: Ib.pos(7,12) → Q1.B(16,9) routes via
-    // waypoints (7,7)→(16,7) to avoid crossing any ground positions.
+    //   DcVoltageSource Vb@(7,12):  neg(7,12), pos(11,12)  voltage=5V
+    //   Resistor Rb@(12,9):         A(12,9),  B(16,9)     resistance=100kΩ
+    //   Grounds at (5,5), (7,14), (20,12)
+    //   Rb.B@(16,9) auto-connects to Q1.B@(16,9)
     await builder.placeLabeled('DcVoltageSource', 7, 5, 'Vcc');
     await builder.setComponentProperty('Vcc', 'voltage', 12);
     await builder.placeLabeled('Resistor', 14, 5, 'Rc');
     await builder.setComponentProperty('Rc', 'resistance', 10000);
     await builder.placeLabeled('NpnBJT', 16, 9, 'Q1');
-    await builder.placeLabeled('CurrentSource', 7, 12, 'Ib');
-    await builder.setComponentProperty('Ib', 'current', 0.00005);
-    await builder.placeLabeled('Probe', 22, 8, 'Pc');
+    await builder.placeLabeled('DcVoltageSource', 7, 12, 'Vb');
+    await builder.setComponentProperty('Vb', 'voltage', 5);
+    await builder.placeLabeled('Resistor', 12, 9, 'Rb');
+    await builder.setComponentProperty('Rb', 'resistance', 100000);
 
-    // Grounds — placed away from the Ib→Q1.B wire path
+    // Grounds
     await builder.placeComponent('Ground', 5, 5);    // Vcc.neg ground
-    await builder.placeComponent('Ground', 11, 14);   // Ib.neg ground
+    await builder.placeComponent('Ground', 7, 14);    // Vb.neg ground
     await builder.placeComponent('Ground', 20, 12);   // Q1.E ground
 
-    // Wiring with explicit waypoints — no autorouter
+    // Wiring
     // Vcc.pos(11,5) → Rc.A(14,5): straight horizontal
     await builder.drawWireExplicit('Vcc', 'pos', 'Rc', 'A');
     // Rc.B(18,5) → Q1.C(20,8): L-shape via (20,5)
     await builder.drawWireExplicit('Rc', 'B', 'Q1', 'C', [[20, 5]]);
-    // Ib.pos(7,12) → Q1.B(16,9): L-route avoiding grounds via (7,7)→(16,7)
-    await builder.drawWireExplicit('Ib', 'pos', 'Q1', 'B', [[7, 7], [16, 7]]);
-    // Probe Pc taps collector node at Q1.C(20,8)
-    await builder.drawWireFromPinExplicit('Pc', 'in', 20, 8);
+    // Vb.pos(11,12) → Rb.A(12,9): L-shape via (11,9)
+    await builder.drawWireExplicit('Vb', 'pos', 'Rb', 'A', [[11, 9]]);
+    // Rb.B(16,9) auto-connects to Q1.B(16,9) — no wire needed
     // Vcc.neg(7,5) → Ground(5,5)
     await builder.drawWireFromPinExplicit('Vcc', 'neg', 5, 5);
-    // Ib.neg(11,12) → Ground(11,14)
-    await builder.drawWireFromPinExplicit('Ib', 'neg', 11, 14);
+    // Vb.neg(7,12) → Ground(7,14)
+    await builder.drawWireFromPinExplicit('Vb', 'neg', 7, 14);
     // Q1.E(20,10) → Ground(20,12)
     await builder.drawWireFromPinExplicit('Q1', 'E', 20, 12);
 
-    // Baseline step with DEFAULT BF=100: BJT saturated, Vc ≈ 0V
+    // --- Phase A: BF=100 (default) — BJT saturated ---
     await builder.stepViaUI();
     await builder.verifyNoErrors();
-    const defaultState = await builder.stepAndReadAnalog('5m');
-    expect(defaultState).not.toBeNull();
-    const vcDefault = defaultState!.nodeVoltages['Pc'];
-    expect(vcDefault).toBeDefined();
 
-    // Open popup and change BF from 100 to 10 via the primary param row.
-    // BF=10 puts the BJT in active region → Vc rises to ~7V.
-    await openPopupForLabel(builder, 'Q1');
-    await setModelParamInPopup(page, 'BF', 10);
-    await page.keyboard.press("Escape");
+    await builder.addTraceViaContextMenu('Q1', 'C');
+    await builder.stepToTimeViaUI('1m');
+    const valuesA = await builder.getTraceValues();
+    expect(valuesA).not.toBeNull();
+    expect(valuesA!.length).toBeGreaterThanOrEqual(1);
 
-    // Step again to pick up hot-loaded BF change
-    const hotState = await builder.stepAndReadAnalog('10m');
-    expect(hotState).not.toBeNull();
-    const vcHot = hotState!.nodeVoltages['Pc'];
-    expect(vcHot).toBeDefined();
+    const vcA = valuesA![0].value;
+    console.log(`[hotload-BF] Phase A: Vc(BF=100) = ${vcA} (ngspice ref: 9.57744513e-02)`);
+    expect(Number.isFinite(vcA)).toBe(true);
+    expectClose(vcA, 9.57744513e-02);
 
-    // Collector voltage must differ between BF=100 (saturated ≈0V) and BF=10 (active ≈7V)
-    expect(Math.abs(vcHot! - vcDefault!)).toBeGreaterThan(0.5);
+    // --- Phase B: Hot-load BF=10 via UI popup ---
+    await builder.setSpiceParameter('Q1', 'BF', 10);
+    await builder.stepToTimeViaUI('2m');
+    const valuesB = await builder.getTraceValues();
+    expect(valuesB).not.toBeNull();
+
+    const vcB = valuesB![0].value;
+    console.log(`[hotload-BF] Phase B: Vc(BF=10) = ${vcB} (ngspice ref: 7.63368375e+00)`);
+    expect(Number.isFinite(vcB)).toBe(true);
+    expectClose(vcB, 7.63368375e+00);
   });
 });
 

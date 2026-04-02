@@ -923,7 +923,7 @@ export const NmosfetDefinition: ComponentDefinition = {
     "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "spice-l1": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createMosfetElement(1, pinNodes, internalNodeIds, branchIdx, props),
@@ -966,7 +966,7 @@ export const NmosfetDefinition: ComponentDefinition = {
       params: NMOS_IRFZ44N,
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "spice-l1",
 };
 
 export const PmosfetDefinition: ComponentDefinition = {
@@ -983,7 +983,7 @@ export const PmosfetDefinition: ComponentDefinition = {
     "Model parameters: VTO, KP, LAMBDA, PHI, GAMMA, W, L.",
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "spice-l1": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createMosfetElement(-1, pinNodes, internalNodeIds, branchIdx, props),
@@ -1026,5 +1026,5 @@ export const PmosfetDefinition: ComponentDefinition = {
       params: PMOS_IRF4905,
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "spice-l1",
 };

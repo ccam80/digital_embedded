@@ -395,12 +395,12 @@ export const DiodeDefinition: ComponentDefinition = {
     "Model parameters: IS, N, CJO, VJ, M, TT, FC.",
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "spice-l1": {
       kind: "inline",
       factory: createDiodeElement,
       paramDefs: DIODE_PARAM_DEFS,
       params: DIODE_PARAM_DEFAULTS,
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "spice-l1",
 };

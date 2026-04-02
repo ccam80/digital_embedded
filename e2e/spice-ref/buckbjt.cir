@@ -1,0 +1,81 @@
+* Buck BJT converter — matches digiTS buckbjt circuit exactly
+* 10kHz square wave -> push-pull BJT buffer -> NMOS switch -> LC filter -> load
+
+* Model params match digiTS models exactly
+* NPN/PNP: BF=100, IS=1e-14, NF=1, BR=1, NR=1, VAF=0(inf), IKF=0(inf), ISE=0, ISC=0
+* NMOS 2N7000: VTO=2.236, KP=0.0932174, LAMBDA=0, W=1e-6, L=1e-6
+* Diode: IS=1e-14, N=1
+
+.model NPNMOD NPN(BF=100 IS=1e-14 NF=1 BR=1 NR=1 VAF=0 IKF=0 IKR=0 ISE=0 ISC=0)
+.model PNPMOD PNP(BF=100 IS=1e-14 NF=1 BR=1 NR=1 VAF=0 IKF=0 IKR=0 ISE=0 ISC=0)
+.model N2N7000 NMOS(VTO=2.236 KP=0.0932174 LAMBDA=0 W=1e-6 L=1e-6 PHI=0.6 GAMMA=0)
+.model DMOD D(IS=1e-14 N=1)
+
+* Power supplies
+Vdc  vcc 0 10
+Vac  drv 0 PULSE(0 4.983907855756475 0 1n 1n 50u 100u)
+
+* NPN driver: DRV -> Rb1(1k) -> Q1.B, Q1.C -> R1(10k) -> VCC, Q1.E -> GND
+Rb1  drv  base_npn 1k
+Q1   col_npn base_npn 0 NPNMOD
+R1   vcc col_npn 10k
+
+* PNP driver: DRV -> Rb2(1k) -> Q2.B, Q2.C -> R2(10k) -> GND, Q2.E -> VCC
+Rb2  drv  base_pnp 1k
+Q2   col_pnp base_pnp vcc PNPMOD
+R2   col_pnp 0 10k
+
+* NMOS switch (2N7000): gate = col_npn (NDRV net), drain = VCC, source = switch_node
+M1   vcc col_npn sw sw N2N7000
+
+* Freewheeling diode with 0V sense source for current measurement
+* Vdiode in series: anode at GND(0), cathode at switch_node(sw)
+Vdiode diode_a 0 0
+D1   diode_a sw DMOD
+
+* LC filter: L1 = 0.3H, C1 = 10uF
+L1   sw out 0.3
+C1   out 0 10u
+
+* Load resistor: 50 ohm
+Rload out 0 50
+
+* Transient: let it settle, measure at 1ms and 5ms
+.tran 1u 5m
+
+.control
+tran 1u 5m
+
+* Measure at 1ms
+meas tran vcol_npn_1ms FIND v(col_npn) AT=1m
+meas tran vcol_pnp_1ms FIND v(col_pnp) AT=1m
+meas tran vsw_1ms FIND v(sw) AT=1m
+meas tran vout_1ms FIND v(out) AT=1m
+meas tran idiode_1ms FIND i(Vdiode) AT=1m
+
+* Measure at 5ms
+meas tran vcol_npn_5ms FIND v(col_npn) AT=5m
+meas tran vcol_pnp_5ms FIND v(col_pnp) AT=5m
+meas tran vsw_5ms FIND v(sw) AT=5m
+meas tran vout_5ms FIND v(out) AT=5m
+meas tran idiode_5ms FIND i(Vdiode) AT=5m
+
+* Min/max over 4ms-5ms (steady state window)
+meas tran vsw_min MIN v(sw) FROM=4m TO=5m
+meas tran vsw_max MAX v(sw) FROM=4m TO=5m
+meas tran vout_min MIN v(out) FROM=4m TO=5m
+meas tran vout_max MAX v(out) FROM=4m TO=5m
+meas tran vout_avg AVG v(out) FROM=4m TO=5m
+meas tran vcol_npn_min MIN v(col_npn) FROM=4m TO=5m
+meas tran vcol_npn_max MAX v(col_npn) FROM=4m TO=5m
+meas tran vcol_pnp_min MIN v(col_pnp) FROM=4m TO=5m
+meas tran vcol_pnp_max MAX v(col_pnp) FROM=4m TO=5m
+meas tran idiode_min MIN i(Vdiode) FROM=4m TO=5m
+meas tran idiode_max MAX i(Vdiode) FROM=4m TO=5m
+meas tran idiode_avg AVG i(Vdiode) FROM=4m TO=5m
+
+* Write raw data for full trace if needed
+wrdata buckbjt_results.txt v(col_npn) v(col_pnp) v(sw) v(out) i(Vdiode)
+quit
+.endc
+.end

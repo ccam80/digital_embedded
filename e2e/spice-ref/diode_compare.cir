@@ -1,0 +1,22 @@
+* Compare diode defaults
+.model D_14 D(IS=1e-14 N=1)
+.model D_DEF D()
+
+Vs1 10 0 1
+Rs1 10 11 1k
+D1 11 0 D_14
+
+Vs2 20 0 1
+Rs2 20 21 1k
+D2 21 0 D_DEF
+
+.op
+
+.control
+op
+set wr_singlescale
+set wr_vecnames
+wrdata diode_compare.txt v(11) v(21)
+quit
+.endc
+.end

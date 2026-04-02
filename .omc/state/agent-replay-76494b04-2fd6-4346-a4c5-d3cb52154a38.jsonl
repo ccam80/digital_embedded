@@ -1,8 +1,0 @@
-{"t":0,"agent":"af7a7c4","agent_type":"architect","event":"agent_start","parent_mode":"none"}
-{"t":0,"agent":"af7a7c4","agent_type":"architect","event":"agent_stop","success":true,"duration_ms":151796}
-{"t":0,"agent":"a529279","agent_type":"architect","event":"agent_start","parent_mode":"none"}
-{"t":0,"agent":"ae22c18","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
-{"t":0,"agent":"ae22c18","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":128789}
-{"t":0,"agent":"a529279","agent_type":"architect","event":"agent_stop","success":true,"duration_ms":151640}
-{"t":0,"agent":"ac7a1e6","agent_type":"architect","event":"agent_start","parent_mode":"none"}
-{"t":0,"agent":"ac7a1e6","agent_type":"architect","event":"agent_stop","success":true,"duration_ms":225767}

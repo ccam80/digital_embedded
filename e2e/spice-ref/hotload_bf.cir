@@ -1,0 +1,29 @@
+* Hotload BF test: BJT common-emitter
+* Matches digiTS default NPN model params exactly
+* BF=100 case and BF=10 case in same simulation
+
+* Default NPN: BF=100, IS=1e-14, NF=1, BR=1, NR=1, VAF=inf, IKF=inf, IKR=inf, ISE=0, ISC=0, VAR=inf
+* ngspice: VAF=0 means infinite Early voltage
+.model NPN_100 NPN(BF=100 IS=1e-14 NF=1 BR=1 NR=1 VAF=0 IKF=0 IKR=0 ISE=0 ISC=0)
+.model NPN_10  NPN(BF=10  IS=1e-14 NF=1 BR=1 NR=1 VAF=0 IKF=0 IKR=0 ISE=0 ISC=0)
+
+Vcc vcc 0 12
+Vb  vb  0 5
+Rc1  vcc col100 10k
+Rb1  vb  base100 100k
+Q1   col100 base100 0 NPN_100
+
+Rc2  vcc col10 10k
+Rb2  vb  base10 100k
+Q2   col10 base10 0 NPN_10
+
+.op
+
+.control
+op
+set wr_singlescale
+set wr_vecnames
+wrdata hotload_bf_results.txt v(col100) v(base100) v(col10) v(base10)
+quit
+.endc
+.end

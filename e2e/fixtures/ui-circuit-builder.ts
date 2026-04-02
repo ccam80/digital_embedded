@@ -374,6 +374,34 @@ export class UICircuitBuilder {
   }
 
   /**
+   * Select a named model from the Model dropdown in the property popup.
+   *
+   * Opens the property popup, finds the <select> dropdown, and selects
+   * the option whose value matches the model key (e.g. "2N7000", "2N3904").
+   */
+  async selectNamedModel(
+    elementLabel: string,
+    modelKey: string,
+  ): Promise<void> {
+    const info = await this.getCircuitInfo();
+    const el = info.elements.find(e => e.label === elementLabel);
+    expect(el, `Element "${elementLabel}" not found`).toBeTruthy();
+
+    await this._dblClickElementBody(el!);
+
+    const popup = this.page.locator('.prop-popup');
+    await expect(popup).toBeVisible({ timeout: 3000 });
+
+    const select = popup.locator('select').first();
+    await expect(select).toBeVisible({ timeout: 2000 });
+    await select.selectOption(modelKey);
+
+    // Close popup to commit the model switch.
+    await popup.locator('.prop-popup-close').click();
+    await popup.waitFor({ state: 'hidden', timeout: 2000 });
+  }
+
+  /**
    * Set a Pin Electrical parameter for a component through the UI.
    *
    * Opens the property popup, expands the "Pin Electrical" collapsible section,
@@ -828,6 +856,14 @@ export class UICircuitBuilder {
    */
   async getTraceStats(): Promise<Array<{ label: string; min: number; max: number; mean: number }> | null> {
     return this.bridge('bridge.getTraceStats()');
+  }
+
+  /**
+   * Read the most recent (instantaneous) value for each scope trace channel.
+   * Returns null if no scope panel is active or no data has been collected.
+   */
+  async getTraceValues(): Promise<Array<{ label: string; value: number }> | null> {
+    return this.bridge('bridge.getTraceValues()');
   }
 
   /** Click the Run button on the toolbar. */

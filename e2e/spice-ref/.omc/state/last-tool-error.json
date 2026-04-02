@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser/e2e/spice-ref\\\" && \\\"C:/ProgramData/chocolatey/lib/ngspice/tools/Spice64/bin/ngspice_con.exe\\\" -b \\\"$(pwd -W)/buckbjt.cir\\\" 2>&1\",\"timeout...",
+  "error": "Exit code 1\n\r\nNote: No compatibility mode selected!\r\n\r\n\r\nCircuit: * buck bjt converter — matches digits buckbjt circuit exactly\r\n\r\nError on line 29 or its substitute:\r\n  m1 vcc col_npn sw nmosmod\r\nnot enough nodes\r\n    Simulation interrupted due to error!\r\n\r\nNote: No \".plot\", \".print\", or \".fourier\" lines; no simulations run",
+  "timestamp": "2026-04-02T01:48:51.924Z",
+  "retry_count": 1
+}

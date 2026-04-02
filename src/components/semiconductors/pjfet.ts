@@ -361,7 +361,7 @@ export const PJfetDefinition: ComponentDefinition = {
     "Model parameters: VTO, BETA, LAMBDA, IS, CGS, CGD.",
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "spice-l1": {
       kind: "inline",
       factory: (pinNodes, internalNodeIds, branchIdx, props, _getTime) =>
         createPJfetElement(pinNodes, internalNodeIds, branchIdx, props),
@@ -369,5 +369,5 @@ export const PJfetDefinition: ComponentDefinition = {
       params: PJFET_PARAM_DEFAULTS,
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "spice-l1",
 };

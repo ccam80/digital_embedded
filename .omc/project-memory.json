@@ -251,26 +251,26 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 303,
-      "lastAccessed": 1775076665132,
+      "accessCount": 304,
+      "lastAccessed": 1775088371679,
       "type": "file"
     },
     {
       "path": "src\\compile\\extract-connectivity.ts",
-      "accessCount": 167,
-      "lastAccessed": 1775070918248,
+      "accessCount": 172,
+      "lastAccessed": 1775094974599,
       "type": "file"
     },
     {
       "path": "",
-      "accessCount": 144,
-      "lastAccessed": 1775077160349,
+      "accessCount": 155,
+      "lastAccessed": 1775085155771,
       "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 84,
-      "lastAccessed": 1775074641358,
+      "accessCount": 85,
+      "lastAccessed": 1775094228749,
       "type": "file"
     },
     {
@@ -280,15 +280,15 @@
       "type": "file"
     },
     {
-      "path": "spec\\progress.md",
-      "accessCount": 71,
-      "lastAccessed": 1774951798824,
+      "path": "src\\compile\\compile.ts",
+      "accessCount": 73,
+      "lastAccessed": 1775095828611,
       "type": "file"
     },
     {
-      "path": "src\\compile\\compile.ts",
-      "accessCount": 70,
-      "lastAccessed": 1775076638133,
+      "path": "spec\\progress.md",
+      "accessCount": 71,
+      "lastAccessed": 1774951798824,
       "type": "file"
     },
     {
@@ -299,8 +299,14 @@
     },
     {
       "path": "src\\components\\gates\\and.ts",
-      "accessCount": 62,
-      "lastAccessed": 1775070927495,
+      "accessCount": 64,
+      "lastAccessed": 1775094995780,
+      "type": "file"
+    },
+    {
+      "path": "src\\compile\\types.ts",
+      "accessCount": 50,
+      "lastAccessed": 1775094326349,
       "type": "file"
     },
     {
@@ -310,15 +316,9 @@
       "type": "file"
     },
     {
-      "path": "src\\compile\\types.ts",
-      "accessCount": 48,
-      "lastAccessed": 1775076623928,
-      "type": "file"
-    },
-    {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 37,
-      "lastAccessed": 1774953177982,
+      "accessCount": 43,
+      "lastAccessed": 1775085148836,
       "type": "file"
     },
     {
@@ -364,15 +364,21 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 29,
+      "lastAccessed": 1775094995719,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\passives\\tapped-transformer.ts",
       "accessCount": 27,
       "lastAccessed": 1774949458794,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 26,
-      "lastAccessed": 1775014103805,
+      "path": "src\\components\\flipflops\\d.ts",
+      "accessCount": 25,
+      "lastAccessed": 1775094996682,
       "type": "file"
     },
     {
@@ -385,12 +391,6 @@
       "path": "src\\components\\gates\\nand.ts",
       "accessCount": 24,
       "lastAccessed": 1774999821346,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\flipflops\\d.ts",
-      "accessCount": 24,
-      "lastAccessed": 1775010116790,
       "type": "file"
     },
     {
@@ -478,6 +478,12 @@
       "type": "file"
     },
     {
+      "path": "CLAUDE.md",
+      "accessCount": 15,
+      "lastAccessed": 1775085149066,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\flipflops\\d-async.ts",
       "accessCount": 14,
       "lastAccessed": 1775010118470,
@@ -535,12 +541,6 @@
       "path": "src\\solver\\analog\\__tests__\\digital-pin-model.test.ts",
       "accessCount": 10,
       "lastAccessed": 1774911055447,
-      "type": "file"
-    },
-    {
-      "path": "CLAUDE.md",
-      "accessCount": 10,
-      "lastAccessed": 1775071474330,
       "type": "file"
     },
     {

@@ -1,0 +1,10 @@
+{"t":0,"agent":"a8c77cc","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"abe2a64","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a24aa47","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"system","event":"skill_invoked","skill_name":"codebase-memory-exploring"}
+{"t":0,"agent":"a8c77cc","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":838057}
+{"t":0,"agent":"a24aa47","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":1452433}
+{"t":0,"agent":"abe2a64","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":1555493}
+{"t":0,"agent":"ad8d602","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"afa2291","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"afa2291","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":656324}

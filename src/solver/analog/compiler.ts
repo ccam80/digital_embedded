@@ -64,10 +64,14 @@ function resolveModelEntry(
  */
 function modelEntryToMnaModel(entry: ModelEntry): MnaModel | null {
   if (entry.kind === "inline") {
-    return {
+    const model: MnaModel = {
       factory: entry.factory,
       branchCount: entry.branchCount ?? 0,
     };
+    if (entry.getInternalNodeCount) {
+      model.getInternalNodeCount = entry.getInternalNodeCount;
+    }
+    return model;
   }
   // Netlist entries are resolved separately by resolveSubcircuitModels
   return null;
@@ -230,7 +234,7 @@ function compileSubcircuitToMnaModel(
         const remappedNodes = connectivity.map(remapNet);
 
         const leafDef = registry.get(subEl.typeId);
-        const leafEntry = leafDef ? resolveModelEntry(leafDef, "behavioral") : null;
+        const leafEntry = leafDef ? resolveModelEntry(leafDef, leafDef.defaultModel ?? "behavioral") : null;
         if (!leafEntry || leafEntry.kind !== "inline") continue;
         const leafFactory = leafEntry.factory;
 
@@ -650,6 +654,15 @@ function runPassA_partition(
         const branchIdx = modelBranchCount > 0 ? branchCount : -1;
         branchCount += modelBranchCount;
         const props = el.getProperties();
+        // Populate model params early so getInternalNodeCount can read them
+        // (e.g. SPICE L1 BJT needs RB/RC/RE to determine internal node count)
+        if (route.entry?.params) {
+          const merged: Record<string, number> = { ...route.entry.params };
+          for (const k of props.getModelParamKeys()) {
+            merged[k] = props.getModelParam<number>(k);
+          }
+          props.replaceModelParams(merged);
+        }
         const internalCount = route.model.getInternalNodeCount?.(props) ?? 0;
         const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
         nextInternalNode += internalCount;
@@ -1144,11 +1157,10 @@ export function compileAnalogPartition(
     }
 
     // Populate model params.
-    // Merge order (lowest wins): behavioral defaults → registry entry params → element _mparams.
+    // Merge order (lowest wins): model entry defaults → element _mparams.
     const modelEntry = route.entry;
     if (modelEntry) {
-      const behavioralDefaults = def.modelRegistry?.["behavioral"]?.params ?? {};
-      const merged: Record<string, number> = { ...behavioralDefaults, ...modelEntry.params };
+      const merged: Record<string, number> = { ...modelEntry.params };
       for (const k of props.getModelParamKeys()) {
         merged[k] = props.getModelParam<number>(k);
       }

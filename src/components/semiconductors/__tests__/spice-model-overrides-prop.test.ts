@@ -1,6 +1,6 @@
 /**
  * Tests that each semiconductor component declares a modelRegistry with a
- * "behavioral" entry of kind "inline", and that the removed legacy model
+ * default model entry of kind "inline", and that the removed legacy model
  * override property no longer appears in propertyDefs.
  */
 
@@ -46,22 +46,24 @@ const SEMICONDUCTOR_DEFS: ComponentDefinition[] = [
 
 describe("modelRegistry on semiconductor components", () => {
   for (const def of SEMICONDUCTOR_DEFS) {
-    it(`${def.name}: has modelRegistry with behavioral entry`, () => {
+    const modelKey = def.defaultModel ?? "behavioral";
+
+    it(`${def.name}: has modelRegistry with default model entry`, () => {
       expect(def.modelRegistry).toBeDefined();
-      expect(def.modelRegistry!["behavioral"]).toBeDefined();
+      expect(def.modelRegistry![modelKey]).toBeDefined();
     });
 
-    it(`${def.name}: behavioral entry has kind "inline"`, () => {
-      expect(def.modelRegistry!["behavioral"]!.kind).toBe("inline");
+    it(`${def.name}: default model entry has kind "inline"`, () => {
+      expect(def.modelRegistry![modelKey]!.kind).toBe("inline");
     });
 
-    it(`${def.name}: behavioral entry has a factory function`, () => {
-      expect(typeof getFactory(def.modelRegistry!["behavioral"]!)).toBe("function");
+    it(`${def.name}: default model entry has a factory function`, () => {
+      expect(typeof getFactory(def.modelRegistry![modelKey]!)).toBe("function");
     });
 
-    it(`${def.name}: behavioral entry has params record`, () => {
-      expect(def.modelRegistry!["behavioral"]!.params).toBeDefined();
-      expect(typeof def.modelRegistry!["behavioral"]!.params).toBe("object");
+    it(`${def.name}: default model entry has params record`, () => {
+      expect(def.modelRegistry![modelKey]!.params).toBeDefined();
+      expect(typeof def.modelRegistry![modelKey]!.params).toBe("object");
     });
 
     it(`${def.name}: legacy model override property does not appear in propertyDefs`, () => {

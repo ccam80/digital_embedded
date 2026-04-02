@@ -13,6 +13,10 @@ The editor/renderer/interaction layer MUST be engine-agnostic:
 - Editor calls engine through the interface, never directly
 - Components program against abstract `RenderContext` and engine interfaces, not Canvas2D or engine implementations
 
+### Component Model Architecture
+
+A fully implemented component has these models: digital, and a modelRegistry containing behavioral, spice-l1, spice-l2, spice-l3, plus device-specific named models. Some components will be missing a subset; this should be considered incomplete implementation, not a design choice. The `defaultModel` property is ONLY meaningful for selecting the initial model in the property bag when a component is first placed. It has no semantic meaning beyond that — code that uses `defaultModel` as a lookup key at compile time, param merging, or model resolution is incorrect. The element's `model` property is the single source of truth after placement.
+
 ### Never Read .dig XML for Topology
 
 **NEVER read .dig XML files directly to understand circuit topology.** The XML contains wire coordinates, pixel positions, and rendering metadata — none of which tells you what's connected to what. ALWAYS use the MCP circuit tools.

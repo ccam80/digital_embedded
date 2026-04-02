@@ -32,11 +32,12 @@ export function applySpiceImportResult(
   registry?: ComponentRegistry,
 ): void {
   const def = registry?.get(element.typeId);
-  const behavioralEntry = def?.modelRegistry?.["behavioral"];
+  const defaultKey = def?.defaultModel ?? "behavioral";
+  const behavioralEntry = def?.modelRegistry?.[defaultKey];
 
   if (!behavioralEntry || behavioralEntry.kind !== "inline") {
     throw new Error(
-      `applySpiceImportResult: component "${element.typeId}" has no "behavioral" inline model entry in its modelRegistry`,
+      `applySpiceImportResult: component "${element.typeId}" has no "${defaultKey}" inline model entry in its modelRegistry`,
     );
   }
 

@@ -171,6 +171,18 @@ export class ScopePanel implements MeasurementObserver {
     });
   }
 
+  /**
+   * Read the most recent (instantaneous) value for each channel.
+   * Returns one entry per channel. Returns an empty array if no data has been collected.
+   */
+  getTraceValues(): Array<{ label: string; value: number }> {
+    return this._channels.map(ch => {
+      if (ch.buffer.sampleCount === 0) return { label: ch.label, value: 0 };
+      const samples = ch.buffer.getSamplesInRange(ch.buffer.timeEnd, ch.buffer.timeEnd);
+      return { label: ch.label, value: samples.value.length > 0 ? samples.value[0] : 0 };
+    });
+  }
+
   /** Read-only channel info for UI (e.g. context menus). */
   getChannelDescriptors(): Array<{ label: string; kind: ChannelKind; autoRange: boolean; yMin: number; yMax: number; overlays: ReadonlySet<OverlayKind> }> {
     return this._channels.map(c => ({

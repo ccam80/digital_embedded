@@ -1,0 +1,30 @@
+* Compare MOSFET defaults
+* Our defaults: VTO=1.0, KP=2e-5, LAMBDA=0.01
+* ngspice suspected: VTO=0, KP=2e-5, LAMBDA=0
+
+.model NMOS_OURS NMOS(VTO=1.0 KP=2e-5 LAMBDA=0.01)
+.model NMOS_DEF NMOS()
+.model NMOS_VTO0 NMOS(VTO=0 KP=2e-5 LAMBDA=0)
+
+Vd1 10 0 5
+Vg1 11 0 3
+M1 10 11 0 0 NMOS_OURS W=1e-6 L=1e-6
+
+Vd2 20 0 5
+Vg2 21 0 3
+M2 20 21 0 0 NMOS_DEF W=1e-4 L=1e-4
+
+Vd3 30 0 5
+Vg3 31 0 3
+M3 30 31 0 0 NMOS_VTO0 W=1e-4 L=1e-4
+
+.op
+
+.control
+op
+set wr_singlescale
+set wr_vecnames
+wrdata mos_compare.txt i(Vd1) i(Vd2) i(Vd3)
+quit
+.endc
+.end

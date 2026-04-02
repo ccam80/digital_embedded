@@ -374,12 +374,12 @@ export const TunnelDiodeDefinition: ComponentDefinition = {
     "NDR region: V_p < V < V_v.",
   models: {},
   modelRegistry: {
-    "behavioral": {
+    "spice-l1": {
       kind: "inline",
       factory: createTunnelDiodeElement,
       paramDefs: TUNNEL_DIODE_PARAM_DEFS,
       params: TUNNEL_DIODE_PARAM_DEFAULTS,
     },
   },
-  defaultModel: "behavioral",
+  defaultModel: "spice-l1",
 };

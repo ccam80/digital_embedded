@@ -15,10 +15,13 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   createBjtElement,
+  createSpiceL1BjtElement,
   NpnBjtDefinition,
   PnpBjtDefinition,
   BJT_NPN_DEFAULTS,
   BJT_PARAM_DEFS,
+  BJT_SPICE_L1_PARAM_DEFS,
+  BJT_SPICE_L1_NPN_DEFAULTS,
 } from "../bjt.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
@@ -45,6 +48,16 @@ const GMIN = 1e-12;
 function makeBjtProps(modelParams?: Record<string, number>): PropertyBag {
   const props = createTestPropertyBag();
   const defaults = { ...BJT_NPN_DEFAULTS };
+  if (modelParams) {
+    Object.assign(defaults, modelParams);
+  }
+  props.replaceModelParams(defaults);
+  return props;
+}
+
+function makeSpiceL1Props(modelParams?: Record<string, number>): PropertyBag {
+  const props = createTestPropertyBag();
+  const defaults = { ...BJT_SPICE_L1_NPN_DEFAULTS };
   if (modelParams) {
     Object.assign(defaults, modelParams);
   }
@@ -412,17 +425,44 @@ describe("PNP", () => {
 describe("Definitions", () => {
   it("npn_definition_fields", () => {
     expect(NpnBjtDefinition.name).toBe("NpnBJT");
-    expect(NpnBjtDefinition.modelRegistry!["behavioral"].kind).toBe("inline");
-    expect(NpnBjtDefinition.modelRegistry!["behavioral"].paramDefs).toBe(BJT_PARAM_DEFS);
-    expect(NpnBjtDefinition.defaultModel).toBe("behavioral");
+    expect(NpnBjtDefinition.modelRegistry!["spice-l1"].kind).toBe("inline");
+    expect(NpnBjtDefinition.modelRegistry!["spice-l1"].paramDefs).toBe(BJT_SPICE_L1_PARAM_DEFS);
+    expect(NpnBjtDefinition.defaultModel).toBe("spice-l1");
     expect(NpnBjtDefinition.pinLayout).toHaveLength(3);
   });
 
   it("pnp_definition_fields", () => {
     expect(PnpBjtDefinition.name).toBe("PnpBJT");
-    expect(PnpBjtDefinition.modelRegistry!["behavioral"].kind).toBe("inline");
-    expect(PnpBjtDefinition.defaultModel).toBe("behavioral");
+    expect(PnpBjtDefinition.modelRegistry!["spice-l1"].kind).toBe("inline");
+    expect(PnpBjtDefinition.modelRegistry!["spice-l1"].paramDefs).toBe(BJT_SPICE_L1_PARAM_DEFS);
+    expect(PnpBjtDefinition.defaultModel).toBe("spice-l1");
     expect(PnpBjtDefinition.pinLayout).toHaveLength(3);
+  });
+
+  it("npn_modelRegistry_has_both_simple_and_spice_l1", () => {
+    const registry = NpnBjtDefinition.modelRegistry!;
+    expect(registry["simple"]).toBeDefined();
+    expect(registry["spice-l1"]).toBeDefined();
+    expect(registry["simple"].kind).toBe("inline");
+    expect(registry["spice-l1"].kind).toBe("inline");
+  });
+
+  it("pnp_modelRegistry_has_both_simple_and_spice_l1", () => {
+    const registry = PnpBjtDefinition.modelRegistry!;
+    expect(registry["simple"]).toBeDefined();
+    expect(registry["spice-l1"]).toBeDefined();
+    expect(registry["simple"].kind).toBe("inline");
+    expect(registry["spice-l1"].kind).toBe("inline");
+  });
+
+  it("simple_model_uses_original_param_defs", () => {
+    expect(NpnBjtDefinition.modelRegistry!["simple"].paramDefs).toBe(BJT_PARAM_DEFS);
+    expect(PnpBjtDefinition.modelRegistry!["simple"].paramDefs).toBe(BJT_PARAM_DEFS);
+  });
+
+  it("spice_l1_model_uses_full_param_defs", () => {
+    expect(NpnBjtDefinition.modelRegistry!["spice-l1"].paramDefs).toBe(BJT_SPICE_L1_PARAM_DEFS);
+    expect(PnpBjtDefinition.modelRegistry!["spice-l1"].paramDefs).toBe(BJT_SPICE_L1_PARAM_DEFS);
   });
 
   it("npn_pin_labels", () => {
@@ -439,18 +479,36 @@ describe("Definitions", () => {
     expect(labels).toContain("E");
   });
 
-  it("npn_modelRegistry_factory_creates_element", () => {
+  it("npn_simple_modelRegistry_factory_creates_element", () => {
     const propsObj = makeBjtProps();
-    const entry = NpnBjtDefinition.modelRegistry!["behavioral"];
+    const entry = NpnBjtDefinition.modelRegistry!["simple"];
     if (entry.kind !== "inline") throw new Error("expected inline");
     const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
     expect(el.pinNodeIds).toEqual([1, 2, 3]);
   });
 
-  it("pnp_modelRegistry_factory_creates_element", () => {
+  it("pnp_simple_modelRegistry_factory_creates_element", () => {
     const propsObj = makeBjtProps();
-    const entry = PnpBjtDefinition.modelRegistry!["behavioral"];
+    const entry = PnpBjtDefinition.modelRegistry!["simple"];
+    if (entry.kind !== "inline") throw new Error("expected inline");
+    const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
+    expect(el.isNonlinear).toBe(true);
+    expect(el.pinNodeIds).toEqual([1, 2, 3]);
+  });
+
+  it("npn_spice_l1_modelRegistry_factory_creates_element", () => {
+    const propsObj = makeSpiceL1Props();
+    const entry = NpnBjtDefinition.modelRegistry!["spice-l1"];
+    if (entry.kind !== "inline") throw new Error("expected inline");
+    const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
+    expect(el.isNonlinear).toBe(true);
+    expect(el.pinNodeIds).toEqual([1, 2, 3]);
+  });
+
+  it("pnp_spice_l1_modelRegistry_factory_creates_element", () => {
+    const propsObj = makeSpiceL1Props();
+    const entry = PnpBjtDefinition.modelRegistry!["spice-l1"];
     if (entry.kind !== "inline") throw new Error("expected inline");
     const el = withNodeIds(entry.factory(new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, propsObj, () => 0), [1, 2, 3]);
     expect(el.isNonlinear).toBe(true);
@@ -721,5 +779,119 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const ibAfter = (after.nodeVoltages[2] - after.nodeVoltages[1]) / 100_000;
     expectSpiceRef(icAfter, 4.425990e-03, "Ic after IS=1e-12");
     expectSpiceRef(ibAfter, 4.425990e-05, "Ib after IS=1e-12");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SPICE Level 1 model tests
+// ---------------------------------------------------------------------------
+
+describe("SPICE L1 model", () => {
+  it("has full param set including terminal resistances and capacitances", () => {
+    const paramKeys = BJT_SPICE_L1_PARAM_DEFS.map(pd => pd.key);
+    // Original simple params
+    expect(paramKeys).toContain("BF");
+    expect(paramKeys).toContain("IS");
+    expect(paramKeys).toContain("NF");
+    expect(paramKeys).toContain("BR");
+    expect(paramKeys).toContain("VAF");
+    expect(paramKeys).toContain("VAR");
+    expect(paramKeys).toContain("IKF");
+    expect(paramKeys).toContain("IKR");
+    expect(paramKeys).toContain("ISE");
+    expect(paramKeys).toContain("ISC");
+    expect(paramKeys).toContain("NR");
+    // New SPICE L1 params
+    expect(paramKeys).toContain("RB");
+    expect(paramKeys).toContain("RC");
+    expect(paramKeys).toContain("RE");
+    expect(paramKeys).toContain("NE");
+    expect(paramKeys).toContain("NC");
+    expect(paramKeys).toContain("CJE");
+    expect(paramKeys).toContain("CJC");
+    expect(paramKeys).toContain("VJE");
+    expect(paramKeys).toContain("VJC");
+    expect(paramKeys).toContain("MJE");
+    expect(paramKeys).toContain("MJC");
+    expect(paramKeys).toContain("TF");
+    expect(paramKeys).toContain("TR");
+    expect(paramKeys).toContain("FC");
+  });
+
+  it("spice_l1_param_count_is_superset_of_simple", () => {
+    expect(BJT_SPICE_L1_PARAM_DEFS.length).toBeGreaterThan(BJT_PARAM_DEFS.length);
+    // Simple has 11 params, SPICE L1 adds RB, RC, RE, NE, NC, CJE, VJE, MJE, CJC, VJC, MJC, FC, TF, TR = 14 more
+    expect(BJT_SPICE_L1_PARAM_DEFS.length).toBe(25);
+  });
+
+  it("factory_produces_valid_element_with_zero_resistances", () => {
+    // With RB=RC=RE=0 (defaults), no internal nodes needed
+    const propsObj = makeSpiceL1Props();
+    const el = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, propsObj);
+    expect(el.isNonlinear).toBe(true);
+  });
+
+  it("factory_produces_element_with_internal_nodes_when_resistances_nonzero", () => {
+    const propsObj = makeSpiceL1Props({ RB: 10, RC: 1, RE: 0.5 });
+    // With all three resistances > 0, needs 3 internal nodes
+    const internalNodes = [100, 101, 102];
+    const el = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), internalNodes, -1, propsObj);
+    expect(el.isNonlinear).toBe(true);
+  });
+
+  it("zero_resistance_zero_capacitance_matches_simple_model_dc_op", () => {
+    // With RB=RC=RE=0 and CJE=CJC=0, the SPICE L1 model should produce
+    // the same DC operating point as the simple model
+    const matrixSize = 6;
+    const branchRowVcc = 4;
+    const branchRowVbb = 5;
+
+    // Simple model circuit
+    const vcc1 = makeDcVoltageSource(4, 0, branchRowVcc, 5) as unknown as AnalogElement;
+    const vbb1 = makeDcVoltageSource(3, 0, branchRowVbb, 5) as unknown as AnalogElement;
+    const rc1 = makeResistor(4, 1, 1000);
+    const rb1 = makeResistor(3, 2, 100_000);
+    const simpleProps = makeBjtProps();
+    const simpleBjt = withNodeIds(
+      createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 0]]), -1, simpleProps),
+      [2, 1, 0],
+    );
+
+    const solver1 = new SparseSolver();
+    const diag1 = new DiagnosticCollector();
+    const result1 = solveDcOperatingPoint({
+      solver: solver1,
+      elements: [vcc1, vbb1, rc1, rb1, simpleBjt],
+      matrixSize,
+      params: DEFAULT_SIMULATION_PARAMS,
+      diagnostics: diag1,
+    });
+    expect(result1.converged).toBe(true);
+
+    // SPICE L1 model circuit with zero resistances/capacitances (defaults)
+    const vcc2 = makeDcVoltageSource(4, 0, branchRowVcc, 5) as unknown as AnalogElement;
+    const vbb2 = makeDcVoltageSource(3, 0, branchRowVbb, 5) as unknown as AnalogElement;
+    const rc2 = makeResistor(4, 1, 1000);
+    const rb2 = makeResistor(3, 2, 100_000);
+    const spiceProps = makeSpiceL1Props(); // defaults: RB=RC=RE=0, CJE=CJC=0
+    const spiceBjt = withNodeIds(
+      createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 0]]), [], -1, spiceProps),
+      [2, 1, 0],
+    );
+
+    const solver2 = new SparseSolver();
+    const diag2 = new DiagnosticCollector();
+    const result2 = solveDcOperatingPoint({
+      solver: solver2,
+      elements: [vcc2, vbb2, rc2, rb2, spiceBjt],
+      matrixSize,
+      params: DEFAULT_SIMULATION_PARAMS,
+      diagnostics: diag2,
+    });
+    expect(result2.converged).toBe(true);
+
+    // Both should produce the same collector and base voltages
+    expect(result2.nodeVoltages[0]).toBeCloseTo(result1.nodeVoltages[0], 4);
+    expect(result2.nodeVoltages[1]).toBeCloseTo(result1.nodeVoltages[1], 4);
   });
 });
