@@ -311,7 +311,7 @@ function renderExpressionEditorTab(container: HTMLElement, ctx: AppContext): voi
 // Main analysis dialog
 // ---------------------------------------------------------------------------
 
-function openAnalysisDialog(ctx: AppContext): void {
+async function openAnalysisDialog(ctx: AppContext): Promise<void> {
   const { circuit, registry, facade } = ctx;
   const flipFlopDefs = registry.getByCategory('FLIP_FLOPS' as any);
   const flipFlopNames = new Set(flipFlopDefs.map((d: { name: string }) => d.name));
@@ -336,7 +336,7 @@ function openAnalysisDialog(ctx: AppContext): void {
     let ttModel: TruthTable | null = null;
     let analysisError: string | null = null;
     try {
-      const result = analyseCircuit(facade, circuit);
+      const result = await analyseCircuit(facade, circuit);
       const inputSpecs = result.inputs.map(s => ({ name: s.name, bitWidth: s.bitWidth }));
       const outputSpecs = result.outputs.map(s => ({ name: s.name, bitWidth: s.bitWidth }));
       const outCount = outputSpecs.length;

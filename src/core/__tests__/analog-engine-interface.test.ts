@@ -137,7 +137,7 @@ describe("AnalogEngineTypes", () => {
     const diag: SolverDiagnostic = {
       code: "convergence-failed",
       severity: "error",
-      summary: "Newton-Raphson failed to converge",
+      message: "Newton-Raphson failed to converge",
       explanation: "The solver exceeded maxIterations without finding a solution.",
       suggestions: [],
     };
@@ -236,7 +236,7 @@ describe("AnalogEngineTypes", () => {
     const diag: SolverDiagnostic = {
       code: "floating-node",
       severity: "warning",
-      summary: "Node 2 is floating",
+      message: "Node 2 is floating",
       explanation: "Node 2 has no DC path to ground.",
       suggestions: [{ text: "Add a resistor to ground", automatable: false }],
       involvedNodes: [2],

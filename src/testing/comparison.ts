@@ -29,9 +29,9 @@ import type { ParsedTestData } from './parser.js';
  */
 export interface ComparatorFacade {
   compile(circuit: Circuit): SimulationCoordinator;
-  setInput(coordinator: SimulationCoordinator, label: string, value: number): void;
-  readOutput(coordinator: SimulationCoordinator, label: string): number;
-  runToStable(coordinator: SimulationCoordinator, maxIterations?: number): void;
+  setSignal(coordinator: SimulationCoordinator, label: string, value: number): void;
+  readSignal(coordinator: SimulationCoordinator, label: string): number;
+  settle(coordinator: SimulationCoordinator, settleTime?: number): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,19 +124,19 @@ function deriveSignalInventory(circuit: Circuit): SignalInventory {
  * Both circuits are compiled fresh. The same test vectors are applied to both.
  * When output signals disagree, a ComparisonMismatch is recorded.
  *
- * @param facade            The facade providing compile/setInput/readOutput/runToStable
+ * @param facade            The facade providing compile/setSignal/readSignal/settle
  * @param referenceCircuit  The known-correct reference circuit
  * @param studentCircuit    The student's circuit under evaluation
  * @param testData          Optional parsed test vectors; if absent, exhaustive mode is used
  * @returns                 ComparisonResult with match/mismatch counts and details
  * @throws                  Error if exhaustive mode is needed but total input bits > 20
  */
-export function compareCircuits(
+export async function compareCircuits(
   facade: ComparatorFacade,
   referenceCircuit: Circuit,
   studentCircuit: Circuit,
   testData?: ParsedTestData,
-): ComparisonResult {
+): Promise<ComparisonResult> {
   const refCoord = facade.compile(referenceCircuit);
   const stuCoord = facade.compile(studentCircuit);
 
@@ -160,12 +160,12 @@ export function compareCircuits(
 // Test-based comparison
 // ---------------------------------------------------------------------------
 
-function runTestBased(
+async function runTestBased(
   facade: ComparatorFacade,
   refEngine: SimulationCoordinator,
   stuEngine: SimulationCoordinator,
   testData: ParsedTestData,
-): ComparisonResult {
+): Promise<ComparisonResult> {
   const mismatches: ComparisonMismatch[] = [];
 
   for (let i = 0; i < testData.vectors.length; i++) {
@@ -186,7 +186,7 @@ function runTestBased(
       inputValues[name] = Number(tv.value);
     }
 
-    const mismatch = runOneBoth(
+    const mismatch = await runOneBoth(
       facade, refEngine, stuEngine,
       testData.inputNames, testData.outputNames,
       inputValues, i,
@@ -211,12 +211,12 @@ function runTestBased(
 // Exhaustive comparison
 // ---------------------------------------------------------------------------
 
-function runExhaustive(
+async function runExhaustive(
   facade: ComparatorFacade,
   refEngine: SimulationCoordinator,
   stuEngine: SimulationCoordinator,
   inventory: SignalInventory,
-): ComparisonResult {
+): Promise<ComparisonResult> {
   const { inputNames, inputBitWidths, outputNames, totalInputBits } = inventory;
   const totalVectors = 1 << totalInputBits;
   const mismatches: ComparisonMismatch[] = [];
@@ -232,7 +232,7 @@ function runExhaustive(
       remaining >>= width;
     }
 
-    const mismatch = runOneBoth(
+    const mismatch = await runOneBoth(
       facade, refEngine, stuEngine,
       inputNames, outputNames,
       inputValues, combo,
@@ -256,7 +256,7 @@ function runExhaustive(
 // Shared: apply one input combination to both circuits and diff outputs
 // ---------------------------------------------------------------------------
 
-function runOneBoth(
+async function runOneBoth(
   facade: ComparatorFacade,
   refEngine: SimulationCoordinator,
   stuEngine: SimulationCoordinator,
@@ -264,18 +264,18 @@ function runOneBoth(
   outputNames: string[],
   inputValues: Record<string, number>,
   vectorIndex: number,
-): ComparisonMismatch | null {
+): Promise<ComparisonMismatch | null> {
   // Apply inputs to reference
   for (const name of inputNames) {
-    facade.setInput(refEngine, name, inputValues[name] ?? 0);
+    facade.setSignal(refEngine, name, inputValues[name] ?? 0);
   }
-  facade.runToStable(refEngine);
+  await facade.settle(refEngine);
 
   // Apply same inputs to student
   for (const name of inputNames) {
-    facade.setInput(stuEngine, name, inputValues[name] ?? 0);
+    facade.setSignal(stuEngine, name, inputValues[name] ?? 0);
   }
-  facade.runToStable(stuEngine);
+  await facade.settle(stuEngine);
 
   // Read and diff outputs
   const referenceOutputs: Record<string, number> = {};
@@ -283,8 +283,8 @@ function runOneBoth(
   const differingSignals: string[] = [];
 
   for (const name of outputNames) {
-    const refVal = facade.readOutput(refEngine, name);
-    const stuVal = facade.readOutput(stuEngine, name);
+    const refVal = facade.readSignal(refEngine, name);
+    const stuVal = facade.readSignal(stuEngine, name);
     referenceOutputs[name] = refVal;
     studentOutputs[name] = stuVal;
     if (refVal !== stuVal) {

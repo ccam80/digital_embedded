@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for executeTests() — task 6.3.2.
  *
  * Uses a mock SimulatorFacade and SimulationEngine to test the executor
@@ -30,19 +30,20 @@ import type { Circuit } from "@/core/circuit";
  */
 function makeMockFacade(outputValues: Record<string, number> = {}): {
   facade: SimulatorFacade;
-  calls: { setInput: Array<[string, number]>; runToStable: number; step: number };
+  calls: { setSignal: Array<[string, number]>; settle: number; step: number };
 } {
-  const calls = { setInput: [] as Array<[string, number]>, runToStable: 0, step: 0 };
+  const calls = { setSignal: [] as Array<[string, number]>, settle: 0, step: 0 };
 
   const facade = {
-    setInput: vi.fn((_coordinator: SimulationCoordinator, label: string, value: number) => {
-      calls.setInput.push([label, value]);
+    setSignal: vi.fn((_coordinator: SimulationCoordinator, label: string, value: number) => {
+      calls.setSignal.push([label, value]);
     }),
-    readOutput: vi.fn((_coordinator: SimulationCoordinator, label: string): number => {
+    readSignal: vi.fn((_coordinator: SimulationCoordinator, label: string): number => {
       return outputValues[label] ?? 0;
     }),
-    runToStable: vi.fn((_coordinator: SimulationCoordinator) => {
-      calls.runToStable++;
+    settle: vi.fn((_coordinator: SimulationCoordinator) => {
+      calls.settle++;
+      return Promise.resolve();
     }),
     step: vi.fn((_coordinator: SimulationCoordinator) => {
       calls.step++;
@@ -115,7 +116,7 @@ describe("executeTests", () => {
   // allPass
   // -------------------------------------------------------------------------
 
-  it("allPass — AND gate truth table with all correct expected outputs → all vectors pass", () => {
+  it("allPass — AND gate truth table with all correct expected outputs → all vectors pass", async () => {
     // AND gate: Y = A AND B
     // Output map: exact match for each input combo
     const { facade } = makeMockFacade({});
@@ -125,14 +126,14 @@ describe("executeTests", () => {
     let lastB = 0;
     const andFacade = {
       ...facade,
-      setInput: vi.fn((_coordinator: SimulationCoordinator, label: string, value: number) => {
+      setSignal: vi.fn((_coordinator: SimulationCoordinator, label: string, value: number) => {
         if (label === "A") lastA = value;
         if (label === "B") lastB = value;
       }),
-      readOutput: vi.fn((_coordinator: SimulationCoordinator, _label: string): number => {
+      readSignal: vi.fn((_coordinator: SimulationCoordinator, _label: string): number => {
         return lastA & lastB;
       }),
-      runToStable: vi.fn(),
+      settle: vi.fn(() => Promise.resolve()),
     } as unknown as SimulatorFacade;
 
     const testData = buildSimpleTestData([
@@ -142,7 +143,7 @@ describe("executeTests", () => {
       { A: 1, B: 1, Y: val(1) },
     ]);
 
-    const results = executeTests(andFacade, stubEngine, stubCircuit, testData);
+    const results = await executeTests(andFacade, stubEngine, stubCircuit, testData);
 
     expect(results.total).toBe(4);
     expect(results.passed).toBe(4);
@@ -155,7 +156,7 @@ describe("executeTests", () => {
   // someFail
   // -------------------------------------------------------------------------
 
-  it("someFail — deliberate wrong expected value on row 2 → that vector fails, others pass", () => {
+  it("someFail — deliberate wrong expected value on row 2 → that vector fails, others pass", async () => {
     // readOutput always returns 0
     const { facade } = makeMockFacade({ Y: 0 });
 
@@ -165,7 +166,7 @@ describe("executeTests", () => {
       { A: 1, B: 0, Y: val(0) }, // correct: expected 0, actual 0
     ]);
 
-    const results = executeTests(facade, stubEngine, stubCircuit, testData);
+    const results = await executeTests(facade, stubEngine, stubCircuit, testData);
 
     expect(results.total).toBe(3);
     expect(results.passed).toBe(2);
@@ -179,7 +180,7 @@ describe("executeTests", () => {
   // dontCareAlwaysPasses
   // -------------------------------------------------------------------------
 
-  it("dontCareAlwaysPasses — output expectation is X → passes regardless of actual value", () => {
+  it("dontCareAlwaysPasses — output expectation is X → passes regardless of actual value", async () => {
     // readOutput returns arbitrary values
     const { facade } = makeMockFacade({ Y: 42 });
 
@@ -198,7 +199,7 @@ describe("executeTests", () => {
       ],
     };
 
-    const results = executeTests(facade, stubEngine, stubCircuit, testData);
+    const results = await executeTests(facade, stubEngine, stubCircuit, testData);
 
     expect(results.total).toBe(2);
     expect(results.passed).toBe(2);
@@ -210,7 +211,7 @@ describe("executeTests", () => {
   // clockToggle
   // -------------------------------------------------------------------------
 
-  it("clockToggle — clock input in vector → setInput called with 1 then 0, runToStable called three times", () => {
+  it("clockToggle — clock input in vector → setSignal called with 1 then 0, settle called three times", async () => {
     const { facade, calls } = makeMockFacade({ Q: 0 });
 
     const testData: ParsedTestData = {
@@ -224,24 +225,24 @@ describe("executeTests", () => {
       ],
     };
 
-    executeTests(facade, stubEngine, stubCircuit, testData);
+    await executeTests(facade, stubEngine, stubCircuit, testData);
 
-    // Clock toggle: setInput(CLK, 1) then setInput(CLK, 0)
-    const clockCalls = calls.setInput.filter(([label]) => label === "CLK");
+    // Clock toggle: setSignal(CLK, 1) then setSignal(CLK, 0)
+    const clockCalls = calls.setSignal.filter(([label]) => label === "CLK");
     expect(clockCalls).toHaveLength(2);
     expect(clockCalls[0]).toEqual(["CLK", 1]);
     expect(clockCalls[1]).toEqual(["CLK", 0]);
 
-    // runToStable called three times: once to propagate regular inputs before the clock edge,
+    // settle called three times: once to propagate regular inputs before the clock edge,
     // once after rising edge, once after falling edge
-    expect(calls.runToStable).toBe(3);
+    expect(calls.settle).toBe(3);
   });
 
   // -------------------------------------------------------------------------
   // resultsStructure
   // -------------------------------------------------------------------------
 
-  it("resultsStructure — TestResults has correct passed, failed, total counts and vectors array length", () => {
+  it("resultsStructure — TestResults has correct passed, failed, total counts and vectors array length", async () => {
     // 5 vectors, readOutput always returns 1, expected values mix of 0 and 1
     const { facade } = makeMockFacade({ Y: 1 });
 
@@ -253,7 +254,7 @@ describe("executeTests", () => {
       { A: 0, B: 0, Y: val(0) }, // fail (actual=1, expected=0)
     ]);
 
-    const results = executeTests(facade, stubEngine, stubCircuit, testData);
+    const results = await executeTests(facade, stubEngine, stubCircuit, testData);
 
     expect(results.total).toBe(5);
     expect(results.passed).toBe(3);

@@ -27,8 +27,6 @@ export type {
   NetPin,
   ComponentDescriptor,
   PinDescriptor,
-  Diagnostic,
-  DiagnosticCode,
   CircuitSpec,
   ComponentSpec,
   CircuitPatch,
@@ -42,6 +40,7 @@ export type {
   PatchOptions,
   PatchResult,
 } from './netlist-types.js';
+export type { Diagnostic, DiagnosticCode } from '../compile/types.js';
 
 // ============================================
 // Builder and facade

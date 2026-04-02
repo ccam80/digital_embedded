@@ -16,7 +16,8 @@ import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import { extractEmbeddedTestData } from './test-runner.js';
 import { parseTestData } from '../testing/parser.js';
 import { executeTests } from '../testing/executor.js';
-import type { CircuitSpec, CircuitPatch, PatchOptions, PatchResult, Diagnostic, Netlist } from './netlist-types.js';
+import type { CircuitSpec, CircuitPatch, PatchOptions, PatchResult, Netlist } from './netlist-types.js';
+import type { Diagnostic } from '../compile/types.js';
 import { resolveComponent, resolvePin, resolveScope } from './address.js';
 import { resolveNets } from './netlist.js';
 import { autoLayout } from './auto-layout.js';
@@ -331,11 +332,11 @@ export class CircuitBuilder {
    * @returns         TestResults with per-vector pass/fail details.
    * @throws FacadeError if no test data is available.
    */
-  runTests(
+  async runTests(
     coordinator: SimulationCoordinator,
     circuit: Circuit,
     testData?: string,
-  ): TestResults {
+  ): Promise<TestResults> {
     const resolvedData = testData ?? extractEmbeddedTestData(circuit);
 
     if (resolvedData === null || resolvedData.trim().length === 0) {
@@ -347,7 +348,7 @@ export class CircuitBuilder {
     const parsed = parseTestData(resolvedData);
     // Provide a minimal RunnerFacade inline — reads/writes via the coordinator directly.
     const runnerFacade = {
-      setInput(coord: SimulationCoordinator, label: string, value: number): void {
+      setSignal(coord: SimulationCoordinator, label: string, value: number): void {
         const addr = coord.compiled.labelSignalMap.get(label);
         if (addr === undefined) {
           const available = [...coord.compiled.labelSignalMap.keys()].join(', ');
@@ -355,12 +356,13 @@ export class CircuitBuilder {
             `Label "${label}" not found in compiled circuit. Available labels: ${available || '(none)'}`,
           );
         }
-        const sv = addr.domain === 'analog'
-          ? { type: 'analog' as const, voltage: value }
-          : { type: 'digital' as const, value };
-        coord.writeSignal(addr, sv);
+        if (addr.domain === 'analog') {
+          coord.setSourceByLabel(label, value);
+          return;
+        }
+        coord.writeSignal(addr, { type: 'digital', value });
       },
-      readOutput(coord: SimulationCoordinator, label: string): number {
+      readSignal(coord: SimulationCoordinator, label: string): number {
         const addr = coord.compiled.labelSignalMap.get(label);
         if (addr === undefined) {
           const available = [...coord.compiled.labelSignalMap.keys()].join(', ');
@@ -374,18 +376,12 @@ export class CircuitBuilder {
       step(coord: SimulationCoordinator, _opts?: { clockAdvance?: boolean }): void {
         coord.step();
       },
-      runToStable(coord: SimulationCoordinator, maxIterations = 1000): void {
-        for (let iter = 0; iter < maxIterations; iter++) {
-          const before = coord.snapshotSignals();
+      async settle(coord: SimulationCoordinator, settleTime = 0.01): Promise<void> {
+        if (coord.simTime === null) {
           coord.step();
-          const after = coord.snapshotSignals();
-          let stable = true;
-          for (let n = 0; n < before.length; n++) {
-            if (before[n] !== after[n]) { stable = false; break; }
-          }
-          if (stable) return;
+          return;
         }
-        throw new FacadeError(`Circuit did not stabilize within ${maxIterations} iterations.`);
+        await coord.stepToTime(coord.simTime + settleTime);
       },
     };
     return executeTests(runnerFacade, coordinator, circuit, parsed);

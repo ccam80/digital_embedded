@@ -12,8 +12,12 @@
 
 import type { Engine, CompiledCircuit, MeasurementObserver } from "./engine-interface.js";
 import type { Wire } from "../core/circuit.js";
-import type { AcParams, AcResult, SolverDiagnosticCode, DiagnosticSuggestion, SolverDiagnostic } from "./analog-types.js";
-export type { AcParams, AcResult, SolverDiagnosticCode, DiagnosticSuggestion, SolverDiagnostic };
+import type { AcParams, AcResult, DiagnosticSuggestion } from "./analog-types.js";
+import type { Diagnostic, DiagnosticCode } from "../compile/types.js";
+export type { AcParams, AcResult, DiagnosticSuggestion };
+export type { Diagnostic, DiagnosticCode };
+export type { DiagnosticCode as SolverDiagnosticCode } from "../compile/types.js";
+export type { Diagnostic as SolverDiagnostic } from "../compile/types.js";
 
 // ---------------------------------------------------------------------------
 // SimulationParams — transient solver configuration
@@ -75,7 +79,7 @@ export interface DcOpResult {
   /** Node voltages at the operating point (indexed by MNA node ID). */
   nodeVoltages: Float64Array;
   /** Any diagnostics emitted during the DC analysis. */
-  diagnostics: SolverDiagnostic[];
+  diagnostics: Diagnostic[];
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +212,7 @@ export interface AnalogEngine extends Engine {
    * emitted. Multiple callbacks can be registered; each is called in
    * registration order.
    */
-  onDiagnostic(callback: (diag: SolverDiagnostic) => void): void;
+  onDiagnostic(callback: (diag: Diagnostic) => void): void;
 
   // -------------------------------------------------------------------------
   // Breakpoints — timestep landing targets

@@ -2,10 +2,10 @@
  * Test Executor — drives the simulation engine with parsed test vectors.
  *
  * For each vector:
- *   1. Set all non-clock inputs via facade.setInput()
- *   2. For clock inputs: toggle high → runToStable() → toggle low → runToStable()
- *   3. For non-clock inputs: runToStable() to propagate
- *   4. Read all output signals via facade.readOutput()
+ *   1. Set all non-clock inputs via facade.setSignal()
+ *   2. For clock inputs: toggle high → settle() → toggle low → settle()
+ *   3. For non-clock inputs: settle() to propagate
+ *   4. Read all output signals via facade.readSignal()
  *   5. Compare against expected values
  *
  */
@@ -29,9 +29,9 @@ export type { TestValue } from './parser.js';
  * Defined here to avoid circular imports between executor.ts and test-runner.ts.
  */
 export interface RunnerFacade {
-  setInput(coordinator: SimulationCoordinator, label: string, value: number): void;
-  readOutput(coordinator: SimulationCoordinator, label: string): number;
-  runToStable(coordinator: SimulationCoordinator, maxIterations?: number): void;
+  setSignal(coordinator: SimulationCoordinator, label: string, value: number): void;
+  readSignal(coordinator: SimulationCoordinator, label: string): number;
+  settle(coordinator: SimulationCoordinator, settleTime?: number): Promise<void>;
   step(coordinator: SimulationCoordinator, opts?: { clockAdvance?: boolean }): void;
 }
 
@@ -55,29 +55,29 @@ const HIGH_Z_SENTINEL = 0xFFFFFFFF;
 /**
  * Execute all test vectors from ParsedTestData against the simulation engine.
  *
- * The facade is used for setInput / readOutput / runToStable calls.
+ * The facade is used for setSignal / readSignal / settle calls.
  * Clock inputs (TestValue kind='clock') receive a full toggle cycle:
- *   drive high → runToStable → drive low → runToStable.
- * Non-clock inputs are set directly, then runToStable() is called once.
+ *   drive high → settle → drive low → settle.
+ * Non-clock inputs are set directly, then settle() is called once.
  *
- * @param facade   The SimulatorFacade providing setInput/readOutput/runToStable
+ * @param facade   The SimulatorFacade providing setSignal/readSignal/settle
  * @param engine   The compiled simulation engine
  * @param circuit  The circuit (unused for execution, included for future metadata access)
  * @param testData The parsed test vectors to execute
  * @returns        TestResults with pass/fail counts and per-vector details
  */
-export function executeTests(
+export async function executeTests(
   facade: RunnerFacade,
   coordinator: SimulationCoordinator,
   _circuit: Circuit,
   testData: ParsedTestData,
-): TestResults {
+): Promise<TestResults> {
   const vectorResults: TestVector[] = [];
   let passed = 0;
   let failed = 0;
 
   for (const vector of testData.vectors) {
-    const result = executeVector(facade, coordinator, testData, vector);
+    const result = await executeVector(facade, coordinator, testData, vector);
     vectorResults.push(result);
     if (result.passed) {
       passed++;
@@ -101,12 +101,12 @@ export function executeTests(
 /**
  * Execute a single test vector row and return its result.
  */
-function executeVector(
+async function executeVector(
   facade: RunnerFacade,
   coordinator: SimulationCoordinator,
   testData: ParsedTestData,
   vector: ParsedVector,
-): TestVector {
+): Promise<TestVector> {
   const inputRecord: Record<string, number> = {};
   const expectedOutputs: Record<string, number> = {};
   const actualOutputs: Record<string, number> = {};
@@ -134,34 +134,34 @@ function executeVector(
     }
     if (val.kind === 'highZ') {
       // Setting HIGH_Z on an input — use HIGH_Z_SENTINEL
-      facade.setInput(coordinator, name, HIGH_Z_SENTINEL);
+      facade.setSignal(coordinator, name, HIGH_Z_SENTINEL);
       inputRecord[name] = HIGH_Z_SENTINEL;
       continue;
     }
     // kind === 'value' or 'clock' — clock inputs handled above via regularInputs list
     const numericValue = val.kind === 'value' ? Number(val.value) : 0;
-    facade.setInput(coordinator, name, numericValue);
+    facade.setSignal(coordinator, name, numericValue);
     inputRecord[name] = numericValue;
   }
 
   // Propagate regular inputs so combinational paths (decoders, enables,
   // muxes) settle before any clock edge arrives.  Without this, sequential
   // components' sampleFns would see stale enable/data signals.
-  facade.runToStable(coordinator);
+  await facade.settle(coordinator);
 
-  // Handle clock inputs: toggle high → runToStable → low → runToStable
-  // Use runToStable() to allow ripple propagation through cascaded sequential elements.
+  // Handle clock inputs: toggle high → settle → low → settle
+  // Use settle() to allow ripple propagation through cascaded sequential elements.
   if (clockInputs.length > 0) {
     for (const name of clockInputs) {
-      facade.setInput(coordinator, name, 1);
+      facade.setSignal(coordinator, name, 1);
       inputRecord[name] = 1;
     }
-    facade.runToStable(coordinator);
+    await facade.settle(coordinator);
 
     for (const name of clockInputs) {
-      facade.setInput(coordinator, name, 0);
+      facade.setSignal(coordinator, name, 0);
     }
-    facade.runToStable(coordinator);
+    await facade.settle(coordinator);
   }
 
   // Read all outputs and compare
@@ -169,7 +169,7 @@ function executeVector(
 
   for (const name of testData.outputNames) {
     const expected = vector.outputs.get(name);
-    const actual = facade.readOutput(coordinator, name);
+    const actual = facade.readSignal(coordinator, name);
     actualOutputs[name] = actual;
 
     if (expected === undefined || expected.kind === 'dontCare') {

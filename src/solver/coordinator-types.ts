@@ -253,6 +253,20 @@ export interface SimulationCoordinator {
    */
   setComponentProperty(element: CircuitElement, key: string, value: number): void;
 
+  /**
+   * Set an analog source parameter by component label.
+   *
+   * Resolves the label to a CircuitElement via labelToCircuitElement,
+   * then calls setComponentProperty to re-stamp the MNA matrix.
+   * The paramKey is the primary parameter of the source (e.g. "voltage",
+   * "current"). If the label is not found or has no analog representation,
+   * this is a no-op.
+   *
+   * @param label    Component label (e.g. "Vdc", "Iin")
+   * @param value    New parameter value
+   */
+  setSourceByLabel(label: string, value: number): void;
+
   // -------------------------------------------------------------------------
   // §1.8 Measurement signal reading (for ScopePanel)
   // -------------------------------------------------------------------------

@@ -228,7 +228,7 @@ export function initApp(search?: string): void {
       if (result.diagnostics.length > 0) {
         const errs = result.diagnostics.filter(d => d.severity === 'error');
         if (errs.length > 0) {
-          showStatus(`AC Sweep error: ${errs[0].summary}`, true);
+          showStatus(`AC Sweep error: ${errs[0].message}`, true);
           return;
         }
       }
@@ -457,16 +457,16 @@ export function initApp(search?: string): void {
         facade.step(engine);
         renderPipeline.scheduleRender();
       },
-      setInput: (label: string, value: number) => {
+      setSignal: (label: string, value: number) => {
         const engine = facade.getActiveCoordinator();
         if (!engine) throw new Error('No circuit loaded');
-        facade.setInput(engine, label, value);
+        facade.setSignal(engine, label, value);
         renderPipeline.scheduleRender();
       },
-      readOutput: (label: string) => {
+      readSignal: (label: string) => {
         const engine = facade.getActiveCoordinator();
         if (!engine) throw new Error('No circuit loaded');
-        return facade.readOutput(engine, label);
+        return facade.readSignal(engine, label);
       },
       readAllSignals: () => {
         const engine = facade.getActiveCoordinator();
@@ -624,7 +624,7 @@ export function initApp(search?: string): void {
               const { detectInputCount } = await import('../testing/detect-input-count.js');
               const inputCount = detectInputCount(circuit, registry, testData);
               const parsed = parseTestData(testData, inputCount);
-              const results = executeTests(facade as import('../testing/executor.js').RunnerFacade, coordinator, circuit, parsed);
+              const results = await executeTests(facade as import('../testing/executor.js').RunnerFacade, coordinator, circuit, parsed);
               return { passed: results.passed, failed: results.failed, total: results.total };
             } catch (err) {
               return { passed: 0, failed: 1, total: 1, message: err instanceof Error ? err.message : String(err) };

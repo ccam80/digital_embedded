@@ -24,7 +24,7 @@ describe("DiagnosticCollector", () => {
       const diag: SolverDiagnostic = {
         code: "singular-matrix",
         severity: "error",
-        summary: "Singular matrix detected",
+        message:"Singular matrix detected",
         explanation: "The matrix is singular",
         suggestions: [],
       };
@@ -43,7 +43,7 @@ describe("DiagnosticCollector", () => {
       const diag1: SolverDiagnostic = {
         code: "singular-matrix",
         severity: "error",
-        summary: "Singular matrix",
+        message:"Singular matrix",
         explanation: "Matrix is singular",
         suggestions: [],
       };
@@ -51,7 +51,7 @@ describe("DiagnosticCollector", () => {
       const diag2: SolverDiagnostic = {
         code: "convergence-failed",
         severity: "warning",
-        summary: "Convergence failed",
+        message:"Convergence failed",
         explanation: "NR did not converge",
         suggestions: [],
       };
@@ -59,7 +59,7 @@ describe("DiagnosticCollector", () => {
       const diag3: SolverDiagnostic = {
         code: "no-ground",
         severity: "error",
-        summary: "No ground element",
+        message:"No ground element",
         explanation: "Circuit has no ground",
         suggestions: [],
       };
@@ -81,7 +81,7 @@ describe("DiagnosticCollector", () => {
       const diag: SolverDiagnostic = {
         code: "singular-matrix",
         severity: "error",
-        summary: "Singular matrix",
+        message:"Singular matrix",
         explanation: "Matrix is singular",
         suggestions: [],
       };
@@ -103,7 +103,7 @@ describe("DiagnosticCollector", () => {
       const diag1: SolverDiagnostic = {
         code: "singular-matrix",
         severity: "error",
-        summary: "Singular matrix",
+        message:"Singular matrix",
         explanation: "Matrix is singular",
         suggestions: [],
       };
@@ -116,7 +116,7 @@ describe("DiagnosticCollector", () => {
       const diag2: SolverDiagnostic = {
         code: "convergence-failed",
         severity: "warning",
-        summary: "Convergence failed",
+        message:"Convergence failed",
         explanation: "NR did not converge",
         suggestions: [],
       };
@@ -138,7 +138,7 @@ describe("makeDiagnostic", () => {
 
       expect(diag.code).toBe("singular-matrix");
       expect(diag.severity).toBe("error");
-      expect(diag.summary).toBe("Singular matrix detected");
+      expect(diag.message).toBe("Singular matrix detected");
     });
 
     it("should default suggestions to empty array", () => {

@@ -13,7 +13,7 @@
 
 import type { Circuit } from "../core/circuit.js";
 import type { ComponentRegistry } from "../core/registry.js";
-import type { Diagnostic } from "../headless/netlist-types.js";
+import type { Diagnostic } from "../compile/types.js";
 import { parseCtzText as parseCtzTextFormat, mapCtzToCircuit } from "./ctz-format.js";
 
 // ---------------------------------------------------------------------------

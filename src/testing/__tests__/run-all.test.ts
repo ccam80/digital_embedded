@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for runAllTests() — task 7.3.2.
  *
  * Tests:
@@ -88,15 +88,16 @@ function makeFacade(outputValues: Record<string, number> = {}): RunnerFacade {
   const lastInputs: Record<string, number> = {};
 
   return {
-    setInput(_coordinator: SimulationCoordinator, label: string, value: number): void {
+    setSignal(_coordinator: SimulationCoordinator, label: string, value: number): void {
       lastInputs[label] = value;
     },
-    readOutput(_coordinator: SimulationCoordinator, label: string): number {
+    readSignal(_coordinator: SimulationCoordinator, label: string): number {
       // Return pre-defined value or fall back to what was last set on input
       return outputValues[label] ?? lastInputs[label] ?? 0;
     },
-    runToStable(_coordinator: SimulationCoordinator): void {
+    settle(_coordinator: SimulationCoordinator): Promise<void> {
       // no-op
+      return Promise.resolve();
     },
     step(_coordinator: SimulationCoordinator): void {},
   };
@@ -137,18 +138,18 @@ describe('runAllTests', () => {
   // multipleTestcases
   // -------------------------------------------------------------------------
 
-  it('multipleTestcases — circuit with 3 Testcase components → all 3 executed, results aggregated', () => {
-    // Buffer facade: readOutput('Y') returns what was last set on 'A'
+  it('multipleTestcases — circuit with 3 Testcase components → all 3 executed, results aggregated', async () => {
+    // Buffer facade: readSignal('Y') returns what was last set on 'A'
     const lastA = { value: 0 };
     const facade: RunnerFacade = {
-      setInput(_e, label, value) {
+      setSignal(_e, label, value) {
         if (label === 'A') lastA.value = value;
       },
-      readOutput(_e, label) {
+      readSignal(_e, label) {
         if (label === 'Y') return lastA.value;
         return 0;
       },
-      runToStable() {},
+      settle(): Promise<void> { return Promise.resolve(); },
       step() {},
     };
 
@@ -157,7 +158,7 @@ describe('runAllTests', () => {
     const tc3 = makeTestcase(BUFFER_TEST);  // 2 rows, both pass
     const circuit = makeCircuit(tc1, tc2, tc3);
 
-    const aggregate: AggregateTestResults = runAllTests(facade, stubEngine, circuit);
+    const aggregate: AggregateTestResults = await runAllTests(facade, stubEngine, circuit);
 
     expect(aggregate.testcaseCount).toBe(3);
     expect(aggregate.results).toHaveLength(3);
@@ -171,7 +172,7 @@ describe('runAllTests', () => {
   // summaryCorrect
   // -------------------------------------------------------------------------
 
-  it('summaryCorrect — one testcase 5/5 pass, one 3/5 pass → aggregate shows 8/10', () => {
+  it('summaryCorrect — one testcase 5/5 pass, one 3/5 pass → aggregate shows 8/10', async () => {
     // For FIVE_ROW_PASS_TEST: all rows expect Y=1, readOutput returns 1 → 5/5 pass
     // For THREE_OF_FIVE_PASS_TEST: rows expect alternating 1/0, readOutput always returns 1
     //   → rows expecting 1 pass (rows 1,3), rows expecting 0 fail (rows 2,4,5) → 3 pass, 2 fail... wait:
@@ -205,7 +206,7 @@ describe('runAllTests', () => {
     // 1 In element → inputCount=1, so column 0 = input A, column 1 = output Y
     const circuit = makeCircuitWithInputs(1, tc1, tc2);
 
-    const aggregate = runAllTests(facade, stubEngine, circuit);
+    const aggregate = await runAllTests(facade, stubEngine, circuit);
 
     expect(aggregate.testcaseCount).toBe(2);
     expect(aggregate.totalPassed).toBe(8);
@@ -222,12 +223,12 @@ describe('runAllTests', () => {
   // noTestcases
   // -------------------------------------------------------------------------
 
-  it('noTestcases — circuit with no Testcase components → returns empty results, not an error', () => {
+  it('noTestcases — circuit with no Testcase components → returns empty results, not an error', async () => {
     const facade = makeFacade();
     const circuit = new Circuit({ name: 'Empty' });
     // circuit has no elements at all
 
-    const aggregate = runAllTests(facade, stubEngine, circuit);
+    const aggregate = await runAllTests(facade, stubEngine, circuit);
 
     expect(aggregate.testcaseCount).toBe(0);
     expect(aggregate.totalPassed).toBe(0);
@@ -236,20 +237,20 @@ describe('runAllTests', () => {
     expect(aggregate.results).toHaveLength(0);
   });
 
-  it('noTestcases — circuit with only non-Testcase elements → empty aggregate', () => {
+  it('noTestcases — circuit with only non-Testcase elements → empty aggregate', async () => {
     const facade = makeFacade();
     const circuit = makeCircuit();
     // No testcase elements — just test that a circuit with elements that are
     // not TestcaseElement instances yields empty results. We can't add other
     // element types without their full setup, so test via empty circuit is sufficient.
 
-    const aggregate = runAllTests(facade, stubEngine, circuit);
+    const aggregate = await runAllTests(facade, stubEngine, circuit);
 
     expect(aggregate.testcaseCount).toBe(0);
     expect(aggregate.results).toHaveLength(0);
   });
 
-  it('noTestcases — empty testData string is skipped, not counted', () => {
+  it('noTestcases — empty testData string is skipped, not counted', async () => {
     // A Testcase with empty testData should not appear in results
     const facade = makeFacade();
     const propsEmpty = new PropertyBag([
@@ -265,7 +266,7 @@ describe('runAllTests', () => {
     );
     const circuit = makeCircuit(emptyTc);
 
-    const aggregate = runAllTests(facade, stubEngine, circuit);
+    const aggregate = await runAllTests(facade, stubEngine, circuit);
 
     expect(aggregate.testcaseCount).toBe(0);
   });

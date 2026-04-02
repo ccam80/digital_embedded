@@ -59,12 +59,12 @@ export interface TruthTable {
 /**
  * Analyse a combinational circuit and return its complete truth table.
  *
- * @param facade   The simulator facade (provides compile/setInput/readOutput/runToStable).
+ * @param facade   The simulator facade (provides compile/setSignal/readSignal/settle).
  * @param circuit  The circuit to analyse.
  * @returns        Complete truth table with all 2^N input combinations.
  * @throws Error   If input count exceeds 20 bits, or combinational cycles are detected.
  */
-export function analyseCircuit(facade: SimulatorFacade, circuit: Circuit): TruthTable {
+export async function analyseCircuit(facade: SimulatorFacade, circuit: Circuit): Promise<TruthTable> {
   // Step 1: identify inputs and outputs
   const inputs = collectInputSpecs(circuit);
   const outputs = collectOutputSpecs(circuit);
@@ -100,15 +100,15 @@ export function analyseCircuit(facade: SimulatorFacade, circuit: Circuit): Truth
 
     // Set each input
     for (let i = 0; i < inputs.length; i++) {
-      facade.setInput(engine, inputs[i].name, Number(inputValues[i]));
+      facade.setSignal(engine, inputs[i].name, Number(inputValues[i]));
     }
 
     // Propagate
-    facade.runToStable(engine);
+    await facade.settle(engine);
 
     // Read outputs
     const outputValues = outputs.map((out) =>
-      BigInt(facade.readOutput(engine, out.name)),
+      BigInt(facade.readSignal(engine, out.name)),
     );
 
     rows.push({ inputValues, outputValues });

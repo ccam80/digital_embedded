@@ -80,16 +80,16 @@ export interface AggregateTestResults {
  *
  * If no Testcase components are present, returns an empty aggregate (not an error).
  *
- * @param facade   The simulation runner facade (setInput/readOutput/runToStable)
+ * @param facade   The simulation runner facade (setSignal/readSignal/settle)
  * @param engine   The compiled simulation engine
  * @param circuit  The circuit to scan for Testcase components
  * @returns        Aggregate test results across all testcases
  */
-export function runAllTests(
+export async function runAllTests(
   facade: RunnerFacade,
   coordinator: SimulationCoordinator,
   circuit: Circuit,
-): AggregateTestResults {
+): Promise<AggregateTestResults> {
   const perTestcase: TestcaseResult[] = [];
   let totalPassed = 0;
   let totalFailed = 0;
@@ -102,7 +102,7 @@ export function runAllTests(
 
     const inputCount = countInputs(circuit);
     const parsed = parseTestData(raw, inputCount > 0 ? inputCount : undefined);
-    const results = executeTests(facade, coordinator, circuit, parsed);
+    const results = await executeTests(facade, coordinator, circuit, parsed);
 
     perTestcase.push({ testcase: element, results });
     totalPassed += results.passed;

@@ -353,11 +353,18 @@ export function compileUnified(
   // Collect analog diagnostics
   if (compiledAnalog !== null) {
     for (const d of compiledAnalog.diagnostics) {
-      diagnostics.push({
-        severity: d.severity === "error" ? "error" : "warning",
-        code: d.code as unknown as import('./types.js').DiagnosticCode,
-        message: d.summary,
-      });
+      diagnostics.push(d);
+    }
+  }
+
+  const labelToCircuitElement = new Map<string, import("../core/element.js").CircuitElement>();
+  for (const el of circuit.elements) {
+    const props = el.getProperties();
+    if (props.has('label')) {
+      const lbl = props.get<string>('label');
+      if (lbl !== undefined && lbl !== '') {
+        labelToCircuitElement.set(lbl, el);
+      }
     }
   }
 
@@ -367,6 +374,7 @@ export function compileUnified(
     bridges,
     wireSignalMap,
     labelSignalMap,
+    labelToCircuitElement,
     pinSignalMap,
     diagnostics,
     allCircuitElements: circuit.elements,

@@ -128,7 +128,7 @@ describe("competing voltage constraints diagnostic", () => {
 
     expect(competing.length).toBeGreaterThanOrEqual(1);
     expect(competing[0].severity).toBe("error");
-    expect(competing[0].summary).toContain("Two competing voltage sources");
+    expect(competing[0].message).toContain("Two competing voltage sources");
   });
 
   it("single voltage source on net emits no competing-voltage-constraints", () => {

@@ -5,6 +5,7 @@
  * introspection and design. The core principle: **read and write use
  * the same addressing scheme.** If the netlist shows `sysreg:ADD [1-bit]`,
  * the edit is `{ op: 'set', target: 'ADD', props: { Bits: 16 } }`.
+ * For analog: if the netlist shows `R1:A [terminal]`, addressing is `R1:A`.
  */
 
 import type { PinDirection } from '../core/pin.js';
@@ -34,11 +35,13 @@ export interface Netlist {
 export interface NetDescriptor {
   /** Unique net identifier (stable within one netlist call). */
   readonly netId: number;
+  /** Circuit domain of this net: 'digital', 'analog', or 'mixed'. */
+  readonly domain: 'digital' | 'analog' | 'mixed';
   /**
-   * Inferred bit width of this net. `null` when pins disagree (→ diagnostic).
-   * When pins agree, this is their shared width.
+   * Bit width when all digital pins on this net agree.
+   * Omitted for analog nets (analog terminals are single-node, not bus-width).
    */
-  readonly inferredWidth: number | null;
+  readonly bitWidth?: number;
   /** All pins connected to this net. */
   readonly pins: NetPin[];
 }
@@ -52,18 +55,14 @@ export interface NetDescriptor {
 export interface NetPin {
   /** Index into `Netlist.components`. */
   readonly componentIndex: number;
-  /** Component type name (e.g. "And", "In", "sysreg"). */
+  /** Component type name (e.g. "And", "In", "sysreg", "Resistor"). */
   readonly componentType: string;
   /** User-assigned label if present, otherwise instanceId. */
   readonly componentLabel: string;
-  /** Pin label on the component (e.g. "A", "Q", "ADD"). */
+  /** Pin label on the component (e.g. "A", "Q", "ADD", "P"). */
   readonly pinLabel: string;
-  /** Pin direction. */
-  readonly pinDirection: PinDirection;
-  /** Declared bit width on this pin. */
-  readonly declaredWidth: number;
-  /** Subcircuit nesting path, e.g. ["MCU.dig", "sysreg"]. Empty for top-level. */
-  readonly hierarchyPath: readonly string[];
+  /** Domain of this pin: 'digital' or 'analog'. */
+  readonly domain: string;
 }
 
 /**
@@ -72,7 +71,7 @@ export interface NetPin {
 export interface ComponentDescriptor {
   /** Index in the circuit's element list. */
   readonly index: number;
-  /** Component type name (e.g. "And", "FlipflopD"). */
+  /** Component type name (e.g. "And", "FlipflopD", "Resistor"). */
   readonly typeId: string;
   /** User-assigned label, if any. */
   readonly label: string | undefined;
@@ -80,12 +79,10 @@ export interface ComponentDescriptor {
   readonly instanceId: string;
   /** All pins on this component, with connectivity info. */
   readonly pins: PinDescriptor[];
-  /** Component properties (Bits, label, Inputs, etc.). */
+  /** Component properties (Bits, label, Inputs, resistance, etc.). */
   readonly properties: Record<string, PropertyValue>;
-  /** Simulation model keys available for this component type (e.g. ["digital"], ["analog"], ["digital", "analog"]). */
-  readonly availableModels: string[];
-  /** Active model key for this instance, if explicitly set. */
-  readonly activeModel?: string;
+  /** Active simulation model key for this instance (e.g. "digital", "spice-l1", "behavioral"). */
+  readonly modelKey: string;
 }
 
 /**
@@ -95,23 +92,19 @@ export interface ComponentDescriptor {
  * you see every other pin on the same net. Width mismatches jump out.
  */
 export interface PinDescriptor {
-  /** Pin label (e.g. "A", "out", "ADD"). */
+  /** Pin label (e.g. "A", "out", "ADD", "P"). */
   readonly label: string;
-  /** Pin direction. */
-  readonly direction: PinDirection;
-  /** Declared bit width. */
-  readonly bitWidth: number;
+  /** Domain of this pin: 'digital' or 'analog'. */
+  readonly domain: string;
+  /** Pin direction. Omitted for analog-domain pins (terminals are non-directional). */
+  readonly direction?: PinDirection;
+  /** Bit width. Omitted for analog-domain pins. */
+  readonly bitWidth?: number;
   /** Net ID this pin is assigned to (-1 if unconnected). */
   readonly netId: number;
   /** All OTHER pins on the same net. Empty if unconnected. */
   readonly connectedTo: NetPin[];
 }
-
-// ===========================================================================
-// Diagnostics — re-exported from compile/types.ts (canonical home)
-// ===========================================================================
-
-export type { DiagnosticCode, Diagnostic } from '../compile/types.js';
 
 // ===========================================================================
 // Circuit spec — declarative circuit creation (the write side, new circuits)

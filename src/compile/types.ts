@@ -12,14 +12,13 @@ import type { ComponentDefinition, DigitalModel, AnalogFactory } from "../core/r
 import type { ComponentRegistry } from "../core/registry.js";
 import type { CompiledCircuitImpl as CompiledDigitalDomain } from "../solver/digital/compiled-circuit.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledAnalogDomain } from "../solver/analog/compiled-analog-circuit.js";
-import type { NetPin } from "../headless/netlist-types.js";
 
 // ---------------------------------------------------------------------------
-// Diagnostic and DiagnosticCode — canonical definitions (moved from headless)
+// Diagnostic and DiagnosticCode — canonical unified definitions
 // ---------------------------------------------------------------------------
 
 /**
- * Diagnostic codes for pre-compilation and compilation errors/warnings.
+ * All diagnostic codes emitted by the compiler, netlist validator, and analog solver.
  */
 export type DiagnosticCode =
   | 'width-mismatch'
@@ -35,11 +34,55 @@ export type DiagnosticCode =
   | 'orphaned-pin-loading-override'
   | 'invalid-simulation-model'
   | 'unresolved-model-ref'
-  | 'competing-voltage-constraints';
+  | 'competing-voltage-constraints'
+  | 'singular-matrix'
+  | 'voltage-source-loop'
+  | 'floating-node'
+  | 'orphan-node'
+  | 'inductor-loop'
+  | 'no-ground'
+  | 'convergence-failed'
+  | 'timestep-too-small'
+  | 'dc-op-converged'
+  | 'dc-op-gmin'
+  | 'dc-op-source-step'
+  | 'dc-op-failed'
+  | 'model-param-ignored'
+  | 'model-level-unsupported'
+  | 'bridge-inner-compile-error'
+  | 'bridge-unconnected-pin'
+  | 'bridge-missing-inner-pin'
+  | 'bridge-indeterminate-input'
+  | 'bridge-oscillating-input'
+  | 'bridge-impedance-mismatch'
+  | 'transmission-line-low-segments'
+  | 'reverse-biased-cap'
+  | 'fuse-blown'
+  | 'ndr-convergence-assist'
+  | 'rs-flipflop-both-set'
+  | 'ac-no-source'
+  | 'ac-linearization-failed'
+  | 'monte-carlo-trial-failed'
+  | 'unconnected-analog-pin';
+
+/**
+ * A concrete suggestion attached to a `Diagnostic`.
+ *
+ * When `automatable` is `true`, the editor can apply the fix automatically
+ * using the `patch` field as a circuit patch operation.
+ */
+export interface DiagnosticSuggestion {
+  /** Human-readable description of the suggested fix. */
+  text: string;
+  /** Whether the editor can apply this fix without user intervention. */
+  automatable: boolean;
+  /** Optional patch operation that implements the fix. */
+  patch?: unknown;
+}
 
 /**
  * A single diagnostic: an error, warning, or informational note about
- * the circuit structure.
+ * the circuit structure or analog solver state.
  *
  * Consumed by:
  * - GUI status bar / error panel (human-readable `message`)
@@ -53,16 +96,26 @@ export interface Diagnostic {
   readonly code: DiagnosticCode;
   /** Human-readable description. */
   readonly message: string;
+  /** Detailed explanation for display in the diagnostics panel. */
+  readonly explanation?: string;
+  /** Ordered list of suggested fixes. */
+  readonly suggestions?: DiagnosticSuggestion[];
+  /** MNA node IDs involved in this diagnostic, if applicable. */
+  readonly involvedNodes?: number[];
+  /** World-space positions of involved pins, for overlay rendering. */
+  readonly involvedPositions?: Point[];
+  /** Element IDs involved in this diagnostic, if applicable. */
+  readonly involvedElements?: number[];
+  /** Simulation time at which this diagnostic was emitted, in seconds. */
+  readonly simTime?: number;
+  /** Additional detail string for extended context. */
+  readonly detail?: string;
   /** Net involved, if applicable. */
   readonly netId?: number;
-  /** Pins involved (e.g. the two sides of a width mismatch). */
-  readonly pins?: NetPin[];
   /** Which .dig file this relates to (for subcircuit errors). */
   readonly subcircuitFile?: string;
   /** Nesting path for subcircuit errors. */
   readonly hierarchyPath?: readonly string[];
-  /** Suggested fix in plain English. */
-  readonly fix?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +317,8 @@ export interface CompiledCircuitUnified {
   wireSignalMap: Map<Wire, SignalAddress>;
   /** Map from component label → signal address for label-based I/O. */
   labelSignalMap: Map<string, SignalAddress>;
+  /** Map from component label → CircuitElement for all labeled elements in the flattened circuit. */
+  labelToCircuitElement: Map<string, CircuitElement>;
   /** Map from "instanceId:pinLabel" → signal address for pin-level I/O (editor binding). */
   pinSignalMap: Map<string, SignalAddress>;
   /** Diagnostics collected during compilation. */

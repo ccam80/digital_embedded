@@ -497,6 +497,7 @@ function buildMixedCompiledUnified(): CompiledCircuitUnified {
     bridges: [],
     wireSignalMap: new Map([...digitalUnified.wireSignalMap]),
     labelSignalMap: new Map([...digitalUnified.labelSignalMap]),
+    labelToCircuitElement: new Map(),
     pinSignalMap: new Map([...digitalUnified.pinSignalMap]),
     allCircuitElements: [...digitalUnified.allCircuitElements],
     diagnostics: [],

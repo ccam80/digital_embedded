@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for DefaultSimulatorFacade — Task 10.
  *
  * Covers:
@@ -78,17 +78,17 @@ describe('DefaultSimulatorFacade', () => {
     expect(facade.getCoordinator()).toBe(engine);
 
     // A=1, B=1 → Y should be 1 after propagation
-    facade.setInput(engine, 'A', 1);
-    facade.setInput(engine, 'B', 1);
+    facade.setSignal(engine, 'A', 1);
+    facade.setSignal(engine, 'B', 1);
     facade.step(engine);
 
-    expect(facade.readOutput(engine, 'Y')).toBe(1);
+    expect(facade.readSignal(engine, 'Y')).toBe(1);
 
     // A=1, B=0 → Y should be 0
-    facade.setInput(engine, 'B', 0);
+    facade.setSignal(engine, 'B', 0);
     facade.step(engine);
 
-    expect(facade.readOutput(engine, 'Y')).toBe(0);
+    expect(facade.readSignal(engine, 'Y')).toBe(0);
   });
 
   // -------------------------------------------------------------------------
@@ -101,7 +101,7 @@ describe('DefaultSimulatorFacade', () => {
     const engine = facade.compile(circuit);
 
     // D=1; step multiple times to allow clock edge to fire and latch
-    facade.setInput(engine, 'D', 1);
+    facade.setSignal(engine, 'D', 1);
 
     // Run enough steps to get at least one rising clock edge
     for (let i = 0; i < 4; i++) {
@@ -109,7 +109,7 @@ describe('DefaultSimulatorFacade', () => {
     }
 
     // After a rising edge with D=1, Q should be 1
-    expect(facade.readOutput(engine, 'Q')).toBe(1);
+    expect(facade.readSignal(engine, 'Q')).toBe(1);
   });
 
   // -------------------------------------------------------------------------
@@ -121,7 +121,7 @@ describe('DefaultSimulatorFacade', () => {
     const circuit = buildDFlipFlop(facade);
     const engine = facade.compile(circuit);
 
-    facade.setInput(engine, 'D', 1);
+    facade.setSignal(engine, 'D', 1);
 
     // Run many steps without clock advancement — flip-flop should not latch
     for (let i = 0; i < 10; i++) {
@@ -129,7 +129,7 @@ describe('DefaultSimulatorFacade', () => {
     }
 
     // Without clock edges, Q remains 0 (initial state)
-    expect(facade.readOutput(engine, 'Q')).toBe(0);
+    expect(facade.readSignal(engine, 'Q')).toBe(0);
   });
 
   // -------------------------------------------------------------------------
@@ -142,10 +142,10 @@ describe('DefaultSimulatorFacade', () => {
 
     // First compile and mutate state
     const engine1 = facade.compile(circuit);
-    facade.setInput(engine1, 'A', 1);
-    facade.setInput(engine1, 'B', 1);
+    facade.setSignal(engine1, 'A', 1);
+    facade.setSignal(engine1, 'B', 1);
     facade.step(engine1);
-    expect(facade.readOutput(engine1, 'Y')).toBe(1);
+    expect(facade.readSignal(engine1, 'Y')).toBe(1);
 
     // Second compile produces a new engine
     const engine2 = facade.compile(circuit);
@@ -153,7 +153,7 @@ describe('DefaultSimulatorFacade', () => {
 
     // New engine starts in clean state (Y=0 before any steps)
     facade.step(engine2);
-    expect(facade.readOutput(engine2, 'Y')).toBe(0);
+    expect(facade.readSignal(engine2, 'Y')).toBe(0);
   });
 
   // -------------------------------------------------------------------------
@@ -165,8 +165,8 @@ describe('DefaultSimulatorFacade', () => {
     const circuit = buildAndGate(facade);
     const engine = facade.compile(circuit);
 
-    facade.setInput(engine, 'A', 1);
-    facade.setInput(engine, 'B', 1);
+    facade.setSignal(engine, 'A', 1);
+    facade.setSignal(engine, 'B', 1);
     facade.step(engine);
 
     const signals = facade.readAllSignals(engine);
@@ -252,55 +252,45 @@ describe('DefaultSimulatorFacade', () => {
   // R1: runToStable — combinational stabilization
   // -------------------------------------------------------------------------
 
-  it('runToStable stabilizes a combinational AND gate and reads correct output', () => {
+  it('settle stabilizes a combinational AND gate and reads correct output', async () => {
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = buildAndGate(facade);
     const engine = facade.compile(circuit);
 
-    facade.setInput(engine, 'A', 1);
-    facade.setInput(engine, 'B', 1);
-    // runToStable should return without throwing for a stable combinational circuit
-    expect(() => facade.runToStable(engine)).not.toThrow();
-    expect(facade.readOutput(engine, 'Y')).toBe(1);
+    facade.setSignal(engine, 'A', 1);
+    facade.setSignal(engine, 'B', 1);
+    await facade.settle(engine);
+    expect(facade.readSignal(engine, 'Y')).toBe(1);
 
-    facade.setInput(engine, 'A', 0);
-    facade.runToStable(engine);
-    expect(facade.readOutput(engine, 'Y')).toBe(0);
+    facade.setSignal(engine, 'A', 0);
+    await facade.settle(engine);
+    expect(facade.readSignal(engine, 'Y')).toBe(0);
   });
 
   // -------------------------------------------------------------------------
-  // R2: runToStable throws FacadeError for oscillating circuit (ring oscillator)
+  // R2: settle completes for pure digital — does a single evaluation step
   // -------------------------------------------------------------------------
 
-  it('runToStable throws FacadeError when circuit does not stabilize', () => {
+  it('settle completes for a pure digital circuit without throwing', async () => {
     const facade = new DefaultSimulatorFacade(registry);
-    // Single NOT gate with output wired back to its own input.
-    // This is a 1-NOT ring oscillator that can never stabilize.
-    const circuit = facade.createCircuit();
-    const notGate = facade.addComponent(circuit, 'Not', {});
-    const notPins = notGate.getPins();
-    const outPin = notPins.find(p => p.label === 'out')!;
-    const inPin  = notPins.find(p => p.label === 'in')!;
-    const outPos = pinWorldPosition(notGate, outPin);
-    const inPos  = pinWorldPosition(notGate, inPin);
-    // Wire from output back to input — creates a combinational feedback loop
-    circuit.addWire(new Wire(outPos, inPos));
-
+    const circuit = buildAndGate(facade);
     const engine = facade.compile(circuit);
-    // The NOT-self-loop will never stabilize within a small iteration cap
-    expect(() => facade.runToStable(engine, 5)).toThrow(FacadeError);
+    facade.setSignal(engine, 'A', 1);
+    facade.setSignal(engine, 'B', 1);
+    await expect(facade.settle(engine)).resolves.toBeUndefined();
+    expect(facade.readSignal(engine, 'Y')).toBe(1);
   });
 
   // -------------------------------------------------------------------------
   // R3: Unknown label throws FacadeError
   // -------------------------------------------------------------------------
 
-  it('setInput with unknown label throws FacadeError', () => {
+  it('setSignal with unknown label throws FacadeError', () => {
     const facade = new DefaultSimulatorFacade(registry);
     const circuit = buildAndGate(facade);
     const engine = facade.compile(circuit);
 
-    expect(() => facade.setInput(engine, 'nonexistent', 1)).toThrow(FacadeError);
+    expect(() => facade.setSignal(engine, 'nonexistent', 1)).toThrow(FacadeError);
   });
 
   // -------------------------------------------------------------------------
@@ -321,7 +311,7 @@ describe('DefaultSimulatorFacade', () => {
   // R5: SR latch feedback convergence via runToStable
   // -------------------------------------------------------------------------
 
-  it('SR latch: S=1 R=0 converges to Q=1, then S=0 R=1 gives Q=0', () => {
+  it('SR latch: S=1 R=0 converges to Q=1, then S=0 R=1 gives Q=0', async () => {
     const facade = new DefaultSimulatorFacade(registry);
     // SR latch from two cross-coupled NOR gates
     // Q  = NOR(R, QB)
@@ -349,18 +339,18 @@ describe('DefaultSimulatorFacade', () => {
     const engine = facade.compile(circuit);
 
     // S=1, R=0 → Q should become 1
-    facade.setInput(engine, 'S', 1);
-    facade.setInput(engine, 'R', 0);
-    facade.runToStable(engine);
-    expect(facade.readOutput(engine, 'Q')).toBe(1);
-    expect(facade.readOutput(engine, 'QB')).toBe(0);
+    facade.setSignal(engine, 'S', 1);
+    facade.setSignal(engine, 'R', 0);
+    await facade.settle(engine);
+    expect(facade.readSignal(engine, 'Q')).toBe(1);
+    expect(facade.readSignal(engine, 'QB')).toBe(0);
 
     // S=0, R=1 → Q should become 0
-    facade.setInput(engine, 'S', 0);
-    facade.setInput(engine, 'R', 1);
-    facade.runToStable(engine);
-    expect(facade.readOutput(engine, 'Q')).toBe(0);
-    expect(facade.readOutput(engine, 'QB')).toBe(1);
+    facade.setSignal(engine, 'S', 0);
+    facade.setSignal(engine, 'R', 1);
+    await facade.settle(engine);
+    expect(facade.readSignal(engine, 'Q')).toBe(0);
+    expect(facade.readSignal(engine, 'QB')).toBe(1);
   });
 
   // -------------------------------------------------------------------------
@@ -397,11 +387,11 @@ describe('DefaultSimulatorFacade', () => {
 
     for (const [a, b, expectedS, expectedC] of cases) {
       const engine = facade.compile(circuit);
-      facade.setInput(engine, 'A', a);
-      facade.setInput(engine, 'B', b);
+      facade.setSignal(engine, 'A', a);
+      facade.setSignal(engine, 'B', b);
       facade.step(engine);
-      expect(facade.readOutput(engine, 'S')).toBe(expectedS);
-      expect(facade.readOutput(engine, 'C')).toBe(expectedC);
+      expect(facade.readSignal(engine, 'S')).toBe(expectedS);
+      expect(facade.readSignal(engine, 'C')).toBe(expectedC);
     }
   });
 
@@ -429,10 +419,10 @@ describe('DefaultSimulatorFacade', () => {
 
     for (const input of [0, 1] as const) {
       const engine = facade.compile(circuit);
-      facade.setInput(engine, 'X', input);
+      facade.setSignal(engine, 'X', input);
       facade.step(engine);
       // NOT(NOT(NOT(x))) = NOT(x)
-      expect(facade.readOutput(engine, 'Y')).toBe(input === 0 ? 1 : 0);
+      expect(facade.readSignal(engine, 'Y')).toBe(input === 0 ? 1 : 0);
     }
   });
 

@@ -15,3 +15,4 @@
 {"t":0,"agent":"a14834b","agent_type":"executor","event":"agent_stop","success":true,"duration_ms":651884}
 {"t":0,"agent":"a8f587d","agent_type":"executor","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"a8f587d","agent_type":"executor","event":"agent_stop","success":true,"duration_ms":106340}
+{"t":0,"agent":"a71640a","agent_type":"general-purpose","event":"agent_stop","success":true,"duration_ms":2290862}

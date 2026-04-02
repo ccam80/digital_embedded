@@ -19,7 +19,7 @@
 import { Circuit, Wire } from "../core/circuit.js";
 import { AbstractCircuitElement } from "../core/element.js";
 import type { ComponentRegistry } from "../core/registry.js";
-import type { Diagnostic } from "../headless/netlist-types.js";
+import type { Diagnostic } from "../compile/types.js";
 import type { RenderContext, Rect } from "../core/renderer-interface.js";
 import type { Pin, Rotation } from "../core/pin.js";
 import { PropertyBag } from "../core/properties.js";
@@ -400,6 +400,6 @@ function emitUnsupportedDiagnostic(
     severity: "info",
     code: "unsupported-ctz-component",
     message: `CTZ component type '${ctzType}' is not supported; a placeholder was inserted.`,
-    fix: `Remove the placeholder or replace it with a supported digiTS component.`,
+    suggestions: [{ text: `Remove the placeholder or replace it with a supported digiTS component.`, automatable: false }],
   });
 }

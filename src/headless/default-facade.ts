@@ -7,9 +7,9 @@
  * Engine lifecycle (F2): compile() always creates a fresh engine. The previous
  * engine is stopped and disposed before creating a new one.
  *
- * Clock management (F3): step(), run(), and runToStable() advance clocks before
- * each engine step when clockAdvance is enabled (the default). Clock advancement
- * is handled by the coordinator's advanceClocks() method.
+ * Clock management (F3): step() and run() advance clocks before each engine step
+ * when clockAdvance is enabled (the default). Clock advancement is handled by
+ * the coordinator's advanceClocks() method.
  */
 
 import type { Circuit } from '../core/circuit.js';
@@ -21,12 +21,12 @@ import type { TestResults, CircuitBuildOptions } from './types.js';
 import { FacadeError } from './types.js';
 import type {
   Netlist,
-  Diagnostic,
   CircuitSpec,
   CircuitPatch,
   PatchOptions,
   PatchResult,
 } from './netlist-types.js';
+import type { Diagnostic } from '../compile/types.js';
 import type { SimulatorFacade } from './facade.js';
 import { CircuitBuilder } from './builder.js';
 import type { CompiledCircuitUnified } from '../compile/types.js';
@@ -140,26 +140,15 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     return coordinator.stepToTime(targetSimTime, budgetMs);
   }
 
-  runToStable(coordinator: SimulationCoordinator, maxIterations = 1000, opts?: StepOptions): void {
-    const settleOpts = opts ?? { clockAdvance: false };
-
-    for (let iter = 0; iter < maxIterations; iter++) {
-      const before = coordinator.snapshotSignals();
-      this.step(coordinator, settleOpts);
-      const after = coordinator.snapshotSignals();
-      let stable = true;
-      for (let n = 0; n < before.length; n++) {
-        if (before[n] !== after[n]) { stable = false; break; }
-      }
-      if (stable) return;
+  async settle(coordinator: SimulationCoordinator, settleTime = 0.01): Promise<void> {
+    if (coordinator.simTime === null) {
+      this.step(coordinator, { clockAdvance: false });
+      return;
     }
-
-    throw new FacadeError(
-      `Circuit did not stabilize within ${maxIterations} iterations.`,
-    );
+    await this.stepToTime(coordinator, coordinator.simTime + settleTime);
   }
 
-  setInput(_coordinator: SimulationCoordinator, label: string, value: number): void {
+  setSignal(_coordinator: SimulationCoordinator, label: string, value: number): void {
     const addr = this._coordinator.compiled.labelSignalMap.get(label);
     if (addr === undefined) {
       const available = [...this._coordinator.compiled.labelSignalMap.keys()].join(', ');
@@ -167,13 +156,14 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
         `Label "${label}" not found in compiled circuit. Available labels: ${available || '(none)'}`,
       );
     }
-    const sv = addr.domain === 'analog'
-      ? { type: 'analog' as const, voltage: value }
-      : { type: 'digital' as const, value };
-    this._coordinator.writeSignal(addr, sv);
+    if (addr.domain === 'analog') {
+      this._coordinator.setSourceByLabel(label, value);
+      return;
+    }
+    this._coordinator.writeSignal(addr, { type: 'digital', value });
   }
 
-  readOutput(_coordinator: SimulationCoordinator, label: string): number {
+  readSignal(_coordinator: SimulationCoordinator, label: string): number {
     const addr = this._coordinator.compiled.labelSignalMap.get(label);
     if (addr === undefined) {
       const available = [...this._coordinator.compiled.labelSignalMap.keys()].join(', ');
@@ -197,7 +187,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // Testing
   // =========================================================================
 
-  runTests(coordinator: SimulationCoordinator, circuit: Circuit, testData?: string): TestResults {
+  async runTests(coordinator: SimulationCoordinator, circuit: Circuit, testData?: string): Promise<TestResults> {
     const resolvedData = testData ?? extractEmbeddedTestData(circuit);
 
     if (resolvedData === null || resolvedData.trim().length === 0) {
@@ -206,9 +196,8 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
       );
     }
 
-    // Infer inputCount from the circuit's In/Clock elements when the test
-    // data doesn't contain an explicit "|" separator.  parseTestData will
-    // prefer an explicit inputCount over a "|" separator over all-inputs.
+    // Infer inputCount from the circuit's labeled elements whose labelSignalMap
+    // entry has domain === 'analog' (analog sources) or typeId In/Clock/Port.
     let inputCount: number | undefined;
     if (!resolvedData.includes('|')) {
       const inputLabels = new Set<string>();
@@ -216,6 +205,12 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
         if (el.typeId === 'In' || el.typeId === 'Clock' || el.typeId === 'Port') {
           const label = el.getProperties().getOrDefault<string>('label', '');
           if (label) inputLabels.add(label);
+        }
+      }
+      // Also include any analog-domain labeled signals from the compiled map
+      for (const [label, addr] of coordinator.compiled.labelSignalMap) {
+        if (addr.domain === 'analog') {
+          inputLabels.add(label);
         }
       }
       if (inputLabels.size > 0) {
@@ -239,10 +234,6 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     }
 
     const parsed = parseTestData(resolvedData, inputCount);
-
-    if (coordinator instanceof DefaultSimulationCoordinator && coordinator.getDigitalEngine() === null) {
-      throw new FacadeError('Test execution requires a digital engine. Analog-only circuits cannot run test vectors.');
-    }
 
     return executeTests(this, coordinator, circuit, parsed);
   }

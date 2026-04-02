@@ -202,7 +202,7 @@ describe("TestRunner", () => {
   // embeddedTests
   // -------------------------------------------------------------------------
 
-  it("embeddedTests — circuit with Testcase component → runTests extracts embedded data and returns results", () => {
+  it("embeddedTests — circuit with Testcase component → runTests extracts embedded data and returns results", async () => {
     const registry = buildRegistry();
     const builder = new CircuitBuilder(registry);
 
@@ -213,9 +213,9 @@ describe("TestRunner", () => {
     const engine = { step: vi.fn(), setSignalValue: vi.fn(), getSignalRaw: vi.fn() } as any;
 
     const expectedResults: TestResults = { passed: 2, failed: 0, total: 2, vectors: [] };
-    executeTestsMock.mockReturnValue(expectedResults);
+    executeTestsMock.mockResolvedValue(expectedResults);
 
-    const results = builder.runTests(engine, circuit);
+    const results = await builder.runTests(engine, circuit);
 
     expect(parseTestDataMock).toHaveBeenCalledWith(testData);
     expect(executeTestsMock).toHaveBeenCalled();
@@ -226,7 +226,7 @@ describe("TestRunner", () => {
   // externalTests
   // -------------------------------------------------------------------------
 
-  it("externalTests — external testData string overrides embedded Testcase data", () => {
+  it("externalTests — external testData string overrides embedded Testcase data", async () => {
     const registry = buildRegistry();
     const builder = new CircuitBuilder(registry);
 
@@ -237,7 +237,7 @@ describe("TestRunner", () => {
     const externalData = "A B Y\n0 0 0\n1 1 1";
     const engine = { step: vi.fn(), setSignalValue: vi.fn(), getSignalRaw: vi.fn() } as any;
 
-    builder.runTests(engine, circuit, externalData);
+    await builder.runTests(engine, circuit, externalData);
 
     // External data takes precedence — parser called with external string
     expect(parseTestDataMock).toHaveBeenCalledWith(externalData);
@@ -247,15 +247,15 @@ describe("TestRunner", () => {
   // noTestData
   // -------------------------------------------------------------------------
 
-  it("noTestData — circuit without Testcase and no external data → throws FacadeError", () => {
+  it("noTestData — circuit without Testcase and no external data → throws FacadeError", async () => {
     const registry = buildRegistry();
     const builder = new CircuitBuilder(registry);
 
     const circuit = buildHalfAdder();
     const engine = { step: vi.fn(), setSignalValue: vi.fn(), getSignalRaw: vi.fn() } as any;
 
-    expect(() => builder.runTests(engine, circuit)).toThrow(FacadeError);
-    expect(() => builder.runTests(engine, circuit)).toThrow(
+    await expect(builder.runTests(engine, circuit)).rejects.toThrow(FacadeError);
+    await expect(builder.runTests(engine, circuit)).rejects.toThrow(
       /no test data available/i,
     );
   });
@@ -264,7 +264,7 @@ describe("TestRunner", () => {
   // multipleTestcases
   // -------------------------------------------------------------------------
 
-  it("multipleTestcases — circuit with 2 Testcase components → both sets of vectors combined", () => {
+  it("multipleTestcases — circuit with 2 Testcase components → both sets of vectors combined", async () => {
     const registry = buildRegistry();
     const builder = new CircuitBuilder(registry);
 
@@ -274,7 +274,7 @@ describe("TestRunner", () => {
 
     const engine = { step: vi.fn(), setSignalValue: vi.fn(), getSignalRaw: vi.fn() } as any;
 
-    builder.runTests(engine, circuit);
+    await builder.runTests(engine, circuit);
 
     // Both test data blocks joined and passed to parser
     const calledWith = parseTestDataMock.mock.calls[0][0] as string;

@@ -820,8 +820,8 @@ describe("SPICE L1 model", () => {
 
   it("spice_l1_param_count_is_superset_of_simple", () => {
     expect(BJT_SPICE_L1_PARAM_DEFS.length).toBeGreaterThan(BJT_PARAM_DEFS.length);
-    // Simple has 11 params, SPICE L1 adds RB, RC, RE, NE, NC, CJE, VJE, MJE, CJC, VJC, MJC, FC, TF, TR = 14 more
-    expect(BJT_SPICE_L1_PARAM_DEFS.length).toBe(25);
+    // Simple has 11 params, SPICE adds terminal R, caps, transit time, and full GP params = 40 total
+    expect(BJT_SPICE_L1_PARAM_DEFS.length).toBe(40);
   });
 
   it("factory_produces_valid_element_with_zero_resistances", () => {

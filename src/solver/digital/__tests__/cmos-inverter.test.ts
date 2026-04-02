@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CMOS inverter integration test.
  *
  * Verifies that PFET + NFET with VDD and Ground correctly implement
@@ -11,7 +11,7 @@ import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import { createDefaultRegistry } from "@/components/register-all";
 
 describe("CMOS inverter", () => {
-  it("inverts: A=0 → Y=1, A=1 → Y=0", () => {
+  it("inverts: A=0 → Y=1, A=1 → Y=0", async () => {
     const registry = createDefaultRegistry();
     const builder = new CircuitBuilder(registry);
     const circuit = builder.build({
@@ -37,14 +37,14 @@ describe("CMOS inverter", () => {
     const coordinator = facade.compile(circuit);
 
     // A=0: PFET conducts (G=0), NFET open → Y should be 1 (VDD)
-    facade.setInput(coordinator, "A", 0);
-    facade.runToStable(coordinator);
+    facade.setSignal(coordinator, "A", 0);
+    await facade.settle(coordinator);
     // VDD outputs all-ones (0xFFFFFFFF); mask to 1-bit
-    expect(facade.readOutput(coordinator, "Y") & 1).toBe(1);
+    expect(facade.readSignal(coordinator, "Y") & 1).toBe(1);
 
     // A=1: NFET conducts (G=1), PFET open → Y should be 0 (GND)
-    facade.setInput(coordinator, "A", 1);
-    facade.runToStable(coordinator);
-    expect(facade.readOutput(coordinator, "Y") & 1).toBe(0);
+    facade.setSignal(coordinator, "A", 1);
+    await facade.settle(coordinator);
+    expect(facade.readSignal(coordinator, "Y") & 1).toBe(0);
   });
 });

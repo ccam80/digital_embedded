@@ -988,10 +988,10 @@ export function createMosfetElement(
   const rawRD = props.hasModelParam("RD") ? props.getModelParam<number>("RD") : 0;
   const rawRS = props.hasModelParam("RS") ? props.getModelParam<number>("RS") : 0;
 
-  // Internal node allocation: [bulk?, Dint?, Sint?]
-  // Bulk is always first (index 0), then RD internal node, then RS internal node.
+  // 3-terminal MOSFET: bulk is always tied to source (no separate bulk pin).
+  // Internal nodes are only allocated for RD/RS series resistances.
+  const nodeB = nodeS;
   let intIdx = 0;
-  const nodeB = internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeS;
   const nodeDint = rawRD > 0 && internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeD;
   const nodeSint = rawRS > 0 && internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeS;
 
@@ -1049,7 +1049,7 @@ export function createMosfetElement(
  * Always 1 for the bulk node, plus 1 for RD > 0, plus 1 for RS > 0.
  */
 export function getMosfetInternalNodeCount(props: PropertyBag): number {
-  let count = 1; // always need bulk node
+  let count = 0; // 3-terminal: bulk = source, no internal node needed
   if (props.hasModelParam("RD") && props.getModelParam<number>("RD") > 0) count++;
   if (props.hasModelParam("RS") && props.getModelParam<number>("RS") > 0) count++;
   return count;

@@ -1,7 +1,7 @@
 # Page snapshot
 
 ```yaml
-- iframe [active] [ref=e2]:
+- iframe [ref=e2]:
   - generic [ref=f1e2]:
     - menubar [ref=f1e3]:
       - menuitem "File" [ref=f1e4] [cursor=pointer]: File ▶ ▶
@@ -25,8 +25,8 @@
         - generic [ref=f1e25]: "Speed:"
         - button "−" [ref=f1e26] [cursor=pointer]
         - textbox "Speed:" [ref=f1e27]: "1"
-        - button "+" [active] [ref=f1e28] [cursor=pointer]
-        - generic [ref=f1e29]: µs/s
+        - button "+" [ref=f1e28] [cursor=pointer]
+        - generic [ref=f1e29]: ms/s
         - button "Toggle light/dark mode" [ref=f1e31] [cursor=pointer]: ☽
     - generic [ref=f1e32]:
       - generic [ref=f1e33]:

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MCP tool surface tests for Port-based subcircuits (SE-9a).
  *
  * Tests verify that the headless facade and compiler correctly handle
@@ -85,7 +85,7 @@ describe('Port MCP surface — compile', () => {
 // ---------------------------------------------------------------------------
 
 describe('Port MCP surface — test vectors resolve Port labels', () => {
-  it('circuit_test resolves Port label as output column in test vectors', () => {
+  it('circuit_test resolves Port label as output column in test vectors', async () => {
     const facade = new DefaultSimulatorFacade(registry);
 
     // AND gate: In-labeled inputs, Port-labeled output (no Out needed)
@@ -107,7 +107,7 @@ describe('Port MCP surface — test vectors resolve Port labels', () => {
 
     // Port label Y used directly as the output column
     const testData = 'A B | Y\n0 0 0\n0 1 0\n1 0 0\n1 1 1';
-    const results = facade.runTests(engine, circuit, testData);
+    const results = await facade.runTests(engine, circuit, testData);
 
     expect(results.total).toBe(4);
     expect(results.passed).toBe(4);
@@ -130,7 +130,7 @@ describe('Port MCP surface — test vectors resolve Port labels', () => {
     });
 
     const engine = facade.compile(circuit);
-    facade.setInput(engine, 'A', 1);
+    facade.setSignal(engine, 'A', 1);
     facade.step(engine);
 
     const signals = facade.readAllSignals(engine);
@@ -165,18 +165,18 @@ describe('Port MCP surface — setInput/readOutput via Port labels', () => {
     const engine = facade.compile(circuit);
 
     // Drive via In label, read via Out label — both should work
-    facade.setInput(engine, 'src', 1);
+    facade.setSignal(engine, 'src', 1);
     facade.step(engine);
-    expect(facade.readOutput(engine, 'dst')).toBe(1);
+    expect(facade.readSignal(engine, 'dst')).toBe(1);
 
     // Port label itself must be readable (same net)
-    expect(facade.readOutput(engine, 'mid')).toBe(1);
+    expect(facade.readSignal(engine, 'mid')).toBe(1);
 
     // Change value
-    facade.setInput(engine, 'src', 0);
+    facade.setSignal(engine, 'src', 0);
     facade.step(engine);
-    expect(facade.readOutput(engine, 'mid')).toBe(0);
-    expect(facade.readOutput(engine, 'dst')).toBe(0);
+    expect(facade.readSignal(engine, 'mid')).toBe(0);
+    expect(facade.readSignal(engine, 'dst')).toBe(0);
   });
 
   it('Port label resolves in labelSignalMap — setInput via Port label drives the net', () => {
@@ -205,9 +205,9 @@ describe('Port MCP surface — setInput/readOutput via Port labels', () => {
     expect(portComp!.label).toBe('drive_port');
 
     // readOutput via Port label works
-    facade.setInput(engine, 'drive', 1);
+    facade.setSignal(engine, 'drive', 1);
     facade.step(engine);
-    expect(facade.readOutput(engine, 'drive_port')).toBe(1);
-    expect(facade.readOutput(engine, 'observe')).toBe(1);
+    expect(facade.readSignal(engine, 'drive_port')).toBe(1);
+    expect(facade.readSignal(engine, 'observe')).toBe(1);
   });
 });

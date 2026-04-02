@@ -652,7 +652,7 @@ export function registerCircuitTools(
           ),
       },
     },
-    ({ handle, testData }) => {
+    async ({ handle, testData }) => {
       try {
         const circuit = session.getCircuit(handle);
         const resolvedData = testData ?? extractEmbeddedTestData(circuit);
@@ -667,7 +667,7 @@ export function registerCircuitTools(
         const engine = testFacade.compile(circuit);
         let results;
         try {
-          results = testFacade.runTests(engine, circuit, resolvedData);
+          results = await testFacade.runTests(engine, circuit, resolvedData);
         } finally {
           testFacade.invalidate();
         }

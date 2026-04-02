@@ -216,7 +216,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
         this._diagnostics?.emit({
           code: 'bridge-missing-inner-pin',
           severity: 'error',
-          summary: `No BridgeInputAdapter for boundary group ${bridge.boundaryGroupId}`,
+          message: `No BridgeInputAdapter for boundary group ${bridge.boundaryGroupId}`,
           explanation: 'An analog-to-digital bridge has no registered BridgeInputAdapter. This indicates a compilation error — the bridge was not fully assembled.',
           suggestions: [],
         });
@@ -580,6 +580,36 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     }
 
     return result;
+  }
+
+  setSourceByLabel(label: string, value: number): void {
+    // Resolve label → CircuitElement via labelToCircuitElement when available,
+    // falling back to walking allCircuitElements.
+    let element: CircuitElement | undefined;
+    const ltce = (this._compiled as { labelToCircuitElement?: Map<string, CircuitElement> }).labelToCircuitElement;
+    if (ltce !== undefined) {
+      element = ltce.get(label);
+    }
+    if (element === undefined) {
+      element = this._compiled.allCircuitElements.find(el => {
+        const props = el.getProperties();
+        return props.has('label') && props.get('label') === label;
+      });
+    }
+    if (element === undefined) return;
+
+    // Determine primary parameter key from the model registry entry
+    let paramKey = 'voltage';
+    if (this._registry !== null) {
+      const def = this._registry.get(element.typeId);
+      const modelKey = element.getProperties().get<string>('model');
+      const entry = modelKey ? def?.modelRegistry?.[modelKey] : undefined;
+      if (entry?.paramDefs && entry.paramDefs.length > 0) {
+        paramKey = entry.paramDefs[0].key;
+      }
+    }
+
+    this.setComponentProperty(element, paramKey, value);
   }
 
   setComponentProperty(element: CircuitElement, key: string, value: number): void {

@@ -18,12 +18,12 @@ export interface EquivalenceResult {
   firstMismatch?: string;
 }
 
-export function testEquivalence(
+export async function testEquivalence(
   circuitA: Circuit,
   circuitB: Circuit,
   registry: ComponentRegistry,
   maxInputBits?: number,
-): EquivalenceResult {
+): Promise<EquivalenceResult> {
   const facadeA = new DefaultSimulatorFacade(registry);
   const facadeB = new DefaultSimulatorFacade(registry);
   const engineA = facadeA.compile(circuitA);
@@ -46,6 +46,12 @@ export function testEquivalence(
     } else if (def.name === "Out") {
       outputLabels.push(label);
     }
+  }
+
+  if (inputLabels.length === 0 && outputLabels.length === 0) {
+    throw new Error(
+      "No input/output labels found. Equivalence testing requires labeled components.",
+    );
   }
 
   const totalBits = inputWidths.reduce((a, b) => a + b, 0);
@@ -72,17 +78,17 @@ export function testEquivalence(
     for (let i = 0; i < inputLabels.length; i++) {
       const mask = (1 << inputWidths[i]!) - 1;
       const value = (combo >> bitPos) & mask;
-      facadeA.setInput(engineA, inputLabels[i]!, value);
-      facadeB.setInput(engineB, inputLabels[i]!, value);
+      facadeA.setSignal(engineA, inputLabels[i]!, value);
+      facadeB.setSignal(engineB, inputLabels[i]!, value);
       bitPos += inputWidths[i]!;
     }
 
-    facadeA.runToStable(engineA);
-    facadeB.runToStable(engineB);
+    await facadeA.settle(engineA);
+    await facadeB.settle(engineB);
 
     for (const label of outputLabels) {
-      const outA = facadeA.readOutput(engineA, label);
-      const outB = facadeB.readOutput(engineB, label);
+      const outA = facadeA.readSignal(engineA, label);
+      const outB = facadeB.readSignal(engineB, label);
       if (outA !== outB) {
         mismatches++;
         if (!firstMismatch) {

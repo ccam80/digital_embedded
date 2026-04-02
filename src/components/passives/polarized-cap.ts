@@ -297,7 +297,7 @@ export class AnalogPolarizedCapElement implements AnalogElement {
         this._emitDiagnostic({
           code: "reverse-biased-cap",
           severity: "warning",
-          summary: `Polarized capacitor reverse biased by ${(-vDiff).toFixed(2)} V (threshold: ${this.reverseMax} V)`,
+          message: `Polarized capacitor reverse biased by ${(-vDiff).toFixed(2)} V (threshold: ${this.reverseMax} V)`,
           explanation:
             "Electrolytic capacitors are damaged by reverse bias. " +
             "Check circuit polarity and ensure the anode (positive terminal) " +

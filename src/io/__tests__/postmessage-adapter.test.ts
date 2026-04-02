@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for PostMessageAdapter.
  *
  * Verifies the postMessage wire protocol adapter. All dependencies are
@@ -512,22 +512,22 @@ describe("PostMessageAdapter — sim-step delegation", () => {
     expect(stepHook).toHaveBeenCalledTimes(1);
   });
 
-  it("sim-set-input delegates to hooks.setInput when provided", async () => {
-    const setInputHook = vi.fn();
-    const { dispatch } = makeAdapter({ setInput: setInputHook });
+  it("sim-set-signal delegates to hooks.setSignal when provided", async () => {
+    const setSignalHook = vi.fn();
+    const { dispatch } = makeAdapter({ setSignal: setSignalHook });
 
-    await dispatch({ type: "sim-set-input", label: "A", value: 1 });
+    await dispatch({ type: "sim-set-signal", label: "A", value: 1 });
 
-    expect(setInputHook).toHaveBeenCalledWith("A", 1);
+    expect(setSignalHook).toHaveBeenCalledWith("A", 1);
   });
 
-  it("sim-read-output delegates to hooks.readOutput when provided", async () => {
-    const readOutputHook = vi.fn().mockReturnValue(1);
-    const { sent, dispatch } = makeAdapter({ readOutput: readOutputHook });
+  it("sim-read-signal delegates to hooks.readSignal when provided", async () => {
+    const readSignalHook = vi.fn().mockReturnValue(1);
+    const { sent, dispatch } = makeAdapter({ readSignal: readSignalHook });
 
-    await dispatch({ type: "sim-read-output", label: "Q" });
+    await dispatch({ type: "sim-read-signal", label: "Q" });
 
-    expect(readOutputHook).toHaveBeenCalledWith("Q");
+    expect(readSignalHook).toHaveBeenCalledWith("Q");
     expect(sent).toContainEqual({ type: "sim-output", label: "Q", value: 1 });
   });
 
@@ -585,8 +585,8 @@ describe("PostMessageAdapter — sim-step clock canary", () => {
       hooks: {
         getCircuit: () => circuit,
         step() { facade.step(engine); },
-        setInput(label: string, value: number) { facade.setInput(engine, label, value); },
-        readOutput(label: string): number { return facade.readOutput(engine, label); },
+        setSignal(label: string, value: number) { facade.setSignal(engine, label, value); },
+        readSignal(label: string): number { return facade.readSignal(engine, label); },
         readAllSignals(): Record<string, number> { return facade.readAllSignals(engine); },
         getFacade() { return facade; },
       },
@@ -600,7 +600,7 @@ describe("PostMessageAdapter — sim-step clock canary", () => {
     };
 
     // Read Q before any stepping — FF not yet latched, Q must be 0
-    await dispatch({ type: "sim-read-output", label: "Q" });
+    await dispatch({ type: "sim-read-signal", label: "Q" });
     const initialOutputMsg = sent.find(
       (m) => (m as { type: string }).type === "sim-output",
     ) as { type: string; label: string; value: number } | undefined;
@@ -609,14 +609,14 @@ describe("PostMessageAdapter — sim-step clock canary", () => {
     expect(initialOutputMsg!.value).toBe(0);
 
     // Set D=1
-    await dispatch({ type: "sim-set-input", label: "D", value: 1 });
+    await dispatch({ type: "sim-set-signal", label: "D", value: 1 });
 
     // Step once to advance clock edge and propagate — Q must become 1
     await dispatch({ type: "sim-step" });
 
     // Read Q after stepping
     sent.length = 0; // clear previous messages so find() returns the new one
-    await dispatch({ type: "sim-read-output", label: "Q" });
+    await dispatch({ type: "sim-read-signal", label: "Q" });
 
     const outputMsg = sent.find(
       (m) => (m as { type: string }).type === "sim-output",

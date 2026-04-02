@@ -66,18 +66,18 @@ export interface BatchTestResults {
  *                  are used.
  * @returns         BatchTestResults aggregate across all files.
  */
-export function runBatchTests(
+export async function runBatchTests(
   facade: SimulatorFacade,
   files: Map<string, string>,
   testData?: string,
-): BatchTestResults {
+): Promise<BatchTestResults> {
   const results: FileTestResult[] = [];
   let passedFiles = 0;
   let failedFiles = 0;
   let errorFiles = 0;
 
   for (const [fileName, content] of files) {
-    const fileResult = runSingleFile(facade, fileName, content, testData);
+    const fileResult = await runSingleFile(facade, fileName, content, testData);
     results.push(fileResult);
 
     switch (fileResult.status) {
@@ -107,12 +107,12 @@ export function runBatchTests(
  * `status: 'error'` with the error message. If tests run and all pass,
  * returns `status: 'passed'`. If any fail, returns `status: 'failed'`.
  */
-function runSingleFile(
+async function runSingleFile(
   facade: SimulatorFacade,
   fileName: string,
   content: string,
   testData?: string,
-): FileTestResult {
+): Promise<FileTestResult> {
   let circuit;
   try {
     circuit = facade.loadDigXml(content);
@@ -137,7 +137,7 @@ function runSingleFile(
 
   let testResults: TestResults;
   try {
-    testResults = facade.runTests(engine, circuit, testData);
+    testResults = await facade.runTests(engine, circuit, testData);
   } catch (err) {
     return {
       fileName,

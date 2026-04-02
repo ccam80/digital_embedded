@@ -240,7 +240,7 @@ describe("TLine", () => {
 
       expect(diag.code).toBe("transmission-line-low-segments");
       expect(diag.severity).toBe("warning");
-      expect(diag.summary).toContain("3 segments");
+      expect(diag.message).toContain("3 segments");
     });
   });
 

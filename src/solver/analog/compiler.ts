@@ -936,13 +936,11 @@ function buildAnalogNodeMapFromPartition(
   }
 
   // Build labelToNodeId from all labeled components in the partition
-  const labelTypesPartition = new Set(["In", "Out", "Probe", "in", "out", "probe", "Port"]);
   const labelToNodeId = new Map<string, number>();
   for (const pc of partition.components) {
     const props = pc.element.getProperties();
     const label = props.has("label") ? String(props.get("label")) : "";
     if (!label) continue;
-    if (!labelTypesPartition.has(pc.element.typeId)) continue;
     // Use the node ID of the first resolved pin
     if (pc.resolvedPins.length > 0) {
       const rp = pc.resolvedPins[0]!;

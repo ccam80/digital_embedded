@@ -78,11 +78,11 @@ function makeBatchFacade(options: {
       return {} as SimulationCoordinator;
     },
 
-    runTests(_engine: SimulationCoordinator, _circuit: Circuit, testData?: string): TestResults {
+    runTests(_engine: SimulationCoordinator, _circuit: Circuit, testData?: string): Promise<TestResults> {
       if (capturedTestData !== undefined) {
         capturedTestData.value = testData;
       }
-      return fileResults.get(lastContent) ?? defaultResults;
+      return Promise.resolve(fileResults.get(lastContent) ?? defaultResults);
     },
 
     // Stub the remaining facade methods
@@ -91,9 +91,9 @@ function makeBatchFacade(options: {
     connect: vi.fn(),
     step: vi.fn(),
     run: vi.fn(),
-    runToStable: vi.fn(),
-    setInput: vi.fn(),
-    readOutput: vi.fn(),
+    settle: vi.fn(),
+    setSignal: vi.fn(),
+    readSignal: vi.fn(),
     readAllSignals: vi.fn(),
     serialize: vi.fn(),
     deserialize: vi.fn(),
@@ -111,7 +111,7 @@ describe('runBatchTests', () => {
   // multipleFiles
   // -------------------------------------------------------------------------
 
-  it('multipleFiles — 3 files, all pass → passedFiles: 3', () => {
+  it('multipleFiles — 3 files, all pass → passedFiles: 3', async () => {
     const facade = makeBatchFacade({
       defaultResults: makeTestResults(5, 0),
     });
@@ -122,7 +122,7 @@ describe('runBatchTests', () => {
       ['circuit3.dig', '<circuit3>'],
     ]);
 
-    const batch: BatchTestResults = runBatchTests(facade, files);
+    const batch: BatchTestResults = await runBatchTests(facade, files);
 
     expect(batch.totalFiles).toBe(3);
     expect(batch.passedFiles).toBe(3);
@@ -135,7 +135,7 @@ describe('runBatchTests', () => {
     }
   });
 
-  it('multipleFiles — file names preserved in results in insertion order', () => {
+  it('multipleFiles — file names preserved in results in insertion order', async () => {
     const facade = makeBatchFacade({ defaultResults: makeTestResults(1, 0) });
 
     const files = new Map([
@@ -144,7 +144,7 @@ describe('runBatchTests', () => {
       ['gamma.dig', '<c>'],
     ]);
 
-    const batch = runBatchTests(facade, files);
+    const batch = await runBatchTests(facade, files);
 
     expect(batch.results[0].fileName).toBe('alpha.dig');
     expect(batch.results[1].fileName).toBe('beta.dig');
@@ -155,7 +155,7 @@ describe('runBatchTests', () => {
   // mixedResults
   // -------------------------------------------------------------------------
 
-  it('mixedResults — 2 pass, 1 fail → correct counts', () => {
+  it('mixedResults — 2 pass, 1 fail → correct counts', async () => {
     const fileResults = new Map([
       ['<pass1>', makeTestResults(5, 0)],
       ['<pass2>', makeTestResults(3, 0)],
@@ -170,7 +170,7 @@ describe('runBatchTests', () => {
       ['fail1.dig', '<fail1>'],
     ]);
 
-    const batch = runBatchTests(facade, files);
+    const batch = await runBatchTests(facade, files);
 
     expect(batch.totalFiles).toBe(3);
     expect(batch.passedFiles).toBe(2);
@@ -184,7 +184,7 @@ describe('runBatchTests', () => {
     expect(failResult!.testResults?.passed).toBe(2);
   });
 
-  it('mixedResults — failed file still has testResults attached', () => {
+  it('mixedResults — failed file still has testResults attached', async () => {
     const fileResults = new Map([
       ['<fail>', makeTestResults(1, 4)],
     ]);
@@ -196,7 +196,7 @@ describe('runBatchTests', () => {
       ['failing.dig', '<fail>'],
     ]);
 
-    const batch = runBatchTests(facade, files);
+    const batch = await runBatchTests(facade, files);
 
     const failResult = batch.results.find((r) => r.fileName === 'failing.dig');
     expect(failResult!.status).toBe('failed');
@@ -209,7 +209,7 @@ describe('runBatchTests', () => {
   // errorFile
   // -------------------------------------------------------------------------
 
-  it('errorFile — 1 file has invalid XML → status: error with message, others still tested', () => {
+  it('errorFile — 1 file has invalid XML → status: error with message, others still tested', async () => {
     const facade = makeBatchFacade({
       defaultResults: makeTestResults(3, 0),
       loadErrors: new Set(['<INVALID_XML>']),
@@ -221,7 +221,7 @@ describe('runBatchTests', () => {
       ['good2.dig', '<circuit2>'],
     ]);
 
-    const batch = runBatchTests(facade, files);
+    const batch = await runBatchTests(facade, files);
 
     expect(batch.totalFiles).toBe(3);
     expect(batch.passedFiles).toBe(2);
@@ -241,7 +241,7 @@ describe('runBatchTests', () => {
     expect(good2!.status).toBe('passed');
   });
 
-  it('errorFile — compile error counts as error, does not block other files', () => {
+  it('errorFile — compile error counts as error, does not block other files', async () => {
     const facade = makeBatchFacade({
       defaultResults: makeTestResults(2, 0),
       compileErrors: new Set(['<bad-circuit>']),
@@ -252,7 +252,7 @@ describe('runBatchTests', () => {
       ['broken.dig', '<bad-circuit>'],
     ]);
 
-    const batch = runBatchTests(facade, files);
+    const batch = await runBatchTests(facade, files);
 
     expect(batch.totalFiles).toBe(2);
     expect(batch.passedFiles).toBe(1);
@@ -263,7 +263,7 @@ describe('runBatchTests', () => {
     expect(brokenResult!.error).toContain('Compile error');
   });
 
-  it('errorFile — all files are errors → passedFiles: 0, errorFiles: N', () => {
+  it('errorFile — all files are errors → passedFiles: 0, errorFiles: N', async () => {
     const facade = makeBatchFacade({
       defaultResults: makeTestResults(1, 0),
       loadErrors: new Set(['<bad1>', '<bad2>']),
@@ -274,7 +274,7 @@ describe('runBatchTests', () => {
       ['bad2.dig', '<bad2>'],
     ]);
 
-    const batch = runBatchTests(facade, files);
+    const batch = await runBatchTests(facade, files);
 
     expect(batch.totalFiles).toBe(2);
     expect(batch.passedFiles).toBe(0);
@@ -285,7 +285,7 @@ describe('runBatchTests', () => {
   // externalTestData
   // -------------------------------------------------------------------------
 
-  it('externalTestData — external test vectors passed to all files\' runTests calls', () => {
+  it('externalTestData — external test vectors passed to all files\' runTests calls', async () => {
     const capturedTestData: { value: string | undefined } = { value: undefined };
     const facade = makeBatchFacade({
       defaultResults: makeTestResults(4, 0),
@@ -299,13 +299,13 @@ describe('runBatchTests', () => {
       ['circuit2.dig', '<c2>'],
     ]);
 
-    const batch = runBatchTests(facade, files, externalVectors);
+    const batch = await runBatchTests(facade, files, externalVectors);
 
     expect(batch.passedFiles).toBe(2);
     expect(capturedTestData.value).toBe(externalVectors);
   });
 
-  it('externalTestData — without external data, testData is undefined in runTests', () => {
+  it('externalTestData — without external data, testData is undefined in runTests', async () => {
     const capturedTestData: { value: string | undefined } = { value: 'not-undefined' };
     const facade = makeBatchFacade({
       defaultResults: makeTestResults(2, 0),
@@ -314,7 +314,7 @@ describe('runBatchTests', () => {
 
     const files = new Map([['circuit.dig', '<c>']]);
 
-    runBatchTests(facade, files);
+    await runBatchTests(facade, files);
 
     expect(capturedTestData.value).toBeUndefined();
   });
@@ -323,10 +323,10 @@ describe('runBatchTests', () => {
   // emptyFiles
   // -------------------------------------------------------------------------
 
-  it('emptyFiles — empty files map → zero everything', () => {
+  it('emptyFiles — empty files map → zero everything', async () => {
     const facade = makeBatchFacade();
 
-    const batch = runBatchTests(facade, new Map());
+    const batch = await runBatchTests(facade, new Map());
 
     expect(batch.totalFiles).toBe(0);
     expect(batch.passedFiles).toBe(0);

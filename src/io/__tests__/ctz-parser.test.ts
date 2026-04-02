@@ -11,7 +11,7 @@ import { CTZ_TYPE_MAP } from "../ctz-format.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
 import type { ComponentDefinition } from "../../core/registry.js";
 import { PropertyBag } from "../../core/properties.js";
-import type { Diagnostic } from "../../headless/netlist-types.js";
+import type { Diagnostic } from "../../compile/types.js";
 import { TestElement } from "../../test-fixtures/test-element.js";
 import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
 

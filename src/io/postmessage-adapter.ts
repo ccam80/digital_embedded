@@ -15,11 +15,11 @@
  *     sim-load-url          — fetch URL then load circuit
  *     sim-load-data         — base64-decode then load circuit
  *     sim-load-json         — deserialize DTS then load circuit
- *     sim-set-input         — drive an input pin by label
+ *     sim-set-signal        — write a signal value by label
  *     sim-step              — single propagation step
  *     sim-run-tests         — run test vectors (headless runner)
  *     sim-test              — run test vectors (tutorial-style, with label validation)
- *     sim-read-output       — read output signal by label
+ *     sim-read-signal       — read a signal value by label
  *     sim-read-all-signals  — snapshot all labeled signals
  *     sim-get-circuit       — export current circuit as base64 DTS JSON
  *     sim-set-base          — update resolver base path
@@ -39,7 +39,7 @@
  *     sim-ready        — sent once on init
  *     sim-loaded       — circuit/setting applied
  *     sim-error        — error occurred
- *     sim-output       — response to sim-read-output
+ *     sim-output       — response to sim-read-signal
  *     sim-signals      — response to sim-read-all-signals
  *     sim-test-result  — response to sim-test / sim-run-tests
  *     sim-circuit-data — response to sim-get-circuit
@@ -133,11 +133,11 @@ export interface PostMessageHooks {
   /** Step the simulation (advance clocks + propagate). */
   step?(): void;
 
-  /** Drive an input by label. */
-  setInput?(label: string, value: number): void;
+  /** Write a signal value by label. */
+  setSignal?(label: string, value: number): void;
 
-  /** Read an output by label. */
-  readOutput?(label: string): number;
+  /** Read a signal value by label. */
+  readSignal?(label: string): number;
 
   /** Read all labeled signals. */
   readAllSignals?(): Record<string, number>;
@@ -236,14 +236,14 @@ export class PostMessageAdapter {
           break;
 
         // --- Core: headless simulation ---
-        case 'sim-set-input':
-          this._handleSetInput(msg);
+        case 'sim-set-signal':
+          this._handleSetSignal(msg);
           break;
         case 'sim-step':
           this._handleStep();
           break;
-        case 'sim-read-output':
-          this._handleReadOutput(msg);
+        case 'sim-read-signal':
+          this._handleReadSignal(msg);
           break;
         case 'sim-read-all-signals':
           this._handleReadAllSignals();
@@ -251,10 +251,10 @@ export class PostMessageAdapter {
 
         // --- Core: testing ---
         case 'sim-test':
-          this._handleTestTutorial(msg);
+          await this._handleTestTutorial(msg);
           break;
         case 'sim-run-tests':
-          this._handleRunTests(msg);
+          await this._handleRunTests(msg);
           break;
 
         // --- Core: circuit export ---
@@ -354,15 +354,15 @@ export class PostMessageAdapter {
   // Headless simulation handlers
   // -------------------------------------------------------------------------
 
-  private _handleSetInput(msg: { label?: unknown; value?: unknown }): void {
+  private _handleSetSignal(msg: { label?: unknown; value?: unknown }): void {
     const label = String(msg.label ?? '');
     const value = Number(msg.value ?? 0);
-    if (this._hooks.setInput) {
-      this._hooks.setInput(label, value);
+    if (this._hooks.setSignal) {
+      this._hooks.setSignal(label, value);
     } else {
       this._ensureFacade();
       const facade = this._facade!;
-      facade.setInput(facade.getCoordinator(), label, value);
+      facade.setSignal(facade.getCoordinator(), label, value);
     }
   }
 
@@ -376,15 +376,15 @@ export class PostMessageAdapter {
     }
   }
 
-  private _handleReadOutput(msg: { label?: unknown }): void {
+  private _handleReadSignal(msg: { label?: unknown }): void {
     const label = String(msg.label ?? '');
     let value: number;
-    if (this._hooks.readOutput) {
-      value = this._hooks.readOutput(label);
+    if (this._hooks.readSignal) {
+      value = this._hooks.readSignal(label);
     } else {
       this._ensureFacade();
       const facade = this._facade!;
-      value = facade.readOutput(facade.getCoordinator(), label);
+      value = facade.readSignal(facade.getCoordinator(), label);
     }
     this._post({ type: 'sim-output', label, value });
   }
@@ -410,7 +410,7 @@ export class PostMessageAdapter {
    * `sim-run-tests` — headless test execution via SimulationRunner.
    * Uses facade.runTests pattern: recompiles, runs all test vectors.
    */
-  private _handleRunTests(msg: { testData?: unknown }): void {
+  private async _handleRunTests(msg: { testData?: unknown }): Promise<void> {
     const circuit = this._getCircuit();
     const testDataStr = msg.testData != null ? String(msg.testData) : undefined;
     const facade = this._hooks.getFacade?.() ?? this._getOwnFacade();
@@ -419,7 +419,7 @@ export class PostMessageAdapter {
     if (testDataStr) {
       const inputCount = detectInputCount(circuit, this._registry, testDataStr);
       const parsed = parseTestData(testDataStr, inputCount);
-      const results = executeTests(facade as RunnerFacade, coordinator, circuit, parsed);
+      const results = await executeTests(facade as RunnerFacade, coordinator, circuit, parsed);
       this._postTestResult(results);
     } else {
       const testcaseEl = circuit.elements.find(el => el.typeId === 'Testcase');
@@ -435,7 +435,7 @@ export class PostMessageAdapter {
       }
       const inputCount = detectInputCount(circuit, this._registry, embedded);
       const parsed = parseTestData(embedded, inputCount);
-      const results = executeTests(facade as RunnerFacade, coordinator, circuit, parsed);
+      const results = await executeTests(facade as RunnerFacade, coordinator, circuit, parsed);
       this._postTestResult(results);
     }
   }
@@ -444,7 +444,7 @@ export class PostMessageAdapter {
    * `sim-test` — tutorial-style test execution with label validation
    * and user-friendly error messages.
    */
-  private _handleTestTutorial(msg: { testData?: unknown }): void {
+  private async _handleTestTutorial(msg: { testData?: unknown }): Promise<void> {
     const testDataStr = String(msg.testData ?? '');
     if (!testDataStr) {
       this._post({ type: 'sim-error', error: 'No testData provided' });
@@ -494,16 +494,13 @@ export class PostMessageAdapter {
         testDataStr,
         detectedInputCount > 0 ? detectedInputCount : undefined,
       );
-      const results = executeTests(facade as RunnerFacade, coordinator, circuit, parsed);
+      const results = await executeTests(facade as RunnerFacade, coordinator, circuit, parsed);
       this._postTestResult(results);
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       let userMsg: string;
       if (errMsg.includes('did not stabilize') || errMsg.includes('oscillation') || errMsg.includes('iterations')) {
-        userMsg =
-          'Circuit has a feedback loop that could not settle. ' +
-          'Check your wiring — a cross-coupled latch needs exactly two feedback paths. ' +
-          'Extra or missing connections can cause the circuit to oscillate forever.';
+        userMsg = 'Circuit did not converge within iteration limit.';
       } else if (errMsg.includes('not found') || errMsg.includes('label')) {
         userMsg = errMsg;
       } else {

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MCP Server Tool Handler Tests — Phase 6 of the test plan.
  *
  * Unit tests for the circuit MCP server's tool handler logic (Vitest).
@@ -95,7 +95,7 @@ describe('Handle lifecycle', () => {
     expect(circuit.elements.length).toBeGreaterThan(0);
   });
 
-  it('built circuit can be used for netlist, compile, and test', () => {
+  it('built circuit can be used for netlist, compile, and test', async () => {
     const circuit = facade.build(andGateSpec());
 
     // Netlist
@@ -107,7 +107,7 @@ describe('Handle lifecycle', () => {
     expect(engine).toBeDefined();
 
     // Test
-    const results = facade.runTests(engine, circuit, 'A B Y\n0 0 0\n1 1 1');
+    const results = await facade.runTests(engine, circuit, 'A B Y\n0 0 0\n1 1 1');
     expect(results.passed).toBe(2);
   });
 
@@ -617,22 +617,22 @@ describe('circuit_compile', () => {
     const circuit = facade.build(andGateSpec());
     const engine = facade.compile(circuit);
 
-    facade.setInput(engine, 'A', 1);
-    facade.setInput(engine, 'B', 1);
-    facade.runToStable(engine);
+    facade.setSignal(engine, 'A', 1);
+    facade.setSignal(engine, 'B', 1);
+    facade.settle(engine);
 
-    expect(facade.readOutput(engine, 'Y')).toBe(1);
+    expect(facade.readSignal(engine, 'Y')).toBe(1);
   });
 
   it('compile with A=1 B=0 produces Y=0', () => {
     const circuit = facade.build(andGateSpec());
     const engine = facade.compile(circuit);
 
-    facade.setInput(engine, 'A', 1);
-    facade.setInput(engine, 'B', 0);
-    facade.runToStable(engine);
+    facade.setSignal(engine, 'A', 1);
+    facade.setSignal(engine, 'B', 0);
+    facade.settle(engine);
 
-    expect(facade.readOutput(engine, 'Y')).toBe(0);
+    expect(facade.readSignal(engine, 'Y')).toBe(0);
   });
 
   it('compilation of invalid circuit throws', () => {
@@ -665,14 +665,14 @@ describe('circuit_compile', () => {
     const engine2 = facade2.compile(circuit);
 
     // Mutations on engine1 don't affect engine2
-    facade1.setInput(engine1, 'A', 1);
-    facade1.setInput(engine1, 'B', 1);
-    facade1.runToStable(engine1);
+    facade1.setSignal(engine1, 'A', 1);
+    facade1.setSignal(engine1, 'B', 1);
+    facade1.settle(engine1);
 
-    facade2.runToStable(engine2);
+    facade2.settle(engine2);
     // engine2 should still have default values
-    expect(facade1.readOutput(engine1, 'Y')).toBe(1);
-    expect(facade2.readOutput(engine2, 'Y')).toBe(0);
+    expect(facade1.readSignal(engine1, 'Y')).toBe(1);
+    expect(facade2.readSignal(engine2, 'Y')).toBe(0);
   });
 });
 
@@ -681,10 +681,10 @@ describe('circuit_compile', () => {
 // ===========================================================================
 
 describe('circuit_test', () => {
-  it('all-pass test vectors return full pass count', () => {
+  it('all-pass test vectors return full pass count', async () => {
     const circuit = facade.build(andGateSpec());
     const engine = facade.compile(circuit);
-    const results = facade.runTests(engine, circuit,
+    const results = await facade.runTests(engine, circuit,
       'A B Y\n0 0 0\n0 1 0\n1 0 0\n1 1 1',
     );
     expect(results.passed).toBe(4);
@@ -692,32 +692,32 @@ describe('circuit_test', () => {
     expect(results.total).toBe(4);
   });
 
-  it('failing test vectors are reported', () => {
+  it('failing test vectors are reported', async () => {
     const circuit = facade.build(andGateSpec());
     const engine = facade.compile(circuit);
     // Deliberately wrong: A=1 B=1 should be Y=1, not Y=0
-    const results = facade.runTests(engine, circuit,
+    const results = await facade.runTests(engine, circuit,
       'A B Y\n1 1 0',
     );
     expect(results.failed).toBe(1);
     expect(results.total).toBe(1);
   });
 
-  it('test vectors work for OR gate', () => {
+  it('test vectors work for OR gate', async () => {
     const circuit = facade.build(orGateSpec());
     const engine = facade.compile(circuit);
-    const results = facade.runTests(engine, circuit,
+    const results = await facade.runTests(engine, circuit,
       'A B Y\n0 0 0\n0 1 1\n1 0 1\n1 1 1',
     );
     expect(results.passed).toBe(4);
     expect(results.failed).toBe(0);
   });
 
-  it('partial pass/fail counts are correct', () => {
+  it('partial pass/fail counts are correct', async () => {
     const circuit = facade.build(andGateSpec());
     const engine = facade.compile(circuit);
     // 3 correct, 1 wrong (0 0 → should be 0, not 1)
-    const results = facade.runTests(engine, circuit,
+    const results = await facade.runTests(engine, circuit,
       'A B Y\n0 0 1\n0 1 0\n1 0 0\n1 1 1',
     );
     expect(results.passed).toBe(3);
@@ -756,16 +756,16 @@ describe('circuit_test_equivalence', () => {
     // Test all 4 input combinations
     for (let a = 0; a <= 1; a++) {
       for (let b = 0; b <= 1; b++) {
-        facadeA.setInput(engineA, 'A', a);
-        facadeA.setInput(engineA, 'B', b);
-        facadeB.setInput(engineB, 'A', a);
-        facadeB.setInput(engineB, 'B', b);
+        facadeA.setSignal(engineA, 'A', a);
+        facadeA.setSignal(engineA, 'B', b);
+        facadeB.setSignal(engineB, 'A', a);
+        facadeB.setSignal(engineB, 'B', b);
 
-        facadeA.runToStable(engineA);
-        facadeB.runToStable(engineB);
+        facadeA.settle(engineA);
+        facadeB.settle(engineB);
 
-        expect(facadeA.readOutput(engineA, 'Y')).toBe(
-          facadeB.readOutput(engineB, 'Y'),
+        expect(facadeA.readSignal(engineA, 'Y')).toBe(
+          facadeB.readSignal(engineB, 'Y'),
         );
       }
     }
@@ -783,15 +783,15 @@ describe('circuit_test_equivalence', () => {
     let mismatches = 0;
     for (let a = 0; a <= 1; a++) {
       for (let b = 0; b <= 1; b++) {
-        facadeAnd.setInput(engineAnd, 'A', a);
-        facadeAnd.setInput(engineAnd, 'B', b);
-        facadeOr.setInput(engineOr, 'A', a);
-        facadeOr.setInput(engineOr, 'B', b);
+        facadeAnd.setSignal(engineAnd, 'A', a);
+        facadeAnd.setSignal(engineAnd, 'B', b);
+        facadeOr.setSignal(engineOr, 'A', a);
+        facadeOr.setSignal(engineOr, 'B', b);
 
-        facadeAnd.runToStable(engineAnd);
-        facadeOr.runToStable(engineOr);
+        facadeAnd.settle(engineAnd);
+        facadeOr.settle(engineOr);
 
-        if (facadeAnd.readOutput(engineAnd, 'Y') !== facadeOr.readOutput(engineOr, 'Y')) {
+        if (facadeAnd.readSignal(engineAnd, 'Y') !== facadeOr.readSignal(engineOr, 'Y')) {
           mismatches++;
         }
       }
@@ -830,14 +830,14 @@ describe('circuit_save', () => {
     const reloaded = facade.deserialize(json);
 
     const engine = facade.compile(reloaded);
-    facade.setInput(engine, 'A', 1);
-    facade.setInput(engine, 'B', 1);
-    facade.runToStable(engine);
-    expect(facade.readOutput(engine, 'Y')).toBe(1);
+    facade.setSignal(engine, 'A', 1);
+    facade.setSignal(engine, 'B', 1);
+    facade.settle(engine);
+    expect(facade.readSignal(engine, 'Y')).toBe(1);
 
-    facade.setInput(engine, 'A', 0);
-    facade.runToStable(engine);
-    expect(facade.readOutput(engine, 'Y')).toBe(0);
+    facade.setSignal(engine, 'A', 0);
+    facade.settle(engine);
+    expect(facade.readSignal(engine, 'Y')).toBe(0);
   });
 });
 
@@ -913,10 +913,10 @@ describe('JSON serialization', () => {
     expect(parsed.diagnostics.length).toBe(netlist.diagnostics.length);
   });
 
-  it('test results are JSON-serializable', () => {
+  it('test results are JSON-serializable', async () => {
     const circuit = facade.build(andGateSpec());
     const engine = facade.compile(circuit);
-    const results = facade.runTests(engine, circuit, 'A B Y\n0 0 0\n1 1 1');
+    const results = await facade.runTests(engine, circuit, 'A B Y\n0 0 0\n1 1 1');
 
     const json = JSON.stringify(results);
     const parsed = JSON.parse(json);

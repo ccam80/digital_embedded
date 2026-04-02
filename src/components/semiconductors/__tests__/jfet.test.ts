@@ -42,6 +42,7 @@ const NJFET_PARAMS = {
   BETA: 1e-4,   // transconductance parameter (A/V²)
   LAMBDA: 0,    // no channel-length modulation by default
   IS: 1e-14,    // gate junction saturation current
+  N: 1,         // gate junction emission coefficient
   CGS: 0,
   CGD: 0,
   PB: 1.0,
@@ -50,6 +51,7 @@ const NJFET_PARAMS = {
   RS: 0,
   KF: 0,
   AF: 1,
+  TNOM: 27,
 };
 
 const PJFET_PARAMS = {
@@ -57,6 +59,7 @@ const PJFET_PARAMS = {
   BETA: 1e-4,
   LAMBDA: 0,
   IS: 1e-14,
+  N: 1,
   CGS: 0,
   CGD: 0,
   PB: 1.0,
@@ -65,6 +68,7 @@ const PJFET_PARAMS = {
   RS: 0,
   KF: 0,
   AF: 1,
+  TNOM: 27,
 };
 
 // ---------------------------------------------------------------------------

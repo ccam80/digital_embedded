@@ -16,8 +16,8 @@ import type {
   NetPin,
   ComponentDescriptor,
   PinDescriptor,
-  Diagnostic,
 } from './netlist-types.js';
+import type { Diagnostic } from '../compile/types.js';
 import type { PropertyValue } from '../core/properties.js';
 import { UnionFind } from '../compile/union-find.js';
 import { pinWorldPosition } from '../core/pin.js';
@@ -225,6 +225,11 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
   // Build NetPin factory helper
   // -------------------------------------------------------------------------
 
+  const pinDomain = (elemIdx: number): 'digital' | 'analog' => {
+    const def = registry.get(elements[elemIdx]!.typeId);
+    return def?.modelRegistry !== undefined ? 'analog' : 'digital';
+  };
+
   const makeNetPin = (elemIdx: number, pinIdx: number): NetPin => {
     const el = elements[elemIdx]!;
     const pin = allPins[elemIdx]![pinIdx]!;
@@ -234,9 +239,7 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
       componentType: el.typeId,
       componentLabel,
       pinLabel: pin.label,
-      pinDirection: pin.direction,
-      declaredWidth: pin.bitWidth,
-      hierarchyPath: [],
+      domain: pinDomain(elemIdx),
     };
   };
 
@@ -263,7 +266,6 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
     }
 
     // Emit one diagnostic per conflicting pair of widths
-    const allNetPins = entries.map(({ elemIdx, pinIdx }) => makeNetPin(elemIdx, pinIdx));
     const widths = Array.from(pinsByWidth.keys());
     const w0 = widths[0]!;
     const w1 = widths[1] ?? widths[0]!;
@@ -281,8 +283,8 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
         `Bit-width mismatch: ${pinDescs.join(" \u2194 ")} ` +
         `(widths: ${widths.join(", ")})`,
       netId,
-      pins: allNetPins,
-      fix: `Ensure all pins on this net have the same bit width (e.g. ${w0} or ${w1}).`,
+      involvedElements: entries.map(({ elemIdx }) => elemIdx),
+      suggestions: [{ text: `Ensure all pins on this net have the same bit width (e.g. ${w0} or ${w1}).`, automatable: false }],
     });
   }
 
@@ -296,8 +298,19 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
     const netPins: NetPin[] = entries.map(({ elemIdx, pinIdx }) =>
       makeNetPin(elemIdx, pinIdx),
     );
-    const inferredWidth = netWidths[netId] === -1 ? null : (netWidths[netId] ?? 1);
-    nets.push({ netId, inferredWidth, pins: netPins });
+    const width = netWidths[netId] === -1 ? undefined : (netWidths[netId] ?? 1);
+    // Determine net domain: analog if any pin on the net is analog
+    const domain: 'digital' | 'analog' | 'mixed' = entries.some(
+      ({ elemIdx }) => pinDomain(elemIdx) === 'analog',
+    )
+      ? entries.some(({ elemIdx }) => pinDomain(elemIdx) === 'digital')
+        ? 'mixed'
+        : 'analog'
+      : 'digital';
+    const netDesc: NetDescriptor = width !== undefined
+      ? { netId, domain, bitWidth: width, pins: netPins }
+      : { netId, domain, pins: netPins };
+    nets.push(netDesc);
   }
 
   // -------------------------------------------------------------------------
@@ -320,8 +333,8 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
             `Unconnected input pin "${np.pinLabel}" on component ` +
             `"${np.componentLabel}" (${np.componentType})`,
           netId,
-          pins: [np],
-          fix: `Connect this input pin to a signal source.`,
+          involvedElements: [elemIdx],
+          suggestions: [{ text: `Connect this input pin to a signal source.`, automatable: false }],
         });
       }
     }
@@ -332,9 +345,6 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
         allPins[elemIdx]![pinIdx]!.direction === PinDirection.OUTPUT,
     );
     if (outputPins.length > 1) {
-      const netPins = outputPins.map(({ elemIdx, pinIdx }) =>
-        makeNetPin(elemIdx, pinIdx),
-      );
       diagnostics.push({
         severity: "warning",
         code: "multi-driver-no-tristate",
@@ -342,8 +352,8 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
           `Net ${netId} has ${outputPins.length} output drivers. ` +
           `This is valid only when all drivers support tri-state (high-Z) output or the net is an analog node.`,
         netId,
-        pins: netPins,
-        fix: `For digital: use tri-state outputs or ensure only one driver is active. For analog: this is normal (node sums currents).`,
+        involvedElements: outputPins.map(({ elemIdx }) => elemIdx),
+        suggestions: [{ text: `For digital: use tri-state outputs or ensure only one driver is active. For analog: this is normal (node sums currents).`, automatable: false }],
       });
     }
   }
@@ -382,6 +392,7 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
 
       return {
         label: pin.label,
+        domain: pinDomain(i),
         direction: pin.direction,
         bitWidth: pin.bitWidth,
         netId: thisNetEntries.length > 0 ? netId : -1,
@@ -389,35 +400,18 @@ export function resolveNets(circuit: Circuit, registry: ComponentRegistry): Netl
       };
     });
 
-    const models = [
-      ...(def.modelRegistry ? Object.keys(def.modelRegistry) : []),
-      ...(def.models?.digital ? ['digital'] : []),
-    ];
-    const activeModelAttr = el.getAttribute('model');
-    const activeModel = typeof activeModelAttr === 'string' ? activeModelAttr : undefined;
+    const modelAttr = el.getAttribute('model');
+    const modelKey = typeof modelAttr === 'string' ? modelAttr : 'digital';
 
-    if (activeModel !== undefined) {
-      components.push({
-        index: i,
-        typeId: el.typeId,
-        label,
-        instanceId: el.instanceId,
-        pins: pinDescriptors,
-        properties,
-        availableModels: models,
-        activeModel,
-      });
-    } else {
-      components.push({
-        index: i,
-        typeId: el.typeId,
-        label,
-        instanceId: el.instanceId,
-        pins: pinDescriptors,
-        properties,
-        availableModels: models,
-      });
-    }
+    components.push({
+      index: i,
+      typeId: el.typeId,
+      label,
+      instanceId: el.instanceId,
+      pins: pinDescriptors,
+      properties,
+      modelKey,
+    });
   }
 
   return { components, nets, diagnostics };

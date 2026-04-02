@@ -219,7 +219,7 @@ export function registerTutorialTools(
             if (step.testData) {
               try {
                 const testEngine = facade.compile(goalCircuit);
-                const results = facade.runTests(testEngine, goalCircuit, step.testData);
+                const results = await facade.runTests(testEngine, goalCircuit, step.testData);
                 if (results.failed > 0) {
                   lines.push(
                     `  WARNING: ${results.failed}/${results.total} test vectors fail against goal circuit!`,

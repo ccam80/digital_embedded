@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Mixed-mode and analog Port tests (SE-9a follow-up).
  *
  * The Port component is documented as "domain-agnostic subcircuit interface
@@ -231,8 +231,8 @@ describe('Port label resolution in analog domain via readAllSignals()', () => {
     // readOutput() throws FacadeError when the label is absent from
     // labelSignalMap. If Port labels are not resolved by compileAnalogPartition,
     // this will throw and the test will fail — exposing the gap.
-    expect(() => facade.readOutput(engine, 'P_read')).not.toThrow();
-    const voltage = facade.readOutput(engine, 'P_read');
+    expect(() => facade.readSignal(engine, 'P_read')).not.toThrow();
+    const voltage = facade.readSignal(engine, 'P_read');
     // With 5V source and 1kΩ load, the voltage at the Port node is ~5V
     // (DcVoltageSource sets the node to exactly 5V).
     expect(voltage).toBeGreaterThan(4.9);
@@ -260,10 +260,10 @@ describe('Port in pure-digital circuit — no regression', () => {
     });
 
     const engine = facade.compile(circuit);
-    facade.setInput(engine, 'A', 1);
+    facade.setSignal(engine, 'A', 1);
     facade.step(engine);
 
-    const y = facade.readOutput(engine, 'Y');
+    const y = facade.readSignal(engine, 'Y');
     expect(y).toBe(1);
   });
 });
@@ -298,7 +298,7 @@ describe('Port at cross-domain boundary', () => {
     const engine = facade.compile(circuit);
     facade.step(engine);
 
-    const value = facade.readOutput(engine, 'P_bnd');
+    const value = facade.readSignal(engine, 'P_bnd');
     expect(value).toBeDefined();
   });
 });

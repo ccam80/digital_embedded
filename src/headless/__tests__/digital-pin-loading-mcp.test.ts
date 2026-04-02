@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MCP tool surface tests for digitalPinLoading circuit metadata.
  *
  * Tests verify that `circuit_compile` respects the `digitalPinLoading` field
@@ -206,21 +206,21 @@ describe('digitalPinLoading MCP surface — bridge behavioral verification', () 
     const engine = facade.compile(circuit);
 
     // A=0 B=0 → Y=0
-    facade.setInput(engine, 'A', 0);
-    facade.setInput(engine, 'B', 0);
+    facade.setSignal(engine, 'A', 0);
+    facade.setSignal(engine, 'B', 0);
     facade.step(engine);
-    expect(facade.readOutput(engine, 'Y')).toBe(0);
+    expect(facade.readSignal(engine, 'Y')).toBe(0);
 
     // A=1 B=1 → Y=1
-    facade.setInput(engine, 'A', 1);
-    facade.setInput(engine, 'B', 1);
+    facade.setSignal(engine, 'A', 1);
+    facade.setSignal(engine, 'B', 1);
     facade.step(engine);
-    expect(facade.readOutput(engine, 'Y')).toBe(1);
+    expect(facade.readSignal(engine, 'Y')).toBe(1);
 
     // A=1 B=0 → Y=0
-    facade.setInput(engine, 'B', 0);
+    facade.setSignal(engine, 'B', 0);
     facade.step(engine);
-    expect(facade.readOutput(engine, 'Y')).toBe(0);
+    expect(facade.readSignal(engine, 'Y')).toBe(0);
   });
 
   it('mixed digital→analog: And gate (digital mode) output drives Resistor via bridge — analog voltage present', () => {
@@ -257,8 +257,8 @@ describe('digitalPinLoading MCP surface — bridge behavioral verification', () 
     expect(bridgeCount).toBeGreaterThan(0);
 
     // Drive both inputs HIGH → And output = HIGH → bridge propagates HIGH voltage.
-    facade.setInput(compiled, 'A', 1);
-    facade.setInput(compiled, 'B', 1);
+    facade.setSignal(compiled, 'A', 1);
+    facade.setSignal(compiled, 'B', 1);
     facade.step(compiled);
 
     // The Port at the bridge boundary reads the analog node voltage.
@@ -293,8 +293,8 @@ describe('digitalPinLoading MCP surface — bridge behavioral verification', () 
     const compiled = facade.compile(circuit);
 
     // A=1 B=0 → And output = LOW → bridge outputs VOL (≈0V).
-    facade.setInput(compiled, 'A', 1);
-    facade.setInput(compiled, 'B', 0);
+    facade.setSignal(compiled, 'A', 1);
+    facade.setSignal(compiled, 'B', 0);
     facade.step(compiled);
 
     const signals = facade.readAllSignals(compiled);

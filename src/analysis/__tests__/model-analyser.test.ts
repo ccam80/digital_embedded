@@ -309,12 +309,12 @@ function buildMultiBitCircuit(): { circuit: Circuit } {
 // ---------------------------------------------------------------------------
 
 describe('ModelAnalyser', () => {
-  it('andGate — 2-input AND → truth table with 4 rows matching AND truth table', () => {
+  it('andGate — 2-input AND → truth table with 4 rows matching AND truth table', async () => {
     const registry = buildRegistry();
     const facade = buildFacade(registry);
     const { circuit } = buildAndGate();
 
-    const table = analyseCircuit(facade, circuit);
+    const table = await analyseCircuit(facade, circuit);
 
     expect(table.inputs).toHaveLength(2);
     expect(table.inputs[0].name).toBe('A');
@@ -337,12 +337,12 @@ describe('ModelAnalyser', () => {
     expect(table.rows[3].outputValues).toEqual([1n]);
   });
 
-  it('halfAdder — half adder → truth table with 4 rows, Sum and Carry columns correct', () => {
+  it('halfAdder — half adder → truth table with 4 rows, Sum and Carry columns correct', async () => {
     const registry = buildRegistry();
     const facade = buildFacade(registry);
     const { circuit } = buildHalfAdder();
 
-    const table = analyseCircuit(facade, circuit);
+    const table = await analyseCircuit(facade, circuit);
 
     expect(table.inputs).toHaveLength(2);
     expect(table.outputs).toHaveLength(2);
@@ -371,29 +371,29 @@ describe('ModelAnalyser', () => {
     expect(table.rows[3].outputValues[carryIdx]).toBe(1n);
   });
 
-  it('inputLimit — circuit with 21 single-bit inputs → throws with descriptive error', () => {
+  it('inputLimit — circuit with 21 single-bit inputs → throws with descriptive error', async () => {
     const registry = buildRegistry();
     const facade = buildFacade(registry);
     const { circuit } = buildTooManyInputs();
 
-    expect(() => analyseCircuit(facade, circuit)).toThrow(/21 input bits/);
-    expect(() => analyseCircuit(facade, circuit)).toThrow(/Maximum is 20/);
+    await expect(analyseCircuit(facade, circuit)).rejects.toThrow(/21 input bits/);
+    await expect(analyseCircuit(facade, circuit)).rejects.toThrow(/Maximum is 20/);
   });
 
-  it('cycleDetection — circuit with combinational feedback → throws with cycle description', () => {
+  it('cycleDetection — circuit with combinational feedback → throws with cycle description', async () => {
     const registry = buildRegistry();
     const facade = buildFacade(registry);
     const { circuit } = buildCyclicCircuit();
 
-    expect(() => analyseCircuit(facade, circuit)).toThrow(/combinational feedback/i);
+    await expect(analyseCircuit(facade, circuit)).rejects.toThrow(/combinational feedback/i);
   });
 
-  it('multiBit — 2 single-bit inputs, 2 single-bit outputs → 4 rows (2^2 combinations)', () => {
+  it('multiBit — 2 single-bit inputs, 2 single-bit outputs → 4 rows (2^2 combinations)', async () => {
     const registry = buildRegistry();
     const facade = buildFacade(registry);
     const { circuit } = buildMultiBitCircuit();
 
-    const table = analyseCircuit(facade, circuit);
+    const table = await analyseCircuit(facade, circuit);
 
     // 2 inputs × 1 bit each = 2 total input bits → 4 rows
     expect(table.rows).toHaveLength(4);

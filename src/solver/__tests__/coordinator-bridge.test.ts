@@ -223,6 +223,7 @@ function buildBridgeFixture(
     bridges: [bridge],
     wireSignalMap: new Map(),
     labelSignalMap: new Map(),
+    labelToCircuitElement: new Map(),
     pinSignalMap: new Map(),
     diagnostics: [],
     allCircuitElements: [],

@@ -188,7 +188,7 @@ export class AnalogFuseElement implements AnalogElement {
       this._emitDiagnostic({
         code: "fuse-blown",
         severity: "info",
-        summary: "Fuse blown: accumulated I²t energy exceeded rating.",
+        message: "Fuse blown: accumulated I²t energy exceeded rating.",
         explanation:
           "The fuse thermal energy (I²·t integral) exceeded the specified i2tRating. " +
           "The fuse is now permanently open (high resistance). " +

@@ -10,7 +10,7 @@
  * how to act on it (log to console, update UI, adjust solver parameters, etc.).
  */
 
-import type { SolverDiagnostic, SolverDiagnosticCode } from "../../core/analog-engine-interface.js";
+import type { Diagnostic, DiagnosticCode } from "../../compile/types.js";
 
 /**
  * Convergence trace captured during a Newton-Raphson iteration.
@@ -44,8 +44,8 @@ export interface ConvergenceTrace {
  * Multiple listeners are supported and called in registration order.
  */
 export class DiagnosticCollector {
-  private _diagnostics: SolverDiagnostic[] = [];
-  private _listeners: Array<(diag: SolverDiagnostic) => void> = [];
+  private _diagnostics: Diagnostic[] = [];
+  private _listeners: Array<(diag: Diagnostic) => void> = [];
 
   /**
    * Emit a diagnostic event.
@@ -55,7 +55,7 @@ export class DiagnosticCollector {
    *
    * @param diag - The diagnostic to emit
    */
-  emit(diag: SolverDiagnostic): void {
+  emit(diag: Diagnostic): void {
     this._diagnostics.push(diag);
     for (const listener of this._listeners) {
       listener(diag);
@@ -70,7 +70,7 @@ export class DiagnosticCollector {
    *
    * @param callback - Listener function that receives the diagnostic
    */
-  onDiagnostic(callback: (diag: SolverDiagnostic) => void): void {
+  onDiagnostic(callback: (diag: Diagnostic) => void): void {
     this._listeners.push(callback);
   }
 
@@ -82,7 +82,7 @@ export class DiagnosticCollector {
    *
    * @param callback - The listener to remove
    */
-  removeDiagnosticListener(callback: (diag: SolverDiagnostic) => void): void {
+  removeDiagnosticListener(callback: (diag: Diagnostic) => void): void {
     const idx = this._listeners.indexOf(callback);
     if (idx >= 0) {
       this._listeners.splice(idx, 1);
@@ -94,7 +94,7 @@ export class DiagnosticCollector {
    *
    * @returns Array of emitted diagnostics in emission order
    */
-  getDiagnostics(): SolverDiagnostic[] {
+  getDiagnostics(): Diagnostic[] {
     return this._diagnostics;
   }
 
@@ -110,7 +110,7 @@ export class DiagnosticCollector {
 }
 
 /**
- * Factory helper to construct a `SolverDiagnostic` with required fields filled in.
+ * Factory helper to construct a `Diagnostic` with required fields filled in.
  *
  * Provides defaults for optional fields:
  * - `suggestions` defaults to `[]`
@@ -124,26 +124,25 @@ export class DiagnosticCollector {
  *
  * @param code - Machine-readable diagnostic code
  * @param severity - Severity level: 'info', 'warning', or 'error'
- * @param summary - One-line summary of the issue
+ * @param message - One-line description of the issue
  * @param opts - Optional partial diagnostic fields to override defaults
- * @returns A complete `SolverDiagnostic` object
+ * @returns A complete `Diagnostic` object
  */
 export function makeDiagnostic(
-  code: SolverDiagnosticCode,
+  code: DiagnosticCode,
   severity: "info" | "warning" | "error",
-  summary: string,
-  opts?: Partial<SolverDiagnostic>
-): SolverDiagnostic {
-  const diag: SolverDiagnostic = {
+  message: string,
+  opts?: Partial<Diagnostic>
+): Diagnostic {
+  return {
     code,
     severity,
-    summary,
+    message,
     explanation: opts?.explanation ?? "",
     suggestions: opts?.suggestions ?? [],
+    ...(opts?.involvedNodes !== undefined && { involvedNodes: opts.involvedNodes }),
+    ...(opts?.involvedElements !== undefined && { involvedElements: opts.involvedElements }),
+    ...(opts?.simTime !== undefined && { simTime: opts.simTime }),
+    ...(opts?.detail !== undefined && { detail: opts.detail }),
   };
-  if (opts?.involvedNodes !== undefined) diag.involvedNodes = opts.involvedNodes;
-  if (opts?.involvedElements !== undefined) diag.involvedElements = opts.involvedElements;
-  if (opts?.simTime !== undefined) diag.simTime = opts.simTime;
-  if (opts?.detail !== undefined) diag.detail = opts.detail;
-  return diag;
 }

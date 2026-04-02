@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Tests for compareCircuits() — task 6.3.6.
  *
  * Uses a mock ComparatorFacade with controlled readOutput returns to test
@@ -114,15 +114,15 @@ function makeFacade(
     return eng;
   });
 
-  const setInput = vi.fn();
-  const runToStable = vi.fn();
+  const setSignal = vi.fn();
+  const settle = vi.fn((): Promise<void> => Promise.resolve());
 
-  const readOutput = vi.fn((_coordinator: SimulationCoordinator, label: string): number => {
+  const readSignal = vi.fn((_coordinator: SimulationCoordinator, label: string): number => {
     const tag = engineTags.get(_coordinator) ?? "ref";
     return readOutputFn(tag, label);
   });
 
-  return { compile, setInput, readOutput, runToStable };
+  return { compile, setSignal, readSignal, settle };
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ describe("compareCircuits", () => {
   // identicalCircuits
   // -------------------------------------------------------------------------
 
-  it("identicalCircuits — compare circuit to itself → zero mismatches", () => {
+  it("identicalCircuits — compare circuit to itself → zero mismatches", async () => {
     // Both engines return same output for every input
     const facade = makeFacade((_tag, _label) => 0);
 
@@ -189,7 +189,7 @@ describe("compareCircuits", () => {
       ],
     };
 
-    const result = compareCircuits(facade, circuit, circuit, testData);
+    const result = await compareCircuits(facade, circuit, circuit, testData);
 
     expect(result.mismatchCount).toBe(0);
     expect(result.matchCount).toBe(2);
@@ -201,7 +201,7 @@ describe("compareCircuits", () => {
   // differentCircuits
   // -------------------------------------------------------------------------
 
-  it("differentCircuits — AND gate reference vs OR gate student → mismatches on specific inputs", () => {
+  it("differentCircuits — AND gate reference vs OR gate student → mismatches on specific inputs", async () => {
     // AND: Y = A & B;  OR: Y = A | B
     // They differ on (0,1) and (1,0): AND=0, OR=1
     const facade = makeFacade((tag, _label) => {
@@ -219,7 +219,7 @@ describe("compareCircuits", () => {
     ]);
 
     const testData = makeAndTruthTable();
-    const result = compareCircuits(facade, circuit, circuit, testData);
+    const result = await compareCircuits(facade, circuit, circuit, testData);
 
     // ref returns 0 always, stu returns 1 always
     // Row 0: expected Y=0 - ref=0 (match with expected, but ref≠stu: 0≠1) → mismatch
@@ -237,7 +237,7 @@ describe("compareCircuits", () => {
   // exhaustiveMode
   // -------------------------------------------------------------------------
 
-  it("exhaustiveMode — no test data, 2 single-bit inputs → all 4 combinations tested, mode is exhaustive", () => {
+  it("exhaustiveMode — no test data, 2 single-bit inputs → all 4 combinations tested, mode is exhaustive", async () => {
     // Both engines return identical outputs → no mismatches
     const facade = makeFacade(() => 0);
 
@@ -253,7 +253,7 @@ describe("compareCircuits", () => {
     ]);
 
     // No test data → exhaustive mode
-    const result = compareCircuits(facade, refCircuit, stuCircuit);
+    const result = await compareCircuits(facade, refCircuit, stuCircuit);
 
     expect(result.mode).toBe("exhaustive");
     expect(result.totalVectors).toBe(4); // 2^2 = 4
@@ -265,7 +265,7 @@ describe("compareCircuits", () => {
   // testBasedMode
   // -------------------------------------------------------------------------
 
-  it("testBasedMode — test data provided → uses provided vectors, mode is test-based", () => {
+  it("testBasedMode — test data provided → uses provided vectors, mode is test-based", async () => {
     const facade = makeFacade(() => 0);
 
     const circuit = makeCircuit([
@@ -288,7 +288,7 @@ describe("compareCircuits", () => {
       ],
     };
 
-    const result = compareCircuits(facade, circuit, circuit, testData);
+    const result = await compareCircuits(facade, circuit, circuit, testData);
 
     expect(result.mode).toBe("test-based");
     expect(result.totalVectors).toBe(2);
@@ -298,7 +298,7 @@ describe("compareCircuits", () => {
   // tooManyInputs
   // -------------------------------------------------------------------------
 
-  it("tooManyInputs — 21 input bits, no test data → throws requesting test vectors", () => {
+  it("tooManyInputs — 21 input bits, no test data → throws requesting test vectors", async () => {
     const facade = makeFacade(() => 0);
 
     // 21 single-bit inputs → 21 total input bits > 20
@@ -311,7 +311,7 @@ describe("compareCircuits", () => {
     const refCircuit = makeCircuit(inElements);
     const stuCircuit = makeCircuit(inElements);
 
-    expect(() => compareCircuits(facade, refCircuit, stuCircuit)).toThrow(
+    await expect(compareCircuits(facade, refCircuit, stuCircuit)).rejects.toThrow(
       /20 total input bits/
     );
   });
@@ -320,7 +320,7 @@ describe("compareCircuits", () => {
   // mismatchDetails
   // -------------------------------------------------------------------------
 
-  it("mismatchDetails — verify differingSignals lists only the outputs that disagree", () => {
+  it("mismatchDetails — verify differingSignals lists only the outputs that disagree", async () => {
     // Two outputs: Y and Z. ref returns: Y=0, Z=1. stu returns: Y=1, Z=1.
     // So only Y differs.
     let callCount = 0;
@@ -350,7 +350,7 @@ describe("compareCircuits", () => {
       ],
     };
 
-    const result = compareCircuits(facade, circuit, circuit, testData);
+    const result = await compareCircuits(facade, circuit, circuit, testData);
 
     expect(result.mismatchCount).toBe(1);
     expect(result.mismatches).toHaveLength(1);

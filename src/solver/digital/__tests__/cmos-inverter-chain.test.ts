@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test: chained CMOS inverter built from NFET/PFET switches.
  *
  * Validates that the bus resolver correctly handles simultaneous switch
@@ -62,36 +62,36 @@ describe("Chained CMOS inverters", () => {
     expect(() => facade.compile(circuit)).not.toThrow();
   });
 
-  it("A=0 → Y=0 (double inversion)", () => {
+  it("A=0 → Y=0 (double inversion)", async () => {
     const circuit = buildChainedInverters();
     const coordinator = facade.compile(circuit);
-    facade.setInput(coordinator, "A", 0);
-    facade.runToStable(coordinator);
-    expect(bit(facade.readOutput(coordinator, "Y"))).toBe(0);
+    facade.setSignal(coordinator, "A", 0);
+    await facade.settle(coordinator);
+    expect(bit(facade.readSignal(coordinator, "Y"))).toBe(0);
   });
 
-  it("A=1 → Y=1 (double inversion)", () => {
+  it("A=1 → Y=1 (double inversion)", async () => {
     const circuit = buildChainedInverters();
     const coordinator = facade.compile(circuit);
-    facade.setInput(coordinator, "A", 1);
-    facade.runToStable(coordinator);
-    expect(bit(facade.readOutput(coordinator, "Y"))).toBe(1);
+    facade.setSignal(coordinator, "A", 1);
+    await facade.settle(coordinator);
+    expect(bit(facade.readSignal(coordinator, "Y"))).toBe(1);
   });
 
-  it("toggles correctly", () => {
+  it("toggles correctly", async () => {
     const circuit = buildChainedInverters();
     const coordinator = facade.compile(circuit);
 
-    facade.setInput(coordinator, "A", 0);
-    facade.runToStable(coordinator);
-    expect(bit(facade.readOutput(coordinator, "Y"))).toBe(0);
+    facade.setSignal(coordinator, "A", 0);
+    await facade.settle(coordinator);
+    expect(bit(facade.readSignal(coordinator, "Y"))).toBe(0);
 
-    facade.setInput(coordinator, "A", 1);
-    facade.runToStable(coordinator);
-    expect(bit(facade.readOutput(coordinator, "Y"))).toBe(1);
+    facade.setSignal(coordinator, "A", 1);
+    await facade.settle(coordinator);
+    expect(bit(facade.readSignal(coordinator, "Y"))).toBe(1);
 
-    facade.setInput(coordinator, "A", 0);
-    facade.runToStable(coordinator);
-    expect(bit(facade.readOutput(coordinator, "Y"))).toBe(0);
+    facade.setSignal(coordinator, "A", 0);
+    await facade.settle(coordinator);
+    expect(bit(facade.readSignal(coordinator, "Y"))).toBe(0);
   });
 });

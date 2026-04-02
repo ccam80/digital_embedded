@@ -14,12 +14,12 @@ import type { ComponentDefinition } from '../core/registry.js';
 import type { TestResults, CircuitBuildOptions } from './types.js';
 import type {
   Netlist,
-  Diagnostic,
   CircuitSpec,
   CircuitPatch,
   PatchOptions,
   PatchResult,
 } from './netlist-types.js';
+import type { Diagnostic } from '../compile/types.js';
 
 /**
  * The primary interface for programmatic circuit building and simulation
@@ -52,9 +52,7 @@ export interface SimulatorFacade {
   ): CircuitElement;
 
   /**
-   * Connect two component pins with a wire
-   * Validates pin labels exist, directions are compatible (output→input or bidirectional),
-   * and bit widths match.
+   * Connect two component pins with a wire. Validates pin labels exist.
    *
    * @param circuit - The circuit
    * @param srcComponent - Source component
@@ -62,7 +60,7 @@ export interface SimulatorFacade {
    * @param dstComponent - Destination component
    * @param dstPinLabel - Destination pin label
    * @returns The created Wire
-   * @throws FacadeError if pin labels unknown, directions incompatible, or bit widths mismatch
+   * @throws FacadeError if pin labels unknown
    */
   connect(
     circuit: Circuit,
@@ -92,8 +90,8 @@ export interface SimulatorFacade {
   // ============================================
 
   /**
-   * Execute one propagation cycle of the engine
-   * Evaluates all components once in topological order, updates net states.
+   * Execute one propagation cycle of the engine.
+   * For analog/mixed circuits, advances the transient solver by one timestep.
    *
    * @param coordinator - The compiled coordinator
    */
@@ -109,14 +107,15 @@ export interface SimulatorFacade {
   run(coordinator: SimulationCoordinator, cycles: number): void;
 
   /**
-   * Execute cycles until the circuit reaches a stable state
-   * (all signals unchanged for a full cycle).
+   * Settle the circuit to a stable state.
+   *
+   * Pure digital: single step with clockAdvance:false (one topological evaluation).
+   * Analog/mixed: stepToTime by settleTime seconds of sim time.
    *
    * @param coordinator - The compiled coordinator
-   * @param maxIterations - Safety limit (default 10000); throws if exceeded
-   * @throws FacadeError if circuit oscillates and exceeds maxIterations
+   * @param settleTime - Sim-time duration for analog settle (default 0.01 = 10ms)
    */
-  runToStable(coordinator: SimulationCoordinator, maxIterations?: number): void;
+  settle(coordinator: SimulationCoordinator, settleTime?: number): Promise<void>;
 
   /**
    * Step until coordinator.simTime >= targetSimTime, with optional wall-clock budget.
@@ -129,26 +128,24 @@ export interface SimulatorFacade {
   stepToTime(coordinator: SimulationCoordinator, targetSimTime: number, budgetMs?: number): Promise<number>;
 
   /**
-   * Drive an input pin to a specific value
-   * Typically called before step() to set switch/input pin states.
+   * Write a signal value by label.
    *
    * @param coordinator - The compiled coordinator
    * @param label - Component label (e.g. "SW0", "Clk")
    * @param value - Numeric value to set
-   * @throws FacadeError if label not found or is not an input component
+   * @throws FacadeError if label not found
    */
-  setInput(coordinator: SimulationCoordinator, label: string, value: number): void;
+  setSignal(coordinator: SimulationCoordinator, label: string, value: number): void;
 
   /**
-   * Read the current value of an output pin
-   * Returns the last computed value. Call step() first to update.
+   * Read a signal value by label.
    *
    * @param coordinator - The compiled coordinator
    * @param label - Component label
    * @returns The numeric value
-   * @throws FacadeError if label not found or is not an output component
+   * @throws FacadeError if label not found
    */
-  readOutput(coordinator: SimulationCoordinator, label: string): number;
+  readSignal(coordinator: SimulationCoordinator, label: string): number;
 
   /**
    * Snapshot all signal values in the circuit
@@ -175,7 +172,7 @@ export interface SimulatorFacade {
    * @returns TestResults with pass/fail counts and per-vector details
    * @throws FacadeError if no test data is available from either source
    */
-  runTests(coordinator: SimulationCoordinator, circuit: Circuit, testData?: string): TestResults;
+  runTests(coordinator: SimulationCoordinator, circuit: Circuit, testData?: string): Promise<TestResults>;
 
   // ============================================
   // File I/O: Load and save circuits
