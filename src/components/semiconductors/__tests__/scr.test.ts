@@ -8,6 +8,8 @@
  *   - turns_off_below_holding_current: unlatch when I_AK < I_hold
  *   - blocks_reverse: V_AK = -50V — only reverse leakage
  *   - breakover_voltage: V_AK > V_breakover triggers without gate
+ *   - no_writeback: updateOperatingPoint does not modify voltages[]
+ *   - pool_state: pool.state0 slots contain correct values after updateOperatingPoint
  */
 
 import { describe, it, expect } from "vitest";
@@ -20,12 +22,27 @@ import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// Helper: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
+
+function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
+  const size = core.stateSize ?? 0;
+  const pool = new StatePool(Math.max(size, 1));
+  if (size > 0) {
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+  } else {
+    core.stateBaseOffset = -1;
+  }
+  return { element: core, pool };
+}
+
 // ---------------------------------------------------------------------------
 // Default SCR parameters (matching spec defaults)
 // ---------------------------------------------------------------------------
@@ -42,6 +59,15 @@ const SCR_DEFAULTS = {
   n: 1,
 };
 
+// Slot indices (must match scr.ts)
+const SLOT_VAK        = 0;
+const SLOT_VGK        = 1;
+const SLOT_GEQ        = 2;
+const SLOT_IEQ        = 3;
+const SLOT_G_GATE_GEQ = 4;
+const SLOT_G_GATE_IEQ = 5;
+const SLOT_LATCHED    = 6;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -51,7 +77,9 @@ function makeScrElement(overrides: Partial<typeof SCR_DEFAULTS> = {}): AnalogEle
   const props = createTestPropertyBag();
   props.replaceModelParams(params);
   // nodeA=1, nodeK=2, nodeG=3
-  return withNodeIds(createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, props), [1, 2, 3]);
+  const core = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, props);
+  const { element } = withState(core);
+  return withNodeIds(element, [1, 2, 3]);
 }
 
 function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
@@ -62,6 +90,8 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    stateSize: 0,
+    stateBaseOffset: -1,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolver): void {
@@ -118,7 +148,9 @@ describe("SCR", () => {
 
     const matrixSize = 3; // node1, node2, branch
     const scrProps0 = new PropertyBag(); scrProps0.replaceModelParams({ ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS });
-    const scr = withNodeIds(createScrElement(new Map([["A", 1], ["K", 0], ["G", 0]]), [], -1, scrProps0), [1, 0, 0]);
+    const scrCore = createScrElement(new Map([["A", 1], ["K", 0], ["G", 0]]), [], -1, scrProps0);
+    const { element: scrEl } = withState(scrCore);
+    const scr = withNodeIds(scrEl, [1, 0, 0]);
     const vs = withNodeIds(makeDcVoltageSource(2, 0, 2, 50), [2, 0]);
     const rLoad = makeResistorElement(2, 1, 10000); // 10kΩ
 
@@ -139,8 +171,6 @@ describe("SCR", () => {
     expect(result.nodeVoltages[1]).toBeCloseTo(50, 1);
 
     // With SCR blocking, most voltage drops across it
-    // Current = V(node2 - node1) / R = very small since V(node1) ≈ 50V * (blocking R / (R + blocking R))
-    // In blocking state, SCR presents very high impedance — current in µA range
     const iAk = (result.nodeVoltages[1] - result.nodeVoltages[0]) / 10000;
     expect(Math.abs(iAk)).toBeLessThan(1e-3); // less than 1mA (leakage only)
   });
@@ -148,17 +178,9 @@ describe("SCR", () => {
   it("triggers_with_gate_current", () => {
     // V_AK = 50V, inject gate current well above I_GT (200µA).
     // Expected: SCR latches and presents low on-state conductance.
-    //
-    // Tested by direct NR iteration: drive the element with updateOperatingPoint
-    // at V_AK=50V and V_GK=0.65V (well forward-biased gate junction, which
-    // drives substantial gate current well above I_GT=200µA).
-    //
-    // At V_GK=0.65V: I_G = IS*(exp(0.65/nVt) - 1) >> I_ref=1mA
-    // → α₂ → ALPHA_MAX = 0.95; α₁+α₂ = 0.5+0.95 = 1.45 > 0.95 → triggers.
-
-    // nodeA=1, nodeK=2, nodeG=3
     const scrProps1 = new PropertyBag(); scrProps1.replaceModelParams({ ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS });
-    const scr = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, scrProps1);
+    const scrCore1 = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, scrProps1);
+    const { element: scr } = withState(scrCore1);
 
     // Drive to operating point: 50V anode, 0V cathode, 0.65V gate
     const voltages = new Float64Array(3);
@@ -190,11 +212,6 @@ describe("SCR", () => {
     expect(maxG).toBeGreaterThan(1.0); // >> GMIN, confirms on-state
     expect(maxG).toBeCloseTo(gOn, 0);  // ≈ 100 S
 
-    // Verify effective current: I_AK = (50 - V_on) / R_on (after convergence)
-    // At V_AK=50V (saturated pnjlim), Norton current: I = geq*vak + ieq
-    // = (1/rOn + GMIN)*vak + (iOn - geq*vak) = iOn = (vak - vOn)/rOn
-    // With _vak converged toward 50V: iOn ≈ (50-1.5)/0.01 = 4850A
-    // Just check the element is latched (high conductance confirmed above)
     expect(maxG).toBeGreaterThan(1.0);
   });
 
@@ -234,18 +251,12 @@ describe("SCR", () => {
     const gOn = 1 / SCR_DEFAULTS.rOn;
     const diagCalls = mockCalls.filter((c) => c[0] === c[1]); // diagonal entries
     const maxG = Math.max(...diagCalls.map((c) => Math.abs(c[2])));
-    // In on-state, diagonal conductance >> GMIN (blocking) — should be near 1/rOn
-    expect(maxG).toBeGreaterThan(1.0); // >> GMIN=1e-12, confirms on-state (1/0.01 = 100)
-    expect(maxG).toBeCloseTo(gOn, 0); // approximately 100 S
+    expect(maxG).toBeGreaterThan(1.0);
+    expect(maxG).toBeCloseTo(gOn, 0);
   });
 
   it("turns_off_below_holding_current", () => {
     // Trigger SCR, then reduce V_AK until I_AK < I_hold
-    // With I_hold = 5mA and R_on = 0.01Ω, V_AK_min ≈ V_on + I_hold * R_on ≈ 1.5V + 0.05mV ≈ 1.5V
-    // To get I < 5mA through on-state SCR: I = (V_AK - V_on) / R_on < I_hold
-    // → V_AK < V_on + I_hold * R_on = 1.5 + 0.05e-3 = 1.500050V
-    // So to turn off, we need V_AK ≈ V_on (near turn-on voltage)
-
     const scr = makeScrElement({ iH: 5e-3, rOn: 0.01, vOn: 1.5 });
 
     // Trigger the SCR first
@@ -263,7 +274,6 @@ describe("SCR", () => {
     expect(gBefore).toBeGreaterThan(1.0); // on-state
 
     // Now reduce V_AK to 0.1V — current = (0.1 - 1.5) / 0.01 = -140A (negative → below I_hold)
-    // This will cause the SCR to unlatch
     const voltages = new Float64Array(3);
     voltages[0] = 0.1; // very low anode voltage
     voltages[1] = 0;
@@ -286,7 +296,6 @@ describe("SCR", () => {
 
     const diagAfter = mockCalls2.filter((c) => c[0] === c[1] && c[0] < 2);
     const gAfter = Math.max(...diagAfter.map((c) => Math.abs(c[2])));
-    // In blocking state: conductance should be << 1 S
     expect(gAfter).toBeLessThan(0.1); // very small — blocking state restored
   });
 
@@ -305,18 +314,13 @@ describe("SCR", () => {
     scr.stampNonlinear!(mockSolver);
 
     // In reverse blocking, geq ≈ GMIN (≈ 1e-12)
-    // The diagonal A-K conductance stamps should be very small
-    // nodeA=1→index 0, nodeK=2→index 1
     const aaDiag = mockCalls.find((c) => c[0] === 0 && c[1] === 0);
     expect(aaDiag).toBeDefined();
-    // geq << 1e-3 (tiny reverse leakage conductance)
     expect(Math.abs(aaDiag![2])).toBeLessThan(1e-3);
 
     // Norton current at reverse bias: I ≈ -I_S (tiny)
-    // RHS at node A (index 0): -ieq
     const rhsA = mockRhs.find((r) => r[0] === 0);
     expect(rhsA).toBeDefined();
-    // |ieq| << 1mA confirms reverse blocking
     expect(Math.abs(rhsA![1])).toBeLessThan(1e-3);
   });
 
@@ -324,10 +328,8 @@ describe("SCR", () => {
     // V_AK > V_breakover (100V) should trigger SCR even without gate current
     const scr = makeScrElement({ vBreakover: 100 });
 
-    // Drive anode to 110V > V_breakover, gate and cathode at 0V
     driveToOp(scr, 110, 0, 0, 100);
 
-    // After breakover, SCR should be in on-state (high conductance)
     const mockCalls: Array<[number, number, number]> = [];
     const mockSolver = {
       stamp: (r: number, c: number, v: number) => mockCalls.push([r, c, v]),
@@ -336,12 +338,83 @@ describe("SCR", () => {
 
     scr.stampNonlinear!(mockSolver);
 
-    // On-state: diagonal conductance ≈ 1/R_on = 100 S
     const gOn = 1 / SCR_DEFAULTS.rOn;
     const diagCalls = mockCalls.filter((c) => c[0] === c[1] && c[0] < 2);
     const maxG = Math.max(...diagCalls.map((c) => Math.abs(c[2])));
-    expect(maxG).toBeGreaterThan(1.0); // significantly above blocking conductance
-    expect(maxG).toBeCloseTo(gOn, 0); // approximately 100 S (on-state)
+    expect(maxG).toBeGreaterThan(1.0);
+    expect(maxG).toBeCloseTo(gOn, 0);
+  });
+
+  it("no_writeback: updateOperatingPoint does not modify voltages[]", () => {
+    const props = new PropertyBag();
+    props.replaceModelParams({ ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS });
+    const core = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, props);
+    const { element } = withState(core);
+
+    // Large forward voltage that would trigger pnjlim limiting
+    const voltages = new Float64Array([50, 0, 0.65]);
+    const snapshot = new Float64Array(voltages);
+
+    element.updateOperatingPoint!(voltages);
+
+    expect(voltages[0]).toBe(snapshot[0]);
+    expect(voltages[1]).toBe(snapshot[1]);
+    expect(voltages[2]).toBe(snapshot[2]);
+  });
+
+  it("pool_state: pool.state0 contains correct slot values after updateOperatingPoint", () => {
+    const props = new PropertyBag();
+    props.replaceModelParams({ ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS });
+    const core = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, props);
+    const { element, pool } = withState(core);
+
+    // Converge at forward-biased gate to trigger latching
+    const voltages = new Float64Array([50, 0, 0.65]);
+    for (let i = 0; i < 200; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = 50;
+      voltages[1] = 0;
+      voltages[2] = 0.65;
+    }
+
+    // SLOT_LATCHED = 6: should be 1.0 (forward latched)
+    expect(pool.state0[SLOT_LATCHED]).toBe(1.0);
+
+    // SLOT_VAK = 0: should hold pnjlim-limited anode-cathode voltage
+    const vakInPool = pool.state0[SLOT_VAK];
+    expect(Number.isFinite(vakInPool)).toBe(true);
+    expect(vakInPool).toBeGreaterThan(0); // positive for forward-biased state
+
+    // SLOT_GEQ = 2: in on-state should be ≈ 1/rOn
+    const geqInPool = pool.state0[SLOT_GEQ];
+    expect(geqInPool).toBeGreaterThan(1.0); // 1/0.01 = 100 S
+
+    // SLOT_IEQ = 3: should be finite
+    expect(Number.isFinite(pool.state0[SLOT_IEQ])).toBe(true);
+
+    // SLOT_G_GATE_GEQ = 4: gate junction conductance, should be positive and finite
+    expect(pool.state0[SLOT_G_GATE_GEQ]).toBeGreaterThan(0);
+    expect(Number.isFinite(pool.state0[SLOT_G_GATE_GEQ])).toBe(true);
+  });
+
+  it("pool_state: SLOT_LATCHED is 0.0 in blocking state", () => {
+    const props = new PropertyBag();
+    props.replaceModelParams({ ...SCR_PARAM_DEFAULTS, ...SCR_DEFAULTS });
+    const core = createScrElement(new Map([["A", 1], ["K", 2], ["G", 3]]), [], -1, props);
+    const { element, pool } = withState(core);
+
+    // Drive with forward voltage but no gate → blocking
+    const voltages = new Float64Array([10, 0, 0]);
+    for (let i = 0; i < 50; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = 10;
+      voltages[1] = 0;
+      voltages[2] = 0;
+    }
+
+    expect(pool.state0[SLOT_LATCHED]).toBe(0.0);
+    // In blocking state GEQ should be near GMIN (very small)
+    expect(pool.state0[SLOT_GEQ]).toBeLessThan(1e-6);
   });
 
   it("definition_has_correct_fields", () => {

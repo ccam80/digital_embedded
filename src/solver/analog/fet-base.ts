@@ -16,7 +16,7 @@
  *   Norton current = ids - gm*vgs_op - gds*vds_op
  */
 
-import type { AnalogElementCore, IntegrationMethod } from "./element.js";
+import type { AnalogElementCore, IntegrationMethod, StatePoolRef } from "../../core/analog-types.js";
 import type { SparseSolver } from "./sparse-solver.js";
 import { stampG, stampRHS } from "./stamp-helpers.js";
 import {
@@ -42,9 +42,21 @@ export interface FetCapacitances {
 }
 
 // ---------------------------------------------------------------------------
-// Stamp helpers — node 0 is ground (skipped)
+// Slot layout for state pool (stateSize: 12)
 // ---------------------------------------------------------------------------
 
+const SLOT_VGS       = 0;
+const SLOT_VDS       = 1;
+const SLOT_GM        = 2;
+const SLOT_GDS       = 3;
+const SLOT_IDS       = 4;
+const SLOT_SWAPPED   = 5;  // 0.0 = false, 1.0 = true
+const SLOT_CAP_GEQ_GS = 6;
+const SLOT_CAP_IEQ_GS = 7;
+const SLOT_CAP_GEQ_GD = 8;
+const SLOT_CAP_IEQ_GD = 9;
+const SLOT_VGS_PREV  = 10;
+const SLOT_VGD_PREV  = 11;
 
 // ---------------------------------------------------------------------------
 // AbstractFetElement
@@ -76,23 +88,66 @@ export abstract class AbstractFetElement implements AnalogElementCore {
    */
   abstract readonly polaritySign: 1 | -1;
 
-  // NR linearization state — initialized with device off
-  protected _vgs: number = 0;
-  protected _vds: number = 0;
-  protected _gm: number = 1e-12;
-  protected _gds: number = 1e-12;
-  protected _ids: number = 0;
-  protected _swapped: boolean = false;
+  // State pool slot constants (public for tests)
+  static readonly SLOT_VGS       = SLOT_VGS;
+  static readonly SLOT_VDS       = SLOT_VDS;
+  static readonly SLOT_GM        = SLOT_GM;
+  static readonly SLOT_GDS       = SLOT_GDS;
+  static readonly SLOT_IDS       = SLOT_IDS;
+  static readonly SLOT_SWAPPED   = SLOT_SWAPPED;
+  static readonly SLOT_CAP_GEQ_GS = SLOT_CAP_GEQ_GS;
+  static readonly SLOT_CAP_IEQ_GS = SLOT_CAP_IEQ_GS;
+  static readonly SLOT_CAP_GEQ_GD = SLOT_CAP_GEQ_GD;
+  static readonly SLOT_CAP_IEQ_GD = SLOT_CAP_IEQ_GD;
+  static readonly SLOT_VGS_PREV  = SLOT_VGS_PREV;
+  static readonly SLOT_VGD_PREV  = SLOT_VGD_PREV;
+
+  // State pool backing array — bound in initState()
+  private _s0!: Float64Array;
+
+  // Source-stepping scale factor — not stored in pool (not state)
   protected _sourceScale: number = 1.0;
 
-  // Capacitance companion model state
-  private _capGeqGS: number = 0;
-  private _capIeqGS: number = 0;
-  private _capGeqGD: number = 0;
-  private _capIeqGD: number = 0;
-  private _vgsPrev: number = NaN;
-  private _vgdPrev: number = NaN;
-  private _capFirstCall: boolean = true;
+  // State pool interface
+  readonly stateSize: number = 12;
+  stateBaseOffset: number = -1;
+
+  initState(pool: StatePoolRef): void {
+    this._s0 = pool.state0;
+    // Initialize device-off linearization values
+    this._s0[this.stateBaseOffset + SLOT_VGS]     = 0;
+    this._s0[this.stateBaseOffset + SLOT_VDS]     = 0;
+    this._s0[this.stateBaseOffset + SLOT_GM]      = 1e-12;
+    this._s0[this.stateBaseOffset + SLOT_GDS]     = 1e-12;
+    this._s0[this.stateBaseOffset + SLOT_IDS]     = 0;
+    this._s0[this.stateBaseOffset + SLOT_SWAPPED] = 0;
+    this._s0[this.stateBaseOffset + SLOT_CAP_GEQ_GS] = 0;
+    this._s0[this.stateBaseOffset + SLOT_CAP_IEQ_GS] = 0;
+    this._s0[this.stateBaseOffset + SLOT_CAP_GEQ_GD] = 0;
+    this._s0[this.stateBaseOffset + SLOT_CAP_IEQ_GD] = 0;
+    // NaN signals first stampCompanion call — use current voltage as warm start
+    this._s0[this.stateBaseOffset + SLOT_VGS_PREV] = NaN;
+    this._s0[this.stateBaseOffset + SLOT_VGD_PREV] = NaN;
+  }
+
+  // Getters and setters backed by state pool
+  protected get _vgs(): number { return this._s0[this.stateBaseOffset + SLOT_VGS]; }
+  protected set _vgs(v: number) { this._s0[this.stateBaseOffset + SLOT_VGS] = v; }
+
+  protected get _vds(): number { return this._s0[this.stateBaseOffset + SLOT_VDS]; }
+  protected set _vds(v: number) { this._s0[this.stateBaseOffset + SLOT_VDS] = v; }
+
+  protected get _gm(): number { return this._s0[this.stateBaseOffset + SLOT_GM]; }
+  protected set _gm(v: number) { this._s0[this.stateBaseOffset + SLOT_GM] = v; }
+
+  protected get _gds(): number { return this._s0[this.stateBaseOffset + SLOT_GDS]; }
+  protected set _gds(v: number) { this._s0[this.stateBaseOffset + SLOT_GDS] = v; }
+
+  protected get _ids(): number { return this._s0[this.stateBaseOffset + SLOT_IDS]; }
+  protected set _ids(v: number) { this._s0[this.stateBaseOffset + SLOT_IDS] = v; }
+
+  protected get _swapped(): boolean { return this._s0[this.stateBaseOffset + SLOT_SWAPPED] !== 0; }
+  protected set _swapped(v: boolean) { this._s0[this.stateBaseOffset + SLOT_SWAPPED] = v ? 1.0 : 0.0; }
 
   constructor(gateNode: number, drainNode: number, sourceNode: number, _extraNodes?: number[]) {
     this.gateNode = gateNode;
@@ -129,22 +184,27 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
 
-    if (this._capGeqGS !== 0 || this._capIeqGS !== 0) {
-      stampG(solver, nodeG, nodeG, this._capGeqGS);
-      stampG(solver, nodeG, nodeS, -this._capGeqGS);
-      stampG(solver, nodeS, nodeG, -this._capGeqGS);
-      stampG(solver, nodeS, nodeS, this._capGeqGS);
-      stampRHS(solver, nodeG, -this._capIeqGS);
-      stampRHS(solver, nodeS, this._capIeqGS);
+    const capGeqGS = this._s0[this.stateBaseOffset + SLOT_CAP_GEQ_GS];
+    const capIeqGS = this._s0[this.stateBaseOffset + SLOT_CAP_IEQ_GS];
+    const capGeqGD = this._s0[this.stateBaseOffset + SLOT_CAP_GEQ_GD];
+    const capIeqGD = this._s0[this.stateBaseOffset + SLOT_CAP_IEQ_GD];
+
+    if (capGeqGS !== 0 || capIeqGS !== 0) {
+      stampG(solver, nodeG, nodeG, capGeqGS);
+      stampG(solver, nodeG, nodeS, -capGeqGS);
+      stampG(solver, nodeS, nodeG, -capGeqGS);
+      stampG(solver, nodeS, nodeS, capGeqGS);
+      stampRHS(solver, nodeG, -capIeqGS);
+      stampRHS(solver, nodeS, capIeqGS);
     }
 
-    if (this._capGeqGD !== 0 || this._capIeqGD !== 0) {
-      stampG(solver, nodeG, nodeG, this._capGeqGD);
-      stampG(solver, nodeG, nodeD, -this._capGeqGD);
-      stampG(solver, nodeD, nodeG, -this._capGeqGD);
-      stampG(solver, nodeD, nodeD, this._capGeqGD);
-      stampRHS(solver, nodeG, -this._capIeqGD);
-      stampRHS(solver, nodeD, this._capIeqGD);
+    if (capGeqGD !== 0 || capIeqGD !== 0) {
+      stampG(solver, nodeG, nodeG, capGeqGD);
+      stampG(solver, nodeG, nodeD, -capGeqGD);
+      stampG(solver, nodeD, nodeG, -capGeqGD);
+      stampG(solver, nodeD, nodeD, capGeqGD);
+      stampRHS(solver, nodeG, -capIeqGD);
+      stampRHS(solver, nodeD, capIeqGD);
     }
   }
 
@@ -175,7 +235,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     stampRHS(solver, effectiveS, nortonId);
   }
 
-  updateOperatingPoint(voltages: Float64Array): void {
+  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     const nodeD = this.drainNode;
     const nodeG = this.gateNode;
     const nodeS = this.sourceNode;
@@ -264,33 +324,42 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     const vgsNow = vG - vS;
     const vgdNow = vG - vD;
 
-    const prevVgs = this._capFirstCall ? vgsNow : this._vgsPrev;
-    const prevVgd = this._capFirstCall ? vgdNow : this._vgdPrev;
+    const base = this.stateBaseOffset;
+    const vgsPrevStored = this._s0[base + SLOT_VGS_PREV];
+    const vgdPrevStored = this._s0[base + SLOT_VGD_PREV];
+
+    // NaN signals first call — use current voltage as warm start
+    const isFirstCall = isNaN(vgsPrevStored);
+    const prevVgs = isFirstCall ? vgsNow : vgsPrevStored;
+    const prevVgd = isFirstCall ? vgdNow : vgdPrevStored;
 
     // Recover capacitor currents at previous accepted step
-    const iGS = this._capGeqGS * vgsNow + this._capIeqGS;
-    const iGD = this._capGeqGD * vgdNow + this._capIeqGD;
+    const capGeqGS = this._s0[base + SLOT_CAP_GEQ_GS];
+    const capIeqGS = this._s0[base + SLOT_CAP_IEQ_GS];
+    const capGeqGD = this._s0[base + SLOT_CAP_GEQ_GD];
+    const capIeqGD = this._s0[base + SLOT_CAP_IEQ_GD];
+    const iGS = capGeqGS * vgsNow + capIeqGS;
+    const iGD = capGeqGD * vgdNow + capIeqGD;
 
-    this._vgsPrev = vgsNow;
-    this._vgdPrev = vgdNow;
-    this._capFirstCall = false;
+    this._s0[base + SLOT_VGS_PREV] = vgsNow;
+    this._s0[base + SLOT_VGD_PREV] = vgdNow;
 
     const caps = this.computeCapacitances(this._vgs, this._vds);
 
     if (caps.cgs > 0) {
-      this._capGeqGS = capacitorConductance(caps.cgs, dt, method);
-      this._capIeqGS = capacitorHistoryCurrent(caps.cgs, dt, method, vgsNow, prevVgs, iGS);
+      this._s0[base + SLOT_CAP_GEQ_GS] = capacitorConductance(caps.cgs, dt, method);
+      this._s0[base + SLOT_CAP_IEQ_GS] = capacitorHistoryCurrent(caps.cgs, dt, method, vgsNow, prevVgs, iGS);
     } else {
-      this._capGeqGS = 0;
-      this._capIeqGS = 0;
+      this._s0[base + SLOT_CAP_GEQ_GS] = 0;
+      this._s0[base + SLOT_CAP_IEQ_GS] = 0;
     }
 
     if (caps.cgd > 0) {
-      this._capGeqGD = capacitorConductance(caps.cgd, dt, method);
-      this._capIeqGD = capacitorHistoryCurrent(caps.cgd, dt, method, vgdNow, prevVgd, iGD);
+      this._s0[base + SLOT_CAP_GEQ_GD] = capacitorConductance(caps.cgd, dt, method);
+      this._s0[base + SLOT_CAP_IEQ_GD] = capacitorHistoryCurrent(caps.cgd, dt, method, vgdNow, prevVgd, iGD);
     } else {
-      this._capGeqGD = 0;
-      this._capIeqGD = 0;
+      this._s0[base + SLOT_CAP_GEQ_GD] = 0;
+      this._s0[base + SLOT_CAP_IEQ_GD] = 0;
     }
   }
 

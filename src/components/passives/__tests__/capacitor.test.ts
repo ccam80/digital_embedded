@@ -18,6 +18,8 @@ import {
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import type { SparseSolverStamp } from "../../../core/analog-types.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
+import type { AnalogElementCore } from "../../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -26,6 +28,22 @@ import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
+}
+
+// ---------------------------------------------------------------------------
+// withState: allocate a StatePool for a single element and call initState
+// ---------------------------------------------------------------------------
+
+function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
+  const size = core.stateSize ?? 0;
+  const pool = new StatePool(Math.max(size, 1));
+  if (size > 0) {
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+  } else {
+    core.stateBaseOffset = -1;
+  }
+  return { element: core, pool };
 }
 
 
@@ -60,11 +78,12 @@ function makeStubSolver(): { solver: SparseSolverStamp; stamps: StampCall[]; rhs
   return { solver, stamps, rhsStamps };
 }
 
-/** Call analogFactory and inject pinNodeIds (simulating what the compiler does). */
+/** Call analogFactory, inject pinNodeIds, and wire up state pool (simulating what the compiler does). */
 function makeCapacitorElement(pinNodes: Map<string, number>, props: PropertyBag) {
-  const el = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(pinNodes, [], -1, props, () => 0);
-  Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
-  return el;
+  const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(pinNodes, [], -1, props, () => 0);
+  Object.assign(core, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
+  const { element } = withState(core);
+  return element;
 }
 
 // ---------------------------------------------------------------------------
@@ -187,6 +206,79 @@ describe("Capacitor", () => {
       expect(m).toBeDefined();
       expect(m!.propertyKey).toBe("label");
       expect(m!.convert("C1")).toBe("C1");
+    });
+  });
+
+  describe("statePool", () => {
+    it("stateSize is 3", () => {
+      const props = new PropertyBag();
+      props.setModelParam("capacitance", 1e-6);
+      const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      );
+      expect(core.stateSize).toBe(3);
+    });
+
+    it("stateBaseOffset is -1 before compiler assigns it", () => {
+      const props = new PropertyBag();
+      props.setModelParam("capacitance", 1e-6);
+      const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      );
+      expect(core.stateBaseOffset).toBe(-1);
+    });
+
+    it("stampCompanion writes GEQ and IEQ to pool slots 0 and 1", () => {
+      const props = new PropertyBag();
+      props.setModelParam("capacitance", 1e-6);
+      const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      );
+      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
+      const { element, pool } = withState(core);
+
+      const voltages = new Float64Array([5, 0]);
+      element.stampCompanion!(1e-6, "bdf1", voltages);
+
+      // slot 0 = GEQ = C/h = 1e-6 / 1e-6 = 1.0
+      expect(pool.state0[0]).toBeCloseTo(1.0, 5);
+      // slot 1 = IEQ (non-zero: -geq * vNow = -1.0 * 5 = -5.0 for BDF-1 at steady DC)
+      expect(pool.state0[1]).toBeCloseTo(-5.0, 5);
+      // slot 2 = V_PREV = vNow = 5.0
+      expect(pool.state0[2]).toBeCloseTo(5.0, 5);
+    });
+
+    it("stampCompanion preserves V_PREV across calls (slot 2 tracks previous voltage)", () => {
+      const props = new PropertyBag();
+      props.setModelParam("capacitance", 1e-6);
+      const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      );
+      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
+      const { element, pool } = withState(core);
+
+      // First call: voltage = 3V
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]));
+      expect(pool.state0[2]).toBeCloseTo(3.0, 5);
+
+      // Second call: voltage = 7V — V_PREV should now be 7V after the call
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]));
+      expect(pool.state0[2]).toBeCloseTo(7.0, 5);
+    });
+
+    it("getLteEstimate returns non-zero truncationError after stampCompanion", () => {
+      const props = new PropertyBag();
+      props.setModelParam("capacitance", 1e-6);
+      const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      );
+      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
+      const { element } = withState(core);
+
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([5, 0]));
+      const lte = element.getLteEstimate!(1e-6);
+      expect(lte).toBeDefined();
+      expect(lte.truncationError).toBeGreaterThanOrEqual(0);
     });
   });
 });

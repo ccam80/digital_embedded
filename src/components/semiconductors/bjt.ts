@@ -39,6 +39,7 @@ import {
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
 import { computeJunctionCapacitance } from "./diode.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -398,19 +399,49 @@ export function createBjtElement(
     IKR: props.getModelParam<number>("IKR"),
   };
 
-  // Operating point state (initialized to zero = all junctions at 0V)
-  let vbe = 0;
-  let vbc = 0;
-  let op: BjtOperatingPoint = computeBjtOp(
-    vbe, vbc,
-    params.IS, params.BF, params.NF, params.BR, params.NR,
-    params.ISE, params.ISC, params.VAF, params.VAR, params.IKF, params.IKR,
-  );
+  // State pool slot indices (BJT simple, stateSize: 10)
+  const SLOT_VBE = 0;
+  const SLOT_VBC = 1;
+  const SLOT_GPI = 2;
+  const SLOT_GMU = 3;
+  const SLOT_GM  = 4;
+  const SLOT_GO  = 5;
+  const SLOT_IC  = 6;
+  const SLOT_IB  = 7;
+  const SLOT_IC_NORTON = 8;
+  const SLOT_IB_NORTON = 9;
+
+  // Pool binding — set by initState
+  let s0: Float64Array;
+  let base: number;
 
   return {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
+    stateSize: 10,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      s0 = pool.state0;
+      base = this.stateBaseOffset;
+      // Initialize operating point at vbe=0, vbc=0
+      const op0 = computeBjtOp(
+        0, 0,
+        params.IS, params.BF, params.NF, params.BR, params.NR,
+        params.ISE, params.ISC, params.VAF, params.VAR, params.IKF, params.IKR,
+      );
+      s0[base + SLOT_VBE] = 0;
+      s0[base + SLOT_VBC] = 0;
+      s0[base + SLOT_GPI] = op0.gpi;
+      s0[base + SLOT_GMU] = op0.gmu;
+      s0[base + SLOT_GM]  = op0.gm;
+      s0[base + SLOT_GO]  = op0.go;
+      s0[base + SLOT_IC]  = op0.ic;
+      s0[base + SLOT_IB]  = op0.ib;
+      s0[base + SLOT_IC_NORTON] = op0.ic - op0.gm * 0 + op0.go * 0;
+      s0[base + SLOT_IB_NORTON] = op0.ib - op0.gpi * 0 - op0.gmu * 0;
+    },
 
     stamp(_solver: SparseSolver): void {
       // No linear (topology-constant) contributions.
@@ -424,18 +455,16 @@ export function createBjtElement(
       //   - VCCS gm*Vbe: current from E to C
       //
       // Norton equivalents at each node:
-      //   Ic_norton = ic - gm*vbe - go*vbc
+      //   Ic_norton = ic - gm*vbe - go*vbc (stored in pool as SLOT_IC_NORTON with sign convention below)
       //   Ib_norton = ib - gpi*vbe - gmu*vbc
-      //   Ie_norton = -(ic + ib) - (-gpi*vbe - gmu*vbc - gm*vbe - go*vbc)
 
-      const { ic, ib, gm, go, gpi, gmu } = op;
-      const vbeOp = op.vbe;
-      const vbcOp = op.vbc;
-
-      // Norton current sources (using polarity-signed operating point voltages)
-      const icNorton = ic - gm * vbeOp + go * vbcOp;
-      const ibNorton = ib - gpi * vbeOp - gmu * vbcOp;
-      const ieNorton = -(ic + ib) + gm * vbeOp - go * vbcOp + gpi * vbeOp + gmu * vbcOp;
+      const gpi = s0[base + SLOT_GPI];
+      const gmu = s0[base + SLOT_GMU];
+      const gm  = s0[base + SLOT_GM];
+      const go  = s0[base + SLOT_GO];
+      const icNorton = s0[base + SLOT_IC_NORTON];
+      const ibNorton = s0[base + SLOT_IB_NORTON];
+      const ieNorton = -(icNorton + ibNorton);
 
       // Stamp conductances (gpi between B-E, gmu between B-C, go between C-E)
       // gpi between B and E
@@ -470,7 +499,7 @@ export function createBjtElement(
       stampRHS(solver, nodeE, -polarity * ieNorton);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       // Read node voltages
       const vC = nodeC > 0 ? voltages[nodeC - 1] : 0;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
@@ -486,58 +515,52 @@ export function createBjtElement(
       const vbeRaw = polarity * (vB - vE);
       const vbcRaw = polarity * (vB - vC);
 
-      // Apply pnjlim to both junctions independently
-      const vbeLimited = pnjlim(vbeRaw, vbe, nfVt, vcritBE);
-      const vbcLimited = pnjlim(vbcRaw, vbc, nrVt, vcritBC);
+      // Apply pnjlim to both junctions using vold from pool
+      const vbeLimited = pnjlim(vbeRaw, s0[base + SLOT_VBE], nfVt, vcritBE);
+      const vbcLimited = pnjlim(vbcRaw, s0[base + SLOT_VBC], nrVt, vcritBC);
 
-      // Write limited voltages back into the solution vector consistently.
-      // Both junctions share the base node, so we must adjust vB AND vC
-      // to enforce both limits simultaneously (keep vE as the anchor).
-      if (nodeB > 0) {
-        voltages[nodeB - 1] = vE + vbeLimited * polarity;
-      }
-      if (nodeC > 0) {
-        // vbc = polarity*(vB'-vC) = vbcLimited → vC = vB' - vbcLimited*polarity
-        const vBnew = nodeB > 0 ? voltages[nodeB - 1] : vE + vbeLimited * polarity;
-        voltages[nodeC - 1] = vBnew - vbcLimited * polarity;
-      }
+      // Save limited voltages to pool — no write-back to voltages[]
+      s0[base + SLOT_VBE] = vbeLimited;
+      s0[base + SLOT_VBC] = vbcLimited;
 
-      vbe = vbeLimited;
-      vbc = vbcLimited;
-
-      op = computeBjtOp(
-        vbe, vbc,
+      const op = computeBjtOp(
+        vbeLimited, vbcLimited,
         params.IS, params.BF, params.NF, params.BR, params.NR,
         params.ISE, params.ISC, params.VAF, params.VAR, params.IKF, params.IKR,
       );
+
+      s0[base + SLOT_GPI] = op.gpi;
+      s0[base + SLOT_GMU] = op.gmu;
+      s0[base + SLOT_GM]  = op.gm;
+      s0[base + SLOT_GO]  = op.go;
+      s0[base + SLOT_IC]  = op.ic;
+      s0[base + SLOT_IB]  = op.ib;
+      s0[base + SLOT_IC_NORTON] = op.ic - op.gm * vbeLimited + op.go * vbcLimited;
+      s0[base + SLOT_IB_NORTON] = op.ib - op.gpi * vbeLimited - op.gmu * vbcLimited;
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array): boolean {
       const vC = nodeC > 0 ? voltages[nodeC - 1] : 0;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
       const vE = nodeE > 0 ? voltages[nodeE - 1] : 0;
-      const vbeNew = polarity * (vB - vE);
-      const vbcNew = polarity * (vB - vC);
+      const vbeRaw = polarity * (vB - vE);
+      const vbcRaw = polarity * (vB - vC);
 
-      const vCp = nodeC > 0 ? prevVoltages[nodeC - 1] : 0;
-      const vBp = nodeB > 0 ? prevVoltages[nodeB - 1] : 0;
-      const vEp = nodeE > 0 ? prevVoltages[nodeE - 1] : 0;
-      const vbePrev = polarity * (vBp - vEp);
-      const vbcPrev = polarity * (vBp - vCp);
-
+      // Compare raw junction voltage against last limited pool value.
+      // Converged when the NR solution matches what pnjlim accepted.
       const nfVt = params.NF * VT;
       const nrVt = params.NR * VT;
       return (
-        Math.abs(vbeNew - vbePrev) <= 2 * nfVt &&
-        Math.abs(vbcNew - vbcPrev) <= 2 * nrVt
+        Math.abs(vbeRaw - s0[base + SLOT_VBE]) <= 2 * nfVt &&
+        Math.abs(vbcRaw - s0[base + SLOT_VBC]) <= 2 * nrVt
       );
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {
       // pinNodeIds order: [nodeB, nodeC, nodeE] (pinLayout order: [B, C, E])
       // Positive = current flowing INTO element at that pin.
-      const ic = polarity * op.ic;
-      const ib = polarity * op.ib;
+      const ic = polarity * s0[base + SLOT_IC];
+      const ib = polarity * s0[base + SLOT_IB];
       const ie = -(ic + ib); // KCL: ib + ic + ie = 0
       return [ib, ic, ie];
     },
@@ -688,14 +711,23 @@ export function createSpiceL1BjtElement(
 
   const hasCapacitance = params.CJE > 0 || params.CJC > 0 || params.TF > 0 || params.TR > 0 || params.CJS > 0;
 
-  let vbe = 0;
-  let vbc = 0;
-  let op: BjtOperatingPoint = computeSpiceL1BjtOp(
-    vbe, vbc,
-    params.IS, params.BF, params.NF, params.BR, params.NR,
-    params.ISE, params.ISC, params.NE, params.NC,
-    params.VAF, params.VAR, params.IKF, params.IKR,
-  );
+  // State pool slot indices (BJT SPICE L1, stateSize: 12)
+  const L1_SLOT_VBE = 0;
+  const L1_SLOT_VBC = 1;
+  const L1_SLOT_GPI = 2;
+  const L1_SLOT_GMU = 3;
+  const L1_SLOT_GM  = 4;
+  const L1_SLOT_GO  = 5;
+  const L1_SLOT_IC  = 6;
+  const L1_SLOT_IB  = 7;
+  const L1_SLOT_IC_NORTON = 8;
+  const L1_SLOT_IB_NORTON = 9;
+  const L1_SLOT_RB_EFF    = 10;
+  const L1_SLOT_IE_NORTON = 11;
+
+  // Pool binding — set by initState
+  let s0: Float64Array;
+  let base: number;
 
   // Junction capacitance companion model state
   let capGeqBE = 0;
@@ -711,19 +743,41 @@ export function createSpiceL1BjtElement(
   let vcsPrev = NaN;      // collector-substrate voltage (Vc - Vsubstrate=0)
   let capFirstCall = true;
 
-  // Current-dependent base resistance (updated in updateOperatingPoint).
-  let rbEff = params.RB;
-
   const element: AnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: hasCapacitance,
+    stateSize: 12,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      s0 = pool.state0;
+      base = this.stateBaseOffset;
+      const op0 = computeSpiceL1BjtOp(
+        0, 0,
+        params.IS, params.BF, params.NF, params.BR, params.NR,
+        params.ISE, params.ISC, params.NE, params.NC,
+        params.VAF, params.VAR, params.IKF, params.IKR,
+      );
+      s0[base + L1_SLOT_VBE] = 0;
+      s0[base + L1_SLOT_VBC] = 0;
+      s0[base + L1_SLOT_GPI] = op0.gpi;
+      s0[base + L1_SLOT_GMU] = op0.gmu;
+      s0[base + L1_SLOT_GM]  = op0.gm;
+      s0[base + L1_SLOT_GO]  = op0.go;
+      s0[base + L1_SLOT_IC]  = op0.ic;
+      s0[base + L1_SLOT_IB]  = op0.ib;
+      s0[base + L1_SLOT_IC_NORTON] = op0.ic - op0.gm * 0 + op0.go * 0;
+      s0[base + L1_SLOT_IB_NORTON] = op0.ib - op0.gpi * 0 - op0.gmu * 0;
+      s0[base + L1_SLOT_RB_EFF]    = params.RB;
+      s0[base + L1_SLOT_IE_NORTON] = -(op0.ic + op0.ib);
+    },
 
     stamp(solver: SparseSolver): void {
       // Stamp terminal resistances.
-      // RB is current-dependent (IRB/RBM), computed in updateOperatingPoint; use rbEff.
+      // RB is current-dependent (IRB/RBM), computed in updateOperatingPoint; use rbEff from pool.
       if (params.RB > 0 && nodeB_int !== nodeB_ext) {
-        const gRB = 1 / rbEff;
+        const gRB = 1 / s0[base + L1_SLOT_RB_EFF];
         stampG(solver, nodeB_ext, nodeB_ext, gRB);
         stampG(solver, nodeB_ext, nodeB_int, -gRB);
         stampG(solver, nodeB_int, nodeB_ext, -gRB);
@@ -779,13 +833,13 @@ export function createSpiceL1BjtElement(
     },
 
     stampNonlinear(solver: SparseSolver): void {
-      const { ic, ib, gm, go, gpi, gmu } = op;
-      const vbeOp = op.vbe;
-      const vbcOp = op.vbc;
-
-      const icNorton = ic - gm * vbeOp + go * vbcOp;
-      const ibNorton = ib - gpi * vbeOp - gmu * vbcOp;
-      const ieNorton = -(ic + ib) + gm * vbeOp - go * vbcOp + gpi * vbeOp + gmu * vbcOp;
+      const gpi = s0[base + L1_SLOT_GPI];
+      const gmu = s0[base + L1_SLOT_GMU];
+      const gm  = s0[base + L1_SLOT_GM];
+      const go  = s0[base + L1_SLOT_GO];
+      const icNorton = s0[base + L1_SLOT_IC_NORTON];
+      const ibNorton = s0[base + L1_SLOT_IB_NORTON];
+      const ieNorton = s0[base + L1_SLOT_IE_NORTON];
 
       // gpi between B_int and E_int
       stampG(solver, nodeB_int, nodeB_int, gpi);
@@ -817,7 +871,7 @@ export function createSpiceL1BjtElement(
       stampRHS(solver, nodeE_int, -polarity * ieNorton);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       // Read internal node voltages
       const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
@@ -831,70 +885,65 @@ export function createSpiceL1BjtElement(
       const vbeRaw = polarity * (vBi - vEi);
       const vbcRaw = polarity * (vBi - vCi);
 
-      const vbeLimited = pnjlim(vbeRaw, vbe, nfVt, vcritBE);
-      const vbcLimited = pnjlim(vbcRaw, vbc, nrVt, vcritBC);
+      // Apply pnjlim using vold from pool — no write-back to voltages[]
+      const vbeLimited = pnjlim(vbeRaw, s0[base + L1_SLOT_VBE], nfVt, vcritBE);
+      const vbcLimited = pnjlim(vbcRaw, s0[base + L1_SLOT_VBC], nrVt, vcritBC);
 
-      // Write limited voltages back to internal nodes
-      if (nodeB_int > 0) {
-        voltages[nodeB_int - 1] = vEi + vbeLimited * polarity;
-      }
-      if (nodeC_int > 0) {
-        const vBnew = nodeB_int > 0 ? voltages[nodeB_int - 1] : vEi + vbeLimited * polarity;
-        voltages[nodeC_int - 1] = vBnew - vbcLimited * polarity;
-      }
+      // Save limited voltages to pool
+      s0[base + L1_SLOT_VBE] = vbeLimited;
+      s0[base + L1_SLOT_VBC] = vbcLimited;
 
-      vbe = vbeLimited;
-      vbc = vbcLimited;
-
-      op = computeSpiceL1BjtOp(
-        vbe, vbc,
+      const op = computeSpiceL1BjtOp(
+        vbeLimited, vbcLimited,
         params.IS, params.BF, params.NF, params.BR, params.NR,
         params.ISE, params.ISC, params.NE, params.NC,
         params.VAF, params.VAR, params.IKF, params.IKR,
       );
+
+      s0[base + L1_SLOT_GPI] = op.gpi;
+      s0[base + L1_SLOT_GMU] = op.gmu;
+      s0[base + L1_SLOT_GM]  = op.gm;
+      s0[base + L1_SLOT_GO]  = op.go;
+      s0[base + L1_SLOT_IC]  = op.ic;
+      s0[base + L1_SLOT_IB]  = op.ib;
+      s0[base + L1_SLOT_IC_NORTON] = op.ic - op.gm * vbeLimited + op.go * vbcLimited;
+      s0[base + L1_SLOT_IB_NORTON] = op.ib - op.gpi * vbeLimited - op.gmu * vbcLimited;
+      s0[base + L1_SLOT_IE_NORTON] = -(op.ic + op.ib) + op.gm * vbeLimited - op.go * vbcLimited + op.gpi * vbeLimited + op.gmu * vbcLimited;
 
       // Update current-dependent base resistance (IRB/RBM).
       // When IRB > 0 and RBM < RB, Rb varies with base current magnitude.
       // Formula from ngspice/SPICE3: Rb(Ib) = RBM + 3*(RB-RBM)*(tan(z)-z)/(z*tan²(z))
       // where z = (-1 + sqrt(1 + 14.59*|Ib|/IRB)) / (2.4 * sqrt(|Ib|/IRB + 1e-30))
       if (params.IRB > 0 && params.RBM > 0 && params.RBM < params.RB) {
-        // Current-dependent base resistance: Rb(Ib) = RBM + (RB-RBM)*f(Ib)
-        // where f(Ib) = 3*(tan(z)-z)/(z*tan²(z)), z from SPICE3 formula.
         const Ib_abs = Math.abs(op.ib) + 1e-30;
         const x = Ib_abs / params.IRB;
         const z = (-1 + Math.sqrt(1 + 14.59265 * x)) / (2.4494897 * Math.sqrt(x + 1e-30));
         const tanz = Math.tan(z);
         const factor = (tanz > 1e-10 && z > 1e-10) ? 3 * (tanz - z) / (z * tanz * tanz) : 1;
-        rbEff = Math.max(params.RBM, params.RBM + (params.RB - params.RBM) * factor);
+        s0[base + L1_SLOT_RB_EFF] = Math.max(params.RBM, params.RBM + (params.RB - params.RBM) * factor);
       } else {
-        rbEff = params.RB;
+        s0[base + L1_SLOT_RB_EFF] = params.RB;
       }
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array): boolean {
       const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
       const vEi = nodeE_int > 0 ? voltages[nodeE_int - 1] : 0;
-      const vbeNew = polarity * (vBi - vEi);
-      const vbcNew = polarity * (vBi - vCi);
-
-      const vCip = nodeC_int > 0 ? prevVoltages[nodeC_int - 1] : 0;
-      const vBip = nodeB_int > 0 ? prevVoltages[nodeB_int - 1] : 0;
-      const vEip = nodeE_int > 0 ? prevVoltages[nodeE_int - 1] : 0;
-      const vbePrevC = polarity * (vBip - vEip);
-      const vbcPrevC = polarity * (vBip - vCip);
+      const vbeRaw = polarity * (vBi - vEi);
+      const vbcRaw = polarity * (vBi - vCi);
 
       const nfVt = params.NF * VT;
       const nrVt = params.NR * VT;
       return (
-        Math.abs(vbeNew - vbePrevC) <= 2 * nfVt &&
-        Math.abs(vbcNew - vbcPrevC) <= 2 * nrVt
+        Math.abs(vbeRaw - s0[base + L1_SLOT_VBE]) <= 2 * nfVt &&
+        Math.abs(vbcRaw - s0[base + L1_SLOT_VBC]) <= 2 * nrVt
       );
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {
-      const ic = polarity * op.ic;
-      const ib = polarity * op.ib;
+      const ic = polarity * s0[base + L1_SLOT_IC];
+      const ib = polarity * s0[base + L1_SLOT_IB];
       const ie = -(ic + ib);
       return [ib, ic, ie];
     },
@@ -934,7 +983,7 @@ export function createSpiceL1BjtElement(
       // Transit time modulation: TF_eff = TF * (1 + XTF*(Ic/(Ic+ITF))^2 * exp(Vbc/(1.44*VTF)))
       let TF_eff = params.TF;
       if (params.TF > 0 && params.XTF > 0) {
-        const Ic = op.ic;
+        const Ic = s0[base + L1_SLOT_IC];
         const ITF_safe = params.ITF > 0 ? params.ITF : 1e-30;
         const icRatio = Ic / (Ic + ITF_safe);
         const VTF_safe = params.VTF === Infinity ? 1e30 : params.VTF;
@@ -943,7 +992,7 @@ export function createSpiceL1BjtElement(
       }
 
       const CjBE = computeJunctionCapacitance(vbeNow, params.CJE, params.VJE, params.MJE, params.FC);
-      const CdBE = TF_eff * op.gm;
+      const CdBE = TF_eff * s0[base + L1_SLOT_GM];
       const CtotalBE = CjBE + CdBE;
 
       if (CtotalBE > 0) {
@@ -958,7 +1007,7 @@ export function createSpiceL1BjtElement(
       // B-C junction: depletion + reverse transit-time diffusion capacitance.
       // Split by XCJC: internal fraction goes to internal B-C nodes, rest to external.
       const CjBC = computeJunctionCapacitance(vbcNow, params.CJC, params.VJC, params.MJC, params.FC);
-      const CdBC = params.TR * op.gmu;
+      const CdBC = params.TR * s0[base + L1_SLOT_GMU];
       const CtotalBC = CjBC + CdBC;
 
       const xcjc = Math.min(Math.max(params.XCJC, 0), 1);

@@ -19,6 +19,8 @@ import {
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import type { SparseSolverStamp } from "../../../core/analog-types.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
+import type { AnalogElementCore } from "../../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -27,6 +29,22 @@ import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
+}
+
+// ---------------------------------------------------------------------------
+// withState: allocate a StatePool for a single element and call initState
+// ---------------------------------------------------------------------------
+
+function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
+  const size = core.stateSize ?? 0;
+  const pool = new StatePool(Math.max(size, 1));
+  if (size > 0) {
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+  } else {
+    core.stateBaseOffset = -1;
+  }
+  return { element: core, pool };
 }
 
 
@@ -61,11 +79,12 @@ function makeStubSolver(): { solver: SparseSolverStamp; stamps: StampCall[]; rhs
   return { solver, stamps, rhsStamps };
 }
 
-/** Call analogFactory and inject pinNodeIds (simulating what the compiler does). */
+/** Call analogFactory, inject pinNodeIds, and wire up state pool (simulating what the compiler does). */
 function makeInductorElement(pinNodes: Map<string, number>, branchIdx: number, props: PropertyBag) {
-  const el = getFactory(InductorDefinition.modelRegistry!.behavioral!)(pinNodes, [], branchIdx, props, () => 0);
-  Object.assign(el, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
-  return el;
+  const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(pinNodes, [], branchIdx, props, () => 0);
+  Object.assign(core, { pinNodeIds: Array.from(pinNodes.values()), allNodeIds: Array.from(pinNodes.values()) });
+  const { element } = withState(core);
+  return element;
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +222,82 @@ describe("Inductor", () => {
       expect(m).toBeDefined();
       expect(m!.propertyKey).toBe("label");
       expect(m!.convert("L1")).toBe("L1");
+    });
+  });
+
+  describe("statePool", () => {
+    it("stateSize is 3", () => {
+      const props = new PropertyBag();
+      props.setModelParam("inductance", 0.01);
+      const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+        new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+      );
+      expect(core.stateSize).toBe(3);
+    });
+
+    it("stateBaseOffset is -1 before compiler assigns it", () => {
+      const props = new PropertyBag();
+      props.setModelParam("inductance", 0.01);
+      const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+        new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+      );
+      expect(core.stateBaseOffset).toBe(-1);
+    });
+
+    it("stampCompanion writes GEQ and IEQ to pool slots 0 and 1, I_PREV to slot 2", () => {
+      const props = new PropertyBag();
+      props.setModelParam("inductance", 0.01);
+      const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+        new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+      );
+      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
+      const { element, pool } = withState(core);
+
+      // voltages[0]=V(node1)=5V, voltages[1]=V(node2)=0V, voltages[2]=I_branch=0.5A
+      const voltages = new Float64Array([5, 0, 0.5]);
+      element.stampCompanion!(1e-4, "bdf1", voltages);
+
+      // slot 0 = GEQ = L/h = 0.01 / 1e-4 = 100
+      expect(pool.state0[0]).toBeCloseTo(100, 3);
+      // slot 2 = I_PREV = iNow = 0.5 (branch current from voltages[branchIndex=2])
+      expect(pool.state0[2]).toBeCloseTo(0.5, 5);
+    });
+
+    it("stampCompanion slot 2 (I_PREV) contains branch current, not terminal voltage", () => {
+      const props = new PropertyBag();
+      props.setModelParam("inductance", 0.01);
+      const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+        new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+      );
+      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
+      const { element, pool } = withState(core);
+
+      // terminal voltage = 10V, branch current = 0.3A
+      const voltages = new Float64Array([10, 0, 0.3]);
+      element.stampCompanion!(1e-4, "bdf1", voltages);
+
+      // slot 2 must be branch current (0.3), not terminal voltage (10)
+      expect(pool.state0[2]).toBeCloseTo(0.3, 5);
+      expect(pool.state0[2]).not.toBeCloseTo(10, 1);
+    });
+
+    it("getLteEstimate returns non-zero truncationError after stampCompanion with non-zero branch current", () => {
+      const props = new PropertyBag();
+      props.setModelParam("inductance", 0.01);
+      const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+        new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+      );
+      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
+      const { element } = withState(core);
+
+      // First call establishes iPrev = 0.5
+      element.stampCompanion!(1e-4, "bdf1", new Float64Array([5, 0, 0.5]));
+      // Second call: previous iPrev=0.5 is now in pool slot 2
+      element.stampCompanion!(1e-4, "bdf1", new Float64Array([5, 0, 0.6]));
+
+      const lte = element.getLteEstimate!(1e-4);
+      expect(lte).toBeDefined();
+      expect(lte.truncationError).toBeGreaterThan(0);
     });
   });
 });

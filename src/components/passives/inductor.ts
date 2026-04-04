@@ -28,6 +28,7 @@ import {
   inductorHistoryCurrent,
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -145,20 +146,31 @@ export class InductorElement extends AbstractCircuitElement {
 // AnalogInductorElement — MNA implementation
 // ---------------------------------------------------------------------------
 
+// Slot indices within the state pool
+const SLOT_GEQ = 0;
+const SLOT_IEQ = 1;
+const SLOT_I_PREV = 2;
+
 class AnalogInductorElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  readonly stateSize: number = 3;
+  stateBaseOffset: number = -1;
 
   private L: number;
-  private geq: number = 0;
-  private ieq: number = 0;
-  private iPrev: number = 0;
+  private s0!: Float64Array;
+  private base!: number;
 
   constructor(branchIdx: number, inductance: number) {
     this.branchIndex = branchIdx;
     this.L = inductance;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this.s0 = pool.state0;
+    this.base = this.stateBaseOffset;
   }
 
   setParam(key: string, value: number): void {
@@ -171,6 +183,8 @@ class AnalogInductorElement implements AnalogElementCore {
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const b = this.branchIndex;
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const ieq = this.s0[this.base + SLOT_IEQ];
 
     // B sub-matrix: branch current incidence in node KCL equations.
     // I_branch flows from n0 through the inductor to n1.
@@ -182,10 +196,10 @@ class AnalogInductorElement implements AnalogElementCore {
     // (short circuit — correct DC operating point for an inductor).
     if (n0 !== 0) solver.stamp(b, n0 - 1, 1);
     if (n1 !== 0) solver.stamp(b, n1 - 1, -1);
-    solver.stamp(b, b, -this.geq);
+    solver.stamp(b, b, -geq);
 
     // RHS: branch equation source
-    solver.stampRHS(b, this.ieq);
+    solver.stampRHS(b, ieq);
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -198,12 +212,20 @@ class AnalogInductorElement implements AnalogElementCore {
     const v0 = this.pinNodeIds[0] > 0 ? voltages[this.pinNodeIds[0] - 1] : 0;
     const v1 = this.pinNodeIds[1] > 0 ? voltages[this.pinNodeIds[1] - 1] : 0;
     const vNow = v0 - v1;
+    const iPrev = this.s0[this.base + SLOT_I_PREV];
 
-    this.geq = inductorConductance(this.L, dt, method);
-    this.ieq = inductorHistoryCurrent(this.L, dt, method, iNow, this.iPrev, vNow);
+    this.s0[this.base + SLOT_GEQ] = inductorConductance(this.L, dt, method);
+    this.s0[this.base + SLOT_IEQ] = inductorHistoryCurrent(this.L, dt, method, iNow, iPrev, vNow);
+    this.s0[this.base + SLOT_I_PREV] = iNow;
+  }
 
-    this.iPrev = iNow;
-    void vNow; // vPrev removed (unused)
+  getLteEstimate(dt: number): { truncationError: number } {
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const iPrev = this.s0[this.base + SLOT_I_PREV];
+    // LTE estimate for inductor: truncationError ~ L * |iPrev| / (12 * geq * dt) when geq > 0.
+    if (geq <= 0 || dt <= 0) return { truncationError: 0 };
+    const truncationError = this.L * Math.abs(iPrev) / (12 * geq * dt);
+    return { truncationError };
   }
 }
 

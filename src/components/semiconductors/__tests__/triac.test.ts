@@ -6,19 +6,37 @@
  *   - conducts_negative_when_triggered: negative V, gate pulse → reverse conduction
  *   - turns_off_at_zero_crossing: triac turns off when current drops below I_hold
  *   - phase_control: trigger at 90° of sine → chopped output starting at 90°
+ *   - no_writeback: updateOperatingPoint does not modify voltages[]
+ *   - pool_state: pool.state0 slots contain correct values after updateOperatingPoint
  */
 
 import { describe, it, expect } from "vitest";
 import { createTriacElement, TriacDefinition, TRIAC_PARAM_DEFAULTS } from "../triac.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
+import { PropertyBag } from "../../../core/properties.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// Helper: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
+
+function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
+  const size = core.stateSize ?? 0;
+  const pool = new StatePool(Math.max(size, 1));
+  if (size > 0) {
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+  } else {
+    core.stateBaseOffset = -1;
+  }
+  return { element: core, pool };
+}
+
 // ---------------------------------------------------------------------------
 // Default Triac parameters
 // ---------------------------------------------------------------------------
@@ -34,6 +52,12 @@ const TRIAC_DEFAULTS = {
   n: 1,
 };
 
+// Slot indices (must match triac.ts)
+const SLOT_VAK        = 0;
+const SLOT_VGK        = 1;
+const SLOT_GEQ        = 2;
+const SLOT_LATCHED    = 6;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -43,7 +67,9 @@ function makeTriac(overrides: Partial<typeof TRIAC_DEFAULTS> = {}): AnalogElemen
   const props = createTestPropertyBag();
   props.replaceModelParams(params);
   // nodeMT1=1, nodeMT2=2, nodeG=3
-  return withNodeIds(createTriacElement(new Map([["MT1", 1], ["MT2", 2], ["G", 3]]), [], -1, props), [1, 2, 3]);
+  const core = createTriacElement(new Map([["MT1", 1], ["MT2", 2], ["G", 3]]), [], -1, props);
+  const { element } = withState(core);
+  return withNodeIds(element, [1, 2, 3]);
 }
 
 /**
@@ -124,11 +150,6 @@ describe("Triac", () => {
   it("turns_off_at_zero_crossing", () => {
     // AC 60Hz source (peak 100V), 100Ω load, I_hold = 10mA.
     // Trigger triac at a positive phase, then simulate through zero-crossing.
-    // At zero crossing, I_MT = V/(R+R_on) ≈ 0, which drops below I_hold.
-    //
-    // Strategy: trigger at peak positive voltage, then step to near-zero voltage.
-    // At V_MT≈0, I_MT = (0 - V_on)/R_on < 0 < I_hold → unlatch.
-
     const triac = makeTriac({ iH: 10e-3 });
 
     // Step 1: trigger at positive peak (100V)
@@ -139,8 +160,6 @@ describe("Triac", () => {
     expect(gBefore).toBeGreaterThan(1.0);
 
     // Step 2: reduce to near zero voltage (simulate zero-crossing)
-    // At V_MT = 0.001V (near zero), current = (0.001 - 1.5) / 0.01 = -149.9A < I_hold
-    // This drives I_MT below I_hold → unlatch
     driveToOp(triac, 0, 0.001, 0, 100);
 
     // Verify it unlatched (blocking state — very low conductance)
@@ -150,10 +169,6 @@ describe("Triac", () => {
 
   it("phase_control", () => {
     // Simulate phase-angle control: trigger at 90° of a 60Hz AC sine.
-    // At 90°: V(t) = 100*sin(π/2) = 100V (peak).
-    // Before 90° (e.g. at 0°): V(t)=0, no trigger → blocking.
-    // After trigger at 90°: conducting for rest of half-cycle.
-
     const triac = makeTriac();
 
     // Before 90° — no gate, low voltage: blocking
@@ -175,6 +190,90 @@ describe("Triac", () => {
     driveToOp(triac, 0, 0.001, 0, 100);
     const gAtZero = getMainPathConductance(triac);
     expect(gAtZero).toBeLessThan(0.1); // back to blocking after zero-crossing
+  });
+
+  it("no_writeback: updateOperatingPoint does not modify voltages[]", () => {
+    const props = new PropertyBag();
+    props.replaceModelParams({ ...TRIAC_PARAM_DEFAULTS, ...TRIAC_DEFAULTS });
+    const core = createTriacElement(new Map([["MT1", 1], ["MT2", 2], ["G", 3]]), [], -1, props);
+    const { element } = withState(core);
+
+    // Large voltage step that would trigger pnjlim limiting
+    const voltages = new Float64Array([0, 50, 0.65]);
+    const snapshot = new Float64Array(voltages);
+
+    element.updateOperatingPoint!(voltages);
+
+    expect(voltages[0]).toBe(snapshot[0]);
+    expect(voltages[1]).toBe(snapshot[1]);
+    expect(voltages[2]).toBe(snapshot[2]);
+  });
+
+  it("pool_state: pool.state0 contains correct slot values after updateOperatingPoint", () => {
+    const props = new PropertyBag();
+    props.replaceModelParams({ ...TRIAC_PARAM_DEFAULTS, ...TRIAC_DEFAULTS });
+    const core = createTriacElement(new Map([["MT1", 1], ["MT2", 2], ["G", 3]]), [], -1, props);
+    const { element, pool } = withState(core);
+
+    // Converge at positive polarity with gate to trigger forward latch
+    // MT1=0, MT2=50, G=0.65 → vmt = 50, vg1 = 0.65
+    const voltages = new Float64Array([0, 50, 0.65]);
+    for (let i = 0; i < 200; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = 0;
+      voltages[1] = 50;
+      voltages[2] = 0.65;
+    }
+
+    // SLOT_LATCHED = 6: should be 1.0 (forward latched)
+    expect(pool.state0[SLOT_LATCHED]).toBe(1.0);
+
+    // SLOT_VAK = 0: pnjlim-limited MT2-MT1 voltage, should be positive and finite
+    const vmtInPool = pool.state0[SLOT_VAK];
+    expect(Number.isFinite(vmtInPool)).toBe(true);
+    expect(vmtInPool).toBeGreaterThan(0);
+
+    // SLOT_GEQ = 2: in on-state ≈ 1/rOn
+    const geqInPool = pool.state0[SLOT_GEQ];
+    expect(geqInPool).toBeGreaterThan(1.0);
+  });
+
+  it("pool_state: SLOT_LATCHED is -1.0 for reverse-latched state", () => {
+    const props = new PropertyBag();
+    props.replaceModelParams({ ...TRIAC_PARAM_DEFAULTS, ...TRIAC_DEFAULTS });
+    const core = createTriacElement(new Map([["MT1", 1], ["MT2", 2], ["G", 3]]), [], -1, props);
+    const { element, pool } = withState(core);
+
+    // MT1=50, MT2=0, G=50.65 → vmt = -50 (reverse), vg1 = 0.65 → trigger reverse
+    const voltages = new Float64Array([50, 0, 50.65]);
+    for (let i = 0; i < 200; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = 50;
+      voltages[1] = 0;
+      voltages[2] = 50.65;
+    }
+
+    // SLOT_LATCHED should be -1.0 (reverse latched)
+    expect(pool.state0[SLOT_LATCHED]).toBe(-1.0);
+  });
+
+  it("pool_state: SLOT_LATCHED is 0.0 in blocking state", () => {
+    const props = new PropertyBag();
+    props.replaceModelParams({ ...TRIAC_PARAM_DEFAULTS, ...TRIAC_DEFAULTS });
+    const core = createTriacElement(new Map([["MT1", 1], ["MT2", 2], ["G", 3]]), [], -1, props);
+    const { element, pool } = withState(core);
+
+    // Small voltage, no gate → blocking
+    const voltages = new Float64Array([0, 10, 0]);
+    for (let i = 0; i < 50; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = 0;
+      voltages[1] = 10;
+      voltages[2] = 0;
+    }
+
+    expect(pool.state0[SLOT_LATCHED]).toBe(0.0);
+    expect(pool.state0[SLOT_GEQ]).toBeLessThan(1e-6);
   });
 
   it("definition_has_correct_fields", () => {

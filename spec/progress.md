@@ -183,3 +183,50 @@
   - All tests updated with withState() helper for StatePool initialization
   - No write-back to voltages[], no legacy code, no TODO markers
 
+
+## Task W3T2: Migrate LED to state pool
+
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: 
+  - `src/components/io/led.ts` — Migrated analog LED implementation to state pool pattern
+  - `src/components/io/__tests__/led.test.ts` — Updated analog LED tests to use `withState()` helper
+  - `src/solver/analog/__tests__/behavioral-remaining.test.ts` — Added `withState()` helper and updated forward_current_lights test
+- **Tests**: 10062/10062 passing (vitest), 34/495 passing (playwright)
+- **Vitest LED tests**: 6/6 passing (red_led_forward_drop, blue_led_forward_drop, analog_factory_produces_nonlinear_element, etc.)
+
+### Summary of changes
+
+LED migration followed the exact diode pattern:
+
+1. **Slot constants**: SLOT_VD=0, SLOT_GEQ=1, SLOT_IEQ=2, SLOT_ID=3
+2. **State pool binding**: Added `s0: Float64Array` and `base: number` closure vars
+3. **Element properties**: Set `stateSize: 4`, `stateBaseOffset: -1`, and `initState()` method
+4. **initState()**: Initializes s0 binding and sets GMIN to pool slot SLOT_GEQ
+5. **updateOperatingPoint**: 
+   - Changed signature to `Readonly<Float64Array>` for voltages parameter
+   - Removed write-back to `voltages[]` (previously line 192: `voltages[nodeAnode - 1] = vc + vdLimited`)
+   - Reads `vdOld` from pool instead of closure var
+   - Writes limited voltage and state to pool slots
+6. **stampNonlinear**: Reads geq/ieq from pool slots instead of closure vars
+7. **getPinCurrents**: Reads current from pool slot SLOT_ID instead of closure var
+8. **checkConvergence**: Reads vdOld from pool instead of closure var
+
+All test updates followed the same pattern as diode tests: use `withState()` helper to initialize pool and bind element state before use.
+
+## Task W5T1: Migrate Capacitor to state pool
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/passives/capacitor.ts`, `src/components/passives/__tests__/capacitor.test.ts`
+- **Tests**: 17/17 passing (all pre-existing + 5 new pool tests)
+- **Summary**: Added SLOT_GEQ/SLOT_IEQ/SLOT_V_PREV constants, stateSize:3, stateBaseOffset:-1, initState(pool), migrated stamp/getPinCurrents/stampCompanion to read/write pool slots, removed instance fields geq/ieq/vPrev, added getLteEstimate, added withState helper and pool-specific tests
+
+## Task W5T2: Migrate Inductor to state pool
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/passives/inductor.ts`, `src/components/passives/__tests__/inductor.test.ts`
+- **Tests**: 18/18 passing (all pre-existing + 5 new pool tests)
+- **Summary**: Added SLOT_GEQ/SLOT_IEQ/SLOT_I_PREV constants, stateSize:3, stateBaseOffset:-1, initState(pool), migrated stamp/stampCompanion to read/write pool slots, removed instance fields geq/ieq/iPrev, removed void vNow dead code, added getLteEstimate, added withState helper and pool-specific tests (including assertion that slot 2 holds branch current not terminal voltage)

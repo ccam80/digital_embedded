@@ -13,6 +13,9 @@
  * Model: two independent latch states (forward path MT2→MT1, reverse path MT1→MT2).
  * The active path is selected based on the sign of V_MT2-MT1. Gate current in
  * either polarity triggers the corresponding SCR path.
+ *
+ * LATCHED slot encoding: 1.0 = forward path latched, -1.0 = reverse path latched,
+ * 0.0 = neither latched. Forward and reverse are mutually exclusive.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -33,6 +36,7 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -46,6 +50,20 @@ const GMIN = 1e-12;
 
 /** Maximum alpha value — prevents division-by-zero. */
 const ALPHA_MAX = 0.95;
+
+// ---------------------------------------------------------------------------
+// State pool slot indices
+// ---------------------------------------------------------------------------
+
+const SLOT_VAK        = 0; // V_MT2 - V_MT1 (main terminal voltage, pnjlim-limited)
+const SLOT_VGK        = 1; // V_G - V_MT1 (gate-MT1 voltage, pnjlim-limited)
+const SLOT_GEQ        = 2;
+const SLOT_IEQ        = 3;
+const SLOT_G_GATE_GEQ = 4;
+const SLOT_G_GATE_IEQ = 5;
+const SLOT_LATCHED    = 6; // 1.0 = fwd latched, -1.0 = rev latched, 0.0 = none
+const SLOT_IAK        = 7;
+const SLOT_IGK        = 8;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -100,26 +118,15 @@ export function createTriacElement(
   let vcritMain = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
   let vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
 
+  // Pool binding — set by initState
+  let s0: Float64Array;
+  let base: number;
+
   function recomputeDerivedConstants(): void {
     nVt = p.n * VT;
     vcritMain = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
     vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
   }
-
-  // Forward path (MT2→MT1 positive): latch state
-  let _latchedFwd = false;
-  // Reverse path (MT1→MT2 positive): latch state
-  let _latchedRev = false;
-
-  // Internal voltage state (pnjlim tracking)
-  let _vmt = 0; // V_MT2 - V_MT1 (positive = forward path active)
-  let _vgk = 0; // V_G - V_MT1
-
-  // Cached stamp values
-  let _geq = GMIN;
-  let _ieq = 0;
-  let _gGateGeq = GMIN;
-  let _gGateIeq = 0;
 
   function computeAlpha2(iGate: number): number {
     const raw = 1 - (1 - p.alpha2_0) * Math.exp(-Math.abs(iGate) / p.i_ref);
@@ -127,17 +134,15 @@ export function createTriacElement(
   }
 
   function computeOnState(vmt: number): void {
-    // On-state: low-resistance path with V_on offset
     const gOn = 1.0 / p.rOn;
     const iOn = (vmt - p.vOn) / p.rOn;
-    _geq = gOn + GMIN;
-    _ieq = iOn - _geq * vmt;
+    s0[base + SLOT_GEQ] = gOn + GMIN;
+    s0[base + SLOT_IEQ] = iOn - s0[base + SLOT_GEQ] * vmt;
   }
 
   function computeBlockingState(): void {
-    // Blocking: high-impedance path (GMIN only)
-    _geq = GMIN;
-    _ieq = 0;
+    s0[base + SLOT_GEQ] = GMIN;
+    s0[base + SLOT_IEQ] = 0;
   }
 
   function computeOperatingPoint(vmt: number, vg1: number): void {
@@ -150,83 +155,107 @@ export function createTriacElement(
     const alphaSum = a1c + a2c;
     const triggered = alphaSum > 0.95;
 
+    const latched = s0[base + SLOT_LATCHED];
+
     if (vmt >= 0) {
       // Forward path (MT2→MT1)
-      if (!_latchedFwd && triggered) {
-        _latchedFwd = true;
+      if (latched !== 1.0 && triggered) {
+        s0[base + SLOT_LATCHED] = 1.0;
       }
-      if (_latchedFwd) {
+      if (s0[base + SLOT_LATCHED] === 1.0) {
         computeOnState(vmt);
-        // Unlatch when current falls below I_hold
-        const iMt = _geq * vmt + _ieq;
+        const iMt = s0[base + SLOT_GEQ] * vmt + s0[base + SLOT_IEQ];
+        s0[base + SLOT_IAK] = iMt;
         if (iMt < p.iH) {
-          _latchedFwd = false;
+          s0[base + SLOT_LATCHED] = 0.0;
           computeBlockingState();
+          s0[base + SLOT_IAK] = GMIN * vmt;
         }
       } else {
         computeBlockingState();
+        s0[base + SLOT_IAK] = GMIN * vmt;
       }
       // Reset reverse latch when polarity changes
-      _latchedRev = false;
+      if (s0[base + SLOT_LATCHED] === -1.0) {
+        s0[base + SLOT_LATCHED] = 0.0;
+      }
     } else {
       // Reverse path (MT1→MT2, vmt < 0)
-      // For reverse path: magnitude is |vmt|, on-state at -V_on
-      if (!_latchedRev && triggered) {
-        _latchedRev = true;
+      if (latched !== -1.0 && triggered) {
+        s0[base + SLOT_LATCHED] = -1.0;
       }
-      if (_latchedRev) {
+      if (s0[base + SLOT_LATCHED] === -1.0) {
         // Mirror: current flows MT1→MT2, V_drop = -V_on
         const gOn = 1.0 / p.rOn;
-        const iOn = (vmt + p.vOn) / p.rOn; // vmt negative, vmt + vOn < 0
-        _geq = gOn + GMIN;
-        _ieq = iOn - _geq * vmt;
-        // Unlatch when |current| falls below I_hold
-        const iMt = _geq * vmt + _ieq;
+        const iOn = (vmt + p.vOn) / p.rOn;
+        s0[base + SLOT_GEQ] = gOn + GMIN;
+        s0[base + SLOT_IEQ] = iOn - s0[base + SLOT_GEQ] * vmt;
+        const iMt = s0[base + SLOT_GEQ] * vmt + s0[base + SLOT_IEQ];
+        s0[base + SLOT_IAK] = iMt;
         if (iMt > -p.iH) {
-          _latchedRev = false;
+          s0[base + SLOT_LATCHED] = 0.0;
           computeBlockingState();
+          s0[base + SLOT_IAK] = GMIN * vmt;
         }
       } else {
         computeBlockingState();
+        s0[base + SLOT_IAK] = GMIN * vmt;
       }
       // Reset forward latch when polarity changes
-      _latchedFwd = false;
+      if (s0[base + SLOT_LATCHED] === 1.0) {
+        s0[base + SLOT_LATCHED] = 0.0;
+      }
     }
 
     // Gate junction: linearized at (already pnjlim-limited) vg1
     const expVg = Math.exp(Math.min(vg1 / nVt, 700));
     const gGate = (p.iS * expVg) / nVt + GMIN;
     const iGateCurrent = p.iS * (expVg - 1);
-    _gGateGeq = gGate;
-    _gGateIeq = iGateCurrent - gGate * vg1;
+    s0[base + SLOT_G_GATE_GEQ] = gGate;
+    s0[base + SLOT_G_GATE_IEQ] = iGateCurrent - gGate * vg1;
+    s0[base + SLOT_IGK] = iGateCurrent;
   }
 
   return {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
+    stateSize: 9,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      s0 = pool.state0;
+      base = this.stateBaseOffset;
+      s0[base + SLOT_GEQ] = GMIN;
+      s0[base + SLOT_G_GATE_GEQ] = GMIN;
+    },
 
     stamp(_solver: SparseSolver): void {
       // No topology-constant contributions
     },
 
     stampNonlinear(solver: SparseSolver): void {
+      const geq      = s0[base + SLOT_GEQ];
+      const ieq      = s0[base + SLOT_IEQ];
+      const gGateGeq = s0[base + SLOT_G_GATE_GEQ];
+      const gGateIeq = s0[base + SLOT_G_GATE_IEQ];
+
       // MT1-MT2 main path
-      stampG(solver, nodeMT2, nodeMT2, _geq);
-      stampG(solver, nodeMT2, nodeMT1, -_geq);
-      stampG(solver, nodeMT1, nodeMT2, -_geq);
-      stampG(solver, nodeMT1, nodeMT1, _geq);
-      // Norton current source: positive _ieq means current from MT1 to MT2
-      stampRHS(solver, nodeMT2, -_ieq);
-      stampRHS(solver, nodeMT1, _ieq);
+      stampG(solver, nodeMT2, nodeMT2, geq);
+      stampG(solver, nodeMT2, nodeMT1, -geq);
+      stampG(solver, nodeMT1, nodeMT2, -geq);
+      stampG(solver, nodeMT1, nodeMT1, geq);
+      // Norton current source: positive ieq means current from MT1 to MT2
+      stampRHS(solver, nodeMT2, -ieq);
+      stampRHS(solver, nodeMT1, ieq);
 
       // Gate-MT1 path
-      stampG(solver, nodeG,   nodeG,   _gGateGeq);
-      stampG(solver, nodeG,   nodeMT1, -_gGateGeq);
-      stampG(solver, nodeMT1, nodeG,   -_gGateGeq);
-      stampG(solver, nodeMT1, nodeMT1, _gGateGeq);
-      stampRHS(solver, nodeG,   -_gGateIeq);
-      stampRHS(solver, nodeMT1, _gGateIeq);
+      stampG(solver, nodeG,   nodeG,   gGateGeq);
+      stampG(solver, nodeG,   nodeMT1, -gGateGeq);
+      stampG(solver, nodeMT1, nodeG,   -gGateGeq);
+      stampG(solver, nodeMT1, nodeMT1, gGateGeq);
+      stampRHS(solver, nodeG,   -gGateIeq);
+      stampRHS(solver, nodeMT1, gGateIeq);
     },
 
     updateOperatingPoint(voltages: Float64Array): void {
@@ -238,22 +267,15 @@ export function createTriacElement(
       const vg1Raw = vG - v1;
 
       // Apply pnjlim to MT1-MT2 voltage for NR stability
-      const vmtLimited = pnjlim(vmtRaw, _vmt, nVt, vcritMain);
+      const vmtLimited = pnjlim(vmtRaw, s0[base + SLOT_VAK], nVt, vcritMain);
       // Apply pnjlim to gate-MT1 voltage
-      const vg1Limited = pnjlim(vg1Raw, _vgk, nVt, vcritGate);
+      const vg1Limited = pnjlim(vg1Raw, s0[base + SLOT_VGK], nVt, vcritGate);
 
-      // Write limited voltages back
-      if (nodeMT2 > 0) {
-        voltages[nodeMT2 - 1] = v1 + vmtLimited;
-      }
-      if (nodeG > 0) {
-        voltages[nodeG - 1] = v1 + vg1Limited;
-      }
+      // Save limited voltages to pool — no write-back to voltages[]
+      s0[base + SLOT_VAK] = vmtLimited;
+      s0[base + SLOT_VGK] = vg1Limited;
 
-      _vmt = vmtLimited;
-      _vgk = vg1Limited;
-
-      computeOperatingPoint(_vmt, _vgk);
+      computeOperatingPoint(vmtLimited, vg1Limited);
     },
 
     checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
@@ -266,21 +288,13 @@ export function createTriacElement(
 
     getPinCurrents(voltages: Float64Array): number[] {
       // pinLayout order: [MT2(0), MT1(1), G(2)]
-      // Positive = current flowing INTO the element at that pin.
       const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
       const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
       const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;
 
-      // Main path (MT2-MT1): Norton equivalent stamps _geq across MT2-MT1 with _ieq source.
-      // stampNonlinear: stampRHS(nodeMT2, -_ieq), stampRHS(nodeMT1, _ieq)
-      // Current from MT2 into element: I = _geq * (V_MT2 - V_MT1) + _ieq
-      const iMT = _geq * (v2 - v1) + _ieq;
+      const iMT = s0[base + SLOT_GEQ] * (v2 - v1) + s0[base + SLOT_IEQ];
+      const iG  = s0[base + SLOT_G_GATE_GEQ] * (vG - v1) + s0[base + SLOT_G_GATE_IEQ];
 
-      // Gate-MT1 path: Norton equivalent _gGateGeq across G-MT1 with _gGateIeq source.
-      // Current from G into element: I = _gGateGeq * (V_G - V_MT1) + _gGateIeq
-      const iG = _gGateGeq * (vG - v1) + _gGateIeq;
-
-      // KCL: I_MT2 + I_MT1 + I_G = 0 → I_MT1 = -(I_MT2 + I_G)
       const iMT2 = iMT;
       const iMT1 = -(iMT2 + iG);
 

@@ -27,6 +27,8 @@
 import type { SparseSolver } from "../sparse-solver.js";
 import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../element.js";
 import { pnjlim } from "../newton-raphson.js";
+import { StatePool } from "../state-pool.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
@@ -257,6 +259,8 @@ const GMIN = 1e-12;
  * `stamp()` is a no-op — the diode has no linear (topology-independent)
  * contribution. All MNA entries come from `stampNonlinear`.
  *
+ * State is stored in a StatePool. Use `withState` to allocate the pool.
+ *
  * @param nodeAnode   - Anode node ID (0 = ground, 1-based)
  * @param nodeCathode - Cathode node ID (0 = ground, 1-based)
  * @param is          - Saturation current in amperes (e.g. 1e-14)
@@ -268,13 +272,16 @@ export function makeDiode(
   nodeCathode: number,
   is: number,
   n: number,
-): AnalogElement {
+): AnalogElementCore {
   const nVt = n * VT;
   const vcrit = nVt * Math.log(nVt / (is * Math.SQRT2));
 
-  let vd = 0;    // current operating-point junction voltage
-  let geq = GMIN; // linearized conductance
-  let ieq = 0;   // Norton equivalent current offset
+  // State pool slot indices
+  const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+
+  // Pool binding — set by initState
+  let s0: Float64Array;
+  let base: number;
 
   return {
     pinNodeIds: [nodeAnode, nodeCathode],
@@ -282,6 +289,15 @@ export function makeDiode(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
+    stateSize: 4,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      s0 = pool.state0;
+      base = this.stateBaseOffset;
+      s0[base + SLOT_GEQ] = GMIN;
+    },
+
     setParam(_key: string, _value: number): void {},
 
     stamp(_solver: SparseSolver): void {
@@ -292,6 +308,8 @@ export function makeDiode(
       // Stamp companion model: conductance geq in parallel, Norton offset ieq
       // Current flows from anode to cathode when vd > 0.
       // G sub-matrix (conductance between anode and cathode):
+      const geq = s0[base + SLOT_GEQ];
+      const ieq = s0[base + SLOT_IEQ];
       G(solver, nodeAnode, nodeAnode, geq);
       G(solver, nodeAnode, nodeCathode, -geq);
       G(solver, nodeCathode, nodeAnode, -geq);
@@ -306,30 +324,24 @@ export function makeDiode(
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
 
-      // Apply pnjlim to prevent exponential runaway.
-      // Write the limited junction voltage back into voltages[] so that:
-      //   (a) the global convergence check operates on limited voltages,
-      //   (b) the next stampNonlinear call sees a companion model built from
-      //       a physically reasonable operating point.
-      const vdLimited = pnjlim(vdRaw, vd, nVt, vcrit);
+      // Read vold from pool
+      const vdOld = s0[base + SLOT_VD];
 
-      // Adjust the anode node voltage by the limiting delta (cathode stays fixed)
-      if (nodeAnode > 0) {
-        voltages[nodeAnode - 1] = vc + vdLimited;
-      }
-      // If cathode is not ground, also adjust (rare for basic diode tests)
-      // For the standard anode-limited case above this is sufficient.
+      // Apply pnjlim to prevent exponential runaway
+      const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
 
-      vd = vdLimited;
+      // Save limited voltage to pool — no write-back to voltages[]
+      s0[base + SLOT_VD] = vdLimited;
 
       // Shockley equation and NR linearization at limited operating point
-      const expArg = vd / nVt;
+      const expArg = vdLimited / nVt;
       // Clamp exponent to avoid Float64 overflow (exp(>709) = Infinity)
       const clampedArg = Math.min(expArg, 700);
       const expVal = Math.exp(clampedArg);
       const id = is * (expVal - 1);
-      geq = (is * expVal) / nVt + GMIN;
-      ieq = id - geq * vd;
+      s0[base + SLOT_ID] = id;
+      s0[base + SLOT_GEQ] = (is * expVal) / nVt + GMIN;
+      s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
     },
 
     checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
@@ -348,6 +360,8 @@ export function makeDiode(
     getPinCurrents(voltages: Float64Array): number[] {
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const geq = s0[base + SLOT_GEQ];
+      const ieq = s0[base + SLOT_IEQ];
       const I = geq * (va - vc) - ieq;
       return [I, -I];
     },

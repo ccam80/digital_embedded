@@ -29,6 +29,7 @@ import {
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -130,19 +131,30 @@ export class CapacitorElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 
+// Slot indices within the state pool
+const SLOT_GEQ = 0;
+const SLOT_IEQ = 1;
+const SLOT_V_PREV = 2;
+
 class AnalogCapacitorElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  readonly stateSize: number = 3;
+  stateBaseOffset: number = -1;
 
   private C: number;
-  private geq: number = 0;
-  private ieq: number = 0;
-  private vPrev: number = 0;
+  private s0!: Float64Array;
+  private base!: number;
 
   constructor(capacitance: number) {
     this.C = capacitance;
+  }
+
+  initState(pool: StatePoolRef): void {
+    this.s0 = pool.state0;
+    this.base = this.stateBaseOffset;
   }
 
   setParam(key: string, value: number): void {
@@ -154,14 +166,16 @@ class AnalogCapacitorElement implements AnalogElementCore {
   stamp(solver: SparseSolver): void {
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const ieq = this.s0[this.base + SLOT_IEQ];
 
-    stampG(solver, n0, n0, this.geq);
-    stampG(solver, n0, n1, -this.geq);
-    stampG(solver, n1, n0, -this.geq);
-    stampG(solver, n1, n1, this.geq);
+    stampG(solver, n0, n0, geq);
+    stampG(solver, n0, n1, -geq);
+    stampG(solver, n1, n0, -geq);
+    stampG(solver, n1, n1, geq);
 
-    stampRHS(solver, n0, -this.ieq);
-    stampRHS(solver, n1, this.ieq);
+    stampRHS(solver, n0, -ieq);
+    stampRHS(solver, n1, ieq);
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -169,7 +183,9 @@ class AnalogCapacitorElement implements AnalogElementCore {
     const n1 = this.pinNodeIds[1];
     const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
     const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
-    const I = this.geq * (v0 - v1) + this.ieq;
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const ieq = this.s0[this.base + SLOT_IEQ];
+    const I = geq * (v0 - v1) + ieq;
     return [I, -I];
   }
 
@@ -179,14 +195,26 @@ class AnalogCapacitorElement implements AnalogElementCore {
     const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
     const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
     const vNow = v0 - v1;
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const ieq = this.s0[this.base + SLOT_IEQ];
+    const vPrev = this.s0[this.base + SLOT_V_PREV];
     // Full Norton current at the previous accepted step: i = geq * v + ieq.
     // On the first call geq=0 and ieq=0, so iNow=0 (DC steady state).
-    const iNow = this.geq * vNow + this.ieq;
+    const iNow = geq * vNow + ieq;
 
-    this.geq = capacitorConductance(this.C, dt, method);
-    this.ieq = capacitorHistoryCurrent(this.C, dt, method, vNow, this.vPrev, iNow);
+    this.s0[this.base + SLOT_GEQ] = capacitorConductance(this.C, dt, method);
+    this.s0[this.base + SLOT_IEQ] = capacitorHistoryCurrent(this.C, dt, method, vNow, vPrev, iNow);
+    this.s0[this.base + SLOT_V_PREV] = vNow;
+  }
 
-    this.vPrev = vNow;
+  getLteEstimate(dt: number): { truncationError: number } {
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const vPrev = this.s0[this.base + SLOT_V_PREV];
+    // LTE estimate for capacitor using trapezoidal vs BDF-1 comparison.
+    // truncationError ~ C * |vNow - vPrev| / (12 * geq * dt) when geq > 0.
+    if (geq <= 0 || dt <= 0) return { truncationError: 0 };
+    const truncationError = this.C * Math.abs(vPrev) / (12 * geq * dt);
+    return { truncationError };
   }
 }
 

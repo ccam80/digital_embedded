@@ -33,6 +33,7 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -46,6 +47,20 @@ const GMIN = 1e-12;
 
 /** Maximum alpha value — prevents division-by-zero in blocking formula. */
 const ALPHA_MAX = 0.95;
+
+// ---------------------------------------------------------------------------
+// State pool slot indices
+// ---------------------------------------------------------------------------
+
+const SLOT_VAK       = 0;
+const SLOT_VGK       = 1;
+const SLOT_GEQ       = 2;
+const SLOT_IEQ       = 3;
+const SLOT_G_GATE_GEQ = 4;
+const SLOT_G_GATE_IEQ = 5;
+const SLOT_LATCHED   = 6;
+const SLOT_IAK       = 7;
+const SLOT_IGK       = 8;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -100,18 +115,11 @@ export function createScrElement(
 
   let nVt = p.n * VT;
   let vcrit = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
-
-  // Internal state
-  let _latched = false;
-  let _vak = 0;
-  let _vgk = 0;
-  let _geq = GMIN;
-  let _ieq = 0;
-  // Gate conductance stamp values
-  let _gGateGeq = GMIN;
-  let _gGateIeq = 0;
-
   let vcritGate = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
+
+  // Pool binding — set by initState
+  let s0: Float64Array;
+  let base: number;
 
   function recomputeDerivedConstants(): void {
     nVt = p.n * VT;
@@ -134,25 +142,22 @@ export function createScrElement(
     const alphaSum = a1clamped + a2clamped;
 
     // Check triggering: alpha sum > 0.95
-    if (!_latched && alphaSum > 0.95) {
-      _latched = true;
+    if (s0[base + SLOT_LATCHED] === 0.0 && alphaSum > 0.95) {
+      s0[base + SLOT_LATCHED] = 1.0;
     }
 
-    if (_latched) {
+    if (s0[base + SLOT_LATCHED] !== 0.0) {
       // On-state: model as diode (V_on forward voltage) in series with R_on
-      // Effective: V_AK = V_on + I_AK * R_on
-      // Linearize: conductance = 1/R_on, Norton current source
       const gOn = 1.0 / p.rOn;
-      // Diode drop: treat V_on as a fixed voltage offset
-      // Current in on-state: I_AK = (V_AK - V_on) / R_on
       const iOn = (vak - p.vOn) / p.rOn;
-      _geq = gOn + GMIN;
-      _ieq = iOn - _geq * vak;
+      s0[base + SLOT_GEQ] = gOn + GMIN;
+      s0[base + SLOT_IEQ] = iOn - s0[base + SLOT_GEQ] * vak;
 
       // Check if current has dropped below holding current → unlatch
-      const iAk = _geq * vak + _ieq;
+      const iAk = s0[base + SLOT_GEQ] * vak + s0[base + SLOT_IEQ];
+      s0[base + SLOT_IAK] = iAk;
       if (iAk < p.iH && vak >= 0) {
-        _latched = false;
+        s0[base + SLOT_LATCHED] = 0.0;
         // Re-compute in blocking mode
         computeBlockingMode(vak, alphaSum);
       }
@@ -165,28 +170,26 @@ export function createScrElement(
     const expVgk = Math.exp(Math.min(vgk / nVt, 700));
     const gGate = (p.iS * expVgk) / nVt + GMIN;
     const iGateCurrent = p.iS * (expVgk - 1);
-    _gGateGeq = gGate;
-    _gGateIeq = iGateCurrent - gGate * vgk;
+    s0[base + SLOT_G_GATE_GEQ] = gGate;
+    s0[base + SLOT_G_GATE_IEQ] = iGateCurrent - gGate * vgk;
+    s0[base + SLOT_IGK] = iGateCurrent;
   }
 
   function computeBlockingMode(vak: number, _alphaSum: number): void {
     if (vak >= 0) {
-      // Forward blocking: the middle junction (J2) is reverse-biased.
-      // Current is approximately constant leakage I_S / (1 - α₁ - α₂),
-      // independent of V_AK (saturated reverse junction).
-      // Model as high-resistance path: G_block = GMIN only.
-      // This keeps current in the µA range for any forward voltage below breakover.
-      _geq = GMIN;
-      _ieq = 0;
+      // Forward blocking: high-resistance path
+      s0[base + SLOT_GEQ] = GMIN;
+      s0[base + SLOT_IEQ] = 0;
+      s0[base + SLOT_IAK] = GMIN * vak;
     } else {
       // Reverse blocking — reverse-biased diode (J1 junction)
-      // Use small-signal conductance: nearly zero current
-      const expArg = Math.min(vak / nVt, 0); // never positive for reverse
+      const expArg = Math.min(vak / nVt, 0);
       const expVal = Math.exp(expArg);
       const iRev = p.iS * (expVal - 1);
       const gRev = (p.iS * expVal) / nVt + GMIN;
-      _geq = gRev;
-      _ieq = iRev - gRev * vak;
+      s0[base + SLOT_GEQ] = gRev;
+      s0[base + SLOT_IEQ] = iRev - gRev * vak;
+      s0[base + SLOT_IAK] = iRev;
     }
   }
 
@@ -194,27 +197,41 @@ export function createScrElement(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
+    stateSize: 9,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      s0 = pool.state0;
+      base = this.stateBaseOffset;
+      s0[base + SLOT_GEQ] = GMIN;
+      s0[base + SLOT_G_GATE_GEQ] = GMIN;
+    },
 
     stamp(_solver: SparseSolver): void {
       // No topology-constant linear contributions
     },
 
     stampNonlinear(solver: SparseSolver): void {
+      const geq      = s0[base + SLOT_GEQ];
+      const ieq      = s0[base + SLOT_IEQ];
+      const gGateGeq = s0[base + SLOT_G_GATE_GEQ];
+      const gGateIeq = s0[base + SLOT_G_GATE_IEQ];
+
       // Anode-cathode path
-      stampG(solver, nodeA, nodeA, _geq);
-      stampG(solver, nodeA, nodeK, -_geq);
-      stampG(solver, nodeK, nodeA, -_geq);
-      stampG(solver, nodeK, nodeK, _geq);
-      stampRHS(solver, nodeA, -_ieq);
-      stampRHS(solver, nodeK, _ieq);
+      stampG(solver, nodeA, nodeA, geq);
+      stampG(solver, nodeA, nodeK, -geq);
+      stampG(solver, nodeK, nodeA, -geq);
+      stampG(solver, nodeK, nodeK, geq);
+      stampRHS(solver, nodeA, -ieq);
+      stampRHS(solver, nodeK, ieq);
 
       // Gate-cathode path (gate junction)
-      stampG(solver, nodeG, nodeG, _gGateGeq);
-      stampG(solver, nodeG, nodeK, -_gGateGeq);
-      stampG(solver, nodeK, nodeG, -_gGateGeq);
-      stampG(solver, nodeK, nodeK, _gGateGeq);
-      stampRHS(solver, nodeG, -_gGateIeq);
-      stampRHS(solver, nodeK, _gGateIeq);
+      stampG(solver, nodeG, nodeG, gGateGeq);
+      stampG(solver, nodeG, nodeK, -gGateGeq);
+      stampG(solver, nodeK, nodeG, -gGateGeq);
+      stampG(solver, nodeK, nodeK, gGateGeq);
+      stampRHS(solver, nodeG, -gGateIeq);
+      stampRHS(solver, nodeK, gGateIeq);
     },
 
     updateOperatingPoint(voltages: Float64Array): void {
@@ -226,31 +243,21 @@ export function createScrElement(
       const vgkRaw = vGateNode - vK;
 
       // Check breakover using raw voltage before pnjlim.
-      // Breakover triggers when V_AK exceeds the breakover threshold —
-      // this must be evaluated against the actual circuit voltage, not the
-      // pnjlim-limited value, so it fires at the right operating point.
-      if (!_latched && vakRaw > p.vBreakover) {
-        _latched = true;
+      if (s0[base + SLOT_LATCHED] === 0.0 && vakRaw > p.vBreakover) {
+        s0[base + SLOT_LATCHED] = 1.0;
       }
 
       // Apply pnjlim to anode-cathode junction voltage for NR stability
-      const vakLimited = pnjlim(vakRaw, _vak, nVt, vcrit);
+      const vakLimited = pnjlim(vakRaw, s0[base + SLOT_VAK], nVt, vcrit);
 
       // Apply pnjlim to gate-cathode junction voltage for NR stability
-      const vgkLimited = pnjlim(vgkRaw, _vgk, nVt, vcritGate);
+      const vgkLimited = pnjlim(vgkRaw, s0[base + SLOT_VGK], nVt, vcritGate);
 
-      // Write limited voltages back
-      if (nodeA > 0) {
-        voltages[nodeA - 1] = vK + vakLimited;
-      }
-      if (nodeG > 0) {
-        voltages[nodeG - 1] = vK + vgkLimited;
-      }
+      // Save limited voltages to pool — no write-back to voltages[]
+      s0[base + SLOT_VAK] = vakLimited;
+      s0[base + SLOT_VGK] = vgkLimited;
 
-      _vak = vakLimited;
-      _vgk = vgkLimited;
-
-      computeOperatingPoint(_vak, _vgk);
+      computeOperatingPoint(vakLimited, vgkLimited);
     },
 
     checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
@@ -264,20 +271,13 @@ export function createScrElement(
 
     getPinCurrents(voltages: Float64Array): number[] {
       // pinLayout order: [A(0), K(1), G(2)]
-      // Positive = current flowing INTO the element at that pin.
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
       const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
 
-      // Anode-cathode path: Norton equivalent I = _geq * V_AK + _ieq
-      // Current into anode (into element at A): iAK flows from A to K through device
-      const iAK = _geq * (vA - vK) + _ieq;
+      const iAK = s0[base + SLOT_GEQ] * (vA - vK) + s0[base + SLOT_IEQ];
+      const iGK = s0[base + SLOT_G_GATE_GEQ] * (vG - vK) + s0[base + SLOT_G_GATE_IEQ];
 
-      // Gate-cathode path: Norton equivalent I = _gGateGeq * V_GK + _gGateIeq
-      // Current into gate (into element at G)
-      const iGK = _gGateGeq * (vG - vK) + _gGateIeq;
-
-      // KCL: I_A + I_K + I_G = 0 → I_K = -(I_A + I_G)
       const iA = iAK;
       const iG = iGK;
       const iK = -(iA + iG);
@@ -299,7 +299,7 @@ export function createScrElement(
 
     // Expose latch state for testing
     get _latchedState(): boolean {
-      return _latched;
+      return s0[base + SLOT_LATCHED] !== 0.0;
     },
   } as AnalogElementCore & { _latchedState: boolean };
 }
