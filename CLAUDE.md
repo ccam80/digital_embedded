@@ -70,12 +70,13 @@ All handling centralized in `src/io/postmessage-adapter.ts` (single source of tr
 ~~~
 Parent → iframe (core):
   sim-load-url, sim-load-data, sim-load-json    — Load circuits
-  sim-set-input, sim-step, sim-read-output       — Drive simulation
+  sim-set-signal, sim-step, sim-read-signal      — Drive simulation
   sim-read-all-signals                           — Snapshot all signals
   sim-run-tests                                  — Run test vectors
   sim-get-circuit                                — Export as base64
   sim-set-base, sim-set-locked                   — Configuration
   sim-load-memory, sim-set-palette               — Memory/palette control
+  sim-import-subcircuit                          — Import subcircuit definition
 
 Parent → iframe (tutorial):
   sim-test                                       — Test vectors with label validation
@@ -88,6 +89,7 @@ Iframe → parent:
   sim-test-result                                — Test results (passed, failed, total, details)
   sim-output, sim-signals                        — Signal reads
   sim-circuit-data                               — Circuit export
+  sim-subcircuit-imported                        — Subcircuit import result
 ~~~
 
 Full message schemas with all fields: read `src/io/postmessage-adapter.ts`.

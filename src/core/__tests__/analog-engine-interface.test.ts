@@ -13,11 +13,10 @@ import type {
   AnalogEngine,
   SimulationParams,
   DcOpResult,
-  SolverDiagnostic,
-  SolverDiagnosticCode,
   DiagnosticSuggestion,
   CompiledAnalogCircuit,
 } from "@/core/analog-engine-interface";
+import type { Diagnostic, DiagnosticCode } from "@/compile/types";
 import type { AcParams, AcResult } from "@/solver/analog/ac-analysis";
 import { DEFAULT_SIMULATION_PARAMS } from "@/core/analog-engine-interface";
 
@@ -100,8 +99,8 @@ describe("AnalogEngineTypes", () => {
 
   it("solver_diagnostic_codes_exhaustive", () => {
     // Every code from the spec's diagnostic table must be a valid
-    // SolverDiagnosticCode value.
-    const allCodes: SolverDiagnosticCode[] = [
+    // DiagnosticCode value.
+    const allCodes: DiagnosticCode[] = [
       "singular-matrix",
       "voltage-source-loop",
       "floating-node",
@@ -133,8 +132,8 @@ describe("AnalogEngineTypes", () => {
     const unique = new Set(allCodes);
     expect(unique.size).toBe(allCodes.length);
 
-    // Construct a SolverDiagnostic using a code — verifies assignability
-    const diag: SolverDiagnostic = {
+    // Construct a Diagnostic using a code — verifies assignability
+    const diag: Diagnostic = {
       code: "convergence-failed",
       severity: "error",
       message: "Newton-Raphson failed to converge",
@@ -180,7 +179,7 @@ describe("AnalogEngineTypes", () => {
       getElementCurrent(_elementId: number): number { return 0; },
       getElementPower(_elementId: number): number { return 0; },
       configure(_params: Partial<SimulationParams>): void {},
-      onDiagnostic(_callback: (diag: SolverDiagnostic) => void): void {},
+      onDiagnostic(_callback: (diag: Diagnostic) => void): void {},
       addBreakpoint(_time: number): void {},
       clearBreakpoints(): void {},
       acAnalysis(_params: AcParams): AcResult {
@@ -232,8 +231,8 @@ describe("AnalogEngineTypes", () => {
   });
 
   it("solver_diagnostic_optional_fields", () => {
-    // SolverDiagnostic with all optional fields populated
-    const diag: SolverDiagnostic = {
+    // Diagnostic with all optional fields populated
+    const diag: Diagnostic = {
       code: "floating-node",
       severity: "warning",
       message: "Node 2 is floating",

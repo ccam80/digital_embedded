@@ -97,7 +97,6 @@ function buildCircuit(
     sccSnapshotBuffer,
     delays: new Uint32Array(componentCount).fill(10),
     componentToElement: new Map(),
-    labelToNetId: new Map(),
     wireToNetId: new Map(),
     pinNetMap: new Map(),
     resetComponentIndices: options?.resetComponentIndices ?? new Uint32Array(0),

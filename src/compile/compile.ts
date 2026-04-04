@@ -20,6 +20,7 @@
 
 import type { Circuit } from "../core/circuit.js";
 import type { ComponentRegistry } from "../core/registry.js";
+import { PinDirection } from "../core/pin.js";
 
 import { resolveModelAssignments, extractConnectivityGroups, resolveLoadingOverrides, applyLoadingDecisions, INFRASTRUCTURE_TYPES } from "./extract-connectivity.js";
 import { partitionByDomain } from "./partition.js";
@@ -249,7 +250,7 @@ export function compileUnified(
     if (isDigital) {
       const netId = groupIdToDigitalNetId.get(group.groupId) ?? 0;
       const bitWidth = group.bitWidth ?? 1;
-      addr = { domain: "digital", netId, bitWidth };
+      addr = { domain: "digital", netId, bitWidth, direction: PinDirection.BIDIRECTIONAL };
     } else if (isAnalog) {
       const nodeId = groupIdToAnalogNodeId.get(group.groupId) ?? 0;
       addr = { domain: "analog", nodeId };
@@ -299,18 +300,77 @@ export function compileUnified(
   // -------------------------------------------------------------------------
   // Step 9: Build labelSignalMap
   //
-  // For each In/Out/Probe label, map to the appropriate SignalAddress.
-  // Use the compiled results' labelToNetId / labelToNodeId maps directly.
+  // Build from pinNetMap + labelToCircuitElement. Every labeled digital
+  // component gets label:pin entries. Single-pin components also get bare label.
+  // The direction is the *external* role: the pin direction describes what the
+  // component does TO the circuit; the external perspective is the inverse.
   // -------------------------------------------------------------------------
+
+  // Build label → element lookup early so step 9 can resolve pin directions.
+  const labelToCircuitElement = new Map<string, import("../core/element.js").CircuitElement>();
+  for (const el of circuit.elements) {
+    const props = el.getProperties();
+    if (props.has('label')) {
+      const lbl = props.get<string>('label');
+      if (lbl !== undefined && lbl !== '') {
+        labelToCircuitElement.set(lbl, el);
+      }
+    }
+  }
 
   const labelSignalMap = new Map<string, SignalAddress>();
 
   if (compiledDigital !== null) {
-    for (const [label, netId] of compiledDigital.labelToNetId) {
+    // Build instanceId → label reverse lookup from labelToCircuitElement
+    const instanceIdToLabel = new Map<string, string>();
+    for (const [label, el] of labelToCircuitElement) {
+      instanceIdToLabel.set(el.instanceId, label);
+    }
+
+    // Count pins per instance for bare-label registration
+    const instancePinCount = new Map<string, number>();
+    for (const key of compiledDigital.pinNetMap.keys()) {
+      const colonIdx = key.indexOf(':');
+      if (colonIdx < 0) continue;
+      const instId = key.substring(0, colonIdx);
+      instancePinCount.set(instId, (instancePinCount.get(instId) ?? 0) + 1);
+    }
+
+    for (const [key, netId] of compiledDigital.pinNetMap) {
+      const colonIdx = key.indexOf(':');
+      if (colonIdx < 0) continue;
+      const instanceId = key.substring(0, colonIdx);
+      const pinLabel = key.substring(colonIdx + 1);
+
+      const label = instanceIdToLabel.get(instanceId);
+      if (label === undefined) continue; // unlabeled component — skip
+
       const bitWidth = netId < compiledDigital.netWidths.length
         ? compiledDigital.netWidths[netId] ?? 1
         : 1;
-      labelSignalMap.set(label, { domain: "digital", netId, bitWidth });
+
+      // Resolve external direction by inverting the component's pin direction.
+      // The pin direction describes what the component does TO the circuit;
+      // the external perspective is the inverse.
+      let direction = PinDirection.BIDIRECTIONAL;
+      const el = labelToCircuitElement.get(label);
+      if (el) {
+        const pin = el.getPins().find(p => p.label === pinLabel);
+        if (pin) {
+          if (pin.direction === PinDirection.OUTPUT) direction = PinDirection.INPUT;
+          else if (pin.direction === PinDirection.INPUT) direction = PinDirection.OUTPUT;
+        }
+      }
+
+      const addr: SignalAddress = { domain: "digital", netId, bitWidth, direction };
+
+      // Register "label:pinLabel" form for explicit pin access
+      labelSignalMap.set(`${label}:${pinLabel}`, addr);
+
+      // Single-pin components also get bare label for readability
+      if ((instancePinCount.get(instanceId) ?? 0) === 1) {
+        labelSignalMap.set(label, addr);
+      }
     }
   }
 
@@ -354,17 +414,6 @@ export function compileUnified(
   if (compiledAnalog !== null) {
     for (const d of compiledAnalog.diagnostics) {
       diagnostics.push(d);
-    }
-  }
-
-  const labelToCircuitElement = new Map<string, import("../core/element.js").CircuitElement>();
-  for (const el of circuit.elements) {
-    const props = el.getProperties();
-    if (props.has('label')) {
-      const lbl = props.get<string>('label');
-      if (lbl !== undefined && lbl !== '') {
-        labelToCircuitElement.set(lbl, el);
-      }
     }
   }
 

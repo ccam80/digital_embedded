@@ -7,7 +7,7 @@ import type { AnalogElementCore, IntegrationMethod } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
-import type { SolverDiagnostic } from "../../../core/analog-engine-interface.js";
+import type { Diagnostic } from "../../../compile/types.js";
 import { makeDiagnostic } from "../diagnostics.js";
 import { FALLBACK_SPEC, getPinSpecs, makeInputPin, makeOutputPin } from "./shared.js";
 
@@ -33,7 +33,7 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
   private _solver: SparseSolver | null = null;
   private _cachedVoltages: Float64Array = new Float64Array(0);
 
-  private _diagnostics: SolverDiagnostic[] = [];
+  private _diagnostics: Diagnostic[] = [];
 
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
@@ -63,7 +63,7 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
     delegatePinSetParam(this._pinModelsByLabel, key, value);
   }
 
-  getDiagnostics(): SolverDiagnostic[] {
+  getDiagnostics(): Diagnostic[] {
     return this._diagnostics;
   }
 

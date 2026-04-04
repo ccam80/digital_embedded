@@ -148,12 +148,6 @@ export class CompiledCircuitImpl implements CompiledCircuit {
   readonly componentToElement: Map<number, CircuitElement>;
 
   /**
-   * Maps label string to net ID for facade's setInput/readOutput resolution.
-   * Labels come from In/Out/Probe components whose label property is set.
-   */
-  readonly labelToNetId: Map<string, number>;
-
-  /**
    * Maps Wire instance to net ID for the renderer's wire coloring.
    * Populated by the net resolver during compilation.
    */
@@ -205,7 +199,6 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     sccSnapshotBuffer: Uint32Array;
     delays: Uint32Array;
     componentToElement: Map<number, CircuitElement>;
-    labelToNetId: Map<string, number>;
     wireToNetId: Map<Wire, number>;
     pinNetMap: Map<string, number>;
     resetComponentIndices?: Uint32Array;
@@ -231,7 +224,6 @@ export class CompiledCircuitImpl implements CompiledCircuit {
     this.sccSnapshotBuffer = fields.sccSnapshotBuffer;
     this.delays = fields.delays;
     this.componentToElement = fields.componentToElement;
-    this.labelToNetId = fields.labelToNetId;
     this.wireToNetId = fields.wireToNetId;
     this.pinNetMap = fields.pinNetMap;
     this.resetComponentIndices = fields.resetComponentIndices ?? new Uint32Array(0);

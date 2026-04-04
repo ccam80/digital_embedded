@@ -224,16 +224,23 @@ describe("NMOS", () => {
   });
 
   it("voltage_limiting", () => {
-    // Large NR step on Vgs above threshold should be clamped by fetlim to 0.5V change
-    // VTO = 0.7, both old and new Vgs above VTO
-    const vgsOld = 2.0; // above threshold
+    // SPICE3f5 three-zone fetlim: near-threshold zone (vold=2.0, vto=0.7, vtox=4.2)
+    // Increasing step: clamp to min(vnew, vto+4) = min(5.0, 4.7) = 4.7
+    const vgsOld = 2.0; // above threshold, near-threshold zone
     const vgsNewLarge = 5.0; // large step: 3V jump
 
     const { vgs: vgsLimited } = limitVoltages(vgsOld, vgsNewLarge, 2.0, 2.0, NMOS_DEFAULTS.VTO);
 
-    // fetlim clamps step to 0.5V when both old and new are above threshold
-    expect(vgsLimited - vgsOld).toBeLessThanOrEqual(0.5 + 1e-10);
+    // Near-threshold increasing: capped at vto+4 = 0.7+4 = 4.7
+    expect(vgsLimited).toBeCloseTo(NMOS_DEFAULTS.VTO + 4, 10);
     expect(vgsLimited).toBeGreaterThan(vgsOld); // still moved in the right direction
+
+    // Deep-on zone: large decreasing step should use vtstlo limiting
+    const vgsOldDeepOn = 6.0; // >= vtox=4.2
+    const vgsNewDecreasing = 1.0; // large decrease
+    const { vgs: vgsLimited2 } = limitVoltages(vgsOldDeepOn, vgsNewDecreasing, 6.0, 2.0, NMOS_DEFAULTS.VTO);
+    // vtstlo = |6.0-0.7|+1 = 6.3, but vnew=1.0 < vtox=4.2: floor at vto+2=2.7
+    expect(vgsLimited2).toBeCloseTo(NMOS_DEFAULTS.VTO + 2, 10);
   });
 
   it("gm_positive_in_active_region", () => {

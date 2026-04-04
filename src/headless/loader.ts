@@ -104,6 +104,6 @@ export class SimulationLoader {
    * Synchronous — JSON parsing and element construction require no I/O.
    */
   loadJson(json: string): Circuit {
-    return deserializeDts(json, this._registry).circuit;
+    return deserializeDts(json, this._registry);
   }
 }

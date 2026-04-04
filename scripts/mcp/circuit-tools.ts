@@ -5,19 +5,22 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { readFile, writeFile, readdir } from "fs/promises";
-import { dirname } from "path";
+import { basename, dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 import { DefaultSimulatorFacade } from "../../src/headless/default-facade.js";
 import type { ComponentRegistry } from "../../src/core/registry.js";
 import type { ComponentDefinition } from "../../src/core/registry.js";
 import type { CircuitSpec, PatchOp, ComponentDescriptor } from "../../src/headless/netlist-types.js";
 import { extractEmbeddedTestData } from "../../src/headless/test-runner.js";
 import { serializeCircuit } from "../../src/io/dts-serializer.js";
+import { deserializeDts } from "../../src/io/dts-deserializer.js";
 import { loadWithSubcircuits } from "../../src/io/subcircuit-loader.js";
-import { registerSubcircuit, createLiveDefinition } from "../../src/components/subcircuit/subcircuit.js";
+import { createLiveDefinition } from "../../src/components/subcircuit/subcircuit.js";
 import type { SubcircuitDefinition } from "../../src/components/subcircuit/subcircuit.js";
 import { testEquivalence } from "../../src/headless/equivalence.js";
 import { makeNodeResolver, SessionState } from "./tool-helpers.js";
 import { formatDiagnostics, formatNetlist, formatComponentDefinition } from "./formatters.js";
+import { LIBRARY_74XX, register74xxSubcircuit } from "../../src/components/library-74xx.js";
 
 export function registerCircuitTools(
   server: McpServer,
@@ -34,18 +37,28 @@ export function registerCircuitTools(
     {
       title: "Load Circuit",
       description:
-        "Load a .dig circuit file from disk. Returns a handle for subsequent operations. " +
+        "Load a circuit file from disk (.dts native JSON or .dig XML). " +
+        "Returns a handle for subsequent operations. " +
         "Use circuit_netlist after loading to inspect components and connectivity.",
       inputSchema: {
-        path: z.string().describe("Absolute or relative path to a .dig circuit file"),
+        path: z.string().describe("Absolute or relative path to a circuit file (.dts or .dig)"),
       },
     },
     async ({ path: filePath }) => {
       try {
-        const xml = await readFile(filePath, "utf-8");
+        const content = await readFile(filePath, "utf-8");
         const baseDir = dirname(filePath) || ".";
-        const nodeResolver = makeNodeResolver(baseDir);
-        const circuit = await loadWithSubcircuits(xml, nodeResolver, registry);
+
+        let circuit;
+        if (content.trimStart().startsWith("{")) {
+          // Native .dts JSON format — subcircuits are stored on circuit.metadata
+          circuit = deserializeDts(content, registry);
+        } else {
+          // .dig XML format
+          const nodeResolver = makeNodeResolver(baseDir);
+          circuit = await loadWithSubcircuits(content, nodeResolver, registry);
+        }
+
         const handle = session.store(circuit, baseDir);
 
         const netlist = facade.netlist(circuit);
@@ -178,7 +191,7 @@ export function registerCircuitTools(
           ),
       },
     },
-    ({ typeName }) => {
+    async ({ typeName }) => {
       try {
         const typeNames = Array.isArray(typeName) ? typeName : [typeName];
 
@@ -186,7 +199,19 @@ export function registerCircuitTools(
         const notFound: string[] = [];
 
         for (const name of typeNames) {
-          const def = facade.describeComponent(name);
+          let def = facade.describeComponent(name);
+          if (def && def.pinLayout.length === 0 && LIBRARY_74XX.some((e) => e.name === name)) {
+            // 74xx stub with no pins — load the full definition from disk
+            const entry = LIBRARY_74XX.find((e) => e.name === name)!;
+            const lib74xxDir = resolve(fileURLToPath(import.meta.url), "../../..", "lib/74xx");
+            const filePath = `${lib74xxDir}/${entry.file}`;
+            const xml = await readFile(filePath, "utf-8");
+            const nodeResolver = makeNodeResolver(lib74xxDir);
+            const circuit = await loadWithSubcircuits(xml, nodeResolver, registry);
+            const definition = createLiveDefinition(circuit, "DEFAULT", name);
+            register74xxSubcircuit(registry, name, definition);
+            def = facade.describeComponent(name);
+          }
           if (!def) {
             notFound.push(name);
           } else {
@@ -350,26 +375,54 @@ export function registerCircuitTools(
       try {
         const circuit = session.getCircuit(handle);
 
-        // On-demand subcircuit registration: if any 'add' op references a .dig
-        // type not yet in the registry, load it from the circuit's source dir.
+        // On-demand subcircuit loading: if any 'add' op references a type
+        // not in the registry or circuit-scoped subcircuits, try to load it
+        // from the circuit's source dir (.dts first, then .dig).
         const sourceDir = session.circuitSourceDirs.get(handle);
         if (sourceDir) {
+          if (!circuit.metadata.subcircuits) {
+            circuit.metadata.subcircuits = new Map();
+          }
           for (const op of ops as unknown as PatchOp[]) {
-            if (op.op === "add" && op.spec?.type?.endsWith(".dig")) {
-              const typeName = op.spec.type;
-              if (registry.get(typeName) === undefined) {
-                const nodeResolver = makeNodeResolver(sourceDir);
-                const sibXml = await readFile(sourceDir + "/" + typeName, "utf-8");
-                const sibCircuit = await loadWithSubcircuits(sibXml, nodeResolver, registry);
-                const shapeType = sibCircuit.metadata.shapeType || "DEFAULT";
-                const subDef = createLiveDefinition(
-                  sibCircuit,
-                  shapeType as SubcircuitDefinition["shapeMode"],
-                  typeName,
-                );
-                registerSubcircuit(registry, typeName, subDef);
-              }
+            if (op.op !== "add" || !op.spec?.type) continue;
+            const typeName = op.spec.type;
+            if (registry.get(typeName) !== undefined) continue;
+            if (circuit.metadata.subcircuits.has(typeName)) continue;
+
+            // Try .dts first, then .dig
+            let sibContent: string | undefined;
+            let sibPath: string | undefined;
+            for (const ext of [".dts", ".dig"]) {
+              const candidate = sourceDir + "/" + typeName + (typeName.endsWith(ext) ? "" : ext);
+              try {
+                sibContent = await readFile(candidate, "utf-8");
+                sibPath = candidate;
+                break;
+              } catch { /* try next extension */ }
             }
+            // Also try the raw typeName (e.g. "FullAdder.dig" used as type name)
+            if (sibContent === undefined) {
+              try {
+                sibContent = await readFile(sourceDir + "/" + typeName, "utf-8");
+                sibPath = sourceDir + "/" + typeName;
+              } catch { /* not found */ }
+            }
+            if (sibContent === undefined || sibPath === undefined) continue;
+
+            let sibCircuit;
+            if (sibContent.trimStart().startsWith("{")) {
+              sibCircuit = deserializeDts(sibContent, registry);
+            } else {
+              const nodeResolver = makeNodeResolver(dirname(sibPath));
+              sibCircuit = await loadWithSubcircuits(sibContent, nodeResolver, registry);
+            }
+            const shapeType = sibCircuit.metadata.shapeType || "DEFAULT";
+            const subDef = createLiveDefinition(
+              sibCircuit,
+              shapeType as SubcircuitDefinition["shapeMode"],
+              typeName,
+            );
+            circuit.metadata.subcircuits.set(typeName, subDef);
           }
         }
 
@@ -791,6 +844,85 @@ export function registerCircuitTools(
             {
               type: "text" as const,
               text: `Error saving circuit: ${err instanceof Error ? err.message : String(err)}`,
+            },
+          ],
+          isError: true as const,
+        };
+      }
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // circuit_import_subcircuit
+  // ---------------------------------------------------------------------------
+
+  server.registerTool(
+    "circuit_import_subcircuit",
+    {
+      title: "Import Subcircuit",
+      description:
+        "Import a .dts or .dig file as a subcircuit definition into a loaded circuit. " +
+        "After import, use circuit_patch with an 'add' op to place instances of the subcircuit.",
+      inputSchema: {
+        handle: z.string().describe("Circuit handle to import into"),
+        path: z.string().describe("Path to the subcircuit file (.dts or .dig)"),
+        name: z
+          .string()
+          .optional()
+          .describe(
+            "Type name for the subcircuit. Defaults to filename without extension.",
+          ),
+      },
+    },
+    async ({ handle, path: filePath, name }) => {
+      try {
+        const circuit = session.getCircuit(handle);
+        const content = await readFile(filePath, "utf-8");
+        const typeName = name ?? basename(filePath).replace(/\.(dts|dig)$/, "");
+        const baseDir = dirname(filePath) || ".";
+
+        let subcircuit;
+        if (content.trimStart().startsWith("{")) {
+          subcircuit = deserializeDts(content, registry);
+        } else {
+          const nodeResolver = makeNodeResolver(baseDir);
+          subcircuit = await loadWithSubcircuits(content, nodeResolver, registry);
+        }
+
+        const shapeType = subcircuit.metadata.shapeType || "DEFAULT";
+        const subDef = createLiveDefinition(
+          subcircuit,
+          shapeType as SubcircuitDefinition["shapeMode"],
+          typeName,
+        );
+
+        if (!circuit.metadata.subcircuits) {
+          circuit.metadata.subcircuits = new Map();
+        }
+        circuit.metadata.subcircuits.set(typeName, subDef);
+
+        const pins = subDef.pinLayout.map((p) => p.label);
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: [
+                `Subcircuit "${typeName}" imported successfully.`,
+                `Pins: ${pins.join(", ") || "none"}`,
+                ``,
+                `Place instances via circuit_patch:`,
+                `  {op: "add", spec: {id: "inst1", type: "${typeName}"}}`,
+              ].join("\n"),
+            },
+          ],
+        };
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error importing subcircuit: ${err instanceof Error ? err.message : String(err)}`,
             },
           ],
           isError: true as const,

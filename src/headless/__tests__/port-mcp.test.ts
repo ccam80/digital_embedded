@@ -6,7 +6,7 @@
  *   - circuit_build with Port appears in netlist
  *   - circuit_compile succeeds for Port-interface subcircuits
  *   - circuit_test resolves test vector columns to Port labels
- *   - setInput()/readOutput() resolve Port labels via labelSignalMap
+ *   - setSignal()/readSignal() resolve Port labels via labelSignalMap
  */
 
 import { describe, it, expect } from 'vitest';
@@ -141,11 +141,11 @@ describe('Port MCP surface — test vectors resolve Port labels', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 4: setInput()/readOutput() resolve Port labels
+// Test 4: setSignal()/readSignal() resolve Port labels
 // ---------------------------------------------------------------------------
 
-describe('Port MCP surface — setInput/readOutput via Port labels', () => {
-  it('setInput and readOutput resolve Port labels in a wire-through circuit', () => {
+describe('Port MCP surface — setSignal/readSignal via Port labels', () => {
+  it('setSignal and readSignal resolve Port labels in a wire-through circuit', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
     // Circuit: In("src") → Port("mid") → Out("dst")
@@ -179,7 +179,7 @@ describe('Port MCP surface — setInput/readOutput via Port labels', () => {
     expect(facade.readSignal(engine, 'dst')).toBe(0);
   });
 
-  it('Port label resolves in labelSignalMap — setInput via Port label drives the net', () => {
+  it('Port label resolves in labelSignalMap — setSignal via Port label drives the net', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
     // Circuit: Port("drive") → Out("observe")
@@ -204,7 +204,7 @@ describe('Port MCP surface — setInput/readOutput via Port labels', () => {
     const portComp = netlist.components.find(c => c.typeId === 'Port');
     expect(portComp!.label).toBe('drive_port');
 
-    // readOutput via Port label works
+    // readSignal via Port label works
     facade.setSignal(engine, 'drive', 1);
     facade.step(engine);
     expect(facade.readSignal(engine, 'drive_port')).toBe(1);

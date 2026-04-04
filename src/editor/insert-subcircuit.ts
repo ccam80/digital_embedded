@@ -15,7 +15,6 @@ import type { EditCommand } from "./undo-redo.js";
 import type { ComponentRegistry } from "@/core/registry.js";
 import {
   SubcircuitElement,
-  registerSubcircuit,
   type SubcircuitDefinition,
 } from "@/components/subcircuit/subcircuit.js";
 import { deriveInterfacePins } from "@/components/subcircuit/pin-derivation.js";
@@ -302,7 +301,7 @@ export function insertAsSubcircuit(
   circuit: Circuit,
   selectedElements: CircuitElement[],
   selectedWires: Wire[],
-  registry?: ComponentRegistry,
+  _registry?: ComponentRegistry,
   name?: string,
   userPorts?: PortOverride[],
 ): { subcircuit: Circuit; command: EditCommand; instance: SubcircuitElement } {
@@ -320,9 +319,11 @@ export function insertAsSubcircuit(
     name: subcircuitName,
   };
 
-  if (registry) {
-    registerSubcircuit(registry, subcircuitName, definition);
+  // Store the definition on the circuit's scoped metadata
+  if (!circuit.metadata.subcircuits) {
+    circuit.metadata.subcircuits = new Map();
   }
+  circuit.metadata.subcircuits.set(subcircuitName, definition);
 
   // Create the SubcircuitElement instance at the selection centroid.
   const centroid = selectionCentroid(selectedElements);

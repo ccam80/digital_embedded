@@ -290,4 +290,28 @@ export interface SimulatorFacade {
    * @throws FacadeError if targets cannot be resolved
    */
   patch(circuit: Circuit, ops: CircuitPatch, opts?: PatchOptions): PatchResult;
+
+  // ============================================
+  // Subcircuit management
+  // ============================================
+
+  /**
+   * Import a subcircuit definition from file content into a circuit.
+   *
+   * Parses the content (auto-detects .dts JSON or .dig XML), creates a
+   * SubcircuitDefinition, and stores it on circuit.metadata.subcircuits.
+   * After import, the subcircuit type is available for addComponent() and
+   * build()/patch() operations.
+   *
+   * @param circuit - The circuit to import into
+   * @param name - Type name for the subcircuit (e.g. "HalfAdder")
+   * @param content - Raw file content (UTF-8 string, .dts JSON or .dig XML)
+   * @returns The imported SubcircuitDefinition
+   */
+  importSubcircuit(
+    circuit: Circuit,
+    name: string,
+    content: string,
+    resolver?: import('../io/file-resolver.js').FileResolver,
+  ): Promise<import('../components/subcircuit/subcircuit.js').SubcircuitDefinition>;
 }

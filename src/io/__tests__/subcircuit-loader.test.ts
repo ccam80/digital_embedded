@@ -2,11 +2,9 @@
  * Tests for subcircuit-loader.ts — Recursive .dig loading with cycle detection.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   loadWithSubcircuits,
-  clearSubcircuitCache,
-  subcircuitCacheSize,
 } from "../subcircuit-loader.js";
 import { SubcircuitElement } from "../../components/subcircuit/subcircuit.js";
 import { ComponentRegistry, ComponentCategory } from "../../core/registry.js";
@@ -62,14 +60,6 @@ ${elements}
 }
 
 // ---------------------------------------------------------------------------
-// Setup: clear cache before each test
-// ---------------------------------------------------------------------------
-
-beforeEach(() => {
-  clearSubcircuitCache();
-});
-
-// ---------------------------------------------------------------------------
 // recursiveLoad
 // ---------------------------------------------------------------------------
 
@@ -92,8 +82,9 @@ describe("subcircuit-loader", () => {
     // Main circuit should have 3 elements: In, Out, SubA-instance
     expect(circuit.elements).toHaveLength(3);
 
-    // SubA should now be registered in the registry
-    const subADef = registry.get("SubA");
+    // SubA should be in circuit-scoped subcircuit metadata (not global registry)
+    expect(circuit.metadata.subcircuits).toBeDefined();
+    const subADef = circuit.metadata.subcircuits!.get("SubA");
     expect(subADef).toBeDefined();
     expect(subADef!.name).toBe("SubA");
 
@@ -103,7 +94,6 @@ describe("subcircuit-loader", () => {
 
     // The element has the loaded subcircuit definition
     const subEl = subAEl as SubcircuitElement;
-    expect(subEl.definition).toBeDefined();
     expect(subEl.definition.circuit.elements).toHaveLength(3); // In, And, Out
   });
 
@@ -132,8 +122,7 @@ describe("subcircuit-loader", () => {
 
     // Error message should contain both A and B
     try {
-      clearSubcircuitCache();
-      // Re-register since registry may be partially mutated
+      // Fresh registry — no cache to clear, each load is independent
       const reg2 = new ComponentRegistry();
       reg2.register(stubDef("In"));
       await loadWithSubcircuits(aXml, resolver, reg2);
@@ -197,7 +186,7 @@ describe("subcircuit-loader", () => {
   // clearCache
   // ---------------------------------------------------------------------------
 
-  it("clearCache — load subcircuit, clear cache, load again, resolver called twice", async () => {
+  it("separateLoads — each loadWithSubcircuits call re-resolves independently", async () => {
     const mainXml = makeDigXml(["In", "SubA", "Out"]);
     const subAXml = makeDigXml(["In", "Out"]);
 
@@ -211,19 +200,14 @@ describe("subcircuit-loader", () => {
     // First load
     await loadWithSubcircuits(mainXml, resolver, registry1);
     expect(resolveFn).toHaveBeenCalledTimes(1);
-    expect(subcircuitCacheSize()).toBe(1);
 
-    // Clear the module-level subcircuit cache
-    clearSubcircuitCache();
-    expect(subcircuitCacheSize()).toBe(0);
-
-    // Second load (new registry — need a fresh registry since SubA is already in registry1)
+    // Second load (fresh registry — each call is independent, no shared cache)
     const registry2 = new ComponentRegistry();
     registry2.register(stubDef("In"));
     registry2.register(stubDef("Out"));
 
     await loadWithSubcircuits(mainXml, resolver, registry2);
-    // Resolver should have been called again (cache was cleared)
+    // Resolver called again — no module-level cache shared between calls
     expect(resolveFn).toHaveBeenCalledTimes(2);
   });
 
@@ -274,16 +258,17 @@ describe("subcircuit-loader", () => {
     // A has 3 elements: In, B (subcircuit), Out
     expect(circuit.elements).toHaveLength(3);
 
-    // B and C should both be registered
-    expect(registry.get("B")).toBeDefined();
-    expect(registry.get("C")).toBeDefined();
+    // B and C should both be in circuit-scoped subcircuit metadata
+    expect(circuit.metadata.subcircuits).toBeDefined();
+    expect(circuit.metadata.subcircuits!.has("B")).toBe(true);
+    expect(circuit.metadata.subcircuits!.has("C")).toBe(true);
   });
 
   // ---------------------------------------------------------------------------
   // SubcircuitElement executeFn is no-op
   // ---------------------------------------------------------------------------
 
-  it("subcircuitExecuteFnNoOp — registered subcircuit execute function does not throw", async () => {
+  it("subcircuitExecuteFnNoOp — circuit-scoped subcircuit execute function does not throw", async () => {
     const mainXml = makeDigXml(["In", "SubA"]);
     const subAXml = makeDigXml(["In", "Out"]);
 
@@ -292,10 +277,16 @@ describe("subcircuit-loader", () => {
     registry.register(stubDef("In"));
     registry.register(stubDef("Out"));
 
-    await loadWithSubcircuits(mainXml, resolver, registry);
+    const circuit = await loadWithSubcircuits(mainXml, resolver, registry);
 
-    const subADef = registry.get("SubA");
-    expect(subADef).toBeDefined();
+    // SubA should be in circuit-scoped metadata
+    expect(circuit.metadata.subcircuits).toBeDefined();
+    const subASubDef = circuit.metadata.subcircuits!.get("SubA");
+    expect(subASubDef).toBeDefined();
+
+    // Build a ComponentDefinition from the SubcircuitDefinition
+    const { buildSubcircuitComponentDef } = await import("../../components/subcircuit/subcircuit.js");
+    const subADef = buildSubcircuitComponentDef("SubA", subASubDef!);
 
     // executeFn should be callable without throwing
     const mockState = new Uint32Array(10);
@@ -308,6 +299,6 @@ describe("subcircuit-loader", () => {
       stateOffset: () => 0,
       getProperty: () => undefined,
     };
-    expect(() => subADef!.models!.digital!.executeFn(0, mockState, new Uint32Array(mockState.length), mockLayout)).not.toThrow();
+    expect(() => subADef.models!.digital!.executeFn(0, mockState, new Uint32Array(mockState.length), mockLayout)).not.toThrow();
   });
 });

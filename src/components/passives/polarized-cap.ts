@@ -44,7 +44,7 @@ import {
 import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
-import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
+import type { Diagnostic } from "../../compile/types.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
@@ -222,7 +222,7 @@ export class AnalogPolarizedCapElement implements AnalogElement {
   private ieq: number = 0;
   private vPrev: number = 0;
 
-  private readonly _emitDiagnostic: (diag: SolverDiagnostic) => void;
+  private readonly _emitDiagnostic: (diag: Diagnostic) => void;
   private _reverseBiasDiagEmitted: boolean = false;
 
   /**
@@ -239,7 +239,7 @@ export class AnalogPolarizedCapElement implements AnalogElement {
     esr: number,
     rLeak: number,
     reverseMax: number,
-    emitDiagnostic?: (diag: SolverDiagnostic) => void,
+    emitDiagnostic?: (diag: Diagnostic) => void,
   ) {
     this.pinNodeIds = pinNodeIds;
     this.allNodeIds = pinNodeIds;

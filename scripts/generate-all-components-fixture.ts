@@ -9,24 +9,19 @@
 
 import { writeFileSync, readFileSync, readdirSync, statSync } from "fs";
 import { join } from "path";
-import { scan74xxPinMap } from "../src/io/dig-pin-scanner.js";
 import { createDefaultRegistry } from "../src/components/register-all.js";
 import { CircuitBuilder } from "../src/headless/builder.js";
 import { serializeCircuit } from "../src/io/dts-serializer.js";
 import { LIBRARY_74XX } from "../src/components/library-74xx.js";
 import { loadWithSubcircuits } from "../src/io/subcircuit-loader.js";
 import { NodeResolver } from "../src/io/file-resolver.js";
-import { registerSubcircuit, createLiveDefinition } from "../src/components/subcircuit/subcircuit.js";
+import { createLiveDefinition } from "../src/components/subcircuit/subcircuit.js";
 
 // ---------------------------------------------------------------------------
 // 1. Create registry with pre-scanned 74xx pins
 // ---------------------------------------------------------------------------
 
-const LIB_74XX_DIR = join(
-  process.cwd(), "ref", "Digital", "src", "main", "dig", "lib", "DIL Chips", "74xx",
-);
-const pinMap74xx = scan74xxPinMap(LIB_74XX_DIR);
-const registry = createDefaultRegistry(pinMap74xx);
+const registry = createDefaultRegistry();
 const builder = new CircuitBuilder(registry);
 const circuit = builder.createCircuit({ name: "All Components" });
 

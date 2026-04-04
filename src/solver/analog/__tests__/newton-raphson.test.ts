@@ -70,11 +70,17 @@ describe("NR", () => {
   // ---------------------------------------------------------------------------
 
   it("fetlim_clamps_above_threshold", () => {
-    // Vgs step from 1.0V → 3.0V (delta = 2.0V > 0.5V) with Vto = 0.7V
-    // Both above threshold, so should clamp to at most 0.5V change
+    // SPICE3f5 three-zone algorithm:
+    // vold=1.0, vto=0.7: near-threshold zone (vold >= vto but < vto+3.5=4.2)
+    // Increasing step (delv=2.0 > 0): clamp to min(vnew, vto+4) = min(3.0, 4.7) = 3.0
     const result = fetlim(3.0, 1.0, 0.7);
-    expect(result).toBeLessThanOrEqual(1.0 + 0.5);
+    expect(result).toBeLessThanOrEqual(1.0 + 0.7 + 4); // capped at vto+4
     expect(result).toBeGreaterThan(1.0);
+
+    // Deep-on zone: large enough step triggers vtsthi clamp
+    // vtsthi = |2*(5.0-0.7)|+2 = 10.6, delv=15 > 10.6 → clamp to 5+10.6=15.6
+    const result3 = fetlim(20.0, 5.0, 0.7);
+    expect(result3).toBeCloseTo(5.0 + (Math.abs(2 * (5.0 - 0.7)) + 2), 10);
   });
 
   // ---------------------------------------------------------------------------

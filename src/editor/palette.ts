@@ -8,6 +8,7 @@
 
 import type { ComponentDefinition } from "@/core/registry";
 import { ComponentCategory, ComponentRegistry } from "@/core/registry";
+import { buildSubcircuitComponentDef } from "../components/subcircuit/subcircuit.js";
 
 // ---------------------------------------------------------------------------
 // PaletteNode — one category tree node
@@ -121,6 +122,8 @@ export class ComponentPalette {
    * have registered components. Populated by refreshCategories().
    */
   private readonly _forceVisibleCategories: Set<ComponentCategory> = new Set();
+  /** Active circuit for reading circuit-scoped subcircuit definitions. */
+  private _activeCircuit: import("../core/circuit.js").Circuit | null = null;
 
   constructor(registry: ComponentRegistry) {
     this._registry = registry;
@@ -179,7 +182,19 @@ export class ComponentPalette {
       // components — don't hide the default-hidden categories since the
       // allowlist is the explicit override.
       if (this._allowlist === null && PALETTE_HIDDEN_CATEGORIES.has(category) && !this._forceVisibleCategories.has(category)) continue;
-      const all = this._registry.getByCategory(category);
+      let all = this._registry.getByCategory(category);
+      // Merge circuit-scoped subcircuit definitions into the SUBCIRCUIT category
+      if (category === ComponentCategory.SUBCIRCUIT) {
+        const circuitDefs = this._getCircuitScopedSubcircuits();
+        if (circuitDefs.length > 0) {
+          const registryNames = new Set(all.map(d => d.name));
+          const merged = [...all];
+          for (const def of circuitDefs) {
+            if (!registryNames.has(def.name)) merged.push(def);
+          }
+          all = merged;
+        }
+      }
       let children: ComponentDefinition[];
       if (this._allowlist !== null) {
         children = this._applyAllowlist(all);
@@ -228,7 +243,19 @@ export class ComponentPalette {
 
     for (const category of CATEGORIES_ANALOG) {
       const cat = category as ComponentCategory;
-      const all = this._applyAllowlist(this._registry.getByCategory(cat));
+      let registryDefs = this._registry.getByCategory(cat);
+      if (cat === ComponentCategory.SUBCIRCUIT) {
+        const circuitDefs = this._getCircuitScopedSubcircuits();
+        if (circuitDefs.length > 0) {
+          const registryNames = new Set(registryDefs.map(d => d.name));
+          const merged = [...registryDefs];
+          for (const def of circuitDefs) {
+            if (!registryNames.has(def.name)) merged.push(def);
+          }
+          registryDefs = merged;
+        }
+      }
+      const all = this._applyAllowlist(registryDefs);
       const matched = all.filter((def) =>
         def.name.toLowerCase().includes(lowerQuery),
       );
@@ -304,9 +331,31 @@ export class ComponentPalette {
    * Called after a subcircuit is created or deleted so the category tree picks
    * up the change on the next getTree() call.
    */
+  /**
+   * Set the active circuit so the palette can read circuit-scoped subcircuit
+   * definitions. Call when the active circuit changes (load, new, etc.).
+   */
+  setActiveCircuit(circuit: import("../core/circuit.js").Circuit | null): void {
+    this._activeCircuit = circuit;
+  }
+
+  /**
+   * Build ComponentDefinition array for circuit-scoped subcircuits.
+   */
+  private _getCircuitScopedSubcircuits(): ComponentDefinition[] {
+    if (!this._activeCircuit?.metadata.subcircuits?.size) return [];
+    const defs: ComponentDefinition[] = [];
+    for (const [name, subDef] of this._activeCircuit.metadata.subcircuits) {
+      defs.push(buildSubcircuitComponentDef(name, subDef));
+    }
+    return defs;
+  }
+
   refreshCategories(): void {
-    const subcircuits = this._registry.getByCategory(ComponentCategory.SUBCIRCUIT);
-    if (subcircuits.length > 0) {
+    const registrySubcircuits = this._registry.getByCategory(ComponentCategory.SUBCIRCUIT);
+    const circuitSubcircuits = this._getCircuitScopedSubcircuits();
+    const hasSubcircuits = registrySubcircuits.length > 0 || circuitSubcircuits.length > 0;
+    if (hasSubcircuits) {
       this._forceVisibleCategories.add(ComponentCategory.SUBCIRCUIT);
       if (!this._expandedCategories.has(ComponentCategory.SUBCIRCUIT)) {
         this._expandedCategories.set(ComponentCategory.SUBCIRCUIT, true);

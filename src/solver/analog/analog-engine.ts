@@ -11,9 +11,9 @@ import { EngineState } from "../../core/engine-interface.js";
 import type {
   AnalogEngine,
   DcOpResult,
-  SolverDiagnostic,
   SimulationParams,
 } from "../../core/analog-engine-interface.js";
+import type { Diagnostic } from "../../compile/types.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../core/analog-engine-interface.js";
 import { AcAnalysis } from "./ac-analysis.js";
 import type { AcParams, AcResult } from "./ac-analysis.js";
@@ -569,8 +569,8 @@ export class MNAEngine implements AnalogEngine {
   // AnalogEngine interface — Diagnostics
   // -------------------------------------------------------------------------
 
-  /** Register a callback to receive SolverDiagnostic records. */
-  onDiagnostic(callback: (diag: SolverDiagnostic) => void): void {
+  /** Register a callback to receive Diagnostic records. */
+  onDiagnostic(callback: (diag: Diagnostic) => void): void {
     this._diagnostics.onDiagnostic(callback);
   }
 

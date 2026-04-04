@@ -291,7 +291,7 @@ export interface BridgeAdapter {
  * resolve any signal without knowing which domain it belongs to.
  */
 export type SignalAddress =
-  | { domain: "digital"; netId: number; bitWidth: number }
+  | { domain: "digital"; netId: number; bitWidth: number; direction: PinDirection }
   | { domain: "analog"; nodeId: number };
 
 /**

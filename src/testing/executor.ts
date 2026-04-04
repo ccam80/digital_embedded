@@ -159,6 +159,7 @@ async function executeVector(
   const inputRecord: Record<string, number> = {};
   const expectedOutputs: Record<string, number> = {};
   const actualOutputs: Record<string, number> = {};
+  const failureMessages: string[] = [];
 
   // Determine which inputs are clock vs regular
   const clockInputs: string[] = [];
@@ -242,8 +243,7 @@ async function executeVector(
       const tol: Tolerance = expected.tolerance ?? testData.analogPragmas?.tolerance ?? {};
       if (!withinTolerance(actual, expected.value, tol)) {
         vectorPassed = false;
-        // Attach failure detail to the vector (stored in actualOutputs for now — message is informational)
-        void formatAnalogFailure(name, expected.value, actual, expected.tolerance ?? testData.analogPragmas?.tolerance);
+        failureMessages.push(formatAnalogFailure(name, expected.value, actual, expected.tolerance ?? testData.analogPragmas?.tolerance));
       }
       continue;
     }
@@ -261,5 +261,6 @@ async function executeVector(
     inputs: inputRecord,
     expectedOutputs,
     actualOutputs,
+    ...(failureMessages.length > 0 ? { message: failureMessages.join('; ') } : {}),
   };
 }

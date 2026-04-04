@@ -221,7 +221,7 @@ export interface AnalogElement {
   /**
    * Optional display label for diagnostic attribution.
    *
-   * When present, used in `SolverDiagnostic.involvedElements` descriptions
+   * When present, used in `Diagnostic.involvedElements` descriptions
    * to identify which element triggered a convergence failure or anomaly.
    */
   label?: string;

@@ -1,0 +1,1273 @@
+{
+  "circuit": {
+    "attributes": {
+      "digitalPinLoadingOverrides": "[{\"anchor\":{\"type\":\"pin\",\"instanceId\":\"1777b8f7-c6fd-46be-9b70-e32713cb25e4\",\"pinLabel\":\"E\"},\"loading\":\"ideal\"},{\"anchor\":{\"type\":\"pin\",\"instanceId\":\"60b34c5a-cf02-4032-b1cb-7be4aa8bbabb\",\"pinLabel\":\"In_2\"},\"loading\":\"ideal\"}]"
+    },
+    "elements": [
+      {
+        "id": "cfdbe996-6795-4f99-99d6-71086338a13c",
+        "position": {
+          "x": 16,
+          "y": 12
+        },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "BF": 100,
+            "BR": 1,
+            "CJC": 0,
+            "CJE": 0,
+            "CJS": 0,
+            "EG": 1.11,
+            "FC": 0.5,
+            "IKF": "_inf",
+            "IKR": "_inf",
+            "IRB": 0,
+            "IS": 1e-14,
+            "ISC": 0,
+            "ISE": 0,
+            "ITF": 0,
+            "KF": 0,
+            "MJC": 0.33,
+            "MJE": 0.33,
+            "MJS": 0,
+            "NC": 2,
+            "NE": 1.5,
+            "NF": 1,
+            "NR": 1,
+            "PTF": 0,
+            "RB": 0,
+            "RBM": 0,
+            "RC": 0,
+            "RE": 0,
+            "TF": 0,
+            "TR": 0,
+            "VAF": "_inf",
+            "VAR": "_inf",
+            "VJC": 0.75,
+            "VJE": 0.75,
+            "VJS": 0.75,
+            "VTF": "_inf",
+            "XCJC": 1,
+            "XTB": 0,
+            "XTF": 0,
+            "XTI": 3
+          },
+          "_pinElectrical": {
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "C": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "E": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          }
+        },
+        "rotation": 0,
+        "type": "NpnBJT"
+      },
+      {
+        "id": "1777b8f7-c6fd-46be-9b70-e32713cb25e4",
+        "position": {
+          "x": 29,
+          "y": 9
+        },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "BF": 100,
+            "BR": 1,
+            "CJC": 0,
+            "CJE": 0,
+            "CJS": 0,
+            "EG": 1.11,
+            "FC": 0.5,
+            "IKF": "_inf",
+            "IKR": "_inf",
+            "IRB": 0,
+            "IS": 1e-14,
+            "ISC": 0,
+            "ISE": 0,
+            "ITF": 0,
+            "KF": 0,
+            "MJC": 0.33,
+            "MJE": 0.33,
+            "MJS": 0,
+            "NC": 2,
+            "NE": 1.5,
+            "NF": 1,
+            "NR": 1,
+            "PTF": 0,
+            "RB": 0,
+            "RBM": 0,
+            "RC": 0,
+            "RE": 0,
+            "TF": 0,
+            "TR": 0,
+            "VAF": "_inf",
+            "VAR": "_inf",
+            "VJC": 0.75,
+            "VJE": 0.75,
+            "VJS": 0.75,
+            "VTF": "_inf",
+            "XCJC": 1,
+            "XTB": 0,
+            "XTF": 0,
+            "XTI": 3
+          },
+          "_pinElectrical": {
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "C": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "E": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          }
+        },
+        "rotation": 0,
+        "type": "PnpBJT"
+      },
+      {
+        "id": "46c5a79b-f3dc-4cce-b11b-073bce4f48d7",
+        "position": {
+          "x": 4,
+          "y": 15
+        },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 4.983907855756475,
+            "dcOffset": 0,
+            "frequency": 10000,
+            "phase": 0
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "amplitude": 4.983907855756475,
+          "frequency": 10000,
+          "waveform": "square"
+        },
+        "rotation": 90,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "eca0267f-0042-4b86-8f73-672d0ad0a64d",
+        "position": {
+          "x": 9,
+          "y": 15
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 10
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          }
+        },
+        "rotation": 90,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "b7f6619f-2b6d-440e-aef8-5cbb1aa198dd",
+        "position": {
+          "x": 20,
+          "y": 10
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 10000
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          }
+        },
+        "rotation": 90,
+        "type": "Resistor"
+      },
+      {
+        "id": "9ce1ac62-0cd1-4dde-925e-8621a6202e5a",
+        "position": {
+          "x": 33,
+          "y": 11
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 10000
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          }
+        },
+        "rotation": 270,
+        "type": "Resistor"
+      },
+      {
+        "id": "221259ba-b329-4515-a709-e57d3bff9026",
+        "position": {
+          "x": 12,
+          "y": 12
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 2528.133479834113
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "resistance": 2528.133479834113
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "c29083f7-8719-441e-97a7-c41917290c08",
+        "position": {
+          "x": 25,
+          "y": 9
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 1000
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          }
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "71e0e06f-6691-4d7a-a3e5-db005e77bacc",
+        "position": {
+          "x": 20,
+          "y": 16
+        },
+        "properties": {},
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "5b7eebf2-bd35-4fb0-b166-3c729700a46d",
+        "position": {
+          "x": 4,
+          "y": 9
+        },
+        "properties": {
+          "NetName": "DRV"
+        },
+        "rotation": 90,
+        "type": "Tunnel"
+      },
+      {
+        "id": "71900212-f469-47bf-8881-91f26b7d0b36",
+        "position": {
+          "x": 20,
+          "y": 4
+        },
+        "properties": {
+          "NetName": "10V"
+        },
+        "rotation": 90,
+        "type": "Tunnel"
+      },
+      {
+        "id": "9672404f-70d7-41bb-8816-21d2a6fa43d0",
+        "position": {
+          "x": 12,
+          "y": 12
+        },
+        "properties": {
+          "NetName": "DRV"
+        },
+        "rotation": 180,
+        "type": "Tunnel"
+      },
+      {
+        "id": "706d9ede-57d5-4078-9a10-7f64335aabc8",
+        "position": {
+          "x": 25,
+          "y": 9
+        },
+        "properties": {
+          "NetName": "DRV"
+        },
+        "rotation": 180,
+        "type": "Tunnel"
+      },
+      {
+        "id": "a3fd98f0-f751-4a78-8ef7-47134dc7f733",
+        "position": {
+          "x": 39,
+          "y": 9
+        },
+        "properties": {
+          "KP": 0.0002,
+          "LAMBDA": 0.1,
+          "VTO": 0.6332861644521975,
+          "_modelParams": {
+            "AF": 1,
+            "CBD": 0,
+            "CBS": 0,
+            "CGBO": 0,
+            "CGDO": 1.0724e-11,
+            "CGSO": 1.79115e-7,
+            "CJ": 0,
+            "CJSW": 0,
+            "FC": 0.5,
+            "GAMMA": 0,
+            "IS": 1e-14,
+            "JS": 0,
+            "KF": 0,
+            "KP": 0.0932174,
+            "L": 0.000001,
+            "LAMBDA": 0,
+            "LD": 0,
+            "MJ": 0.5,
+            "MJSW": 0.33,
+            "NSS": 0,
+            "NSUB": 0,
+            "PB": 0.8,
+            "PHI": 0.6,
+            "RD": 0,
+            "RS": 0,
+            "RSH": 0,
+            "TOX": 1e-7,
+            "TPG": 1,
+            "UO": 600,
+            "VTO": 2.236,
+            "W": 0.000001
+          },
+          "_pinElectrical": {
+            "D": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "G": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "S": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "model": "2N7000"
+        },
+        "rotation": 90,
+        "type": "NMOS"
+      },
+      {
+        "id": "e94311cd-8257-4706-a2f9-6007009726d7",
+        "position": {
+          "x": 46,
+          "y": 5
+        },
+        "properties": {
+          "_modelParams": {
+            "inductance": 0.3
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          }
+        },
+        "rotation": 0,
+        "type": "Inductor"
+      },
+      {
+        "id": "e8025077-db7f-45dc-88ce-0ca74fa09956",
+        "position": {
+          "x": 52,
+          "y": 11
+        },
+        "properties": {
+          "_modelParams": {
+            "capacitance": 0.000009999999999999999
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          }
+        },
+        "rotation": 90,
+        "type": "Capacitor"
+      },
+      {
+        "id": "33409af3-0dc8-4d61-8588-9c4af72cf167",
+        "position": {
+          "x": 58,
+          "y": 11
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 50
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          }
+        },
+        "rotation": 90,
+        "type": "Resistor"
+      },
+      {
+        "id": "e516320a-407d-4eae-8e58-5cbe6bf68e99",
+        "position": {
+          "x": 21,
+          "y": 11
+        },
+        "properties": {
+          "NetName": "NDRV"
+        },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "879307b2-1c01-47c3-b32f-01402bf0e67c",
+        "position": {
+          "x": 34,
+          "y": 10
+        },
+        "properties": {
+          "NetName": "PDRV"
+        },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "5fb739a0-25f7-4587-9c3d-524f45ab9588",
+        "position": {
+          "x": 39,
+          "y": 10
+        },
+        "properties": {
+          "NetName": "NDRV"
+        },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "60b34c5a-cf02-4032-b1cb-7be4aa8bbabb",
+        "position": {
+          "x": 38,
+          "y": -1
+        },
+        "properties": {},
+        "rotation": 90,
+        "type": "And"
+      },
+      {
+        "id": "d7cdc2a5-1791-4292-a850-44036e4ee854",
+        "position": {
+          "x": 45,
+          "y": -3
+        },
+        "properties": {},
+        "rotation": 270,
+        "type": "Driver"
+      },
+      {
+        "id": "4b0e20ef-4dec-40da-9fc3-452a6cd130ba",
+        "position": {
+          "x": 46,
+          "y": -3
+        },
+        "properties": {},
+        "rotation": 180,
+        "type": "Const"
+      },
+      {
+        "id": "e16d72a1-2705-4a26-88b7-4f445c2e3c83",
+        "position": {
+          "x": 43,
+          "y": 12
+        },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "BV": "_inf",
+            "CJO": 0,
+            "EG": 1.11,
+            "FC": 0.5,
+            "IBV": 0.001,
+            "IS": 1e-14,
+            "KF": 0,
+            "M": 0.5,
+            "N": 1,
+            "RS": 0,
+            "TT": 0,
+            "VJ": 1,
+            "XTI": 3
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "K": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          }
+        },
+        "rotation": 90,
+        "type": "Diode"
+      }
+    ],
+    "name": "buckbjtandbuf",
+    "traces": [
+      {
+        "domain": "analog",
+        "group": "probe",
+        "name": "node8",
+        "panelIndex": 0
+      },
+      {
+        "domain": "digital",
+        "group": "probe",
+        "name": "net2",
+        "panelIndex": 1
+      },
+      {
+        "domain": "digital",
+        "group": "probe",
+        "name": "net1",
+        "panelIndex": 0
+      }
+    ],
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 11
+          },
+          {
+            "x": 9,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 5
+          },
+          {
+            "x": 33,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 5
+          },
+          {
+            "x": 20,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 5
+          },
+          {
+            "x": 33,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 5
+          },
+          {
+            "x": 38,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 10
+          },
+          {
+            "x": 20,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 4
+          },
+          {
+            "x": 20,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 5
+          },
+          {
+            "x": 20,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 11
+          },
+          {
+            "x": 33,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 15
+          },
+          {
+            "x": 9,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 15
+          },
+          {
+            "x": 20,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 15
+          },
+          {
+            "x": 33,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 15
+          },
+          {
+            "x": 43,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 15
+          },
+          {
+            "x": 52,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 52,
+            "y": 15
+          },
+          {
+            "x": 58,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 13
+          },
+          {
+            "x": 20,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 20,
+            "y": 15
+          },
+          {
+            "x": 20,
+            "y": 16
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 9
+          },
+          {
+            "x": 4,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 58,
+            "y": 5
+          },
+          {
+            "x": 58,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 50,
+            "y": 5
+          },
+          {
+            "x": 52,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 52,
+            "y": 5
+          },
+          {
+            "x": 58,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 52,
+            "y": 7
+          },
+          {
+            "x": 52,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 58,
+            "y": 11
+          },
+          {
+            "x": 58,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 12
+          },
+          {
+            "x": 43,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 52,
+            "y": 11
+          },
+          {
+            "x": 52,
+            "y": 15
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 39,
+            "y": 9
+          },
+          {
+            "x": 39,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 40,
+            "y": 5
+          },
+          {
+            "x": 43,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 5
+          },
+          {
+            "x": 45,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 45,
+            "y": 5
+          },
+          {
+            "x": 46,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 8
+          },
+          {
+            "x": 43,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 21,
+            "y": 11
+          },
+          {
+            "x": 20,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 33,
+            "y": 10
+          },
+          {
+            "x": 34,
+            "y": 10
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 38,
+            "y": -1
+          },
+          {
+            "x": 38,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 40,
+            "y": 5
+          },
+          {
+            "x": 40,
+            "y": -1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 39,
+            "y": -4
+          },
+          {
+            "x": 39,
+            "y": -5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 39,
+            "y": -5
+          },
+          {
+            "x": 45,
+            "y": -5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 45,
+            "y": -4
+          },
+          {
+            "x": 45,
+            "y": -5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 45,
+            "y": -2
+          },
+          {
+            "x": 45,
+            "y": 5
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

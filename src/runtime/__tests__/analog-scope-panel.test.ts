@@ -8,6 +8,7 @@ import { ScopePanel } from "../analog-scope-panel.js";
 import { AnalogScopeBuffer } from "../analog-scope-buffer.js";
 import { MockCoordinator } from "@/test-utils/mock-coordinator.js";
 import type { SignalAddress } from "@/compile/types.js";
+import { PinDirection } from "@/core/pin.js";
 
 // ---------------------------------------------------------------------------
 // Shared signal addresses
@@ -15,7 +16,7 @@ import type { SignalAddress } from "@/compile/types.js";
 
 const VOLTAGE_ADDR: SignalAddress = { domain: "analog", nodeId: 3 };
 const VOLTAGE_ADDR2: SignalAddress = { domain: "analog", nodeId: 5 };
-const DIGITAL_ADDR: SignalAddress = { domain: "digital", netId: 0, bitWidth: 1 };
+const DIGITAL_ADDR: SignalAddress = { domain: "digital", netId: 0, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL };
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -96,8 +96,6 @@ export interface ConcreteCompiledCircuit extends CompiledCircuit {
   readonly delays: Uint32Array;
   /** Maps component index to its CircuitElement for debugging and micro-step UI. */
   readonly componentToElement: Map<number, CircuitElement>;
-  /** Maps label string to net ID for facade's label-based signal access. */
-  readonly labelToNetId: Map<string, number>;
   /** Maps Wire instance to net ID for the renderer's wire coloring. */
   readonly wireToNetId: Map<Wire, number>;
   /** Maps "{instanceId}:{pinLabel}" keys to net IDs for pin-level signal access. */

@@ -94,9 +94,19 @@ export function pnjlim(vnew: number, vold: number, vt: number, vcrit: number): n
 /**
  * MOSFET gate-source voltage limiting (fetlim).
  *
- * Clamps the change in Vgs per NR iteration to 0.5 V when both the old and
- * new voltages are above threshold (Vto), preventing oscillation in the
- * saturation-region transconductance equation.
+ * Three-zone algorithm from SPICE3f5/ngspice DEVfetlim (devsup.c):
+ *
+ *   Zone 1 — Deep ON (vold >= vto + 3.5):
+ *     Decreasing: clamp to max(-delta, vtstlo); floor at vto + 2
+ *     Increasing: clamp to +vtsthi
+ *
+ *   Zone 2 — Near threshold (vto <= vold < vto + 3.5):
+ *     Decreasing: floor at vto - 0.5
+ *     Increasing: cap at vto + 4
+ *
+ *   Zone 3 — OFF (vold < vto):
+ *     Decreasing: clamp to -vtsthi
+ *     Increasing toward threshold: clamp to vtstlo; hard cap at vto + 0.5
  *
  * @param vnew - Proposed new Vgs
  * @param vold - Previous Vgs
@@ -104,14 +114,74 @@ export function pnjlim(vnew: number, vold: number, vt: number, vcrit: number): n
  * @returns    - Voltage-limited new Vgs
  */
 export function fetlim(vnew: number, vold: number, vto: number): number {
-  const MAX_STEP = 0.5;
-  if (vnew > vto && vold > vto) {
-    const delta = vnew - vold;
-    if (delta > MAX_STEP) {
-      return vold + MAX_STEP;
+  const vtsthi = Math.abs(2 * (vold - vto)) + 2;
+  const vtstlo = Math.abs(vold - vto) + 1;
+  const vtox = vto + 3.5;
+  const delv = vnew - vold;
+
+  if (vold >= vto) {
+    // ON
+    if (vold >= vtox) {
+      // Deep on
+      if (delv <= 0) {
+        // Decreasing
+        if (vnew >= vtox) {
+          if (-delv > vtstlo) vnew = vold - vtstlo;
+        } else {
+          vnew = Math.max(vnew, vto + 2);
+        }
+      } else {
+        // Increasing
+        if (delv >= vtsthi) vnew = vold + vtsthi;
+      }
+    } else {
+      // Near threshold
+      if (delv <= 0) {
+        vnew = Math.max(vnew, vto - 0.5);
+      } else {
+        vnew = Math.min(vnew, vto + 4);
+      }
     }
-    if (delta < -MAX_STEP) {
-      return vold - MAX_STEP;
+  } else {
+    // OFF
+    if (delv <= 0) {
+      if (-delv > vtsthi) vnew = vold - vtsthi;
+    } else {
+      const vtemp = vto + 0.5;
+      if (vnew <= vtemp) {
+        if (delv > vtstlo) vnew = vold + vtstlo;
+      } else {
+        vnew = vtemp;
+      }
+    }
+  }
+  return vnew;
+}
+
+/**
+ * MOSFET drain-source voltage limiting (limvds).
+ *
+ * Prevents large Vds swings per NR iteration. Critical for switching
+ * circuits where Vds can swing across the full supply range.
+ *
+ * Algorithm from SPICE3f5/ngspice DEVlimvds (devsup.c).
+ *
+ * @param vnew - Proposed new Vds
+ * @param vold - Previous Vds
+ * @returns    - Voltage-limited new Vds
+ */
+export function limvds(vnew: number, vold: number): number {
+  if (vold >= 3.5) {
+    if (vnew > vold) {
+      vnew = Math.min(vnew, 3 * vold + 2);
+    } else if (vnew < 3.5) {
+      vnew = Math.max(vnew, 2);
+    }
+  } else {
+    if (vnew > vold) {
+      vnew = Math.min(vnew, 4);
+    } else {
+      vnew = Math.max(vnew, -0.5);
     }
   }
   return vnew;
@@ -130,11 +200,14 @@ export function fetlim(vnew: number, vold: number, vto: number): number {
  *  3. Stamps nonlinear contributions at the current operating point
  *  4. Finalizes and factors the matrix
  *  5. Solves for updated voltages
- *  6. Updates operating points — elements apply voltage limiting and write
- *     limited voltages back into the solution vector, and update their
- *     linearized companion model (geq/ieq) for the next iteration
- *  7. Checks global node-voltage convergence and element-specific checks
- *  8. Records a ConvergenceTrace entry
+ *  6. Node damping (ngspice heuristic): if max voltage change > 10 V, scale
+ *     all updates down (min factor 0.1) to prevent runaway steps
+ *  7. Backtracking line search: if the max voltage change is growing vs the
+ *     previous iteration, halve the step to break divergence
+ *  8. Updates operating points — elements apply voltage limiting and update
+ *     their linearized companion model (geq/ieq) for the next iteration
+ *  9. Checks global node-voltage convergence and element-specific checks
+ * 10. Records a ConvergenceTrace entry
  *
  * Non-convergence is returned via the result object, never thrown. The caller
  * (DC operating point solver) decides the appropriate fallback strategy.
@@ -149,6 +222,7 @@ export function newtonRaphson(opts: NROptions): NRResult {
   const voltages = new Float64Array(matrixSize);
   const prevVoltages = new Float64Array(matrixSize);
   const trace: ConvergenceTrace[] = [];
+  let prevIterMaxChange = Infinity; // max voltage change from the previous iteration (for line search)
 
   // Initialize from initial guess if provided
   if (opts.initialGuess) {
@@ -197,9 +271,47 @@ export function newtonRaphson(opts: NROptions): NRResult {
       return { converged: true, iterations: iteration + 1, voltages, trace };
     }
 
-    // 5. Update operating points: elements apply voltage limiting and write
-    //    limited junction voltages back into voltages[], then recompute
-    //    their companion model (geq/ieq) for the next stampNonlinear.
+    // 5a. Node damping (ngspice heuristic from niiter.c):
+    //     If any voltage node changed by more than 10V, scale ALL updates
+    //     by 10/maxDelta. Minimum scale factor 0.1.
+    //     Only active after first iteration (need a reference point).
+    if (iteration > 0) {
+      let maxDelta = 0;
+      for (let i = 0; i < matrixSize; i++) {
+        const delta = Math.abs(voltages[i] - prevVoltages[i]);
+        if (delta > maxDelta) maxDelta = delta;
+      }
+      if (maxDelta > 10) {
+        const dampFactor = Math.max(10 / maxDelta, 0.1);
+        for (let i = 0; i < matrixSize; i++) {
+          voltages[i] = prevVoltages[i] + dampFactor * (voltages[i] - prevVoltages[i]);
+        }
+      }
+    }
+
+    // 5b. Backtracking line search: activates only when the NR step is GROWING
+    //     (max voltage change this iteration exceeds the previous iteration).
+    //     A growing step indicates divergence, not convergence. One halving
+    //     is applied as a one-shot perturbation to redirect toward convergence.
+    //     Only active after iteration 1 to allow the first step to be unrestricted.
+    if (iteration >= 2) {
+      let maxChange = 0;
+      for (let i = 0; i < matrixSize; i++) {
+        maxChange = Math.max(maxChange, Math.abs(voltages[i] - prevVoltages[i]));
+      }
+      if (maxChange > prevIterMaxChange && maxChange > abstol * 100) {
+        // Step is growing: halve to break divergence
+        for (let i = 0; i < matrixSize; i++) {
+          voltages[i] = prevVoltages[i] + 0.5 * (voltages[i] - prevVoltages[i]);
+        }
+        prevIterMaxChange = maxChange * 0.5;
+      } else {
+        prevIterMaxChange = maxChange;
+      }
+    }
+
+    // 5c. Update operating points: elements apply voltage limiting, recompute
+    //     their companion model (geq/ieq) for the next stampNonlinear.
     assembler.updateOperatingPoints(elements, voltages);
 
     // 6. Check global node-voltage convergence criterion

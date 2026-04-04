@@ -8,6 +8,9 @@
 import { Circuit, Wire } from '../core/circuit.js';
 import type { CircuitMetadata } from '../core/circuit.js';
 import type { ComponentRegistry, ModelEntry } from '../core/registry.js';
+import { resolveComponentDef } from '../core/resolve-component.js';
+import { createLiveDefinition } from '../components/subcircuit/subcircuit.js';
+import type { ShapeMode } from '../components/subcircuit/shape-renderer.js';
 import { PropertyBag } from '../core/properties.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { Rotation } from '../core/pin.js';
@@ -149,6 +152,7 @@ function deserializeDtsCircuit(
   dtsCircuit: DtsCircuit,
   registry: ComponentRegistry,
   circuitModels?: Record<string, Record<string, ModelEntry>>,
+  subcircuitDefs?: Map<string, import('../components/subcircuit/subcircuit.js').SubcircuitDefinition>,
 ): Circuit {
   const metadata: Partial<CircuitMetadata> = {
     name: dtsCircuit.name,
@@ -198,8 +202,12 @@ function deserializeDtsCircuit(
 
   const circuit = new Circuit(metadata);
 
+  if (subcircuitDefs !== undefined && subcircuitDefs.size > 0) {
+    circuit.metadata.subcircuits = subcircuitDefs;
+  }
+
   for (const savedEl of dtsCircuit.elements) {
-    const element = createElement(savedEl, registry, circuitModels);
+    const element = createElement(savedEl, registry, circuit, circuitModels);
     circuit.addElement(element);
   }
 
@@ -214,13 +222,14 @@ function deserializeDtsCircuit(
 function createElement(
   savedEl: DtsElement,
   registry: ComponentRegistry,
+  circuit: Circuit,
   circuitModels?: Record<string, Record<string, ModelEntry>>,
 ): import('../core/element.js').CircuitElement {
-  const def = registry.get(savedEl.type);
+  const def = resolveComponentDef(savedEl.type, circuit, registry);
   if (def === undefined) {
     throw new Error(
       `deserializeDts: unknown component type "${savedEl.type}". ` +
-        `Register it in the ComponentRegistry before loading.`,
+        `Register it in the ComponentRegistry or add it to circuit.metadata.subcircuits before loading.`,
     );
   }
 
@@ -264,12 +273,14 @@ function createWire(savedWire: DtsWire): Wire {
 // ---------------------------------------------------------------------------
 
 /**
- * Parse a .dts JSON string back to Circuit objects.
+ * Parse a .dts JSON string back to a Circuit object.
  *
- * Returns the main circuit and a map of subcircuit names to Circuit objects.
- * The subcircuits map is empty when the document has no `subcircuitDefinitions`.
- * Accepts both `format: 'dts'` (current) and `format: 'digb'`.
+ * Subcircuit definitions embedded in `subcircuitDefinitions` are deserialized
+ * and attached to `circuit.metadata.subcircuits` so elements can resolve their
+ * types during construction. Accepts both `format: 'dts'` (current) and
+ * `format: 'digb'`.
  *
+ * @returns The fully populated Circuit with subcircuit definitions on metadata.
  * @throws Error if the JSON is malformed or the document fails validation.
  * @throws Error if any component type is not found in the registry.
  * @throws Error if the document contains obsolete fields (namedParameterSets,
@@ -278,7 +289,7 @@ function createWire(savedWire: DtsWire): Wire {
 export function deserializeDts(
   json: string,
   registry: ComponentRegistry,
-): { circuit: Circuit; subcircuits: Map<string, Circuit> } {
+): Circuit {
   const raw = JSON.parse(json) as unknown;
   const doc = validateDtsDocument(raw);
 
@@ -287,14 +298,23 @@ export function deserializeDts(
       ? rehydrateModels(doc.models, registry)
       : undefined;
 
-  const circuit = deserializeDtsCircuit(doc.circuit, registry, circuitModels);
-
-  const subcircuits = new Map<string, Circuit>();
+  // Deserialize subcircuit definitions so they are available as
+  // circuit-scoped definitions when the main circuit's elements are created.
+  const subcircuitDefs = new Map<string, import('../components/subcircuit/subcircuit.js').SubcircuitDefinition>();
   if (doc.subcircuitDefinitions !== undefined) {
     for (const [name, subDef] of Object.entries(doc.subcircuitDefinitions)) {
-      subcircuits.set(name, deserializeDtsCircuit(subDef, registry, circuitModels));
+      const subCircuit = deserializeDtsCircuit(subDef, registry, circuitModels);
+      const shapeType = (subCircuit.metadata.shapeType || 'DEFAULT') as ShapeMode;
+      subcircuitDefs.set(name, createLiveDefinition(subCircuit, shapeType, name));
     }
   }
 
-  return { circuit, subcircuits };
+  // Deserialize the main circuit, passing subcircuit defs so they are
+  // set on circuit.metadata before elements are created. This lets
+  // resolveComponentDef() find subcircuit types during createElement().
+  const circuit = deserializeDtsCircuit(
+    doc.circuit, registry, circuitModels, subcircuitDefs,
+  );
+
+  return circuit;
 }

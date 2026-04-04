@@ -4,6 +4,7 @@
 
 import { Circuit, Wire } from '../core/circuit.js';
 import type { ComponentRegistry, ComponentDefinition, AttributeMapping } from '../core/registry.js';
+import { resolveComponentDef } from '../core/resolve-component.js';
 import type { PropertyValue } from '../core/properties.js';
 import { PropertyBag, PropertyType } from '../core/properties.js';
 import type { Pin } from '../core/pin.js';
@@ -175,7 +176,7 @@ export class CircuitBuilder {
     typeName: string,
     props?: Record<string, PropertyValue>
   ): CircuitElement {
-    const definition = this.registry.get(typeName);
+    const definition = resolveComponentDef(typeName, circuit, this.registry);
     if (!definition) {
       const allNames = this.registry.getAll().map((d) => d.name);
       const suggestion = findClosestMatch(typeName, allNames);

@@ -40,7 +40,7 @@
 
 import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
+import type { Diagnostic } from "../../compile/types.js";
 import { PropertyBag } from "../../core/properties.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -102,7 +102,7 @@ export class AnalogFuseElement implements AnalogElement {
   private _blown: boolean = false;
   private _blownDiagEmitted: boolean = false;
 
-  private readonly _emitDiagnostic: (diag: SolverDiagnostic) => void;
+  private readonly _emitDiagnostic: (diag: Diagnostic) => void;
   private readonly _onStateChange: ((blown: boolean, thermalRatio: number) => void) | null;
 
   /**
@@ -118,7 +118,7 @@ export class AnalogFuseElement implements AnalogElement {
     rCold: number,
     rBlown: number,
     i2tRating: number,
-    emitDiagnostic?: (diag: SolverDiagnostic) => void,
+    emitDiagnostic?: (diag: Diagnostic) => void,
     onStateChange?: (blown: boolean, thermalRatio: number) => void,
   ) {
     this.pinNodeIds = pinNodeIds;

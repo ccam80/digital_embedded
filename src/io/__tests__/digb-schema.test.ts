@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { validateDtsDocument } from '../dts-schema.js';
-import { serializeCircuit, serializeWithSubcircuits } from '../dts-serializer.js';
+import { serializeCircuit } from '../dts-serializer.js';
+import { createLiveDefinition } from '../../components/subcircuit/subcircuit.js';
 import { deserializeDts } from '../dts-deserializer.js';
 import { Circuit, Wire } from '../../core/circuit.js';
 import { PropertyBag } from '../../core/properties.js';
@@ -115,7 +116,7 @@ describe('serialize', () => {
     circuit.addWire(new Wire({ x: 120, y: 200 }, { x: 280, y: 200 }));
 
     const json1 = serializeCircuit(circuit);
-    const { circuit: restored } = deserializeDts(json1, registry);
+    const restored = deserializeDts(json1, registry);
     const json2 = serializeCircuit(restored);
 
     expect(json1).toBe(json2);
@@ -137,20 +138,21 @@ describe('serialize', () => {
     const sub2 = new Circuit({ name: 'Sub2' });
     sub2.addElement(makeElement('Out', 'id-s2', 20, 20));
 
-    const subcircuits = new Map<string, Circuit>([
-      ['Sub1', sub1],
-      ['Sub2', sub2],
+    main.metadata.subcircuits = new Map([
+      ['Sub1', createLiveDefinition(sub1, 'DEFAULT', 'Sub1')],
+      ['Sub2', createLiveDefinition(sub2, 'DEFAULT', 'Sub2')],
     ]);
 
-    const json = serializeWithSubcircuits(main, subcircuits);
-    const { circuit: restoredMain, subcircuits: restoredSubs } = deserializeDts(json, registry);
+    const json = serializeCircuit(main);
+    const restoredMain = deserializeDts(json, registry);
 
     expect(restoredMain.metadata.name).toBe('Main');
+    const restoredSubs = restoredMain.metadata.subcircuits!;
     expect(restoredSubs.size).toBe(2);
     expect(restoredSubs.has('Sub1')).toBe(true);
     expect(restoredSubs.has('Sub2')).toBe(true);
-    expect(restoredSubs.get('Sub1')!.metadata.name).toBe('Sub1');
-    expect(restoredSubs.get('Sub2')!.metadata.name).toBe('Sub2');
+    expect(restoredSubs.get('Sub1')!.circuit.metadata.name).toBe('Sub1');
+    expect(restoredSubs.get('Sub2')!.circuit.metadata.name).toBe('Sub2');
   });
 
   // -------------------------------------------------------------------------
@@ -188,7 +190,7 @@ describe('serialize', () => {
     circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 10, y: 10 }));
 
     const json = serializeCircuit(circuit);
-    const { circuit: restored } = deserializeDts(json, registry);
+    const restored = deserializeDts(json, registry);
 
     expect(restored.metadata.name).toBe('Full');
     expect(restored.metadata.description).toBe('A circuit with all fields');

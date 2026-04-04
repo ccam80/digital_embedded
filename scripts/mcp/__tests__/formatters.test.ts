@@ -188,13 +188,23 @@ describe('formatNetlist', () => {
 
   it('shows [N-bit, M pins] for digital nets', () => {
     const netlist: Netlist = {
-      components: [],
+      components: [
+        {
+          index: 0,
+          typeId: 'Register',
+          label: 'reg',
+          instanceId: 'reg1',
+          pins: [makeDigitalPinDescriptor('out', 8, 'OUTPUT'), makeDigitalPinDescriptor('in', 8, 'INPUT')],
+          properties: {},
+          modelKey: 'behavioral',
+        } as ComponentDescriptor,
+      ],
       nets: [
         {
           netId: 2,
           domain: 'digital',
           bitWidth: 8,
-          pins: [makeDigitalPin('reg', 'out'), makeDigitalPin('bus', 'in')],
+          pins: [makeDigitalPin('reg', 'out'), makeDigitalPin('reg', 'in')],
         } as NetDescriptor,
       ],
       diagnostics: [],
@@ -219,9 +229,19 @@ describe('formatNetlist', () => {
     expect(result).toContain('R1:A [terminal]');
   });
 
-  it('shows [digital] for digital net pins', () => {
+  it('shows [N-bit, DIRECTION] for digital net pins', () => {
     const netlist: Netlist = {
-      components: [],
+      components: [
+        {
+          index: 0,
+          typeId: 'And',
+          label: 'gate',
+          instanceId: 'g1',
+          pins: [makeDigitalPinDescriptor('out', 1, 'OUTPUT')],
+          properties: {},
+          modelKey: 'digital',
+        } as ComponentDescriptor,
+      ],
       nets: [
         {
           netId: 2,
@@ -233,7 +253,8 @@ describe('formatNetlist', () => {
       diagnostics: [],
     };
     const result = formatNetlist(netlist);
-    expect(result).toContain('gate:out [digital]');
+    expect(result).toContain('gate:out [1-bit, OUTPUT]');
+    expect(result).not.toContain('gate:out [digital]');
   });
 
   it('filters out nets with zero pins', () => {

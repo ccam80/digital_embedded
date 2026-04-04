@@ -10,13 +10,8 @@
  */
 import { DefaultSimulatorFacade } from '../src/headless/default-facade.js';
 import { createDefaultRegistry } from '../src/components/register-all.js';
-import { scan74xxPinMap } from '../src/io/dig-pin-scanner.js';
-import { join } from 'path';
 
-const LIB_74XX_DIR = join(process.cwd(), "ref", "Digital", "src", "main", "dig", "lib", "DIL Chips", "74xx");
-let pinMap74xx: Map<string, any>;
-try { pinMap74xx = scan74xxPinMap(LIB_74XX_DIR); } catch { pinMap74xx = new Map(); }
-const registry = createDefaultRegistry(pinMap74xx);
+const registry = createDefaultRegistry();
 
 // ---------------------------------------------------------------------------
 // Circuit XML definitions — matching exactly what the E2E tests build

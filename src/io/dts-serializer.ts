@@ -274,34 +274,14 @@ export function serializeCircuit(
     ...buildModelFields(circuit),
   };
 
-  return JSON.stringify(doc, sortedReplacer, 2);
-}
-
-/**
- * Serialize a Circuit together with its subcircuit definitions to a .dts
- * JSON string.
- *
- * The main circuit is placed under `circuit`; each subcircuit in the map is
- * placed under `subcircuitDefinitions` keyed by its name. The result is a
- * fully self-contained document — no external files are required to load it.
- *
- */
-export function serializeWithSubcircuits(
-  circuit: Circuit,
-  subcircuits: Map<string, Circuit>,
-): string {
-  const subcircuitDefinitions: Record<string, DtsCircuit> = {};
-  for (const [name, sub] of subcircuits) {
-    subcircuitDefinitions[name] = circuitToDtsCircuit(sub);
+  // Include circuit-scoped subcircuit definitions
+  if (circuit.metadata.subcircuits?.size) {
+    const subcircuitDefinitions: Record<string, DtsCircuit> = {};
+    for (const [name, subDef] of circuit.metadata.subcircuits) {
+      subcircuitDefinitions[name] = circuitToDtsCircuit(subDef.circuit);
+    }
+    doc.subcircuitDefinitions = subcircuitDefinitions;
   }
-
-  const doc: DtsDocument = {
-    format: 'dts',
-    version: 1,
-    circuit: circuitToDtsCircuit(circuit),
-    subcircuitDefinitions,
-    ...buildModelFields(circuit),
-  };
 
   return JSON.stringify(doc, sortedReplacer, 2);
 }

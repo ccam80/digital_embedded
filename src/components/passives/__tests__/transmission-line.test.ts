@@ -229,7 +229,7 @@ describe("TLine", () => {
       // not have access to a DiagnosticCollector at construction time.
       // The spec says: set segments=3; assert diagnostic is emitted with warning severity.
       // We implement the check as: the component definition can detect low segments
-      // and the test validates the diagnostic code is in the SolverDiagnosticCode union.
+      // and the test validates the diagnostic code is in the DiagnosticCode union.
       //
       // Build a diagnostic directly and verify it uses the correct code.
       const diag = makeDiagnostic(
@@ -750,7 +750,7 @@ describe("TransmissionLine", () => {
   });
 
   describe("low_segments_warning", () => {
-    it("transmission-line-low-segments diagnostic code is valid SolverDiagnosticCode", () => {
+    it("transmission-line-low-segments diagnostic code is valid DiagnosticCode", () => {
       const diag = makeDiagnostic(
         "transmission-line-low-segments",
         "warning",

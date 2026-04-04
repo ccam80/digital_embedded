@@ -3,8 +3,8 @@
  *
  * When the loader encounters an elementName not in the built-in registry,
  * it uses the FileResolver to fetch the corresponding .dig file, parses it,
- * recursively loads any subcircuits it references, then registers a new
- * ComponentDefinition in the registry so the element can be instantiated.
+ * recursively loads any subcircuits it references, then accumulates the
+ * resulting SubcircuitDefinition into the circuit-scoped collectedDefs map.
  *
  * Safety:
  *   - Cycle detection: if a circuit appears in its own ancestor chain, throws
@@ -21,51 +21,9 @@ import { loadDigCircuit } from "./dig-loader.js";
 import type { FileResolver } from "./file-resolver.js";
 import { CacheResolver, ResolverNotFoundError } from "./file-resolver.js";
 
-import { registerSubcircuit, createLiveDefinition } from "../components/subcircuit/subcircuit.js";
+import { createLiveDefinition } from "../components/subcircuit/subcircuit.js";
 import type { SubcircuitDefinition } from "../components/subcircuit/subcircuit.js";
 import { MAX_DEPTH } from "../core/constants.js";
-
-// ---------------------------------------------------------------------------
-// SubcircuitCache
-// ---------------------------------------------------------------------------
-
-/**
- * In-memory cache of loaded subcircuit Circuit definitions, keyed by name.
- *
- * Shared across calls to loadWithSubcircuits() so that multiple references
- * to the same subcircuit within one load session only trigger one resolve()
- * call. Cleared via clearSubcircuitCache() for checkpoint jumping.
- */
-const _subcircuitCache = new Map<string, Circuit>();
-
-/**
- * Clear all cached subcircuit definitions.
- *
- * Call when jumping to a different checkpoint so stale definitions are not
- * reused.
- */
-export function clearSubcircuitCache(): void {
-  _subcircuitCache.clear();
-}
-
-/**
- * Invalidate a single subcircuit from the cache.
- *
- * Call when a subcircuit .dig file is modified or reloaded so the next
- * loadWithSubcircuits() re-resolves and re-registers the definition.
- * The registry entry is NOT removed — re-registration via registerOrUpdate()
- * will replace it with the new definition while preserving the typeId.
- */
-export function invalidateSubcircuit(name: string): void {
-  _subcircuitCache.delete(name);
-}
-
-/**
- * Return the number of cached subcircuit definitions (for testing).
- */
-export function subcircuitCacheSize(): number {
-  return _subcircuitCache.size;
-}
 
 // ---------------------------------------------------------------------------
 // XML content cache (tracks resolver call counts for testing)
@@ -87,13 +45,16 @@ export function subcircuitCacheSize(): number {
  * For each element whose name is not found in the built-in registry:
  *   1. Use resolver.resolve(name) to get the .dig XML
  *   2. Parse and recursively load the subcircuit (cycle + depth checks)
- *   3. Register a new ComponentDefinition in the registry
+ *   3. Accumulate the SubcircuitDefinition into the circuit-scoped collectedDefs map
  *   4. Cache the loaded Circuit so duplicate references are free
+ *
+ * The collected definitions are attached to circuit.metadata.subcircuits so
+ * subcircuit elements can resolve their definitions without touching the global registry.
  *
  * @param xml       The root .dig XML string
  * @param resolver  FileResolver used for unknown element names
- * @param registry  ComponentRegistry to look up and extend with subcircuits
- * @returns         Populated Circuit with all subcircuits registered
+ * @param registry  ComponentRegistry to look up built-in component types
+ * @returns         Populated Circuit with subcircuit definitions on circuit.metadata
  * @throws          On circular references, depth limit exceeded, or resolver failures
  */
 export async function loadWithSubcircuits(
@@ -102,7 +63,15 @@ export async function loadWithSubcircuits(
   registry: ComponentRegistry,
 ): Promise<Circuit> {
   const xmlCache = new CacheResolver();
-  return loadRecursive(xml, resolver, registry, xmlCache, [], 0);
+  const collectedDefs = new Map<string, SubcircuitDefinition>();
+  const circuit = await loadRecursive(xml, resolver, registry, xmlCache, [], 0, collectedDefs);
+
+  // Attach all resolved subcircuit definitions to the circuit's metadata
+  if (collectedDefs.size > 0) {
+    circuit.metadata.subcircuits = collectedDefs;
+  }
+
+  return circuit;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,24 +85,27 @@ async function loadRecursive(
   xmlCache: CacheResolver,
   loadingStack: string[],
   depth: number,
+  collectedDefs?: Map<string, SubcircuitDefinition>,
 ): Promise<Circuit> {
   // Parse the XML to discover element names before attempting to load
   const parsed = parseDigXml(xml);
 
-  // Collect unknown element names
+  // Collect unknown element names — check both global registry and
+  // circuit-scoped subcircuit defs accumulated during this load session.
   const unknownNames = new Set<string>();
   for (const ve of parsed.visualElements) {
-    if (registry.get(ve.elementName) === undefined) {
+    if (registry.get(ve.elementName) === undefined &&
+        !(collectedDefs?.has(ve.elementName))) {
       unknownNames.add(ve.elementName);
     }
   }
 
-  // Resolve and register all unknown subcircuits.
+  // Resolve all unknown subcircuits into the collectedDefs accumulator.
   // If a name can't be resolved (e.g. Digital built-in like GenericInitCode),
   // skip it — loadDigCircuit will also skip unregistered elements gracefully.
   for (const name of unknownNames) {
     try {
-      await resolveAndRegister(name, resolver, registry, xmlCache, loadingStack, depth);
+      await resolveAndCollect(name, resolver, registry, xmlCache, loadingStack, depth, collectedDefs!);
     } catch (e) {
       if (e instanceof ResolverNotFoundError) {
         console.warn(`Skipping unresolvable element "${name}" (not a subcircuit file)`);
@@ -143,24 +115,23 @@ async function loadRecursive(
     }
   }
 
-  // Now all elements should be registered — load the circuit normally
-  return loadDigCircuit(parsed, registry);
+  // Load the circuit, passing accumulated subcircuit defs so they are
+  // set on circuit.metadata before elements are created. This lets
+  // resolveComponentDef() find subcircuit types without the global registry.
+  return loadDigCircuit(parsed, registry, collectedDefs);
 }
 
-async function resolveAndRegister(
+async function resolveAndCollect(
   name: string,
   resolver: FileResolver,
   registry: ComponentRegistry,
   xmlCache: CacheResolver,
   loadingStack: string[],
   depth: number,
+  collectedDefs: Map<string, SubcircuitDefinition>,
 ): Promise<void> {
-  // Return cached circuit if already loaded (and re-register via registerOrUpdate)
-  if (_subcircuitCache.has(name)) {
-    const cachedDef = _subcircuitCache.get(name)!;
-    registerSubcircuitDefinition(name, cachedDef, registry);
-    return;
-  }
+  // Already collected during this load session — skip
+  if (collectedDefs.has(name)) return;
 
   // Cycle detection
   if (loadingStack.includes(name)) {
@@ -192,37 +163,15 @@ async function resolveAndRegister(
     xmlCache,
     [...loadingStack, name],
     depth + 1,
+    collectedDefs,
   );
 
-  // Cache the loaded definition
-  _subcircuitCache.set(name, subcircuit);
-
-  // Register or update in the registry (re-registration replaces the old
-  // definition while preserving the typeId — Step 6 of the refactor).
-  registerSubcircuitDefinition(name, subcircuit, registry);
-}
-
-/**
- * Register a loaded subcircuit as a ComponentDefinition in the registry.
- *
- * Derives interface pins from the circuit's In/Out elements and registers
- * using the proper SubcircuitElement factory so subcircuits render with
- * their chip shape and pins.
- *
- * Uses registerOrUpdate so that re-loading a modified subcircuit replaces
- * the old definition while preserving the typeId.
- */
-function registerSubcircuitDefinition(
-  name: string,
-  definition: Circuit,
-  registry: ComponentRegistry,
-): void {
-  const shapeType = definition.metadata.shapeType || "DEFAULT";
+  // Collect the definition for circuit-scoped storage — no global registry mutation.
+  const shapeType = subcircuit.metadata.shapeType || "DEFAULT";
   const subDef = createLiveDefinition(
-    definition,
+    subcircuit,
     shapeType as SubcircuitDefinition["shapeMode"],
     name,
   );
-
-  registerSubcircuit(registry, name, subDef);
+  collectedDefs.set(name, subDef);
 }

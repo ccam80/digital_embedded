@@ -254,7 +254,6 @@ function buildClockDFFCircuit(
     sccSnapshotBuffer: new Uint32Array(netCount),
     delays: new Uint32Array(componentCount).fill(10),
     componentToElement,
-    labelToNetId: new Map(),
     wireToNetId: new Map<Wire, number>(),
     pinNetMap: new Map(),
     resetComponentIndices: new Uint32Array(0),

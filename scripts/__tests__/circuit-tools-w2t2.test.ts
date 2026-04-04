@@ -104,18 +104,27 @@ describe('circuit_list include_pins', () => {
   });
 
   it('category description includes ANALOG in the tool schema', () => {
-    const tools = (server as unknown as { _registeredTools: Record<string, { inputSchema: unknown; description?: string }> })._registeredTools;
+    const tools = (server as unknown as { _registeredTools: Record<string, { inputSchema: { shape?: Record<string, { _def?: { description?: string } }> } }> })._registeredTools;
     const circuitList = tools['circuit_list'];
     expect(circuitList).toBeDefined();
+    // The category field description must mention ANALOG as an example category
+    const categoryField = circuitList.inputSchema?.shape?.['category'];
+    const description = categoryField?._def?.description ?? '';
+    expect(description).toContain('ANALOG');
   });
 
-  it('ANALOG category filter returns components when ANALOG category exists', async () => {
+  it('ANALOG category filter returns no-components message when ANALOG category does not exist', async () => {
     const allDefs = registry.getAll();
     const hasAnalog = allDefs.some(d => d.category?.toUpperCase() === 'ANALOG');
     if (hasAnalog) {
       const output = await callTool('circuit_list', { category: 'ANALOG' });
       expect(output).not.toContain('↓');
       expect(output).not.toContain('↑');
+    } else {
+      // ANALOG is not a registered category — the tool must say so, not silently return nothing
+      const output = await callTool('circuit_list', { category: 'ANALOG' });
+      expect(output).toContain('No components found');
+      expect(output).toContain('ANALOG');
     }
   });
 });
@@ -178,9 +187,14 @@ describe('circuit_compile analog tool suggestions', () => {
 
 describe('circuit_patch description includes analog example', () => {
   it('patch tool schema description includes resistor analog example', () => {
-    const tools = (server as unknown as { _registeredTools: Record<string, { description?: string; inputSchema?: unknown }> })._registeredTools;
+    const tools = (server as unknown as { _registeredTools: Record<string, { description?: string; inputSchema: { shape?: Record<string, { _def?: { description?: string } }> } }> })._registeredTools;
     const patchTool = tools['circuit_patch'];
     expect(patchTool).toBeDefined();
+    // The ops field description must include the analog resistor example (R1, resistance)
+    const opsField = patchTool.inputSchema?.shape?.['ops'];
+    const opsDescription = opsField?._def?.description ?? '';
+    expect(opsDescription).toContain('R1');
+    expect(opsDescription).toContain('resistance');
   });
 });
 

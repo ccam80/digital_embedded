@@ -2,7 +2,7 @@
  * Diagnostic emission and collection infrastructure for the analog solver.
  *
  * The `DiagnosticCollector` class provides the runtime machinery for emitting,
- * collecting, and dispatching `SolverDiagnostic` events produced by the
+ * collecting, and dispatching `Diagnostic` events produced by the
  * Newton-Raphson loop, DC operating point solver, and timestep controller.
  *
  * Diagnostics are collected synchronously and dispatched to all registered
@@ -33,7 +33,7 @@ export interface ConvergenceTrace {
 }
 
 /**
- * Collects and dispatches `SolverDiagnostic` events emitted by the analog solver.
+ * Collects and dispatches `Diagnostic` events emitted by the analog solver.
  *
  * - `emit()` stores a diagnostic and synchronously calls all registered listeners
  * - `onDiagnostic()` registers a listener callback

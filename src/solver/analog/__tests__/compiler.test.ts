@@ -306,16 +306,19 @@ describe("AnalogCompiler", () => {
 
     const labelIn:  Map<string, PropertyValue> = new Map([["label", "V_in"]]);
     const labelOut: Map<string, PropertyValue> = new Map([["label", "V_mid"]]);
+    // AnalogR was NOT in the old whitelist — it must be discoverable via labelToNodeId.
+    // Spec acceptance criterion: "A labeled resistor's node voltage is discoverable via labelToNodeId"
+    const labelR: Map<string, PropertyValue> = new Map([["label", "R_mid"]]);
 
     // Include a true analog element (AnalogVs + AnalogR) so that Ground
     // touches an analog-domain connectivity group and participates in the
     // analog partition. Without them, Ground is excluded (neutral +
     // touchesAnalog check) and node numbering has no ground reference.
-    const vs   = makeElement("AnalogVs", "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }], new Map(), registry);
-    const r1   = makeElement("AnalogR",  "r1",   [{ x: 10, y: 0 }, { x: 20, y: 0 }], new Map(), registry);
-    const inEl  = makeElement("In",     "in1",  [{ x: 10, y: 0 }], labelIn, registry);
-    const outEl = makeElement("Out",    "out1", [{ x: 20, y: 0 }], labelOut, registry);
-    const gnd   = makeElement("Ground", "gnd1", [{ x: 0,  y: 0 }], new Map(), registry);
+    const vs    = makeElement("AnalogVs", "vs1",  [{ x: 10, y: 0 }, { x: 0, y: 0 }], new Map(), registry);
+    const r1    = makeElement("AnalogR",  "r1",   [{ x: 10, y: 0 }, { x: 20, y: 0 }], labelR, registry);
+    const inEl  = makeElement("In",      "in1",  [{ x: 10, y: 0 }], labelIn, registry);
+    const outEl = makeElement("Out",     "out1", [{ x: 20, y: 0 }], labelOut, registry);
+    const gnd   = makeElement("Ground",  "gnd1", [{ x: 0,  y: 0 }], new Map(), registry);
 
     circuit.addElement(vs);
     circuit.addElement(r1);
@@ -334,6 +337,12 @@ describe("AnalogCompiler", () => {
     // Both labeled nodes should be non-ground
     expect(compiled.labelToNodeId.get("V_in")).toBeGreaterThan(0);
     expect(compiled.labelToNodeId.get("V_mid")).toBeGreaterThan(0);
+
+    // Spec: a labeled resistor (AnalogR) — not in the old whitelist — must also
+    // appear in labelToNodeId so its node voltage is discoverable at runtime.
+    expect(compiled.labelToNodeId.has("R_mid")).toBe(true);
+    // The resistor sits at x=10 (node >0), so its mapped node is non-ground
+    expect(compiled.labelToNodeId.get("R_mid")).toBeGreaterThan(0);
   });
 
   it("detects_floating_node", () => {

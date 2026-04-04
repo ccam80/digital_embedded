@@ -18,7 +18,7 @@
 import { Circuit } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
 import type { ComponentRegistry } from "../../core/registry.js";
-import type { SolverDiagnostic } from "../../core/analog-engine-interface.js";
+import type { Diagnostic } from "../../compile/types.js";
 import { pinWorldPosition } from "../../core/pin.js";
 import type { ResolvedPin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
@@ -122,7 +122,7 @@ function resolveSubcircuitModels(
   partition: SolverPartition,
   runtimeModels: Record<string, MnaSubcircuitNetlist>,
   registry: ComponentRegistry,
-  diagnostics: import("../../core/analog-engine-interface.js").SolverDiagnostic[],
+  diagnostics: import("../../core/analog-engine-interface.js").Diagnostic[],
 ): void {
   for (const pc of partition.components) {
     const def = pc.definition;
@@ -626,7 +626,7 @@ type PassAPartitionResult = {
 function runPassA_partition(
   partition: SolverPartition,
   externalNodeCount: number,
-  _diagnostics: SolverDiagnostic[],
+  _diagnostics: Diagnostic[],
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
   runtimeModelMap?: Record<string, Record<string, ModelEntry>>,
 ): PassAPartitionResult {
@@ -689,7 +689,7 @@ function runPassA_partition(
 function validateTopologyAndEmitDiagnostics(
   topologyInfo: Array<{ nodeIds: number[]; isBranch: boolean; typeHint: string; label: string }>,
   totalNodeCount: number,
-  diagnostics: SolverDiagnostic[],
+  diagnostics: Diagnostic[],
 ): void {
   if (totalNodeCount > 0) {
     const weakNodes = detectWeakNodes(topologyInfo, totalNodeCount);
@@ -822,7 +822,7 @@ function validateTopologyAndEmitDiagnostics(
  */
 function buildAnalogNodeMapFromPartition(
   partition: SolverPartition,
-  diagnostics: SolverDiagnostic[],
+  diagnostics: Diagnostic[],
 ): {
   nodeCount: number;
   groupToNodeId: Map<number, number>;
@@ -971,7 +971,7 @@ export function compileAnalogPartition(
   digitalPinLoading: "cross-domain" | "all" | "none" = "cross-domain",
   perNetLoadingOverrides?: ReadonlyMap<number, "loaded" | "ideal">,
 ): ConcreteCompiledAnalogCircuit {
-  const diagnostics: SolverDiagnostic[] = [];
+  const diagnostics: Diagnostic[] = [];
 
   // Build node map from partition groups
   const {

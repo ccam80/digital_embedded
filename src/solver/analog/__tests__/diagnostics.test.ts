@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { DiagnosticCollector, makeDiagnostic, type ConvergenceTrace } from "../diagnostics.js";
-import type { SolverDiagnostic } from "../../../core/analog-engine-interface.js";
+import type { Diagnostic } from "../../../compile/types.js";
 
 describe("DiagnosticCollector", () => {
   let collector: DiagnosticCollector;
@@ -21,7 +21,7 @@ describe("DiagnosticCollector", () => {
       collector.onDiagnostic(callback1);
       collector.onDiagnostic(callback2);
 
-      const diag: SolverDiagnostic = {
+      const diag: Diagnostic = {
         code: "singular-matrix",
         severity: "error",
         message:"Singular matrix detected",
@@ -40,7 +40,7 @@ describe("DiagnosticCollector", () => {
 
   describe("collects_all_diagnostics", () => {
     it("should collect all emitted diagnostics in order", () => {
-      const diag1: SolverDiagnostic = {
+      const diag1: Diagnostic = {
         code: "singular-matrix",
         severity: "error",
         message:"Singular matrix",
@@ -48,7 +48,7 @@ describe("DiagnosticCollector", () => {
         suggestions: [],
       };
 
-      const diag2: SolverDiagnostic = {
+      const diag2: Diagnostic = {
         code: "convergence-failed",
         severity: "warning",
         message:"Convergence failed",
@@ -56,7 +56,7 @@ describe("DiagnosticCollector", () => {
         suggestions: [],
       };
 
-      const diag3: SolverDiagnostic = {
+      const diag3: Diagnostic = {
         code: "no-ground",
         severity: "error",
         message:"No ground element",
@@ -78,7 +78,7 @@ describe("DiagnosticCollector", () => {
 
   describe("clear_resets", () => {
     it("should clear collected diagnostics when clear is called", () => {
-      const diag: SolverDiagnostic = {
+      const diag: Diagnostic = {
         code: "singular-matrix",
         severity: "error",
         message:"Singular matrix",
@@ -100,7 +100,7 @@ describe("DiagnosticCollector", () => {
 
       collector.onDiagnostic(callback);
 
-      const diag1: SolverDiagnostic = {
+      const diag1: Diagnostic = {
         code: "singular-matrix",
         severity: "error",
         message:"Singular matrix",
@@ -113,7 +113,7 @@ describe("DiagnosticCollector", () => {
 
       collector.removeDiagnosticListener(callback);
 
-      const diag2: SolverDiagnostic = {
+      const diag2: Diagnostic = {
         code: "convergence-failed",
         severity: "warning",
         message:"Convergence failed",

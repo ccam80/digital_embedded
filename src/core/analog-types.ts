@@ -152,8 +152,6 @@ export interface AnalogElementCore {
 
 import type { Diagnostic, DiagnosticCode, DiagnosticSuggestion } from "../compile/types.js";
 export type { Diagnostic, DiagnosticCode, DiagnosticSuggestion };
-export type { DiagnosticCode as SolverDiagnosticCode } from "../compile/types.js";
-export type { Diagnostic as SolverDiagnostic } from "../compile/types.js";
 
 // ---------------------------------------------------------------------------
 // AcParams — frequency sweep configuration

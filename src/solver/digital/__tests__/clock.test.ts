@@ -144,7 +144,6 @@ function buildClockCircuit(
     sccSnapshotBuffer: new Uint32Array(1),
     delays: new Uint32Array(componentCount).fill(10),
     componentToElement,
-    labelToNetId: new Map(),
     wireToNetId: new Map<Wire, number>(),
     pinNetMap: new Map(),
     resetComponentIndices: new Uint32Array(0),

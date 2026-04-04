@@ -22,6 +22,9 @@ import { analyzeBoundary, insertAsSubcircuit, type PortOverride } from '../edito
 import { openSubcircuitDialog } from './subcircuit-dialog.js';
 import { storeSubcircuit } from '../io/subcircuit-store.js';
 import { serializeCircuitToDig } from '../io/dig-serializer.js';
+import { deserializeDts } from '../io/dts-deserializer.js';
+import { createLiveDefinition, buildSubcircuitComponentDef } from '../components/subcircuit/subcircuit.js';
+import type { ShapeMode } from '../components/subcircuit/shape-renderer.js';
 import { Circuit, Wire } from '../core/circuit.js';
 import { resolveModelAssignments, extractConnectivityGroups, stableNetId, applyLoadingDecisions, resolveLoadingOverrides } from '../compile/extract-connectivity.js';
 import type { PinLoadingOverride } from '../compile/extract-connectivity.js';
@@ -137,7 +140,77 @@ function buildInsertMenu(ctx: AppContext, deps: MTDeps): () => void {
   }
 
   rebuildInsertMenu();
-  return rebuildInsertMenu;
+
+  // --- Import Subcircuit from File ---
+  const importSubcircuitInput = document.createElement('input');
+  importSubcircuitInput.type = 'file';
+  importSubcircuitInput.accept = '.dts,.dig';
+  importSubcircuitInput.style.display = 'none';
+  document.body.appendChild(importSubcircuitInput);
+
+  importSubcircuitInput.addEventListener('change', () => {
+    const file = importSubcircuitInput.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const text = reader.result as string;
+        const typeName = file.name.replace(/\.(dts|dig)$/, '');
+
+        let subCircuit;
+        if (text.trimStart().startsWith('{')) {
+          subCircuit = deserializeDts(text, ctx.registry);
+        } else {
+          const { loadDig } = await import('../io/dig-loader.js');
+          subCircuit = loadDig(text, ctx.registry);
+        }
+
+        const shapeType = (subCircuit.metadata.shapeType || 'DEFAULT') as ShapeMode;
+        const subDef = createLiveDefinition(subCircuit, shapeType, typeName);
+
+        const circuit = ctx.getCircuit();
+        if (!circuit.metadata.subcircuits) {
+          circuit.metadata.subcircuits = new Map();
+        }
+        circuit.metadata.subcircuits.set(typeName, subDef);
+
+        // Enter placement mode with the new subcircuit type
+        const componentDef = buildSubcircuitComponentDef(typeName, subDef);
+        placement.start(componentDef);
+        ctx.palette.refreshCategories();
+        ctx.paletteUI.render();
+        ctx.scheduleRender();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('Failed to import subcircuit:', msg);
+        ctx.showStatus(`Import error: ${msg}`, true);
+      }
+    };
+    reader.readAsText(file);
+    importSubcircuitInput.value = '';
+  });
+
+  // Add the "Import Subcircuit..." item to the insert menu on each rebuild
+  const origRebuild = rebuildInsertMenu;
+  function rebuildWithImport(): void {
+    origRebuild();
+    if (!insertMenuDropdown) return;
+    const sep = document.createElement('hr');
+    sep.className = 'menu-separator';
+    insertMenuDropdown.appendChild(sep);
+
+    const item = document.createElement('div');
+    item.className = 'menu-action';
+    item.textContent = 'Import Subcircuit\u2026';
+    item.addEventListener('click', () => {
+      importSubcircuitInput.click();
+      document.querySelectorAll('.menu-item.open').forEach(m => m.classList.remove('open'));
+    });
+    insertMenuDropdown.appendChild(item);
+  }
+
+  rebuildWithImport();
+  return rebuildWithImport;
 }
 
 // ---------------------------------------------------------------------------

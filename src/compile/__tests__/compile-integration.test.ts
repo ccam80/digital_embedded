@@ -801,7 +801,7 @@ describe('compileUnified — labelSignalMap', () => {
     }
   });
 
-  it('labelSignalMap is consistent with labelToNetId from reference compileUnified', () => {
+  it('labelSignalMap has pin-form and bare-label entries for single-pin IO components', () => {
     const inPins = [outputPin(0, 0, 'out')];
     const outPins = [inputPin(0, 0, 'in')];
 
@@ -836,18 +836,31 @@ describe('compileUnified — labelSignalMap', () => {
     circuit.addElement(createTestElementFromDecls('Out', 'out-1', outPins, outProps, { x: 10, y: 0 }));
     circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 10, y: 0 }));
 
-    const reference = compileUnified(circuit, registry).digital!;
     const unified = compileUnified(circuit, registry);
+    const labelSignalMap = unified.labelSignalMap;
 
-    // Both maps should agree on the net ID for label "A"
-    const referenceNetIdA = reference.labelToNetId.get('A');
-    const unifiedAddrA = unified.labelSignalMap.get('A');
+    // Single-pin In component labeled "A" — both "A:out" (pin-form) and "A" (bare) should exist
+    const addrAPin = labelSignalMap.get('A:out');
+    const addrABare = labelSignalMap.get('A');
+    expect(addrAPin).toBeDefined();
+    expect(addrABare).toBeDefined();
+    expect(addrAPin!.domain).toBe('digital');
+    expect(addrABare!.domain).toBe('digital');
+    // Both point to the same net
+    if (addrAPin!.domain === 'digital' && addrABare!.domain === 'digital') {
+      expect(addrAPin!.netId).toBe(addrABare!.netId);
+    }
 
-    expect(referenceNetIdA).toBeDefined();
-    expect(unifiedAddrA).toBeDefined();
-    expect(unifiedAddrA!.domain).toBe('digital');
-    if (unifiedAddrA!.domain === 'digital') {
-      expect(unifiedAddrA!.netId).toBe(referenceNetIdA);
+    // Single-pin Out component labeled "Y" — both "Y:in" (pin-form) and "Y" (bare) should exist
+    const addrYPin = labelSignalMap.get('Y:in');
+    const addrYBare = labelSignalMap.get('Y');
+    expect(addrYPin).toBeDefined();
+    expect(addrYBare).toBeDefined();
+    expect(addrYPin!.domain).toBe('digital');
+    expect(addrYBare!.domain).toBe('digital');
+    // Both point to the same net
+    if (addrYPin!.domain === 'digital' && addrYBare!.domain === 'digital') {
+      expect(addrYPin!.netId).toBe(addrYBare!.netId);
     }
   });
 });

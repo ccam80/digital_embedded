@@ -185,8 +185,7 @@ export const LIBRARY_74XX: Library74xxEntry[] = [
  * If `pinMap` is provided, the stub's `pinLayout` is populated from the
  * pre-scanned pin declarations. This allows `circuit_describe` and other
  * introspection to return real pin metadata without loading the full
- * subcircuit. Use `scanDigPins()` from `io/dig-pin-scanner.ts` to build
- * the map.
+ * subcircuit.
  *
  * @param registry - The component registry to register into.
  * @param pinMap   - Optional map of IC name → pre-scanned PinDeclaration[].

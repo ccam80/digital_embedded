@@ -1,7 +1,6 @@
 /**
  * RenderPipeline — canvas rendering loop, coordinate helpers, canvas management.
  *
- * Extracted from app-init.ts (Step 3 of modularization plan).
  * Owns: resizeCanvas, scheduleRender, renderFrame, frame profiling,
  * diagnostic overlays, canvas rect cache, coordinate helpers, sizeCanvasInContainer.
  */

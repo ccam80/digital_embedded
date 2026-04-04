@@ -72,7 +72,7 @@ describe('models_roundtrip', () => {
     };
 
     const json = serializeCircuit(circuit);
-    const { circuit: restored } = deserializeDts(json, registry);
+    const restored = deserializeDts(json, registry);
 
     const entry = restored.metadata.models!['NpnBJT']['2N2222'];
     expect(entry.kind).toBe('inline');
@@ -141,7 +141,7 @@ describe('element_modelParamDeltas_roundtrip', () => {
     circuit.addElement(el);
 
     const json = serializeCircuit(circuit);
-    const { circuit: restored } = deserializeDts(json, registry);
+    const restored = deserializeDts(json, registry);
 
     expect(restored.elements).toHaveLength(1);
     const restoredEl = restored.elements[0];

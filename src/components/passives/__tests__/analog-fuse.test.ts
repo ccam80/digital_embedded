@@ -23,7 +23,7 @@ import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
-import type { SolverDiagnostic } from "../../../core/analog-engine-interface.js";
+import type { Diagnostic } from "../../../compile/types.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import { FuseDefinition } from "../../switching/fuse.js";
@@ -38,7 +38,7 @@ function makeFuseElement(opts: {
   rCold?: number;
   rBlown?: number;
   i2tRating?: number;
-  emitDiagnostic?: (d: SolverDiagnostic) => void;
+  emitDiagnostic?: (d: Diagnostic) => void;
   onStateChange?: (blown: boolean, thermalRatio: number) => void;
 }): AnalogFuseElement {
   return new AnalogFuseElement(
@@ -171,7 +171,7 @@ describe("AnalogFuseElement", () => {
 
   describe("blown_emits_diagnostic", () => {
     it("driving 2× rated current emits fuse-blown diagnostic with info severity", () => {
-      const diagnostics: SolverDiagnostic[] = [];
+      const diagnostics: Diagnostic[] = [];
       const fuse = makeFuseElement({
         rCold: 0.01,
         rBlown: 1e9,
@@ -197,7 +197,7 @@ describe("AnalogFuseElement", () => {
     });
 
     it("diagnostic is emitted only once even after multiple steps past blow", () => {
-      const diagnostics: SolverDiagnostic[] = [];
+      const diagnostics: Diagnostic[] = [];
       const fuse = makeFuseElement({
         rCold: 0.01,
         rBlown: 1e9,

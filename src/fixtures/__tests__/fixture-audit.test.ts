@@ -18,7 +18,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from "fs";
 import { join, relative, dirname, basename } from "path";
 
 import { createDefaultRegistry } from "@/components/register-all";
-import { loadWithSubcircuits, clearSubcircuitCache } from "@/io/subcircuit-loader";
+import { loadWithSubcircuits } from "@/io/subcircuit-loader";
 import type { FileResolver } from "@/io/file-resolver";
 import { ResolverNotFoundError } from "@/io/file-resolver";
 import type { Circuit } from "@/core/circuit";
@@ -230,7 +230,6 @@ describe("fixture audit", () => {
     let loadError: Error | null = null;
 
     beforeAll(async () => {
-      clearSubcircuitCache();
       const registry = createDefaultRegistry();
       const xml = readFileSync(path, "utf-8");
       const resolver = new FixtureTreeResolver(digIndex, dir);

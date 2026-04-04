@@ -755,27 +755,7 @@ export function compileDigitalPartition(
   const resetComponentIndices = new Uint32Array(resetIndices);
 
   // -----------------------------------------------------------------------
-  // Step 14: Build labelToNetId
-  // -----------------------------------------------------------------------
-
-  const labelToNetId = new Map<string, number>();
-  const LABELED_TYPES = new Set(["In", "Out", "Probe", "Measurement", "Clock", "Port", "VDD", "Const"]);
-
-  for (let i = 0; i < componentCount; i++) {
-    const el = elements[i]!;
-    if (LABELED_TYPES.has(el.typeId)) {
-      const label = el.getAttribute("label");
-      if (typeof label === "string" && label.length > 0) {
-        const refs = allPinRefs[i]!;
-        if (refs.length > 0) {
-          labelToNetId.set(label, slotToNetId(i, 0));
-        }
-      }
-    }
-  }
-
-  // -----------------------------------------------------------------------
-  // Step 14b: Build pinNetMap
+  // Step 14: Build pinNetMap
   // -----------------------------------------------------------------------
 
   const pinNetMap = new Map<string, number>();
@@ -831,7 +811,6 @@ export function compileDigitalPartition(
     sccSnapshotBuffer,
     delays,
     componentToElement,
-    labelToNetId,
     wireToNetId,
     pinNetMap,
     resetComponentIndices,

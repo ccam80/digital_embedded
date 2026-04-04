@@ -13,6 +13,7 @@ import type { CircuitElement } from "./element.js";
 import type { LogicFamilyConfig } from "./logic-family.js";
 import { mergeCollinearSegments } from "./wire-utils.js";
 import type { ModelEntry } from "./registry.js";
+import type { SubcircuitDefinition } from "../components/subcircuit/subcircuit.js";
 
 // ---------------------------------------------------------------------------
 // Wire — visual wire segment
@@ -177,6 +178,14 @@ export interface CircuitMetadata {
    * Each entry is a full ModelEntry with factory refs — runtime only, never serialized directly.
    */
   models?: Record<string, Record<string, ModelEntry>>;
+
+  /**
+   * Circuit-scoped subcircuit definitions.
+   * Keyed by subcircuit type name (e.g. "HalfAdder").
+   * These take priority over global registry lookups for element creation.
+   * Runtime only — serialized via DtsDocument.subcircuitDefinitions.
+   */
+  subcircuits?: Map<string, SubcircuitDefinition>;
 }
 
 function defaultCircuitMetadata(): CircuitMetadata {

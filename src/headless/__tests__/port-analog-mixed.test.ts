@@ -207,7 +207,7 @@ describe('Port label resolution in analog domain via readAllSignals()', () => {
     expect(signals['P_probe']).toBeGreaterThan(4.9);
   });
 
-  it('readOutput() via Port label works in a pure analog circuit', () => {
+  it('readSignal() via Port label works in a pure analog circuit', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
     const circuit = facade.build({
@@ -228,7 +228,7 @@ describe('Port label resolution in analog domain via readAllSignals()', () => {
     const engine = facade.compile(circuit);
     facade.step(engine);
 
-    // readOutput() throws FacadeError when the label is absent from
+    // readSignal() throws FacadeError when the label is absent from
     // labelSignalMap. If Port labels are not resolved by compileAnalogPartition,
     // this will throw and the test will fail — exposing the gap.
     expect(() => facade.readSignal(engine, 'P_read')).not.toThrow();
@@ -273,7 +273,7 @@ describe('Port in pure-digital circuit — no regression', () => {
 // ---------------------------------------------------------------------------
 
 describe('Port at cross-domain boundary', () => {
-  it('readOutput() returns a value for Port at digital-analog boundary', () => {
+  it('readSignal() returns a value for Port at digital-analog boundary', () => {
     const facade = new DefaultSimulatorFacade(registry);
 
     const circuit = facade.build({

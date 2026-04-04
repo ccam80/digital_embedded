@@ -5,9 +5,8 @@
  * dynamically from the subcircuit's In/Out components.
  *
  * Dynamic registration: when a subcircuit .dig is loaded, call
- * registerSubcircuit() to add a new ComponentDefinition to the registry. All
- * subcircuits are then accessible through the registry by name, uniformly
- * with built-in components.
+ * buildSubcircuitComponentDef() to create a ComponentDefinition, which is then
+ * resolved via resolveComponentDef() from circuit-scoped metadata.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -26,7 +25,6 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
   type ComponentLayout,
-  type ComponentRegistry,
 } from "../../core/registry.js";
 import type { Circuit, CustomShapeData } from "../../core/circuit.js";
 import type { ShapeMode } from "./shape-renderer.js";
@@ -491,25 +489,18 @@ export function executeSubcircuit(
 }
 
 // ---------------------------------------------------------------------------
-// Dynamic registration
+// ComponentDefinition builder
 // ---------------------------------------------------------------------------
 
 /**
- * Register a loaded subcircuit as a new ComponentDefinition in the registry.
- *
- * After registration, the subcircuit is accessible by name from the registry,
- * uniformly with built-in components. Subsequent placements of the subcircuit
- * use the registered factory to create SubcircuitElement instances.
- *
- * @param registry    The component registry to register into.
- * @param name        The name (typically filename without extension) used as the lookup key.
- * @param definition  The loaded subcircuit definition.
+ * Build a ComponentDefinition for a subcircuit without mutating any registry.
+ * This is the pure factory used by resolveComponentDef() for circuit-scoped
+ * subcircuit resolution.
  */
-export function registerSubcircuit(
-  registry: ComponentRegistry,
+export function buildSubcircuitComponentDef(
   name: string,
   definition: SubcircuitDefinition,
-): void {
+): ComponentDefinition {
   const propertyDefs: PropertyDefinition[] = [
     {
       key: "label",
@@ -541,7 +532,7 @@ export function registerSubcircuit(
     },
   ];
 
-  const componentDef: ComponentDefinition = {
+  return {
     name,
     typeId: -1,
     factory: (props: PropertyBag) =>
@@ -564,16 +555,5 @@ export function registerSubcircuit(
       "This component is flattened into its constituent gates before simulation.",
     models: { digital: { executeFn: executeSubcircuit } },
   };
-
-  registry.registerOrUpdate(componentDef);
-
-  // Register the "Subcircuit:<name>" alias so that SubcircuitElement instances
-  // created by insertAsSubcircuit() (which use typeId = "Subcircuit:<name>")
-  // can be found via registry.get(element.typeId) in the compiler.
-  // The bare name remains the canonical key (used by the .dig loader path).
-  // _aliases.set is idempotent so re-registration on subcircuit reload is safe.
-  const prefixedName = `Subcircuit:${name}`;
-  if (!registry.get(prefixedName)) {
-    registry.registerAlias(prefixedName, name);
-  }
 }
+

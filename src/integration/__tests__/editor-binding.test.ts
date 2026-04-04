@@ -9,7 +9,7 @@ import { MockCoordinator } from "@/test-utils/mock-coordinator";
 import { Wire, Circuit } from "@/core/circuit";
 import { BitVector } from "@/core/signal";
 import type { CircuitElement } from "@/core/element";
-import type { Pin } from "@/core/pin";
+import { type Pin, PinDirection } from "@/core/pin";
 import type { RenderContext, Rect } from "@/core/renderer-interface";
 import type { PropertyBag, PropertyValue } from "@/core/properties";
 import type { SerializedElement } from "@/core/element";
@@ -53,8 +53,8 @@ describe("EditorBinding", () => {
   let element: StubElement;
   let wireSignalMap: Map<Wire, SignalAddress>;
   let pinSignalMap: Map<string, SignalAddress>;
-  const wireAddr: SignalAddress = { domain: "digital", netId: 3, bitWidth: 1 };
-  const pinAddr: SignalAddress = { domain: "digital", netId: 3, bitWidth: 1 };
+  const wireAddr: SignalAddress = { domain: "digital", netId: 3, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL };
+  const pinAddr: SignalAddress = { domain: "digital", netId: 3, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL };
 
   beforeEach(() => {
     binding = createEditorBinding();

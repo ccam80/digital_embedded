@@ -18,6 +18,7 @@
 import type { DigCircuit, DigVisualElement, DigWire, DigValue } from "./dig-schema.js";
 import type { AttributeMapping, ComponentDefinition } from "../core/registry.js";
 import type { ComponentRegistry } from "../core/registry.js";
+import { resolveComponentDef } from "../core/resolve-component.js";
 import type { CircuitElement } from "../core/element.js";
 import type { CircuitMetadata, CustomShapeData, CustomDrawable } from "../core/circuit.js";
 import { Circuit, Wire } from "../core/circuit.js";
@@ -76,21 +77,28 @@ export class DigParserError extends Error {
 export function loadDigCircuit(
   parsed: DigCircuit,
   registry: ComponentRegistry,
+  subcircuitDefs?: Map<string, import("../components/subcircuit/subcircuit.js").SubcircuitDefinition>,
 ): Circuit {
   const metadata = extractCircuitMetadata(parsed);
   const circuit = new Circuit(metadata);
+
+  // Inject accumulated subcircuit definitions so resolveComponentDef()
+  // can find subcircuit types without global registry mutation.
+  if (subcircuitDefs !== undefined && subcircuitDefs.size > 0) {
+    circuit.metadata.subcircuits = new Map(subcircuitDefs);
+  }
 
   for (const ve of parsed.visualElements) {
     // Skip unregistered elements gracefully (e.g. GenericInitCode, decorations,
     // HDL elements) rather than crashing. These are metadata/decoration elements
     // from Digital that have no simulation behavior in our engine.
-    if (registry.get(ve.elementName) === undefined) {
+    if (resolveComponentDef(ve.elementName, circuit, registry) === undefined) {
       console.warn(
         `Skipping unregistered element "${ve.elementName}" at (${ve.pos.x}, ${ve.pos.y})`,
       );
       continue;
     }
-    const element = createElementFromDig(ve, registry);
+    const element = createElementFromDig(ve, registry, circuit);
     circuit.addElement(element);
   }
 
@@ -143,12 +151,13 @@ export function loadDigFromParsed(parsed: DigCircuit, registry: ComponentRegistr
 export function createElementFromDig(
   ve: DigVisualElement,
   registry: ComponentRegistry,
+  circuit?: import("../core/circuit.js").Circuit,
 ): CircuitElement {
-  const def = registry.get(ve.elementName);
+  const def = resolveComponentDef(ve.elementName, circuit ?? null, registry);
   if (def === undefined) {
     throw new DigParserError(
       `Unknown component "${ve.elementName}" at (${ve.pos.x}, ${ve.pos.y}). ` +
-        `Register this component type before loading circuits that contain it.`,
+        `Register this component type or add it to circuit.metadata.subcircuits before loading.`,
       ve.elementName,
       ve.pos,
     );

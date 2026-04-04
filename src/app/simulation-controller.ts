@@ -1,7 +1,6 @@
 /**
  * SimulationController — compile/bind, simulation loop, speed control, analog viz.
  *
- * Extracted from app-init.ts (Step 4 of modularization plan).
  * Owns: compileAndBind, invalidateCompiled, startSimulation, stopSimulation,
  * _startRenderLoop, analog visualization, speed control UI, toolbar sim buttons,
  * engine settings (load/save/apply), _friendlyAnalogError.

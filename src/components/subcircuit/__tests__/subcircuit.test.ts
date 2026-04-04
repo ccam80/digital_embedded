@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 import { Circuit } from "../../../core/circuit.js";
-import { ComponentRegistry, ComponentCategory } from "../../../core/registry.js";
+import { ComponentCategory } from "../../../core/registry.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
 import { MockRenderContext } from "../../../test-utils/mock-render-context.js";
@@ -13,7 +13,7 @@ import { PropertyType } from "../../../core/properties.js";
 import {
   SubcircuitElement,
   SubcircuitDefinition,
-  registerSubcircuit,
+  buildSubcircuitComponentDef,
   executeSubcircuit,
 } from "../subcircuit.js";
 
@@ -124,36 +124,29 @@ describe("derivesPins", () => {
 // ---------------------------------------------------------------------------
 
 describe("dynamicRegistration", () => {
-  it("registers a subcircuit definition in the registry", () => {
-    const registry = new ComponentRegistry();
+  it("buildSubcircuitComponentDef returns correct name and category", () => {
     const definition = makeSubcircuitDefinition(["A", "B"], ["Y"], "AndChip");
 
-    registerSubcircuit(registry, "AndChip", definition);
+    const def = buildSubcircuitComponentDef("AndChip", definition);
 
-    const def = registry.get("AndChip");
     expect(def).toBeDefined();
-    expect(def!.name).toBe("AndChip");
-    expect(def!.category).toBe(ComponentCategory.SUBCIRCUIT);
+    expect(def.name).toBe("AndChip");
+    expect(def.category).toBe(ComponentCategory.SUBCIRCUIT);
   });
 
-  it("assigns a typeId to the registered subcircuit", () => {
-    const registry = new ComponentRegistry();
+  it("buildSubcircuitComponentDef returns typeId of -1 (assigned by registry on registration)", () => {
     const definition = makeSubcircuitDefinition(["X"], ["Z"], "MyChip");
 
-    registerSubcircuit(registry, "MyChip", definition);
+    const def = buildSubcircuitComponentDef("MyChip", definition);
 
-    const def = registry.get("MyChip");
     expect(def).toBeDefined();
-    expect(def!.typeId).toBeGreaterThanOrEqual(0);
+    expect(def.typeId).toBe(-1);
   });
 
   it("factory creates a SubcircuitElement", () => {
-    const registry = new ComponentRegistry();
     const definition = makeSubcircuitDefinition(["IN"], ["OUT"], "TestChip");
 
-    registerSubcircuit(registry, "TestChip", definition);
-
-    const def = registry.get("TestChip")!;
+    const def = buildSubcircuitComponentDef("TestChip", definition);
     const element = def.factory(new PropertyBag());
 
     expect(element).toBeInstanceOf(SubcircuitElement);
@@ -319,23 +312,19 @@ describe("pinOrderMatchesInOut", () => {
 // ---------------------------------------------------------------------------
 
 describe("shapeTypeEnumProperty", () => {
-  it("registered subcircuit has shapeType property of type ENUM", () => {
-    const registry = new ComponentRegistry();
+  it("buildSubcircuitComponentDef has shapeType property of type ENUM", () => {
     const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
-    registerSubcircuit(registry, "TestChip", definition);
+    const def = buildSubcircuitComponentDef("TestChip", definition);
 
-    const def = registry.get("TestChip")!;
     const shapeProp = def.propertyDefs.find(p => p.key === "shapeType");
     expect(shapeProp).toBeDefined();
     expect(shapeProp!.type).toBe(PropertyType.ENUM);
   });
 
   it("shapeType ENUM includes all six ShapeMode values", () => {
-    const registry = new ComponentRegistry();
     const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
-    registerSubcircuit(registry, "TestChip", definition);
+    const def = buildSubcircuitComponentDef("TestChip", definition);
 
-    const def = registry.get("TestChip")!;
     const shapeProp = def.propertyDefs.find(p => p.key === "shapeType")!;
     expect(shapeProp.enumValues).toEqual(
       expect.arrayContaining(["LAYOUT", "DIL", "CUSTOM", "DEFAULT", "SIMPLE", "MINIMIZED"])
@@ -344,21 +333,17 @@ describe("shapeTypeEnumProperty", () => {
   });
 
   it("shapeType ENUM has label 'Shape'", () => {
-    const registry = new ComponentRegistry();
     const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
-    registerSubcircuit(registry, "TestChip", definition);
+    const def = buildSubcircuitComponentDef("TestChip", definition);
 
-    const def = registry.get("TestChip")!;
     const shapeProp = def.propertyDefs.find(p => p.key === "shapeType")!;
     expect(shapeProp.label).toBe("Shape");
   });
 
   it("shapeType default value is LAYOUT", () => {
-    const registry = new ComponentRegistry();
     const definition = makeSubcircuitDefinition(["A"], ["Y"], "TestChip");
-    registerSubcircuit(registry, "TestChip", definition);
+    const def = buildSubcircuitComponentDef("TestChip", definition);
 
-    const def = registry.get("TestChip")!;
     const shapeProp = def.propertyDefs.find(p => p.key === "shapeType")!;
     expect(shapeProp.defaultValue).toBe("LAYOUT");
   });
@@ -453,31 +438,25 @@ describe("Port-based subcircuit definitions", () => {
     }
   });
 
-  it("registerSubcircuit with Port-based definition appears in registry with correct category and pin count", () => {
-    const registry = new ComponentRegistry();
+  it("buildSubcircuitComponentDef with Port-based definition has correct category and pin count", () => {
     const definition = makePortSubcircuitDefinition(
       [{ label: "A" }, { label: "B" }, { label: "Y" }],
       "PortAndChip",
     );
 
-    registerSubcircuit(registry, "PortAndChip", definition);
-
-    const def = registry.get("PortAndChip");
+    const def = buildSubcircuitComponentDef("PortAndChip", definition);
     expect(def).toBeDefined();
-    expect(def!.name).toBe("PortAndChip");
-    expect(def!.category).toBe(ComponentCategory.SUBCIRCUIT);
+    expect(def.name).toBe("PortAndChip");
+    expect(def.category).toBe(ComponentCategory.SUBCIRCUIT);
   });
 
   it("SubcircuitElement instantiation from Port-based definition has BIDIRECTIONAL getPins", () => {
-    const registry = new ComponentRegistry();
     const definition = makePortSubcircuitDefinition(
       [{ label: "IN" }, { label: "OUT" }],
       "PortChip",
     );
 
-    registerSubcircuit(registry, "PortChip", definition);
-
-    const def = registry.get("PortChip")!;
+    const def = buildSubcircuitComponentDef("PortChip", definition);
     const element = def.factory(new PropertyBag());
 
     expect(element).toBeInstanceOf(SubcircuitElement);

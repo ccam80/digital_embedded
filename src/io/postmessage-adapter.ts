@@ -52,6 +52,8 @@ import type { FileResolver } from './file-resolver.js';
 import { CacheResolver, ChainResolver, HttpResolver } from './file-resolver.js';
 import { deserializeDts } from './dts-deserializer.js';
 import { serializeCircuitToDig } from './dig-serializer.js';
+import { createLiveDefinition } from '../components/subcircuit/subcircuit.js';
+import type { ShapeMode } from '../components/subcircuit/shape-renderer.js';
 import type { ComponentRegistry } from '../core/registry.js';
 import type { Circuit } from '../core/circuit.js';
 import { DefaultSimulatorFacade } from '../headless/default-facade.js';
@@ -60,6 +62,7 @@ import { executeTests } from '../testing/executor.js';
 import type { RunnerFacade } from '../testing/executor.js';
 import { detectInputCount } from '../testing/detect-input-count.js';
 import type { SimulatorFacade } from '../headless/facade.js';
+import { PinDirection } from '../core/pin.js';
 
 // ---------------------------------------------------------------------------
 // Callback hooks — injected by app-init.ts for GUI integration
@@ -84,6 +87,12 @@ export interface PostMessageHooks {
    * When provided, used by sim-load-data when the payload is DTS JSON format.
    */
   loadCircuitDts?(circuit: import('../core/circuit.js').Circuit): Promise<void> | void;
+
+  /**
+   * Called after a subcircuit is imported via sim-import-subcircuit.
+   * In the UI, this should enter placement mode for the new subcircuit type.
+   */
+  subcircuitImported?(name: string, definition: import('../components/subcircuit/subcircuit.js').SubcircuitDefinition): void;
 
   /**
    * Return the editor's current live circuit.
@@ -273,6 +282,11 @@ export class PostMessageAdapter {
           this._handleLoadMemory(msg);
           break;
 
+        // --- Core: subcircuit import ---
+        case 'sim-import-subcircuit':
+          await this._handleImportSubcircuit(msg);
+          break;
+
         // --- Tutorial / UI ---
         case 'sim-set-palette':
           this._handleSetPalette(msg);
@@ -457,22 +471,21 @@ export class PostMessageAdapter {
       const facade = this._hooks.getFacade?.() ?? this._getOwnFacade();
       const coordinator = facade.compile(circuit);
 
-      // Determine input/output labels from compiled labelSignalMap domain.
-      // Analog-domain entries are inputs (sources). For digital, use element
-      // typeId to distinguish inputs (In, Clock, Port) from outputs (Out, Port).
+      // Determine input/output labels from compiled labelSignalMap.
+      // Analog-domain entries are inputs (sources). For digital, use
+      // the direction field on the SignalAddress (resolved at compile time
+      // from the component's pin layout — no typeId whitelist needed).
       const circuitInputLabels = new Set<string>();
       const circuitOutputLabels = new Set<string>();
-      for (const el of circuit.elements) {
-        const lbl = el.getProperties().getOrDefault('label', '') as string;
-        if (!lbl) continue;
-        const addr = coordinator.compiled.labelSignalMap.get(lbl);
-        if (!addr) continue;
+      for (const [lbl, addr] of coordinator.compiled.labelSignalMap) {
         if (addr.domain === 'analog') {
           circuitInputLabels.add(lbl);
-        } else if (el.typeId === 'In' || el.typeId === 'Clock' || el.typeId === 'Port') {
-          circuitInputLabels.add(lbl);
         } else {
-          circuitOutputLabels.add(lbl);
+          if (addr.direction === PinDirection.INPUT || addr.direction === PinDirection.BIDIRECTIONAL) {
+            circuitInputLabels.add(lbl);
+          } else {
+            circuitOutputLabels.add(lbl);
+          }
         }
       }
 
@@ -636,7 +649,7 @@ export class PostMessageAdapter {
    * shows the circuit), otherwise falls back to headless compilation.
    */
   private async _loadCircuitDts(json: string): Promise<void> {
-    const { circuit } = deserializeDts(json, this._registry);
+    const circuit = deserializeDts(json, this._registry);
     if (this._hooks.loadCircuitDts) {
       await this._hooks.loadCircuitDts(circuit);
     } else if (this._hooks.loadCircuitXml) {
@@ -645,6 +658,43 @@ export class PostMessageAdapter {
     } else {
       this._getOwnFacade().compile(circuit);
     }
+  }
+
+  private async _handleImportSubcircuit(msg: { name?: unknown; data?: unknown }): Promise<void> {
+    const name = String(msg.name ?? '');
+    const data = String(msg.data ?? '');
+    if (!name || !data) {
+      this._post({ type: 'sim-error', error: 'sim-import-subcircuit requires name and data' });
+      return;
+    }
+
+    // Parse the content into a Circuit
+    let subCircuit: Circuit;
+    if (data.trimStart().startsWith('{')) {
+      subCircuit = deserializeDts(data, this._registry);
+    } else {
+      const { loadDig } = await import('./dig-loader.js');
+      subCircuit = loadDig(data, this._registry);
+    }
+
+    // Create SubcircuitDefinition and store on the active circuit
+    const shapeType = (subCircuit.metadata.shapeType || 'DEFAULT') as ShapeMode;
+    const subDef = createLiveDefinition(subCircuit, shapeType, name);
+
+    // Store on the facade's active circuit if available, otherwise on the
+    // subcircuit itself (headless mode may not have an active circuit)
+    const facade = this._getOwnFacade();
+    const activeCircuit = facade.getCircuit?.();
+    if (activeCircuit) {
+      if (!activeCircuit.metadata.subcircuits) {
+        activeCircuit.metadata.subcircuits = new Map();
+      }
+      activeCircuit.metadata.subcircuits.set(name, subDef);
+    }
+
+    this._hooks.subcircuitImported?.(name, subDef);
+    const pins = subDef.pinLayout.map(p => p.label);
+    this._post({ type: 'sim-subcircuit-imported', name, pins });
   }
 
   private async _loadCircuit(xml: string): Promise<void> {

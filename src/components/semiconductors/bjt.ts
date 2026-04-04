@@ -493,7 +493,6 @@ export function createBjtElement(
       // Write limited voltages back into the solution vector consistently.
       // Both junctions share the base node, so we must adjust vB AND vC
       // to enforce both limits simultaneously (keep vE as the anchor).
-      // Original bug: only vB was adjusted for vbe, silently corrupting vbc.
       if (nodeB > 0) {
         voltages[nodeB - 1] = vE + vbeLimited * polarity;
       }

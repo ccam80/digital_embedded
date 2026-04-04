@@ -311,9 +311,9 @@ describe("Compiler", () => {
   });
 
   // -------------------------------------------------------------------------
-  // labelToNetIdMapsInputsOutputs
+  // pinNetMapMapsAllPins
   // -------------------------------------------------------------------------
-  it("labelToNetIdMapsInputsOutputs", () => {
+  it("pinNetMapMapsAllPins", () => {
     // Circuit with In(label="A") and Out(label="S").
     // In at (0,0): output pin at (0,0) — drives value into the circuit
     // Out at (10,0): input pin at (10,0) — reads value from circuit
@@ -344,11 +344,12 @@ describe("Compiler", () => {
 
     const compiled = compileUnified(circuit, registry).digital!;
 
-    expect(compiled.labelToNetId.has("A")).toBe(true);
-    expect(compiled.labelToNetId.has("S")).toBe(true);
+    // pinNetMap keys are instanceId:pinLabel
+    expect(compiled.pinNetMap.has("in-1:A")).toBe(true);
+    expect(compiled.pinNetMap.has("out-1:S")).toBe(true);
 
-    // Both A and S should map to the same net (they're connected by wire)
-    expect(compiled.labelToNetId.get("A")).toBe(compiled.labelToNetId.get("S"));
+    // Both pins are on the same net (connected by wire)
+    expect(compiled.pinNetMap.get("in-1:A")).toBe(compiled.pinNetMap.get("out-1:S"));
   });
 
   // -------------------------------------------------------------------------
@@ -835,9 +836,9 @@ describe("compileDigitalPartition", () => {
   });
 
   // -------------------------------------------------------------------------
-  // labelToNetIdBuiltFromPartition
+  // pinNetMapBuiltFromPartition
   // -------------------------------------------------------------------------
-  it("labelToNetIdBuiltFromPartition", () => {
+  it("pinNetMapBuiltFromPartition", () => {
     // In(label="A") and Out(label="S") connected via shared group 0
     const inPins = inputOnlyPin("A", { x: 0, y: 0 });
     const outPins = outputOnlyPin("S", { x: 0, y: 0 });
@@ -864,9 +865,10 @@ describe("compileDigitalPartition", () => {
 
     const compiled = compileDigitalPartition(partition, registry);
 
-    expect(compiled.labelToNetId.has("A")).toBe(true);
-    expect(compiled.labelToNetId.has("S")).toBe(true);
-    expect(compiled.labelToNetId.get("A")).toBe(compiled.labelToNetId.get("S"));
+    // pinNetMap keys are instanceId:pinLabel
+    expect(compiled.pinNetMap.has("in-1:A")).toBe(true);
+    expect(compiled.pinNetMap.has("out-1:S")).toBe(true);
+    expect(compiled.pinNetMap.get("in-1:A")).toBe(compiled.pinNetMap.get("out-1:S"));
   });
 
   // -------------------------------------------------------------------------

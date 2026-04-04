@@ -27,7 +27,8 @@ import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import { SparseSolver } from "./sparse-solver.js";
 import type { AnalogElement } from "./element.js";
-import type { SolverDiagnostic, SimulationParams } from "../../core/analog-engine-interface.js";
+import type { SimulationParams } from "../../core/analog-engine-interface.js";
+import type { Diagnostic } from "../../compile/types.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
@@ -226,7 +227,7 @@ export class AcAnalysis {
     return { compiled: this._compiled, diagnostics };
   }
 
-  private _emptyResult(params: AcParams, diagList: SolverDiagnostic[]): AcResult {
+  private _emptyResult(params: AcParams, diagList: Diagnostic[]): AcResult {
     const frequencies = buildFrequencyArray(params);
     const n = frequencies.length;
     const magnitude = new Map<string, Float64Array>();

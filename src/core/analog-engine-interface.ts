@@ -6,7 +6,7 @@
  * can accept an `AnalogEngine`. The concrete implementation `MNAEngine`
  * (Phase 1) implements this interface.
  *
- * All associated types (`SimulationParams`, `DcOpResult`, `SolverDiagnostic`,
+ * All associated types (`SimulationParams`, `DcOpResult`, `Diagnostic`,
  * `CompiledAnalogCircuit`) are defined and exported here.
  */
 
@@ -16,8 +16,6 @@ import type { AcParams, AcResult, DiagnosticSuggestion } from "./analog-types.js
 import type { Diagnostic, DiagnosticCode } from "../compile/types.js";
 export type { AcParams, AcResult, DiagnosticSuggestion };
 export type { Diagnostic, DiagnosticCode };
-export type { DiagnosticCode as SolverDiagnosticCode } from "../compile/types.js";
-export type { Diagnostic as SolverDiagnostic } from "../compile/types.js";
 
 // ---------------------------------------------------------------------------
 // SimulationParams — transient solver configuration
@@ -124,7 +122,7 @@ export interface AnalogEngine extends Engine {
    * Find the DC operating point of the circuit.
    *
    * Attempts direct Newton-Raphson first; falls back to Gmin stepping, then
-   * source stepping. Emits `SolverDiagnostic` records for every fallback or
+   * source stepping. Emits `Diagnostic` records for every fallback or
    * failure via the `onDiagnostic` callback.
    */
   dcOperatingPoint(): DcOpResult;
@@ -208,7 +206,7 @@ export interface AnalogEngine extends Engine {
   // -------------------------------------------------------------------------
 
   /**
-   * Register a callback to receive `SolverDiagnostic` records as they are
+   * Register a callback to receive `Diagnostic` records as they are
    * emitted. Multiple callbacks can be registered; each is called in
    * registration order.
    */

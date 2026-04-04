@@ -208,7 +208,6 @@ function buildBridgeFixture(
       sccSnapshotBuffer: new Uint32Array(0),
       delays: new Uint32Array(0),
       componentToElement: new Map(),
-      labelToNetId: new Map(),
       wireToNetId: new Map(),
       pinNetMap: new Map(),
       resetComponentIndices: new Uint32Array(0),

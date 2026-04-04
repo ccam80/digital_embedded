@@ -35,6 +35,8 @@ export interface TestVector {
   expectedOutputs: Record<string, number>;
   /** The actual output values observed (signal label → raw value). */
   actualOutputs: Record<string, number>;
+  /** Human-readable failure message, present when the vector failed (e.g. analog mismatch). */
+  message?: string;
 }
 
 // ---------------------------------------------------------------------------

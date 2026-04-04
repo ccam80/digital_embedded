@@ -17,6 +17,9 @@ import type { CircuitElement } from '../core/element.js';
 import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 import type { PropertyValue } from '../core/properties.js';
 import type { ComponentDefinition, ComponentRegistry } from '../core/registry.js';
+import { createLiveDefinition } from '../components/subcircuit/subcircuit.js';
+import type { SubcircuitDefinition } from '../components/subcircuit/subcircuit.js';
+import type { ShapeMode } from '../components/subcircuit/shape-renderer.js';
 import type { TestResults, CircuitBuildOptions } from './types.js';
 import { FacadeError } from './types.js';
 import type {
@@ -251,7 +254,39 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   }
 
   deserialize(json: string): Circuit {
-    return deserializeDts(json, this._registry).circuit;
+    return deserializeDts(json, this._registry);
+  }
+
+  async importSubcircuit(
+    circuit: Circuit,
+    name: string,
+    content: string,
+    resolver?: import('../io/file-resolver.js').FileResolver,
+  ): Promise<SubcircuitDefinition> {
+    let subCircuit: Circuit;
+
+    if (content.trimStart().startsWith('{')) {
+      // .dts JSON format
+      subCircuit = deserializeDts(content, this._registry);
+    } else if (resolver) {
+      // .dig XML format with resolver for nested subcircuit resolution
+      const { loadWithSubcircuits } = await import('../io/subcircuit-loader.js');
+      subCircuit = await loadWithSubcircuits(content, resolver, this._registry);
+    } else {
+      // .dig XML format — no resolver, basic loading only
+      const { loadDig } = await import('../io/dig-loader.js');
+      subCircuit = loadDig(content, this._registry);
+    }
+
+    const shapeType = (subCircuit.metadata.shapeType || 'DEFAULT') as ShapeMode;
+    const subDef = createLiveDefinition(subCircuit, shapeType, name);
+
+    if (!circuit.metadata.subcircuits) {
+      circuit.metadata.subcircuits = new Map();
+    }
+    circuit.metadata.subcircuits.set(name, subDef);
+
+    return subDef;
   }
 
   // =========================================================================

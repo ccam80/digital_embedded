@@ -172,7 +172,6 @@ function handleInit(msg: Extract<EngineMessage, { type: "init" }>): void {
     sccSnapshotBuffer: new Uint32Array(msg.netCount),
     delays: msg.delays,
     componentToElement: new Map(),
-    labelToNetId: new Map(),
     wireToNetId: new Map(),
     pinNetMap: new Map(),
     resetComponentIndices: msg.resetComponentIndices,

@@ -15,7 +15,7 @@ import { join, relative, dirname, basename } from "path";
 
 import { createDefaultRegistry } from "@/components/register-all";
 import type { ComponentRegistry } from "@/core/registry";
-import { loadWithSubcircuits, clearSubcircuitCache } from "@/io/subcircuit-loader";
+import { loadWithSubcircuits } from "@/io/subcircuit-loader";
 import type { FileResolver } from "@/io/file-resolver";
 import { ResolverNotFoundError } from "@/io/file-resolver";
 import type { Circuit } from "@/core/circuit";
@@ -152,7 +152,6 @@ describe("property-diversity pin audit — non-default props from fixtures", () 
 
   describe.each(fixtures)("$label", ({ label, path, dir }) => {
     it("pin positions match Java reference", async () => {
-      clearSubcircuitCache();
       const xml = readFileSync(path, "utf-8");
       const resolver = new FixtureTreeResolver(digIndex, dir);
 

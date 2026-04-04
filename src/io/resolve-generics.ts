@@ -23,6 +23,7 @@ import { Circuit, Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import type { ComponentDefinition, ComponentRegistry } from "../core/registry.js";
 import type { AttributeMapping } from "../core/registry.js";
+import { resolveComponentDef } from "../core/resolve-component.js";
 import type { FileResolver } from "../hgs/context.js";
 import { HGSContext, createRootContext } from "../hgs/context.js";
 import { registerBuiltins } from "../hgs/builtins.js";
@@ -297,7 +298,7 @@ class GenericResolver {
     const code = getGenericCode(el);
     if (code.trim().length === 0) return el;
 
-    const def = this.registry.get(el.typeId);
+    const def = resolveComponentDef(el.typeId, this.circuit, this.registry);
     if (def === undefined) return el;
 
     // Build a mutable map using XML attribute names as keys
@@ -328,7 +329,7 @@ class GenericResolver {
     y: number,
     pendingElements: PendingElement[],
   ): ElementAttributeMap {
-    const def = this.registry.get(typeName);
+    const def = resolveComponentDef(typeName, this.circuit, this.registry);
     if (def === undefined) {
       throw new HGSEvalError(`addComponent: unknown component type "${typeName}"`);
     }

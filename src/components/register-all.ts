@@ -203,7 +203,6 @@ import { register74xxLibrary } from "./library-74xx.js";
  * @param pinMap74xx - Optional pre-scanned pin declarations for 74xx ICs.
  *   When provided, 74xx stub entries include real pin metadata so that
  *   `describeComponent()` returns pins without loading the full subcircuit.
- *   Use `scan74xxPinMap()` from `io/dig-pin-scanner.ts` to build this.
  */
 export function createDefaultRegistry(
   pinMap74xx?: ReadonlyMap<string, import('../core/pin.js').PinDeclaration[]>,

@@ -155,8 +155,7 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
         } else {
           const firstChar = text.replace(/^\s+/, '').charAt(0);
           if (firstChar === '{' || firstChar === '[') {
-            const result = deserializeDts(text, registry);
-            loaded = result.circuit;
+            loaded = deserializeDts(text, registry);
           } else {
             loaded = await loadWithSubcircuits(text, httpResolver, registry);
           }
@@ -367,8 +366,7 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
       let loaded: Circuit;
       const firstChar = xml.replace(/^\s+/, '').charAt(0);
       if (firstChar === '{' || firstChar === '[') {
-        const result = deserializeDts(xml, registry);
-        loaded = result.circuit;
+        loaded = deserializeDts(xml, registry);
       } else {
         loaded = await loadWithSubcircuits(xml, folderResolver, registry);
       }

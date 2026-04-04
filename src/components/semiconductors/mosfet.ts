@@ -42,7 +42,7 @@ import {
 import type { IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
-import { fetlim } from "../../solver/analog/newton-raphson.js";
+import { fetlim, limvds } from "../../solver/analog/newton-raphson.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
@@ -595,7 +595,7 @@ export function computeGmbs(
 export function limitVoltages(
   vgsOld: number,
   vgsNew: number,
-  _vdsOld: number,
+  vdsOld: number,
   vdsNew: number,
   vto: number,
 ): { vgs: number; vds: number; swapped: boolean } {
@@ -609,6 +609,9 @@ export function limitVoltages(
     vgs = vgs - vdsNew; // Vgd becomes the new Vgs
     swapped = true;
   }
+
+  // Apply SPICE3f5 Vds limiting after source/drain swap
+  vds = limvds(vds, Math.abs(vdsOld));
 
   return { vgs, vds, swapped };
 }

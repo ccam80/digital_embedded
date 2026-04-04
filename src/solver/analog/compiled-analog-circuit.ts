@@ -7,7 +7,8 @@
  * across engine types.
  */
 
-import type { CompiledAnalogCircuit, SolverDiagnostic } from "../../core/analog-engine-interface.js";
+import type { CompiledAnalogCircuit } from "../../core/analog-engine-interface.js";
+import type { Diagnostic } from "../../compile/types.js";
 import type { Wire } from "../../core/circuit.js";
 import type { CircuitElement } from "../../core/element.js";
 import type { AnalogElement } from "./element.js";
@@ -104,7 +105,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   readonly bridgeAdaptersByGroupId: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
 
   /** Diagnostics emitted during compilation (topology issues, missing models, etc.). */
-  readonly diagnostics: SolverDiagnostic[];
+  readonly diagnostics: Diagnostic[];
 
   /** Mutable time reference shared with element closures. The engine updates
    *  `timeRef.value` each timestep so elements see the current simulation time. */
@@ -123,7 +124,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     groupToNodeId?: Map<number, number>;
     elementBridgeAdapters?: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
     bridgeAdaptersByGroupId?: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
-    diagnostics?: SolverDiagnostic[];
+    diagnostics?: Diagnostic[];
     timeRef?: { value: number };
   }) {
     this.nodeCount = params.nodeCount;

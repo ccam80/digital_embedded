@@ -19,6 +19,7 @@
 import { Circuit, Wire } from "../core/circuit.js";
 import { AbstractCircuitElement } from "../core/element.js";
 import type { ComponentRegistry } from "../core/registry.js";
+import { resolveComponentDef } from "../core/resolve-component.js";
 import type { Diagnostic } from "../compile/types.js";
 import type { RenderContext, Rect } from "../core/renderer-interface.js";
 import type { Pin, Rotation } from "../core/pin.js";
@@ -341,7 +342,7 @@ export function mapCtzToCircuit(
     const digiTsType = CTZ_TYPE_MAP[comp.type];
 
     if (digiTsType !== undefined) {
-      const def = registry.get(digiTsType);
+      const def = resolveComponentDef(digiTsType, circuit, registry);
       if (def !== undefined) {
         // Build a PropertyBag from CTZ properties
         const entries: Array<[string, import("../core/properties.js").PropertyValue]> = [];

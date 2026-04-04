@@ -22,7 +22,7 @@ import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
 import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import type { SolverDiagnostic } from "../../../core/analog-engine-interface.js";
+import type { Diagnostic } from "../../../compile/types.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -54,7 +54,7 @@ function makeCapElement(opts: {
   esr: number;
   rLeak: number;
   reverseMax?: number;
-  emitDiagnostic?: (d: SolverDiagnostic) => void;
+  emitDiagnostic?: (d: Diagnostic) => void;
 }): AnalogPolarizedCapElement {
   return new AnalogPolarizedCapElement(
     [1, 0, 2],
@@ -246,7 +246,7 @@ describe("PolarizedCap", () => {
 
   describe("reverse_bias_emits_diagnostic", () => {
     it("emits reverse-biased-cap diagnostic when V(pos) < V(neg) - reverseMax", () => {
-      const diagnostics: SolverDiagnostic[] = [];
+      const diagnostics: Diagnostic[] = [];
       // Build a cap where node 1 = pos (solver idx 0) and ground = neg
       const capReverse = new AnalogPolarizedCapElement(
         [1, 0, 2],
@@ -269,7 +269,7 @@ describe("PolarizedCap", () => {
 
   describe("forward_bias_no_diagnostic", () => {
     it("emits no diagnostic when forward biased", () => {
-      const diagnostics: SolverDiagnostic[] = [];
+      const diagnostics: Diagnostic[] = [];
       const cap = new AnalogPolarizedCapElement(
         [1, 0, 2],
         100e-6,

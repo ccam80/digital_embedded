@@ -10,10 +10,8 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { join } from "path";
 import { createDefaultRegistry } from "../src/components/register-all.js";
 import { DefaultSimulatorFacade } from "../src/headless/default-facade.js";
-import { scan74xxPinMap } from "../src/io/dig-pin-scanner.js";
 import { SessionState } from "./mcp/tool-helpers.js";
 import { registerCircuitTools } from "./mcp/circuit-tools.js";
 import { registerTutorialTools } from "./mcp/tutorial-tools.js";
@@ -23,9 +21,7 @@ import { registerSimulationTools } from "./mcp/simulation-tools.js";
 // Registry + facade (initialized once)
 // ---------------------------------------------------------------------------
 
-const LIB_74XX_DIR = join(process.cwd(), "ref", "Digital", "src", "main", "dig", "lib", "DIL Chips", "74xx");
-const pinMap74xx = scan74xxPinMap(LIB_74XX_DIR);
-const registry = createDefaultRegistry(pinMap74xx);
+const registry = createDefaultRegistry();
 const facade = new DefaultSimulatorFacade(registry);
 const session = new SessionState();
 

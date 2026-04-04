@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import { TimingDiagramPanel } from "../timing-diagram.js";
 import { MockCoordinator } from "@/test-utils/mock-coordinator.js";
 import type { SignalAddress } from "@/compile/types.js";
+import { PinDirection } from "@/core/pin.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -25,9 +26,9 @@ function teardownCanvas(canvas: HTMLCanvasElement): void {
   canvas.remove();
 }
 
-const CLK_ADDR: SignalAddress = { domain: "digital", netId: 0, bitWidth: 1 };
-const DATA_ADDR: SignalAddress = { domain: "digital", netId: 1, bitWidth: 8 };
-const SIG_ADDR: SignalAddress = { domain: "digital", netId: 0, bitWidth: 1 };
+const CLK_ADDR: SignalAddress = { domain: "digital", netId: 0, bitWidth: 1, direction: PinDirection.INPUT };
+const DATA_ADDR: SignalAddress = { domain: "digital", netId: 1, bitWidth: 8, direction: PinDirection.INPUT };
+const SIG_ADDR: SignalAddress = { domain: "digital", netId: 0, bitWidth: 1, direction: PinDirection.INPUT };
 
 const TWO_CHANNELS = [
   { name: "CLK", addr: CLK_ADDR, width: 1 },
