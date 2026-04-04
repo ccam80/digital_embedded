@@ -36,6 +36,7 @@ import {
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -113,66 +114,75 @@ export function createVaractorElement(
   const nVt = nParam * VT;
   let vcrit = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
 
-  // NR linearization state for diode I-V
-  let _vd = 0; // junction voltage (positive = forward biased)
-  let _geq = GMIN;
-  let _ieq = 0;
-  let _id = 0; // cached junction current for getPinCurrents
+  // State pool slot indices
+  const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+  const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_VD_PREV = 6;
 
-  // Capacitance companion model state
-  let _capGeq = 0;
-  let _capIeq = 0;
-  let _vdPrev = NaN;
-  let _capFirstCall = true;
+  // Pool binding — set by initState
+  let s0: Float64Array;
+  let base: number;
+
+  // Capacitance companion model state (non-pool: init sentinel only)
+  let capFirstCall = true;
 
   return {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
+    stateSize: 7,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      s0 = pool.state0;
+      base = this.stateBaseOffset;
+      s0[base + SLOT_GEQ] = GMIN;
+    },
 
     stamp(solver: SparseSolver): void {
       // Stamp capacitance companion model (computed in stampCompanion)
-      if (_capGeq !== 0 || _capIeq !== 0) {
-        stampG(solver, nodeAnode,   nodeAnode,   _capGeq);
-        stampG(solver, nodeAnode,   nodeCathode, -_capGeq);
-        stampG(solver, nodeCathode, nodeAnode,   -_capGeq);
-        stampG(solver, nodeCathode, nodeCathode, _capGeq);
-        stampRHS(solver, nodeAnode,   -_capIeq);
-        stampRHS(solver, nodeCathode, _capIeq);
+      const capGeq = s0[base + SLOT_CAP_GEQ];
+      const capIeq = s0[base + SLOT_CAP_IEQ];
+      if (capGeq !== 0 || capIeq !== 0) {
+        stampG(solver, nodeAnode,   nodeAnode,   capGeq);
+        stampG(solver, nodeAnode,   nodeCathode, -capGeq);
+        stampG(solver, nodeCathode, nodeAnode,   -capGeq);
+        stampG(solver, nodeCathode, nodeCathode, capGeq);
+        stampRHS(solver, nodeAnode,   -capIeq);
+        stampRHS(solver, nodeCathode, capIeq);
       }
     },
 
     stampNonlinear(solver: SparseSolver): void {
       // Stamp Shockley diode Norton equivalent
-      stampG(solver, nodeAnode,   nodeAnode,   _geq);
-      stampG(solver, nodeAnode,   nodeCathode, -_geq);
-      stampG(solver, nodeCathode, nodeAnode,   -_geq);
-      stampG(solver, nodeCathode, nodeCathode, _geq);
-      stampRHS(solver, nodeAnode,   -_ieq);
-      stampRHS(solver, nodeCathode, _ieq);
+      const geq = s0[base + SLOT_GEQ];
+      const ieq = s0[base + SLOT_IEQ];
+      stampG(solver, nodeAnode,   nodeAnode,   geq);
+      stampG(solver, nodeAnode,   nodeCathode, -geq);
+      stampG(solver, nodeCathode, nodeAnode,   -geq);
+      stampG(solver, nodeCathode, nodeCathode, geq);
+      stampRHS(solver, nodeAnode,   -ieq);
+      stampRHS(solver, nodeCathode, ieq);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;
 
-      // Apply pnjlim to prevent exponential runaway
-      const vdLimited = pnjlim(vdRaw, _vd, nVt, vcrit);
+      // Apply pnjlim to prevent exponential runaway, using vold from pool
+      const vdOld = s0[base + SLOT_VD];
+      const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
 
-      if (nodeAnode > 0) {
-        voltages[nodeAnode - 1] = vC + vdLimited;
-      }
-
-      _vd = vdLimited;
+      // Save limited voltage to pool — no write-back to voltages[]
+      s0[base + SLOT_VD] = vdLimited;
 
       // Shockley equation linearized at operating point
-      const expArg = Math.min(_vd / nVt, 700);
+      const expArg = Math.min(vdLimited / nVt, 700);
       const expVal = Math.exp(expArg);
       const id = p.iS * (expVal - 1);
-      _id = id;
-      _geq = (p.iS * expVal) / nVt + GMIN;
-      _ieq = id - _geq * _vd;
+      s0[base + SLOT_ID] = id;
+      s0[base + SLOT_GEQ] = (p.iS * expVal) / nVt + GMIN;
+      s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
     },
 
     stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
@@ -185,30 +195,38 @@ export function createVaractorElement(
       const Cj = computeVaractorCapacitance(vReverse, p.cjo, p.vj, p.m);
 
       // Recover previous capacitor current for trapezoidal history
-      const iNow = _capGeq * vNow + _capIeq;
-      const vPrevForFormula = _capFirstCall ? vNow : _vdPrev;
-      _vdPrev = vNow;
-      _capFirstCall = false;
+      const prevCapGeq = s0[base + SLOT_CAP_GEQ];
+      const prevCapIeq = s0[base + SLOT_CAP_IEQ];
+      const iNow = prevCapGeq * vNow + prevCapIeq;
+      const vPrevForFormula = capFirstCall ? vNow : s0[base + SLOT_VD_PREV];
+      s0[base + SLOT_VD_PREV] = vNow;
+      capFirstCall = false;
 
-      _capGeq = capacitorConductance(Cj, dt, method);
-      _capIeq = capacitorHistoryCurrent(Cj, dt, method, vNow, vPrevForFormula, iNow);
+      s0[base + SLOT_CAP_GEQ] = capacitorConductance(Cj, dt, method);
+      s0[base + SLOT_CAP_IEQ] = capacitorHistoryCurrent(Cj, dt, method, vNow, vPrevForFormula, iNow);
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
-      const vA  = nodeAnode   > 0 ? voltages[nodeAnode   - 1]     : 0;
-      const vC  = nodeCathode > 0 ? voltages[nodeCathode - 1]     : 0;
-      const vAp = nodeAnode   > 0 ? prevVoltages[nodeAnode   - 1] : 0;
-      const vCp = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
-      return Math.abs((vA - vC) - (vAp - vCp)) <= 2 * nVt;
-    },
-
-    getPinCurrents(voltages: Float64Array): number[] {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array): boolean {
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vd = vA - vC;
-      const iDiode = _id;
-      const iCap = _capGeq * vd + _capIeq;
-      const I = iDiode + iCap;
+      const vdRaw = vA - vC;
+
+      // Compare raw junction voltage against the last limited voltage stored in
+      // the pool. Converged when the NR solution matches what pnjlim accepted.
+      return Math.abs(vdRaw - s0[base + SLOT_VD]) <= 2 * nVt;
+    },
+
+    getPinCurrents(_voltages: Float64Array): number[] {
+      // pinLayout order: [A (anode), K (cathode)]
+      // Positive = current flowing INTO element at that pin.
+      const id = s0[base + SLOT_ID];
+      const capGeq = s0[base + SLOT_CAP_GEQ];
+      const capIeq = s0[base + SLOT_CAP_IEQ];
+      const vNow = nodeAnode > 0 && nodeCathode > 0
+        ? (_voltages[nodeAnode - 1] - _voltages[nodeCathode - 1])
+        : 0;
+      const iCap = capGeq * vNow + capIeq;
+      const I = id + iCap;
       return [I, -I];
     },
 

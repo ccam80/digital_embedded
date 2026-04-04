@@ -16,9 +16,27 @@ import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+
+// ---------------------------------------------------------------------------
+// Helper: allocate a StatePool for a single element and call initState
+// ---------------------------------------------------------------------------
+
+function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
+  const size = core.stateSize ?? 0;
+  const pool = new StatePool(Math.max(size, 1));
+  if (size > 0) {
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+  } else {
+    core.stateBaseOffset = -1;
+  }
+  return { element: core, pool };
+}
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -62,7 +80,9 @@ function makeZenerAtVd(
     IBV: 1e-3,
     ...modelOverrides,
   });
-  const element = withNodeIds(createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj), [1, 2]);
+  const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+  const { element: statedCore } = withState(core);
+  const element = withNodeIds(statedCore, [1, 2]);
 
   // Drive to operating point
   const voltages = new Float64Array(2);
@@ -122,7 +142,8 @@ describe("Zener", () => {
 
     // Create element and drive to breakdown
     const propsObj = makeParamBag({ IS, N, BV, IBV });
-    const el = createZenerElement(new Map([["A", 1], ["K", 0]]), [], -1, propsObj);
+    const core = createZenerElement(new Map([["A", 1], ["K", 0]]), [], -1, propsObj);
+    const { element: el } = withState(core);
 
     // Verify the element is nonlinear
     expect(el.isNonlinear).toBe(true);
@@ -154,15 +175,34 @@ describe("Zener", () => {
     expect(id).toBeGreaterThan(1e-6); // should be mA range
   });
 
+  it("updateOperatingPoint_does_not_write_voltages", () => {
+    // Verify that updateOperatingPoint reads from voltages but does NOT write back
+    // This is critical for the state pool migration: voltages[] stays read-only
+    const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3 });
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element } = withState(core);
+
+    const voltages = new Float64Array([0.7, 0.0]);
+    const voltagesBefore = new Float64Array(voltages);
+
+    element.updateOperatingPoint!(voltages);
+
+    // Voltages should be completely unchanged
+    expect(voltages[0]).toBe(voltagesBefore[0]);
+    expect(voltages[1]).toBe(voltagesBefore[1]);
+  });
+
   it("isNonlinear_true", () => {
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1 });
-    const element = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element } = withState(core);
     expect(element.isNonlinear).toBe(true);
   });
 
   it("isReactive_false", () => {
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1 });
-    const element = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element } = withState(core);
     expect(element.isReactive).toBe(false);
   });
 
@@ -206,7 +246,9 @@ describe("Integration", () => {
     // When node1 ≈ 5.1V, Vd = 0 - 5.1 = -5.1V (breakdown)
     // IBV=1e-3 gives sharp clamping at BV (SPICE default)
     const zenerProps = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3 });
-    const z = withNodeIds(createZenerElement(new Map([["A", 0], ["K", 1]]), [], -1, zenerProps), [0, 1]);
+    const zenerCore = createZenerElement(new Map([["A", 0], ["K", 1]]), [], -1, zenerProps);
+    const { element: zenerStated } = withState(zenerCore);
+    const z = withNodeIds(zenerStated, [0, 1]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

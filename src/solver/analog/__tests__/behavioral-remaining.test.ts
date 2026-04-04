@@ -25,6 +25,7 @@ import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson } from "../newton-raphson.js";
 import { makeVoltageSource, makeResistor, withNodeIds } from "./test-helpers.js";
+import { StatePool } from "../state-pool.js";
 import {
   createDriverAnalogElement,
   createSevenSegAnalogElement,
@@ -32,6 +33,7 @@ import {
 } from "../behavioral-remaining.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../element.js";
+import type { AnalogElementCore } from "../../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Component definitions imported for registration test
@@ -58,6 +60,21 @@ function getFactory(entry: ModelEntry): AnalogFactory {
   return entry.factory;
 }
 
+// ---------------------------------------------------------------------------
+// Helper: allocate a StatePool for a single element and call initState
+// ---------------------------------------------------------------------------
+
+function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
+  const size = core.stateSize ?? 0;
+  const pool = new StatePool(Math.max(size, 1));
+  if (size > 0) {
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+  } else {
+    core.stateBaseOffset = -1;
+  }
+  return { element: core, pool };
+}
 
 // ---------------------------------------------------------------------------
 // Shared constants
@@ -196,14 +213,16 @@ describe("LED", () => {
     props.replaceModelParams({ IS: 3.17e-19, N: 1.8 });
 
     // LED: anode = circuit node 2, cathode = ground (0)
-    const led = getFactory(LedDefinition.modelRegistry!.red!)(new Map([["in", 2]]), [], -1, props, () => 0);
+    const ledCore = getFactory(LedDefinition.modelRegistry!.red!)(new Map([["in", 2]]), [], -1, props);
+    const { element: ledStateWrapped } = withState(ledCore);
+    const led = withNodeIds(ledStateWrapped, [2, 0]);
 
     // VS at circuit node 1 (solver row 0), branch row 2 (absolute)
     const vs = makeVoltageSource(1, 0, 2, VDD);
     // 330Ω from circuit node 1 to circuit node 2 (LED anode)
     const rSeries = makeResistor(1, 2, 330);
 
-    const elements: AnalogElement[] = [vs, rSeries, withNodeIds(led, [2, 0])];
+    const elements: AnalogElement[] = [vs, rSeries, led];
     const matrixSize = 3; // 2 node rows (0,1) + 1 branch row (2)
 
     const result = solve(elements, matrixSize);

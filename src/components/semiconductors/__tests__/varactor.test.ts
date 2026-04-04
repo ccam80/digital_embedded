@@ -17,13 +17,27 @@ import {
 } from "../varactor.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
 
 // ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
+// Helper: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
+
+function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
+  const size = core.stateSize ?? 0;
+  const pool = new StatePool(Math.max(size, 1));
+  if (size > 0) {
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+  } else {
+    core.stateBaseOffset = -1;
+  }
+  return { element: core, pool };
+}
+
 // ---------------------------------------------------------------------------
 // Default varactor parameters
 // ---------------------------------------------------------------------------
@@ -39,19 +53,21 @@ const VARACTOR_DEFAULTS = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeVaractor(overrides: Partial<typeof VARACTOR_DEFAULTS> = {}): AnalogElement {
+function makeVaractor(overrides: Partial<typeof VARACTOR_DEFAULTS> = {}): AnalogElementCore {
   const params = { ...VARACTOR_PARAM_DEFAULTS, ...VARACTOR_DEFAULTS, ...overrides };
   const props = createTestPropertyBag();
   props.replaceModelParams(params);
   // nodeAnode=1, nodeCathode=2
-  return withNodeIds(createVaractorElement(new Map([["A", 1], ["K", 2]]), [], -1, props), [1, 2]);
+  const core = createVaractorElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+  const { element: statedCore } = withState(core);
+  return withNodeIds(statedCore, [1, 2]);
 }
 
 /**
  * Drive varactor to operating point and call stampCompanion to set capacitance.
  * Returns the _capGeq (capacitance companion conductance) by observing stamp() output.
  */
-function getCapacitanceAtBias(element: AnalogElement, vd: number, dt = 1e-6): number {
+function getCapacitanceAtBias(element: AnalogElementCore, vd: number, dt = 1e-6): number {
   // Drive to operating point (vAnode = vd, vCathode = 0)
   const voltages = new Float64Array(2);
   voltages[0] = vd;

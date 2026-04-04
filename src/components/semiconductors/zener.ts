@@ -27,6 +27,7 @@ import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { createDiodeElement, getDiodeInternalNodeCount } from "./diode.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -91,22 +92,33 @@ export function createZenerElement(
     params[key] = props.getModelParam<number>(key);
   }
 
-  // NR linearization state
-  let vd = 0;
-  let geq = GMIN;
-  let ieq = 0;
-  let _id = 0; // cached junction current for getPinCurrents
+  // State pool slot indices
+  const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+
+  // Pool binding — set by initState
+  let s0: Float64Array;
+  let base: number;
 
   return {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
+    stateSize: 4,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      s0 = pool.state0;
+      base = this.stateBaseOffset;
+      s0[base + SLOT_GEQ] = GMIN;
+    },
 
     stamp(_solver: SparseSolver): void {
       // No linear topology-constant contributions.
     },
 
     stampNonlinear(solver: SparseSolver): void {
+      const geq = s0[base + SLOT_GEQ];
+      const ieq = s0[base + SLOT_IEQ];
       stampG(solver, nodeAnode, nodeAnode, geq);
       stampG(solver, nodeAnode, nodeCathode, -geq);
       stampG(solver, nodeCathode, nodeAnode, -geq);
@@ -115,7 +127,7 @@ export function createZenerElement(
       stampRHS(solver, nodeCathode, ieq);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
@@ -125,33 +137,31 @@ export function createZenerElement(
       const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
 
       // Apply pnjlim to prevent exponential runaway in forward region
-      const vdLimited = pnjlim(vdRaw, vd, nVt, vcrit);
+      const vdOld = s0[base + SLOT_VD];
+      const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
 
-      if (nodeAnode > 0) {
-        voltages[nodeAnode - 1] = vc + vdLimited;
-      }
-
-      vd = vdLimited;
+      // Save limited voltage to pool — no write-back to voltages[]
+      s0[base + SLOT_VD] = vdLimited;
 
       // Compute diode current and linearized conductance
-      if (vd >= -params.BV) {
+      if (vdLimited >= -params.BV) {
         // Forward region and normal reverse region: standard Shockley
-        const expArg = Math.min(vd / nVt, 700);
+        const expArg = Math.min(vdLimited / nVt, 700);
         const expVal = Math.exp(expArg);
         const id = params.IS * (expVal - 1);
-        _id = id;
-        geq = (params.IS * expVal) / nVt + GMIN;
-        ieq = id - geq * vd;
+        s0[base + SLOT_ID] = id;
+        s0[base + SLOT_GEQ] = (params.IS * expVal) / nVt + GMIN;
+        s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
       } else {
         // Reverse breakdown region: Id = -IBV * exp(-(Vd + BV) / (N*Vt))
         // IBV is the reference current at the breakdown voltage BV.
-        const bdExpArg = Math.min(-(vd + params.BV) / nVt, 700);
+        const bdExpArg = Math.min(-(vdLimited + params.BV) / nVt, 700);
         const bdExpVal = Math.exp(bdExpArg);
         const id = -params.IBV * bdExpVal;
-        _id = id;
+        s0[base + SLOT_ID] = id;
         // geq = |dId/dVd| = IBV * exp(-(Vd+BV)/nVt) / nVt
-        geq = (params.IBV * bdExpVal) / nVt + GMIN;
-        ieq = id - geq * vd;
+        s0[base + SLOT_GEQ] = (params.IBV * bdExpVal) / nVt + GMIN;
+        s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
       }
     },
 
@@ -171,7 +181,8 @@ export function createZenerElement(
     getPinCurrents(_voltages: Float64Array): number[] {
       // pinLayout order: [A (anode), K (cathode)]
       // Positive = current flowing INTO element at that pin.
-      return [_id, -_id];
+      const id = s0[base + SLOT_ID];
+      return [id, -id];
     },
 
     setParam(key: string, value: number): void {

@@ -20,13 +20,11 @@ import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { newtonRaphson } from "../../../solver/analog/newton-raphson.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
+import type { AnalogElement, AnalogElementCore } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
-// ---------------------------------------------------------------------------
-// Helper: narrow ModelEntry to inline factory (throws if netlist kind)
-// ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
 // Default tunnel diode parameters
 // ---------------------------------------------------------------------------
@@ -49,6 +47,18 @@ const TD_MODEL_PARAMS = {
 // Helpers
 // ---------------------------------------------------------------------------
 
+function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
+  const size = core.stateSize ?? 0;
+  const pool = new StatePool(Math.max(size, 1));
+  if (size > 0) {
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+  } else {
+    core.stateBaseOffset = -1;
+  }
+  return { element: core, pool };
+}
+
 function makeParamBag(params: Record<string, number>): PropertyBag {
   const bag = new PropertyBag();
   bag.replaceModelParams(params);
@@ -57,8 +67,10 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
 
 function makeTunnelDiode(overrides: Partial<typeof TD_MODEL_PARAMS> = {}): AnalogElement {
   const modelParams = { ...TD_MODEL_PARAMS, ...overrides };
+  const core = createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, makeParamBag(modelParams));
+  const { element: statedCore } = withState(core);
   // nodeAnode=1, nodeCathode=2
-  return withNodeIds(createTunnelDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, makeParamBag(modelParams)), [1, 2]);
+  return withNodeIds(statedCore, [1, 2]);
 }
 
 /**
@@ -248,12 +260,14 @@ describe("TunnelDiode", () => {
 
     const vTarget = (TD_DEFAULTS.vp + TD_DEFAULTS.vv) / 2; // ~0.29V
 
-    const td = withNodeIds(createTunnelDiodeElement(
+    const core = createTunnelDiodeElement(
       new Map([["A", 2], ["K", 0]]),
       [],
       -1,
       makeParamBag(TD_MODEL_PARAMS),
-    ), [2, 0]);
+    );
+    const { element: statedCore } = withState(core);
+    const td = withNodeIds(statedCore, [2, 0]);
 
     // Resistor element
     const G = 1 / 100;

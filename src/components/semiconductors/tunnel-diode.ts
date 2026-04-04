@@ -34,6 +34,7 @@ import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -152,17 +153,18 @@ export function createTunnelDiodeElement(
     N:  readParam("N"),
   };
 
-  // NR linearization state
-  let _vd = 0;
-  let _geq = GMIN;
-  let _ieq = 0;
-  let _id = 0; // cached junction current for getPinCurrents
+  // State pool slot indices
+  const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+
+  // Pool binding — set by initState
+  let s0: Float64Array;
+  let base: number;
 
   function recompute(v: number): void {
     const { i, dIdV } = tunnelDiodeIV(v, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
-    _id = i;
-    _geq = dIdV; // dI/dV is the conductance (can be negative in NDR)
-    _ieq = i - _geq * v;
+    s0[base + SLOT_ID] = i;
+    s0[base + SLOT_GEQ] = dIdV; // dI/dV is the conductance (can be negative in NDR)
+    s0[base + SLOT_IEQ] = i - dIdV * v;
   }
 
   function isInNdrRegion(v: number): boolean {
@@ -173,32 +175,43 @@ export function createTunnelDiodeElement(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
+    stateSize: 4,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      s0 = pool.state0;
+      base = this.stateBaseOffset;
+      s0[base + SLOT_GEQ] = GMIN;
+    },
 
     stamp(_solver: SparseSolver): void {
       // No topology-constant contributions
     },
 
     stampNonlinear(solver: SparseSolver): void {
-      stampG(solver, nodeAnode,   nodeAnode,   _geq);
-      stampG(solver, nodeAnode,   nodeCathode, -_geq);
-      stampG(solver, nodeCathode, nodeAnode,   -_geq);
-      stampG(solver, nodeCathode, nodeCathode, _geq);
-      stampRHS(solver, nodeAnode,   -_ieq);
-      stampRHS(solver, nodeCathode, _ieq);
+      const geq = s0[base + SLOT_GEQ];
+      const ieq = s0[base + SLOT_IEQ];
+      stampG(solver, nodeAnode,   nodeAnode,   geq);
+      stampG(solver, nodeAnode,   nodeCathode, -geq);
+      stampG(solver, nodeCathode, nodeAnode,   -geq);
+      stampG(solver, nodeCathode, nodeCathode, geq);
+      stampRHS(solver, nodeAnode,   -ieq);
+      stampRHS(solver, nodeCathode, ieq);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;
 
       // Voltage limiting in or near NDR region: clamp step to NDR_VSTEP_MAX
       // This prevents NR from jumping across the negative-resistance valley.
+      const vdOld = s0[base + SLOT_VD];
       let vdNew: number;
-      if (isInNdrRegion(_vd) || isInNdrRegion(vdRaw)) {
-        const step = vdRaw - _vd;
+      if (isInNdrRegion(vdOld) || isInNdrRegion(vdRaw)) {
+        const step = vdRaw - vdOld;
         if (Math.abs(step) > NDR_VSTEP_MAX) {
-          vdNew = _vd + Math.sign(step) * NDR_VSTEP_MAX;
+          vdNew = vdOld + Math.sign(step) * NDR_VSTEP_MAX;
         } else {
           vdNew = vdRaw;
         }
@@ -206,13 +219,9 @@ export function createTunnelDiodeElement(
         vdNew = vdRaw;
       }
 
-      // Write limited voltage back
-      if (nodeAnode > 0) {
-        voltages[nodeAnode - 1] = vC + vdNew;
-      }
-
-      _vd = vdNew;
-      recompute(_vd);
+      // Save limited voltage to pool — no write-back to voltages[]
+      s0[base + SLOT_VD] = vdNew;
+      recompute(vdNew);
     },
 
     checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
@@ -222,14 +231,16 @@ export function createTunnelDiodeElement(
       const vCp = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
       const dvd = Math.abs((vA - vC) - (vAp - vCp));
       // Tighter tolerance in NDR region
-      const tol = isInNdrRegion(_vd) ? NDR_VSTEP_MAX * 0.01 : 2 * VT;
+      const vdPooled = s0[base + SLOT_VD];
+      const tol = isInNdrRegion(vdPooled) ? NDR_VSTEP_MAX * 0.01 : 2 * VT;
       return dvd <= tol;
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {
       // pinLayout order: [A (anode), K (cathode)]
       // Positive = current flowing INTO element at that pin.
-      return [_id, -_id];
+      const id = s0[base + SLOT_ID];
+      return [id, -id];
     },
 
     setParam(key: string, value: number): void {

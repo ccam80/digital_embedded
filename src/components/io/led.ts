@@ -22,8 +22,10 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -158,82 +160,79 @@ function createLedAnalogElement(
   const nVt = N * LED_VT;
   const vcrit = nVt * Math.log(nVt / (IS * Math.SQRT2));
 
-  let vd = 0;
-  let geq = LED_GMIN;
-  let ieq = 0;
-  let _id = 0;
+  // State pool slot indices
+  const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
 
-  return {
+  // Pool binding — set by initState
+  let s0: Float64Array;
+  let base: number;
+
+  const element: AnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: false,
+    stateSize: 4,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      s0 = pool.state0;
+      base = this.stateBaseOffset;
+      s0[base + SLOT_GEQ] = LED_GMIN;
+    },
 
     stamp(_solver: SparseSolver): void {
       // No linear topology-constant contributions.
     },
 
     stampNonlinear(solver: SparseSolver): void {
-      _ledStampG(solver, nodeAnode, nodeAnode, geq);
-      _ledStampG(solver, nodeAnode, nodeCathode, -geq);
-      _ledStampG(solver, nodeCathode, nodeAnode, -geq);
-      _ledStampG(solver, nodeCathode, nodeCathode, geq);
-      _ledStampRHS(solver, nodeAnode, -ieq);
-      _ledStampRHS(solver, nodeCathode, ieq);
+      const geq = s0[base + SLOT_GEQ];
+      const ieq = s0[base + SLOT_IEQ];
+      stampG(solver, nodeAnode, nodeAnode, geq);
+      stampG(solver, nodeAnode, nodeCathode, -geq);
+      stampG(solver, nodeCathode, nodeAnode, -geq);
+      stampG(solver, nodeCathode, nodeCathode, geq);
+      stampRHS(solver, nodeAnode, -ieq);
+      stampRHS(solver, nodeCathode, ieq);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
 
-      const vdLimited = pnjlim(vdRaw, vd, nVt, vcrit);
+      const vdOld = s0[base + SLOT_VD];
+      const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
 
-      if (nodeAnode > 0) {
-        voltages[nodeAnode - 1] = vc + vdLimited;
-      }
+      s0[base + SLOT_VD] = vdLimited;
 
-      vd = vdLimited;
-
-      const expArg = Math.min(vd / nVt, 700);
+      const expArg = Math.min(vdLimited / nVt, 700);
       const expVal = Math.exp(expArg);
       const id = IS * (expVal - 1);
-      _id = id;
-      geq = (IS * expVal) / nVt + LED_GMIN;
-      ieq = id - geq * vd;
+      s0[base + SLOT_ID] = id;
+      s0[base + SLOT_GEQ] = (IS * expVal) / nVt + LED_GMIN;
+      s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
     },
 
-    getPinCurrents(_voltages: Float64Array): number[] {
+    getPinCurrents(_voltages: Readonly<Float64Array>): number[] {
       // pinLayout order: [in (anode)]. Cathode is implicit ground.
       // Positive = current flowing INTO element at that pin.
-      return [_id];
+      const id = s0[base + SLOT_ID];
+      return [id];
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array): boolean {
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdNew = va - vc;
 
-      const vaPrev = nodeAnode > 0 ? prevVoltages[nodeAnode - 1] : 0;
-      const vcPrev = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
-      const vdPrevVal = vaPrev - vcPrev;
-
-      return Math.abs(vdNew - vdPrevVal) <= 2 * nVt;
+      const vdOld = s0[base + SLOT_VD];
+      return Math.abs(vdNew - vdOld) <= 2 * nVt;
     },
 
     setParam(_key: string, _value: number) {},
   };
-}
 
-function _ledStampG(solver: SparseSolver, row: number, col: number, val: number): void {
-  if (row !== 0 && col !== 0) {
-    solver.stamp(row - 1, col - 1, val);
-  }
-}
-
-function _ledStampRHS(solver: SparseSolver, row: number, val: number): void {
-  if (row !== 0) {
-    solver.stampRHS(row - 1, val);
-  }
+  return element;
 }
 
 // ---------------------------------------------------------------------------
