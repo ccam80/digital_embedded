@@ -100,7 +100,7 @@ export interface AnalogElement {
    *
    * @param voltages - Full MNA solution vector (size = nodeCount + branchCount)
    */
-  updateOperatingPoint?(voltages: Float64Array): void;
+  updateOperatingPoint?(voltages: Readonly<Float64Array>): void;
 
   /**
    * Recompute companion model coefficients and stamp them into the solver.

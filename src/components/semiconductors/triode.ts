@@ -244,7 +244,7 @@ export function createTriodeElement(
       stampRHS(solver, nodeK, igNorton);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const vP = nodeP > 0 ? voltages[nodeP - 1] : 0;
       const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;

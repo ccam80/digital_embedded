@@ -170,7 +170,7 @@ function createSchmittTriggerElement(
       if (nOut > 0) outModel.stampOutput(solver);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const vIn = readNode(voltages, nIn);
 
       // Apply hysteresis state machine

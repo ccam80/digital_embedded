@@ -235,7 +235,7 @@ function createOpAmpElement(
       }
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       vInp = readNode(voltages, nInp);
       vInn = readNode(voltages, nInn);
 

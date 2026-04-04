@@ -283,7 +283,7 @@ export class AnalogPolarizedCapElement implements AnalogElement {
     // Polarity violation detection occurs in updateOperatingPoint.
   }
 
-  updateOperatingPoint(voltages: Float64Array): void {
+  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
 

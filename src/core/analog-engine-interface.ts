@@ -12,7 +12,7 @@
 
 import type { Engine, CompiledCircuit, MeasurementObserver } from "./engine-interface.js";
 import type { Wire } from "../core/circuit.js";
-import type { AcParams, AcResult, DiagnosticSuggestion } from "./analog-types.js";
+import type { AcParams, AcResult, DiagnosticSuggestion, StatePoolRef } from "./analog-types.js";
 import type { Diagnostic, DiagnosticCode } from "../compile/types.js";
 export type { AcParams, AcResult, DiagnosticSuggestion };
 export type { Diagnostic, DiagnosticCode };
@@ -100,6 +100,8 @@ export interface CompiledAnalogCircuit extends CompiledCircuit {
   readonly labelToNodeId: Map<string, number>;
   /** Maps Wire objects to MNA node IDs for wire renderer signal access. */
   readonly wireToNodeId: Map<Wire, number>;
+  /** Shared state pool for per-element operating-point state. */
+  readonly statePool: StatePoolRef;
 }
 
 // ---------------------------------------------------------------------------

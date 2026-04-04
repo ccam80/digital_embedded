@@ -219,7 +219,7 @@ export class NJfetAnalogElement extends AbstractFetElement {
     if (key in this._p) (this._p as unknown as Record<string, number>)[key] = value;
   }
 
-  override updateOperatingPoint(voltages: Float64Array): void {
+  override updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;

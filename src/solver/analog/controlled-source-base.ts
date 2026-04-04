@@ -141,7 +141,7 @@ export abstract class ControlledSourceElement implements AnalogElementCore {
    * `_bindContext` to extract the correct control variable (voltage or current)
    * and set `_ctrlValue`.
    */
-  updateOperatingPoint(voltages: Float64Array): void {
+  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     this._bindContext(voltages);
   }
 

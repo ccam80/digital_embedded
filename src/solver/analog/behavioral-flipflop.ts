@@ -154,7 +154,7 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
    *
    * Grows the cache array lazily to match the solution vector size.
    */
-  updateOperatingPoint(voltages: Float64Array): void {
+  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     if (this._cachedVoltages.length !== voltages.length) {
       this._cachedVoltages = new Float64Array(voltages.length);
     }

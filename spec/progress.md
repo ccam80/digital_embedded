@@ -39,12 +39,13 @@
 | W5T1 | complete | Capacitor — stateSize:3, pool slots for geq/ieq/vPrev |
 | W5T2 | complete | Inductor — stateSize:3, pool slots for geq/ieq/iPrev |
 
-## Phase 6: Engine integration — PENDING
+## Phase 6: Engine integration — IN PROGRESS
 | Task | Status | Notes |
 |------|--------|-------|
-| W6T1 | pending | Wire checkpoint/rollback/acceptTimestep into analog-engine.ts |
+| G1 | complete | Added statePool to CompiledAnalogCircuit interface + MNAEngine local interface |
+| W6T1 | complete | checkpoint/rollback/acceptTimestep wired into step(), reset(), dcOperatingPoint() |
 | W6T2 | pending | Convergence regression integration tests |
-| W6T3 | pending | Make voltages param Readonly<Float64Array> in updateOperatingPoint |
+| W6T3 | complete | updateOperatingPoint voltages param narrowed to Readonly<Float64Array> across all interfaces and devices |
 
 ---
 ## Wave 1.1 Summary

@@ -348,7 +348,7 @@ function createDACElement(
       }
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       _vOut = computeOutputVoltage(voltages);
     },
 

@@ -146,7 +146,7 @@ export class MemristorElement implements AnalogElementCore {
     // (This matches the resistor pattern: pure G stamp, no RHS offset.)
   }
 
-  updateOperatingPoint(_voltages: Float64Array): void {
+  updateOperatingPoint(_voltages: Readonly<Float64Array>): void {
     // No voltage limiting needed; conductance is a smooth function of w.
   }
 

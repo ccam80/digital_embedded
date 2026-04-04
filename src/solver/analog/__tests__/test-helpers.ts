@@ -319,7 +319,7 @@ export function makeDiode(
       RHS(solver, nodeCathode, ieq);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
@@ -344,17 +344,14 @@ export function makeDiode(
       s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array): boolean {
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vdNew = va - vc;
-
-      const vaPrev = nodeAnode > 0 ? prevVoltages[nodeAnode - 1] : 0;
-      const vcPrev = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
-      const vdPrev = vaPrev - vcPrev;
-
-      // Converged when junction voltage change is within tolerance
-      return Math.abs(vdNew - vdPrev) <= 2 * nVt;
+      const vdRaw = va - vc;
+      const vdLim = s0[base + SLOT_VD];
+      // Converged when the limited voltage and raw solver voltage agree within tolerance.
+      // This matches SPICE's junction convergence criterion.
+      return Math.abs(vdLim - vdRaw) <= 2 * nVt;
     },
 
     getPinCurrents(voltages: Float64Array): number[] {

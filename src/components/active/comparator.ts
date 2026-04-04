@@ -250,7 +250,7 @@ function createOpenCollectorComparatorElement(
       _gEff = gNew;
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const vInp = readNode(voltages, nInp);
       const vInn = readNode(voltages, nInn);
       const vDiff = vInp - vInn - p.vos;
@@ -377,7 +377,7 @@ function createPushPullComparatorElement(
       }
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const vInp = readNode(voltages, nInp);
       const vInn = readNode(voltages, nInn);
       const vDiff = vInp - vInn - p.vos;

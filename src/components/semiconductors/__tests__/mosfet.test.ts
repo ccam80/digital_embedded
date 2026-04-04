@@ -30,9 +30,25 @@ import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+
+// ---------------------------------------------------------------------------
+// withState — allocate a StatePool and call initState on the element
+// ---------------------------------------------------------------------------
+
+function withState<T extends AnalogElementCore>(element: T): T {
+  const size = element.stateSize ?? 0;
+  if (size > 0 && element.initState) {
+    element.stateBaseOffset = 0;
+    const pool = new StatePool(size);
+    element.initState(pool);
+  }
+  return element;
+}
 
 /** Assert actual ≈ expected within 0.1% relative tolerance (ngspice reference). */
 function expectSpiceRef(actual: number, expected: number, label: string) {
@@ -95,7 +111,7 @@ function makeNmosAtVgs_Vds(
   modelParams: Record<string, number> = NMOS_DEFAULTS,
 ): AnalogElement {
   const propsObj = makeParamBag(modelParams);
-  const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
+  const element = withState(createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj));
   // pinNodeIds: pinLayout order [G, D, S, B]; B=S for 3-terminal → [2, 1, 3, 3]
   Object.assign(element, { pinNodeIds: [2, 1, 3, 3], allNodeIds: [2, 1, 3, 3] });
   const elementWithPins = element as unknown as AnalogElement;
@@ -395,7 +411,7 @@ describe("PMOS", () => {
     // In MNA: nodeS at high voltage (5V), nodeD at 0V, nodeG at 2V (so Vgs = 2-5 = -3V)
     // createMosfetElement pin order: [G, S, D]
     const propsObj = makeParamBag(PMOS_DEFAULTS);
-    const element = createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
+    const element = withState(createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj));
 
     // vS=5V (node3), vG=2V (node2), vD=0V (node1)
     // Vgs = 2-5 = -3V, Vds = 0-5 = -5V
@@ -528,7 +544,7 @@ describe("Integration", () => {
     // createMosfetElement pin order: [G, S, D]
     const nmosParams = { ...NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
     const propsObj = makeParamBag(nmosParams);
-    const nmos = withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]);
+    const nmos = withState(withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]));
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
@@ -574,7 +590,7 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const rd = makeResistorElement(2, 1, 1000);
     const nmosParams = { ...NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
     const propsObj = makeParamBag(nmosParams);
-    const nmos = withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]);
+    const nmos = withState(withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]));
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
@@ -600,7 +616,7 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const rd = makeResistorElement(2, 1, 1000);
     const nmosParams = { ...NMOS_DEFAULTS, W: 10e-6, L: 1e-6 };
     const propsObj = makeParamBag(nmosParams);
-    const nmos = withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]);
+    const nmos = withState(withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]));
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

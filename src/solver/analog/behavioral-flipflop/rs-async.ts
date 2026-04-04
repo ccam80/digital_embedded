@@ -81,7 +81,7 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
     this._qBarPin.stampOutput(solver);
   }
 
-  updateOperatingPoint(voltages: Float64Array): void {
+  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     if (this._cachedVoltages.length !== voltages.length) {
       this._cachedVoltages = new Float64Array(voltages.length);
     }

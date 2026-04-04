@@ -102,7 +102,7 @@ export interface AnalogElementCore {
   /**
    * Update internal linearization state from the latest NR solution vector.
    */
-  updateOperatingPoint?(voltages: Float64Array): void;
+  updateOperatingPoint?(voltages: Readonly<Float64Array>): void;
 
   /**
    * Recompute companion model coefficients and stamp them into the solver.

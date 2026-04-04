@@ -515,7 +515,7 @@ export function createRealOpAmpElement(
       }
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const G_out  = 1 / Math.max(p.rOut,  1e-9);
       const iMax   = Math.max(p.iMax,   1e-12);
       const vSatPos = Math.max(p.vSatPos, 0);

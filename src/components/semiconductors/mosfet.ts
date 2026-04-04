@@ -768,7 +768,7 @@ class MosfetAnalogElement extends AbstractFetElement {
     return { cgs: caps.cgs, cgd: caps.cgd };
   }
 
-  override updateOperatingPoint(voltages: Float64Array): void {
+  override updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     const nodeD = this.drainNode;
     const nodeG = this.gateNode;
     const nodeS = this.sourceNode;

@@ -322,7 +322,7 @@ function compileSubcircuitToMnaModel(
         core.stampNonlinear = (solver: import("../../core/analog-types.js").SparseSolverStamp): void => {
           for (const sub of subElements) sub.stampNonlinear?.(solver);
         };
-        core.updateOperatingPoint = (voltages: Float64Array): void => {
+        core.updateOperatingPoint = (voltages: Readonly<Float64Array>): void => {
           for (const sub of subElements) sub.updateOperatingPoint?.(voltages);
         };
       }

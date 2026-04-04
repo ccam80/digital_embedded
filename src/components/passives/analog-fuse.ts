@@ -153,7 +153,7 @@ export class AnalogFuseElement implements AnalogElement {
     }
   }
 
-  updateOperatingPoint(voltages: Float64Array): void {
+  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     void voltages;
   }
 

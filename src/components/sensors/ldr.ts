@@ -142,7 +142,7 @@ export class LDRElement implements AnalogElementCore {
     }
   }
 
-  updateOperatingPoint(voltages: Float64Array): void {
+  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     // No internal voltage-dependent state; resistance depends only on lux.
     void voltages;
   }

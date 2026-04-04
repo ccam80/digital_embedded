@@ -354,7 +354,7 @@ function createTimer555Element(
       }
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       // Update output pin voltage levels for stampNonlinear but do NOT advance
       // flip-flop. Keeping flip-flop state constant within each NR solve lets
       // the solver converge to the linearized operating point. State transitions

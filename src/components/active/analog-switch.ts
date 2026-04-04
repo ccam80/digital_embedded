@@ -136,7 +136,7 @@ function createSwitchSPSTElement(
       stampConductance(solver, nIn, nOut, g);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const vCtrl = readNode(voltages, nCtrl);
       currentR = switchResistance(vCtrl, p.threshold, Math.max(p.rOn, 1e-6), Math.max(p.rOff, p.rOn + 1), p.transitionSharpness, false);
     },
@@ -198,7 +198,7 @@ function createSwitchSPDTElement(
       stampConductance(solver, nCom, nNC, 1 / rNC);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const vCtrl = readNode(voltages, nCtrl);
       const rOnNow  = Math.max(p.rOn, 1e-6);
       const rOffNow = Math.max(p.rOff, rOnNow + 1);

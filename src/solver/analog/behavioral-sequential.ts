@@ -121,7 +121,7 @@ export class BehavioralCounterElement implements AnalogElementCore {
     this._ovfPin.stampOutput(solver);
   }
 
-  updateOperatingPoint(voltages: Float64Array): void {
+  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     if (this._cachedVoltages.length !== voltages.length) {
       this._cachedVoltages = new Float64Array(voltages.length);
     }
@@ -308,7 +308,7 @@ export class BehavioralRegisterElement implements AnalogElementCore {
     }
   }
 
-  updateOperatingPoint(voltages: Float64Array): void {
+  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     if (this._cachedVoltages.length !== voltages.length) {
       this._cachedVoltages = new Float64Array(voltages.length);
     }
@@ -591,7 +591,7 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     this._ovfPin.stampOutput(solver);
   }
 
-  updateOperatingPoint(voltages: Float64Array): void {
+  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     if (this._cachedVoltages.length !== voltages.length) {
       this._cachedVoltages = new Float64Array(voltages.length);
     }

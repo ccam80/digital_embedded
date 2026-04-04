@@ -18,8 +18,10 @@ import { solveDcOperatingPoint } from "../dc-operating-point.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../../components/sources/dc-voltage-source.js";
 import { withNodeIds } from "./test-helpers.js";
+import { StatePool } from "../state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../sparse-solver.js";
 import type { AnalogElement } from "../element.js";
+import type { AnalogElementCore } from "../../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Default model parameters (same as mosfet.test.ts for exact comparison)
@@ -62,6 +64,24 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
 }
 
 // ---------------------------------------------------------------------------
+// withState — allocate a StatePool and call initState on the element
+// ---------------------------------------------------------------------------
+
+/**
+ * Allocate a StatePool sized for the element's stateSize, assign stateBaseOffset,
+ * and call initState. Returns the element (mutated in place) for chaining.
+ */
+function withState<T extends AnalogElementCore>(element: T): T {
+  const size = element.stateSize ?? 0;
+  if (size > 0 && element.initState) {
+    element.stateBaseOffset = 0;
+    const pool = new StatePool(size);
+    element.initState(pool);
+  }
+  return element;
+}
+
+// ---------------------------------------------------------------------------
 // Mock SparseSolver
 // ---------------------------------------------------------------------------
 
@@ -84,6 +104,8 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    stateSize: 0,
+    stateBaseOffset: -1,
     stamp(solver: SparseSolverType): void {
       if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
       if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -111,13 +133,13 @@ describe("Refactor", () => {
     const diagnostics = new DiagnosticCollector();
 
     const propsObj = makeParamBag(NMOS_10U_1U);
-    const nmosElement = withNodeIds(createMosfetElement(
+    const nmosElement = withState(withNodeIds(createMosfetElement(
       1,
       new Map([["G", 3], ["S", 0], ["D", 1]]), // G=node3, S=ground, D=node1
       [],
       -1,
       propsObj,
-    ), [3, 0, 1]); // pinLayout order: [G, S, D]
+    ), [3, 0, 1])); // pinLayout order: [G, S, D]
 
     const vddSource = withNodeIds(makeDcVoltageSource(2, 0, 3, 5.0), [2, 0]);
     const vgateSource = withNodeIds(makeDcVoltageSource(3, 0, 4, 3.0), [3, 0]);
@@ -161,13 +183,13 @@ describe("Refactor", () => {
     const diagnostics = new DiagnosticCollector();
 
     const propsObj = makeParamBag(PMOS_DEFAULTS);
-    const pmosElement = withNodeIds(createMosfetElement(
+    const pmosElement = withState(withNodeIds(createMosfetElement(
       -1,
       new Map([["G", 3], ["S", 2], ["D", 1]]), // G=node3, S=node2(Vss), D=node1
       [],
       -1,
       propsObj,
-    ), [3, 1, 2]); // pinLayout order: [G, D, S] for PMOS
+    ), [3, 1, 2])); // pinLayout order: [G, D, S] for PMOS
 
     const rdElement = makeResistorElement(1, 0, 1000); // Rd from drain to GND
     const vssSource = withNodeIds(makeDcVoltageSource(2, 0, 3, 5.0), [2, 0]);
@@ -203,7 +225,7 @@ describe("Refactor", () => {
     // and its stampCompanion should update companion model state.
     const propsWithCap = { ...NMOS_DEFAULTS, CBD: 1e-12 };
     const propsObj = makeParamBag(propsWithCap);
-    const element = createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj);
+    const element = withState(createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj));
 
     expect(element.isReactive).toBe(true);
     expect(element.stampCompanion).toBeDefined();
@@ -239,7 +261,7 @@ describe("Refactor", () => {
     // Use nodeG=2, nodeS=0 (ground source), nodeD=1 for cleaner test
     // createMosfetElement expects [G, S, D]
     const propsObj = makeParamBag(NMOS_DEFAULTS);
-    const element = createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj);
+    const element = withState(createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj));
 
     // Drive to saturation: Vgs=3V (G=3V, S=0V), Vds=5V (D=5V, S=0V)
     // matrixSize=2, voltages: index0=V(node1)=Vds=5V, index1=V(node2=G)=3V
@@ -318,7 +340,7 @@ describe("AbstractFetElement", () => {
     // nodeG=1, nodeS=3, nodeD=2; createMosfetElement expects [G, S, D]
     // matrix indices: G-1=0, S-1=2, D-1=1
     const propsObj = makeParamBag(NMOS_DEFAULTS);
-    const element = createMosfetElement(1, new Map([["G", 1], ["S", 3], ["D", 2]]), [], -1, propsObj);
+    const element = withState(createMosfetElement(1, new Map([["G", 1], ["S", 3], ["D", 2]]), [], -1, propsObj));
 
     const voltages = new Float64Array(3);
     voltages[0] = 3; // V(node1=G) = 3V
@@ -347,5 +369,145 @@ describe("AbstractFetElement", () => {
     const ddEntry = stampCalls.find((c) => c[0] === 1 && c[1] === 1);
     expect(ddEntry).toBeDefined();
     expect(ddEntry![2] as number).toBeGreaterThan(0); // gds > 0
+  });
+});
+
+// ---------------------------------------------------------------------------
+// State pool migration tests
+// ---------------------------------------------------------------------------
+
+describe("StatePool migration", () => {
+  it("stateSize_is_12", () => {
+    const propsObj = makeParamBag(NMOS_DEFAULTS);
+    const element = createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj);
+    expect(element.stateSize).toBe(12);
+  });
+
+  it("stateBaseOffset_defaults_to_minus1_before_initState", () => {
+    const propsObj = makeParamBag(NMOS_DEFAULTS);
+    const element = createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj);
+    expect(element.stateBaseOffset).toBe(-1);
+  });
+
+  it("initState_binds_pool_and_sets_initial_values", () => {
+    const propsObj = makeParamBag(NMOS_DEFAULTS);
+    const element = createMosfetElement(1, new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
+    element.stateBaseOffset = 0;
+    const pool = new StatePool(12);
+    element.initState!(pool);
+
+    // Initial _gm and _gds should be 1e-12 (device-off values)
+    expect(pool.state0[AbstractFetElement.SLOT_GM]).toBeCloseTo(1e-12);
+    expect(pool.state0[AbstractFetElement.SLOT_GDS]).toBeCloseTo(1e-12);
+    // VGS, VDS, IDS = 0 initially
+    expect(pool.state0[AbstractFetElement.SLOT_VGS]).toBe(0);
+    expect(pool.state0[AbstractFetElement.SLOT_VDS]).toBe(0);
+    expect(pool.state0[AbstractFetElement.SLOT_IDS]).toBe(0);
+    // SWAPPED = 0.0
+    expect(pool.state0[AbstractFetElement.SLOT_SWAPPED]).toBe(0);
+    // VGS_PREV and VGD_PREV = NaN (first-call sentinel)
+    expect(isNaN(pool.state0[AbstractFetElement.SLOT_VGS_PREV])).toBe(true);
+    expect(isNaN(pool.state0[AbstractFetElement.SLOT_VGD_PREV])).toBe(true);
+  });
+
+  it("updateOperatingPoint_writes_state_to_pool", () => {
+    const propsObj = makeParamBag(NMOS_DEFAULTS);
+    const element = createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj);
+    element.stateBaseOffset = 0;
+    const pool = new StatePool(12);
+    element.initState!(pool);
+
+    // Drive to saturation: Vgs=3, Vds=5
+    const voltages = new Float64Array(2);
+    voltages[0] = 5; // V(node1=D) = 5V
+    voltages[1] = 3; // V(node2=G) = 3V
+
+    for (let i = 0; i < 20; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = 5;
+      voltages[1] = 3;
+    }
+
+    // After convergence, pool should contain non-trivial gm and gds
+    expect(pool.state0[AbstractFetElement.SLOT_VGS]).toBeGreaterThan(0);
+    expect(pool.state0[AbstractFetElement.SLOT_VDS]).toBeGreaterThan(0);
+    expect(pool.state0[AbstractFetElement.SLOT_GM]).toBeGreaterThan(1e-12);
+    expect(pool.state0[AbstractFetElement.SLOT_GDS]).toBeGreaterThan(1e-12);
+  });
+
+  it("voltages_unchanged_after_updateOperatingPoint", () => {
+    const propsObj = makeParamBag(NMOS_DEFAULTS);
+    const element = withState(createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj));
+
+    const voltages = new Float64Array([5.0, 3.0]);
+    const snapshot = new Float64Array(voltages);
+
+    for (let i = 0; i < 10; i++) {
+      element.updateOperatingPoint!(voltages);
+    }
+
+    // voltages array must be unchanged — no write-back
+    expect(voltages[0]).toBe(snapshot[0]);
+    expect(voltages[1]).toBe(snapshot[1]);
+  });
+
+  it("swapped_flag_stored_as_float_in_pool", () => {
+    const propsObj = makeParamBag(NMOS_DEFAULTS);
+    const element = createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj);
+    element.stateBaseOffset = 0;
+    const pool = new StatePool(12);
+    element.initState!(pool);
+
+    // Drive with reversed Vds (Vgs=3, Vds<0 → swap condition)
+    const voltages = new Float64Array(2);
+    voltages[0] = 0; // V(D) = 0V (less than source)
+    voltages[1] = 3; // V(G) = 3V
+
+    for (let i = 0; i < 5; i++) {
+      element.updateOperatingPoint!(voltages);
+    }
+
+    // SLOT_SWAPPED must be 0.0 or 1.0, never another value
+    const swappedVal = pool.state0[AbstractFetElement.SLOT_SWAPPED];
+    expect(swappedVal === 0.0 || swappedVal === 1.0).toBe(true);
+  });
+
+  it("pool_state_survives_rollback", () => {
+    const propsObj = makeParamBag(NMOS_DEFAULTS);
+    const element = withState(createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj));
+
+    const pool = new StatePool(12);
+    element.stateBaseOffset = 0;
+    element.initState!(pool);
+
+    // Drive to a known operating point
+    const voltages = new Float64Array([5.0, 3.0]);
+    for (let i = 0; i < 10; i++) {
+      element.updateOperatingPoint!(voltages);
+      voltages[0] = 5.0;
+      voltages[1] = 3.0;
+    }
+
+    // Checkpoint the state
+    const cp = pool.checkpoint(0);
+
+    // Mutate state with different voltages
+    const voltages2 = new Float64Array([1.0, 0.5]);
+    for (let i = 0; i < 5; i++) {
+      element.updateOperatingPoint!(voltages2);
+      voltages2[0] = 1.0;
+      voltages2[1] = 0.5;
+    }
+
+    const vgsAfterMutation = pool.state0[AbstractFetElement.SLOT_VGS];
+
+    // Rollback
+    pool.rollback(cp);
+
+    const vgsAfterRollback = pool.state0[AbstractFetElement.SLOT_VGS];
+
+    // After rollback, state0 should be restored to checkpoint values
+    expect(vgsAfterRollback).not.toBe(vgsAfterMutation);
+    expect(vgsAfterRollback).toBe(cp.state0[AbstractFetElement.SLOT_VGS]);
   });
 });

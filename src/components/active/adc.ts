@@ -406,7 +406,7 @@ function createADCElement(
       }
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       // Cache voltages — stampNonlinear reads output pin states which were
       // set during updateCompanion (clock-edge detection). No re-evaluation
       // of the ADC conversion here — that only happens on accepted timesteps.

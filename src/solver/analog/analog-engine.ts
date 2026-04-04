@@ -25,6 +25,7 @@ import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import { newtonRaphson } from "./newton-raphson.js";
 import type { AnalogElement } from "./element.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledWithBridges } from "./compiled-analog-circuit.js";
+import type { StatePool } from "./state-pool.js";
 
 // ---------------------------------------------------------------------------
 // ConcreteCompiledAnalogCircuit — minimal interface for what MNAEngine needs
@@ -47,6 +48,8 @@ export interface ConcreteCompiledAnalogCircuit extends CompiledCircuit {
   readonly elements: readonly AnalogElement[];
   /** Maps component label strings to MNA node IDs. */
   readonly labelToNodeId: Map<string, number>;
+  /** Shared state pool for per-element operating-point state. */
+  readonly statePool: StatePool;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +132,25 @@ export class MNAEngine implements AnalogEngine {
     this._simTime = 0;
     this._lastDt = 0;
 
+    // Assign stateBaseOffset for elements that were not compiler-processed
+    // (stateSize > 0 but stateBaseOffset still -1). Then call initState on all
+    // pool-backed elements to bind them to the state pool.
+    const cac = compiled as CompiledWithBridges;
+    if (cac.statePool) {
+      let nextOffset = 0;
+      for (const el of elements) {
+        if (el.stateSize > 0) {
+          if (el.stateBaseOffset < 0) {
+            el.stateBaseOffset = nextOffset;
+          }
+          nextOffset = el.stateBaseOffset + el.stateSize;
+          if (el.initState) {
+            el.initState(cac.statePool);
+          }
+        }
+      }
+    }
+
     this._transitionState(EngineState.STOPPED);
   }
 
@@ -140,6 +162,7 @@ export class MNAEngine implements AnalogEngine {
     this._simTime = 0;
     const cac = this._compiled as CompiledWithBridges | undefined;
     if (cac?.timeRef) cac.timeRef.value = 0;
+    if (cac?.statePool) cac.statePool.reset();
     this._lastDt = 0;
     this._timestep = new TimestepController(this._params);
     this._diagnostics.clear();
@@ -179,6 +202,8 @@ export class MNAEngine implements AnalogEngine {
     const params = this._params;
 
     this._prevVoltages.set(this._voltages);
+    const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;
+    const checkpoint = statePool ? statePool.checkpoint(this._simTime) : null;
 
     let dt = this._timestep.getClampedDt(this._simTime);
     const method = this._timestep.currentMethod;
@@ -210,6 +235,7 @@ export class MNAEngine implements AnalogEngine {
       while (retryDt >= params.minTimeStep) {
         // Restore voltages before retry
         this._voltages.set(this._prevVoltages);
+        if (statePool && checkpoint) statePool.rollback(checkpoint);
 
         // Restamp companion models with reduced dt
         for (const el of elements) {
@@ -271,6 +297,7 @@ export class MNAEngine implements AnalogEngine {
     if (this._timestep.shouldReject(r)) {
       // Restore and retry with halved dt
       this._voltages.set(this._prevVoltages);
+      if (statePool && checkpoint) statePool.rollback(checkpoint);
       const rejectedDt = this._timestep.reject();
 
       // Restamp companion with halved dt and retry NR
@@ -298,6 +325,7 @@ export class MNAEngine implements AnalogEngine {
     }
 
     // Accept the timestep
+    if (statePool) statePool.acceptTimestep();
     this._simTime += dt;
     const cac = this._compiled as CompiledWithBridges | undefined;
     if (cac?.timeRef) cac.timeRef.value = this._simTime;
@@ -413,6 +441,9 @@ export class MNAEngine implements AnalogEngine {
     const { elements, matrixSize } = this._compiled;
     this._diagnostics.clear();
 
+    const cac = this._compiled as CompiledWithBridges;
+    if (cac.statePool) cac.statePool.reset();
+
     const result = solveDcOperatingPoint({
       solver: this._solver,
       elements,
@@ -423,6 +454,10 @@ export class MNAEngine implements AnalogEngine {
 
     if (result.converged) {
       this._voltages.set(result.nodeVoltages);
+      if (cac.statePool) {
+        cac.statePool.state1.set(cac.statePool.state0);
+        cac.statePool.state2.set(cac.statePool.state0);
+      }
     }
 
     return result;

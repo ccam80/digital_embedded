@@ -150,7 +150,7 @@ export function createDriverAnalogElement(
       outputPin.stampOutput(s);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       if (cachedVoltages.length !== voltages.length) {
         cachedVoltages = new Float64Array(voltages.length);
       }
@@ -257,7 +257,7 @@ export function createDriverInvAnalogElement(
       outputPin.stampOutput(s);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       if (cachedVoltages.length !== voltages.length) {
         cachedVoltages = new Float64Array(voltages.length);
       }
@@ -373,7 +373,7 @@ export function createSplitterAnalogElement(
       }
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       if (cachedVoltages.length !== voltages.length) {
         cachedVoltages = new Float64Array(voltages.length);
       }
@@ -449,7 +449,7 @@ function createSegmentDiodeElement(
       if (nodeCathode > 0) stampRHS(s, nodeCathode, ieq);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vd = va - vc;
@@ -515,7 +515,7 @@ export function createSevenSegAnalogElement(
       for (const d of segDiodes) d.stampNonlinear!(s);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       for (const d of segDiodes) d.updateOperatingPoint!(voltages);
     },
 
@@ -619,7 +619,7 @@ export function createRelayAnalogElement(
       stampG(s, nodeContactA, nodeContactB, contactG());
     },
 
-    updateOperatingPoint(_voltages: Float64Array): void {
+    updateOperatingPoint(_voltages: Readonly<Float64Array>): void {
       // No nonlinear operating-point update needed for coil resistance
     },
 
@@ -741,7 +741,7 @@ export function createRelayDTAnalogElement(
       stampG(s, nodeCommon, nodeRest, gRest());
     },
 
-    updateOperatingPoint(_voltages: Float64Array): void {},
+    updateOperatingPoint(_voltages: Readonly<Float64Array>): void {},
 
     stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
       if (L <= 0 || dt <= 0 || cachedSolverDT === null) return;
@@ -832,7 +832,7 @@ export function createButtonLEDAnalogElement(
       ledDiode.stampNonlinear!(s);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       ledDiode.updateOperatingPoint!(voltages);
     },
 

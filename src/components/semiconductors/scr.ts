@@ -234,7 +234,7 @@ export function createScrElement(
       stampRHS(solver, nodeK, gGateIeq);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
       const vGateNode = nodeG > 0 ? voltages[nodeG - 1] : 0;

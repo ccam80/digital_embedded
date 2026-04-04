@@ -143,7 +143,7 @@ export class BridgeOutputAdapter implements AnalogElement {
    * No-op — bridge output operating point is set by the coordinator, not
    * read from the MNA solution.
    */
-  updateOperatingPoint(_voltages: Float64Array): void {
+  updateOperatingPoint(_voltages: Readonly<Float64Array>): void {
     // Intentionally empty — logic level is owned by the coordinator.
   }
 

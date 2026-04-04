@@ -21,6 +21,8 @@ import {
   makeCapacitor,
   makeDiode,
 } from "./test-helpers.js";
+import { StatePool } from "../state-pool.js";
+import type { AnalogElementCore } from "../element.js";
 import { AnalogFuseElement } from "../../../components/passives/analog-fuse.js";
 import { Circuit, Wire } from "../../../core/circuit.js";
 import { ComponentRegistry } from "../../../core/registry.js";
@@ -38,6 +40,32 @@ import { GroundDefinition } from "../../../components/io/ground.js";
 import { ProbeDefinition } from "../../../components/io/probe.js";
 
 // ---------------------------------------------------------------------------
+// State pool helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Allocate a StatePool for a list of elements, assign stateBaseOffset to each
+ * element with stateSize > 0, and call initState on each. Mirrors what the
+ * analog compiler does at compile time.
+ */
+function buildStatePool(elements: AnalogElementCore[]): StatePool {
+  let offset = 0;
+  for (const el of elements) {
+    if (el.stateSize > 0) {
+      el.stateBaseOffset = offset;
+      offset += el.stateSize;
+    }
+  }
+  const pool = new StatePool(offset);
+  for (const el of elements) {
+    if (el.stateSize > 0 && el.initState) {
+      el.initState(pool);
+    }
+  }
+  return pool;
+}
+
+// ---------------------------------------------------------------------------
 // Fixture builders
 // ---------------------------------------------------------------------------
 
@@ -53,6 +81,8 @@ function makeResistorDividerCircuit(): ConcreteCompiledAnalogCircuit {
   const vs = makeVoltageSource(1, 0, 2, 5.0);   // pos=node1, neg=gnd, branch row=2
   const r1 = makeResistor(1, 2, 1000);           // node1 → node2, 1kΩ
   const r2 = makeResistor(2, 0, 1000);           // node2 → gnd,   1kΩ
+  const elements = [vs, r1, r2];
+  const statePool = buildStatePool(elements);
 
   return {
     netCount: 2,
@@ -60,8 +90,9 @@ function makeResistorDividerCircuit(): ConcreteCompiledAnalogCircuit {
     nodeCount: 2,
     branchCount: 1,
     matrixSize: 3,
-    elements: [vs, r1, r2],
+    elements,
     labelToNodeId: new Map([["V_mid", 2]]),
+    statePool,
   };
 }
 
@@ -74,6 +105,8 @@ function makeDiodeCircuit(): ConcreteCompiledAnalogCircuit {
   const vs = makeVoltageSource(1, 0, 2, 5.0);
   const r = makeResistor(1, 2, 1000);
   const diode = makeDiode(2, 0, 1e-14, 1.0);
+  const elements = [vs, r, diode];
+  const statePool = buildStatePool(elements);
 
   return {
     netCount: 2,
@@ -81,8 +114,9 @@ function makeDiodeCircuit(): ConcreteCompiledAnalogCircuit {
     nodeCount: 2,
     branchCount: 1,
     matrixSize: 3,
-    elements: [vs, r, diode],
+    elements,
     labelToNodeId: new Map(),
+    statePool,
   };
 }
 
@@ -102,6 +136,8 @@ function makeRCCircuit(): ConcreteCompiledAnalogCircuit {
   const vs = makeVoltageSource(1, 0, 2, 5.0);
   const r = makeResistor(1, 2, 1000);
   const cap = makeCapacitor(2, 0, 1e-6);
+  const elements = [vs, r, cap];
+  const statePool = buildStatePool(elements);
 
   return {
     netCount: 2,
@@ -109,8 +145,9 @@ function makeRCCircuit(): ConcreteCompiledAnalogCircuit {
     nodeCount: 2,
     branchCount: 1,
     matrixSize: 3,
-    elements: [vs, r, cap],
+    elements,
     labelToNodeId: new Map(),
+    statePool,
   };
 }
 
@@ -439,11 +476,14 @@ describe("MNAEngine", () => {
     const vs = makeVoltageSource(1, 0, 2, 5.0);
     const fuse = new AnalogFuseElement([1, 2], 1.0, 1e9, 1e-8);
     const rLoad = makeResistor(2, 0, 9.0);
+    const fuseElements = [vs, fuse, rLoad];
+    const fuseStatePool = buildStatePool(fuseElements);
 
     const circuit: ConcreteCompiledAnalogCircuit = {
       netCount: 2, componentCount: 3, nodeCount: 2, branchCount: 1, matrixSize: 3,
-      elements: [vs, fuse, rLoad],
+      elements: fuseElements,
       labelToNodeId: new Map(),
+      statePool: fuseStatePool,
     };
 
     engine.init(circuit);

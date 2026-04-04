@@ -103,7 +103,7 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
     return { vgs: vgsLimited, vds, swapped: false };
   }
 
-  override updateOperatingPoint(voltages: Float64Array): void {
+  override updateOperatingPoint(voltages: Readonly<Float64Array>): void {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;

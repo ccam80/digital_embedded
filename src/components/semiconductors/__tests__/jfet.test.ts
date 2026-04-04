@@ -29,9 +29,25 @@ import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+
+// ---------------------------------------------------------------------------
+// withState — allocate a StatePool and call initState on the element
+// ---------------------------------------------------------------------------
+
+function withState<T extends AnalogElementCore>(element: T): T {
+  const size = element.stateSize ?? 0;
+  if (size > 0 && element.initState) {
+    element.stateBaseOffset = 0;
+    const pool = new StatePool(size);
+    element.initState(pool);
+  }
+  return element;
+}
 
 // ---------------------------------------------------------------------------
 // Default model parameters
@@ -118,7 +134,7 @@ describe("NJFET", () => {
     // G=voltage[0]=-3V, D=voltage[1]=5V
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
-    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
+    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj));
 
     const voltages = new Float64Array(2);
     voltages[0] = -3; // V(G) = -3V → Vgs = -3V
@@ -147,7 +163,7 @@ describe("NJFET", () => {
     const params = { ...NJFET_PARAMS, LAMBDA: 0 };
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(params);
-    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj) as NJfetAnalogElement;
+    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj)) as NJfetAnalogElement;
 
     const voltages = new Float64Array(2);
     voltages[0] = 0; // V(G) = 0V → Vgs = 0
@@ -177,7 +193,7 @@ describe("NJFET", () => {
     const params = { ...NJFET_PARAMS, LAMBDA: 0 };
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(params);
-    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj) as NJfetAnalogElement;
+    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj)) as NJfetAnalogElement;
 
     const voltages = new Float64Array(2);
     voltages[0] = 0;   // Vgs = 0
@@ -247,7 +263,7 @@ describe("NJFET", () => {
     // Create element with forward-biased gate
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
-    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
+    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj));
 
     const voltages = new Float64Array(2);
     voltages[0] = 0.7; // V(G) = 0.7V → Vgs = 0.7V
@@ -305,7 +321,7 @@ describe("PJFET", () => {
     // Vsd = 5 - 0 = 5V → saturation (Vsd > Vsg - Vp = 3 - 2 = 1V)
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(PJFET_PARAMS);
-    const element = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj);
+    const element = withState(createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj));
 
     // node1=G=2V, node2=D=0V, node3=S=5V
     const voltages = new Float64Array(3);
@@ -351,7 +367,7 @@ describe("NR", () => {
     // createNJfetElement pin order: [G, S, D]
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
-    const jfet = withNodeIds(createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]);
+    const jfet = withState(withNodeIds(createNJfetElement(new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]));
     const rd = makeResistorElement(2, 1, 10000); // Rd=10kΩ from Vdd to drain
     const vdd = makeDcVoltageSource(2, 0, 3, 10.0) as unknown as AnalogElement; // Vdd=10V
     const vgate = makeDcVoltageSource(3, 0, 4, 0.0) as unknown as AnalogElement; // Vg=0V

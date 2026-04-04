@@ -210,7 +210,7 @@ function createOTAElement(
       if (nOutN !== 0) solver.stampRHS(nOutN - 1, -iNR);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const twoVt = 2 * p.vt;
       const vp = readNode(voltages, nVp);
       const vm = readNode(voltages, nVm);

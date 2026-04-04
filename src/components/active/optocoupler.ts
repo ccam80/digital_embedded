@@ -230,7 +230,7 @@ function createOptocouplerElement(
       if (nEmitter !== 0) solver.stampRHS(nEmitter - 1, -iCnr);
     },
 
-    updateOperatingPoint(voltages: Float64Array): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const vA = readNode(voltages, nAnode);
       const vK = readNode(voltages, nCathode);
       vd = vA - vK;
