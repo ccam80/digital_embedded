@@ -14,6 +14,7 @@ import type { CircuitElement } from "../../core/element.js";
 import type { AnalogElement } from "./element.js";
 import type { BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.js";
 import type { ResolvedPin } from "../../core/pin.js";
+import { StatePool } from "./state-pool.js";
 
 // ---------------------------------------------------------------------------
 // DeviceModel — placeholder for Phase 2 .MODEL support
@@ -111,6 +112,9 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
    *  `timeRef.value` each timestep so elements see the current simulation time. */
   readonly timeRef: { value: number };
 
+  /** Shared state pool for all elements in this compiled circuit. */
+  readonly statePool: StatePool;
+
   constructor(params: {
     nodeCount: number;
     branchCount: number;
@@ -126,6 +130,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     bridgeAdaptersByGroupId?: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
     diagnostics?: Diagnostic[];
     timeRef?: { value: number };
+    statePool?: StatePool;
   }) {
     this.nodeCount = params.nodeCount;
     this.branchCount = params.branchCount;
@@ -142,6 +147,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.bridgeAdaptersByGroupId = params.bridgeAdaptersByGroupId ?? new Map();
     this.diagnostics = params.diagnostics ?? [];
     this.timeRef = params.timeRef ?? { value: 0 };
+    this.statePool = params.statePool ?? new StatePool(0);
   }
 
   // CompiledCircuit base interface

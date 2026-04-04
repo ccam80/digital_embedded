@@ -51,6 +51,22 @@ export interface ComplexSparseSolver {
 }
 
 // ---------------------------------------------------------------------------
+// StatePoolRef — forward reference to avoid circular import
+// ---------------------------------------------------------------------------
+
+/**
+ * Forward reference to StatePool to avoid core→solver circular import.
+ * The actual StatePool class in solver/analog/state-pool.ts structurally
+ * satisfies this interface, allowing core/analog-types.ts to refer to it
+ * in method signatures without importing from solver/.
+ */
+export interface StatePoolRef {
+  readonly state0: Float64Array;
+  readonly state1: Float64Array;
+  readonly state2: Float64Array;
+}
+
+// ---------------------------------------------------------------------------
 // AnalogElementCore
 // ---------------------------------------------------------------------------
 
@@ -144,6 +160,21 @@ export interface AnalogElementCore {
    * Optional display label for diagnostic attribution.
    */
   label?: string;
+
+  /**
+   * Float64 slots required in the state pool. 0 = no state.
+   */
+  readonly stateSize: number;
+
+  /**
+   * Base offset into pool, assigned by compiler. -1 if stateSize === 0.
+   */
+  stateBaseOffset: number;
+
+  /**
+   * Bind to state pool after allocation. Called once by compiler.
+   */
+  initState?(pool: StatePoolRef): void;
 }
 
 // ---------------------------------------------------------------------------

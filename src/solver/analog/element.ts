@@ -14,6 +14,7 @@ export type {
   ComplexSparseSolver,
   IntegrationMethod,
   SparseSolverStamp,
+  StatePoolRef,
 } from "../../core/analog-types.js";
 
 import type { ComplexSparseSolver, IntegrationMethod, SparseSolverStamp } from "../../core/analog-types.js";
@@ -225,4 +226,19 @@ export interface AnalogElement {
    * to identify which element triggered a convergence failure or anomaly.
    */
   label?: string;
+
+  /**
+   * Float64 slots required in the state pool. 0 = no state.
+   */
+  readonly stateSize: number;
+
+  /**
+   * Base offset into pool, assigned by compiler. -1 if stateSize === 0.
+   */
+  stateBaseOffset: number;
+
+  /**
+   * Bind to state pool after allocation. Called once by compiler.
+   */
+  initState?(pool: StatePoolRef): void;
 }

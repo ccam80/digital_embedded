@@ -36,6 +36,7 @@ import type { BridgeOutputAdapter, BridgeInputAdapter } from "./bridge-adapter.j
 import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
 import type { ModelEntry } from "../../core/registry.js";
+import { StatePool } from "./state-pool.js";
 
 // ---------------------------------------------------------------------------
 // Component routing — shared decision logic for Pass A and Pass B
@@ -1294,6 +1295,22 @@ export function compileAnalogPartition(
     }
   }
 
+  // State pool allocation — assign offsets and initialise pool slots.
+  let stateOffset = 0;
+  for (const element of analogElements) {
+    const size = element.stateSize ?? 0;
+    if (size > 0) {
+      element.stateBaseOffset = stateOffset;
+      stateOffset += size;
+    } else {
+      element.stateBaseOffset = -1;
+    }
+  }
+  const statePool = new StatePool(stateOffset);
+  for (const element of analogElements) {
+    if (element.initState) element.initState(statePool);
+  }
+
   // Build and return ConcreteCompiledAnalogCircuit
   const models = new Map<string, DeviceModel>();
 
@@ -1312,5 +1329,6 @@ export function compileAnalogPartition(
     bridgeAdaptersByGroupId,
     diagnostics,
     timeRef,
+    statePool,
   });
 }

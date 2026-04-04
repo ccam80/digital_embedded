@@ -21,6 +21,7 @@ import type { SparseSolver } from "../sparse-solver.js";
 import { compileAnalogPartition } from "../compiler.js";
 import type { SolverPartition, PartitionedComponent, ConnectivityGroup } from "../../../compile/types.js";
 import { pinWorldPosition } from "../../../core/pin.js";
+import { StatePool } from "../state-pool.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers — mirror the helpers from analog-compiler.test.ts
@@ -514,5 +515,157 @@ describe("compileAnalogPartition", () => {
     expect(nodeValues.every((n) => n > 0)).toBe(true);
     // All three must be distinct and non-zero
     expect(new Set(nodeValues).size).toBe(3);
+  });
+
+  it("compiled circuit has a statePool field that is a StatePool instance", () => {
+    const propsMap = new Map<string, PropertyValue>([["model", "behavioral"]]);
+    const { partition, registry } = buildAndGatePartition(propsMap);
+    const compiled = compileAnalogPartition(partition, registry);
+
+    expect(compiled.statePool).toBeInstanceOf(StatePool);
+  });
+
+  it("statePool totalSlots is 0 when all elements have stateSize 0 (existing elements)", () => {
+    const propsMap = new Map<string, PropertyValue>([["model", "behavioral"]]);
+    const { partition, registry } = buildAndGatePartition(propsMap);
+    const compiled = compileAnalogPartition(partition, registry);
+
+    // The stub elements in the test registry don't declare stateSize — treated as 0
+    // so the pool should have totalSlots 0
+    expect(compiled.statePool.totalSlots).toBe(0);
+  });
+
+  it("elements without stateSize get stateBaseOffset -1 after compilation", () => {
+    const propsMap = new Map<string, PropertyValue>([["model", "behavioral"]]);
+    const { partition, registry } = buildAndGatePartition(propsMap);
+    const compiled = compileAnalogPartition(partition, registry);
+
+    for (const element of compiled.elements) {
+      expect(element.stateBaseOffset).toBe(-1);
+    }
+  });
+
+  it("statePool is a fresh StatePool instance per compile call — not shared across compilations", () => {
+    const propsMap = new Map<string, PropertyValue>([["model", "behavioral"]]);
+    const { partition, registry } = buildAndGatePartition(propsMap);
+    const compiled1 = compileAnalogPartition(partition, registry);
+    const compiled2 = compileAnalogPartition(partition, registry);
+
+    expect(compiled1.statePool).not.toBe(compiled2.statePool);
+  });
+
+  it("elements with stateSize get contiguous stateBaseOffset values assigned by compiler", () => {
+    // Build a registry with an element that declares stateSize
+    const registry = new ComponentRegistry();
+    registry.register({
+      ...makeBaseDef("Ground"),
+      models: {},
+    });
+
+    let assignedBase = -999;
+    const elementWithState = {
+      stateSize: 7,
+      stateBaseOffset: -1,
+      branchIndex: -1,
+      isNonlinear: false,
+      isReactive: false,
+      pinNodeIds: [] as number[],
+      allNodeIds: [] as number[],
+      stamp(_s: import("../sparse-solver.js").SparseSolver) { /* no-op */ },
+      setParam(_key: string, _value: number): void {},
+      getPinCurrents(_v: Float64Array) { return []; },
+      initState(pool: StatePool): void {
+        assignedBase = this.stateBaseOffset;
+        pool.state0[this.stateBaseOffset] = 99.0;
+      },
+    };
+
+    const factoryReturningStateElement = vi.fn((_pinNodes: ReadonlyMap<string, number>) => {
+      // Return the element that has state — pinNodeIds/allNodeIds set by compiler
+      return elementWithState;
+    });
+
+    registry.register({
+      ...makeBaseDef("StatefulComp"),
+      pinLayout: [
+        {
+          label: "A",
+          direction: PinDirection.BIDIRECTIONAL,
+          defaultBitWidth: 1,
+          position: { x: 10, y: 0 },
+          isNegatable: false,
+          isClockCapable: false,
+          kind: "signal" as const,
+        },
+      ],
+      models: {},
+      modelRegistry: {
+        behavioral: {
+          kind: "inline" as const,
+          factory: factoryReturningStateElement as unknown as import("../../../core/registry.js").AnalogFactory,
+          paramDefs: [],
+          params: {},
+        },
+      },
+      defaultModel: "behavioral",
+    });
+
+    const comp = makeElement("StatefulComp", "sc1", [
+      { x: 10, y: 0, label: "A", direction: PinDirection.BIDIRECTIONAL },
+    ], new Map([["model", "behavioral"]]));
+    const gnd = makeElement("Ground", "gnd1", [
+      { x: 0, y: 0, label: "in", direction: PinDirection.INPUT },
+    ]);
+
+    const compDef = registry.get("StatefulComp")!;
+    const gndDef = registry.get("Ground")!;
+
+    const wireGnd = new Wire({ x: 0, y: 0 }, { x: 0, y: 0 });
+    const wireA = new Wire({ x: 10, y: 0 }, { x: 10, y: 0 });
+
+    const groupGnd: ConnectivityGroup = {
+      groupId: 0,
+      pins: [{ elementIndex: 1, pinIndex: 0, pinLabel: "in", direction: PinDirection.INPUT, bitWidth: 1, worldPosition: { x: 0, y: 0 }, wireVertex: { x: 0, y: 0 }, domain: "analog", kind: "signal" }],
+      wires: [wireGnd],
+      domains: new Set(["analog"]),
+      bitWidth: 1,
+    };
+    const groupA: ConnectivityGroup = {
+      groupId: 1,
+      pins: [{ elementIndex: 0, pinIndex: 0, pinLabel: "A", direction: PinDirection.BIDIRECTIONAL, bitWidth: 1, worldPosition: { x: 10, y: 0 }, wireVertex: { x: 10, y: 0 }, domain: "analog", kind: "signal" }],
+      wires: [wireA],
+      domains: new Set(["analog"]),
+      bitWidth: 1,
+    };
+
+    const partition: SolverPartition = {
+      domain: "analog",
+      components: [
+        {
+          element: comp,
+          definition: compDef,
+          modelKey: "behavioral",
+          model: null,
+          resolvedPins: [{ label: "A", direction: PinDirection.BIDIRECTIONAL, localPosition: { x: 10, y: 0 }, worldPosition: { x: 10, y: 0 }, wireVertex: { x: 10, y: 0 }, nodeId: 0, bitWidth: 1 }],
+        },
+        {
+          element: gnd,
+          definition: gndDef,
+          modelKey: "",
+          model: null,
+          resolvedPins: [{ label: "in", direction: PinDirection.INPUT, localPosition: { x: 0, y: 0 }, worldPosition: { x: 0, y: 0 }, wireVertex: { x: 0, y: 0 }, nodeId: 0, bitWidth: 1 }],
+        },
+      ],
+      groups: [groupGnd, groupA],
+      bridgeStubs: [],
+    };
+
+    const compiled = compileAnalogPartition(partition, registry);
+
+    // The element with stateSize:7 should have been assigned offset 0
+    expect(assignedBase).toBe(0);
+    expect(compiled.statePool.totalSlots).toBe(7);
+    // initState wrote 99.0 to slot 0
+    expect(compiled.statePool.state0[0]).toBe(99.0);
   });
 });
