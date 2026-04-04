@@ -18,9 +18,27 @@ import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+
+// ---------------------------------------------------------------------------
+// Helper: allocate a StatePool for a single element and call initState
+// ---------------------------------------------------------------------------
+
+function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
+  const size = core.stateSize ?? 0;
+  const pool = new StatePool(Math.max(size, 1));
+  if (size > 0) {
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+  } else {
+    core.stateBaseOffset = -1;
+  }
+  return { element: core, pool };
+}
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -79,7 +97,8 @@ function makeDiodeAtVd(
 ): AnalogElement {
   const propsObj = makeParamBag({ ...DIODE_PARAM_DEFAULTS, IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, ...modelOverrides });
   const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
-  const element = withNodeIds(core, [1, 2]);
+  const { element: statedCore } = withState(core);
+  const element = withNodeIds(statedCore, [1, 2]);
 
   // Drive the element to the operating point by calling updateOperatingPoint
   // multiple times to converge the pnjlim limiting
@@ -157,7 +176,7 @@ describe("Diode", () => {
 
     // Start at vd = 0.3V
     const propsObj = makeParamBag({ IS, N, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element, pool } = withState(createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj));
 
     const voltages = new Float64Array(2);
     voltages[0] = 0.3;
@@ -174,9 +193,12 @@ describe("Diode", () => {
     voltages[1] = 0;
     element.updateOperatingPoint!(voltages);
 
-    // After pnjlim, the anode voltage should have been compressed, not = 5V
-    // The limited vd should be much less than 5V - 0.3V = 4.7V step
-    const limitedVd = voltages[0] - voltages[1];
+    // Voltages array must be unchanged — no write-back
+    expect(voltages[0]).toBe(5.0);
+    expect(voltages[1]).toBe(0);
+
+    // The limited vd is stored in pool.state0[SLOT_VD = 0]
+    const limitedVd = pool.state0[0];
     expect(limitedVd).toBeLessThan(5.0);
     // The step should be compressed from 4.7V to something reasonable
     expect(limitedVd - 0.3).toBeLessThan(4.5);
@@ -189,7 +211,7 @@ describe("Diode", () => {
     const FC = 0.5;
 
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, CJO, VJ, M, TT: 0, FC });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element } = withState(createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj));
 
     // isReactive should be true when CJO > 0
     expect(element.isReactive).toBe(true);
@@ -296,7 +318,8 @@ describe("Integration", () => {
 
     // Diode: anode=node1, cathode=ground(0)
     const diodeProps = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
-    const d = withNodeIds(createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps), [1, 0]);
+    const { element: dCore } = withState(createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps));
+    const d = withNodeIds(dCore, [1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
@@ -337,7 +360,8 @@ describe("setParam mutates params object (not captured locals)", () => {
     const vs = makeDcVoltageSource(2, 0, branchRow, 5) as unknown as AnalogElement;
     const r = makeResistorElement(1, 2, 1000);
     const diodeProps = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
-    const d = withNodeIds(createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps), [1, 0]);
+    const { element: dCore1 } = withState(createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps));
+    const d = withNodeIds(dCore1, [1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
@@ -363,7 +387,8 @@ describe("setParam mutates params object (not captured locals)", () => {
     const vs = makeDcVoltageSource(2, 0, branchRow, 5) as unknown as AnalogElement;
     const r = makeResistorElement(1, 2, 1000);
     const diodeProps = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
-    const d = withNodeIds(createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps), [1, 0]);
+    const { element: dCore2 } = withState(createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps));
+    const d = withNodeIds(dCore2, [1, 0]);
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();

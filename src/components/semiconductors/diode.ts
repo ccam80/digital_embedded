@@ -37,6 +37,7 @@ import {
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -142,22 +143,29 @@ export function createDiodeElement(
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
-  // NR linearization state
-  let vd = 0;
-  let geq = GMIN;
-  let ieq = 0;
-  let _id = 0; // cached junction current for getPinCurrents
+  // State pool slot indices
+  const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+  const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_VD_PREV = 6;
 
-  // Junction capacitance companion model state
-  let capGeq = 0;
-  let capIeq = 0;
-  let vdPrev = NaN;
+  // Pool binding — set by initState
+  let s0: Float64Array;
+  let base: number;
+
+  // Junction capacitance companion model state (non-pool: init sentinel only)
   let capFirstCall = true;
 
   const element: AnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: hasCapacitance,
+    stateSize: hasCapacitance ? 7 : 4,
+    stateBaseOffset: -1,
+
+    initState(pool: StatePoolRef): void {
+      s0 = pool.state0;
+      base = this.stateBaseOffset;
+      s0[base + SLOT_GEQ] = GMIN;
+    },
 
     stamp(solver: SparseSolver): void {
       // Stamp series resistance RS between anode pin and internal junction node
@@ -169,17 +177,23 @@ export function createDiodeElement(
         stampG(solver, nodeJunction, nodeJunction, gRS);
       }
       // Stamp junction capacitance companion model when active
-      if (capGeq !== 0 || capIeq !== 0) {
-        stampG(solver, nodeJunction, nodeJunction, capGeq);
-        stampG(solver, nodeJunction, nodeCathode, -capGeq);
-        stampG(solver, nodeCathode, nodeJunction, -capGeq);
-        stampG(solver, nodeCathode, nodeCathode, capGeq);
-        stampRHS(solver, nodeJunction, -capIeq);
-        stampRHS(solver, nodeCathode, capIeq);
+      if (hasCapacitance) {
+        const capGeq = s0[base + SLOT_CAP_GEQ];
+        const capIeq = s0[base + SLOT_CAP_IEQ];
+        if (capGeq !== 0 || capIeq !== 0) {
+          stampG(solver, nodeJunction, nodeJunction, capGeq);
+          stampG(solver, nodeJunction, nodeCathode, -capGeq);
+          stampG(solver, nodeCathode, nodeJunction, -capGeq);
+          stampG(solver, nodeCathode, nodeCathode, capGeq);
+          stampRHS(solver, nodeJunction, -capIeq);
+          stampRHS(solver, nodeCathode, capIeq);
+        }
       }
     },
 
     stampNonlinear(solver: SparseSolver): void {
+      const geq = s0[base + SLOT_GEQ];
+      const ieq = s0[base + SLOT_IEQ];
       // Stamp companion model: conductance geq in parallel, Norton offset ieq
       // Junction is between nodeJunction and nodeCathode
       stampG(solver, nodeJunction, nodeJunction, geq);
@@ -200,52 +214,48 @@ export function createDiodeElement(
       const nVt = params.N * VT;
       const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
 
-      // Apply pnjlim to prevent exponential runaway
-      const vdLimited = pnjlim(vdRaw, vd, nVt, vcrit);
+      // Apply pnjlim to prevent exponential runaway, using vold from pool
+      const vdOld = s0[base + SLOT_VD];
+      const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
 
-      // Write limited junction voltage back into voltages[]
-      if (nodeJunction > 0) {
-        voltages[nodeJunction - 1] = vc + vdLimited;
-      }
-
-      vd = vdLimited;
+      // Save limited voltage to pool — no write-back to voltages[]
+      s0[base + SLOT_VD] = vdLimited;
 
       // Shockley equation and NR linearization at limited operating point
-      if (params.BV < Infinity && vd < -params.BV) {
+      if (params.BV < Infinity && vdLimited < -params.BV) {
         // Reverse breakdown region: Id = -IBV * exp(-(Vd + BV) / (N*Vt))
-        const bdExpArg = Math.min(-(vd + params.BV) / nVt, 700);
+        const bdExpArg = Math.min(-(vdLimited + params.BV) / nVt, 700);
         const bdExpVal = Math.exp(bdExpArg);
         const id = -params.IBV * bdExpVal;
-        _id = id;
-        geq = (params.IBV * bdExpVal) / nVt + GMIN;
-        ieq = id - geq * vd;
+        s0[base + SLOT_ID] = id;
+        s0[base + SLOT_GEQ] = (params.IBV * bdExpVal) / nVt + GMIN;
+        s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
       } else {
-        const expArg = Math.min(vd / nVt, 700);
+        const expArg = Math.min(vdLimited / nVt, 700);
         const expVal = Math.exp(expArg);
         const id = params.IS * (expVal - 1);
-        _id = id;
-        geq = (params.IS * expVal) / nVt + GMIN;
-        ieq = id - geq * vd;
+        s0[base + SLOT_ID] = id;
+        s0[base + SLOT_GEQ] = (params.IS * expVal) / nVt + GMIN;
+        s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
       }
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array): boolean {
       const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vdNew = va - vc;
+      const vdRaw = va - vc;
 
-      const vaPrev = nodeJunction > 0 ? prevVoltages[nodeJunction - 1] : 0;
-      const vcPrev = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
-      const vdPrevVal = vaPrev - vcPrev;
-
+      // Compare raw junction voltage against the last limited voltage stored in
+      // the pool. Converged when the NR solution matches what pnjlim accepted.
       const nVt = params.N * VT;
-      return Math.abs(vdNew - vdPrevVal) <= 2 * nVt;
+      return Math.abs(vdRaw - s0[base + SLOT_VD]) <= 2 * nVt;
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {
       // pinLayout order: [A (anode), K (cathode)]
       // Positive = current flowing INTO element at that pin.
-      return [_id, -_id];
+      const id = s0[base + SLOT_ID];
+      return [id, -id];
     },
 
     setParam(key: string, value: number): void {
@@ -276,14 +286,16 @@ export function createDiodeElement(
       const Ctotal = Cj + Ct;
 
       // Recover capacitor current at previous accepted step
-      const iNow = capGeq * vNow + capIeq;
-      const vPrevForFormula = capFirstCall ? vNow : vdPrev;
-      vdPrev = vNow;
+      const prevCapGeq = s0[base + SLOT_CAP_GEQ];
+      const prevCapIeq = s0[base + SLOT_CAP_IEQ];
+      const iNow = prevCapGeq * vNow + prevCapIeq;
+      const vPrevForFormula = capFirstCall ? vNow : s0[base + SLOT_VD_PREV];
+      s0[base + SLOT_VD_PREV] = vNow;
       capFirstCall = false;
 
-      capGeq = capacitorConductance(Ctotal, dt, method);
-      capIeq = capacitorHistoryCurrent(Ctotal, dt, method, vNow, vPrevForFormula, iNow);
-      // capGeq/capIeq are stamped in stamp() on every NR iteration
+      s0[base + SLOT_CAP_GEQ] = capacitorConductance(Ctotal, dt, method);
+      s0[base + SLOT_CAP_IEQ] = capacitorHistoryCurrent(Ctotal, dt, method, vNow, vPrevForFormula, iNow);
+      // CAP_GEQ/CAP_IEQ are stamped in stamp() on every NR iteration
     };
   }
 

@@ -1,94 +1,111 @@
-# Domain Leak Fix — Progress
+# Implementation Progress
 
-## Status: In Progress
+## Phase 1: Infrastructure
+| Task | Status | Notes |
+|------|--------|-------|
+| W1T1 | pending | |
+| W1T2 | pending | |
+| W1T3 | pending | |
+| W1T4 | pending | |
 
-### Wave 1 — Type foundations + algorithm rebuilds
-| Task ID | Title | Status |
-|---------|-------|--------|
-| W1-T1 | Unify Diagnostic types | pending |
-| W1-T2 | Add labelToCircuitElement | pending |
-| W1-T3 | Reshape netlist types | pending |
-| W1-T4 | Rebuild resolveNets on infrastructure | pending |
-| W1-T5 | Move connectivity diagnostics | pending |
-| W1-T6 | Pass solver diagnostics through | pending |
-| W1-T7 | Remove label whitelist | pending |
-| W1-T8 | Add setSourceByLabel | pending |
-| W1-T9 | Remove electrical validation from connect() | pending |
-| W1-T10 | Facade renames + settle + setSignal routing | pending |
-| W1-T11 | Async test executor + parser extensions | pending |
-| W1-T12 | Equivalence vacuous fix + settle | pending |
+## Phase 2: Diode prototype
+| Task | Status | Notes |
+|------|--------|-------|
+| W2T1 | pending | |
+| W2T2 | pending | |
 
-### Wave 2 — Consumers + formatting
-| Task ID | Title | Status |
-|---------|-------|--------|
-| W2-T1 | Domain-aware formatting | pending |
-| W2-T2 | MCP tool fixes + delete circuit_describe_file | pending |
-| W2-T3 | postMessage wire protocol rename + fixes | pending |
-| W2-T4 | Unified diagnostic overlays | pending |
-| W2-T5 | Rename-only consumer files | pending |
+## Phase 3: Remaining PN-junction devices
+| Task | Status | Notes |
+|------|--------|-------|
+| W3T1 | pending | |
+| W3T2 | pending | |
+| W3T3 | pending | |
+| W3T4 | pending | |
+| W3T5 | pending | |
+| W3T6 | pending | |
+| W3T7 | pending | |
+| W3T8 | pending | |
+| W3T9 | pending | |
 
-## Task W1-T7: Remove label whitelist from analog compiler
+## Phase 4: MOSFET/JFET
+| Task | Status | Notes |
+|------|--------|-------|
+| W4T1 | pending | |
+| W4T2 | pending | |
+
+## Phase 5: Reactive passives
+| Task | Status | Notes |
+|------|--------|-------|
+| W5T1 | pending | |
+| W5T2 | pending | |
+
+## Phase 6: Engine integration
+| Task | Status | Notes |
+|------|--------|-------|
+| W6T1 | pending | |
+| W6T2 | pending | |
+| W6T3 | pending | |
+
+## Task W1T4: StatePool unit tests
+- **Status**: skipped (file lock conflict)
+- **Agent**: implementer
+- **Files**: src/solver/analog/__tests__/state-pool.test.ts
+- **Reason**: File lock held by W1T1 (task started earlier). W1T1 is creating state-pool.ts and holds a lock on the test file. Since these tasks execute in parallel and W1T1 was started first, W1T4 must wait for W1T1 to complete and release its locks before proceeding. Requeue W1T4 after W1T1 completes.
+
+## Task W1T2: Add stateSize/stateBaseOffset/initState to AnalogElement interfaces
 - **Status**: complete
 - **Agent**: implementer
 - **Files created**: none
-- **Files modified**: src/solver/analog/compiler.ts
-- **Tests**: 9932/9932 passing
+- **Files modified**: 
+  - src/core/analog-types.ts (added StatePoolRef interface and three members to AnalogElementCore)
+  - src/solver/analog/element.ts (re-exported StatePoolRef and added three members to AnalogElement)
+- **Tests**: Interface additions only — no test file created. TypeScript syntax verified.
+- **Details**:
+  - Added `StatePoolRef` forward-reference interface to analog-types.ts to avoid circular imports from core → solver
+  - Added three readonly/mutable members to AnalogElementCore:
+    - `stateSize: number` (readonly) — declared slots required in pool
+    - `stateBaseOffset: number` (mutable) — assigned by compiler, -1 if stateSize === 0
+    - `initState?(pool: StatePoolRef): void` (optional) — called once per compile to bind element to pool
+  - Mirrored the same three members in AnalogElement interface in solver/analog/element.ts
+  - Re-exported StatePoolRef from element.ts for backward compatibility
+  - All existing elements will receive default values in W1T3 (compiler task) — this task is interface-only as specified
 
-## Task W2-T1: Domain-aware formatting
+## Task W1T1: Create StatePool class
 - **Status**: complete
 - **Agent**: implementer
-- **Files created**: scripts/mcp/__tests__/formatters.test.ts
-- **Files modified**: scripts/mcp/formatters.ts
-- **Tests**: 24/24 passing
+- **Files created**: src/solver/analog/state-pool.ts, src/solver/analog/__tests__/state-pool.test.ts
+- **Files modified**: (none)
+- **Tests**: 27/27 passing
 
-## Task W2-T3: postMessage wire protocol rename + fixes
+## Task W1T3: Add allocation loop to compiler + statePool on CompiledAnalogCircuit
 - **Status**: complete
 - **Agent**: implementer
 - **Files created**: none
 - **Files modified**:
-  - `e2e/parity/headless-simulation.spec.ts` — renamed all `sim-set-input` → `sim-set-signal` and `sim-read-output` → `sim-read-signal` in test bodies and descriptions; updated module comment
-  - `e2e/fixtures/simulator-harness.ts` — updated JSDoc comment to reflect new message names
-  - `src/io/postmessage-adapter.ts` — updated JSDoc comment for `sim-set-signal`/`sim-read-signal`; rewrote `_handleTestTutorial` to compile first and then use `labelSignalMap` domain to detect analog inputs, removing hardcoded In/Clock/Port whitelist
-- **Tests**: 9956/9956 vitest passing (0 failures); 1 flaky timeout in `wire-current-resolver.test.ts` under full-suite load (passes in isolation at 3568ms, pre-existing flakiness unrelated to this task); E2E not run (dev server not available)
-- **Notes**: The switch cases `sim-set-signal` and `sim-read-signal` were already present in the adapter; old names `sim-set-input`/`sim-read-output` were already removed from the switch in a prior Wave 1 task. This task updated the parity tests and harness comment to match, and improved the tutorial signal detection to be domain-aware using `labelSignalMap`.
+  - `src/solver/analog/compiled-analog-circuit.ts` — imported StatePool, added `readonly statePool: StatePool` field, added `statePool` to constructor params with `StatePool(0)` default
+  - `src/solver/analog/compiler.ts` — imported StatePool, added state pool allocation loop after bridge adapter loop (assigns stateBaseOffset per element, creates StatePool(stateOffset), calls initState on each element), passed statePool to ConcreteCompiledAnalogCircuit constructor
+  - `src/solver/analog/__tests__/state-pool.test.ts` — added allocation loop tests (zero-state elements get -1, stateful elements get contiguous offsets, mixed elements, initState called with correct base, missing stateSize defaults to 0)
+  - `src/solver/analog/__tests__/compile-analog-partition.test.ts` — added StatePool import, added tests: statePool is StatePool instance, totalSlots 0 for elements without stateSize, elements get stateBaseOffset -1, fresh pool per compile, stateful element gets correct offset and initState is called
+- **Tests**: 10048/10048 passing
 
-## Task W2-T2: MCP tool fixes + delete circuit_describe_file
+## Task W2T1: Migrate Diode to state pool, remove write-back
 - **Status**: complete
 - **Agent**: implementer
-- **Files created**: scripts/__tests__/circuit-tools-w2t2.test.ts
-- **Files modified**: scripts/mcp/circuit-tools.ts
-- **Tests**: 20/20 passing (new tests); 9956/9956 total passing
-- **Changes made**:
-  - Deleted `circuit_describe_file` tool registration and `scanDigPins` import
-  - `circuit_list`: removed directional arrows (↓↑↕) from include_pins output; pin labels only
-  - `circuit_list`: added "ANALOG" to category filter description
-  - `circuit_test`: changed description from "Digital test format" to "test vector format"
-  - `circuit_test`: domain-aware driver analysis — analog pins show connected components without directional language; digital pins keep existing INPUT→OUTPUT trace
-  - `circuit_patch`: added analog example `{op:'set', target:'R1', props:{resistance:10000}}` to ops description
-  - `circuit_compile`: replaced stale `circuit_set_input`/`circuit_read_output` references with `circuit_set_signal`/`circuit_read_signal`; added conditional analog tool suggestions (circuit_dc_op, circuit_ac_sweep) when coordinator.supportsDcOp() or supportsAcSweep() is true
-  - Note: `src/io/dig-pin-scanner.ts` was NOT deleted — it has other consumers (scan74xxPinMap used by circuit-mcp-server.ts, generate-all-components-fixture.ts, measure-engine-references.ts). Only the scanDigPins import was removed from circuit-tools.ts.
+- **Files created**: src/components/semiconductors/__tests__/diode-state-pool.test.ts
+- **Files modified**: src/components/semiconductors/diode.ts, src/components/semiconductors/__tests__/diode.test.ts
+- **Tests**: 10064/10064 passing (all unit tests)
+- **Summary**:
+  - Replaced closure vars (vd, geq, ieq, _id, capGeq, capIeq, vdPrev) with StatePool slots (SLOT_VD=0, SLOT_GEQ=1, SLOT_IEQ=2, SLOT_ID=3, SLOT_CAP_GEQ=4, SLOT_CAP_IEQ=5, SLOT_VD_PREV=6)
+  - Added stateSize (4 without capacitance, 7 with), stateBaseOffset: -1, initState(pool) to element
+  - Removed voltages[nodeJunction-1] = vc + vdLimited write-back line
+  - Updated checkConvergence to compare raw voltage against pool SLOT_VD (limited voltage) instead of prev raw voltage — required for NR to converge correctly without write-back
+  - Updated existing diode.test.ts: added withState() helper that allocates StatePool and calls initState, updated all test helpers and integration tests to use it
+  - Added diode-state-pool.test.ts with 14 verification tests covering write-back elimination and pool state correctness
 
-## Task W2-T4: Unified diagnostic overlays (render-pipeline.ts + simulation-controller.ts)
+## Task W2T2: Diode write-back elimination test
 - **Status**: complete
 - **Agent**: implementer
-- **Files created**: none
-- **Files modified**:
-  - `src/app/render-pipeline.ts` — changed import from `SolverDiagnostic` in `../core/analog-engine-interface.js` to `Diagnostic` from `../compile/types.js`; updated `RenderPipeline` interface and `populateDiagnosticOverlays` implementation to accept `Diagnostic[]`; extended the function to handle both `involvedNodes` (via `wireToNodeId` reverse-lookup for solver diagnostics) and `involvedPositions` (used directly for connectivity diagnostics)
-  - `src/app/simulation-controller.ts` — removed the forced `as unknown as SolverDiagnostic[]` cast at lines 308-309; now passes `allDiags` (typed `Diagnostic[]`) directly to `populateDiagnosticOverlays`
-- **Tests**: 7789/7789 vitest passing; TypeScript compiles clean
-
-## Task W2-T5: Rename-only consumer files
-- **Status**: complete
-- **Agent**: implementer
-- **Files created**: none
-- **Files modified**: none (all target files already updated by Wave 1)
-- **Files analyzed**:
-  - `src/testing/comparison.ts` — already uses `setSignal`, `readSignal`, `settle` (async)
-  - `src/testing/run-all.ts` — already uses `setSignal`, `readSignal`, `settle` (async)
-  - `src/analysis/model-analyser.ts` — already uses `setSignal`, `readSignal`, `settle` (async)
-  - `scripts/verify-fixes.ts` — already uses `setSignal`, `readSignal`, `settle` (async)
-- **Notes**: 
-  - Verified no remaining references to old facade method names (`setInput`, `readOutput`, `runToStable`) on the main SimulatorFacade in production code
-  - Mock facades in test files and specialized interfaces (e.g., `SequentialAnalysisFacade` in state-transition.ts, `EditorBinding.setInput` for UI binding) intentionally kept their own method names as they are not part of the main facade contract
-  - `src/io/dig-pin-scanner.ts` was NOT deleted — it has other consumers (`scan74xxPinMap` used by circuit-mcp-server.ts, generate-all-components-fixture.ts, measure-engine-references.ts). The file was previously deleted and restored per spec (only delete if ONLY consumer is circuit_describe_file, which was already deleted by W2-T2)
-- **Tests**: 9956/9956 vitest passing (no changes needed)
+- **Files created**: (delivered as part of W2T1 — src/components/semiconductors/__tests__/diode-state-pool.test.ts)
+- **Files modified**: none additional
+- **Tests**: 16/16 passing
+- **Summary**: 14 verification tests in diode-state-pool.test.ts covering: voltages array unchanged after updateOperatingPoint, pool SLOT_VD contains limited voltage, stateSize values, initState initialization, IEQ formula invariant, Shockley ID at convergence. All tests confirm write-back is eliminated and state pool is correct.
