@@ -91,7 +91,10 @@
       "WebFetch(domain:people.eecs.berkeley.edu)",
       "WebFetch(domain:cseweb.ucsd.edu)",
       "WebFetch(domain:spicesharp.github.io)",
-      "WebFetch(domain:www.macspice.com)"
+      "WebFetch(domain:www.macspice.com)",
+      "WebFetch(domain:nmg.gitlab.io)",
+      "WebFetch(domain:ngspice.sourceforge.io)",
+      "WebFetch(domain:web.engr.oregonstate.edu)"
     ]
   },
   "enableAllProjectMcpServers": true,

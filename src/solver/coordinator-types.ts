@@ -82,6 +82,7 @@ export interface SimulationCoordinator {
   readonly compiled: {
     readonly wireSignalMap: ReadonlyMap<Wire, SignalAddress>;
     readonly labelSignalMap: ReadonlyMap<string, SignalAddress>;
+    readonly labelToCircuitElement: ReadonlyMap<string, CircuitElement>;
     readonly diagnostics: readonly Diagnostic[];
   };
 
@@ -130,6 +131,22 @@ export interface SimulationCoordinator {
    * @param budgetMs - Wall-clock budget in milliseconds (default 5000)
    */
   stepToTime(targetSimTime: number, budgetMs?: number): Promise<number>;
+
+  /**
+   * Headless batch sampler: step to each time in `times` without yielding to the
+   * event loop between samples. Designed for test/MCP contexts where UI
+   * responsiveness is not required but speed matters.
+   *
+   * `times` must be monotonically increasing. `capture` is called synchronously
+   * at each target time and its return value is stored in the result array.
+   *
+   * @param times    Sorted list of simulation times to sample at.
+   * @param capture  Called synchronously when each target time is reached.
+   * @param wallBudgetMs  Wall-clock timeout in milliseconds (default 30000).
+   *                 Throws if exceeded to prevent runaway loops.
+   * @returns Array of captured values, one per entry in `times`.
+   */
+  sampleAtTimes<T>(times: readonly number[], capture: () => T, wallBudgetMs?: number): Promise<readonly T[]>;
 
   /**
    * Current simulation time in seconds, or null if timing is purely discrete.

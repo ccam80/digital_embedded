@@ -2,3 +2,5 @@
 {"t":0,"agent":"a824d98","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":102093}
 {"t":0,"agent":"a835af7","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"a835af7","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":278937}
+{"t":0,"agent":"ad34b50","agent_type":"Explore","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"ad34b50","agent_type":"Explore","event":"agent_stop","success":true,"duration_ms":234479}

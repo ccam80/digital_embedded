@@ -19,7 +19,11 @@
             "NF": 1,
             "NR": 1,
             "VAF": "_inf",
-            "VAR": "_inf"
+            "VAR": "_inf",
+            "CJE": 4.5e-12,
+            "CJC": 3.5e-12,
+            "TF": 3e-10,
+            "TR": 2.5e-7
           }
         },
         "rotation": 0,
@@ -43,7 +47,11 @@
             "NF": 1,
             "NR": 1,
             "VAF": "_inf",
-            "VAR": "_inf"
+            "VAR": "_inf",
+            "CJE": 4.5e-12,
+            "CJC": 3.5e-12,
+            "TF": 3e-10,
+            "TR": 2.5e-7
           }
         },
         "rotation": 0,

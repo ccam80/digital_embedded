@@ -375,13 +375,25 @@ export function compileUnified(
   }
 
   if (compiledAnalog !== null) {
-    for (const [label, nodeId] of compiledAnalog.labelToNodeId) {
-      // Analog takes precedence when a label exists in both maps. This
-      // happens for neutral components like Port that are routed to both
-      // partitions: the digital compiler creates a spurious net-based
-      // mapping (value 0), while the analog compiler maps to the correct
-      // MNA node with the solved voltage.
-      labelSignalMap.set(label, { domain: "analog", nodeId });
+    // Analog takes precedence when a label exists in both maps. This
+    // happens for neutral components like Port that are routed to both
+    // partitions: the digital compiler creates a spurious net-based
+    // mapping (value 0), while the analog compiler maps to the correct
+    // MNA node with the solved voltage.
+    //
+    // For each labeled analog component:
+    //   • always register `label:pinLabel` entries (one per pin) so callers
+    //     can read an individual pin node voltage regardless of pin count;
+    //   • 1-pin → bare `label` also resolves to that pin's node;
+    //   • 2+ pin → bare `label` is NOT registered; callers must use
+    //     the `label:pinLabel` form to target a specific node.
+    for (const [label, pins] of compiledAnalog.labelPinNodes) {
+      for (const p of pins) {
+        labelSignalMap.set(`${label}:${p.pinLabel}`, { domain: "analog", nodeId: p.nodeId });
+      }
+      if (pins.length === 1) {
+        labelSignalMap.set(label, { domain: "analog", nodeId: pins[0]!.nodeId });
+      }
     }
   }
 

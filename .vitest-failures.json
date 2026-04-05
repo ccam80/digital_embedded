@@ -1,10 +1,65 @@
 {
   "summary": {
-    "passed": 3,
-    "failed": 0,
+    "passed": 10109,
+    "failed": 17,
     "skipped": 0,
-    "totalFiles": 1,
-    "durationSeconds": 2.1
+    "totalFiles": 338,
+    "durationSeconds": 18.6
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "expected false to be true // Object.is equality",
+      "count": 6,
+      "locations": [
+        {
+          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
+          "test": "parsed .MODEL card applied via applySpiceImportResult: circuit compiles and DC converges",
+          "line": 201,
+          "column": 27
+        },
+        {
+          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
+          "test": "compile with default IS vs IS=1e-20 produces different collector voltage",
+          "line": 235,
+          "column": 34
+        },
+        {
+          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
+          "test": "deserialized circuit produces same DC result as pre-serialization",
+          "line": 323,
+          "column": 35
+        },
+        {
+          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
+          "test": "parseModelCard then applySpiceImportResult stores params and DC converges",
+          "line": 402,
+          "column": 27
+        },
+        {
+          "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
+          "test": "default params remain at BJT defaults when only IS is overridden",
+          "line": 219,
+          "column": 47
+        },
+        {
+          "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
+          "test": "deserialized circuit with overrides produces same DC result as pre-serialization",
+          "line": 272,
+          "column": 35
+        }
+      ]
+    },
+    {
+      "message": "Engine entered ERROR state at step 1148, simTime=0.0007477007215307047",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
+          "test": "survives 2000 transient steps without ERROR state",
+          "line": 79,
+          "column": 15
+        }
+      ]
+    }
+  ]
 }

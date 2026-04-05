@@ -396,6 +396,57 @@ describe('DefaultSimulatorFacade', () => {
   });
 
   // -------------------------------------------------------------------------
+  // REGRESSION: resistor resistance prop survives build() translation
+  // Builder fix: modelRegistry paramDefs keys must be added to knownKeys so
+  // they are treated as internal keys rather than falling through to the
+  // xmlToInternal branch where the self-guard silently drops them.
+  // -------------------------------------------------------------------------
+
+  it('resistor resistance prop survives build() translation (regression: modelRegistry paramDefs knownKeys)', async () => {
+    const facade = new DefaultSimulatorFacade(registry);
+
+    // Voltage divider: 10 V source, two equal resistors (10 Ω each).
+    // Midpoint voltage = Vsrc * R2 / (R1 + R2) = 10 * 10/20 = 5 V.
+    // If `resistance` is silently dropped, both resistors default to their
+    // fallback value and the ratio stays 1:1 — but the absolute Ohm values
+    // change, which we can detect by confirming the midpoint is 5 V.
+    // More directly: use unequal resistors (R1=10, R2=40) so the ratio is
+    // 10:40 = 1:4, giving Vmid = 10 * 40/50 = 8 V.  If resistance is dropped
+    // both resistors get the same default and Vmid collapses to 5 V — a clear
+    // regression signal.
+    const R1 = 10;
+    const R2 = 40;
+    const Vsrc = 10;
+    const expectedVmid = Vsrc * R2 / (R1 + R2); // 8 V
+
+    const circuit = facade.build({
+      components: [
+        { id: 'vs',  type: 'DcVoltageSource', props: { voltage: Vsrc, label: 'Vs' } },
+        { id: 'r1',  type: 'Resistor',        props: { resistance: R1 } },
+        // Label on R2: 2-pin components use label:pinLabel form; 'Vmid:A' resolves
+        // to R2's A-pin node, which is the midpoint node between R1 and R2.
+        { id: 'r2',  type: 'Resistor',        props: { resistance: R2, label: 'Vmid' } },
+        { id: 'gnd', type: 'Ground' },
+      ],
+      connections: [
+        ['vs:pos',  'r1:A'],
+        ['r1:B',    'r2:A'],
+        ['r2:B',    'gnd:out'],
+        ['vs:neg',  'gnd:out'],
+      ],
+    });
+
+    const engine = facade.compile(circuit);
+    await facade.settle(engine);
+
+    const signals = facade.readAllSignals(engine);
+    const vmid = signals['Vmid:A'];
+    expect(vmid).toBeDefined();
+    // Allow 1% tolerance for solver convergence
+    expect(vmid).toBeCloseTo(expectedVmid, 0);
+  });
+
+  // -------------------------------------------------------------------------
   // R7: Chain of 3 inverters: NOT(NOT(NOT(x))) = NOT(x)
   // -------------------------------------------------------------------------
 

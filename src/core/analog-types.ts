@@ -178,6 +178,21 @@ export interface AnalogElementCore {
    * Bind to state pool after allocation. Called once by compiler.
    */
   initState?(pool: StatePoolRef): void;
+
+  /**
+   * Return the strictly-next breakpoint strictly greater than afterTime, or
+   * null if the source has no more breakpoints. Called once per accepted
+   * step on which this source's breakpoint was consumed.
+   */
+  nextBreakpoint?(afterTime: number): number | null;
+
+  /**
+   * Optional: register a callback invoked by the element when a setParam
+   * change invalidates the outstanding breakpoint (e.g. frequency/phase).
+   * The engine uses this to refresh the queue entry. Called once at seed
+   * time by MNAEngine._seedBreakpoints().
+   */
+  registerRefreshCallback?(cb: () => void): void;
 }
 
 // ---------------------------------------------------------------------------

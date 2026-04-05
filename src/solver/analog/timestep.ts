@@ -15,6 +15,22 @@ import type { SimulationParams } from "../../core/analog-engine-interface.js";
 import type { HistoryStore } from "./integration.js";
 
 // ---------------------------------------------------------------------------
+// BreakpointEntry — file-private
+// ---------------------------------------------------------------------------
+
+interface BreakpointEntry {
+  /** Absolute simulation time in seconds. */
+  time: number;
+  /**
+   * Element that produced this breakpoint, or null for external one-shots
+   * registered via the public addBreakpoint(time) API. On pop, if source
+   * is non-null and implements nextBreakpoint, the controller refills the
+   * queue with the element's next edge.
+   */
+  source: AnalogElement | null;
+}
+
+// ---------------------------------------------------------------------------
 // TimestepController
 // ---------------------------------------------------------------------------
 
@@ -36,8 +52,11 @@ export class TimestepController {
 
   private _params: SimulationParams;
 
-  /** Sorted ascending list of registered breakpoint times. */
-  private _breakpoints: number[];
+  /** Sorted ascending list of registered breakpoint entries. */
+  private _breakpoints: BreakpointEntry[];
+
+  /** Simulation time of the last accepted step. Used for accept() invariant check. */
+  private _lastAcceptedSimTime: number;
 
   /** Total accepted step count — drives the startup state machine. */
   private _acceptedSteps: number;
@@ -62,6 +81,7 @@ export class TimestepController {
     this.currentDt = params.maxTimeStep;
     this.currentMethod = "bdf1";
     this._breakpoints = [];
+    this._lastAcceptedSimTime = -Infinity;
     this._acceptedSteps = 0;
     this._signHistory = [];
     this._stableOnBdf2 = 0;
@@ -151,7 +171,7 @@ export class TimestepController {
 
     // Clamp to next breakpoint.
     if (this._breakpoints.length > 0) {
-      const nextBp = this._breakpoints[0];
+      const nextBp = this._breakpoints[0]!.time;
       const remaining = nextBp - simTime;
       if (remaining > 0 && newDt > remaining) {
         newDt = remaining;
@@ -169,7 +189,7 @@ export class TimestepController {
   getClampedDt(simTime: number): number {
     let dt = this.currentDt;
     if (this._breakpoints.length > 0) {
-      const remaining = this._breakpoints[0] - simTime;
+      const remaining = this._breakpoints[0]!.time - simTime;
       if (remaining > 0 && dt > remaining) {
         dt = remaining;
       }
@@ -219,12 +239,25 @@ export class TimestepController {
    * @param simTime - Simulation time after the accepted step, in seconds
    */
   accept(simTime: number): void {
+    if (simTime <= this._lastAcceptedSimTime) {
+      throw new Error(
+        `TimestepController.accept() invariant violated: simTime ${simTime} <= _lastAcceptedSimTime ${this._lastAcceptedSimTime}`,
+      );
+    }
+    this._lastAcceptedSimTime = simTime;
+
     this._acceptedSteps++;
     this._updateMethodForStartup();
 
-    // Pop breakpoints that have been reached.
-    while (this._breakpoints.length > 0 && simTime >= this._breakpoints[0]) {
-      this._breakpoints.shift();
+    // Pop breakpoints that have been reached and refill from source if any.
+    while (this._breakpoints.length > 0 && simTime >= this._breakpoints[0]!.time) {
+      const popped = this._breakpoints.shift()!;
+      if (typeof popped.source?.nextBreakpoint === "function") {
+        const next = popped.source.nextBreakpoint(simTime);
+        if (next !== null) {
+          this.insertForSource(next, popped.source);
+        }
+      }
     }
   }
 
@@ -320,7 +353,7 @@ export class TimestepController {
     let hi = this._breakpoints.length;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;
-      if (this._breakpoints[mid] < time) lo = mid + 1;
+      if (this._breakpoints[mid]!.time < time) lo = mid + 1;
       else hi = mid;
     }
     // Dedup: if an existing entry at lo or lo-1 is within eps of `time`,
@@ -329,13 +362,49 @@ export class TimestepController {
     // breakpoints (which cannot be closer than minTimeStep without the
     // solver being unable to separate them anyway).
     const eps = 0.5 * this._params.minTimeStep;
-    if (lo < this._breakpoints.length && this._breakpoints[lo] - time < eps) {
+    if (lo < this._breakpoints.length && this._breakpoints[lo]!.time - time < eps) {
       return;
     }
-    if (lo > 0 && time - this._breakpoints[lo - 1] < eps) {
+    if (lo > 0 && time - this._breakpoints[lo - 1]!.time < eps) {
       return;
     }
-    this._breakpoints.splice(lo, 0, time);
+    this._breakpoints.splice(lo, 0, { time, source: null });
+  }
+
+  /**
+   * Register the next outstanding breakpoint for an element source. The
+   * controller holds at most one entry per source; when this entry is
+   * consumed in accept(), the controller calls source.nextBreakpoint to
+   * refill.
+   *
+   * Seeded at compile time for every element with nextBreakpoint, and
+   * re-seeded automatically during accept(). Never called from the hot
+   * path per step.
+   */
+  insertForSource(time: number, source: AnalogElement): void {
+    let lo = 0;
+    let hi = this._breakpoints.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (this._breakpoints[mid]!.time < time) lo = mid + 1;
+      else hi = mid;
+    }
+    this._breakpoints.splice(lo, 0, { time, source });
+  }
+
+  /**
+   * Find the existing queue entry for source (by identity), remove it, and
+   * reinsert at newNextTime if non-null. Used by the engine to refresh a
+   * stale breakpoint after a setParam change (e.g. frequency/phase change).
+   */
+  refreshForSource(source: AnalogElement, newNextTime: number | null): void {
+    const idx = this._breakpoints.findIndex((e) => e.source === source);
+    if (idx >= 0) {
+      this._breakpoints.splice(idx, 1);
+    }
+    if (newNextTime !== null) {
+      this.insertForSource(newNextTime, source);
+    }
   }
 
   /**

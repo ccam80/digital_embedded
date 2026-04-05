@@ -222,11 +222,11 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
     ctx.save();
     ctx.setLineWidth(1);
 
-    // Lead from pos pin to body
-    drawColoredLead(ctx, signals, vPos, 0, 0, 15 * PX, 0);
+    // Lead from neg pin (x=0) to body
+    drawColoredLead(ctx, signals, vNeg, 0, 0, 15 * PX, 0);
 
-    // Lead from neg pin to body
-    drawColoredLead(ctx, signals, vNeg, 49 * PX, 0, 4, 0);
+    // Lead from pos pin (x=4) to body
+    drawColoredLead(ctx, signals, vPos, 49 * PX, 0, 4, 0);
 
     // Circle body and sine wave stay COMPONENT color
     ctx.setColor("COMPONENT");
@@ -268,8 +268,8 @@ export class AcVoltageSourceElement extends AbstractCircuitElement {
 
 const AC_VOLTAGE_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
   {
-    direction: PinDirection.INPUT,
-    label: "pos",
+    direction: PinDirection.OUTPUT,
+    label: "neg",
     defaultBitWidth: 1,
     position: { x: 0, y: 0 },
     isNegatable: false,
@@ -277,8 +277,8 @@ const AC_VOLTAGE_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
     kind: "signal",
   },
   {
-    direction: PinDirection.OUTPUT,
-    label: "neg",
+    direction: PinDirection.INPUT,
+    label: "pos",
     defaultBitWidth: 1,
     position: { x: 4, y: 0 },
     isNegatable: false,
@@ -395,6 +395,10 @@ const AC_VOLTAGE_SOURCE_ATTRIBUTE_MAP: AttributeMapping[] = [
 export interface AcVoltageSourceAnalogElement extends AnalogElementCore {
   /** Returns transition times within [tStart, tEnd] for square waveforms. */
   getBreakpoints(tStart: number, tEnd: number): number[];
+  /** Returns the strictly-next breakpoint strictly after afterTime, or null. */
+  nextBreakpoint(afterTime: number): number | null;
+  /** Register a callback to be invoked when a setParam change invalidates the outstanding breakpoint. */
+  registerRefreshCallback(cb: () => void): void;
   /**
    * Parsed expression AST for expression waveform mode.
    * Null if waveform is not "expression" or if parsing failed.
@@ -425,6 +429,7 @@ function createAcVoltageSourceElement(
   let frequency = p.frequency;
   let phase = p.phase;
   let dcOffset = p.dcOffset;
+  let refreshCallback: (() => void) | null = null;
   const waveform = props.getOrDefault<string>("waveform", "sine") as Waveform;
   const ext: ExtendedWaveformParams = {
     freqStart: props.getOrDefault<number>("freqStart", 100),
@@ -465,6 +470,9 @@ function createAcVoltageSourceElement(
         frequency = p.frequency;
         phase = p.phase;
         dcOffset = p.dcOffset;
+        if ((key === "frequency" || key === "phase") && refreshCallback !== null) {
+          refreshCallback();
+        }
       }
     },
 
@@ -501,29 +509,43 @@ function createAcVoltageSourceElement(
 
     getPinCurrents(voltages: Float64Array): number[] {
       // MNA branch variable: voltages[branchIdx] = I flowing from nodeNeg
-      // through source to nodePos. Convention for getPinCurrents: positive =
-      // current from pin 0 → pin 1 through the element body (matching the
-      // engine's getElementCurrent fallback [I, -I] at t=0, t=1).
-      // Pin layout order: [pos, neg].
+      // through source to nodePos.
+      // Pin layout order: [neg, pos].
+      // "Into element at neg" = -I (current exits neg into external circuit).
+      // "Into element at pos" = +I (current enters pos from external circuit).
       const I = voltages[branchIdx];
-      return [I, -I];
+      return [-I, I];
+    },
+
+    nextBreakpoint(afterTime: number): number | null {
+      if (waveform === "square") {
+        const halfPeriod = 1 / (2 * frequency);
+        const idx = Math.floor((afterTime - phase) / halfPeriod) + 1;
+        return phase + idx * halfPeriod;
+      }
+      if (waveform === "noise") {
+        return afterTime + 1 / (20 * frequency);
+      }
+      return null;
+    },
+
+    registerRefreshCallback(cb: () => void): void {
+      refreshCallback = cb;
     },
 
     getBreakpoints(tStart: number, tEnd: number): number[] {
-      if (waveform === "square") {
-        return squareWaveBreakpoints(frequency, phase, tStart, tEnd);
-      }
-      if (waveform === "noise") {
-        // Force timestep controller to sample at each interval so noise is uncorrelated.
-        const dt = Math.min(1 / (20 * frequency), (tEnd - tStart));
-        if (dt <= 0) return [];
-        const pts: number[] = [];
-        for (let t = tStart + dt; t < tEnd; t += dt) {
-          pts.push(t);
+      const out: number[] = [];
+      let t = tStart;
+      while (true) {
+        const next = element.nextBreakpoint(t);
+        if (next === null || next >= tEnd) break;
+        if (next <= t) {
+          throw new Error(`nextBreakpoint returned non-monotonic value: ${next} <= ${t}`);
         }
-        return pts;
+        out.push(next);
+        t = next;
       }
-      return [];
+      return out;
     },
   };
 

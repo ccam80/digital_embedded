@@ -113,8 +113,8 @@ export class CurrentSourceElement extends AbstractCircuitElement {
 
 const CURRENT_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
   {
-    label: "pos",
-    direction: PinDirection.INPUT,
+    label: "neg",
+    direction: PinDirection.OUTPUT,
     position: { x: 0, y: 0 },
     defaultBitWidth: 1,
     isNegatable: false,
@@ -122,8 +122,8 @@ const CURRENT_SOURCE_PIN_LAYOUT: PinDeclaration[] = [
     kind: "signal",
   },
   {
-    label: "neg",
-    direction: PinDirection.OUTPUT,
+    label: "pos",
+    direction: PinDirection.INPUT,
     position: { x: 4, y: 0 },
     defaultBitWidth: 1,
     isNegatable: false,
@@ -188,12 +188,12 @@ export function makeCurrentSource(
 
     getPinCurrents(_voltages: Float64Array): number[] {
       // No branch row — current is defined by the stamp: I = current * scale.
-      // Pin layout order: [pos, neg] — pos is index 0, neg is index 1.
+      // Pin layout order: [neg, pos] — neg is index 0, pos is index 1.
       // Conventional current flows from neg through source to pos (arrow direction).
-      // Current into pos = -I (current exits element at pos into the circuit).
       // Current into neg = +I (current enters element at neg from the circuit).
+      // Current into pos = -I (current exits element at pos into the circuit).
       const I = p.current * scale;
-      return [-I, I];
+      return [I, -I];
     },
   };
 }

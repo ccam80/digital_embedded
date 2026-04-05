@@ -455,7 +455,7 @@ export function createBjtElement(
       //   - VCCS gm*Vbe: current from E to C
       //
       // Norton equivalents at each node:
-      //   Ic_norton = ic - gm*vbe - go*vbc (stored in pool as SLOT_IC_NORTON with sign convention below)
+      //   Ic_norton = ic - (gm+go)*vbe + go*vbc (stored in pool as SLOT_IC_NORTON with sign convention below)
       //   Ib_norton = ib - gpi*vbe - gmu*vbc
 
       const gpi = s0[base + SLOT_GPI];
@@ -534,7 +534,7 @@ export function createBjtElement(
       s0[base + SLOT_GO]  = op.go;
       s0[base + SLOT_IC]  = op.ic;
       s0[base + SLOT_IB]  = op.ib;
-      s0[base + SLOT_IC_NORTON] = op.ic - op.gm * vbeLimited + op.go * vbcLimited;
+      s0[base + SLOT_IC_NORTON] = op.ic - (op.gm + op.go) * vbeLimited + op.go * vbcLimited;
       s0[base + SLOT_IB_NORTON] = op.ib - op.gpi * vbeLimited - op.gmu * vbcLimited;
     },
 
@@ -913,9 +913,9 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_GO]  = op.go;
       s0[base + L1_SLOT_IC]  = op.ic;
       s0[base + L1_SLOT_IB]  = op.ib;
-      s0[base + L1_SLOT_IC_NORTON] = op.ic - op.gm * vbeLimited + op.go * vbcLimited;
+      s0[base + L1_SLOT_IC_NORTON] = op.ic - (op.gm + op.go) * vbeLimited + op.go * vbcLimited;
       s0[base + L1_SLOT_IB_NORTON] = op.ib - op.gpi * vbeLimited - op.gmu * vbcLimited;
-      s0[base + L1_SLOT_IE_NORTON] = -(op.ic + op.ib) + op.gm * vbeLimited - op.go * vbcLimited + op.gpi * vbeLimited + op.gmu * vbcLimited;
+      s0[base + L1_SLOT_IE_NORTON] = -(op.ic + op.ib) + (op.gm + op.go + op.gpi) * vbeLimited + (op.gmu - op.go) * vbcLimited;
 
       // Update current-dependent base resistance (IRB/RBM).
       // When IRB > 0 and RBM < RB, Rb varies with base current magnitude.

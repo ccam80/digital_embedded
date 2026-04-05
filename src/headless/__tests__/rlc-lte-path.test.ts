@@ -81,7 +81,7 @@ describe('LTE/composite-tolerance path — MCP (facade) surface', () => {
 
     // At t = τ: Vc ≈ 5·(1 - e⁻¹) = 3.1606 V
     await facade.stepToTime(engine, tau);
-    const vcAtTau = facade.readSignal(engine, 'Vc');
+    const vcAtTau = facade.readSignal(engine, 'Vc:pos');
     const expected1 = 5 * (1 - Math.exp(-1)); // 3.1606
     // Within ±2 % of analytical
     expect(vcAtTau).toBeGreaterThanOrEqual(expected1 * 0.98);
@@ -89,7 +89,7 @@ describe('LTE/composite-tolerance path — MCP (facade) surface', () => {
 
     // At t = 5τ: Vc ≈ 5·(1 - e⁻⁵) = 4.9663 V
     await facade.stepToTime(engine, 5 * tau);
-    const vcAt5tau = facade.readSignal(engine, 'Vc');
+    const vcAt5tau = facade.readSignal(engine, 'Vc:pos');
     const expected5 = 5 * (1 - Math.exp(-5)); // 4.9663
     // Within ±1 %
     expect(vcAt5tau).toBeGreaterThanOrEqual(expected5 * 0.99);
@@ -132,14 +132,14 @@ describe('LTE/composite-tolerance path — MCP (facade) surface', () => {
 
     // At t = τ: V_R = R·i = 1 - e⁻¹ ≈ 0.6321 V
     await facade.stepToTime(engine, tau);
-    const vrAtTau = facade.readSignal(engine, 'VR');
+    const vrAtTau = facade.readSignal(engine, 'VR:A') - facade.readSignal(engine, 'VR:B');
     const expected1 = 1 - Math.exp(-1); // 0.6321
     expect(vrAtTau).toBeGreaterThanOrEqual(expected1 * 0.98);
     expect(vrAtTau).toBeLessThanOrEqual(expected1 * 1.02);
 
     // At t = 5τ: V_R ≈ 1 - e⁻⁵ ≈ 0.9933 V
     await facade.stepToTime(engine, 5 * tau);
-    const vrAt5tau = facade.readSignal(engine, 'VR');
+    const vrAt5tau = facade.readSignal(engine, 'VR:A') - facade.readSignal(engine, 'VR:B');
     const expected5 = 1 - Math.exp(-5); // 0.9933
     expect(vrAt5tau).toBeGreaterThanOrEqual(expected5 * 0.99);
     expect(vrAt5tau).toBeLessThanOrEqual(expected5 * 1.01);
@@ -187,18 +187,20 @@ describe('LTE/composite-tolerance path — MCP (facade) surface', () => {
     facade.setSignal(engine, 'Vs', 1);
 
     // Sample densely over 10 periods (≈ 2 ms) — 500 samples
-    const totalTime = 5e-6 + 10 * T0; // start + 10 periods
     const sampleCount = 500;
     const dt = (10 * T0) / sampleCount;
 
-    const samples: Array<{ t: number; v: number }> = [];
-    for (let i = 1; i <= sampleCount; i++) {
-      await facade.stepToTime(engine, 5e-6 + dt * i);
-      samples.push({
-        t: 5e-6 + dt * i,
-        v: facade.readSignal(engine, 'Vc'),
-      });
-    }
+    const sampleTimes = Array.from({ length: sampleCount }, (_, i) => 5e-6 + dt * (i + 1));
+    const voltages = await facade.sampleAtTimes(
+      engine,
+      sampleTimes,
+      () => facade.readSignal(engine, 'Vc:pos'),
+    );
+
+    const samples: Array<{ t: number; v: number }> = sampleTimes.map((t, i) => ({
+      t,
+      v: voltages[i]!,
+    }));
 
     // Deviation from the drive (1 V)
     const dev = samples.map(s => s.v - 1);
@@ -270,7 +272,7 @@ describe('LTE/composite-tolerance path — MCP (facade) surface', () => {
     const analogLoose = coordLoose.getAnalogEngine() as MNAEngine;
     analogLoose.configure({ reltol: 1e-2 });
     await facadeLoose.stepToTime(engineLoose, target);
-    const vcLoose = facadeLoose.readSignal(engineLoose, 'Vc');
+    const vcLoose = facadeLoose.readSignal(engineLoose, 'Vc:pos');
     const stepCountLoose = (analogLoose as unknown as { _stepCount: number })._stepCount;
 
     // Tight reltol compile
@@ -280,7 +282,7 @@ describe('LTE/composite-tolerance path — MCP (facade) surface', () => {
     const analogTight = coordTight.getAnalogEngine() as MNAEngine;
     analogTight.configure({ reltol: 1e-6 });
     await facadeTight.stepToTime(engineTight, target);
-    const vcTight = facadeTight.readSignal(engineTight, 'Vc');
+    const vcTight = facadeTight.readSignal(engineTight, 'Vc:pos');
     const stepCountTight = (analogTight as unknown as { _stepCount: number })._stepCount;
 
     // Two different reltol values must produce numerically different results
@@ -320,13 +322,13 @@ describe('LTE/composite-tolerance path — MCP (facade) surface', () => {
     const engineA = facadeA.compile(buildCircuit(facadeA));
     facadeA.setSignal(engineA, 'Vs', 5);
     await facadeA.stepToTime(engineA, target);
-    const vcA = facadeA.readSignal(engineA, 'Vc');
+    const vcA = facadeA.readSignal(engineA, 'Vc:pos');
 
     const facadeB = new DefaultSimulatorFacade(registry);
     const engineB = facadeB.compile(buildCircuit(facadeB));
     facadeB.setSignal(engineB, 'Vs', 5);
     await facadeB.stepToTime(engineB, target);
-    const vcB = facadeB.readSignal(engineB, 'Vc');
+    const vcB = facadeB.readSignal(engineB, 'Vc:pos');
 
     // Bit-for-bit identical — no LTE history leak
     expect(vcB).toBe(vcA);
@@ -378,7 +380,7 @@ describe('LTE/composite-tolerance path — MCP (facade) surface', () => {
     const samples: number[] = [];
     for (let i = 1; i <= sampleCount; i++) {
       await facade.stepToTime(engine, tStart + dt * i);
-      samples.push(facade.readSignal(engine, 'Vc'));
+      samples.push(facade.readSignal(engine, 'Vc:pos'));
     }
 
     // Exactly 2 zero-crossings ± 1 (boundary effects)
@@ -438,7 +440,7 @@ describe('LTE/composite-tolerance path — MCP (facade) surface', () => {
     const samples: number[] = [];
     for (let i = 1; i <= sampleCount; i++) {
       await facade.stepToTime(engine, tStart + dt * i);
-      samples.push(facade.readSignal(engine, 'VR'));
+      samples.push(facade.readSignal(engine, 'VR:A') - facade.readSignal(engine, 'VR:B'));
     }
 
     // At least 6 zero-crossings (2/period × 4 periods − 2 edge slop)

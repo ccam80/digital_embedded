@@ -84,6 +84,7 @@ export class MockCoordinator implements SimulationCoordinator {
   dcOperatingPoint(): DcOpResult | null { return null; }
   acAnalysis(_params: AcParams): AcResult | null { return null; }
   async stepToTime(_targetSimTime: number, _budgetMs?: number): Promise<number> { return 0; }
+  async sampleAtTimes<T>(_times: readonly number[], _capture: () => T, _wallBudgetMs?: number): Promise<readonly T[]> { return []; }
   syncTimeTarget(): void { /* no-op */ }
   addTimeBreakpoint(_time: number): void { /* no-op */ }
 
@@ -120,10 +121,11 @@ export class MockCoordinator implements SimulationCoordinator {
 
   getCurrentResolverContext(): CurrentResolverContext | null { return null; }
 
-  get compiled(): { wireSignalMap: ReadonlyMap<Wire, SignalAddress>; labelSignalMap: ReadonlyMap<string, SignalAddress>; diagnostics: readonly Diagnostic[] } {
+  get compiled(): { wireSignalMap: ReadonlyMap<Wire, SignalAddress>; labelSignalMap: ReadonlyMap<string, SignalAddress>; labelToCircuitElement: ReadonlyMap<string, CircuitElement>; diagnostics: readonly Diagnostic[] } {
     return {
       wireSignalMap: new Map(),
       labelSignalMap: new Map(),
+      labelToCircuitElement: new Map(),
       diagnostics: [],
     };
   }

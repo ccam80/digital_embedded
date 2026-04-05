@@ -55,8 +55,16 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
   /** Current latched Q state. Initial value is false (logic LOW). */
   private _latchedQ = false;
 
-  /** Clock voltage at the previous accepted timestep. */
-  private _prevClockVoltage = 0;
+  /**
+   * Clock voltage at the previous accepted timestep.
+   *
+   * Initialized to NaN as a sentinel meaning "no previous sample yet": the
+   * first updateCompanion() call seeds this field from the current clock
+   * voltage and skips edge detection. Without the sentinel, a DC operating
+   * point with clock HIGH would produce a spurious rising edge on the first
+   * transient step (prev=0, curr=3.3V).
+   */
+  private _prevClockVoltage = NaN;
 
   /**
    * Threshold for rising-edge detection — taken from the clock pin's vIH.
@@ -203,9 +211,14 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
     const currentClockV = readMnaVoltage(clockNodeId, voltages);
     const dVoltage = readMnaVoltage(dNodeId, voltages);
 
-    // Rising edge detection
+    // Rising edge detection. On the first call _prevClockVoltage is NaN
+    // (sentinel): skip edge detection and just seed from the current sample
+    // — edge detection requires two samples, and the DC steady-state value
+    // must not be interpreted as a transition from LOW.
     const risingEdge =
-      this._prevClockVoltage < this._vIH && currentClockV >= this._vIH;
+      !Number.isNaN(this._prevClockVoltage) &&
+      this._prevClockVoltage < this._vIH &&
+      currentClockV >= this._vIH;
 
     if (risingEdge) {
       const dLevel = this._dPin.readLogicLevel(dVoltage);

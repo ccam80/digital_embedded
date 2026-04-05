@@ -307,7 +307,7 @@ export function initViewerController(ctx: AppContext, renderPipeline: RenderPipe
       const width = addr.bitWidth;
       const group: SignalGroup = 'probe';
       const idx = panelIndex ?? (watchedSignals.length === 0 ? 0 : watchedSignals[watchedSignals.length - 1].panelIndex);
-      watchedSignals.push({ name, addr: { domain: 'digital', netId, bitWidth: width }, width, group, panelIndex: idx });
+      watchedSignals.push({ name, addr: { domain: 'digital', netId, bitWidth: width, direction: addr.direction }, width, group, panelIndex: idx });
     }
 
     viewerPanel?.classList.add('open');

@@ -291,8 +291,10 @@ export function newtonRaphson(opts: NROptions): NRResult {
     // 5a. Node damping (ngspice heuristic from niiter.c):
     //     If any voltage node changed by more than 10V, scale ALL updates
     //     by 10/maxDelta. Minimum scale factor 0.1.
-    //     Only active after first iteration (need a reference point).
-    if (iteration > 0) {
+    //     Active from iteration 0: prevVoltages is always set from the initial
+    //     guess at the top of each iteration before solver.solve(), so it is
+    //     always finite and well-defined — including the first iteration.
+    {
       let maxDelta = 0;
       for (let i = 0; i < matrixSize; i++) {
         const delta = Math.abs(voltages[i] - prevVoltages[i]);

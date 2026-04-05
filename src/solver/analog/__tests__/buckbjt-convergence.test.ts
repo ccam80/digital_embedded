@@ -5,6 +5,12 @@
  * power switch, inductor, freewheeling diode, output capacitor, and
  * resistive loads. It exercises all three BJT convergence fallback levels
  * (direct NR, Gmin stepping, source stepping) and is a BJT convergence stress test.
+ *
+ * NOTE: The BJT instances in fixtures/buckbjt.dts have nonzero CJE/CJC/TF/TR parameters
+ * (2N3904-ish values). These are present to avoid zero-cap Newton-Raphson runaway — without
+ * junction capacitances the BJT Jacobian lacks the small regularising conductance (geq = C/dt)
+ * that prevents the MNA matrix from becoming numerically singular during transient. They are
+ * NOT intended to model a specific device; do not remove them to "clean up" the fixture.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';

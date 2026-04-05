@@ -68,8 +68,16 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   /** All analog element instances. */
   readonly elements: AnalogElement[];
 
-  /** Maps component label strings to MNA node IDs. */
+  /** Maps component label strings to MNA node IDs (first-pin semantics —
+   *  preserved for AC analysis, Monte Carlo, parameter sweep, etc.). */
   readonly labelToNodeId: Map<string, number>;
+
+  /** Maps component labels to the full list of their pins with MNA node IDs.
+   *  Used by the unified compiler to build rich `labelSignalMap` entries:
+   *  1-pin components get a bare label entry pointing to that pin's node;
+   *  2-pin (and higher) components do NOT get a bare label entry — callers
+   *  must use `label:pinLabel` form to address individual pins. */
+  readonly labelPinNodes: Map<string, Array<{ pinLabel: string; nodeId: number }>>;
 
   /** Maps Wire objects to MNA node IDs. */
   readonly wireToNodeId: Map<Wire, number>;
@@ -120,6 +128,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     branchCount: number;
     elements: AnalogElement[];
     labelToNodeId: Map<string, number>;
+    labelPinNodes?: Map<string, Array<{ pinLabel: string; nodeId: number }>>;
     wireToNodeId: Map<Wire, number>;
     models: Map<string, DeviceModel>;
     elementToCircuitElement: Map<number, CircuitElement>;
@@ -137,6 +146,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.matrixSize = params.nodeCount + params.branchCount;
     this.elements = params.elements;
     this.labelToNodeId = params.labelToNodeId;
+    this.labelPinNodes = params.labelPinNodes ?? new Map();
     this.wireToNodeId = params.wireToNodeId;
     this.models = params.models;
     this.elementToCircuitElement = params.elementToCircuitElement;

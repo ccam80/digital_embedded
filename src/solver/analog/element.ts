@@ -128,6 +128,27 @@ export interface AnalogElement {
   updateState?(dt: number, voltages: Float64Array): void;
 
   /**
+   * Update companion-model internal state after an accepted timestep.
+   *
+   * Distinct from `updateState`: this hook is for elements whose companion
+   * model carries per-timestep state that must be refreshed from the accepted
+   * solution (edge detection, pin capacitance history, latched logic levels).
+   * Called exactly once per accepted timestep — never on a rejected LTE retry
+   * and never inside the NR convergence loop — so implementations can safely
+   * perform discrete transitions (e.g. rising-edge latching) without risking
+   * mid-NR false triggers.
+   *
+   * @param dt       - Accepted timestep in seconds
+   * @param method   - Integration method used for this accepted step
+   * @param voltages - Accepted solution vector
+   */
+  updateCompanion?(
+    dt: number,
+    method: IntegrationMethod,
+    voltages: Float64Array,
+  ): void;
+
+  /**
    * Element-specific convergence check beyond the global node-voltage criterion.
    *
    * Called by the assembler after every NR iteration. Return `true` if this
@@ -259,4 +280,19 @@ export interface AnalogElement {
    * or pulse waveforms) need to implement this. All others may omit it.
    */
   getBreakpoints?(tStart: number, tEnd: number): number[];
+
+  /**
+   * Return the strictly-next breakpoint strictly greater than afterTime, or
+   * null if the source has no more breakpoints. Called once per accepted
+   * step on which this source's breakpoint was consumed.
+   */
+  nextBreakpoint?(afterTime: number): number | null;
+
+  /**
+   * Optional: register a callback invoked by the element when a setParam
+   * change invalidates the outstanding breakpoint (e.g. frequency/phase).
+   * The engine uses this to refresh the queue entry. Called once at seed
+   * time by MNAEngine._seedBreakpoints().
+   */
+  registerRefreshCallback?(cb: () => void): void;
 }

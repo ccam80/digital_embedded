@@ -450,7 +450,7 @@ describe('DefaultSimulationCoordinator - analog-only', () => {
     const unified = compileUnified(circuit, registry);
     expect(unified.analog).not.toBeNull();
     const coord = new DefaultSimulationCoordinator(unified);
-    const addr: SignalAddress = { domain: 'digital', netId: 0, bitWidth: 1 };
+    const addr: SignalAddress = { domain: 'digital', netId: 0, bitWidth: 1, direction: PinDirection.OUTPUT };
     // Digital engine now exists (Ground routes to digital), so reading
     // a digital address no longer throws.
     expect(() => coord.readSignal(addr)).not.toThrow();

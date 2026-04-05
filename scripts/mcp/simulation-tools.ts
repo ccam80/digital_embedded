@@ -198,6 +198,51 @@ export function registerSimulationTools(
   );
 
   // ---------------------------------------------------------------------------
+  // circuit_sample_at_times
+  // ---------------------------------------------------------------------------
+
+  server.registerTool(
+    "circuit_sample_at_times",
+    {
+      title: "Sample Signals at Times",
+      description:
+        "Run the analog simulation to each target time in order, capturing all labeled " +
+        "signal values at each sample point. Times must be monotonically increasing. " +
+        "Runs without yielding to the event loop — fast for headless/test use. " +
+        "Returns a table of signal values at each time.",
+      inputSchema: {
+        handle: z.string().describe("Circuit handle"),
+        times: z
+          .array(z.number())
+          .min(1)
+          .describe("Sorted list of simulation times (seconds) to sample at"),
+        wallBudgetMs: z
+          .number()
+          .optional()
+          .describe("Wall-clock timeout in milliseconds (default: 30000)"),
+      },
+    },
+    wrapTool<{ handle: string; times: number[]; wallBudgetMs?: number }>(
+      "circuit_sample_at_times error",
+      async ({ handle, times, wallBudgetMs }) => {
+        const coordinator = ensureEngine(handle, facade, session);
+        const snapshots = await facade.sampleAtTimes(
+          coordinator,
+          times,
+          () => coordinator.readAllSignals(),
+          wallBudgetMs,
+        );
+        const lines: string[] = [`Samples (${times.length} time points):`];
+        for (let i = 0; i < times.length; i++) {
+          lines.push(`  t=${times[i]!.toExponential(4)} s:`);
+          lines.push(formatAllSignals(snapshots[i]!).replace(/^/gm, '  '));
+        }
+        return lines.join("\n");
+      },
+    ),
+  );
+
+  // ---------------------------------------------------------------------------
   // circuit_dc_op
   // ---------------------------------------------------------------------------
 

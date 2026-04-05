@@ -143,6 +143,19 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     return coordinator.stepToTime(targetSimTime, budgetMs);
   }
 
+  /**
+   * Headless batch sampler — no event-loop yields between samples.
+   * For test/MCP contexts. See SimulationCoordinator.sampleAtTimes for full docs.
+   */
+  sampleAtTimes<T>(
+    coordinator: SimulationCoordinator,
+    times: readonly number[],
+    capture: () => T,
+    wallBudgetMs?: number,
+  ): Promise<readonly T[]> {
+    return coordinator.sampleAtTimes(times, capture, wallBudgetMs);
+  }
+
   async settle(coordinator: SimulationCoordinator, settleTime = 0.01): Promise<void> {
     if (coordinator.simTime === null) {
       this.step(coordinator, { clockAdvance: false });
@@ -154,6 +167,15 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   setSignal(_coordinator: SimulationCoordinator, label: string, value: number): void {
     const addr = this._coordinator.compiled.labelSignalMap.get(label);
     if (addr === undefined) {
+      // The label may belong to a multi-pin analog component (e.g. a voltage
+      // source with pins pos/neg) that is not in labelSignalMap as a bare
+      // entry. If it exists as a circuit element, route to setSourceByLabel
+      // which drives it via its behavioral param (e.g. voltage/amplitude).
+      const el = this._coordinator.compiled.labelToCircuitElement.get(label);
+      if (el !== undefined) {
+        this._coordinator.setSourceByLabel(label, '', value);
+        return;
+      }
       const available = [...this._coordinator.compiled.labelSignalMap.keys()].join(', ');
       throw new FacadeError(
         `Label "${label}" not found in compiled circuit. Available labels: ${available || '(none)'}`,

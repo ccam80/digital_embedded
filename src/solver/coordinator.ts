@@ -346,6 +346,50 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     return count;
   }
 
+  async sampleAtTimes<T>(
+    times: readonly number[],
+    capture: () => T,
+    wallBudgetMs = 30_000,
+  ): Promise<readonly T[]> {
+    if (this._analog === null) return [];
+    if (times.length === 0) return [];
+
+    // Validate monotonically increasing
+    for (let i = 1; i < times.length; i++) {
+      if (times[i]! <= times[i - 1]!) {
+        throw new Error(
+          `sampleAtTimes: times must be monotonically increasing. ` +
+          `times[${i - 1}]=${times[i - 1]} >= times[${i}]=${times[i]}`,
+        );
+      }
+    }
+
+    // Register all target times as breakpoints up front (dedup is handled by addBreakpoint)
+    for (const t of times) {
+      this._analog.addBreakpoint(t);
+    }
+
+    const results: T[] = [];
+    const wallStart = performance.now();
+
+    for (const target of times) {
+      while ((this._analog.simTime ?? 0) < target) {
+        if (performance.now() - wallStart > wallBudgetMs) {
+          throw new Error(
+            `sampleAtTimes: wall-clock budget of ${wallBudgetMs}ms exceeded at simTime=${this._analog.simTime} (target=${target})`,
+          );
+        }
+        if (this.getState() === EngineState.ERROR) {
+          throw new Error(`sampleAtTimes: engine entered ERROR state at simTime=${this._analog.simTime}`);
+        }
+        this.step();
+      }
+      results.push(capture());
+    }
+
+    return results;
+  }
+
   get simTime(): number | null {
     return this._analog !== null ? this._analog.simTime : null;
   }

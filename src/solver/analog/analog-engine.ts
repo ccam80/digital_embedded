@@ -188,6 +188,7 @@ export class MNAEngine implements AnalogEngine {
       }
     }
 
+    this._seedBreakpoints();
     this._transitionState(EngineState.STOPPED);
   }
 
@@ -207,6 +208,7 @@ export class MNAEngine implements AnalogEngine {
     for (const obs of this._measurementObservers) {
       obs.onReset();
     }
+    this._seedBreakpoints();
     this._transitionState(EngineState.STOPPED);
   }
 
@@ -235,11 +237,15 @@ export class MNAEngine implements AnalogEngine {
    *   6. On LTE rejection: restore prevVoltages, halve dt, retry.
    *   7. On acceptance: advance simTime, push history, update dt.
    */
+  // TEMPORARY TRACE INSTRUMENTATION — REVERT BEFORE COMMIT
+  private _traceStepCount: number = 0;
+
   step(): void {
     if (!this._compiled) return;
 
     const { elements, matrixSize, nodeCount } = this._compiled;
     const params = this._params;
+    this._traceStepCount++;
 
     this._prevVoltages.set(this._voltages);
     const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;
@@ -247,22 +253,6 @@ export class MNAEngine implements AnalogEngine {
     // Mirrors the `_prevVoltages.set(_voltages)` pattern one line above.
     if (statePool && this._stateCheckpoint) {
       this._stateCheckpoint.set(statePool.state0);
-    }
-
-    // Register upcoming discontinuity breakpoints from elements (e.g. square-wave
-    // AC sources). Query ahead by 3× maxTimeStep so the timestep controller can
-    // clamp the current step to land exactly on the next edge rather than stepping
-    // across it. Using 3× guarantees the breakpoint is found in the open interval
-    // (simTime, lookaheadEnd) even when it falls exactly at simTime + maxTimeStep.
-    // Only elements with getBreakpoints need to participate.
-    const lookaheadEnd = this._simTime + 3 * params.maxTimeStep;
-    for (const el of elements) {
-      if (el.getBreakpoints) {
-        const bps = el.getBreakpoints(this._simTime, lookaheadEnd);
-        for (const bp of bps) {
-          this._timestep.addBreakpoint(bp);
-        }
-      }
     }
 
     let dt = this._timestep.getClampedDt(this._simTime);
@@ -276,6 +266,17 @@ export class MNAEngine implements AnalogEngine {
     }
 
     // NR solve with retry on convergence failure
+    const _traceEnabled = this._traceStepCount >= 1130;
+    if (_traceEnabled) {
+      const halfPeriod = 50e-6;
+      const edgeIdx = Math.floor(this._simTime / halfPeriod);
+      const timeIntoHalf = this._simTime - edgeIdx * halfPeriod;
+      const atEdge = timeIntoHalf < dt * 2 || (halfPeriod - timeIntoHalf) < dt * 2;
+      const vs = this._voltages;
+      // Log all voltages up to matrixSize (capped at 20)
+      const vlog = Array.from({length: Math.min(matrixSize, 20)}, (_, i) => vs[i]?.toFixed(3) ?? '?').join(',');
+      console.log(`[TRACE] step=${this._traceStepCount} t=${this._simTime.toExponential(5)} dt=${dt.toExponential(3)} method=${method} edge#${edgeIdx} atEdge=${atEdge} V=[${vlog}]`);
+    }
     let nrResult = newtonRaphson({
       solver: this._solver,
       elements,
@@ -288,6 +289,16 @@ export class MNAEngine implements AnalogEngine {
       voltagesBuffer: this._nrVoltages,
       prevVoltagesBuffer: this._nrPrevVoltages,
     });
+    if (_traceEnabled) {
+      console.log(`[TRACE] step=${this._traceStepCount} NR: converged=${nrResult.converged} iterations=${nrResult.iterations} traceLen=${nrResult.trace.length}`);
+      if (!nrResult.converged) {
+        const last = nrResult.trace[nrResult.trace.length - 1];
+        console.log(`[TRACE] NR FAIL last trace: iter=${last?.iteration} largestNode=${last?.largestChangeNode} largestElem=${last?.largestChangeElement} oscillating=${last?.oscillating}`);
+        const finalV = nrResult.voltages;
+        const flog = Array.from({length: Math.min(matrixSize, 20)}, (_, i) => finalV[i]?.toFixed(3) ?? '?').join(',');
+        console.log(`[TRACE] NR FAIL final voltages: [${flog}]`);
+      }
+    }
 
     if (!nrResult.converged) {
       // Retry with progressively halved dt
@@ -338,6 +349,11 @@ export class MNAEngine implements AnalogEngine {
           trace.length > 0 ? trace[trace.length - 1].largestChangeElement : -1;
         const involvedElements = blameElement >= 0 ? [blameElement] : [];
 
+        // TEMPORARY TRACE
+        console.log(`[TRACE-ERROR] NR unrecovered at step=${this._traceStepCount} t=${this._simTime.toExponential(5)} blameElem=${blameElement}`);
+        console.log(`[TRACE-ERROR] Retry attempts exhausted. Final voltages: [${Array.from({length: Math.min(matrixSize, 20)}, (_, i) => nrResult.voltages[i]?.toFixed(3)).join(',')}]`);
+        console.log(`[TRACE-ERROR] prevVoltages: [${Array.from({length: Math.min(matrixSize, 20)}, (_, i) => this._prevVoltages[i]?.toFixed(3)).join(',')}]`);
+
         this._diagnostics.emit(
           makeDiagnostic("convergence-failed", "error", "Transient NR failed to converge", {
             explanation:
@@ -363,7 +379,11 @@ export class MNAEngine implements AnalogEngine {
     // one element blew its tolerance and the step must be rejected.
     const { newDt, worstRatio } = this._timestep.computeNewDt(elements, this._history, this._simTime, dt);
 
+    if (_traceEnabled) {
+      console.log(`[TRACE] step=${this._traceStepCount} LTE: worstRatio=${worstRatio.toFixed(4)} newDt=${newDt.toExponential(3)} shouldReject=${this._timestep.shouldReject(worstRatio)}`);
+    }
     if (this._timestep.shouldReject(worstRatio)) {
+      if (_traceEnabled) console.log(`[TRACE] step=${this._traceStepCount} LTE REJECTED — restoring and retrying`);
       // Restore voltages and state to start of this step
       this._voltages.set(this._prevVoltages);
       if (statePool && this._stateCheckpoint) {
@@ -459,8 +479,31 @@ export class MNAEngine implements AnalogEngine {
 
     // Advance timestep controller state
     this._timestep.currentDt = newDt;
-    this._timestep.accept(this._simTime);
+    try {
+      this._timestep.accept(this._simTime);
+    } catch (err) {
+      this._diagnostics.emit(
+        makeDiagnostic("convergence-failed", "error", String(err instanceof Error ? err.message : err), {
+          explanation: "TimestepController.accept() invariant violated — simTime did not advance monotonically.",
+          involvedElements: [],
+          simTime: this._simTime,
+        }),
+      );
+      this._transitionState(EngineState.ERROR);
+      return;
+    }
     this._timestep.checkMethodSwitch(elements, this._history);
+
+    // Run companion-state updates (edge detection, pin companion refresh,
+    // latched logic levels) once on the accepted solution. Must run BEFORE
+    // updateState so any downstream consumer sees post-edge latched state.
+    // Never runs on rejected LTE retries or inside NR — both are handled by
+    // the retry loops above, which restore voltages and re-enter the solver.
+    for (const el of elements) {
+      if (el.updateCompanion) {
+        el.updateCompanion(dt, method, this._voltages);
+      }
+    }
 
     // Update non-MNA state for elements that track it
     for (const el of elements) {
@@ -567,6 +610,20 @@ export class MNAEngine implements AnalogEngine {
       if (cac.statePool) {
         cac.statePool.state1.set(cac.statePool.state0);
         cac.statePool.state2.set(cac.statePool.state0);
+      }
+
+      // Seed per-timestep companion state from the DC operating point.
+      // Elements with sentinel-initialized edge-detection state (e.g.
+      // behavioral flip-flops with _prevClockVoltage=NaN) use this call to
+      // capture the DC steady-state voltages so the first transient step
+      // does not mis-fire an edge on a signal that was already at its level
+      // during DC op. dt=0 signals "no time elapsed"; method is irrelevant
+      // because the first real step will restamp companion models.
+      const seedMethod = this._timestep.currentMethod;
+      for (const el of elements) {
+        if (el.updateCompanion) {
+          el.updateCompanion(0, seedMethod, this._voltages);
+        }
       }
     }
 
@@ -708,6 +765,7 @@ export class MNAEngine implements AnalogEngine {
   configure(params: Partial<SimulationParams>): void {
     this._params = { ...this._params, ...params };
     this._timestep = new TimestepController(this._params);
+    this._seedBreakpoints();
   }
 
   // -------------------------------------------------------------------------
@@ -728,9 +786,10 @@ export class MNAEngine implements AnalogEngine {
     this._timestep.addBreakpoint(time);
   }
 
-  /** Remove all registered breakpoints. */
+  /** Remove all registered breakpoints and reseed from element sources. */
   clearBreakpoints(): void {
     this._timestep.clearBreakpoints();
+    this._seedBreakpoints();
   }
 
   // -------------------------------------------------------------------------
@@ -742,6 +801,39 @@ export class MNAEngine implements AnalogEngine {
     for (const listener of this._changeListeners) {
       listener(newState);
     }
+  }
+
+  /**
+   * Seed the breakpoint queue from all elements that implement nextBreakpoint.
+   * Called once after init(), reset(), and configure() to populate the queue
+   * with the first upcoming edge for each periodic source.
+   */
+  private _seedBreakpoints(): void {
+    if (!this._compiled) return;
+    for (const el of this._compiled.elements) {
+      if (typeof el.nextBreakpoint === "function") {
+        const first = el.nextBreakpoint(this._simTime);
+        if (first !== null) {
+          this._timestep.insertForSource(first, el);
+        }
+      }
+      if (typeof el.registerRefreshCallback === "function") {
+        el.registerRefreshCallback(() => this.refreshBreakpointForSource(el));
+      }
+    }
+  }
+
+  /**
+   * Refresh the queue entry for a source after a setParam change that
+   * invalidates its outstanding breakpoint (e.g. frequency/phase change).
+   */
+  refreshBreakpointForSource(source: AnalogElement): void {
+    if (!this._compiled) return;
+    const newNextTime =
+      typeof source.nextBreakpoint === "function"
+        ? source.nextBreakpoint(this._simTime)
+        : null;
+    this._timestep.refreshForSource(source, newNextTime);
   }
 
 }

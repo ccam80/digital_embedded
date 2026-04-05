@@ -23,7 +23,6 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import { squareWaveBreakpoints } from "../sources/ac-voltage-source.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -234,6 +233,10 @@ function clockFactory(props: PropertyBag): ClockElement {
 export interface AnalogClockElement extends AnalogElementCore {
   /** Returns edge breakpoints within [tStart, tEnd] for the timestep controller. */
   getBreakpoints(tStart: number, tEnd: number): number[];
+  /** Returns the strictly-next breakpoint strictly after afterTime. Clock is infinite; never returns null. */
+  nextBreakpoint(afterTime: number): number | null;
+  /** Register a callback to be invoked when a setParam change invalidates the outstanding breakpoint. */
+  registerRefreshCallback(cb: () => void): void;
 }
 
 function createAnalogClockElement(
@@ -242,15 +245,22 @@ function createAnalogClockElement(
   branchIdx: number,
   frequency: number,
   _vdd: number,
-  addBreakpoint?: (t: number) => void,
 ): AnalogClockElement {
   void (1 / frequency); // period unused
+  let refreshCallback: (() => void) | null = null;
 
   const element: AnalogClockElement = {
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
-    setParam(_key: string, _value: number): void {},
+    // Clock frequency is not currently hot-loadable via setParam; the refresh
+    // callback is wired up defensively so that if frequency hot-loading is added
+    // in future, the breakpoint queue is automatically refreshed.
+    setParam(key: string, _value: number): void {
+      if (key === "frequency" && refreshCallback !== null) {
+        refreshCallback();
+      }
+    },
 
     setSourceScale(_factor: number): void {
       // Square wave, no source stepping needed.
@@ -269,12 +279,29 @@ function createAnalogClockElement(
       // Here we provide the value via stampWithTime below.
     },
 
+    nextBreakpoint(afterTime: number): number | null {
+      const halfPeriod = 1 / (2 * frequency);
+      const idx = Math.floor(afterTime / halfPeriod) + 1;
+      return idx * halfPeriod;
+    },
+
+    registerRefreshCallback(cb: () => void): void {
+      refreshCallback = cb;
+    },
+
     getBreakpoints(tStart: number, tEnd: number): number[] {
-      const pts = squareWaveBreakpoints(frequency, 0, tStart, tEnd);
-      if (addBreakpoint !== undefined) {
-        for (const t of pts) addBreakpoint(t);
+      const out: number[] = [];
+      let t = tStart;
+      while (true) {
+        const next = element.nextBreakpoint(t);
+        if (next === null || next >= tEnd) break;
+        if (next <= t) {
+          throw new Error(`nextBreakpoint returned non-monotonic value: ${next} <= ${t}`);
+        }
+        out.push(next);
+        t = next;
       }
-      return pts;
+      return out;
     },
 
     getPinCurrents(voltages: Float64Array): number[] {

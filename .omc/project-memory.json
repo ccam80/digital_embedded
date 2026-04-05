@@ -265,32 +265,68 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 101,
-      "lastAccessed": 1775360766902,
+      "accessCount": 188,
+      "lastAccessed": 1775383384547,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 77,
+      "lastAccessed": 1775383310708,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\timestep.ts",
+      "accessCount": 61,
+      "lastAccessed": 1775383283992,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\compiler.ts",
+      "accessCount": 55,
+      "lastAccessed": 1775382700102,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\newton-raphson.ts",
+      "accessCount": 46,
+      "lastAccessed": 1775383283772,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 42,
+      "lastAccessed": 1775383215744,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\element.ts",
+      "accessCount": 41,
+      "lastAccessed": 1775382713599,
       "type": "file"
     },
     {
       "path": "src\\components\\passives\\capacitor.ts",
-      "accessCount": 36,
-      "lastAccessed": 1775360651109,
+      "accessCount": 38,
+      "lastAccessed": 1775361918466,
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\timestep.ts",
-      "accessCount": 34,
-      "lastAccessed": 1775360773306,
-      "type": "file"
+      "path": "",
+      "accessCount": 37,
+      "lastAccessed": 1775383202196,
+      "type": "directory"
     },
     {
       "path": "src\\components\\passives\\inductor.ts",
-      "accessCount": 28,
-      "lastAccessed": 1775360971841,
+      "accessCount": 35,
+      "lastAccessed": 1775378482275,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\fet-base.ts",
-      "accessCount": 27,
-      "lastAccessed": 1775360920074,
+      "accessCount": 31,
+      "lastAccessed": 1775382712167,
       "type": "file"
     },
     {
@@ -300,51 +336,51 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 23,
-      "lastAccessed": 1775359208884,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 22,
-      "lastAccessed": 1775359194618,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 20,
-      "lastAccessed": 1775359218963,
+      "accessCount": 25,
+      "lastAccessed": 1775378358946,
       "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 19,
-      "lastAccessed": 1775357567458,
-      "type": "directory"
     },
     {
       "path": "src\\core\\analog-types.ts",
-      "accessCount": 16,
-      "lastAccessed": 1775355910977,
+      "accessCount": 23,
+      "lastAccessed": 1775382720661,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\state-pool.ts",
-      "accessCount": 16,
-      "lastAccessed": 1775360649143,
+      "path": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
+      "accessCount": 22,
+      "lastAccessed": 1775383341372,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\sparse-solver.ts",
-      "accessCount": 15,
-      "lastAccessed": 1775351613294,
+      "accessCount": 21,
+      "lastAccessed": 1775379676191,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\state-pool.ts",
+      "accessCount": 21,
+      "lastAccessed": 1775381269732,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
+      "accessCount": 18,
+      "lastAccessed": 1775382632977,
       "type": "file"
     },
     {
       "path": "src\\core\\analog-engine-interface.ts",
-      "accessCount": 13,
-      "lastAccessed": 1775360912655,
+      "accessCount": 18,
+      "lastAccessed": 1775383341926,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
+      "accessCount": 14,
+      "lastAccessed": 1775379435374,
       "type": "file"
     },
     {
@@ -360,22 +396,10 @@
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 12,
-      "lastAccessed": 1775360939553,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
-      "accessCount": 11,
-      "lastAccessed": 1775355002756,
+      "accessCount": 12,
+      "lastAccessed": 1775381986748,
       "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
-      "accessCount": 11,
-      "lastAccessed": 1775360837691,
-      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\dc-operating-point.test.ts",
@@ -390,12 +414,6 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
-      "accessCount": 10,
-      "lastAccessed": 1775356407394,
-      "type": "file"
-    },
-    {
       "path": "src\\components\\semiconductors\\varactor.ts",
       "accessCount": 10,
       "lastAccessed": 1775357610229,
@@ -406,18 +424,6 @@
       "accessCount": 9,
       "lastAccessed": 1775352920752,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
-      "accessCount": 9,
-      "lastAccessed": 1775358040542,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 9,
-      "lastAccessed": 1775359181002,
-      "type": "directory"
     },
     {
       "path": "src\\components\\passives\\__tests__\\capacitor.test.ts",
@@ -459,12 +465,6 @@
       "path": "src\\components\\semiconductors\\triac.ts",
       "accessCount": 7,
       "lastAccessed": 1775357645104,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 7,
-      "lastAccessed": 1775360523957,
       "type": "file"
     },
     {
@@ -529,8 +529,8 @@
     },
     {
       "path": "src/solver/analog",
-      "accessCount": 2,
-      "lastAccessed": 1775351291997,
+      "accessCount": 4,
+      "lastAccessed": 1775381987781,
       "type": "directory"
     },
     {

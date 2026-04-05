@@ -829,6 +829,7 @@ function buildAnalogNodeMapFromPartition(
   groupToNodeId: Map<number, number>;
   wireToNodeId: Map<import("../../core/circuit.js").Wire, number>;
   labelToNodeId: Map<string, number>;
+  labelPinNodes: Map<string, Array<{ pinLabel: string; nodeId: number }>>;
   positionToNodeId: Map<string, number>;
 } {
   const groups = partition.groups;
@@ -936,22 +937,41 @@ function buildAnalogNodeMapFromPartition(
     }
   }
 
-  // Build labelToNodeId from all labeled components in the partition
+  // Build labelToNodeId and labelPinNodes from all labeled components in
+  // the partition.
+  //
+  // `labelToNodeId` preserves the legacy single-node-per-label semantics for
+  // internal consumers (AC analysis, Monte Carlo, parameter sweep): it maps
+  // a label to the MNA node of the element's first resolved pin.
+  //
+  // `labelPinNodes` is the richer form used by the unified compile step to
+  // build `labelSignalMap` entries: for each label it records every resolved
+  // pin with `{pinLabel, nodeId}`. This lets downstream code distinguish
+  // 1-pin, 2-pin, and 3+ pin components so `readSignal(label)` can return
+  // V_acrossthe element for 2-pin passives and reject bare labels on
+  // multi-pin elements (forcing callers to use `label:pin` form).
   const labelToNodeId = new Map<string, number>();
+  const labelPinNodes = new Map<string, Array<{ pinLabel: string; nodeId: number }>>();
   for (const pc of partition.components) {
     const props = pc.element.getProperties();
     const label = props.has("label") ? String(props.get("label")) : "";
     if (!label) continue;
-    // Use the node ID of the first resolved pin
-    if (pc.resolvedPins.length > 0) {
-      const rp = pc.resolvedPins[0]!;
-      const key = `${rp.worldPosition.x},${rp.worldPosition.y}`;
-      const nodeId = positionToNodeId.get(key) ?? 0;
-      labelToNodeId.set(label, nodeId);
+    if (pc.resolvedPins.length === 0) continue;
+
+    const rp0 = pc.resolvedPins[0]!;
+    const key0 = `${rp0.worldPosition.x},${rp0.worldPosition.y}`;
+    const nodeId0 = positionToNodeId.get(key0) ?? 0;
+    labelToNodeId.set(label, nodeId0);
+
+    const pins: Array<{ pinLabel: string; nodeId: number }> = [];
+    for (const rp of pc.resolvedPins) {
+      const k = `${rp.worldPosition.x},${rp.worldPosition.y}`;
+      pins.push({ pinLabel: rp.pinLabel, nodeId: positionToNodeId.get(k) ?? 0 });
     }
+    labelPinNodes.set(label, pins);
   }
 
-  return { nodeCount, groupToNodeId, wireToNodeId, labelToNodeId, positionToNodeId };
+  return { nodeCount, groupToNodeId, wireToNodeId, labelToNodeId, labelPinNodes, positionToNodeId };
 }
 
 /**
@@ -980,6 +1000,7 @@ export function compileAnalogPartition(
     groupToNodeId,
     wireToNodeId,
     labelToNodeId,
+    labelPinNodes,
     positionToNodeId,
   } = buildAnalogNodeMapFromPartition(partition, diagnostics);
 
@@ -1319,6 +1340,7 @@ export function compileAnalogPartition(
     branchCount,
     elements: analogElements,
     labelToNodeId,
+    labelPinNodes,
     wireToNodeId,
     models,
     elementToCircuitElement,

@@ -136,6 +136,15 @@ export class CircuitBuilder {
     for (const pd of definition.propertyDefs) {
       knownKeys.add(pd.key);
     }
+    // Model-param keys (e.g. `resistance`, `capacitance`) declared via
+    // modelRegistry are also internal keys that callers pass directly.
+    if (definition.modelRegistry) {
+      for (const entry of Object.values(definition.modelRegistry)) {
+        if (entry.paramDefs) {
+          for (const pd of entry.paramDefs) knownKeys.add(pd.key);
+        }
+      }
+    }
     // 'position' and 'label' are universal implicit keys
     knownKeys.add('position');
     knownKeys.add('label');

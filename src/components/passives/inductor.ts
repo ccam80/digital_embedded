@@ -192,13 +192,6 @@ class AnalogInductorElement implements AnalogElementCore {
     const b = this.branchIndex;
     const geq = this.s0[this.base + SLOT_GEQ];
     const ieq = this.s0[this.base + SLOT_IEQ];
-    // @ts-ignore DEBUG instrumentation
-    if (globalThis.__INDUCTOR_DEBUG && globalThis.__INDUCTOR_DEBUG_COUNT < 40) {
-      // @ts-ignore
-      globalThis.__INDUCTOR_DEBUG_COUNT++;
-      // @ts-ignore
-      console.log(`[L.stamp] base=${this.base} b=${b} n0=${n0} n1=${n1} geq=${geq} ieq=${ieq} L=${this.L} sameRef=${this.s0 === (globalThis.__POOL_REF ?? this.s0)}`);
-    }
 
     // B sub-matrix: branch current incidence in node KCL equations.
     // I_branch flows from n0 through the inductor to n1.
@@ -228,17 +221,8 @@ class AnalogInductorElement implements AnalogElementCore {
     const vNow = v0 - v1;
     const iPrev = this.s0[this.base + SLOT_I_PREV];
 
-    const newGeq = inductorConductance(this.L, dt, method);
-    const newIeq = inductorHistoryCurrent(this.L, dt, method, iNow, iPrev, vNow);
-    this.s0[this.base + SLOT_GEQ] = newGeq;
-    this.s0[this.base + SLOT_IEQ] = newIeq;
-    // @ts-ignore DEBUG instrumentation
-    if (globalThis.__INDUCTOR_DEBUG && globalThis.__INDUCTOR_DEBUG_COUNT < 40) {
-      // @ts-ignore
-      console.log(`[L.stampComp] base=${this.base} dt=${dt} method=${method} iNow=${iNow} iPrev=${iPrev} vNow=${vNow} newGeq=${newGeq} newIeq=${newIeq}`);
-      // @ts-ignore
-      globalThis.__POOL_REF = this.s0;
-    }
+    this.s0[this.base + SLOT_GEQ] = inductorConductance(this.L, dt, method);
+    this.s0[this.base + SLOT_IEQ] = inductorHistoryCurrent(this.L, dt, method, iNow, iPrev, vNow);
     // Shift LTE history: the prior iPrev (= current at end of step N-2)
     // moves to prev-prev, and iNow (= current at end of step N-1) becomes
     // the new prev. getLteEstimate compares these two points to produce a

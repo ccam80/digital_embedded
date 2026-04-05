@@ -71,6 +71,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   readonly compiled = {
     wireSignalMap: new Map<Wire, SignalAddress>(),
     labelSignalMap: new Map<string, SignalAddress>(),
+    labelToCircuitElement: new Map<string, import('../core/element.js').CircuitElement>(),
     diagnostics: [] as import('../compile/types.js').Diagnostic[],
     digital: null,
     analog: null,
@@ -101,6 +102,7 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   dcOperatingPoint(): DcOpResult | null { return null; }
   acAnalysis(_params: AcParams): AcResult | null { return null; }
   async stepToTime(_targetSimTime: number, _budgetMs?: number): Promise<number> { return 0; }
+  async sampleAtTimes<T>(_times: readonly number[], _capture: () => T, _wallBudgetMs?: number): Promise<readonly T[]> { return []; }
   syncTimeTarget(): void { /* no-op */ }
   addTimeBreakpoint(_time: number): void { /* no-op */ }
 
