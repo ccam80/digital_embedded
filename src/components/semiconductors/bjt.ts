@@ -895,7 +895,6 @@ export function createSpiceL1BjtElement(
 
       const vbeLimited = pnjlim(vbeRaw, s0[base + L1_SLOT_VBE], nfVt, vcritBE);
       const vbcLimited = pnjlim(vbcRaw, s0[base + L1_SLOT_VBC], nrVt, vcritBC);
-
       // Save limited voltages to pool
       s0[base + L1_SLOT_VBE] = vbeLimited;
       s0[base + L1_SLOT_VBC] = vbcLimited;

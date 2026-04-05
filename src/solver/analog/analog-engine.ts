@@ -237,15 +237,11 @@ export class MNAEngine implements AnalogEngine {
    *   6. On LTE rejection: restore prevVoltages, halve dt, retry.
    *   7. On acceptance: advance simTime, push history, update dt.
    */
-  // TEMPORARY TRACE INSTRUMENTATION — REVERT BEFORE COMMIT
-  private _traceStepCount: number = 0;
-
   step(): void {
     if (!this._compiled) return;
 
     const { elements, matrixSize, nodeCount } = this._compiled;
     const params = this._params;
-    this._traceStepCount++;
 
     this._prevVoltages.set(this._voltages);
     const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;
@@ -266,17 +262,6 @@ export class MNAEngine implements AnalogEngine {
     }
 
     // NR solve with retry on convergence failure
-    const _traceEnabled = this._traceStepCount >= 1130;
-    if (_traceEnabled) {
-      const halfPeriod = 50e-6;
-      const edgeIdx = Math.floor(this._simTime / halfPeriod);
-      const timeIntoHalf = this._simTime - edgeIdx * halfPeriod;
-      const atEdge = timeIntoHalf < dt * 2 || (halfPeriod - timeIntoHalf) < dt * 2;
-      const vs = this._voltages;
-      // Log all voltages up to matrixSize (capped at 20)
-      const vlog = Array.from({length: Math.min(matrixSize, 20)}, (_, i) => vs[i]?.toFixed(3) ?? '?').join(',');
-      console.log(`[TRACE] step=${this._traceStepCount} t=${this._simTime.toExponential(5)} dt=${dt.toExponential(3)} method=${method} edge#${edgeIdx} atEdge=${atEdge} V=[${vlog}]`);
-    }
     let nrResult = newtonRaphson({
       solver: this._solver,
       elements,
@@ -289,16 +274,6 @@ export class MNAEngine implements AnalogEngine {
       voltagesBuffer: this._nrVoltages,
       prevVoltagesBuffer: this._nrPrevVoltages,
     });
-    if (_traceEnabled) {
-      console.log(`[TRACE] step=${this._traceStepCount} NR: converged=${nrResult.converged} iterations=${nrResult.iterations} traceLen=${nrResult.trace.length}`);
-      if (!nrResult.converged) {
-        const last = nrResult.trace[nrResult.trace.length - 1];
-        console.log(`[TRACE] NR FAIL last trace: iter=${last?.iteration} largestNode=${last?.largestChangeNode} largestElem=${last?.largestChangeElement} oscillating=${last?.oscillating}`);
-        const finalV = nrResult.voltages;
-        const flog = Array.from({length: Math.min(matrixSize, 20)}, (_, i) => finalV[i]?.toFixed(3) ?? '?').join(',');
-        console.log(`[TRACE] NR FAIL final voltages: [${flog}]`);
-      }
-    }
 
     if (!nrResult.converged) {
       // Retry with progressively halved dt
@@ -349,11 +324,6 @@ export class MNAEngine implements AnalogEngine {
           trace.length > 0 ? trace[trace.length - 1].largestChangeElement : -1;
         const involvedElements = blameElement >= 0 ? [blameElement] : [];
 
-        // TEMPORARY TRACE
-        console.log(`[TRACE-ERROR] NR unrecovered at step=${this._traceStepCount} t=${this._simTime.toExponential(5)} blameElem=${blameElement}`);
-        console.log(`[TRACE-ERROR] Retry attempts exhausted. Final voltages: [${Array.from({length: Math.min(matrixSize, 20)}, (_, i) => nrResult.voltages[i]?.toFixed(3)).join(',')}]`);
-        console.log(`[TRACE-ERROR] prevVoltages: [${Array.from({length: Math.min(matrixSize, 20)}, (_, i) => this._prevVoltages[i]?.toFixed(3)).join(',')}]`);
-
         this._diagnostics.emit(
           makeDiagnostic("convergence-failed", "error", "Transient NR failed to converge", {
             explanation:
@@ -379,11 +349,7 @@ export class MNAEngine implements AnalogEngine {
     // one element blew its tolerance and the step must be rejected.
     const { newDt, worstRatio } = this._timestep.computeNewDt(elements, this._history, this._simTime, dt);
 
-    if (_traceEnabled) {
-      console.log(`[TRACE] step=${this._traceStepCount} LTE: worstRatio=${worstRatio.toFixed(4)} newDt=${newDt.toExponential(3)} shouldReject=${this._timestep.shouldReject(worstRatio)}`);
-    }
     if (this._timestep.shouldReject(worstRatio)) {
-      if (_traceEnabled) console.log(`[TRACE] step=${this._traceStepCount} LTE REJECTED — restoring and retrying`);
       // Restore voltages and state to start of this step
       this._voltages.set(this._prevVoltages);
       if (statePool && this._stateCheckpoint) {
