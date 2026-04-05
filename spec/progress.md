@@ -39,13 +39,20 @@
 | W5T1 | complete | Capacitor — stateSize:3, pool slots for geq/ieq/vPrev |
 | W5T2 | complete | Inductor — stateSize:3, pool slots for geq/ieq/iPrev |
 
-## Phase 6: Engine integration — IN PROGRESS
+## Phase 6: Engine integration — COMPLETE
 | Task | Status | Notes |
 |------|--------|-------|
 | G1 | complete | Added statePool to CompiledAnalogCircuit interface + MNAEngine local interface |
 | W6T1 | complete | checkpoint/rollback/acceptTimestep wired into step(), reset(), dcOperatingPoint() |
-| W6T2 | pending | Convergence regression integration tests |
+| W6T2 | complete | Convergence regression integration tests (6 tests covering diode, RC, state0/state1, reset, 100-step stability) |
 | W6T3 | complete | updateOperatingPoint voltages param narrowed to Readonly<Float64Array> across all interfaces and devices |
+
+## Wave 6.1 Review Follow-ups
+| Finding | Status | Notes |
+|---------|--------|-------|
+| V2 (major) + G3 | fixed | LTE retry NR failure now emits diagnostic and transitions to ERROR state |
+| G1 (review gap) | fixed | analog-engine-interface.test.ts literal now includes statePool field |
+| V1 (critical) | addressed by user | init() slot allocation shim kept with improved justification per performance fix |
 
 ---
 ## Wave 1.1 Summary

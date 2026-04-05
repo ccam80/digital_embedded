@@ -84,6 +84,11 @@ describe("AnalogEngineTypes", () => {
       elementCount: 3,
       labelToNodeId: new Map([["R1", 1], ["R2", 2]]),
       wireToNodeId: new Map(),
+      statePool: {
+        state0: new Float64Array(0),
+        state1: new Float64Array(0),
+        state2: new Float64Array(0),
+      },
     };
 
     // Assignment to CompiledCircuit must be valid (structural subtype check)
