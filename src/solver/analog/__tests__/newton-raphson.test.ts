@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson, pnjlim, fetlim } from "../newton-raphson.js";
-import { makeResistor, makeVoltageSource, makeDiode } from "./test-helpers.js";
+import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helpers — build a simple diode+resistor circuit
@@ -35,8 +35,10 @@ function makeDiodeCircuit(sourceVoltage: number) {
   const vs = makeVoltageSource(1, 0, 2, sourceVoltage);
   const r = makeResistor(1, 2, 1000);
   const d = makeDiode(2, 0, 1e-14, 1);
+  const elements = [vs, r, d];
+  allocateStatePool(elements);
 
-  return { solver, diagnostics, elements: [vs, r, d], matrixSize: 3 };
+  return { solver, diagnostics, elements, matrixSize: 3 };
 }
 
 // ---------------------------------------------------------------------------

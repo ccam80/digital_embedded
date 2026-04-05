@@ -4,8 +4,7 @@
  * This circuit is a BJT buck converter: NPN + PNP push-pull driver, NMOS
  * power switch, inductor, freewheeling diode, output capacitor, and
  * resistive loads. It exercises all three BJT convergence fallback levels
- * (direct NR, Gmin stepping, source stepping) and is a stress test for the
- * BJT pnjlim voltage write-back.
+ * (direct NR, Gmin stepping, source stepping) and is a BJT convergence stress test.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';

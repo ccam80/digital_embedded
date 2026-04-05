@@ -34,6 +34,18 @@ export interface NROptions {
   initialGuess?: Float64Array;
   /** Diagnostic collector for emitting solver events. */
   diagnostics: DiagnosticCollector;
+  /**
+   * Optional pre-allocated working buffer for the current voltages iterate.
+   * When provided, newtonRaphson() reuses it instead of allocating a new
+   * Float64Array per call. Must be at least `matrixSize` long. The caller
+   * retains ownership; contents are overwritten on each call.
+   */
+  voltagesBuffer?: Float64Array;
+  /**
+   * Optional pre-allocated working buffer for the previous-iteration voltages.
+   * Same contract as `voltagesBuffer`.
+   */
+  prevVoltagesBuffer?: Float64Array;
 }
 
 /** Result of a Newton-Raphson solve. */
@@ -219,8 +231,13 @@ export function newtonRaphson(opts: NROptions): NRResult {
   const { solver, elements, matrixSize, maxIterations, reltol, abstol, diagnostics } = opts;
 
   const assembler = new MNAAssembler(solver);
-  const voltages = new Float64Array(matrixSize);
-  const prevVoltages = new Float64Array(matrixSize);
+  // Reuse caller-provided buffers when available to avoid per-call allocation
+  // in the hot transient step loop. Zero the reused buffer so stale data from
+  // a previous call cannot leak into the first iteration before `initialGuess`
+  // or `solver.solve()` writes to it.
+  const voltages = opts.voltagesBuffer ?? new Float64Array(matrixSize);
+  if (opts.voltagesBuffer) voltages.fill(0);
+  const prevVoltages = opts.prevVoltagesBuffer ?? new Float64Array(matrixSize);
   const trace: ConvergenceTrace[] = [];
   let prevIterMaxChange = Infinity; // max voltage change from the previous iteration (for line search)
 

@@ -147,16 +147,23 @@ export class InductorElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 // Slot indices within the state pool
+// Slot indices within the state pool.
+//
+// GEQ, IEQ, I_PREV hold the Norton companion coefficients and the branch
+// current at the previous accepted step (used by the history update in
+// `stampCompanion`). I_PREV_PREV holds the branch current two steps ago,
+// used only by `getLteEstimate` for a dt-scaled truncation error estimate.
 const SLOT_GEQ = 0;
 const SLOT_IEQ = 1;
 const SLOT_I_PREV = 2;
+const SLOT_I_PREV_PREV = 3;
 
 class AnalogInductorElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
-  readonly stateSize: number = 3;
+  readonly stateSize: number = 4;
   stateBaseOffset: number = -1;
 
   private L: number;
@@ -185,6 +192,13 @@ class AnalogInductorElement implements AnalogElementCore {
     const b = this.branchIndex;
     const geq = this.s0[this.base + SLOT_GEQ];
     const ieq = this.s0[this.base + SLOT_IEQ];
+    // @ts-ignore DEBUG instrumentation
+    if (globalThis.__INDUCTOR_DEBUG && globalThis.__INDUCTOR_DEBUG_COUNT < 40) {
+      // @ts-ignore
+      globalThis.__INDUCTOR_DEBUG_COUNT++;
+      // @ts-ignore
+      console.log(`[L.stamp] base=${this.base} b=${b} n0=${n0} n1=${n1} geq=${geq} ieq=${ieq} L=${this.L} sameRef=${this.s0 === (globalThis.__POOL_REF ?? this.s0)}`);
+    }
 
     // B sub-matrix: branch current incidence in node KCL equations.
     // I_branch flows from n0 through the inductor to n1.
@@ -214,18 +228,51 @@ class AnalogInductorElement implements AnalogElementCore {
     const vNow = v0 - v1;
     const iPrev = this.s0[this.base + SLOT_I_PREV];
 
-    this.s0[this.base + SLOT_GEQ] = inductorConductance(this.L, dt, method);
-    this.s0[this.base + SLOT_IEQ] = inductorHistoryCurrent(this.L, dt, method, iNow, iPrev, vNow);
+    const newGeq = inductorConductance(this.L, dt, method);
+    const newIeq = inductorHistoryCurrent(this.L, dt, method, iNow, iPrev, vNow);
+    this.s0[this.base + SLOT_GEQ] = newGeq;
+    this.s0[this.base + SLOT_IEQ] = newIeq;
+    // @ts-ignore DEBUG instrumentation
+    if (globalThis.__INDUCTOR_DEBUG && globalThis.__INDUCTOR_DEBUG_COUNT < 40) {
+      // @ts-ignore
+      console.log(`[L.stampComp] base=${this.base} dt=${dt} method=${method} iNow=${iNow} iPrev=${iPrev} vNow=${vNow} newGeq=${newGeq} newIeq=${newIeq}`);
+      // @ts-ignore
+      globalThis.__POOL_REF = this.s0;
+    }
+    // Shift LTE history: the prior iPrev (= current at end of step N-2)
+    // moves to prev-prev, and iNow (= current at end of step N-1) becomes
+    // the new prev. getLteEstimate compares these two points to produce a
+    // dt-scaled truncation error — see capacitor.ts for derivation.
+    this.s0[this.base + SLOT_I_PREV_PREV] = iPrev;
     this.s0[this.base + SLOT_I_PREV] = iNow;
   }
 
-  getLteEstimate(dt: number): { truncationError: number } {
-    const geq = this.s0[this.base + SLOT_GEQ];
+  getLteEstimate(dt: number): { truncationError: number; toleranceReference: number } {
+    // LTE estimate for trapezoidal integration of an inductor.
+    //
+    // Parallels the capacitor derivation in `capacitor.ts`. The first-
+    // difference of stored branch currents across the previous two step
+    // boundaries, scaled by dt/12, produces an error that scales linearly
+    // with dt.
+    //
+    // `toleranceReference` is the inductor flux φ = L · i_prev, the natural
+    // stored quantity used by ngspice's relative LTE tolerance formula. The
+    // engine composes the rejection threshold as
+    //   local_tol = trtol · (reltol · |φ| + chargeTol)
+    // keeping the per-step tolerance proportional to the flux the inductor
+    // is actually storing.
+    //
+    // Retrospective by one step — zero on the first two calls, valid
+    // thereafter.
+    if (dt <= 0) return { truncationError: 0, toleranceReference: 0 };
     const iPrev = this.s0[this.base + SLOT_I_PREV];
-    // LTE estimate for inductor: truncationError ~ L * |iPrev| / (12 * geq * dt) when geq > 0.
-    if (geq <= 0 || dt <= 0) return { truncationError: 0 };
-    const truncationError = this.L * Math.abs(iPrev) / (12 * geq * dt);
-    return { truncationError };
+    const iPrevPrev = this.s0[this.base + SLOT_I_PREV_PREV];
+    const deltaI = Math.abs(iPrev - iPrevPrev);
+    const fluxRef = this.L * Math.max(Math.abs(iPrev), Math.abs(iPrevPrev));
+    return {
+      truncationError: (dt / 12) * deltaI,
+      toleranceReference: fluxRef,
+    };
   }
 }
 

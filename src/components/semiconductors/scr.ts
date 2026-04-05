@@ -253,7 +253,6 @@ export function createScrElement(
       // Apply pnjlim to gate-cathode junction voltage for NR stability
       const vgkLimited = pnjlim(vgkRaw, s0[base + SLOT_VGK], nVt, vcritGate);
 
-      // Save limited voltages to pool — no write-back to voltages[]
       s0[base + SLOT_VAK] = vakLimited;
       s0[base + SLOT_VGK] = vgkLimited;
 

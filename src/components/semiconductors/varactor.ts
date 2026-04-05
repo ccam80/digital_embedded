@@ -117,25 +117,24 @@ export function createVaractorElement(
   // State pool slot indices
   const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
   const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_VD_PREV = 6;
+  const SLOT_CAP_FIRST_CALL = 7;
 
   // Pool binding — set by initState
   let s0: Float64Array;
   let base: number;
 
-  // Capacitance companion model state (non-pool: init sentinel only)
-  let capFirstCall = true;
-
   return {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
-    stateSize: 7,
+    stateSize: 8,
     stateBaseOffset: -1,
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       base = this.stateBaseOffset;
       s0[base + SLOT_GEQ] = GMIN;
+      s0[base + SLOT_CAP_FIRST_CALL] = 1.0; // true: Float64Array zero-inits, must set explicitly
     },
 
     stamp(solver: SparseSolver): void {
@@ -173,7 +172,6 @@ export function createVaractorElement(
       const vdOld = s0[base + SLOT_VD];
       const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
 
-      // Save limited voltage to pool — no write-back to voltages[]
       s0[base + SLOT_VD] = vdLimited;
 
       // Shockley equation linearized at operating point
@@ -198,9 +196,9 @@ export function createVaractorElement(
       const prevCapGeq = s0[base + SLOT_CAP_GEQ];
       const prevCapIeq = s0[base + SLOT_CAP_IEQ];
       const iNow = prevCapGeq * vNow + prevCapIeq;
-      const vPrevForFormula = capFirstCall ? vNow : s0[base + SLOT_VD_PREV];
+      const vPrevForFormula = s0[base + SLOT_CAP_FIRST_CALL] !== 0 ? vNow : s0[base + SLOT_VD_PREV];
       s0[base + SLOT_VD_PREV] = vNow;
-      capFirstCall = false;
+      s0[base + SLOT_CAP_FIRST_CALL] = 0.0;
 
       s0[base + SLOT_CAP_GEQ] = capacitorConductance(Cj, dt, method);
       s0[base + SLOT_CAP_IEQ] = capacitorHistoryCurrent(Cj, dt, method, vNow, vPrevForFormula, iNow);

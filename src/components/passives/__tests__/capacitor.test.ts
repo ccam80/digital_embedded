@@ -210,13 +210,13 @@ describe("Capacitor", () => {
   });
 
   describe("statePool", () => {
-    it("stateSize is 3", () => {
+    it("stateSize is 6", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", 1e-6);
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
         new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
       );
-      expect(core.stateSize).toBe(3);
+      expect(core.stateSize).toBe(6);
     });
 
     it("stateBaseOffset is -1 before compiler assigns it", () => {
@@ -279,6 +279,46 @@ describe("Capacitor", () => {
       const lte = element.getLteEstimate!(1e-6);
       expect(lte).toBeDefined();
       expect(lte.truncationError).toBeGreaterThanOrEqual(0);
+    });
+
+    it("toleranceReference uses max of last two voltage samples (natural-charge formulation)", () => {
+      const C = 1e-6;
+      const props = new PropertyBag();
+      props.setModelParam("capacitance", C);
+      const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      );
+      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
+      const { element } = withState(core);
+
+      // First call: v1 = 3V
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]));
+      // Second call: v2 = 7V
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]));
+
+      const lte = element.getLteEstimate!(1e-6);
+      // toleranceReference = C * max(|v(n-1)|, |v(n-2)|) = C * max(7, 3) = C * 7
+      expect(lte.toleranceReference).toBeCloseTo(C * 7, 10);
+    });
+
+    it("zero-crossing protection: toleranceReference is non-zero when vPrev was non-zero", () => {
+      const C = 1e-6;
+      const props = new PropertyBag();
+      props.setModelParam("capacitance", C);
+      const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+      );
+      Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
+      const { element } = withState(core);
+
+      // First call: v1 = 5V (non-zero)
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([5, 0]));
+      // Second call: v2 = 0V (zero crossing)
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([0, 0]));
+
+      const lte = element.getLteEstimate!(1e-6);
+      // toleranceReference = C * max(|0|, |5|) = C * 5 — NOT collapsed to zero
+      expect(lte.toleranceReference).toBeCloseTo(C * 5, 10);
     });
   });
 });

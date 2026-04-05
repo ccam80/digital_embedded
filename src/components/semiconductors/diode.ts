@@ -151,7 +151,7 @@ export function createDiodeElement(
   let s0: Float64Array;
   let base: number;
 
-  // Junction capacitance companion model state (non-pool: init sentinel only)
+  // Sentinel: first call to updateOperatingPoint initialises the capacitance companion model.
   let capFirstCall = true;
 
   const element: AnalogElementCore = {
@@ -218,7 +218,6 @@ export function createDiodeElement(
       const vdOld = s0[base + SLOT_VD];
       const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
 
-      // Save limited voltage to pool — no write-back to voltages[]
       s0[base + SLOT_VD] = vdLimited;
 
       // Shockley equation and NR linearization at limited operating point

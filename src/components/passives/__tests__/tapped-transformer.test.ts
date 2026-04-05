@@ -27,7 +27,7 @@ import {
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { makeVoltageSource, makeResistor, makeDiode, makeCapacitor } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeVoltageSource, makeResistor, makeDiode, makeCapacitor, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -287,6 +287,7 @@ describe("TappedTransformer", () => {
     // Diodes: D1 anode=S1(2), cathode=out(5); D2 anode=S2(4), cathode=out(5)
     const d1 = makeDiode(2, 5, 1e-14, 1.0);
     const d2 = makeDiode(4, 5, 1e-14, 1.0);
+    allocateStatePool([d1, d2]);
 
     // Filter cap 1000µF + load
     const cFilter = makeCapacitor(5, 0, 1000e-6);

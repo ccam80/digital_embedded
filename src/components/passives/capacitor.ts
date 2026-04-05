@@ -131,17 +131,28 @@ export class CapacitorElement extends AbstractCircuitElement {
 // ---------------------------------------------------------------------------
 
 
-// Slot indices within the state pool
+// Slot indices within the state pool.
+//
+// 6-slot layout:
+//   0: GEQ          — Norton companion conductance
+//   1: IEQ          — Norton companion history current
+//   2: V_PREV       — terminal voltage at last accepted step (n-1), used by companion history
+//   3: I_PREV       — capacitor current at step n-1, used by LTE
+//   4: I_PREV_PREV  — capacitor current at step n-2, used by LTE
+//   5: V_PREV_PREV  — terminal voltage at step n-2, used by LTE toleranceReference
 const SLOT_GEQ = 0;
 const SLOT_IEQ = 1;
 const SLOT_V_PREV = 2;
+const SLOT_I_PREV = 3;
+const SLOT_I_PREV_PREV = 4;
+const SLOT_V_PREV_PREV = 5;
 
 class AnalogCapacitorElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
-  readonly stateSize: number = 3;
+  readonly stateSize: number = 6;
   stateBaseOffset: number = -1;
 
   private C: number;
@@ -204,17 +215,51 @@ class AnalogCapacitorElement implements AnalogElementCore {
 
     this.s0[this.base + SLOT_GEQ] = capacitorConductance(this.C, dt, method);
     this.s0[this.base + SLOT_IEQ] = capacitorHistoryCurrent(this.C, dt, method, vNow, vPrev, iNow);
+    // Shift LTE history: both voltage and current pairs are updated together
+    // so getLteEstimate always sees a consistent pair of samples.
+    // Voltage shift: V_PREV → V_PREV_PREV, vNow → V_PREV
+    this.s0[this.base + SLOT_V_PREV_PREV] = vPrev;
     this.s0[this.base + SLOT_V_PREV] = vNow;
+    // Current shift: I_PREV → I_PREV_PREV, iNow → I_PREV
+    // iNow is the capacitor current at the boundary between the previous and
+    // current step, computed above from the previous step's companion
+    // coefficients. getLteEstimate compares these two to produce an error
+    // estimate that scales linearly with dt.
+    this.s0[this.base + SLOT_I_PREV_PREV] = this.s0[this.base + SLOT_I_PREV];
+    this.s0[this.base + SLOT_I_PREV] = iNow;
   }
 
-  getLteEstimate(dt: number): { truncationError: number } {
-    const geq = this.s0[this.base + SLOT_GEQ];
+  getLteEstimate(dt: number): { truncationError: number; toleranceReference: number } {
+    // LTE estimate for trapezoidal integration of a capacitor.
+    //
+    // For trap, local truncation error is O(dt³ · v‴). Using i = C · dv/dt,
+    // v‴ = (1/C) · d²i/dt², so LTE_Q ~ (dt³/12) · d²i/dt². Approximating
+    // d²i/dt² by the first-difference of stored currents at the previous
+    // two step boundaries collapses to:
+    //   LTE_Q ≈ (dt/12) · |Δi|,  Δi = i(n-1) - i(n-2)
+    // which scales linearly with dt. The estimate is retrospective by one
+    // step and returns zero for the first two calls (before two current
+    // samples exist), which is safe because a capacitor at DC has no
+    // history to truncate.
+    //
+    // `toleranceReference` is the "natural" stored quantity — the capacitor
+    // charge Q = C · v_prev. The engine composes the rejection threshold
+    // with ngspice's relative tolerance formula
+    //   local_tol = trtol · (reltol · |Q| + chargeTol)
+    // which keeps the per-step tolerance proportional to the charge the
+    // capacitor is actually carrying, instead of the pathologically-tight
+    // absolute `chargeTol = 1e-14 C` that makes sense only when `|Q|` is
+    // near zero.
+    if (dt <= 0) return { truncationError: 0, toleranceReference: 0 };
+    const iPrev = this.s0[this.base + SLOT_I_PREV];
+    const iPrevPrev = this.s0[this.base + SLOT_I_PREV_PREV];
     const vPrev = this.s0[this.base + SLOT_V_PREV];
-    // LTE estimate for capacitor using trapezoidal vs BDF-1 comparison.
-    // truncationError ~ C * |vNow - vPrev| / (12 * geq * dt) when geq > 0.
-    if (geq <= 0 || dt <= 0) return { truncationError: 0 };
-    const truncationError = this.C * Math.abs(vPrev) / (12 * geq * dt);
-    return { truncationError };
+    const vPrevPrev = this.s0[this.base + SLOT_V_PREV_PREV];
+    const deltaI = Math.abs(iPrev - iPrevPrev);
+    return {
+      truncationError: (dt / 12) * deltaI,
+      toleranceReference: this.C * Math.max(Math.abs(vPrev), Math.abs(vPrevPrev)),
+    };
   }
 }
 

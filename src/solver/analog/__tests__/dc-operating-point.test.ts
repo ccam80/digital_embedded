@@ -16,7 +16,7 @@ import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { solveDcOperatingPoint } from "../dc-operating-point.js";
-import { makeResistor, makeVoltageSource, makeDiode } from "./test-helpers.js";
+import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
 import type { AnalogElement } from "../element.js";
 import type { SimulationParams } from "../../../core/analog-engine-interface.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
@@ -119,6 +119,7 @@ describe("DcOP", () => {
       makeResistor(1, 2, 1000),                 // R=1kOhm
       makeDiode(2, 0, 1e-14, 1),               // diode: anode=node2, cathode=gnd
     ];
+    allocateStatePool(elements);
 
     const result = solveDcOperatingPoint({
       solver,
@@ -187,6 +188,7 @@ describe("DcOP", () => {
       makeResistor(1, 2, 1000),
       makeDiode(2, 0, 1e-14, 1),
     ];
+    allocateStatePool(elements);
 
     const result = solveDcOperatingPoint({
       solver,
@@ -232,6 +234,7 @@ describe("DcOP", () => {
       makeResistor(1, 2, 1000),
       makeDiode(2, 0, 1e-14, 1),
     ];
+    allocateStatePool(elements);
 
     const result = solveDcOperatingPoint({
       solver,
@@ -280,6 +283,7 @@ describe("DcOP", () => {
       makeResistor(1, 2, 1000),
       makeDiode(2, 0, 1e-14, 1),
     ];
+    allocateStatePool(elements);
 
     const result = solveDcOperatingPoint({
       solver,

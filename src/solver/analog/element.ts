@@ -17,7 +17,7 @@ export type {
   StatePoolRef,
 } from "../../core/analog-types.js";
 
-import type { ComplexSparseSolver, IntegrationMethod, SparseSolverStamp } from "../../core/analog-types.js";
+import type { ComplexSparseSolver, IntegrationMethod, SparseSolverStamp, StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // AnalogElement
@@ -144,17 +144,22 @@ export interface AnalogElement {
 
   /**
    * Compute and return the local truncation error estimate for adaptive
-   * timestepping.
+   * timestepping, together with a reference magnitude used by the engine
+   * to form a relative tolerance (ngspice-style).
    *
-   * Reactive elements implement this to allow the timestep controller to
-   * decide whether to accept or reject the current step, and to choose the
-   * next timestep via the standard LTE formula.
+   * The engine accepts or rejects the step by computing
+   *   local_tol = trtol · (reltol · |toleranceReference| + chargeTol)
+   *   ratio     = truncationError / local_tol
+   * and rejecting if any element's `ratio > 1`. `toleranceReference` is the
+   * "natural" stored quantity of the element — charge (C·v) for capacitors,
+   * flux (L·i) for inductors — at the most recent accepted step.
    *
    * @param dt - Current timestep in seconds
-   * @returns Object with `truncationError` in appropriate units (charge for
-   *          capacitors, flux for inductors)
+   * @returns `truncationError` and `toleranceReference`, both in charge
+   *          (or flux) units; returning zero for both is equivalent to
+   *          "no opinion" and never triggers rejection.
    */
-  getLteEstimate?(dt: number): { truncationError: number };
+  getLteEstimate?(dt: number): { truncationError: number; toleranceReference: number };
 
   /**
    * Scale independent source magnitude for source-stepping DC convergence.
@@ -241,4 +246,17 @@ export interface AnalogElement {
    * Bind to state pool after allocation. Called once by compiler.
    */
   initState?(pool: StatePoolRef): void;
+
+  /**
+   * Return simulation times within (tStart, tEnd) at which this element has
+   * a discontinuity (e.g. a square-wave edge, a PWL corner).
+   *
+   * The engine calls this once per step (with the upcoming step window) so
+   * it can pre-register these times as timestep breakpoints, ensuring the
+   * solver lands exactly on each discontinuity rather than stepping across it.
+   *
+   * Only elements with time-varying discontinuities (AC sources with square
+   * or pulse waveforms) need to implement this. All others may omit it.
+   */
+  getBreakpoints?(tStart: number, tEnd: number): number[];
 }

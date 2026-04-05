@@ -21,6 +21,7 @@ import { SparseSolver } from "./sparse-solver.js";
 import { TimestepController } from "./timestep.js";
 import { HistoryStore } from "./integration.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
+import type { ConvergenceTrace } from "./diagnostics.js";
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import { newtonRaphson } from "./newton-raphson.js";
 import type { AnalogElement } from "./element.js";
@@ -82,6 +83,20 @@ export class MNAEngine implements AnalogEngine {
   private _prevVoltages: Float64Array = new Float64Array(0);
 
   // -------------------------------------------------------------------------
+  // Hoisted working buffers — allocated once in init() and reused every step.
+  //
+  // `_stateCheckpoint`: persistent scratch buffer for snapshotting state0
+  // before each NR solve. Sized to `statePool.totalSlots`; null when the
+  // circuit has no state pool.
+  //
+  // `_nrVoltages` and `_nrPrevVoltages`: per-iteration voltage arrays for
+  // the NR solver. Sized to `matrixSize`.
+  // -------------------------------------------------------------------------
+  private _stateCheckpoint: Float64Array | null = null;
+  private _nrVoltages: Float64Array = new Float64Array(0);
+  private _nrPrevVoltages: Float64Array = new Float64Array(0);
+
+  // -------------------------------------------------------------------------
   // Compiled circuit reference
   // -------------------------------------------------------------------------
   private _compiled: ConcreteCompiledAnalogCircuit | null = null;
@@ -124,6 +139,14 @@ export class MNAEngine implements AnalogEngine {
     this._voltages = new Float64Array(matrixSize);
     this._prevVoltages = new Float64Array(matrixSize);
 
+    // Hoisted NR working buffers (see field declarations for rationale).
+    this._nrVoltages = new Float64Array(matrixSize);
+    this._nrPrevVoltages = new Float64Array(matrixSize);
+
+    // Hoisted state-pool checkpoint buffer — sized to pool slot count when a pool is present.
+    const pool = (compiled as CompiledWithBridges).statePool ?? null;
+    this._stateCheckpoint = pool ? new Float64Array(pool.totalSlots) : null;
+
     this._solver = new SparseSolver();
     this._timestep = new TimestepController(this._params);
     this._history = new HistoryStore(elements.length);
@@ -132,21 +155,35 @@ export class MNAEngine implements AnalogEngine {
     this._simTime = 0;
     this._lastDt = 0;
 
-    // Assign stateBaseOffset for elements that were not compiler-processed
-    // (stateSize > 0 but stateBaseOffset still -1). Then call initState on all
-    // pool-backed elements to bind them to the state pool.
+    // Bind pool-backed elements to the compiled circuit's shared state pool.
+    //
+    // Allocation is the compiler's responsibility (see compiler.ts, the loop
+    // that assigns `stateBaseOffset` before constructing `StatePool`). The
+    // engine assumes every element with `stateSize > 0` already has a valid
+    // offset by the time `init()` is called. It only performs the cheap
+    // `initState` binding step — handing the element a reference to the
+    // pool so it can cache `this.s0 = pool.state0` and `this.base = offset`.
+    //
+    // Any element that arrives here with `stateBaseOffset < 0` signals a
+    // real upstream bug: a code path that produced a `CompiledAnalogCircuit`
+    // without running allocation. We throw rather than paper over it,
+    // because a silent fallback reassignment would hide future allocation
+    // regressions as numerical wrongness (flat capacitor voltages, etc.)
+    // rather than loud failures.
     const cac = compiled as CompiledWithBridges;
     if (cac.statePool) {
-      let nextOffset = 0;
       for (const el of elements) {
         if (el.stateSize > 0) {
           if (el.stateBaseOffset < 0) {
-            el.stateBaseOffset = nextOffset;
+            throw new Error(
+              `MNAEngine.init(): element with stateSize=${el.stateSize} arrived ` +
+              `with stateBaseOffset=-1. Pool-backed elements must have offsets ` +
+              `assigned at compile time (see compiler.ts state-pool allocation ` +
+              `loop). A circuit produced without running that allocation step ` +
+              `is invalid input to the engine.`,
+            );
           }
-          nextOffset = el.stateBaseOffset + el.stateSize;
-          if (el.initState) {
-            el.initState(cac.statePool);
-          }
+          el.initState?.(cac.statePool);
         }
       }
     }
@@ -178,6 +215,9 @@ export class MNAEngine implements AnalogEngine {
     this._compiled = null;
     this._voltages = new Float64Array(0);
     this._prevVoltages = new Float64Array(0);
+    this._nrVoltages = new Float64Array(0);
+    this._nrPrevVoltages = new Float64Array(0);
+    this._stateCheckpoint = null;
     this._history = new HistoryStore(0);
     this._diagnostics.clear();
     this._changeListeners = [];
@@ -203,7 +243,27 @@ export class MNAEngine implements AnalogEngine {
 
     this._prevVoltages.set(this._voltages);
     const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;
-    const checkpoint = statePool ? statePool.checkpoint(this._simTime) : null;
+    // Snapshot state0 into the hoisted scratch buffer (memcpy, no allocation).
+    // Mirrors the `_prevVoltages.set(_voltages)` pattern one line above.
+    if (statePool && this._stateCheckpoint) {
+      this._stateCheckpoint.set(statePool.state0);
+    }
+
+    // Register upcoming discontinuity breakpoints from elements (e.g. square-wave
+    // AC sources). Query ahead by 3× maxTimeStep so the timestep controller can
+    // clamp the current step to land exactly on the next edge rather than stepping
+    // across it. Using 3× guarantees the breakpoint is found in the open interval
+    // (simTime, lookaheadEnd) even when it falls exactly at simTime + maxTimeStep.
+    // Only elements with getBreakpoints need to participate.
+    const lookaheadEnd = this._simTime + 3 * params.maxTimeStep;
+    for (const el of elements) {
+      if (el.getBreakpoints) {
+        const bps = el.getBreakpoints(this._simTime, lookaheadEnd);
+        for (const bp of bps) {
+          this._timestep.addBreakpoint(bp);
+        }
+      }
+    }
 
     let dt = this._timestep.getClampedDt(this._simTime);
     const method = this._timestep.currentMethod;
@@ -225,6 +285,8 @@ export class MNAEngine implements AnalogEngine {
       abstol: params.abstol,
       initialGuess: this._voltages,
       diagnostics: this._diagnostics,
+      voltagesBuffer: this._nrVoltages,
+      prevVoltagesBuffer: this._nrPrevVoltages,
     });
 
     if (!nrResult.converged) {
@@ -235,7 +297,9 @@ export class MNAEngine implements AnalogEngine {
       while (retryDt >= params.minTimeStep) {
         // Restore voltages before retry
         this._voltages.set(this._prevVoltages);
-        if (statePool && checkpoint) statePool.rollback(checkpoint);
+        if (statePool && this._stateCheckpoint) {
+          statePool.state0.set(this._stateCheckpoint);
+        }
 
         // Restamp companion models with reduced dt
         for (const el of elements) {
@@ -253,6 +317,8 @@ export class MNAEngine implements AnalogEngine {
           abstol: params.abstol,
           initialGuess: this._voltages,
           diagnostics: this._diagnostics,
+          voltagesBuffer: this._nrVoltages,
+          prevVoltagesBuffer: this._nrPrevVoltages,
         });
 
         if (nrResult.converged) {
@@ -289,38 +355,82 @@ export class MNAEngine implements AnalogEngine {
     // Accept the NR solution into _voltages
     this._voltages.set(nrResult.voltages);
 
-    // LTE-based timestep rejection
-    const newDt = this._timestep.computeNewDt(elements, this._history, this._simTime);
-    const maxError = this._computeMaxLteError(elements, dt);
-    const r = maxError > 0 ? params.chargeTol / maxError : Infinity;
+    // LTE-based timestep rejection.
+    //
+    // `worstRatio` is the largest per-element (LTE / local_tolerance) ratio
+    // across all reactive elements, using the ngspice composite tolerance
+    // (trtol · (reltol · |Q_ref| + chargeTol)). A ratio > 1 means at least
+    // one element blew its tolerance and the step must be rejected.
+    const { newDt, worstRatio } = this._timestep.computeNewDt(elements, this._history, this._simTime, dt);
 
-    if (this._timestep.shouldReject(r)) {
-      // Restore and retry with halved dt
+    if (this._timestep.shouldReject(worstRatio)) {
+      // Restore voltages and state to start of this step
       this._voltages.set(this._prevVoltages);
-      if (statePool && checkpoint) statePool.rollback(checkpoint);
+      if (statePool && this._stateCheckpoint) {
+        statePool.state0.set(this._stateCheckpoint);
+      }
       const rejectedDt = this._timestep.reject();
 
-      // Restamp companion with halved dt and retry NR
-      for (const el of elements) {
-        if (el.isReactive && el.stampCompanion) {
-          el.stampCompanion(rejectedDt, method, this._voltages);
+      // Retry NR with progressively halved dt until convergence or minTimeStep.
+      // Mirrors the NR failure retry loop so LTE rejection has the same
+      // robustness as a direct NR failure.
+      let lteRetryDt = rejectedDt;
+      let lteRecovered = false;
+      let lteLastTrace: ConvergenceTrace[] = [];
+
+      while (lteRetryDt >= params.minTimeStep) {
+        // Restamp companion with current retry dt
+        for (const el of elements) {
+          if (el.isReactive && el.stampCompanion) {
+            el.stampCompanion(lteRetryDt, method, this._voltages);
+          }
         }
+
+        const retryResult = newtonRaphson({
+          solver: this._solver,
+          elements,
+          matrixSize,
+          maxIterations: params.maxIterations,
+          reltol: params.reltol,
+          abstol: params.abstol,
+          initialGuess: this._voltages,
+          diagnostics: this._diagnostics,
+          voltagesBuffer: this._nrVoltages,
+          prevVoltagesBuffer: this._nrPrevVoltages,
+        });
+        lteLastTrace = retryResult.trace;
+
+        if (retryResult.converged) {
+          this._voltages.set(retryResult.voltages);
+          dt = lteRetryDt;
+          this._timestep.currentDt = lteRetryDt;
+          lteRecovered = true;
+          break;
+        }
+
+        // Not converged — restore and halve
+        this._voltages.set(this._prevVoltages);
+        if (statePool && this._stateCheckpoint) {
+          statePool.state0.set(this._stateCheckpoint);
+        }
+        lteRetryDt /= 2;
       }
 
-      const retryResult = newtonRaphson({
-        solver: this._solver,
-        elements,
-        matrixSize,
-        maxIterations: params.maxIterations,
-        reltol: params.reltol,
-        abstol: params.abstol,
-        initialGuess: this._voltages,
-        diagnostics: this._diagnostics,
-      });
-
-      if (retryResult.converged) {
-        this._voltages.set(retryResult.voltages);
-        dt = rejectedDt;
+      if (!lteRecovered) {
+        const blameElement =
+          lteLastTrace.length > 0 ? lteLastTrace[lteLastTrace.length - 1].largestChangeElement : -1;
+        const involvedElements = blameElement >= 0 ? [blameElement] : [];
+        this._diagnostics.emit(
+          makeDiagnostic("convergence-failed", "error", "Transient NR failed on LTE retry", {
+            explanation:
+              "Newton-Raphson iteration failed to converge after LTE-triggered timestep reduction. " +
+              "Check the circuit for instability or stiff elements.",
+            involvedElements,
+            simTime: this._simTime,
+          }),
+        );
+        this._transitionState(EngineState.ERROR);
+        return;
       }
     }
 
@@ -634,19 +744,4 @@ export class MNAEngine implements AnalogEngine {
     }
   }
 
-  /**
-   * Compute the maximum LTE error across all reactive elements.
-   *
-   * Returns 0 when there are no reactive elements or none implement getLteEstimate.
-   */
-  private _computeMaxLteError(elements: readonly AnalogElement[], dt: number): number {
-    let maxError = 0;
-    for (const el of elements) {
-      if (el.isReactive && el.getLteEstimate) {
-        const { truncationError } = el.getLteEstimate(dt);
-        if (truncationError > maxError) maxError = truncationError;
-      }
-    }
-    return maxError;
-  }
 }

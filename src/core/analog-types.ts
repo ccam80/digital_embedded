@@ -4,8 +4,8 @@
  * These types are placed in core/ so that the registry (a foundational module)
  * does not need to import from solver/analog internals.
  *
- * The solver/analog layer re-exports these types for backward compatibility
- * with existing consumers that import from those paths.
+ * The solver/analog layer re-exports these types so consumers may import
+ * from either path.
  */
 
 // ---------------------------------------------------------------------------
@@ -120,9 +120,12 @@ export interface AnalogElementCore {
   checkConvergence?(voltages: Float64Array, prevVoltages: Float64Array): boolean;
 
   /**
-   * Compute and return the local truncation error estimate for adaptive timestepping.
+   * Compute and return the local truncation error estimate for adaptive
+   * timestepping. See `AnalogElementCore` in solver/analog/element.ts for
+   * the full contract; both fields are in charge/flux units, and the engine
+   * forms an ngspice-style relative tolerance from `toleranceReference`.
    */
-  getLteEstimate?(dt: number): { truncationError: number };
+  getLteEstimate?(dt: number): { truncationError: number; toleranceReference: number };
 
   /**
    * Scale independent source magnitude for source-stepping DC convergence.
@@ -215,7 +218,7 @@ export interface AcParams {
  *
  * Imported from core/ so that analog-engine-interface.ts does not depend on
  * solver/analog internals. The solver/analog/ac-analysis.ts re-exports these
- * types for backward compatibility.
+ * types so consumers may import from either path.
  */
 export interface AcResult {
   /** Frequency points in Hz. */

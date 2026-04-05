@@ -271,7 +271,6 @@ export function createTriacElement(
       // Apply pnjlim to gate-MT1 voltage
       const vg1Limited = pnjlim(vg1Raw, s0[base + SLOT_VGK], nVt, vcritGate);
 
-      // Save limited voltages to pool — no write-back to voltages[]
       s0[base + SLOT_VAK] = vmtLimited;
       s0[base + SLOT_VGK] = vg1Limited;
 

@@ -305,7 +305,8 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
               const selectedElements = [...selection.getSelectedElements()];
               const selectedWires = [...selection.getSelectedWires()];
               const { boundaryPorts } = analyzeBoundary(ctx.circuit, selectedElements, selectedWires);
-              void openSubcircuitDialog(boundaryPorts, registry, selectedElements).then((result) => {
+              const existingSubNames = new Set(ctx.circuit.metadata.subcircuits?.keys() ?? []);
+              void openSubcircuitDialog(boundaryPorts, registry, selectedElements, undefined, existingSubNames).then((result) => {
                 if (!result) return;
                 const userPorts: PortOverride[] = result.ports.map(p => ({
                   label: p.label,
@@ -369,7 +370,8 @@ function buildContextMenu(ctx: AppContext, deps: MTDeps): void {
               for (const el of subDef.circuit.elements) {
                 if (el.typeId === 'Port') portElements.push(el);
               }
-              void openSubcircuitDialog([], registry, portElements, subDef.name).then((result) => {
+              const existingSubNames = new Set(ctx.circuit.metadata.subcircuits?.keys() ?? []);
+              void openSubcircuitDialog([], registry, portElements, subDef.name, existingSubNames).then((result) => {
                 if (!result) return;
                 // Update Port elements in the subcircuit definition to match dialog edits
                 const existingPorts = subDef.circuit.elements.filter(el => el.typeId === 'Port');

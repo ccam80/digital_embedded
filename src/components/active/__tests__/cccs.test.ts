@@ -21,6 +21,7 @@
 
 import { describe, it, expect } from "vitest";
 import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { makeResistor, makeVoltageSource, withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import { CCCSDefinition } from "../cccs.js";
@@ -81,6 +82,7 @@ function buildCircuit(opts: {
     wireToNodeId: new Map(),
     models: new Map(),
     elementToCircuitElement: new Map(),
+    statePool: new StatePool(0),
   });
 }
 

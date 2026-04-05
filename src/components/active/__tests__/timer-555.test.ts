@@ -47,6 +47,7 @@ import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
 import { EngineState } from "../../../core/engine-interface.js";
 import { vi } from "vitest";
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
@@ -166,6 +167,7 @@ function buildHandCircuit(opts: {
     wireToNodeId: new Map(),
     models: new Map(),
     elementToCircuitElement: new Map(),
+    statePool: new StatePool(0),
   });
 }
 

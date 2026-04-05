@@ -21,6 +21,7 @@ import type { AnalogElement } from '../../solver/analog/element.js';
 import type { SparseSolver } from '../../solver/analog/sparse-solver.js';
 import type { SignalAddress, CompiledCircuitUnified } from '../types.js';
 import { ConcreteCompiledAnalogCircuit } from '../../solver/analog/compiled-analog-circuit.js';
+import { StatePool } from '../../solver/analog/state-pool.js';
 import { TestElement, makePin } from '../../test-fixtures/test-element.js';
 import { noopExecFn, executePassThrough, executeAnd2 } from '../../test-fixtures/execute-stubs.js';
 
@@ -474,6 +475,7 @@ function buildMinimalAnalogDomain(): ConcreteCompiledAnalogCircuit {
     wireToNodeId: new Map(),
     models: new Map(),
     elementToCircuitElement: new Map(),
+    statePool: new StatePool(0),
   });
 }
 

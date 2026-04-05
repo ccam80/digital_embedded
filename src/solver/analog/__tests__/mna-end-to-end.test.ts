@@ -35,6 +35,7 @@ import {
   makeCapacitor,
   makeDiode,
   makeInductor,
+  allocateStatePool,
 } from "./test-helpers.js";
 
 // Import real component definitions
@@ -131,6 +132,7 @@ function buildHandCircuit(opts: {
   branchCount: number;
   elements: import("../element.js").AnalogElement[];
 }): ConcreteCompiledAnalogCircuit {
+  const statePool = allocateStatePool(opts.elements);
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: opts.nodeCount,
     branchCount: opts.branchCount,
@@ -139,6 +141,7 @@ function buildHandCircuit(opts: {
     wireToNodeId: new Map(),
     models: new Map(),
     elementToCircuitElement: new Map(),
+    statePool,
   });
 }
 

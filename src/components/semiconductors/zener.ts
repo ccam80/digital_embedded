@@ -140,7 +140,6 @@ export function createZenerElement(
       const vdOld = s0[base + SLOT_VD];
       const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
 
-      // Save limited voltage to pool — no write-back to voltages[]
       s0[base + SLOT_VD] = vdLimited;
 
       // Compute diode current and linearized conductance

@@ -15,7 +15,7 @@ import { PropertyBag as _PropertyBag } from "../../../core/properties.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
@@ -166,6 +166,7 @@ describe("Diac", () => {
       -1,
       triacProps,
     );
+    allocateStatePool([triac]);
 
     // Step 1: verify diac at V=40V (above V_BO=32V) produces current that can trigger triac
     const diac = makeDiac();

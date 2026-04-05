@@ -26,6 +26,7 @@ import {
   type SweepCircuitFactory,
 } from "../parameter-sweep.js";
 import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
+import { StatePool } from "../state-pool.js";
 import { makeResistor, makeVoltageSource } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
@@ -76,6 +77,7 @@ function buildDividerCircuit(
     wireToNodeId: new Map(),
     models: new Map(),
     elementToCircuitElement: new Map(),
+    statePool: new StatePool(0),
   });
 }
 
@@ -108,6 +110,7 @@ function buildSweepDividerFactory(nominalR2: number = 1000): SweepCircuitFactory
       wireToNodeId: new Map(),
       models: new Map(),
       elementToCircuitElement: new Map(),
+      statePool: new StatePool(0),
     });
   };
 }
@@ -152,6 +155,7 @@ function buildRcSweepFactory(_c: number = 1e-9): SweepCircuitFactory {
       wireToNodeId: new Map(),
       models: new Map(),
       elementToCircuitElement: new Map(),
+      statePool: new StatePool(0),
     });
   };
 }

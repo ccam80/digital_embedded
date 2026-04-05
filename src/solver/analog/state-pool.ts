@@ -1,9 +1,3 @@
-export interface StateCheckpoint {
-  /** Deep copy of state0 at checkpoint time (via `new Float64Array(pool.state0)`). */
-  readonly state0: Float64Array;
-  readonly simTime: number;
-}
-
 export class StatePool {
   /** Current operating point state. */
   readonly state0: Float64Array;
@@ -18,19 +12,6 @@ export class StatePool {
     this.state0 = new Float64Array(totalSlots);
     this.state1 = new Float64Array(totalSlots);
     this.state2 = new Float64Array(totalSlots);
-  }
-
-  /** Snapshot state0 for NR failure rollback. Returns a deep copy. */
-  checkpoint(simTime: number): StateCheckpoint {
-    return {
-      state0: new Float64Array(this.state0),
-      simTime,
-    };
-  }
-
-  /** Restore state0 from a checkpoint (copies data back). */
-  rollback(cp: StateCheckpoint): void {
-    this.state0.set(cp.state0);
   }
 
   /** Copy history after accepted timestep: state2.set(state1); state1.set(state0). */

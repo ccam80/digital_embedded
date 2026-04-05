@@ -278,10 +278,17 @@ function computeCentroid(ports: BoundaryPort[]): { x: number; y: number } {
 
 /**
  * Generate the next available subcircuit name like "subcircuit_1", "subcircuit_2", etc.
+ *
+ * Checks both the component registry (global) and the caller-supplied existing
+ * names (circuit-scoped subcircuits live on `circuit.metadata.subcircuits`, not
+ * in the registry).
  */
-function generateAutoName(registry: ComponentRegistry): string {
+function generateAutoName(
+  registry: ComponentRegistry,
+  existingNames: ReadonlySet<string>,
+): string {
   let n = 1;
-  while (registry.get(`subcircuit_${n}`) !== undefined) {
+  while (registry.get(`subcircuit_${n}`) !== undefined || existingNames.has(`subcircuit_${n}`)) {
     n++;
   }
   return `subcircuit_${n}`;
@@ -301,6 +308,7 @@ export function openSubcircuitDialog(
   registry: ComponentRegistry,
   selectedElements?: import('../core/element.js').CircuitElement[],
   existingName?: string,
+  existingNames: ReadonlySet<string> = new Set(),
 ): Promise<SubcircuitDialogResult | null> {
   return new Promise<SubcircuitDialogResult | null>((resolve) => {
     let resolved = false;
@@ -340,7 +348,7 @@ export function openSubcircuitDialog(
 
     const nameInput = document.createElement('input');
     nameInput.type = 'text';
-    nameInput.value = existingName ?? generateAutoName(registry);
+    nameInput.value = existingName ?? generateAutoName(registry, existingNames);
     nameInput.placeholder = 'MySubcircuit';
     nameInput.style.flex = '1';
     nameInput.style.padding = '4px 6px';
@@ -485,7 +493,7 @@ export function openSubcircuitDialog(
         nameError.style.display = '';
         nameInput.style.borderColor = '#c00';
         nameValid = false;
-      } else if (name !== existingName && registry.get(name) !== undefined) {
+      } else if (name !== existingName && (registry.get(name) !== undefined || existingNames.has(name))) {
         nameError.textContent = `A subcircuit named "${name}" already exists.`;
         nameError.style.display = '';
         nameInput.style.borderColor = '#c00';

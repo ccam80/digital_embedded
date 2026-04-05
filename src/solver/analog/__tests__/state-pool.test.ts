@@ -32,88 +32,6 @@ describe('StatePool', () => {
     });
   });
 
-  describe('checkpoint()', () => {
-    it('returns a deep copy of state0', () => {
-      const pool = new StatePool(4);
-      pool.state0.set([1.0, 2.0, 3.0, 4.0]);
-
-      const cp = pool.checkpoint(0.001);
-
-      expect(Array.from(cp.state0)).toEqual([1.0, 2.0, 3.0, 4.0]);
-    });
-
-    it('stores simTime in the checkpoint', () => {
-      const pool = new StatePool(3);
-      const cp = pool.checkpoint(0.005);
-      expect(cp.simTime).toBe(0.005);
-    });
-
-    it('checkpoint is independent — mutating state0 after checkpoint does not affect checkpoint', () => {
-      const pool = new StatePool(4);
-      pool.state0.set([1.0, 2.0, 3.0, 4.0]);
-
-      const cp = pool.checkpoint(0.001);
-
-      // Modify state0 after taking checkpoint
-      pool.state0[0] = 99.0;
-      pool.state0[3] = 88.0;
-
-      // Checkpoint values must be unchanged
-      expect(cp.state0[0]).toBe(1.0);
-      expect(cp.state0[3]).toBe(4.0);
-    });
-
-    it('returns a different Float64Array instance from state0', () => {
-      const pool = new StatePool(4);
-      const cp = pool.checkpoint(0.0);
-      expect(cp.state0).not.toBe(pool.state0);
-    });
-  });
-
-  describe('rollback()', () => {
-    it('restores state0 from checkpoint', () => {
-      const pool = new StatePool(4);
-      pool.state0.set([1.0, 2.0, 3.0, 4.0]);
-
-      const cp = pool.checkpoint(0.001);
-
-      // Corrupt state0 to simulate a failed NR iteration
-      pool.state0.set([9.0, 8.0, 7.0, 6.0]);
-
-      pool.rollback(cp);
-
-      expect(Array.from(pool.state0)).toEqual([1.0, 2.0, 3.0, 4.0]);
-    });
-
-    it('does not modify state1 or state2 on rollback', () => {
-      const pool = new StatePool(3);
-      pool.state0.set([1.0, 2.0, 3.0]);
-      pool.state1.set([10.0, 20.0, 30.0]);
-      pool.state2.set([100.0, 200.0, 300.0]);
-
-      const cp = pool.checkpoint(0.0);
-
-      pool.state0.set([5.0, 5.0, 5.0]);
-      pool.rollback(cp);
-
-      expect(Array.from(pool.state1)).toEqual([10.0, 20.0, 30.0]);
-      expect(Array.from(pool.state2)).toEqual([100.0, 200.0, 300.0]);
-    });
-
-    it('rollback does not share memory with the checkpoint — further mutations are independent', () => {
-      const pool = new StatePool(2);
-      pool.state0.set([1.0, 2.0]);
-      const cp = pool.checkpoint(0.0);
-
-      pool.state0.set([9.0, 9.0]);
-      pool.rollback(cp);
-
-      // Now mutate state0 again — checkpoint must remain unchanged
-      pool.state0[0] = 42.0;
-      expect(cp.state0[0]).toBe(1.0);
-    });
-  });
-
   describe('acceptTimestep()', () => {
     it('shifts history: state2 ← state1, state1 ← state0', () => {
       const pool = new StatePool(3);
@@ -333,30 +251,7 @@ describe('StatePool', () => {
     });
   });
 
-  describe('integration: checkpoint + rollback + acceptTimestep', () => {
-    it('NR retry scenario: rollback restores state0 while state1/state2 remain from accepted history', () => {
-      const pool = new StatePool(3);
-
-      // Simulate DC convergence accepted as first timestep
-      pool.state0.set([0.6, 0.001, 5.0]);
-      pool.state1.set([0.6, 0.001, 5.0]);
-      pool.state2.set([0.6, 0.001, 5.0]);
-
-      // Take checkpoint before NR attempt
-      const cp = pool.checkpoint(1e-6);
-
-      // NR iteration modifies state0
-      pool.state0.set([0.65, 0.002, 4.8]);
-
-      // NR fails — rollback
-      pool.rollback(cp);
-
-      expect(Array.from(pool.state0)).toEqual([0.6, 0.001, 5.0]);
-      // History unchanged
-      expect(Array.from(pool.state1)).toEqual([0.6, 0.001, 5.0]);
-      expect(Array.from(pool.state2)).toEqual([0.6, 0.001, 5.0]);
-    });
-
+  describe('integration: acceptTimestep', () => {
     it('accepted timestep scenario: history advances correctly', () => {
       const pool = new StatePool(2);
 

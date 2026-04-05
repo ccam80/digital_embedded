@@ -519,7 +519,6 @@ export function createBjtElement(
       const vbeLimited = pnjlim(vbeRaw, s0[base + SLOT_VBE], nfVt, vcritBE);
       const vbcLimited = pnjlim(vbcRaw, s0[base + SLOT_VBC], nrVt, vcritBC);
 
-      // Save limited voltages to pool — no write-back to voltages[]
       s0[base + SLOT_VBE] = vbeLimited;
       s0[base + SLOT_VBC] = vbcLimited;
 
@@ -711,7 +710,7 @@ export function createSpiceL1BjtElement(
 
   const hasCapacitance = params.CJE > 0 || params.CJC > 0 || params.TF > 0 || params.TR > 0 || params.CJS > 0;
 
-  // State pool slot indices (BJT SPICE L1, stateSize: 12)
+  // State pool slot indices (BJT SPICE L1, stateSize: 24)
   const L1_SLOT_VBE = 0;
   const L1_SLOT_VBC = 1;
   const L1_SLOT_GPI = 2;
@@ -724,30 +723,29 @@ export function createSpiceL1BjtElement(
   const L1_SLOT_IB_NORTON = 9;
   const L1_SLOT_RB_EFF    = 10;
   const L1_SLOT_IE_NORTON = 11;
+  // Junction capacitance companion model state (slots 12–23)
+  const L1_SLOT_CAP_GEQ_BE     = 12;
+  const L1_SLOT_CAP_IEQ_BE     = 13;
+  const L1_SLOT_CAP_GEQ_BC_INT = 14;
+  const L1_SLOT_CAP_IEQ_BC_INT = 15;
+  const L1_SLOT_CAP_GEQ_BC_EXT = 16;
+  const L1_SLOT_CAP_IEQ_BC_EXT = 17;
+  const L1_SLOT_CAP_GEQ_CS     = 18;
+  const L1_SLOT_CAP_IEQ_CS     = 19;
+  const L1_SLOT_VBE_PREV        = 20;
+  const L1_SLOT_VBC_PREV        = 21;
+  const L1_SLOT_VCS_PREV        = 22;
+  const L1_SLOT_CAP_FIRST_CALL  = 23;  // 1.0 = first call (true), 0.0 = subsequent
 
   // Pool binding — set by initState
   let s0: Float64Array;
   let base: number;
 
-  // Junction capacitance companion model state
-  let capGeqBE = 0;
-  let capIeqBE = 0;
-  let capGeqBC_int = 0;   // XCJC fraction: internal base to internal collector
-  let capIeqBC_int = 0;
-  let capGeqBC_ext = 0;   // (1-XCJC) fraction: external base to external collector
-  let capIeqBC_ext = 0;
-  let capGeqCS = 0;       // collector-substrate capacitance
-  let capIeqCS = 0;
-  let vbePrev = NaN;
-  let vbcPrev = NaN;
-  let vcsPrev = NaN;      // collector-substrate voltage (Vc - Vsubstrate=0)
-  let capFirstCall = true;
-
   const element: AnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: hasCapacitance,
-    stateSize: 12,
+    stateSize: 24,
     stateBaseOffset: -1,
 
     initState(pool: StatePoolRef): void {
@@ -771,6 +769,8 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_IB_NORTON] = op0.ib - op0.gpi * 0 - op0.gmu * 0;
       s0[base + L1_SLOT_RB_EFF]    = params.RB;
       s0[base + L1_SLOT_IE_NORTON] = -(op0.ic + op0.ib);
+      // Capacitance companion state — zero by default (Float64Array), except first-call flag
+      s0[base + L1_SLOT_CAP_FIRST_CALL] = 1.0;
     },
 
     stamp(solver: SparseSolver): void {
@@ -799,36 +799,44 @@ export function createSpiceL1BjtElement(
       }
 
       // Stamp junction capacitance companion models when active.
-      if (capGeqBE !== 0 || capIeqBE !== 0) {
-        stampG(solver, nodeB_int, nodeB_int, capGeqBE);
-        stampG(solver, nodeB_int, nodeE_int, -capGeqBE);
-        stampG(solver, nodeE_int, nodeB_int, -capGeqBE);
-        stampG(solver, nodeE_int, nodeE_int, capGeqBE);
-        stampRHS(solver, nodeB_int, -capIeqBE);
-        stampRHS(solver, nodeE_int, capIeqBE);
+      const _capGeqBE     = s0[base + L1_SLOT_CAP_GEQ_BE];
+      const _capIeqBE     = s0[base + L1_SLOT_CAP_IEQ_BE];
+      const _capGeqBC_int = s0[base + L1_SLOT_CAP_GEQ_BC_INT];
+      const _capIeqBC_int = s0[base + L1_SLOT_CAP_IEQ_BC_INT];
+      const _capGeqBC_ext = s0[base + L1_SLOT_CAP_GEQ_BC_EXT];
+      const _capIeqBC_ext = s0[base + L1_SLOT_CAP_IEQ_BC_EXT];
+      const _capGeqCS     = s0[base + L1_SLOT_CAP_GEQ_CS];
+      const _capIeqCS     = s0[base + L1_SLOT_CAP_IEQ_CS];
+      if (_capGeqBE !== 0 || _capIeqBE !== 0) {
+        stampG(solver, nodeB_int, nodeB_int, _capGeqBE);
+        stampG(solver, nodeB_int, nodeE_int, -_capGeqBE);
+        stampG(solver, nodeE_int, nodeB_int, -_capGeqBE);
+        stampG(solver, nodeE_int, nodeE_int, _capGeqBE);
+        stampRHS(solver, nodeB_int, -_capIeqBE);
+        stampRHS(solver, nodeE_int, _capIeqBE);
       }
       // B-C capacitance: XCJC fraction between internal nodes, (1-XCJC) between external nodes.
-      if (capGeqBC_int !== 0 || capIeqBC_int !== 0) {
-        stampG(solver, nodeB_int, nodeB_int, capGeqBC_int);
-        stampG(solver, nodeB_int, nodeC_int, -capGeqBC_int);
-        stampG(solver, nodeC_int, nodeB_int, -capGeqBC_int);
-        stampG(solver, nodeC_int, nodeC_int, capGeqBC_int);
-        stampRHS(solver, nodeB_int, -capIeqBC_int);
-        stampRHS(solver, nodeC_int, capIeqBC_int);
+      if (_capGeqBC_int !== 0 || _capIeqBC_int !== 0) {
+        stampG(solver, nodeB_int, nodeB_int, _capGeqBC_int);
+        stampG(solver, nodeB_int, nodeC_int, -_capGeqBC_int);
+        stampG(solver, nodeC_int, nodeB_int, -_capGeqBC_int);
+        stampG(solver, nodeC_int, nodeC_int, _capGeqBC_int);
+        stampRHS(solver, nodeB_int, -_capIeqBC_int);
+        stampRHS(solver, nodeC_int, _capIeqBC_int);
       }
-      if (capGeqBC_ext !== 0 || capIeqBC_ext !== 0) {
-        stampG(solver, nodeB_ext, nodeB_ext, capGeqBC_ext);
-        stampG(solver, nodeB_ext, nodeC_ext, -capGeqBC_ext);
-        stampG(solver, nodeC_ext, nodeB_ext, -capGeqBC_ext);
-        stampG(solver, nodeC_ext, nodeC_ext, capGeqBC_ext);
-        stampRHS(solver, nodeB_ext, -capIeqBC_ext);
-        stampRHS(solver, nodeC_ext, capIeqBC_ext);
+      if (_capGeqBC_ext !== 0 || _capIeqBC_ext !== 0) {
+        stampG(solver, nodeB_ext, nodeB_ext, _capGeqBC_ext);
+        stampG(solver, nodeB_ext, nodeC_ext, -_capGeqBC_ext);
+        stampG(solver, nodeC_ext, nodeB_ext, -_capGeqBC_ext);
+        stampG(solver, nodeC_ext, nodeC_ext, _capGeqBC_ext);
+        stampRHS(solver, nodeB_ext, -_capIeqBC_ext);
+        stampRHS(solver, nodeC_ext, _capIeqBC_ext);
       }
       // Collector-substrate capacitance: between external collector and ground.
-      if (capGeqCS !== 0 || capIeqCS !== 0) {
-        stampG(solver, nodeC_ext, nodeC_ext, capGeqCS);
+      if (_capGeqCS !== 0 || _capIeqCS !== 0) {
+        stampG(solver, nodeC_ext, nodeC_ext, _capGeqCS);
         // ground node = 0, skipped per MNA convention
-        stampRHS(solver, nodeC_ext, -capIeqCS);
+        stampRHS(solver, nodeC_ext, -_capIeqCS);
       }
     },
 
@@ -885,7 +893,6 @@ export function createSpiceL1BjtElement(
       const vbeRaw = polarity * (vBi - vEi);
       const vbcRaw = polarity * (vBi - vCi);
 
-      // Apply pnjlim using vold from pool — no write-back to voltages[]
       const vbeLimited = pnjlim(vbeRaw, s0[base + L1_SLOT_VBE], nfVt, vcritBE);
       const vbcLimited = pnjlim(vbcRaw, s0[base + L1_SLOT_VBC], nrVt, vcritBC);
 
@@ -971,13 +978,15 @@ export function createSpiceL1BjtElement(
       // Collector-substrate voltage: Vc_ext referenced to substrate (ground = 0).
       const vcsNow = polarity * vCe;
 
-      const prevVbe = capFirstCall ? vbeNow : vbePrev;
-      const prevVbc = capFirstCall ? vbcNow : vbcPrev;
-      const prevVcs = capFirstCall ? vcsNow : vcsPrev;
-      vbePrev = vbeNow;
-      vbcPrev = vbcNow;
-      vcsPrev = vcsNow;
-      capFirstCall = false;
+      // Read history voltages and first-call flag from pool BEFORE writing new values.
+      const isFirstCall = s0[base + L1_SLOT_CAP_FIRST_CALL] !== 0;
+      const prevVbe = isFirstCall ? vbeNow : s0[base + L1_SLOT_VBE_PREV];
+      const prevVbc = isFirstCall ? vbcNow : s0[base + L1_SLOT_VBC_PREV];
+      const prevVcs = isFirstCall ? vcsNow : s0[base + L1_SLOT_VCS_PREV];
+      s0[base + L1_SLOT_VBE_PREV] = vbeNow;
+      s0[base + L1_SLOT_VBC_PREV] = vbcNow;
+      s0[base + L1_SLOT_VCS_PREV] = vcsNow;
+      s0[base + L1_SLOT_CAP_FIRST_CALL] = 0.0;
 
       // B-E junction: depletion + transit-time diffusion capacitance.
       // Transit time modulation: TF_eff = TF * (1 + XTF*(Ic/(Ic+ITF))^2 * exp(Vbc/(1.44*VTF)))
@@ -996,12 +1005,12 @@ export function createSpiceL1BjtElement(
       const CtotalBE = CjBE + CdBE;
 
       if (CtotalBE > 0) {
-        const iBE = capGeqBE * vbeNow + capIeqBE;
-        capGeqBE = capacitorConductance(CtotalBE, dt, method);
-        capIeqBE = capacitorHistoryCurrent(CtotalBE, dt, method, vbeNow, prevVbe, iBE);
+        const iBE = s0[base + L1_SLOT_CAP_GEQ_BE] * vbeNow + s0[base + L1_SLOT_CAP_IEQ_BE];
+        s0[base + L1_SLOT_CAP_GEQ_BE] = capacitorConductance(CtotalBE, dt, method);
+        s0[base + L1_SLOT_CAP_IEQ_BE] = capacitorHistoryCurrent(CtotalBE, dt, method, vbeNow, prevVbe, iBE);
       } else {
-        capGeqBE = 0;
-        capIeqBE = 0;
+        s0[base + L1_SLOT_CAP_GEQ_BE] = 0;
+        s0[base + L1_SLOT_CAP_IEQ_BE] = 0;
       }
 
       // B-C junction: depletion + reverse transit-time diffusion capacitance.
@@ -1015,36 +1024,36 @@ export function createSpiceL1BjtElement(
       const CtotalBC_ext = (1 - xcjc) * CtotalBC;
 
       if (CtotalBC_int > 0) {
-        const iBC_int = capGeqBC_int * vbcNow + capIeqBC_int;
-        capGeqBC_int = capacitorConductance(CtotalBC_int, dt, method);
-        capIeqBC_int = capacitorHistoryCurrent(CtotalBC_int, dt, method, vbcNow, prevVbc, iBC_int);
+        const iBC_int = s0[base + L1_SLOT_CAP_GEQ_BC_INT] * vbcNow + s0[base + L1_SLOT_CAP_IEQ_BC_INT];
+        s0[base + L1_SLOT_CAP_GEQ_BC_INT] = capacitorConductance(CtotalBC_int, dt, method);
+        s0[base + L1_SLOT_CAP_IEQ_BC_INT] = capacitorHistoryCurrent(CtotalBC_int, dt, method, vbcNow, prevVbc, iBC_int);
       } else {
-        capGeqBC_int = 0;
-        capIeqBC_int = 0;
+        s0[base + L1_SLOT_CAP_GEQ_BC_INT] = 0;
+        s0[base + L1_SLOT_CAP_IEQ_BC_INT] = 0;
       }
 
       if (CtotalBC_ext > 0) {
         // External B-C uses external node voltages for Vbc; prevVbc tracks the internal vbc
         // which is equivalent to external when XCJC < 1 (both driven by same junction).
         const vbcExt = polarity * (vBe - vCe);
-        const iBC_ext = capGeqBC_ext * vbcExt + capIeqBC_ext;
-        capGeqBC_ext = capacitorConductance(CtotalBC_ext, dt, method);
-        capIeqBC_ext = capacitorHistoryCurrent(CtotalBC_ext, dt, method, vbcExt, prevVbc, iBC_ext);
+        const iBC_ext = s0[base + L1_SLOT_CAP_GEQ_BC_EXT] * vbcExt + s0[base + L1_SLOT_CAP_IEQ_BC_EXT];
+        s0[base + L1_SLOT_CAP_GEQ_BC_EXT] = capacitorConductance(CtotalBC_ext, dt, method);
+        s0[base + L1_SLOT_CAP_IEQ_BC_EXT] = capacitorHistoryCurrent(CtotalBC_ext, dt, method, vbcExt, prevVbc, iBC_ext);
       } else {
-        capGeqBC_ext = 0;
-        capIeqBC_ext = 0;
+        s0[base + L1_SLOT_CAP_GEQ_BC_EXT] = 0;
+        s0[base + L1_SLOT_CAP_IEQ_BC_EXT] = 0;
       }
 
       // Collector-substrate capacitance (CJS): between external collector and ground.
       if (params.CJS > 0) {
         const CjCS = computeJunctionCapacitance(vcsNow, params.CJS, params.VJS, params.MJS, params.FC);
         if (CjCS > 0) {
-          const iCS = capGeqCS * vcsNow + capIeqCS;
-          capGeqCS = capacitorConductance(CjCS, dt, method);
-          capIeqCS = capacitorHistoryCurrent(CjCS, dt, method, vcsNow, prevVcs, iCS);
+          const iCS = s0[base + L1_SLOT_CAP_GEQ_CS] * vcsNow + s0[base + L1_SLOT_CAP_IEQ_CS];
+          s0[base + L1_SLOT_CAP_GEQ_CS] = capacitorConductance(CjCS, dt, method);
+          s0[base + L1_SLOT_CAP_IEQ_CS] = capacitorHistoryCurrent(CjCS, dt, method, vcsNow, prevVcs, iCS);
         } else {
-          capGeqCS = 0;
-          capIeqCS = 0;
+          s0[base + L1_SLOT_CAP_GEQ_CS] = 0;
+          s0[base + L1_SLOT_CAP_IEQ_CS] = 0;
         }
       }
     };

@@ -89,9 +89,44 @@ export class SparseSolver {
   private _scratch: Float64Array = new Float64Array(0);
 
   // -- Topology tracking --
+  /**
+   * When true, the next `finalize()` rebuilds CSC + AMD + symbolic LU from
+   * scratch. Flipped back to `false` at the end of a rebuild. Flipped back
+   * to `true` by `finalize()` whenever the COO stamp count changes — this
+   * catches legitimate pattern changes within a single solver lifetime:
+   *  - DC operating point with gmin-stepping stamps extra diagonals that
+   *    disappear once gmin reaches zero
+   *  - DC → transient transition (reactive companion models stamp differently)
+   *  - Retry paths that drop or add stamps
+   * True topology changes (new circuit) always arrive via a fresh
+   * `SparseSolver` instance from the engine's `init()`, so this flag never
+   * needs external invalidation in production.
+   */
   private _topologyDirty = true;
-  private _prevCscColPtr: Int32Array | null = null;
-  private _prevCscRowIdx: Int32Array | null = null;
+  /**
+   * COO triplet count at the last successful full rebuild. A mismatch at
+   * the top of `finalize()` forces `_topologyDirty = true`, ensuring the
+   * `_cooToCsc` mapping is never consumed by `_refillCSC()` with a stale
+   * stamp pattern. Initialized to -1 so the very first finalize always
+   * takes the slow path.
+   */
+  private _prevCooCount = -1;
+  /**
+   * Maps each COO triplet index `k` to its accumulated position in
+   * `_cscVals`. Populated during `_buildCSC()`; consumed by `_refillCSC()`
+   * to scatter-add new stamp values without rebuilding the CSC structure.
+   */
+  private _cooToCsc: Int32Array = new Int32Array(0);
+
+  // -- Scratch buffers for _buildCSC (hoisted, grown lazily) --
+  /** Per-column nonzero counts + prefix-summed column start offsets. */
+  private _bldColCount: Int32Array = new Int32Array(0);
+  /** Per-column write cursor during COO→bucket scatter. */
+  private _bldColPos: Int32Array = new Int32Array(0);
+  /** Pre-dedup row indices, bucketed by column. Size ≥ max COO count seen. */
+  private _bldBucketRows: Int32Array = new Int32Array(0);
+  /** Parallel to _bldBucketRows: original COO triplet index, used to record _cooToCsc. */
+  private _bldBucketCooIdx: Int32Array = new Int32Array(0);
 
   constructor() {
     this._cooRows = new Int32Array(INITIAL_TRIPLET_CAPACITY);
@@ -125,26 +160,56 @@ export class SparseSolver {
     this._rhs[row] += value;
   }
 
+  /**
+   * Convert accumulated COO triplets into CSC form.
+   *
+   * Fast path (steady state): sparsity pattern is assumed stable, so only
+   * `_cscVals` is refilled via a pre-built COO→CSC index map. Zero
+   * allocations. This is the common case for a fixed-topology transient
+   * simulation where every NR iteration stamps the same (row, col) positions
+   * with different numeric values.
+   *
+   * Slow path (first finalize only, or after `invalidateTopology()`): rebuild
+   * CSC + cooToCsc mapping, then recompute AMD and symbolic LU.
+   *
+   * The fast path trusts that callers have stamped at the same (row, col)
+   * positions as last time. Stamp-pattern changes in this codebase are
+   * compile-gated — topology changes go through the compiler, which produces
+   * a new compiled circuit and the engine constructs a fresh solver. Inside
+   * the solver's lifetime the pattern is invariant.
+   */
   finalize(): void {
-    this._buildCSC();
+    // Any change in the COO stamp count invalidates the cached CSC structure
+    // and the `_cooToCsc` index map that the refill fast path relies on.
+    // This covers:
+    //  - first call of a solver's lifetime (_prevCooCount === -1)
+    //  - DC op gmin-stepping adds diagonal stamps that disappear at gmin=0
+    //  - DC → transient transition changes which reactive companions stamp
+    //  - NR retry paths that add/drop stamps
+    if (this._cooCount !== this._prevCooCount) {
+      this._topologyDirty = true;
+    }
     if (this._topologyDirty) {
+      this._buildCSC();
       this._computeAMD();
       this._symbolicLU();
-      this._prevCscColPtr = this._cscColPtr.slice();
-      this._prevCscRowIdx = this._cscRowIdx.slice();
       this._topologyDirty = false;
+      this._prevCooCount = this._cooCount;
+    } else {
+      this._refillCSC();
     }
   }
 
   factor(): FactorResult {
     const result = this._numericLU();
     if (!result.success && result.singularRow === undefined) {
+      // Pivot threshold failure: force a full topology rebuild and retry.
       this._topologyDirty = true;
+      this._buildCSC();
       this._computeAMD();
       this._symbolicLU();
-      this._prevCscColPtr = this._cscColPtr.slice();
-      this._prevCscRowIdx = this._cscRowIdx.slice();
       this._topologyDirty = false;
+      this._prevCooCount = this._cooCount;
       return this._numericLU();
     }
     return result;
@@ -230,65 +295,136 @@ export class SparseSolver {
   // CSC conversion
   // =========================================================================
 
+  /**
+   * Full CSC build: bucket COO triplets by column, insertion-sort each
+   * bucket by row in place, dedup-sum duplicates, and record the
+   * COO-index → CSC-position mapping for the fast path.
+   *
+   * Uses hoisted scratch buffers; the only allocations are lazy growths of
+   * those buffers when nnz or matrix dimension exceeds their current capacity
+   * (one-time cost for a fresh solver). Called on first finalize, after
+   * `invalidateTopology()`, or on pivot-threshold failure during factor.
+   */
   private _buildCSC(): void {
     const n = this._n;
     const nnz = this._cooCount;
+    const cooRows = this._cooRows;
+    const cooCols = this._cooCols;
+    const cooVals = this._cooVals;
 
-    const colCount = new Int32Array(n + 1);
-    for (let k = 0; k < nnz; k++) colCount[this._cooCols[k] + 1]++;
-    for (let j = 0; j < n; j++) colCount[j + 1] += colCount[j];
-
-    const rowIdx = new Int32Array(nnz);
-    const vals = new Float64Array(nnz);
-    const pos = colCount.slice(0, n);
-    for (let k = 0; k < nnz; k++) {
-      const p = pos[this._cooCols[k]]++;
-      rowIdx[p] = this._cooRows[k];
-      vals[p] = this._cooVals[k];
+    // Grow scratch buffers if needed (one-time; reused on subsequent builds).
+    if (this._bldColCount.length < n + 1) {
+      this._bldColCount = new Int32Array(n + 1);
+      this._bldColPos = new Int32Array(n);
+    } else {
+      this._bldColCount.fill(0, 0, n + 1);
+    }
+    if (this._bldBucketRows.length < nnz) {
+      const cap = Math.max(nnz, this._bldBucketRows.length * 2);
+      this._bldBucketRows = new Int32Array(cap);
+      this._bldBucketCooIdx = new Int32Array(cap);
+    }
+    if (this._cooToCsc.length < nnz) {
+      this._cooToCsc = new Int32Array(Math.max(nnz, this._cooToCsc.length * 2));
+    }
+    if (this._cscColPtr.length < n + 1) {
+      this._cscColPtr = new Int32Array(n + 1);
+    }
+    // CSC output arrays — upper bound is nnz (before dedup); grow-only.
+    if (this._cscRowIdx.length < nnz) {
+      const cap = Math.max(nnz, this._cscRowIdx.length * 2);
+      this._cscRowIdx = new Int32Array(cap);
+      this._cscVals = new Float64Array(cap);
     }
 
-    const finalColPtr = new Int32Array(n + 1);
-    const tempRows: number[] = [];
-    const tempVals: number[] = [];
+    const colCount = this._bldColCount;
+    const colPos = this._bldColPos;
+    const bucketRows = this._bldBucketRows;
+    const bucketCooIdx = this._bldBucketCooIdx;
+    const cooToCsc = this._cooToCsc;
+    const cscColPtr = this._cscColPtr;
+    const cscRowIdx = this._cscRowIdx;
+    const cscVals = this._cscVals;
 
+    // Step 1: count nonzeros per column, then prefix-sum to column starts.
+    for (let k = 0; k < nnz; k++) colCount[cooCols[k] + 1]++;
+    for (let j = 0; j < n; j++) colCount[j + 1] += colCount[j];
+
+    // Step 2: scatter COO triplets into their column buckets (unsorted),
+    // carrying the original COO index so we can record cooToCsc later.
+    for (let j = 0; j < n; j++) colPos[j] = colCount[j];
+    for (let k = 0; k < nnz; k++) {
+      const c = cooCols[k];
+      const p = colPos[c]++;
+      bucketRows[p] = cooRows[k];
+      bucketCooIdx[p] = k;
+    }
+
+    // Step 3: per-column insertion sort by row (carrying cooIdx) + dedup sum.
+    // Insertion sort is fine here — MNA matrix columns have very few nonzeros
+    // (typically 2–6) so O(k²) per column is cheaper than comparator sort
+    // and allocates nothing.
+    let outPos = 0;
     for (let j = 0; j < n; j++) {
-      const start = colCount[j], end = colCount[j + 1];
-      const col: Array<[number, number]> = [];
-      for (let p = start; p < end; p++) col.push([rowIdx[p], vals[p]]);
-      col.sort((a, b) => a[0] - b[0]);
-
-      finalColPtr[j] = tempRows.length;
+      const start = colCount[j];
+      const end = colCount[j + 1];
+      // Insertion sort [start, end) by bucketRows, moving bucketCooIdx in lockstep.
+      for (let i = start + 1; i < end; i++) {
+        const r = bucketRows[i];
+        const idx = bucketCooIdx[i];
+        let h = i - 1;
+        while (h >= start && bucketRows[h] > r) {
+          bucketRows[h + 1] = bucketRows[h];
+          bucketCooIdx[h + 1] = bucketCooIdx[h];
+          h--;
+        }
+        bucketRows[h + 1] = r;
+        bucketCooIdx[h + 1] = idx;
+      }
+      // Dedup-sum: merge consecutive entries with equal row; record cooToCsc.
+      cscColPtr[j] = outPos;
       let prevRow = -1;
-      for (const [r, v] of col) {
+      for (let i = start; i < end; i++) {
+        const r = bucketRows[i];
+        const origK = bucketCooIdx[i];
         if (r === prevRow) {
-          tempVals[tempVals.length - 1] += v;
+          cscVals[outPos - 1] += cooVals[origK];
+          cooToCsc[origK] = outPos - 1;
         } else {
-          tempRows.push(r);
-          tempVals.push(v);
+          cscRowIdx[outPos] = r;
+          cscVals[outPos] = cooVals[origK];
+          cooToCsc[origK] = outPos;
+          outPos++;
           prevRow = r;
         }
       }
     }
-    finalColPtr[n] = tempRows.length;
-
-    this._cscColPtr = finalColPtr;
-    this._cscRowIdx = new Int32Array(tempRows);
-    this._cscVals = new Float64Array(tempVals);
-
-    if (!this._topologyDirty) this._topologyDirty = this._patternChanged();
+    cscColPtr[n] = outPos;
   }
 
-  private _patternChanged(): boolean {
-    if (!this._prevCscColPtr || !this._prevCscRowIdx) return true;
-    if (this._prevCscColPtr.length !== this._cscColPtr.length) return true;
-    for (let i = 0; i < this._cscColPtr.length; i++) {
-      if (this._prevCscColPtr[i] !== this._cscColPtr[i]) return true;
+  /**
+   * Fast path: refill `_cscVals` in place using the COO→CSC index map
+   * recorded by the last `_buildCSC()`. Structure (`_cscColPtr`,
+   * `_cscRowIdx`) is reused unchanged. Zero allocations.
+   */
+  private _refillCSC(): void {
+    const n = this._n;
+    const nnz = this._cooCount;
+    const cscNnz = this._cscColPtr[n];
+    const vals = this._cscVals;
+    const cooVals = this._cooVals;
+    const map = this._cooToCsc;
+
+    // Zero only the live portion of the CSC values array, not any trailing
+    // capacity left over from a previous larger matrix.
+    vals.fill(0, 0, cscNnz);
+
+    // Scatter-add COO values into their pre-computed CSC slots. Duplicate
+    // COO triplets at the same (row, col) naturally sum because multiple
+    // `k` values map to the same `map[k]`.
+    for (let k = 0; k < nnz; k++) {
+      vals[map[k]] += cooVals[k];
     }
-    if (this._prevCscRowIdx.length !== this._cscRowIdx.length) return true;
-    for (let i = 0; i < this._cscRowIdx.length; i++) {
-      if (this._prevCscRowIdx[i] !== this._cscRowIdx[i]) return true;
-    }
-    return false;
   }
 
   // =========================================================================

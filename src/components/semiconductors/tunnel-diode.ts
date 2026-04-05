@@ -219,7 +219,6 @@ export function createTunnelDiodeElement(
         vdNew = vdRaw;
       }
 
-      // Save limited voltage to pool — no write-back to voltages[]
       s0[base + SLOT_VD] = vdNew;
       recompute(vdNew);
     },

@@ -1014,10 +1014,10 @@ describe("StatePool — BJT simple write-back elimination", () => {
 });
 
 describe("StatePool — BJT SPICE L1 write-back elimination", () => {
-  it("stateSize_is_12", () => {
+  it("stateSize_is_24", () => {
     const propsObj = makeSpiceL1Props();
     const core = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, propsObj);
-    expect(core.stateSize).toBe(12);
+    expect(core.stateSize).toBe(24);
   });
 
   it("stateBaseOffset_minus_one_before_initState", () => {

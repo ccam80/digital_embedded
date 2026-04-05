@@ -130,7 +130,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     bridgeAdaptersByGroupId?: Map<number, Array<BridgeOutputAdapter | BridgeInputAdapter>>;
     diagnostics?: Diagnostic[];
     timeRef?: { value: number };
-    statePool?: StatePool;
+    statePool: StatePool;
   }) {
     this.nodeCount = params.nodeCount;
     this.branchCount = params.branchCount;
@@ -147,7 +147,7 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.bridgeAdaptersByGroupId = params.bridgeAdaptersByGroupId ?? new Map();
     this.diagnostics = params.diagnostics ?? [];
     this.timeRef = params.timeRef ?? { value: 0 };
-    this.statePool = params.statePool ?? new StatePool(0);
+    this.statePool = params.statePool;
   }
 
   // CompiledCircuit base interface

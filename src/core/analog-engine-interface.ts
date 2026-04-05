@@ -36,8 +36,20 @@ export interface SimulationParams {
   reltol: number;
   /** Absolute voltage tolerance in volts. Default: 1e-6 */
   abstol: number;
-  /** Charge tolerance for LTE control. Default: 1e-14 */
+  /**
+   * Absolute charge tolerance for LTE control, in coulombs. Acts as the
+   * floor term in the ngspice-style relative LTE tolerance formula
+   *   local_tol = trtol · (reltol · |Q_ref| + chargeTol)
+   * It only dominates when the element is carrying near-zero charge; for
+   * any realistic signal the relative term dominates. Default: 1e-14
+   */
   chargeTol: number;
+  /**
+   * Truncation-error multiplier (ngspice `trtol`). Multiplies the composite
+   * per-element LTE tolerance, giving the simulator a safety margin above
+   * the raw absolute+relative floor. ngspice default is 7.0 — same here.
+   */
+  trtol: number;
   /** Maximum Newton-Raphson iterations before declaring failure. Default: 100 */
   maxIterations: number;
   /** Integration method. Default: 'auto' */
@@ -55,6 +67,7 @@ export const DEFAULT_SIMULATION_PARAMS: SimulationParams = {
   reltol: 1e-3,
   abstol: 1e-6,
   chargeTol: 1e-14,
+  trtol: 7.0,
   maxIterations: 100,
   integrationMethod: "auto",
   gmin: 1e-12,

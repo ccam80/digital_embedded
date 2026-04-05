@@ -32,6 +32,7 @@ describe("AnalogEngineTypes", () => {
       reltol: 1e-3,
       abstol: 1e-6,
       chargeTol: 1e-14,
+      trtol: 7.0,
       maxIterations: 100,
       integrationMethod: "auto",
       gmin: 1e-12,

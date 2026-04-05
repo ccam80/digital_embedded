@@ -226,13 +226,13 @@ describe("Inductor", () => {
   });
 
   describe("statePool", () => {
-    it("stateSize is 3", () => {
+    it("stateSize is 4", () => {
       const props = new PropertyBag();
       props.setModelParam("inductance", 0.01);
       const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
         new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
       );
-      expect(core.stateSize).toBe(3);
+      expect(core.stateSize).toBe(4);
     });
 
     it("stateBaseOffset is -1 before compiler assigns it", () => {

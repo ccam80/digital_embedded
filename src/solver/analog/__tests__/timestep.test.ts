@@ -26,6 +26,7 @@ const DEFAULT_PARAMS: SimulationParams = {
   reltol: 1e-3,
   abstol: 1e-6,
   chargeTol: 1e-14,
+  trtol: 7.0,
   maxIterations: 100,
   integrationMethod: "auto",
   gmin: 1e-12,
@@ -34,7 +35,10 @@ const DEFAULT_PARAMS: SimulationParams = {
 /**
  * Create a minimal reactive element that returns a fixed LTE estimate.
  *
- * isReactive = true, getLteEstimate returns the given truncationError.
+ * isReactive = true, getLteEstimate returns the given truncationError with
+ * toleranceReference=0 so the ngspice composite `local_tol = trtol · (reltol ·
+ * |ref| + chargeTol)` collapses to the pure-absolute `trtol · chargeTol`
+ * form — this keeps the rejection/ratio math easy to reason about in tests.
  */
 function makeReactiveElement(truncationError: number): AnalogElement {
   return {
@@ -44,8 +48,8 @@ function makeReactiveElement(truncationError: number): AnalogElement {
     isNonlinear: false,
     isReactive: true,
     stamp(_solver: SparseSolver): void {},
-    getLteEstimate(_dt: number): { truncationError: number } {
-      return { truncationError };
+    getLteEstimate(_dt: number): { truncationError: number; toleranceReference: number } {
+      return { truncationError, toleranceReference: 0 };
     },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
@@ -67,7 +71,7 @@ describe("LTE", () => {
     const elements = [makeReactiveElement(bigError)];
     const history = new HistoryStore(1);
 
-    const newDt = ctrl.computeNewDt(elements, history, 0);
+    const { newDt } = ctrl.computeNewDt(elements, history, 0);
 
     expect(newDt).toBeLessThan(dt);
   });
@@ -80,13 +84,13 @@ describe("LTE", () => {
     ctrl.currentDt = 1e-6;
     const dt = ctrl.currentDt;
 
-    // LTE error much smaller than tolerance → r >> 1 → dt should grow
+    // LTE error much smaller than tolerance → worstRatio << 1 → dt should grow
     // But capped at 4× current dt.
     const tinyError = 1e-20;
     const elements = [makeReactiveElement(tinyError)];
     const history = new HistoryStore(1);
 
-    const newDt = ctrl.computeNewDt(elements, history, 0);
+    const { newDt } = ctrl.computeNewDt(elements, history, 0);
 
     // Should be larger than current dt, capped at 4× (4us < maxTimeStep=1ms)
     expect(newDt).toBeGreaterThan(dt);
@@ -107,36 +111,36 @@ describe("LTE", () => {
     const elements = [makeReactiveElement(hugeError)];
     const history = new HistoryStore(1);
 
-    const newDtSmall = ctrl.computeNewDt(elements, history, 0);
+    const { newDt: newDtSmall } = ctrl.computeNewDt(elements, history, 0);
     expect(newDtSmall).toBeGreaterThanOrEqual(params.minTimeStep);
 
     // Extremely small error — would push dt far above maxTimeStep
     const tinyError = 1e-30;
     const elements2 = [makeReactiveElement(tinyError)];
-    const newDtLarge = ctrl.computeNewDt(elements2, history, 0);
+    const { newDt: newDtLarge } = ctrl.computeNewDt(elements2, history, 0);
     expect(newDtLarge).toBeLessThanOrEqual(params.maxTimeStep);
   });
 
   it("safety_factor_0_9", () => {
     const chargeTol = 1e-14;
-    const params: SimulationParams = { ...DEFAULT_PARAMS, chargeTol };
+    const trtol = 7.0;
+    const params: SimulationParams = { ...DEFAULT_PARAMS, chargeTol, trtol };
     const ctrl = new TimestepController(params);
     const dt = ctrl.currentDt; // 5e-6
 
-    // Choose an error such that ratio^(1/3) * dt is well within [dt/4, 4*dt]
-    // and within [minTimeStep, maxTimeStep], so clamping doesn't interfere.
-    // ratio = chargeTol / error; choose error = chargeTol * 8 → ratio = 1/8
-    // ratio^(1/3) = 0.5; theoretical newDt = dt * 0.5 = 2.5e-6
-    // With safety factor 0.9: expected = 0.9 * dt * 0.5 = 2.25e-6
-    const error = chargeTol * 8;
+    // With toleranceReference=0 in the test element, the ngspice composite
+    // tolerance collapses to localTol = trtol · chargeTol. Choose an error
+    // such that ratio = error/localTol stays within the [dt/4, 4*dt] clamp.
+    // error = 8 · localTol  →  ratio = 8  →  scale = 0.9 · (1/8)^(1/3) = 0.45
+    // newDt ≈ 2.25e-6 (within bounds).
+    const localTol = trtol * chargeTol;
+    const error = localTol * 8;
     const elements = [makeReactiveElement(error)];
     const history = new HistoryStore(1);
 
-    const newDt = ctrl.computeNewDt(elements, history, 0);
+    const { newDt } = ctrl.computeNewDt(elements, history, 0);
 
-    const expected = 0.9 * dt * Math.pow(chargeTol / error, 1 / 3);
-    // expected = 0.9 * 5e-6 * 0.5 = 2.25e-6, which is within [dt/4=1.25e-6, 4*dt=20e-6]
-    // and within [minTimeStep, maxTimeStep]
+    const expected = 0.9 * dt * Math.pow(localTol / error, 1 / 3);
     expect(newDt).toBeCloseTo(expected, 12);
   });
 
@@ -162,18 +166,21 @@ describe("LTE", () => {
 // ---------------------------------------------------------------------------
 
 describe("Rejection", () => {
-  it("shouldReject_true_when_r_lt_1", () => {
+  it("shouldReject_true_when_worstRatio_gt_1", () => {
     const ctrl = new TimestepController(DEFAULT_PARAMS);
-    expect(ctrl.shouldReject(0.5)).toBe(true);
-    expect(ctrl.shouldReject(0.99)).toBe(true);
-    expect(ctrl.shouldReject(0)).toBe(true);
+    expect(ctrl.shouldReject(1.001)).toBe(true);
+    expect(ctrl.shouldReject(2.0)).toBe(true);
+    expect(ctrl.shouldReject(100)).toBe(true);
   });
 
-  it("shouldReject_false_when_r_ge_1", () => {
+  it("shouldReject_false_when_worstRatio_le_1", () => {
     const ctrl = new TimestepController(DEFAULT_PARAMS);
+    // worstRatio == 0: no reactive errors → accept
+    expect(ctrl.shouldReject(0)).toBe(false);
+    // worstRatio == 1: tolerance exactly met → accept
     expect(ctrl.shouldReject(1.0)).toBe(false);
-    expect(ctrl.shouldReject(2.0)).toBe(false);
-    expect(ctrl.shouldReject(100)).toBe(false);
+    // worstRatio slightly below 1 → accept
+    expect(ctrl.shouldReject(0.99)).toBe(false);
   });
 
   it("reject_halves_dt", () => {
@@ -340,7 +347,7 @@ describe("Breakpoints", () => {
     const history = new HistoryStore(1);
 
     const simTime = 95e-6;
-    const newDt = ctrl2.computeNewDt(elements, history, simTime);
+    const { newDt } = ctrl2.computeNewDt(elements, history, simTime);
 
     // Remaining to breakpoint = 100e-6 - 95e-6 = 5e-6; dt should be clamped to 5us
     expect(newDt).toBeCloseTo(5e-6, 12);
@@ -357,7 +364,7 @@ describe("Breakpoints", () => {
     const elements = [makeReactiveElement(0)];
     const history = new HistoryStore(1);
     ctrl.currentDt = 5e-6;
-    const newDt = ctrl.computeNewDt(elements, history, 100e-6);
+    const { newDt } = ctrl.computeNewDt(elements, history, 100e-6);
 
     // No breakpoint remaining → dt is unclamped (should equal currentDt = 5e-6, no scaling for zero error)
     expect(newDt).toBe(5e-6);
@@ -380,7 +387,7 @@ describe("Breakpoints", () => {
     // and no breakpoint clamping applies.
     const elements = [makeReactiveElement(0)];
     const history = new HistoryStore(1);
-    const newDt = ctrl.computeNewDt(elements, history, 0);
+    const { newDt } = ctrl.computeNewDt(elements, history, 0);
 
     // Should be unclamped (10us, within [minTimeStep, maxTimeStep])
     expect(newDt).toBe(10e-6);

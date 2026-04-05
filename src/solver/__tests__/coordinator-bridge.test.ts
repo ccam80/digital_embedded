@@ -11,6 +11,7 @@ import { DefaultSimulationCoordinator } from "../coordinator.js";
 import { makeBridgeOutputAdapter, makeBridgeInputAdapter } from "../analog/bridge-adapter.js";
 import type { BridgeOutputAdapter, BridgeInputAdapter } from "../analog/bridge-adapter.js";
 import { ConcreteCompiledAnalogCircuit } from "../analog/compiled-analog-circuit.js";
+import { StatePool } from "../analog/state-pool.js";
 import type { FlatComponentLayout } from "../digital/compiled-circuit.js";
 import type { CompiledCircuitUnified, BridgeAdapter } from "../../compile/types.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
@@ -159,6 +160,7 @@ function buildBridgeFixture(
     models: new Map(),
     elementToCircuitElement: new Map(),
     bridgeAdaptersByGroupId,
+    statePool: new StatePool(0),
   });
 
   const bridge: BridgeAdapter = {

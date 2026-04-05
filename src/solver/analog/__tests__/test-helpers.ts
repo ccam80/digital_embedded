@@ -28,7 +28,7 @@ import type { SparseSolver } from "../sparse-solver.js";
 import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../element.js";
 import { pnjlim } from "../newton-raphson.js";
 import { StatePool } from "../state-pool.js";
-import type { StatePoolRef } from "../../core/analog-types.js";
+import type { StatePoolRef } from "../../../core/analog-types.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
@@ -330,7 +330,6 @@ export function makeDiode(
       // Apply pnjlim to prevent exponential runaway
       const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
 
-      // Save limited voltage to pool — no write-back to voltages[]
       s0[base + SLOT_VD] = vdLimited;
 
       // Shockley equation and NR linearization at limited operating point
@@ -619,4 +618,46 @@ export function makeAcVoltageSource(
       return [I, -I];
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// allocateStatePool — mirror compiler state-pool allocation in test fixtures
+// ---------------------------------------------------------------------------
+
+/**
+ * Assign `stateBaseOffset` sequentially to every element with `stateSize > 0`,
+ * construct a `StatePool` sized to the total slot count, and invoke each
+ * element's `initState` hook so closure-captured `s0`/`base` are populated.
+ *
+ * Tests that build `ConcreteCompiledAnalogCircuit` directly (bypassing the
+ * real compiler) must call this before `engine.init()` — otherwise pool-backed
+ * elements arrive with `stateBaseOffset=-1` and the engine's allocation
+ * assertion throws. Tests that stamp into a solver without going through the
+ * engine must also call this so element closures have a valid pool reference
+ * to read/write.
+ *
+ * Mirrors the allocation loop in `src/compile/compiler.ts` that the real
+ * compiler runs when building a production `CompiledAnalogCircuit`.
+ */
+export function allocateStatePool(
+  elements: readonly { stateSize?: number; stateBaseOffset?: number; initState?: (pool: StatePool) => void }[],
+): StatePool {
+  let offset = 0;
+  for (const el of elements) {
+    const size = el.stateSize ?? 0;
+    const mutable = el as { stateSize?: number; stateBaseOffset: number };
+    if (size > 0) {
+      mutable.stateBaseOffset = offset;
+      offset += size;
+    } else {
+      mutable.stateBaseOffset = -1;
+    }
+  }
+  const pool = new StatePool(offset);
+  for (const el of elements) {
+    if ((el.stateSize ?? 0) > 0 && el.initState) {
+      el.initState(pool);
+    }
+  }
+  return pool;
 }

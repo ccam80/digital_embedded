@@ -333,6 +333,7 @@ import {
   makeCapacitor,
   makeDiode,
   makeInductor,
+  allocateStatePool,
 } from "./test-helpers.js";
 import { ConcreteCompiledAnalogCircuit } from "../compiled-analog-circuit.js";
 import { MNAEngine } from "../analog-engine.js";
@@ -386,6 +387,7 @@ describe("SparseSolver real MNA circuit", () => {
     elements.push(makeResistor(5, 45, 10000));
     elements.push(makeResistor(12, 38, 10000));
 
+    const statePool = allocateStatePool(elements);
     const compiled = new ConcreteCompiledAnalogCircuit({
       nodeCount,
       branchCount,
@@ -394,6 +396,7 @@ describe("SparseSolver real MNA circuit", () => {
       wireToNodeId: new Map(),
       models: new Map(),
       elementToCircuitElement: new Map(),
+      statePool,
     });
 
     const engine = new MNAEngine();
