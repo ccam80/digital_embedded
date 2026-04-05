@@ -42,7 +42,7 @@ export interface FetCapacitances {
 }
 
 // ---------------------------------------------------------------------------
-// Slot layout for state pool (stateSize: 12)
+// Slot layout for state pool (stateSize: 25)
 // ---------------------------------------------------------------------------
 
 const SLOT_VGS       = 0;
@@ -57,6 +57,21 @@ const SLOT_CAP_GEQ_GD = 8;
 const SLOT_CAP_IEQ_GD = 9;
 const SLOT_VGS_PREV  = 10;
 const SLOT_VGD_PREV  = 11;
+// Junction and gate-bulk cap state (slots 12–22)
+const SLOT_CAP_GEQ_DB            = 12;
+const SLOT_CAP_IEQ_DB            = 13;
+const SLOT_CAP_GEQ_SB            = 14;
+const SLOT_CAP_IEQ_SB            = 15;
+const SLOT_VDB_PREV              = 16;
+const SLOT_VSB_PREV              = 17;
+const SLOT_CAP_GEQ_GB            = 18;
+const SLOT_CAP_IEQ_GB            = 19;
+const SLOT_VGB_PREV              = 20;
+const SLOT_CAP_JUNCTION_FIRST_CALL = 21;  // 1.0 = true, 0.0 = false
+const SLOT_CAP_GB_FIRST_CALL     = 22;    // 1.0 = true, 0.0 = false
+// Body-effect operating-point state (slots 23–24) — MOSFET-specific, zero-init fine
+const SLOT_VSB                   = 23;
+const SLOT_GMBS                  = 24;
 
 // ---------------------------------------------------------------------------
 // AbstractFetElement
@@ -101,15 +116,28 @@ export abstract class AbstractFetElement implements AnalogElementCore {
   static readonly SLOT_CAP_IEQ_GD = SLOT_CAP_IEQ_GD;
   static readonly SLOT_VGS_PREV  = SLOT_VGS_PREV;
   static readonly SLOT_VGD_PREV  = SLOT_VGD_PREV;
+  static readonly SLOT_CAP_GEQ_DB            = SLOT_CAP_GEQ_DB;
+  static readonly SLOT_CAP_IEQ_DB            = SLOT_CAP_IEQ_DB;
+  static readonly SLOT_CAP_GEQ_SB            = SLOT_CAP_GEQ_SB;
+  static readonly SLOT_CAP_IEQ_SB            = SLOT_CAP_IEQ_SB;
+  static readonly SLOT_VDB_PREV              = SLOT_VDB_PREV;
+  static readonly SLOT_VSB_PREV              = SLOT_VSB_PREV;
+  static readonly SLOT_CAP_GEQ_GB            = SLOT_CAP_GEQ_GB;
+  static readonly SLOT_CAP_IEQ_GB            = SLOT_CAP_IEQ_GB;
+  static readonly SLOT_VGB_PREV              = SLOT_VGB_PREV;
+  static readonly SLOT_CAP_JUNCTION_FIRST_CALL = SLOT_CAP_JUNCTION_FIRST_CALL;
+  static readonly SLOT_CAP_GB_FIRST_CALL     = SLOT_CAP_GB_FIRST_CALL;
+  static readonly SLOT_VSB                   = SLOT_VSB;
+  static readonly SLOT_GMBS                  = SLOT_GMBS;
 
   // State pool backing array — bound in initState()
-  private _s0!: Float64Array;
+  protected _s0!: Float64Array;
 
   // Source-stepping scale factor — not stored in pool (not state)
   protected _sourceScale: number = 1.0;
 
   // State pool interface
-  readonly stateSize: number = 12;
+  readonly stateSize: number = 25;
   stateBaseOffset: number = -1;
 
   initState(pool: StatePoolRef): void {
@@ -128,6 +156,10 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     // NaN signals first stampCompanion call — use current voltage as warm start
     this._s0[this.stateBaseOffset + SLOT_VGS_PREV] = NaN;
     this._s0[this.stateBaseOffset + SLOT_VGD_PREV] = NaN;
+    // Slots 12–22: junction/gate-bulk cap state — Float64Array zero-inits most;
+    // first-call flags start as 1.0 (true) so stampCompanion warm-starts on first call.
+    this._s0[this.stateBaseOffset + SLOT_CAP_JUNCTION_FIRST_CALL] = 1.0;
+    this._s0[this.stateBaseOffset + SLOT_CAP_GB_FIRST_CALL]       = 1.0;
   }
 
   // Getters and setters backed by state pool

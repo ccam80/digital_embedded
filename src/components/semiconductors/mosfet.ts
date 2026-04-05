@@ -689,25 +689,6 @@ class MosfetAnalogElement extends AbstractFetElement {
   private readonly _p: ResolvedMosfetParams;
   private readonly _nodeB: number;
 
-  // Body-effect state
-  private _vsb: number = 0;
-  private _gmbs: number = 0;
-
-  // Junction capacitance companion model state (drain-bulk and source-bulk)
-  private _capGeqDB: number = 0;
-  private _capIeqDB: number = 0;
-  private _capGeqSB: number = 0;
-  private _capIeqSB: number = 0;
-  private _vdbPrev: number = NaN;
-  private _vsbCapPrev: number = NaN;
-  private _capJunctionFirstCall: boolean = true;
-
-  // Gate-bulk overlap capacitance companion model state
-  private _capGeqGB: number = 0;
-  private _capIeqGB: number = 0;
-  private _vgbPrev: number = NaN;
-  private _capGbFirstCall: boolean = true;
-
   private readonly _nodeDext: number;
   private readonly _nodeSext: number;
 
@@ -749,6 +730,12 @@ class MosfetAnalogElement extends AbstractFetElement {
   ): { vgs: number; vds: number; swapped: boolean } {
     return limitVoltages(vgsOld, vgsNew, _vdsOld, vdsNew, this._p.VTO);
   }
+
+  private get _vsb(): number { return this._s0[this.stateBaseOffset + AbstractFetElement.SLOT_VSB]; }
+  private set _vsb(v: number) { this._s0[this.stateBaseOffset + AbstractFetElement.SLOT_VSB] = v; }
+
+  private get _gmbs(): number { return this._s0[this.stateBaseOffset + AbstractFetElement.SLOT_GMBS]; }
+  private set _gmbs(v: number) { this._s0[this.stateBaseOffset + AbstractFetElement.SLOT_GMBS] = v; }
 
   computeIds(vgs: number, vds: number): number {
     const { ids } = computeIds(vgs, vds, this._vsb, this._p);
@@ -862,16 +849,21 @@ class MosfetAnalogElement extends AbstractFetElement {
       stampG(solver, this.sourceNode, this.sourceNode, gRS);
     }
 
+    const base = this.stateBaseOffset;
+    const s0 = this._s0;
+
     // Gate-bulk overlap capacitance (CGBO * L)
-    if (this._capGeqGB !== 0 || this._capIeqGB !== 0) {
+    const capGeqGB = s0[base + AbstractFetElement.SLOT_CAP_GEQ_GB];
+    const capIeqGB = s0[base + AbstractFetElement.SLOT_CAP_IEQ_GB];
+    if (capGeqGB !== 0 || capIeqGB !== 0) {
       const nodeG = this.gateNode;
       const nodeB = this._nodeB;
-      stampG(solver, nodeG, nodeG, this._capGeqGB);
-      stampG(solver, nodeG, nodeB, -this._capGeqGB);
-      stampG(solver, nodeB, nodeG, -this._capGeqGB);
-      stampG(solver, nodeB, nodeB, this._capGeqGB);
-      stampRHS(solver, nodeG, -this._capIeqGB);
-      stampRHS(solver, nodeB, this._capIeqGB);
+      stampG(solver, nodeG, nodeG, capGeqGB);
+      stampG(solver, nodeG, nodeB, -capGeqGB);
+      stampG(solver, nodeB, nodeG, -capGeqGB);
+      stampG(solver, nodeB, nodeB, capGeqGB);
+      stampRHS(solver, nodeG, -capIeqGB);
+      stampRHS(solver, nodeB, capIeqGB);
     }
 
     const nodeD = this.drainNode;
@@ -879,23 +871,27 @@ class MosfetAnalogElement extends AbstractFetElement {
     const nodeB = this._nodeB;
 
     // Drain-bulk junction capacitance
-    if (this._capGeqDB !== 0 || this._capIeqDB !== 0) {
-      stampG(solver, nodeD, nodeD, this._capGeqDB);
-      stampG(solver, nodeD, nodeB, -this._capGeqDB);
-      stampG(solver, nodeB, nodeD, -this._capGeqDB);
-      stampG(solver, nodeB, nodeB, this._capGeqDB);
-      stampRHS(solver, nodeD, -this._capIeqDB);
-      stampRHS(solver, nodeB, this._capIeqDB);
+    const capGeqDB = s0[base + AbstractFetElement.SLOT_CAP_GEQ_DB];
+    const capIeqDB = s0[base + AbstractFetElement.SLOT_CAP_IEQ_DB];
+    if (capGeqDB !== 0 || capIeqDB !== 0) {
+      stampG(solver, nodeD, nodeD, capGeqDB);
+      stampG(solver, nodeD, nodeB, -capGeqDB);
+      stampG(solver, nodeB, nodeD, -capGeqDB);
+      stampG(solver, nodeB, nodeB, capGeqDB);
+      stampRHS(solver, nodeD, -capIeqDB);
+      stampRHS(solver, nodeB, capIeqDB);
     }
 
     // Source-bulk junction capacitance
-    if (this._capGeqSB !== 0 || this._capIeqSB !== 0) {
-      stampG(solver, nodeS, nodeS, this._capGeqSB);
-      stampG(solver, nodeS, nodeB, -this._capGeqSB);
-      stampG(solver, nodeB, nodeS, -this._capGeqSB);
-      stampG(solver, nodeB, nodeB, this._capGeqSB);
-      stampRHS(solver, nodeS, -this._capIeqSB);
-      stampRHS(solver, nodeB, this._capIeqSB);
+    const capGeqSB = s0[base + AbstractFetElement.SLOT_CAP_GEQ_SB];
+    const capIeqSB = s0[base + AbstractFetElement.SLOT_CAP_IEQ_SB];
+    if (capGeqSB !== 0 || capIeqSB !== 0) {
+      stampG(solver, nodeS, nodeS, capGeqSB);
+      stampG(solver, nodeS, nodeB, -capGeqSB);
+      stampG(solver, nodeB, nodeS, -capGeqSB);
+      stampG(solver, nodeB, nodeB, capGeqSB);
+      stampRHS(solver, nodeS, -capIeqSB);
+      stampRHS(solver, nodeB, capIeqSB);
     }
   }
 
@@ -921,19 +917,25 @@ class MosfetAnalogElement extends AbstractFetElement {
     const vsbCap = vS - vBulkV;
     const vgb = vG - vBulkV;
 
-    const prevVdb = this._capJunctionFirstCall ? vdb : this._vdbPrev;
-    const prevVsb = this._capJunctionFirstCall ? vsbCap : this._vsbCapPrev;
-    const prevVgb = this._capGbFirstCall ? vgb : this._vgbPrev;
+    const base = this.stateBaseOffset;
+    const s0 = this._s0;
 
-    const iDB = this._capGeqDB * vdb + this._capIeqDB;
-    const iSB = this._capGeqSB * vsbCap + this._capIeqSB;
-    const iGB = this._capGeqGB * vgb + this._capIeqGB;
+    const junctionFirstCall = s0[base + AbstractFetElement.SLOT_CAP_JUNCTION_FIRST_CALL] !== 0;
+    const gbFirstCall       = s0[base + AbstractFetElement.SLOT_CAP_GB_FIRST_CALL] !== 0;
 
-    this._vdbPrev = vdb;
-    this._vsbCapPrev = vsbCap;
-    this._vgbPrev = vgb;
-    this._capJunctionFirstCall = false;
-    this._capGbFirstCall = false;
+    const prevVdb = junctionFirstCall ? vdb : s0[base + AbstractFetElement.SLOT_VDB_PREV];
+    const prevVsb = junctionFirstCall ? vsbCap : s0[base + AbstractFetElement.SLOT_VSB_PREV];
+    const prevVgb = gbFirstCall       ? vgb    : s0[base + AbstractFetElement.SLOT_VGB_PREV];
+
+    const iDB = s0[base + AbstractFetElement.SLOT_CAP_GEQ_DB] * vdb    + s0[base + AbstractFetElement.SLOT_CAP_IEQ_DB];
+    const iSB = s0[base + AbstractFetElement.SLOT_CAP_GEQ_SB] * vsbCap + s0[base + AbstractFetElement.SLOT_CAP_IEQ_SB];
+    const iGB = s0[base + AbstractFetElement.SLOT_CAP_GEQ_GB] * vgb    + s0[base + AbstractFetElement.SLOT_CAP_IEQ_GB];
+
+    s0[base + AbstractFetElement.SLOT_VDB_PREV] = vdb;
+    s0[base + AbstractFetElement.SLOT_VSB_PREV] = vsbCap;
+    s0[base + AbstractFetElement.SLOT_VGB_PREV] = vgb;
+    s0[base + AbstractFetElement.SLOT_CAP_JUNCTION_FIRST_CALL] = 0.0;
+    s0[base + AbstractFetElement.SLOT_CAP_GB_FIRST_CALL]       = 0.0;
 
     const caps = computeCapacitances(this._p);
     const pb = this._p.PB;
@@ -943,30 +945,30 @@ class MosfetAnalogElement extends AbstractFetElement {
     // Drain-bulk junction capacitance with FC linearization
     if (caps.cbd > 0) {
       const cbdEff = junctionCap(caps.cbd, vdb, pb, mj, fc);
-      this._capGeqDB = capacitorConductance(cbdEff, dt, method);
-      this._capIeqDB = capacitorHistoryCurrent(cbdEff, dt, method, vdb, prevVdb, iDB);
+      s0[base + AbstractFetElement.SLOT_CAP_GEQ_DB] = capacitorConductance(cbdEff, dt, method);
+      s0[base + AbstractFetElement.SLOT_CAP_IEQ_DB] = capacitorHistoryCurrent(cbdEff, dt, method, vdb, prevVdb, iDB);
     } else {
-      this._capGeqDB = 0;
-      this._capIeqDB = 0;
+      s0[base + AbstractFetElement.SLOT_CAP_GEQ_DB] = 0;
+      s0[base + AbstractFetElement.SLOT_CAP_IEQ_DB] = 0;
     }
 
     // Source-bulk junction capacitance with FC linearization
     if (caps.cbs > 0) {
       const cbsEff = junctionCap(caps.cbs, vsbCap, pb, mj, fc);
-      this._capGeqSB = capacitorConductance(cbsEff, dt, method);
-      this._capIeqSB = capacitorHistoryCurrent(cbsEff, dt, method, vsbCap, prevVsb, iSB);
+      s0[base + AbstractFetElement.SLOT_CAP_GEQ_SB] = capacitorConductance(cbsEff, dt, method);
+      s0[base + AbstractFetElement.SLOT_CAP_IEQ_SB] = capacitorHistoryCurrent(cbsEff, dt, method, vsbCap, prevVsb, iSB);
     } else {
-      this._capGeqSB = 0;
-      this._capIeqSB = 0;
+      s0[base + AbstractFetElement.SLOT_CAP_GEQ_SB] = 0;
+      s0[base + AbstractFetElement.SLOT_CAP_IEQ_SB] = 0;
     }
 
     // Gate-bulk overlap capacitance (CGBO * L), no voltage dependence
     if (caps.cgb > 0) {
-      this._capGeqGB = capacitorConductance(caps.cgb, dt, method);
-      this._capIeqGB = capacitorHistoryCurrent(caps.cgb, dt, method, vgb, prevVgb, iGB);
+      s0[base + AbstractFetElement.SLOT_CAP_GEQ_GB] = capacitorConductance(caps.cgb, dt, method);
+      s0[base + AbstractFetElement.SLOT_CAP_IEQ_GB] = capacitorHistoryCurrent(caps.cgb, dt, method, vgb, prevVgb, iGB);
     } else {
-      this._capGeqGB = 0;
-      this._capIeqGB = 0;
+      s0[base + AbstractFetElement.SLOT_CAP_GEQ_GB] = 0;
+      s0[base + AbstractFetElement.SLOT_CAP_IEQ_GB] = 0;
     }
   }
 

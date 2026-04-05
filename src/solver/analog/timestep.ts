@@ -5,7 +5,7 @@
  *  - Safety factor 0.9 applied to all computed dt predictions
  *  - Clamping to [dt/4, 4*dt] per step, then to [minTimeStep, maxTimeStep]
  *  - Breakpoint support for exact landing at registered simulation times
- *  - Timestep rejection with halving when LTE ratio r < 1
+ *  - Timestep rejection with halving when worstRatio > 1
  *  - Automatic integration method switching: BDF-1 → trapezoidal → BDF-2 (on
  *    ringing) → trapezoidal (after 5 stable BDF-2 steps)
  */
@@ -22,8 +22,8 @@ import type { HistoryStore } from "./integration.js";
  * Controls adaptive timestepping for the MNA transient solver.
  *
  * Call sequence per accepted timestep:
- *   1. computeNewDt(elements, history) → proposed next dt
- *   2. shouldReject(r) — r is tolerance / maxError from computeNewDt
+ *   1. computeNewDt(elements, history) → { newDt, worstRatio }
+ *   2. shouldReject(worstRatio) — rejects when worstRatio > 1
  *   3. If rejected: reject() → halved dt, retry
  *   4. If accepted: accept(simTime), checkMethodSwitch(elements, history)
  */
@@ -94,39 +94,52 @@ export class TimestepController {
    * @param elements  - All circuit elements (non-reactive ones are skipped)
    * @param history   - HistoryStore (unused here; present for caller symmetry)
    * @param simTime   - Current simulation time in seconds (for breakpoint clamping)
-   * @returns Proposed next dt in seconds
+   * @param stepDt    - The actual dt used for this step (defaults to `currentDt`).
+   *   Pass this when the step dt may differ from `currentDt` (e.g. breakpoint clamping).
+   * @returns Object with `newDt` (proposed next dt in seconds) and `worstRatio`
+   *   (largest per-element LTE/tolerance ratio; 0 means no reactive errors reported).
+   *   Pass `worstRatio` to `shouldReject` to decide whether to accept the step.
    */
   computeNewDt(
     elements: readonly AnalogElement[],
     _history: HistoryStore,
     simTime: number = 0,
-  ): number {
-    const dt = this.currentDt;
-    const tol = this._params.chargeTol;
+    stepDt?: number,
+  ): { newDt: number; worstRatio: number } {
+    const dt = stepDt ?? this.currentDt;
+    const reltol = this._params.reltol;
+    const chgtol = this._params.chargeTol;
+    const trtol = this._params.trtol;
 
-    let maxError = 0;
-    let maxErrorIdx = -1;
-
+    // Worst per-element (LTE / local_tolerance) ratio using the ngspice
+    // composite tolerance: local_tol = trtol · (reltol · |ref| + chargeTol).
+    let worstRatio = 0;
+    let worstRatioIdx = -1;
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i];
       if (!el.isReactive || typeof el.getLteEstimate !== "function") continue;
-      const { truncationError } = el.getLteEstimate(dt);
-      if (truncationError > maxError) {
-        maxError = truncationError;
-        maxErrorIdx = i;
+      const { truncationError, toleranceReference } = el.getLteEstimate(dt);
+      if (!(truncationError > 0)) continue;
+      const localTol = trtol * (reltol * Math.abs(toleranceReference) + chgtol);
+      if (!(localTol > 0)) continue;
+      const ratio = truncationError / localTol;
+      if (ratio > worstRatio) {
+        worstRatio = ratio;
+        worstRatioIdx = i;
       }
     }
 
-    this._largestErrorElement = maxErrorIdx >= 0 ? maxErrorIdx : undefined;
+    this._largestErrorElement = worstRatioIdx >= 0 ? worstRatioIdx : undefined;
 
     let newDt: number;
-    if (maxError <= 0) {
-      // No reactive elements or all errors are zero — hold current dt.
+    if (worstRatio <= 0) {
+      // No reactive elements reported a non-zero error — hold current dt.
       newDt = dt;
     } else {
-      // LTE control formula with 0.9 safety factor.
-      const ratio = tol / maxError;
-      const scale = 0.9 * Math.pow(ratio, 1 / 3);
+      // Classical adaptive-step formula for a p=2 method (trapezoidal):
+      //   newDt = 0.9 · dt · (1/ratio)^(1/(p+1)) = 0.9 · dt / ratio^(1/3)
+      // The 0.9 safety factor keeps us slightly below the ideal step.
+      const scale = 0.9 * Math.pow(1 / worstRatio, 1 / 3);
       newDt = dt * scale;
 
       // Clamp step change to [1/4, 4] of current dt.
@@ -145,7 +158,7 @@ export class TimestepController {
       }
     }
 
-    return newDt;
+    return { newDt, worstRatio };
   }
 
   /**
@@ -169,13 +182,18 @@ export class TimestepController {
   // -------------------------------------------------------------------------
 
   /**
-   * Returns true when the LTE ratio `r = tolerance / maxError` is less than 1,
-   * meaning the current step must be rejected.
+   * Returns true when the LTE ratio `worstRatio = maxError / tolerance` is
+   * greater than 1, meaning the current step must be rejected.
    *
-   * @param r - LTE ratio (tolerance / error)
+   * Semantics:
+   *   - worstRatio == 0 → accept (no reactive errors reported)
+   *   - worstRatio == 1 → accept (tolerance exactly met)
+   *   - worstRatio > 1  → reject (tolerance exceeded)
+   *
+   * @param worstRatio - Largest per-element LTE/tolerance ratio from computeNewDt
    */
-  shouldReject(r: number): boolean {
-    return r < 1;
+  shouldReject(worstRatio: number): boolean {
+    return worstRatio > 1;
   }
 
   /**
@@ -289,18 +307,33 @@ export class TimestepController {
 
   /**
    * Register a simulation time at which the timestep controller must land a
-   * step exactly. Inserted into the sorted breakpoint list.
+   * step exactly. Inserted into the sorted breakpoint list. Duplicate
+   * registrations within half a minTimeStep of an existing breakpoint are
+   * silently dropped so that callers which re-query the same lookahead
+   * window on every step() do not unboundedly grow the list.
    *
    * @param time - Breakpoint time in seconds
    */
   addBreakpoint(time: number): void {
-    // Insert in sorted order.
+    // Binary-search insertion point.
     let lo = 0;
     let hi = this._breakpoints.length;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;
       if (this._breakpoints[mid] < time) lo = mid + 1;
       else hi = mid;
+    }
+    // Dedup: if an existing entry at lo or lo-1 is within eps of `time`,
+    // treat as already registered. eps = 0.5 * minTimeStep collapses re-adds
+    // from overlapping lookahead windows without merging genuinely distinct
+    // breakpoints (which cannot be closer than minTimeStep without the
+    // solver being unable to separate them anyway).
+    const eps = 0.5 * this._params.minTimeStep;
+    if (lo < this._breakpoints.length && this._breakpoints[lo] - time < eps) {
+      return;
+    }
+    if (lo > 0 && time - this._breakpoints[lo - 1] < eps) {
+      return;
     }
     this._breakpoints.splice(lo, 0, time);
   }

@@ -72,7 +72,7 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
  * and call initState. Returns the element (mutated in place) for chaining.
  */
 function withState<T extends AnalogElementCore>(element: T): T {
-  const size = element.stateSize ?? 0;
+  const size = element.stateSize;
   if (size > 0 && element.initState) {
     element.stateBaseOffset = 0;
     const pool = new StatePool(size);
@@ -377,10 +377,10 @@ describe("AbstractFetElement", () => {
 // ---------------------------------------------------------------------------
 
 describe("StatePool migration", () => {
-  it("stateSize_is_12", () => {
+  it("stateSize_is_25", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
     const element = createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj);
-    expect(element.stateSize).toBe(12);
+    expect(element.stateSize).toBe(25);
   });
 
   it("stateBaseOffset_defaults_to_minus1_before_initState", () => {
@@ -393,7 +393,7 @@ describe("StatePool migration", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
     const element = createMosfetElement(1, new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
     element.stateBaseOffset = 0;
-    const pool = new StatePool(12);
+    const pool = new StatePool(element.stateSize);
     element.initState!(pool);
 
     // Initial _gm and _gds should be 1e-12 (device-off values)
@@ -414,7 +414,7 @@ describe("StatePool migration", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
     const element = createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj);
     element.stateBaseOffset = 0;
-    const pool = new StatePool(12);
+    const pool = new StatePool(element.stateSize);
     element.initState!(pool);
 
     // Drive to saturation: Vgs=3, Vds=5
@@ -455,7 +455,7 @@ describe("StatePool migration", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
     const element = createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj);
     element.stateBaseOffset = 0;
-    const pool = new StatePool(12);
+    const pool = new StatePool(element.stateSize);
     element.initState!(pool);
 
     // Drive with reversed Vds (Vgs=3, Vds<0 → swap condition)
@@ -476,7 +476,7 @@ describe("StatePool migration", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
     const element = withState(createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj));
 
-    const pool = new StatePool(12);
+    const pool = new StatePool(element.stateSize);
     element.stateBaseOffset = 0;
     element.initState!(pool);
 
@@ -488,8 +488,7 @@ describe("StatePool migration", () => {
       voltages[1] = 3.0;
     }
 
-    // Checkpoint the state
-    const cp = pool.checkpoint(0);
+    const cp = new Float64Array(pool.state0);
 
     // Mutate state with different voltages
     const voltages2 = new Float64Array([1.0, 0.5]);
@@ -501,13 +500,13 @@ describe("StatePool migration", () => {
 
     const vgsAfterMutation = pool.state0[AbstractFetElement.SLOT_VGS];
 
-    // Rollback
-    pool.rollback(cp);
+    // Rollback by copying the saved buffer back into state0.
+    pool.state0.set(cp);
 
     const vgsAfterRollback = pool.state0[AbstractFetElement.SLOT_VGS];
 
     // After rollback, state0 should be restored to checkpoint values
     expect(vgsAfterRollback).not.toBe(vgsAfterMutation);
-    expect(vgsAfterRollback).toBe(cp.state0[AbstractFetElement.SLOT_VGS]);
+    expect(vgsAfterRollback).toBe(cp[AbstractFetElement.SLOT_VGS]);
   });
 });
