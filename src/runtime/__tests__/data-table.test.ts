@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import { DataTablePanel } from "../data-table.js";
 import type { SignalDescriptor } from "../data-table.js";
 import type { SignalAddress, SignalValue } from "@/compile/types";
+import { PinDirection } from "@/core/pin";
 import type { SimulationCoordinator } from "@/solver/coordinator-types";
 import type { MeasurementObserver } from "@/core/engine-interface";
 
@@ -57,9 +58,9 @@ class MockCoordinator implements Pick<SimulationCoordinator, 'readSignal' | 'add
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const DIGITAL_ADDR_0: SignalAddress = { domain: 'digital', netId: 0, bitWidth: 1 };
-const DIGITAL_ADDR_1: SignalAddress = { domain: 'digital', netId: 1, bitWidth: 1 };
-const DIGITAL_ADDR_2: SignalAddress = { domain: 'digital', netId: 2, bitWidth: 1 };
+const DIGITAL_ADDR_0: SignalAddress = { domain: 'digital', netId: 0, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL };
+const DIGITAL_ADDR_1: SignalAddress = { domain: 'digital', netId: 1, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL };
+const DIGITAL_ADDR_2: SignalAddress = { domain: 'digital', netId: 2, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL };
 
 const THREE_SIGNALS: SignalDescriptor[] = [
   { name: "A", addr: DIGITAL_ADDR_0, width: 1, group: "input" },
@@ -137,9 +138,9 @@ describe("DataTablePanel", () => {
       const coordinator = new MockCoordinator();
 
       const signals: SignalDescriptor[] = [
-        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8 }, width: 8, group: "output" },
+        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
       coordinator.setDigitalSignal(0, 7);
@@ -194,9 +195,9 @@ describe("DataTablePanel", () => {
       const coordinator = new MockCoordinator();
 
       const signals: SignalDescriptor[] = [
-        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8 }, width: 8, group: "output" },
+        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
       coordinator.setDigitalSignal(0, 5);
@@ -227,9 +228,9 @@ describe("DataTablePanel", () => {
       const coordinator = new MockCoordinator();
 
       const signals: SignalDescriptor[] = [
-        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8 }, width: 8, group: "output" },
+        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
       coordinator.setDigitalSignal(0, 255);
@@ -255,9 +256,9 @@ describe("DataTablePanel", () => {
       const coordinator = new MockCoordinator();
 
       const signals: SignalDescriptor[] = [
-        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8 }, width: 8, group: "output" },
+        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
       coordinator.setDigitalSignal(0, 10);
@@ -277,9 +278,9 @@ describe("DataTablePanel", () => {
       const coordinator = new MockCoordinator();
 
       const signals: SignalDescriptor[] = [
-        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8 }, width: 8, group: "output" },
+        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
       coordinator.setDigitalSignal(0, 16);
@@ -303,9 +304,9 @@ describe("DataTablePanel", () => {
       const coordinator = new MockCoordinator();
 
       const signals: SignalDescriptor[] = [
-        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8 }, width: 8, group: "output" },
+        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
       coordinator.setDigitalSignal(0, 255);
@@ -342,9 +343,9 @@ describe("DataTablePanel", () => {
       const coordinator = new MockCoordinator();
 
       const signals: SignalDescriptor[] = [
-        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8 }, width: 8, group: "output" },
+        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
       coordinator.setDigitalSignal(0, 42);
@@ -374,9 +375,9 @@ describe("DataTablePanel", () => {
       const coordinator = new MockCoordinator();
 
       const signals: SignalDescriptor[] = [
-        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8 }, width: 8, group: "output" },
+        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
       coordinator.setDigitalSignal(0, 5);
@@ -407,9 +408,9 @@ describe("DataTablePanel", () => {
       const coordinator = new MockCoordinator();
 
       const signals: SignalDescriptor[] = [
-        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8 }, width: 8, group: "input" },
-        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8 }, width: 8, group: "output" },
+        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "input" },
+        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 8, direction: PinDirection.BIDIRECTIONAL }, width: 8, group: "output" },
       ];
 
       coordinator.setDigitalSignal(0, 99);
@@ -435,10 +436,10 @@ describe("DataTablePanel", () => {
   describe("sorting and grouping", () => {
     it("groups signals by input, output, probe in default order", () => {
       const signals: SignalDescriptor[] = [
-        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 1 }, width: 1, group: "output" },
-        { name: "P", addr: { domain: 'digital', netId: 3, bitWidth: 1 }, width: 1, group: "probe" },
-        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 1 }, width: 1, group: "input" },
-        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 1 }, width: 1, group: "input" },
+        { name: "Y", addr: { domain: 'digital', netId: 2, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL }, width: 1, group: "output" },
+        { name: "P", addr: { domain: 'digital', netId: 3, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL }, width: 1, group: "probe" },
+        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL }, width: 1, group: "input" },
+        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL }, width: 1, group: "input" },
       ];
 
       const container = makeContainer();
@@ -477,9 +478,9 @@ describe("DataTablePanel", () => {
 
     it("setSortByName sorts alphabetically", () => {
       const signals: SignalDescriptor[] = [
-        { name: "C", addr: { domain: 'digital', netId: 2, bitWidth: 1 }, width: 1, group: "output" },
-        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 1 }, width: 1, group: "input" },
-        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 1 }, width: 1, group: "probe" },
+        { name: "C", addr: { domain: 'digital', netId: 2, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL }, width: 1, group: "output" },
+        { name: "A", addr: { domain: 'digital', netId: 0, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL }, width: 1, group: "input" },
+        { name: "B", addr: { domain: 'digital', netId: 1, bitWidth: 1, direction: PinDirection.BIDIRECTIONAL }, width: 1, group: "probe" },
       ];
 
       const container = makeContainer();

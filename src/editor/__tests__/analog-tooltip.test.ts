@@ -66,10 +66,11 @@ class TestCoordinator extends MockCoordinator {
     this._elementPowers.set(elementIndex, power);
   }
 
-  override get compiled(): { wireSignalMap: ReadonlyMap<Wire, SignalAddress>; labelSignalMap: ReadonlyMap<string, SignalAddress>; diagnostics: readonly import("@/compile/types").Diagnostic[] } {
+  override get compiled(): { wireSignalMap: ReadonlyMap<Wire, SignalAddress>; labelSignalMap: ReadonlyMap<string, SignalAddress>; labelToCircuitElement: ReadonlyMap<string, CircuitElement>; diagnostics: readonly import("@/compile/types").Diagnostic[] } {
     return {
       wireSignalMap: this._wireSignalMap,
       labelSignalMap: this._labelSignalMap,
+      labelToCircuitElement: new Map(),
       diagnostics: [],
     };
   }

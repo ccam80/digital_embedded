@@ -25,7 +25,8 @@
  */
 
 import type { SparseSolver } from "../sparse-solver.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../element.js";
+import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from "../element.js";
+import { isPoolBacked } from "../element.js";
 import { pnjlim } from "../newton-raphson.js";
 import { StatePool } from "../state-pool.js";
 import type { StatePoolRef } from "../../../core/analog-types.js";
@@ -288,7 +289,7 @@ export function makeDiode(
   nodeCathode: number,
   is: number,
   n: number,
-): AnalogElementCore {
+): ReactiveAnalogElement {
   const nVt = n * VT;
   const vcrit = nVt * Math.log(nVt / (is * Math.SQRT2));
 
@@ -302,6 +303,7 @@ export function makeDiode(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
+    poolBacked: true as const,
     stateSize: 4,
     stateBaseOffset: -1,
     stateSchema: DIODE_SCHEMA,
@@ -357,7 +359,7 @@ export function makeDiode(
       s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array): boolean {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, _reltol: number, _abstol: number): boolean {
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
@@ -654,23 +656,19 @@ export function makeAcVoltageSource(
  * compiler runs when building a production `CompiledAnalogCircuit`.
  */
 export function allocateStatePool(
-  elements: readonly { stateSize?: number; stateBaseOffset?: number; initState?: (pool: StatePool) => void }[],
+  elements: readonly (AnalogElement | AnalogElementCore)[],
 ): StatePool {
   let offset = 0;
   for (const el of elements) {
-    const size = el.stateSize ?? 0;
-    const mutable = el as { stateSize?: number; stateBaseOffset: number };
-    if (size > 0) {
-      mutable.stateBaseOffset = offset;
-      offset += size;
-    } else {
-      mutable.stateBaseOffset = -1;
+    if (isPoolBacked(el)) {
+      el.stateBaseOffset = offset;
+      offset += el.stateSize;
     }
   }
   const pool = new StatePool(offset);
   for (const el of elements) {
-    if ((el.stateSize ?? 0) > 0 && el.initState) {
-      el.initState(pool);
+    if (isPoolBacked(el)) {
+      (el as ReactiveAnalogElement).initState(pool);
     }
   }
   return pool;

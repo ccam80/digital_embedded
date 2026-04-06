@@ -23,6 +23,7 @@ import { pinWorldPosition } from "../../core/pin.js";
 import type { ResolvedPin } from "../../core/pin.js";
 import { PropertyBag } from "../../core/properties.js";
 import { makeDiagnostic } from "./diagnostics.js";
+import { paramDefDefaults } from "../../core/model-params.js";
 import type { MnaSubcircuitNetlist } from "../../core/mna-subcircuit-netlist.js";
 import {
   ConcreteCompiledAnalogCircuit,
@@ -37,6 +38,7 @@ import type { LogicFamilyConfig } from "../../core/logic-family.js";
 import type { SolverPartition, PartitionedComponent, DigitalCompilerFn, ComponentDefinition, MnaModel } from "../../compile/types.js";
 import type { ModelEntry } from "../../core/registry.js";
 import { StatePool } from "./state-pool.js";
+import { isPoolBacked } from "./element.js";
 
 // ---------------------------------------------------------------------------
 // Component routing — shared decision logic for Pass A and Pass B
@@ -658,8 +660,8 @@ function runPassA_partition(
         const props = el.getProperties();
         // Populate model params early so getInternalNodeCount can read them
         // (e.g. SPICE L1 BJT needs RB/RC/RE to determine internal node count)
-        if (route.entry?.params) {
-          const merged: Record<string, number> = { ...route.entry.params };
+        if (route.entry) {
+          const merged: Record<string, number> = { ...paramDefDefaults(route.entry.paramDefs), ...route.entry.params };
           for (const k of props.getModelParamKeys()) {
             merged[k] = props.getModelParam<number>(k);
           }
@@ -1181,7 +1183,16 @@ export function compileAnalogPartition(
     // Merge order (lowest wins): model entry defaults → element _mparams.
     const modelEntry = route.entry;
     if (modelEntry) {
-      const merged: Record<string, number> = { ...modelEntry.params };
+      const schemaKeys = new Set(modelEntry.paramDefs.map(d => d.key));
+      for (const k of Object.keys(modelEntry.params)) {
+        if (!schemaKeys.has(k)) {
+          diagnostics.push(makeDiagnostic(
+            'model-param-ignored', 'warning',
+            `Model param "${k}" on ${pc.definition.name} is not in the schema and will be ignored`,
+          ));
+        }
+      }
+      const merged: Record<string, number> = { ...paramDefDefaults(modelEntry.paramDefs), ...modelEntry.params };
       for (const k of props.getModelParamKeys()) {
         merged[k] = props.getModelParam<number>(k);
       }
@@ -1319,17 +1330,16 @@ export function compileAnalogPartition(
   // State pool allocation — assign offsets and initialise pool slots.
   let stateOffset = 0;
   for (const element of analogElements) {
-    const size = element.stateSize ?? 0;
-    if (size > 0) {
+    if (isPoolBacked(element)) {
       element.stateBaseOffset = stateOffset;
-      stateOffset += size;
-    } else {
-      element.stateBaseOffset = -1;
+      stateOffset += element.stateSize;
     }
   }
   const statePool = new StatePool(stateOffset);
   for (const element of analogElements) {
-    if (element.initState) element.initState(statePool);
+    if (isPoolBacked(element)) {
+      element.initState(statePool);
+    }
   }
 
   // Build and return ConcreteCompiledAnalogCircuit

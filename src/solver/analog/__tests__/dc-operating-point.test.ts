@@ -94,6 +94,7 @@ describe("DcOP", () => {
       matrixSize,
       params: DEFAULT_PARAMS,
       diagnostics,
+      nodeCount: 2,
     });
 
     expect(result.converged).toBe(true);
@@ -127,6 +128,7 @@ describe("DcOP", () => {
       matrixSize,
       params: DEFAULT_PARAMS,
       diagnostics,
+      nodeCount: 2,
     });
 
     expect(result.converged).toBe(true);
@@ -156,6 +158,7 @@ describe("DcOP", () => {
       matrixSize,
       params: DEFAULT_PARAMS,
       diagnostics,
+      nodeCount: 1,
     });
 
     expect(result.converged).toBe(true);
@@ -196,6 +199,7 @@ describe("DcOP", () => {
       matrixSize,
       params,
       diagnostics,
+      nodeCount: 2,
     });
 
     expect(result.converged).toBe(true);
@@ -242,6 +246,7 @@ describe("DcOP", () => {
       matrixSize,
       params,
       diagnostics,
+      nodeCount: 2,
     });
 
     const diags = diagnostics.getDiagnostics();
@@ -291,6 +296,7 @@ describe("DcOP", () => {
       matrixSize,
       params,
       diagnostics,
+      nodeCount: 2,
     });
 
     expect(result.converged).toBe(false);

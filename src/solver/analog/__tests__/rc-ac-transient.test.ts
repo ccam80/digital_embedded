@@ -23,6 +23,7 @@
 import { describe, it, expect } from "vitest";
 import { MNAEngine } from "../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../analog-engine.js";
+import { StatePool } from "../state-pool.js";
 import {
   makeResistor,
   makeCapacitor,
@@ -66,6 +67,7 @@ function makeAcRcCircuit(timeRef: { value: number }): ConcreteCompiledAnalogCirc
     matrixSize: 3,
     elements: [vs, r, cap],
     labelToNodeId: new Map([["Vout", 2]]),
+    statePool: new StatePool(0),
     timeRef,
   };
 }
@@ -258,6 +260,7 @@ describe("RC lowpass AC transient — hand-built", () => {
       matrixSize: 3,
       elements: [vs, r, cap],
       labelToNodeId: new Map(),
+      statePool: new StatePool(0),
       timeRef,
     };
 

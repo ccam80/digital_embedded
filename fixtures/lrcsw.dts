@@ -1,9 +1,0 @@
-{
-  "circuit": {
-    "elements": [],
-    "name": "lrcsw",
-    "wires": []
-  },
-  "format": "dts",
-  "version": 1
-}

@@ -51,6 +51,11 @@ import {
   AbstractFetElement,
   SLOT_VSB,
   SLOT_GMBS,
+  SLOT_GBD,
+  SLOT_GBS,
+  SLOT_CBD_I,
+  SLOT_CBS_I,
+  SLOT_VBD,
   SLOT_CAP_GEQ_GB,
   SLOT_CAP_IEQ_GB,
   SLOT_CAP_GEQ_DB,
@@ -64,7 +69,7 @@ import {
   SLOT_VGB_PREV,
 } from "../../solver/analog/fet-base.js";
 import type { FetCapacitances } from "../../solver/analog/fet-base.js";
-import { defineModelParams } from "../../core/model-params.js";
+import { defineModelParams, deviceParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -221,49 +226,49 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
 // ---------------------------------------------------------------------------
 
 /** Small signal NMOS (TO-92, 60V/200mA). Source: ON Semi 2N7000.REV0.LIB (Symmetry MODPEX 2004-03-31). */
-const NMOS_2N7000: Record<string, number> = {
+const NMOS_2N7000 = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   VTO: 2.236, KP: 0.0932174, LAMBDA: 0, W: 1e-6, L: 1e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1.0724e-11, CGSO: 1.79115e-7,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
-};
+});
 
 /** Small signal NMOS (TO-92, 60V/500mA). Source: Zetex BS170/ZTX model (rev 12/85). */
-const NMOS_BS170: Record<string, number> = {
+const NMOS_BS170 = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   VTO: 1.824, KP: 0.1233, LAMBDA: 0, W: 1e-6, L: 1e-6,
   PHI: 0.6, GAMMA: 0, CBD: 35e-12, CBS: 0, CGDO: 3e-12, CGSO: 28e-12,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
-};
+});
 
 /** Medium power NMOS (TO-220, 100V/17A). Source: IR irf530n_IR (Symmetry MODPEX 1996-04-24). */
-const NMOS_IRF530N: Record<string, number> = {
+const NMOS_IRF530N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   VTO: 3.63019, KP: 17.6091, LAMBDA: 0.00363922, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 2.4372e-7, CGSO: 5.59846e-6,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
-};
+});
 
 /** High power NMOS (TO-220, 100V/33A). Source: IR irf540n_IR (Symmetry MODPEX 1996-04-24). */
-const NMOS_IRF540N: Record<string, number> = {
+const NMOS_IRF540N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   VTO: 3.55958, KP: 28.379, LAMBDA: 0.000888191, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1.77276e-8, CGSO: 1.23576e-5,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
-};
+});
 
 /** High power NMOS (TO-220, 55V/49A). Source: IR irfz44n_IR (Symmetry MODPEX 1996-04-24). */
-const NMOS_IRFZ44N: Record<string, number> = {
+const NMOS_IRFZ44N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   VTO: 3.56214, KP: 39.3974, LAMBDA: 0, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 2.2826e-7, CGSO: 1.25255e-5,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
-};
+});
 
 export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS } = defineModelParams({
   primary: {
@@ -310,49 +315,49 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
 // ---------------------------------------------------------------------------
 
 /** Small signal PMOS (TO-92, -45V/230mA). Source: Zetex/Diodes Inc. BS250P v1.0 (2003-03-19). */
-const PMOS_BS250: Record<string, number> = {
+const PMOS_BS250 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   VTO: -3.193, KP: 0.277, LAMBDA: 0.012, W: 1e-6, L: 1e-6,
   PHI: 0.6, GAMMA: 0, CBD: 105e-12, CBS: 0, CGDO: 0, CGSO: 0,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
-};
+});
 
 /** Medium power PMOS (TO-220, -100V/6.8A). Source: IR irf9520_IR (KiCad-Spice-Library irf.lib). */
-const PMOS_IRF9520: Record<string, number> = {
+const PMOS_IRF9520 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   VTO: -3.41185, KP: 3.46967, LAMBDA: 0.0289226, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 3.45033e-6,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
-};
+});
 
 /** High power PMOS (TO-247, -200V/12A). Source: IR irfp9240_IR (KiCad-Spice-Library irf.lib). */
-const PMOS_IRFP9240: Record<string, number> = {
+const PMOS_IRFP9240 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   VTO: -3.67839, KP: 6.41634, LAMBDA: 0.0117285, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 1.08446e-5,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
-};
+});
 
 /** High power PMOS (TO-220, -100V/40A). Source: IR irf5210_IR (KiCad-Spice-Library irf.lib). */
-const PMOS_IRF5210: Record<string, number> = {
+const PMOS_IRF5210 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   VTO: -3.79917, KP: 12.9564, LAMBDA: 0.00220079, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 2.34655e-5,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
-};
+});
 
 /** High power PMOS (TO-220, -55V/74A). Source: IR irf4905_IR (ngspice/KiCad-Spice-Library). */
-const PMOS_IRF4905: Record<string, number> = {
+const PMOS_IRF4905 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   VTO: -3.53713, KP: 23.3701, LAMBDA: 0.00549383, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 2.84439e-5,
   CGBO: 0, RD: 0, RS: 0, IS: 1e-14, PB: 0.8,
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.33, JS: 0, RSH: 0,
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
-};
+});
 
 // ---------------------------------------------------------------------------
 // resolveParams — derive process parameters when NSUB/TOX are specified
@@ -801,6 +806,31 @@ class MosfetAnalogElement extends AbstractFetElement {
     this._gm = computeGm(this._vgs, this._vds, this._vsb, this._p);
     this._gds = computeGds(this._vgs, this._vds, this._vsb, this._p);
     this._gmbs = computeGmbs(this._vgs, this._vds, this._vsb, this._p);
+
+    // Bulk junction DC diode: compute gbd, gbs, Ibd, Ibs and store VBD
+    // VBS = -VSB (bulk-source), VBD = VBS - VDS
+    const vbs = -this._vsb;
+    const vbd = vbs - this._vds;
+    const IS = this._p.IS;
+
+    // Drain-bulk junction diode (reverse-biased junction: vbd typically < 0 for NMOS)
+    const evbd = Math.exp(Math.min(vbd / VT, 80));  // clamp exponent to avoid overflow
+    const gbd = (IS / VT) * evbd + GMIN;
+    const cbdI = IS * (evbd - 1);
+
+    // Source-bulk junction diode (vbs typically <= 0 for NMOS)
+    const evbs = Math.exp(Math.min(vbs / VT, 80));
+    const gbs = (IS / VT) * evbs + GMIN;
+    const cbsI = IS * (evbs - 1);
+
+    // Store in pool for convergence check (MOS1convTest)
+    const base = this.stateBaseOffset;
+    const s0 = this._s0;
+    s0[base + SLOT_GBD] = gbd;
+    s0[base + SLOT_GBS] = gbs;
+    s0[base + SLOT_CBD_I] = cbdI;
+    s0[base + SLOT_CBS_I] = cbsI;
+    s0[base + SLOT_VBD] = vbd;
   }
 
   override stampNonlinear(solver: SparseSolver): void {

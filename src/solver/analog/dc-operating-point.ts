@@ -40,6 +40,8 @@ export interface DcOpOptions {
   params: SimulationParams;
   /** Diagnostic collector for emitting convergence events. */
   diagnostics: DiagnosticCollector;
+  /** Number of node-voltage rows (0..nodeCount-1) in the MNA solution vector. */
+  nodeCount: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,13 +114,16 @@ function scaleAllSources(elements: readonly AnalogElement[], factor: number): vo
  */
 export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   const { solver, elements, matrixSize, params, diagnostics } = opts;
+  const nodeCount = opts.nodeCount;
 
   const nrBase = {
     solver,
     matrixSize,
+    nodeCount,
     maxIterations: params.maxIterations,
     reltol: params.reltol,
     abstol: params.abstol,
+    iabstol: params.iabstol,
     diagnostics,
   };
 
@@ -152,13 +157,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   // Level 1 — Gmin stepping
   // -------------------------------------------------------------------------
   // Build Gmin shunt elements for every non-ground node (nodes 1..nodeCount).
-  // nodeCount = matrixSize - branchCount; but we don't have branchCount directly.
-  // Instead, we shunt every position 1..matrixSize (harmless if it covers branches,
-  // because branch rows don't correspond to node voltages in MNA).
-  // Actually per MNA structure: first nodeCount rows are node voltages,
-  // remaining rows are branch currents. Gmin shunts should only go to node rows.
-  // We infer nodeCount as the number of non-branch nodes from elements.
-  const nodeCount = _inferNodeCount(elements, matrixSize);
+  // nodeCount is provided by the caller (required field in DcOpOptions).
 
   // Gmin shunt elements: one per non-ground node
   const gminShunts: AnalogElement[] = [];
@@ -323,28 +322,6 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Infer the number of non-ground voltage nodes from the element list.
- *
- * Scans all node indices across all elements and returns the maximum
- * non-ground node ID encountered. This gives the count of voltage nodes
- * without requiring the caller to pass nodeCount separately.
- *
- * @param elements   - The element list
- * @param matrixSize - Upper bound (used as fallback if no nodes found)
- */
-function _inferNodeCount(elements: readonly AnalogElement[], matrixSize: number): number {
-  let maxNode = 0;
-  for (const el of elements) {
-    for (const n of el.allNodeIds) {
-      if (n > maxNode) maxNode = n;
-    }
-  }
-  // If no node information found, conservatively use matrixSize
-  // (Gmin shunts on branch rows are no-ops since they stamp nothing for row 0).
-  return maxNode > 0 ? maxNode : matrixSize;
-}
 
 /**
  * Build the sequence of Gmin values for Gmin stepping.

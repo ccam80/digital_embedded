@@ -41,7 +41,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -232,12 +232,13 @@ export class TappedTransformerElement extends AbstractCircuitElement {
  * applied in stamp(), following the same "pre-compute then stamp" pattern as
  * AnalogTransformerElement.
  */
-export class AnalogTappedTransformerElement implements AnalogElement {
+export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear = false;
   readonly isReactive = true;
+  readonly poolBacked = true as const;
   readonly stateSchema = TAPPED_TRANSFORMER_SCHEMA;
   readonly stateSize = TAPPED_TRANSFORMER_SCHEMA.size;
   stateBaseOffset = -1;

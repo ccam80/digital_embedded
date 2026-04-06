@@ -31,6 +31,7 @@ describe("AnalogEngineTypes", () => {
       minTimeStep: 1e-14,
       reltol: 1e-3,
       abstol: 1e-6,
+      iabstol: 1e-12,
       chargeTol: 1e-14,
       trtol: 7.0,
       maxIterations: 100,

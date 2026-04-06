@@ -283,18 +283,27 @@ export function createTriodeElement(
       return [iPlate, iGrid, iCathode];
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
-      const vPn = nodeP > 0 ? voltages[nodeP - 1] : 0;
-      const vGn = nodeG > 0 ? voltages[nodeG - 1] : 0;
-      const vKn = nodeK > 0 ? voltages[nodeK - 1] : 0;
-      const vPp = nodeP > 0 ? prevVoltages[nodeP - 1] : 0;
-      const vGp = nodeG > 0 ? prevVoltages[nodeG - 1] : 0;
-      const vKp = nodeK > 0 ? prevVoltages[nodeK - 1] : 0;
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      const vP = nodeP > 0 ? voltages[nodeP - 1] : 0;
+      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
+      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
 
-      const dvgk = Math.abs((vGn - vKn) - (vGp - vKp));
-      const dvpk = Math.abs((vPn - vKn) - (vPp - vKp));
+      const vgkRaw = vG - vK;
+      const vpkRaw = vP - vK;
 
-      return dvgk <= 0.1 && dvpk <= 0.5;
+      // BJTconvTest-style current prediction for triode
+      const delvgk = vgkRaw - vgk;
+      const delvpk = vpkRaw - vpk;
+
+      const { ip, ig, gm: gmOp, gp: gpOp, ggi: ggiOp } = op;
+
+      const cphat = ip + gmOp * delvgk + gpOp * delvpk;
+      const cghat = ig + ggiOp * delvgk;
+
+      const tolP = reltol * Math.max(Math.abs(cphat), Math.abs(ip)) + abstol;
+      const tolG = reltol * Math.max(Math.abs(cghat), Math.abs(ig)) + abstol;
+
+      return Math.abs(cphat - ip) <= tolP && Math.abs(cghat - ig) <= tolG;
     },
 
     setParam(key: string, value: number): void {

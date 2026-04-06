@@ -34,6 +34,7 @@ import {
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
+import type { ReactiveAnalogElement } from "../element.js";
 
 // ---------------------------------------------------------------------------
 // Component definitions imported for registration test
@@ -64,16 +65,12 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // Helper: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
 
-function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
-  const size = core.stateSize ?? 0;
-  const pool = new StatePool(Math.max(size, 1));
-  if (size > 0) {
-    core.stateBaseOffset = 0;
-    core.initState!(pool);
-  } else {
-    core.stateBaseOffset = -1;
-  }
-  return { element: core, pool };
+function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
+  const re = core as ReactiveAnalogElement;
+  const pool = new StatePool(Math.max(re.stateSize, 1));
+  re.stateBaseOffset = 0;
+  re.initState(pool);
+  return { element: re, pool };
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +80,7 @@ function withState<T extends AnalogElementCore>(core: T): { element: T; pool: St
 const VDD = 3.3;
 const GND = 0.0;
 const LOAD_R = 10_000;
-const NR_OPTS = { maxIterations: 50, reltol: 1e-3, abstol: 1e-6 };
+const NR_OPTS = { maxIterations: 50, reltol: 1e-3, abstol: 1e-6, iabstol: 1e-12 };
 
 // CMOS 3.3V parameters (matches behavioral-remaining.ts CMOS_3V3_FALLBACK)
 const VOH = 3.3;
@@ -213,7 +210,7 @@ describe("LED", () => {
     props.replaceModelParams({ IS: 3.17e-19, N: 1.8 });
 
     // LED: anode = circuit node 2, cathode = ground (0)
-    const ledCore = getFactory(LedDefinition.modelRegistry!.red!)(new Map([["in", 2]]), [], -1, props);
+    const ledCore = getFactory(LedDefinition.modelRegistry!.red!)(new Map([["in", 2]]), [], -1, props, () => 0);
     const { element: ledStateWrapped } = withState(ledCore);
     const led = withNodeIds(ledStateWrapped, [2, 0]);
 

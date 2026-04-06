@@ -21,6 +21,7 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { ReactiveAnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
@@ -179,10 +180,11 @@ function createLedAnalogElement(
   let s0: Float64Array;
   let base: number;
 
-  const element: AnalogElementCore = {
+  const element: ReactiveAnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
+    poolBacked: true as const,
     stateSize: 4,
     stateSchema: LED_STATE_SCHEMA,
     stateBaseOffset: -1,
@@ -233,13 +235,18 @@ function createLedAnalogElement(
       return [id];
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array): boolean {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vdNew = va - vc;
+      const vdRaw = va - vc;
 
-      const vdOld = s0[base + SLOT_VD];
-      return Math.abs(vdNew - vdOld) <= 2 * nVt;
+      // ngspice DIOconvTest: current-prediction convergence
+      const delvd = vdRaw - s0[base + SLOT_VD];
+      const id = s0[base + SLOT_ID];
+      const gd = s0[base + SLOT_GEQ];
+      const cdhat = id + gd * delvd;
+      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + abstol;
+      return Math.abs(cdhat - id) <= tol;
     },
 
     setParam(_key: string, _value: number) {},

@@ -23,6 +23,7 @@ import {
 } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
 import type { AnalogElementCore } from "../element.js";
+import { isPoolBacked } from "../element.js";
 import { AnalogFuseElement } from "../../../components/passives/analog-fuse.js";
 import { Circuit, Wire } from "../../../core/circuit.js";
 import { ComponentRegistry } from "../../../core/registry.js";
@@ -51,14 +52,14 @@ import { ProbeDefinition } from "../../../components/io/probe.js";
 function buildStatePool(elements: AnalogElementCore[]): StatePool {
   let offset = 0;
   for (const el of elements) {
-    if (el.stateSize > 0) {
+    if (isPoolBacked(el)) {
       el.stateBaseOffset = offset;
       offset += el.stateSize;
     }
   }
   const pool = new StatePool(offset);
   for (const el of elements) {
-    if (el.stateSize > 0 && el.initState) {
+    if (isPoolBacked(el)) {
       el.initState(pool);
     }
   }

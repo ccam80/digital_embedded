@@ -239,6 +239,7 @@ describe("OpAmp", () => {
       solver,
       elements: [opampEl, rLoadEl, vinSource as unknown as AnalogElement, vinnSource as unknown as AnalogElement, vccPSource as unknown as AnalogElement, vccNSource as unknown as AnalogElement],
       matrixSize,
+      nodeCount: 5,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });
@@ -310,6 +311,7 @@ describe("Integration", () => {
       solver,
       elements: [opampEl, rin, rf, vsVin as unknown as AnalogElement, vsInp as unknown as AnalogElement, vsVccP as unknown as AnalogElement, vsVccN as unknown as AnalogElement],
       matrixSize,
+      nodeCount: 6,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });
@@ -347,6 +349,7 @@ describe("Integration", () => {
       solver,
       elements: [opampEl, vsVin as unknown as AnalogElement, vsVccP as unknown as AnalogElement, vsVccN as unknown as AnalogElement],
       matrixSize,
+      nodeCount: 4,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });

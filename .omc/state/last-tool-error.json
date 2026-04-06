@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"ls -la \\\"C:\\\\Users\\\\cca79\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--local-working-projects-digital-in-browser\\\\af88c622-bc57-4e85-a195-c26bf9507a04\\\\tasks\\\\\\\" 2>&1\",\"description\":\"Check task outpu...",
-  "error": "Exit code 2\n/usr/bin/bash: eval: line 1: unexpected EOF while looking for matching `\"'",
-  "timestamp": "2026-04-05T10:01:03.162Z",
+  "tool_input_preview": "{\"command\":\"cat .vitest-failures.json | python3 -c \\\"\\nimport json, sys\\ndata = json.load(sys.stdin)\\nprint(f'Total entries: {len(data)}')\\nfor f in data:\\n    print(f'{f.get(\\\\\\\"file\\\\\\\",\\\\\\\"?\\\\\\\")}:...",
+  "error": "Exit code 1\nTotal entries: 2",
+  "timestamp": "2026-04-06T08:19:14.126Z",
   "retry_count": 1
 }

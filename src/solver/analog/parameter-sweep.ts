@@ -135,6 +135,7 @@ function runDcSync(compiled: ConcreteCompiledAnalogCircuit): {
     solver,
     elements: compiled.elements,
     matrixSize: compiled.matrixSize,
+    nodeCount: compiled.nodeCount,
     params: DEFAULT_SIMULATION_PARAMS,
     diagnostics,
   });

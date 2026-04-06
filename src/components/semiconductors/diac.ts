@@ -173,13 +173,15 @@ export function createDiacElement(
       recompute(_v);
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
-      const vA  = nodeA > 0 ? voltages[nodeA - 1]     : 0;
-      const vB  = nodeB > 0 ? voltages[nodeB - 1]     : 0;
-      const vAp = nodeA > 0 ? prevVoltages[nodeA - 1] : 0;
-      const vBp = nodeB > 0 ? prevVoltages[nodeB - 1] : 0;
-      // Converge when voltage change is < 10mV (tighter than default for snap region)
-      return Math.abs((vA - vB) - (vAp - vBp)) <= 0.01;
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
+      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vRaw = vA - vB;
+
+      const delvd = vRaw - _v;
+      const cdhat = _id + _geq * delvd;
+      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(_id)) + abstol;
+      return Math.abs(cdhat - _id) <= tol;
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {

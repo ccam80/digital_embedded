@@ -286,6 +286,7 @@ describe("AnalogFuseElement", () => {
         solver,
         elements: [vs, fuse],
         matrixSize: 2,
+        nodeCount: 1,
         params: DEFAULT_SIMULATION_PARAMS,
         diagnostics,
       });
@@ -335,6 +336,7 @@ describe("AnalogFuseElement", () => {
         solver,
         elements: [vs, fuse, loadResistor],
         matrixSize: 3,
+        nodeCount: 2,
         params: DEFAULT_SIMULATION_PARAMS,
         diagnostics,
       });

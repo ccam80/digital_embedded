@@ -27,7 +27,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { CoupledInductorPair } from "../../solver/analog/coupled-inductor.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -225,12 +225,13 @@ export class TransformerElement extends AbstractCircuitElement {
  *   [0] = P1 (primary+)   [1] = P2 (primary−)
  *   [2] = S1 (secondary+) [3] = S2 (secondary−)
  */
-export class AnalogTransformerElement implements AnalogElement {
+export class AnalogTransformerElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear = false;
   readonly isReactive = true;
+  readonly poolBacked = true as const;
   readonly stateSchema = TRANSFORMER_SCHEMA;
   readonly stateSize = TRANSFORMER_SCHEMA.size;
   stateBaseOffset = -1;

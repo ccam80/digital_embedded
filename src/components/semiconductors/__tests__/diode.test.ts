@@ -22,22 +22,19 @@ import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
+import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Helper: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
 
-function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
-  const size = core.stateSize ?? 0;
-  const pool = new StatePool(Math.max(size, 1));
-  if (size > 0) {
-    core.stateBaseOffset = 0;
-    core.initState!(pool);
-  } else {
-    core.stateBaseOffset = -1;
-  }
-  return { element: core, pool };
+function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
+  const re = core as ReactiveAnalogElement;
+  const pool = new StatePool(Math.max(re.stateSize, 1));
+  re.stateBaseOffset = 0;
+  re.initState(pool);
+  return { element: re, pool };
 }
 
 // ---------------------------------------------------------------------------
@@ -328,6 +325,7 @@ describe("Integration", () => {
       solver,
       elements: [vs, r, d],
       matrixSize,
+      nodeCount: 2,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });
@@ -368,14 +366,14 @@ describe("setParam mutates params object (not captured locals)", () => {
     const elements = [vs, r, d];
 
     // Before: default IS=1e-14
-    const before = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const before = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 2, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[0], 6.928910e-01, "V(diode) before");
     expectSpiceRef((before.nodeVoltages[1] - before.nodeVoltages[0]) / 1000, 4.307675e-03, "I(diode) before");
 
     // setParam and re-solve
     d.setParam("IS", 1e-11);
-    const after = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const after = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 2, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
     expect(after.converged).toBe(true);
     expectSpiceRef(after.nodeVoltages[0], 5.152668e-01, "V(diode) after IS=1e-11");
     expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 4.485160e-03, "I(diode) after IS=1e-11");
@@ -395,14 +393,14 @@ describe("setParam mutates params object (not captured locals)", () => {
     const elements = [vs, r, d];
 
     // Before: default N=1
-    const before = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const before = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 2, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[0], 6.928910e-01, "V(diode) before");
     expectSpiceRef((before.nodeVoltages[1] - before.nodeVoltages[0]) / 1000, 4.307675e-03, "I(diode) before");
 
     // setParam and re-solve
     d.setParam("N", 2);
-    const after = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const after = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 2, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
     expect(after.converged).toBe(true);
     expectSpiceRef(after.nodeVoltages[0], 1.376835e+00, "V(diode) after N=2");
     expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 3.623504e-03, "I(diode) after N=2");

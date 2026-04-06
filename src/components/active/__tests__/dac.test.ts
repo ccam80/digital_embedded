@@ -130,6 +130,7 @@ function solveDac(
     solver,
     elements,
     matrixSize,
+    nodeCount: nNodes,
     params: DEFAULT_SIMULATION_PARAMS,
     diagnostics,
   });

@@ -44,7 +44,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
@@ -224,12 +224,13 @@ export class CrystalCircuitElement extends AbstractCircuitElement {
 // AnalogCrystalElement — MNA implementation
 // ---------------------------------------------------------------------------
 
-export class AnalogCrystalElement implements AnalogElement {
+export class AnalogCrystalElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear = false;
   readonly isReactive = true;
+  readonly poolBacked = true as const;
   readonly stateSchema = CRYSTAL_SCHEMA;
   readonly stateSize = CRYSTAL_SCHEMA.size;
   stateBaseOffset = -1;

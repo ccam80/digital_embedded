@@ -62,7 +62,7 @@ const CMOS_3V3: ResolvedPinElectrical = {
 const VDD = 3.3;
 const GND = 0.0;
 const LOAD_R = 10_000; // 10 kΩ load resistor on output
-const NR_OPTS = { maxIterations: 50, reltol: 1e-3, abstol: 1e-6 };
+const NR_OPTS = { maxIterations: 50, reltol: 1e-3, abstol: 1e-6, iabstol: 1e-12 };
 
 // ---------------------------------------------------------------------------
 // Circuit builder helpers

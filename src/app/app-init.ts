@@ -128,13 +128,17 @@ export function initApp(search?: string): void {
   const statusDismiss = document.getElementById('status-dismiss')!;
 
   function showStatus(message: string, isError = false): void {
+    statusBar.classList.remove('expanded');
     statusMessage.textContent = message;
     statusBar.classList.toggle('error', isError);
+    if (isError && message.includes('\n')) {
+      statusBar.classList.add('expanded');
+    }
   }
 
   function clearStatus(): void {
     statusMessage.textContent = 'Ready';
-    statusBar.classList.remove('error');
+    statusBar.classList.remove('error', 'expanded');
   }
 
   statusDismiss.addEventListener('click', clearStatus);

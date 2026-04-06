@@ -433,6 +433,8 @@ function createSegmentDiodeElement(
 ): SegmentDiodeElement {
   let geq = LED_GMIN;
   let ieq = 0;
+  let _vdStored = 0;
+  let _idStored = 0;
 
   return {
     branchIndex: -1,
@@ -460,14 +462,19 @@ function createSegmentDiodeElement(
         geq = 1 / LED_ROFF + LED_GMIN;
         ieq = 0;
       }
+      _vdStored = vd;
+      _idStored = geq * vd + ieq;
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vaPrev = nodeAnode > 0 ? prevVoltages[nodeAnode - 1] : 0;
-      const vcPrev = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
-      return Math.abs((va - vc) - (vaPrev - vcPrev)) <= 0.05;
+      const vdRaw = va - vc;
+
+      const delvd = vdRaw - _vdStored;
+      const cdhat = _idStored + geq * delvd;
+      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(_idStored)) + abstol;
+      return Math.abs(cdhat - _idStored) <= tol;
     },
 
     anodeCurrent(voltages: Float64Array): number {
@@ -519,8 +526,8 @@ export function createSevenSegAnalogElement(
       for (const d of segDiodes) d.updateOperatingPoint!(voltages);
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
-      return segDiodes.every((d) => d.checkConvergence!(voltages, prevVoltages));
+    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      return segDiodes.every((d) => d.checkConvergence!(voltages, prevVoltages, reltol, abstol));
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -836,8 +843,8 @@ export function createButtonLEDAnalogElement(
       ledDiode.updateOperatingPoint!(voltages);
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
-      return ledDiode.checkConvergence!(voltages, prevVoltages);
+    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      return ledDiode.checkConvergence!(voltages, prevVoltages, reltol, abstol);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {

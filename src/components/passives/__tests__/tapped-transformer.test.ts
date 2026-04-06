@@ -117,7 +117,7 @@ describe("TappedTransformer", () => {
     const rCtGnd = makeResistor(3, 0, 1e6);
     const rS2Gnd = makeResistor(4, 0, 1e6);
 
-    allocateStatePool([tx as unknown as AnalogElementCore]);
+    allocateStatePool([tx as AnalogElementCore]);
 
     const solver = new SparseSolver();
     let voltages = new Float64Array(matrixSize);
@@ -206,7 +206,7 @@ describe("TappedTransformer", () => {
     // Ground S2 via reference
     const rGnd = makeResistor(4, 0, 0.1); // low resistance to gnd for S2
 
-    allocateStatePool([tx as unknown as AnalogElementCore]);
+    allocateStatePool([tx as AnalogElementCore]);
 
     const solver = new SparseSolver();
     let voltages = new Float64Array(matrixSize);
@@ -333,8 +333,8 @@ describe("TappedTransformer", () => {
         solver.solve(voltages);
 
         // Check convergence
-        const d1conv = d1.checkConvergence?.(voltages, prevVoltages) ?? true;
-        const d2conv = d2.checkConvergence?.(voltages, prevVoltages) ?? true;
+        const d1conv = d1.checkConvergence?.(voltages, prevVoltages, 1e-3, 1e-6) ?? true;
+        const d2conv = d2.checkConvergence?.(voltages, prevVoltages, 1e-3, 1e-6) ?? true;
         if (d1conv && d2conv) break;
       }
     }

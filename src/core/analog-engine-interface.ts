@@ -34,8 +34,10 @@ export interface SimulationParams {
   minTimeStep: number;
   /** Relative convergence tolerance. Default: 1e-3 */
   reltol: number;
-  /** Absolute voltage tolerance in volts. Default: 1e-6 */
+  /** Absolute voltage tolerance in volts (ngspice VNTOL). Default: 1e-6 */
   abstol: number;
+  /** Absolute current tolerance in amperes (ngspice ABSTOL). Default: 1e-12 */
+  iabstol: number;
   /**
    * Absolute charge tolerance for LTE control, in coulombs. Acts as the
    * floor term in the ngspice-style relative LTE tolerance formula
@@ -66,6 +68,7 @@ export const DEFAULT_SIMULATION_PARAMS: SimulationParams = {
   minTimeStep: 1e-14,
   reltol: 1e-3,
   abstol: 1e-6,
+  iabstol: 1e-12,
   chargeTol: 1e-14,
   trtol: 7.0,
   maxIterations: 100,

@@ -21,7 +21,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { ReactiveAnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
@@ -95,7 +95,7 @@ export function createZenerElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): ReactiveAnalogElementCore {
   const nodeAnode = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
@@ -115,6 +115,7 @@ export function createZenerElement(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
+    poolBacked: true as const,
     stateSize: 4,
     stateSchema: ZENER_STATE_SCHEMA,
     stateBaseOffset: -1,
@@ -177,17 +178,18 @@ export function createZenerElement(
       }
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vdNew = va - vc;
+      const vdRaw = va - vc;
 
-      const vaPrev = nodeAnode > 0 ? prevVoltages[nodeAnode - 1] : 0;
-      const vcPrev = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
-      const vdPrevVal = vaPrev - vcPrev;
-
-      const nVt = params.N * VT;
-      return Math.abs(vdNew - vdPrevVal) <= 2 * nVt;
+      // ngspice DIOconvTest: current-prediction convergence
+      const delvd = vdRaw - s0[base + SLOT_VD];
+      const id = s0[base + SLOT_ID];
+      const gd = s0[base + SLOT_GEQ];
+      const cdhat = id + gd * delvd;
+      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + abstol;
+      return Math.abs(cdhat - id) <= tol;
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {

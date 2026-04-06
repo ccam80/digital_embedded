@@ -20,6 +20,7 @@ import {
 } from "../../../solver/analog/__tests__/test-helpers.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -259,6 +260,7 @@ describe("Integration", () => {
       matrixSize: 3,
       elements: [acSrc as unknown as import("../../../solver/analog/element.js").AnalogElement, r, cap],
       labelToNodeId: new Map(),
+      statePool: new StatePool(0),
     };
 
     const engine = new MNAEngine();

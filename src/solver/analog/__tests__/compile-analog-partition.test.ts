@@ -541,7 +541,7 @@ describe("compileAnalogPartition", () => {
     const compiled = compileAnalogPartition(partition, registry);
 
     for (const element of compiled.elements) {
-      expect(element.stateBaseOffset).toBe(-1);
+      expect(element.isReactive).toBe(false);
     }
   });
 
@@ -564,11 +564,12 @@ describe("compileAnalogPartition", () => {
 
     let assignedBase = -999;
     const elementWithState = {
+      poolBacked: true as const,
       stateSize: 7,
       stateBaseOffset: -1,
       branchIndex: -1,
       isNonlinear: false,
-      isReactive: false,
+      isReactive: true,
       pinNodeIds: [] as number[],
       allNodeIds: [] as number[],
       stamp(_s: import("../sparse-solver.js").SparseSolver) { /* no-op */ },
@@ -639,21 +640,20 @@ describe("compileAnalogPartition", () => {
     };
 
     const partition: SolverPartition = {
-      domain: "analog",
       components: [
         {
           element: comp,
           definition: compDef,
           modelKey: "behavioral",
           model: null,
-          resolvedPins: [{ label: "A", direction: PinDirection.BIDIRECTIONAL, localPosition: { x: 10, y: 0 }, worldPosition: { x: 10, y: 0 }, wireVertex: { x: 10, y: 0 }, nodeId: 0, bitWidth: 1 }],
+          resolvedPins: [{ elementIndex: 0, pinIndex: 0, pinLabel: "A", direction: PinDirection.BIDIRECTIONAL, worldPosition: { x: 10, y: 0 }, wireVertex: { x: 10, y: 0 }, domain: "analog", kind: "signal", bitWidth: 1 }],
         },
         {
           element: gnd,
           definition: gndDef,
           modelKey: "",
           model: null,
-          resolvedPins: [{ label: "in", direction: PinDirection.INPUT, localPosition: { x: 0, y: 0 }, worldPosition: { x: 0, y: 0 }, wireVertex: { x: 0, y: 0 }, nodeId: 0, bitWidth: 1 }],
+          resolvedPins: [{ elementIndex: 1, pinIndex: 0, pinLabel: "in", direction: PinDirection.INPUT, worldPosition: { x: 0, y: 0 }, wireVertex: { x: 0, y: 0 }, domain: "analog", kind: "signal", bitWidth: 1 }],
         },
       ],
       groups: [groupGnd, groupA],

@@ -49,7 +49,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG } from "../../solver/analog/stamp-helpers.js";
 import {
@@ -313,12 +313,13 @@ class SegmentShuntConductanceElement implements AnalogElement {
 //   C sub-matrix: V_A - V_B - geq*I_b = ieq
 // ---------------------------------------------------------------------------
 
-class SegmentInductorElement implements AnalogElement {
+class SegmentInductorElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear = false;
   readonly isReactive = true;
+  readonly poolBacked = true as const;
   readonly stateSchema = SEGMENT_INDUCTOR_SCHEMA;
   readonly stateSize = SEGMENT_INDUCTOR_SCHEMA.size;
   stateBaseOffset = -1;
@@ -385,12 +386,13 @@ class SegmentInductorElement implements AnalogElement {
 // charge onto the node, so the sign is -ieq (current leaving node A via cap).
 // ---------------------------------------------------------------------------
 
-class SegmentCapacitorElement implements AnalogElement {
+class SegmentCapacitorElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear = false;
   readonly isReactive = true;
+  readonly poolBacked = true as const;
   readonly stateSchema = SEGMENT_CAPACITOR_SCHEMA;
   readonly stateSize = SEGMENT_CAPACITOR_SCHEMA.size;
   stateBaseOffset = -1;
@@ -448,12 +450,13 @@ class SegmentCapacitorElement implements AnalogElement {
 // diagonal only during transient.
 // ---------------------------------------------------------------------------
 
-class CombinedRLElement implements AnalogElement {
+class CombinedRLElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
   readonly isNonlinear = false;
   readonly isReactive = true;
+  readonly poolBacked = true as const;
   readonly stateSchema = COMBINED_RL_SCHEMA;
   readonly stateSize = COMBINED_RL_SCHEMA.size;
   stateBaseOffset = -1;
@@ -524,8 +527,6 @@ export class TransmissionLineElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear = false;
   readonly isReactive = true;
-  readonly stateSize: number = 0;
-  stateBaseOffset = -1;
   setParam(_key: string, _value: number): void {}
 
   private readonly _subElements: AnalogElement[];
@@ -613,25 +614,25 @@ export class TransmissionLineElement implements AnalogElement {
     this._firstBranchIdx = firstBranchIdx;
     this._lastBranchIdx = firstBranchIdx + N - 1;
 
-    this.stateSize = 0;
-
     // Compute total private pool size from all reactive sub-elements.
     let totalState = 0;
     for (const el of this._subElements) {
-      totalState += el.stateSize ?? 0;
+      if (el.isReactive) {
+        totalState += (el as ReactiveAnalogElement).stateSize;
+      }
     }
 
     // Bind sub-elements to a private pool so they are immediately usable.
     // The outer element declares stateSize=0 so the compiler allocates no engine
     // pool slots for it; the private pool provides the backing storage.
-    const privatePool: StatePoolRef = { state0: new Float64Array(totalState) };
+    const privatePool: StatePoolRef = { state0: new Float64Array(totalState), state1: new Float64Array(totalState), state2: new Float64Array(totalState) };
     let offset = 0;
     for (const el of this._subElements) {
-      const sz = el.stateSize ?? 0;
-      if (sz > 0) {
-        el.stateBaseOffset = offset;
-        el.initState!(privatePool);
-        offset += sz;
+      if (el.isReactive) {
+        const re = el as ReactiveAnalogElement;
+        re.stateBaseOffset = offset;
+        re.initState(privatePool);
+        offset += re.stateSize;
       }
     }
   }

@@ -147,7 +147,7 @@ export function createDiodeElement(
   internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+) {
   const nodeAnode = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
@@ -180,10 +180,11 @@ export function createDiodeElement(
   let s0: Float64Array;
   let base: number;
 
-  const element: AnalogElementCore = {
+  const element = {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: hasCapacitance,
+    poolBacked: true as const,
     stateSize: hasCapacitance ? 8 : 4,
     stateSchema: hasCapacitance ? DIODE_CAP_SCHEMA : DIODE_SCHEMA,
     stateBaseOffset: -1,
@@ -191,7 +192,7 @@ export function createDiodeElement(
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       base = this.stateBaseOffset;
-      applyInitialValues(this.stateSchema!, pool, base, params);
+      applyInitialValues(this.stateSchema, pool, base, params);
     },
 
     stamp(solver: SparseSolver): void {
@@ -266,15 +267,18 @@ export function createDiodeElement(
       }
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array): boolean {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
       const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
 
-      // Compare raw junction voltage against the last limited voltage stored in
-      // the pool. Converged when the NR solution matches what pnjlim accepted.
-      const nVt = params.N * VT;
-      return Math.abs(vdRaw - s0[base + SLOT_VD]) <= 2 * nVt;
+      // ngspice DIOconvTest: current-prediction convergence
+      const delvd = vdRaw - s0[base + SLOT_VD];
+      const id = s0[base + SLOT_ID];
+      const gd = s0[base + SLOT_GEQ];
+      const cdhat = id + gd * delvd;
+      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + abstol;
+      return Math.abs(cdhat - id) <= tol;
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {
@@ -291,7 +295,7 @@ export function createDiodeElement(
 
   // Attach stampCompanion only when junction capacitance is present
   if (hasCapacitance) {
-    element.stampCompanion = function (
+    (element as unknown as { stampCompanion: AnalogElementCore["stampCompanion"] }).stampCompanion = function (
       dt: number,
       method: IntegrationMethod,
       voltages: Float64Array,

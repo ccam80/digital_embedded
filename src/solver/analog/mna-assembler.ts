@@ -114,10 +114,12 @@ export class MNAAssembler {
     elements: readonly AnalogElement[],
     voltages: Float64Array,
     prevVoltages: Float64Array,
+    reltol: number,
+    iabstol: number,
   ): boolean {
     for (const el of elements) {
       if (el.checkConvergence) {
-        if (!el.checkConvergence(voltages, prevVoltages)) {
+        if (!el.checkConvergence(voltages, prevVoltages, reltol, iabstol)) {
           return false;
         }
       }

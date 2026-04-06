@@ -117,7 +117,7 @@ export interface AnalogElementCore {
   /**
    * Element-specific convergence check beyond the global node-voltage criterion.
    */
-  checkConvergence?(voltages: Float64Array, prevVoltages: Float64Array): boolean;
+  checkConvergence?(voltages: Float64Array, prevVoltages: Float64Array, reltol: number, abstol: number): boolean;
 
   /**
    * Compute and return the local truncation error estimate for adaptive
@@ -165,21 +165,6 @@ export interface AnalogElementCore {
   label?: string;
 
   /**
-   * Float64 slots required in the state pool. 0 = no state.
-   */
-  readonly stateSize: number;
-
-  /**
-   * Base offset into pool, assigned by compiler. -1 if stateSize === 0.
-   */
-  stateBaseOffset: number;
-
-  /**
-   * Bind to state pool after allocation. Called once by compiler.
-   */
-  initState?(pool: StatePoolRef): void;
-
-  /**
    * Return the strictly-next breakpoint strictly greater than afterTime, or
    * null if the source has no more breakpoints. Called once per accepted
    * step on which this source's breakpoint was consumed.
@@ -193,22 +178,6 @@ export interface AnalogElementCore {
    * time by MNAEngine._seedBreakpoints().
    */
   registerRefreshCallback?(cb: () => void): void;
-}
-
-import type { StateSchema } from "../solver/analog/state-schema.js";
-
-/**
- * Sub-interface for reactive elements that declare a full StateSchema.
- * Every element with `isReactive: true` MUST implement this interface —
- * it makes `stateSchema` non-optional via the subtype, so the dev probe
- * can enforce pool-backed state without a runtime null check.
- *
- * The `readonly isReactive: true` discriminant narrows the union at
- * call sites; TypeScript uses it to select this interface over the base.
- */
-export interface ReactiveAnalogElement extends AnalogElementCore {
-  readonly isReactive: true;
-  readonly stateSchema: StateSchema;
 }
 
 // ---------------------------------------------------------------------------

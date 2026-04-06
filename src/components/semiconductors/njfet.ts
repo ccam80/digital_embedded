@@ -58,9 +58,9 @@ const GMIN = 1e-12;
 // JFET state-pool slots
 // ---------------------------------------------------------------------------
 
-export const SLOT_VGS_JUNCTION = 25;
-export const SLOT_GD_JUNCTION  = 26;
-export const SLOT_ID_JUNCTION  = 27;
+export const SLOT_VGS_JUNCTION = 30;
+export const SLOT_GD_JUNCTION  = 31;
+export const SLOT_ID_JUNCTION  = 32;
 
 const JFET_SCHEMA = defineStateSchema("NJfetAnalogElement", [
   ...FET_BASE_SCHEMA.slots,
@@ -132,7 +132,7 @@ export class NJfetAnalogElement extends AbstractFetElement {
   protected readonly _p: JfetParams;
 
   override readonly stateSchema = JFET_SCHEMA;
-  override readonly stateSize: number = 28;
+  override readonly stateSize: number = JFET_SCHEMA.size;
 
   constructor(
     gateNode: number,

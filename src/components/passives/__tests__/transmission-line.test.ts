@@ -783,14 +783,9 @@ describe("TransmissionLine", () => {
       );
     }
 
-    it("outer TransmissionLineElement has stateSize=0", () => {
+    it("outer TransmissionLineElement is not pool-backed", () => {
       const el = makeEl(5);
-      expect(el.stateSize).toBe(0);
-    });
-
-    it("outer TransmissionLineElement has stateBaseOffset=-1 (no engine pool slots)", () => {
-      const el = makeEl(5);
-      expect(el.stateBaseOffset).toBe(-1);
+      expect((el as any).poolBacked).toBeUndefined();
     });
 
     it("sub-elements are pool-bound immediately after construction — stampCompanion works without initState", () => {

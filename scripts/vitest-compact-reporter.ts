@@ -60,13 +60,7 @@ export default class CompactReporter implements Reporter {
   }
 
   onTaskUpdate(packs: TaskResultPack[]) {
-    for (const [, result] of packs) {
-      if (!result) continue;
-      if (result.state === 'pass') this.passed++;
-      else if (result.state === 'fail') this.failed++;
-    }
     if (!quiet) {
-      // live progress dots
       for (const [, result] of packs) {
         if (!result) continue;
         process.stdout.write(result.state === 'pass' ? '.' : result.state === 'fail' ? 'F' : '');
@@ -85,9 +79,9 @@ export default class CompactReporter implements Reporter {
       this.collectFailures(file.tasks, relative(this.cwd, file.filepath));
     }
 
-    // Count skipped
+    // Count passed, failed, skipped from leaf tasks only (not suites/files)
     for (const file of files) {
-      this.countSkipped(file.tasks);
+      this.countLeafResults(file.tasks);
     }
 
     const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(1);
@@ -188,15 +182,16 @@ export default class CompactReporter implements Reporter {
     }
   }
 
-  private countSkipped(tasks: any[]) {
+  private countLeafResults(tasks: any[]) {
     for (const task of tasks) {
       if (task.type === 'suite' && task.tasks) {
-        this.countSkipped(task.tasks);
+        this.countLeafResults(task.tasks);
         continue;
       }
-      if (task.mode === 'skip' || task.result?.state === 'skip') {
-        this.skipped++;
-      }
+      const state = task.result?.state;
+      if (state === 'pass') this.passed++;
+      else if (state === 'fail') this.failed++;
+      else if (task.mode === 'skip' || state === 'skip') this.skipped++;
     }
   }
 }

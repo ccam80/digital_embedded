@@ -254,7 +254,7 @@ describe("Triode", () => {
       }
 
       // The element should converge with positive grid
-      const converged = elem.checkConvergence!(voltages, voltages);
+      const converged = elem.checkConvergence!(voltages, voltages, 1e-3, 1e-12);
       expect(converged).toBe(true);
     });
   });
@@ -294,7 +294,7 @@ describe("Triode", () => {
         elem.updateOperatingPoint!(voltages);
 
         if (iter >= 2) {
-          converged = elem.checkConvergence!(voltages, prevVoltages) ?? true;
+          converged = elem.checkConvergence!(voltages, prevVoltages, 1e-3, 1e-12) ?? true;
           if (converged) break;
         }
       }

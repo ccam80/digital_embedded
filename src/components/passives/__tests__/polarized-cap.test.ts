@@ -24,7 +24,7 @@ import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { AnalogElementCore } from "../../../solver/analog/element.js";
+import type { AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -41,16 +41,12 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
-  const size = core.stateSize ?? 0;
-  const pool = new StatePool(Math.max(size, 1));
-  if (size > 0) {
-    core.stateBaseOffset = 0;
-    core.initState!(pool);
-  } else {
-    core.stateBaseOffset = -1;
-  }
-  return { element: core, pool };
+function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
+  const re = core as ReactiveAnalogElement;
+  const pool = new StatePool(Math.max(re.stateSize, 1));
+  re.stateBaseOffset = 0;
+  re.initState(pool);
+  return { element: re, pool };
 }
 
 /**
@@ -137,6 +133,7 @@ describe("PolarizedCap", () => {
         solver,
         elements: [vs, cap],
         matrixSize: 3,
+        nodeCount: 2,
         params: DEFAULT_SIMULATION_PARAMS,
         diagnostics,
       });
@@ -185,6 +182,7 @@ describe("PolarizedCap", () => {
         solver,
         elements: [vs, cap],
         matrixSize: 3,
+        nodeCount: 2,
         params: DEFAULT_SIMULATION_PARAMS,
         diagnostics,
       });

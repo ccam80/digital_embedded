@@ -28,7 +28,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { ReactiveAnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
@@ -113,7 +113,7 @@ export function createScrElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): ReactiveAnalogElementCore {
   const nodeA = pinNodes.get("A")!; // anode
   const nodeK = pinNodes.get("K")!; // cathode
   const nodeG = pinNodes.get("G")!; // gate
@@ -214,6 +214,7 @@ export function createScrElement(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
+    poolBacked: true as const,
     stateSize: 9,
     stateSchema: SCR_STATE_SCHEMA,
     stateBaseOffset: -1,
@@ -276,13 +277,28 @@ export function createScrElement(
       computeOperatingPoint(vakLimited, vgkLimited);
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
-      const vAp = nodeA > 0 ? prevVoltages[nodeA - 1] : 0;
-      const vKp = nodeK > 0 ? prevVoltages[nodeK - 1] : 0;
+      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
 
-      return Math.abs((vA - vK) - (vAp - vKp)) <= 2 * nVt;
+      // ngspice DIOconvTest on J1 (anode-cathode)
+      const vakRaw = vA - vK;
+      const delvak = vakRaw - s0[base + SLOT_VAK];
+      const iak = s0[base + SLOT_IAK];
+      const gak = s0[base + SLOT_GEQ];
+      const cakhat = iak + gak * delvak;
+      const tolAK = reltol * Math.max(Math.abs(cakhat), Math.abs(iak)) + abstol;
+
+      // ngspice DIOconvTest on J2 (gate-cathode)
+      const vgkRaw = vG - vK;
+      const delvgk = vgkRaw - s0[base + SLOT_VGK];
+      const igk = s0[base + SLOT_IGK];
+      const ggk = s0[base + SLOT_G_GATE_GEQ];
+      const cgkhat = igk + ggk * delvgk;
+      const tolGK = reltol * Math.max(Math.abs(cgkhat), Math.abs(igk)) + abstol;
+
+      return Math.abs(cakhat - iak) <= tolAK && Math.abs(cgkhat - igk) <= tolGK;
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -317,7 +333,7 @@ export function createScrElement(
     get _latchedState(): boolean {
       return s0[base + SLOT_LATCHED] !== 0.0;
     },
-  } as AnalogElementCore & { _latchedState: boolean };
+  } as ReactiveAnalogElementCore & { _latchedState: boolean };
 }
 
 // ---------------------------------------------------------------------------

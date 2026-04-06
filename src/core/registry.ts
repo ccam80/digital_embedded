@@ -39,6 +39,7 @@ export interface ParamDef {
   rank: "primary" | "secondary";
   min?: number;
   max?: number;
+  default?: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -62,8 +62,6 @@ function makeNoopAnalogFactory() {
     branchIndex: -1 as const,
     isNonlinear: false,
     isReactive: false,
-    stateSize: 0,
-    stateBaseOffset: 0,
     stamp: () => {},
     getPinCurrents: () => [] as number[],
     setParam: (_key: string, _value: number) => {},

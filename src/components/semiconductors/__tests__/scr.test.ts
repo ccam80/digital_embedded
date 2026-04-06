@@ -25,22 +25,19 @@ import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
+import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // Helper: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
 
-function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
-  const size = core.stateSize ?? 0;
-  const pool = new StatePool(Math.max(size, 1));
-  if (size > 0) {
-    core.stateBaseOffset = 0;
-    core.initState!(pool);
-  } else {
-    core.stateBaseOffset = -1;
-  }
-  return { element: core, pool };
+function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
+  const re = core as ReactiveAnalogElement;
+  const pool = new StatePool(Math.max(re.stateSize, 1));
+  re.stateBaseOffset = 0;
+  re.initState(pool);
+  return { element: re, pool };
 }
 
 // ---------------------------------------------------------------------------
@@ -61,11 +58,9 @@ const SCR_DEFAULTS = {
 
 // Slot indices (must match scr.ts)
 const SLOT_VAK        = 0;
-const SLOT_VGK        = 1;
 const SLOT_GEQ        = 2;
 const SLOT_IEQ        = 3;
 const SLOT_G_GATE_GEQ = 4;
-const SLOT_G_GATE_IEQ = 5;
 const SLOT_LATCHED    = 6;
 
 // ---------------------------------------------------------------------------
@@ -90,8 +85,6 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
-    stateSize: 0,
-    stateBaseOffset: -1,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolver): void {
@@ -161,6 +154,7 @@ describe("SCR", () => {
       solver,
       elements: [vs, rLoad, scr],
       matrixSize,
+      nodeCount: 2,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics: diag,
     });

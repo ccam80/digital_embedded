@@ -17,7 +17,8 @@ export type {
   StatePoolRef,
 } from "../../core/analog-types.js";
 
-import type { ComplexSparseSolver, IntegrationMethod, SparseSolverStamp, StatePoolRef } from "../../core/analog-types.js";
+import type { AnalogElementCore, ComplexSparseSolver, IntegrationMethod, SparseSolverStamp, StatePoolRef } from "../../core/analog-types.js";
+import type { StateSchema } from "./state-schema.js";
 
 // ---------------------------------------------------------------------------
 // AnalogElement
@@ -161,7 +162,7 @@ export interface AnalogElement {
    * @param voltages     - Current NR solution vector
    * @param prevVoltages - Solution vector from the previous NR iteration
    */
-  checkConvergence?(voltages: Float64Array, prevVoltages: Float64Array): boolean;
+  checkConvergence?(voltages: Float64Array, prevVoltages: Float64Array, reltol: number, iabstol: number): boolean;
 
   /**
    * Compute and return the local truncation error estimate for adaptive
@@ -254,36 +255,6 @@ export interface AnalogElement {
   label?: string;
 
   /**
-   * Float64 slots required in the state pool. 0 = no state.
-   *
-   * For elements with a declared StateSchema (see state-schema.ts), this MUST
-   * equal `schema.size`. For elements with `stateSize > 0` but no schema
-   * (trivial pool usage), the element still owns its slots but forfeits
-   * dev-time enforcement. New reactive elements MUST declare a schema.
-   */
-  readonly stateSize: number;
-
-  /**
-   * Optional schema declaring this element's slot layout. When present, the
-   * dev-time probe enforces that all mutable scalar state lives inside the
-   * pool rather than on the element instance.
-   */
-  readonly stateSchema?: import("./state-schema.js").StateSchema;
-
-  /** Base offset into pool, assigned by compiler. -1 if stateSize === 0. */
-  stateBaseOffset: number;
-
-  /**
-   * Bind to state pool after allocation. Called once by the compiler at
-   * compiler.ts:1332. Contract:
-   *   - Pool contents are guaranteed zero on entry (fresh StatePool).
-   *   - Must cache pool reference + base offset for hot-path access.
-   *   - Must call applyInitialValues(schema, pool, base, params) if a schema
-   *     is declared. No other writes are permitted to `this`.
-   */
-  initState?(pool: StatePoolRef): void;
-
-  /**
    * Return simulation times within (tStart, tEnd) at which this element has
    * a discontinuity (e.g. a square-wave edge, a PWL corner).
    *
@@ -310,4 +281,33 @@ export interface AnalogElement {
    * time by MNAEngine._seedBreakpoints().
    */
   registerRefreshCallback?(cb: () => void): void;
+}
+
+/**
+ * AnalogElementCore extended with state-pool-backed reactive fields.
+ *
+ * This is the factory return type for components that use the shared
+ * state pool (capacitors, diodes, BJTs, etc.). It does NOT include
+ * pinNodeIds / allNodeIds — those are set by the compiler after
+ * factory construction.
+ */
+export interface ReactiveAnalogElementCore extends AnalogElementCore {
+  readonly poolBacked: true;
+  readonly isReactive: true;
+  readonly stateSize: number;
+  stateBaseOffset: number;
+  readonly stateSchema: StateSchema;
+  initState(pool: StatePoolRef): void;
+}
+
+/**
+ * Post-compilation reactive element with both compiler-assigned node IDs
+ * and state-pool fields. Used by the engine and post-compilation code.
+ */
+export type ReactiveAnalogElement = ReactiveAnalogElementCore & AnalogElement;
+
+export function isPoolBacked(el: AnalogElement): el is ReactiveAnalogElement;
+export function isPoolBacked(el: AnalogElementCore): el is ReactiveAnalogElementCore;
+export function isPoolBacked(el: AnalogElementCore): el is ReactiveAnalogElementCore {
+  return (el as any).poolBacked === true;
 }

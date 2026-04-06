@@ -50,6 +50,7 @@ import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
+import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -65,16 +66,12 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // Helper: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
 
-function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
-  const size = core.stateSize ?? 0;
-  const pool = new StatePool(Math.max(size, 1));
-  if (size > 0) {
-    core.stateBaseOffset = 0;
-    core.initState!(pool);
-  } else {
-    core.stateBaseOffset = -1;
-  }
-  return { element: core, pool };
+function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
+  const re = core as ReactiveAnalogElement;
+  const pool = new StatePool(Math.max(re.stateSize, 1));
+  re.stateBaseOffset = 0;
+  re.initState(pool);
+  return { element: re, pool };
 }
 
 
@@ -779,7 +776,7 @@ describe("AnalogLED", () => {
     const props = new PropertyBag();
     props.set("color", "red");
     props.replaceModelParams({ IS: 3.17e-19, N: 1.8 });
-    const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props);
+    const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     const { element } = withState(core);
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
@@ -803,7 +800,7 @@ describe("AnalogLED", () => {
     const props = new PropertyBag();
     props.set("color", "red");
     props.replaceModelParams({ IS: 3.17e-19, N: 1.8 });
-    const ledCore = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props);
+    const ledCore = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     const { element: ledStateWrapped } = withState(ledCore);
     const led = withNodeIds(ledStateWrapped, [1, 0]);
 
@@ -814,6 +811,7 @@ describe("AnalogLED", () => {
       solver,
       elements: [vs, r, led],
       matrixSize,
+      nodeCount: 2,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });
@@ -839,7 +837,7 @@ describe("AnalogLED", () => {
     const props = new PropertyBag();
     props.set("color", "blue");
     props.replaceModelParams({ IS: 6.26e-24, N: 2.5 });
-    const ledCore = getFactory(LedDefinition.modelRegistry!.blue!)!(new Map([["in", 1]]), [], -1, props);
+    const ledCore = getFactory(LedDefinition.modelRegistry!.blue!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     const { element: ledStateWrapped } = withState(ledCore);
     const led = withNodeIds(ledStateWrapped, [1, 0]);
 
@@ -850,6 +848,7 @@ describe("AnalogLED", () => {
       solver,
       elements: [vs, r, led],
       matrixSize,
+      nodeCount: 2,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });

@@ -217,6 +217,7 @@ describe("SPST", () => {
       solver,
       elements: [sw, rLoad, vsCtrl as unknown as AnalogElement, vsIn as unknown as AnalogElement],
       matrixSize,
+      nodeCount: 3,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });
@@ -259,6 +260,7 @@ describe("SPST", () => {
       solver,
       elements: [sw, rLoad, vsCtrl as unknown as AnalogElement, vsIn as unknown as AnalogElement],
       matrixSize,
+      nodeCount: 3,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });

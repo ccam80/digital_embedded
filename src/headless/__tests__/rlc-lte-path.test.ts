@@ -15,7 +15,6 @@
 import { describe, it, expect } from 'vitest';
 import { DefaultSimulatorFacade } from '../default-facade.js';
 import { createDefaultRegistry } from '../../components/register-all.js';
-import { DefaultSimulationCoordinator } from '../../solver/coordinator.js';
 import { MNAEngine } from '../../solver/analog/analog-engine.js';
 
 const registry = createDefaultRegistry();

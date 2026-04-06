@@ -32,6 +32,7 @@ import { StatePool } from "../state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../sparse-solver.js";
 import type { AnalogElement } from "../element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
+import type { ReactiveAnalogElement } from "../element.js";
 
 // ---------------------------------------------------------------------------
 // Default model parameters (same as mosfet.test.ts for exact comparison)
@@ -81,14 +82,12 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
  * Allocate a StatePool sized for the element's stateSize, assign stateBaseOffset,
  * and call initState. Returns the element (mutated in place) for chaining.
  */
-function withState<T extends AnalogElementCore>(element: T): T {
-  const size = element.stateSize;
-  if (size > 0 && element.initState) {
-    element.stateBaseOffset = 0;
-    const pool = new StatePool(size);
-    element.initState(pool);
-  }
-  return element;
+function withState(element: AnalogElementCore): ReactiveAnalogElement {
+  const re = element as ReactiveAnalogElement;
+  re.stateBaseOffset = 0;
+  const pool = new StatePool(re.stateSize);
+  re.initState(pool);
+  return re;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,8 +113,6 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
-    stateSize: 0,
-    stateBaseOffset: -1,
     stamp(solver: SparseSolverType): void {
       if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
       if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
@@ -163,6 +160,7 @@ describe("Refactor", () => {
       matrixSize,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
+      nodeCount: 3,
     });
 
     expect(result.converged).toBe(true);
@@ -213,6 +211,7 @@ describe("Refactor", () => {
       matrixSize,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
+      nodeCount: 3,
     });
 
     expect(result.converged).toBe(true);
@@ -387,10 +386,10 @@ describe("AbstractFetElement", () => {
 // ---------------------------------------------------------------------------
 
 describe("StatePool migration", () => {
-  it("stateSize_is_25", () => {
+  it("stateSize_is_30", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
     const element = createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj);
-    expect(element.stateSize).toBe(25);
+    expect(element.stateSize).toBe(30);
   });
 
   it("stateBaseOffset_defaults_to_minus1_before_initState", () => {

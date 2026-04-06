@@ -33,6 +33,14 @@ A fully implemented component has these models: digital, and a modelRegistry con
 
 A feature can work headless but break in MCP serialization, or work in MCP but fail in the browser. All three surfaces are non-negotiable.
 
+### No Pragmatic Patches
+
+Never propose "pragmatic", "simple", "fastest", or "minimal" solutions. Always implement the cleanest final architecture. If the correct fix requires interface changes, larger blast radius, or new infrastructure — do that work. Never defer the real fix until later.
+
+### SPICE-Correct Implementations Only
+
+When implementing or fixing any SPICE-derived algorithm (convergence, stamps, limiting, integration), match the corresponding ngspice source function exactly (e.g., `BJTconvTest`, `DIOload`). Provide a mapping table from ngspice variables to ours.
+
 ### Serve Over HTTP
 
 All files MUST be served over HTTP, not opened as `file://` URLs.

@@ -88,6 +88,7 @@ export class AcAnalysis {
       solver: dcSolver,
       elements: compiled.elements,
       matrixSize: compiled.matrixSize,
+      nodeCount: compiled.nodeCount,
       params: this._params,
       diagnostics: dcDiagnostics,
     });

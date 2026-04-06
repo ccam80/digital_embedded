@@ -1,0 +1,184 @@
+--- a/spec/state-pool-schema.md
++++ b/spec/state-pool-schema.md
+# Amendment N: Pre-flight gate §0 — MOSFET stateBaseOffset=-1 regression blocks Wave A
+@@ -7,6 +7,26 @@
+ ---
+ 
++## 0. Pre-flight gate — MOSFET `stateBaseOffset=-1` regression (blocks Wave A)
++
++**Status: OPEN. Wave A MUST NOT land until this regression is root-caused and fixed.**
++
++**Symptom:** `stateBaseOffset=-1` reaches `fet-base.ts:97` (the `get _vgs` accessor) with `this._s0` undefined, producing `TypeError: Cannot read properties of undefined`. Reproduces in the Phase C CMOS AND recompile path.
++
++**Important:** The user-facing "unconnected pin" error is a misleading friendly-error translation of the raw TypeError — NOT an actual connectivity diagnostic. Investigators must look at the raw TypeError, not the friendly message.
++
++**Owner pointers:**
++- `src/solver/analog/fet-base.ts:97` — `get _vgs` dereferences `this._s0[this.stateBaseOffset + SLOT_VGS]`; crashes when the pool was never bound (`initState` never called for this element).
++- `src/components/semiconductors/mosfet.ts:646` — `updateOperatingPoint` calls through to `_vgs`.
++- Hypothesis: MOSFET elements from CMOS AND subcircuit flattening are not getting `initState`/`stateBaseOffset` assigned before the first NR pass in `solveDcOperatingPoint`.
++- Related files in git status: `src/compile/compiler.ts`, `src/solver/analog/compiled-analog-circuit.ts`, `src/solver/analog/compiler.ts`.
++
++**Why this blocks Wave A:** Wave A changes (engine `initState` dedup removal at `analog-engine.ts:186`, `reset()` re-init, first-step probe) touch the same pool-binding subsystem. Landing Wave A on top of this regression would compound or mask the failure path.
++
++**Cross-reference §3:** Once resolved, the dev-probe (Wave A step 5, §5.1) would have caught this class of bug — an element with `stateSize > 0` whose `initState` was never called. Further motivation for landing the probe promptly after this regression is fixed.
++
++---
++
+ ## 1. The contract shape
+# Amendment L: Explicit-defaults rule and closure-variable constraint note in §1.1
+@@ -13,5 +33,10 @@
+ ### 1.1 Decision summary
+ 
+ After reading `element.ts:235-248`, `state-pool.ts:1-29`, `capacitor.ts:130-264`, `bjt.ts:713-774`, and `fet-base.ts:45-163`, the shape that satisfies every constraint (hot-path zero-overhead, declarative initial values, grouping, type-safe slot access, first-call flags) is:
++
++**Explicit-defaults rule:** Every `SlotDescriptor` MUST carry an explicit `init` entry. There is no implicit default. Zero-init: `{ kind: "zero" }`. Constant: `{ kind: "constant", value: N }`. Param-dependent: `{ kind: "fromParams", compute: (params) => ... }`. Never omit `init`.
++
++**Note on `fromParams` and closure variables:** `fromParams` compute receives only the element's `params: Readonly<Record<string, number>>` model-param record — it cannot capture factory closure variables (e.g. BJT `polarity: 1 | -1`). For slots seeded from a closure variable, write an imperative assignment in `initState` after `applyInitialValues`, and document this in the slot's `doc` field.
++
+ 
+ > **A frozen array of `SlotDescriptor` records, declared as `const` at module scope.
+# Amendment C + Blocker 2: Fix compiler.ts:1310-1312 → compiler.ts:1332 in applyInitialValues JSDoc
+@@ -101,7 +126,7 @@
+  * Apply `SlotInit` entries to the backing Float64Array starting at `base`.
+  * Called exactly once per element from its initState(). Runs at compile time
+- * (via compiler.ts:1310-1312), never per step.
++ * (via compiler.ts:1332), never per step.
+  *
+  * `params` is the element's resolved param record, used by `fromParams` slots.
+  * Pass an empty object if the element has no param-dependent initial values.
+# Amendment C + Blocker 2: Fix compiler.ts:1310-1312 → compiler.ts:1332 in §1.3 initState JSDoc
+@@ -198,7 +223,7 @@
+   /**
+    * Bind to state pool after allocation. Called once by the compiler at
+-   * compiler.ts:1310-1312. Contract:
++   * compiler.ts:1332. Contract:
+    *   - Pool contents are guaranteed zero on entry (fresh StatePool).
+    *   - Must cache pool reference + base offset for hot-path access.
+    *   - Must call applyInitialValues(schema, pool, base, params) if a schema
+# Amendment D: Add ReactiveAnalogElement mixin interface after §1.3 code block
+@@ -206,4 +231,19 @@
+   initState?(pool: StatePoolRef): void;
+ ```
+ 
++**Amendment D — `ReactiveAnalogElement` interface (`element.ts`):**
++
++Add the following interface in `src/solver/analog/element.ts` alongside `AnalogElement`. Elements that adopt a `StateSchema` SHOULD implement this interface:
++
++```typescript
++/**
++ * Mixin interface for reactive analog elements that declare a StateSchema.
++ * Enables the dev-time assertPoolIsSoleMutableState probe (§3).
++ */
++export interface ReactiveAnalogElement extends AnalogElementCore {
++  readonly stateSchema: import("./state-schema.js").StateSchema;
++  readonly stateSize: number;  // must equal stateSchema.size
++  stateBaseOffset: number;
++  initState(pool: StatePoolRef): void;
++}
++```
++
+ ### 1.4 Worked example — `AnalogCapacitorElement` in the new shape
+# Amendment C + Blocker 2: Fix compiler.ts:1310-1312 → compiler.ts:1332 in §2 Engine guarantees
+@@ -283,3 +323,3 @@
+ **Engine guarantees on entry:**
+-- `pool.state0` contents for this element's slots are **guaranteed zero**. `StatePool`'s constructor (`state-pool.ts:10-15`) uses `new Float64Array(totalSlots)` which zero-fills. `initState` is called exactly once per compile at `compiler.ts:1310-1312` on a freshly-allocated pool. No stale data.
++- `pool.state0` contents for this element's slots are **guaranteed zero**. `StatePool`'s constructor (`state-pool.ts:10-15`) uses `new Float64Array(totalSlots)` which zero-fills. `initState` is called exactly once per compile at `compiler.ts:1332` (loop `compiler.ts:1319-1334`) on a freshly-allocated pool. No stale data.
+ - `pool.state1` and `pool.state2` are also zero, but `initState` MUST NOT write to them — history vectors are managed exclusively by `StatePool.acceptTimestep()` (`state-pool.ts:17-21`).
+# Amendment A + B + C + Blocker 2 + L2: Rewrite §2 Call sites paragraph
+@@ -288,1 +328,1 @@
+-**Call sites:** exactly one — `compiler.ts:1310-1312`. Not called from `analog-engine.ts:init` (that only rebinds pool refs for re-use, see `analog-engine.ts:175-187`), not called from DC-op, not called from `reset()` (`analog-engine.ts:195-211` — reset uses `statePool.reset()` which zero-fills, meaning **on reset, initial values are lost**). Flagged in section 6 as an open issue, but the fix is out of scope for this spec: a follow-up must either (a) have `reset()` re-invoke `initState` for all elements, or (b) for now, rely on the observation that every current reset is followed by a fresh transient that re-converges naturally.
++**Call sites:** exactly one — `compiler.ts:1332` (loop `compiler.ts:1319-1334`). Not called from DC-op. The `analog-engine.ts:186` call (`el.initState?.(cac.statePool)`) is a redundant rebind; Wave A step 3 removes it. **Note (L2):** removal requires promoting `elements` from local `const` at `analog-engine.ts:173` to instance field `this._elements` so the first-step probe (Wave A step 5) can iterate it. Not called from `reset()` (`analog-engine.ts:195-211` — pool is zero-filled, so **non-zero initial values are lost on reset**); Wave A step 4 adds re-invocation of `initState` in `reset()` to restore them. See §5.1 and §6.
+# Amendment C + Blocker 4: Rewrite §3 probe "When it runs" — move to first MNAEngine.step()
+@@ -303,3 +343,3 @@
+ Location: `src/solver/analog/state-schema.ts` (already included in section 1.2 as `assertPoolIsSoleMutableState`).
+ 
+-When it runs: once per element, immediately after `compiler.ts:1311` calls `element.initState(statePool)`. Gated by `import.meta.env?.DEV` (Vite convention, already used elsewhere in the repo — verify in `compiler.ts`; if absent, use `process.env.NODE_ENV !== "production"`).
++When it runs: once per element, on the first `MNAEngine.step()` call (one-shot, guarded by `private _devProbeRan = false`). Gated by `import.meta.env?.DEV`. On first step, iterate `this._elements`, call `assertPoolIsSoleMutableState` for each element with a `stateSchema`, push violations as diagnostics, set `_devProbeRan = true`. **Closure-variable limitation:** factory-closure `let` variables (e.g. `capFirstCall` at `diode.ts:154-155`) are not enumerable own fields on the element object — `snapshotOwnFields` will not see them change. This gap closes when Wave C migrates those variables to pool slots.
+# Amendment F + H3: Fix transformer.ts row 10→7 (remove PREV_PREV/FIRST_CALL); tapped row 15→12 (remove PREV_PREV)
+@@ -477,3 +517,3 @@
+ | `crystal.ts` | 9 | `GEQ_L`, `IEQ_L`, `I_PREV_L`, `GEQ_CS`, `IEQ_CS`, `V_PREV_CS`, `GEQ_C0`, `IEQ_C0`, `V_PREV_C0` |
+-| `transformer.ts` | 10 | `G11`, `G22`, `G12`, `HIST1`, `HIST2`, `PREV_I1`, `PREV_I2`, `PREV_PREV_I1`, `PREV_PREV_I2`, `FIRST_CALL` |
+-| `tapped-transformer.ts` | 15 | `G11`, `G22`, `G33`, `G12`, `G13`, `G23`, `HIST1`, `HIST2`, `HIST3`, `PREV_I1`, `PREV_I2`, `PREV_I3`, `PREV_PREV_I1`, `PREV_PREV_I2`, `PREV_PREV_I3` (14 if no first-call flag is needed; verify against `transformer.ts` pattern at read-time and add `FIRST_CALL` as slot 15 if required) |
++| `transformer.ts` | 7 | `G11`, `G22`, `G12`, `HIST1`, `HIST2`, `PREV_I1`, `PREV_I2`. Pre-diff note: read `coupled-inductor.ts:29-38` before migrating; `_state.prevI1/prevI2` accesses in BDF-2 branch (`transformer.ts:338-344`) must migrate with `_g11/_g22/_g12/_hist1/_hist2`. Pre-diff row included `PREV_PREV_I1`, `PREV_PREV_I2`, and `FIRST_CALL`; **removed** — no such fields exist on `AnalogLinearTransformerElement`. |
++| `tapped-transformer.ts` | 12 | `G11`, `G22`, `G33`, `G12`, `G13`, `G23`, `HIST1`, `HIST2`, `HIST3`, `PREV_I1`, `PREV_I2`, `PREV_I3`. Verified from `tapped-transformer.ts:222-235`: 12 instance fields, no `PREV_PREV_I*`. Pre-diff row listed 14–15 slots with fictional `PREV_PREV_I1/2/3`; **removed**. |
+# Amendment E2: Fix diode stateSize 4/7→4/8; add CAP_FIRST_CALL as slot 7; correct initState line to 164-168
+@@ -482,1 +522,1 @@
+-| `diode.ts` | current stateSize 4 or 7 (`diode.ts:161`). Add `CAP_FIRST_CALL` as a new slot at the tail (value 1.0 on init via `constant: 1.0`), making stateSize 5 or 8. `schottky.ts` inherits automatically. |
++| `diode.ts` | stateSize 4 or 7 per `diode.ts:161`. Add `CAP_FIRST_CALL` as slot 7 (seeded `{ kind: "constant", value: 1.0 }`), making stateSize 4 or **8**. The closure `let capFirstCall` (`diode.ts:154-155`) migrates to this slot. `schottky.ts` inherits automatically. `initState` is at `diode.ts:164-168`. |
+# Amendment I: Clarify FET stateSize 25 base→28 with JFET extension; confirm pool-backed VSB/GMBS
+@@ -483,1 +523,1 @@
+-| `mosfet.ts` / `fet-base.ts` | keep the existing 25-slot layout from `fet-base.ts:46-74`, add `VSB` and `GMBS` formally into the schema (already slots 23-24 on disk per the in-flight migration, see section 5), extend to 28 for JFET as above → **final FET base stateSize: 28**. |
++| `mosfet.ts` / `fet-base.ts` | existing 25-slot layout `fet-base.ts:46-74` (slots 0–24); `VSB`=slot 23, `GMBS`=slot 24, already pool-backed via `_s0` getters (`mosfet.ts:734-738`). Schema retrofit is additive (Wave D). Extend to 28 for JFET: slots 25–27 are `JFET_VGS_JUNCTION`, `JFET_GD_JUNCTION` (seeded `{ kind: "constant", value: GMIN }`), `JFET_ID_JUNCTION` (seeded `{ kind: "zero" }`). MOSFET leaves slots 25-27 zero. **Final stateSize: 28 after Wave D.** |
+# Amendment A + B + Blocker 4 + H2 + L2: Rewrite Wave A steps 3-4; renumber to 6 steps; correct ordering
+@@ -495,6 +535,8 @@
+ **Wave A — Infrastructure (one commit, no functional change):**
+ 1. Create `src/solver/analog/state-schema.ts` (file from section 1.2 verbatim).
+ 2. Update `element.ts:235-248` JSDoc and add the optional `stateSchema` field (section 1.3).
+-3. Add the dev-probe invocation at the end of `compiler.ts:1312`, inside `if (import.meta.env?.DEV)`. It iterates every `analogElements` entry, runs `assertPoolIsSoleMutableState`, and pushes any returned violations as diagnostics onto the existing `diagnostics` array.
+-4. Run full test suite. No element has yet adopted the schema, so no violations fire. Expected: green.
++3. Remove the redundant `el.initState?.(cac.statePool)` at `analog-engine.ts:186`. Requires promoting `elements` from local `const` (destructured at `analog-engine.ts:173`) to instance field `this._elements` so step 5's probe can iterate it.
++4. Fix `reset()` at `analog-engine.ts:195-211`: after `cac.statePool.reset()`, re-invoke `el.initState(cac.statePool)` for every element with `stateSize > 0`. Restores non-zero initial values after reset. Flag in commit message as a pre-existing bug fix.
++5. Wire dev-probe in `MNAEngine.step()` as one-shot: `private _devProbeRan = false`; when `import.meta.env?.DEV && !this._devProbeRan`, iterate `this._elements`, call `assertPoolIsSoleMutableState` for elements with `stateSchema`, push violations as diagnostics, set `_devProbeRan = true`.
++6. Run full test suite. No element has yet adopted the schema, so no violations fire. Expected: green.
+# Amendment E + K + M: Add Wave E section with BJT layout verification and warm-start seeds
+@@ -513,3 +555,22 @@
+ 
+ **Wave D — MOSFET finalisation:**
+ 14. See section 5.3 below.
++
++**Wave E — Declarative schema retrofit for already-migrated reactive elements:**
++15. Retrofit all elements that completed pool migration in Phases 1–5 with `defineStateSchema` + `applyInitialValues`. Order: `capacitor.ts`, `inductor.ts`, `coupled-inductor.ts`, `bjt.ts` (both factories — see K/M notes below), `zener.ts`, `led.ts`, `tunnel-diode.ts`, `varactor.ts`, `scr.ts`, `triac.ts`, `fet-base.ts` (covers all FET subclasses).
++
++**Wave E — Amendment K: BJT slot layout (verified from `bjt.ts:713-774`):**
++- Simple (`createBjtElement`): `stateSize: 10`. `SLOT_VBE=0` … `SLOT_IB_NORTON=9`. Schema: `{ kind: "zero" }` for all 10; `initState` retains the imperative `computeBjtOp` snapshot.
++- L1 (`createSpiceL1BjtElement`): `stateSize: 24`. Slots 0–9 L1-prefixed. `L1_SLOT_RB_EFF=10` → `{ kind: "fromParams", compute: (p) => p.RB }`. Slots 11–22 `{ kind: "zero" }`. `L1_SLOT_CAP_FIRST_CALL=23` → `{ kind: "constant", value: 1.0 }`.
++
++**Wave E — Amendment M: BJT warm-start slot seeds:**
++NR convergence requires non-zero junction bias; zero-init leaves both junctions at cutoff, slowing or failing convergence for typical amplifier operating points.
++
++Add to `initState` in both factories immediately after `applyInitialValues`:
++- Simple: `s0[base + SLOT_VBE] = polarity * 0.6;` (NPN: +0.6 V, PNP: -0.6 V). `SLOT_VBC` stays 0.
++- L1: `s0[base + L1_SLOT_VBE] = polarity * 0.6;`. `L1_SLOT_VBC` stays 0.
++
++In the `StateSchema`, declare both VBE slots with `{ kind: "zero" }` and `doc`: `"VBE warm-start: seeded ±0.6 V in initState via polarity closure (NPN: +0.6, PNP: -0.6). Cannot use fromParams — polarity is factory arg, not model param."`.
++
++**Polarity key:** both factories take `polarity: 1 | -1` as first argument (`bjt.ts:376-381`). NOT in the `params` model-param record. Imperative post-`applyInitialValues` assignment is required.
++
+# Amendment J: Add non-violations callout and see-also note after last §6 non-goal bullet
+@@ -546,3 +589,8 @@
+ - **`AbstractFetElement` migration style.** Decision committed in section 5.3: schema-based, with the existing `const SLOT_*` integer constants and `static readonly SLOT_*` class mirrors retained as the hot-path access pattern. No getter/setter removal. The existing private getter/setters at `fet-base.ts:166-180` that already route through `this._s0[this.stateBaseOffset + SLOT_X]` are the correct pattern and are preserved.
+ 
++**Non-violations (probe must not flag):** (a) digital-pin-model objects — not `AnalogElementCore` implementors; (b) behavioral flip-flops in digital domain — no state pool; (c) `_reverseBiasDiagEmitted` boolean latch in `polarized-cap.ts:226` — probe filters `typeof v === "number"` so booleans are skipped; (d) physical-parameter fields (`C`, `G_esr`, `R`, etc.) mutated only via `setParam` — probe snapshots only during stamp-chain calls so these are not observed.
++
++**See also:** A separate `updateCompanion` dead-dispatch defect exists (some elements' `updateCompanion` is never called; engine calls `stampCompanion` directly). Distinct from the pool-contract violations addressed here; tracked separately.
++
+ **Open questions the executor must NOT resolve (punt to a follow-up):**
+# Amendment C + Blocker 2: Fix compiler.ts:1298-1312 → compiler.ts:1319-1334 in References section
+@@ -564,1 +612,1 @@
+-- `src/solver/analog/compiler.ts:1298-1312` — state-pool allocation loop; the dev probe attaches at line 1312.
++- `src/solver/analog/compiler.ts:1319-1334` — state-pool allocation loop; `element.initState(statePool)` is called at line 1332.
+```
+
+---
+
+Hunk coverage table:
+
+| Amendment | Hunk # | Old line range | Description |
+|-----------|--------|----------------|-------------|
+| N | 1 | 7–12 | New §0 pre-flight gate — MOSFET regression blocks Wave A |
+| L | 2 | 13–17 | Explicit-defaults rule + fromParams/closure-var note in §1.1 |
+| C (Blocker 2) | 3 | 101–107 | Fix `compiler.ts:1310-1312` → `:1332` in `applyInitialValues` JSDoc |
+| C (Blocker 2) | 4 | 198–204 | Fix `compiler.ts:1310-1312` → `:1332` in `§1.3` initState JSDoc |
+| D | 5 | 206–209 | Insert `ReactiveAnalogElement` mixin interface after §1.3 code block |
+| C (Blocker 2) | 6 | 283–285 | Fix `compiler.ts:1310-1312` → `:1332` in §2 Engine guarantees |
+| A+B+C+Blocker2+L2 | 7 | 288 | Rewrite §2 Call sites — correct line ref, add dedup/reset/`_elements` note |
+| C+Blocker4 | 8 | 303–305 | Rewrite §3 "When it runs" — move probe to first `step()`, closure-var limitation |
+| F+H3 | 9 | 477–479 | Transformer 10→7 slots (remove `PREV_PREV`/`FIRST_CALL`); tapped 15→12 |
+| E2 | 10 | 482 | Diode size 4/7→4/8; `CAP_FIRST_CALL` = slot 7; initState at `:164-168` |
+| I | 11 | 483 | FET stateSize 25 base, 28 after JFET extension; confirm pool-backed `VSB`/`GMBS` |
+| A+B+Blocker4+H2+L2 | 12 | 495–500 | Rewrite Wave A steps 3-4 → steps 3-6 (engine dedup, reset re-init, first-step probe) |
+| E+K+M | 13 | 513–515 | Add Wave E section — retrofit list + BJT layout (K) + warm-start seeds (M) |
+| J | 14 | 546–548 | Non-violations callout + `updateCompanion` see-also note in §6 |
+| C (Blocker 2) | 15 | 564 | Fix References `compiler.ts:1298-1312` → `compiler.ts:1319-1334` |
+
+*Note: `+` line numbers in `@@` headers are approximate; `-` old-file anchors are validated against current file content. The reviewer should run `git apply --check spec/state-pool-schema.md.patch` before applying. Hunk 13 Wave E placement is at the end of Wave D (original line 513) — no ambiguity.*

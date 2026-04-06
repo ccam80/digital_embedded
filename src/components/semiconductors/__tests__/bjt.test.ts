@@ -34,22 +34,19 @@ import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
+import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 
 // ---------------------------------------------------------------------------
 // Helper: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
 
-function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
-  const size = core.stateSize ?? 0;
-  const pool = new StatePool(Math.max(size, 1));
-  if (size > 0) {
-    core.stateBaseOffset = 0;
-    core.initState!(pool);
-  } else {
-    core.stateBaseOffset = -1;
-  }
-  return { element: core, pool };
+function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
+  const re = core as ReactiveAnalogElement;
+  const pool = new StatePool(Math.max(re.stateSize, 1));
+  re.stateBaseOffset = 0;
+  re.initState(pool);
+  return { element: re, pool };
 }
 
 // ---------------------------------------------------------------------------
@@ -345,25 +342,25 @@ describe("NPN", () => {
     const prevVoltages = new Float64Array(3);
     prevVoltages.set(voltages);
 
-    const converged = element.checkConvergence!(voltages, prevVoltages);
+    const converged = element.checkConvergence!(voltages, prevVoltages, 1e-3, 1e-12);
     expect(converged).toBe(true);
   });
 
   it("checkConvergence_returns_false_when_large_deviation_from_pool", () => {
     // makeBjtAtOp converges the element at Vbe=0.7V in pool.
-    // Present a junction voltage far from 0.7V → not converged.
+    // Present a junction voltage far from 0.7V → predicted currents diverge.
     const element = makeBjtAtOp(1, 0.7, -4.3);
 
-    // Vb=0.0 → vbeRaw = 0.0, pool has 0.7V, difference = 0.7V >> 2*VT
+    // Vb=0.0 → vbeRaw = 0.0, pool has 0.7V → large delvbe → predicted currents far from stored
     const voltages = new Float64Array(3);
     voltages[0] = 5.0;
-    voltages[1] = 0.0; // vbeRaw = 0.0, pool ≈ 0.7 → diff = 0.7V > 2*VT
+    voltages[1] = 0.0;
     voltages[2] = 0;
 
     const prevVoltages = new Float64Array(3);
     prevVoltages.set(voltages);
 
-    const converged = element.checkConvergence!(voltages, prevVoltages);
+    const converged = element.checkConvergence!(voltages, prevVoltages, 1e-3, 1e-12);
     expect(converged).toBe(false);
   });
 
@@ -670,6 +667,7 @@ describe("Integration", () => {
       solver,
       elements: [vcc, vbb, rc, rb, bjt],
       matrixSize,
+      nodeCount: 4,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });
@@ -718,6 +716,7 @@ describe("Integration", () => {
       solver,
       elements: [vcc, rc, bjt],
       matrixSize,
+      nodeCount: 2,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });
@@ -755,14 +754,14 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const elements = [vcc, vbb, rc, rb, bjt];
 
     // Before: BF=100
-    const before = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const before = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 4, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[0], 6.928910e-01, "V(collector) before");
     expectSpiceRef(before.nodeVoltages[1], 6.928910e-01, "V(base) before");
 
     // setParam and re-solve
     bjt.setParam("BF", 50);
-    const after = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const after = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 4, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
     expect(after.converged).toBe(true);
     expectSpiceRef(after.nodeVoltages[0], 2.837533e+00, "V(collector) after BF=50");
     expectSpiceRef(after.nodeVoltages[1], 6.750668e-01, "V(base) after BF=50");
@@ -789,14 +788,14 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const elements = [vcc, vbb, rc, rb, bjt];
 
     // Before: IS=1e-14
-    const before = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const before = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 4, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[0], 6.928910e-01, "V(collector) before");
     expectSpiceRef(before.nodeVoltages[1], 6.928910e-01, "V(base) before");
 
     // setParam and re-solve
     bjt.setParam("IS", 1e-12);
-    const after = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const after = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 4, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
     expect(after.converged).toBe(true);
     expectSpiceRef(after.nodeVoltages[0], 5.744795e-01, "V(collector) after IS=1e-12");
     expectSpiceRef(after.nodeVoltages[1], 5.744795e-01, "V(base) after IS=1e-12");
@@ -889,6 +888,7 @@ describe("SPICE L1 model", () => {
       solver: solver1,
       elements: [vcc1, vbb1, rc1, rb1, simpleBjt],
       matrixSize,
+      nodeCount: 4,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics: diag1,
     });
@@ -911,6 +911,7 @@ describe("SPICE L1 model", () => {
       solver: solver2,
       elements: [vcc2, vbb2, rc2, rb2, spiceBjt],
       matrixSize,
+      nodeCount: 4,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics: diag2,
     });

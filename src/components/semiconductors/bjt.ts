@@ -29,17 +29,18 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import { defineModelParams } from "../../core/model-params.js";
+import { defineModelParams, deviceParams } from "../../core/model-params.js";
 import {
   capacitorConductance,
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
 import { computeJunctionCapacitance } from "./diode.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import type { ReactiveAnalogElementCore } from "../../solver/analog/element.js";
 import {
   defineStateSchema,
   applyInitialValues,
@@ -200,37 +201,37 @@ export const { defaults: BJT_SPICE_L1_PNP_DEFAULTS } = defineModelParams({
 // ---------------------------------------------------------------------------
 
 /** Small signal general purpose NPN. Source: Fairchild extracted. */
-const NPN_2N3904: Record<string, number> = {
+const NPN_2N3904 = deviceParams(BJT_SPICE_L1_PARAM_DEFS, {
   IS: 6.734e-15, BF: 416.4, NF: 1.0, BR: 0.7371, NR: 1.0,
   VAF: 74.03, IKF: 0.06678, IKR: 0, ISE: 6.734e-15, ISC: 0, VAR: 100,
   RB: 10, RC: 1, RE: 0, NE: 1.5, NC: 2,
   CJE: 2.65e-11, VJE: 0.65, MJE: 0.33, CJC: 3.59e-12, VJC: 0.75, MJC: 0.33,
   TF: 3.97e-10, TR: 5e-8, FC: 0.5,
-};
+});
 
 /** Small signal NPN (European, B-grade). Source: NXP extracted. */
-const NPN_BC547B: Record<string, number> = {
+const NPN_BC547B = deviceParams(BJT_SPICE_L1_PARAM_DEFS, {
   IS: 2.39e-14, BF: 294.3, NF: 1.008, BR: 7.946, NR: 1.004,
   VAF: 63.2, IKF: 0.1357, IKR: 0.1144, ISE: 3.545e-15, ISC: 6.272e-14, VAR: 25.9,
   RB: 10, RC: 1, RE: 0, NE: 1.48, NC: 2,
   CJE: 1.12e-11, VJE: 0.72, MJE: 0.33, CJC: 4.43e-12, VJC: 0.72, MJC: 0.33,
   TF: 4.26e-10, TR: 5e-8, FC: 0.5,
-};
+});
 
 /** General purpose NPN. Source: Fairchild extracted. */
-const NPN_2N2222A: Record<string, number> = {
+const NPN_2N2222A = deviceParams(BJT_SPICE_L1_PARAM_DEFS, {
   IS: 14.34e-15, BF: 255.9, NF: 1.0, BR: 6.092, NR: 1.0,
   VAF: 74.03, IKF: 0.2847, IKR: 0, ISE: 14.34e-15, ISC: 0, VAR: 100,
   RB: 10, RC: 1, RE: 0, NE: 1.5, NC: 2,
   CJE: 2.24e-11, VJE: 0.75, MJE: 0.33, CJC: 7.31e-12, VJC: 0.75, MJC: 0.33,
   TF: 4.11e-10, TR: 4.6e-8, FC: 0.5,
-};
+});
 
 /** Medium power NPN (TO-39, same die as 2N2222A). Source: Philips/LTspice. */
-const NPN_2N2219A: Record<string, number> = {
+const NPN_2N2219A = deviceParams(BJT_SPICE_L1_PARAM_DEFS, {
   IS: 14.34e-15, BF: 255.9, NF: 1.0, BR: 6.092, NR: 1.0,
   VAF: 74.03, IKF: 0.2847, IKR: 0, ISE: 14.34e-15, ISC: 0, VAR: 100,
-};
+});
 
 // ---------------------------------------------------------------------------
 // Built-in PNP model presets
@@ -238,31 +239,31 @@ const NPN_2N2219A: Record<string, number> = {
 // ---------------------------------------------------------------------------
 
 /** Small signal PNP (complement of 2N3904). Source: Fairchild extracted. */
-const PNP_2N3906: Record<string, number> = {
+const PNP_2N3906 = deviceParams(BJT_SPICE_L1_PARAM_DEFS, {
   IS: 1.41e-15, BF: 180.7, NF: 1.0, BR: 4.977, NR: 1.0,
   VAF: 18.7, IKF: 0.08, IKR: 0, ISE: 0, ISC: 0, VAR: 100,
   RB: 10, RC: 1, RE: 0, NE: 1.5, NC: 2,
   CJE: 4.49e-12, VJE: 0.66, MJE: 0.33, CJC: 1.95e-11, VJC: 0.75, MJC: 0.33,
   TF: 1e-9, TR: 1e-7, FC: 0.5,
-};
+});
 
 /** Small signal PNP (European, B-grade, complement of BC547B). Source: NXP extracted. */
-const PNP_BC557B: Record<string, number> = {
+const PNP_BC557B = deviceParams(BJT_SPICE_L1_PARAM_DEFS, {
   IS: 3.83e-14, BF: 344.4, NF: 1.008, BR: 14.84, NR: 1.005,
   VAF: 21.11, IKF: 0.08039, IKR: 0.047, ISE: 1.22e-14, ISC: 2.85e-13, VAR: 32.02,
-};
+});
 
 /** General purpose PNP (complement of 2N2222). Source: Philips extracted. */
-const PNP_2N2907A: Record<string, number> = {
+const PNP_2N2907A = deviceParams(BJT_SPICE_L1_PARAM_DEFS, {
   IS: 650.6e-18, BF: 231.7, NF: 1.0, BR: 3.563, NR: 1.0,
   VAF: 115.7, IKF: 1.079, IKR: 0, ISE: 54.81e-15, ISC: 0, VAR: 100,
-};
+});
 
 /** Medium power PNP. Source: Central Semiconductor Corp TIP32C.LIB. */
-const PNP_TIP32C: Record<string, number> = {
+const PNP_TIP32C = deviceParams(BJT_SPICE_L1_PARAM_DEFS, {
   IS: 1.8111e-12, BF: 526.98, NF: 1.0, BR: 1.1294, NR: 1.0,
   VAF: 100, IKF: 0.95034, IKR: 0.15869, ISE: 68.670e-12, ISC: 409.26e-9, VAR: 100,
-};
+});
 
 // ---------------------------------------------------------------------------
 // Stamp helpers — node 0 is ground (skipped)
@@ -400,7 +401,7 @@ export function createBjtElement(
   pinNodes: ReadonlyMap<string, number>,
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): ReactiveAnalogElementCore {
   const nodeB = pinNodes.get("B")!; // base
   const nodeC = pinNodes.get("C")!; // collector
   const nodeE = pinNodes.get("E")!; // emitter
@@ -441,6 +442,7 @@ export function createBjtElement(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true as const,
+    poolBacked: true as const,
     stateSchema: BJT_SIMPLE_SCHEMA,
     stateSize: BJT_SIMPLE_SCHEMA.size,
     stateBaseOffset: -1,
@@ -559,21 +561,39 @@ export function createBjtElement(
       s0[base + SLOT_IB_NORTON] = op.ib - op.gpi * vbeLimited - op.gmu * vbcLimited;
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array): boolean {
-      const vC = nodeC > 0 ? voltages[nodeC - 1] : 0;
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vC = nodeC > 0 ? voltages[nodeC - 1] : 0;
       const vE = nodeE > 0 ? voltages[nodeE - 1] : 0;
       const vbeRaw = polarity * (vB - vE);
       const vbcRaw = polarity * (vB - vC);
 
-      // Compare raw junction voltage against last limited pool value.
-      // Converged when the NR solution matches what pnjlim accepted.
+      const delvbe = vbeRaw - s0[base + SLOT_VBE];
+      const delvbc = vbcRaw - s0[base + SLOT_VBC];
+
+      // ngspice icheck: junction voltage must match what pnjlim accepted
+      // (mirrors the BJTload icheck flag that gates entry to BJTconvTest)
       const nfVt = params.NF * VT;
       const nrVt = params.NR * VT;
-      return (
-        Math.abs(vbeRaw - s0[base + SLOT_VBE]) <= 2 * nfVt &&
-        Math.abs(vbcRaw - s0[base + SLOT_VBC]) <= 2 * nrVt
-      );
+      if (Math.abs(delvbe) > nfVt || Math.abs(delvbc) > nrVt) {
+        return false;
+      }
+
+      // ngspice BJTconvTest: predict currents from linearisation, check tolerance
+      const cc  = s0[base + SLOT_IC];
+      const cb  = s0[base + SLOT_IB];
+      const gm  = s0[base + SLOT_GM];
+      const go  = s0[base + SLOT_GO];
+      const gpi = s0[base + SLOT_GPI];
+      const gmu = s0[base + SLOT_GMU];
+
+      const cchat = cc + (gm + go) * delvbe - (go + gmu) * delvbc;
+      const cbhat = cb + gpi * delvbe + gmu * delvbc;
+
+      const tolC = reltol * Math.max(Math.abs(cchat), Math.abs(cc)) + abstol;
+      const tolB = reltol * Math.max(Math.abs(cbhat), Math.abs(cb)) + abstol;
+
+      return Math.abs(cchat - cc) <= tolC && Math.abs(cbhat - cb) <= tolB;
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {
@@ -706,7 +726,7 @@ export function createSpiceL1BjtElement(
   internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): ReactiveAnalogElementCore {
   const nodeB_ext = pinNodes.get("B")!;
   const nodeC_ext = pinNodes.get("C")!;
   const nodeE_ext = pinNodes.get("E")!;
@@ -793,10 +813,11 @@ export function createSpiceL1BjtElement(
   let s0: Float64Array;
   let base: number;
 
-  const element: AnalogElementCore = {
+  const element: ReactiveAnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true as const,
+    poolBacked: true as const,
     stateSchema: BJT_L1_SCHEMA,
     stateSize: BJT_L1_SCHEMA.size,
     stateBaseOffset: -1,
@@ -981,19 +1002,38 @@ export function createSpiceL1BjtElement(
       }
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array): boolean {
-      const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
+      const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
       const vEi = nodeE_int > 0 ? voltages[nodeE_int - 1] : 0;
       const vbeRaw = polarity * (vBi - vEi);
       const vbcRaw = polarity * (vBi - vCi);
 
+      const delvbe = vbeRaw - s0[base + L1_SLOT_VBE];
+      const delvbc = vbcRaw - s0[base + L1_SLOT_VBC];
+
+      // ngspice icheck: junction voltage must match what pnjlim accepted
       const nfVt = params.NF * VT;
       const nrVt = params.NR * VT;
-      return (
-        Math.abs(vbeRaw - s0[base + L1_SLOT_VBE]) <= 2 * nfVt &&
-        Math.abs(vbcRaw - s0[base + L1_SLOT_VBC]) <= 2 * nrVt
-      );
+      if (Math.abs(delvbe) > nfVt || Math.abs(delvbc) > nrVt) {
+        return false;
+      }
+
+      // ngspice BJTconvTest: predict currents from linearisation, check tolerance
+      const cc  = s0[base + L1_SLOT_IC];
+      const cb  = s0[base + L1_SLOT_IB];
+      const gm  = s0[base + L1_SLOT_GM];
+      const go  = s0[base + L1_SLOT_GO];
+      const gpi = s0[base + L1_SLOT_GPI];
+      const gmu = s0[base + L1_SLOT_GMU];
+
+      const cchat = cc + (gm + go) * delvbe - (go + gmu) * delvbc;
+      const cbhat = cb + gpi * delvbe + gmu * delvbc;
+
+      const tolC = reltol * Math.max(Math.abs(cchat), Math.abs(cc)) + abstol;
+      const tolB = reltol * Math.max(Math.abs(cbhat), Math.abs(cb)) + abstol;
+
+      return Math.abs(cchat - cc) <= tolC && Math.abs(cbhat - cb) <= tolB;
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {

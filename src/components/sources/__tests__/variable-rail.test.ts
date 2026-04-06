@@ -54,6 +54,7 @@ function solveCircuit(elements: AnalogElement[], nodeCount: number, branchCount:
     solver,
     elements,
     matrixSize: nodeCount + branchCount,
+    nodeCount,
     params: DEFAULT_SIMULATION_PARAMS,
     diagnostics: diag,
   });

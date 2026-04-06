@@ -25,6 +25,7 @@ import type { ConvergenceTrace } from "./diagnostics.js";
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import { newtonRaphson } from "./newton-raphson.js";
 import type { AnalogElement } from "./element.js";
+import { isPoolBacked } from "./element.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledWithBridges } from "./compiled-analog-circuit.js";
 import type { StatePool } from "./state-pool.js";
 import { assertPoolIsSoleMutableState } from "../../solver/analog/state-schema.js";
@@ -174,9 +175,9 @@ export class MNAEngine implements AnalogEngine {
     const cac = compiled as CompiledWithBridges;
     if (cac.statePool) {
       for (const el of elements) {
-        if (el.stateSize > 0 && el.stateBaseOffset < 0) {
+        if (isPoolBacked(el) && el.stateBaseOffset < 0) {
           throw new Error(
-            `MNAEngine.init(): element with stateSize=${el.stateSize} arrived ` +
+            `MNAEngine.init(): reactive element arrived ` +
             `with stateBaseOffset=-1. Pool-backed elements must have offsets ` +
             `assigned at compile time (see compiler.ts state-pool allocation ` +
             `loop). A circuit produced without running that allocation step ` +
@@ -201,8 +202,8 @@ export class MNAEngine implements AnalogEngine {
     if (cac?.statePool) {
       cac.statePool.reset();
       for (const el of this._elements) {
-        if (el.stateSize > 0) {
-          el.initState?.(cac.statePool);
+        if (isPoolBacked(el)) {
+          el.initState(cac.statePool);
         }
       }
     }
@@ -258,9 +259,9 @@ export class MNAEngine implements AnalogEngine {
         const method = this._timestep.currentMethod;
         const poolSnapshot = statePool.state0.slice();
         for (const element of this._elements) {
-          if (element.stateSize > 0) {
+          if (isPoolBacked(element)) {
             const violations = assertPoolIsSoleMutableState(
-              element.stateSchema?.owner ?? "unknown",
+              element.stateSchema.owner ?? "unknown",
               element,
               () => {
                 element.stamp(solver);
@@ -316,9 +317,11 @@ export class MNAEngine implements AnalogEngine {
       solver: this._solver,
       elements,
       matrixSize,
+      nodeCount,
       maxIterations: params.maxIterations,
       reltol: params.reltol,
       abstol: params.abstol,
+      iabstol: params.iabstol,
       initialGuess: this._voltages,
       diagnostics: this._diagnostics,
       voltagesBuffer: this._nrVoltages,
@@ -348,9 +351,11 @@ export class MNAEngine implements AnalogEngine {
           solver: this._solver,
           elements,
           matrixSize,
+          nodeCount,
           maxIterations: params.maxIterations,
           reltol: params.reltol,
           abstol: params.abstol,
+          iabstol: params.iabstol,
           initialGuess: this._voltages,
           diagnostics: this._diagnostics,
           voltagesBuffer: this._nrVoltages,
@@ -426,9 +431,11 @@ export class MNAEngine implements AnalogEngine {
           solver: this._solver,
           elements,
           matrixSize,
+          nodeCount,
           maxIterations: params.maxIterations,
           reltol: params.reltol,
           abstol: params.abstol,
+          iabstol: params.iabstol,
           initialGuess: this._voltages,
           diagnostics: this._diagnostics,
           voltagesBuffer: this._nrVoltages,
@@ -607,16 +614,24 @@ export class MNAEngine implements AnalogEngine {
       };
     }
 
-    const { elements, matrixSize } = this._compiled;
+    const { elements, matrixSize, nodeCount } = this._compiled;
     this._diagnostics.clear();
 
     const cac = this._compiled as CompiledWithBridges;
-    if (cac.statePool) cac.statePool.reset();
+    if (cac.statePool) {
+      cac.statePool.reset();
+      for (const el of this._elements) {
+        if (isPoolBacked(el)) {
+          el.initState(cac.statePool);
+        }
+      }
+    }
 
     const result = solveDcOperatingPoint({
       solver: this._solver,
       elements,
       matrixSize,
+      nodeCount,
       params: this._params,
       diagnostics: this._diagnostics,
     });

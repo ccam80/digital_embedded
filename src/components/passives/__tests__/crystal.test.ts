@@ -33,7 +33,7 @@ import { StatePool } from "../../../solver/analog/state-pool.js";
 // ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
-import type { AnalogElementCore } from "../../../solver/analog/element.js";
+import type { AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
@@ -42,16 +42,12 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // ---------------------------------------------------------------------------
 // withState: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
-function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
-  const size = core.stateSize ?? 0;
-  const pool = new StatePool(Math.max(size, 1));
-  if (size > 0 && core.initState) {
-    core.stateBaseOffset = 0;
-    core.initState(pool);
-  } else {
-    core.stateBaseOffset = -1;
-  }
-  return { element: core, pool };
+function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
+  const re = core as ReactiveAnalogElement;
+  const pool = new StatePool(Math.max(re.stateSize, 1));
+  re.stateBaseOffset = 0;
+  re.initState(pool);
+  return { element: re, pool };
 }
 
 
@@ -270,6 +266,7 @@ describe("Crystal", () => {
         solver,
         elements: [vs, crystal, gminShunts],
         matrixSize: 5,
+        nodeCount: 3,
         params: DEFAULT_SIMULATION_PARAMS,
         diagnostics,
       });
@@ -419,7 +416,7 @@ describe("Crystal", () => {
       props.setModelParam("motionalCapacitance", 20e-15);
       props.setModelParam("shuntCapacitance", 5e-12);
       const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
-      expect(el.stateSize).toBe(9);
+      expect((el as ReactiveAnalogElement).stateSize).toBe(9);
     });
 
     it("stateBaseOffset is -1 before compiler assigns it", () => {
@@ -429,7 +426,7 @@ describe("Crystal", () => {
       props.setModelParam("motionalCapacitance", 20e-15);
       props.setModelParam("shuntCapacitance", 5e-12);
       const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
-      expect(el.stateBaseOffset).toBe(-1);
+      expect((el as ReactiveAnalogElement).stateBaseOffset).toBe(-1);
     });
 
     it("stateSchema has 9 slots with correct names", () => {
@@ -439,8 +436,9 @@ describe("Crystal", () => {
       props.setModelParam("motionalCapacitance", 20e-15);
       props.setModelParam("shuntCapacitance", 5e-12);
       const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
-      expect(el.stateSchema).toBeDefined();
-      const names = el.stateSchema!.slots.map((s) => s.name);
+      const re = el as ReactiveAnalogElement;
+      expect(re.stateSchema).toBeDefined();
+      const names = re.stateSchema.slots.map((s: { name: string }) => s.name);
       expect(names).toEqual([
         "GEQ_L", "IEQ_L", "I_PREV_L",
         "GEQ_CS", "IEQ_CS", "V_PREV_CS",

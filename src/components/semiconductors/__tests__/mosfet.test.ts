@@ -34,20 +34,19 @@ import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
+import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // withState — allocate a StatePool and call initState on the element
 // ---------------------------------------------------------------------------
 
-function withState<T extends AnalogElementCore>(element: T): T {
-  const size = element.stateSize ?? 0;
-  if (size > 0 && element.initState) {
-    element.stateBaseOffset = 0;
-    const pool = new StatePool(size);
-    element.initState(pool);
-  }
-  return element;
+function withState(element: AnalogElementCore): ReactiveAnalogElement {
+  const re = element as ReactiveAnalogElement;
+  re.stateBaseOffset = 0;
+  const pool = new StatePool(re.stateSize);
+  re.initState(pool);
+  return re;
 }
 
 /** Assert actual ≈ expected within 0.1% relative tolerance (ngspice reference). */
@@ -553,6 +552,7 @@ describe("Integration", () => {
       solver,
       elements: [vdd, vgate, rd, nmos],
       matrixSize,
+      nodeCount: 3,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });
@@ -597,13 +597,13 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const elements = [vdd, vgate, rd, nmos];
 
     // Before: VTO=0.7
-    const before = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const before = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 3, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[0], 1.840508e+00, "V(drain) before");
 
     // setParam and re-solve
     nmos.setParam("VTO", 2.5);
-    const after = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const after = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 3, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
     expect(after.converged).toBe(true);
     expectSpiceRef(after.nodeVoltages[0], 4.835494e+00, "V(drain) after VTO=2.5");
     expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 1.645065e-04, "Id after VTO=2.5");
@@ -623,13 +623,13 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const elements = [vdd, vgate, rd, nmos];
 
     // Before: KP=120µ
-    const before = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const before = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 3, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[0], 1.840508e+00, "V(drain) before");
 
     // setParam and re-solve
     nmos.setParam("KP", 240e-6);
-    const after = solveDcOperatingPoint({ solver, elements, matrixSize, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const after = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 3, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
     expect(after.converged).toBe(true);
     expectSpiceRef(after.nodeVoltages[0], 9.071396e-01, "V(drain) after KP=240µ");
     expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 4.092860e-03, "Id after KP=240µ");

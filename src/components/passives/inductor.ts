@@ -21,7 +21,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import {
   inductorConductance,
@@ -159,11 +159,12 @@ const SLOT_IEQ = 1;
 const SLOT_I_PREV = 2;
 const SLOT_I_PREV_PREV = 3;
 
-class AnalogInductorElement implements AnalogElementCore {
+class AnalogInductorElement implements ReactiveAnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number;
   readonly isNonlinear = false;
   readonly isReactive = true;
+  readonly poolBacked = true as const;
   readonly stateSchema = INDUCTOR_SCHEMA;
   readonly stateSize = INDUCTOR_SCHEMA.size;
   stateBaseOffset = -1;

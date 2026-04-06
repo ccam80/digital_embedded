@@ -1470,8 +1470,8 @@
     /* ---- Status bar ---- */
     #status-bar {
       display: flex;
-      align-items: center;
-      height: 22px;
+      align-items: flex-start;
+      min-height: 22px;
       padding: 0 8px;
       background: var(--toolbar-bg);
       border-top: 1px solid var(--toolbar-border);
@@ -1479,6 +1479,10 @@
       flex-shrink: 0;
       user-select: none;
       overflow: hidden;
+    }
+    #status-bar.expanded {
+      max-height: 30vh;
+      overflow-y: auto;
     }
     #status-bar.error {
       background: #5c1a1a;
@@ -1492,6 +1496,12 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       flex: 1;
+      line-height: 22px;
+    }
+    #status-bar.expanded #status-message {
+      white-space: pre-wrap;
+      text-overflow: unset;
+      overflow: visible;
     }
     #status-dismiss {
       background: none;
@@ -1502,6 +1512,8 @@
       padding: 0 4px;
       opacity: 0.6;
       display: none;
+      line-height: 22px;
+      flex-shrink: 0;
     }
     #status-dismiss:hover { opacity: 1; }
     #status-bar.error #status-dismiss { display: inline; }
@@ -1740,7 +1752,7 @@
         display: none;
       }
       #status-bar {
-        height: 32px;
+        min-height: 32px;
         line-height: 32px;
       }
       #viewer-panel {
@@ -1792,7 +1804,7 @@
       display: none;
     }
     .tablet-mode #status-bar {
-      height: 32px;
+      min-height: 32px;
       line-height: 32px;
     }
     .tablet-mode #viewer-panel {

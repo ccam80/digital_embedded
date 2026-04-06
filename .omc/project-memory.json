@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1775347220319,
+  "lastScanned": 1775433750542,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -83,7 +83,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1775347220289,
+      "lastAccessed": 1775433750502,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -95,7 +95,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 5,
-      "lastAccessed": 1775347220289,
+      "lastAccessed": 1775433750502,
       "keyFiles": [
         "simulator.html",
         "tutorial-editor.html",
@@ -108,7 +108,7 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 1,
-      "lastAccessed": 1775347220289,
+      "lastAccessed": 1775433750503,
       "keyFiles": [
         "domain-leak-inventory.md"
       ]
@@ -116,17 +116,15 @@
     "e2e": {
       "path": "e2e",
       "purpose": null,
-      "fileCount": 1,
-      "lastAccessed": 1775347220304,
-      "keyFiles": [
-        "pin-map-discovery.spec.ts"
-      ]
+      "fileCount": 0,
+      "lastAccessed": 1775433750522,
+      "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 12,
-      "lastAccessed": 1775347220304,
+      "lastAccessed": 1775433750522,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -139,28 +137,28 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1775347220304,
+      "lastAccessed": 1775433750523,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1775347220304,
+      "lastAccessed": 1775433750523,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1775347220304,
+      "lastAccessed": 1775433750523,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 21,
-      "lastAccessed": 1775347220305,
+      "fileCount": 19,
+      "lastAccessed": 1775433750524,
       "keyFiles": [
         "circuit-mcp-server.ts",
         "cleanup-unused-imports.mjs",
@@ -172,21 +170,21 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 13,
-      "lastAccessed": 1775347220305,
+      "fileCount": 16,
+      "lastAccessed": 1775433750524,
       "keyFiles": [
         "analog-snapshot-analysis.md",
         "analog-state-pool-and-writeback-removal.md",
         "app-modules-test-plan.md",
-        "circuit-scoped-subcircuits.md",
-        "domain-leak-fix.md"
+        "breakpoint-push-once.md",
+        "circuit-scoped-subcircuits.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1775347220305,
+      "lastAccessed": 1775433750524,
       "keyFiles": [
         "main.ts"
       ]
@@ -195,17 +193,16 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1775347220305,
+      "lastAccessed": 1775433750525,
       "keyFiles": [
-        "playwright-failures.json",
-        "test-failures.json"
+        "playwright-failures.json"
       ]
     },
     "tutorials": {
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1775347220305,
+      "lastAccessed": 1775433750525,
       "keyFiles": [
         "index.json"
       ]
@@ -214,7 +211,7 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1775347220306,
+      "lastAccessed": 1775433750525,
       "keyFiles": [
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js",
@@ -225,7 +222,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1775347220306,
+      "lastAccessed": 1775433750526,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -236,7 +233,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 24,
-      "lastAccessed": 1775347220307,
+      "lastAccessed": 1775433750528,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -247,7 +244,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1775347220307,
+      "lastAccessed": 1775433750528,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -258,22 +255,76 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1775347220308,
+      "lastAccessed": 1775433750528,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 188,
-      "lastAccessed": 1775383384547,
+      "accessCount": 333,
+      "lastAccessed": 1775462355716,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 77,
-      "lastAccessed": 1775383310708,
+      "accessCount": 277,
+      "lastAccessed": 1775463963281,
       "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\compiler.ts",
+      "accessCount": 143,
+      "lastAccessed": 1775463896121,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 114,
+      "lastAccessed": 1775464320653,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\element.ts",
+      "accessCount": 110,
+      "lastAccessed": 1775460857368,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\diode.ts",
+      "accessCount": 104,
+      "lastAccessed": 1775460868396,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\newton-raphson.ts",
+      "accessCount": 94,
+      "lastAccessed": 1775455749506,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\fet-base.ts",
+      "accessCount": 83,
+      "lastAccessed": 1775447363955,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 74,
+      "lastAccessed": 1775464329233,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\analog-types.ts",
+      "accessCount": 69,
+      "lastAccessed": 1775447559114,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\capacitor.ts",
+      "accessCount": 63,
+      "lastAccessed": 1775446939799,
+      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\timestep.ts",
@@ -282,111 +333,153 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 55,
-      "lastAccessed": 1775382700102,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 46,
-      "lastAccessed": 1775383283772,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 42,
-      "lastAccessed": 1775383215744,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 41,
-      "lastAccessed": 1775382713599,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\capacitor.ts",
-      "accessCount": 38,
-      "lastAccessed": 1775361918466,
-      "type": "directory"
-    },
-    {
-      "path": "",
-      "accessCount": 37,
-      "lastAccessed": 1775383202196,
-      "type": "directory"
-    },
-    {
       "path": "src\\components\\passives\\inductor.ts",
-      "accessCount": 35,
-      "lastAccessed": 1775378482275,
+      "accessCount": 60,
+      "lastAccessed": 1775446940732,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\fet-base.ts",
-      "accessCount": 31,
-      "lastAccessed": 1775382712167,
-      "type": "file"
+      "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
+      "accessCount": 56,
+      "lastAccessed": 1775460882799,
+      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\fet-base.test.ts",
-      "accessCount": 27,
-      "lastAccessed": 1775360980481,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 25,
-      "lastAccessed": 1775378358946,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\analog-types.ts",
-      "accessCount": 23,
-      "lastAccessed": 1775382720661,
+      "accessCount": 56,
+      "lastAccessed": 1775463045310,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
-      "accessCount": 22,
-      "lastAccessed": 1775383341372,
+      "accessCount": 45,
+      "lastAccessed": 1775439457935,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\sparse-solver.ts",
-      "accessCount": 21,
-      "lastAccessed": 1775379676191,
+      "path": "src\\components\\semiconductors\\scr.ts",
+      "accessCount": 43,
+      "lastAccessed": 1775451389546,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\state-pool.ts",
-      "accessCount": 21,
-      "lastAccessed": 1775381269732,
+      "path": "src\\components\\semiconductors\\varactor.ts",
+      "accessCount": 43,
+      "lastAccessed": 1775451396001,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
-      "accessCount": 18,
-      "lastAccessed": 1775382632977,
+      "path": "src\\components\\semiconductors\\triac.ts",
+      "accessCount": 38,
+      "lastAccessed": 1775451389808,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\zener.ts",
+      "accessCount": 35,
+      "lastAccessed": 1775451395873,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\tunnel-diode.ts",
+      "accessCount": 33,
+      "lastAccessed": 1775451400119,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\diode-state-pool.test.ts",
+      "accessCount": 32,
+      "lastAccessed": 1775446061497,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\led.ts",
+      "accessCount": 31,
+      "lastAccessed": 1775446916797,
+      "type": "file"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 30,
+      "lastAccessed": 1775438313568,
       "type": "file"
     },
     {
       "path": "src\\core\\analog-engine-interface.ts",
-      "accessCount": 18,
-      "lastAccessed": 1775383341926,
+      "accessCount": 29,
+      "lastAccessed": 1775448935281,
+      "type": "file"
+    },
+    {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 28,
+      "lastAccessed": 1775437896944,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 28,
+      "lastAccessed": 1775438305045,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\state-pool.ts",
+      "accessCount": 27,
+      "lastAccessed": 1775449732878,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\rc-ac-transient.test.ts",
-      "accessCount": 14,
-      "lastAccessed": 1775379435374,
+      "accessCount": 26,
+      "lastAccessed": 1775446153841,
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\sparse-solver.ts",
+      "accessCount": 22,
+      "lastAccessed": 1775434954719,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
+      "accessCount": 22,
+      "lastAccessed": 1775463088631,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
+      "accessCount": 21,
+      "lastAccessed": 1775464108851,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\dc-operating-point.test.ts",
+      "accessCount": 20,
+      "lastAccessed": 1775463030080,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\passives\\__tests__\\tapped-transformer.test.ts",
+      "accessCount": 18,
+      "lastAccessed": 1775447909506,
+      "type": "directory"
+    },
+    {
+      "path": "src\\components\\passives\\__tests__\\capacitor.test.ts",
+      "accessCount": 17,
+      "lastAccessed": 1775445532230,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+      "accessCount": 15,
+      "lastAccessed": 1775451367512,
+      "type": "directory"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\timestep.test.ts",
-      "accessCount": 12,
-      "lastAccessed": 1775355925304,
+      "accessCount": 14,
+      "lastAccessed": 1775448095350,
       "type": "file"
     },
     {
@@ -396,100 +489,40 @@
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
+      "path": "spec\\.context\\reviewer.md",
       "accessCount": 12,
-      "lastAccessed": 1775381986748,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\dc-operating-point.test.ts",
-      "accessCount": 10,
-      "lastAccessed": 1775352941935,
-      "type": "directory"
+      "lastAccessed": 1775438305007,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\state-pool.test.ts",
-      "accessCount": 10,
-      "lastAccessed": 1775354419247,
+      "accessCount": 11,
+      "lastAccessed": 1775443055318,
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\varactor.ts",
-      "accessCount": 10,
-      "lastAccessed": 1775357610229,
-      "type": "file"
-    },
-    {
-      "path": "spec\\progress.md",
-      "accessCount": 9,
-      "lastAccessed": 1775352920752,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\__tests__\\capacitor.test.ts",
-      "accessCount": 8,
-      "lastAccessed": 1775354879743,
-      "type": "file"
-    },
-    {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 8,
-      "lastAccessed": 1775355548390,
-      "type": "file"
-    },
-    {
-      "path": "spec\\analog-state-pool-and-writeback-removal.md",
-      "accessCount": 7,
-      "lastAccessed": 1775352920911,
+      "path": "src\\components\\passives\\__tests__\\inductor.test.ts",
+      "accessCount": 11,
+      "lastAccessed": 1775445533105,
       "type": "file"
     },
     {
       "path": "src\\core\\__tests__\\analog-engine-interface.test.ts",
-      "accessCount": 7,
-      "lastAccessed": 1775352930175,
+      "accessCount": 9,
+      "lastAccessed": 1775448094138,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+      "path": "spec\\analog-state-pool-and-writeback-removal.md",
+      "accessCount": 8,
+      "lastAccessed": 1775419904946,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__",
       "accessCount": 7,
-      "lastAccessed": 1775352931022,
+      "lastAccessed": 1775448468031,
       "type": "directory"
-    },
-    {
-      "path": "src\\components\\semiconductors\\scr.ts",
-      "accessCount": 7,
-      "lastAccessed": 1775357634449,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\triac.ts",
-      "accessCount": 7,
-      "lastAccessed": 1775357645104,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\__tests__\\tapped-transformer.test.ts",
-      "accessCount": 6,
-      "lastAccessed": 1775352880576,
-      "type": "directory"
-    },
-    {
-      "path": "spec\\.context\\reviewer.md",
-      "accessCount": 6,
-      "lastAccessed": 1775352916302,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 6,
-      "lastAccessed": 1775352916371,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\tunnel-diode.ts",
-      "accessCount": 6,
-      "lastAccessed": 1775358143191,
-      "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\__tests__\\diac.test.ts",
@@ -504,33 +537,9 @@
       "type": "directory"
     },
     {
-      "path": "src\\components\\semiconductors\\zener.ts",
-      "accessCount": 5,
-      "lastAccessed": 1775357585857,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\__tests__\\diode-state-pool.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1775352855102,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\passives\\__tests__\\inductor.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1775352946922,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__",
-      "accessCount": 4,
-      "lastAccessed": 1775359191425,
-      "type": "directory"
-    },
-    {
       "path": "src/solver/analog",
-      "accessCount": 4,
-      "lastAccessed": 1775381987781,
+      "accessCount": 5,
+      "lastAccessed": 1775447156820,
       "type": "directory"
     },
     {
@@ -540,21 +549,9 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
-      "accessCount": 2,
-      "lastAccessed": 1775352848790,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\io\\led.ts",
-      "accessCount": 2,
-      "lastAccessed": 1775354387827,
-      "type": "file"
-    },
-    {
       "path": "scripts",
-      "accessCount": 1,
-      "lastAccessed": 1775351296598,
+      "accessCount": 2,
+      "lastAccessed": 1775463655440,
       "type": "directory"
     },
     {

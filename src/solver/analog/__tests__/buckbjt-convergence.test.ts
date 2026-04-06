@@ -1,16 +1,16 @@
 /**
  * Headless convergence regression test for fixtures/buckbjt.dts.
  *
- * This circuit is a BJT buck converter: NPN + PNP push-pull driver, NMOS
- * power switch, inductor, freewheeling diode, output capacitor, and
- * resistive loads. It exercises all three BJT convergence fallback levels
- * (direct NR, Gmin stepping, source stepping) and is a BJT convergence stress test.
+ * This circuit is a BJT-driven buck converter. A 10kHz square wave on
+ * the DRV net feeds two independent BJT gate-driver stages:
+ *   - NPN: base via 1kΩ, collector pulled up to 10V through 10kΩ → NDRV
+ *   - PNP: base via 1kΩ, collector pulled down through 10kΩ → PDRV
+ * NDRV drives the NMOS gate. The NMOS drain is on the 10V rail; the
+ * source switches into a tunnel diode (freewheeling clamp to ground)
+ * and an L-C-R output filter (300mH, 10µF, 50Ω).
  *
- * NOTE: The BJT instances in fixtures/buckbjt.dts have nonzero CJE/CJC/TF/TR parameters
- * (2N3904-ish values). These are present to avoid zero-cap Newton-Raphson runaway — without
- * junction capacitances the BJT Jacobian lacks the small regularising conductance (geq = C/dt)
- * that prevents the MNA matrix from becoming numerically singular during transient. They are
- * NOT intended to model a specific device; do not remove them to "clean up" the fixture.
+ * The circuit is a convergence stress test for the DC operating point
+ * and transient solvers.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';

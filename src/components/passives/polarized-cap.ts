@@ -41,7 +41,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import type { Diagnostic } from "../../compile/types.js";
@@ -224,12 +224,13 @@ export class PolarizedCapElement extends AbstractCircuitElement {
 // AnalogPolarizedCapElement — MNA implementation
 // ---------------------------------------------------------------------------
 
-export class AnalogPolarizedCapElement implements AnalogElement {
+export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = true;
   readonly isReactive = true;
+  readonly poolBacked = true as const;
   setParam(_key: string, _value: number): void {}
 
   readonly stateSchema = POLARIZED_CAP_SCHEMA;

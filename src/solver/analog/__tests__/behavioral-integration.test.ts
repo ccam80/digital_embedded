@@ -28,6 +28,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { MNAEngine } from "../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../analog-engine.js";
+import { StatePool } from "../state-pool.js";
 import { EngineState } from "../../../core/engine-interface.js";
 import { SparseSolver } from "../sparse-solver.js";
 import {
@@ -141,6 +142,7 @@ function buildAndGateCircuit(
     matrixSize: 5,
     elements,
     labelToNodeId: new Map([["out", 3]]),
+    statePool: new StatePool(0),
   };
 }
 
@@ -201,6 +203,7 @@ function buildHighImpedanceSourceCircuit(): ConcreteCompiledAnalogCircuit {
     matrixSize: 6,
     elements,
     labelToNodeId: new Map(),
+    statePool: new StatePool(0),
   };
 }
 
@@ -266,6 +269,7 @@ function buildDffToggleCircuit(): {
     matrixSize: 4,
     elements,
     labelToNodeId: new Map([["Q", 3], ["QB", 4]]),
+    statePool: new StatePool(0),
   };
 
   return { circuit, clockPin, dPin, qPin, qBarPin, element };
@@ -426,6 +430,7 @@ describe("Integration", () => {
       matrixSize: 5,
       elements: [vsA, vsB, rLoad, withNodeIds(andGate, [1, 2, 3])],
       labelToNodeId: new Map(),
+      statePool: new StatePool(0),
     };
 
     engine.init(circuit);
@@ -562,6 +567,7 @@ describe("Integration", () => {
       matrixSize: 5,
       elements: [vsA, vsB, rLoad, andGate],
       labelToNodeId: new Map(),
+      statePool: new StatePool(0),
     };
 
     engine.init(circuit);
@@ -602,6 +608,7 @@ describe("Integration", () => {
       matrixSize: 4,
       elements: [rLoadQ, rLoadQBar, dff],
       labelToNodeId: new Map(),
+      statePool: new StatePool(0),
     };
 
     engine.init(circuit);

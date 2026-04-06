@@ -1,10 +1,10 @@
 {
   "summary": {
-    "passed": 10109,
-    "failed": 17,
+    "passed": 7985,
+    "failed": 6,
     "skipped": 0,
-    "totalFiles": 338,
-    "durationSeconds": 18.6
+    "totalFiles": 340,
+    "durationSeconds": 24.3
   },
   "failures": [
     {
@@ -46,18 +46,6 @@
           "test": "deserialized circuit with overrides produces same DC result as pre-serialization",
           "line": 272,
           "column": 35
-        }
-      ]
-    },
-    {
-      "message": "Engine entered ERROR state at step 1148, simTime=0.0007477007215307047",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
-          "test": "survives 2000 transient steps without ERROR state",
-          "line": 79,
-          "column": 15
         }
       ]
     }

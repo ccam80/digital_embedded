@@ -27,7 +27,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { ReactiveAnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
@@ -37,7 +37,7 @@ import {
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
-import { defineStateSchema, applyInitialValues, type StateSchema } from "../../solver/analog/state-schema.js";
+import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -115,7 +115,7 @@ export function createVaractorElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): ReactiveAnalogElementCore {
   const nodeAnode   = pinNodes.get("A")!; // anode (typically more negative in reverse bias)
   const nodeCathode = pinNodes.get("K")!; // cathode (typically more positive in reverse bias)
 
@@ -143,6 +143,7 @@ export function createVaractorElement(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
+    poolBacked: true as const,
     stateSize: 8,
     stateSchema: VARACTOR_STATE_SCHEMA,
     stateBaseOffset: -1,
@@ -221,14 +222,18 @@ export function createVaractorElement(
       s0[base + SLOT_CAP_IEQ] = capacitorHistoryCurrent(Cj, dt, method, vNow, vPrevForFormula, iNow);
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array): boolean {
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;
 
-      // Compare raw junction voltage against the last limited voltage stored in
-      // the pool. Converged when the NR solution matches what pnjlim accepted.
-      return Math.abs(vdRaw - s0[base + SLOT_VD]) <= 2 * nVt;
+      // ngspice DIOconvTest: current-prediction convergence
+      const delvd = vdRaw - s0[base + SLOT_VD];
+      const id = s0[base + SLOT_ID];
+      const gd = s0[base + SLOT_GEQ];
+      const cdhat = id + gd * delvd;
+      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + abstol;
+      return Math.abs(cdhat - id) <= tol;
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {

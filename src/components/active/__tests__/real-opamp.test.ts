@@ -148,13 +148,14 @@ function makeOpAmp(
 /**
  * Solve DC operating point for given elements.
  */
-function solveDC(elements: AnalogElement[], matrixSize: number) {
+function solveDC(elements: AnalogElement[], matrixSize: number, nodeCount: number) {
   const solver  = new SparseSolver();
   const diags   = new DiagnosticCollector();
   return solveDcOperatingPoint({
     solver,
     elements,
     matrixSize,
+    nodeCount,
     params: DEFAULT_SIMULATION_PARAMS,
     diagnostics: diags,
   });
@@ -169,6 +170,7 @@ function solveDC(elements: AnalogElement[], matrixSize: number) {
 function runTransient(
   elements: AnalogElement[],
   matrixSize: number,
+  nodeCount: number,
   nSteps: number,
   dt: number,
   outputNode: number,
@@ -191,6 +193,7 @@ function runTransient(
       solver: stepSolver,
       elements,
       matrixSize,
+      nodeCount,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics: stepDiags,
     });
@@ -237,7 +240,7 @@ describe("DCGain", () => {
       makeDcSource(nVccN, 0, brVccN, -15),
     ];
 
-    const result = solveDC(elements, 10);
+    const result = solveDC(elements, 10, 6);
     expect(result.converged).toBe(true);
 
     const vOut = result.nodeVoltages[nOut - 1];
@@ -270,7 +273,7 @@ describe("DCGain", () => {
       makeDcSource(nVccN, 0, brVccN, -15),
     ];
 
-    const result = solveDC(elements, 7);
+    const result = solveDC(elements, 7, 4);
     expect(result.converged).toBe(true);
 
     const vOut = result.nodeVoltages[nFeedback - 1];
@@ -369,7 +372,7 @@ describe("SlewRate", () => {
 
     const dt = 1e-6; // 1 µs
     const nSteps = 20;
-    const vOutSeries = runTransient(elements, matrixSize, nSteps, dt, nFeedback);
+    const vOutSeries = runTransient(elements, matrixSize, 4, nSteps, dt, nFeedback);
 
     // Check that no step exceeds SR * dt + tolerance
     const maxAllowedStep = slewRate * dt * 1.2; // 20% tolerance on slew
@@ -408,7 +411,7 @@ describe("SlewRate", () => {
       makeDcSource(nVccN, 0, brVccN, -15),
     ];
 
-    const vOutSeries = runTransient(elements, matrixSize, 5, dt, nFeedback);
+    const vOutSeries = runTransient(elements, matrixSize, 4, 5, dt, nFeedback);
 
     // The final settled output should be close to 10mV
     const vFinal = vOutSeries[vOutSeries.length - 1];
@@ -470,7 +473,7 @@ describe("Offset", () => {
       makeDcSource(nVccN, 0, brVccN, -15),
     ];
 
-    const result = solveDC(elements, matrixSize);
+    const result = solveDC(elements, matrixSize, 5);
     expect(result.converged).toBe(true);
 
     const vOut = result.nodeVoltages[nOut - 1];
@@ -516,7 +519,7 @@ describe("CurrentLimit", () => {
       makeDcSource(nVccN, 0, brVccN, -15),
     ];
 
-    const result = solveDC(elements, matrixSize);
+    const result = solveDC(elements, matrixSize, 4);
     expect(result.converged).toBe(true);
 
     const vOut = result.nodeVoltages[nOut - 1];
@@ -574,7 +577,7 @@ describe("RealOpAmp", () => {
       makeDcSource(nVccP, 0, brVccP,  15),
       makeDcSource(nVccN, 0, brVccN, -15),
     ];
-    const result = solveDC(elements, 7);
+    const result = solveDC(elements, 7, 4);
     expect(result.converged).toBe(true);
 
     // Output of unity-gain buffer ≈ input voltage (within 10%)

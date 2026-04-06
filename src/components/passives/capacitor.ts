@@ -21,7 +21,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
@@ -153,11 +153,12 @@ const SLOT_I_PREV      = 3;
 const SLOT_I_PREV_PREV = 4;
 const SLOT_V_PREV_PREV = 5;
 
-class AnalogCapacitorElement implements AnalogElementCore {
+class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   pinNodeIds!: readonly number[];
   readonly branchIndex = -1;
   readonly isNonlinear = false;
   readonly isReactive = true;
+  readonly poolBacked = true as const;
   readonly stateSchema = CAPACITOR_SCHEMA;
   readonly stateSize = CAPACITOR_SCHEMA.size;
   stateBaseOffset = -1;

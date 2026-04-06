@@ -17,6 +17,7 @@ import {
 } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
 import type { AnalogElementCore } from "../element.js";
+import { isPoolBacked } from "../element.js";
 
 // ---------------------------------------------------------------------------
 // State pool helper (mirrors analog-engine.test.ts)
@@ -25,14 +26,14 @@ import type { AnalogElementCore } from "../element.js";
 function buildStatePool(elements: AnalogElementCore[]): StatePool {
   let offset = 0;
   for (const el of elements) {
-    if (el.stateSize > 0) {
+    if (isPoolBacked(el)) {
       el.stateBaseOffset = offset;
       offset += el.stateSize;
     }
   }
   const pool = new StatePool(offset);
   for (const el of elements) {
-    if (el.stateSize > 0 && el.initState) {
+    if (isPoolBacked(el)) {
       el.initState(pool);
     }
   }
@@ -175,7 +176,7 @@ describe("convergence regression", () => {
     // Before DC op, state0 should have GMIN at the diode's GEQ slot
     // (set by initState). Diode is element[2], stateBaseOffset should be 0
     // (vs and r have stateSize 0).
-    const diodeBase = circuit.elements[2].stateBaseOffset;
+    const diodeBase = (circuit.elements[2] as ReactiveAnalogElement).stateBaseOffset;
     expect(diodeBase).toBeGreaterThanOrEqual(0);
 
     // SLOT_GEQ = 1 — should be GMIN (1e-12) after initState
@@ -203,14 +204,11 @@ describe("convergence regression", () => {
     engine.init(circuit);
     engine.dcOperatingPoint();
 
-    const diodeBase = circuit.elements[2].stateBaseOffset;
+    const diodeBase = (circuit.elements[2] as ReactiveAnalogElement).stateBaseOffset;
 
     // After DC op, state1 should have been initialized from state0
     const state1VdAfterDc = pool.state1[diodeBase + 0];
     expect(state1VdAfterDc).toBeGreaterThan(0.5);
-
-    // Capture state0 before step
-    const state0VdBeforeStep = pool.state0[diodeBase + 0];
 
     // Run one transient step
     engine.step();
@@ -258,7 +256,7 @@ describe("convergence regression", () => {
     engine.init(circuit);
     engine.dcOperatingPoint();
 
-    const diodeBase = circuit.elements[2].stateBaseOffset;
+    const diodeBase = (circuit.elements[2] as ReactiveAnalogElement).stateBaseOffset;
     expect(pool.state0[diodeBase + 0]).toBeGreaterThan(0); // has data
 
     engine.reset();

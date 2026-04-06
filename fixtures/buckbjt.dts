@@ -9,21 +9,81 @@
         },
         "properties": {
           "_modelParams": {
+            "AF": 1,
             "BF": 100,
             "BR": 1,
+            "CJC": 3.5e-12,
+            "CJE": 4.5e-12,
+            "CJS": 0,
+            "EG": 1.11,
+            "FC": 0.5,
             "IKF": "_inf",
             "IKR": "_inf",
+            "IRB": 0,
             "IS": 1e-14,
             "ISC": 0,
             "ISE": 0,
+            "ITF": 0,
+            "KF": 0,
+            "MJC": 0.33,
+            "MJE": 0.33,
+            "MJS": 0,
+            "NC": 2,
+            "NE": 1.5,
             "NF": 1,
             "NR": 1,
+            "PTF": 0,
+            "RB": 0,
+            "RBM": 0,
+            "RC": 0,
+            "RE": 0,
+            "TF": 3e-10,
+            "TR": 2.5e-7,
             "VAF": "_inf",
             "VAR": "_inf",
-            "CJE": 4.5e-12,
-            "CJC": 3.5e-12,
-            "TF": 3e-10,
-            "TR": 2.5e-7
+            "VJC": 0.75,
+            "VJE": 0.75,
+            "VJS": 0.75,
+            "VTF": "_inf",
+            "XCJC": 1,
+            "XTB": 0,
+            "XTF": 0,
+            "XTI": 3
+          },
+          "_pinElectrical": {
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "C": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "E": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
           }
         },
         "rotation": 0,
@@ -37,21 +97,81 @@
         },
         "properties": {
           "_modelParams": {
+            "AF": 1,
             "BF": 100,
             "BR": 1,
+            "CJC": 3.5e-12,
+            "CJE": 4.5e-12,
+            "CJS": 0,
+            "EG": 1.11,
+            "FC": 0.5,
             "IKF": "_inf",
             "IKR": "_inf",
+            "IRB": 0,
             "IS": 1e-14,
             "ISC": 0,
             "ISE": 0,
+            "ITF": 0,
+            "KF": 0,
+            "MJC": 0.33,
+            "MJE": 0.33,
+            "MJS": 0,
+            "NC": 2,
+            "NE": 1.5,
             "NF": 1,
             "NR": 1,
+            "PTF": 0,
+            "RB": 0,
+            "RBM": 0,
+            "RC": 0,
+            "RE": 0,
+            "TF": 3e-10,
+            "TR": 2.5e-7,
             "VAF": "_inf",
             "VAR": "_inf",
-            "CJE": 4.5e-12,
-            "CJC": 3.5e-12,
-            "TF": 3e-10,
-            "TR": 2.5e-7
+            "VJC": 0.75,
+            "VJE": 0.75,
+            "VJS": 0.75,
+            "VTF": "_inf",
+            "XCJC": 1,
+            "XTB": 0,
+            "XTF": 0,
+            "XTI": 3
+          },
+          "_pinElectrical": {
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "C": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "E": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
           }
         },
         "rotation": 0,
@@ -70,6 +190,30 @@
             "frequency": 10000,
             "phase": 0
           },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
           "amplitude": 4.983907855756475,
           "frequency": 10000,
           "waveform": "square"
@@ -86,6 +230,30 @@
         "properties": {
           "_modelParams": {
             "voltage": 10
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
           }
         },
         "rotation": 90,
@@ -100,6 +268,30 @@
         "properties": {
           "_modelParams": {
             "resistance": 10000
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
           }
         },
         "rotation": 90,
@@ -114,6 +306,30 @@
         "properties": {
           "_modelParams": {
             "resistance": 10000
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
           }
         },
         "rotation": 270,
@@ -128,6 +344,30 @@
         "properties": {
           "_modelParams": {
             "resistance": 1000
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
           }
         },
         "rotation": 0,
@@ -142,6 +382,30 @@
         "properties": {
           "_modelParams": {
             "resistance": 1000
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
           }
         },
         "rotation": 0,
@@ -213,40 +477,76 @@
         },
         "properties": {
           "_modelParams": {
+            "AF": 1,
             "CBD": 0,
             "CBS": 0,
+            "CGBO": 0,
             "CGDO": 0,
             "CGSO": 0,
+            "CJ": 0,
+            "CJSW": 0,
+            "FC": 0.5,
             "GAMMA": 0,
+            "IS": 1e-14,
+            "JS": 0,
+            "KF": 0,
             "KP": 0.00002,
             "L": 0.000001,
             "LAMBDA": 0.01,
+            "LD": 0,
+            "MJ": 0.5,
+            "MJSW": 0.33,
+            "NSS": 0,
+            "NSUB": 0,
+            "PB": 0.8,
             "PHI": 0.6,
+            "RD": 0,
+            "RS": 0,
+            "RSH": 0,
+            "TOX": 1e-7,
+            "TPG": 1,
+            "UO": 600,
             "VTO": 1,
             "W": 0.000001
+          },
+          "_pinElectrical": {
+            "D": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "G": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "S": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
           }
         },
         "rotation": 90,
         "type": "NMOS"
-      },
-      {
-        "id": "ec2d4fa0-edac-445a-966b-f14e22df8ee1",
-        "position": {
-          "x": 43,
-          "y": 12
-        },
-        "properties": {
-          "_modelParams": {
-            "IP": 0.001,
-            "IS": 1e-14,
-            "IV": 0.0001,
-            "N": 1,
-            "VP": 0.065,
-            "VV": 0.35
-          }
-        },
-        "rotation": 90,
-        "type": "TunnelDiode"
       },
       {
         "id": "e94311cd-8257-4706-a2f9-6007009726d7",
@@ -257,6 +557,30 @@
         "properties": {
           "_modelParams": {
             "inductance": 0.3
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
           }
         },
         "rotation": 0,
@@ -271,6 +595,30 @@
         "properties": {
           "_modelParams": {
             "capacitance": 0.000009999999999999999
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
           }
         },
         "rotation": 90,
@@ -285,6 +633,30 @@
         "properties": {
           "_modelParams": {
             "resistance": 50
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
           }
         },
         "rotation": 90,
@@ -325,6 +697,34 @@
         },
         "rotation": 0,
         "type": "Tunnel"
+      },
+      {
+        "id": "7bc4e9cd-f7f6-4cf1-98a5-b57669a9d5a2",
+        "position": {
+          "x": 43,
+          "y": 12
+        },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "BV": "_inf",
+            "CJO": 0,
+            "EG": 1.11,
+            "FC": 0.5,
+            "IBV": 0.001,
+            "IS": 1e-14,
+            "KF": 0,
+            "M": 0.5,
+            "N": 1,
+            "RS": 0,
+            "TT": 0,
+            "VJ": 1,
+            "XTI": 3
+          },
+          "model": "spice"
+        },
+        "rotation": 90,
+        "type": "Diode"
       }
     ],
     "name": "buckbjt",

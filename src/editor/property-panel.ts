@@ -11,6 +11,7 @@ import { createInput } from "./property-inputs.js";
 import type { PropertyInput } from "./property-inputs.js";
 import { formatSI, parseSI } from "./si-format.js";
 import type { ComponentDefinition, ModelEntry, ParamDef } from "@/core/registry";
+import { paramDefDefaults } from "@/core/model-params";
 import type { PinElectricalSpec } from "@/core/pin-electrical";
 import { resolvePinElectrical } from "@/core/pin-electrical.js";
 import type { LogicFamilyConfig } from "@/core/logic-family";
@@ -353,7 +354,7 @@ export class PropertyPanel {
       const newParams: Record<string, PropertyValue> =
         newKey === "digital" || !newEntry
           ? {}
-          : { ...newEntry.params };
+          : { ...paramDefDefaults(newEntry.paramDefs), ...newEntry.params };
 
       const cmd: ModelSwitchCommand = createModelSwitchCommand(element, newKey, newParams);
       cmd.execute();

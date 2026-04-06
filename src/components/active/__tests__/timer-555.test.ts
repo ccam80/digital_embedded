@@ -252,6 +252,7 @@ describe("Timer555", () => {
       solver,
       elements: [timer, vsVcc],
       matrixSize,
+      nodeCount: 3,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });

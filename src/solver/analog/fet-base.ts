@@ -74,6 +74,12 @@ export const SLOT_CAP_GB_FIRST_CALL     = 22;    // 1.0 = true, 0.0 = false
 // Body-effect operating-point state (slots 23–24) — MOSFET-specific, zero-init fine
 export const SLOT_VSB                   = 23;
 export const SLOT_GMBS                  = 24;
+// Bulk junction DC state (slots 25–29) — needed for MOS1convTest convergence check
+export const SLOT_GBD                   = 25;  // drain-bulk junction conductance
+export const SLOT_GBS                   = 26;  // source-bulk junction conductance
+export const SLOT_CBD_I                 = 27;  // drain-bulk junction current
+export const SLOT_CBS_I                 = 28;  // source-bulk junction current
+export const SLOT_VBD                   = 29;  // drain-bulk voltage (stored)
 
 export const FET_BASE_SCHEMA: StateSchema = defineStateSchema("AbstractFetElement", [
   { name: "VGS",                    doc: "Gate-source voltage",                        init: { kind: "zero" } },
@@ -101,6 +107,11 @@ export const FET_BASE_SCHEMA: StateSchema = defineStateSchema("AbstractFetElemen
   { name: "CAP_GB_FIRST_CALL",      doc: "Gate-bulk cap first-call flag (1=true)",     init: { kind: "constant", value: 1.0 } },
   { name: "VSB",                    doc: "Source-bulk voltage (MOSFET body effect)",   init: { kind: "zero" } },
   { name: "GMBS",                   doc: "Body-effect transconductance",               init: { kind: "zero" } },
+  { name: "GBD",                    doc: "Drain-bulk junction conductance",             init: { kind: "zero" } },
+  { name: "GBS",                    doc: "Source-bulk junction conductance",             init: { kind: "zero" } },
+  { name: "CBD_I",                  doc: "Drain-bulk junction current",                 init: { kind: "zero" } },
+  { name: "CBS_I",                  doc: "Source-bulk junction current",                 init: { kind: "zero" } },
+  { name: "VBD",                    doc: "Drain-bulk voltage (stored)",                  init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -140,6 +151,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
   protected _sourceScale: number = 1.0;
 
   // State pool interface
+  readonly poolBacked = true as const;
   readonly stateSchema = FET_BASE_SCHEMA;
   readonly stateSize = FET_BASE_SCHEMA.size;
   stateBaseOffset: number = -1;
@@ -310,7 +322,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     return result;
   }
 
-  checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
+  checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
     const nodeD = this.drainNode;
     const nodeG = this.gateNode;
     const nodeS = this.sourceNode;
@@ -318,17 +330,47 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
     const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
     const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
-    const vDp = nodeD > 0 ? prevVoltages[nodeD - 1] : 0;
-    const vGp = nodeG > 0 ? prevVoltages[nodeG - 1] : 0;
-    const vSp = nodeS > 0 ? prevVoltages[nodeS - 1] : 0;
 
-    const vgsNew = this.polaritySign * (vG - vS);
-    const vdsNew = this.polaritySign * (vD - vS);
-    const vgsPrev = this.polaritySign * (vGp - vSp);
-    const vdsPrev = this.polaritySign * (vDp - vSp);
+    // Raw junction voltages from current NR iterate (polarity-corrected)
+    const vgsRaw = this.polaritySign * (vG - vS);
+    const vdsRaw = this.polaritySign * (vD - vS);
+    // VBS = -(VSB): we store VSB (source-bulk, >= 0), ngspice uses VBS (bulk-source)
+    const vbsRaw = -this._s0[this.stateBaseOffset + SLOT_VSB];  // current iterate approximation
+    const vbdRaw = vbsRaw - vdsRaw;
 
-    const TOL = 0.01;
-    return Math.abs(vgsNew - vgsPrev) <= TOL && Math.abs(vdsNew - vdsPrev) <= TOL;
+    // Stored operating-point values from last updateOperatingPoint
+    const storedVgs = this._vgs;
+    const storedVds = this._vds;
+    const storedVsb = this._s0[this.stateBaseOffset + SLOT_VSB];
+    const storedVbd = this._s0[this.stateBaseOffset + SLOT_VBD];
+
+    // Deltas between raw iterate and stored (limited) values
+    const delvgs = vgsRaw - storedVgs;
+    const delvds = vdsRaw - storedVds;
+    const delvbs = vbsRaw - (-storedVsb);  // stored VBS = -storedVsb
+    const delvbd = vbdRaw - storedVbd;
+
+    // Read small-signal parameters from pool
+    const base = this.stateBaseOffset;
+    const s0 = this._s0;
+    const gm   = s0[base + SLOT_GM];
+    const gds  = s0[base + SLOT_GDS];
+    const gmbs = s0[base + SLOT_GMBS];
+    const ids  = s0[base + SLOT_IDS];
+    const gbd  = s0[base + SLOT_GBD];
+    const gbs  = s0[base + SLOT_GBS];
+    const cbdI = s0[base + SLOT_CBD_I];
+    const cbsI = s0[base + SLOT_CBS_I];
+
+    // MOS1convTest: predicted drain current
+    const cdhat = ids + gm * delvgs + gds * delvds + gmbs * delvbs - gbd * delvbd;
+    // MOS1convTest: predicted bulk current
+    const cbhat = cbsI + cbdI + gbd * delvbd + gbs * delvbs;
+
+    const tolD = reltol * Math.max(Math.abs(cdhat), Math.abs(ids)) + abstol;
+    const tolB = reltol * Math.max(Math.abs(cbhat), Math.abs(cbsI + cbdI)) + abstol;
+
+    return Math.abs(cdhat - ids) <= tolD && Math.abs(cbhat - (cbsI + cbdI)) <= tolB;
   }
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {

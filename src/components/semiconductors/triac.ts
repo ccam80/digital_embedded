@@ -31,7 +31,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { ReactiveAnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
@@ -115,7 +115,7 @@ export function createTriacElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): ReactiveAnalogElementCore {
   const nodeMT2 = pinNodes.get("MT2")!; // Main Terminal 2
   const nodeMT1 = pinNodes.get("MT1")!; // Main Terminal 1
   const nodeG   = pinNodes.get("G")!;   // Gate
@@ -237,6 +237,7 @@ export function createTriacElement(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
+    poolBacked: true as const,
     stateSize: 9,
     stateSchema: TRIAC_STATE_SCHEMA,
     stateBaseOffset: -1,
@@ -294,12 +295,28 @@ export function createTriacElement(
       computeOperatingPoint(vmtLimited, vg1Limited);
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
-      const v1  = nodeMT1 > 0 ? voltages[nodeMT1 - 1]     : 0;
-      const v2  = nodeMT2 > 0 ? voltages[nodeMT2 - 1]     : 0;
-      const v1p = nodeMT1 > 0 ? prevVoltages[nodeMT1 - 1] : 0;
-      const v2p = nodeMT2 > 0 ? prevVoltages[nodeMT2 - 1] : 0;
-      return Math.abs((v2 - v1) - (v2p - v1p)) <= 2 * nVt;
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
+      const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
+      const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;
+
+      // ngspice DIOconvTest on J1 (MT2-MT1)
+      const vmtRaw = v2 - v1;
+      const delvmt = vmtRaw - s0[base + SLOT_VAK];
+      const imt = s0[base + SLOT_IAK];
+      const gmt = s0[base + SLOT_GEQ];
+      const cmthat = imt + gmt * delvmt;
+      const tolMT = reltol * Math.max(Math.abs(cmthat), Math.abs(imt)) + abstol;
+
+      // ngspice DIOconvTest on J2 (gate-MT1)
+      const vg1Raw = vG - v1;
+      const delvg1 = vg1Raw - s0[base + SLOT_VGK];
+      const ig1 = s0[base + SLOT_IGK];
+      const gg1 = s0[base + SLOT_G_GATE_GEQ];
+      const cg1hat = ig1 + gg1 * delvg1;
+      const tolG1 = reltol * Math.max(Math.abs(cg1hat), Math.abs(ig1)) + abstol;
+
+      return Math.abs(cmthat - imt) <= tolMT && Math.abs(cg1hat - ig1) <= tolG1;
     },
 
     getPinCurrents(voltages: Float64Array): number[] {

@@ -1,0 +1,158 @@
+{
+  "summary": {
+    "vitest": {
+      "passed": 7985,
+      "failed": 6,
+      "skipped": 0,
+      "totalFiles": 340,
+      "durationSeconds": 24.3
+    },
+    "playwright": {
+      "passed": 479,
+      "failed": 9,
+      "skipped": 0,
+      "totalFiles": 23,
+      "durationSeconds": 301.866489
+    },
+    "totalFailed": 15,
+    "totalPassed": 8464
+  },
+  "failures": {
+    "vitest": [
+      {
+        "message": "expected false to be true // Object.is equality",
+        "count": 6,
+        "locations": [
+          {
+            "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
+            "test": "parsed .MODEL card applied via applySpiceImportResult: circuit compiles and DC converges",
+            "line": 201,
+            "column": 27
+          },
+          {
+            "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
+            "test": "compile with default IS vs IS=1e-20 produces different collector voltage",
+            "line": 235,
+            "column": 34
+          },
+          {
+            "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
+            "test": "deserialized circuit produces same DC result as pre-serialization",
+            "line": 323,
+            "column": 35
+          },
+          {
+            "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
+            "test": "parseModelCard then applySpiceImportResult stores params and DC converges",
+            "line": 402,
+            "column": 27
+          },
+          {
+            "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
+            "test": "default params remain at BJT defaults when only IS is overridden",
+            "line": 219,
+            "column": 47
+          },
+          {
+            "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
+            "test": "deserialized circuit with overrides produces same DC result as pre-serialization",
+            "line": 272,
+            "column": 35
+          }
+        ]
+      }
+    ],
+    "playwright": [
+      {
+        "message": "Error: Status bar shows an error",
+        "count": 4,
+        "locations": [
+          {
+            "file": "gui/analog-bjt-convergence.spec.ts",
+            "test": "compile and step — no convergence error, supply rail is 10V",
+            "line": 251,
+            "column": 3
+          },
+          {
+            "file": "gui/analog-bjt-convergence.spec.ts",
+            "test": "run continuously — voltages remain bounded",
+            "line": 355,
+            "column": 3
+          },
+          {
+            "file": "gui/analog-bjt-convergence.spec.ts",
+            "test": "step to 5ms — output voltage evolves and trace captures transient",
+            "line": 387,
+            "column": 3
+          },
+          {
+            "file": "gui/master-circuit-assembly.spec.ts",
+            "test": "Master 1: digital logic — gates, flip-flop, counter",
+            "line": 46,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-ui-fixup.spec.ts",
+            "test": "speed control affects analog simulation rate",
+            "line": 140,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: Expected 0.10948619919842355 to be close to 0.0957744513 (err=0.013711747898423554, limit=9.577445129999999e-8)",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "changing BF on BJT via primary param row changes output voltage",
+            "line": 103,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "new subcircuit appears in the palette",
+            "line": 360,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "ReferenceError: x is not defined",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/subcircuit-workflow.spec.ts",
+            "test": "second subcircuit auto-names as subcircuit_2",
+            "line": 626,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "parity/rlc-lte-path.spec.ts",
+            "test": "RC zero-crossing progression through the postMessage bridge",
+            "line": 40,
+            "column": 3
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -58,7 +58,7 @@ const CMOS_3V3: ResolvedPinElectrical = {
 const VDD = 3.3;
 const GND = 0.0;
 const LOAD_R = 10_000;
-const NR_OPTS = { maxIterations: 50, reltol: 1e-3, abstol: 1e-6 };
+const NR_OPTS = { maxIterations: 50, reltol: 1e-3, abstol: 1e-6, iabstol: 1e-12 };
 
 // ---------------------------------------------------------------------------
 // Solve helper

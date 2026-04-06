@@ -162,6 +162,7 @@ describe("Integration", () => {
       solver,
       elements: [vs, r1, r2],
       matrixSize,
+      nodeCount: 2,
       params: DEFAULT_SIMULATION_PARAMS,
       diagnostics,
     });

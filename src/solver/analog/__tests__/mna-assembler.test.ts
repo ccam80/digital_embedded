@@ -222,6 +222,8 @@ describe("Convergence", () => {
       [R1, R2],
       voltages,
       prevVoltages,
+      1e-3,
+      1e-6,
     );
 
     expect(converged).toBe(true);

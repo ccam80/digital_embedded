@@ -30,7 +30,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { ReactiveAnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -147,7 +147,7 @@ export function createTunnelDiodeElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): AnalogElementCore {
+): ReactiveAnalogElementCore {
   const nodeAnode   = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
@@ -187,6 +187,7 @@ export function createTunnelDiodeElement(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
+    poolBacked: true as const,
     stateSize: 4,
     stateSchema: TUNNEL_DIODE_STATE_SCHEMA,
     stateBaseOffset: -1,
@@ -236,16 +237,19 @@ export function createTunnelDiodeElement(
       recompute(vdNew);
     },
 
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array): boolean {
-      const vA  = nodeAnode   > 0 ? voltages[nodeAnode   - 1]     : 0;
-      const vC  = nodeCathode > 0 ? voltages[nodeCathode - 1]     : 0;
-      const vAp = nodeAnode   > 0 ? prevVoltages[nodeAnode   - 1] : 0;
-      const vCp = nodeCathode > 0 ? prevVoltages[nodeCathode - 1] : 0;
-      const dvd = Math.abs((vA - vC) - (vAp - vCp));
-      // Tighter tolerance in NDR region
-      const vdPooled = s0[base + SLOT_VD];
-      const tol = isInNdrRegion(vdPooled) ? NDR_VSTEP_MAX * 0.01 : 2 * VT;
-      return dvd <= tol;
+    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
+      const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const vdRaw = vA - vC;
+
+      // ngspice DIOconvTest: current-prediction convergence
+      // GEQ can be negative in the NDR region; the formula self-scales via max(|cdhat|, |id|)
+      const delvd = vdRaw - s0[base + SLOT_VD];
+      const id = s0[base + SLOT_ID];
+      const gd = s0[base + SLOT_GEQ];
+      const cdhat = id + gd * delvd;
+      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + abstol;
+      return Math.abs(cdhat - id) <= tol;
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {

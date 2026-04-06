@@ -288,7 +288,7 @@ export function initSimulationController(
       const compileWarnings = unified.diagnostics.filter(d => d.severity === 'warning');
 
       if (compileErrors.length > 0) {
-        const combined = compileErrors.map(d => d.message).join(' | ');
+        const combined = compileErrors.map(d => d.message).join('\n');
         console.error('Compilation diagnostics:', compileErrors);
         ctx.showStatus(`Circuit problem: ${combined}`, true);
       }

@@ -24,12 +24,21 @@ export interface NROptions {
   elements: readonly AnalogElement[];
   /** MNA matrix size = nodeCount + branchCount. */
   matrixSize: number;
+  /**
+   * Number of node-voltage rows at the front of the solution vector.
+   * Damping and line search are restricted to node rows only (0..nodeCount-1),
+   * matching ngspice niiter.c which never damps branch-current rows.
+   * Defaults to matrixSize when omitted.
+   */
+  nodeCount?: number;
   /** Maximum number of NR iterations before declaring failure. */
   maxIterations: number;
   /** Relative convergence tolerance. */
   reltol: number;
   /** Absolute voltage convergence tolerance in volts. */
   abstol: number;
+  /** Absolute current tolerance for device convergence checks (ngspice ABSTOL). */
+  iabstol: number;
   /** Optional initial guess for the solution vector. */
   initialGuess?: Float64Array;
   /** Diagnostic collector for emitting solver events. */
@@ -228,7 +237,8 @@ export function limvds(vnew: number, vold: number): number {
  * @returns    - NRResult with convergence status, iterations, voltages, trace
  */
 export function newtonRaphson(opts: NROptions): NRResult {
-  const { solver, elements, matrixSize, maxIterations, reltol, abstol, diagnostics } = opts;
+  const { solver, elements, matrixSize, maxIterations, reltol, abstol, iabstol, diagnostics } = opts;
+  const nodeCount = opts.nodeCount ?? matrixSize;
 
   const assembler = new MNAAssembler(solver);
   // Reuse caller-provided buffers when available to avoid per-call allocation
@@ -296,13 +306,13 @@ export function newtonRaphson(opts: NROptions): NRResult {
     //     always finite and well-defined — including the first iteration.
     {
       let maxDelta = 0;
-      for (let i = 0; i < matrixSize; i++) {
+      for (let i = 0; i < nodeCount; i++) {
         const delta = Math.abs(voltages[i] - prevVoltages[i]);
         if (delta > maxDelta) maxDelta = delta;
       }
       if (maxDelta > 10) {
         const dampFactor = Math.max(10 / maxDelta, 0.1);
-        for (let i = 0; i < matrixSize; i++) {
+        for (let i = 0; i < nodeCount; i++) {
           voltages[i] = prevVoltages[i] + dampFactor * (voltages[i] - prevVoltages[i]);
         }
       }
@@ -315,12 +325,12 @@ export function newtonRaphson(opts: NROptions): NRResult {
     //     Only active after iteration 1 to allow the first step to be unrestricted.
     if (iteration >= 2) {
       let maxChange = 0;
-      for (let i = 0; i < matrixSize; i++) {
+      for (let i = 0; i < nodeCount; i++) {
         maxChange = Math.max(maxChange, Math.abs(voltages[i] - prevVoltages[i]));
       }
       if (maxChange > prevIterMaxChange && maxChange > abstol * 100) {
         // Step is growing: halve to break divergence
-        for (let i = 0; i < matrixSize; i++) {
+        for (let i = 0; i < nodeCount; i++) {
           voltages[i] = prevVoltages[i] + 0.5 * (voltages[i] - prevVoltages[i]);
         }
         prevIterMaxChange = maxChange * 0.5;
@@ -329,29 +339,34 @@ export function newtonRaphson(opts: NROptions): NRResult {
       }
     }
 
-    // 5c. Update operating points: elements apply voltage limiting, recompute
-    //     their companion model (geq/ieq) for the next stampNonlinear.
-    assembler.updateOperatingPoints(elements, voltages);
-
-    // 6. Check global node-voltage convergence criterion
-    let globalConverged = true;
+    // 5c. Convergence checks (skip iteration 0 — no previous operating point yet)
+    let globalConverged = false;
+    let elemConverged = false;
     let largestChangeNode = 0;
     let largestChangeMag = 0;
 
-    for (let i = 0; i < matrixSize; i++) {
-      const delta = Math.abs(voltages[i] - prevVoltages[i]);
-      if (delta > largestChangeMag) {
-        largestChangeMag = delta;
-        largestChangeNode = i;
+    if (iteration > 0) {
+      // 6. Check global node-voltage convergence criterion
+      globalConverged = true;
+      for (let i = 0; i < matrixSize; i++) {
+        const delta = Math.abs(voltages[i] - prevVoltages[i]);
+        if (delta > largestChangeMag) {
+          largestChangeMag = delta;
+          largestChangeNode = i;
+        }
+        const tol = abstol + reltol * Math.abs(voltages[i]);
+        if (delta > tol) {
+          globalConverged = false;
+        }
       }
-      const tol = abstol + reltol * Math.abs(voltages[i]);
-      if (delta > tol) {
-        globalConverged = false;
-      }
+
+      // 7. Element-specific convergence check
+      elemConverged = assembler.checkAllConverged(elements, voltages, prevVoltages, reltol, iabstol);
     }
 
-    // 7. Element-specific convergence check
-    const elemConverged = assembler.checkAllConverged(elements, voltages, prevVoltages);
+    // 5d. Update operating points: elements apply voltage limiting, recompute
+    //     their companion model (geq/ieq) for the next stampNonlinear.
+    assembler.updateOperatingPoints(elements, voltages);
 
     // 8. Find element with largest contribution to non-convergence (blame tracking)
     let largestChangeElement = -1;

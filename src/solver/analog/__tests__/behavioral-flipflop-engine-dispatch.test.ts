@@ -26,6 +26,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { MNAEngine } from "../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../analog-engine.js";
+import { StatePool } from "../state-pool.js";
 import { EngineState } from "../../../core/engine-interface.js";
 import {
   makeVoltageSource,
@@ -145,6 +146,7 @@ function buildDffEngineDispatchCircuit(): {
       ["Q", 3],
       ["QB", 4],
     ]),
+    statePool: new StatePool(0),
   };
 
   return { circuit, element, qPin, qBarPin, clockSource, dSource };

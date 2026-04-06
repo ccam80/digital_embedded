@@ -20,6 +20,7 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import type { SparseSolverStamp } from "../../../core/analog-types.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
+import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -34,16 +35,12 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // withState: allocate a StatePool for a single element and call initState
 // ---------------------------------------------------------------------------
 
-function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
-  const size = core.stateSize ?? 0;
-  const pool = new StatePool(Math.max(size, 1));
-  if (size > 0) {
-    core.stateBaseOffset = 0;
-    core.initState!(pool);
-  } else {
-    core.stateBaseOffset = -1;
-  }
-  return { element: core, pool };
+function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; pool: StatePool } {
+  const re = core as ReactiveAnalogElement;
+  const pool = new StatePool(Math.max(re.stateSize, 1));
+  re.stateBaseOffset = 0;
+  re.initState(pool);
+  return { element: re, pool };
 }
 
 
@@ -216,7 +213,7 @@ describe("Capacitor", () => {
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
         new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
       );
-      expect(core.stateSize).toBe(6);
+      expect((core as ReactiveAnalogElement).stateSize).toBe(6);
     });
 
     it("stateBaseOffset is -1 before compiler assigns it", () => {
@@ -225,7 +222,7 @@ describe("Capacitor", () => {
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
         new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
       );
-      expect(core.stateBaseOffset).toBe(-1);
+      expect((core as ReactiveAnalogElement).stateBaseOffset).toBe(-1);
     });
 
     it("stampCompanion writes GEQ and IEQ to pool slots 0 and 1", () => {

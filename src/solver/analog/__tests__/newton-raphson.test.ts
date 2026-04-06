@@ -109,6 +109,7 @@ describe("NR", () => {
       maxIterations: 100,
       reltol: 1e-3,
       abstol: 1e-6,
+      iabstol: 1e-12,
       diagnostics,
     });
 
@@ -132,6 +133,7 @@ describe("NR", () => {
       maxIterations: 100,
       reltol: 1e-3,
       abstol: 1e-6,
+      iabstol: 1e-12,
       diagnostics,
     });
 
@@ -159,6 +161,7 @@ describe("NR", () => {
       maxIterations: 100,
       reltol: 1e-3,
       abstol: 1e-6,
+      iabstol: 1e-12,
       diagnostics,
     });
 
@@ -189,6 +192,7 @@ describe("NR", () => {
       maxIterations: 2,
       reltol: 1e-3,
       abstol: 1e-6,
+      iabstol: 1e-12,
       diagnostics,
     });
 
@@ -210,6 +214,7 @@ describe("NR", () => {
       maxIterations: 100,
       reltol: 1e-3,
       abstol: 1e-6,
+      iabstol: 1e-12,
       diagnostics,
     });
 
@@ -239,6 +244,7 @@ describe("NR", () => {
       maxIterations: 100,
       reltol: 1e-3,
       abstol: 1e-6,
+      iabstol: 1e-12,
       diagnostics: diag1,
     });
 
@@ -257,6 +263,7 @@ describe("NR", () => {
       maxIterations: 100,
       reltol: 1e-3,
       abstol: 1e-6,
+      iabstol: 1e-12,
       initialGuess: guess,
       diagnostics: diag2,
     });

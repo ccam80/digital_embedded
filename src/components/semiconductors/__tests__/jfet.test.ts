@@ -36,20 +36,19 @@ import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
+import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
 // withState — allocate a StatePool and call initState on the element
 // ---------------------------------------------------------------------------
 
-function withState<T extends AnalogElementCore>(element: T): T {
-  const size = element.stateSize ?? 0;
-  if (size > 0 && element.initState) {
-    element.stateBaseOffset = 0;
-    const pool = new StatePool(size);
-    element.initState(pool);
-  }
-  return element;
+function withState(element: AnalogElementCore): ReactiveAnalogElement {
+  const re = element as ReactiveAnalogElement;
+  re.stateBaseOffset = 0;
+  const pool = new StatePool(re.stateSize);
+  re.initState(pool);
+  return re;
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +165,7 @@ describe("NJFET", () => {
     const params = { ...NJFET_PARAMS, LAMBDA: 0 };
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(params);
-    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj)) as NJfetAnalogElement;
+    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj)) as unknown as NJfetAnalogElement;
 
     const voltages = new Float64Array(2);
     voltages[0] = 0; // V(G) = 0V → Vgs = 0
@@ -196,7 +195,7 @@ describe("NJFET", () => {
     const params = { ...NJFET_PARAMS, LAMBDA: 0 };
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(params);
-    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj)) as NJfetAnalogElement;
+    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj)) as unknown as NJfetAnalogElement;
 
     const voltages = new Float64Array(2);
     voltages[0] = 0;   // Vgs = 0
@@ -379,6 +378,7 @@ describe("NR", () => {
       solver,
       elements: [vdd, vgate, rd, jfet],
       matrixSize,
+      nodeCount: 3,
       params: { ...DEFAULT_SIMULATION_PARAMS, maxIterations: 10 },
       diagnostics,
     });
@@ -428,24 +428,24 @@ describe("Registration", () => {
 // ---------------------------------------------------------------------------
 
 describe("JFET state-pool extension schema", () => {
-  it("stateSize_is_28", () => {
+  it("stateSize_is_33", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
     const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    expect(element.stateSize).toBe(28);
+    expect(element.stateSize).toBe(33);
   });
 
-  it("extension_slot_constants_are_25_26_27", () => {
-    expect(SLOT_VGS_JUNCTION).toBe(25);
-    expect(SLOT_GD_JUNCTION).toBe(26);
-    expect(SLOT_ID_JUNCTION).toBe(27);
+  it("extension_slot_constants_are_30_31_32", () => {
+    expect(SLOT_VGS_JUNCTION).toBe(30);
+    expect(SLOT_GD_JUNCTION).toBe(31);
+    expect(SLOT_ID_JUNCTION).toBe(32);
   });
 
   it("initState_initializes_VGS_JUNCTION_to_zero", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
     const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    const pool = new StatePool(28);
+    const pool = new StatePool(33);
     element.stateBaseOffset = 0;
     element.initState(pool);
     expect(pool.state0[SLOT_VGS_JUNCTION]).toBe(0);
@@ -455,7 +455,7 @@ describe("JFET state-pool extension schema", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
     const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    const pool = new StatePool(28);
+    const pool = new StatePool(33);
     element.stateBaseOffset = 0;
     element.initState(pool);
     expect(pool.state0[SLOT_GD_JUNCTION]).toBe(1e-12);
@@ -465,7 +465,7 @@ describe("JFET state-pool extension schema", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
     const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    const pool = new StatePool(28);
+    const pool = new StatePool(33);
     element.stateBaseOffset = 0;
     element.initState(pool);
     expect(pool.state0[SLOT_ID_JUNCTION]).toBe(0);
@@ -495,18 +495,18 @@ describe("JFET state-pool extension schema", () => {
     expect(Math.abs(idJunction)).toBeGreaterThan(0);
   });
 
-  it("pjfet_stateSize_is_28", () => {
+  it("pjfet_stateSize_is_33", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(PJFET_PARAMS);
     const element = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj);
-    expect(element.stateSize).toBe(28);
+    expect(element.stateSize).toBe(33);
   });
 
   it("pjfet_initState_initializes_extension_slots", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(PJFET_PARAMS);
     const element = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj);
-    const pool = new StatePool(28);
+    const pool = new StatePool(33);
     element.stateBaseOffset = 0;
     element.initState(pool);
     expect(pool.state0[SLOT_VGS_JUNCTION]).toBe(0);
@@ -518,7 +518,7 @@ describe("JFET state-pool extension schema", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
     const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    const pool = new StatePool(28);
+    const pool = new StatePool(33);
     element.stateBaseOffset = 0;
     element.initState(pool);
     // Base FET slots: GM=1e-12, GDS=1e-12 (device-off linearization)

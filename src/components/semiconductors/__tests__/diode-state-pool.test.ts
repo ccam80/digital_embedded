@@ -10,6 +10,7 @@ import { describe, it, expect } from "vitest";
 import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../diode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
+import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 
 const SLOT_VD = 0;
 const SLOT_GEQ = 1;
@@ -28,11 +29,11 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
  */
 function makeDiodeWithPool(params: Record<string, number> = {}) {
   const props = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, ...params });
-  const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+  const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
   const stateSize = element.stateSize;
   const pool = new StatePool(stateSize);
   element.stateBaseOffset = 0;
-  element.initState!(pool);
+  element.initState(pool);
   return { element, pool };
 }
 
@@ -147,19 +148,19 @@ describe("diode state pool migration", () => {
 
   it("stateSize is 4 when CJO=0 and TT=0", () => {
     const props = makeParamBag({ CJO: 0, TT: 0 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
     expect(element.stateSize).toBe(4);
   });
 
   it("stateSize is 8 when CJO > 0", () => {
     const props = makeParamBag({ CJO: 10e-12, TT: 0 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
     expect(element.stateSize).toBe(8);
   });
 
   it("stateSize is 8 when TT > 0", () => {
     const props = makeParamBag({ CJO: 0, TT: 1e-9 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
     expect(element.stateSize).toBe(8);
   });
 
@@ -183,10 +184,10 @@ describe("diode state pool migration", () => {
 
   it("capacitance slots initialized to zero before stampCompanion", () => {
     const props = makeParamBag({ CJO: 10e-12, TT: 0 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
     const pool = new StatePool(element.stateSize);
     element.stateBaseOffset = 0;
-    element.initState!(pool);
+    element.initState(pool);
 
     // SLOT_CAP_GEQ=4, SLOT_CAP_IEQ=5, SLOT_VD_PREV=6 start at zero
     expect(pool.state0[4]).toBe(0);
@@ -196,10 +197,10 @@ describe("diode state pool migration", () => {
 
   it("SLOT_CAP_FIRST_CALL is 1.0 after initState for capacitive diode", () => {
     const props = makeParamBag({ CJO: 10e-12, TT: 0 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
     const pool = new StatePool(element.stateSize);
     element.stateBaseOffset = 0;
-    element.initState!(pool);
+    element.initState(pool);
 
     // SLOT_CAP_FIRST_CALL=7 must be 1.0 so the first stampCompanion uses vNow as vPrev
     expect(pool.state0[7]).toBe(1.0);
@@ -207,10 +208,10 @@ describe("diode state pool migration", () => {
 
   it("SLOT_CAP_FIRST_CALL becomes 0 after first stampCompanion call", () => {
     const props = makeParamBag({ CJO: 10e-12, TT: 0 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
     const pool = new StatePool(element.stateSize);
     element.stateBaseOffset = 0;
-    element.initState!(pool);
+    element.initState(pool);
 
     const voltages = new Float64Array([-1.0, 0.0]);
     element.updateOperatingPoint!(voltages);
@@ -222,24 +223,23 @@ describe("diode state pool migration", () => {
 
   it("stateSchema is DIODE_SCHEMA for resistive diode", () => {
     const props = makeParamBag({ CJO: 0, TT: 0 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
     expect(element.stateSchema).toBeDefined();
-    expect(element.stateSchema!.size).toBe(4);
-    expect(element.stateSchema!.owner).toBe("DiodeElement");
+    expect(element.stateSchema.size).toBe(4);
+    expect(element.stateSchema.owner).toBe("DiodeElement");
   });
 
   it("stateSchema is DIODE_CAP_SCHEMA for capacitive diode", () => {
     const props = makeParamBag({ CJO: 10e-12, TT: 0 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
     expect(element.stateSchema).toBeDefined();
-    expect(element.stateSchema!.size).toBe(8);
-    expect(element.stateSchema!.owner).toBe("DiodeElement_cap");
+    expect(element.stateSchema.size).toBe(8);
+    expect(element.stateSchema.owner).toBe("DiodeElement_cap");
   });
 
   it("pool IEQ satisfies ieq = id - geq * vd at converged point", () => {
     const IS = 1e-14;
     const N = 1;
-    const VT = 0.02585;
     const { element, pool } = makeDiodeWithPool({ IS, N });
 
     const voltages = new Float64Array([0.65, 0.0]);
