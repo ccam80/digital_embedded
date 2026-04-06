@@ -135,3 +135,23 @@
 - **Files modified**: `src/solver/analog/analog-engine.ts`
 - **Tests**: 1 pre-existing test fails due to spec conflict
 - **Spec/test conflict**: WA5 spec requires calling `el.initState?.(cac.statePool)` after `statePool.reset()` to restore non-zero initial values (FET GM/GDS=1e-12, BJT op-point). Pre-existing test `convergence-regression.test.ts > reset zeros statePool` asserts that `state0[diodeBase + 1]` is 0 after reset. The diode's `initState` sets SLOT_GEQ=1e-12, so WA5's reinit produces 1e-12 ≠ 0. Cannot resolve without modifying the pre-existing test.
+
+## Task WB1: capacitor.ts adopt schema (§1.4)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/passives/capacitor.ts`
+- **Tests**: 29/29 passing (capacitor suite); full Vitest 10145 passing, 17 failing (all pre-existing — spice-import-roundtrip, spice-model-overrides, buckbjt-convergence; none related to capacitor)
+
+## Task WB2: inductor.ts adopt schema
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/passives/inductor.ts
+- **Tests**: 28/28 passing (inductor suite); full vitest suite 10145/10162 passing
+- **Notes**: 17 pre-existing failures in spice-import-roundtrip-mcp, spice-model-overrides-mcp, buckbjt-convergence — unrelated to inductor changes (BJT/SPICE domain). Not in original test-baseline.md (which predates these tests). All 28 inductor tests pass cleanly.
+  - Added `INDUCTOR_SCHEMA` using `defineStateSchema("AnalogInductorElement", [...L_COMPANION_SLOTS, {name:"V_PREV",...}])`
+  - Added `stateSchema = INDUCTOR_SCHEMA` and `stateSize = INDUCTOR_SCHEMA.size` (was hardcoded 4, now schema-derived, same value)
+  - Updated `initState` to call `applyInitialValues(INDUCTOR_SCHEMA, pool, this.base, {})`
+  - Renamed `SLOT_I_PREV_PREV=3` → `SLOT_V_PREV=3`; `stampCompanion` now stores `vNow` (terminal voltage) at slot 3 instead of `iPrev`
+  - Updated `getLteEstimate` to use single-point estimate `(dt/12)*|iPrev|` (slot 3 no longer holds previous current)

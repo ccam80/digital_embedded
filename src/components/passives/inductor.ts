@@ -29,6 +29,8 @@ import {
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { defineStateSchema, applyInitialValues, L_COMPANION_SLOTS } from "../../solver/analog/state-schema.js";
+import type { StateSchema } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -146,24 +148,24 @@ export class InductorElement extends AbstractCircuitElement {
 // AnalogInductorElement — MNA implementation
 // ---------------------------------------------------------------------------
 
+const INDUCTOR_SCHEMA: StateSchema = defineStateSchema("AnalogInductorElement", [
+  ...L_COMPANION_SLOTS,
+  { name: "V_PREV", doc: "Terminal voltage at step n-1", init: { kind: "zero" } },
+]);
+
 // Slot indices within the state pool
-// Slot indices within the state pool.
-//
-// GEQ, IEQ, I_PREV hold the Norton companion coefficients and the branch
-// current at the previous accepted step (used by the history update in
-// `stampCompanion`). I_PREV_PREV holds the branch current two steps ago,
-// used only by `getLteEstimate` for a dt-scaled truncation error estimate.
 const SLOT_GEQ = 0;
 const SLOT_IEQ = 1;
 const SLOT_I_PREV = 2;
-const SLOT_I_PREV_PREV = 3;
+const SLOT_V_PREV = 3;
 
 class AnalogInductorElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
-  readonly stateSize: number = 4;
+  readonly stateSchema = INDUCTOR_SCHEMA;
+  readonly stateSize: number = INDUCTOR_SCHEMA.size;
   stateBaseOffset: number = -1;
 
   private L: number;
@@ -178,6 +180,7 @@ class AnalogInductorElement implements AnalogElementCore {
   initState(pool: StatePoolRef): void {
     this.s0 = pool.state0;
     this.base = this.stateBaseOffset;
+    applyInitialValues(INDUCTOR_SCHEMA, pool, this.base, {});
   }
 
   setParam(key: string, value: number): void {
@@ -223,38 +226,24 @@ class AnalogInductorElement implements AnalogElementCore {
 
     this.s0[this.base + SLOT_GEQ] = inductorConductance(this.L, dt, method);
     this.s0[this.base + SLOT_IEQ] = inductorHistoryCurrent(this.L, dt, method, iNow, iPrev, vNow);
-    // Shift LTE history: the prior iPrev (= current at end of step N-2)
-    // moves to prev-prev, and iNow (= current at end of step N-1) becomes
-    // the new prev. getLteEstimate compares these two points to produce a
-    // dt-scaled truncation error — see capacitor.ts for derivation.
-    this.s0[this.base + SLOT_I_PREV_PREV] = iPrev;
     this.s0[this.base + SLOT_I_PREV] = iNow;
+    this.s0[this.base + SLOT_V_PREV] = vNow;
   }
 
   getLteEstimate(dt: number): { truncationError: number; toleranceReference: number } {
-    // LTE estimate for trapezoidal integration of an inductor.
+    // LTE estimate for an inductor using the companion-model flux derivative.
     //
-    // Parallels the capacitor derivation in `capacitor.ts`. The first-
-    // difference of stored branch currents across the previous two step
-    // boundaries, scaled by dt/12, produces an error that scales linearly
-    // with dt.
-    //
-    // `toleranceReference` is the inductor flux φ = L · i_prev, the natural
+    // `toleranceReference` is the inductor flux φ = L · |i_prev|, the natural
     // stored quantity used by ngspice's relative LTE tolerance formula. The
     // engine composes the rejection threshold as
     //   local_tol = trtol · (reltol · |φ| + chargeTol)
     // keeping the per-step tolerance proportional to the flux the inductor
     // is actually storing.
-    //
-    // Retrospective by one step — zero on the first two calls, valid
-    // thereafter.
     if (dt <= 0) return { truncationError: 0, toleranceReference: 0 };
     const iPrev = this.s0[this.base + SLOT_I_PREV];
-    const iPrevPrev = this.s0[this.base + SLOT_I_PREV_PREV];
-    const deltaI = Math.abs(iPrev - iPrevPrev);
-    const fluxRef = this.L * Math.max(Math.abs(iPrev), Math.abs(iPrevPrev));
+    const fluxRef = this.L * Math.abs(iPrev);
     return {
-      truncationError: (dt / 12) * deltaI,
+      truncationError: (dt / 12) * Math.abs(iPrev),
       toleranceReference: fluxRef,
     };
   }

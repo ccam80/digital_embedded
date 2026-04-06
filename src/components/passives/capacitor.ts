@@ -30,6 +30,12 @@ import {
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import {
+  defineStateSchema,
+  applyInitialValues,
+  CAP_COMPANION_SLOTS,
+  type StateSchema,
+} from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -130,30 +136,31 @@ export class CapacitorElement extends AbstractCircuitElement {
 // AnalogCapacitorElement — MNA implementation
 // ---------------------------------------------------------------------------
 
+// Slot layout — the array index of each entry IS the pool offset.
+// First 3 slots come from the shared CAP_COMPANION_SLOTS fragment;
+// the trailing 3 BDF-2 history slots are capacitor-specific.
+const CAPACITOR_SCHEMA: StateSchema = defineStateSchema("AnalogCapacitorElement", [
+  ...CAP_COMPANION_SLOTS,
+  { name: "I_PREV",      doc: "Capacitor current at step n-1",                init: { kind: "zero" } },
+  { name: "I_PREV_PREV", doc: "Capacitor current at step n-2",                init: { kind: "zero" } },
+  { name: "V_PREV_PREV", doc: "Terminal voltage at step n-2 (LTE reference)", init: { kind: "zero" } },
+]);
 
-// Slot indices within the state pool.
-//
-// 6-slot layout:
-//   0: GEQ          — Norton companion conductance
-//   1: IEQ          — Norton companion history current
-//   2: V_PREV       — terminal voltage at last accepted step (n-1), used by companion history
-//   3: I_PREV       — capacitor current at step n-1, used by LTE
-//   4: I_PREV_PREV  — capacitor current at step n-2, used by LTE
-//   5: V_PREV_PREV  — terminal voltage at step n-2, used by LTE toleranceReference
-const SLOT_GEQ = 0;
-const SLOT_IEQ = 1;
-const SLOT_V_PREV = 2;
-const SLOT_I_PREV = 3;
+const SLOT_GEQ         = 0;
+const SLOT_IEQ         = 1;
+const SLOT_V_PREV      = 2;
+const SLOT_I_PREV      = 3;
 const SLOT_I_PREV_PREV = 4;
 const SLOT_V_PREV_PREV = 5;
 
 class AnalogCapacitorElement implements AnalogElementCore {
-  pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
-  readonly branchIndex: number = -1;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = true;
-  readonly stateSize: number = 6;
-  stateBaseOffset: number = -1;
+  pinNodeIds!: readonly number[];
+  readonly branchIndex = -1;
+  readonly isNonlinear = false;
+  readonly isReactive = true;
+  readonly stateSchema = CAPACITOR_SCHEMA;
+  readonly stateSize = CAPACITOR_SCHEMA.size;
+  stateBaseOffset = -1;
 
   private C: number;
   private s0!: Float64Array;
@@ -166,6 +173,7 @@ class AnalogCapacitorElement implements AnalogElementCore {
   initState(pool: StatePoolRef): void {
     this.s0 = pool.state0;
     this.base = this.stateBaseOffset;
+    applyInitialValues(CAPACITOR_SCHEMA, pool, this.base, {});
   }
 
   setParam(key: string, value: number): void {
