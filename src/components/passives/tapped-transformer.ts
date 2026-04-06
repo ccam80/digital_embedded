@@ -44,6 +44,9 @@ import {
 import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
+import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+import type { StateSchema } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -60,6 +63,38 @@ export const { paramDefs: TAPPED_TRANSFORMER_PARAM_DEFS, defaults: TAPPED_TRANSF
     secondaryResistance: { default: 0.0,   unit: "Ω", description: "Each secondary half winding series resistance in ohms", min: 0 },
   },
 });
+
+// ---------------------------------------------------------------------------
+// State-pool schema — 12 slots: 9 companion matrix coefficients + 3 current history
+// ---------------------------------------------------------------------------
+
+const TAPPED_TRANSFORMER_SCHEMA: StateSchema = defineStateSchema("AnalogTappedTransformerElement", [
+  { name: "G11",    doc: "Primary self-conductance companion coefficient",          init: { kind: "zero" } },
+  { name: "G22",    doc: "Secondary half-1 self-conductance companion coefficient", init: { kind: "zero" } },
+  { name: "G33",    doc: "Secondary half-2 self-conductance companion coefficient", init: { kind: "zero" } },
+  { name: "G12",    doc: "Primary–secondary half-1 mutual conductance",             init: { kind: "zero" } },
+  { name: "G13",    doc: "Primary–secondary half-2 mutual conductance",             init: { kind: "zero" } },
+  { name: "G23",    doc: "Secondary half-1 to half-2 mutual conductance",           init: { kind: "zero" } },
+  { name: "HIST1",  doc: "Primary winding history voltage term",                    init: { kind: "zero" } },
+  { name: "HIST2",  doc: "Secondary half-1 history voltage term",                   init: { kind: "zero" } },
+  { name: "HIST3",  doc: "Secondary half-2 history voltage term",                   init: { kind: "zero" } },
+  { name: "PREV_I1", doc: "Primary branch current at step n-1 (BDF-2 history)",    init: { kind: "zero" } },
+  { name: "PREV_I2", doc: "Secondary half-1 current at step n-1 (BDF-2 history)",  init: { kind: "zero" } },
+  { name: "PREV_I3", doc: "Secondary half-2 current at step n-1 (BDF-2 history)",  init: { kind: "zero" } },
+]);
+
+const SLOT_G11    = 0;
+const SLOT_G22    = 1;
+const SLOT_G33    = 2;
+const SLOT_G12    = 3;
+const SLOT_G13    = 4;
+const SLOT_G23    = 5;
+const SLOT_HIST1  = 6;
+const SLOT_HIST2  = 7;
+const SLOT_HIST3  = 8;
+const SLOT_PREV_I1 = 9;
+const SLOT_PREV_I2 = 10;
+const SLOT_PREV_I3 = 11;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -203,6 +238,9 @@ export class AnalogTappedTransformerElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  readonly stateSchema = TAPPED_TRANSFORMER_SCHEMA;
+  readonly stateSize: number = TAPPED_TRANSFORMER_SCHEMA.size;
+  stateBaseOffset: number = -1;
   setParam(_key: string, _value: number): void {}
 
   private readonly _b2: number;
@@ -218,21 +256,8 @@ export class AnalogTappedTransformerElement implements AnalogElement {
   private _m13: number;
   private _m23: number;
 
-  // Pre-computed companion coefficients, updated in stampCompanion()
-  private _g11: number = 0;
-  private _g22: number = 0;
-  private _g33: number = 0;
-  private _g12: number = 0;
-  private _g13: number = 0;
-  private _g23: number = 0;
-  private _hist1: number = 0;
-  private _hist2: number = 0;
-  private _hist3: number = 0;
-
-  // Previous accepted currents and voltages for history terms
-  private _prevI1: number = 0;
-  private _prevI2: number = 0;
-  private _prevI3: number = 0;
+  private s0!: Float64Array;
+  private base!: number;
 
   constructor(
     pinNodeIds: number[],
@@ -260,6 +285,12 @@ export class AnalogTappedTransformerElement implements AnalogElement {
     this._m12 = k * Math.sqrt(this._l1 * this._l2);
     this._m13 = k * Math.sqrt(this._l1 * this._l3);
     this._m23 = k * Math.sqrt(this._l2 * this._l3);
+  }
+
+  initState(pool: StatePoolRef): void {
+    this.s0 = pool.state0;
+    this.base = this.stateBaseOffset;
+    applyInitialValues(TAPPED_TRANSFORMER_SCHEMA, pool, this.base, {});
   }
 
   updateDerivedParams(lPrimary: number, turnsRatio: number, k: number, rPri: number, rSec: number): void {
@@ -328,26 +359,26 @@ export class AnalogTappedTransformerElement implements AnalogElement {
     // Primary:     V(P1) - V(P2) - (g11 + R_pri)·I1 - g12·I2 - g13·I3 = hist1
     if (p1 !== 0) solver.stamp(b1, p1 - 1, 1);
     if (p2 !== 0) solver.stamp(b1, p2 - 1, -1);
-    solver.stamp(b1, b1, -(this._g11 + this._rPri));
-    solver.stamp(b1, b2, -this._g12);
-    solver.stamp(b1, b3, -this._g13);
-    solver.stampRHS(b1, this._hist1);
+    solver.stamp(b1, b1, -(this.s0[this.base + SLOT_G11] + this._rPri));
+    solver.stamp(b1, b2, -this.s0[this.base + SLOT_G12]);
+    solver.stamp(b1, b3, -this.s0[this.base + SLOT_G13]);
+    solver.stampRHS(b1, this.s0[this.base + SLOT_HIST1]);
 
     // Sec half-1: V(S1) - V(CT) - g12·I1 - (g22 + R_sec)·I2 - g23·I3 = hist2
     if (s1 !== 0) solver.stamp(b2, s1 - 1, 1);
     if (ct !== 0) solver.stamp(b2, ct - 1, -1);
-    solver.stamp(b2, b1, -this._g12);
-    solver.stamp(b2, b2, -(this._g22 + this._rSec));
-    solver.stamp(b2, b3, -this._g23);
-    solver.stampRHS(b2, this._hist2);
+    solver.stamp(b2, b1, -this.s0[this.base + SLOT_G12]);
+    solver.stamp(b2, b2, -(this.s0[this.base + SLOT_G22] + this._rSec));
+    solver.stamp(b2, b3, -this.s0[this.base + SLOT_G23]);
+    solver.stampRHS(b2, this.s0[this.base + SLOT_HIST2]);
 
     // Sec half-2: V(CT) - V(S2) - g13·I1 - g23·I2 - (g33 + R_sec)·I3 = hist3
     if (ct !== 0) solver.stamp(b3, ct - 1, 1);
     if (s2 !== 0) solver.stamp(b3, s2 - 1, -1);
-    solver.stamp(b3, b1, -this._g13);
-    solver.stamp(b3, b2, -this._g23);
-    solver.stamp(b3, b3, -(this._g33 + this._rSec));
-    solver.stampRHS(b3, this._hist3);
+    solver.stamp(b3, b1, -this.s0[this.base + SLOT_G13]);
+    solver.stamp(b3, b2, -this.s0[this.base + SLOT_G23]);
+    solver.stamp(b3, b3, -(this.s0[this.base + SLOT_G33] + this._rSec));
+    solver.stampRHS(b3, this.s0[this.base + SLOT_HIST3]);
   }
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
@@ -368,54 +399,53 @@ export class AnalogTappedTransformerElement implements AnalogElement {
     const v2Now = vs1 - vct;
     const v3Now = vct - vs2;
 
+    const s = this.s0;
+    const b = this.base;
+
     switch (method) {
       case "bdf1":
-        this._g11 = this._l1 / dt;
-        this._g22 = this._l2 / dt;
-        this._g33 = this._l3 / dt;
-        this._g12 = this._m12 / dt;
-        this._g13 = this._m13 / dt;
-        this._g23 = this._m23 / dt;
-        this._hist1 = -this._g11 * i1Now - this._g12 * i2Now - this._g13 * i3Now;
-        this._hist2 = -this._g12 * i1Now - this._g22 * i2Now - this._g23 * i3Now;
-        this._hist3 = -this._g13 * i1Now - this._g23 * i2Now - this._g33 * i3Now;
+        s[b + SLOT_G11] = this._l1 / dt;
+        s[b + SLOT_G22] = this._l2 / dt;
+        s[b + SLOT_G33] = this._l3 / dt;
+        s[b + SLOT_G12] = this._m12 / dt;
+        s[b + SLOT_G13] = this._m13 / dt;
+        s[b + SLOT_G23] = this._m23 / dt;
+        s[b + SLOT_HIST1] = -s[b + SLOT_G11] * i1Now - s[b + SLOT_G12] * i2Now - s[b + SLOT_G13] * i3Now;
+        s[b + SLOT_HIST2] = -s[b + SLOT_G12] * i1Now - s[b + SLOT_G22] * i2Now - s[b + SLOT_G23] * i3Now;
+        s[b + SLOT_HIST3] = -s[b + SLOT_G13] * i1Now - s[b + SLOT_G23] * i2Now - s[b + SLOT_G33] * i3Now;
         break;
       case "trapezoidal":
-        this._g11 = (2 * this._l1) / dt;
-        this._g22 = (2 * this._l2) / dt;
-        this._g33 = (2 * this._l3) / dt;
-        this._g12 = (2 * this._m12) / dt;
-        this._g13 = (2 * this._m13) / dt;
-        this._g23 = (2 * this._m23) / dt;
-        this._hist1 =
-          -this._g11 * i1Now - this._g12 * i2Now - this._g13 * i3Now - v1Now;
-        this._hist2 =
-          -this._g12 * i1Now - this._g22 * i2Now - this._g23 * i3Now - v2Now;
-        this._hist3 =
-          -this._g13 * i1Now - this._g23 * i2Now - this._g33 * i3Now - v3Now;
+        s[b + SLOT_G11] = (2 * this._l1) / dt;
+        s[b + SLOT_G22] = (2 * this._l2) / dt;
+        s[b + SLOT_G33] = (2 * this._l3) / dt;
+        s[b + SLOT_G12] = (2 * this._m12) / dt;
+        s[b + SLOT_G13] = (2 * this._m13) / dt;
+        s[b + SLOT_G23] = (2 * this._m23) / dt;
+        s[b + SLOT_HIST1] = -s[b + SLOT_G11] * i1Now - s[b + SLOT_G12] * i2Now - s[b + SLOT_G13] * i3Now - v1Now;
+        s[b + SLOT_HIST2] = -s[b + SLOT_G12] * i1Now - s[b + SLOT_G22] * i2Now - s[b + SLOT_G23] * i3Now - v2Now;
+        s[b + SLOT_HIST3] = -s[b + SLOT_G13] * i1Now - s[b + SLOT_G23] * i2Now - s[b + SLOT_G33] * i3Now - v3Now;
         break;
       case "bdf2": {
-        this._g11 = (3 * this._l1) / (2 * dt);
-        this._g22 = (3 * this._l2) / (2 * dt);
-        this._g33 = (3 * this._l3) / (2 * dt);
-        this._g12 = (3 * this._m12) / (2 * dt);
-        this._g13 = (3 * this._m13) / (2 * dt);
-        this._g23 = (3 * this._m23) / (2 * dt);
-        const i1H = (4 / 3) * i1Now - (1 / 3) * this._prevI1;
-        const i2H = (4 / 3) * i2Now - (1 / 3) * this._prevI2;
-        const i3H = (4 / 3) * i3Now - (1 / 3) * this._prevI3;
-        this._hist1 = -this._g11 * i1H - this._g12 * i2H - this._g13 * i3H;
-        this._hist2 = -this._g12 * i1H - this._g22 * i2H - this._g23 * i3H;
-        this._hist3 = -this._g13 * i1H - this._g23 * i2H - this._g33 * i3H;
+        s[b + SLOT_G11] = (3 * this._l1) / (2 * dt);
+        s[b + SLOT_G22] = (3 * this._l2) / (2 * dt);
+        s[b + SLOT_G33] = (3 * this._l3) / (2 * dt);
+        s[b + SLOT_G12] = (3 * this._m12) / (2 * dt);
+        s[b + SLOT_G13] = (3 * this._m13) / (2 * dt);
+        s[b + SLOT_G23] = (3 * this._m23) / (2 * dt);
+        const i1H = (4 / 3) * i1Now - (1 / 3) * s[b + SLOT_PREV_I1];
+        const i2H = (4 / 3) * i2Now - (1 / 3) * s[b + SLOT_PREV_I2];
+        const i3H = (4 / 3) * i3Now - (1 / 3) * s[b + SLOT_PREV_I3];
+        s[b + SLOT_HIST1] = -s[b + SLOT_G11] * i1H - s[b + SLOT_G12] * i2H - s[b + SLOT_G13] * i3H;
+        s[b + SLOT_HIST2] = -s[b + SLOT_G12] * i1H - s[b + SLOT_G22] * i2H - s[b + SLOT_G23] * i3H;
+        s[b + SLOT_HIST3] = -s[b + SLOT_G13] * i1H - s[b + SLOT_G23] * i2H - s[b + SLOT_G33] * i3H;
         break;
       }
     }
 
-    // Rotate history state
-    this._prevI1 = i1Now;
-    this._prevI2 = i2Now;
-    this._prevI3 = i3Now;
-    void v1Now; void v2Now; void v3Now; // _prevV fields removed (unused)
+    s[b + SLOT_PREV_I1] = i1Now;
+    s[b + SLOT_PREV_I2] = i2Now;
+    s[b + SLOT_PREV_I3] = i3Now;
+    void v1Now; void v2Now; void v3Now;
   }
 
   getPinCurrents(voltages: Float64Array): number[] {

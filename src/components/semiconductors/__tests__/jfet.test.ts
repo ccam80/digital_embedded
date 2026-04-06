@@ -16,6 +16,9 @@ import {
   NJfetDefinition,
   createNJfetElement,
   NJfetAnalogElement,
+  SLOT_VGS_JUNCTION,
+  SLOT_GD_JUNCTION,
+  SLOT_ID_JUNCTION,
 } from "../njfet.js";
 import {
   PJfetDefinition,
@@ -417,5 +420,112 @@ describe("Registration", () => {
     expect(labels).toContain("G");
     expect(labels).toContain("D");
     expect(labels).toContain("S");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// State-pool schema tests — WC7: JFET 3-slot extension schema
+// ---------------------------------------------------------------------------
+
+describe("JFET state-pool extension schema", () => {
+  it("stateSize_is_28", () => {
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(NJFET_PARAMS);
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
+    expect(element.stateSize).toBe(28);
+  });
+
+  it("extension_slot_constants_are_25_26_27", () => {
+    expect(SLOT_VGS_JUNCTION).toBe(25);
+    expect(SLOT_GD_JUNCTION).toBe(26);
+    expect(SLOT_ID_JUNCTION).toBe(27);
+  });
+
+  it("initState_initializes_VGS_JUNCTION_to_zero", () => {
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(NJFET_PARAMS);
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
+    const pool = new StatePool(28);
+    element.stateBaseOffset = 0;
+    element.initState(pool);
+    expect(pool.state0[SLOT_VGS_JUNCTION]).toBe(0);
+  });
+
+  it("initState_initializes_GD_JUNCTION_to_GMIN", () => {
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(NJFET_PARAMS);
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
+    const pool = new StatePool(28);
+    element.stateBaseOffset = 0;
+    element.initState(pool);
+    expect(pool.state0[SLOT_GD_JUNCTION]).toBe(1e-12);
+  });
+
+  it("initState_initializes_ID_JUNCTION_to_zero", () => {
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(NJFET_PARAMS);
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
+    const pool = new StatePool(28);
+    element.stateBaseOffset = 0;
+    element.initState(pool);
+    expect(pool.state0[SLOT_ID_JUNCTION]).toBe(0);
+  });
+
+  it("junction_slots_are_written_by_updateOperatingPoint", () => {
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(NJFET_PARAMS);
+    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj));
+
+    // Forward-bias gate junction: V(G)=0.7V, V(S)=0V
+    const voltages = new Float64Array(2);
+    voltages[0] = 0.7;
+    voltages[1] = 0;
+
+    for (let i = 0; i < 20; i++) {
+      element.updateOperatingPoint!(voltages);
+    }
+
+    // After forward-bias iterations, GD_JUNCTION should be > GMIN (junction active)
+    const pool = (element as unknown as { _s0: Float64Array })._s0;
+    const gdJunction = pool[SLOT_GD_JUNCTION];
+    expect(gdJunction).toBeGreaterThan(1e-12);
+
+    // ID_JUNCTION should be nonzero (junction conducting)
+    const idJunction = pool[SLOT_ID_JUNCTION];
+    expect(Math.abs(idJunction)).toBeGreaterThan(0);
+  });
+
+  it("pjfet_stateSize_is_28", () => {
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(PJFET_PARAMS);
+    const element = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj);
+    expect(element.stateSize).toBe(28);
+  });
+
+  it("pjfet_initState_initializes_extension_slots", () => {
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(PJFET_PARAMS);
+    const element = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj);
+    const pool = new StatePool(28);
+    element.stateBaseOffset = 0;
+    element.initState(pool);
+    expect(pool.state0[SLOT_VGS_JUNCTION]).toBe(0);
+    expect(pool.state0[SLOT_GD_JUNCTION]).toBe(1e-12);
+    expect(pool.state0[SLOT_ID_JUNCTION]).toBe(0);
+  });
+
+  it("base_slots_still_initialized_by_initState", () => {
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams(NJFET_PARAMS);
+    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
+    const pool = new StatePool(28);
+    element.stateBaseOffset = 0;
+    element.initState(pool);
+    // Base FET slots: GM=1e-12, GDS=1e-12 (device-off linearization)
+    expect(pool.state0[2]).toBe(1e-12); // SLOT_GM = 2
+    expect(pool.state0[3]).toBe(1e-12); // SLOT_GDS = 3
+    // VGS_PREV and VGD_PREV should be NaN (warm-start sentinels)
+    expect(Number.isNaN(pool.state0[10])).toBe(true); // SLOT_VGS_PREV = 10
+    expect(Number.isNaN(pool.state0[11])).toBe(true); // SLOT_VGD_PREV = 11
   });
 });

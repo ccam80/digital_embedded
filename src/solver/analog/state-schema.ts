@@ -134,9 +134,9 @@ export function assertPoolIsSoleMutableState(
 function snapshotOwnFields(obj: object): Map<string, unknown> {
   const out = new Map<string, unknown>();
   for (const key of Object.keys(obj)) {
+    if (key === "stateBaseOffset") continue;
     const v = (obj as Record<string, unknown>)[key];
     if (typeof v === "number") out.set(key, v);
-    // Skip arrays/objects — schema violations are scalar drift.
   }
   return out;
 }

@@ -41,6 +41,8 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
+import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -51,6 +53,22 @@ const VT = 0.02585;
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
+
+// ---------------------------------------------------------------------------
+// JFET extension state-pool slots (indices relative to stateBaseOffset)
+// The base FET schema occupies slots 0-24 (stateSize=25).
+// JFET adds 3 extension slots at indices 25, 26, 27.
+// ---------------------------------------------------------------------------
+
+export const SLOT_VGS_JUNCTION = 25;
+export const SLOT_GD_JUNCTION  = 26;
+export const SLOT_ID_JUNCTION  = 27;
+
+const JFET_EXTENSION_SCHEMA = defineStateSchema("NJfetAnalogElement", [
+  { name: "VGS_JUNCTION", doc: "Gate-source junction voltage (NR linearization state)", init: { kind: "zero" } },
+  { name: "GD_JUNCTION",  doc: "Gate-source junction conductance (NR linearization state)", init: { kind: "constant", value: GMIN } },
+  { name: "ID_JUNCTION",  doc: "Gate-source junction current (NR linearization state)", init: { kind: "zero" } },
+]);
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -114,10 +132,7 @@ export class NJfetAnalogElement extends AbstractFetElement {
 
   protected readonly _p: JfetParams;
 
-  // Gate junction diode NR state
-  protected _vgs_junction: number = 0;
-  protected _gd_junction: number = GMIN;
-  protected _id_junction: number = 0;
+  override readonly stateSize: number = 28;
 
   constructor(
     gateNode: number,
@@ -130,6 +145,20 @@ export class NJfetAnalogElement extends AbstractFetElement {
     const hasCaps = p.CGS > 0 || p.CGD > 0;
     this._initReactive(hasCaps);
   }
+
+  override initState(pool: StatePoolRef): void {
+    super.initState(pool);
+    applyInitialValues(JFET_EXTENSION_SCHEMA, pool, this.stateBaseOffset + 25, {});
+  }
+
+  protected get _vgs_junction(): number { return this._s0[this.stateBaseOffset + SLOT_VGS_JUNCTION]; }
+  protected set _vgs_junction(v: number) { this._s0[this.stateBaseOffset + SLOT_VGS_JUNCTION] = v; }
+
+  protected get _gd_junction(): number { return this._s0[this.stateBaseOffset + SLOT_GD_JUNCTION]; }
+  protected set _gd_junction(v: number) { this._s0[this.stateBaseOffset + SLOT_GD_JUNCTION] = v; }
+
+  protected get _id_junction(): number { return this._s0[this.stateBaseOffset + SLOT_ID_JUNCTION]; }
+  protected set _id_junction(v: number) { this._s0[this.stateBaseOffset + SLOT_ID_JUNCTION] = v; }
 
   limitVoltages(
     vgsOld: number,

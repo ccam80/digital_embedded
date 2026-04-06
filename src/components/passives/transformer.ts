@@ -30,8 +30,10 @@ import {
 import type { AnalogElement, AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { CoupledInductorPair } from "../../solver/analog/coupled-inductor.js";
-import type { CoupledInductorState } from "../../solver/analog/coupled-inductor.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
+import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+import type { StateSchema } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -48,6 +50,40 @@ export const { paramDefs: TRANSFORMER_PARAM_DEFS, defaults: TRANSFORMER_DEFAULTS
     secondaryResistance: { default: 1.0,   unit: "Ω", description: "Secondary winding series resistance in ohms", min: 0 },
   },
 });
+
+// ---------------------------------------------------------------------------
+// State pool schema — 13 slots
+// ---------------------------------------------------------------------------
+
+const TRANSFORMER_SCHEMA: StateSchema = defineStateSchema("AnalogLinearTransformerElement", [
+  { name: "G11",          doc: "Companion conductance self-1",         init: { kind: "zero" } },
+  { name: "G22",          doc: "Companion conductance self-2",         init: { kind: "zero" } },
+  { name: "G12",          doc: "Companion mutual conductance",         init: { kind: "zero" } },
+  { name: "HIST1",        doc: "History current source winding 1",     init: { kind: "zero" } },
+  { name: "HIST2",        doc: "History current source winding 2",     init: { kind: "zero" } },
+  { name: "PREV_I1",      doc: "Previous current winding 1",           init: { kind: "zero" } },
+  { name: "PREV_I2",      doc: "Previous current winding 2",           init: { kind: "zero" } },
+  { name: "PREV_PREV_I1", doc: "Current winding 1 at step n-2",        init: { kind: "zero" } },
+  { name: "PREV_PREV_I2", doc: "Current winding 2 at step n-2",        init: { kind: "zero" } },
+  { name: "PREV_V1",      doc: "Previous voltage winding 1",           init: { kind: "zero" } },
+  { name: "PREV_V2",      doc: "Previous voltage winding 2",           init: { kind: "zero" } },
+  { name: "PREV_PREV_V1", doc: "Voltage winding 1 at step n-2",        init: { kind: "zero" } },
+  { name: "PREV_PREV_V2", doc: "Voltage winding 2 at step n-2",        init: { kind: "zero" } },
+]);
+
+const SLOT_G11          = 0;
+const SLOT_G22          = 1;
+const SLOT_G12          = 2;
+const SLOT_HIST1        = 3;
+const SLOT_HIST2        = 4;
+const SLOT_PREV_I1      = 5;
+const SLOT_PREV_I2      = 6;
+const SLOT_PREV_PREV_I1 = 7;
+const SLOT_PREV_PREV_I2 = 8;
+const SLOT_PREV_V1      = 9;
+const SLOT_PREV_V2      = 10;
+const SLOT_PREV_PREV_V1 = 11;
+const SLOT_PREV_PREV_V2 = 12;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -195,20 +231,16 @@ export class AnalogTransformerElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
-  setParam(_key: string, _value: number): void {}
+  readonly stateSchema = TRANSFORMER_SCHEMA;
+  readonly stateSize: number = TRANSFORMER_SCHEMA.size;
+  stateBaseOffset: number = -1;
 
   private _pair: CoupledInductorPair;
   private readonly _branch2: number;
   private _rPri: number;
   private _rSec: number;
-  private _state: CoupledInductorState;
-
-  // Pre-computed companion coefficients, updated in stampCompanion()
-  private _g11: number = 0;
-  private _g22: number = 0;
-  private _g12: number = 0;
-  private _hist1: number = 0;
-  private _hist2: number = 0;
+  private _s0!: Float64Array;
+  private _base!: number;
 
   constructor(
     pinNodeIds: number[],
@@ -229,21 +261,35 @@ export class AnalogTransformerElement implements AnalogElement {
     this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
     this._rPri = rPri;
     this._rSec = rSec;
-    this._state = this._pair.createState();
   }
+
+  initState(pool: StatePoolRef): void {
+    this._s0 = pool.state0;
+    this._base = this.stateBaseOffset;
+    applyInitialValues(TRANSFORMER_SCHEMA, pool, this._base, {});
+  }
+
+  setParam(_key: string, _value: number): void {}
 
   updateDerivedParams(lPrimary: number, turnsRatio: number, k: number, rPri: number, rSec: number): void {
     const lSecondary = lPrimary / (turnsRatio * turnsRatio);
     this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
     this._rPri = rPri;
     this._rSec = rSec;
-    this._state = this._pair.createState();
+    if (this._s0) {
+      applyInitialValues(TRANSFORMER_SCHEMA, { state0: this._s0 } as StatePoolRef, this._base, {});
+    }
   }
 
   stamp(solver: SparseSolver): void {
     const [p1, p2, s1, s2] = this.pinNodeIds;
     const b1 = this.branchIndex;
     const b2 = this._branch2;
+    const g11   = this._s0[this._base + SLOT_G11];
+    const g22   = this._s0[this._base + SLOT_G22];
+    const g12   = this._s0[this._base + SLOT_G12];
+    const hist1 = this._s0[this._base + SLOT_HIST1];
+    const hist2 = this._s0[this._base + SLOT_HIST2];
 
     // Primary winding resistance: series resistance modelled as a conductance
     // between P1 and P2 in the node block (Norton parallel equivalent).
@@ -284,16 +330,16 @@ export class AnalogTransformerElement implements AnalogElement {
     // Primary: V(P1) - V(P2) - (g11 + R_pri)·I1 - g12·I2 = hist1
     if (p1 !== 0) solver.stamp(b1, p1 - 1, 1);
     if (p2 !== 0) solver.stamp(b1, p2 - 1, -1);
-    solver.stamp(b1, b1, -(this._g11 + this._rPri));
-    solver.stamp(b1, b2, -this._g12);
-    solver.stampRHS(b1, this._hist1);
+    solver.stamp(b1, b1, -(g11 + this._rPri));
+    solver.stamp(b1, b2, -g12);
+    solver.stampRHS(b1, hist1);
 
     // Secondary: V(S1) - V(S2) - g12·I1 - (g22 + R_sec)·I2 = hist2
     if (s1 !== 0) solver.stamp(b2, s1 - 1, 1);
     if (s2 !== 0) solver.stamp(b2, s2 - 1, -1);
-    solver.stamp(b2, b1, -this._g12);
-    solver.stamp(b2, b2, -(this._g22 + this._rSec));
-    solver.stampRHS(b2, this._hist2);
+    solver.stamp(b2, b1, -g12);
+    solver.stamp(b2, b2, -(g22 + this._rSec));
+    solver.stampRHS(b2, hist2);
   }
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
@@ -306,7 +352,6 @@ export class AnalogTransformerElement implements AnalogElement {
     const M = this._pair.m;
 
     // Read the accepted solution from the previous timestep.
-    // These are the i(n) and v(n) values that enter the companion history terms.
     const i1Now = voltages[b1];
     const i2Now = voltages[b2];
     const vp1 = p1 > 0 ? voltages[p1 - 1] : 0;
@@ -316,37 +361,56 @@ export class AnalogTransformerElement implements AnalogElement {
     const v1Now = vp1 - vp2;
     const v2Now = vs1 - vs2;
 
+    const s = this._s0;
+    const base = this._base;
+
     switch (method) {
-      case "bdf1":
-        this._g11 = L1 / dt;
-        this._g22 = L2 / dt;
-        this._g12 = M / dt;
-        this._hist1 = -this._g11 * i1Now - this._g12 * i2Now;
-        this._hist2 = -this._g22 * i2Now - this._g12 * i1Now;
+      case "bdf1": {
+        const g11 = L1 / dt;
+        const g22 = L2 / dt;
+        const g12 = M / dt;
+        s[base + SLOT_G11]   = g11;
+        s[base + SLOT_G22]   = g22;
+        s[base + SLOT_G12]   = g12;
+        s[base + SLOT_HIST1] = -g11 * i1Now - g12 * i2Now;
+        s[base + SLOT_HIST2] = -g22 * i2Now - g12 * i1Now;
         break;
-      case "trapezoidal":
-        this._g11 = (2 * L1) / dt;
-        this._g22 = (2 * L2) / dt;
-        this._g12 = (2 * M) / dt;
-        this._hist1 = -this._g11 * i1Now - this._g12 * i2Now - v1Now;
-        this._hist2 = -this._g22 * i2Now - this._g12 * i1Now - v2Now;
+      }
+      case "trapezoidal": {
+        const g11 = (2 * L1) / dt;
+        const g22 = (2 * L2) / dt;
+        const g12 = (2 * M) / dt;
+        s[base + SLOT_G11]   = g11;
+        s[base + SLOT_G22]   = g22;
+        s[base + SLOT_G12]   = g12;
+        s[base + SLOT_HIST1] = -g11 * i1Now - g12 * i2Now - v1Now;
+        s[base + SLOT_HIST2] = -g22 * i2Now - g12 * i1Now - v2Now;
         break;
+      }
       case "bdf2": {
-        this._g11 = (3 * L1) / (2 * dt);
-        this._g22 = (3 * L2) / (2 * dt);
-        this._g12 = (3 * M) / (2 * dt);
-        const i1Hist =
-          (4 / 3) * i1Now - (1 / 3) * (this._state.prevI1 ?? 0);
-        const i2Hist =
-          (4 / 3) * i2Now - (1 / 3) * (this._state.prevI2 ?? 0);
-        this._hist1 = -this._g11 * i1Hist - this._g12 * i2Hist;
-        this._hist2 = -this._g22 * i2Hist - this._g12 * i1Hist;
+        const g11 = (3 * L1) / (2 * dt);
+        const g22 = (3 * L2) / (2 * dt);
+        const g12 = (3 * M) / (2 * dt);
+        s[base + SLOT_G11] = g11;
+        s[base + SLOT_G22] = g22;
+        s[base + SLOT_G12] = g12;
+        const i1Hist = (4 / 3) * i1Now - (1 / 3) * s[base + SLOT_PREV_I1];
+        const i2Hist = (4 / 3) * i2Now - (1 / 3) * s[base + SLOT_PREV_I2];
+        s[base + SLOT_HIST1] = -g11 * i1Hist - g12 * i2Hist;
+        s[base + SLOT_HIST2] = -g22 * i2Hist - g12 * i1Hist;
         break;
       }
     }
 
-    // Update history state for next timestep (stores i(n) and v(n) for BDF-2).
-    this._pair.updateState(dt, method, i1Now, i2Now, v1Now, v2Now, this._state);
+    // Shift history: n-1 → n-2, current → n-1
+    s[base + SLOT_PREV_PREV_I1] = s[base + SLOT_PREV_I1];
+    s[base + SLOT_PREV_PREV_I2] = s[base + SLOT_PREV_I2];
+    s[base + SLOT_PREV_PREV_V1] = s[base + SLOT_PREV_V1];
+    s[base + SLOT_PREV_PREV_V2] = s[base + SLOT_PREV_V2];
+    s[base + SLOT_PREV_I1] = i1Now;
+    s[base + SLOT_PREV_I2] = i2Now;
+    s[base + SLOT_PREV_V1] = v1Now;
+    s[base + SLOT_PREV_V2] = v2Now;
   }
 
   getPinCurrents(voltages: Float64Array): number[] {

@@ -214,3 +214,29 @@
 - Updated `makeCapElement` helper to call `withState` automatically
 - Added `withState(cap)` call in the RC time constant test that directly constructs `AnalogPolarizedCapElement`
 - Added `describe("pool_infrastructure")` block with 6 new tests covering: stateSize=3, default stateBaseOffset=-1, zero-initialization, slot writes in stampCompanion, stateSchema defined with correct size and owner, slot names in order
+
+## Task WC7: njfet.ts/pjfet.ts 3-slot JFET extension schema
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/njfet.ts` — added 3 extension pool slots (SLOT_VGS_JUNCTION=25, SLOT_GD_JUNCTION=26, SLOT_ID_JUNCTION=27), JFET_EXTENSION_SCHEMA via defineStateSchema, stateSize override to 28, initState override calling super then applyInitialValues for extension slots, pool-backed getter/setter accessors replacing 3 instance fields
+  - `src/components/semiconductors/__tests__/jfet.test.ts` — added 8 new tests in "JFET state-pool extension schema" describe block verifying stateSize=28, slot constants, initState initialization values, pool write-back from updateOperatingPoint, pjfet inheritance
+- **Tests**: 26/26 passing (10 new schema tests added on top of 16 existing)
+- **Notes**: pjfet.ts inherits NJfetAnalogElement unchanged; extension slots work automatically. Pre-existing Vitest failures (spice-import-roundtrip-mcp x4, spice-model-overrides-mcp x2, buckbjt-convergence x1) are not related to JFET changes — those files are not modified by this task.
+
+## Task WC6: tapped-transformer.ts migrate to 12-slot schema
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/passives/tapped-transformer.ts`, `src/components/passives/__tests__/tapped-transformer.test.ts`
+- **Tests**: 19/19 passing
+- **Summary**: Declared `TAPPED_TRANSFORMER_SCHEMA` with 12 slots (G11, G22, G33, G12, G13, G23, HIST1, HIST2, HIST3, PREV_I1, PREV_I2, PREV_I3). Removed 9 companion instance fields and 3 history fields. Added `stateSchema`, `stateSize`, `stateBaseOffset=-1`, `s0`, `base` fields, and `initState` method. Rerouted all `stampCompanion` reads/writes through `this.s0[this.base + SLOT_X]`. Updated tests to call `allocateStatePool([tx])` before simulation loops.
+
+## Task WC5: transformer.ts migrate to 13-slot schema
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/passives/transformer.ts`, `src/components/passives/__tests__/transformer.test.ts`
+- **Tests**: 26/26 passing
+- **Notes**: Declared TRANSFORMER_SCHEMA (13 slots: G11, G22, G12, HIST1, HIST2, PREV_I1, PREV_I2, PREV_PREV_I1, PREV_PREV_I2, PREV_V1, PREV_V2, PREV_PREV_V1, PREV_PREV_V2). Removed private _state, _g11, _g22, _g12, _hist1, _hist2 fields. Added initState pool binding. stampCompanion and stamp now read/write via pool slots. CoupledInductorState/updateState/createState retained in coupled-inductor.ts (still referenced by coupled-inductor.test.ts). Pre-existing failures (spice-import-roundtrip x6, buckbjt-convergence x1, triac x10) are not related to this task.

@@ -102,16 +102,7 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
   private _compiled: ConcreteCompiledAnalogCircuit | null = null;
 
-  // -------------------------------------------------------------------------
-  // Element list — promoted from init() local so the first-step probe can
-  // iterate it without re-destructuring the compiled circuit.
-  // -------------------------------------------------------------------------
   private _elements: readonly AnalogElement[] = [];
-
-  // -------------------------------------------------------------------------
-  // Dev-probe one-shot flag — reset to false in init() so a fresh compile
-  // triggers a new probe pass on the first step.
-  // -------------------------------------------------------------------------
   private _devProbeRan: boolean = false;
 
   // -------------------------------------------------------------------------
@@ -269,7 +260,7 @@ export class MNAEngine implements AnalogEngine {
         for (const element of this._elements) {
           if (element.stateSize > 0) {
             const violations = assertPoolIsSoleMutableState(
-              (element as unknown as { owner?: string }).owner ?? "unknown",
+              element.stateSchema?.owner ?? "unknown",
               element,
               () => {
                 element.stamp(solver);

@@ -28,6 +28,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { makeVoltageSource, makeResistor, makeDiode, makeCapacitor, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
+import type { AnalogElementCore } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -116,6 +117,8 @@ describe("TappedTransformer", () => {
     const rCtGnd = makeResistor(3, 0, 1e6);
     const rS2Gnd = makeResistor(4, 0, 1e6);
 
+    allocateStatePool([tx as unknown as AnalogElementCore]);
+
     const solver = new SparseSolver();
     let voltages = new Float64Array(matrixSize);
     let maxVS1CT = 0;
@@ -203,6 +206,8 @@ describe("TappedTransformer", () => {
     // Ground S2 via reference
     const rGnd = makeResistor(4, 0, 0.1); // low resistance to gnd for S2
 
+    allocateStatePool([tx as unknown as AnalogElementCore]);
+
     const solver = new SparseSolver();
     let voltages = new Float64Array(matrixSize);
     let maxVS1toGnd = 0;
@@ -287,7 +292,7 @@ describe("TappedTransformer", () => {
     // Diodes: D1 anode=S1(2), cathode=out(5); D2 anode=S2(4), cathode=out(5)
     const d1 = makeDiode(2, 5, 1e-14, 1.0);
     const d2 = makeDiode(4, 5, 1e-14, 1.0);
-    allocateStatePool([d1, d2]);
+    allocateStatePool([tx as unknown as AnalogElementCore, d1, d2]);
 
     // Filter cap 1000µF + load
     const cFilter = makeCapacitor(5, 0, 1000e-6);

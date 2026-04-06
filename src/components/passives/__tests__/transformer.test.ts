@@ -34,6 +34,8 @@ import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { makeVoltageSource, makeResistor } from "../../../solver/analog/__tests__/test-helpers.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
+import type { AnalogElementCore } from "../../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -44,7 +46,21 @@ function getFactory(entry: ModelEntry): AnalogFactory {
   return entry.factory;
 }
 
+// ---------------------------------------------------------------------------
+// withState: allocate a StatePool for a single element and call initState
+// ---------------------------------------------------------------------------
 
+function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
+  const size = core.stateSize ?? 0;
+  const pool = new StatePool(Math.max(size, 1));
+  if (size > 0) {
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+  } else {
+    core.stateBaseOffset = -1;
+  }
+  return { element: core, pool };
+}
 
 // ---------------------------------------------------------------------------
 // Transformer element construction helper
@@ -59,7 +75,7 @@ function makeTransformerElement(opts: {
   rPri?: number;
   rSec?: number;
 }): AnalogTransformerElement {
-  return new AnalogTransformerElement(
+  const el = new AnalogTransformerElement(
     opts.pinNodeIds,
     opts.branch1,
     opts.lPrimary ?? 10e-3,
@@ -68,6 +84,8 @@ function makeTransformerElement(opts: {
     opts.rPri ?? 0.0,
     opts.rSec ?? 0.0,
   );
+  withState(el);
+  return el;
 }
 
 // ---------------------------------------------------------------------------
@@ -484,6 +502,89 @@ describe("Transformer", () => {
     const offN1N2 = stamps.find((s) => s.row === 0 && s.col === 1);
     expect(offN1N2).toBeDefined();
     expect(offN1N2!.value).toBeCloseTo(-gPri, 8);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// State pool schema tests
+// ---------------------------------------------------------------------------
+
+describe("AnalogTransformerElement state pool", () => {
+  it("stateSize is 13", () => {
+    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
+    expect(el.stateSize).toBe(13);
+  });
+
+  it("stateBaseOffset defaults to -1 before initState", () => {
+    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
+    expect(el.stateBaseOffset).toBe(-1);
+  });
+
+  it("initState binds pool and zero-initialises all 13 slots", () => {
+    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
+    const { pool } = withState(el);
+    for (let i = 0; i < 13; i++) {
+      expect(pool.state0[i]).toBe(0);
+    }
+  });
+
+  it("isReactive is true", () => {
+    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
+    expect(el.isReactive).toBe(true);
+  });
+
+  it("stateSchema has 13 slots named correctly", () => {
+    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
+    expect(el.stateSchema).toBeDefined();
+    expect(el.stateSchema.size).toBe(13);
+    const names = el.stateSchema.slots.map((s) => s.name);
+    expect(names).toContain("G11");
+    expect(names).toContain("G22");
+    expect(names).toContain("G12");
+    expect(names).toContain("HIST1");
+    expect(names).toContain("HIST2");
+    expect(names).toContain("PREV_I1");
+    expect(names).toContain("PREV_I2");
+    expect(names).toContain("PREV_PREV_I1");
+    expect(names).toContain("PREV_PREV_I2");
+    expect(names).toContain("PREV_V1");
+    expect(names).toContain("PREV_V2");
+    expect(names).toContain("PREV_PREV_V1");
+    expect(names).toContain("PREV_PREV_V2");
+  });
+
+  it("stampCompanion writes G11/G22/G12 slots (trapezoidal)", () => {
+    const Lp = 10e-3;
+    const N = 1;
+    const k = 0.99;
+    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, Lp, N, k, 0, 0);
+    const { pool } = withState(el);
+    const dt = 1e-4;
+    const matrixSize = 5;
+    const voltages = new Float64Array(matrixSize);
+    el.stampCompanion(dt, "trapezoidal", voltages);
+    const Ls = Lp / (N * N);
+    const M = k * Math.sqrt(Lp * Ls);
+    // G11 = 2*L1/dt
+    expect(pool.state0[0]).toBeCloseTo((2 * Lp) / dt, 8);
+    // G22 = 2*L2/dt
+    expect(pool.state0[1]).toBeCloseTo((2 * Ls) / dt, 8);
+    // G12 = 2*M/dt
+    expect(pool.state0[2]).toBeCloseTo((2 * M) / dt, 8);
+  });
+
+  it("stampCompanion accumulates PREV_I1/PREV_I2 history after a step", () => {
+    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
+    const { pool } = withState(el);
+    const dt = 1e-4;
+    const matrixSize = 5;
+    const voltages = new Float64Array(matrixSize);
+    voltages[2] = 0.5; // branch 1 (primary current)
+    voltages[3] = 0.2; // branch 2 (secondary current)
+    el.stampCompanion(dt, "trapezoidal", voltages);
+    // PREV_I1 = i1Now = 0.5, PREV_I2 = i2Now = 0.2
+    expect(pool.state0[5]).toBeCloseTo(0.5, 8); // SLOT_PREV_I1
+    expect(pool.state0[6]).toBeCloseTo(0.2, 8); // SLOT_PREV_I2
   });
 });
 
