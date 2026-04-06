@@ -114,8 +114,9 @@ export function createZenerElement(
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: false,
+    isReactive: true,
     stateSize: 4,
+    stateSchema: ZENER_STATE_SCHEMA,
     stateBaseOffset: -1,
 
     initState(pool: StatePoolRef): void {

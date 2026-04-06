@@ -186,8 +186,9 @@ export function createTunnelDiodeElement(
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: false,
+    isReactive: true,
     stateSize: 4,
+    stateSchema: TUNNEL_DIODE_STATE_SCHEMA,
     stateBaseOffset: -1,
 
     initState(pool: StatePoolRef): void {

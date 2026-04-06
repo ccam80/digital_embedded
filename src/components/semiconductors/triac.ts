@@ -236,8 +236,9 @@ export function createTriacElement(
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: false,
+    isReactive: true,
     stateSize: 9,
+    stateSchema: TRIAC_STATE_SCHEMA,
     stateBaseOffset: -1,
 
     initState(pool: StatePoolRef): void {

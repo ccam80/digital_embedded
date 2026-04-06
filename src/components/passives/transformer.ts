@@ -229,11 +229,11 @@ export class AnalogTransformerElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = true;
+  readonly isNonlinear = false;
+  readonly isReactive = true;
   readonly stateSchema = TRANSFORMER_SCHEMA;
-  readonly stateSize: number = TRANSFORMER_SCHEMA.size;
-  stateBaseOffset: number = -1;
+  readonly stateSize = TRANSFORMER_SCHEMA.size;
+  stateBaseOffset = -1;
 
   private _pair: CoupledInductorPair;
   private readonly _branch2: number;
@@ -276,9 +276,10 @@ export class AnalogTransformerElement implements AnalogElement {
     this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
     this._rPri = rPri;
     this._rSec = rSec;
-    if (this._s0) {
-      applyInitialValues(TRANSFORMER_SCHEMA, { state0: this._s0 } as StatePoolRef, this._base, {});
+    if (!this._s0) {
+      throw new Error("AnalogTransformerElement.updateDerivedParams called before initState");
     }
+    applyInitialValues(TRANSFORMER_SCHEMA, { state0: this._s0 } as StatePoolRef, this._base, {});
   }
 
   stamp(solver: SparseSolver): void {

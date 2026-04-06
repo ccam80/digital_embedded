@@ -182,8 +182,9 @@ function createLedAnalogElement(
   const element: AnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: false,
+    isReactive: true,
     stateSize: 4,
+    stateSchema: LED_STATE_SCHEMA,
     stateBaseOffset: -1,
 
     initState(pool: StatePoolRef): void {

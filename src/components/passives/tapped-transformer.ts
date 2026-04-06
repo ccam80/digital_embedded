@@ -236,11 +236,11 @@ export class AnalogTappedTransformerElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = true;
+  readonly isNonlinear = false;
+  readonly isReactive = true;
   readonly stateSchema = TAPPED_TRANSFORMER_SCHEMA;
-  readonly stateSize: number = TAPPED_TRANSFORMER_SCHEMA.size;
-  stateBaseOffset: number = -1;
+  readonly stateSize = TAPPED_TRANSFORMER_SCHEMA.size;
+  stateBaseOffset = -1;
   setParam(_key: string, _value: number): void {}
 
   private readonly _b2: number;

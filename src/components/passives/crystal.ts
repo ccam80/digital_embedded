@@ -228,8 +228,8 @@ export class AnalogCrystalElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = true;
+  readonly isNonlinear = false;
+  readonly isReactive = true;
   readonly stateSchema = CRYSTAL_SCHEMA;
   readonly stateSize = CRYSTAL_SCHEMA.size;
   stateBaseOffset = -1;

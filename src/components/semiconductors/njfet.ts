@@ -35,7 +35,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import { AbstractFetElement } from "../../solver/analog/fet-base.js";
+import { AbstractFetElement, FET_BASE_SCHEMA } from "../../solver/analog/fet-base.js";
 import type { FetCapacitances } from "../../solver/analog/fet-base.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
@@ -55,20 +55,19 @@ const VT = 0.02585;
 const GMIN = 1e-12;
 
 // ---------------------------------------------------------------------------
-// JFET extension state-pool slots (indices relative to stateBaseOffset)
-// The base FET schema occupies slots 0-24 (stateSize=25).
-// JFET adds 3 extension slots at indices 25, 26, 27.
+// JFET state-pool slots
 // ---------------------------------------------------------------------------
 
 export const SLOT_VGS_JUNCTION = 25;
 export const SLOT_GD_JUNCTION  = 26;
 export const SLOT_ID_JUNCTION  = 27;
 
-const JFET_EXTENSION_SCHEMA = defineStateSchema("NJfetAnalogElement", [
+const JFET_SCHEMA = defineStateSchema("NJfetAnalogElement", [
+  ...FET_BASE_SCHEMA.slots,
   { name: "VGS_JUNCTION", doc: "Gate-source junction voltage (NR linearization state)", init: { kind: "zero" } },
   { name: "GD_JUNCTION",  doc: "Gate-source junction conductance (NR linearization state)", init: { kind: "constant", value: GMIN } },
   { name: "ID_JUNCTION",  doc: "Gate-source junction current (NR linearization state)", init: { kind: "zero" } },
-]);
+] as const);
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -132,6 +131,7 @@ export class NJfetAnalogElement extends AbstractFetElement {
 
   protected readonly _p: JfetParams;
 
+  override readonly stateSchema = JFET_SCHEMA;
   override readonly stateSize: number = 28;
 
   constructor(
@@ -147,8 +147,8 @@ export class NJfetAnalogElement extends AbstractFetElement {
   }
 
   override initState(pool: StatePoolRef): void {
-    super.initState(pool);
-    applyInitialValues(JFET_EXTENSION_SCHEMA, pool, this.stateBaseOffset + 25, {});
+    this._s0 = pool.state0;
+    applyInitialValues(JFET_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
   protected get _vgs_junction(): number { return this._s0[this.stateBaseOffset + SLOT_VGS_JUNCTION]; }

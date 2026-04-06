@@ -103,6 +103,7 @@ const VARACTOR_STATE_SCHEMA = defineStateSchema("VaractorElement", [
   { name: "CAP_GEQ", doc: "Capacitance companion conductance (S)", init: { kind: "zero" } },
   { name: "CAP_IEQ", doc: "Capacitance history current (A)", init: { kind: "zero" } },
   { name: "VD_PREV", doc: "Previous junction voltage for capacitor (V)", init: { kind: "zero" } },
+  { name: "CAP_FIRST_CALL", doc: "Capacitor first-call flag", init: { kind: "constant", value: 1.0 } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -142,7 +143,7 @@ export function createVaractorElement(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
-    stateSize: 7,
+    stateSize: 8,
     stateSchema: VARACTOR_STATE_SCHEMA,
     stateBaseOffset: -1,
 

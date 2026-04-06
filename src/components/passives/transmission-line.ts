@@ -235,8 +235,8 @@ class SegmentResistorElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
+  readonly isNonlinear = false;
+  readonly isReactive = false;
   setParam(_key: string, _value: number): void {}
 
   private readonly G: number;
@@ -272,8 +272,8 @@ class SegmentShuntConductanceElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = false;
+  readonly isNonlinear = false;
+  readonly isReactive = false;
   setParam(_key: string, _value: number): void {}
 
   private readonly G: number;
@@ -317,11 +317,11 @@ class SegmentInductorElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = true;
+  readonly isNonlinear = false;
+  readonly isReactive = true;
   readonly stateSchema = SEGMENT_INDUCTOR_SCHEMA;
-  readonly stateSize: number = SEGMENT_INDUCTOR_SCHEMA.size;
-  stateBaseOffset: number = -1;
+  readonly stateSize = SEGMENT_INDUCTOR_SCHEMA.size;
+  stateBaseOffset = -1;
   setParam(_key: string, _value: number): void {}
 
   private readonly L: number;
@@ -389,11 +389,11 @@ class SegmentCapacitorElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = true;
+  readonly isNonlinear = false;
+  readonly isReactive = true;
   readonly stateSchema = SEGMENT_CAPACITOR_SCHEMA;
-  readonly stateSize: number = SEGMENT_CAPACITOR_SCHEMA.size;
-  stateBaseOffset: number = -1;
+  readonly stateSize = SEGMENT_CAPACITOR_SCHEMA.size;
+  stateBaseOffset = -1;
   setParam(_key: string, _value: number): void {}
 
   private readonly C: number;
@@ -452,11 +452,11 @@ class CombinedRLElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = true;
+  readonly isNonlinear = false;
+  readonly isReactive = true;
   readonly stateSchema = COMBINED_RL_SCHEMA;
-  readonly stateSize: number = COMBINED_RL_SCHEMA.size;
-  stateBaseOffset: number = -1;
+  readonly stateSize = COMBINED_RL_SCHEMA.size;
+  stateBaseOffset = -1;
   setParam(_key: string, _value: number): void {}
 
   private readonly R: number;
@@ -522,10 +522,10 @@ export class TransmissionLineElement implements AnalogElement {
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number;
-  readonly isNonlinear: boolean = false;
-  readonly isReactive: boolean = true;
+  readonly isNonlinear = false;
+  readonly isReactive = true;
   readonly stateSize: number = 0;
-  stateBaseOffset: number = -1;
+  stateBaseOffset = -1;
   setParam(_key: string, _value: number): void {}
 
   private readonly _subElements: AnalogElement[];

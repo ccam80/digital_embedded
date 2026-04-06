@@ -213,8 +213,9 @@ export function createScrElement(
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: false,
+    isReactive: true,
     stateSize: 9,
+    stateSchema: SCR_STATE_SCHEMA,
     stateBaseOffset: -1,
 
     initState(pool: StatePoolRef): void {
