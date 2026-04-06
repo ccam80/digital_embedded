@@ -40,6 +40,11 @@ import {
 } from "../../solver/analog/integration.js";
 import { computeJunctionCapacitance } from "./diode.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import {
+  defineStateSchema,
+  applyInitialValues,
+  type StateSchema,
+} from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -370,6 +375,23 @@ function computeBjtOp(
 }
 
 // ---------------------------------------------------------------------------
+// State schema — BJT simple (10 slots)
+// ---------------------------------------------------------------------------
+
+const BJT_SIMPLE_SCHEMA: StateSchema = defineStateSchema("BjtSimpleElement", [
+  { name: "VBE",       doc: "pnjlim-limited B-E junction voltage",          init: { kind: "fromParams", compute: (_p) => _p["polarity"] === 1 ? 0.6 : -0.6 } },
+  { name: "VBC",       doc: "pnjlim-limited B-C junction voltage",          init: { kind: "zero" } },
+  { name: "GPI",       doc: "dIb/dVbe input conductance",                   init: { kind: "zero" } },
+  { name: "GMU",       doc: "dIb/dVbc feedback conductance",                init: { kind: "zero" } },
+  { name: "GM",        doc: "dIc/dVbe transconductance",                    init: { kind: "zero" } },
+  { name: "GO",        doc: "dIc/dVce output conductance",                  init: { kind: "zero" } },
+  { name: "IC",        doc: "Collector current at operating point",         init: { kind: "zero" } },
+  { name: "IB",        doc: "Base current at operating point",              init: { kind: "zero" } },
+  { name: "IC_NORTON", doc: "Norton collector current for MNA stamp",       init: { kind: "zero" } },
+  { name: "IB_NORTON", doc: "Norton base current for MNA stamp",            init: { kind: "zero" } },
+]);
+
+// ---------------------------------------------------------------------------
 // createBjtElement — AnalogElement factory
 // ---------------------------------------------------------------------------
 
@@ -418,21 +440,20 @@ export function createBjtElement(
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: false,
-    stateSize: 10,
+    isReactive: true as const,
+    stateSchema: BJT_SIMPLE_SCHEMA,
+    stateSize: BJT_SIMPLE_SCHEMA.size,
     stateBaseOffset: -1,
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       base = this.stateBaseOffset;
-      // Initialize operating point at vbe=0, vbc=0
+      applyInitialValues(BJT_SIMPLE_SCHEMA, pool, base, { polarity });
       const op0 = computeBjtOp(
         0, 0,
         params.IS, params.BF, params.NF, params.BR, params.NR,
         params.ISE, params.ISC, params.VAF, params.VAR, params.IKF, params.IKR,
       );
-      s0[base + SLOT_VBE] = 0;
-      s0[base + SLOT_VBC] = 0;
       s0[base + SLOT_GPI] = op0.gpi;
       s0[base + SLOT_GMU] = op0.gmu;
       s0[base + SLOT_GM]  = op0.gm;
@@ -645,6 +666,37 @@ function computeSpiceL1BjtOp(
 }
 
 // ---------------------------------------------------------------------------
+// State schema — BJT SPICE L1 (24 slots)
+// ---------------------------------------------------------------------------
+
+const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element", [
+  { name: "VBE",            doc: "pnjlim-limited B-E junction voltage",              init: { kind: "fromParams", compute: (_p) => _p["polarity"] === 1 ? 0.6 : -0.6 } },
+  { name: "VBC",            doc: "pnjlim-limited B-C junction voltage",              init: { kind: "zero" } },
+  { name: "GPI",            doc: "dIb/dVbe input conductance",                       init: { kind: "zero" } },
+  { name: "GMU",            doc: "dIb/dVbc feedback conductance",                    init: { kind: "zero" } },
+  { name: "GM",             doc: "dIc/dVbe transconductance",                        init: { kind: "zero" } },
+  { name: "GO",             doc: "dIc/dVce output conductance",                      init: { kind: "zero" } },
+  { name: "IC",             doc: "Collector current at operating point",             init: { kind: "zero" } },
+  { name: "IB",             doc: "Base current at operating point",                  init: { kind: "zero" } },
+  { name: "IC_NORTON",      doc: "Norton collector current for MNA stamp",           init: { kind: "zero" } },
+  { name: "IB_NORTON",      doc: "Norton base current for MNA stamp",               init: { kind: "zero" } },
+  { name: "RB_EFF",         doc: "Effective base resistance at operating point",     init: { kind: "fromParams", compute: (_p) => _p["RB"] } },
+  { name: "IE_NORTON",      doc: "Norton emitter current for MNA stamp",             init: { kind: "zero" } },
+  { name: "CAP_GEQ_BE",     doc: "B-E junction-cap companion conductance",           init: { kind: "zero" } },
+  { name: "CAP_IEQ_BE",     doc: "B-E junction-cap companion history current",       init: { kind: "zero" } },
+  { name: "CAP_GEQ_BC_INT", doc: "B-C internal junction-cap companion conductance",  init: { kind: "zero" } },
+  { name: "CAP_IEQ_BC_INT", doc: "B-C internal junction-cap companion history current", init: { kind: "zero" } },
+  { name: "CAP_GEQ_BC_EXT", doc: "B-C external junction-cap companion conductance",  init: { kind: "zero" } },
+  { name: "CAP_IEQ_BC_EXT", doc: "B-C external junction-cap companion history current", init: { kind: "zero" } },
+  { name: "CAP_GEQ_CS",     doc: "C-S junction-cap companion conductance",           init: { kind: "zero" } },
+  { name: "CAP_IEQ_CS",     doc: "C-S junction-cap companion history current",       init: { kind: "zero" } },
+  { name: "VBE_PREV",       doc: "B-E voltage at previous accepted step",            init: { kind: "zero" } },
+  { name: "VBC_PREV",       doc: "B-C voltage at previous accepted step",            init: { kind: "zero" } },
+  { name: "VCS_PREV",       doc: "C-S voltage at previous accepted step",            init: { kind: "zero" } },
+  { name: "CAP_FIRST_CALL", doc: "1 until first stampCompanion call; then 0",        init: { kind: "constant", value: 1.0 } },
+]);
+
+// ---------------------------------------------------------------------------
 // createSpiceL1BjtElement — SPICE Level 1 AnalogElement factory
 // ---------------------------------------------------------------------------
 
@@ -744,21 +796,21 @@ export function createSpiceL1BjtElement(
   const element: AnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: hasCapacitance,
-    stateSize: 24,
+    isReactive: true as const,
+    stateSchema: BJT_L1_SCHEMA,
+    stateSize: BJT_L1_SCHEMA.size,
     stateBaseOffset: -1,
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       base = this.stateBaseOffset;
+      applyInitialValues(BJT_L1_SCHEMA, pool, base, { polarity, RB: params.RB });
       const op0 = computeSpiceL1BjtOp(
         0, 0,
         params.IS, params.BF, params.NF, params.BR, params.NR,
         params.ISE, params.ISC, params.NE, params.NC,
         params.VAF, params.VAR, params.IKF, params.IKR,
       );
-      s0[base + L1_SLOT_VBE] = 0;
-      s0[base + L1_SLOT_VBC] = 0;
       s0[base + L1_SLOT_GPI] = op0.gpi;
       s0[base + L1_SLOT_GMU] = op0.gmu;
       s0[base + L1_SLOT_GM]  = op0.gm;
@@ -767,10 +819,7 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_IB]  = op0.ib;
       s0[base + L1_SLOT_IC_NORTON] = op0.ic - op0.gm * 0 + op0.go * 0;
       s0[base + L1_SLOT_IB_NORTON] = op0.ib - op0.gpi * 0 - op0.gmu * 0;
-      s0[base + L1_SLOT_RB_EFF]    = params.RB;
       s0[base + L1_SLOT_IE_NORTON] = -(op0.ic + op0.ib);
-      // Capacitance companion state — zero by default (Float64Array), except first-call flag
-      s0[base + L1_SLOT_CAP_FIRST_CALL] = 1.0;
     },
 
     stamp(solver: SparseSolver): void {

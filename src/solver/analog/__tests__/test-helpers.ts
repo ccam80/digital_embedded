@@ -35,6 +35,11 @@ import {
   inductorConductance,
   inductorHistoryCurrent,
 } from "../integration.js";
+import {
+  defineStateSchema,
+  applyInitialValues,
+  type StateSchema,
+} from "../state-schema.js";
 
 // ---------------------------------------------------------------------------
 // withNodeIds — test helper for factory-created elements
@@ -246,6 +251,17 @@ const VT = 0.02585;
 /** Minimum conductance added for numerical stability (GMIN). */
 const GMIN = 1e-12;
 
+// State pool slot indices
+const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+
+/** Schema for test helper diode (4 slots). */
+const DIODE_SCHEMA: StateSchema = defineStateSchema("TestHelperDiodeElement", [
+  { name: "VD",  doc: "Diode voltage (anode minus cathode)",            init: { kind: "zero" } },
+  { name: "GEQ", doc: "Equivalent conductance (linearized)",             init: { kind: "constant", value: GMIN } },
+  { name: "IEQ", doc: "Norton equivalent current source",               init: { kind: "zero" } },
+  { name: "ID",  doc: "Diode current (anode to cathode)",               init: { kind: "zero" } },
+]);
+
 /**
  * Create a Shockley diode test element with NR linearization.
  *
@@ -276,9 +292,6 @@ export function makeDiode(
   const nVt = n * VT;
   const vcrit = nVt * Math.log(nVt / (is * Math.SQRT2));
 
-  // State pool slot indices
-  const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
-
   // Pool binding — set by initState
   let s0: Float64Array;
   let base: number;
@@ -288,14 +301,15 @@ export function makeDiode(
     allNodeIds: [nodeAnode, nodeCathode],
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: false,
+    isReactive: true,
     stateSize: 4,
     stateBaseOffset: -1,
+    stateSchema: DIODE_SCHEMA,
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       base = this.stateBaseOffset;
-      s0[base + SLOT_GEQ] = GMIN;
+      applyInitialValues(DIODE_SCHEMA, pool, base, {});
     },
 
     setParam(_key: string, _value: number): void {},

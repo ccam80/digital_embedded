@@ -23,6 +23,8 @@ import {
   capacitorConductance,
   capacitorHistoryCurrent,
 } from "./integration.js";
+import { defineStateSchema, applyInitialValues } from "./state-schema.js";
+import type { StateSchema } from "./state-schema.js";
 
 // ---------------------------------------------------------------------------
 // FetCapacitances interface
@@ -45,33 +47,61 @@ export interface FetCapacitances {
 // Slot layout for state pool (stateSize: 25)
 // ---------------------------------------------------------------------------
 
-const SLOT_VGS       = 0;
-const SLOT_VDS       = 1;
-const SLOT_GM        = 2;
-const SLOT_GDS       = 3;
-const SLOT_IDS       = 4;
-const SLOT_SWAPPED   = 5;  // 0.0 = false, 1.0 = true
-const SLOT_CAP_GEQ_GS = 6;
-const SLOT_CAP_IEQ_GS = 7;
-const SLOT_CAP_GEQ_GD = 8;
-const SLOT_CAP_IEQ_GD = 9;
-const SLOT_VGS_PREV  = 10;
-const SLOT_VGD_PREV  = 11;
+export const SLOT_VGS       = 0;
+export const SLOT_VDS       = 1;
+export const SLOT_GM        = 2;
+export const SLOT_GDS       = 3;
+export const SLOT_IDS       = 4;
+export const SLOT_SWAPPED   = 5;  // 0.0 = false, 1.0 = true
+export const SLOT_CAP_GEQ_GS = 6;
+export const SLOT_CAP_IEQ_GS = 7;
+export const SLOT_CAP_GEQ_GD = 8;
+export const SLOT_CAP_IEQ_GD = 9;
+export const SLOT_VGS_PREV  = 10;
+export const SLOT_VGD_PREV  = 11;
 // Junction and gate-bulk cap state (slots 12–22)
-const SLOT_CAP_GEQ_DB            = 12;
-const SLOT_CAP_IEQ_DB            = 13;
-const SLOT_CAP_GEQ_SB            = 14;
-const SLOT_CAP_IEQ_SB            = 15;
-const SLOT_VDB_PREV              = 16;
-const SLOT_VSB_PREV              = 17;
-const SLOT_CAP_GEQ_GB            = 18;
-const SLOT_CAP_IEQ_GB            = 19;
-const SLOT_VGB_PREV              = 20;
-const SLOT_CAP_JUNCTION_FIRST_CALL = 21;  // 1.0 = true, 0.0 = false
-const SLOT_CAP_GB_FIRST_CALL     = 22;    // 1.0 = true, 0.0 = false
+export const SLOT_CAP_GEQ_DB            = 12;
+export const SLOT_CAP_IEQ_DB            = 13;
+export const SLOT_CAP_GEQ_SB            = 14;
+export const SLOT_CAP_IEQ_SB            = 15;
+export const SLOT_VDB_PREV              = 16;
+export const SLOT_VSB_PREV              = 17;
+export const SLOT_CAP_GEQ_GB            = 18;
+export const SLOT_CAP_IEQ_GB            = 19;
+export const SLOT_VGB_PREV              = 20;
+export const SLOT_CAP_JUNCTION_FIRST_CALL = 21;  // 1.0 = true, 0.0 = false
+export const SLOT_CAP_GB_FIRST_CALL     = 22;    // 1.0 = true, 0.0 = false
 // Body-effect operating-point state (slots 23–24) — MOSFET-specific, zero-init fine
-const SLOT_VSB                   = 23;
-const SLOT_GMBS                  = 24;
+export const SLOT_VSB                   = 23;
+export const SLOT_GMBS                  = 24;
+
+export const FET_BASE_SCHEMA: StateSchema = defineStateSchema("AbstractFetElement", [
+  { name: "VGS",                    doc: "Gate-source voltage",                        init: { kind: "zero" } },
+  { name: "VDS",                    doc: "Drain-source voltage",                       init: { kind: "zero" } },
+  { name: "GM",                     doc: "Transconductance",                           init: { kind: "constant", value: 1e-12 } },
+  { name: "GDS",                    doc: "Output conductance",                         init: { kind: "constant", value: 1e-12 } },
+  { name: "IDS",                    doc: "Drain-source current",                       init: { kind: "zero" } },
+  { name: "SWAPPED",                doc: "Source/drain swap flag (0=false, 1=true)",   init: { kind: "zero" } },
+  { name: "CAP_GEQ_GS",             doc: "Gate-source companion conductance",          init: { kind: "zero" } },
+  { name: "CAP_IEQ_GS",             doc: "Gate-source companion history current",      init: { kind: "zero" } },
+  { name: "CAP_GEQ_GD",             doc: "Gate-drain companion conductance",           init: { kind: "zero" } },
+  { name: "CAP_IEQ_GD",             doc: "Gate-drain companion history current",       init: { kind: "zero" } },
+  { name: "VGS_PREV",               doc: "Previous gate-source voltage",               init: { kind: "constant", value: NaN } },
+  { name: "VGD_PREV",               doc: "Previous gate-drain voltage",                init: { kind: "constant", value: NaN } },
+  { name: "CAP_GEQ_DB",             doc: "Drain-bulk companion conductance",           init: { kind: "zero" } },
+  { name: "CAP_IEQ_DB",             doc: "Drain-bulk companion history current",       init: { kind: "zero" } },
+  { name: "CAP_GEQ_SB",             doc: "Source-bulk companion conductance",          init: { kind: "zero" } },
+  { name: "CAP_IEQ_SB",             doc: "Source-bulk companion history current",      init: { kind: "zero" } },
+  { name: "VDB_PREV",               doc: "Previous drain-bulk voltage",                init: { kind: "zero" } },
+  { name: "VSB_PREV",               doc: "Previous source-bulk voltage",               init: { kind: "zero" } },
+  { name: "CAP_GEQ_GB",             doc: "Gate-bulk companion conductance",            init: { kind: "zero" } },
+  { name: "CAP_IEQ_GB",             doc: "Gate-bulk companion history current",        init: { kind: "zero" } },
+  { name: "VGB_PREV",               doc: "Previous gate-bulk voltage",                 init: { kind: "zero" } },
+  { name: "CAP_JUNCTION_FIRST_CALL", doc: "Junction cap first-call flag (1=true)",     init: { kind: "constant", value: 1.0 } },
+  { name: "CAP_GB_FIRST_CALL",      doc: "Gate-bulk cap first-call flag (1=true)",     init: { kind: "constant", value: 1.0 } },
+  { name: "VSB",                    doc: "Source-bulk voltage (MOSFET body effect)",   init: { kind: "zero" } },
+  { name: "GMBS",                   doc: "Body-effect transconductance",               init: { kind: "zero" } },
+]);
 
 // ---------------------------------------------------------------------------
 // AbstractFetElement
@@ -103,33 +133,6 @@ export abstract class AbstractFetElement implements AnalogElementCore {
    */
   abstract readonly polaritySign: 1 | -1;
 
-  // State pool slot constants (public for tests)
-  static readonly SLOT_VGS       = SLOT_VGS;
-  static readonly SLOT_VDS       = SLOT_VDS;
-  static readonly SLOT_GM        = SLOT_GM;
-  static readonly SLOT_GDS       = SLOT_GDS;
-  static readonly SLOT_IDS       = SLOT_IDS;
-  static readonly SLOT_SWAPPED   = SLOT_SWAPPED;
-  static readonly SLOT_CAP_GEQ_GS = SLOT_CAP_GEQ_GS;
-  static readonly SLOT_CAP_IEQ_GS = SLOT_CAP_IEQ_GS;
-  static readonly SLOT_CAP_GEQ_GD = SLOT_CAP_GEQ_GD;
-  static readonly SLOT_CAP_IEQ_GD = SLOT_CAP_IEQ_GD;
-  static readonly SLOT_VGS_PREV  = SLOT_VGS_PREV;
-  static readonly SLOT_VGD_PREV  = SLOT_VGD_PREV;
-  static readonly SLOT_CAP_GEQ_DB            = SLOT_CAP_GEQ_DB;
-  static readonly SLOT_CAP_IEQ_DB            = SLOT_CAP_IEQ_DB;
-  static readonly SLOT_CAP_GEQ_SB            = SLOT_CAP_GEQ_SB;
-  static readonly SLOT_CAP_IEQ_SB            = SLOT_CAP_IEQ_SB;
-  static readonly SLOT_VDB_PREV              = SLOT_VDB_PREV;
-  static readonly SLOT_VSB_PREV              = SLOT_VSB_PREV;
-  static readonly SLOT_CAP_GEQ_GB            = SLOT_CAP_GEQ_GB;
-  static readonly SLOT_CAP_IEQ_GB            = SLOT_CAP_IEQ_GB;
-  static readonly SLOT_VGB_PREV              = SLOT_VGB_PREV;
-  static readonly SLOT_CAP_JUNCTION_FIRST_CALL = SLOT_CAP_JUNCTION_FIRST_CALL;
-  static readonly SLOT_CAP_GB_FIRST_CALL     = SLOT_CAP_GB_FIRST_CALL;
-  static readonly SLOT_VSB                   = SLOT_VSB;
-  static readonly SLOT_GMBS                  = SLOT_GMBS;
-
   // State pool backing array — bound in initState()
   protected _s0!: Float64Array;
 
@@ -137,29 +140,13 @@ export abstract class AbstractFetElement implements AnalogElementCore {
   protected _sourceScale: number = 1.0;
 
   // State pool interface
-  readonly stateSize: number = 25;
+  readonly stateSchema = FET_BASE_SCHEMA;
+  readonly stateSize = FET_BASE_SCHEMA.size;
   stateBaseOffset: number = -1;
 
   initState(pool: StatePoolRef): void {
     this._s0 = pool.state0;
-    // Initialize device-off linearization values
-    this._s0[this.stateBaseOffset + SLOT_VGS]     = 0;
-    this._s0[this.stateBaseOffset + SLOT_VDS]     = 0;
-    this._s0[this.stateBaseOffset + SLOT_GM]      = 1e-12;
-    this._s0[this.stateBaseOffset + SLOT_GDS]     = 1e-12;
-    this._s0[this.stateBaseOffset + SLOT_IDS]     = 0;
-    this._s0[this.stateBaseOffset + SLOT_SWAPPED] = 0;
-    this._s0[this.stateBaseOffset + SLOT_CAP_GEQ_GS] = 0;
-    this._s0[this.stateBaseOffset + SLOT_CAP_IEQ_GS] = 0;
-    this._s0[this.stateBaseOffset + SLOT_CAP_GEQ_GD] = 0;
-    this._s0[this.stateBaseOffset + SLOT_CAP_IEQ_GD] = 0;
-    // NaN signals first stampCompanion call — use current voltage as warm start
-    this._s0[this.stateBaseOffset + SLOT_VGS_PREV] = NaN;
-    this._s0[this.stateBaseOffset + SLOT_VGD_PREV] = NaN;
-    // Slots 12–22: junction/gate-bulk cap state — Float64Array zero-inits most;
-    // first-call flags start as 1.0 (true) so stampCompanion warm-starts on first call.
-    this._s0[this.stateBaseOffset + SLOT_CAP_JUNCTION_FIRST_CALL] = 1.0;
-    this._s0[this.stateBaseOffset + SLOT_CAP_GB_FIRST_CALL]       = 1.0;
+    applyInitialValues(FET_BASE_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
   // Getters and setters backed by state pool

@@ -26,6 +26,7 @@ import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Layout constants
@@ -142,6 +143,17 @@ const LED_VT = 0.02585;
 const LED_GMIN = 1e-12;
 
 // ---------------------------------------------------------------------------
+// State schema declaration
+// ---------------------------------------------------------------------------
+
+const LED_STATE_SCHEMA = defineStateSchema("LedAnalogElement", [
+  { name: "VD", doc: "LED junction voltage (V)", init: { kind: "zero" } },
+  { name: "GEQ", doc: "Linearized junction conductance (S)", init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ", doc: "Linearized current source (A)", init: { kind: "zero" } },
+  { name: "ID", doc: "LED current (A)", init: { kind: "zero" } },
+]);
+
+// ---------------------------------------------------------------------------
 // createLedAnalogElement — AnalogElement factory
 // ---------------------------------------------------------------------------
 
@@ -177,7 +189,7 @@ function createLedAnalogElement(
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       base = this.stateBaseOffset;
-      s0[base + SLOT_GEQ] = LED_GMIN;
+      applyInitialValues(LED_STATE_SCHEMA, pool, base, {});
     },
 
     stamp(_solver: SparseSolver): void {

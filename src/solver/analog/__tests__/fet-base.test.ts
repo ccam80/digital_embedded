@@ -10,7 +10,17 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { createMosfetElement } from "../../../components/semiconductors/mosfet.js";
-import { AbstractFetElement } from "../fet-base.js";
+import {
+  AbstractFetElement,
+  SLOT_GM,
+  SLOT_GDS,
+  SLOT_VGS,
+  SLOT_VDS,
+  SLOT_IDS,
+  SLOT_SWAPPED,
+  SLOT_VGS_PREV,
+  SLOT_VGD_PREV,
+} from "../fet-base.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
@@ -397,17 +407,17 @@ describe("StatePool migration", () => {
     element.initState!(pool);
 
     // Initial _gm and _gds should be 1e-12 (device-off values)
-    expect(pool.state0[AbstractFetElement.SLOT_GM]).toBeCloseTo(1e-12);
-    expect(pool.state0[AbstractFetElement.SLOT_GDS]).toBeCloseTo(1e-12);
+    expect(pool.state0[SLOT_GM]).toBeCloseTo(1e-12);
+    expect(pool.state0[SLOT_GDS]).toBeCloseTo(1e-12);
     // VGS, VDS, IDS = 0 initially
-    expect(pool.state0[AbstractFetElement.SLOT_VGS]).toBe(0);
-    expect(pool.state0[AbstractFetElement.SLOT_VDS]).toBe(0);
-    expect(pool.state0[AbstractFetElement.SLOT_IDS]).toBe(0);
+    expect(pool.state0[SLOT_VGS]).toBe(0);
+    expect(pool.state0[SLOT_VDS]).toBe(0);
+    expect(pool.state0[SLOT_IDS]).toBe(0);
     // SWAPPED = 0.0
-    expect(pool.state0[AbstractFetElement.SLOT_SWAPPED]).toBe(0);
+    expect(pool.state0[SLOT_SWAPPED]).toBe(0);
     // VGS_PREV and VGD_PREV = NaN (first-call sentinel)
-    expect(isNaN(pool.state0[AbstractFetElement.SLOT_VGS_PREV])).toBe(true);
-    expect(isNaN(pool.state0[AbstractFetElement.SLOT_VGD_PREV])).toBe(true);
+    expect(isNaN(pool.state0[SLOT_VGS_PREV])).toBe(true);
+    expect(isNaN(pool.state0[SLOT_VGD_PREV])).toBe(true);
   });
 
   it("updateOperatingPoint_writes_state_to_pool", () => {
@@ -429,10 +439,10 @@ describe("StatePool migration", () => {
     }
 
     // After convergence, pool should contain non-trivial gm and gds
-    expect(pool.state0[AbstractFetElement.SLOT_VGS]).toBeGreaterThan(0);
-    expect(pool.state0[AbstractFetElement.SLOT_VDS]).toBeGreaterThan(0);
-    expect(pool.state0[AbstractFetElement.SLOT_GM]).toBeGreaterThan(1e-12);
-    expect(pool.state0[AbstractFetElement.SLOT_GDS]).toBeGreaterThan(1e-12);
+    expect(pool.state0[SLOT_VGS]).toBeGreaterThan(0);
+    expect(pool.state0[SLOT_VDS]).toBeGreaterThan(0);
+    expect(pool.state0[SLOT_GM]).toBeGreaterThan(1e-12);
+    expect(pool.state0[SLOT_GDS]).toBeGreaterThan(1e-12);
   });
 
   it("voltages_unchanged_after_updateOperatingPoint", () => {
@@ -468,7 +478,7 @@ describe("StatePool migration", () => {
     }
 
     // SLOT_SWAPPED must be 0.0 or 1.0, never another value
-    const swappedVal = pool.state0[AbstractFetElement.SLOT_SWAPPED];
+    const swappedVal = pool.state0[SLOT_SWAPPED];
     expect(swappedVal === 0.0 || swappedVal === 1.0).toBe(true);
   });
 
@@ -498,15 +508,15 @@ describe("StatePool migration", () => {
       voltages2[1] = 0.5;
     }
 
-    const vgsAfterMutation = pool.state0[AbstractFetElement.SLOT_VGS];
+    const vgsAfterMutation = pool.state0[SLOT_VGS];
 
     // Rollback by copying the saved buffer back into state0.
     pool.state0.set(cp);
 
-    const vgsAfterRollback = pool.state0[AbstractFetElement.SLOT_VGS];
+    const vgsAfterRollback = pool.state0[SLOT_VGS];
 
     // After rollback, state0 should be restored to checkpoint values
     expect(vgsAfterRollback).not.toBe(vgsAfterMutation);
-    expect(vgsAfterRollback).toBe(cp[AbstractFetElement.SLOT_VGS]);
+    expect(vgsAfterRollback).toBe(cp[SLOT_VGS]);
   });
 });

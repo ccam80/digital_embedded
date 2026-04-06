@@ -37,6 +37,7 @@ import {
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { defineStateSchema, applyInitialValues, type StateSchema } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -91,6 +92,20 @@ export function computeVaractorCapacitance(
 }
 
 // ---------------------------------------------------------------------------
+// State schema declaration
+// ---------------------------------------------------------------------------
+
+const VARACTOR_STATE_SCHEMA = defineStateSchema("VaractorElement", [
+  { name: "VD", doc: "Diode junction voltage (V)", init: { kind: "zero" } },
+  { name: "GEQ", doc: "Linearized junction conductance (S)", init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ", doc: "Linearized current source (A)", init: { kind: "zero" } },
+  { name: "ID", doc: "Diode current (A)", init: { kind: "zero" } },
+  { name: "CAP_GEQ", doc: "Capacitance companion conductance (S)", init: { kind: "zero" } },
+  { name: "CAP_IEQ", doc: "Capacitance history current (A)", init: { kind: "zero" } },
+  { name: "VD_PREV", doc: "Previous junction voltage for capacitor (V)", init: { kind: "zero" } },
+]);
+
+// ---------------------------------------------------------------------------
 // createVaractorElement — AnalogElement factory
 // ---------------------------------------------------------------------------
 
@@ -127,13 +142,14 @@ export function createVaractorElement(
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
-    stateSize: 8,
+    stateSize: 7,
+    stateSchema: VARACTOR_STATE_SCHEMA,
     stateBaseOffset: -1,
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       base = this.stateBaseOffset;
-      s0[base + SLOT_GEQ] = GMIN;
+      applyInitialValues(VARACTOR_STATE_SCHEMA, pool, base, {});
       s0[base + SLOT_CAP_FIRST_CALL] = 1.0; // true: Float64Array zero-inits, must set explicitly
     },
 

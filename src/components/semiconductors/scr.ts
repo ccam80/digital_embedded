@@ -34,6 +34,7 @@ import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -86,6 +87,22 @@ export const { paramDefs: SCR_PARAM_DEFS, defaults: SCR_PARAM_DEFAULTS } = defin
 // Stamp helpers — node 0 is ground (skipped)
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// State schema declaration
+// ---------------------------------------------------------------------------
+
+const SCR_STATE_SCHEMA = defineStateSchema("ScrElement", [
+  { name: "VAK", doc: "Anode-cathode voltage, pnjlim-limited (V)", init: { kind: "zero" } },
+  { name: "VGK", doc: "Gate-cathode voltage, pnjlim-limited (V)", init: { kind: "zero" } },
+  { name: "GEQ", doc: "Linearized anode-cathode conductance (S)", init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ", doc: "Linearized anode-cathode current source (A)", init: { kind: "zero" } },
+  { name: "G_GATE_GEQ", doc: "Gate junction conductance (S)", init: { kind: "constant", value: 1e-12 } },
+  { name: "G_GATE_IEQ", doc: "Gate junction current source (A)", init: { kind: "zero" } },
+  { name: "LATCHED", doc: "Latch state flag (0=off, 1=on)", init: { kind: "zero" } },
+  { name: "IAK", doc: "Anode current (A)", init: { kind: "zero" } },
+  { name: "IGK", doc: "Gate current (A)", init: { kind: "zero" } },
+]);
 
 // ---------------------------------------------------------------------------
 // createScrElement — AnalogElement factory
@@ -203,8 +220,7 @@ export function createScrElement(
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       base = this.stateBaseOffset;
-      s0[base + SLOT_GEQ] = GMIN;
-      s0[base + SLOT_G_GATE_GEQ] = GMIN;
+      applyInitialValues(SCR_STATE_SCHEMA, pool, base, {});
     },
 
     stamp(_solver: SparseSolver): void {

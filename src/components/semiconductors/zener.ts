@@ -28,6 +28,7 @@ import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { createDiodeElement, getDiodeInternalNodeCount } from "./diode.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -75,6 +76,17 @@ export const { paramDefs: ZENER_SPICE_L1_PARAM_DEFS, defaults: ZENER_SPICE_L1_DE
 });
 
 // ---------------------------------------------------------------------------
+// State schema declaration
+// ---------------------------------------------------------------------------
+
+const ZENER_STATE_SCHEMA = defineStateSchema("ZenerElement", [
+  { name: "VD", doc: "Diode junction voltage (V)", init: { kind: "zero" } },
+  { name: "GEQ", doc: "Linearized junction conductance (S)", init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ", doc: "Linearized current source (A)", init: { kind: "zero" } },
+  { name: "ID", doc: "Diode current (A)", init: { kind: "zero" } },
+]);
+
+// ---------------------------------------------------------------------------
 // createZenerElement — AnalogElement factory
 // ---------------------------------------------------------------------------
 
@@ -109,7 +121,7 @@ export function createZenerElement(
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       base = this.stateBaseOffset;
-      s0[base + SLOT_GEQ] = GMIN;
+      applyInitialValues(ZENER_STATE_SCHEMA, pool, base, {});
     },
 
     stamp(_solver: SparseSolver): void {

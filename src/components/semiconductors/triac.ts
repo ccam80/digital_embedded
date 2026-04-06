@@ -37,6 +37,7 @@ import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -83,6 +84,22 @@ export const { paramDefs: TRIAC_PARAM_DEFS, defaults: TRIAC_PARAM_DEFAULTS } = d
     n:        { default: 1,               description: "Emission coefficient" },
   },
 });
+
+// ---------------------------------------------------------------------------
+// State schema declaration
+// ---------------------------------------------------------------------------
+
+const TRIAC_STATE_SCHEMA = defineStateSchema("TriacElement", [
+  { name: "VAK", doc: "MT2-MT1 voltage, pnjlim-limited (V)", init: { kind: "zero" } },
+  { name: "VGK", doc: "Gate-MT1 voltage, pnjlim-limited (V)", init: { kind: "zero" } },
+  { name: "GEQ", doc: "Linearized MT1-MT2 conductance (S)", init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ", doc: "Linearized MT1-MT2 current source (A)", init: { kind: "zero" } },
+  { name: "G_GATE_GEQ", doc: "Gate junction conductance (S)", init: { kind: "constant", value: 1e-12 } },
+  { name: "G_GATE_IEQ", doc: "Gate junction current source (A)", init: { kind: "zero" } },
+  { name: "LATCHED", doc: "Latch state (1.0=fwd, -1.0=rev, 0.0=none)", init: { kind: "zero" } },
+  { name: "IAK", doc: "Main terminal current (A)", init: { kind: "zero" } },
+  { name: "IGK", doc: "Gate current (A)", init: { kind: "zero" } },
+]);
 
 // ---------------------------------------------------------------------------
 // Stamp helpers — node 0 is ground (skipped)
@@ -226,8 +243,7 @@ export function createTriacElement(
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       base = this.stateBaseOffset;
-      s0[base + SLOT_GEQ] = GMIN;
-      s0[base + SLOT_G_GATE_GEQ] = GMIN;
+      applyInitialValues(TRIAC_STATE_SCHEMA, pool, base, {});
     },
 
     stamp(_solver: SparseSolver): void {

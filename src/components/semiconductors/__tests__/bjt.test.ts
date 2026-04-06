@@ -373,10 +373,10 @@ describe("NPN", () => {
     expect(element.isNonlinear).toBe(true);
   });
 
-  it("isReactive_false", () => {
+  it("isReactive_true", () => {
     const propsObj = makeBjtProps();
     const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
-    expect(element.isReactive).toBe(false);
+    expect(element.isReactive).toBe(true);
   });
 
   it("pinNodeIds_correct", () => {
@@ -1070,5 +1070,93 @@ describe("StatePool — BJT SPICE L1 write-back elimination", () => {
 
     // With IRB=0 and RBM=0, rbEff = RB = 10
     expect(pool.state0[10]).toBe(10); // L1_SLOT_RB_EFF = 10
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stateSchema declaration tests (WE1 / WE2)
+// ---------------------------------------------------------------------------
+
+describe("stateSchema — BJT simple", () => {
+  it("stateSchema_declared", () => {
+    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, makeBjtProps());
+    expect(core.stateSchema).toBeDefined();
+  });
+
+  it("stateSchema_size_equals_stateSize", () => {
+    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, makeBjtProps());
+    expect(core.stateSchema!.size).toBe(core.stateSize);
+    expect(core.stateSize).toBe(10);
+  });
+
+  it("stateSchema_owner_identifies_element", () => {
+    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, makeBjtProps());
+    expect(core.stateSchema!.owner).toBe("BjtSimpleElement");
+  });
+
+  it("warmstart_NPN_VBE_seeded_to_0_6", () => {
+    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, makeBjtProps());
+    const pool = new StatePool(10);
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+    expect(pool.state0[0]).toBeCloseTo(0.6, 10); // SLOT_VBE = 0, NPN polarity
+  });
+
+  it("warmstart_PNP_VBE_seeded_to_minus_0_6", () => {
+    const core = createBjtElement(-1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, makeBjtProps());
+    const pool = new StatePool(10);
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+    expect(pool.state0[0]).toBeCloseTo(-0.6, 10); // SLOT_VBE = 0, PNP polarity
+  });
+});
+
+describe("stateSchema — BJT SPICE L1", () => {
+  it("stateSchema_declared", () => {
+    const core = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, makeSpiceL1Props());
+    expect(core.stateSchema).toBeDefined();
+  });
+
+  it("stateSchema_size_equals_stateSize", () => {
+    const core = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, makeSpiceL1Props());
+    expect(core.stateSchema!.size).toBe(core.stateSize);
+    expect(core.stateSize).toBe(24);
+  });
+
+  it("stateSchema_owner_identifies_element", () => {
+    const core = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, makeSpiceL1Props());
+    expect(core.stateSchema!.owner).toBe("BjtSpiceL1Element");
+  });
+
+  it("warmstart_NPN_VBE_seeded_to_0_6", () => {
+    const core = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, makeSpiceL1Props());
+    const pool = new StatePool(24);
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+    expect(pool.state0[0]).toBeCloseTo(0.6, 10); // L1_SLOT_VBE = 0, NPN polarity
+  });
+
+  it("warmstart_PNP_VBE_seeded_to_minus_0_6", () => {
+    const core = createSpiceL1BjtElement(-1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, makeSpiceL1Props());
+    const pool = new StatePool(24);
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+    expect(pool.state0[0]).toBeCloseTo(-0.6, 10); // L1_SLOT_VBE = 0, PNP polarity
+  });
+
+  it("cap_first_call_seeded_to_1", () => {
+    const core = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, makeSpiceL1Props());
+    const pool = new StatePool(24);
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+    expect(pool.state0[23]).toBe(1.0); // L1_SLOT_CAP_FIRST_CALL = 23
+  });
+
+  it("rb_eff_seeded_from_params", () => {
+    const core = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, makeSpiceL1Props({ RB: 15 }));
+    const pool = new StatePool(24);
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+    expect(pool.state0[10]).toBe(15); // L1_SLOT_RB_EFF = 10, value = RB param
   });
 });

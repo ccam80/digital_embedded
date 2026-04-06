@@ -35,6 +35,7 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -127,6 +128,17 @@ export function tunnelDiodeIV(
 }
 
 // ---------------------------------------------------------------------------
+// State schema declaration
+// ---------------------------------------------------------------------------
+
+const TUNNEL_DIODE_STATE_SCHEMA = defineStateSchema("TunnelDiodeElement", [
+  { name: "VD", doc: "Tunnel diode junction voltage (V)", init: { kind: "zero" } },
+  { name: "GEQ", doc: "Differential conductance (S)", init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ", doc: "Linearized current source (A)", init: { kind: "zero" } },
+  { name: "ID", doc: "Diode current (A)", init: { kind: "zero" } },
+]);
+
+// ---------------------------------------------------------------------------
 // createTunnelDiodeElement — AnalogElement factory
 // ---------------------------------------------------------------------------
 
@@ -181,7 +193,7 @@ export function createTunnelDiodeElement(
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       base = this.stateBaseOffset;
-      s0[base + SLOT_GEQ] = GMIN;
+      applyInitialValues(TUNNEL_DIODE_STATE_SCHEMA, pool, base, {});
     },
 
     stamp(_solver: SparseSolver): void {

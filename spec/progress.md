@@ -240,3 +240,35 @@
 - **Files modified**: `src/components/passives/transformer.ts`, `src/components/passives/__tests__/transformer.test.ts`
 - **Tests**: 26/26 passing
 - **Notes**: Declared TRANSFORMER_SCHEMA (13 slots: G11, G22, G12, HIST1, HIST2, PREV_I1, PREV_I2, PREV_PREV_I1, PREV_PREV_I2, PREV_V1, PREV_V2, PREV_PREV_V1, PREV_PREV_V2). Removed private _state, _g11, _g22, _g12, _hist1, _hist2 fields. Added initState pool binding. stampCompanion and stamp now read/write via pool slots. CoupledInductorState/updateState/createState retained in coupled-inductor.ts (still referenced by coupled-inductor.test.ts). Pre-existing failures (spice-import-roundtrip x6, buckbjt-convergence x1, triac x10) are not related to this task.
+
+## Task WE10: test-helpers.ts stateSchema declaration
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/__tests__/test-helpers.ts`
+- **Tests**: 10200/10220 passing (20 pre-existing failures unrelated to this task)
+- **Summary**: Added `stateSchema` declaration to test helper diode element in `makeDiode()`. Imported `defineStateSchema`, `applyInitialValues`, and `type StateSchema` from `state-schema.js`. Declared `DIODE_SCHEMA` at module scope with 4 slots (VD, GEQ, IEQ, ID) matching existing slot layout. Moved slot constants (SLOT_VD, SLOT_GEQ, SLOT_IEQ, SLOT_ID) to module scope. Updated element object: added `isReactive: true`, `stateSchema: DIODE_SCHEMA` properties. Updated `initState` to call `applyInitialValues(DIODE_SCHEMA, pool, base, {})` instead of manual `s0[base + SLOT_GEQ] = GMIN`. GEQ slot seeded to GMIN via schema `{ kind: "constant", value: GMIN }` in slot descriptor. All 4 test files using makeDiode (convergence-regression.test.ts, analog-engine.test.ts, dc-operating-point.test.ts) continue to pass. Pre-existing failures (spice-import-roundtrip x6, spice-model-overrides x2, buckbjt-convergence x1, wire-current-resolver timeout x1) are unrelated to this change.
+
+## Task WE1: bjt.ts simple factory stateSchema declaration (10 slots)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/semiconductors/bjt.ts`, `src/components/semiconductors/__tests__/bjt.test.ts`
+- **Tests**: 75/75 passing
+- **Summary**: Added import of `defineStateSchema`, `applyInitialValues`, `StateSchema` from `state-schema.js`. Declared `BJT_SIMPLE_SCHEMA` at module scope with 10 slots (VBE, VBC, GPI, GMU, GM, GO, IC, IB, IC_NORTON, IB_NORTON). VBE slot uses `fromParams` warm-start: NPN=+0.6, PNP=-0.6 via `_p["polarity"]`. Updated factory to set `isReactive: true`, `stateSchema: BJT_SIMPLE_SCHEMA`, `stateSize: BJT_SIMPLE_SCHEMA.size`. Updated `initState` to call `applyInitialValues(BJT_SIMPLE_SCHEMA, pool, base, { polarity })` then compute op0 at (0,0). Updated test `isReactive_false` to `isReactive_true`. Added schema declaration and warm-start seed tests. Pre-existing failures (buckbjt-convergence x1, spice-import-roundtrip x6, spice-model-overrides x2) confirmed pre-existing via HEAD `.vitest-failures.json`.
+
+## Task WE2: bjt.ts L1 factory stateSchema declaration (24 slots)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/semiconductors/bjt.ts`, `src/components/semiconductors/__tests__/bjt.test.ts`
+- **Tests**: 75/75 passing (included in WE1 run)
+- **Summary**: Declared `BJT_L1_SCHEMA` at module scope with 24 slots matching L1_SLOT_* constants. VBE slot (0): warm-start `fromParams` NPN=+0.6/PNP=-0.6. RB_EFF slot (10): `fromParams` `_p["RB"]`. CAP_FIRST_CALL slot (23): `constant` 1.0. All others: `zero`. Updated L1 factory to `isReactive: true`, `stateSchema: BJT_L1_SCHEMA`, `stateSize: BJT_L1_SCHEMA.size`. Updated `initState` to call `applyInitialValues(BJT_L1_SCHEMA, pool, base, { polarity, RB: params.RB })` then compute op0 at (0,0). Added L1 schema tests (stateSchema declared, size, owner, warm-start NPN/PNP, cap_first_call, rb_eff).
+
+## Task WE3: diode.ts stateSchema verification
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none
+- **Tests**: pre-existing (diode tests pass)
+- **Summary**: Verified diode.ts already has `stateSchema` from Wave C.1 migration. Line 188: `stateSchema: hasCapacitance ? DIODE_CAP_SCHEMA : DIODE_SCHEMA`. Line 194: `applyInitialValues(this.stateSchema!, pool, base, params)`. No changes needed.
