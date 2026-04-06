@@ -59,6 +59,14 @@ import {
   inductorHistoryCurrent,
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
+import {
+  defineStateSchema,
+  applyInitialValues,
+  CAP_COMPANION_SLOTS,
+  L_COMPANION_SLOTS,
+} from "../../solver/analog/state-schema.js";
+import type { StateSchema } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -66,6 +74,29 @@ import { defineModelParams } from "../../core/model-params.js";
 
 const MIN_CONDUCTANCE = 1e-12;
 const SHORT_CIRCUIT_CONDUCTANCE = 1e9;
+
+// ---------------------------------------------------------------------------
+// State-pool schemas for reactive sub-elements
+// ---------------------------------------------------------------------------
+
+const SEGMENT_INDUCTOR_SCHEMA: StateSchema = defineStateSchema("SegmentInductorElement", [
+  ...L_COMPANION_SLOTS,
+]);
+
+const SLOT_GEQ    = 0;
+const SLOT_IEQ    = 1;
+const SLOT_I_PREV = 2;
+
+const SEGMENT_CAPACITOR_SCHEMA: StateSchema = defineStateSchema("SegmentCapacitorElement", [
+  ...CAP_COMPANION_SLOTS,
+]);
+
+// CAP slots reuse same offsets: GEQ=0, IEQ=1, V_PREV=2
+const SLOT_V_PREV = 2;
+
+const COMBINED_RL_SCHEMA: StateSchema = defineStateSchema("CombinedRLElement", [
+  ...L_COMPANION_SLOTS,
+]);
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -288,12 +319,14 @@ class SegmentInductorElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  readonly stateSchema = SEGMENT_INDUCTOR_SCHEMA;
+  readonly stateSize: number = SEGMENT_INDUCTOR_SCHEMA.size;
+  stateBaseOffset: number = -1;
   setParam(_key: string, _value: number): void {}
 
   private readonly L: number;
-  private geq: number = 0;
-  private ieq: number = 0;
-  private iPrev: number = 0;
+  private s0!: Float64Array;
+  private base!: number;
 
   constructor(nA: number, nB: number, branchIdx: number, inductance: number) {
     this.pinNodeIds = [nA, nB];
@@ -302,10 +335,18 @@ class SegmentInductorElement implements AnalogElement {
     this.L = inductance;
   }
 
+  initState(pool: StatePoolRef): void {
+    this.s0 = pool.state0;
+    this.base = this.stateBaseOffset;
+    applyInitialValues(SEGMENT_INDUCTOR_SCHEMA, pool, this.base, {});
+  }
+
   stamp(solver: SparseSolver): void {
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
     const b = this.branchIndex;
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const ieq = this.s0[this.base + SLOT_IEQ];
 
     // B sub-matrix: I_b flows into nA, out of nB (KCL at both nodes).
     if (nA !== 0) solver.stamp(nA - 1, b, 1);
@@ -315,8 +356,8 @@ class SegmentInductorElement implements AnalogElement {
     // When geq=0 this reduces to V_A = V_B (short circuit at DC).
     if (nA !== 0) solver.stamp(b, nA - 1, 1);
     if (nB !== 0) solver.stamp(b, nB - 1, -1);
-    solver.stamp(b, b, -this.geq);
-    solver.stampRHS(b, this.ieq);
+    solver.stamp(b, b, -geq);
+    solver.stampRHS(b, ieq);
   }
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
@@ -325,10 +366,9 @@ class SegmentInductorElement implements AnalogElement {
     const v1 = this.pinNodeIds[1] > 0 ? voltages[this.pinNodeIds[1] - 1] : 0;
     const vNow = v0 - v1;
 
-    this.geq = inductorConductance(this.L, dt, method);
-    this.ieq = inductorHistoryCurrent(this.L, dt, method, iNow, this.iPrev, vNow);
-
-    this.iPrev = iNow;
+    this.s0[this.base + SLOT_GEQ]    = inductorConductance(this.L, dt, method);
+    this.s0[this.base + SLOT_IEQ]    = inductorHistoryCurrent(this.L, dt, method, iNow, this.s0[this.base + SLOT_I_PREV], vNow);
+    this.s0[this.base + SLOT_I_PREV] = iNow;
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -351,12 +391,14 @@ class SegmentCapacitorElement implements AnalogElement {
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  readonly stateSchema = SEGMENT_CAPACITOR_SCHEMA;
+  readonly stateSize: number = SEGMENT_CAPACITOR_SCHEMA.size;
+  stateBaseOffset: number = -1;
   setParam(_key: string, _value: number): void {}
 
   private readonly C: number;
-  private geq: number = 0;
-  private ieq: number = 0;
-  private vPrev: number = 0;
+  private s0!: Float64Array;
+  private base!: number;
 
   constructor(node: number, capacitance: number) {
     this.pinNodeIds = [node, 0];
@@ -364,28 +406,34 @@ class SegmentCapacitorElement implements AnalogElement {
     this.C = capacitance;
   }
 
+  initState(pool: StatePoolRef): void {
+    this.s0 = pool.state0;
+    this.base = this.stateBaseOffset;
+    applyInitialValues(SEGMENT_CAPACITOR_SCHEMA, pool, this.base, {});
+  }
+
   stamp(solver: SparseSolver): void {
     const n0 = this.pinNodeIds[0];
     if (n0 !== 0) {
-      solver.stamp(n0 - 1, n0 - 1, this.geq);
-      solver.stampRHS(n0 - 1, -this.ieq);
+      solver.stamp(n0 - 1, n0 - 1, this.s0[this.base + SLOT_GEQ]);
+      solver.stampRHS(n0 - 1, -this.s0[this.base + SLOT_IEQ]);
     }
   }
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
     const n0 = this.pinNodeIds[0];
     const vNow = n0 > 0 ? voltages[n0 - 1] : 0;
-    const iNow = this.geq * vNow + this.ieq;
+    const iNow = this.s0[this.base + SLOT_GEQ] * vNow + this.s0[this.base + SLOT_IEQ];
 
-    this.geq = capacitorConductance(this.C, dt, method);
-    this.ieq = capacitorHistoryCurrent(this.C, dt, method, vNow, this.vPrev, iNow);
-    this.vPrev = vNow;
+    this.s0[this.base + SLOT_GEQ]    = capacitorConductance(this.C, dt, method);
+    this.s0[this.base + SLOT_IEQ]    = capacitorHistoryCurrent(this.C, dt, method, vNow, this.s0[this.base + SLOT_V_PREV], iNow);
+    this.s0[this.base + SLOT_V_PREV] = vNow;
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
     const n0 = this.pinNodeIds[0];
     const v = n0 > 0 ? voltages[n0 - 1] : 0;
-    const I = this.geq * v + this.ieq;
+    const I = this.s0[this.base + SLOT_GEQ] * v + this.s0[this.base + SLOT_IEQ];
     return [I, -I];
   }
 }
@@ -406,13 +454,15 @@ class CombinedRLElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  readonly stateSchema = COMBINED_RL_SCHEMA;
+  readonly stateSize: number = COMBINED_RL_SCHEMA.size;
+  stateBaseOffset: number = -1;
   setParam(_key: string, _value: number): void {}
 
   private readonly R: number;
   private readonly L: number;
-  private geqL: number = 0;
-  private ieq: number = 0;
-  private iPrev: number = 0;
+  private s0!: Float64Array;
+  private base!: number;
 
   constructor(nA: number, nB: number, branchIdx: number, resistance: number, inductance: number) {
     this.pinNodeIds = [nA, nB];
@@ -422,21 +472,29 @@ class CombinedRLElement implements AnalogElement {
     this.L = inductance;
   }
 
+  initState(pool: StatePoolRef): void {
+    this.s0 = pool.state0;
+    this.base = this.stateBaseOffset;
+    applyInitialValues(COMBINED_RL_SCHEMA, pool, this.base, {});
+  }
+
   stamp(solver: SparseSolver): void {
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
     const b = this.branchIndex;
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const ieq = this.s0[this.base + SLOT_IEQ];
 
     // B sub-matrix: I_b flows into nA, out of nB.
     if (nA !== 0) solver.stamp(nA - 1, b, 1);
     if (nB !== 0) solver.stamp(nB - 1, b, -1);
 
-    // C sub-matrix: branch equation V_A - V_B - (R + geqL)*I_b = ieq
-    // When geqL=0 and R=0 this reduces to V_A = V_B (short circuit at DC).
+    // C sub-matrix: branch equation V_A - V_B - (R + geq)*I_b = ieq
+    // When geq=0 and R=0 this reduces to V_A = V_B (short circuit at DC).
     if (nA !== 0) solver.stamp(b, nA - 1, 1);
     if (nB !== 0) solver.stamp(b, nB - 1, -1);
-    solver.stamp(b, b, -(this.R + this.geqL));
-    solver.stampRHS(b, this.ieq);
+    solver.stamp(b, b, -(this.R + geq));
+    solver.stampRHS(b, ieq);
   }
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
@@ -445,10 +503,9 @@ class CombinedRLElement implements AnalogElement {
     const v1 = this.pinNodeIds[1] > 0 ? voltages[this.pinNodeIds[1] - 1] : 0;
     const vNow = v0 - v1;
 
-    this.geqL = inductorConductance(this.L, dt, method);
-    this.ieq = inductorHistoryCurrent(this.L, dt, method, iNow, this.iPrev, vNow);
-
-    this.iPrev = iNow;
+    this.s0[this.base + SLOT_GEQ]    = inductorConductance(this.L, dt, method);
+    this.s0[this.base + SLOT_IEQ]    = inductorHistoryCurrent(this.L, dt, method, iNow, this.s0[this.base + SLOT_I_PREV], vNow);
+    this.s0[this.base + SLOT_I_PREV] = iNow;
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -467,6 +524,8 @@ export class TransmissionLineElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  readonly stateSize: number = 0;
+  stateBaseOffset: number = -1;
   setParam(_key: string, _value: number): void {}
 
   private readonly _subElements: AnalogElement[];
@@ -553,6 +612,28 @@ export class TransmissionLineElement implements AnalogElement {
     // Branch indices for getPinCurrents.
     this._firstBranchIdx = firstBranchIdx;
     this._lastBranchIdx = firstBranchIdx + N - 1;
+
+    this.stateSize = 0;
+
+    // Compute total private pool size from all reactive sub-elements.
+    let totalState = 0;
+    for (const el of this._subElements) {
+      totalState += el.stateSize ?? 0;
+    }
+
+    // Bind sub-elements to a private pool so they are immediately usable.
+    // The outer element declares stateSize=0 so the compiler allocates no engine
+    // pool slots for it; the private pool provides the backing storage.
+    const privatePool: StatePoolRef = { state0: new Float64Array(totalState) };
+    let offset = 0;
+    for (const el of this._subElements) {
+      const sz = el.stateSize ?? 0;
+      if (sz > 0) {
+        el.stateBaseOffset = offset;
+        el.initState!(privatePool);
+        offset += sz;
+      }
+    }
   }
 
   stamp(solver: SparseSolver): void {

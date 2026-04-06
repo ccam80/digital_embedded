@@ -54,6 +54,36 @@ import {
   inductorHistoryCurrent,
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
+import {
+  defineStateSchema,
+  applyInitialValues,
+  CAP_COMPANION_SLOTS,
+  L_COMPANION_SLOTS,
+  suffixed,
+  type StateSchema,
+} from "../../solver/analog/state-schema.js";
+
+// ---------------------------------------------------------------------------
+// State-pool schema
+// ---------------------------------------------------------------------------
+
+const CRYSTAL_SCHEMA: StateSchema = defineStateSchema("AnalogCrystalElement", [
+  ...suffixed(L_COMPANION_SLOTS, "_L"),
+  ...suffixed(CAP_COMPANION_SLOTS, "_CS"),
+  ...suffixed(CAP_COMPANION_SLOTS, "_C0"),
+]);
+
+// Slot indices — must match the layout above.
+const SLOT_GEQ_L    = 0; // inductor companion conductance
+const SLOT_IEQ_L    = 1; // inductor companion history current
+const SLOT_I_PREV_L = 2; // inductor branch current at step n-1
+const SLOT_GEQ_CS   = 3; // series-cap companion conductance
+const SLOT_IEQ_CS   = 4; // series-cap companion history current
+const SLOT_V_PREV_CS = 5; // series-cap terminal voltage at step n-1
+const SLOT_GEQ_C0   = 6; // shunt-cap companion conductance
+const SLOT_IEQ_C0   = 7; // shunt-cap companion history current
+const SLOT_V_PREV_C0 = 8; // shunt-cap terminal voltage at step n-1
 
 // ---------------------------------------------------------------------------
 // Derived parameter helpers
@@ -200,28 +230,22 @@ export class AnalogCrystalElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = true;
+  readonly stateSchema = CRYSTAL_SCHEMA;
+  readonly stateSize = CRYSTAL_SCHEMA.size;
+  stateBaseOffset = -1;
   setParam(_key: string, _value: number): void {}
 
   // Series resistance
   private G_s: number;
 
-  // Motional inductance (L_s) companion model
+  // Physical params for companion model recomputation
   private L_s: number;
-  private geqL: number = 0;
-  private ieqL: number = 0;
-  private iPrevL: number = 0;
-
-  // Motional capacitance (C_s) companion model
   private C_s: number;
-  private geqCs: number = 0;
-  private ieqCs: number = 0;
-  private vPrevCs: number = 0;
-
-  // Shunt electrode capacitance (C_0) companion model
   private C_0: number;
-  private geqC0: number = 0;
-  private ieqC0: number = 0;
-  private vPrevC0: number = 0;
+
+  // Pool references — bound in initState()
+  private s0!: Float64Array;
+  private base!: number;
 
   /**
    * @param pinNodeIds - [n_A, n_B, n1, n2] where n1 and n2 are internal nodes
@@ -248,6 +272,12 @@ export class AnalogCrystalElement implements AnalogElement {
     this.C_0 = C0;
   }
 
+  initState(pool: StatePoolRef): void {
+    this.s0 = pool.state0;
+    this.base = this.stateBaseOffset;
+    applyInitialValues(CRYSTAL_SCHEMA, pool, this.base, {});
+  }
+
   updateDerivedParams(Rs: number, Ls: number, Cs: number, C0: number): void {
     this.G_s = 1 / Math.max(Rs, 1e-12);
     this.L_s = Ls;
@@ -261,6 +291,13 @@ export class AnalogCrystalElement implements AnalogElement {
     const n1 = this.pinNodeIds[2];
     const n2 = this.pinNodeIds[3];
     const b = this.branchIndex;
+
+    const geqL  = this.s0[this.base + SLOT_GEQ_L];
+    const ieqL  = this.s0[this.base + SLOT_IEQ_L];
+    const geqCs = this.s0[this.base + SLOT_GEQ_CS];
+    const ieqCs = this.s0[this.base + SLOT_IEQ_CS];
+    const geqC0 = this.s0[this.base + SLOT_GEQ_C0];
+    const ieqC0 = this.s0[this.base + SLOT_IEQ_C0];
 
     // R_s: conductance between n_A and n1
     stampG(solver, nA, nA, this.G_s);
@@ -276,24 +313,24 @@ export class AnalogCrystalElement implements AnalogElement {
     // V(n1) - V(n2) - geqL * I_branch = ieqL
     if (n1 !== 0) solver.stamp(b, n1 - 1, 1);
     if (n2 !== 0) solver.stamp(b, n2 - 1, -1);
-    solver.stamp(b, b, -this.geqL);
-    solver.stampRHS(b, this.ieqL);
+    solver.stamp(b, b, -geqL);
+    solver.stampRHS(b, ieqL);
 
     // C_s: companion model between n2 and n_B (with corrected RHS sign convention)
-    stampG(solver, n2, n2, this.geqCs);
-    stampG(solver, n2, nB, -this.geqCs);
-    stampG(solver, nB, n2, -this.geqCs);
-    stampG(solver, nB, nB, this.geqCs);
-    stampRHS(solver, n2, -this.ieqCs);
-    stampRHS(solver, nB, this.ieqCs);
+    stampG(solver, n2, n2, geqCs);
+    stampG(solver, n2, nB, -geqCs);
+    stampG(solver, nB, n2, -geqCs);
+    stampG(solver, nB, nB, geqCs);
+    stampRHS(solver, n2, -ieqCs);
+    stampRHS(solver, nB, ieqCs);
 
     // C_0: shunt capacitance between n_A and n_B (with corrected RHS sign convention)
-    stampG(solver, nA, nA, this.geqC0);
-    stampG(solver, nA, nB, -this.geqC0);
-    stampG(solver, nB, nA, -this.geqC0);
-    stampG(solver, nB, nB, this.geqC0);
-    stampRHS(solver, nA, -this.ieqC0);
-    stampRHS(solver, nB, this.ieqC0);
+    stampG(solver, nA, nA, geqC0);
+    stampG(solver, nA, nB, -geqC0);
+    stampG(solver, nB, nA, -geqC0);
+    stampG(solver, nB, nB, geqC0);
+    stampRHS(solver, nA, -ieqC0);
+    stampRHS(solver, nB, ieqC0);
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -309,7 +346,9 @@ export class AnalogCrystalElement implements AnalogElement {
 
     // C_0 shunt current flowing into pin A: I = geqC0 * (vA - vB) + ieqC0
     const vB = nB > 0 ? voltages[nB - 1] : 0;
-    const iShunt = this.geqC0 * (vA - vB) + this.ieqC0;
+    const geqC0 = this.s0[this.base + SLOT_GEQ_C0];
+    const ieqC0 = this.s0[this.base + SLOT_IEQ_C0];
+    const iShunt = geqC0 * (vA - vB) + ieqC0;
 
     // Total current into pin A = motional arm current + shunt current
     const I = iMotional + iShunt;
@@ -328,26 +367,32 @@ export class AnalogCrystalElement implements AnalogElement {
     const vN1 = n1 > 0 ? voltages[n1 - 1] : 0;
     const vN2 = n2 > 0 ? voltages[n2 - 1] : 0;
     const vNowL = vN1 - vN2;
-    this.geqL = inductorConductance(this.L_s, dt, method);
-    this.ieqL = inductorHistoryCurrent(this.L_s, dt, method, iNowL, this.iPrevL, vNowL);
-    this.iPrevL = iNowL;
-    void vNowL; // vPrevL removed (unused in BDF-1)
+    const iPrevL = this.s0[this.base + SLOT_I_PREV_L];
+    this.s0[this.base + SLOT_GEQ_L]    = inductorConductance(this.L_s, dt, method);
+    this.s0[this.base + SLOT_IEQ_L]    = inductorHistoryCurrent(this.L_s, dt, method, iNowL, iPrevL, vNowL);
+    this.s0[this.base + SLOT_I_PREV_L] = iNowL;
 
     // C_s companion model — voltage across n2 and n_B
     const vCs_now = vN2 - (nB > 0 ? voltages[nB - 1] : 0);
-    const iNowCs = this.geqCs * vCs_now + this.ieqCs;
-    this.geqCs = capacitorConductance(this.C_s, dt, method);
-    this.ieqCs = capacitorHistoryCurrent(this.C_s, dt, method, vCs_now, this.vPrevCs, iNowCs);
-    this.vPrevCs = vCs_now;
+    const geqCs   = this.s0[this.base + SLOT_GEQ_CS];
+    const ieqCs   = this.s0[this.base + SLOT_IEQ_CS];
+    const vPrevCs = this.s0[this.base + SLOT_V_PREV_CS];
+    const iNowCs  = geqCs * vCs_now + ieqCs;
+    this.s0[this.base + SLOT_GEQ_CS]   = capacitorConductance(this.C_s, dt, method);
+    this.s0[this.base + SLOT_IEQ_CS]   = capacitorHistoryCurrent(this.C_s, dt, method, vCs_now, vPrevCs, iNowCs);
+    this.s0[this.base + SLOT_V_PREV_CS] = vCs_now;
 
     // C_0 companion model — voltage across n_A and n_B
     const vA = nA > 0 ? voltages[nA - 1] : 0;
     const vB = nB > 0 ? voltages[nB - 1] : 0;
     const vC0_now = vA - vB;
-    const iNowC0 = this.geqC0 * vC0_now + this.ieqC0;
-    this.geqC0 = capacitorConductance(this.C_0, dt, method);
-    this.ieqC0 = capacitorHistoryCurrent(this.C_0, dt, method, vC0_now, this.vPrevC0, iNowC0);
-    this.vPrevC0 = vC0_now;
+    const geqC0   = this.s0[this.base + SLOT_GEQ_C0];
+    const ieqC0   = this.s0[this.base + SLOT_IEQ_C0];
+    const vPrevC0 = this.s0[this.base + SLOT_V_PREV_C0];
+    const iNowC0  = geqC0 * vC0_now + ieqC0;
+    this.s0[this.base + SLOT_GEQ_C0]   = capacitorConductance(this.C_0, dt, method);
+    this.s0[this.base + SLOT_IEQ_C0]   = capacitorHistoryCurrent(this.C_0, dt, method, vC0_now, vPrevC0, iNowC0);
+    this.s0[this.base + SLOT_V_PREV_C0] = vC0_now;
   }
 }
 

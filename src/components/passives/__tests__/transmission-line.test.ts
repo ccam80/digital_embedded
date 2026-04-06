@@ -15,6 +15,7 @@
 import { describe, it, expect } from "vitest";
 import {
   TransmissionLineDefinition,
+  TransmissionLineElement,
   TRANSMISSION_LINE_ATTRIBUTE_MAPPINGS,
 } from "../transmission-line.js";
 import { PropertyBag } from "../../../core/properties.js";
@@ -764,6 +765,90 @@ describe("TransmissionLine", () => {
       );
       expect(diag.code).toBe("transmission-line-low-segments");
       expect(diag.severity).toBe("warning");
+    });
+  });
+
+  describe("state_pool_infrastructure", () => {
+    function makeEl(N: number): TransmissionLineElement {
+      const nodeIds = buildNodeIds(1, 2, 3, N);
+      const firstBranch = 2 + 2 * (N - 1);
+      return new TransmissionLineElement(
+        nodeIds,
+        firstBranch,
+        50,
+        10e-9,
+        0,
+        1.0,
+        N,
+      );
+    }
+
+    it("outer TransmissionLineElement has stateSize=0", () => {
+      const el = makeEl(5);
+      expect(el.stateSize).toBe(0);
+    });
+
+    it("outer TransmissionLineElement has stateBaseOffset=-1 (no engine pool slots)", () => {
+      const el = makeEl(5);
+      expect(el.stateBaseOffset).toBe(-1);
+    });
+
+    it("sub-elements are pool-bound immediately after construction — stampCompanion works without initState", () => {
+      const N = 3;
+      const el = makeEl(N);
+      const voltages = new Float64Array(2 + 2 * (N - 1) + N);
+      expect(() => el.stampCompanion!(1e-9, "bdf1", voltages)).not.toThrow();
+    });
+
+    it("SegmentInductorElement sub-elements declare stateSchema with 3 slots", () => {
+      const N = 3;
+      const el = makeEl(N);
+      const subEls = (el as unknown as { _subElements: { stateSchema?: { size: number; owner: string } }[] })._subElements;
+      const inductors = subEls.filter(s => s.stateSchema?.owner === "SegmentInductorElement");
+      expect(inductors.length).toBe(N - 1);
+      for (const ind of inductors) {
+        expect(ind.stateSchema!.size).toBe(3);
+      }
+    });
+
+    it("SegmentCapacitorElement sub-elements declare stateSchema with 3 slots", () => {
+      const N = 3;
+      const el = makeEl(N);
+      const subEls = (el as unknown as { _subElements: { stateSchema?: { size: number; owner: string } }[] })._subElements;
+      const caps = subEls.filter(s => s.stateSchema?.owner === "SegmentCapacitorElement");
+      expect(caps.length).toBe(N - 1);
+      for (const cap of caps) {
+        expect(cap.stateSchema!.size).toBe(3);
+      }
+    });
+
+    it("CombinedRLElement sub-element declares stateSchema with 3 slots", () => {
+      const N = 3;
+      const el = makeEl(N);
+      const subEls = (el as unknown as { _subElements: { stateSchema?: { size: number; owner: string } }[] })._subElements;
+      const combRL = subEls.filter(s => s.stateSchema?.owner === "CombinedRLElement");
+      expect(combRL.length).toBe(1);
+      expect(combRL[0].stateSchema!.size).toBe(3);
+    });
+
+    it("all reactive sub-elements have stateBaseOffset >= 0 after construction", () => {
+      const N = 4;
+      const el = makeEl(N);
+      const subEls = (el as unknown as { _subElements: { stateSize?: number; stateBaseOffset?: number }[] })._subElements;
+      const reactive = subEls.filter(s => (s.stateSize ?? 0) > 0);
+      for (const sub of reactive) {
+        expect(sub.stateBaseOffset).toBeGreaterThanOrEqual(0);
+      }
+    });
+
+    it("reactive sub-elements have non-overlapping stateBaseOffset values", () => {
+      const N = 4;
+      const el = makeEl(N);
+      const subEls = (el as unknown as { _subElements: { stateSize?: number; stateBaseOffset?: number }[] })._subElements;
+      const reactive = subEls.filter(s => (s.stateSize ?? 0) > 0);
+      const offsets = reactive.map(s => s.stateBaseOffset!);
+      const uniqueOffsets = new Set(offsets);
+      expect(uniqueOffsets.size).toBe(offsets.length);
     });
   });
 });

@@ -26,15 +26,32 @@ import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { AnalogElementCore } from "../../../solver/analog/element.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
+}
+
+// ---------------------------------------------------------------------------
+// withState: allocate a StatePool for a single element and call initState
+// ---------------------------------------------------------------------------
+function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
+  const size = core.stateSize ?? 0;
+  const pool = new StatePool(Math.max(size, 1));
+  if (size > 0 && core.initState) {
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+  } else {
+    core.stateBaseOffset = -1;
+  }
+  return { element: core, pool };
 }
 
 
@@ -223,7 +240,9 @@ describe("Crystal", () => {
       props.setModelParam("motionalCapacitance", Cs);
       props.setModelParam("shuntCapacitance", C0);
 
-      const crystal = createCrystalElement(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props) as unknown as AnalogElement;
+      const crystalCore = createCrystalElement(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props);
+      const { element: crystalEl } = withState(crystalCore);
+      const crystal = crystalEl as unknown as AnalogElement;
       const vs = makeDcVoltageSource(1, 0, 4, 1.0) as unknown as AnalogElement;
 
       // 1GΩ gmin shunts on all non-ground nodes (1,2,3) to prevent floating nodes
@@ -391,6 +410,75 @@ describe("Crystal", () => {
       expect(m).toBeDefined();
       expect(m!.propertyKey).toBe("frequency");
       expect(m!.convert("1000000")).toBeCloseTo(1e6, 5);
+    });
+
+    it("stateSize is 9 (three companion fragments of 3 slots each)", () => {
+      const props = new PropertyBag();
+      props.setModelParam("frequency", 1e6);
+      props.setModelParam("qualityFactor", 1000);
+      props.setModelParam("motionalCapacitance", 20e-15);
+      props.setModelParam("shuntCapacitance", 5e-12);
+      const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
+      expect(el.stateSize).toBe(9);
+    });
+
+    it("stateBaseOffset is -1 before compiler assigns it", () => {
+      const props = new PropertyBag();
+      props.setModelParam("frequency", 1e6);
+      props.setModelParam("qualityFactor", 1000);
+      props.setModelParam("motionalCapacitance", 20e-15);
+      props.setModelParam("shuntCapacitance", 5e-12);
+      const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
+      expect(el.stateBaseOffset).toBe(-1);
+    });
+
+    it("stateSchema has 9 slots with correct names", () => {
+      const props = new PropertyBag();
+      props.setModelParam("frequency", 1e6);
+      props.setModelParam("qualityFactor", 1000);
+      props.setModelParam("motionalCapacitance", 20e-15);
+      props.setModelParam("shuntCapacitance", 5e-12);
+      const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
+      expect(el.stateSchema).toBeDefined();
+      const names = el.stateSchema!.slots.map((s) => s.name);
+      expect(names).toEqual([
+        "GEQ_L", "IEQ_L", "I_PREV_L",
+        "GEQ_CS", "IEQ_CS", "V_PREV_CS",
+        "GEQ_C0", "IEQ_C0", "V_PREV_C0",
+      ]);
+    });
+
+    it("initState initialises all pool slots to zero", () => {
+      const props = new PropertyBag();
+      props.setModelParam("frequency", 1e6);
+      props.setModelParam("qualityFactor", 1000);
+      props.setModelParam("motionalCapacitance", 20e-15);
+      props.setModelParam("shuntCapacitance", 5e-12);
+      const core = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
+      const { pool } = withState(core);
+      for (let i = 0; i < 9; i++) {
+        expect(pool.state0[i]).toBe(0);
+      }
+    });
+
+    it("stampCompanion writes geqL into pool slot 0", () => {
+      const props = new PropertyBag();
+      props.setModelParam("frequency", 1e6);
+      props.setModelParam("qualityFactor", 1000);
+      props.setModelParam("motionalCapacitance", 20e-15);
+      props.setModelParam("shuntCapacitance", 5e-12);
+      const core = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
+      const { element } = withState(core);
+
+      // Provide a minimal voltage array (matrixSize=4: nodes 1-4 map to indices 0-3)
+      // node 1=A, 0=B(ground), 2=n1, 3=n2, branch 3=L_s current (index 3)
+      const voltages = new Float64Array(5); // indices 0-4
+      (element as unknown as { stampCompanion: (dt: number, method: string, v: Float64Array) => void })
+        .stampCompanion(1e-6, "bdf1", voltages);
+
+      // After stampCompanion, pool slot 0 (GEQ_L) must be non-zero
+      const pool = (element as unknown as { s0: Float64Array }).s0;
+      expect(pool[0]).toBeGreaterThan(0);
     });
   });
 });

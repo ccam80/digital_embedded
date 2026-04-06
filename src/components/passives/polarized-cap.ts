@@ -50,12 +50,31 @@ import {
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
+import {
+  defineStateSchema,
+  applyInitialValues,
+  CAP_COMPANION_SLOTS,
+  type StateSchema,
+} from "../../solver/analog/state-schema.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const MIN_RESISTANCE = 1e-9;
+
+// ---------------------------------------------------------------------------
+// State schema
+// ---------------------------------------------------------------------------
+
+const POLARIZED_CAP_SCHEMA: StateSchema = defineStateSchema("AnalogPolarizedCapElement", [
+  ...CAP_COMPANION_SLOTS,
+]);
+
+const SLOT_GEQ    = 0;
+const SLOT_IEQ    = 1;
+const SLOT_V_PREV = 2;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -210,17 +229,19 @@ export class AnalogPolarizedCapElement implements AnalogElement {
   readonly allNodeIds: readonly number[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: boolean = true;
-  readonly isReactive: boolean = true;
+  readonly isReactive = true;
   setParam(_key: string, _value: number): void {}
+
+  readonly stateSchema = POLARIZED_CAP_SCHEMA;
+  readonly stateSize = POLARIZED_CAP_SCHEMA.size;
+  stateBaseOffset = -1;
 
   private C: number;
   private G_esr: number;
   private G_leak: number;
   private reverseMax: number;
-
-  private geq: number = 0;
-  private ieq: number = 0;
-  private vPrev: number = 0;
+  private s0!: Float64Array;
+  private base!: number;
 
   private readonly _emitDiagnostic: (diag: Diagnostic) => void;
   private _reverseBiasDiagEmitted: boolean = false;
@@ -250,10 +271,18 @@ export class AnalogPolarizedCapElement implements AnalogElement {
     this._emitDiagnostic = emitDiagnostic ?? (() => {});
   }
 
+  initState(pool: StatePoolRef): void {
+    this.s0 = pool.state0;
+    this.base = this.stateBaseOffset;
+    applyInitialValues(POLARIZED_CAP_SCHEMA, pool, this.base, {});
+  }
+
   stamp(solver: SparseSolver): void {
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
     const nCap = this.pinNodeIds[2];
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const ieq = this.s0[this.base + SLOT_IEQ];
 
     // ESR: conductance between n_pos and n_cap
     stampG(solver, nPos, nPos, this.G_esr);
@@ -269,13 +298,13 @@ export class AnalogPolarizedCapElement implements AnalogElement {
 
     // Capacitor companion model: conductance + history current between n_cap and n_neg
     // RHS sign: -ieq at nCap, +ieq at nNeg (standard Norton convention: ieq = -geq*v(n))
-    stampG(solver, nCap, nCap, this.geq);
-    stampG(solver, nCap, nNeg, -this.geq);
-    stampG(solver, nNeg, nCap, -this.geq);
-    stampG(solver, nNeg, nNeg, this.geq);
+    stampG(solver, nCap, nCap, geq);
+    stampG(solver, nCap, nNeg, -geq);
+    stampG(solver, nNeg, nCap, -geq);
+    stampG(solver, nNeg, nNeg, geq);
 
-    stampRHS(solver, nCap, -this.ieq);
-    stampRHS(solver, nNeg, this.ieq);
+    stampRHS(solver, nCap, -ieq);
+    stampRHS(solver, nNeg, ieq);
   }
 
   stampNonlinear(_solver: SparseSolver): void {
@@ -340,13 +369,17 @@ export class AnalogPolarizedCapElement implements AnalogElement {
     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
     const vNow = vCapNode - vNeg;
 
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const ieq = this.s0[this.base + SLOT_IEQ];
+    const vPrev = this.s0[this.base + SLOT_V_PREV];
+
     // Recover capacitor current at previous accepted step from companion model.
     // On the first call geq=0 and ieq=0, so iNow=0 (correct: DC steady state).
-    const iNow = this.geq * vNow + this.ieq;
+    const iNow = geq * vNow + ieq;
 
-    this.geq = capacitorConductance(this.C, dt, method);
-    this.ieq = capacitorHistoryCurrent(this.C, dt, method, vNow, this.vPrev, iNow);
-    this.vPrev = vNow;
+    this.s0[this.base + SLOT_GEQ]    = capacitorConductance(this.C, dt, method);
+    this.s0[this.base + SLOT_IEQ]    = capacitorHistoryCurrent(this.C, dt, method, vNow, vPrev, iNow);
+    this.s0[this.base + SLOT_V_PREV] = vNow;
   }
 }
 

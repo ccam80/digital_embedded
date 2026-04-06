@@ -151,16 +151,16 @@ describe("diode state pool migration", () => {
     expect(element.stateSize).toBe(4);
   });
 
-  it("stateSize is 7 when CJO > 0", () => {
+  it("stateSize is 8 when CJO > 0", () => {
     const props = makeParamBag({ CJO: 10e-12, TT: 0 });
     const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
-    expect(element.stateSize).toBe(7);
+    expect(element.stateSize).toBe(8);
   });
 
-  it("stateSize is 7 when TT > 0", () => {
+  it("stateSize is 8 when TT > 0", () => {
     const props = makeParamBag({ CJO: 0, TT: 1e-9 });
     const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
-    expect(element.stateSize).toBe(7);
+    expect(element.stateSize).toBe(8);
   });
 
   it("initState sets SLOT_GEQ to GMIN", () => {
@@ -192,6 +192,48 @@ describe("diode state pool migration", () => {
     expect(pool.state0[4]).toBe(0);
     expect(pool.state0[5]).toBe(0);
     expect(pool.state0[6]).toBe(0);
+  });
+
+  it("SLOT_CAP_FIRST_CALL is 1.0 after initState for capacitive diode", () => {
+    const props = makeParamBag({ CJO: 10e-12, TT: 0 });
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(element.stateSize);
+    element.stateBaseOffset = 0;
+    element.initState!(pool);
+
+    // SLOT_CAP_FIRST_CALL=7 must be 1.0 so the first stampCompanion uses vNow as vPrev
+    expect(pool.state0[7]).toBe(1.0);
+  });
+
+  it("SLOT_CAP_FIRST_CALL becomes 0 after first stampCompanion call", () => {
+    const props = makeParamBag({ CJO: 10e-12, TT: 0 });
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(element.stateSize);
+    element.stateBaseOffset = 0;
+    element.initState!(pool);
+
+    const voltages = new Float64Array([-1.0, 0.0]);
+    element.updateOperatingPoint!(voltages);
+    element.stampCompanion!(1e-6, "trapezoidal", voltages);
+
+    // After first stampCompanion, SLOT_CAP_FIRST_CALL must be cleared to 0
+    expect(pool.state0[7]).toBe(0);
+  });
+
+  it("stateSchema is DIODE_SCHEMA for resistive diode", () => {
+    const props = makeParamBag({ CJO: 0, TT: 0 });
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    expect(element.stateSchema).toBeDefined();
+    expect(element.stateSchema!.size).toBe(4);
+    expect(element.stateSchema!.owner).toBe("DiodeElement");
+  });
+
+  it("stateSchema is DIODE_CAP_SCHEMA for capacitive diode", () => {
+    const props = makeParamBag({ CJO: 10e-12, TT: 0 });
+    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    expect(element.stateSchema).toBeDefined();
+    expect(element.stateSchema!.size).toBe(8);
+    expect(element.stateSchema!.owner).toBe("DiodeElement_cap");
   });
 
   it("pool IEQ satisfies ieq = id - geq * vd at converged point", () => {

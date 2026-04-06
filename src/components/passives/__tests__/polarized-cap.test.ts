@@ -23,6 +23,8 @@ import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { Diagnostic } from "../../../compile/types.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
+import type { AnalogElementCore } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -39,8 +41,20 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // Helpers
 // ---------------------------------------------------------------------------
 
+function withState<T extends AnalogElementCore>(core: T): { element: T; pool: StatePool } {
+  const size = core.stateSize ?? 0;
+  const pool = new StatePool(Math.max(size, 1));
+  if (size > 0) {
+    core.stateBaseOffset = 0;
+    core.initState!(pool);
+  } else {
+    core.stateBaseOffset = -1;
+  }
+  return { element: core, pool };
+}
+
 /**
- * Build a PolarizedCap analog element for direct testing.
+ * Build a PolarizedCap analog element for direct testing, pre-initialized with a pool.
  *
  * Node layout:
  *   n_pos = 1, n_neg = 0 (ground), n_cap = 2
@@ -56,7 +70,7 @@ function makeCapElement(opts: {
   reverseMax?: number;
   emitDiagnostic?: (d: Diagnostic) => void;
 }): AnalogPolarizedCapElement {
-  return new AnalogPolarizedCapElement(
+  const el = new AnalogPolarizedCapElement(
     [1, 0, 2],
     opts.capacitance,
     opts.esr,
@@ -64,6 +78,8 @@ function makeCapElement(opts: {
     opts.reverseMax ?? 1.0,
     opts.emitDiagnostic,
   );
+  withState(el);
+  return el;
 }
 
 /**
@@ -211,6 +227,7 @@ describe("PolarizedCap", () => {
       const vs = makeDcVoltageSource(1, 0, 3, V_step);
       const rSeries = makeResistorElement(1, 2, R);
       const cap = new AnalogPolarizedCapElement([2, 0, 3], C, esr, rLeak, 1.0);
+      withState(cap);
 
       const matrixSize = 4;
       const solver = new SparseSolver();
@@ -331,6 +348,57 @@ describe("PolarizedCap", () => {
         props,
       );
       expect(el).toBeDefined();
+    });
+  });
+
+  describe("pool_infrastructure", () => {
+    it("stateSize equals 3 (GEQ + IEQ + V_PREV)", () => {
+      const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
+      expect(el.stateSize).toBe(3);
+    });
+
+    it("stateBaseOffset defaults to -1 before initState", () => {
+      const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
+      expect(el.stateBaseOffset).toBe(-1);
+    });
+
+    it("initState binds pool and zero-initializes all slots", () => {
+      const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
+      const { pool } = withState(el);
+      expect(pool.state0[0]).toBe(0); // GEQ
+      expect(pool.state0[1]).toBe(0); // IEQ
+      expect(pool.state0[2]).toBe(0); // V_PREV
+    });
+
+    it("stampCompanion writes GEQ and IEQ to pool slots 0 and 1", () => {
+      const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
+      const { pool } = withState(el);
+      const voltages = new Float64Array([5, 0]); // node1=5V, node2=0V
+      el.stampCompanion(1e-6, "bdf1", voltages);
+      expect(pool.state0[0]).toBeGreaterThan(0); // GEQ = C/dt > 0
+      expect(pool.state0[1]).not.toBe(0);        // IEQ non-zero after step
+    });
+
+    it("stampCompanion writes V_PREV to pool slot 2", () => {
+      const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
+      const { pool } = withState(el);
+      // nCap=2 (1-based), nNeg=0 → vCapNode = voltages[1], vNeg = 0
+      const voltages = new Float64Array([0, 3]); // node1=0, node2=3V
+      el.stampCompanion(1e-6, "bdf1", voltages);
+      expect(pool.state0[2]).toBeCloseTo(3, 6); // V_PREV = vNow = 3V
+    });
+
+    it("stateSchema is defined and has size 3", () => {
+      const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
+      expect(el.stateSchema).toBeDefined();
+      expect(el.stateSchema.size).toBe(3);
+      expect(el.stateSchema.owner).toBe("AnalogPolarizedCapElement");
+    });
+
+    it("stateSchema slot names are GEQ, IEQ, V_PREV in order", () => {
+      const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
+      const names = el.stateSchema.slots.map((s) => s.name);
+      expect(names).toEqual(["GEQ", "IEQ", "V_PREV"]);
     });
   });
 });

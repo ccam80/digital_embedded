@@ -155,3 +155,62 @@
   - Updated `initState` to call `applyInitialValues(INDUCTOR_SCHEMA, pool, this.base, {})`
   - Renamed `SLOT_I_PREV_PREV=3` → `SLOT_V_PREV=3`; `stampCompanion` now stores `vNow` (terminal voltage) at slot 3 instead of `iPrev`
   - Updated `getLteEstimate` to use single-point estimate `(dt/12)*|iPrev|` (slot 3 no longer holds previous current)
+
+## Task WC2: diode.ts add SLOT_CAP_FIRST_CALL, stateSize 4→8 (Amendment E2)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none (schottky test file not created — Write permission denied; schottky inherits diode element and is verified via diode test coverage)
+- **Files modified**: `src/components/semiconductors/diode.ts`, `src/components/semiconductors/__tests__/diode-state-pool.test.ts`
+- **Tests**: 34/34 passing (diode suite: 30 original + 4 new; schottky verified as side-effect via shared factory)
+- **Changes summary**:
+  - Added import of `defineStateSchema`, `applyInitialValues`, `StateSchema` from state-schema.ts
+  - Moved slot index constants to module scope: `SLOT_VD=0, SLOT_GEQ=1, SLOT_IEQ=2, SLOT_ID=3, SLOT_CAP_GEQ=4, SLOT_CAP_IEQ=5, SLOT_VD_PREV=6, SLOT_CAP_FIRST_CALL=7`
+  - Declared `DIODE_SCHEMA` (4 slots, resistive) and `DIODE_CAP_SCHEMA` (8 slots, capacitive) at module scope
+  - `DIODE_CAP_SCHEMA` slot 7 (`CAP_FIRST_CALL`) has `init: { kind: "constant", value: 1.0 }`
+  - Removed closure variable `capFirstCall`; replaced with `s0[base + SLOT_CAP_FIRST_CALL]`; truthy check → `!== 0`; set false → set `0`
+  - Updated `stateSize` from `hasCapacitance ? 7 : 4` to `hasCapacitance ? 8 : 4`
+  - Added `stateSchema` property to element object
+  - Updated `initState` to call `applyInitialValues(this.stateSchema!, pool, base, params)` instead of manual `s0[base + SLOT_GEQ] = GMIN`
+  - Updated tests: stateSize assertions 7→8 for CJO>0 and TT>0 cases
+  - Added 4 new tests: SLOT_CAP_FIRST_CALL=1.0 after initState, SLOT_CAP_FIRST_CALL=0 after stampCompanion, stateSchema size/owner for both resistive and capacitive paths
+  - Schottky (`createSchottkyElement`) delegates to `createDiodeElement` unchanged — automatically gets all new behavior
+
+## Task WC3: crystal.ts adopt 9-slot schema via suffixed fragments
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/passives/crystal.ts, src/components/passives/__tests__/crystal.test.ts
+- **Tests**: 31/31 passing
+- **Summary**: Migrated AnalogCrystalElement to use 9-slot state pool schema. Added imports for defineStateSchema, applyInitialValues, CAP_COMPANION_SLOTS, L_COMPANION_SLOTS, suffixed, StatePoolRef. Declared CRYSTAL_SCHEMA with suffixed fragments (_L, _CS, _C0). Removed 9 private mutable companion fields and replaced with pool-backed slot reads/writes. Added stateSchema, stateSize, stateBaseOffset, s0, base fields plus initState(). Updated test file with withState helper, fixed DC test to initialize pool before stamp(), added 5 new schema-specific tests verifying stateSize=9, stateBaseOffset=-1, slot names, zero-init, and pool write-back.
+
+## Task WC4: transmission-line.ts add pool infrastructure to 3 sub-element classes
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/components/passives/transmission-line.ts, src/components/passives/__tests__/transmission-line.test.ts
+- **Tests**: 50/50 passing
+- **Summary**: Added pool infrastructure to SegmentInductorElement, SegmentCapacitorElement, and CombinedRLElement. Each class now declares stateSchema (using L_COMPANION_SLOTS or CAP_COMPANION_SLOTS), stateSize, stateBaseOffset=-1, s0/base fields, and initState(). Slot constants SLOT_GEQ=0, SLOT_IEQ=1, SLOT_I_PREV=2 / SLOT_V_PREV=2 declared at module scope. The outer TransmissionLineElement keeps stateSize=0 (no engine pool slots); it allocates a private Float64Array in the constructor and binds all reactive sub-elements to it immediately, so stampCompanion works without engine initState. Added imports for StatePoolRef, defineStateSchema, applyInitialValues, CAP_COMPANION_SLOTS, L_COMPANION_SLOTS, StateSchema. Added 9 pool-specific tests verifying stateSize=0 on outer element, stateBaseOffset=-1, schema sizes, immediate usability, non-overlapping offsets. Pre-existing unrelated failures (spice-import-roundtrip, spice-model-overrides, buckbjt-convergence) were present before this task.
+
+## Task WC1: polarized-cap.ts add pool infrastructure from scratch (§4.1)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/components/passives/polarized-cap.ts`, `src/components/passives/__tests__/polarized-cap.test.ts`
+- **Tests**: 28/28 passing
+
+### Changes made
+
+**polarized-cap.ts:**
+- Added imports: `defineStateSchema`, `applyInitialValues`, `CAP_COMPANION_SLOTS`, `type StateSchema` from `state-schema.js`; `StatePoolRef` from `analog-types.js`
+- Added module-scope schema: `POLARIZED_CAP_SCHEMA = defineStateSchema("AnalogPolarizedCapElement", [...CAP_COMPANION_SLOTS])` with 3 slots (GEQ=0, IEQ=1, V_PREV=2)
+- Added to class: `readonly isReactive = true`, `readonly stateSchema`, `readonly stateSize`, `stateBaseOffset = -1`, `private s0!: Float64Array`, `private base!: number`
+- Added `initState(pool)` method: caches `pool.state0` and `stateBaseOffset`, calls `applyInitialValues`
+- Removed instance fields: `private geq: number = 0`, `private ieq: number = 0`, `private vPrev: number = 0`
+- Rerouted all reads/writes in `stamp()` and `stampCompanion()` to use `this.s0[this.base + SLOT_*]`
+
+**polarized-cap.test.ts:**
+- Added imports: `StatePool`, `AnalogElementCore`
+- Added `withState` helper (same pattern as capacitor.test.ts)
+- Updated `makeCapElement` helper to call `withState` automatically
+- Added `withState(cap)` call in the RC time constant test that directly constructs `AnalogPolarizedCapElement`
+- Added `describe("pool_infrastructure")` block with 6 new tests covering: stateSize=3, default stateBaseOffset=-1, zero-initialization, slot writes in stampCompanion, stateSchema defined with correct size and owner, slot names in order

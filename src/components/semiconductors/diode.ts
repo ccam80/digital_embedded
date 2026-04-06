@@ -38,6 +38,11 @@ import {
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import {
+  defineStateSchema,
+  applyInitialValues,
+  type StateSchema,
+} from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -48,6 +53,34 @@ const VT = 0.02585;
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
+
+// ---------------------------------------------------------------------------
+// State schemas
+// ---------------------------------------------------------------------------
+
+// Slot index constants — shared between both schema variants.
+const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_VD_PREV = 6, SLOT_CAP_FIRST_CALL = 7;
+
+/** Schema for resistive diode (no junction capacitance): 4 slots. */
+export const DIODE_SCHEMA: StateSchema = defineStateSchema("DiodeElement", [
+  { name: "VD",  doc: "pnjlim-limited junction voltage",          init: { kind: "zero" } },
+  { name: "GEQ", doc: "NR companion conductance",                 init: { kind: "constant", value: GMIN } },
+  { name: "IEQ", doc: "NR companion Norton current",              init: { kind: "zero" } },
+  { name: "ID",  doc: "Diode current at operating point",         init: { kind: "zero" } },
+]);
+
+/** Schema for capacitive diode (CJO > 0 or TT > 0): 8 slots. */
+export const DIODE_CAP_SCHEMA: StateSchema = defineStateSchema("DiodeElement_cap", [
+  { name: "VD",              doc: "pnjlim-limited junction voltage",          init: { kind: "zero" } },
+  { name: "GEQ",             doc: "NR companion conductance",                 init: { kind: "constant", value: GMIN } },
+  { name: "IEQ",             doc: "NR companion Norton current",              init: { kind: "zero" } },
+  { name: "ID",              doc: "Diode current at operating point",         init: { kind: "zero" } },
+  { name: "CAP_GEQ",         doc: "Junction-capacitance companion conductance", init: { kind: "zero" } },
+  { name: "CAP_IEQ",         doc: "Junction-capacitance companion history current", init: { kind: "zero" } },
+  { name: "VD_PREV",         doc: "Junction voltage at previous accepted step", init: { kind: "zero" } },
+  { name: "CAP_FIRST_CALL",  doc: "1 until first stampCompanion call; then 0", init: { kind: "constant", value: 1.0 } },
+]);
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -143,28 +176,22 @@ export function createDiodeElement(
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
-  // State pool slot indices
-  const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
-  const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_VD_PREV = 6;
-
   // Pool binding — set by initState
   let s0: Float64Array;
   let base: number;
-
-  // Sentinel: first call to updateOperatingPoint initialises the capacitance companion model.
-  let capFirstCall = true;
 
   const element: AnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: hasCapacitance,
-    stateSize: hasCapacitance ? 7 : 4,
+    stateSize: hasCapacitance ? 8 : 4,
+    stateSchema: hasCapacitance ? DIODE_CAP_SCHEMA : DIODE_SCHEMA,
     stateBaseOffset: -1,
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
       base = this.stateBaseOffset;
-      s0[base + SLOT_GEQ] = GMIN;
+      applyInitialValues(this.stateSchema!, pool, base, params);
     },
 
     stamp(solver: SparseSolver): void {
@@ -288,9 +315,9 @@ export function createDiodeElement(
       const prevCapGeq = s0[base + SLOT_CAP_GEQ];
       const prevCapIeq = s0[base + SLOT_CAP_IEQ];
       const iNow = prevCapGeq * vNow + prevCapIeq;
-      const vPrevForFormula = capFirstCall ? vNow : s0[base + SLOT_VD_PREV];
+      const vPrevForFormula = s0[base + SLOT_CAP_FIRST_CALL] !== 0 ? vNow : s0[base + SLOT_VD_PREV];
       s0[base + SLOT_VD_PREV] = vNow;
-      capFirstCall = false;
+      s0[base + SLOT_CAP_FIRST_CALL] = 0;
 
       s0[base + SLOT_CAP_GEQ] = capacitorConductance(Ctotal, dt, method);
       s0[base + SLOT_CAP_IEQ] = capacitorHistoryCurrent(Ctotal, dt, method, vNow, vPrevForFormula, iNow);
