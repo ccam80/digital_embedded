@@ -86,3 +86,52 @@
 - **Gap G1**: CompiledAnalogCircuit interface not updated with statePool (blocks Phase 6)
 - **Gap G2**: updateOperatingPoint not narrowed to Readonly<Float64Array> yet (Phase 6 task W6T3)
 - **Full report**: spec/reviews/wave-1.1.md
+
+## Task WA1: Create state-schema.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/state-schema.ts, src/solver/analog/__tests__/state-schema.test.ts
+- **Files modified**: none
+- **Tests**: 32/32 passing
+
+## Task WA2: Amend element.ts + add ReactiveAnalogElement to analog-types.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/element.ts (JSDoc + stateSchema? field), src/core/analog-types.ts (ReactiveAnalogElement interface + StateSchema import)
+- **Tests**: 32/32 passing (state-schema.test.ts)
+- **Note**: Pre-existing Vitest failures in buckbjt-convergence, convergence-regression, spice-import-roundtrip-mcp are from prior analog-engine.ts changes already in working tree, unrelated to WA1/WA2 changes.
+
+## Task WA3: Wire dev-probe in MNAEngine
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/analog-engine.ts`, `src/compile/types.ts`
+- **Tests**: 0/0 new tests written (probe is gated by import.meta.env?.DEV; existing tests validate engine behavior)
+- **Notes**:
+  - Added `_devProbeRan: boolean = false` field to MNAEngine
+  - Added import of `assertPoolIsSoleMutableState` from `../../solver/analog/state-schema.js`
+  - Added `reactive-state-outside-pool` to `DiagnosticCode` union in `src/compile/types.ts`
+  - On first `step()` call with `import.meta.env?.DEV` true: snapshots pool state0, iterates `_elements`, calls `assertPoolIsSoleMutableState` for each element with `stateSize > 0`, emits diagnostics for violations, restores pool state0 after all elements probed
+  - Pool snapshot/restore prevents probe's `stampCompanion`/`updateOperatingPoint` calls from corrupting actual first-step state
+
+## Task WA4: Delete redundant initState + promote elements
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/analog-engine.ts`
+- **Tests**: 0/0 new tests written (existing tests validate behavior)
+- **Notes**:
+  - Removed `el.initState?.(cac.statePool)` call from `MNAEngine.init()` element loop
+  - Kept offset validation (`stateBaseOffset < 0` throw)
+  - Promoted `elements` from local destructured `const` to instance field `this._elements = compiled.elements`
+  - Added `_elements: readonly AnalogElement[] = []` instance field
+  - Reset `_devProbeRan = false` in `init()` so fresh compile triggers new probe
+
+## Task WA5: Fix reset() re-init gap
+- **Status**: complete (with spec/test conflict noted)
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/analog-engine.ts`
+- **Tests**: 1 pre-existing test fails due to spec conflict
+- **Spec/test conflict**: WA5 spec requires calling `el.initState?.(cac.statePool)` after `statePool.reset()` to restore non-zero initial values (FET GM/GDS=1e-12, BJT op-point). Pre-existing test `convergence-regression.test.ts > reset zeros statePool` asserts that `state0[diodeBase + 1]` is 0 after reset. The diode's `initState` sets SLOT_GEQ=1e-12, so WA5's reinit produces 1e-12 ≠ 0. Cannot resolve without modifying the pre-existing test.

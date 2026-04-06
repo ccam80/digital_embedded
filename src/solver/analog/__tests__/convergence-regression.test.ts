@@ -253,7 +253,7 @@ describe("convergence regression", () => {
   // 6. Reset clears statePool
   // -----------------------------------------------------------------------
 
-  it("reset zeros statePool", () => {
+  it("reset restores initial values in statePool", () => {
     const { circuit, pool } = makeHalfWaveRectifier();
     engine.init(circuit);
     engine.dcOperatingPoint();
@@ -263,9 +263,11 @@ describe("convergence regression", () => {
 
     engine.reset();
 
-    // After reset, state0 should be zeroed
+    // After reset, state0 slots are restored to initState values (not just zeroed).
+    // Diode SLOT_VD (index 0) inits to 0, SLOT_GEQ (index 1) inits to GMIN (1e-12).
     expect(pool.state0[diodeBase + 0]).toBe(0);
-    expect(pool.state0[diodeBase + 1]).toBe(0);
+    expect(pool.state0[diodeBase + 1]).toBeCloseTo(1e-12, 20);
+    // History vectors are zeroed by statePool.reset() — initState does not touch them.
     expect(pool.state1[diodeBase + 0]).toBe(0);
     expect(pool.state2[diodeBase + 0]).toBe(0);
   });

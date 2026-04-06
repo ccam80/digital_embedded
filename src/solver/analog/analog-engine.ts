@@ -27,6 +27,7 @@ import { newtonRaphson } from "./newton-raphson.js";
 import type { AnalogElement } from "./element.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledWithBridges } from "./compiled-analog-circuit.js";
 import type { StatePool } from "./state-pool.js";
+import { assertPoolIsSoleMutableState } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // ConcreteCompiledAnalogCircuit — minimal interface for what MNAEngine needs
@@ -102,6 +103,18 @@ export class MNAEngine implements AnalogEngine {
   private _compiled: ConcreteCompiledAnalogCircuit | null = null;
 
   // -------------------------------------------------------------------------
+  // Element list — promoted from init() local so the first-step probe can
+  // iterate it without re-destructuring the compiled circuit.
+  // -------------------------------------------------------------------------
+  private _elements: readonly AnalogElement[] = [];
+
+  // -------------------------------------------------------------------------
+  // Dev-probe one-shot flag — reset to false in init() so a fresh compile
+  // triggers a new probe pass on the first step.
+  // -------------------------------------------------------------------------
+  private _devProbeRan: boolean = false;
+
+  // -------------------------------------------------------------------------
   // Engine lifecycle state
   // -------------------------------------------------------------------------
   private _engineState: EngineState = EngineState.STOPPED;
@@ -133,6 +146,8 @@ export class MNAEngine implements AnalogEngine {
   init(circuit: CompiledCircuit): void {
     const compiled = circuit as ConcreteCompiledAnalogCircuit;
     this._compiled = compiled;
+    this._elements = compiled.elements;
+    this._devProbeRan = false;
 
     const { matrixSize, elements } = compiled;
 
@@ -155,17 +170,12 @@ export class MNAEngine implements AnalogEngine {
     this._simTime = 0;
     this._lastDt = 0;
 
-    // Bind pool-backed elements to the compiled circuit's shared state pool.
+    // Validate that pool-backed elements received their offsets from the compiler.
     //
     // Allocation is the compiler's responsibility (see compiler.ts, the loop
-    // that assigns `stateBaseOffset` before constructing `StatePool`). The
-    // engine assumes every element with `stateSize > 0` already has a valid
-    // offset by the time `init()` is called. It only performs the cheap
-    // `initState` binding step — handing the element a reference to the
-    // pool so it can cache `this.s0 = pool.state0` and `this.base = offset`.
-    //
-    // Any element that arrives here with `stateBaseOffset < 0` signals a
-    // real upstream bug: a code path that produced a `CompiledAnalogCircuit`
+    // that assigns `stateBaseOffset` before constructing `StatePool`). Any
+    // element that arrives here with `stateBaseOffset < 0` signals a real
+    // upstream bug: a code path that produced a `CompiledAnalogCircuit`
     // without running allocation. We throw rather than paper over it,
     // because a silent fallback reassignment would hide future allocation
     // regressions as numerical wrongness (flat capacitor voltages, etc.)
@@ -173,17 +183,14 @@ export class MNAEngine implements AnalogEngine {
     const cac = compiled as CompiledWithBridges;
     if (cac.statePool) {
       for (const el of elements) {
-        if (el.stateSize > 0) {
-          if (el.stateBaseOffset < 0) {
-            throw new Error(
-              `MNAEngine.init(): element with stateSize=${el.stateSize} arrived ` +
-              `with stateBaseOffset=-1. Pool-backed elements must have offsets ` +
-              `assigned at compile time (see compiler.ts state-pool allocation ` +
-              `loop). A circuit produced without running that allocation step ` +
-              `is invalid input to the engine.`,
-            );
-          }
-          el.initState?.(cac.statePool);
+        if (el.stateSize > 0 && el.stateBaseOffset < 0) {
+          throw new Error(
+            `MNAEngine.init(): element with stateSize=${el.stateSize} arrived ` +
+            `with stateBaseOffset=-1. Pool-backed elements must have offsets ` +
+            `assigned at compile time (see compiler.ts state-pool allocation ` +
+            `loop). A circuit produced without running that allocation step ` +
+            `is invalid input to the engine.`,
+          );
         }
       }
     }
@@ -200,7 +207,14 @@ export class MNAEngine implements AnalogEngine {
     this._simTime = 0;
     const cac = this._compiled as CompiledWithBridges | undefined;
     if (cac?.timeRef) cac.timeRef.value = 0;
-    if (cac?.statePool) cac.statePool.reset();
+    if (cac?.statePool) {
+      cac.statePool.reset();
+      for (const el of this._elements) {
+        if (el.stateSize > 0) {
+          el.initState?.(cac.statePool);
+        }
+      }
+    }
     this._lastDt = 0;
     this._timestep = new TimestepController(this._params);
     this._diagnostics.clear();
@@ -242,6 +256,51 @@ export class MNAEngine implements AnalogEngine {
 
     const { elements, matrixSize, nodeCount } = this._compiled;
     const params = this._params;
+
+    if (import.meta.env?.DEV && !this._devProbeRan) {
+      this._devProbeRan = true;
+      const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;
+      if (statePool) {
+        const solver = this._solver;
+        const voltages = this._voltages;
+        const dt = this._timestep.getClampedDt(this._simTime);
+        const method = this._timestep.currentMethod;
+        const poolSnapshot = statePool.state0.slice();
+        for (const element of this._elements) {
+          if (element.stateSize > 0) {
+            const violations = assertPoolIsSoleMutableState(
+              (element as unknown as { owner?: string }).owner ?? "unknown",
+              element,
+              () => {
+                element.stamp(solver);
+                if (element.isReactive && element.stampCompanion) {
+                  element.stampCompanion(dt, method, voltages);
+                }
+                if (element.isNonlinear && element.updateOperatingPoint) {
+                  element.updateOperatingPoint(voltages);
+                }
+              },
+            );
+            for (const v of violations) {
+              const msg =
+                `reactive-state-outside-pool: ${v.owner}.${v.field} changed during stamp/stampCompanion\n` +
+                `but is not declared in the element's StateSchema. Mutable numeric state MUST\n` +
+                `live in pool.state0 so the engine can roll it back on NR-failure and LTE-\n` +
+                `rejection retries (see analog-engine.ts:297-302, 369-371). Move ${v.field} into\n` +
+                `a schema slot and access it via this.s0[this.base + SLOT_${v.field.replace(/^_/, "").toUpperCase()}].`;
+              this._diagnostics.emit(
+                makeDiagnostic("reactive-state-outside-pool", "error", msg, {
+                  explanation: msg,
+                  involvedElements: [],
+                  simTime: this._simTime,
+                }),
+              );
+            }
+          }
+        }
+        statePool.state0.set(poolSnapshot);
+      }
+    }
 
     this._prevVoltages.set(this._voltages);
     const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;

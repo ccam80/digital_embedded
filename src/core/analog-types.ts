@@ -195,6 +195,22 @@ export interface AnalogElementCore {
   registerRefreshCallback?(cb: () => void): void;
 }
 
+import type { StateSchema } from "../solver/analog/state-schema.js";
+
+/**
+ * Sub-interface for reactive elements that declare a full StateSchema.
+ * Every element with `isReactive: true` MUST implement this interface —
+ * it makes `stateSchema` non-optional via the subtype, so the dev probe
+ * can enforce pool-backed state without a runtime null check.
+ *
+ * The `readonly isReactive: true` discriminant narrows the union at
+ * call sites; TypeScript uses it to select this interface over the base.
+ */
+export interface ReactiveAnalogElement extends AnalogElementCore {
+  readonly isReactive: true;
+  readonly stateSchema: StateSchema;
+}
+
 // ---------------------------------------------------------------------------
 // Re-exports of unified diagnostic types from compile/types.ts
 // ---------------------------------------------------------------------------

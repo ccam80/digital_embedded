@@ -64,7 +64,8 @@ export type DiagnosticCode =
   | 'ac-linearization-failed'
   | 'monte-carlo-trial-failed'
   | 'unconnected-analog-pin'
-  | 'floating-terminal';
+  | 'floating-terminal'
+  | 'reactive-state-outside-pool';
 
 /**
  * A concrete suggestion attached to a `Diagnostic`.

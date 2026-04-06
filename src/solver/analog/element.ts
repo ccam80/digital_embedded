@@ -255,16 +255,31 @@ export interface AnalogElement {
 
   /**
    * Float64 slots required in the state pool. 0 = no state.
+   *
+   * For elements with a declared StateSchema (see state-schema.ts), this MUST
+   * equal `schema.size`. For elements with `stateSize > 0` but no schema
+   * (trivial pool usage), the element still owns its slots but forfeits
+   * dev-time enforcement. New reactive elements MUST declare a schema.
    */
   readonly stateSize: number;
 
   /**
-   * Base offset into pool, assigned by compiler. -1 if stateSize === 0.
+   * Optional schema declaring this element's slot layout. When present, the
+   * dev-time probe enforces that all mutable scalar state lives inside the
+   * pool rather than on the element instance.
    */
+  readonly stateSchema?: import("./state-schema.js").StateSchema;
+
+  /** Base offset into pool, assigned by compiler. -1 if stateSize === 0. */
   stateBaseOffset: number;
 
   /**
-   * Bind to state pool after allocation. Called once by compiler.
+   * Bind to state pool after allocation. Called once by the compiler at
+   * compiler.ts:1332. Contract:
+   *   - Pool contents are guaranteed zero on entry (fresh StatePool).
+   *   - Must cache pool reference + base offset for hot-path access.
+   *   - Must call applyInitialValues(schema, pool, base, params) if a schema
+   *     is declared. No other writes are permitted to `this`.
    */
   initState?(pool: StatePoolRef): void;
 
