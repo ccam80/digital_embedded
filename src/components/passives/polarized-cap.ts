@@ -53,10 +53,10 @@ import { defineModelParams } from "../../core/model-params.js";
 import {
   defineStateSchema,
   applyInitialValues,
-  CAP_COMPANION_SLOTS,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { cktTerr } from "../../solver/analog/ckt-terr.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -68,13 +68,19 @@ const MIN_RESISTANCE = 1e-9;
 // State schema
 // ---------------------------------------------------------------------------
 
+// Slot layout — 4 slots total. Previous values are read from s1/s2/s3
+// at the same offsets (pointer-rotation history).
 const POLARIZED_CAP_SCHEMA: StateSchema = defineStateSchema("AnalogPolarizedCapElement", [
-  ...CAP_COMPANION_SLOTS,
+  { name: "GEQ", doc: "Companion conductance",       init: { kind: "zero" } },
+  { name: "IEQ", doc: "Companion history current",   init: { kind: "zero" } },
+  { name: "V",   doc: "Terminal voltage this step",  init: { kind: "zero" } },
+  { name: "Q",   doc: "Charge Q=C*V this step",      init: { kind: "zero" } },
 ]);
 
-const SLOT_GEQ    = 0;
-const SLOT_IEQ    = 1;
-const SLOT_V_PREV = 2;
+const SLOT_GEQ = 0;
+const SLOT_IEQ = 1;
+const SLOT_V   = 2;
+const SLOT_Q   = 3;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -234,14 +240,17 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   setParam(_key: string, _value: number): void {}
 
   readonly stateSchema = POLARIZED_CAP_SCHEMA;
-  readonly stateSize = POLARIZED_CAP_SCHEMA.size;
+  readonly stateSize = POLARIZED_CAP_SCHEMA.size; // 4 slots
   stateBaseOffset = -1;
 
   private C: number;
   private G_esr: number;
   private G_leak: number;
   private reverseMax: number;
-  private s0!: Float64Array;
+  s0!: Float64Array;
+  s1!: Float64Array;
+  s2!: Float64Array;
+  s3!: Float64Array;
   private base!: number;
 
   private readonly _emitDiagnostic: (diag: Diagnostic) => void;
@@ -273,7 +282,10 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.state0;
+    this.s0 = pool.states[0];
+    this.s1 = pool.states[1];
+    this.s2 = pool.states[2];
+    this.s3 = pool.states[3];
     this.base = this.stateBaseOffset;
     applyInitialValues(POLARIZED_CAP_SCHEMA, pool, this.base, {});
   }
@@ -370,17 +382,42 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
     const vNow = vCapNode - vNeg;
 
-    const geq = this.s0[this.base + SLOT_GEQ];
-    const ieq = this.s0[this.base + SLOT_IEQ];
-    const vPrev = this.s0[this.base + SLOT_V_PREV];
+    // Read previous step's companion model from s1 (rotated history)
+    const geqPrev = this.s1[this.base + SLOT_GEQ];
+    const ieqPrev = this.s1[this.base + SLOT_IEQ];
+    const vPrev   = this.s1[this.base + SLOT_V];
+    const iPrev   = geqPrev * vNow + ieqPrev;
 
-    // Recover capacitor current at previous accepted step from companion model.
-    // On the first call geq=0 and ieq=0, so iNow=0 (correct: DC steady state).
-    const iNow = geq * vNow + ieq;
+    // Write new companion model into s0
+    this.s0[this.base + SLOT_GEQ] = capacitorConductance(this.C, dt, method);
+    this.s0[this.base + SLOT_IEQ] = capacitorHistoryCurrent(this.C, dt, method, vNow, vPrev, iPrev);
+    this.s0[this.base + SLOT_V]   = vNow;
+  }
 
-    this.s0[this.base + SLOT_GEQ]    = capacitorConductance(this.C, dt, method);
-    this.s0[this.base + SLOT_IEQ]    = capacitorHistoryCurrent(this.C, dt, method, vNow, vPrev, iNow);
-    this.s0[this.base + SLOT_V_PREV] = vNow;
+  updateChargeFlux(voltages: Float64Array): void {
+    const nCap = this.pinNodeIds[2];
+    const nNeg = this.pinNodeIds[1];
+    const vCapNode = nCap > 0 ? voltages[nCap - 1] : 0;
+    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    this.s0[this.base + SLOT_Q] = this.C * (vCapNode - vNeg);
+  }
+
+  getLteTimestep(
+    dt: number,
+    deltaOld: readonly number[],
+    order: number,
+    method: IntegrationMethod,
+    lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
+  ): number {
+    const q0 = this.s0[this.base + SLOT_Q];
+    const q1 = this.s1[this.base + SLOT_Q];
+    const q2 = this.s2[this.base + SLOT_Q];
+    const q3 = this.s3[this.base + SLOT_Q];
+    const h0 = dt;
+    const h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
+    const ccap0 = h0 > 0 ? (q0 - q1) / h0 : 0;
+    const ccap1 = h1 > 0 ? (q1 - q2) / h1 : 0;
+    return cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
   }
 }
 

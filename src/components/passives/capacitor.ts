@@ -28,12 +28,12 @@ import {
   capacitorConductance,
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
+import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import {
   defineStateSchema,
   applyInitialValues,
-  CAP_COMPANION_SLOTS,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
 
@@ -136,22 +136,19 @@ export class CapacitorElement extends AbstractCircuitElement {
 // AnalogCapacitorElement — MNA implementation
 // ---------------------------------------------------------------------------
 
-// Slot layout — the array index of each entry IS the pool offset.
-// First 3 slots come from the shared CAP_COMPANION_SLOTS fragment;
-// the trailing 3 BDF-2 history slots are capacitor-specific.
+// Slot layout — 4 slots total. Previous values are read from s1/s2/s3
+// at the same offsets (pointer-rotation history).
 const CAPACITOR_SCHEMA: StateSchema = defineStateSchema("AnalogCapacitorElement", [
-  ...CAP_COMPANION_SLOTS,
-  { name: "I_PREV",      doc: "Capacitor current at step n-1",                init: { kind: "zero" } },
-  { name: "I_PREV_PREV", doc: "Capacitor current at step n-2",                init: { kind: "zero" } },
-  { name: "V_PREV_PREV", doc: "Terminal voltage at step n-2 (LTE reference)", init: { kind: "zero" } },
+  { name: "GEQ", doc: "Companion conductance",       init: { kind: "zero" } },
+  { name: "IEQ", doc: "Companion history current",   init: { kind: "zero" } },
+  { name: "V",   doc: "Terminal voltage this step",  init: { kind: "zero" } },
+  { name: "Q",   doc: "Charge Q=C*V this step",      init: { kind: "zero" } },
 ]);
 
-const SLOT_GEQ         = 0;
-const SLOT_IEQ         = 1;
-const SLOT_V_PREV      = 2;
-const SLOT_I_PREV      = 3;
-const SLOT_I_PREV_PREV = 4;
-const SLOT_V_PREV_PREV = 5;
+const SLOT_GEQ = 0;
+const SLOT_IEQ = 1;
+const SLOT_V   = 2;
+const SLOT_Q   = 3;
 
 class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   pinNodeIds!: readonly number[];
@@ -164,7 +161,10 @@ class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   stateBaseOffset = -1;
 
   private C: number;
-  private s0!: Float64Array;
+  s0!: Float64Array;
+  s1!: Float64Array;
+  s2!: Float64Array;
+  s3!: Float64Array;
   private base!: number;
 
   constructor(capacitance: number) {
@@ -172,7 +172,10 @@ class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.state0;
+    this.s0 = pool.states[0];
+    this.s1 = pool.states[1];
+    this.s2 = pool.states[2];
+    this.s3 = pool.states[3];
     this.base = this.stateBaseOffset;
     applyInitialValues(CAPACITOR_SCHEMA, pool, this.base, {});
   }
@@ -215,27 +218,25 @@ class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
     const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
     const vNow = v0 - v1;
-    const geq = this.s0[this.base + SLOT_GEQ];
-    const ieq = this.s0[this.base + SLOT_IEQ];
-    const vPrev = this.s0[this.base + SLOT_V_PREV];
-    // Full Norton current at the previous accepted step: i = geq * v + ieq.
-    // On the first call geq=0 and ieq=0, so iNow=0 (DC steady state).
-    const iNow = geq * vNow + ieq;
 
+    // Read previous step's companion model from s1 (rotated history)
+    const geqPrev = this.s1[this.base + SLOT_GEQ];
+    const ieqPrev = this.s1[this.base + SLOT_IEQ];
+    const vPrev   = this.s1[this.base + SLOT_V];
+    const iPrev   = geqPrev * vNow + ieqPrev;
+
+    // Write new companion model into s0
     this.s0[this.base + SLOT_GEQ] = capacitorConductance(this.C, dt, method);
-    this.s0[this.base + SLOT_IEQ] = capacitorHistoryCurrent(this.C, dt, method, vNow, vPrev, iNow);
-    // Shift LTE history: both voltage and current pairs are updated together
-    // so getLteEstimate always sees a consistent pair of samples.
-    // Voltage shift: V_PREV → V_PREV_PREV, vNow → V_PREV
-    this.s0[this.base + SLOT_V_PREV_PREV] = vPrev;
-    this.s0[this.base + SLOT_V_PREV] = vNow;
-    // Current shift: I_PREV → I_PREV_PREV, iNow → I_PREV
-    // iNow is the capacitor current at the boundary between the previous and
-    // current step, computed above from the previous step's companion
-    // coefficients. getLteEstimate compares these two to produce an error
-    // estimate that scales linearly with dt.
-    this.s0[this.base + SLOT_I_PREV_PREV] = this.s0[this.base + SLOT_I_PREV];
-    this.s0[this.base + SLOT_I_PREV] = iNow;
+    this.s0[this.base + SLOT_IEQ] = capacitorHistoryCurrent(this.C, dt, method, vNow, vPrev, iPrev);
+    this.s0[this.base + SLOT_V]   = vNow;
+  }
+
+  updateChargeFlux(voltages: Float64Array): void {
+    const n0 = this.pinNodeIds[0];
+    const n1 = this.pinNodeIds[1];
+    const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
+    const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
+    this.s0[this.base + SLOT_Q] = this.C * (v0 - v1);
   }
 
   getLteEstimate(dt: number): { truncationError: number; toleranceReference: number } {
@@ -260,15 +261,33 @@ class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     // absolute `chargeTol = 1e-14 C` that makes sense only when `|Q|` is
     // near zero.
     if (dt <= 0) return { truncationError: 0, toleranceReference: 0 };
-    const iPrev = this.s0[this.base + SLOT_I_PREV];
-    const iPrevPrev = this.s0[this.base + SLOT_I_PREV_PREV];
-    const vPrev = this.s0[this.base + SLOT_V_PREV];
-    const vPrevPrev = this.s0[this.base + SLOT_V_PREV_PREV];
+    const vNow  = this.s0[this.base + SLOT_V];
+    const iPrev     = this.s1[this.base + SLOT_GEQ] * vNow + this.s1[this.base + SLOT_IEQ];
+    const vPrev     = this.s1[this.base + SLOT_V];
+    const iPrevPrev = this.s2[this.base + SLOT_GEQ] * vPrev + this.s2[this.base + SLOT_IEQ];
     const deltaI = Math.abs(iPrev - iPrevPrev);
     return {
       truncationError: (dt / 12) * deltaI,
-      toleranceReference: this.C * Math.max(Math.abs(vPrev), Math.abs(vPrevPrev)),
+      toleranceReference: this.C * Math.max(Math.abs(vNow), Math.abs(vPrev)),
     };
+  }
+
+  getLteTimestep(
+    dt: number,
+    deltaOld: readonly number[],
+    order: number,
+    method: IntegrationMethod,
+    lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
+  ): number {
+    const q0 = this.s0[this.base + SLOT_Q];
+    const q1 = this.s1[this.base + SLOT_Q];
+    const q2 = this.s2[this.base + SLOT_Q];
+    const q3 = this.s3[this.base + SLOT_Q];
+    const h0 = dt;
+    const h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
+    const ccap0 = h0 > 0 ? (q0 - q1) / h0 : 0;
+    const ccap1 = h1 > 0 ? (q1 - q2) / h1 : 0;
+    return cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
   }
 }
 

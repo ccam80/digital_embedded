@@ -31,20 +31,20 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { ReactiveAnalogElementCore } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { VT } from "../../core/constants.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
 // ---------------------------------------------------------------------------
 
-/** Thermal voltage at 300 K (kT/q in volts). */
-const VT = 0.02585;
+// VT (thermal voltage) imported from ../../core/constants.js
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -115,7 +115,7 @@ export function createTriacElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): ReactiveAnalogElementCore {
+): PoolBackedAnalogElementCore {
   const nodeMT2 = pinNodes.get("MT2")!; // Main Terminal 2
   const nodeMT1 = pinNodes.get("MT1")!; // Main Terminal 1
   const nodeG   = pinNodes.get("G")!;   // Gate
@@ -137,7 +137,13 @@ export function createTriacElement(
 
   // Pool binding — set by initState
   let s0: Float64Array;
+  let s1: Float64Array;
+  let s2: Float64Array;
+  let s3: Float64Array;
   let base: number;
+
+  // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, TRIACload sets CKTnoncon++)
+  let pnjlimLimited = false;
 
   function recomputeDerivedConstants(): void {
     nVt = p.n * VT;
@@ -236,14 +242,22 @@ export function createTriacElement(
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: true,
+    isReactive: false,
     poolBacked: true as const,
     stateSize: 9,
     stateSchema: TRIAC_STATE_SCHEMA,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
+      s1 = pool.state1;
+      s2 = pool.state2;
+      s3 = pool.state3;
+      this.s0 = s0; this.s1 = s1; this.s2 = s2; this.s3 = s3;
       base = this.stateBaseOffset;
       applyInitialValues(TRIAC_STATE_SCHEMA, pool, base, {});
     },
@@ -276,7 +290,7 @@ export function createTriacElement(
       stampRHS(solver, nodeMT1, gGateIeq);
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
       const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
       const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
       const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;
@@ -285,17 +299,25 @@ export function createTriacElement(
       const vg1Raw = vG - v1;
 
       // Apply pnjlim to MT1-MT2 voltage for NR stability
-      const vmtLimited = pnjlim(vmtRaw, s0[base + SLOT_VAK], nVt, vcritMain);
+      const vmtResult = pnjlim(vmtRaw, s0[base + SLOT_VAK], nVt, vcritMain);
+      const vmtLimited = vmtResult.value;
       // Apply pnjlim to gate-MT1 voltage
-      const vg1Limited = pnjlim(vg1Raw, s0[base + SLOT_VGK], nVt, vcritGate);
+      const vg1Result = pnjlim(vg1Raw, s0[base + SLOT_VGK], nVt, vcritGate);
+      const vg1Limited = vg1Result.value;
+      pnjlimLimited = vmtResult.limited || vg1Result.limited;
 
       s0[base + SLOT_VAK] = vmtLimited;
       s0[base + SLOT_VGK] = vg1Limited;
 
       computeOperatingPoint(vmtLimited, vg1Limited);
+      return pnjlimLimited;
     },
 
     checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+      // declare non-convergence immediately (TRIACload sets CKTnoncon++)
+      if (pnjlimLimited) return false;
+
       const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
       const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
       const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;

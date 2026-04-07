@@ -13,26 +13,6 @@
 import type { Diagnostic, DiagnosticCode } from "../../compile/types.js";
 
 /**
- * Convergence trace captured during a Newton-Raphson iteration.
- *
- * Records the element causing largest voltage change, any oscillating behavior,
- * the current iteration count, and which fallback mode is active (if any).
- * Emitted as part of convergence diagnostics for pedagogical debugging.
- */
-export interface ConvergenceTrace {
-  /** Index of the MNA element with the largest voltage change this iteration. */
-  largestChangeElement: number;
-  /** Index of the MNA node with the largest voltage change this iteration. */
-  largestChangeNode: number;
-  /** True if the iteration is oscillating (voltage changes exceed convergence threshold repeatedly). */
-  oscillating: boolean;
-  /** Current Newton-Raphson iteration number (0-indexed). */
-  iteration: number;
-  /** Current fallback mode: 'none' for direct NR, 'gmin' for Gmin stepping, 'source-step' for source stepping. */
-  fallbackLevel: "none" | "gmin" | "source-step";
-}
-
-/**
  * Collects and dispatches `Diagnostic` events emitted by the analog solver.
  *
  * - `emit()` stores a diagnostic and synchronously calls all registered listeners

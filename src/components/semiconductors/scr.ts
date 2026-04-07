@@ -28,20 +28,20 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { ReactiveAnalogElementCore } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { VT } from "../../core/constants.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
 // ---------------------------------------------------------------------------
 
-/** Thermal voltage at 300 K (kT/q in volts). */
-const VT = 0.02585;
+// VT (thermal voltage) imported from ../../core/constants.js
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -113,7 +113,7 @@ export function createScrElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): ReactiveAnalogElementCore {
+): PoolBackedAnalogElementCore {
   const nodeA = pinNodes.get("A")!; // anode
   const nodeK = pinNodes.get("K")!; // cathode
   const nodeG = pinNodes.get("G")!; // gate
@@ -137,6 +137,9 @@ export function createScrElement(
   // Pool binding — set by initState
   let s0: Float64Array;
   let base: number;
+
+  // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, SCRload sets CKTnoncon++)
+  let pnjlimLimited = false;
 
   function recomputeDerivedConstants(): void {
     nVt = p.n * VT;
@@ -213,7 +216,7 @@ export function createScrElement(
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: true,
+    isReactive: false,
     poolBacked: true as const,
     stateSize: 9,
     stateSchema: SCR_STATE_SCHEMA,
@@ -252,7 +255,7 @@ export function createScrElement(
       stampRHS(solver, nodeK, gGateIeq);
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
       const vGateNode = nodeG > 0 ? voltages[nodeG - 1] : 0;
@@ -266,18 +269,26 @@ export function createScrElement(
       }
 
       // Apply pnjlim to anode-cathode junction voltage for NR stability
-      const vakLimited = pnjlim(vakRaw, s0[base + SLOT_VAK], nVt, vcrit);
+      const vakResult = pnjlim(vakRaw, s0[base + SLOT_VAK], nVt, vcrit);
+      const vakLimited = vakResult.value;
 
       // Apply pnjlim to gate-cathode junction voltage for NR stability
-      const vgkLimited = pnjlim(vgkRaw, s0[base + SLOT_VGK], nVt, vcritGate);
+      const vgkResult = pnjlim(vgkRaw, s0[base + SLOT_VGK], nVt, vcritGate);
+      const vgkLimited = vgkResult.value;
+      pnjlimLimited = vakResult.limited || vgkResult.limited;
 
       s0[base + SLOT_VAK] = vakLimited;
       s0[base + SLOT_VGK] = vgkLimited;
 
       computeOperatingPoint(vakLimited, vgkLimited);
+      return pnjlimLimited;
     },
 
     checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+      // declare non-convergence immediately (SCRload sets CKTnoncon++)
+      if (pnjlimLimited) return false;
+
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
       const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
@@ -333,7 +344,7 @@ export function createScrElement(
     get _latchedState(): boolean {
       return s0[base + SLOT_LATCHED] !== 0.0;
     },
-  } as ReactiveAnalogElementCore & { _latchedState: boolean };
+  } as PoolBackedAnalogElementCore & { _latchedState: boolean };
 }
 
 // ---------------------------------------------------------------------------

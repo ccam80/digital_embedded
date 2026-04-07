@@ -101,7 +101,7 @@ export interface AnalogElement {
    *
    * @param voltages - Full MNA solution vector (size = nodeCount + branchCount)
    */
-  updateOperatingPoint?(voltages: Readonly<Float64Array>): void;
+  updateOperatingPoint?(voltages: Readonly<Float64Array>): boolean | void;
 
   /**
    * Recompute companion model coefficients and stamp them into the solver.
@@ -115,6 +115,14 @@ export interface AnalogElement {
    * @param voltages - Solution vector from the previous accepted timestep
    */
   stampCompanion?(dt: number, method: IntegrationMethod, voltages: Float64Array): void;
+
+  /**
+   * Rewrite the _NOW charge/flux slot(s) using converged NR voltages.
+   * Called after NR convergence but before LTE evaluation so that
+   * getLteTimestep sees accurate charge/flux values.
+   * Implementations must write ONLY the _NOW slot — never shift history.
+   */
+  updateChargeFlux?(voltages: Float64Array): void;
 
   /**
    * Update non-MNA internal state variables after an accepted timestep.
@@ -182,6 +190,30 @@ export interface AnalogElement {
    *          "no opinion" and never triggers rejection.
    */
   getLteEstimate?(dt: number): { truncationError: number; toleranceReference: number };
+
+  /**
+   * CKTterr-based LTE timestep proposal. Returns the maximum allowable
+   * timestep for this element based on charge history divided differences.
+   *
+   * Elements implementing this method call `cktTerr()` internally for each
+   * reactive junction, passing charge values as individual scalars (not arrays)
+   * to avoid hot-path allocations. The controller calls this in preference
+   * to `getLteEstimate` when present.
+   *
+   * @param dt        Current timestep in seconds
+   * @param deltaOld  Timestep history (pre-allocated array from controller)
+   * @param order     Integration order (1 or 2)
+   * @param method    Integration method
+   * @param lteParams Pre-allocated tolerance parameters from controller
+   * @returns Proposed maximum timestep in seconds, or Infinity if no constraint
+   */
+  getLteTimestep?(
+    dt: number,
+    deltaOld: readonly number[],
+    order: number,
+    method: IntegrationMethod,
+    lteParams: import("./ckt-terr.js").LteParams,
+  ): number;
 
   /**
    * Scale independent source magnitude for source-stepping DC convergence.
@@ -284,6 +316,23 @@ export interface AnalogElement {
 }
 
 /**
+ * AnalogElementCore extended with state-pool-backed fields.
+ * For components that use the shared state pool but do NOT necessarily
+ * implement companion models for transient integration.
+ */
+export interface PoolBackedAnalogElementCore extends AnalogElementCore {
+  readonly poolBacked: true;
+  readonly stateSize: number;
+  stateBaseOffset: number;
+  readonly stateSchema: StateSchema;
+  initState(pool: StatePoolRef): void;
+  s0: Float64Array;
+  s1: Float64Array;
+  s2: Float64Array;
+  s3: Float64Array;
+}
+
+/**
  * AnalogElementCore extended with state-pool-backed reactive fields.
  *
  * This is the factory return type for components that use the shared
@@ -291,14 +340,14 @@ export interface AnalogElement {
  * pinNodeIds / allNodeIds — those are set by the compiler after
  * factory construction.
  */
-export interface ReactiveAnalogElementCore extends AnalogElementCore {
-  readonly poolBacked: true;
+export interface ReactiveAnalogElementCore extends PoolBackedAnalogElementCore {
   readonly isReactive: true;
-  readonly stateSize: number;
-  stateBaseOffset: number;
-  readonly stateSchema: StateSchema;
-  initState(pool: StatePoolRef): void;
 }
+
+/**
+ * Post-compilation pool-backed element with compiler-assigned node IDs.
+ */
+export type PoolBackedAnalogElement = PoolBackedAnalogElementCore & AnalogElement;
 
 /**
  * Post-compilation reactive element with both compiler-assigned node IDs
@@ -306,8 +355,8 @@ export interface ReactiveAnalogElementCore extends AnalogElementCore {
  */
 export type ReactiveAnalogElement = ReactiveAnalogElementCore & AnalogElement;
 
-export function isPoolBacked(el: AnalogElement): el is ReactiveAnalogElement;
-export function isPoolBacked(el: AnalogElementCore): el is ReactiveAnalogElementCore;
-export function isPoolBacked(el: AnalogElementCore): el is ReactiveAnalogElementCore {
+export function isPoolBacked(el: AnalogElement): el is PoolBackedAnalogElement;
+export function isPoolBacked(el: AnalogElementCore): el is PoolBackedAnalogElementCore;
+export function isPoolBacked(el: AnalogElementCore): el is PoolBackedAnalogElementCore {
   return (el as any).poolBacked === true;
 }

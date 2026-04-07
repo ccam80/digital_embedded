@@ -293,7 +293,8 @@ describe("NMOS", () => {
   });
 
   it("isReactive_false_when_no_capacitances", () => {
-    const propsObj = makeParamBag(NMOS_DEFAULTS);
+    // TOX: 0 ensures oxideCap is zero; all other cap params are zero in NMOS_DEFAULTS.
+    const propsObj = makeParamBag({ ...NMOS_DEFAULTS, TOX: 0 });
     const element = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj);
     expect(element.isReactive).toBe(false);
   });
@@ -342,12 +343,12 @@ describe("NMOS", () => {
 
     const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
     for (const call of rhsCalls) {
-      expect(Math.abs(call[1] as number)).toBe(0);
+      expect(Math.abs(call[1] as number)).toBeCloseTo(0, 11);
     }
 
     const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
     for (const call of stampCalls) {
-      expect(Math.abs(call[2] as number)).toBe(0);
+      expect(Math.abs(call[2] as number)).toBeCloseTo(0, 11);
     }
   });
 

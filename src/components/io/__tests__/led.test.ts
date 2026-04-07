@@ -779,7 +779,7 @@ describe("AnalogLED", () => {
     const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
     const { element } = withState(core);
     expect(element.isNonlinear).toBe(true);
-    expect(element.isReactive).toBe(true);
+    expect(element.isReactive).toBe(false);
   });
 
   it("red_led_forward_drop", () => {

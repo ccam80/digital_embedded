@@ -13,6 +13,7 @@
 import type { Engine, CompiledCircuit, MeasurementObserver } from "./engine-interface.js";
 import type { Wire } from "../core/circuit.js";
 import type { AcParams, AcResult, DiagnosticSuggestion, StatePoolRef } from "./analog-types.js";
+import type { ConvergenceLog } from "../solver/analog/convergence-log.js";
 import type { Diagnostic, DiagnosticCode } from "../compile/types.js";
 export type { AcParams, AcResult, DiagnosticSuggestion };
 export type { Diagnostic, DiagnosticCode };
@@ -54,10 +55,19 @@ export interface SimulationParams {
   trtol: number;
   /** Maximum Newton-Raphson iterations before declaring failure. Default: 100 */
   maxIterations: number;
+  /** Max NR iterations per transient timestep (ngspice ITL4). Default: 10 */
+  transientMaxIterations: number;
   /** Integration method. Default: 'auto' */
   integrationMethod: "auto" | "trapezoidal" | "bdf1" | "bdf2";
+  /**
+   * Max NR iterations per gmin/source stepping sub-solve (ngspice ITL3 / CKTdcTrcvMaxIter).
+   * Default: 50.
+   */
+  dcTrcvMaxIter: number;
   /** Minimum conductance added to all nodes for numerical stability. Default: 1e-12 */
   gmin: number;
+  /** Enable node damping in NR iteration (ngspice niiter.c). Default: false */
+  nodeDamping: boolean;
 }
 
 /**
@@ -65,15 +75,18 @@ export interface SimulationParams {
  */
 export const DEFAULT_SIMULATION_PARAMS: SimulationParams = {
   maxTimeStep: 5e-6,
-  minTimeStep: 1e-14,
+  minTimeStep: 5e-6 * 1e-11,  // 1e-11 * maxTimeStep (ngspice traninit.c:34)
   reltol: 1e-3,
   abstol: 1e-6,
   iabstol: 1e-12,
   chargeTol: 1e-14,
   trtol: 7.0,
   maxIterations: 100,
+  transientMaxIterations: 10,
   integrationMethod: "auto",
+  dcTrcvMaxIter: 50,
   gmin: 1e-12,
+  nodeDamping: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -87,7 +100,7 @@ export interface DcOpResult {
   /** Whether the DC operating point converged. */
   converged: boolean;
   /** Which convergence method was used. */
-  method: "direct" | "gmin-stepping" | "source-stepping";
+  method: "direct" | "dynamic-gmin" | "spice3-gmin" | "gillespie-src";
   /** Total Newton-Raphson iterations performed across all attempts. */
   iterations: number;
   /** Node voltages at the operating point (indexed by MNA node ID). */
@@ -229,6 +242,13 @@ export interface AnalogEngine extends Engine {
    * registration order.
    */
   onDiagnostic(callback: (diag: Diagnostic) => void): void;
+
+  // -------------------------------------------------------------------------
+  // Convergence logging
+  // -------------------------------------------------------------------------
+
+  /** Convergence log for post-mortem analysis. Enable via convergenceLog.enabled = true. */
+  readonly convergenceLog: ConvergenceLog;
 
   // -------------------------------------------------------------------------
   // Breakpoints — timestep landing targets

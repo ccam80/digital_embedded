@@ -70,6 +70,8 @@ export interface SimControllerCallbacks {
    * open and there are watched signals.
    */
   rebuildViewersIfOpen(): void;
+  /** Called after every successful compile with the new coordinator, before simulation starts. */
+  applyPreRunState?(coordinator: SimulationCoordinator): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -329,6 +331,10 @@ export function initSimulationController(
 
       callbacks.rebuildViewersIfOpen();
 
+      if (callbacks.applyPreRunState) {
+        callbacks.applyPreRunState(facade.getCoordinator());
+      }
+
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -457,8 +463,14 @@ export function initSimulationController(
             if (performance.now() - stepStart > frame.budgetMs) break;
             facade.step(coordinator);
             if (coordinator.getState() === EngineState.ERROR) {
-              ctx.showStatus('Simulation error: solver failed to converge', true);
               stopSimulation();
+              const errCoord = ctx.facade.getCoordinator();
+              const errRecords = errCoord.supportsConvergenceLog() ? errCoord.getConvergenceLog(1) : null;
+              if (errRecords && errRecords.length > 0) {
+                import('./convergence-log-panel.js').then(m => m.autoOpenConvergenceLog(ctx));
+              } else {
+                ctx.showStatus('Simulation error: solver failed to converge. Enable Convergence Log from the Analysis menu and re-run to capture a trace.', true);
+              }
               return;
             }
           }
@@ -477,8 +489,19 @@ export function initSimulationController(
           ctx.clearStatus();
         }
       } catch (err) {
-        ctx.showStatus(`Simulation error: ${err instanceof Error ? err.message : String(err)}`, true);
+        const msg = err instanceof Error ? err.message : String(err);
         stopSimulation();
+        if (msg.includes('stagnation')) {
+          const stagCoord = ctx.facade.getCoordinator();
+          const stagRecords = stagCoord.supportsConvergenceLog() ? stagCoord.getConvergenceLog(1) : null;
+          if (stagRecords && stagRecords.length > 0) {
+            import('./convergence-log-panel.js').then(m => m.autoOpenConvergenceLog(ctx));
+          } else {
+            ctx.showStatus(`Simulation error: ${msg}. Enable Convergence Log from the Analysis menu and re-run to capture a trace.`, true);
+          }
+        } else {
+          ctx.showStatus(`Simulation error: ${msg}`, true);
+        }
         return;
       }
 

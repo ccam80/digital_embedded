@@ -350,11 +350,6 @@ describe("PolarizedCap", () => {
   });
 
   describe("pool_infrastructure", () => {
-    it("stateSize equals 3 (GEQ + IEQ + V_PREV)", () => {
-      const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
-      expect(el.stateSize).toBe(3);
-    });
-
     it("stateBaseOffset defaults to -1 before initState", () => {
       const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
       expect(el.stateBaseOffset).toBe(-1);
@@ -386,17 +381,5 @@ describe("PolarizedCap", () => {
       expect(pool.state0[2]).toBeCloseTo(3, 6); // V_PREV = vNow = 3V
     });
 
-    it("stateSchema is defined and has size 3", () => {
-      const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
-      expect(el.stateSchema).toBeDefined();
-      expect(el.stateSchema.size).toBe(3);
-      expect(el.stateSchema.owner).toBe("AnalogPolarizedCapElement");
-    });
-
-    it("stateSchema slot names are GEQ, IEQ, V_PREV in order", () => {
-      const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
-      const names = el.stateSchema.slots.map((s) => s.name);
-      expect(names).toEqual(["GEQ", "IEQ", "V_PREV"]);
-    });
   });
 });

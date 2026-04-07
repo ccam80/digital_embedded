@@ -34,6 +34,7 @@ import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
+import { cktTerr } from "../../solver/analog/ckt-terr.js";
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -55,35 +56,29 @@ export const { paramDefs: TRANSFORMER_PARAM_DEFS, defaults: TRANSFORMER_DEFAULTS
 // State pool schema — 13 slots
 // ---------------------------------------------------------------------------
 
+// Slot layout — 9 slots total. Previous values are read from s1/s2/s3
+// at the same offsets (pointer-rotation history).
 const TRANSFORMER_SCHEMA: StateSchema = defineStateSchema("AnalogLinearTransformerElement", [
-  { name: "G11",          doc: "Companion conductance self-1",         init: { kind: "zero" } },
-  { name: "G22",          doc: "Companion conductance self-2",         init: { kind: "zero" } },
-  { name: "G12",          doc: "Companion mutual conductance",         init: { kind: "zero" } },
-  { name: "HIST1",        doc: "History current source winding 1",     init: { kind: "zero" } },
-  { name: "HIST2",        doc: "History current source winding 2",     init: { kind: "zero" } },
-  { name: "PREV_I1",      doc: "Previous current winding 1",           init: { kind: "zero" } },
-  { name: "PREV_I2",      doc: "Previous current winding 2",           init: { kind: "zero" } },
-  { name: "PREV_PREV_I1", doc: "Current winding 1 at step n-2",        init: { kind: "zero" } },
-  { name: "PREV_PREV_I2", doc: "Current winding 2 at step n-2",        init: { kind: "zero" } },
-  { name: "PREV_V1",      doc: "Previous voltage winding 1",           init: { kind: "zero" } },
-  { name: "PREV_V2",      doc: "Previous voltage winding 2",           init: { kind: "zero" } },
-  { name: "PREV_PREV_V1", doc: "Voltage winding 1 at step n-2",        init: { kind: "zero" } },
-  { name: "PREV_PREV_V2", doc: "Voltage winding 2 at step n-2",        init: { kind: "zero" } },
+  { name: "G11",   doc: "Companion conductance self-1",         init: { kind: "zero" } },
+  { name: "G22",   doc: "Companion conductance self-2",         init: { kind: "zero" } },
+  { name: "G12",   doc: "Companion mutual conductance",         init: { kind: "zero" } },
+  { name: "HIST1", doc: "History voltage source winding 1",     init: { kind: "zero" } },
+  { name: "HIST2", doc: "History voltage source winding 2",     init: { kind: "zero" } },
+  { name: "I1",    doc: "Winding 1 branch current this step",   init: { kind: "zero" } },
+  { name: "I2",    doc: "Winding 2 branch current this step",   init: { kind: "zero" } },
+  { name: "PHI1",  doc: "Total flux linkage winding 1",         init: { kind: "zero" } },
+  { name: "PHI2",  doc: "Total flux linkage winding 2",         init: { kind: "zero" } },
 ]);
 
-const SLOT_G11          = 0;
-const SLOT_G22          = 1;
-const SLOT_G12          = 2;
-const SLOT_HIST1        = 3;
-const SLOT_HIST2        = 4;
-const SLOT_PREV_I1      = 5;
-const SLOT_PREV_I2      = 6;
-const SLOT_PREV_PREV_I1 = 7;
-const SLOT_PREV_PREV_I2 = 8;
-const SLOT_PREV_V1      = 9;
-const SLOT_PREV_V2      = 10;
-const SLOT_PREV_PREV_V1 = 11;
-const SLOT_PREV_PREV_V2 = 12;
+const SLOT_G11   = 0;
+const SLOT_G22   = 1;
+const SLOT_G12   = 2;
+const SLOT_HIST1 = 3;
+const SLOT_HIST2 = 4;
+const SLOT_I1    = 5;
+const SLOT_I2    = 6;
+const SLOT_PHI1  = 7;
+const SLOT_PHI2  = 8;
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -240,7 +235,10 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
   private readonly _branch2: number;
   private _rPri: number;
   private _rSec: number;
-  private _s0!: Float64Array;
+  s0!: Float64Array;
+  s1!: Float64Array;
+  s2!: Float64Array;
+  s3!: Float64Array;
   private _base!: number;
 
   constructor(
@@ -265,7 +263,10 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this._s0 = pool.state0;
+    this.s0 = pool.states[0];
+    this.s1 = pool.states[1];
+    this.s2 = pool.states[2];
+    this.s3 = pool.states[3];
     this._base = this.stateBaseOffset;
     applyInitialValues(TRANSFORMER_SCHEMA, pool, this._base, {});
   }
@@ -277,21 +278,21 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
     this._rPri = rPri;
     this._rSec = rSec;
-    if (!this._s0) {
+    if (!this.s0) {
       throw new Error("AnalogTransformerElement.updateDerivedParams called before initState");
     }
-    applyInitialValues(TRANSFORMER_SCHEMA, { state0: this._s0 } as StatePoolRef, this._base, {});
+    applyInitialValues(TRANSFORMER_SCHEMA, { states: [this.s0, this.s1, this.s2, this.s3], state0: this.s0, state1: this.s1, state2: this.s2, state3: this.s3, totalSlots: this.s0.length } as StatePoolRef, this._base, {});
   }
 
   stamp(solver: SparseSolver): void {
     const [p1, p2, s1, s2] = this.pinNodeIds;
     const b1 = this.branchIndex;
     const b2 = this._branch2;
-    const g11   = this._s0[this._base + SLOT_G11];
-    const g22   = this._s0[this._base + SLOT_G22];
-    const g12   = this._s0[this._base + SLOT_G12];
-    const hist1 = this._s0[this._base + SLOT_HIST1];
-    const hist2 = this._s0[this._base + SLOT_HIST2];
+    const g11   = this.s0[this._base + SLOT_G11];
+    const g22   = this.s0[this._base + SLOT_G22];
+    const g12   = this.s0[this._base + SLOT_G12];
+    const hist1 = this.s0[this._base + SLOT_HIST1];
+    const hist2 = this.s0[this._base + SLOT_HIST2];
 
     // Primary winding resistance: series resistance modelled as a conductance
     // between P1 and P2 in the node block (Norton parallel equivalent).
@@ -363,7 +364,8 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     const v1Now = vp1 - vp2;
     const v2Now = vs1 - vs2;
 
-    const s = this._s0;
+    const s = this.s0;
+    const s1r = this.s1;
     const base = this._base;
 
     switch (method) {
@@ -396,23 +398,53 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
         s[base + SLOT_G11] = g11;
         s[base + SLOT_G22] = g22;
         s[base + SLOT_G12] = g12;
-        const i1Hist = (4 / 3) * i1Now - (1 / 3) * s[base + SLOT_PREV_I1];
-        const i2Hist = (4 / 3) * i2Now - (1 / 3) * s[base + SLOT_PREV_I2];
+        // Read previous step's currents from s1 (rotated history)
+        const i1Hist = (4 / 3) * i1Now - (1 / 3) * s1r[base + SLOT_I1];
+        const i2Hist = (4 / 3) * i2Now - (1 / 3) * s1r[base + SLOT_I2];
         s[base + SLOT_HIST1] = -g11 * i1Hist - g12 * i2Hist;
         s[base + SLOT_HIST2] = -g22 * i2Hist - g12 * i1Hist;
         break;
       }
     }
 
-    // Shift history: n-1 → n-2, current → n-1
-    s[base + SLOT_PREV_PREV_I1] = s[base + SLOT_PREV_I1];
-    s[base + SLOT_PREV_PREV_I2] = s[base + SLOT_PREV_I2];
-    s[base + SLOT_PREV_PREV_V1] = s[base + SLOT_PREV_V1];
-    s[base + SLOT_PREV_PREV_V2] = s[base + SLOT_PREV_V2];
-    s[base + SLOT_PREV_I1] = i1Now;
-    s[base + SLOT_PREV_I2] = i2Now;
-    s[base + SLOT_PREV_V1] = v1Now;
-    s[base + SLOT_PREV_V2] = v2Now;
+    // Write current step's values into s0 (no manual history shifting)
+    s[base + SLOT_I1]   = i1Now;
+    s[base + SLOT_I2]   = i2Now;
+  }
+
+  updateChargeFlux(voltages: Float64Array): void {
+    const b1 = this.branchIndex;
+    const b2 = this._branch2;
+    const L1 = this._pair.l1;
+    const L2 = this._pair.l2;
+    const M = this._pair.m;
+    const i1Now = voltages[b1];
+    const i2Now = voltages[b2];
+    this.s0[this._base + SLOT_PHI1] = L1 * i1Now + M * i2Now;
+    this.s0[this._base + SLOT_PHI2] = L2 * i2Now + M * i1Now;
+  }
+
+  getLteTimestep(
+    dt: number,
+    deltaOld: readonly number[],
+    order: number,
+    method: IntegrationMethod,
+    lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
+  ): number {
+    const base = this._base;
+    // Winding 1 flux (inductor pattern: pass 0,0 for ccap)
+    const phi1_0 = this.s0[base + SLOT_PHI1];
+    const phi1_1 = this.s1[base + SLOT_PHI1];
+    const phi1_2 = this.s2[base + SLOT_PHI1];
+    const phi1_3 = this.s3[base + SLOT_PHI1];
+    const dt1 = cktTerr(dt, deltaOld, order, method, phi1_0, phi1_1, phi1_2, phi1_3, 0, 0, lteParams);
+    // Winding 2 flux (inductor pattern: pass 0,0 for ccap)
+    const phi2_0 = this.s0[base + SLOT_PHI2];
+    const phi2_1 = this.s1[base + SLOT_PHI2];
+    const phi2_2 = this.s2[base + SLOT_PHI2];
+    const phi2_3 = this.s3[base + SLOT_PHI2];
+    const dt2 = cktTerr(dt, deltaOld, order, method, phi2_0, phi2_1, phi2_2, phi2_3, 0, 0, lteParams);
+    return Math.min(dt1, dt2);
   }
 
   getPinCurrents(voltages: Float64Array): number[] {

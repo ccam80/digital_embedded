@@ -44,7 +44,7 @@ export interface FetCapacitances {
 }
 
 // ---------------------------------------------------------------------------
-// Slot layout for state pool (stateSize: 25)
+// Slot layout for state pool (stateSize: 40)
 // ---------------------------------------------------------------------------
 
 export const SLOT_VGS       = 0;
@@ -57,61 +57,126 @@ export const SLOT_CAP_GEQ_GS = 6;
 export const SLOT_CAP_IEQ_GS = 7;
 export const SLOT_CAP_GEQ_GD = 8;
 export const SLOT_CAP_IEQ_GD = 9;
-export const SLOT_VGS_PREV  = 10;
-export const SLOT_VGD_PREV  = 11;
-// Junction and gate-bulk cap state (slots 12–22)
+// Current-step voltages for companion model (replacing _PREV slots)
+export const SLOT_V_GS      = 10;  // Gate-source voltage at current step (for companion)
+export const SLOT_V_GD      = 11;  // Gate-drain voltage at current step (for companion)
+// Junction and gate-bulk cap state (slots 12–19)
 export const SLOT_CAP_GEQ_DB            = 12;
 export const SLOT_CAP_IEQ_DB            = 13;
 export const SLOT_CAP_GEQ_SB            = 14;
 export const SLOT_CAP_IEQ_SB            = 15;
-export const SLOT_VDB_PREV              = 16;
-export const SLOT_VSB_PREV              = 17;
+export const SLOT_V_DB                  = 16;  // Drain-bulk voltage at current step
+export const SLOT_V_SB                  = 17;  // Source-bulk voltage at current step
 export const SLOT_CAP_GEQ_GB            = 18;
 export const SLOT_CAP_IEQ_GB            = 19;
-export const SLOT_VGB_PREV              = 20;
-export const SLOT_CAP_JUNCTION_FIRST_CALL = 21;  // 1.0 = true, 0.0 = false
-export const SLOT_CAP_GB_FIRST_CALL     = 22;    // 1.0 = true, 0.0 = false
-// Body-effect operating-point state (slots 23–24) — MOSFET-specific, zero-init fine
-export const SLOT_VSB                   = 23;
-export const SLOT_GMBS                  = 24;
-// Bulk junction DC state (slots 25–29) — needed for MOS1convTest convergence check
-export const SLOT_GBD                   = 25;  // drain-bulk junction conductance
-export const SLOT_GBS                   = 26;  // source-bulk junction conductance
-export const SLOT_CBD_I                 = 27;  // drain-bulk junction current
-export const SLOT_CBS_I                 = 28;  // source-bulk junction current
-export const SLOT_VBD                   = 29;  // drain-bulk voltage (stored)
+export const SLOT_V_GB                  = 20;  // Gate-bulk voltage at current step
+// Body-effect operating-point state (slots 21–22) — MOSFET-specific, zero-init fine
+export const SLOT_VSB                   = 21;
+export const SLOT_GMBS                  = 22;
+// Bulk junction DC state (slots 23–27) — needed for MOS1convTest convergence check
+export const SLOT_GBD                   = 23;  // drain-bulk junction conductance
+export const SLOT_GBS                   = 24;  // source-bulk junction conductance
+export const SLOT_CBD_I                 = 25;  // drain-bulk junction current
+export const SLOT_CBS_I                 = 26;  // source-bulk junction current
+export const SLOT_VBD                   = 27;  // drain-bulk voltage (stored)
+// MOSFET ngspice-correct limiting state (slots 28–31)
+export const SLOT_VON                   = 28;  // previous Vth (for fetlim von)
+export const SLOT_VBS_OLD               = 29;  // previous Vbs (for pnjlim)
+export const SLOT_VBD_OLD               = 30;  // previous Vbd (for pnjlim)
+export const SLOT_MODE                  = 31;  // +1 normal, -1 reverse (for convergence/Norton)
+// Charge at current step for CKTterr (history comes from s1/s2/s3 at same offsets)
+export const SLOT_Q_GS                  = 32;  // Gate-source charge at current step
+export const SLOT_Q_GD                  = 33;  // Gate-drain charge at current step
+export const SLOT_Q_GB                  = 34;  // Gate-bulk charge at current step
+
+// Keep legacy names as aliases so mosfet.ts imports still resolve during transition
+/** @deprecated Use SLOT_V_GS */
+export const SLOT_VGS_PREV              = SLOT_V_GS;
+/** @deprecated Use SLOT_V_GD */
+export const SLOT_VGD_PREV              = SLOT_V_GD;
+/** @deprecated Use SLOT_V_DB */
+export const SLOT_VDB_PREV              = SLOT_V_DB;
+/** @deprecated Use SLOT_V_SB */
+export const SLOT_VSB_PREV              = SLOT_V_SB;
+/** @deprecated Use SLOT_V_GB */
+export const SLOT_VGB_PREV              = SLOT_V_GB;
+/** @deprecated Eliminated — first call detection via s1[Q]===0 */
+export const SLOT_CAP_JUNCTION_FIRST_CALL = -1;
+/** @deprecated Eliminated — first call detection via s1[Q]===0 */
+export const SLOT_CAP_GB_FIRST_CALL     = -1;
+/** @deprecated Use SLOT_Q_GS */
+export const SLOT_Q_GS_NOW              = SLOT_Q_GS;
+/** @deprecated History from s1[SLOT_Q_GS] */
+export const SLOT_Q_GS_PREV             = SLOT_Q_GS;
+/** @deprecated History from s2[SLOT_Q_GS] */
+export const SLOT_Q_GS_PREV2            = SLOT_Q_GS;
+/** @deprecated History from s3[SLOT_Q_GS] */
+export const SLOT_Q_GS_PREV3            = SLOT_Q_GS;
+/** @deprecated Use SLOT_Q_GD */
+export const SLOT_Q_GD_NOW              = SLOT_Q_GD;
+/** @deprecated History from s1[SLOT_Q_GD] */
+export const SLOT_Q_GD_PREV             = SLOT_Q_GD;
+/** @deprecated History from s2[SLOT_Q_GD] */
+export const SLOT_Q_GD_PREV2            = SLOT_Q_GD;
+/** @deprecated History from s3[SLOT_Q_GD] */
+export const SLOT_Q_GD_PREV3            = SLOT_Q_GD;
+/** @deprecated Use SLOT_Q_GB */
+export const SLOT_Q_GB_NOW              = SLOT_Q_GB;
+/** @deprecated History from s1[SLOT_Q_GB] */
+export const SLOT_Q_GB_PREV             = SLOT_Q_GB;
+/** @deprecated History from s2[SLOT_Q_GB] */
+export const SLOT_Q_GB_PREV2            = SLOT_Q_GB;
+/** @deprecated History from s3[SLOT_Q_GB] */
+export const SLOT_Q_GB_PREV3            = SLOT_Q_GB;
+/** @deprecated Eliminated — history from s1/s2 */
+export const SLOT_CAP_I_GS_PREV         = -1;
+/** @deprecated Eliminated — history from s1/s2 */
+export const SLOT_CAP_I_GS_PREV_PREV    = -1;
+/** @deprecated Eliminated — history from s1/s2 */
+export const SLOT_CAP_I_GD_PREV         = -1;
+/** @deprecated Eliminated — history from s1/s2 */
+export const SLOT_CAP_I_GD_PREV_PREV    = -1;
+/** @deprecated Eliminated — history from s1/s2 */
+export const SLOT_CAP_I_GB_PREV         = -1;
+/** @deprecated Eliminated — history from s1/s2 */
+export const SLOT_CAP_I_GB_PREV_PREV    = -1;
 
 export const FET_BASE_SCHEMA: StateSchema = defineStateSchema("AbstractFetElement", [
-  { name: "VGS",                    doc: "Gate-source voltage",                        init: { kind: "zero" } },
-  { name: "VDS",                    doc: "Drain-source voltage",                       init: { kind: "zero" } },
-  { name: "GM",                     doc: "Transconductance",                           init: { kind: "constant", value: 1e-12 } },
-  { name: "GDS",                    doc: "Output conductance",                         init: { kind: "constant", value: 1e-12 } },
-  { name: "IDS",                    doc: "Drain-source current",                       init: { kind: "zero" } },
-  { name: "SWAPPED",                doc: "Source/drain swap flag (0=false, 1=true)",   init: { kind: "zero" } },
-  { name: "CAP_GEQ_GS",             doc: "Gate-source companion conductance",          init: { kind: "zero" } },
-  { name: "CAP_IEQ_GS",             doc: "Gate-source companion history current",      init: { kind: "zero" } },
-  { name: "CAP_GEQ_GD",             doc: "Gate-drain companion conductance",           init: { kind: "zero" } },
-  { name: "CAP_IEQ_GD",             doc: "Gate-drain companion history current",       init: { kind: "zero" } },
-  { name: "VGS_PREV",               doc: "Previous gate-source voltage",               init: { kind: "constant", value: NaN } },
-  { name: "VGD_PREV",               doc: "Previous gate-drain voltage",                init: { kind: "constant", value: NaN } },
-  { name: "CAP_GEQ_DB",             doc: "Drain-bulk companion conductance",           init: { kind: "zero" } },
-  { name: "CAP_IEQ_DB",             doc: "Drain-bulk companion history current",       init: { kind: "zero" } },
-  { name: "CAP_GEQ_SB",             doc: "Source-bulk companion conductance",          init: { kind: "zero" } },
-  { name: "CAP_IEQ_SB",             doc: "Source-bulk companion history current",      init: { kind: "zero" } },
-  { name: "VDB_PREV",               doc: "Previous drain-bulk voltage",                init: { kind: "zero" } },
-  { name: "VSB_PREV",               doc: "Previous source-bulk voltage",               init: { kind: "zero" } },
-  { name: "CAP_GEQ_GB",             doc: "Gate-bulk companion conductance",            init: { kind: "zero" } },
-  { name: "CAP_IEQ_GB",             doc: "Gate-bulk companion history current",        init: { kind: "zero" } },
-  { name: "VGB_PREV",               doc: "Previous gate-bulk voltage",                 init: { kind: "zero" } },
-  { name: "CAP_JUNCTION_FIRST_CALL", doc: "Junction cap first-call flag (1=true)",     init: { kind: "constant", value: 1.0 } },
-  { name: "CAP_GB_FIRST_CALL",      doc: "Gate-bulk cap first-call flag (1=true)",     init: { kind: "constant", value: 1.0 } },
-  { name: "VSB",                    doc: "Source-bulk voltage (MOSFET body effect)",   init: { kind: "zero" } },
-  { name: "GMBS",                   doc: "Body-effect transconductance",               init: { kind: "zero" } },
-  { name: "GBD",                    doc: "Drain-bulk junction conductance",             init: { kind: "zero" } },
-  { name: "GBS",                    doc: "Source-bulk junction conductance",             init: { kind: "zero" } },
-  { name: "CBD_I",                  doc: "Drain-bulk junction current",                 init: { kind: "zero" } },
-  { name: "CBS_I",                  doc: "Source-bulk junction current",                 init: { kind: "zero" } },
-  { name: "VBD",                    doc: "Drain-bulk voltage (stored)",                  init: { kind: "zero" } },
+  { name: "VGS",       doc: "Gate-source voltage",                               init: { kind: "zero" } },
+  { name: "VDS",       doc: "Drain-source voltage",                              init: { kind: "zero" } },
+  { name: "GM",        doc: "Transconductance",                                  init: { kind: "constant", value: 1e-12 } },
+  { name: "GDS",       doc: "Output conductance",                                init: { kind: "constant", value: 1e-12 } },
+  { name: "IDS",       doc: "Drain-source current",                              init: { kind: "zero" } },
+  { name: "SWAPPED",   doc: "Source/drain swap flag (0=false, 1=true)",          init: { kind: "zero" } },
+  { name: "CAP_GEQ_GS", doc: "Gate-source companion conductance",               init: { kind: "zero" } },
+  { name: "CAP_IEQ_GS", doc: "Gate-source companion history current",           init: { kind: "zero" } },
+  { name: "CAP_GEQ_GD", doc: "Gate-drain companion conductance",                init: { kind: "zero" } },
+  { name: "CAP_IEQ_GD", doc: "Gate-drain companion history current",            init: { kind: "zero" } },
+  { name: "V_GS",      doc: "Gate-source voltage at current step (companion)",   init: { kind: "zero" } },
+  { name: "V_GD",      doc: "Gate-drain voltage at current step (companion)",    init: { kind: "zero" } },
+  { name: "CAP_GEQ_DB", doc: "Drain-bulk companion conductance",                init: { kind: "zero" } },
+  { name: "CAP_IEQ_DB", doc: "Drain-bulk companion history current",            init: { kind: "zero" } },
+  { name: "CAP_GEQ_SB", doc: "Source-bulk companion conductance",               init: { kind: "zero" } },
+  { name: "CAP_IEQ_SB", doc: "Source-bulk companion history current",           init: { kind: "zero" } },
+  { name: "V_DB",      doc: "Drain-bulk voltage at current step (companion)",    init: { kind: "zero" } },
+  { name: "V_SB",      doc: "Source-bulk voltage at current step (companion)",   init: { kind: "zero" } },
+  { name: "CAP_GEQ_GB", doc: "Gate-bulk companion conductance",                 init: { kind: "zero" } },
+  { name: "CAP_IEQ_GB", doc: "Gate-bulk companion history current",             init: { kind: "zero" } },
+  { name: "V_GB",      doc: "Gate-bulk voltage at current step (companion)",     init: { kind: "zero" } },
+  { name: "VSB",       doc: "Source-bulk voltage (MOSFET body effect)",          init: { kind: "zero" } },
+  { name: "GMBS",      doc: "Body-effect transconductance",                      init: { kind: "zero" } },
+  { name: "GBD",       doc: "Drain-bulk junction conductance",                   init: { kind: "zero" } },
+  { name: "GBS",       doc: "Source-bulk junction conductance",                  init: { kind: "zero" } },
+  { name: "CBD_I",     doc: "Drain-bulk junction current",                       init: { kind: "zero" } },
+  { name: "CBS_I",     doc: "Source-bulk junction current",                      init: { kind: "zero" } },
+  { name: "VBD",       doc: "Drain-bulk voltage (stored)",                       init: { kind: "zero" } },
+  { name: "VON",       doc: "Previous threshold voltage (for fetlim von)",       init: { kind: "constant", value: NaN } },
+  { name: "VBS_OLD",   doc: "Previous Vbs (for pnjlim)",                         init: { kind: "zero" } },
+  { name: "VBD_OLD",   doc: "Previous Vbd (for pnjlim)",                         init: { kind: "zero" } },
+  { name: "MODE",      doc: "Normal (+1) or reverse (-1) mode",                  init: { kind: "constant", value: 1.0 } },
+  { name: "Q_GS",      doc: "Gate-source charge at current step",                init: { kind: "zero" } },
+  { name: "Q_GD",      doc: "Gate-drain charge at current step",                 init: { kind: "zero" } },
+  { name: "Q_GB",      doc: "Gate-bulk charge at current step",                  init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -144,11 +209,18 @@ export abstract class AbstractFetElement implements AnalogElementCore {
    */
   abstract readonly polaritySign: 1 | -1;
 
-  // State pool backing array — bound in initState()
+  // State pool backing arrays — bound in initState(), refreshed by StatePool.refreshElementRefs()
   protected _s0!: Float64Array;
+  s0!: Float64Array;
+  s1!: Float64Array;
+  s2!: Float64Array;
+  s3!: Float64Array;
 
   // Source-stepping scale factor — not stored in pool (not state)
   protected _sourceScale: number = 1.0;
+
+  // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, sets CKTnoncon++)
+  protected _pnjlimLimited: boolean = false;
 
   // State pool interface
   readonly poolBacked = true as const;
@@ -158,6 +230,10 @@ export abstract class AbstractFetElement implements AnalogElementCore {
 
   initState(pool: StatePoolRef): void {
     this._s0 = pool.state0;
+    this.s0 = pool.state0;
+    this.s1 = pool.state1;
+    this.s2 = pool.state2;
+    this.s3 = pool.state3;
     applyInitialValues(FET_BASE_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
@@ -323,6 +399,10 @@ export abstract class AbstractFetElement implements AnalogElementCore {
   }
 
   checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+    // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+    // declare non-convergence immediately (MOSload/JFETload sets CKTnoncon++)
+    if (this._pnjlimLimited) return false;
+
     const nodeD = this.drainNode;
     const nodeG = this.gateNode;
     const nodeS = this.sourceNode;
@@ -334,20 +414,22 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     // Raw junction voltages from current NR iterate (polarity-corrected)
     const vgsRaw = this.polaritySign * (vG - vS);
     const vdsRaw = this.polaritySign * (vD - vS);
-    // VBS = -(VSB): we store VSB (source-bulk, >= 0), ngspice uses VBS (bulk-source)
-    const vbsRaw = -this._s0[this.stateBaseOffset + SLOT_VSB];  // current iterate approximation
+    // Compute VBS from raw node voltages (ngspice mos1conv.c:36-43)
+    const nodeBulk = this.pinNodeIds.length > 3 ? this.pinNodeIds[3] : nodeS;
+    const vBulk = nodeBulk > 0 ? voltages[nodeBulk - 1] : 0;
+    const vbsRaw = this.polaritySign * (vBulk - vS);
     const vbdRaw = vbsRaw - vdsRaw;
 
     // Stored operating-point values from last updateOperatingPoint
     const storedVgs = this._vgs;
     const storedVds = this._vds;
-    const storedVsb = this._s0[this.stateBaseOffset + SLOT_VSB];
+    const storedVbs = -this._s0[this.stateBaseOffset + SLOT_VSB]; // stored VBS = -VSB
     const storedVbd = this._s0[this.stateBaseOffset + SLOT_VBD];
 
     // Deltas between raw iterate and stored (limited) values
     const delvgs = vgsRaw - storedVgs;
     const delvds = vdsRaw - storedVds;
-    const delvbs = vbsRaw - (-storedVsb);  // stored VBS = -storedVsb
+    const delvbs = vbsRaw - storedVbs;
     const delvbd = vbdRaw - storedVbd;
 
     // Read small-signal parameters from pool
@@ -362,15 +444,28 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     const cbdI = s0[base + SLOT_CBD_I];
     const cbsI = s0[base + SLOT_CBS_I];
 
-    // MOS1convTest: predicted drain current
-    const cdhat = ids + gm * delvgs + gds * delvds + gmbs * delvbs - gbd * delvbd;
+    // cd = channel current minus drain junction current (ngspice MOS1convTest)
+    const cd = ids - cbdI;
+    const mode = s0[base + SLOT_MODE];
+
+    // MOS1convTest: predicted drain current — mode-dependent formula
+    let cdhat: number;
+    if (mode >= 0) {
+      // Normal mode
+      cdhat = cd + gm * delvgs + gds * delvds + gmbs * delvbs - gbd * delvbd;
+    } else {
+      // Reverse mode: vgd = vgs - vds
+      const delvgd = delvgs - delvds;
+      cdhat = cd - (gbd - gmbs) * delvbd - gm * delvgd + gds * delvds;
+    }
+
     // MOS1convTest: predicted bulk current
     const cbhat = cbsI + cbdI + gbd * delvbd + gbs * delvbs;
 
-    const tolD = reltol * Math.max(Math.abs(cdhat), Math.abs(ids)) + abstol;
+    const tolD = reltol * Math.max(Math.abs(cdhat), Math.abs(cd)) + abstol;
     const tolB = reltol * Math.max(Math.abs(cbhat), Math.abs(cbsI + cbdI)) + abstol;
 
-    return Math.abs(cdhat - ids) <= tolD && Math.abs(cbhat - (cbsI + cbdI)) <= tolB;
+    return Math.abs(cdhat - cd) <= tolD && Math.abs(cbhat - (cbsI + cbdI)) <= tolB;
   }
 
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
@@ -386,24 +481,25 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     const vgdNow = vG - vD;
 
     const base = this.stateBaseOffset;
-    const vgsPrevStored = this._s0[base + SLOT_VGS_PREV];
-    const vgdPrevStored = this._s0[base + SLOT_VGD_PREV];
 
-    // NaN signals first call — use current voltage as warm start
-    const isFirstCall = isNaN(vgsPrevStored);
-    const prevVgs = isFirstCall ? vgsNow : vgsPrevStored;
-    const prevVgd = isFirstCall ? vgdNow : vgdPrevStored;
-
-    // Recover capacitor currents at previous accepted step
-    const capGeqGS = this._s0[base + SLOT_CAP_GEQ_GS];
-    const capIeqGS = this._s0[base + SLOT_CAP_IEQ_GS];
-    const capGeqGD = this._s0[base + SLOT_CAP_GEQ_GD];
-    const capIeqGD = this._s0[base + SLOT_CAP_IEQ_GD];
+    // Recover capacitor currents at previous accepted step from s1
+    const capGeqGS = this.s1[base + SLOT_CAP_GEQ_GS];
+    const capIeqGS = this.s1[base + SLOT_CAP_IEQ_GS];
+    const capGeqGD = this.s1[base + SLOT_CAP_GEQ_GD];
+    const capIeqGD = this.s1[base + SLOT_CAP_IEQ_GD];
     const iGS = capGeqGS * vgsNow + capIeqGS;
     const iGD = capGeqGD * vgdNow + capIeqGD;
 
-    this._s0[base + SLOT_VGS_PREV] = vgsNow;
-    this._s0[base + SLOT_VGD_PREV] = vgdNow;
+    // Previous voltages from s1 — first call: s1[V_GS]==0, use vgsNow as warm start
+    const prevVgsStored = this.s1[base + SLOT_V_GS];
+    const prevVgdStored = this.s1[base + SLOT_V_GD];
+    const isFirstCall = prevVgsStored === 0 && this.s1[base + SLOT_Q_GS] === 0;
+    const prevVgs = isFirstCall ? vgsNow : prevVgsStored;
+    const prevVgd = isFirstCall ? vgdNow : prevVgdStored;
+
+    // Write current voltages and charges to s0
+    this._s0[base + SLOT_V_GS] = vgsNow;
+    this._s0[base + SLOT_V_GD] = vgdNow;
 
     const caps = this.computeCapacitances(this._vgs, this._vds);
 
@@ -422,6 +518,26 @@ export abstract class AbstractFetElement implements AnalogElementCore {
       this._s0[base + SLOT_CAP_GEQ_GD] = 0;
       this._s0[base + SLOT_CAP_IEQ_GD] = 0;
     }
+
+  }
+
+  updateChargeFlux(voltages: Float64Array): void {
+    const nodeG = this.gateNode;
+    const nodeD = this.drainNode;
+    const nodeS = this.sourceNode;
+
+    const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
+    const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
+    const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
+
+    const vgsNow = vG - vS;
+    const vgdNow = vG - vD;
+
+    const base = this.stateBaseOffset;
+    const caps = this.computeCapacitances(this._vgs, this._vds);
+
+    this._s0[base + SLOT_Q_GS] = caps.cgs * vgsNow;
+    this._s0[base + SLOT_Q_GD] = caps.cgd * vgdNow;
   }
 
   // ---------------------------------------------------------------------------

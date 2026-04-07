@@ -5,7 +5,6 @@
  *  - Safety factor 0.9 applied to all computed dt predictions
  *  - Clamping to [dt/4, 4*dt] per step, then to [minTimeStep, maxTimeStep]
  *  - Breakpoint support for exact landing at registered simulation times
- *  - Timestep rejection with halving when worstRatio > 1
  *  - Automatic integration method switching: BDF-1 → trapezoidal → BDF-2 (on
  *    ringing) → trapezoidal (after 5 stable BDF-2 steps)
  */
@@ -13,6 +12,7 @@
 import type { AnalogElement, IntegrationMethod } from "./element.js";
 import type { SimulationParams } from "../../core/analog-engine-interface.js";
 import type { HistoryStore } from "./integration.js";
+import type { LteParams } from "./ckt-terr.js";
 
 // ---------------------------------------------------------------------------
 // BreakpointEntry — file-private
@@ -40,8 +40,7 @@ interface BreakpointEntry {
  * Call sequence per accepted timestep:
  *   1. computeNewDt(elements, history) → { newDt, worstRatio }
  *   2. shouldReject(worstRatio) — rejects when worstRatio > 1
- *   3. If rejected: reject() → halved dt, retry
- *   4. If accepted: accept(simTime), checkMethodSwitch(elements, history)
+ *   3. If accepted: accept(simTime), checkMethodSwitch(elements, history)
  */
 export class TimestepController {
   /** Current timestep in seconds. */
@@ -76,9 +75,63 @@ export class TimestepController {
   /** Backing field for largestErrorElement. */
   private _largestErrorElement: number | undefined;
 
+  /**
+   * Unclamped dt saved before breakpoint clamping in getClampedDt().
+   * Used by accept() to compute post-breakpoint delta reduction
+   * (ngspice dctran.c:506 saveDelta).
+   */
+  private _savedDelta: number = 0;
+
+  /**
+   * Timestep history for CKTterr divided differences.
+   * [0] = h_{n-1} (previous accepted dt), [1] = h_{n-2}, [2] = h_{n-3}.
+   * Pre-allocated once; shifted in accept(). ngspice: CKTdeltaOld[].
+   */
+  private _deltaOld: number[] = [0, 0, 0];
+
+  /**
+   * Integration order derived from currentMethod.
+   * 1 for bdf1, 2 for trapezoidal and bdf2. ngspice: CKTorder.
+   */
+  currentOrder: number = 1;
+
+  /**
+   * Shift the deltaOld history ring. Called by the engine BEFORE the for(;;)
+   * retry loop (ngspice dctran.c:704-706).
+   */
+  rotateDeltaOld(): void {
+    this._deltaOld[2] = this._deltaOld[1];
+    this._deltaOld[1] = this._deltaOld[0];
+    this._deltaOld[0] = this.currentDt;
+  }
+
+  /**
+   * Update deltaOld[0] to the current trial delta without shifting history.
+   * Called at the top of each for(;;) iteration (ngspice dctran.c:735).
+   */
+  setDeltaOldCurrent(dt: number): void {
+    this._deltaOld[0] = dt;
+  }
+
+  /**
+   * Pre-allocated LteParams object passed to element getLteTimestep calls.
+   * Updated once per computeNewDt from SimulationParams.
+   */
+  private _lteParams: LteParams;
+
+  /**
+   * Pre-allocated result object for computeNewDt to avoid per-call allocation.
+   * Callers destructure immediately so aliasing is safe.
+   */
+  private _lteResult = { newDt: 0, worstRatio: 0 };
+
   constructor(params: SimulationParams) {
     this._params = params;
-    this.currentDt = params.maxTimeStep;
+    // ngspice dctran.c:112: initial delta = MIN(finalTime/100, step) / 10.
+    // We have no finalTime in an interactive simulator; maxTimeStep is
+    // our userStep equivalent.  The /10 divisor matches ngspice's outer
+    // divisor on the MIN result — total factor is 1000×.
+    this.currentDt = params.maxTimeStep / 1000;
     this.currentMethod = "bdf1";
     this._breakpoints = [];
     this._lastAcceptedSimTime = -Infinity;
@@ -86,6 +139,17 @@ export class TimestepController {
     this._signHistory = [];
     this._stableOnBdf2 = 0;
     this._largestErrorElement = undefined;
+    this._lteParams = {
+      trtol: params.trtol,
+      reltol: params.reltol,
+      abstol: params.abstol,
+      chgtol: params.chargeTol,
+    };
+
+    // ngspice dctran.c:310-311: CKTdeltaOld[i] = CKTmaxStep for all slots.
+    this._deltaOld[0] = params.maxTimeStep;
+    this._deltaOld[1] = params.maxTimeStep;
+    this._deltaOld[2] = params.maxTimeStep;
   }
 
   /**
@@ -94,6 +158,16 @@ export class TimestepController {
    */
   get largestErrorElement(): number | undefined {
     return this._largestErrorElement;
+  }
+
+  /** Timestep history for CKTterr. Read-only reference to the pre-allocated array. */
+  get deltaOld(): readonly number[] {
+    return this._deltaOld;
+  }
+
+  /** Pre-allocated LteParams for element getLteTimestep calls. */
+  get lteParams(): LteParams {
+    return this._lteParams;
   }
 
   // -------------------------------------------------------------------------
@@ -127,43 +201,48 @@ export class TimestepController {
     stepDt?: number,
   ): { newDt: number; worstRatio: number } {
     const dt = stepDt ?? this.currentDt;
-    const reltol = this._params.reltol;
-    const chgtol = this._params.chargeTol;
-    const trtol = this._params.trtol;
+    const order = this.currentOrder;
+    const method = this.currentMethod;
+    const lteParams = this._lteParams;
+    const deltaOld = this._deltaOld;
 
-    // Worst per-element (LTE / local_tolerance) ratio using the ngspice
-    // composite tolerance: local_tol = trtol · (reltol · |ref| + chargeTol).
-    let worstRatio = 0;
-    let worstRatioIdx = -1;
+    // Collect minimum proposed timestep from CKTterr-based elements.
+    // If an element is reactive but doesn't implement getLteTimestep, it
+    // contributes no LTE constraint (skip it).
+    let minProposedDt = Infinity;
+    let minProposedIdx = -1;
+
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i];
-      if (!el.isReactive || typeof el.getLteEstimate !== "function") continue;
-      const { truncationError, toleranceReference } = el.getLteEstimate(dt);
-      if (!(truncationError > 0)) continue;
-      const localTol = trtol * (reltol * Math.abs(toleranceReference) + chgtol);
-      if (!(localTol > 0)) continue;
-      const ratio = truncationError / localTol;
-      if (ratio > worstRatio) {
-        worstRatio = ratio;
-        worstRatioIdx = i;
+      if (!el.isReactive) continue;
+
+      if (typeof el.getLteTimestep === "function") {
+        const proposed = el.getLteTimestep(dt, deltaOld, order, method, lteParams);
+        if (proposed < minProposedDt) {
+          minProposedDt = proposed;
+          minProposedIdx = i;
+        }
       }
+      // Elements without getLteTimestep contribute no LTE constraint.
     }
 
-    this._largestErrorElement = worstRatioIdx >= 0 ? worstRatioIdx : undefined;
+    this._largestErrorElement = minProposedIdx >= 0 ? minProposedIdx : undefined;
 
     let newDt: number;
-    if (worstRatio <= 0) {
-      // No reactive elements reported a non-zero error — hold current dt.
-      newDt = dt;
-    } else {
-      // Classical adaptive-step formula for a p=2 method (trapezoidal):
-      //   newDt = 0.9 · dt · (1/ratio)^(1/(p+1)) = 0.9 · dt / ratio^(1/3)
-      // The 0.9 safety factor keeps us slightly below the ideal step.
-      const scale = 0.9 * Math.pow(1 / worstRatio, 1 / 3);
-      newDt = dt * scale;
+    let worstRatio: number;
 
+    if (minProposedDt < Infinity) {
+      // CKTterr path: use the proposed dt directly (already incorporates
+      // tolerance, safety factors, and order-dependent root extraction).
+      newDt = minProposedDt;
       // Clamp step change to [1/4, 4] of current dt.
-      newDt = Math.max(dt / 4, Math.min(4 * dt, newDt));
+      newDt = Math.max(dt / 4, Math.min(2 * dt, newDt));
+      // worstRatio: >1 means step should be rejected (proposed < current dt)
+      worstRatio = minProposedDt < dt ? dt / minProposedDt : 0;
+    } else {
+      // No reactive elements with getLteTimestep -- grow step toward maxTimeStep.
+      newDt = Math.min(dt * 2, this._params.maxTimeStep);
+      worstRatio = 0;
     }
 
     // Clamp to solver bounds.
@@ -178,7 +257,10 @@ export class TimestepController {
       }
     }
 
-    return { newDt, worstRatio };
+    // Return via pre-allocated result object (zero allocation).
+    this._lteResult.newDt = newDt;
+    this._lteResult.worstRatio = worstRatio;
+    return this._lteResult;
   }
 
   /**
@@ -188,9 +270,16 @@ export class TimestepController {
    */
   getClampedDt(simTime: number): number {
     let dt = this.currentDt;
+    // Save unclamped delta before breakpoint clamping (ngspice saveDelta,
+    // dctran.c:506). Used in accept() for post-breakpoint delta reduction.
+    this._savedDelta = dt;
     if (this._breakpoints.length > 0) {
-      const remaining = this._breakpoints[0]!.time - simTime;
-      if (remaining > 0 && dt > remaining) {
+      const nextBp = this._breakpoints[0]!.time;
+      const remaining = nextBp - simTime;
+      if (remaining > 0 && dt >= remaining) {
+        // ngspice dctran.c:583-585: simple clamp to the breakpoint.
+        // saveDelta is already captured above; accept() uses it for
+        // post-breakpoint delta reduction (dctran.c:561).
         dt = remaining;
       }
     }
@@ -216,16 +305,6 @@ export class TimestepController {
     return worstRatio > 1;
   }
 
-  /**
-   * Reject the current timestep: halve dt, clamp to minTimeStep.
-   *
-   * @returns The new (halved) dt in seconds
-   */
-  reject(): number {
-    this.currentDt = Math.max(this._params.minTimeStep, this.currentDt / 2);
-    return this.currentDt;
-  }
-
   // -------------------------------------------------------------------------
   // Acceptance
   // -------------------------------------------------------------------------
@@ -249,15 +328,41 @@ export class TimestepController {
     this._acceptedSteps++;
     this._updateMethodForStartup();
 
+    // deltaOld rotation removed — now performed by the engine before/inside
+    // the for(;;) loop to match ngspice dctran.c:704-706, 735.
+
     // Pop breakpoints that have been reached and refill from source if any.
+    // Guard: nextBreakpoint() can return a value <= simTime due to
+    // floating-point rounding (e.g. clock halfPeriod not exactly
+    // representable). Without the strict-future check, the loop would
+    // pop, re-insert at the front, and spin forever.
+    let breakpointConsumed = false;
     while (this._breakpoints.length > 0 && simTime >= this._breakpoints[0]!.time) {
+      breakpointConsumed = true;
       const popped = this._breakpoints.shift()!;
       if (typeof popped.source?.nextBreakpoint === "function") {
         const next = popped.source.nextBreakpoint(simTime);
-        if (next !== null) {
+        if (next !== null && next > simTime) {
           this.insertForSource(next, popped.source);
         }
       }
+    }
+
+    // ngspice dctran.c:493 — reset integration order after a breakpoint
+    // so the first step past the discontinuity uses the robust BDF-1.
+    if (breakpointConsumed) {
+      this.currentMethod = "bdf1";
+      this.currentOrder = 1;
+
+      // ngspice dctran.c:506-507 — reduce delta after breakpoint:
+      //   delta = MAX(0.1 * MIN(saveDelta, nextBreakDelta), 2 * delmin)
+      const nextBreakGap = this._breakpoints.length > 0
+        ? this._breakpoints[0]!.time - simTime
+        : Infinity;
+      this.currentDt = Math.max(
+        0.1 * Math.min(this._savedDelta, nextBreakGap),
+        2 * this._params.minTimeStep,
+      );
     }
   }
 
@@ -323,15 +428,60 @@ export class TimestepController {
     if (ringing) {
       if (this.currentMethod !== "bdf2") {
         this.currentMethod = "bdf2";
+        this.currentOrder = 2;
         this._stableOnBdf2 = 0;
       }
     } else if (this.currentMethod === "bdf2") {
       this._stableOnBdf2++;
       if (this._stableOnBdf2 >= 5) {
         this.currentMethod = "trapezoidal";
+        this.currentOrder = 2;
         this._stableOnBdf2 = 0;
       }
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Order promotion trial  (ngspice dctran.c:820-829)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Speculatively re-run LTE at a higher integration order to see if
+   * promoting would allow a larger timestep.
+   *
+   * Called by the engine after an accepted step when the order-1 LTE
+   * already passed the `.9 * delta` gate (caller checks).
+   *
+   * ngspice dctran.c:862-876.
+   *
+   * @param executedDt  - The step delta that was actually executed (CKTdelta
+   *   at accept time). Used to re-seed CKTtrunc at order 2, matching
+   *   ngspice dctran.c:864 where newdelta = ckt->CKTdelta before the
+   *   order-2 CKTtrunc call.
+   */
+  tryOrderPromotion(
+    elements: readonly AnalogElement[],
+    history: HistoryStore,
+    simTime: number,
+    executedDt: number,
+  ): void {
+    // Only promote from order 1 (BDF-1), and only after startup (steps > 2).
+    if (this.currentMethod !== "bdf1" || this._acceptedSteps <= 2) return;
+
+    // ngspice dctran.c:864-866: re-seed and re-truncate at order 2.
+    this.currentMethod = "trapezoidal";
+    this.currentOrder = 2;
+    const { newDt: trialDt } = this.computeNewDt(elements, history, simTime, executedDt);
+
+    if (trialDt <= 1.05 * this.currentDt) {
+      // Revert order — promotion does not help.
+      this.currentMethod = "bdf1";
+      this.currentOrder = 1;
+    }
+    // ngspice dctran.c:876: ALWAYS update delta to the (possibly order-2) newdelta.
+    // When reverted, trialDt is the order-2 result; when not reverted, it's also
+    // the order-2 result. Either way, update.
+    this.currentDt = trialDt;
   }
 
   // -------------------------------------------------------------------------
@@ -389,6 +539,13 @@ export class TimestepController {
       if (this._breakpoints[mid]!.time < time) lo = mid + 1;
       else hi = mid;
     }
+    const eps = 0.5 * this._params.minTimeStep;
+    if (lo < this._breakpoints.length && this._breakpoints[lo]!.time - time < eps) {
+      return;
+    }
+    if (lo > 0 && time - this._breakpoints[lo - 1]!.time < eps) {
+      return;
+    }
     this._breakpoints.splice(lo, 0, { time, source });
   }
 
@@ -432,5 +589,8 @@ export class TimestepController {
       this.currentMethod = "trapezoidal";
     }
     // Subsequent method changes are handled by checkMethodSwitch.
+
+    // Keep currentOrder in sync with currentMethod.
+    this.currentOrder = this.currentMethod === "bdf1" ? 1 : 2;
   }
 }

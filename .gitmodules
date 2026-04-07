@@ -1,0 +1,3 @@
+[submodule "ref/ngspice"]
+	path = ref/ngspice
+	url = https://github.com/ccam80/ngspice

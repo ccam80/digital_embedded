@@ -21,12 +21,23 @@ import {
   type ComponentLayout,
 } from "../../core/registry.js";
 import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { ReactiveAnalogElementCore } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import type { IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import {
+  computeJunctionCapacitance,
+  computeJunctionCharge,
+} from "../semiconductors/diode.js";
+import {
+  capacitorConductance,
+  capacitorHistoryCurrent,
+} from "../../solver/analog/integration.js";
+import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { VT as LED_VT } from "../../core/constants.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
@@ -136,22 +147,45 @@ export const { paramDefs: LED_PARAM_DEFS, defaults: LED_DEFAULTS } = defineModel
     IS: { default: 3.17e-19, unit: "A", description: "Saturation current" },
     N:  { default: 1.8,      unit: "",  description: "Ideality factor" },
   },
+  secondary: {
+    CJO: { default: 0,   unit: "F", description: "Zero-bias junction capacitance" },
+    VJ:  { default: 1,   unit: "V", description: "Junction built-in potential" },
+    M:   { default: 0.5,            description: "Grading coefficient" },
+    TT:  { default: 0,   unit: "s", description: "Transit time" },
+    FC:  { default: 0.5,            description: "Forward-bias capacitance coefficient" },
+  },
 });
 
-/** Thermal voltage at 300 K (kT/q). */
-const LED_VT = 0.02585;
+// LED_VT (thermal voltage) imported from ../../core/constants.js
 /** Minimum conductance for numerical stability. */
 const LED_GMIN = 1e-12;
 
 // ---------------------------------------------------------------------------
-// State schema declaration
+// State schema declarations
 // ---------------------------------------------------------------------------
 
+// Slot index constants — shared between both schema variants.
+const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_V = 6, SLOT_Q = 7;
+
+/** Schema for resistive LED (no junction capacitance): 4 slots. */
 const LED_STATE_SCHEMA = defineStateSchema("LedAnalogElement", [
-  { name: "VD", doc: "LED junction voltage (V)", init: { kind: "zero" } },
-  { name: "GEQ", doc: "Linearized junction conductance (S)", init: { kind: "constant", value: 1e-12 } },
-  { name: "IEQ", doc: "Linearized current source (A)", init: { kind: "zero" } },
-  { name: "ID", doc: "LED current (A)", init: { kind: "zero" } },
+  { name: "VD",      doc: "LED junction voltage (V)",                           init: { kind: "zero" } },
+  { name: "GEQ",     doc: "Linearized junction conductance (S)",                init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ",     doc: "Linearized current source (A)",                      init: { kind: "zero" } },
+  { name: "ID",      doc: "LED current (A)",                                    init: { kind: "zero" } },
+]);
+
+/** Schema for capacitive LED (CJO > 0 or TT > 0): 8 slots. */
+const LED_CAP_STATE_SCHEMA = defineStateSchema("LedAnalogElement_cap", [
+  { name: "VD",      doc: "LED junction voltage (V)",                           init: { kind: "zero" } },
+  { name: "GEQ",     doc: "Linearized junction conductance (S)",                init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ",     doc: "Linearized current source (A)",                      init: { kind: "zero" } },
+  { name: "ID",      doc: "LED current (A)",                                    init: { kind: "zero" } },
+  { name: "CAP_GEQ", doc: "Junction-capacitance companion conductance",         init: { kind: "zero" } },
+  { name: "CAP_IEQ", doc: "Junction-capacitance companion history current",     init: { kind: "zero" } },
+  { name: "V",       doc: "Junction voltage at current step (for companion)",   init: { kind: "zero" } },
+  { name: "Q",       doc: "Junction charge at current step",                    init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -168,35 +202,68 @@ function createLedAnalogElement(
   // Single-pin LED: cathode is implicitly ground (node 0)
   const nodeCathode = 0;
 
-  const IS = props.getModelParam<number>("IS");
-  const N = props.getModelParam<number>("N");
-  const nVt = N * LED_VT;
-  const vcrit = nVt * Math.log(nVt / (IS * Math.SQRT2));
+  const params: Record<string, number> = {
+    IS:  props.getModelParam<number>("IS"),
+    N:   props.getModelParam<number>("N"),
+    CJO: props.getModelParam<number>("CJO"),
+    VJ:  props.getModelParam<number>("VJ"),
+    M:   props.getModelParam<number>("M"),
+    TT:  props.getModelParam<number>("TT"),
+    FC:  props.getModelParam<number>("FC"),
+  };
 
-  // State pool slot indices
-  const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+  const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
   // Pool binding — set by initState
   let s0: Float64Array;
+  let s1: Float64Array;
+  let s2: Float64Array;
+  let s3: Float64Array;
   let base: number;
 
-  const element: ReactiveAnalogElementCore = {
+  // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
+  let pnjlimLimited = false;
+
+  const element: PoolBackedAnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: true,
+    isReactive: hasCapacitance,
     poolBacked: true as const,
-    stateSize: 4,
-    stateSchema: LED_STATE_SCHEMA,
+    stateSize: hasCapacitance ? 8 : 4,
+    stateSchema: hasCapacitance ? LED_CAP_STATE_SCHEMA : LED_STATE_SCHEMA,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
+      s1 = pool.state1;
+      s2 = pool.state2;
+      s3 = pool.state3;
+      this.s0 = s0;
+      this.s1 = s1;
+      this.s2 = s2;
+      this.s3 = s3;
       base = this.stateBaseOffset;
-      applyInitialValues(LED_STATE_SCHEMA, pool, base, {});
+      applyInitialValues(this.stateSchema, pool, base, params);
     },
 
-    stamp(_solver: SparseSolver): void {
-      // No linear topology-constant contributions.
+    stamp(solver: SparseSolver): void {
+      // Stamp junction capacitance companion model when active
+      if (hasCapacitance) {
+        const capGeq = s0[base + SLOT_CAP_GEQ];
+        const capIeq = s0[base + SLOT_CAP_IEQ];
+        if (capGeq !== 0 || capIeq !== 0) {
+          stampG(solver, nodeAnode,   nodeAnode,   capGeq);
+          stampG(solver, nodeAnode,   nodeCathode, -capGeq);
+          stampG(solver, nodeCathode, nodeAnode,   -capGeq);
+          stampG(solver, nodeCathode, nodeCathode, capGeq);
+          stampRHS(solver, nodeAnode,   -capIeq);
+          stampRHS(solver, nodeCathode, capIeq);
+        }
+      }
     },
 
     stampNonlinear(solver: SparseSolver): void {
@@ -211,21 +278,29 @@ function createLedAnalogElement(
     },
 
     updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+      const nVt = params.N * LED_VT;
+      const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
+
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
 
       const vdOld = s0[base + SLOT_VD];
-      const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
+      const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
+      const vdLimited = vdResult.value;
+      pnjlimLimited = vdResult.limited;
 
       s0[base + SLOT_VD] = vdLimited;
 
       const expArg = Math.min(vdLimited / nVt, 700);
       const expVal = Math.exp(expArg);
-      const id = IS * (expVal - 1);
+      const idRaw = params.IS * (expVal - 1);
+      const gdRaw = (params.IS * expVal) / nVt;
+      const gd = gdRaw + LED_GMIN;
+      const id = idRaw + LED_GMIN * vdLimited;
       s0[base + SLOT_ID] = id;
-      s0[base + SLOT_GEQ] = (IS * expVal) / nVt + LED_GMIN;
-      s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
+      s0[base + SLOT_GEQ] = gd;
+      s0[base + SLOT_IEQ] = id - gd * vdLimited;
     },
 
     getPinCurrents(_voltages: Readonly<Float64Array>): number[] {
@@ -236,6 +311,10 @@ function createLedAnalogElement(
     },
 
     checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+      // declare non-convergence immediately (DIOload sets CKTnoncon++)
+      if (pnjlimLimited) return false;
+
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
@@ -249,8 +328,75 @@ function createLedAnalogElement(
       return Math.abs(cdhat - id) <= tol;
     },
 
-    setParam(_key: string, _value: number) {},
+    setParam(key: string, value: number): void {
+      if (key in params) params[key] = value;
+    },
   };
+
+  // Attach stampCompanion and getLteTimestep only when junction capacitance is present
+  if (hasCapacitance) {
+    (element as unknown as { stampCompanion: (dt: number, method: IntegrationMethod, voltages: Float64Array) => void }).stampCompanion = function (
+      dt: number,
+      method: IntegrationMethod,
+      voltages: Float64Array,
+    ): void {
+      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
+      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const vNow = va - vc;
+
+      const nVt = params.N * LED_VT;
+
+      // Depletion + transit-time capacitance at current operating point
+      const Cj = computeJunctionCapacitance(vNow, params.CJO, params.VJ, params.M, params.FC);
+      const expArg = Math.min(vNow / nVt, 700);
+      const expVal = Math.exp(expArg);
+      const gDiode = (params.IS * expVal) / nVt;
+      const Ct = params.TT * gDiode;
+      const Ctotal = Cj + Ct;
+
+      // Recover capacitor current at previous accepted step from s1
+      const prevCapGeq = s1[base + SLOT_CAP_GEQ];
+      const prevCapIeq = s1[base + SLOT_CAP_IEQ];
+      const iNow = prevCapGeq * vNow + prevCapIeq;
+      // First call: s1[V] == 0, use vNow as warm start
+      const vPrev = s1[base + SLOT_V];
+      const vPrevForFormula = vPrev === 0 && s1[base + SLOT_Q] === 0 ? vNow : vPrev;
+
+      s0[base + SLOT_V] = vNow;
+      s0[base + SLOT_CAP_GEQ] = capacitorConductance(Ctotal, dt, method);
+      s0[base + SLOT_CAP_IEQ] = capacitorHistoryCurrent(Ctotal, dt, method, vNow, vPrevForFormula, iNow);
+    };
+
+    (element as unknown as { getLteTimestep: (dt: number, deltaOld: readonly number[], order: number, method: IntegrationMethod, lteParams: import("../../solver/analog/ckt-terr.js").LteParams) => number }).getLteTimestep = function (
+      dt: number,
+      deltaOld: readonly number[],
+      order: number,
+      method: IntegrationMethod,
+      lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
+    ): number {
+      const _q0 = s0[base + SLOT_Q];
+      const _q1 = s1[base + SLOT_Q];
+      const _q2 = s2[base + SLOT_Q];
+      const _q3 = s3[base + SLOT_Q];
+      const _h0 = dt;
+      const _h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
+      const _ccap0 = _h0 > 0 ? (_q0 - _q1) / _h0 : 0;
+      const _ccap1 = _h1 > 0 ? (_q1 - _q2) / _h1 : 0;
+      return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, _ccap0, _ccap1, lteParams);
+    };
+
+    (element as unknown as { updateChargeFlux: (v: Float64Array) => void }).updateChargeFlux = function(voltages: Float64Array): void {
+      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
+      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const vd = va - vc;
+      const nVt = params.N * LED_VT;
+      const expArg = Math.min(vd / nVt, 700);
+      const expVal = Math.exp(expArg);
+      const idRaw = params.IS * (expVal - 1);
+      s0[base + SLOT_Q] = computeJunctionCharge(vd, params.CJO, params.VJ, params.M, params.FC, params.TT, idRaw);
+      s0[base + SLOT_V] = vd;
+    };
+  }
 
   return element;
 }

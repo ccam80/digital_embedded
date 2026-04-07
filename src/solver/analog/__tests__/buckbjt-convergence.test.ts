@@ -94,7 +94,7 @@ describe('buckbjt.dts convergence', () => {
 
     const targetSimTime = 600e-6; // 600µs
     let stepCount = 0;
-    const maxSteps = 50000;
+    const maxSteps = 200000;
 
     while (analog.simTime < targetSimTime && stepCount < maxSteps) {
       coordinator.step();

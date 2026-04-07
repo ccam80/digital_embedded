@@ -3,13 +3,13 @@
  *
  * Implements the core NR loop with separate linear/nonlinear stamp passes,
  * voltage limiting (pnjlim for PN junctions, fetlim for MOSFETs), global and
- * element-specific convergence checking, and ConvergenceTrace blame tracking.
+ * element-specific convergence checking, and blame tracking.
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
 import type { AnalogElement } from "./element.js";
 import { MNAAssembler } from "./mna-assembler.js";
-import type { DiagnosticCollector, ConvergenceTrace } from "./diagnostics.js";
+import type { DiagnosticCollector } from "./diagnostics.js";
 import { makeDiagnostic } from "./diagnostics.js";
 
 // ---------------------------------------------------------------------------
@@ -26,7 +26,7 @@ export interface NROptions {
   matrixSize: number;
   /**
    * Number of node-voltage rows at the front of the solution vector.
-   * Damping and line search are restricted to node rows only (0..nodeCount-1),
+   * Damping is restricted to node rows only (0..nodeCount-1),
    * matching ngspice niiter.c which never damps branch-current rows.
    * Defaults to matrixSize when omitted.
    */
@@ -39,6 +39,13 @@ export interface NROptions {
   abstol: number;
   /** Absolute current tolerance for device convergence checks (ngspice ABSTOL). */
   iabstol: number;
+  /**
+   * Whether this solve is a DC operating point (DCOP/TRANOP).
+   * Node damping is only applied during DC operating point solves,
+   * matching ngspice niiter.c which skips damping during transient.
+   * Defaults to false.
+   */
+  isDcOp?: boolean;
   /** Optional initial guess for the solution vector. */
   initialGuess?: Float64Array;
   /** Diagnostic collector for emitting solver events. */
@@ -55,6 +62,18 @@ export interface NROptions {
    * Same contract as `voltagesBuffer`.
    */
   prevVoltagesBuffer?: Float64Array;
+  /**
+   * Optional gmin conductance to add to every diagonal of the assembled matrix
+   * before factorization. Matches ngspice LoadGmin (spsmp.c:448-478).
+   * Applied after finalize() and before factor() on each NR iteration.
+   */
+  diagonalGmin?: number;
+  /** When true, compute per-element blame tracking (largestChangeElement). Only needed when convergence logging is active. */
+  enableBlameTracking?: boolean;
+  /** Optional shared state pool for state0 damping (ngspice niiter.c). */
+  statePool?: { state0: Float64Array } | null;
+  /** Enable node damping in NR iteration (ngspice niiter.c). Default: false */
+  nodeDamping?: boolean;
 }
 
 /** Result of a Newton-Raphson solve. */
@@ -65,13 +84,23 @@ export interface NRResult {
   iterations: number;
   /** Final solution vector (node voltages + branch currents). */
   voltages: Float64Array;
-  /** Per-iteration convergence trace for blame tracking. */
-  trace: ConvergenceTrace[];
+  /** Index of the element with the largest voltage change in the final iteration; -1 when unknown. */
+  largestChangeElement: number;
+  /** Index of the node with the largest voltage change in the final iteration; -1 when unknown. */
+  largestChangeNode: number;
 }
 
 // ---------------------------------------------------------------------------
 // Voltage limiting functions
 // ---------------------------------------------------------------------------
+
+/**
+ * Result of a pnjlim call, matching ngspice DEVpnjlim output parameters.
+ */
+export interface PnjlimResult {
+  value: number;
+  limited: boolean;
+}
 
 /**
  * PN-junction voltage limiting (pnjlim).
@@ -80,36 +109,55 @@ export interface NRResult {
  * compressing large forward-bias steps logarithmically, and clamping
  * large reverse-bias steps.
  *
- * When |vnew - vold| <= 2*vt AND vnew <= vcrit, the step is within the
- * quasi-linear region and is returned unchanged. Otherwise the step is
- * compressed:
- * - Forward (vnew > vcrit, large step): vold + vt*(1 + ln((vnew-vold)/vt))
- * - Reverse (large negative step): vold - 2*vt
+ * Matches ngspice DEVpnjlim (devsup.c:50-58) exactly, including the
+ * `*icheck` output parameter exposed here as the `limited` field.
  *
  * @param vnew  - Proposed new junction voltage
  * @param vold  - Previous junction voltage
  * @param vt    - Thermal voltage (kT/q, ~0.02585 V at 300 K)
  * @param vcrit - Critical voltage above which limiting engages
- * @returns     - Voltage-limited new junction voltage
+ * @returns     - { value: limited voltage, limited: true if clipping was applied }
  */
-export function pnjlim(vnew: number, vold: number, vt: number, vcrit: number): number {
+/**
+ * Module-level reusable result object for pnjlim(). Mutated and returned on
+ * every call -- callers MUST extract .value and .limited before the next
+ * pnjlim() call, as the object is shared. Single-threaded, safe.
+ */
+const _pnjlimResult: PnjlimResult = { value: 0, limited: false };
+
+export function pnjlim(vnew: number, vold: number, vt: number, vcrit: number): PnjlimResult {
+  let limited = false;
   if (vnew > vcrit && Math.abs(vnew - vold) > 2 * vt) {
     // Large forward-bias step: compress logarithmically to prevent exp() overflow
     if (vold > 0) {
-      const arg = 1 + (vnew - vold) / vt;
+      const arg = (vnew - vold) / vt;
       if (arg > 0) {
-        vnew = vold + vt * Math.log(arg);
+        vnew = vold + vt * (2 + Math.log(arg - 2));
       } else {
-        vnew = vcrit;
+        vnew = vold - vt * (2 + Math.log(2 - arg));
       }
     } else {
       vnew = vt * Math.log(vnew / vt);
     }
+    limited = true;
+  } else {
+    // Reverse-bias limiting (ngspice devsup.c AlansFixes, lines 65-79)
+    if (vnew < 0) {
+      let arg: number;
+      if (vold > 0) {
+        arg = -vold - 1;
+      } else {
+        arg = 2 * vold - 1;
+      }
+      if (vnew < arg) {
+        vnew = arg;
+        limited = true;
+      }
+    }
   }
-  // Reverse-bias steps are not limited: exp(vnew/vt) ≈ 0 for large negative
-  // vnew, so no exponential runaway can occur. Limiting reverse steps would
-  // cause extremely slow convergence for reverse-biased junctions.
-  return vnew;
+  _pnjlimResult.value = vnew;
+  _pnjlimResult.limited = limited;
+  return _pnjlimResult;
 }
 
 /**
@@ -221,23 +269,24 @@ export function limvds(vnew: number, vold: number): number {
  *  3. Stamps nonlinear contributions at the current operating point
  *  4. Finalizes and factors the matrix
  *  5. Solves for updated voltages
- *  6. Node damping (ngspice heuristic): if max voltage change > 10 V, scale
- *     all updates down (min factor 0.1) to prevent runaway steps
- *  7. Backtracking line search: if the max voltage change is growing vs the
- *     previous iteration, halve the step to break divergence
- *  8. Updates operating points — elements apply voltage limiting and update
+ *  6. Node damping (ngspice niiter.c, DCOP only): if max voltage change > 10 V,
+ *     scale all updates down (min factor 0.1) to prevent runaway steps
+ *  7. Updates operating points — elements apply voltage limiting and update
  *     their linearized companion model (geq/ieq) for the next iteration
- *  9. Checks global node-voltage convergence and element-specific checks
- * 10. Records a ConvergenceTrace entry
+ *  8. Checks global node-voltage convergence (ngspice NIconvTest) and
+ *     element-specific checks
+ *  9. Tracks the element/node with the largest voltage change for blame reporting
  *
  * Non-convergence is returned via the result object, never thrown. The caller
  * (DC operating point solver) decides the appropriate fallback strategy.
  *
  * @param opts - NR iteration options
- * @returns    - NRResult with convergence status, iterations, voltages, trace
+ * @returns    - NRResult with convergence status, iterations, voltages, and blame scalars
  */
 export function newtonRaphson(opts: NROptions): NRResult {
-  const { solver, elements, matrixSize, maxIterations, reltol, abstol, iabstol, diagnostics } = opts;
+  const { solver, elements, matrixSize, maxIterations: rawMaxIter, reltol, abstol, iabstol, diagnostics } = opts;
+  // ngspice niiter.c:37-38 — unconditional floor: if (maxIter < 100) maxIter = 100;
+  const maxIterations = Math.max(rawMaxIter, 100);
   const nodeCount = opts.nodeCount ?? matrixSize;
 
   const assembler = new MNAAssembler(solver);
@@ -248,8 +297,9 @@ export function newtonRaphson(opts: NROptions): NRResult {
   const voltages = opts.voltagesBuffer ?? new Float64Array(matrixSize);
   if (opts.voltagesBuffer) voltages.fill(0);
   const prevVoltages = opts.prevVoltagesBuffer ?? new Float64Array(matrixSize);
-  const trace: ConvergenceTrace[] = [];
-  let prevIterMaxChange = Infinity; // max voltage change from the previous iteration (for line search)
+
+  const statePool = opts.statePool ?? null;
+  let oldState0: Float64Array | null = null;
 
   // Initialize from initial guess if provided
   if (opts.initialGuess) {
@@ -265,46 +315,83 @@ export function newtonRaphson(opts: NROptions): NRResult {
   // (sets up geq/ieq for the first stampNonlinear call)
   assembler.updateOperatingPoints(elements, voltages);
 
+  // Stamp linear contributions once before the NR loop. These values are
+  // operating-point-independent and identical on every iteration -- hoisting
+  // them avoids redundant COO rebuilds and CSC scatters.
+  // First iteration: full assembly establishes sparsity pattern + _cooToCsc.
+  solver.beginAssembly(matrixSize);
+  assembler.stampLinear(elements);
+  // Capture the linear-only RHS and COO position before nonlinear stamps.
+  const linearCooCount = solver.cooCount;
+  solver.captureLinearRhs();
+
+  assembler.stampNonlinear(elements);
+  solver.finalize();
+  // Snapshot CSC values for linear-only contributions (scatter-adds only
+  // the linear COO portion [0, linearCooCount) into a separate buffer).
+  solver.saveLinearBase(linearCooCount);
+
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     // Save previous voltages for convergence check
     prevVoltages.set(voltages);
 
-    // 1. Clear matrix and re-stamp both linear and nonlinear contributions
-    solver.beginAssembly(matrixSize);
-    assembler.stampLinear(elements);
-    assembler.stampNonlinear(elements);
-    solver.finalize();
+    if (iteration === 0) {
+      // First iteration: matrix already assembled above, no work needed.
+    } else {
+      // Subsequent iterations: restore the linear base (CSC values + RHS),
+      // reset COO cursor to the linear boundary, re-stamp only nonlinear
+      // contributions, and partial-refill CSC with nonlinear entries only.
+      solver.restoreLinearBase();
+      solver.setCooCount(linearCooCount);
+      assembler.stampNonlinear(elements);
+      solver.finalize(linearCooCount);
+    }
+
+    // 1b. Diagonal gmin augmentation (ngspice LoadGmin, spsmp.c:448-478):
+    //     Add gmin to every diagonal element before factorization.
+    if (opts.diagonalGmin) {
+      solver.addDiagonalGmin(opts.diagonalGmin);
+    }
 
     // 2. Factor — if singular, record and report non-convergence
     const factorResult = solver.factor();
     if (!factorResult.success) {
-      trace.push(_makeTrace(iteration, -1, -1, false));
       diagnostics.emit(
         makeDiagnostic("singular-matrix", "error", "Singular matrix during NR iteration", {
           explanation: `The MNA matrix became singular at iteration ${iteration + 1}.`,
           suggestions: [],
         }),
       );
-      return { converged: false, iterations: iteration + 1, voltages, trace };
+      return { converged: false, iterations: iteration + 1, voltages, largestChangeElement: -1, largestChangeNode: -1 };
     }
 
-    // 3. Solve for new voltages (written into voltages in-place)
+    // 3. Save state0 before solve for state0 damping (DO10)
+    if (statePool) {
+      if (!oldState0) {
+        oldState0 = new Float64Array(statePool.state0.length);
+      }
+      oldState0.set(statePool.state0);
+    }
+
+    // 4. Solve for new voltages (written into voltages in-place)
     solver.solve(voltages);
 
-    // 4. For purely linear circuits, the first solve gives the exact answer.
+    // 5. For purely linear circuits, the first solve gives the exact answer.
     //    Return immediately — no convergence iteration needed.
     if (!hasNonlinear) {
-      trace.push(_makeTrace(iteration, 0, -1, false));
-      return { converged: true, iterations: iteration + 1, voltages, trace };
+      return { converged: true, iterations: iteration + 1, voltages, largestChangeElement: -1, largestChangeNode: -1 };
     }
 
-    // 5a. Node damping (ngspice heuristic from niiter.c):
+    // 5a. Update operating points BEFORE damping (DO12 reorder):
+    //     elements apply voltage limiting, recompute their companion model
+    //     (geq/ieq) for the next stampNonlinear. Sets assembler.noncon.
+    assembler.updateOperatingPoints(elements, voltages);
+
+    // 5b. Node damping (ngspice niiter.c:204-229):
+    //     Guards: nodeDamping enabled, noncon != 0, isDcOp, iteration > 0.
     //     If any voltage node changed by more than 10V, scale ALL updates
     //     by 10/maxDelta. Minimum scale factor 0.1.
-    //     Active from iteration 0: prevVoltages is always set from the initial
-    //     guess at the top of each iteration before solver.solve(), so it is
-    //     always finite and well-defined — including the first iteration.
-    {
+    if (opts.nodeDamping && assembler.noncon !== 0 && opts.isDcOp && iteration > 0) {
       let maxDelta = 0;
       for (let i = 0; i < nodeCount; i++) {
         const delta = Math.abs(voltages[i] - prevVoltages[i]);
@@ -315,38 +402,27 @@ export function newtonRaphson(opts: NROptions): NRResult {
         for (let i = 0; i < nodeCount; i++) {
           voltages[i] = prevVoltages[i] + dampFactor * (voltages[i] - prevVoltages[i]);
         }
-      }
-    }
-
-    // 5b. Backtracking line search: activates only when the NR step is GROWING
-    //     (max voltage change this iteration exceeds the previous iteration).
-    //     A growing step indicates divergence, not convergence. One halving
-    //     is applied as a one-shot perturbation to redirect toward convergence.
-    //     Only active after iteration 1 to allow the first step to be unrestricted.
-    if (iteration >= 2) {
-      let maxChange = 0;
-      for (let i = 0; i < nodeCount; i++) {
-        maxChange = Math.max(maxChange, Math.abs(voltages[i] - prevVoltages[i]));
-      }
-      if (maxChange > prevIterMaxChange && maxChange > abstol * 100) {
-        // Step is growing: halve to break divergence
-        for (let i = 0; i < nodeCount; i++) {
-          voltages[i] = prevVoltages[i] + 0.5 * (voltages[i] - prevVoltages[i]);
+        // DO10: damp state0 alongside voltages
+        if (statePool && oldState0) {
+          const s0 = statePool.state0;
+          for (let i = 0; i < s0.length; i++) {
+            s0[i] = oldState0[i] + dampFactor * (s0[i] - oldState0[i]);
+          }
         }
-        prevIterMaxChange = maxChange * 0.5;
-      } else {
-        prevIterMaxChange = maxChange;
       }
     }
 
-    // 5c. Convergence checks (skip iteration 0 — no previous operating point yet)
+    // 5c. Convergence checks — skip when noncon > 0 or iteration === 0
     let globalConverged = false;
     let elemConverged = false;
     let largestChangeNode = 0;
     let largestChangeMag = 0;
 
-    if (iteration > 0) {
-      // 6. Check global node-voltage convergence criterion
+    if (assembler.noncon === 0 && iteration > 0) {
+      // 6. Check global node-voltage convergence criterion (ngspice NIconvTest / niconv.c)
+      //    tol = reltol * max(|old|, |new|) + absTol
+      //    where absTol = abstol (VNTOL, 1e-6 V) for voltage rows,
+      //          absTol = iabstol (ABSTOL, 1e-12 A) for branch-current rows.
       globalConverged = true;
       for (let i = 0; i < matrixSize; i++) {
         const delta = Math.abs(voltages[i] - prevVoltages[i]);
@@ -354,7 +430,8 @@ export function newtonRaphson(opts: NROptions): NRResult {
           largestChangeMag = delta;
           largestChangeNode = i;
         }
-        const tol = abstol + reltol * Math.abs(voltages[i]);
+        const absTol = i < nodeCount ? abstol : iabstol;
+        const tol = reltol * Math.max(Math.abs(voltages[i]), Math.abs(prevVoltages[i])) + absTol;
         if (delta > tol) {
           globalConverged = false;
         }
@@ -364,67 +441,33 @@ export function newtonRaphson(opts: NROptions): NRResult {
       elemConverged = assembler.checkAllConverged(elements, voltages, prevVoltages, reltol, iabstol);
     }
 
-    // 5d. Update operating points: elements apply voltage limiting, recompute
-    //     their companion model (geq/ieq) for the next stampNonlinear.
-    assembler.updateOperatingPoints(elements, voltages);
-
     // 8. Find element with largest contribution to non-convergence (blame tracking)
     let largestChangeElement = -1;
-    let largestElemDelta = -1;
-    for (let ei = 0; ei < elements.length; ei++) {
-      const el = elements[ei];
-      if (!el.isNonlinear) continue;
-      let elDelta = 0;
-      for (const ni of el.pinNodeIds) {
-        if (ni > 0 && ni - 1 < matrixSize) {
-          const d = Math.abs(voltages[ni - 1] - prevVoltages[ni - 1]);
-          if (d > elDelta) elDelta = d;
+    if (opts.enableBlameTracking) {
+      let largestElemDelta = -1;
+      for (let ei = 0; ei < elements.length; ei++) {
+        const el = elements[ei];
+        if (!el.isNonlinear) continue;
+        let elDelta = 0;
+        for (const ni of el.pinNodeIds) {
+          if (ni > 0 && ni - 1 < matrixSize) {
+            const d = Math.abs(voltages[ni - 1] - prevVoltages[ni - 1]);
+            if (d > elDelta) elDelta = d;
+          }
+        }
+        if (elDelta > largestElemDelta) {
+          largestElemDelta = elDelta;
+          largestChangeElement = ei;
         }
       }
-      if (elDelta > largestElemDelta) {
-        largestElemDelta = elDelta;
-        largestChangeElement = ei;
-      }
     }
-
-    // 9. Oscillation detection: same node shows large change in consecutive iters
-    let oscillating = false;
-    if (trace.length > 0) {
-      const prevTrace = trace[trace.length - 1];
-      if (
-        prevTrace.largestChangeNode === largestChangeNode &&
-        largestChangeMag > abstol * 10
-      ) {
-        oscillating = true;
-      }
-    }
-
-    trace.push(_makeTrace(iteration, largestChangeNode, largestChangeElement, oscillating));
 
     // 10. Return on convergence
     if (globalConverged && elemConverged) {
-      return { converged: true, iterations: iteration + 1, voltages, trace };
+      return { converged: true, iterations: iteration + 1, voltages, largestChangeElement, largestChangeNode };
     }
   }
 
-  return { converged: false, iterations: maxIterations, voltages, trace };
+  return { converged: false, iterations: maxIterations, voltages, largestChangeElement: -1, largestChangeNode: -1 };
 }
 
-// ---------------------------------------------------------------------------
-// Internal helper
-// ---------------------------------------------------------------------------
-
-function _makeTrace(
-  iteration: number,
-  largestChangeNode: number,
-  largestChangeElement: number,
-  oscillating: boolean,
-): ConvergenceTrace {
-  return {
-    iteration,
-    largestChangeNode,
-    largestChangeElement,
-    oscillating,
-    fallbackLevel: "none",
-  };
-}

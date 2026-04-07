@@ -183,7 +183,7 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
 
   // --- Ground bus (y=15 horizontal bus) ---
   // Vac.pos@(4,15) → Vdc.neg@(9,15)
-  await builder.drawWireExplicit('Vac', 'pos', 'Vdc', 'neg');
+  await builder.drawWireExplicit('Vac', 'neg', 'Vdc', 'neg');
   // Vdc.neg@(9,15) → R2.B@(33,15)
   await builder.drawWireExplicit('Vdc', 'neg', 'R2', 'B');
   // R2.B@(33,15) → (57,15) → Rload.A@(57,11) — extends bus and connects load
@@ -199,7 +199,7 @@ async function buildBuckBJT(builder: UICircuitBuilder): Promise<void> {
 
   // --- DRV source ---
   // T_DRV_S@(4,9) → Vac.neg@(4,11)
-  await builder.drawWireExplicit('T_DRV_S', 'in', 'Vac', 'neg');
+  await builder.drawWireExplicit('T_DRV_S', 'in', 'Vac', 'pos');
 
   // --- NPN section ---
   // R1.A@(20,10) → Q1.C@(20,11)

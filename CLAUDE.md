@@ -122,3 +122,4 @@ Authoring workflow:
 - Unit/integration: Vitest — `src/**/__tests__/*.test.ts`
 - E2E: Playwright — `e2e/gui/` (browser interaction), `e2e/parity/` (postMessage API)
 - E2E harness: `SimulatorHarness` in `e2e/fixtures/simulator-harness.ts`
+- **Diagnosing engine crashes/stagnation**: Enable the convergence log (UI: Analysis → Convergence Log → Enable; MCP: `circuit_convergence_log { action: "enable" }`; headless: `coordinator.setConvergenceLogEnabled(true)`) BEFORE running the simulation, then inspect per-step records to identify the blame element and dt collapse pattern.

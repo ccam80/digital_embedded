@@ -1,51 +1,33 @@
 {
   "summary": {
-    "passed": 7985,
-    "failed": 6,
+    "passed": 56,
+    "failed": 2,
     "skipped": 0,
-    "totalFiles": 340,
-    "durationSeconds": 24.3
+    "totalFiles": 3,
+    "durationSeconds": 1.2
   },
   "failures": [
     {
-      "message": "expected false to be true // Object.is equality",
-      "count": 6,
+      "message": "V(drain) after VTO=2.5: relative error 61.9375% exceeds 0.1% (actual=1.840507626028466, expected=4.835494)",
+      "count": 1,
       "locations": [
         {
-          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
-          "test": "parsed .MODEL card applied via applySpiceImportResult: circuit compiles and DC converges",
-          "line": 201,
-          "column": 27
-        },
+          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
+          "test": "setParam('VTO', 2.5) shifts DC OP to match SPICE reference",
+          "line": 56,
+          "column": 11
+        }
+      ]
+    },
+    {
+      "message": "V(drain) after KP=240µ: relative error 102.8913% exceeds 0.1% (actual=1.840507626028466, expected=0.9071396)",
+      "count": 1,
+      "locations": [
         {
-          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
-          "test": "compile with default IS vs IS=1e-20 produces different collector voltage",
-          "line": 235,
-          "column": 34
-        },
-        {
-          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
-          "test": "deserialized circuit produces same DC result as pre-serialization",
-          "line": 323,
-          "column": 35
-        },
-        {
-          "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
-          "test": "parseModelCard then applySpiceImportResult stores params and DC converges",
-          "line": 402,
-          "column": 27
-        },
-        {
-          "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
-          "test": "default params remain at BJT defaults when only IS is overridden",
-          "line": 219,
-          "column": 47
-        },
-        {
-          "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
-          "test": "deserialized circuit with overrides produces same DC result as pre-serialization",
-          "line": 272,
-          "column": 35
+          "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
+          "test": "setParam('KP', 240µ) shifts DC OP to match SPICE reference",
+          "line": 56,
+          "column": 11
         }
       ]
     }

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { DiagnosticCollector, makeDiagnostic, type ConvergenceTrace } from "../diagnostics.js";
+import { DiagnosticCollector, makeDiagnostic } from "../diagnostics.js";
 import type { Diagnostic } from "../../../compile/types.js";
 
 describe("DiagnosticCollector", () => {
@@ -223,50 +223,3 @@ describe("makeDiagnostic", () => {
   });
 });
 
-describe("ConvergenceTrace type", () => {
-  it("should have correct type structure", () => {
-    const trace: ConvergenceTrace = {
-      largestChangeElement: 5,
-      largestChangeNode: 3,
-      oscillating: false,
-      iteration: 10,
-      fallbackLevel: "none",
-    };
-
-    expect(trace.largestChangeElement).toBe(5);
-    expect(trace.largestChangeNode).toBe(3);
-    expect(trace.oscillating).toBe(false);
-    expect(trace.iteration).toBe(10);
-    expect(trace.fallbackLevel).toBe("none");
-  });
-
-  it("should support all fallbackLevel variants", () => {
-    const trace1: ConvergenceTrace = {
-      largestChangeElement: 0,
-      largestChangeNode: 0,
-      oscillating: false,
-      iteration: 0,
-      fallbackLevel: "none",
-    };
-
-    const trace2: ConvergenceTrace = {
-      largestChangeElement: 0,
-      largestChangeNode: 0,
-      oscillating: false,
-      iteration: 0,
-      fallbackLevel: "gmin",
-    };
-
-    const trace3: ConvergenceTrace = {
-      largestChangeElement: 0,
-      largestChangeNode: 0,
-      oscillating: false,
-      iteration: 0,
-      fallbackLevel: "source-step",
-    };
-
-    expect(trace1.fallbackLevel).toBe("none");
-    expect(trace2.fallbackLevel).toBe("gmin");
-    expect(trace3.fallbackLevel).toBe("source-step");
-  });
-});

@@ -30,6 +30,9 @@ import type { AnalogElement } from "./element.js";
 export class MNAAssembler {
   private readonly _solver: SparseSolver;
 
+  /** Number of elements whose updateOperatingPoint reported limiting (ngspice CKTnoncon). */
+  noncon = 0;
+
   /**
    * @param solver - The shared SparseSolver instance used for all stamp calls.
    */
@@ -92,9 +95,11 @@ export class MNAAssembler {
     elements: readonly AnalogElement[],
     voltages: Float64Array,
   ): void {
+    this.noncon = 0;
     for (const el of elements) {
       if (el.isNonlinear && el.updateOperatingPoint) {
-        el.updateOperatingPoint(voltages);
+        const limited = el.updateOperatingPoint(voltages);
+        if (limited) this.noncon++;
       }
     }
   }

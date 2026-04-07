@@ -15,6 +15,10 @@
  *
  * NR convergence in NDR region: voltage steps are clamped to 0.1V per
  * iteration to prevent oscillation between the peak and valley.
+ *
+ * When CJO > 0 or TT > 0, junction capacitance is added via stampCompanion().
+ * The diffusion conductance uses the total dI/dV from tunnelDiodeIV (all
+ * current components), not just the Shockley term.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -30,19 +34,29 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { ReactiveAnalogElementCore } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import type { IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import {
+  computeJunctionCapacitance,
+  computeJunctionCharge,
+} from "./diode.js";
+import {
+  capacitorConductance,
+  capacitorHistoryCurrent,
+} from "../../solver/analog/integration.js";
+import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { VT } from "../../core/constants.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
 // ---------------------------------------------------------------------------
 
-/** Thermal voltage at 300 K (kT/q in volts). */
-const VT = 0.02585;
+// VT (thermal voltage) imported from ../../core/constants.js
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -68,8 +82,13 @@ export const { paramDefs: TUNNEL_DIODE_PARAM_DEFS, defaults: TUNNEL_DIODE_PARAM_
     VV: { default: 0.35,  unit: "V", description: "Valley voltage" },
   },
   secondary: {
-    IS: { default: 1e-14, unit: "A", description: "Shockley saturation current" },
-    N:  { default: 1,                description: "Emission coefficient" },
+    IS:  { default: 1e-14, unit: "A", description: "Shockley saturation current" },
+    N:   { default: 1,                description: "Emission coefficient" },
+    CJO: { default: 0,    unit: "F",  description: "Zero-bias junction capacitance" },
+    VJ:  { default: 1,    unit: "V",  description: "Junction built-in potential" },
+    M:   { default: 0.5,              description: "Grading coefficient" },
+    TT:  { default: 0,    unit: "s",  description: "Transit time" },
+    FC:  { default: 0.5,              description: "Forward-bias capacitance coefficient" },
   },
 });
 
@@ -128,14 +147,31 @@ export function tunnelDiodeIV(
 }
 
 // ---------------------------------------------------------------------------
-// State schema declaration
+// State schema declarations
 // ---------------------------------------------------------------------------
 
+// Slot index constants — shared between both schema variants.
+const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_V = 6, SLOT_Q = 7;
+
+/** Schema for resistive tunnel diode (no junction capacitance): 4 slots. */
 const TUNNEL_DIODE_STATE_SCHEMA = defineStateSchema("TunnelDiodeElement", [
-  { name: "VD", doc: "Tunnel diode junction voltage (V)", init: { kind: "zero" } },
-  { name: "GEQ", doc: "Differential conductance (S)", init: { kind: "constant", value: 1e-12 } },
-  { name: "IEQ", doc: "Linearized current source (A)", init: { kind: "zero" } },
-  { name: "ID", doc: "Diode current (A)", init: { kind: "zero" } },
+  { name: "VD",  doc: "Tunnel diode junction voltage (V)",    init: { kind: "zero" } },
+  { name: "GEQ", doc: "Differential conductance (S)",         init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ", doc: "Linearized current source (A)",        init: { kind: "zero" } },
+  { name: "ID",  doc: "Diode current (A)",                    init: { kind: "zero" } },
+]);
+
+/** Schema for capacitive tunnel diode (CJO > 0 or TT > 0): 8 slots. */
+const TUNNEL_DIODE_CAP_STATE_SCHEMA = defineStateSchema("TunnelDiodeElement_cap", [
+  { name: "VD",      doc: "Tunnel diode junction voltage (V)",                      init: { kind: "zero" } },
+  { name: "GEQ",     doc: "Differential conductance (S)",                           init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ",     doc: "Linearized current source (A)",                          init: { kind: "zero" } },
+  { name: "ID",      doc: "Diode current (A)",                                      init: { kind: "zero" } },
+  { name: "CAP_GEQ", doc: "Junction-capacitance companion conductance",             init: { kind: "zero" } },
+  { name: "CAP_IEQ", doc: "Junction-capacitance companion history current",         init: { kind: "zero" } },
+  { name: "V",       doc: "Junction voltage at current step (for companion)",       init: { kind: "zero" } },
+  { name: "Q",       doc: "Junction charge at current step (history from s1/s2/s3)", init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -147,7 +183,7 @@ export function createTunnelDiodeElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): ReactiveAnalogElementCore {
+): PoolBackedAnalogElementCore {
   const nodeAnode   = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
@@ -157,49 +193,80 @@ export function createTunnelDiodeElement(
   }
 
   const params: Record<string, number> = {
-    IP: readParam("IP"),
-    VP: readParam("VP"),
-    IV: readParam("IV"),
-    VV: readParam("VV"),
-    IS: readParam("IS"),
-    N:  readParam("N"),
+    IP:  readParam("IP"),
+    VP:  readParam("VP"),
+    IV:  readParam("IV"),
+    VV:  readParam("VV"),
+    IS:  readParam("IS"),
+    N:   readParam("N"),
+    CJO: readParam("CJO"),
+    VJ:  readParam("VJ"),
+    M:   readParam("M"),
+    TT:  readParam("TT"),
+    FC:  readParam("FC"),
   };
 
-  // State pool slot indices
-  const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
+  const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
   // Pool binding — set by initState
   let s0: Float64Array;
+  let s1: Float64Array;
+  let s2: Float64Array;
+  let s3: Float64Array;
   let base: number;
 
   function recompute(v: number): void {
     const { i, dIdV } = tunnelDiodeIV(v, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
-    s0[base + SLOT_ID] = i;
-    s0[base + SLOT_GEQ] = dIdV; // dI/dV is the conductance (can be negative in NDR)
-    s0[base + SLOT_IEQ] = i - dIdV * v;
+    // dIdV already includes GMIN from tunnelDiodeIV; add GMIN*v to current (DD5)
+    s0[base + SLOT_ID] = i + GMIN * v;
+    s0[base + SLOT_GEQ] = dIdV;
+    s0[base + SLOT_IEQ] = (i + GMIN * v) - dIdV * v;
   }
 
   function isInNdrRegion(v: number): boolean {
     return v > params.VP * 0.8 && v < params.VV * 1.2;
   }
 
-  return {
+  const element: PoolBackedAnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: true,
+    isReactive: hasCapacitance,
     poolBacked: true as const,
-    stateSize: 4,
-    stateSchema: TUNNEL_DIODE_STATE_SCHEMA,
+    stateSize: hasCapacitance ? 8 : 4,
+    stateSchema: hasCapacitance ? TUNNEL_DIODE_CAP_STATE_SCHEMA : TUNNEL_DIODE_STATE_SCHEMA,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
+      s1 = pool.state1;
+      s2 = pool.state2;
+      s3 = pool.state3;
+      this.s0 = s0;
+      this.s1 = s1;
+      this.s2 = s2;
+      this.s3 = s3;
       base = this.stateBaseOffset;
-      applyInitialValues(TUNNEL_DIODE_STATE_SCHEMA, pool, base, {});
+      applyInitialValues(this.stateSchema, pool, base, params);
     },
 
-    stamp(_solver: SparseSolver): void {
-      // No topology-constant contributions
+    stamp(solver: SparseSolver): void {
+      // Stamp junction capacitance companion model when active
+      if (hasCapacitance) {
+        const capGeq = s0[base + SLOT_CAP_GEQ];
+        const capIeq = s0[base + SLOT_CAP_IEQ];
+        if (capGeq !== 0 || capIeq !== 0) {
+          stampG(solver, nodeAnode,   nodeAnode,   capGeq);
+          stampG(solver, nodeAnode,   nodeCathode, -capGeq);
+          stampG(solver, nodeCathode, nodeAnode,   -capGeq);
+          stampG(solver, nodeCathode, nodeCathode, capGeq);
+          stampRHS(solver, nodeAnode,   -capIeq);
+          stampRHS(solver, nodeCathode, capIeq);
+        }
+      }
     },
 
     stampNonlinear(solver: SparseSolver): void {
@@ -213,7 +280,7 @@ export function createTunnelDiodeElement(
       stampRHS(solver, nodeCathode, ieq);
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;
@@ -222,10 +289,12 @@ export function createTunnelDiodeElement(
       // This prevents NR from jumping across the negative-resistance valley.
       const vdOld = s0[base + SLOT_VD];
       let vdNew: number;
+      let limited = false;
       if (isInNdrRegion(vdOld) || isInNdrRegion(vdRaw)) {
         const step = vdRaw - vdOld;
         if (Math.abs(step) > NDR_VSTEP_MAX) {
           vdNew = vdOld + Math.sign(step) * NDR_VSTEP_MAX;
+          limited = true;
         } else {
           vdNew = vdRaw;
         }
@@ -235,6 +304,7 @@ export function createTunnelDiodeElement(
 
       s0[base + SLOT_VD] = vdNew;
       recompute(vdNew);
+      return limited;
     },
 
     checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
@@ -263,6 +333,66 @@ export function createTunnelDiodeElement(
       if (key in params) params[key] = value;
     },
   };
+
+  // Attach stampCompanion and getLteTimestep only when junction capacitance is present
+  if (hasCapacitance) {
+    (element as unknown as { stampCompanion: (dt: number, method: IntegrationMethod, voltages: Float64Array) => void }).stampCompanion = function (
+      dt: number,
+      method: IntegrationMethod,
+      voltages: Float64Array,
+    ): void {
+      const va = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
+      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const vNow = va - vc;
+
+      // Depletion + transit-time capacitance at current operating point.
+      // For transit-time cap: use total dI/dV (all components) as gDiode.
+      const Cj = computeJunctionCapacitance(vNow, params.CJO, params.VJ, params.M, params.FC);
+      const { dIdV: gDiode } = tunnelDiodeIV(vNow, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
+      const Ct = params.TT * gDiode;
+      const Ctotal = Cj + Ct;
+
+      // Recover capacitor current from s1 (last accepted step via pool rotation)
+      const prevCapGeq = s1[base + SLOT_CAP_GEQ];
+      const prevCapIeq = s1[base + SLOT_CAP_IEQ];
+      const iNow = prevCapGeq * s1[base + SLOT_V] + prevCapIeq;
+      // First call detected by s1 voltage still zero (pool zero-initialised)
+      const vPrevForFormula = (s1[base + SLOT_V] === 0 && s1[base + SLOT_Q] === 0) ? vNow : s1[base + SLOT_V];
+
+      s0[base + SLOT_CAP_GEQ] = capacitorConductance(Ctotal, dt, method);
+      s0[base + SLOT_CAP_IEQ] = capacitorHistoryCurrent(Ctotal, dt, method, vNow, vPrevForFormula, iNow);
+      s0[base + SLOT_V] = vNow;
+    };
+
+    (element as unknown as { getLteTimestep: (dt: number, deltaOld: readonly number[], order: number, method: IntegrationMethod, lteParams: import("../../solver/analog/ckt-terr.js").LteParams) => number }).getLteTimestep = function (
+      dt: number,
+      deltaOld: readonly number[],
+      order: number,
+      method: IntegrationMethod,
+      lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
+    ): number {
+      const _q0 = s0[base + SLOT_Q];
+      const _q1 = s1[base + SLOT_Q];
+      const _q2 = s2[base + SLOT_Q];
+      const _q3 = s3[base + SLOT_Q];
+      const _h0 = dt;
+      const _h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
+      const _ccap0 = _h0 > 0 ? (_q0 - _q1) / _h0 : 0;
+      const _ccap1 = _h1 > 0 ? (_q1 - _q2) / _h1 : 0;
+      return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, _ccap0, _ccap1, lteParams);
+    };
+
+    (element as unknown as { updateChargeFlux: (v: Float64Array) => void }).updateChargeFlux = function(voltages: Float64Array): void {
+      const va = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
+      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const vd = va - vc;
+      const { i: iNowDiode } = tunnelDiodeIV(vd, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
+      s0[base + SLOT_Q] = computeJunctionCharge(vd, params.CJO, params.VJ, params.M, params.FC, params.TT, iNowDiode);
+      s0[base + SLOT_V] = vd;
+    };
+  }
+
+  return element;
 }
 
 // ---------------------------------------------------------------------------

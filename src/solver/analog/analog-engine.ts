@@ -21,10 +21,12 @@ import { SparseSolver } from "./sparse-solver.js";
 import { TimestepController } from "./timestep.js";
 import { HistoryStore } from "./integration.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
-import type { ConvergenceTrace } from "./diagnostics.js";
+import { ConvergenceLog } from "./convergence-log.js";
+import type { StepRecord } from "./convergence-log.js";
+
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import { newtonRaphson } from "./newton-raphson.js";
-import type { AnalogElement } from "./element.js";
+import type { AnalogElement, PoolBackedAnalogElement } from "./element.js";
 import { isPoolBacked } from "./element.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledWithBridges } from "./compiled-analog-circuit.js";
 import type { StatePool } from "./state-pool.js";
@@ -77,6 +79,7 @@ export class MNAEngine implements AnalogEngine {
   private _timestep: TimestepController = new TimestepController(DEFAULT_SIMULATION_PARAMS);
   private _history: HistoryStore = new HistoryStore(0);
   private _diagnostics: DiagnosticCollector = new DiagnosticCollector();
+  private _convergenceLog: ConvergenceLog = new ConvergenceLog(128);
 
   // -------------------------------------------------------------------------
   // State vectors (allocated in init, sized to matrixSize)
@@ -87,14 +90,9 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
   // Hoisted working buffers — allocated once in init() and reused every step.
   //
-  // `_stateCheckpoint`: persistent scratch buffer for snapshotting state0
-  // before each NR solve. Sized to `statePool.totalSlots`; null when the
-  // circuit has no state pool.
-  //
   // `_nrVoltages` and `_nrPrevVoltages`: per-iteration voltage arrays for
   // the NR solver. Sized to `matrixSize`.
   // -------------------------------------------------------------------------
-  private _stateCheckpoint: Float64Array | null = null;
   private _nrVoltages: Float64Array = new Float64Array(0);
   private _nrPrevVoltages: Float64Array = new Float64Array(0);
 
@@ -150,14 +148,11 @@ export class MNAEngine implements AnalogEngine {
     this._nrVoltages = new Float64Array(matrixSize);
     this._nrPrevVoltages = new Float64Array(matrixSize);
 
-    // Hoisted state-pool checkpoint buffer — sized to pool slot count when a pool is present.
-    const pool = (compiled as CompiledWithBridges).statePool ?? null;
-    this._stateCheckpoint = pool ? new Float64Array(pool.totalSlots) : null;
-
     this._solver = new SparseSolver();
     this._timestep = new TimestepController(this._params);
     this._history = new HistoryStore(elements.length);
     this._diagnostics = new DiagnosticCollector();
+    this._convergenceLog.clear();
 
     this._simTime = 0;
     this._lastDt = 0;
@@ -210,6 +205,7 @@ export class MNAEngine implements AnalogEngine {
     this._lastDt = 0;
     this._timestep = new TimestepController(this._params);
     this._diagnostics.clear();
+    this._convergenceLog.clear();
     this._stepCount = 0;
     for (const obs of this._measurementObservers) {
       obs.onReset();
@@ -225,7 +221,6 @@ export class MNAEngine implements AnalogEngine {
     this._prevVoltages = new Float64Array(0);
     this._nrVoltages = new Float64Array(0);
     this._nrPrevVoltages = new Float64Array(0);
-    this._stateCheckpoint = null;
     this._history = new HistoryStore(0);
     this._diagnostics.clear();
     this._changeListeners = [];
@@ -245,9 +240,12 @@ export class MNAEngine implements AnalogEngine {
    */
   step(): void {
     if (!this._compiled) return;
+    if (this._engineState === EngineState.ERROR) return;
 
     const { elements, matrixSize, nodeCount } = this._compiled;
     const params = this._params;
+    const logging = this._convergenceLog.enabled;
+    let stepRec: StepRecord | null = null;
 
     if (import.meta.env?.DEV && !this._devProbeRan) {
       this._devProbeRan = true;
@@ -296,190 +294,170 @@ export class MNAEngine implements AnalogEngine {
 
     this._prevVoltages.set(this._voltages);
     const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;
-    // Snapshot state0 into the hoisted scratch buffer (memcpy, no allocation).
-    // Mirrors the `_prevVoltages.set(_voltages)` pattern one line above.
-    if (statePool && this._stateCheckpoint) {
-      this._stateCheckpoint.set(statePool.state0);
-    }
 
     let dt = this._timestep.getClampedDt(this._simTime);
     const method = this._timestep.currentMethod;
 
-    // Stamp companion models for reactive elements
-    for (const el of elements) {
-      if (el.isReactive && el.stampCompanion) {
-        el.stampCompanion(dt, method, this._voltages);
-      }
+    if (logging) {
+      stepRec = {
+        stepNumber: this._stepCount,
+        simTime: this._simTime,
+        entryDt: dt,
+        acceptedDt: dt,
+        entryMethod: method,
+        exitMethod: method,
+        attempts: [],
+        lteWorstRatio: 0,
+        lteProposedDt: 0,
+        lteRejected: false,
+        outcome: "accepted",
+      };
     }
 
-    // NR solve with retry on convergence failure
-    let nrResult = newtonRaphson({
-      solver: this._solver,
-      elements,
-      matrixSize,
-      nodeCount,
-      maxIterations: params.maxIterations,
-      reltol: params.reltol,
-      abstol: params.abstol,
-      iabstol: params.iabstol,
-      initialGuess: this._voltages,
-      diagnostics: this._diagnostics,
-      voltagesBuffer: this._nrVoltages,
-      prevVoltagesBuffer: this._nrPrevVoltages,
-    });
+    // ---- Single retry loop (ngspice dctran.c:715 for(;;)) ----
+    // Both NR failure and LTE rejection feed back to the top.
+    // Each iteration: stamp companions → NR solve → LTE check.
+    let newDt = dt;
+    let worstRatio = 0;
+    let olddelta = dt;    // ngspice dctran.c:729 — tracks previous delta for two-strike delmin
 
-    if (!nrResult.converged) {
-      // Retry with progressively halved dt
-      let retryDt = dt / 2;
-      let recovered = false;
+    // ngspice dctran.c:704-706 — rotate deltaOld BEFORE entering the loop.
+    this._timestep.rotateDeltaOld();
 
-      while (retryDt >= params.minTimeStep) {
-        // Restore voltages before retry
-        this._voltages.set(this._prevVoltages);
-        if (statePool && this._stateCheckpoint) {
-          statePool.state0.set(this._stateCheckpoint);
+    for (;;) {
+      // ngspice dctran.c:735 — deltaOld[0] = delta each iteration.
+      this._timestep.setDeltaOldCurrent(dt);
+
+      // ngspice dctran.c:731 — advance simTime at top of each iteration.
+      this._simTime += dt;
+
+      // --- Companion stamp (ngspice dctran.c:736 NIcomCof) ---
+      for (const el of elements) {
+        if (el.isReactive && el.stampCompanion) {
+          el.stampCompanion(dt, this._timestep.currentMethod, this._voltages);
         }
+      }
 
-        // Restamp companion models with reduced dt
+      // --- NR solve (ngspice dctran.c:770 NIiter) ---
+      const nrResult = newtonRaphson({
+        solver: this._solver,
+        elements,
+        matrixSize,
+        nodeCount,
+        maxIterations: params.transientMaxIterations,
+        reltol: params.reltol,
+        abstol: params.abstol,
+        iabstol: params.iabstol,
+        initialGuess: this._voltages,
+        diagnostics: this._diagnostics,
+        voltagesBuffer: this._nrVoltages,
+        prevVoltagesBuffer: this._nrPrevVoltages,
+        enableBlameTracking: logging,
+      });
+
+      // --- Logging (merged from initial and retry blocks) ---
+      if (logging) {
+        stepRec!.attempts.push({
+          dt,
+          method: this._timestep.currentMethod,
+          iterations: nrResult.iterations,
+          converged: nrResult.converged,
+          blameElement: nrResult.largestChangeElement,
+          blameNode: nrResult.largestChangeNode,
+          trigger: stepRec!.attempts.length === 0 ? "initial" : "nr-retry",
+        });
+      }
+
+      if (!nrResult.converged) {
+        // --- NR FAILED (ngspice dctran.c:793-810) ---
+        this._simTime -= dt;                              // ngspice dctran.c:796
+        this._voltages.set(this._prevVoltages);
+        dt = dt / 8;                                    // ngspice dctran.c:802
+        this._timestep.currentDt = dt;
+        this._timestep.currentOrder = 1;                // ngspice dctran.c:810 — order, NOT method
+        // fall through to delmin check below
+      } else {
+        // --- NR CONVERGED — evaluate LTE (ngspice dctran.c:830+) ---
+        this._timestep.currentDt = dt;
+        this._voltages.set(nrResult.voltages);
+
+        // Update charge/flux _NOW slots with converged voltages.
+        // stampCompanion wrote _NOW from previous-step voltages; overwrite
+        // with the converged NR solution so LTE sees accurate values.
         for (const el of elements) {
-          if (el.isReactive && el.stampCompanion) {
-            el.stampCompanion(retryDt, method, this._voltages);
+          if (el.isReactive && el.updateChargeFlux) {
+            el.updateChargeFlux(this._voltages);
           }
         }
 
-        nrResult = newtonRaphson({
-          solver: this._solver,
-          elements,
-          matrixSize,
-          nodeCount,
-          maxIterations: params.maxIterations,
-          reltol: params.reltol,
-          abstol: params.abstol,
-          iabstol: params.iabstol,
-          initialGuess: this._voltages,
-          diagnostics: this._diagnostics,
-          voltagesBuffer: this._nrVoltages,
-          prevVoltagesBuffer: this._nrPrevVoltages,
-        });
-
-        if (nrResult.converged) {
-          dt = retryDt;
-          this._timestep.currentDt = retryDt;
-          recovered = true;
-          break;
-        }
-
-        retryDt /= 2;
-      }
-
-      if (!recovered) {
-        // Identify the element with the largest voltage change from last trace
-        const trace = nrResult.trace;
-        const blameElement =
-          trace.length > 0 ? trace[trace.length - 1].largestChangeElement : -1;
-        const involvedElements = blameElement >= 0 ? [blameElement] : [];
-
-        this._diagnostics.emit(
-          makeDiagnostic("convergence-failed", "error", "Transient NR failed to converge", {
-            explanation:
-              "Newton-Raphson iteration failed to converge after halving the timestep to the " +
-              "minimum allowed value. Check the circuit for instability or stiff elements.",
-            involvedElements,
-            simTime: this._simTime,
-          }),
+        const lte = this._timestep.computeNewDt(
+          elements, this._history, this._simTime, dt,
         );
-        this._transitionState(EngineState.ERROR);
-        return;
-      }
-    }
+        newDt = lte.newDt;
+        worstRatio = lte.worstRatio;
 
-    // Accept the NR solution into _voltages
-    this._voltages.set(nrResult.voltages);
-
-    // LTE-based timestep rejection.
-    //
-    // `worstRatio` is the largest per-element (LTE / local_tolerance) ratio
-    // across all reactive elements, using the ngspice composite tolerance
-    // (trtol · (reltol · |Q_ref| + chargeTol)). A ratio > 1 means at least
-    // one element blew its tolerance and the step must be rejected.
-    const { newDt, worstRatio } = this._timestep.computeNewDt(elements, this._history, this._simTime, dt);
-
-    if (this._timestep.shouldReject(worstRatio)) {
-      // Restore voltages and state to start of this step
-      this._voltages.set(this._prevVoltages);
-      if (statePool && this._stateCheckpoint) {
-        statePool.state0.set(this._stateCheckpoint);
-      }
-      const rejectedDt = this._timestep.reject();
-
-      // Retry NR with progressively halved dt until convergence or minTimeStep.
-      // Mirrors the NR failure retry loop so LTE rejection has the same
-      // robustness as a direct NR failure.
-      let lteRetryDt = rejectedDt;
-      let lteRecovered = false;
-      let lteLastTrace: ConvergenceTrace[] = [];
-
-      while (lteRetryDt >= params.minTimeStep) {
-        // Restamp companion with current retry dt
-        for (const el of elements) {
-          if (el.isReactive && el.stampCompanion) {
-            el.stampCompanion(lteRetryDt, method, this._voltages);
-          }
+        if (logging) {
+          stepRec!.lteWorstRatio = worstRatio;
+          stepRec!.lteProposedDt = newDt;
         }
 
-        const retryResult = newtonRaphson({
-          solver: this._solver,
-          elements,
-          matrixSize,
-          nodeCount,
-          maxIterations: params.maxIterations,
-          reltol: params.reltol,
-          abstol: params.abstol,
-          iabstol: params.iabstol,
-          initialGuess: this._voltages,
-          diagnostics: this._diagnostics,
-          voltagesBuffer: this._nrVoltages,
-          prevVoltagesBuffer: this._nrPrevVoltages,
-        });
-        lteLastTrace = retryResult.trace;
-
-        if (retryResult.converged) {
-          this._voltages.set(retryResult.voltages);
-          dt = lteRetryDt;
-          this._timestep.currentDt = lteRetryDt;
-          lteRecovered = true;
-          break;
+        if (!this._timestep.shouldReject(worstRatio)) {
+          // --- LTE ACCEPTED (ngspice dctran.c:862-912) ---
+          break;  // exit the for(;;) — proceed to acceptance block
         }
 
-        // Not converged — restore and halve
+        // --- LTE REJECTED (ngspice dctran.c:917-931) ---
+        this._simTime -= dt;                            // ngspice dctran.c:920
+        if (logging) stepRec!.lteRejected = true;
+
         this._voltages.set(this._prevVoltages);
-        if (statePool && this._stateCheckpoint) {
-          statePool.state0.set(this._stateCheckpoint);
-        }
-        lteRetryDt /= 2;
+        dt = newDt;                                     // ngspice dctran.c:926
+        this._timestep.currentDt = dt;
+        // fall through to delmin check below
       }
 
-      if (!lteRecovered) {
-        const blameElement =
-          lteLastTrace.length > 0 ? lteLastTrace[lteLastTrace.length - 1].largestChangeElement : -1;
-        const involvedElements = blameElement >= 0 ? [blameElement] : [];
-        this._diagnostics.emit(
-          makeDiagnostic("convergence-failed", "error", "Transient NR failed on LTE retry", {
-            explanation:
-              "Newton-Raphson iteration failed to converge after LTE-triggered timestep reduction. " +
-              "Check the circuit for instability or stiff elements.",
-            involvedElements,
-            simTime: this._simTime,
-          }),
-        );
-        this._transitionState(EngineState.ERROR);
-        return;
+      // --- Common delmin check (ngspice dctran.c:934-945) ---
+      if (dt <= params.minTimeStep) {
+        if (olddelta > params.minTimeStep) {
+          // First time at delmin — allow one more try (ngspice dctran.c:936)
+          dt = params.minTimeStep;
+          this._timestep.currentDt = dt;
+        } else {
+          // Second consecutive delmin — give up (ngspice dctran.c:941-943)
+          this._diagnostics.emit(
+            makeDiagnostic("convergence-failed", "error",
+              "Timestep too small", {
+                explanation: `Newton-Raphson failed after timestep reduced to minimum (${params.minTimeStep}s).`,
+                involvedElements: [],
+                simTime: this._simTime,
+              }),
+          );
+          if (logging) {
+            stepRec!.outcome = "error";
+            stepRec!.acceptedDt = dt;
+            stepRec!.exitMethod = this._timestep.currentMethod;
+            this._convergenceLog.record(stepRec!);
+          }
+          this._transitionState(EngineState.ERROR);
+          return;
+        }
       }
+      olddelta = dt;   // track for next iteration's two-strike check
     }
+    // ---- End single retry loop ----
 
     // Accept the timestep
-    if (statePool) statePool.acceptTimestep();
-    this._simTime += dt;
+    if (statePool) {
+      statePool.acceptTimestep();
+      statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
+    }
+
+    if (logging) {
+      stepRec!.acceptedDt = dt;
+      stepRec!.exitMethod = this._timestep.currentMethod;
+      this._convergenceLog.record(stepRec!);
+    }
+
     const cac = this._compiled as CompiledWithBridges | undefined;
     if (cac?.timeRef) cac.timeRef.value = this._simTime;
     this._lastDt = dt;
@@ -516,6 +494,13 @@ export class MNAEngine implements AnalogEngine {
       return;
     }
     this._timestep.checkMethodSwitch(elements, this._history);
+
+    // ngspice dctran.c:856-876 — trial promotion from BDF-1 to trapezoidal.
+    // Gate: only attempt when the order-1 newDt > .9 * dt (LTE result exceeds
+    // 90% of the executed step). Matches ngspice dctran.c:862.
+    if (newDt > 0.9 * dt) {
+      this._timestep.tryOrderPromotion(elements, this._history, this._simTime, dt);
+    }
 
     // Run companion-state updates (edge detection, pin companion refresh,
     // latched logic levels) once on the accepted solution. Must run BEFORE
@@ -634,13 +619,27 @@ export class MNAEngine implements AnalogEngine {
       nodeCount,
       params: this._params,
       diagnostics: this._diagnostics,
+      statePool: cac.statePool ?? null,
     });
 
     if (result.converged) {
       this._voltages.set(result.nodeVoltages);
+
+      // Write initial charge/flux from the DC operating point so that
+      // seedHistory propagates correct Q values into all history slots.
+      // Without this, Q=0 in history causes cktTerr to see a step function
+      // on the first transient step → LTE rejection → stagnation.
+      // (ngspice equivalent: CAPload writes state0[qcap] during DCOP,
+      // then dctran.c:342 bcopy seeds state1 from state0.)
+      for (const el of elements) {
+        if (el.isReactive && el.updateChargeFlux) {
+          el.updateChargeFlux(this._voltages);
+        }
+      }
+
       if (cac.statePool) {
-        cac.statePool.state1.set(cac.statePool.state0);
-        cac.statePool.state2.set(cac.statePool.state0);
+        cac.statePool.seedHistory();
+        cac.statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
       }
 
       // Seed per-timestep companion state from the DC operating point.
@@ -806,6 +805,11 @@ export class MNAEngine implements AnalogEngine {
   /** Register a callback to receive Diagnostic records. */
   onDiagnostic(callback: (diag: Diagnostic) => void): void {
     this._diagnostics.onDiagnostic(callback);
+  }
+
+  /** Convergence log for post-mortem analysis. Enable via convergenceLog.enabled = true. */
+  get convergenceLog(): ConvergenceLog {
+    return this._convergenceLog;
   }
 
   // -------------------------------------------------------------------------

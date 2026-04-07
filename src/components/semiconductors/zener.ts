@@ -21,11 +21,12 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { ReactiveAnalogElementCore } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
+import { VT } from "../../core/constants.js";
 import { createDiodeElement, getDiodeInternalNodeCount } from "./diode.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
@@ -34,8 +35,7 @@ import { defineStateSchema, applyInitialValues } from "../../solver/analog/state
 // Physical constants
 // ---------------------------------------------------------------------------
 
-/** Thermal voltage at 300 K (kT/q in volts). */
-const VT = 0.02585;
+// VT (thermal voltage) imported from ../../core/constants.js
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -95,7 +95,7 @@ export function createZenerElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): ReactiveAnalogElementCore {
+): PoolBackedAnalogElementCore {
   const nodeAnode = pinNodes.get("A")!;
   const nodeCathode = pinNodes.get("K")!;
 
@@ -109,19 +109,33 @@ export function createZenerElement(
 
   // Pool binding — set by initState
   let s0: Float64Array;
+  let s1: Float64Array;
+  let s2: Float64Array;
+  let s3: Float64Array;
   let base: number;
+
+  // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
+  let pnjlimLimited = false;
 
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: true,
+    isReactive: false,
     poolBacked: true as const,
     stateSize: 4,
     stateSchema: ZENER_STATE_SCHEMA,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
+      s1 = pool.state1;
+      s2 = pool.state2;
+      s3 = pool.state3;
+      this.s0 = s0; this.s1 = s1; this.s2 = s2; this.s3 = s3;
       base = this.stateBaseOffset;
       applyInitialValues(ZENER_STATE_SCHEMA, pool, base, {});
     },
@@ -152,7 +166,9 @@ export function createZenerElement(
 
       // Apply pnjlim to prevent exponential runaway in forward region
       const vdOld = s0[base + SLOT_VD];
-      const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
+      const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
+      const vdLimited = vdResult.value;
+      pnjlimLimited = vdResult.limited;
 
       s0[base + SLOT_VD] = vdLimited;
 
@@ -179,6 +195,10 @@ export function createZenerElement(
     },
 
     checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+      // declare non-convergence immediately (DIOload sets CKTnoncon++)
+      if (pnjlimLimited) return false;
+
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;

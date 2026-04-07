@@ -57,7 +57,7 @@ export interface FileIOControllerOptions {
 }
 
 export function initFileIOController(ctx: AppContext, opts: FileIOControllerOptions = {}): FileIOController {
-  const { registry, facade, paletteUI, viewport, canvas, selection, params, isIframe } = ctx;
+  const { registry, facade, palette, paletteUI, viewport, canvas, selection, params, isIframe } = ctx;
 
   // -------------------------------------------------------------------------
   // HTTP resolver
@@ -82,6 +82,7 @@ export function initFileIOController(ctx: AppContext, opts: FileIOControllerOpti
     for (const el of loaded.elements) circuit.addElement(el);
     for (const w of loaded.wires) circuit.addWire(w);
     circuit.metadata = loaded.metadata;
+    palette.setActiveCircuit(circuit);
     paletteUI.render();
     opts.onCircuitLoaded?.();
     selection.clear();

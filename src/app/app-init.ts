@@ -18,6 +18,7 @@ import { initKeyboardHandler } from './keyboard-handler.js';
 import { AppSettings, SettingKey } from '../editor/settings.js';
 import { initFileIOController } from './file-io-controller.js';
 import { initAnalysisDialogs } from './analysis-dialogs.js';
+import { openConvergenceLogPanel } from './convergence-log-panel.js';
 import { initCanvasInteraction } from './canvas-interaction.js';
 import { initMenuAndToolbar, applyColorScheme } from './menu-toolbar.js';
 import type { MenuToolbarController } from './menu-toolbar.js';
@@ -149,6 +150,7 @@ export function initApp(search?: string): void {
   }
   const paletteContainer = document.getElementById('palette-content')!;
   const paletteUI = new PaletteUI(palette, paletteContainer, colorScheme);
+  palette.setActiveCircuit(circuit);
 
   // -------------------------------------------------------------------------
   // Engine + binding
@@ -380,6 +382,11 @@ export function initApp(search?: string): void {
         viewerController.restoreTraces(circuit.metadata.traces);
       }
     },
+    applyPreRunState(coordinator): void {
+      import('./convergence-log-panel.js').then(({ applyLoggingDesired }) => {
+        applyLoggingDesired(coordinator);
+      });
+    },
   });
 
   // Initialize file I/O controller
@@ -422,6 +429,10 @@ export function initApp(search?: string): void {
   });
 
   initAnalysisDialogs(ctx);
+
+  document.getElementById('btn-convergence-log')?.addEventListener('click', () => {
+    openConvergenceLogPanel(ctx);
+  });
 
   // -------------------------------------------------------------------------
   // postMessage adapter

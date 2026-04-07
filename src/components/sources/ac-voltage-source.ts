@@ -521,7 +521,8 @@ function createAcVoltageSourceElement(
       if (waveform === "square") {
         const halfPeriod = 1 / (2 * frequency);
         const idx = Math.floor((afterTime - phase) / halfPeriod) + 1;
-        return phase + idx * halfPeriod;
+        const result = phase + idx * halfPeriod;
+        return result > afterTime ? result : phase + (idx + 1) * halfPeriod;
       }
       if (waveform === "noise") {
         return afterTime + 1 / (20 * frequency);

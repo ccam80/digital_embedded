@@ -19,8 +19,8 @@
       - button "■" [ref=e18] [cursor=pointer]
       - generic [ref=e20]:
         - button "▶❙" [ref=e21] [cursor=pointer]
-        - button "1ms ▾" [ref=e22] [cursor=pointer]
-        - button "⏩" [ref=e23] [cursor=pointer]
+        - button "1.0249949999999999m ▾" [ref=e22] [cursor=pointer]
+        - button "⏩" [active] [ref=e23] [cursor=pointer]
       - generic [ref=e25]: "Speed:"
       - button "−" [ref=e26] [cursor=pointer]
       - textbox "Speed:" [ref=e27]: "1"
@@ -281,10 +281,17 @@
       - button "‹" [ref=e378] [cursor=pointer]
     - generic "Drag to resize palette" [ref=e379]
     - generic "Circuit editor canvas" [ref=e381]
-  - generic [ref=e382]:
-    - generic [ref=e383]: ⚠️
-    - generic [ref=e384]: "Circuit problem: Voltage source loop detected — two or more voltage sources form a loop with no resistance"
-    - button "×" [ref=e385] [cursor=pointer]
-    - button "96%" [ref=e387] [cursor=pointer]
-    - generic [ref=e388]: 52, 5
+  - generic "Drag to resize viewer" [ref=e382]
+  - generic [ref=e383]:
+    - generic [ref=e384]:
+      - button "Traces" [ref=e385] [cursor=pointer]
+      - button "Values" [ref=e386] [cursor=pointer]
+      - button "×" [ref=e387] [cursor=pointer]
+    - button "×" [ref=e391] [cursor=pointer]
+  - generic [ref=e393]:
+    - generic [ref=e394]: ⚠️
+    - generic [ref=e395]: "Simulation error: Analog engine stagnation: simTime stuck at 0.000008042546037421391s. The engine exhausted all internal retries without advancing. Check convergence log for details."
+    - button "×" [ref=e396] [cursor=pointer]
+    - button "96%" [ref=e398] [cursor=pointer]
+    - generic [ref=e399]: 31, 9
 ```

@@ -11,7 +11,7 @@
       - menuitem "Simulation" [ref=f1e8] [cursor=pointer]
       - generic [ref=f1e9] [cursor=pointer]: Analysis
       - generic [ref=f1e10] [cursor=pointer]: Tutorials
-      - textbox "Circuit name" [ref=f1e11]: Untitled
+      - textbox "Circuit name" [ref=f1e11]: buckbjt
       - generic [ref=f1e12]:
         - button "↶" [disabled] [ref=f1e13]
         - button "↷" [disabled] [ref=f1e14]

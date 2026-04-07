@@ -16,7 +16,7 @@ import {
   makeDiode,
 } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
-import type { AnalogElementCore } from "../element.js";
+import type { AnalogElementCore, ReactiveAnalogElement } from "../element.js";
 import { isPoolBacked } from "../element.js";
 
 // ---------------------------------------------------------------------------

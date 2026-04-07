@@ -19,6 +19,7 @@ import type { Diagnostic, SignalAddress, SignalValue } from "@/compile/types";
 import type { Wire } from "@/core/circuit";
 import type { CircuitElement } from "@/core/element";
 import type { AcParams, AcResult } from "@/solver/analog/ac-analysis";
+import type { StepRecord } from "@/solver/analog/convergence-log";
 
 export type WriteCall = { addr: SignalAddress; value: SignalValue };
 
@@ -83,6 +84,14 @@ export class MockCoordinator implements SimulationCoordinator {
   runToBreak(): void { /* no-op */ }
   dcOperatingPoint(): DcOpResult | null { return null; }
   acAnalysis(_params: AcParams): AcResult | null { return null; }
+
+  // §1.11 Convergence logging
+  getElementLabel(_index: number): string | undefined { return undefined; }
+  supportsConvergenceLog(): boolean { return false; }
+  setConvergenceLogEnabled(_enabled: boolean): void { /* no-op */ }
+  getConvergenceLog(_lastN?: number): StepRecord[] | null { return null; }
+  clearConvergenceLog(): void { /* no-op */ }
+
   async stepToTime(_targetSimTime: number, _budgetMs?: number): Promise<number> { return 0; }
   async sampleAtTimes<T>(_times: readonly number[], _capture: () => T, _wallBudgetMs?: number): Promise<readonly T[]> { return []; }
   syncTimeTarget(): void { /* no-op */ }

@@ -127,6 +127,7 @@ test.describe('Hot-loading model params via property popup', () => {
     await builder.placeLabeled('Resistor', 14, 5, 'Rc');
     await builder.setComponentProperty('Rc', 'resistance', 10000);
     await builder.placeLabeled('NpnBJT', 16, 9, 'Q1');
+    await builder.setSpiceParameter('Q1', 'IS', 1e-14);
     await builder.placeLabeled('DcVoltageSource', 7, 12, 'Vb');
     await builder.setComponentProperty('Vb', 'voltage', 5);
     await builder.placeLabeled('Resistor', 12, 9, 'Rb');

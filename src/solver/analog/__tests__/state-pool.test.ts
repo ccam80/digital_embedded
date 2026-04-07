@@ -3,14 +3,16 @@ import { StatePool } from '../state-pool';
 
 describe('StatePool', () => {
   describe('constructor', () => {
-    it('allocates three Float64Array vectors of the given size', () => {
+    it('allocates four Float64Array vectors of the given size', () => {
       const pool = new StatePool(10);
       expect(pool.state0).toBeInstanceOf(Float64Array);
       expect(pool.state1).toBeInstanceOf(Float64Array);
       expect(pool.state2).toBeInstanceOf(Float64Array);
+      expect(pool.state3).toBeInstanceOf(Float64Array);
       expect(pool.state0.length).toBe(10);
       expect(pool.state1.length).toBe(10);
       expect(pool.state2.length).toBe(10);
+      expect(pool.state3.length).toBe(10);
     });
 
     it('sets totalSlots', () => {
@@ -23,6 +25,7 @@ describe('StatePool', () => {
       expect(Array.from(pool.state0)).toEqual([0, 0, 0, 0, 0]);
       expect(Array.from(pool.state1)).toEqual([0, 0, 0, 0, 0]);
       expect(Array.from(pool.state2)).toEqual([0, 0, 0, 0, 0]);
+      expect(Array.from(pool.state3)).toEqual([0, 0, 0, 0, 0]);
     });
 
     it('works with totalSlots of 0', () => {
@@ -30,29 +33,41 @@ describe('StatePool', () => {
       expect(pool.totalSlots).toBe(0);
       expect(pool.state0.length).toBe(0);
     });
+
+    it('exposes states ring buffer with 4 entries', () => {
+      const pool = new StatePool(3);
+      expect(pool.states.length).toBe(4);
+      expect(pool.states[0]).toBe(pool.state0);
+      expect(pool.states[1]).toBe(pool.state1);
+      expect(pool.states[2]).toBe(pool.state2);
+      expect(pool.states[3]).toBe(pool.state3);
+    });
   });
 
   describe('acceptTimestep()', () => {
-    it('shifts history: state2 ← state1, state1 ← state0', () => {
+    it('rotates ring: state3←state2, state2←state1, state1←state0, state0←recycled old state3', () => {
       const pool = new StatePool(3);
       pool.state0.set([1.0, 2.0, 3.0]);
       pool.state1.set([10.0, 20.0, 30.0]);
       pool.state2.set([100.0, 200.0, 300.0]);
+      pool.state3.set([1000.0, 2000.0, 3000.0]);
 
       pool.acceptTimestep();
 
+      // After rotation: state3=old_state2, state2=old_state1, state1=old_state0
+      expect(Array.from(pool.state3)).toEqual([100.0, 200.0, 300.0]);
       expect(Array.from(pool.state2)).toEqual([10.0, 20.0, 30.0]);
       expect(Array.from(pool.state1)).toEqual([1.0, 2.0, 3.0]);
     });
 
-    it('does not modify state0 during acceptTimestep', () => {
+    it('seeds state0 from state1 after rotation', () => {
       const pool = new StatePool(3);
       pool.state0.set([1.0, 2.0, 3.0]);
       pool.state1.set([10.0, 20.0, 30.0]);
-      pool.state2.set([100.0, 200.0, 300.0]);
 
       pool.acceptTimestep();
 
+      // state0 should be seeded from new state1 (which is old state0)
       expect(Array.from(pool.state0)).toEqual([1.0, 2.0, 3.0]);
     });
 
@@ -61,6 +76,7 @@ describe('StatePool', () => {
       pool.state0.set([5.0, 6.0]);
       pool.state1.set([1.0, 2.0]);
       pool.state2.set([0.0, 0.0]);
+      pool.state3.set([0.0, 0.0]);
 
       pool.acceptTimestep();
 
@@ -78,32 +94,36 @@ describe('StatePool', () => {
       pool.state0.set([1.0, 1.0]);
       pool.state1.set([2.0, 2.0]);
       pool.state2.set([3.0, 3.0]);
+      pool.state3.set([4.0, 4.0]);
 
       pool.acceptTimestep();
-      // state0=[1,1], state1=[1,1], state2=[2,2]
+      // After: state3=[3,3], state2=[2,2], state1=[1,1], state0 seeded=[1,1]
 
-      pool.state0.set([4.0, 4.0]);
+      pool.state0.set([5.0, 5.0]);
       pool.acceptTimestep();
-      // state0=[4,4], state1=[4,4], state2=[1,1]
+      // After: state3=[2,2], state2=[1,1], state1=[5,5], state0 seeded=[5,5]
 
+      expect(Array.from(pool.state3)).toEqual([2.0, 2.0]);
       expect(Array.from(pool.state2)).toEqual([1.0, 1.0]);
-      expect(Array.from(pool.state1)).toEqual([4.0, 4.0]);
-      expect(Array.from(pool.state0)).toEqual([4.0, 4.0]);
+      expect(Array.from(pool.state1)).toEqual([5.0, 5.0]);
+      expect(Array.from(pool.state0)).toEqual([5.0, 5.0]);
     });
   });
 
   describe('reset()', () => {
-    it('zeros all three vectors', () => {
+    it('zeros all four vectors', () => {
       const pool = new StatePool(4);
       pool.state0.set([1.0, 2.0, 3.0, 4.0]);
       pool.state1.set([5.0, 6.0, 7.0, 8.0]);
       pool.state2.set([9.0, 10.0, 11.0, 12.0]);
+      pool.state3.set([13.0, 14.0, 15.0, 16.0]);
 
       pool.reset();
 
       expect(Array.from(pool.state0)).toEqual([0, 0, 0, 0]);
       expect(Array.from(pool.state1)).toEqual([0, 0, 0, 0]);
       expect(Array.from(pool.state2)).toEqual([0, 0, 0, 0]);
+      expect(Array.from(pool.state3)).toEqual([0, 0, 0, 0]);
     });
 
     it('reset on a zero-slot pool does not throw', () => {
@@ -251,14 +271,24 @@ describe('StatePool', () => {
     });
   });
 
+  describe('seedHistory()', () => {
+    it('seeds state1, state2, state3 from state0', () => {
+      const pool = new StatePool(3);
+      pool.state0.set([0.6, 5.0, 1.2]);
+      pool.seedHistory();
+      expect(Array.from(pool.state1)).toEqual([0.6, 5.0, 1.2]);
+      expect(Array.from(pool.state2)).toEqual([0.6, 5.0, 1.2]);
+      expect(Array.from(pool.state3)).toEqual([0.6, 5.0, 1.2]);
+    });
+  });
+
   describe('integration: acceptTimestep', () => {
     it('accepted timestep scenario: history advances correctly', () => {
       const pool = new StatePool(2);
 
-      // t=0: DC operating point
+      // t=0: DC operating point — seed all history
       pool.state0.set([0.6, 5.0]);
-      pool.state1.set([0.6, 5.0]);
-      pool.state2.set([0.6, 5.0]);
+      pool.seedHistory();
 
       // t=1: NR converges with new state
       pool.state0.set([0.61, 4.9]);
@@ -266,6 +296,7 @@ describe('StatePool', () => {
 
       expect(Array.from(pool.state1)).toEqual([0.61, 4.9]);
       expect(Array.from(pool.state2)).toEqual([0.6, 5.0]);
+      expect(Array.from(pool.state3)).toEqual([0.6, 5.0]);
 
       // t=2: NR converges again
       pool.state0.set([0.62, 4.8]);
@@ -273,6 +304,7 @@ describe('StatePool', () => {
 
       expect(Array.from(pool.state1)).toEqual([0.62, 4.8]);
       expect(Array.from(pool.state2)).toEqual([0.61, 4.9]);
+      expect(Array.from(pool.state3)).toEqual([0.6, 5.0]);
     });
   });
 });

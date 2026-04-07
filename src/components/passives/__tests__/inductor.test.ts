@@ -223,15 +223,6 @@ describe("Inductor", () => {
   });
 
   describe("statePool", () => {
-    it("stateSize is 4", () => {
-      const props = new PropertyBag();
-      props.setModelParam("inductance", 0.01);
-      const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
-        new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
-      );
-      expect((core as ReactiveAnalogElement).stateSize).toBe(4);
-    });
-
     it("stateBaseOffset is -1 before compiler assigns it", () => {
       const props = new PropertyBag();
       props.setModelParam("inductance", 0.01);
@@ -285,11 +276,13 @@ describe("Inductor", () => {
         new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
       );
       Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
-      const { element } = withState(core);
+      const { element, pool } = withState(core);
 
-      // First call establishes iPrev = 0.5
+      // First call establishes i=0.5 in s0, then rotate so it lands in s1
       element.stampCompanion!(1e-4, "bdf1", new Float64Array([5, 0, 0.5]));
-      // Second call: previous iPrev=0.5 is now in pool slot 2
+      pool.acceptTimestep();
+      pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
+      // Second call: i=0.6, s1 now has i=0.5 → getLteEstimate can compute |0.6 - 0.5|
       element.stampCompanion!(1e-4, "bdf1", new Float64Array([5, 0, 0.6]));
 
       const lte = element.getLteEstimate!(1e-4);

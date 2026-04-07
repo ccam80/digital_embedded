@@ -12,6 +12,7 @@
 import type { MeasurementObserver, SnapshotId } from "../core/engine-interface.js";
 import { EngineState } from "../core/engine-interface.js";
 import type { DcOpResult } from "../core/analog-engine-interface.js";
+import type { StepRecord } from "./analog/convergence-log.js";
 import type { Diagnostic, SignalAddress, SignalValue } from "../compile/types.js";
 import type { AcParams, AcResult } from "./analog/ac-analysis.js";
 import type { Wire } from "../core/circuit.js";
@@ -123,6 +124,25 @@ export interface SimulationCoordinator {
 
   /** AC sweep analysis. Returns null if not supported. */
   acAnalysis(params: AcParams): AcResult | null;
+
+  // -------------------------------------------------------------------------
+  // §1.11 Convergence logging
+  // -------------------------------------------------------------------------
+
+  /** Return a human-readable label for analog element at the given index, or undefined. */
+  getElementLabel(index: number): string | undefined;
+
+  /** True when convergence log is available (analog domain present). */
+  supportsConvergenceLog(): boolean;
+
+  /** Enable or disable convergence step recording. */
+  setConvergenceLogEnabled(enabled: boolean): void;
+
+  /** Return recorded convergence steps, or null if no analog domain. Last N if specified (most recent first). */
+  getConvergenceLog(lastN?: number): StepRecord[] | null;
+
+  /** Clear the convergence log ring buffer. */
+  clearConvergenceLog(): void;
 
   /**
    * Step until simTime >= targetSimTime, with optional wall-clock budget.

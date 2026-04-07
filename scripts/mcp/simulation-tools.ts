@@ -10,6 +10,7 @@ import { z } from "zod";
 import type { DefaultSimulatorFacade } from "../../src/headless/default-facade.js";
 import type { ComponentRegistry } from "../../src/core/registry.js";
 import type { SignalValue } from "../../src/compile/types.js";
+import type { StepRecord } from "../../src/solver/analog/convergence-log.js";
 import { wrapTool, SessionState } from "./tool-helpers.js";
 
 // ---------------------------------------------------------------------------
@@ -29,6 +30,32 @@ function formatAllSignals(signals: Map<string, SignalValue>): string {
   const lines: string[] = [];
   for (const [label, sv] of signals) {
     lines.push(`  ${label} = ${formatSignalValue(sv)}`);
+  }
+  return lines.join("\n");
+}
+
+function formatConvergenceLog(records: StepRecord[]): string {
+  const lines: string[] = [`Convergence log (${records.length} steps):`];
+  for (const rec of records) {
+    lines.push(
+      `  step ${rec.stepNumber}: t=${rec.simTime.toExponential(4)} ` +
+      `dt=${rec.entryDt.toExponential(3)}→${rec.acceptedDt.toExponential(3)} ` +
+      `method=${rec.entryMethod}→${rec.exitMethod} ` +
+      `outcome=${rec.outcome}`,
+    );
+    for (const a of rec.attempts) {
+      lines.push(
+        `    ${a.trigger}: dt=${a.dt.toExponential(3)} method=${a.method} ` +
+        `iters=${a.iterations} converged=${a.converged}` +
+        (a.blameElement >= 0 ? ` blame=element[${a.blameElement}]` : ""),
+      );
+    }
+    if (rec.lteRejected) {
+      lines.push(
+        `    LTE rejected: ratio=${rec.lteWorstRatio.toFixed(3)} ` +
+        `proposedDt=${rec.lteProposedDt.toExponential(3)}`,
+      );
+    }
   }
   return lines.join("\n");
 }
@@ -381,6 +408,58 @@ export function registerSimulationTools(
         }
 
         return lines.join("\n");
+      },
+    ),
+  );
+
+  // ---------------------------------------------------------------------------
+  // circuit_convergence_log
+  // ---------------------------------------------------------------------------
+
+  server.registerTool(
+    "circuit_convergence_log",
+    {
+      title: "Convergence Log",
+      description:
+        "Control and read the Newton-Raphson convergence log for the analog engine. " +
+        "Actions: 'enable' starts recording, 'disable' stops, 'read' returns recorded steps, " +
+        "'clear' resets the ring buffer. Only available for circuits with an analog domain.",
+      inputSchema: {
+        handle: z.string().describe("Circuit handle"),
+        action: z
+          .enum(["enable", "disable", "read", "clear"])
+          .describe("Action to perform on the convergence log"),
+        lastN: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe("For 'read': return only the last N steps (most recent first). Default: all"),
+      },
+    },
+    wrapTool<{ handle: string; action: "enable" | "disable" | "read" | "clear"; lastN?: number }>(
+      "circuit_convergence_log error",
+      ({ handle, action, lastN }) => {
+        const coordinator = ensureEngine(handle, facade, session);
+        if (!coordinator.supportsConvergenceLog()) {
+          return "Convergence log not available (no analog domain)";
+        }
+        switch (action) {
+          case "enable":
+            coordinator.setConvergenceLogEnabled(true);
+            return "Convergence logging enabled.";
+          case "disable":
+            coordinator.setConvergenceLogEnabled(false);
+            return "Convergence logging disabled.";
+          case "clear":
+            coordinator.clearConvergenceLog();
+            return "Convergence log cleared.";
+          case "read": {
+            const records = coordinator.getConvergenceLog(lastN);
+            if (!records || records.length === 0) return "Convergence log is empty.";
+            return formatConvergenceLog(records);
+          }
+        }
       },
     ),
   );

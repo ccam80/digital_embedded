@@ -196,11 +196,11 @@ describe("Zener", () => {
     expect(element.isNonlinear).toBe(true);
   });
 
-  it("isReactive_true", () => {
+  it("isReactive_false", () => {
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1 });
     const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
     const { element } = withState(core);
-    expect(element.isReactive).toBe(true);
+    expect(element.isReactive).toBe(false);
   });
 
   it("definition_has_correct_fields", () => {

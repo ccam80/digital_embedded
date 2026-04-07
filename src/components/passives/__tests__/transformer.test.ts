@@ -507,20 +507,15 @@ describe("Transformer", () => {
 // ---------------------------------------------------------------------------
 
 describe("AnalogTransformerElement state pool", () => {
-  it("stateSize is 13", () => {
-    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
-    expect(el.stateSize).toBe(13);
-  });
-
   it("stateBaseOffset defaults to -1 before initState", () => {
     const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
     expect(el.stateBaseOffset).toBe(-1);
   });
 
-  it("initState binds pool and zero-initialises all 13 slots", () => {
+  it("initState binds pool and zero-initialises all 9 slots", () => {
     const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
     const { pool } = withState(el);
-    for (let i = 0; i < 13; i++) {
+    for (let i = 0; i < 9; i++) {
       expect(pool.state0[i]).toBe(0);
     }
   });
@@ -528,26 +523,6 @@ describe("AnalogTransformerElement state pool", () => {
   it("isReactive is true", () => {
     const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
     expect(el.isReactive).toBe(true);
-  });
-
-  it("stateSchema has 13 slots named correctly", () => {
-    const el = new AnalogTransformerElement([1, 0, 2, 0], 2, 10e-3, 1.0, 0.99, 0, 0);
-    expect(el.stateSchema).toBeDefined();
-    expect(el.stateSchema.size).toBe(13);
-    const names = el.stateSchema.slots.map((s) => s.name);
-    expect(names).toContain("G11");
-    expect(names).toContain("G22");
-    expect(names).toContain("G12");
-    expect(names).toContain("HIST1");
-    expect(names).toContain("HIST2");
-    expect(names).toContain("PREV_I1");
-    expect(names).toContain("PREV_I2");
-    expect(names).toContain("PREV_PREV_I1");
-    expect(names).toContain("PREV_PREV_I2");
-    expect(names).toContain("PREV_V1");
-    expect(names).toContain("PREV_V2");
-    expect(names).toContain("PREV_PREV_V1");
-    expect(names).toContain("PREV_PREV_V2");
   });
 
   it("stampCompanion writes G11/G22/G12 slots (trapezoidal)", () => {

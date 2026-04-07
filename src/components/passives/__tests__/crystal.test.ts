@@ -409,16 +409,6 @@ describe("Crystal", () => {
       expect(m!.convert("1000000")).toBeCloseTo(1e6, 5);
     });
 
-    it("stateSize is 9 (three companion fragments of 3 slots each)", () => {
-      const props = new PropertyBag();
-      props.setModelParam("frequency", 1e6);
-      props.setModelParam("qualityFactor", 1000);
-      props.setModelParam("motionalCapacitance", 20e-15);
-      props.setModelParam("shuntCapacitance", 5e-12);
-      const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
-      expect((el as ReactiveAnalogElement).stateSize).toBe(9);
-    });
-
     it("stateBaseOffset is -1 before compiler assigns it", () => {
       const props = new PropertyBag();
       props.setModelParam("frequency", 1e6);
@@ -427,23 +417,6 @@ describe("Crystal", () => {
       props.setModelParam("shuntCapacitance", 5e-12);
       const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
       expect((el as ReactiveAnalogElement).stateBaseOffset).toBe(-1);
-    });
-
-    it("stateSchema has 9 slots with correct names", () => {
-      const props = new PropertyBag();
-      props.setModelParam("frequency", 1e6);
-      props.setModelParam("qualityFactor", 1000);
-      props.setModelParam("motionalCapacitance", 20e-15);
-      props.setModelParam("shuntCapacitance", 5e-12);
-      const el = getFactory(CrystalDefinition.modelRegistry!.behavioral!)(new Map([["A", 1], ["B", 0]]), [2, 3], 3, props, () => 0);
-      const re = el as ReactiveAnalogElement;
-      expect(re.stateSchema).toBeDefined();
-      const names = re.stateSchema.slots.map((s: { name: string }) => s.name);
-      expect(names).toEqual([
-        "GEQ_L", "IEQ_L", "I_PREV_L",
-        "GEQ_CS", "IEQ_CS", "V_PREV_CS",
-        "GEQ_C0", "IEQ_C0", "V_PREV_C0",
-      ]);
     });
 
     it("initState initialises all pool slots to zero", () => {

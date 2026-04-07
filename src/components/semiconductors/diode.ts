@@ -36,8 +36,10 @@ import {
   capacitorConductance,
   capacitorHistoryCurrent,
 } from "../../solver/analog/integration.js";
+import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { VT } from "../../core/constants.js";
 import {
   defineStateSchema,
   applyInitialValues,
@@ -48,8 +50,7 @@ import {
 // Physical constants
 // ---------------------------------------------------------------------------
 
-/** Thermal voltage at 300 K (kT/q in volts). */
-const VT = 0.02585;
+// VT (thermal voltage) imported from ../../core/constants.js
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -60,26 +61,26 @@ const GMIN = 1e-12;
 
 // Slot index constants — shared between both schema variants.
 const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
-const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_VD_PREV = 6, SLOT_CAP_FIRST_CALL = 7;
+const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_V = 6, SLOT_Q = 7;
 
 /** Schema for resistive diode (no junction capacitance): 4 slots. */
 export const DIODE_SCHEMA: StateSchema = defineStateSchema("DiodeElement", [
-  { name: "VD",  doc: "pnjlim-limited junction voltage",          init: { kind: "zero" } },
-  { name: "GEQ", doc: "NR companion conductance",                 init: { kind: "constant", value: GMIN } },
-  { name: "IEQ", doc: "NR companion Norton current",              init: { kind: "zero" } },
-  { name: "ID",  doc: "Diode current at operating point",         init: { kind: "zero" } },
+  { name: "VD",      doc: "pnjlim-limited junction voltage",                  init: { kind: "zero" } },
+  { name: "GEQ",     doc: "NR companion conductance",                         init: { kind: "constant", value: GMIN } },
+  { name: "IEQ",     doc: "NR companion Norton current",                      init: { kind: "zero" } },
+  { name: "ID",      doc: "Diode current at operating point",                 init: { kind: "zero" } },
 ]);
 
 /** Schema for capacitive diode (CJO > 0 or TT > 0): 8 slots. */
 export const DIODE_CAP_SCHEMA: StateSchema = defineStateSchema("DiodeElement_cap", [
-  { name: "VD",              doc: "pnjlim-limited junction voltage",          init: { kind: "zero" } },
-  { name: "GEQ",             doc: "NR companion conductance",                 init: { kind: "constant", value: GMIN } },
-  { name: "IEQ",             doc: "NR companion Norton current",              init: { kind: "zero" } },
-  { name: "ID",              doc: "Diode current at operating point",         init: { kind: "zero" } },
-  { name: "CAP_GEQ",         doc: "Junction-capacitance companion conductance", init: { kind: "zero" } },
-  { name: "CAP_IEQ",         doc: "Junction-capacitance companion history current", init: { kind: "zero" } },
-  { name: "VD_PREV",         doc: "Junction voltage at previous accepted step", init: { kind: "zero" } },
-  { name: "CAP_FIRST_CALL",  doc: "1 until first stampCompanion call; then 0", init: { kind: "constant", value: 1.0 } },
+  { name: "VD",      doc: "pnjlim-limited junction voltage",                  init: { kind: "zero" } },
+  { name: "GEQ",     doc: "NR companion conductance",                         init: { kind: "constant", value: GMIN } },
+  { name: "IEQ",     doc: "NR companion Norton current",                      init: { kind: "zero" } },
+  { name: "ID",      doc: "Diode current at operating point",                 init: { kind: "zero" } },
+  { name: "CAP_GEQ", doc: "Junction-capacitance companion conductance",       init: { kind: "zero" } },
+  { name: "CAP_IEQ", doc: "Junction-capacitance companion history current",   init: { kind: "zero" } },
+  { name: "V",       doc: "Junction voltage at current step (for companion)", init: { kind: "zero" } },
+  { name: "Q",       doc: "Junction charge at current step",                  init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,7 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     FC:  { default: 0.5,              description: "Forward-bias capacitance coefficient" },
     BV:  { default: Infinity, unit: "V", description: "Reverse breakdown voltage" },
     IBV: { default: 1e-3, unit: "A",  description: "Reverse breakdown current" },
+    NBV: { default: NaN, unit: "",     description: "Breakdown emission coefficient (default=N)" },
     EG:  { default: 1.11, unit: "eV", description: "Activation energy" },
     XTI: { default: 3,                description: "Saturation current temperature exponent" },
     KF:  { default: 0,                description: "Flicker noise coefficient" },
@@ -139,6 +141,104 @@ export function computeJunctionCapacitance(
 }
 
 // ---------------------------------------------------------------------------
+// computeJunctionCharge
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute total junction charge — integral of C(V) dV — matching ngspice
+ * dioload.c:308-341.
+ *
+ * Depletion charge (reverse bias, vd < FC*VJ):
+ *   dioload.c:312: deplcharge = tJctPot * czero * (1 - arg*sarg) / (1-M)
+ *   where arg = 1 - vd/VJ, sarg = arg^(-M), so arg*sarg = (1-vd/VJ)^(1-M)
+ *   => Q_depl = VJ * CJO * (1 - (1 - vd/VJ)^(1-M)) / (1-M)
+ *   Special case M=1: Q_depl = -VJ * CJO * ln(1 - vd/VJ)
+ *
+ * Depletion charge (forward bias, vd >= FC*VJ):
+ *   dioload.c:316: deplcharge = F1*czero + czof2*(F3*(vd-depCap) + M/(2*VJ)*(vd^2-depCap^2))
+ *   where F1 = VJ*(1-(1-FC)^(1-M))/(1-M), czof2 = CJO/(1-FC)^(1+M),
+ *         F3 = 1-FC*(1+M), depCap = FC*VJ
+ *
+ * Diffusion charge (dioload.c:333):
+ *   diffcharge = TT * Id
+ *   where Id = IS*(exp(vd/(N*Vt))-1) is the diode current
+ */
+export function computeJunctionCharge(
+  vd: number,
+  CJO: number,
+  VJ: number,
+  M: number,
+  FC: number,
+  TT: number,
+  Id: number,
+): number {
+  let Q_depl = 0;
+  if (CJO > 0) {
+    const depCap = FC * VJ;
+    if (vd < depCap) {
+      // Reverse-bias depletion charge
+      const arg = Math.max(1 - vd / VJ, 1e-6);
+      if (Math.abs(M - 1) < 1e-10) {
+        // M=1 special case: integral of CJO/(1-vd/VJ) = -VJ*CJO*ln(1-vd/VJ)
+        Q_depl = -VJ * Math.log(arg);
+      } else {
+        // dioload.c:312: VJ * CJO * (1 - (1-vd/VJ)^(1-M)) / (1-M)
+        Q_depl = VJ * CJO * (1 - Math.pow(arg, 1 - M)) / (1 - M);
+      }
+    } else {
+      // Forward-bias depletion charge (linearized region)
+      // dioload.c:316: F1*CJO + czof2*(F3*(vd-depCap) + M/(2*VJ)*(vd^2-depCap^2))
+      const xfc = Math.log(1 - FC);
+      const F1 = Math.abs(M - 1) < 1e-10
+        ? -VJ * Math.log(1 - FC)
+        : VJ * (1 - Math.exp((1 - M) * xfc)) / (1 - M);
+      const F2 = Math.exp((1 + M) * xfc);  // = (1-FC)^(1+M)
+      const F3 = 1 - FC * (1 + M);
+      const czof2 = CJO / F2;
+      Q_depl = CJO * F1 + czof2 * (F3 * (vd - depCap) + (M / (2 * VJ)) * (vd * vd - depCap * depCap));
+    }
+  }
+
+  // Diffusion charge: dioload.c:333
+  const Q_diff = TT * Id;
+
+  return Q_depl + Q_diff;
+}
+
+// ---------------------------------------------------------------------------
+// computeDiodeIV — 3-region I-V model
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute diode DC current and conductance at the given operating point.
+ * Returns { id, gd } WITHOUT GMIN (caller adds GMIN as needed).
+ * Three regions matching dioload.c:232-252.
+ */
+export function computeDiodeIV(
+  vd: number,
+  IS: number,
+  nVt: number,
+  BV: number,
+  vtebrk: number,
+): { id: number; gd: number } {
+  if (vd >= -3 * nVt) {
+    // Region 1 — Forward: dioload.c:232-234
+    const expArg = Math.min(vd / nVt, 700);
+    const evd = Math.exp(expArg);
+    return { id: IS * (evd - 1), gd: IS * evd / nVt };
+  } else if (BV >= Infinity || vd >= -BV) {
+    // Region 2 — Smooth reverse (cubic): dioload.c:238-244
+    const arg3 = 3 * nVt / (vd * Math.E);
+    const arg = arg3 * arg3 * arg3;
+    return { id: -IS * (1 + arg), gd: IS * 3 * arg / vd };
+  } else {
+    // Region 3 — Breakdown: dioload.c:246-252
+    const evrev = Math.exp(Math.min(-(BV + vd) / vtebrk, 700));
+    return { id: -IS * evrev, gd: IS * evrev / vtebrk };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // createDiodeElement — AnalogElement factory
 // ---------------------------------------------------------------------------
 
@@ -162,11 +262,15 @@ export function createDiodeElement(
     FC:  props.getModelParam<number>("FC"),
     BV:  props.getModelParam<number>("BV"),
     IBV: props.getModelParam<number>("IBV"),
+    NBV: props.getModelParam<number>("NBV"),
     EG:  props.getModelParam<number>("EG"),
     XTI: props.getModelParam<number>("XTI"),
     KF:  props.getModelParam<number>("KF"),
     AF:  props.getModelParam<number>("AF"),
   };
+
+  // diosetup.c:93-95: NBV defaults to N when not explicitly given
+  if (isNaN(params.NBV)) params.NBV = params.N;
 
   // When RS > 0, use an internal node between the anode pin and the junction.
   // nodeJunction is the node the Shockley junction connects from (internal side of RS).
@@ -178,7 +282,13 @@ export function createDiodeElement(
 
   // Pool binding — set by initState
   let s0: Float64Array;
+  let s1: Float64Array;
+  let s2: Float64Array;
+  let s3: Float64Array;
   let base: number;
+
+  // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
+  let pnjlimLimited = false;
 
   const element = {
     branchIndex: -1,
@@ -191,6 +301,9 @@ export function createDiodeElement(
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
+      s1 = pool.state1;
+      s2 = pool.state2;
+      s3 = pool.state3;
       base = this.stateBaseOffset;
       applyInitialValues(this.stateSchema, pool, base, params);
     },
@@ -233,7 +346,7 @@ export function createDiodeElement(
       stampRHS(solver, nodeCathode, ieq);
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
       const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
@@ -242,32 +355,46 @@ export function createDiodeElement(
       const nVt = params.N * VT;
       const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
 
-      // Apply pnjlim to prevent exponential runaway, using vold from pool
+      const vtebrk = params.NBV * VT;  // DD3: breakdown emission voltage
+
+      // Apply pnjlim — dioload.c:180-191
       const vdOld = s0[base + SLOT_VD];
-      const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
+      let vdLimited: number;
+      if (params.BV < Infinity && vdRaw < Math.min(0, -params.BV + 10 * vtebrk)) {
+        // Breakdown reflection: limit in the reflected domain
+        let vdtemp = -(vdRaw + params.BV);
+        const vdtempOld = -(vdOld + params.BV);
+        const reflResult = pnjlim(vdtemp, vdtempOld, vtebrk, vcrit);
+        vdtemp = reflResult.value;
+        pnjlimLimited = reflResult.limited;
+        vdLimited = -(vdtemp + params.BV);
+      } else {
+        // Normal forward/reverse limiting: dioload.c:189-191
+        const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
+        vdLimited = vdResult.value;
+        pnjlimLimited = vdResult.limited;
+      }
 
       s0[base + SLOT_VD] = vdLimited;
 
-      // Shockley equation and NR linearization at limited operating point
-      if (params.BV < Infinity && vdLimited < -params.BV) {
-        // Reverse breakdown region: Id = -IBV * exp(-(Vd + BV) / (N*Vt))
-        const bdExpArg = Math.min(-(vdLimited + params.BV) / nVt, 700);
-        const bdExpVal = Math.exp(bdExpArg);
-        const id = -params.IBV * bdExpVal;
-        s0[base + SLOT_ID] = id;
-        s0[base + SLOT_GEQ] = (params.IBV * bdExpVal) / nVt + GMIN;
-        s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
-      } else {
-        const expArg = Math.min(vdLimited / nVt, 700);
-        const expVal = Math.exp(expArg);
-        const id = params.IS * (expVal - 1);
-        s0[base + SLOT_ID] = id;
-        s0[base + SLOT_GEQ] = (params.IS * expVal) / nVt + GMIN;
-        s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
-      }
+      // 3-region I-V: dioload.c:232-252 (vtebrk already computed above for DD4)
+      const { id: idRaw, gd: gdRaw } = computeDiodeIV(vdLimited, params.IS, nVt, params.BV, vtebrk);
+
+      // Add GMIN — dioload.c:283-300
+      const gd = gdRaw + GMIN;
+      const id = idRaw + GMIN * vdLimited;  // DD5: store id + GMIN*vd
+
+      s0[base + SLOT_ID] = id;
+      s0[base + SLOT_GEQ] = gd;
+      s0[base + SLOT_IEQ] = id - gd * vdLimited;
+      return pnjlimLimited;
     },
 
     checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+      // declare non-convergence immediately (DIOload sets CKTnoncon++)
+      if (pnjlimLimited) return false;
+
       const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
@@ -309,23 +436,76 @@ export function createDiodeElement(
 
       // Depletion + transit-time capacitance at current operating point
       const Cj = computeJunctionCapacitance(vNow, params.CJO, params.VJ, params.M, params.FC);
-      const expArg = Math.min(vNow / nVt, 700);
+      const vtebrk = params.NBV * VT;
+      const { gd: gDiode } = computeDiodeIV(vNow, params.IS, nVt, params.BV, vtebrk);
+      const Ct = params.TT * gDiode;  // dioload.c:338: diffcap = TT * gdb
+      const Ctotal = Cj + Ct;
+
+      // Recover capacitor current at previous accepted step from s1 (previous accepted state)
+      const prevCapGeq = s1[base + SLOT_CAP_GEQ];
+      const prevCapIeq = s1[base + SLOT_CAP_IEQ];
+      const iNow = prevCapGeq * vNow + prevCapIeq;
+      // First call: s1[V] == 0 (zero-initialized), use vNow as warm start
+      const vPrev = s1[base + SLOT_V];
+      const vPrevForFormula = vPrev === 0 && s1[base + SLOT_Q] === 0 ? vNow : vPrev;
+
+      s0[base + SLOT_V] = vNow;
+      s0[base + SLOT_CAP_GEQ] = capacitorConductance(Ctotal, dt, method);
+      s0[base + SLOT_CAP_IEQ] = capacitorHistoryCurrent(Ctotal, dt, method, vNow, vPrevForFormula, iNow);
+      // CAP_GEQ/CAP_IEQ are stamped in stamp() on every NR iteration
+    };
+
+    (element as unknown as { getLteEstimate: (dt: number) => { truncationError: number; toleranceReference: number } }).getLteEstimate = function (
+      dt: number,
+    ): { truncationError: number; toleranceReference: number } {
+      if (dt <= 0) return { truncationError: 0, toleranceReference: 0 };
+      // Reconstruct cap current at s1 and s2 from stored companion coefficients
+      const v1 = s1[base + SLOT_V];
+      const v2 = s2[base + SLOT_V];
+      const iCap1 = s1[base + SLOT_CAP_GEQ] * v1 + s1[base + SLOT_CAP_IEQ];
+      const iCap2 = s2[base + SLOT_CAP_GEQ] * v2 + s2[base + SLOT_CAP_IEQ];
+      const deltaI = Math.abs(iCap1 - iCap2);
+      const truncationError = (dt / 12) * deltaI;
+      // toleranceReference: junction charge estimate = Ctotal * |Vd|
+      const vd = v1;
+      const nVt = params.N * VT;
+      const Cj = computeJunctionCapacitance(vd, params.CJO, params.VJ, params.M, params.FC);
+      const expArg = Math.min(vd / nVt, 700);
       const expVal = Math.exp(expArg);
       const gDiode = (params.IS * expVal) / nVt;
       const Ct = params.TT * gDiode;
       const Ctotal = Cj + Ct;
+      const toleranceReference = Ctotal * Math.abs(vd);
+      return { truncationError, toleranceReference };
+    };
 
-      // Recover capacitor current at previous accepted step
-      const prevCapGeq = s0[base + SLOT_CAP_GEQ];
-      const prevCapIeq = s0[base + SLOT_CAP_IEQ];
-      const iNow = prevCapGeq * vNow + prevCapIeq;
-      const vPrevForFormula = s0[base + SLOT_CAP_FIRST_CALL] !== 0 ? vNow : s0[base + SLOT_VD_PREV];
-      s0[base + SLOT_VD_PREV] = vNow;
-      s0[base + SLOT_CAP_FIRST_CALL] = 0;
+    (element as unknown as { getLteTimestep: (dt: number, deltaOld: readonly number[], order: number, method: IntegrationMethod, lteParams: import("../../solver/analog/ckt-terr.js").LteParams) => number }).getLteTimestep = function (
+      dt: number,
+      deltaOld: readonly number[],
+      order: number,
+      method: IntegrationMethod,
+      lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
+    ): number {
+      const _q0 = s0[base + SLOT_Q];
+      const _q1 = s1[base + SLOT_Q];
+      const _q2 = s2[base + SLOT_Q];
+      const _q3 = s3[base + SLOT_Q];
+      const _h0 = dt;
+      const _h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
+      const _ccap0 = _h0 > 0 ? (_q0 - _q1) / _h0 : 0;
+      const _ccap1 = _h1 > 0 ? (_q1 - _q2) / _h1 : 0;
+      return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, _ccap0, _ccap1, lteParams);
+    };
 
-      s0[base + SLOT_CAP_GEQ] = capacitorConductance(Ctotal, dt, method);
-      s0[base + SLOT_CAP_IEQ] = capacitorHistoryCurrent(Ctotal, dt, method, vNow, vPrevForFormula, iNow);
-      // CAP_GEQ/CAP_IEQ are stamped in stamp() on every NR iteration
+    (element as unknown as { updateChargeFlux: (v: Float64Array) => void }).updateChargeFlux = function(voltages: Float64Array): void {
+      const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
+      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const vd = va - vc;
+      const nVt = params.N * VT;
+      const vtebrk = params.NBV * VT;
+      const { id: idRaw } = computeDiodeIV(vd, params.IS, nVt, params.BV, vtebrk);
+      s0[base + SLOT_Q] = computeJunctionCharge(vd, params.CJO, params.VJ, params.M, params.FC, params.TT, idRaw);
+      s0[base + SLOT_V] = vd;
     };
   }
 

@@ -35,13 +35,13 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
+import { VT } from "../../core/constants.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
 // ---------------------------------------------------------------------------
 
-/** Thermal voltage at 300 K (kT/q in volts). */
-const VT = 0.02585;
+// VT (thermal voltage) imported from ../../core/constants.js
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -94,16 +94,17 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
     // For P-JFET, apply pnjlim on the sign-inverted gate junction
     const vt_n = VT * this._p.N;
     const vcrit = vt_n * Math.log(vt_n / (Math.SQRT2 * this._p.IS));
-    const vgsLimited = pnjlim(vgsNew, vgsOld, vt_n, vcrit);
+    const vgsResult = pnjlim(vgsNew, vgsOld, vt_n, vcrit);
+    this._pnjlimLimited = vgsResult.limited;
 
     let vds = vdsNew;
     if (vds < -50) vds = -50;
     if (vds > 10) vds = 10;
 
-    return { vgs: vgsLimited, vds, swapped: false };
+    return { vgs: vgsResult.value, vds, swapped: false };
   }
 
-  override updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+  override updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -131,12 +132,15 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
     const vGSraw = vG - vS;
     const vt_n = VT * this._p.N;
     const vcrit = vt_n * Math.log(vt_n / (Math.SQRT2 * this._p.IS));
-    this._vgs_junction = pnjlim(vGSraw, this._vgs_junction, vt_n, vcrit);
+    const gateJunctionResult = pnjlim(vGSraw, this._vgs_junction, vt_n, vcrit);
+    this._vgs_junction = gateJunctionResult.value;
+    this._pnjlimLimited = this._pnjlimLimited || gateJunctionResult.limited;
 
     const expArg = Math.min(this._vgs_junction / vt_n, 80);
     const igJunction = this._p.IS * (Math.exp(expArg) - 1);
     this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
     this._id_junction = igJunction;
+    return this._pnjlimLimited;
   }
 
   override stampNonlinear(solver: SparseSolver): void {

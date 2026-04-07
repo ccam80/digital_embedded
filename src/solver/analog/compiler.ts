@@ -383,11 +383,11 @@ function resolveElementNodes(
     const pinPos = pinWorldPosition(el, pins[i]);
     for (const wire of circuit.wires) {
       const matchStart =
-        Math.abs(wire.start.x - pinPos.x) < 0.5 &&
-        Math.abs(wire.start.y - pinPos.y) < 0.5;
+        Math.abs(wire.start.x - pinPos.x) <= 0.5 &&
+        Math.abs(wire.start.y - pinPos.y) <= 0.5;
       const matchEnd =
-        Math.abs(wire.end.x - pinPos.x) < 0.5 &&
-        Math.abs(wire.end.y - pinPos.y) < 0.5;
+        Math.abs(wire.end.x - pinPos.x) <= 0.5 &&
+        Math.abs(wire.end.y - pinPos.y) <= 0.5;
       if (matchStart || matchEnd) {
         const nodeId = wireToNodeId.get(wire);
         if (nodeId !== undefined) {
@@ -1205,6 +1205,9 @@ export function compileAnalogPartition(
     const element: import("./element.js").AnalogElement = Object.assign(core, {
       pinNodeIds: pinNodeIds,
       allNodeIds: [...pinNodeIds, ...internalNodeIds],
+      label: el.getProperties().has("label")
+        ? String(el.getProperties().get("label") ?? el.instanceId)
+        : el.instanceId,
     });
 
     const elementIndex = analogElements.length;

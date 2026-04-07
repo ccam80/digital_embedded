@@ -295,6 +295,9 @@ export function makeDiode(
 
   // Pool binding — set by initState
   let s0: Float64Array;
+  let s1: Float64Array;
+  let s2: Float64Array;
+  let s3: Float64Array;
   let base: number;
 
   return {
@@ -307,9 +310,17 @@ export function makeDiode(
     stateSize: 4,
     stateBaseOffset: -1,
     stateSchema: DIODE_SCHEMA,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
+      s1 = pool.state1;
+      s2 = pool.state2;
+      s3 = pool.state3;
+      this.s0 = s0; this.s1 = s1; this.s2 = s2; this.s3 = s3;
       base = this.stateBaseOffset;
       applyInitialValues(DIODE_SCHEMA, pool, base, {});
     },
@@ -344,7 +355,7 @@ export function makeDiode(
       const vdOld = s0[base + SLOT_VD];
 
       // Apply pnjlim to prevent exponential runaway
-      const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
+      const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit).value;
 
       s0[base + SLOT_VD] = vdLimited;
 

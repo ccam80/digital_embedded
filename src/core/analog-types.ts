@@ -61,9 +61,12 @@ export interface ComplexSparseSolver {
  * in method signatures without importing from solver/.
  */
 export interface StatePoolRef {
+  readonly states: readonly Float64Array[];
   readonly state0: Float64Array;
   readonly state1: Float64Array;
   readonly state2: Float64Array;
+  readonly state3: Float64Array;
+  readonly totalSlots: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,12 +105,20 @@ export interface AnalogElementCore {
   /**
    * Update internal linearization state from the latest NR solution vector.
    */
-  updateOperatingPoint?(voltages: Readonly<Float64Array>): void;
+  updateOperatingPoint?(voltages: Readonly<Float64Array>): boolean | void;
 
   /**
    * Recompute companion model coefficients and stamp them into the solver.
    */
   stampCompanion?(dt: number, method: IntegrationMethod, voltages: Float64Array): void;
+
+  /**
+   * Rewrite the _NOW charge/flux slot(s) using converged NR voltages.
+   * Called after NR convergence but before LTE evaluation so that
+   * getLteTimestep sees accurate charge/flux values.
+   * Implementations must write ONLY the _NOW slot — never shift history.
+   */
+  updateChargeFlux?(voltages: Float64Array): void;
 
   /**
    * Update non-MNA internal state variables after an accepted timestep.
@@ -126,6 +137,22 @@ export interface AnalogElementCore {
    * forms an ngspice-style relative tolerance from `toleranceReference`.
    */
   getLteEstimate?(dt: number): { truncationError: number; toleranceReference: number };
+
+  /**
+   * CKTterr-based LTE timestep proposal. Returns the maximum allowable
+   * timestep for this element based on charge/flux history divided differences.
+   *
+   * Elements implementing this method call `cktTerr()` internally for each
+   * reactive junction. The controller calls this in preference to
+   * `getLteEstimate` when present.
+   */
+  getLteTimestep?(
+    dt: number,
+    deltaOld: readonly number[],
+    order: number,
+    method: import("../solver/analog/element.js").IntegrationMethod,
+    lteParams: import("../solver/analog/ckt-terr.js").LteParams,
+  ): number;
 
   /**
    * Scale independent source magnitude for source-stepping DC convergence.

@@ -252,14 +252,14 @@ describe('spice-import round-trip MCP surface -- IS override changes DC operatin
     // Both circuits must have the same number of nodes
     expect(dcOverride!.nodeVoltages.length).toBe(dcDefault!.nodeVoltages.length);
 
-    // IS=1e-20 → cutoff → Vc near 5V. IS=1e-14 → active/saturation → Vc much lower.
-    // At least one node voltage must differ by more than 1V.
+    // IS=1e-20 → cutoff → Vc near 5V. Default IS=1e-16 → less saturated than IS=1e-14.
+    // At least one node voltage must differ by more than 0.5V.
     const voltagesDefault = Array.from(dcDefault!.nodeVoltages);
     const voltagesOverride = Array.from(dcOverride!.nodeVoltages);
     const maxDiff = Math.max(
       ...voltagesDefault.map((v, i) => Math.abs(v - voltagesOverride[i]!))
     );
-    expect(maxDiff).toBeGreaterThan(1.0);
+    expect(maxDiff).toBeGreaterThan(0.5);
   });
 });
 

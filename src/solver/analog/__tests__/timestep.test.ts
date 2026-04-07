@@ -3,7 +3,7 @@
  *
  * Tests cover:
  *  - LTE-based adaptive timestep computation (safety factor, clamping, element tracking)
- *  - Timestep rejection logic (shouldReject, reject with halving and min clamping)
+ *  - Timestep rejection logic (shouldReject)
  *  - Integration method auto-switching state machine
  *  - Breakpoint clamping and removal
  */
@@ -29,8 +29,11 @@ const DEFAULT_PARAMS: SimulationParams = {
   chargeTol: 1e-14,
   trtol: 7.0,
   maxIterations: 100,
+  transientMaxIterations: 10,
   integrationMethod: "auto",
+  dcTrcvMaxIter: 50,
   gmin: 1e-12,
+  nodeDamping: false,
 };
 
 /**
@@ -184,32 +187,6 @@ describe("Rejection", () => {
     expect(ctrl.shouldReject(0.99)).toBe(false);
   });
 
-  it("reject_halves_dt", () => {
-    const ctrl = new TimestepController(DEFAULT_PARAMS);
-    const initialDt = ctrl.currentDt;
-
-    const newDt = ctrl.reject();
-
-    expect(newDt).toBe(initialDt / 2);
-    expect(ctrl.currentDt).toBe(initialDt / 2);
-  });
-
-  it("reject_clamps_to_min", () => {
-    const minTimeStep = 1e-14;
-    const params: SimulationParams = { ...DEFAULT_PARAMS, minTimeStep };
-    const ctrl = new TimestepController(params);
-
-    // Set dt to 2× minTimeStep manually
-    ctrl.currentDt = 2 * minTimeStep;
-
-    // First reject: dt → minTimeStep
-    ctrl.reject();
-    expect(ctrl.currentDt).toBe(minTimeStep);
-
-    // Second reject: dt should stay at minTimeStep, not go below
-    ctrl.reject();
-    expect(ctrl.currentDt).toBe(minTimeStep);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -390,7 +367,7 @@ describe("Breakpoints", () => {
     const history = new HistoryStore(1);
     const { newDt } = ctrl.computeNewDt(elements, history, 0);
 
-    // Should be unclamped (10us, within [minTimeStep, maxTimeStep])
-    expect(newDt).toBe(10e-6);
+    // With no reactive elements, step grows by 2x toward maxTimeStep
+    expect(newDt).toBe(20e-6);
   });
 });

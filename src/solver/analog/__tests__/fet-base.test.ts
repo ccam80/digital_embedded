@@ -386,12 +386,6 @@ describe("AbstractFetElement", () => {
 // ---------------------------------------------------------------------------
 
 describe("StatePool migration", () => {
-  it("stateSize_is_30", () => {
-    const propsObj = makeParamBag(NMOS_DEFAULTS);
-    const element = createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj);
-    expect(element.stateSize).toBe(30);
-  });
-
   it("stateBaseOffset_defaults_to_minus1_before_initState", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
     const element = createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj);
@@ -414,9 +408,10 @@ describe("StatePool migration", () => {
     expect(pool.state0[SLOT_IDS]).toBe(0);
     // SWAPPED = 0.0
     expect(pool.state0[SLOT_SWAPPED]).toBe(0);
-    // VGS_PREV and VGD_PREV = NaN (first-call sentinel)
-    expect(isNaN(pool.state0[SLOT_VGS_PREV])).toBe(true);
-    expect(isNaN(pool.state0[SLOT_VGD_PREV])).toBe(true);
+    // SLOT_V_GS (alias SLOT_VGS_PREV) and SLOT_V_GD (alias SLOT_VGD_PREV) are zero-initialised;
+    // first-call detection is now done via s1[Q_GS]===0, not a NaN sentinel.
+    expect(pool.state0[SLOT_VGS_PREV]).toBe(0);
+    expect(pool.state0[SLOT_VGD_PREV]).toBe(0);
   });
 
   it("updateOperatingPoint_writes_state_to_pool", () => {

@@ -19,6 +19,7 @@ import type { ConcreteCompiledCircuit } from './digital/digital-engine.js';
 import { ClockManager } from './digital/clock.js';
 import type { CompiledCircuitImpl as CompiledDigitalDomain } from './digital/compiled-circuit.js';
 import { MNAEngine } from './analog/analog-engine.js';
+import type { StepRecord } from './analog/convergence-log.js';
 import { BitVector } from '../core/signal.js';
 import { FacadeError } from '../headless/types.js';
 import { DiagnosticCollector } from './analog/diagnostics.js';
@@ -177,6 +178,8 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   }
 
   step(): void {
+    const analogTimeBefore = this._analog?.simTime ?? 0;
+
     if (this._digital !== null && this._analog !== null) {
       this._stepMixed();
     } else if (this._digital !== null) {
@@ -184,6 +187,19 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     } else if (this._analog !== null) {
       this._analog.step();
     }
+
+    // Stagnation guard: if the analog engine completed step() but simTime
+    // did not advance, all internal retries were exhausted — the engine
+    // cannot make progress from this state. Fail immediately rather than
+    // burning CPU repeating identical failures.
+    if (this._analog !== null && this._analog.simTime === analogTimeBefore) {
+      throw new Error(
+        `Analog engine stagnation: simTime stuck at ${this._analog.simTime}s. ` +
+        `The engine exhausted all internal retries without advancing. ` +
+        `Check convergence log for details.`,
+      );
+    }
+
     this._stepCount++;
     for (const obs of this._observers) obs.onStep(this._stepCount);
   }
@@ -248,9 +264,6 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       );
       if (outputAdapter !== undefined) {
         outputAdapter.setLogicLevel(high);
-      }
-      if (high) {
-        analog.addBreakpoint(analog.simTime);
       }
     }
 
@@ -319,6 +332,39 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   acAnalysis(params: AcParams): AcResult | null {
     if (this._analog === null) return null;
     return this._analog.acAnalysis(params);
+  }
+
+  // -------------------------------------------------------------------------
+  // §1.11 Convergence logging
+  // -------------------------------------------------------------------------
+
+  getElementLabel(index: number): string | undefined {
+    if (this._analog === null) return undefined;
+    const compiledAnalog = this._compiled.analog as ConcreteCompiledAnalogCircuit;
+    const circEl = compiledAnalog.elementToCircuitElement.get(index);
+    if (!circEl) return undefined;
+    const label = circEl.getProperties().has("label")
+      ? String(circEl.getProperties().get("label") ?? circEl.instanceId)
+      : circEl.instanceId;
+    return `${label} (${circEl.typeId})`;
+  }
+
+  supportsConvergenceLog(): boolean { return this._analog !== null; }
+
+  setConvergenceLogEnabled(enabled: boolean): void {
+    if (this._analog === null) return;
+    this._analog.convergenceLog.enabled = enabled;
+  }
+
+  getConvergenceLog(lastN?: number): StepRecord[] | null {
+    if (this._analog === null) return null;
+    const log = this._analog.convergenceLog;
+    return lastN !== undefined ? log.getLast(lastN) : log.getAll();
+  }
+
+  clearConvergenceLog(): void {
+    if (this._analog === null) return;
+    this._analog.convergenceLog.clear();
   }
 
   async stepToTime(targetSimTime: number, budgetMs = 5000): Promise<number> {

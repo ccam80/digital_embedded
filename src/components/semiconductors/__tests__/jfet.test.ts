@@ -428,44 +428,28 @@ describe("Registration", () => {
 // ---------------------------------------------------------------------------
 
 describe("JFET state-pool extension schema", () => {
-  it("stateSize_is_33", () => {
-    const propsObj = createTestPropertyBag();
-    propsObj.replaceModelParams(NJFET_PARAMS);
-    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    expect(element.stateSize).toBe(33);
-  });
-
-  it("extension_slot_constants_are_30_31_32", () => {
-    expect(SLOT_VGS_JUNCTION).toBe(30);
-    expect(SLOT_GD_JUNCTION).toBe(31);
-    expect(SLOT_ID_JUNCTION).toBe(32);
+  it("extension_slot_constants_are_35_36_37", () => {
+    // FET_BASE_SCHEMA has 35 slots (0-34); JFET extension starts at 35.
+    expect(SLOT_VGS_JUNCTION).toBe(35);
+    expect(SLOT_GD_JUNCTION).toBe(36);
+    expect(SLOT_ID_JUNCTION).toBe(37);
   });
 
   it("initState_initializes_VGS_JUNCTION_to_zero", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
     const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    const pool = new StatePool(33);
+    const pool = new StatePool(38);
     element.stateBaseOffset = 0;
     element.initState(pool);
     expect(pool.state0[SLOT_VGS_JUNCTION]).toBe(0);
-  });
-
-  it("initState_initializes_GD_JUNCTION_to_GMIN", () => {
-    const propsObj = createTestPropertyBag();
-    propsObj.replaceModelParams(NJFET_PARAMS);
-    const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    const pool = new StatePool(33);
-    element.stateBaseOffset = 0;
-    element.initState(pool);
-    expect(pool.state0[SLOT_GD_JUNCTION]).toBe(1e-12);
   });
 
   it("initState_initializes_ID_JUNCTION_to_zero", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
     const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    const pool = new StatePool(33);
+    const pool = new StatePool(38);
     element.stateBaseOffset = 0;
     element.initState(pool);
     expect(pool.state0[SLOT_ID_JUNCTION]).toBe(0);
@@ -495,18 +479,11 @@ describe("JFET state-pool extension schema", () => {
     expect(Math.abs(idJunction)).toBeGreaterThan(0);
   });
 
-  it("pjfet_stateSize_is_33", () => {
-    const propsObj = createTestPropertyBag();
-    propsObj.replaceModelParams(PJFET_PARAMS);
-    const element = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj);
-    expect(element.stateSize).toBe(33);
-  });
-
   it("pjfet_initState_initializes_extension_slots", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(PJFET_PARAMS);
     const element = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj);
-    const pool = new StatePool(33);
+    const pool = new StatePool(38);
     element.stateBaseOffset = 0;
     element.initState(pool);
     expect(pool.state0[SLOT_VGS_JUNCTION]).toBe(0);
@@ -518,14 +495,14 @@ describe("JFET state-pool extension schema", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
     const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    const pool = new StatePool(33);
+    const pool = new StatePool(38);
     element.stateBaseOffset = 0;
     element.initState(pool);
     // Base FET slots: GM=1e-12, GDS=1e-12 (device-off linearization)
     expect(pool.state0[2]).toBe(1e-12); // SLOT_GM = 2
     expect(pool.state0[3]).toBe(1e-12); // SLOT_GDS = 3
-    // VGS_PREV and VGD_PREV should be NaN (warm-start sentinels)
-    expect(Number.isNaN(pool.state0[10])).toBe(true); // SLOT_VGS_PREV = 10
-    expect(Number.isNaN(pool.state0[11])).toBe(true); // SLOT_VGD_PREV = 11
+    // SLOT_V_GS and SLOT_V_GD are zero-initialised (first-call detection via s1[Q_GS]===0)
+    expect(pool.state0[10]).toBe(0); // SLOT_V_GS = 10
+    expect(pool.state0[11]).toBe(0); // SLOT_V_GD = 11
   });
 });

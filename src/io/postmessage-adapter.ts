@@ -257,6 +257,9 @@ export class PostMessageAdapter {
         case 'sim-read-all-signals':
           this._handleReadAllSignals();
           break;
+        case 'sim-convergence-log':
+          this._handleConvergenceLog(msg);
+          break;
 
         // --- Core: testing ---
         case 'sim-test':
@@ -414,6 +417,40 @@ export class PostMessageAdapter {
     }
     const simTime = this._facade?.getCoordinator().simTime ?? null;
     this._post({ type: 'sim-signals', signals, simTime });
+  }
+
+  // -------------------------------------------------------------------------
+  // Convergence log handler
+  // -------------------------------------------------------------------------
+
+  private _handleConvergenceLog(msg: { action?: unknown; lastN?: unknown }): void {
+    const action = String(msg.action ?? 'read');
+    const facade = this._hooks.getFacade?.() as import('../headless/default-facade.js').DefaultSimulatorFacade | undefined
+      ?? this._getOwnFacade();
+    const coord = facade.getCoordinator();
+
+    switch (action) {
+      case 'enable':
+        coord.setConvergenceLogEnabled(true);
+        this._post({ type: 'sim-convergence-log-data', records: [], enabled: true });
+        break;
+      case 'disable':
+        coord.setConvergenceLogEnabled(false);
+        this._post({ type: 'sim-convergence-log-data', records: [], enabled: false });
+        break;
+      case 'clear':
+        coord.clearConvergenceLog();
+        this._post({ type: 'sim-convergence-log-data', records: [], enabled: true });
+        break;
+      case 'read': {
+        const lastN = msg.lastN !== undefined ? Number(msg.lastN) : undefined;
+        const records = coord.getConvergenceLog(lastN) ?? [];
+        this._post({ type: 'sim-convergence-log-data', records, enabled: true });
+        break;
+      }
+      default:
+        this._post({ type: 'sim-error', error: `Unknown convergence-log action: ${action}` });
+    }
   }
 
   // -------------------------------------------------------------------------

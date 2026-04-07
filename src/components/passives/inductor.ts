@@ -27,9 +27,10 @@ import {
   inductorConductance,
   inductorHistoryCurrent,
 } from "../../solver/analog/integration.js";
+import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
-import { defineStateSchema, applyInitialValues, L_COMPANION_SLOTS } from "../../solver/analog/state-schema.js";
+import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 import type { StateSchema } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
@@ -148,16 +149,20 @@ export class InductorElement extends AbstractCircuitElement {
 // AnalogInductorElement — MNA implementation
 // ---------------------------------------------------------------------------
 
+// Slot layout — 4 slots total. Previous values are read from s1/s2/s3
+// at the same offsets (pointer-rotation history).
 const INDUCTOR_SCHEMA: StateSchema = defineStateSchema("AnalogInductorElement", [
-  ...L_COMPANION_SLOTS,
-  { name: "I_PREV_PREV", doc: "Branch current at step n-2 (LTE history)", init: { kind: "zero" } },
+  { name: "GEQ", doc: "Companion conductance",          init: { kind: "zero" } },
+  { name: "IEQ", doc: "Companion history current",      init: { kind: "zero" } },
+  { name: "I",   doc: "Branch current this step",       init: { kind: "zero" } },
+  { name: "PHI", doc: "Flux phi=L*i this step",         init: { kind: "zero" } },
 ]);
 
 // Slot indices within the state pool
 const SLOT_GEQ = 0;
 const SLOT_IEQ = 1;
-const SLOT_I_PREV = 2;
-const SLOT_I_PREV_PREV = 3;
+const SLOT_I   = 2;
+const SLOT_PHI = 3;
 
 class AnalogInductorElement implements ReactiveAnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
@@ -170,7 +175,10 @@ class AnalogInductorElement implements ReactiveAnalogElementCore {
   stateBaseOffset = -1;
 
   private L: number;
-  private s0!: Float64Array;
+  s0!: Float64Array;
+  s1!: Float64Array;
+  s2!: Float64Array;
+  s3!: Float64Array;
   private base!: number;
 
   constructor(branchIdx: number, inductance: number) {
@@ -179,7 +187,10 @@ class AnalogInductorElement implements ReactiveAnalogElementCore {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.state0;
+    this.s0 = pool.states[0];
+    this.s1 = pool.states[1];
+    this.s2 = pool.states[2];
+    this.s3 = pool.states[3];
     this.base = this.stateBaseOffset;
     applyInitialValues(INDUCTOR_SCHEMA, pool, this.base, {});
   }
@@ -223,16 +234,19 @@ class AnalogInductorElement implements ReactiveAnalogElementCore {
     const v0 = this.pinNodeIds[0] > 0 ? voltages[this.pinNodeIds[0] - 1] : 0;
     const v1 = this.pinNodeIds[1] > 0 ? voltages[this.pinNodeIds[1] - 1] : 0;
     const vNow = v0 - v1;
-    const iPrev = this.s0[this.base + SLOT_I_PREV];
 
+    // Read previous step's values from s1 (rotated history)
+    const iPrev = this.s1[this.base + SLOT_I];
+
+    // Write new companion model into s0
     this.s0[this.base + SLOT_GEQ] = inductorConductance(this.L, dt, method);
     this.s0[this.base + SLOT_IEQ] = inductorHistoryCurrent(this.L, dt, method, iNow, iPrev, vNow);
-    // Shift LTE history: the prior iPrev (= current at end of step N-2)
-    // moves to prev-prev, and iNow (= current at end of step N-1) becomes
-    // the new prev. getLteEstimate compares these two points to produce a
-    // dt-scaled truncation error.
-    this.s0[this.base + SLOT_I_PREV_PREV] = iPrev;
-    this.s0[this.base + SLOT_I_PREV] = iNow;
+    this.s0[this.base + SLOT_I]   = iNow;
+  }
+
+  updateChargeFlux(voltages: Float64Array): void {
+    const iNow = voltages[this.branchIndex];
+    this.s0[this.base + SLOT_PHI] = this.L * iNow;
   }
 
   getLteEstimate(dt: number): { truncationError: number; toleranceReference: number } {
@@ -251,14 +265,32 @@ class AnalogInductorElement implements ReactiveAnalogElementCore {
     //
     // Retrospective by one step — zero on the first two calls, valid thereafter.
     if (dt <= 0) return { truncationError: 0, toleranceReference: 0 };
-    const iPrev = this.s0[this.base + SLOT_I_PREV];
-    const iPrevPrev = this.s0[this.base + SLOT_I_PREV_PREV];
+    const iPrev     = this.s1[this.base + SLOT_I];
+    const iPrevPrev = this.s2[this.base + SLOT_I];
     const deltaI = Math.abs(iPrev - iPrevPrev);
     const fluxRef = this.L * Math.max(Math.abs(iPrev), Math.abs(iPrevPrev));
     return {
       truncationError: (dt / 12) * deltaI,
       toleranceReference: fluxRef,
     };
+  }
+
+  getLteTimestep(
+    dt: number,
+    deltaOld: readonly number[],
+    order: number,
+    method: IntegrationMethod,
+    lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
+  ): number {
+    const phi0 = this.s0[this.base + SLOT_PHI];
+    const phi1 = this.s1[this.base + SLOT_PHI];
+    const phi2 = this.s2[this.base + SLOT_PHI];
+    const phi3 = this.s3[this.base + SLOT_PHI];
+    const h0 = dt;
+    const h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
+    const ccap0 = h0 > 0 ? (phi0 - phi1) / h0 : 0;
+    const ccap1 = h1 > 0 ? (phi1 - phi2) / h1 : 0;
+    return cktTerr(dt, deltaOld, order, method, phi0, phi1, phi2, phi3, ccap0, ccap1, lteParams);
   }
 }
 

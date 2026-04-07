@@ -282,7 +282,8 @@ function createAnalogClockElement(
     nextBreakpoint(afterTime: number): number | null {
       const halfPeriod = 1 / (2 * frequency);
       const idx = Math.floor(afterTime / halfPeriod) + 1;
-      return idx * halfPeriod;
+      const result = idx * halfPeriod;
+      return result > afterTime ? result : (idx + 1) * halfPeriod;
     },
 
     registerRefreshCallback(cb: () => void): void {

@@ -651,7 +651,7 @@ test.describe('Subcircuit workflow — full lifecycle', () => {
     const nameInput = dialog.locator('input[type="text"]').first();
     expect(await nameInput.inputValue()).toBe('subcircuit_2');
 
-    await dialog.getByRole('button', { name: 'Cancel' }).click();x
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
   });
 
   // -------------------------------------------------------------------------

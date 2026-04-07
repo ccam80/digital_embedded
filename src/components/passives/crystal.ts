@@ -58,32 +58,47 @@ import type { StatePoolRef } from "../../core/analog-types.js";
 import {
   defineStateSchema,
   applyInitialValues,
-  CAP_COMPANION_SLOTS,
-  L_COMPANION_SLOTS,
-  suffixed,
   type StateSchema,
 } from "../../solver/analog/state-schema.js";
+import { cktTerr } from "../../solver/analog/ckt-terr.js";
 
 // ---------------------------------------------------------------------------
 // State-pool schema
 // ---------------------------------------------------------------------------
 
+// Slot layout — 12 slots total (3 reactive stores × 4 slots each).
+// Previous values are read from s1/s2/s3 at the same offsets.
 const CRYSTAL_SCHEMA: StateSchema = defineStateSchema("AnalogCrystalElement", [
-  ...suffixed(L_COMPANION_SLOTS, "_L"),
-  ...suffixed(CAP_COMPANION_SLOTS, "_CS"),
-  ...suffixed(CAP_COMPANION_SLOTS, "_C0"),
+  // L_s (inductor motional arm)
+  { name: "GEQ_L",  doc: "L_s companion conductance",         init: { kind: "zero" } },
+  { name: "IEQ_L",  doc: "L_s companion history current",     init: { kind: "zero" } },
+  { name: "I_L",    doc: "L_s branch current this step",      init: { kind: "zero" } },
+  { name: "PHI_L",  doc: "L_s flux phi=Ls*i this step",       init: { kind: "zero" } },
+  // C_s (series motional capacitor)
+  { name: "GEQ_CS", doc: "C_s companion conductance",         init: { kind: "zero" } },
+  { name: "IEQ_CS", doc: "C_s companion history current",     init: { kind: "zero" } },
+  { name: "V_CS",   doc: "C_s terminal voltage this step",    init: { kind: "zero" } },
+  { name: "Q_CS",   doc: "C_s charge Cs*V this step",         init: { kind: "zero" } },
+  // C_0 (shunt electrode capacitor)
+  { name: "GEQ_C0", doc: "C_0 companion conductance",         init: { kind: "zero" } },
+  { name: "IEQ_C0", doc: "C_0 companion history current",     init: { kind: "zero" } },
+  { name: "V_C0",   doc: "C_0 terminal voltage this step",    init: { kind: "zero" } },
+  { name: "Q_C0",   doc: "C_0 charge C0*V this step",         init: { kind: "zero" } },
 ]);
 
 // Slot indices — must match the layout above.
-const SLOT_GEQ_L    = 0; // inductor companion conductance
-const SLOT_IEQ_L    = 1; // inductor companion history current
-const SLOT_I_PREV_L = 2; // inductor branch current at step n-1
-const SLOT_GEQ_CS   = 3; // series-cap companion conductance
-const SLOT_IEQ_CS   = 4; // series-cap companion history current
-const SLOT_V_PREV_CS = 5; // series-cap terminal voltage at step n-1
-const SLOT_GEQ_C0   = 6; // shunt-cap companion conductance
-const SLOT_IEQ_C0   = 7; // shunt-cap companion history current
-const SLOT_V_PREV_C0 = 8; // shunt-cap terminal voltage at step n-1
+const SLOT_GEQ_L  = 0;
+const SLOT_IEQ_L  = 1;
+const SLOT_I_L    = 2;
+const SLOT_PHI_L  = 3;
+const SLOT_GEQ_CS = 4;
+const SLOT_IEQ_CS = 5;
+const SLOT_V_CS   = 6;
+const SLOT_Q_CS   = 7;
+const SLOT_GEQ_C0 = 8;
+const SLOT_IEQ_C0 = 9;
+const SLOT_V_C0   = 10;
+const SLOT_Q_C0   = 11;
 
 // ---------------------------------------------------------------------------
 // Derived parameter helpers
@@ -245,7 +260,10 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   private C_0: number;
 
   // Pool references — bound in initState()
-  private s0!: Float64Array;
+  s0!: Float64Array;
+  s1!: Float64Array;
+  s2!: Float64Array;
+  s3!: Float64Array;
   private base!: number;
 
   /**
@@ -274,7 +292,10 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.state0;
+    this.s0 = pool.states[0];
+    this.s1 = pool.states[1];
+    this.s2 = pool.states[2];
+    this.s3 = pool.states[3];
     this.base = this.stateBaseOffset;
     applyInitialValues(CRYSTAL_SCHEMA, pool, this.base, {});
   }
@@ -368,32 +389,90 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const vN1 = n1 > 0 ? voltages[n1 - 1] : 0;
     const vN2 = n2 > 0 ? voltages[n2 - 1] : 0;
     const vNowL = vN1 - vN2;
-    const iPrevL = this.s0[this.base + SLOT_I_PREV_L];
-    this.s0[this.base + SLOT_GEQ_L]    = inductorConductance(this.L_s, dt, method);
-    this.s0[this.base + SLOT_IEQ_L]    = inductorHistoryCurrent(this.L_s, dt, method, iNowL, iPrevL, vNowL);
-    this.s0[this.base + SLOT_I_PREV_L] = iNowL;
+    // Read previous step's L_s values from s1 (rotated history)
+    const iPrevL = this.s1[this.base + SLOT_I_L];
+    this.s0[this.base + SLOT_GEQ_L] = inductorConductance(this.L_s, dt, method);
+    this.s0[this.base + SLOT_IEQ_L] = inductorHistoryCurrent(this.L_s, dt, method, iNowL, iPrevL, vNowL);
+    this.s0[this.base + SLOT_I_L]   = iNowL;
 
     // C_s companion model — voltage across n2 and n_B
-    const vCs_now = vN2 - (nB > 0 ? voltages[nB - 1] : 0);
-    const geqCs   = this.s0[this.base + SLOT_GEQ_CS];
-    const ieqCs   = this.s0[this.base + SLOT_IEQ_CS];
-    const vPrevCs = this.s0[this.base + SLOT_V_PREV_CS];
-    const iNowCs  = geqCs * vCs_now + ieqCs;
-    this.s0[this.base + SLOT_GEQ_CS]   = capacitorConductance(this.C_s, dt, method);
-    this.s0[this.base + SLOT_IEQ_CS]   = capacitorHistoryCurrent(this.C_s, dt, method, vCs_now, vPrevCs, iNowCs);
-    this.s0[this.base + SLOT_V_PREV_CS] = vCs_now;
+    const vB = nB > 0 ? voltages[nB - 1] : 0;
+    const vCs_now = vN2 - vB;
+    // Read previous step's C_s values from s1 (rotated history)
+    const geqCsPrev = this.s1[this.base + SLOT_GEQ_CS];
+    const ieqCsPrev = this.s1[this.base + SLOT_IEQ_CS];
+    const vPrevCs   = this.s1[this.base + SLOT_V_CS];
+    const iPrevCs   = geqCsPrev * vCs_now + ieqCsPrev;
+    this.s0[this.base + SLOT_GEQ_CS] = capacitorConductance(this.C_s, dt, method);
+    this.s0[this.base + SLOT_IEQ_CS] = capacitorHistoryCurrent(this.C_s, dt, method, vCs_now, vPrevCs, iPrevCs);
+    this.s0[this.base + SLOT_V_CS]   = vCs_now;
 
     // C_0 companion model — voltage across n_A and n_B
     const vA = nA > 0 ? voltages[nA - 1] : 0;
-    const vB = nB > 0 ? voltages[nB - 1] : 0;
     const vC0_now = vA - vB;
-    const geqC0   = this.s0[this.base + SLOT_GEQ_C0];
-    const ieqC0   = this.s0[this.base + SLOT_IEQ_C0];
-    const vPrevC0 = this.s0[this.base + SLOT_V_PREV_C0];
-    const iNowC0  = geqC0 * vC0_now + ieqC0;
-    this.s0[this.base + SLOT_GEQ_C0]   = capacitorConductance(this.C_0, dt, method);
-    this.s0[this.base + SLOT_IEQ_C0]   = capacitorHistoryCurrent(this.C_0, dt, method, vC0_now, vPrevC0, iNowC0);
-    this.s0[this.base + SLOT_V_PREV_C0] = vC0_now;
+    // Read previous step's C_0 values from s1 (rotated history)
+    const geqC0Prev = this.s1[this.base + SLOT_GEQ_C0];
+    const ieqC0Prev = this.s1[this.base + SLOT_IEQ_C0];
+    const vPrevC0   = this.s1[this.base + SLOT_V_C0];
+    const iPrevC0   = geqC0Prev * vC0_now + ieqC0Prev;
+    this.s0[this.base + SLOT_GEQ_C0] = capacitorConductance(this.C_0, dt, method);
+    this.s0[this.base + SLOT_IEQ_C0] = capacitorHistoryCurrent(this.C_0, dt, method, vC0_now, vPrevC0, iPrevC0);
+    this.s0[this.base + SLOT_V_C0]   = vC0_now;
+  }
+
+  updateChargeFlux(voltages: Float64Array): void {
+    const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
+    const n2 = this.pinNodeIds[3];
+    const b = this.branchIndex;
+
+    const iNowL = voltages[b];
+    this.s0[this.base + SLOT_PHI_L] = this.L_s * iNowL;
+
+    const vN2 = n2 > 0 ? voltages[n2 - 1] : 0;
+    const vB = nB > 0 ? voltages[nB - 1] : 0;
+    this.s0[this.base + SLOT_Q_CS] = this.C_s * (vN2 - vB);
+
+    const vA = nA > 0 ? voltages[nA - 1] : 0;
+    this.s0[this.base + SLOT_Q_C0] = this.C_0 * (vA - vB);
+  }
+
+  getLteTimestep(
+    dt: number,
+    deltaOld: readonly number[],
+    order: number,
+    method: IntegrationMethod,
+    lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
+  ): number {
+    const h0 = dt;
+    const h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
+
+    // L_s (flux-based): pass 0,0 for ccap (inductor pattern)
+    const phi0 = this.s0[this.base + SLOT_PHI_L];
+    const phi1 = this.s1[this.base + SLOT_PHI_L];
+    const phi2 = this.s2[this.base + SLOT_PHI_L];
+    const phi3 = this.s3[this.base + SLOT_PHI_L];
+    const dtL = cktTerr(dt, deltaOld, order, method, phi0, phi1, phi2, phi3, 0, 0, lteParams);
+
+    // C_s (charge-based)
+    const qCs0 = this.s0[this.base + SLOT_Q_CS];
+    const qCs1 = this.s1[this.base + SLOT_Q_CS];
+    const qCs2 = this.s2[this.base + SLOT_Q_CS];
+    const qCs3 = this.s3[this.base + SLOT_Q_CS];
+    const ccap0Cs = h0 > 0 ? (qCs0 - qCs1) / h0 : 0;
+    const ccap1Cs = h1 > 0 ? (qCs1 - qCs2) / h1 : 0;
+    const dtCs = cktTerr(dt, deltaOld, order, method, qCs0, qCs1, qCs2, qCs3, ccap0Cs, ccap1Cs, lteParams);
+
+    // C_0 (charge-based)
+    const qC00 = this.s0[this.base + SLOT_Q_C0];
+    const qC01 = this.s1[this.base + SLOT_Q_C0];
+    const qC02 = this.s2[this.base + SLOT_Q_C0];
+    const qC03 = this.s3[this.base + SLOT_Q_C0];
+    const ccap0C0 = h0 > 0 ? (qC00 - qC01) / h0 : 0;
+    const ccap1C0 = h1 > 0 ? (qC01 - qC02) / h1 : 0;
+    const dtC0 = cktTerr(dt, deltaOld, order, method, qC00, qC01, qC02, qC03, ccap0C0, ccap1C0, lteParams);
+
+    return Math.min(dtL, dtCs, dtC0);
   }
 }
 

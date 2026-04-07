@@ -1,89 +1,101 @@
 {
   "summary": {
     "vitest": {
-      "passed": 7985,
-      "failed": 6,
+      "passed": 56,
+      "failed": 2,
       "skipped": 0,
-      "totalFiles": 340,
-      "durationSeconds": 24.3
+      "totalFiles": 3,
+      "durationSeconds": 1.2
     },
     "playwright": {
-      "passed": 479,
-      "failed": 9,
+      "passed": 477,
+      "failed": 11,
       "skipped": 0,
       "totalFiles": 23,
-      "durationSeconds": 301.866489
+      "durationSeconds": 181.628508
     },
-    "totalFailed": 15,
-    "totalPassed": 8464
+    "totalFailed": 13,
+    "totalPassed": 533
   },
   "failures": {
     "vitest": [
       {
-        "message": "expected false to be true // Object.is equality",
-        "count": 6,
+        "message": "V(drain) after VTO=2.5: relative error 61.9375% exceeds 0.1% (actual=1.840507626028466, expected=4.835494)",
+        "count": 1,
         "locations": [
           {
-            "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
-            "test": "parsed .MODEL card applied via applySpiceImportResult: circuit compiles and DC converges",
-            "line": 201,
-            "column": 27
-          },
+            "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
+            "test": "setParam('VTO', 2.5) shifts DC OP to match SPICE reference",
+            "line": 56,
+            "column": 11
+          }
+        ]
+      },
+      {
+        "message": "V(drain) after KP=240µ: relative error 102.8913% exceeds 0.1% (actual=1.840507626028466, expected=0.9071396)",
+        "count": 1,
+        "locations": [
           {
-            "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
-            "test": "compile with default IS vs IS=1e-20 produces different collector voltage",
-            "line": 235,
-            "column": 34
-          },
-          {
-            "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
-            "test": "deserialized circuit produces same DC result as pre-serialization",
-            "line": 323,
-            "column": 35
-          },
-          {
-            "file": "src\\headless\\__tests__\\spice-import-roundtrip-mcp.test.ts",
-            "test": "parseModelCard then applySpiceImportResult stores params and DC converges",
-            "line": 402,
-            "column": 27
-          },
-          {
-            "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
-            "test": "default params remain at BJT defaults when only IS is overridden",
-            "line": 219,
-            "column": 47
-          },
-          {
-            "file": "src\\headless\\__tests__\\spice-model-overrides-mcp.test.ts",
-            "test": "deserialized circuit with overrides produces same DC result as pre-serialization",
-            "line": 272,
-            "column": 35
+            "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
+            "test": "setParam('KP', 240µ) shifts DC OP to match SPICE reference",
+            "line": 56,
+            "column": 11
           }
         ]
       }
     ],
     "playwright": [
       {
-        "message": "Error: Status bar shows an error",
-        "count": 4,
+        "message": "Error: Expected 0.020900161470425022 to be close to 0.02084652 (err=0.00005364147042502196, limit=2.084652e-8)",
+        "count": 1,
         "locations": [
           {
             "file": "gui/analog-bjt-convergence.spec.ts",
             "test": "compile and step — no convergence error, supply rail is 10V",
             "line": 251,
             "column": 3
-          },
-          {
-            "file": "gui/analog-bjt-convergence.spec.ts",
-            "test": "run continuously — voltages remain bounded",
-            "line": 355,
-            "column": 3
-          },
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mnot\u001b[2m.\u001b[22mtoBeCloseTo\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m, \u001b[22mprecision\u001b[2m)\u001b[22m",
+        "count": 1,
+        "locations": [
           {
             "file": "gui/analog-bjt-convergence.spec.ts",
             "test": "step to 5ms — output voltage evolves and trace captures transient",
             "line": 387,
             "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: Status bar shows an error",
+        "count": 5,
+        "locations": [
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC at bits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "DAC at bits=8: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ADC at bits=4: set property and compile",
+            "line": 532,
+            "column": 9
+          },
+          {
+            "file": "gui/component-sweep.spec.ts",
+            "test": "ADC at bits=8: set property and compile",
+            "line": 532,
+            "column": 9
           },
           {
             "file": "gui/master-circuit-assembly.spec.ts",
@@ -94,19 +106,7 @@
         ]
       },
       {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
-        "count": 1,
-        "locations": [
-          {
-            "file": "gui/analog-ui-fixup.spec.ts",
-            "test": "speed control affects analog simulation rate",
-            "line": 140,
-            "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: Expected 0.10948619919842355 to be close to 0.0957744513 (err=0.013711747898423554, limit=9.577445129999999e-8)",
+        "message": "Error: Expected 0.09577162815079189 to be close to 0.0957744513 (err=0.000002823149208103226, limit=9.577445129999999e-8)",
         "count": 1,
         "locations": [
           {
@@ -118,37 +118,37 @@
         ]
       },
       {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed",
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
         "count": 1,
         "locations": [
           {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "new subcircuit appears in the palette",
-            "line": 360,
+            "file": "gui/master-circuit-assembly.spec.ts",
+            "test": "Master 2: analog — switched divider, RC, opamp, BJT",
+            "line": 207,
             "column": 3
           }
         ]
       },
       {
-        "message": "ReferenceError: x is not defined",
+        "message": "Error: simTime only advanced 0.0us — expected at least 500us",
         "count": 1,
         "locations": [
           {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "second subcircuit auto-names as subcircuit_2",
-            "line": 626,
+            "file": "gui/stepping-perf.spec.ts",
+            "test": "buckbjt at 1ms/s — simTime advances at least 500us in 2s wall time",
+            "line": 48,
             "column": 3
           }
         ]
       },
       {
-        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeGreaterThanOrEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "message": "Error: FF only advanced 0.0us — expected ~1ms",
         "count": 1,
         "locations": [
           {
-            "file": "parity/rlc-lte-path.spec.ts",
-            "test": "RC zero-crossing progression through the postMessage bridge",
-            "line": 40,
+            "file": "gui/stepping-perf.spec.ts",
+            "test": "buckbjt fast-forward 1ms — completes within 5s wall budget",
+            "line": 93,
             "column": 3
           }
         ]

@@ -43,13 +43,13 @@ import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { VT } from "../../core/constants.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
 // ---------------------------------------------------------------------------
 
-/** Thermal voltage at 300 K (kT/q in volts). */
-const VT = 0.02585;
+// VT (thermal voltage) imported from ../../core/constants.js
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -58,9 +58,9 @@ const GMIN = 1e-12;
 // JFET state-pool slots
 // ---------------------------------------------------------------------------
 
-export const SLOT_VGS_JUNCTION = 30;
-export const SLOT_GD_JUNCTION  = 31;
-export const SLOT_ID_JUNCTION  = 32;
+export const SLOT_VGS_JUNCTION = 35;
+export const SLOT_GD_JUNCTION  = 36;
+export const SLOT_ID_JUNCTION  = 37;
 
 const JFET_SCHEMA = defineStateSchema("NJfetAnalogElement", [
   ...FET_BASE_SCHEMA.slots,
@@ -148,6 +148,10 @@ export class NJfetAnalogElement extends AbstractFetElement {
 
   override initState(pool: StatePoolRef): void {
     this._s0 = pool.state0;
+    this.s0 = pool.state0;
+    this.s1 = pool.state1;
+    this.s2 = pool.state2;
+    this.s3 = pool.state3;
     applyInitialValues(JFET_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
@@ -168,14 +172,15 @@ export class NJfetAnalogElement extends AbstractFetElement {
   ): { vgs: number; vds: number; swapped?: boolean } {
     const vt_n = VT * this._p.N;
     const vcrit = vt_n * Math.log(vt_n / (Math.SQRT2 * this._p.IS));
-    const vgsLimited = pnjlim(vgsNew, vgsOld, vt_n, vcrit);
+    const vgsResult = pnjlim(vgsNew, vgsOld, vt_n, vcrit);
+    this._pnjlimLimited = vgsResult.limited;
 
     // Clamp Vds to prevent huge steps
     let vds = vdsNew;
     if (vds < -10) vds = -10;
     if (vds > 50) vds = 50;
 
-    return { vgs: vgsLimited, vds, swapped: false };
+    return { vgs: vgsResult.value, vds, swapped: false };
   }
 
   computeIds(vgs: number, vds: number): number {
@@ -248,7 +253,7 @@ export class NJfetAnalogElement extends AbstractFetElement {
     if (key in this._p) (this._p as unknown as Record<string, number>)[key] = value;
   }
 
-  override updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+  override updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -274,13 +279,16 @@ export class NJfetAnalogElement extends AbstractFetElement {
     // Gate junction diode: limit V_GS for junction
     const vt_n = VT * this._p.N;
     const vcrit = vt_n * Math.log(vt_n / (Math.SQRT2 * this._p.IS));
-    this._vgs_junction = pnjlim(vGraw, this._vgs_junction, vt_n, vcrit);
+    const gateJunctionResult = pnjlim(vGraw, this._vgs_junction, vt_n, vcrit);
+    this._vgs_junction = gateJunctionResult.value;
+    this._pnjlimLimited = this._pnjlimLimited || gateJunctionResult.limited;
 
     // Gate junction I-V (Shockley): Ig = IS*(exp(Vgs/(N*Vt)) - 1)
     const expArg = Math.min(this._vgs_junction / vt_n, 80);
     const igJunction = this._p.IS * (Math.exp(expArg) - 1);
     this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
     this._id_junction = igJunction;
+    return this._pnjlimLimited;
   }
 
   override stampNonlinear(solver: SparseSolver): void {

@@ -57,7 +57,8 @@ function expectSpiceRef(actual: number, expected: number, label: string) {
 // Physical constants
 // ---------------------------------------------------------------------------
 
-const VT = 0.02585;
+// VT imported from core/constants to match production code
+import { VT } from "../../../core/constants.js";
 const GMIN = 1e-12;
 
 function makeParamBag(params: Record<string, number>): PropertyBag {

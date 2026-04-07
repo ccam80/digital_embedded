@@ -207,15 +207,6 @@ describe("Capacitor", () => {
   });
 
   describe("statePool", () => {
-    it("stateSize is 6", () => {
-      const props = new PropertyBag();
-      props.setModelParam("capacitance", 1e-6);
-      const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-        new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
-      );
-      expect((core as ReactiveAnalogElement).stateSize).toBe(6);
-    });
-
     it("stateBaseOffset is -1 before compiler assigns it", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", 1e-6);
@@ -286,10 +277,12 @@ describe("Capacitor", () => {
         new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
       );
       Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
-      const { element } = withState(core);
+      const { element, pool } = withState(core);
 
-      // First call: v1 = 3V
+      // First call: v1 = 3V — rotate pool so v=3 lands in s1
       element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]));
+      pool.acceptTimestep();
+      pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       // Second call: v2 = 7V
       element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]));
 
@@ -306,10 +299,12 @@ describe("Capacitor", () => {
         new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
       );
       Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
-      const { element } = withState(core);
+      const { element, pool } = withState(core);
 
-      // First call: v1 = 5V (non-zero)
+      // First call: v1 = 5V (non-zero) — rotate so v=5 lands in s1
       element.stampCompanion!(1e-6, "bdf1", new Float64Array([5, 0]));
+      pool.acceptTimestep();
+      pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       // Second call: v2 = 0V (zero crossing)
       element.stampCompanion!(1e-6, "bdf1", new Float64Array([0, 0]));
 

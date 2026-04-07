@@ -100,7 +100,7 @@ test.describe('RLC LTE path — postMessage (E2E) surface', () => {
     while (simTime < 2 * period && batchCount < BATCH_LIMIT) {
       const result = await batchStepAndRead(BATCH_SIZE);
       const t = result.simTime ?? simTime;
-      const vc = result.signals['Vc'] ?? 0;
+      const vc = result.signals['Vc:pos'] ?? 0;
       simTime = t;
       samples.push({ t, vc });
       batchCount++;

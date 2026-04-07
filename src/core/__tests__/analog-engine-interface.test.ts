@@ -19,6 +19,7 @@ import type {
 import type { Diagnostic, DiagnosticCode } from "@/compile/types";
 import type { AcParams, AcResult } from "@/solver/analog/ac-analysis";
 import { DEFAULT_SIMULATION_PARAMS } from "@/core/analog-engine-interface";
+import { ConvergenceLog } from "@/solver/analog/convergence-log";
 
 // ---------------------------------------------------------------------------
 // AnalogEngineTypes
@@ -28,19 +29,22 @@ describe("AnalogEngineTypes", () => {
   it("simulation_params_has_all_fields", () => {
     const params: SimulationParams = {
       maxTimeStep: 5e-6,
-      minTimeStep: 1e-14,
+      minTimeStep: 5e-17,
       reltol: 1e-3,
       abstol: 1e-6,
       iabstol: 1e-12,
       chargeTol: 1e-14,
       trtol: 7.0,
       maxIterations: 100,
+      transientMaxIterations: 10,
       integrationMethod: "auto",
+      dcTrcvMaxIter: 50,
       gmin: 1e-12,
+      nodeDamping: false,
     };
 
     expect(params.maxTimeStep).toBe(5e-6);
-    expect(params.minTimeStep).toBe(1e-14);
+    expect(params.minTimeStep).toBe(5e-17);
     expect(params.reltol).toBe(1e-3);
     expect(params.abstol).toBe(1e-6);
     expect(params.chargeTol).toBe(1e-14);
@@ -50,7 +54,7 @@ describe("AnalogEngineTypes", () => {
 
     // Verify DEFAULT_SIMULATION_PARAMS matches the spec
     expect(DEFAULT_SIMULATION_PARAMS.maxTimeStep).toBe(5e-6);
-    expect(DEFAULT_SIMULATION_PARAMS.minTimeStep).toBe(1e-14);
+    expect(DEFAULT_SIMULATION_PARAMS.minTimeStep).toBe(5e-17);
     expect(DEFAULT_SIMULATION_PARAMS.reltol).toBe(1e-3);
     expect(DEFAULT_SIMULATION_PARAMS.abstol).toBe(1e-6);
     expect(DEFAULT_SIMULATION_PARAMS.chargeTol).toBe(1e-14);
@@ -87,9 +91,12 @@ describe("AnalogEngineTypes", () => {
       labelToNodeId: new Map([["R1", 1], ["R2", 2]]),
       wireToNodeId: new Map(),
       statePool: {
+        states: [new Float64Array(0), new Float64Array(0), new Float64Array(0), new Float64Array(0)],
         state0: new Float64Array(0),
         state1: new Float64Array(0),
         state2: new Float64Array(0),
+        state3: new Float64Array(0),
+        totalSlots: 0,
       },
     };
 
@@ -187,6 +194,7 @@ describe("AnalogEngineTypes", () => {
       getElementPower(_elementId: number): number { return 0; },
       configure(_params: Partial<SimulationParams>): void {},
       onDiagnostic(_callback: (diag: Diagnostic) => void): void {},
+      convergenceLog: new ConvergenceLog(),
       addBreakpoint(_time: number): void {},
       clearBreakpoints(): void {},
       acAnalysis(_params: AcParams): AcResult {
@@ -273,7 +281,7 @@ describe("AnalogEngineTypes", () => {
   });
 
   it("dc_op_result_methods", () => {
-    const methods: DcOpResult["method"][] = ["direct", "gmin-stepping", "source-stepping"];
+    const methods: DcOpResult["method"][] = ["direct", "dynamic-gmin", "gillespie-src"];
 
     for (const method of methods) {
       const result: DcOpResult = {

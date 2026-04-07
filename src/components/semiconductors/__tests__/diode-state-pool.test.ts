@@ -10,6 +10,7 @@ import { describe, it, expect } from "vitest";
 import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../diode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
+import { VT } from "../../../core/constants.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 
 const SLOT_VD = 0;
@@ -131,7 +132,6 @@ describe("diode state pool migration", () => {
   it("pool state0[SLOT_ID] matches Shockley equation at converged operating point", () => {
     const IS = 1e-14;
     const N = 1;
-    const VT = 0.02585;
     const { element, pool } = makeDiodeWithPool({ IS, N });
 
     // Converge to 0.65V
@@ -150,18 +150,6 @@ describe("diode state pool migration", () => {
     const props = makeParamBag({ CJO: 0, TT: 0 });
     const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
     expect(element.stateSize).toBe(4);
-  });
-
-  it("stateSize is 8 when CJO > 0", () => {
-    const props = makeParamBag({ CJO: 10e-12, TT: 0 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
-    expect(element.stateSize).toBe(8);
-  });
-
-  it("stateSize is 8 when TT > 0", () => {
-    const props = makeParamBag({ CJO: 0, TT: 1e-9 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
-    expect(element.stateSize).toBe(8);
   });
 
   it("initState sets SLOT_GEQ to GMIN", () => {
@@ -195,18 +183,19 @@ describe("diode state pool migration", () => {
     expect(pool.state0[6]).toBe(0);
   });
 
-  it("SLOT_CAP_FIRST_CALL is 1.0 after initState for capacitive diode", () => {
+  it("SLOT_V and SLOT_Q are 0 after initState for capacitive diode", () => {
     const props = makeParamBag({ CJO: 10e-12, TT: 0 });
     const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
     const pool = new StatePool(element.stateSize);
     element.stateBaseOffset = 0;
     element.initState(pool);
 
-    // SLOT_CAP_FIRST_CALL=7 must be 1.0 so the first stampCompanion uses vNow as vPrev
-    expect(pool.state0[7]).toBe(1.0);
+    // SLOT_V=6, SLOT_Q=7 — both zero so first-call detection (s1[V]===0 && s1[Q]===0) works
+    expect(pool.state0[6]).toBe(0); // SLOT_V
+    expect(pool.state0[7]).toBe(0); // SLOT_Q
   });
 
-  it("SLOT_CAP_FIRST_CALL becomes 0 after first stampCompanion call", () => {
+  it("SLOT_V is written to vNow after first stampCompanion call", () => {
     const props = makeParamBag({ CJO: 10e-12, TT: 0 });
     const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
     const pool = new StatePool(element.stateSize);
@@ -217,8 +206,9 @@ describe("diode state pool migration", () => {
     element.updateOperatingPoint!(voltages);
     element.stampCompanion!(1e-6, "trapezoidal", voltages);
 
-    // After first stampCompanion, SLOT_CAP_FIRST_CALL must be cleared to 0
-    expect(pool.state0[7]).toBe(0);
+    // After first stampCompanion, SLOT_V should hold the current junction voltage
+    // vNow = voltages[0] - voltages[1] = -1.0
+    expect(pool.state0[6]).toBeCloseTo(-1.0, 10); // SLOT_V
   });
 
   it("stateSchema is DIODE_SCHEMA for resistive diode", () => {
@@ -227,14 +217,6 @@ describe("diode state pool migration", () => {
     expect(element.stateSchema).toBeDefined();
     expect(element.stateSchema.size).toBe(4);
     expect(element.stateSchema.owner).toBe("DiodeElement");
-  });
-
-  it("stateSchema is DIODE_CAP_SCHEMA for capacitive diode", () => {
-    const props = makeParamBag({ CJO: 10e-12, TT: 0 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
-    expect(element.stateSchema).toBeDefined();
-    expect(element.stateSchema.size).toBe(8);
-    expect(element.stateSchema.owner).toBe("DiodeElement_cap");
   });
 
   it("pool IEQ satisfies ieq = id - geq * vd at converged point", () => {

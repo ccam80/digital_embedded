@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cat .vitest-failures.json | python3 -c \\\"\\nimport json, sys\\ndata = json.load(sys.stdin)\\nprint(f'Total entries: {len(data)}')\\nfor f in data:\\n    print(f'{f.get(\\\\\\\"file\\\\\\\",\\\\\\\"?\\\\\\\")}:...",
-  "error": "Exit code 1\nTotal entries: 2",
-  "timestamp": "2026-04-06T08:19:14.126Z",
+  "tool_input_preview": "{\"command\":\"node -e \\\"import('./src/solver/analog/fet-base.js').then(m => { console.log('FET_BASE_SCHEMA.size:', m.FET_BASE_SCHEMA.size); console.log('SLOT_VGS:', m.SLOT_VGS); console.log('SLOT_Q_GB:'...",
+  "error": "Exit code 1\nnode:internal/modules/esm/resolve:271\r\n    throw new ERR_MODULE_NOT_FOUND(\r\n          ^\r\n\r\nError [ERR_MODULE_NOT_FOUND]: Cannot find module 'C:\\local_working_projects\\digital_in_browser\\src\\solver\\analog\\fet-base.js' imported from C:\\local_working_projects\\digital_in_browser\\[eval]\r\n    at finalizeResolution (node:internal/modules/esm/resolve:271:11)\r\n    at moduleResolve (node:internal/modules/esm/resolve:861:10)\r\n    at defaultResolve (node:internal/modules/esm/resolve:988:11)\r\n   ...",
+  "timestamp": "2026-04-07T11:33:55.999Z",
   "retry_count": 1
 }

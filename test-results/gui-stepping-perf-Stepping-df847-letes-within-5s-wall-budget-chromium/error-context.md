@@ -1,7 +1,7 @@
 # Page snapshot
 
 ```yaml
-- iframe [active] [ref=e2]:
+- iframe [ref=e2]:
   - generic [ref=f1e2]:
     - menubar [ref=f1e3]:
       - menuitem "File" [ref=f1e4] [cursor=pointer]: File ▶ ▶
@@ -11,7 +11,7 @@
       - menuitem "Simulation" [ref=f1e8] [cursor=pointer]
       - generic [ref=f1e9] [cursor=pointer]: Analysis
       - generic [ref=f1e10] [cursor=pointer]: Tutorials
-      - textbox "Circuit name" [ref=f1e11]: Untitled
+      - textbox "Circuit name" [ref=f1e11]: buckbjt
       - generic [ref=f1e12]:
         - button "↶" [disabled] [ref=f1e13]
         - button "↷" [disabled] [ref=f1e14]
@@ -20,13 +20,13 @@
         - button "■" [ref=f1e18] [cursor=pointer]
         - generic [ref=f1e20]:
           - button "▶❙" [ref=f1e21] [cursor=pointer]
-          - button "1ms ▾" [ref=f1e22] [cursor=pointer]
+          - button "1m ▾" [ref=f1e22] [cursor=pointer]
           - button "⏩" [ref=f1e23] [cursor=pointer]
         - generic [ref=f1e25]: "Speed:"
         - button "−" [ref=f1e26] [cursor=pointer]
         - textbox "Speed:" [ref=f1e27]: "1"
-        - button "+" [active] [ref=f1e28] [cursor=pointer]
-        - generic [ref=f1e29]: µs/s
+        - button "+" [ref=f1e28] [cursor=pointer]
+        - generic [ref=f1e29]: ms/s
         - button "Toggle light/dark mode" [ref=f1e31] [cursor=pointer]: ☽
     - generic [ref=f1e32]:
       - generic [ref=f1e33]:
@@ -260,6 +260,8 @@
       - generic "Drag to resize palette" [ref=f1e346]
       - generic "Circuit editor canvas" [ref=f1e348]
     - generic [ref=f1e349]:
-      - generic [ref=f1e350]: Ready
-      - button "100%" [ref=f1e352] [cursor=pointer]
+      - generic [ref=f1e350]: ⚠️
+      - generic [ref=f1e351]: "Simulation error: Analog engine stagnation: simTime stuck at 0s. The engine exhausted all internal retries without advancing. Check convergence log for details."
+      - button "×" [ref=f1e352] [cursor=pointer]
+      - button "100%" [ref=f1e354] [cursor=pointer]
 ```

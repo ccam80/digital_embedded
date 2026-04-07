@@ -5,6 +5,9 @@
       "Circuit-simulator",
       "Read",
       "Fetch"
+    ],
+    "ask": [
+      "Write"
     ]
   }
 }

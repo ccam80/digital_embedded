@@ -326,7 +326,10 @@ class SegmentInductorElement implements ReactiveAnalogElement {
   setParam(_key: string, _value: number): void {}
 
   private readonly L: number;
-  private s0!: Float64Array;
+  s0!: Float64Array;
+  s1!: Float64Array;
+  s2!: Float64Array;
+  s3!: Float64Array;
   private base!: number;
 
   constructor(nA: number, nB: number, branchIdx: number, inductance: number) {
@@ -399,7 +402,10 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
   setParam(_key: string, _value: number): void {}
 
   private readonly C: number;
-  private s0!: Float64Array;
+  s0!: Float64Array;
+  s1!: Float64Array;
+  s2!: Float64Array;
+  s3!: Float64Array;
   private base!: number;
 
   constructor(node: number, capacitance: number) {
@@ -464,7 +470,10 @@ class CombinedRLElement implements ReactiveAnalogElement {
 
   private readonly R: number;
   private readonly L: number;
-  private s0!: Float64Array;
+  s0!: Float64Array;
+  s1!: Float64Array;
+  s2!: Float64Array;
+  s3!: Float64Array;
   private base!: number;
 
   constructor(nA: number, nB: number, branchIdx: number, resistance: number, inductance: number) {
@@ -625,7 +634,15 @@ export class TransmissionLineElement implements AnalogElement {
     // Bind sub-elements to a private pool so they are immediately usable.
     // The outer element declares stateSize=0 so the compiler allocates no engine
     // pool slots for it; the private pool provides the backing storage.
-    const privatePool: StatePoolRef = { state0: new Float64Array(totalState), state1: new Float64Array(totalState), state2: new Float64Array(totalState) };
+    const _pBufs = [new Float64Array(totalState), new Float64Array(totalState), new Float64Array(totalState), new Float64Array(totalState)];
+    const privatePool: StatePoolRef = {
+      states: _pBufs,
+      get state0() { return _pBufs[0]; },
+      get state1() { return _pBufs[1]; },
+      get state2() { return _pBufs[2]; },
+      get state3() { return _pBufs[3]; },
+      totalSlots: totalState,
+    };
     let offset = 0;
     for (const el of this._subElements) {
       if (el.isReactive) {

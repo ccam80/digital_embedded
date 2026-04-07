@@ -34,6 +34,7 @@ import type { SimulatorFacade } from './facade.js';
 import { CircuitBuilder } from './builder.js';
 import type { CompiledCircuitUnified } from '../compile/types.js';
 import { compileUnified } from '../compile/compile.js';
+import type { StepRecord } from '../solver/analog/convergence-log.js';
 
 import { SimulationLoader } from './loader.js';
 import { serializeCircuit } from '../io/dts-serializer.js';
@@ -369,6 +370,21 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   /** Returns the DC operating-point result, or null if no analog backend. */
   getDcOpResult(): import('../core/analog-engine-interface.js').DcOpResult | null {
     return this._coordinator.dcOperatingPoint();
+  }
+
+  /** Enable or disable convergence step recording on the analog engine. */
+  setConvergenceLogEnabled(enabled: boolean): void {
+    this._coordinator.setConvergenceLogEnabled(enabled);
+  }
+
+  /** Return recorded convergence steps, or null if no analog domain. */
+  getConvergenceLog(lastN?: number): StepRecord[] | null {
+    return this._coordinator.getConvergenceLog(lastN);
+  }
+
+  /** Clear the convergence log ring buffer. */
+  clearConvergenceLog(): void {
+    this._coordinator.clearConvergenceLog();
   }
 
   /**

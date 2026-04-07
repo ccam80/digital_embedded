@@ -37,14 +37,15 @@ import {
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
+import { VT } from "../../core/constants.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+import { cktTerr } from "../../solver/analog/ckt-terr.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
 // ---------------------------------------------------------------------------
 
-/** Thermal voltage at 300 K (kT/q in volts). */
-const VT = 0.02585;
+// VT (thermal voltage) imported from ../../core/constants.js
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -96,14 +97,14 @@ export function computeVaractorCapacitance(
 // ---------------------------------------------------------------------------
 
 const VARACTOR_STATE_SCHEMA = defineStateSchema("VaractorElement", [
-  { name: "VD", doc: "Diode junction voltage (V)", init: { kind: "zero" } },
-  { name: "GEQ", doc: "Linearized junction conductance (S)", init: { kind: "constant", value: 1e-12 } },
-  { name: "IEQ", doc: "Linearized current source (A)", init: { kind: "zero" } },
-  { name: "ID", doc: "Diode current (A)", init: { kind: "zero" } },
-  { name: "CAP_GEQ", doc: "Capacitance companion conductance (S)", init: { kind: "zero" } },
-  { name: "CAP_IEQ", doc: "Capacitance history current (A)", init: { kind: "zero" } },
-  { name: "VD_PREV", doc: "Previous junction voltage for capacitor (V)", init: { kind: "zero" } },
-  { name: "CAP_FIRST_CALL", doc: "Capacitor first-call flag", init: { kind: "constant", value: 1.0 } },
+  { name: "VD",      doc: "Diode junction voltage (V)",                          init: { kind: "zero" } },
+  { name: "GEQ",     doc: "Linearized junction conductance (S)",                  init: { kind: "constant", value: 1e-12 } },
+  { name: "IEQ",     doc: "Linearized current source (A)",                        init: { kind: "zero" } },
+  { name: "ID",      doc: "Diode current (A)",                                    init: { kind: "zero" } },
+  { name: "CAP_GEQ", doc: "Capacitance companion conductance (S)",                init: { kind: "zero" } },
+  { name: "CAP_IEQ", doc: "Capacitance history current (A)",                      init: { kind: "zero" } },
+  { name: "V",       doc: "Junction voltage at current step (for companion)",     init: { kind: "zero" } },
+  { name: "Q",       doc: "Charge Cj*V at current step (history from s1/s2/s3)", init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -132,12 +133,17 @@ export function createVaractorElement(
 
   // State pool slot indices
   const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
-  const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_VD_PREV = 6;
-  const SLOT_CAP_FIRST_CALL = 7;
+  const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_V = 6, SLOT_Q = 7;
 
   // Pool binding — set by initState
   let s0: Float64Array;
+  let s1: Float64Array;
+  let s2: Float64Array;
+  let s3: Float64Array;
   let base: number;
+
+  // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
+  let pnjlimLimited = false;
 
   return {
     branchIndex: -1,
@@ -147,12 +153,19 @@ export function createVaractorElement(
     stateSize: 8,
     stateSchema: VARACTOR_STATE_SCHEMA,
     stateBaseOffset: -1,
+    s0: new Float64Array(0),
+    s1: new Float64Array(0),
+    s2: new Float64Array(0),
+    s3: new Float64Array(0),
 
     initState(pool: StatePoolRef): void {
       s0 = pool.state0;
+      s1 = pool.state1;
+      s2 = pool.state2;
+      s3 = pool.state3;
+      this.s0 = s0; this.s1 = s1; this.s2 = s2; this.s3 = s3;
       base = this.stateBaseOffset;
       applyInitialValues(VARACTOR_STATE_SCHEMA, pool, base, {});
-      s0[base + SLOT_CAP_FIRST_CALL] = 1.0; // true: Float64Array zero-inits, must set explicitly
     },
 
     stamp(solver: SparseSolver): void {
@@ -188,7 +201,9 @@ export function createVaractorElement(
 
       // Apply pnjlim to prevent exponential runaway, using vold from pool
       const vdOld = s0[base + SLOT_VD];
-      const vdLimited = pnjlim(vdRaw, vdOld, nVt, vcrit);
+      const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
+      const vdLimited = vdResult.value;
+      pnjlimLimited = vdResult.limited;
 
       s0[base + SLOT_VD] = vdLimited;
 
@@ -210,19 +225,39 @@ export function createVaractorElement(
       const vReverse = -vNow;
       const Cj = computeVaractorCapacitance(vReverse, p.cjo, p.vj, p.m);
 
-      // Recover previous capacitor current for trapezoidal history
-      const prevCapGeq = s0[base + SLOT_CAP_GEQ];
-      const prevCapIeq = s0[base + SLOT_CAP_IEQ];
-      const iNow = prevCapGeq * vNow + prevCapIeq;
-      const vPrevForFormula = s0[base + SLOT_CAP_FIRST_CALL] !== 0 ? vNow : s0[base + SLOT_VD_PREV];
-      s0[base + SLOT_VD_PREV] = vNow;
-      s0[base + SLOT_CAP_FIRST_CALL] = 0.0;
+      // Recover previous capacitor current from s1 (last accepted step via pool rotation)
+      const prevCapGeq = s1[base + SLOT_CAP_GEQ];
+      const prevCapIeq = s1[base + SLOT_CAP_IEQ];
+      const iNow = prevCapGeq * s1[base + SLOT_V] + prevCapIeq;
+      // First call detected by s1 voltage still zero (pool zero-initialised)
+      const vPrevForFormula = (s1[base + SLOT_V] === 0 && s1[base + SLOT_Q] === 0) ? vNow : s1[base + SLOT_V];
 
       s0[base + SLOT_CAP_GEQ] = capacitorConductance(Cj, dt, method);
       s0[base + SLOT_CAP_IEQ] = capacitorHistoryCurrent(Cj, dt, method, vNow, vPrevForFormula, iNow);
+      s0[base + SLOT_V] = vNow;
+    },
+
+    getLteTimestep(
+      dt: number,
+      deltaOld: readonly number[],
+      order: number,
+      method: IntegrationMethod,
+      lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
+    ): number {
+      const q0 = s0[base + SLOT_Q];
+      const q1 = s1[base + SLOT_Q];
+      const q2 = s2[base + SLOT_Q];
+      const q3 = s3[base + SLOT_Q];
+      const ccap0 = dt > 0 ? (q0 - q1) / dt : 0;
+      const ccap1 = deltaOld.length > 0 && deltaOld[0] > 0 ? (q1 - q2) / deltaOld[0] : 0;
+      return cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
     },
 
     checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+      // declare non-convergence immediately (DIOload sets CKTnoncon++)
+      if (pnjlimLimited) return false;
+
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;
@@ -255,6 +290,16 @@ export function createVaractorElement(
         (p as Record<string, number>)[key] = value;
         vcrit = nVt * Math.log(nVt / (p.iS * Math.SQRT2));
       }
+    },
+
+    updateChargeFlux(voltages: Float64Array): void {
+      const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
+      const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+      const vNow = vA - vC;
+      const vReverse = -vNow;
+      const Cj = computeVaractorCapacitance(vReverse, p.cjo, p.vj, p.m);
+      s0[base + SLOT_Q] = Cj * vNow;
+      s0[base + SLOT_V] = vNow;
     },
   };
 }
