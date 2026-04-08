@@ -32,6 +32,18 @@ export interface NRAttemptRecord {
   blameNode: number;
   /** Trigger: "initial" | "nr-retry" | "lte-retry" */
   trigger: "initial" | "nr-retry" | "lte-retry";
+  /**
+   * Optional per-NR-iteration convergence detail. Populated only when the
+   * comparison harness postIterationHook is active alongside convergence
+   * logging. Absent in normal (non-harness) operation.
+   */
+  iterationDetails?: Array<{
+    iteration: number;
+    maxDelta: number;
+    maxDeltaNode: number;
+    noncon: number;
+    converged: boolean;
+  }>;
 }
 
 /** Per-step record. Fixed-layout for ring buffer. */

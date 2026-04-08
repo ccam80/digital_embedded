@@ -34,12 +34,9 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams, deviceParams } from "../../core/model-params.js";
-import {
-  capacitorConductance,
-  capacitorHistoryCurrent,
-} from "../../solver/analog/integration.js";
+import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
-import { computeJunctionCapacitance } from "./diode.js";
+import { computeJunctionCapacitance, computeJunctionCharge } from "./diode.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import type { ReactiveAnalogElementCore } from "../../solver/analog/element.js";
 import {
@@ -146,6 +143,8 @@ export const { paramDefs: BJT_SPICE_L1_PARAM_DEFS, defaults: BJT_SPICE_L1_NPN_DE
     CJS: { default: 0,      unit: "F", description: "Collector-substrate zero-bias capacitance" },
     VJS: { default: 0.75,   unit: "V", description: "Substrate junction built-in potential" },
     MJS: { default: 0,      description: "Substrate junction exponential factor" },
+    ISS: { default: 0,      unit: "A", description: "Substrate saturation current" },
+    NS:  { default: 1,      description: "Substrate emission coefficient" },
     XTB: { default: 0,      description: "Forward/reverse beta temperature exponent" },
     EG:  { default: 1.11,   unit: "eV", description: "Energy gap for temperature effect on IS" },
     XTI: { default: 3,      description: "Saturation current temperature exponent" },
@@ -197,6 +196,8 @@ export const { defaults: BJT_SPICE_L1_PNP_DEFAULTS } = defineModelParams({
     CJS: { default: 0,      unit: "F", description: "Collector-substrate zero-bias capacitance" },
     VJS: { default: 0.75,   unit: "V", description: "Substrate junction built-in potential" },
     MJS: { default: 0,      description: "Substrate junction exponential factor" },
+    ISS: { default: 0,      unit: "A", description: "Substrate saturation current" },
+    NS:  { default: 1,      description: "Substrate emission coefficient" },
     XTB: { default: 0,      description: "Forward/reverse beta temperature exponent" },
     EG:  { default: 1.11,   unit: "eV", description: "Energy gap for temperature effect on IS" },
     XTI: { default: 3,      description: "Saturation current temperature exponent" },
@@ -344,6 +345,8 @@ function computeBjtTempParams(p: {
   VAF: number; VAR: number;
   // BJ7/BJ12: Excess phase and transit time inputs
   PTF: number; TF: number; TR: number;
+  // BJ11: Substrate saturation current
+  ISS: number;
 }, T: number = 300.15): BjtTempParams {
   const REFTEMP = 300.15;
   const k = 1.3806226e-23;
@@ -416,8 +419,9 @@ function computeBjtTempParams(p: {
     tSubpot = p.VJS;
   }
 
-  // BJ11: Substrate saturation current (same temp scaling as main IS)
-  const tSubSatCur = p.IS * factor;
+  // BJ11: Substrate saturation current — ngspice bjttemp.c:173 uses BJTsubSatCur (ISS), not IS.
+  // ISS defaults to 0, so the substrate diode is inactive unless explicitly specified.
+  const tSubSatCur = p.ISS * factor;
 
   const tDepCap = p.FC * tBEpot;
   const tf1 = tBEpot * (1 - Math.exp((1 - p.MJE) * xfc)) / (1 - p.MJE);
@@ -480,6 +484,10 @@ interface BjtOperatingPoint {
   dqbdvc: number;
   dqbdve: number;
   qb: number;
+  // BJ13: Raw junction currents and BC conductance
+  gbc: number;
+  If: number;
+  Ir: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -576,14 +584,14 @@ function computeBjtOp(
   const dqbdVbc = dq1dVbc * (1 + sqrtTerm) / 2 + q1 / sqrtTerm * oikr * dIrdVbc;
 
   // Transconductance and output conductance use transport current for dqb terms (Fix 3)
-  const gm = dIfdVbe / qb - iTransport * dqbdVbe / qb;
   const go = dIrdVbc / qb + iTransport * dqbdVbc / qb;
+  const gm = dIfdVbe / qb - iTransport * dqbdVbe / qb - go;
 
   // Input/feedback conductances with GMIN on non-ideal terms (ngspice gben/gbcn)
   const gpi = dIfdVbe / betaF + (c2 > 0 ? c2 * Math.exp(Math.min(vbe / nfVt, 700)) / nfVt : 0) + GMIN;
   const gmu = dIrdVbc / betaR + (c4 > 0 ? c4 * Math.exp(Math.min(vbc / nrVt, 700)) / nrVt : 0) + GMIN;
 
-  return { vbe, vbc, ic, ib, gm, go, gpi, gmu, cbe: 0, gbe, dqbdvc: dqbdVbc, dqbdve: dqbdVbe, qb };
+  return { vbe, vbc, ic, ib, gm, go, gpi, gmu, cbe: 0, gbe, dqbdvc: dqbdVbc, dqbdve: dqbdVbe, qb, gbc, If, Ir };
 }
 
 // ---------------------------------------------------------------------------
@@ -650,6 +658,7 @@ export function createBjtElement(
       FC: 0.5, AREA: params.AREA, TNOM: params.TNOM,
       VAF: params.VAF, VAR: params.VAR,
       PTF: 0, TF: 0, TR: 0,
+      ISS: 0,
     });
   }
   let tp = makeTp();
@@ -672,6 +681,7 @@ export function createBjtElement(
   let s2: Float64Array;
   let s3: Float64Array;
   let base: number;
+  let pool: StatePoolRef;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, BJTload sets CKTnoncon++)
   let icheckLimited = false;
@@ -679,7 +689,7 @@ export function createBjtElement(
   return {
     branchIndex: -1,
     isNonlinear: true,
-    isReactive: true as const,
+    isReactive: false as const,
     poolBacked: true as const,
     stateSchema: BJT_SIMPLE_SCHEMA,
     stateSize: BJT_SIMPLE_SCHEMA.size,
@@ -689,7 +699,8 @@ export function createBjtElement(
     s2: new Float64Array(0),
     s3: new Float64Array(0),
 
-    initState(pool: StatePoolRef): void {
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
       s0 = pool.state0;
       s1 = pool.state1;
       s2 = pool.state2;
@@ -996,14 +1007,14 @@ function computeSpiceL1BjtOp(
   }
 
   // Transconductance and output conductance use transport current for dqb terms
-  const gm = dIfdVbe / qb - iTransport * dqbdVbe / qb;
   const go = dIrdVbc / qb + iTransport * dqbdVbc / qb;
+  const gm = dIfdVbe / qb - iTransport * dqbdVbe / qb - go;
 
   // Input/feedback conductances: gben/gbcn include GMIN (ngspice approach)
   const gpi = dIfdVbe / betaF + gben + GMIN;
   const gmu = dIrdVbc / betaR + gbcn + GMIN;
 
-  return { vbe, vbc, ic, ib, gm, go, gpi, gmu, cbe: 0, gbe, dqbdvc: dqbdVbc, dqbdve: dqbdVbe, qb };
+  return { vbe, vbc, ic, ib, gm, go, gpi, gmu, cbe: 0, gbe, dqbdvc: dqbdVbc, dqbdve: dqbdVbe, qb, gbc, If, Ir };
 }
 
 // ---------------------------------------------------------------------------
@@ -1042,7 +1053,7 @@ const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element", [
   { name: "Q_BE",           doc: "B-E junction charge at current step",              init: { kind: "zero" } },
   { name: "Q_BC",           doc: "B-C junction charge at current step",              init: { kind: "zero" } },
   { name: "Q_CS",           doc: "C-S junction charge at current step",              init: { kind: "zero" } },
-  // Total capacitance per junction (stored by stampCompanion for getLteEstimate)
+  // Total capacitance per junction (stored by stampCompanion for getLteTimestep)
   { name: "CTOT_BE",        doc: "Total B-E capacitance (depletion + diffusion)",    init: { kind: "zero" } },
   { name: "CTOT_BC",        doc: "Total B-C capacitance (depletion + diffusion)",    init: { kind: "zero" } },
   { name: "CTOT_CS",        doc: "Total C-S capacitance",                            init: { kind: "zero" } },
@@ -1062,6 +1073,14 @@ const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element", [
   { name: "VSUB",           doc: "Substrate junction voltage",                       init: { kind: "zero" } },
   { name: "GDSUB",          doc: "Substrate diode conductance",                      init: { kind: "zero" } },
   { name: "CDSUB",          doc: "Substrate diode current",                          init: { kind: "zero" } },
+  // BJ13: Raw junction current and conductance slots
+  { name: "OP_IF",          doc: "Forward junction current",                         init: { kind: "zero" } },
+  { name: "OP_IR",          doc: "Reverse junction current",                         init: { kind: "zero" } },
+  { name: "OP_GBC",         doc: "Raw BC junction conductance",                      init: { kind: "zero" } },
+  // NIintegrate ccap history slots (for getLteTimestep)
+  { name: "CCAP_BE",        doc: "B-E companion current (NIintegrate)",              init: { kind: "zero" } },
+  { name: "CCAP_BC",        doc: "B-C companion current (NIintegrate)",              init: { kind: "zero" } },
+  { name: "CCAP_CS",        doc: "C-S companion current (NIintegrate)",              init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -1115,6 +1134,8 @@ export function createSpiceL1BjtElement(
     CJS: props.getModelParam<number>("CJS"),
     VJS: props.getModelParam<number>("VJS"),
     MJS: props.getModelParam<number>("MJS"),
+    ISS: props.getModelParam<number>("ISS"),
+    NS:  props.getModelParam<number>("NS"),
     XTB: props.getModelParam<number>("XTB"),
     EG: props.getModelParam<number>("EG"),
     XTI: props.getModelParam<number>("XTI"),
@@ -1139,6 +1160,7 @@ export function createSpiceL1BjtElement(
       FC: params.FC, AREA: params.AREA, TNOM: params.TNOM,
       VAF: params.VAF, VAR: params.VAR,
       PTF: params.PTF, TF: params.TF, TR: params.TR,
+      ISS: params.ISS,
     });
   }
   let tpL1 = makeTpL1();
@@ -1203,6 +1225,14 @@ export function createSpiceL1BjtElement(
   const L1_SLOT_VSUB  = 39;
   const L1_SLOT_GDSUB = 40;
   const L1_SLOT_CDSUB = 41;
+  // BJ13: Raw junction current and conductance slots
+  const L1_SLOT_OP_IF  = 42;   // Forward junction current before qb division
+  const L1_SLOT_OP_IR  = 43;   // Reverse junction current before qb division
+  const L1_SLOT_OP_GBC = 44;   // Raw BC junction conductance
+
+  const L1_SLOT_CCAP_BE = 45;  // B-E NIintegrate ccap history
+  const L1_SLOT_CCAP_BC = 46;  // B-C NIintegrate ccap history
+  const L1_SLOT_CCAP_CS = 47;  // C-S NIintegrate ccap history
 
   // Pool binding — set by initState
   let s0: Float64Array;
@@ -1210,6 +1240,7 @@ export function createSpiceL1BjtElement(
   let s2: Float64Array;
   let s3: Float64Array;
   let base: number;
+  let pool: StatePoolRef;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, BJTload sets CKTnoncon++)
   let icheckLimited = false;
@@ -1227,7 +1258,8 @@ export function createSpiceL1BjtElement(
     s2: new Float64Array(0),
     s3: new Float64Array(0),
 
-    initState(pool: StatePoolRef): void {
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
       s0 = pool.state0;
       s1 = pool.state1;
       s2 = pool.state2;
@@ -1260,20 +1292,18 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_OP_DQBDVC] = op0.dqbdvc;
       s0[base + L1_SLOT_OP_DQBDVE] = op0.dqbdve;
       s0[base + L1_SLOT_OP_QB] = op0.qb;
+      // BJ13: Store raw junction currents and conductance
+      s0[base + L1_SLOT_OP_IF] = op0.If;
+      s0[base + L1_SLOT_OP_IR] = op0.Ir;
+      s0[base + L1_SLOT_OP_GBC] = op0.gbc;
     },
 
     stamp(solver: SparseSolver): void {
       // BJ5: M multiplier on terminal resistance conductances
       const m = params.M;
 
-      // Stamp terminal resistances.
-      if (params.RB > 0 && nodeB_int !== nodeB_ext) {
-        const gRB = 1 / s0[base + L1_SLOT_RB_EFF];
-        stampG(solver, nodeB_ext, nodeB_ext, m * gRB);
-        stampG(solver, nodeB_ext, nodeB_int, m * -gRB);
-        stampG(solver, nodeB_int, nodeB_ext, m * -gRB);
-        stampG(solver, nodeB_int, nodeB_int, m * gRB);
-      }
+      // Stamp topology-constant terminal resistances (RC and RE only).
+      // RB_EFF depends on operating point and is stamped in stampNonlinear().
       if (params.RC > 0 && nodeC_int !== nodeC_ext) {
         const gRC = tpL1.tcollectorConduct * params.AREA;
         stampG(solver, nodeC_ext, nodeC_ext, m * gRC);
@@ -1288,51 +1318,20 @@ export function createSpiceL1BjtElement(
         stampG(solver, nodeE_int, nodeE_ext, m * -gRE);
         stampG(solver, nodeE_int, nodeE_int, m * gRE);
       }
-
-      // Stamp junction capacitance companion models when active.
-      const _capGeqBE     = s0[base + L1_SLOT_CAP_GEQ_BE];
-      const _capIeqBE     = s0[base + L1_SLOT_CAP_IEQ_BE];
-      const _capGeqBC_int = s0[base + L1_SLOT_CAP_GEQ_BC_INT];
-      const _capIeqBC_int = s0[base + L1_SLOT_CAP_IEQ_BC_INT];
-      const _capGeqBC_ext = s0[base + L1_SLOT_CAP_GEQ_BC_EXT];
-      const _capIeqBC_ext = s0[base + L1_SLOT_CAP_IEQ_BC_EXT];
-      const _capGeqCS     = s0[base + L1_SLOT_CAP_GEQ_CS];
-      const _capIeqCS     = s0[base + L1_SLOT_CAP_IEQ_CS];
-      if (_capGeqBE !== 0 || _capIeqBE !== 0) {
-        stampG(solver, nodeB_int, nodeB_int, m * _capGeqBE);
-        stampG(solver, nodeB_int, nodeE_int, m * -_capGeqBE);
-        stampG(solver, nodeE_int, nodeB_int, m * -_capGeqBE);
-        stampG(solver, nodeE_int, nodeE_int, m * _capGeqBE);
-        stampRHS(solver, nodeB_int, m * -_capIeqBE);
-        stampRHS(solver, nodeE_int, m * _capIeqBE);
-      }
-      // B-C capacitance: XCJC fraction between internal nodes, (1-XCJC) between external nodes.
-      if (_capGeqBC_int !== 0 || _capIeqBC_int !== 0) {
-        stampG(solver, nodeB_int, nodeB_int, m * _capGeqBC_int);
-        stampG(solver, nodeB_int, nodeC_int, m * -_capGeqBC_int);
-        stampG(solver, nodeC_int, nodeB_int, m * -_capGeqBC_int);
-        stampG(solver, nodeC_int, nodeC_int, m * _capGeqBC_int);
-        stampRHS(solver, nodeB_int, m * -_capIeqBC_int);
-        stampRHS(solver, nodeC_int, m * _capIeqBC_int);
-      }
-      if (_capGeqBC_ext !== 0 || _capIeqBC_ext !== 0) {
-        stampG(solver, nodeB_ext, nodeB_ext, m * _capGeqBC_ext);
-        stampG(solver, nodeB_ext, nodeC_ext, m * -_capGeqBC_ext);
-        stampG(solver, nodeC_ext, nodeB_ext, m * -_capGeqBC_ext);
-        stampG(solver, nodeC_ext, nodeC_ext, m * _capGeqBC_ext);
-        stampRHS(solver, nodeB_ext, m * -_capIeqBC_ext);
-        stampRHS(solver, nodeC_ext, m * _capIeqBC_ext);
-      }
-      // Collector-substrate capacitance: between external collector and ground.
-      if (_capGeqCS !== 0 || _capIeqCS !== 0) {
-        stampG(solver, nodeC_ext, nodeC_ext, m * _capGeqCS);
-        stampRHS(solver, nodeC_ext, m * -_capIeqCS);
-      }
     },
 
     stampNonlinear(solver: SparseSolver): void {
       // BJ5: M multiplier on all stamps
       const m = params.M;
+
+      // RB_EFF depends on operating point (qb, |Ib|) — stamp here each NR iteration.
+      if (params.RB > 0 && nodeB_int !== nodeB_ext) {
+        const gRB = 1 / s0[base + L1_SLOT_RB_EFF];
+        stampG(solver, nodeB_ext, nodeB_ext, m * gRB);
+        stampG(solver, nodeB_ext, nodeB_int, m * -gRB);
+        stampG(solver, nodeB_int, nodeB_ext, m * -gRB);
+        stampG(solver, nodeB_int, nodeB_int, m * gRB);
+      }
 
       const gpi = s0[base + L1_SLOT_GPI];
       const gmu = s0[base + L1_SLOT_GMU];
@@ -1429,6 +1428,10 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_OP_DQBDVC] = op.dqbdvc;
       s0[base + L1_SLOT_OP_DQBDVE] = op.dqbdve;
       s0[base + L1_SLOT_OP_QB] = op.qb;
+      // BJ13: Store raw junction currents and conductance
+      s0[base + L1_SLOT_OP_IF] = op.If;
+      s0[base + L1_SLOT_OP_IR] = op.Ir;
+      s0[base + L1_SLOT_OP_GBC] = op.gbc;
 
       s0[base + L1_SLOT_GPI] = op.gpi;
       s0[base + L1_SLOT_GMU] = op.gmu;
@@ -1462,10 +1465,12 @@ export function createSpiceL1BjtElement(
       }
 
       // BJ11: Substrate diode DC current
+      // tSubSatCur derives from ISS (defaults to 0), so csubsat is 0 unless
+      // the user specified ISS. Guard on csubsat > 0 to skip inactive substrate diodes.
       const vCe = nodeC_ext > 0 ? voltages[nodeC_ext - 1] : 0;
       const vsub = polarity * vCe;
       const csubsat = tpL1.tSubSatCur * params.AREA;
-      const vts = tpL1.vt;
+      const vts = tpL1.vt * params.NS;
       let gdsub: number, cdsub: number;
       if (csubsat > 0) {
         if (vsub > -3 * vts) {
@@ -1502,12 +1507,30 @@ export function createSpiceL1BjtElement(
       if (icheckLimited) return false;
 
       // ngspice BJTconvTest: predict currents from linearisation, check tolerance
-      const cc  = s0[base + L1_SLOT_IC];
-      const cb  = s0[base + L1_SLOT_IB];
+      let cc  = s0[base + L1_SLOT_IC];
+      let cb  = s0[base + L1_SLOT_IB];
       const gm  = s0[base + L1_SLOT_GM];
       const go  = s0[base + L1_SLOT_GO];
-      const gpi = s0[base + L1_SLOT_GPI];
-      const gmu = s0[base + L1_SLOT_GMU];
+      let gpi = s0[base + L1_SLOT_GPI];
+      let gmu = s0[base + L1_SLOT_GMU];
+
+      // Add cap companion contributions inline for convergence test only
+      // (ngspice bjtload.c:704-710). NOT stored — stampNonlinear must see raw DC values.
+      if (hasCapacitance) {
+        const vbe = vbeRaw;
+        const vbc = vbcRaw;
+
+        const geqBE = s0[base + L1_SLOT_CAP_GEQ_BE];
+        const cqbe = geqBE * vbe + s0[base + L1_SLOT_CAP_IEQ_BE];
+        gpi += geqBE;
+        cb  += cqbe;
+
+        const geqBCint = s0[base + L1_SLOT_CAP_GEQ_BC_INT];
+        const cqbc = geqBCint * vbc + s0[base + L1_SLOT_CAP_IEQ_BC_INT];
+        gmu += geqBCint;
+        cb  += cqbc;
+        cc  -= cqbc;
+      }
 
       const cchat = cc + (gm + go) * delvbe - (go + gmu) * delvbc;
       const cbhat = cb + gpi * delvbe + gmu * delvbc;
@@ -1539,6 +1562,8 @@ export function createSpiceL1BjtElement(
       dt: number,
       method: IntegrationMethod,
       voltages: Float64Array,
+      order: number,
+      deltaOld: readonly number[],
     ): void {
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
       const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
@@ -1552,8 +1577,8 @@ export function createSpiceL1BjtElement(
       const vcsNow = polarity * vCe;
 
       // Read history voltages from s1 (last accepted step via StatePool rotation).
-      // First call detected by s1 voltage still zero (pool zero-initialised).
-      const isFirstCall = s1[base + L1_SLOT_V_BE] === 0 && s1[base + L1_SLOT_Q_BE] === 0;
+      // First call detected by tranStep === 0 (pool not yet advanced).
+      const isFirstCall = pool.tranStep === 0;
       const prevVbe = isFirstCall ? vbeNow : s1[base + L1_SLOT_V_BE];
       const prevVbc = isFirstCall ? vbcNow : s1[base + L1_SLOT_V_BC];
       const prevVcs = isFirstCall ? vcsNow : s1[base + L1_SLOT_V_CS];
@@ -1569,41 +1594,58 @@ export function createSpiceL1BjtElement(
       const mjs_eff = tpL1.tjunctionExpSub;
 
       // B-E junction: depletion + transit-time diffusion capacitance.
-      // Transit time modulation: TF_eff = TF * (1 + XTF*(Ic/(Ic+ITF))^2 * exp(Vbc/(1.44*VTF)))
-      let TF_eff = tf_eff_base;
-      if (tf_eff_base > 0 && params.XTF > 0) {
-        const Ic = s0[base + L1_SLOT_IC];
-        const ITF_safe = (params.ITF * params.AREA) > 0 ? params.ITF * params.AREA : 1e-30;
-        const icRatio = Ic / (Ic + ITF_safe);
+      // BJ13: XTF-modified diffusion cap using gbe (ngspice bjtload.c:584-585,593)
+      const CjBE = computeJunctionCapacitance(vbeNow, tpL1.tBEcap * params.AREA, tpL1.tBEpot, mje_eff, params.FC);
+      let CdBE: number;
+      if (tf_eff_base > 0 && params.XTF > 0 && vbeNow > 0) {
+        const If_val = s0[base + L1_SLOT_OP_IF];
+        const qb_val = s0[base + L1_SLOT_OP_QB];
+        const gbe_raw = s0[base + L1_SLOT_OP_GBE];
+        const ITF_safe = Math.max(params.ITF * params.AREA, 1e-30);
+        const icRatio = If_val / (If_val + ITF_safe);
         const VTF_safe = params.VTF === Infinity ? 1e30 : params.VTF;
         const expTerm = Math.exp(Math.min(vbcNow / (1.44 * VTF_safe), 700));
-        TF_eff = tf_eff_base * (1 + params.XTF * icRatio * icRatio * expTerm);
+        const argtf = params.XTF * icRatio * icRatio * expTerm;
+        const arg2 = argtf * (3 - icRatio - icRatio);
+        const cbe_mod = If_val * (1 + argtf) / Math.max(qb_val, 1e-30);
+        const dqbdVbe = s0[base + L1_SLOT_OP_DQBDVE];
+        const gbe_mod = (gbe_raw * (1 + arg2) - cbe_mod * dqbdVbe) / Math.max(qb_val, 1e-30);
+        CdBE = tf_eff_base * gbe_mod;
+      } else {
+        CdBE = tf_eff_base * s0[base + L1_SLOT_GM];
       }
-
-      // BJ12: Use temp-adjusted cap and exponent for BE junction
-      const CjBE = computeJunctionCapacitance(vbeNow, tpL1.tBEcap * params.AREA, tpL1.tBEpot, mje_eff, params.FC);
-      const CdBE = TF_eff * s0[base + L1_SLOT_GM];
       const CtotalBE = CjBE + CdBE;
 
       // Store total BE capacitance for LTE tolerance reference
       s0[base + L1_SLOT_CTOT_BE] = CtotalBE;
 
-      // BJ8: Store cbe in OP slot
-      s0[base + L1_SLOT_OP_CBE] = CtotalBE;
+      // BJ8: OP_CBE slot is set in updateOperatingPoint; CTOT_BE is the canonical cap value here
 
+      let beAg0 = 1 / dt;
       if (CtotalBE > 0) {
-        const iBE = s1[base + L1_SLOT_CAP_GEQ_BE] * s1[base + L1_SLOT_V_BE] + s1[base + L1_SLOT_CAP_IEQ_BE];
-        s0[base + L1_SLOT_CAP_GEQ_BE] = capacitorConductance(CtotalBE, dt, method);
-        s0[base + L1_SLOT_CAP_IEQ_BE] = capacitorHistoryCurrent(CtotalBE, dt, method, vbeNow, prevVbe, iBE);
+        const q0_be = s0[base + L1_SLOT_Q_BE];
+        const q1_be = s1[base + L1_SLOT_Q_BE];
+        const q2_be = s2[base + L1_SLOT_Q_BE];
+        const ccapPrevBE = s1[base + L1_SLOT_CCAP_BE];
+        const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+        const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+        const resBE = integrateCapacitor(CtotalBE, vbeNow, q0_be, q1_be, q2_be, dt, h1, h2, order, method, ccapPrevBE);
+        s0[base + L1_SLOT_CAP_GEQ_BE] = resBE.geq;
+        s0[base + L1_SLOT_CAP_IEQ_BE] = resBE.ceq;
+        s0[base + L1_SLOT_CCAP_BE] = resBE.ccap;
+        beAg0 = resBE.ag0;
       } else {
         s0[base + L1_SLOT_CAP_GEQ_BE] = 0;
         s0[base + L1_SLOT_CAP_IEQ_BE] = 0;
+        s0[base + L1_SLOT_CCAP_BE] = 0;
       }
 
       // B-C junction: depletion + reverse transit-time diffusion capacitance.
       // BJ12: Use temp-adjusted cap and exponent for BC junction
+      // B-C junction: depletion + reverse transit-time diffusion capacitance.
+      // BJ13: CdBC uses raw gbc (not gmu) per ngspice bjtload.c
       const CjBC = computeJunctionCapacitance(vbcNow, tpL1.tBCcap * params.AREA, tpL1.tBCpot, mjc_eff, params.FC);
-      const CdBC = tr_eff * s0[base + L1_SLOT_GMU];
+      const CdBC = tr_eff * s0[base + L1_SLOT_OP_GBC];
       const CtotalBC = CjBC + CdBC;
 
       const xcjc = Math.min(Math.max(params.XCJC, 0), 1);
@@ -1613,28 +1655,24 @@ export function createSpiceL1BjtElement(
       // Store total BC capacitance for LTE tolerance reference
       s0[base + L1_SLOT_CTOT_BC] = CtotalBC;
 
-      // Compute total BC companion current (int + ext) before updating coefficients
-      let iBC_total = 0;
-
-      if (CtotalBC_int > 0) {
-        const iBC_int = s1[base + L1_SLOT_CAP_GEQ_BC_INT] * s1[base + L1_SLOT_V_BC] + s1[base + L1_SLOT_CAP_IEQ_BC_INT];
-        iBC_total += iBC_int;
-        s0[base + L1_SLOT_CAP_GEQ_BC_INT] = capacitorConductance(CtotalBC_int, dt, method);
-        s0[base + L1_SLOT_CAP_IEQ_BC_INT] = capacitorHistoryCurrent(CtotalBC_int, dt, method, vbcNow, prevVbc, iBC_int);
+      if (CtotalBC > 0) {
+        const q0_bc = s0[base + L1_SLOT_Q_BC];
+        const q1_bc = s1[base + L1_SLOT_Q_BC];
+        const q2_bc = s2[base + L1_SLOT_Q_BC];
+        const ccapPrevBC = s1[base + L1_SLOT_CCAP_BC];
+        const h1_bc = deltaOld.length > 1 ? deltaOld[1] : dt;
+        const h2_bc = deltaOld.length > 2 ? deltaOld[2] : h1_bc;
+        const resBC = integrateCapacitor(CtotalBC, vbcNow, q0_bc, q1_bc, q2_bc, dt, h1_bc, h2_bc, order, method, ccapPrevBC);
+        s0[base + L1_SLOT_CCAP_BC] = resBC.ccap;
+        // Split by XCJC
+        s0[base + L1_SLOT_CAP_GEQ_BC_INT] = xcjc * resBC.geq;
+        s0[base + L1_SLOT_CAP_IEQ_BC_INT] = xcjc * resBC.ceq;
+        s0[base + L1_SLOT_CAP_GEQ_BC_EXT] = (1 - xcjc) * resBC.geq;
+        s0[base + L1_SLOT_CAP_IEQ_BC_EXT] = (1 - xcjc) * resBC.ceq;
       } else {
+        s0[base + L1_SLOT_CCAP_BC] = 0;
         s0[base + L1_SLOT_CAP_GEQ_BC_INT] = 0;
         s0[base + L1_SLOT_CAP_IEQ_BC_INT] = 0;
-      }
-
-      if (CtotalBC_ext > 0) {
-        // External B-C uses external node voltages for Vbc; prevVbc tracks the internal vbc
-        // which is equivalent to external when XCJC < 1 (both driven by same junction).
-        const vbcExt = polarity * (vBe - vCe);
-        const iBC_ext = s1[base + L1_SLOT_CAP_GEQ_BC_EXT] * vbcExt + s1[base + L1_SLOT_CAP_IEQ_BC_EXT];
-        iBC_total += iBC_ext;
-        s0[base + L1_SLOT_CAP_GEQ_BC_EXT] = capacitorConductance(CtotalBC_ext, dt, method);
-        s0[base + L1_SLOT_CAP_IEQ_BC_EXT] = capacitorHistoryCurrent(CtotalBC_ext, dt, method, vbcExt, prevVbc, iBC_ext);
-      } else {
         s0[base + L1_SLOT_CAP_GEQ_BC_EXT] = 0;
         s0[base + L1_SLOT_CAP_IEQ_BC_EXT] = 0;
       }
@@ -1647,97 +1685,109 @@ export function createSpiceL1BjtElement(
         const CjCS = computeJunctionCapacitance(vcsNow, tpL1.tSubcap, tpL1.tSubpot, mjs_eff, params.FC);
         s0[base + L1_SLOT_CTOT_CS] = CjCS;
         if (CjCS > 0) {
-          const iCS = s1[base + L1_SLOT_CAP_GEQ_CS] * s1[base + L1_SLOT_V_CS] + s1[base + L1_SLOT_CAP_IEQ_CS];
-          s0[base + L1_SLOT_CAP_GEQ_CS] = capacitorConductance(CjCS, dt, method);
-          s0[base + L1_SLOT_CAP_IEQ_CS] = capacitorHistoryCurrent(CjCS, dt, method, vcsNow, prevVcs, iCS);
+          const q0_cs = s0[base + L1_SLOT_Q_CS];
+          const q1_cs = s1[base + L1_SLOT_Q_CS];
+          const q2_cs = s2[base + L1_SLOT_Q_CS];
+          const ccapPrevCS = s1[base + L1_SLOT_CCAP_CS];
+          const h1_cs = deltaOld.length > 1 ? deltaOld[1] : dt;
+          const h2_cs = deltaOld.length > 2 ? deltaOld[2] : h1_cs;
+          const resCS = integrateCapacitor(CjCS, vcsNow, q0_cs, q1_cs, q2_cs, dt, h1_cs, h2_cs, order, method, ccapPrevCS);
+          s0[base + L1_SLOT_CAP_GEQ_CS] = resCS.geq;
+          s0[base + L1_SLOT_CAP_IEQ_CS] = resCS.ceq;
+          s0[base + L1_SLOT_CCAP_CS] = resCS.ccap;
         } else {
           s0[base + L1_SLOT_CAP_GEQ_CS] = 0;
           s0[base + L1_SLOT_CAP_IEQ_CS] = 0;
+          s0[base + L1_SLOT_CCAP_CS] = 0;
         }
       }
 
-      // BJ6/BJ8: Compute geqcb from stored OP values using TF modulation formula
+      // Transit-time charge modulation feedback (ngspice bjtload.c:567-586, 703)
       const opQb = s0[base + L1_SLOT_OP_QB];
       const opDqbdvc = s0[base + L1_SLOT_OP_DQBDVC];
-      const opCbe = s0[base + L1_SLOT_OP_CBE];
+      const opIf = s0[base + L1_SLOT_OP_IF];
       let geqcb = 0;
-      if (opQb > 1e-30 && opCbe > 0) {
-        let ag0: number;
-        switch (method) {
-          case "bdf1":    ag0 = 1 / dt; break;
-          case "trapezoidal": ag0 = 2 / dt; break;
-          case "bdf2":    ag0 = 3 / (2 * dt); break;
-          default:        ag0 = 1 / dt; break;
+      if (tf_eff_base > 0 && opQb > 1e-30 && vbeNow > 0) {
+        const ag0 = beAg0;
+
+        let argtf = 0;
+        const ovtf = params.VTF === Infinity ? 0 : 1 / (1.44 * params.VTF);
+        if (params.XTF > 0) {
+          argtf = params.XTF;
+          if (ovtf !== 0) {
+            argtf = argtf * Math.exp(Math.min(vbcNow * ovtf, 700));
+          }
+          const xjtf = params.ITF * params.AREA;
+          if (xjtf > 0) {
+            const temp = opIf / (opIf + xjtf);
+            argtf = argtf * temp * temp;
+          }
         }
-        geqcb = ag0 * opCbe * opDqbdvc / opQb;
+        const arg3 = opIf * argtf * ovtf;
+        const cbe_mod = opIf * (1 + argtf) / opQb;
+        geqcb = ag0 * tf_eff_base * (arg3 - cbe_mod * opDqbdvc) / opQb;
       }
       s0[base + L1_SLOT_GEQCB] = geqcb;
 
-      // BJ7: Excess phase implementation (Weil's backward-Euler approximation)
       if (tpL1.excessPhaseFactor > 0) {
         const td = tpL1.excessPhaseFactor;
         let cc = s0[base + L1_SLOT_IC];
-        const prevDt = s0[base + L1_SLOT_DT_PREV];
+        // Read previous dt from s1 (after state rotation, s1 holds previous step's s0)
+        const prevDt = s1[base + L1_SLOT_DT_PREV];
 
         if (prevDt > 0) {
-          const arg1 = dt / td;
-          const arg2 = 3 * arg1;
-          const denom = 1 + arg2;
-          const cexbc_prev = s0[base + L1_SLOT_CEXBC_PREV];
-          const cexbc_prev2 = s0[base + L1_SLOT_CEXBC_PREV2];
-          const cex = cexbc_prev + (cc + cexbc_prev2) * arg1 / denom;
-          cc = (cc - cex) * arg2 / denom + cex / denom;
-          s0[base + L1_SLOT_CEXBC_NOW] = cc;
+          // ngspice bjtload.c:497-519 — corrected filter with quadratic denominator
+          const r = dt / td;
+          const r3 = 3 * r;
+          const r3sq = 3 * r * r;
+          const denom = 1 + r3sq + r3;
+
+          const cexbc_prev = s1[base + L1_SLOT_CEXBC_PREV];
+          const cexbc_prev2 = s1[base + L1_SLOT_CEXBC_PREV2];
+          const dtRatio = dt / prevDt;
+
+          // 3-term digital filter (bjtload.c:512-515)
+          cc = (cexbc_prev * (1 + dtRatio + r3) - cexbc_prev2 * dtRatio) / denom;
+
+          const arg3 = r3sq / denom;
+          const opIf = s0[base + L1_SLOT_OP_IF];
+          const opQb = s0[base + L1_SLOT_OP_QB];
+          let argtf_run = 0;
+          if (tf_eff_base > 0 && params.XTF > 0 && vbeNow > 0) {
+            const ITF_safe_run = Math.max(params.ITF * params.AREA, 1e-30);
+            const icRatioRun = opIf / (opIf + ITF_safe_run);
+            const VTF_safe_run = params.VTF === Infinity ? 1e30 : params.VTF;
+            const expTermRun = Math.exp(Math.min(vbcNow / (1.44 * VTF_safe_run), 700));
+            argtf_run = params.XTF * icRatioRun * icRatioRun * expTermRun;
+          }
+          const cbe_mod_run = opIf * (1 + argtf_run) / Math.max(opQb, 1e-30);
+          const cex = cbe_mod_run * arg3;
+          // cexbc(n) = cc + cex/qb (bjtload.c:518)
+          s0[base + L1_SLOT_CEXBC_NOW] = cc + (opQb > 1e-30 ? cex / opQb : 0);
+        } else {
+          // MODEINITTRAN: initialize history (bjtload.c:508-510)
+          const opIf = s0[base + L1_SLOT_OP_IF];
+          const opQb = s0[base + L1_SLOT_OP_QB];
+          let initArgtf = 0;
+          if (tf_eff_base > 0 && params.XTF > 0 && vbeNow > 0) {
+            const ITF_safe = Math.max(params.ITF * params.AREA, 1e-30);
+            const icRatioInit = opIf / (opIf + ITF_safe);
+            const VTF_safe = params.VTF === Infinity ? 1e30 : params.VTF;
+            const expTermInit = Math.exp(Math.min(vbcNow / (1.44 * VTF_safe), 700));
+            initArgtf = params.XTF * icRatioInit * icRatioInit * expTermInit;
+          }
+          const cbe_mod_init = opIf * (1 + initArgtf) / Math.max(opQb, 1e-30);
+          const cexbc_init = opQb > 1e-30 ? cbe_mod_init / opQb : 0;
+          s0[base + L1_SLOT_CEXBC_NOW] = cexbc_init;
+          s0[base + L1_SLOT_CEXBC_PREV] = cexbc_init;
+          s0[base + L1_SLOT_CEXBC_PREV2] = cexbc_init;
         }
 
+        // Shift history
         s0[base + L1_SLOT_CEXBC_PREV2] = s0[base + L1_SLOT_CEXBC_PREV];
         s0[base + L1_SLOT_CEXBC_PREV] = s0[base + L1_SLOT_CEXBC_NOW];
         s0[base + L1_SLOT_DT_PREV] = dt;
       }
-    };
-
-    // Attach getLteEstimate for adaptive timestepping (ngspice bjttrunc.c).
-    // Uses the same formula as the capacitor: LTE ≈ (dt/12) * |ΔI|,
-    // applied to each junction's capacitance current history.
-    element.getLteEstimate = function (dt: number): { truncationError: number; toleranceReference: number } {
-      if (dt <= 0) return { truncationError: 0, toleranceReference: 0 };
-
-      let maxError = 0;
-      let maxRef = 0;
-
-      // Reconstruct cap currents from s1/s2: i = geq * v + ieq
-      // B-E junction
-      const iBE_prev  = s1[base + L1_SLOT_CAP_GEQ_BE] * s1[base + L1_SLOT_V_BE] + s1[base + L1_SLOT_CAP_IEQ_BE];
-      const iBE_prev2 = s2[base + L1_SLOT_CAP_GEQ_BE] * s2[base + L1_SLOT_V_BE] + s2[base + L1_SLOT_CAP_IEQ_BE];
-      const deltaI_BE = Math.abs(iBE_prev - iBE_prev2);
-      const err_BE = (dt / 12) * deltaI_BE;
-      const cBE = s0[base + L1_SLOT_CTOT_BE];
-      const ref_BE = cBE * Math.abs(s0[base + L1_SLOT_VBE]);
-      if (err_BE > maxError) { maxError = err_BE; maxRef = ref_BE; }
-
-      // B-C junction (use combined int+ext companion — BC_INT dominates when XCJC=1)
-      const iBC_prev  = s1[base + L1_SLOT_CAP_GEQ_BC_INT] * s1[base + L1_SLOT_V_BC] + s1[base + L1_SLOT_CAP_IEQ_BC_INT]
-                      + s1[base + L1_SLOT_CAP_GEQ_BC_EXT] * s1[base + L1_SLOT_V_BC] + s1[base + L1_SLOT_CAP_IEQ_BC_EXT];
-      const iBC_prev2 = s2[base + L1_SLOT_CAP_GEQ_BC_INT] * s2[base + L1_SLOT_V_BC] + s2[base + L1_SLOT_CAP_IEQ_BC_INT]
-                      + s2[base + L1_SLOT_CAP_GEQ_BC_EXT] * s2[base + L1_SLOT_V_BC] + s2[base + L1_SLOT_CAP_IEQ_BC_EXT];
-      const deltaI_BC = Math.abs(iBC_prev - iBC_prev2);
-      const err_BC = (dt / 12) * deltaI_BC;
-      const cBC = s0[base + L1_SLOT_CTOT_BC];
-      const ref_BC = cBC * Math.abs(s0[base + L1_SLOT_VBC]);
-      if (err_BC > maxError) { maxError = err_BC; maxRef = ref_BC; }
-
-      // C-S junction (only if CJS > 0)
-      if (params.CJS > 0) {
-        const iCS_prev  = s1[base + L1_SLOT_CAP_GEQ_CS] * s1[base + L1_SLOT_V_CS] + s1[base + L1_SLOT_CAP_IEQ_CS];
-        const iCS_prev2 = s2[base + L1_SLOT_CAP_GEQ_CS] * s2[base + L1_SLOT_V_CS] + s2[base + L1_SLOT_CAP_IEQ_CS];
-        const deltaI_CS = Math.abs(iCS_prev - iCS_prev2);
-        const err_CS = (dt / 12) * deltaI_CS;
-        const cCS = s0[base + L1_SLOT_CTOT_CS];
-        const ref_CS = cCS * Math.abs(s1[base + L1_SLOT_V_CS]);
-        if (err_CS > maxError) { maxError = err_CS; maxRef = ref_CS; }
-      }
-
-      return { truncationError: maxError, toleranceReference: maxRef };
     };
 
     element.getLteTimestep = function (
@@ -1755,11 +1805,9 @@ export function createSpiceL1BjtElement(
         const _q1 = s1[base + L1_SLOT_Q_BE];
         const _q2 = s2[base + L1_SLOT_Q_BE];
         const _q3 = s3[base + L1_SLOT_Q_BE];
-        const _h0 = dt;
-        const _h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
-        const _ccap0 = _h0 > 0 ? (_q0 - _q1) / _h0 : 0;
-        const _ccap1 = _h1 > 0 ? (_q1 - _q2) / _h1 : 0;
-        const dtBE = cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, _ccap0, _ccap1, lteParams);
+        const ccap0 = s0[base + L1_SLOT_CCAP_BE];
+        const ccap1 = s1[base + L1_SLOT_CCAP_BE];
+        const dtBE = cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, ccap0, ccap1, lteParams);
         if (dtBE < minDt) minDt = dtBE;
       }
 
@@ -1769,32 +1817,77 @@ export function createSpiceL1BjtElement(
         const _q1 = s1[base + L1_SLOT_Q_BC];
         const _q2 = s2[base + L1_SLOT_Q_BC];
         const _q3 = s3[base + L1_SLOT_Q_BC];
-        const _h0 = dt;
-        const _h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
-        const _ccap0 = _h0 > 0 ? (_q0 - _q1) / _h0 : 0;
-        const _ccap1 = _h1 > 0 ? (_q1 - _q2) / _h1 : 0;
-        const dtBC = cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, _ccap0, _ccap1, lteParams);
+        const ccap0 = s0[base + L1_SLOT_CCAP_BC];
+        const ccap1 = s1[base + L1_SLOT_CCAP_BC];
+        const dtBC = cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, ccap0, ccap1, lteParams);
         if (dtBC < minDt) minDt = dtBC;
       }
 
-      // C-S junction (only if CJS > 0)
-      if (params.CJS > 0) {
+      // C-S junction (only if tSubSatCur > 0)
+      if (tpL1.tSubSatCur > 0) {
         const _q0 = s0[base + L1_SLOT_Q_CS];
         const _q1 = s1[base + L1_SLOT_Q_CS];
         const _q2 = s2[base + L1_SLOT_Q_CS];
         const _q3 = s3[base + L1_SLOT_Q_CS];
-        const _h0 = dt;
-        const _h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
-        const _ccap0 = _h0 > 0 ? (_q0 - _q1) / _h0 : 0;
-        const _ccap1 = _h1 > 0 ? (_q1 - _q2) / _h1 : 0;
-        const dtCS = cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, _ccap0, _ccap1, lteParams);
+        const ccap0 = s0[base + L1_SLOT_CCAP_CS];
+        const ccap1 = s1[base + L1_SLOT_CCAP_CS];
+        const dtCS = cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, ccap0, ccap1, lteParams);
         if (dtCS < minDt) minDt = dtCS;
       }
 
       return minDt;
     };
 
-    element.updateChargeFlux = function(voltages: Float64Array): void {
+    element.stampReactiveCompanion = function (solver: SparseSolver): void {
+      const m = params.M;
+
+      // B-E junction capacitance companion
+      const geqBE = s0[base + L1_SLOT_CAP_GEQ_BE];
+      const ieqBE = s0[base + L1_SLOT_CAP_IEQ_BE];
+      if (geqBE !== 0 || ieqBE !== 0) {
+        stampG(solver, nodeB_int, nodeB_int, m * geqBE);
+        stampG(solver, nodeB_int, nodeE_int, m * -geqBE);
+        stampG(solver, nodeE_int, nodeB_int, m * -geqBE);
+        stampG(solver, nodeE_int, nodeE_int, m * geqBE);
+        stampRHS(solver, nodeB_int, m * -polarity * ieqBE);
+        stampRHS(solver, nodeE_int, m * polarity * ieqBE);
+      }
+
+      // B-C internal junction capacitance companion
+      const geqBCint = s0[base + L1_SLOT_CAP_GEQ_BC_INT];
+      const ieqBCint = s0[base + L1_SLOT_CAP_IEQ_BC_INT];
+      if (geqBCint !== 0 || ieqBCint !== 0) {
+        stampG(solver, nodeB_int, nodeB_int, m * geqBCint);
+        stampG(solver, nodeB_int, nodeC_int, m * -geqBCint);
+        stampG(solver, nodeC_int, nodeB_int, m * -geqBCint);
+        stampG(solver, nodeC_int, nodeC_int, m * geqBCint);
+        stampRHS(solver, nodeB_int, m * -polarity * ieqBCint);
+        stampRHS(solver, nodeC_int, m * polarity * ieqBCint);
+      }
+
+      // B-C external junction capacitance companion
+      const geqBCext = s0[base + L1_SLOT_CAP_GEQ_BC_EXT];
+      const ieqBCext = s0[base + L1_SLOT_CAP_IEQ_BC_EXT];
+      if (geqBCext !== 0 || ieqBCext !== 0) {
+        stampG(solver, nodeB_ext, nodeB_ext, m * geqBCext);
+        stampG(solver, nodeB_ext, nodeC_ext, m * -geqBCext);
+        stampG(solver, nodeC_ext, nodeB_ext, m * -geqBCext);
+        stampG(solver, nodeC_ext, nodeC_ext, m * geqBCext);
+        stampRHS(solver, nodeB_ext, m * -polarity * ieqBCext);
+        stampRHS(solver, nodeC_ext, m * polarity * ieqBCext);
+      }
+
+      // C-S junction capacitance companion
+      const geqCS = s0[base + L1_SLOT_CAP_GEQ_CS];
+      const ieqCS = s0[base + L1_SLOT_CAP_IEQ_CS];
+      if (geqCS !== 0 || ieqCS !== 0) {
+        // Substrate is ground (node 0); only stamp C_ext row/col
+        stampG(solver, nodeC_ext, nodeC_ext, m * geqCS);
+        stampRHS(solver, nodeC_ext, m * -polarity * ieqCS);
+      }
+    };
+
+    element.updateChargeFlux = function(voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
       const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
       const vEi = nodeE_int > 0 ? voltages[nodeE_int - 1] : 0;
@@ -1804,33 +1897,59 @@ export function createSpiceL1BjtElement(
       const vbcNow = polarity * (vBi - vCi);
       const vcsNow = polarity * vCe;
 
-      // B-E junction charge: (Cj_BE + TF_eff * GM) * Vbe
-      let TF_eff = tpL1.ttransitTimeF;
-      if (TF_eff > 0 && params.XTF > 0) {
-        const Ic = s0[base + L1_SLOT_IC];
-        const ITF_safe = (params.ITF * params.AREA) > 0 ? params.ITF * params.AREA : 1e-30;
-        const icRatio = Ic / (Ic + ITF_safe);
+      // B-E junction charge: depletion integral + diffusion charge
+      // Depletion: analytical integral matching ngspice bjtload.c:591-601
+      const Q_depl_BE = computeJunctionCharge(vbeNow, tpL1.tBEcap * params.AREA, tpL1.tBEpot, tpL1.tjunctionExpBE, params.FC, 0, 0);
+
+      // Diffusion: TF * If * (1+argtf) / qb  (ngspice bjtload.c:584,591)
+      const qb = s0[base + L1_SLOT_OP_QB];
+      const If_val = s0[base + L1_SLOT_OP_IF];
+      const TF = tpL1.ttransitTimeF;
+      let argtf = 0;
+      if (TF > 0 && params.XTF > 0 && vbeNow > 0) {
+        const ITF_safe = Math.max(params.ITF * params.AREA, 1e-30);
+        const icRatio = If_val / (If_val + ITF_safe);
         const VTF_safe = params.VTF === Infinity ? 1e30 : params.VTF;
         const expTerm = Math.exp(Math.min(vbcNow / (1.44 * VTF_safe), 700));
-        TF_eff = tpL1.ttransitTimeF * (1 + params.XTF * icRatio * icRatio * expTerm);
+        argtf = params.XTF * icRatio * icRatio * expTerm;
       }
-      const CjBE = computeJunctionCapacitance(vbeNow, tpL1.tBEcap * params.AREA, tpL1.tBEpot, tpL1.tjunctionExpBE, params.FC);
-      const CdBE = TF_eff * s0[base + L1_SLOT_GM];
-      const CtotalBE = CjBE + CdBE;
-      s0[base + L1_SLOT_Q_BE] = CtotalBE * vbeNow;
+      const cbe_mod = If_val * (1 + argtf) / Math.max(qb, 1e-30);
+      const Q_diff_BE = TF * cbe_mod;
+
+      const CtotalBE = computeJunctionCapacitance(vbeNow, tpL1.tBEcap * params.AREA, tpL1.tBEpot, tpL1.tjunctionExpBE, params.FC);
+      s0[base + L1_SLOT_Q_BE] = Q_depl_BE + Q_diff_BE;
       s0[base + L1_SLOT_V_BE] = vbeNow;
-      s0[base + L1_SLOT_CTOT_BE] = CtotalBE;
+      s0[base + L1_SLOT_CTOT_BE] = CtotalBE + TF * s0[base + L1_SLOT_GM];
 
-      // B-C junction charge: (Cj_BC + TR * GMU) * Vbc
-      const CjBC = computeJunctionCapacitance(vbcNow, tpL1.tBCcap * params.AREA, tpL1.tBCpot, tpL1.tjunctionExpBC, params.FC);
-      const CdBC = tpL1.ttransitTimeR * s0[base + L1_SLOT_GMU];
-      const CtotalBC = CjBC + CdBC;
-      s0[base + L1_SLOT_Q_BC] = CtotalBC * vbcNow;
+      // B-C junction charge: depletion integral + diffusion charge
+      const Q_depl_BC = computeJunctionCharge(vbcNow, tpL1.tBCcap * params.AREA, tpL1.tBCpot, tpL1.tjunctionExpBC, params.FC, 0, 0);
+      const Ir_val = s0[base + L1_SLOT_OP_IR];
+      const Q_diff_BC = tpL1.ttransitTimeR * Ir_val;
+      const CtotalBC = computeJunctionCapacitance(vbcNow, tpL1.tBCcap * params.AREA, tpL1.tBCpot, tpL1.tjunctionExpBC, params.FC);
+      s0[base + L1_SLOT_Q_BC] = Q_depl_BC + Q_diff_BC;
       s0[base + L1_SLOT_V_BC] = vbcNow;
-      s0[base + L1_SLOT_CTOT_BC] = CtotalBC;
+      s0[base + L1_SLOT_CTOT_BC] = CtotalBC + tpL1.ttransitTimeR * s0[base + L1_SLOT_GMU];
 
-      // C-S junction charge: Cj_CS * Vcs
-      if (tpL1.tSubcap > 0 || params.CJS > 0) {
+      // C-S substrate charge (ngspice bjtload.c:631-641)
+      if (tpL1.tSubcap > 0) {
+        const czsub = tpL1.tSubcap;
+        const ps = tpL1.tSubpot;
+        const xms = tpL1.tjunctionExpSub;
+        let Q_CS: number;
+        if (vcsNow < 0) {
+          const arg = Math.max(1 - vcsNow / ps, 1e-6);
+          if (Math.abs(xms - 1) < 1e-10) {
+            Q_CS = -ps * czsub * Math.log(arg);
+          } else {
+            Q_CS = ps * czsub * (1 - Math.pow(arg, 1 - xms)) / (1 - xms);
+          }
+        } else {
+          Q_CS = vcsNow * czsub * (1 + xms * vcsNow / (2 * ps));
+        }
+        s0[base + L1_SLOT_Q_CS] = Q_CS;
+        s0[base + L1_SLOT_V_CS] = vcsNow;
+        s0[base + L1_SLOT_CTOT_CS] = computeJunctionCapacitance(vcsNow, tpL1.tSubcap, tpL1.tSubpot, tpL1.tjunctionExpSub, params.FC);
+      } else if (params.CJS > 0) {
         const CjCS = computeJunctionCapacitance(vcsNow, tpL1.tSubcap, tpL1.tSubpot, tpL1.tjunctionExpSub, params.FC);
         s0[base + L1_SLOT_Q_CS] = CjCS * vcsNow;
         s0[base + L1_SLOT_V_CS] = vcsNow;

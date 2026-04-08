@@ -74,6 +74,24 @@ export interface NROptions {
   statePool?: { state0: Float64Array } | null;
   /** Enable node damping in NR iteration (ngspice niiter.c). Default: false */
   nodeDamping?: boolean;
+  /** Hook for per-iteration companion recomputation. Called on iteration > 0 before re-stamping. */
+  preIterationHook?: (iteration: number, voltages: Float64Array) => void;
+  /**
+   * Hook called after each NR iteration's convergence check, before the
+   * convergence return. Receives the full iteration state for external
+   * instrumentation (comparison harness, convergence logging, etc.).
+   *
+   * Called unconditionally on every iteration (not just converged ones).
+   * The hook must not mutate voltages or prevVoltages.
+   */
+  postIterationHook?: (
+    iteration: number,
+    voltages: Float64Array,
+    prevVoltages: Float64Array,
+    noncon: number,
+    globalConverged: boolean,
+    elemConverged: boolean,
+  ) => void;
 }
 
 /** Result of a Newton-Raphson solve. */
@@ -326,6 +344,7 @@ export function newtonRaphson(opts: NROptions): NRResult {
   solver.captureLinearRhs();
 
   assembler.stampNonlinear(elements);
+  assembler.stampReactiveCompanion(elements);
   solver.finalize();
   // Snapshot CSC values for linear-only contributions (scatter-adds only
   // the linear COO portion [0, linearCooCount) into a separate buffer).
@@ -341,9 +360,11 @@ export function newtonRaphson(opts: NROptions): NRResult {
       // Subsequent iterations: restore the linear base (CSC values + RHS),
       // reset COO cursor to the linear boundary, re-stamp only nonlinear
       // contributions, and partial-refill CSC with nonlinear entries only.
+      opts.preIterationHook?.(iteration, voltages);
       solver.restoreLinearBase();
       solver.setCooCount(linearCooCount);
       assembler.stampNonlinear(elements);
+      assembler.stampReactiveCompanion(elements);
       solver.finalize(linearCooCount);
     }
 
@@ -461,6 +482,9 @@ export function newtonRaphson(opts: NROptions): NRResult {
         }
       }
     }
+
+    // 9a. Post-iteration hook for external instrumentation
+    opts.postIterationHook?.(iteration, voltages, prevVoltages, assembler.noncon, globalConverged, elemConverged);
 
     // 10. Return on convergence
     if (globalConverged && elemConverged) {

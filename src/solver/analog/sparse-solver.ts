@@ -424,6 +424,46 @@ export class SparseSolver {
   }
 
   // =========================================================================
+  // Harness instrumentation accessors (zero-cost when unused)
+  // =========================================================================
+
+  /** Current MNA matrix dimension. */
+  get dimension(): number {
+    return this._n;
+  }
+
+  /**
+   * Return a snapshot (copy) of the current RHS vector.
+   * The returned array is owned by the caller — mutations do not
+   * affect the solver's internal state.
+   */
+  getRhsSnapshot(): Float64Array {
+    return this._rhs.slice(0, this._n);
+  }
+
+  /**
+   * Return the assembled matrix as an array of CSC non-zero entries.
+   * Each entry contains { row, col, value } in original (un-permuted)
+   * node ordering. Used by the comparison harness to diff against
+   * ngspice's matrix dump.
+   *
+   * Performance: O(nnz) — allocates one object per non-zero. Not for
+   * hot-path use; intended for offline comparison only.
+   */
+  getCSCNonZeros(): Array<{ row: number; col: number; value: number }> {
+    const n = this._n;
+    const result: Array<{ row: number; col: number; value: number }> = [];
+    for (let col = 0; col < n; col++) {
+      const p0 = this._cscColPtr[col];
+      const p1 = this._cscColPtr[col + 1];
+      for (let p = p0; p < p1; p++) {
+        result.push({ row: this._cscRowIdx[p], col, value: this._cscVals[p] });
+      }
+    }
+    return result;
+  }
+
+  // =========================================================================
   // COO growth
   // =========================================================================
 

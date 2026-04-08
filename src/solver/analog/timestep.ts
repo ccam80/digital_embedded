@@ -84,10 +84,10 @@ export class TimestepController {
 
   /**
    * Timestep history for CKTterr divided differences.
-   * [0] = h_{n-1} (previous accepted dt), [1] = h_{n-2}, [2] = h_{n-3}.
-   * Pre-allocated once; shifted in accept(). ngspice: CKTdeltaOld[].
+   * [0] = current trial dt (set by setDeltaOldCurrent), [1] = h_{n-1} (previous accepted dt), [2] = h_{n-2}, [3] = h_{n-3}.
+   * Pre-allocated once; shifted in rotateDeltaOld(). ngspice: CKTdeltaOld[].
    */
-  private _deltaOld: number[] = [0, 0, 0];
+  private _deltaOld: number[] = [0, 0, 0, 0];
 
   /**
    * Integration order derived from currentMethod.
@@ -100,6 +100,7 @@ export class TimestepController {
    * retry loop (ngspice dctran.c:704-706).
    */
   rotateDeltaOld(): void {
+    this._deltaOld[3] = this._deltaOld[2];
     this._deltaOld[2] = this._deltaOld[1];
     this._deltaOld[1] = this._deltaOld[0];
     this._deltaOld[0] = this.currentDt;
@@ -150,6 +151,7 @@ export class TimestepController {
     this._deltaOld[0] = params.maxTimeStep;
     this._deltaOld[1] = params.maxTimeStep;
     this._deltaOld[2] = params.maxTimeStep;
+    this._deltaOld[3] = params.maxTimeStep;
   }
 
   /**
@@ -177,7 +179,7 @@ export class TimestepController {
   /**
    * Compute the proposed next timestep based on local truncation error estimates.
    *
-   * Iterates all reactive elements that implement `getLteEstimate`, takes the
+   * Iterates all reactive elements that implement `getLteTimestep`, takes the
    * maximum truncation error, and derives the new dt using:
    *
    *   newDt = 0.9 * dt * (chargeTol / maxError)^(1/3)

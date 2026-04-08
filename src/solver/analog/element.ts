@@ -114,15 +114,25 @@ export interface AnalogElement {
    * @param method - Active integration method
    * @param voltages - Solution vector from the previous accepted timestep
    */
-  stampCompanion?(dt: number, method: IntegrationMethod, voltages: Float64Array): void;
+  stampCompanion?(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void;
 
   /**
-   * Rewrite the _NOW charge/flux slot(s) using converged NR voltages.
+   * Stamp previously-computed companion model entries (geq/ieq) into the
+   * MNA matrix. Called every NR iteration. Companion entries are separated
+   * from stamp() so the linear base contains only topology-constant
+   * contributions.
+   */
+  stampReactiveCompanion?(solver: SparseSolverStamp): void;
+
+  /**
+   * Rewrite the _NOW charge/flux slot(s) using converged NR voltages, and
+   * recompute ccap from the converged charge so the next step's trapezoidal
+   * recursion starts from the correct companion current.
    * Called after NR convergence but before LTE evaluation so that
    * getLteTimestep sees accurate charge/flux values.
    * Implementations must write ONLY the _NOW slot — never shift history.
    */
-  updateChargeFlux?(voltages: Float64Array): void;
+  updateChargeFlux?(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void;
 
   /**
    * Update non-MNA internal state variables after an accepted timestep.
@@ -173,32 +183,13 @@ export interface AnalogElement {
   checkConvergence?(voltages: Float64Array, prevVoltages: Float64Array, reltol: number, iabstol: number): boolean;
 
   /**
-   * Compute and return the local truncation error estimate for adaptive
-   * timestepping, together with a reference magnitude used by the engine
-   * to form a relative tolerance (ngspice-style).
-   *
-   * The engine accepts or rejects the step by computing
-   *   local_tol = trtol · (reltol · |toleranceReference| + chargeTol)
-   *   ratio     = truncationError / local_tol
-   * and rejecting if any element's `ratio > 1`. `toleranceReference` is the
-   * "natural" stored quantity of the element — charge (C·v) for capacitors,
-   * flux (L·i) for inductors — at the most recent accepted step.
-   *
-   * @param dt - Current timestep in seconds
-   * @returns `truncationError` and `toleranceReference`, both in charge
-   *          (or flux) units; returning zero for both is equivalent to
-   *          "no opinion" and never triggers rejection.
-   */
-  getLteEstimate?(dt: number): { truncationError: number; toleranceReference: number };
-
-  /**
    * CKTterr-based LTE timestep proposal. Returns the maximum allowable
    * timestep for this element based on charge history divided differences.
    *
    * Elements implementing this method call `cktTerr()` internally for each
    * reactive junction, passing charge values as individual scalars (not arrays)
    * to avoid hot-path allocations. The controller calls this in preference
-   * to `getLteEstimate` when present.
+   * to avoid hot-path allocations.
    *
    * @param dt        Current timestep in seconds
    * @param deltaOld  Timestep history (pre-allocated array from controller)
@@ -261,7 +252,7 @@ export interface AnalogElement {
    * True if this element implements `stampCompanion`.
    *
    * The timestep controller reads this flag to decide whether to call
-   * `stampCompanion` and `getLteEstimate` for reactive element handling.
+   * `stampCompanion` and `getLteTimestep` for reactive element handling.
    * Non-reactive elements set this to `false`.
    */
   readonly isReactive: boolean;

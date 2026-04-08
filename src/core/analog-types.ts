@@ -67,6 +67,8 @@ export interface StatePoolRef {
   readonly state2: Float64Array;
   readonly state3: Float64Array;
   readonly totalSlots: number;
+  /** Number of accepted transient steps. 0 = MODEINITTRAN equivalent. */
+  readonly tranStep: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,15 +112,25 @@ export interface AnalogElementCore {
   /**
    * Recompute companion model coefficients and stamp them into the solver.
    */
-  stampCompanion?(dt: number, method: IntegrationMethod, voltages: Float64Array): void;
+  stampCompanion?(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void;
 
   /**
-   * Rewrite the _NOW charge/flux slot(s) using converged NR voltages.
+   * Stamp previously-computed companion model entries (geq/ieq) into the
+   * MNA matrix. Called every NR iteration. Companion entries are separated
+   * from stamp() so the linear base contains only topology-constant
+   * contributions.
+   */
+  stampReactiveCompanion?(solver: SparseSolverStamp): void;
+
+  /**
+   * Rewrite the _NOW charge/flux slot(s) using converged NR voltages, and
+   * recompute ccap from the converged charge so the next step's trapezoidal
+   * recursion starts from the correct companion current.
    * Called after NR convergence but before LTE evaluation so that
    * getLteTimestep sees accurate charge/flux values.
    * Implementations must write ONLY the _NOW slot — never shift history.
    */
-  updateChargeFlux?(voltages: Float64Array): void;
+  updateChargeFlux?(voltages: Float64Array, dt: number, method: import("../solver/analog/element.js").IntegrationMethod, order: number, deltaOld: readonly number[]): void;
 
   /**
    * Update non-MNA internal state variables after an accepted timestep.
@@ -131,20 +143,12 @@ export interface AnalogElementCore {
   checkConvergence?(voltages: Float64Array, prevVoltages: Float64Array, reltol: number, abstol: number): boolean;
 
   /**
-   * Compute and return the local truncation error estimate for adaptive
-   * timestepping. See `AnalogElementCore` in solver/analog/element.ts for
-   * the full contract; both fields are in charge/flux units, and the engine
-   * forms an ngspice-style relative tolerance from `toleranceReference`.
-   */
-  getLteEstimate?(dt: number): { truncationError: number; toleranceReference: number };
-
-  /**
    * CKTterr-based LTE timestep proposal. Returns the maximum allowable
    * timestep for this element based on charge/flux history divided differences.
    *
    * Elements implementing this method call `cktTerr()` internally for each
-   * reactive junction. The controller calls this in preference to
-   * `getLteEstimate` when present.
+   * reactive junction, passing charge values as individual scalars (not arrays)
+   * to avoid hot-path allocations.
    */
   getLteTimestep?(
     dt: number,
