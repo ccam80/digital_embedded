@@ -188,7 +188,6 @@ export interface AnalogElement {
    *
    * Elements implementing this method call `cktTerr()` internally for each
    * reactive junction, passing charge values as individual scalars (not arrays)
-   * to avoid hot-path allocations. The controller calls this in preference
    * to avoid hot-path allocations.
    *
    * @param dt        Current timestep in seconds

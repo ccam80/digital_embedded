@@ -108,10 +108,54 @@ export function compareSnapshots(
         }
       }
 
-      // Device state diffs
+      // Device state diffs — compare our pool-backed state slots against
+      // ngspice state via device mappings
       const stateDiffs: ComparisonResult["stateDiffs"] = [];
-      // (State comparison requires device mappings and ngspice-side state capture;
-      //  deferred to Phase 3 when ngspice bridge provides state snapshots.)
+      for (const ourEs of ourIter.elementStates) {
+        // Find matching element in reference by label
+        const refEs = refIter.elementStates.find(e => e.label === ourEs.label);
+        if (!refEs) continue;
+
+        // Look up the device mapping for this element type
+        // The element label format is "type_N" or just the label; device type
+        // is inferred from which mapping has slots that match our slot names.
+        let mapping: DeviceMapping | undefined;
+        for (const [, m] of Object.entries(DEVICE_MAPPINGS)) {
+          const mappedSlots = Object.keys(m.slotToNgspice);
+          const ourSlots = Object.keys(ourEs.slots);
+          if (ourSlots.length > 0 && mappedSlots.some(s => s in ourEs.slots)) {
+            mapping = m;
+            break;
+          }
+        }
+        if (!mapping) continue;
+
+        // Compare each mapped slot
+        for (const [slotName, ngIdx] of Object.entries(mapping.slotToNgspice)) {
+          if (ngIdx === null) continue; // no ngspice equivalent
+          if (!(slotName in ourEs.slots) || !(slotName in refEs.slots)) continue;
+
+          const o = ourEs.slots[slotName];
+          const t = refEs.slots[slotName];
+          const absDelta = Math.abs(o - t);
+          // Use charge tolerance for Q/CCAP slots, voltage for V slots, current for others
+          const isCharge = slotName.startsWith("Q_") || slotName.startsWith("CCAP");
+          const isVoltage = slotName.startsWith("V") && !slotName.startsWith("VON");
+          const absTol = isCharge ? tolerance.qAbsTol
+            : isVoltage ? tolerance.vAbsTol
+            : tolerance.iAbsTol;
+          const wt = withinTol(o, t, absTol, tolerance.relTol);
+
+          stateDiffs.push({
+            elementLabel: ourEs.label,
+            slotName,
+            ours: o,
+            theirs: t,
+            absDelta,
+            withinTol: wt,
+          });
+        }
+      }
 
       const allWithinTol = voltageDiffs.every(d => d.withinTol)
         && rhsDiffs.every(d => d.withinTol)

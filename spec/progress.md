@@ -78,3 +78,59 @@ Added optional `iterationDetails` field to `NRAttemptRecord` interface in conver
 - **Files modified**: none
 - **Tests**: N/A (utility module; TypeScript compile check passes with no errors in new file)
 - **Notes**: All functions specified in Phase 2e: querySteps, nodeVoltageTrajectory, elementStateTrajectory, convergenceSummary, findLargestDelta. IterationSnapshot import included per spec (used implicitly via StepSnapshot.iterations).
+
+## Task P3a: niiter.c instrumentation callback
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: ref/ngspice/src/maths/ni/niiter.c
+- **Tests**: N/A (C source file — no automated tests; modifications are pure instrumentation hooks)
+
+**Change 1**: Added NR iteration instrumentation infrastructure after line 20 (`#include "ngspice/sperror.h"`):
+- `NI_InstrumentCallback` typedef (function pointer for iteration instrumentation callback)
+- `static ni_instrument_cb` global pointer initialized to NULL
+- `ni_instrument_register()` function to register the callback from shared-lib consumer
+
+**Change 2**: Added callback invocation after line 217 (STEPDEBUG printf block), before closing brace of if(1) block:
+- Fires after solve and convergence check
+- Passes: 0-based iteration count, matrix size, voltage vectors, state array, convergence state
+- Safely guards callback invocation with NULL check
+
+## Task P3b: Windows shared library build instructions
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: ref/ngspice/BUILD-SHARED-WIN.md
+- **Files modified**: none
+- **Tests**: N/A (documentation file — no automated tests; provides build workflow for developers)
+
+Created comprehensive build instructions document covering:
+- Prerequisites: Visual Studio 2022 with C++ workload, CMake 3.20+ (optional)
+- Option A: Visual Studio Solution build (recommended) — open .sln, set Release|x64 config, build, output to visualc/sharedspice/x64/Release/ngspice.dll
+- Option B: CMake build — mkdir build, cmake with VS2022 generator and Release config, cmake --build
+- Verifying instrumentation: dumpbin /exports command to confirm ni_instrument_register is exported
+- Adding export if needed: __declspec(dllexport) annotation on function signature
+
+All content matches Phase 3b specification exactly.
+
+## Task P3c: NgspiceBridge FFI module
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/harness/ngspice-bridge.ts
+- **Files modified**: none
+- **Tests**: 7967/7971 passing (4 pre-existing coordinator stagnation failures from baseline, no regressions)
+
+Created comprehensive FFI bridge to ngspice shared library covering:
+- `RawNgspiceIteration` interface: matches C typedef from niiter.c with iteration count, matrix size, voltage vectors (rhs, rhsOld), state array, convergence flags
+- `NgspiceBridge` class with:
+  - `constructor(dllPath)`: stores path, defers FFI loading
+  - `async init()`: dynamically imports koffi, loads DLL, defines callback type, registers callback via koffi.register
+  - `loadNetlist(netlist)`: calls ngSpice_Circ with split lines and null terminator
+  - `runDcOp()`: resets iterations, calls ngSpice_Command("op")
+  - `runTran(stopTime, maxStep)`: resets iterations, calls ngSpice_Command with tran command
+  - `getCaptureSession()`: converts accumulated raw iteration data to CaptureSession format by:
+    - Detecting step boundaries via iteration counter resets
+    - Packaging each iteration into IterationSnapshot with voltage arrays and convergence flags (globalConverged/elemConverged)
+    - Creating StepSnapshot objects with proper iteration grouping
+    - Returning CaptureSession with topology and steps array
+  - `dispose()`: unregisters callback and cleans up FFI handle
+
+All TypeScript types verified. File correctly uses type imports from types.ts. Dynamic koffi import prevents hard dependency on native module. Tests pass with no regressions from baseline (4 pre-existing failures confirmed in test-baseline.md).

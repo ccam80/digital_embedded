@@ -8,7 +8,6 @@
 import type {
   CaptureSession,
   StepSnapshot,
-  IterationSnapshot,
   SnapshotQuery,
 } from "./types.js";
 

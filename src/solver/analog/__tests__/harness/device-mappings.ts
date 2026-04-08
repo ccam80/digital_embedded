@@ -167,11 +167,20 @@ export const BJT_MAPPING: DeviceMapping = {
 };
 
 // ---------------------------------------------------------------------------
-// MOSFET Level 1 — placeholder
+// MOSFET Level 1
 // ---------------------------------------------------------------------------
-// Our MOSFET does not yet use the pool-backed state schema (no
-// defineStateSchema call found in mosfet.ts). This mapping is a
-// placeholder for when pool migration is complete.
+// Our slots (FET_BASE_SCHEMA in fet-base.ts, 45 slots):
+//   0: VGS, 1: VDS, 2: GM, 3: GDS, 4: IDS, 5: SWAPPED,
+//   6: CAP_GEQ_GS, 7: CAP_IEQ_GS, 8: CAP_GEQ_GD, 9: CAP_IEQ_GD,
+//   10: V_GS, 11: V_GD, 12: CAP_GEQ_DB, 13: CAP_IEQ_DB,
+//   14: CAP_GEQ_SB, 15: CAP_IEQ_SB, 16: V_DB, 17: V_SB,
+//   18: CAP_GEQ_GB, 19: CAP_IEQ_GB, 20: V_GB,
+//   21: VSB, 22: GMBS, 23: GBD, 24: GBS, 25: CBD_I, 26: CBS_I, 27: VBD,
+//   28: VON, 29: VBS_OLD, 30: VBD_OLD, 31: MODE,
+//   32: Q_GS, 33: Q_GD, 34: Q_GB,
+//   35: MEYER_GS, 36: MEYER_GD, 37: MEYER_GB,
+//   38: CCAP_GS, 39: CCAP_GD, 40: CCAP_GB,
+//   41: Q_DB, 42: Q_SB, 43: CCAP_DB, 44: CCAP_SB
 // ngspice mos1 state offsets (mos1defs.h):
 //   MOS1vbs=0, MOS1vgs=1, MOS1vds=2, MOS1capgs=3, MOS1qgs=4,
 //   MOS1cqgs=5, MOS1capgd=6, MOS1qgd=7, MOS1cqgd=8,
@@ -180,8 +189,71 @@ export const BJT_MAPPING: DeviceMapping = {
 
 export const MOSFET_MAPPING: DeviceMapping = {
   deviceType: "mosfet",
-  slotToNgspice: {},   // populated after pool migration
-  ngspiceToSlot: {},
+  slotToNgspice: {
+    VGS: 1,           // MOS1vgs
+    VDS: 2,           // MOS1vds
+    GM: null,         // computed, not in ngspice state vector
+    GDS: null,        // computed, not in ngspice state vector
+    IDS: null,        // computed, not in ngspice state vector
+    SWAPPED: null,    // internal flag, no ngspice equivalent
+    CAP_GEQ_GS: null, // companion conductance — derived
+    CAP_IEQ_GS: null, // companion current — derived
+    CAP_GEQ_GD: null,
+    CAP_IEQ_GD: null,
+    V_GS: null,       // terminal voltage — read from solution vector
+    V_GD: null,
+    CAP_GEQ_DB: null,
+    CAP_IEQ_DB: null,
+    CAP_GEQ_SB: null,
+    CAP_IEQ_SB: null,
+    V_DB: null,
+    V_SB: null,
+    CAP_GEQ_GB: null,
+    CAP_IEQ_GB: null,
+    V_GB: null,
+    VSB: 0,           // MOS1vbs
+    GMBS: null,       // computed, not in ngspice state vector
+    GBD: null,        // computed
+    GBS: null,        // computed
+    CBD_I: null,      // computed
+    CBS_I: null,      // computed
+    VBD: null,        // derived from vbs - vds
+    VON: null,        // internal limiting state
+    VBS_OLD: null,    // internal limiting state
+    VBD_OLD: null,    // internal limiting state
+    MODE: null,       // internal flag
+    Q_GS: 4,          // MOS1qgs
+    Q_GD: 7,          // MOS1qgd
+    Q_GB: 10,         // MOS1qgb
+    MEYER_GS: 3,      // MOS1capgs (Meyer half-cap)
+    MEYER_GD: 6,      // MOS1capgd (Meyer half-cap)
+    MEYER_GB: 9,      // MOS1capgb (Meyer half-cap)
+    CCAP_GS: 5,       // MOS1cqgs
+    CCAP_GD: 8,       // MOS1cqgd
+    CCAP_GB: 11,      // MOS1cqgb
+    Q_DB: 12,         // MOS1qbd
+    Q_SB: 14,         // MOS1qbs
+    CCAP_DB: 13,      // MOS1cqbd
+    CCAP_SB: 15,      // MOS1cqbs
+  },
+  ngspiceToSlot: {
+    0: "VSB",
+    1: "VGS",
+    2: "VDS",
+    3: "MEYER_GS",
+    4: "Q_GS",
+    5: "CCAP_GS",
+    6: "MEYER_GD",
+    7: "Q_GD",
+    8: "CCAP_GD",
+    9: "MEYER_GB",
+    10: "Q_GB",
+    11: "CCAP_GB",
+    12: "Q_DB",
+    13: "CCAP_DB",
+    14: "Q_SB",
+    15: "CCAP_SB",
+  },
 };
 
 // ---------------------------------------------------------------------------
