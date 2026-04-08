@@ -400,6 +400,7 @@ export function newtonRaphson(opts: NROptions): NRResult {
     // 5. For purely linear circuits, the first solve gives the exact answer.
     //    Return immediately — no convergence iteration needed.
     if (!hasNonlinear) {
+      opts.postIterationHook?.(iteration, voltages, prevVoltages, 0, true, true);
       return { converged: true, iterations: iteration + 1, voltages, largestChangeElement: -1, largestChangeNode: -1 };
     }
 

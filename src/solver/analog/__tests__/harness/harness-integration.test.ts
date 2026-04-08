@@ -97,7 +97,7 @@ describe("harness integration", () => {
     expect(getSnapshots()).toHaveLength(0);
   });
 
-  it("postIterationHook fires during DC OP via step capture", () => {
+  it("postIterationHook fires during DC OP (nonlinear circuit)", () => {
     const { circuit, pool } = makeHWR();
     engine.init(circuit);
     let hookCallCount = 0;
@@ -105,6 +105,21 @@ describe("harness integration", () => {
     const result = engine.dcOperatingPoint();
     expect(result.converged).toBe(true);
     expect(hookCallCount).toBeGreaterThan(0);
+  });
+
+  it("postIterationHook fires during DC OP (linear circuit)", () => {
+    const { circuit, pool } = makeRC();
+    engine.init(circuit);
+    let hookCallCount = 0;
+    let lastGlobalConverged = false;
+    engine.postIterationHook = (_i: number, _v: Float64Array, _p: Float64Array, _n: number, g: boolean, _e: boolean) => {
+      hookCallCount++;
+      lastGlobalConverged = g;
+    };
+    const result = engine.dcOperatingPoint();
+    expect(result.converged).toBe(true);
+    expect(hookCallCount).toBeGreaterThan(0);
+    expect(lastGlobalConverged).toBe(true);
   });
 
   it("step capture hook packages iterations into step snapshots", () => {
