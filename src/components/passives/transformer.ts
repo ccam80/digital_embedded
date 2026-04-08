@@ -281,18 +281,13 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     if (!this.s0) {
       throw new Error("AnalogTransformerElement.updateDerivedParams called before initState");
     }
-    applyInitialValues(TRANSFORMER_SCHEMA, { states: [this.s0, this.s1, this.s2, this.s3], state0: this.s0, state1: this.s1, state2: this.s2, state3: this.s3, totalSlots: this.s0.length } as StatePoolRef, this._base, {});
+    applyInitialValues(TRANSFORMER_SCHEMA, { states: [this.s0, this.s1, this.s2, this.s3], state0: this.s0, state1: this.s1, state2: this.s2, state3: this.s3, totalSlots: this.s0.length, tranStep: 0 } as StatePoolRef, this._base, {});
   }
 
   stamp(solver: SparseSolver): void {
     const [p1, p2, s1, s2] = this.pinNodeIds;
     const b1 = this.branchIndex;
     const b2 = this._branch2;
-    const g11   = this.s0[this._base + SLOT_G11];
-    const g22   = this.s0[this._base + SLOT_G22];
-    const g12   = this.s0[this._base + SLOT_G12];
-    const hist1 = this.s0[this._base + SLOT_HIST1];
-    const hist2 = this.s0[this._base + SLOT_HIST2];
 
     // Primary winding resistance: series resistance modelled as a conductance
     // between P1 and P2 in the node block (Norton parallel equivalent).
@@ -325,21 +320,32 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     if (s1 !== 0) solver.stamp(s1 - 1, b2, 1);
     if (s2 !== 0) solver.stamp(s2 - 1, b2, -1);
 
-    // Branch rows (C sub-matrix).
-    // Winding resistances appear as series terms in the branch equation
-    // (added to the branch diagonal), providing the RL damping needed for
-    // DC steady-state convergence with trapezoidal integration.
-    //
-    // Primary: V(P1) - V(P2) - (g11 + R_pri)·I1 - g12·I2 = hist1
+    // C sub-matrix: voltage incidence (topology-constant ±1 entries).
     if (p1 !== 0) solver.stamp(b1, p1 - 1, 1);
     if (p2 !== 0) solver.stamp(b1, p2 - 1, -1);
+    if (s1 !== 0) solver.stamp(b2, s1 - 1, 1);
+    if (s2 !== 0) solver.stamp(b2, s2 - 1, -1);
+  }
+
+  stampReactiveCompanion(solver: SparseSolver): void {
+    const b1 = this.branchIndex;
+    const b2 = this._branch2;
+    const g11   = this.s0[this._base + SLOT_G11];
+    const g22   = this.s0[this._base + SLOT_G22];
+    const g12   = this.s0[this._base + SLOT_G12];
+    const hist1 = this.s0[this._base + SLOT_HIST1];
+    const hist2 = this.s0[this._base + SLOT_HIST2];
+
+    // Branch rows: companion + winding resistance on diagonal, mutual on off-diagonal.
+    // Winding resistances appear here combined with the companion conductance,
+    // providing the RL damping needed for DC steady-state convergence.
+    //
+    // Primary: -(g11 + R_pri)·I1 - g12·I2 = hist1
     solver.stamp(b1, b1, -(g11 + this._rPri));
     solver.stamp(b1, b2, -g12);
     solver.stampRHS(b1, hist1);
 
-    // Secondary: V(S1) - V(S2) - g12·I1 - (g22 + R_sec)·I2 = hist2
-    if (s1 !== 0) solver.stamp(b2, s1 - 1, 1);
-    if (s2 !== 0) solver.stamp(b2, s2 - 1, -1);
+    // Secondary: -g12·I1 - (g22 + R_sec)·I2 = hist2
     solver.stamp(b2, b1, -g12);
     solver.stamp(b2, b2, -(g22 + this._rSec));
     solver.stampRHS(b2, hist2);
@@ -412,7 +418,7 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     s[base + SLOT_I2]   = i2Now;
   }
 
-  updateChargeFlux(voltages: Float64Array): void {
+  updateChargeFlux(voltages: Float64Array, _dt: number, _method: IntegrationMethod, _order: number, _deltaOld: readonly number[]): void {
     const b1 = this.branchIndex;
     const b2 = this._branch2;
     const L1 = this._pair.l1;

@@ -44,10 +44,7 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
 import { VT } from "../../core/constants.js";
-import {
-  capacitorConductance,
-  capacitorHistoryCurrent,
-} from "../../solver/analog/integration.js";
+import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import {
   AbstractFetElement,
@@ -58,10 +55,6 @@ import {
   SLOT_CBD_I,
   SLOT_CBS_I,
   SLOT_VBD,
-  SLOT_CAP_GEQ_GS,
-  SLOT_CAP_IEQ_GS,
-  SLOT_CAP_GEQ_GD,
-  SLOT_CAP_IEQ_GD,
   SLOT_CAP_GEQ_GB,
   SLOT_CAP_IEQ_GB,
   SLOT_CAP_GEQ_DB,
@@ -75,11 +68,15 @@ import {
   SLOT_VBS_OLD,
   SLOT_VBD_OLD,
   SLOT_MODE,
-  SLOT_V_GS,
-  SLOT_V_GD,
-  SLOT_Q_GS,
-  SLOT_Q_GD,
   SLOT_Q_GB,
+  SLOT_MEYER_GS,
+  SLOT_MEYER_GD,
+  SLOT_MEYER_GB,
+  SLOT_CCAP_GB,
+  SLOT_Q_DB,
+  SLOT_Q_SB,
+  SLOT_CCAP_DB,
+  SLOT_CCAP_SB,
 } from "../../solver/analog/fet-base.js";
 import type { FetCapacitances } from "../../solver/analog/fet-base.js";
 import { defineModelParams, deviceParams } from "../../core/model-params.js";
@@ -1174,10 +1171,17 @@ class MosfetAnalogElement extends AbstractFetElement {
         meyerGs = meyer.capgd;
         meyerGd = meyer.capgs;
       }
-      return {
-        cgs: 2 * meyerGs + gsOverlap,
-        cgd: 2 * meyerGd + gdOverlap,
-      };
+      // Store half-caps for averaging
+      this._s0[base + SLOT_MEYER_GS] = meyerGs;
+      this._s0[base + SLOT_MEYER_GD] = meyerGd;
+
+      // Average with previous step's half-cap (mos1load.c:769-786)
+      const prevMeyerGs = this.s1[base + SLOT_MEYER_GS];
+      const prevMeyerGd = this.s1[base + SLOT_MEYER_GD];
+      const firstTran = this._pool.tranStep === 0;
+      const cgs = (firstTran ? 2 * meyerGs : meyerGs + prevMeyerGs) + gsOverlap;
+      const cgd = (firstTran ? 2 * meyerGd : meyerGd + prevMeyerGd) + gdOverlap;
+      return { cgs, cgd };
     }
 
     // No oxide cap: overlap only
@@ -1213,9 +1217,14 @@ class MosfetAnalogElement extends AbstractFetElement {
     const mode = limited.swapped ? -1 : 1;
     s0[base + SLOT_MODE] = mode;
 
-    // Fix 8: Source-bulk voltage — allow forward body bias (no clamp to >= 0)
-    // Vsb = -(Vbs). In swapped mode, the effective source is the physical drain.
-    this._vsb = -vBraw;
+    // Source-bulk voltage — allow forward body bias (no clamp to >= 0)
+    // In reverse mode, body effect uses vbd (mos1load.c:480)
+    if (limited.swapped) {
+      // Reverse mode: effective source is the physical drain node
+      this._vsb = -this.polaritySign * (vBulk - vD);
+    } else {
+      this._vsb = -vBraw;
+    }
 
     // Recompute operating point at limited voltages
     const result = computeIds(this._vgs, this._vds, this._vsb, this._p);
@@ -1369,9 +1378,6 @@ class MosfetAnalogElement extends AbstractFetElement {
   }
 
   override stamp(solver: SparseSolver): void {
-    // Stamp base gate overlap capacitances (Cgs, Cgd)
-    super.stamp(solver);
-
     // Drain ohmic resistance RD between external drain pin and internal drain node
     if (this._p.RD > 0 && this.drainNode !== this._nodeDext) {
       const gRD = 1 / this._p.RD;
@@ -1389,6 +1395,11 @@ class MosfetAnalogElement extends AbstractFetElement {
       stampG(solver, this.sourceNode, this._nodeSext, -gRS);
       stampG(solver, this.sourceNode, this.sourceNode, gRS);
     }
+  }
+
+  override stampReactiveCompanion(solver: SparseSolver): void {
+    // GS and GD gate overlap capacitances via base class
+    super.stampReactiveCompanion(solver);
 
     const base = this.stateBaseOffset;
     const s0 = this._s0;
@@ -1439,16 +1450,13 @@ class MosfetAnalogElement extends AbstractFetElement {
   setParam(key: string, value: number): void {
     if (key in this._p) {
       (this._p as unknown as Record<string, number>)[key] = value;
-      // Recompute precomputed temp/area values when relevant params change
-      if (key === "IS" || key === "JS" || key === "AD" || key === "AS" || key === "TNOM") {
-        this._recomputeTempParams();
-      }
+      this._recomputeTempParams();
     }
   }
 
-  override stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+  override stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
     // Gate overlap capacitances (Cgs, Cgd) via base class
-    super.stampCompanion(dt, method, voltages);
+    super.stampCompanion(dt, method, voltages, order, deltaOld);
 
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -1467,18 +1475,8 @@ class MosfetAnalogElement extends AbstractFetElement {
     const base = this.stateBaseOffset;
     const s0 = this._s0;
 
-    // Previous voltages from s1; first call: s1[V_DB]==0 and s1[Q_GS]==0
+    // Previous voltages from s1; first call: tranStep === 0
     const s1 = this.s1;
-    const isJunctionFirstCall = s1[base + SLOT_V_DB] === 0 && s1[base + SLOT_Q_GS] === 0;
-    const isGbFirstCall       = s1[base + SLOT_V_GB] === 0 && s1[base + SLOT_Q_GB] === 0;
-
-    const prevVdb = isJunctionFirstCall ? vdb    : s1[base + SLOT_V_DB];
-    const prevVsb = isJunctionFirstCall ? vsbCap : s1[base + SLOT_V_SB];
-    const prevVgb = isGbFirstCall       ? vgb    : s1[base + SLOT_V_GB];
-
-    const iDB = s1[base + SLOT_CAP_GEQ_DB] * vdb    + s1[base + SLOT_CAP_IEQ_DB];
-    const iSB = s1[base + SLOT_CAP_GEQ_SB] * vsbCap + s1[base + SLOT_CAP_IEQ_SB];
-    const iGB = s1[base + SLOT_CAP_GEQ_GB] * vgb    + s1[base + SLOT_CAP_IEQ_GB];
 
     s0[base + SLOT_V_DB] = vdb;
     s0[base + SLOT_V_SB] = vsbCap;
@@ -1488,26 +1486,39 @@ class MosfetAnalogElement extends AbstractFetElement {
     const mj = this._p.MJ;
     const mjsw = this._p.MJSW;
 
+    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+
     // --- Drain-bulk junction capacitance using precomputed f2/f3/f4 (mos1load.c:629-669) ---
     const czbd = this._czbd;
     const czbdsw = this._czbdsw;
     if (czbd > 0 || czbdsw > 0) {
       let capbd: number;
+      let qbd: number;
       if (vdb < this._tDepCap) {
-        // Reverse bias: depletion cap
         const argD = 1 - vdb / pb;
         const sargD = Math.exp(-mj * Math.log(argD));
         const sargswD = Math.exp(-mjsw * Math.log(argD));
         capbd = czbd * sargD + czbdsw * sargswD;
+        qbd = pb * (czbd * (1 - argD * sargD) / (1 - mj)
+          + czbdsw * (1 - argD * sargswD) / (1 - mjsw));
       } else {
-        // Forward bias: linearized
         capbd = this._f2d + vdb * this._f3d;
+        qbd = this._f4d + vdb * (this._f2d + vdb * this._f3d / 2);
       }
-      s0[base + SLOT_CAP_GEQ_DB] = capacitorConductance(capbd, dt, method);
-      s0[base + SLOT_CAP_IEQ_DB] = capacitorHistoryCurrent(capbd, dt, method, vdb, prevVdb, iDB);
+      s0[base + SLOT_Q_DB] = qbd;
+      const q1_db = s1[base + SLOT_Q_DB];
+      const q2_db = this.s2[base + SLOT_Q_DB];
+      const ccapPrev_db = s1[base + SLOT_CCAP_DB];
+      const resDB = integrateCapacitor(capbd, vdb, qbd, q1_db, q2_db, dt, h1, h2, order, method, ccapPrev_db);
+      s0[base + SLOT_CAP_GEQ_DB] = resDB.geq;
+      s0[base + SLOT_CAP_IEQ_DB] = resDB.ceq;
+      s0[base + SLOT_CCAP_DB] = resDB.ccap;
     } else {
       s0[base + SLOT_CAP_GEQ_DB] = 0;
       s0[base + SLOT_CAP_IEQ_DB] = 0;
+      s0[base + SLOT_CCAP_DB] = 0;
+      s0[base + SLOT_Q_DB] = 0;
     }
 
     // --- Source-bulk junction capacitance using precomputed f2/f3/f4 (mos1load.c:569-614) ---
@@ -1515,19 +1526,31 @@ class MosfetAnalogElement extends AbstractFetElement {
     const czbssw = this._czbssw;
     if (czbs > 0 || czbssw > 0) {
       let capbs: number;
+      let qbs: number;
       if (vsbCap < this._tDepCap) {
         const argS = 1 - vsbCap / pb;
         const sargS = Math.exp(-mj * Math.log(argS));
         const sargswS = Math.exp(-mjsw * Math.log(argS));
         capbs = czbs * sargS + czbssw * sargswS;
+        qbs = pb * (czbs * (1 - argS * sargS) / (1 - mj)
+          + czbssw * (1 - argS * sargswS) / (1 - mjsw));
       } else {
         capbs = this._f2s + vsbCap * this._f3s;
+        qbs = this._f4s + vsbCap * (this._f2s + vsbCap * this._f3s / 2);
       }
-      s0[base + SLOT_CAP_GEQ_SB] = capacitorConductance(capbs, dt, method);
-      s0[base + SLOT_CAP_IEQ_SB] = capacitorHistoryCurrent(capbs, dt, method, vsbCap, prevVsb, iSB);
+      s0[base + SLOT_Q_SB] = qbs;
+      const q1_sb = s1[base + SLOT_Q_SB];
+      const q2_sb = this.s2[base + SLOT_Q_SB];
+      const ccapPrev_sb = s1[base + SLOT_CCAP_SB];
+      const resSB = integrateCapacitor(capbs, vsbCap, qbs, q1_sb, q2_sb, dt, h1, h2, order, method, ccapPrev_sb);
+      s0[base + SLOT_CAP_GEQ_SB] = resSB.geq;
+      s0[base + SLOT_CAP_IEQ_SB] = resSB.ceq;
+      s0[base + SLOT_CCAP_SB] = resSB.ccap;
     } else {
       s0[base + SLOT_CAP_GEQ_SB] = 0;
       s0[base + SLOT_CAP_IEQ_SB] = 0;
+      s0[base + SLOT_CCAP_SB] = 0;
+      s0[base + SLOT_Q_SB] = 0;
     }
 
     // --- Gate-bulk capacitance: Meyer capgb + CGBO overlap (mos1load.c:753-775) ---
@@ -1550,19 +1573,37 @@ class MosfetAnalogElement extends AbstractFetElement {
         const meyer = devQmeyer(vgdM, vgsM, vgb, this._s0[this.stateBaseOffset + SLOT_VON] || this._tVto, this._lastVdsat, this._tPhi, oxideCap);
         meyerCapgb = meyer.capgb;
       }
-      const totalGb = 2 * meyerCapgb + gbOverlap;
-      s0[base + SLOT_CAP_GEQ_GB] = capacitorConductance(totalGb, dt, method);
-      s0[base + SLOT_CAP_IEQ_GB] = capacitorHistoryCurrent(totalGb, dt, method, vgb, prevVgb, iGB);
+      s0[base + SLOT_MEYER_GB] = meyerCapgb;
+      const prevMeyerGb = this.s1[base + SLOT_MEYER_GB];
+      const totalGb = (this._pool.tranStep === 0 ? 2 * meyerCapgb : meyerCapgb + prevMeyerGb) + gbOverlap;
+      const qgb = totalGb * vgb;
+      const q1_gb = s1[base + SLOT_Q_GB];
+      const q2_gb = this.s2[base + SLOT_Q_GB];
+      const ccapPrev_gb = s1[base + SLOT_CCAP_GB];
+      const resGB = integrateCapacitor(totalGb, vgb, qgb, q1_gb, q2_gb, dt, h1, h2, order, method, ccapPrev_gb);
+      s0[base + SLOT_CAP_GEQ_GB] = resGB.geq;
+      s0[base + SLOT_CAP_IEQ_GB] = resGB.ceq;
+      s0[base + SLOT_CCAP_GB] = resGB.ccap;
+      s0[base + SLOT_Q_GB] = qgb;
     } else {
       s0[base + SLOT_CAP_GEQ_GB] = 0;
       s0[base + SLOT_CAP_IEQ_GB] = 0;
+      s0[base + SLOT_CCAP_GB] = 0;
     }
 
+    // ngspice mos1load.c:842-853 — zero gate-bulk cap companions during MODEINITTRAN
+    if (this._pool.tranStep === 0) {
+      s0[base + SLOT_CAP_GEQ_GB] = 0;
+      s0[base + SLOT_CAP_IEQ_GB] = 0;
+      s0[base + SLOT_CCAP_GB] = 0;
+      s0[base + SLOT_CCAP_DB] = 0;
+      s0[base + SLOT_CCAP_SB] = 0;
+    }
   }
 
-  override updateChargeFlux(voltages: Float64Array): void {
+  override updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
     // GS and GD charges via base class
-    super.updateChargeFlux(voltages);
+    super.updateChargeFlux(voltages, dt, method, order, deltaOld);
 
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -1574,10 +1615,13 @@ class MosfetAnalogElement extends AbstractFetElement {
     const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
     const vBulkV = nodeB > 0 ? voltages[nodeB - 1] : 0;
 
+    const vdb = vD - vBulkV;
+    const vsbCap = vS - vBulkV;
     const vgb = vG - vBulkV;
 
     const base = this.stateBaseOffset;
     const s0 = this._s0;
+    const s1 = this.s1;
 
     const p = this._p;
     const ld = p.LD ?? 0;
@@ -1597,12 +1641,100 @@ class MosfetAnalogElement extends AbstractFetElement {
         const meyer = devQmeyer(vgdM, vgsM, vgb, this._s0[this.stateBaseOffset + SLOT_VON] || this._tVto, this._lastVdsat, this._tPhi, oxideCap);
         meyerCapgb = meyer.capgb;
       }
-      const totalGb = 2 * meyerCapgb + gbOverlap;
-      s0[base + SLOT_Q_GB] = totalGb * vgb;
+      const prevMeyerGbU = s1[base + SLOT_MEYER_GB];
+      const isFirstCallU = this._pool.tranStep === 0;
+      const totalGb = (isFirstCallU ? 2 * meyerCapgb : meyerCapgb + prevMeyerGbU) + gbOverlap;
+      const prevVgb = s1[base + SLOT_V_GB];
+      const prevQgb = s1[base + SLOT_Q_GB];
+      if (isFirstCallU) {
+        s0[base + SLOT_Q_GB] = totalGb * vgb;
+      } else {
+        s0[base + SLOT_Q_GB] = totalGb * (vgb - prevVgb) + prevQgb;
+      }
       s0[base + SLOT_V_GB] = vgb;
     } else {
       s0[base + SLOT_Q_GB] = 0;
       s0[base + SLOT_V_GB] = vgb;
+    }
+
+    // Recompute Q_DB and Q_SB from converged voltages, then recompute ccap for
+    // GB/DB/SB so the next step's trapezoidal recursion starts from the correct
+    // companion current (fixes stale CCAP slots).
+    if (dt > 0) {
+      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+
+      // Drain-bulk charge recomputation
+      const czbd = this._czbd;
+      const czbdsw = this._czbdsw;
+      if (czbd > 0 || czbdsw > 0) {
+        const pb = this._tBulkPot;
+        const mj = this._p.MJ;
+        const mjsw = this._p.MJSW;
+        let capbd: number;
+        let qbd: number;
+        if (vdb < this._tDepCap) {
+          const argD = 1 - vdb / pb;
+          const sargD = Math.exp(-mj * Math.log(argD));
+          const sargswD = Math.exp(-mjsw * Math.log(argD));
+          capbd = czbd * sargD + czbdsw * sargswD;
+          qbd = pb * (czbd * (1 - argD * sargD) / (1 - mj)
+            + czbdsw * (1 - argD * sargswD) / (1 - mjsw));
+        } else {
+          capbd = this._f2d + vdb * this._f3d;
+          qbd = this._f4d + vdb * (this._f2d + vdb * this._f3d / 2);
+        }
+        s0[base + SLOT_Q_DB] = qbd;
+        const q1_db = s1[base + SLOT_Q_DB];
+        const q2_db = this.s2[base + SLOT_Q_DB];
+        const ccapPrev_db = s1[base + SLOT_CCAP_DB];
+        const resDB = integrateCapacitor(capbd, vdb, qbd, q1_db, q2_db, dt, h1, h2, order, method, ccapPrev_db);
+        s0[base + SLOT_CCAP_DB] = resDB.ccap;
+      }
+
+      // Source-bulk charge recomputation
+      const czbs = this._czbs;
+      const czbssw = this._czbssw;
+      if (czbs > 0 || czbssw > 0) {
+        const pb = this._tBulkPot;
+        const mj = this._p.MJ;
+        const mjsw = this._p.MJSW;
+        let capbs: number;
+        let qbs: number;
+        if (vsbCap < this._tDepCap) {
+          const argS = 1 - vsbCap / pb;
+          const sargS = Math.exp(-mj * Math.log(argS));
+          const sargswS = Math.exp(-mjsw * Math.log(argS));
+          capbs = czbs * sargS + czbssw * sargswS;
+          qbs = pb * (czbs * (1 - argS * sargS) / (1 - mj)
+            + czbssw * (1 - argS * sargswS) / (1 - mjsw));
+        } else {
+          capbs = this._f2s + vsbCap * this._f3s;
+          qbs = this._f4s + vsbCap * (this._f2s + vsbCap * this._f3s / 2);
+        }
+        s0[base + SLOT_Q_SB] = qbs;
+        const q1_sb = s1[base + SLOT_Q_SB];
+        const q2_sb = this.s2[base + SLOT_Q_SB];
+        const ccapPrev_sb = s1[base + SLOT_CCAP_SB];
+        const resSB = integrateCapacitor(capbs, vsbCap, qbs, q1_sb, q2_sb, dt, h1, h2, order, method, ccapPrev_sb);
+        s0[base + SLOT_CCAP_SB] = resSB.ccap;
+      }
+
+      // Gate-bulk ccap recomputation
+      const q0_gb = s0[base + SLOT_Q_GB];
+      if (q0_gb !== 0 || s1[base + SLOT_Q_GB] !== 0) {
+        const q1_gb = s1[base + SLOT_Q_GB];
+        const q2_gb = this.s2[base + SLOT_Q_GB];
+        const ccapPrev_gb = s1[base + SLOT_CCAP_GB];
+        const meyerGbNow = s0[base + SLOT_MEYER_GB];
+        const meyerGbPrev = s1[base + SLOT_MEYER_GB];
+        const isFirstCallU2 = this._pool.tranStep === 0;
+        const totalGbRecalc = (isFirstCallU2 ? 2 * meyerGbNow : meyerGbNow + meyerGbPrev) + gbOverlap;
+        if (totalGbRecalc > 0) {
+          const resGB = integrateCapacitor(totalGbRecalc, vgb, q0_gb, q1_gb, q2_gb, dt, h1, h2, order, method, ccapPrev_gb);
+          s0[base + SLOT_CCAP_GB] = resGB.ccap;
+        }
+      }
     }
   }
 
@@ -1610,108 +1742,31 @@ class MosfetAnalogElement extends AbstractFetElement {
   // LTE estimation — ngspice CKTterr on gate charge quantities Qgs, Qgd, Qgb
   // ---------------------------------------------------------------------------
 
-  getLteEstimate(dt: number): { truncationError: number; toleranceReference: number } {
-    if (dt <= 0) return { truncationError: 0, toleranceReference: 0 };
-
-    const base = this.stateBaseOffset;
-    const s1 = this.s1;
-    const s2 = this.s2;
-
-    // Hoist computeCapacitances -- called once, not 3 times
-    const caps = computeCapacitances(this._p);
-
-    // Previous voltages from s1 (last accepted step)
-    const vgsPrev = s1[base + SLOT_V_GS];
-    const vgdPrev = s1[base + SLOT_V_GD];
-    const vgbPrev = s1[base + SLOT_V_GB];
-
-    // Reconstruct cap currents from s1/s2: i = geq * v + ieq
-    const iGS_prev  = s1[base + SLOT_CAP_GEQ_GS] * s1[base + SLOT_V_GS] + s1[base + SLOT_CAP_IEQ_GS];
-    const iGS_prev2 = s2[base + SLOT_CAP_GEQ_GS] * s2[base + SLOT_V_GS] + s2[base + SLOT_CAP_IEQ_GS];
-    const iGD_prev  = s1[base + SLOT_CAP_GEQ_GD] * s1[base + SLOT_V_GD] + s1[base + SLOT_CAP_IEQ_GD];
-    const iGD_prev2 = s2[base + SLOT_CAP_GEQ_GD] * s2[base + SLOT_V_GD] + s2[base + SLOT_CAP_IEQ_GD];
-    const iGB_prev  = s1[base + SLOT_CAP_GEQ_GB] * s1[base + SLOT_V_GB] + s1[base + SLOT_CAP_IEQ_GB];
-    const iGB_prev2 = s2[base + SLOT_CAP_GEQ_GB] * s2[base + SLOT_V_GB] + s2[base + SLOT_CAP_IEQ_GB];
-
-    let maxError = 0;
-    let maxRef = 0;
-
-    const deltaIGS = Math.abs(iGS_prev - iGS_prev2);
-    const errGS = (dt / 12) * deltaIGS;
-    if (errGS > maxError) {
-      maxError = errGS;
-      maxRef = caps.cgs * Math.abs(vgsPrev);
-    }
-
-    const deltaIGD = Math.abs(iGD_prev - iGD_prev2);
-    const errGD = (dt / 12) * deltaIGD;
-    if (errGD > maxError) {
-      maxError = errGD;
-      maxRef = caps.cgd * Math.abs(vgdPrev);
-    }
-
-    const deltaIGB = Math.abs(iGB_prev - iGB_prev2);
-    const errGB = (dt / 12) * deltaIGB;
-    if (errGB > maxError) {
-      maxError = errGB;
-      maxRef = caps.cgb * Math.abs(vgbPrev);
-    }
-
-    return { truncationError: maxError, toleranceReference: maxRef };
-  }
-
-  getLteTimestep(
+  override getLteTimestep(
     dt: number,
     deltaOld: readonly number[],
     order: number,
     method: IntegrationMethod,
     lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
   ): number {
+    // GS + GD from base class
+    let minDt = super.getLteTimestep(dt, deltaOld, order, method, lteParams);
+
     const base = this.stateBaseOffset;
     const s0 = this._s0;
     const s1 = this.s1;
     const s2 = this.s2;
     const s3 = this.s3;
 
-    // Gate-source
-    let minDt: number;
-    {
-      const _q0 = s0[base + SLOT_Q_GS];
-      const _q1 = s1[base + SLOT_Q_GS];
-      const _q2 = s2[base + SLOT_Q_GS];
-      const _q3 = s3[base + SLOT_Q_GS];
-      const _h0 = dt;
-      const _h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
-      const _ccap0 = _h0 > 0 ? (_q0 - _q1) / _h0 : 0;
-      const _ccap1 = _h1 > 0 ? (_q1 - _q2) / _h1 : 0;
-      minDt = cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, _ccap0, _ccap1, lteParams);
-    }
-
-    // Gate-drain
-    {
-      const _q0 = s0[base + SLOT_Q_GD];
-      const _q1 = s1[base + SLOT_Q_GD];
-      const _q2 = s2[base + SLOT_Q_GD];
-      const _q3 = s3[base + SLOT_Q_GD];
-      const _h0 = dt;
-      const _h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
-      const _ccap0 = _h0 > 0 ? (_q0 - _q1) / _h0 : 0;
-      const _ccap1 = _h1 > 0 ? (_q1 - _q2) / _h1 : 0;
-      const dtGD = cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, _ccap0, _ccap1, lteParams);
-      if (dtGD < minDt) minDt = dtGD;
-    }
-
     // Gate-bulk
     {
-      const _q0 = s0[base + SLOT_Q_GB];
-      const _q1 = s1[base + SLOT_Q_GB];
-      const _q2 = s2[base + SLOT_Q_GB];
-      const _q3 = s3[base + SLOT_Q_GB];
-      const _h0 = dt;
-      const _h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
-      const _ccap0 = _h0 > 0 ? (_q0 - _q1) / _h0 : 0;
-      const _ccap1 = _h1 > 0 ? (_q1 - _q2) / _h1 : 0;
-      const dtGB = cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, _ccap0, _ccap1, lteParams);
+      const ccap0 = s0[base + SLOT_CCAP_GB];
+      const ccap1 = s1[base + SLOT_CCAP_GB];
+      const q0 = s0[base + SLOT_Q_GB];
+      const q1 = s1[base + SLOT_Q_GB];
+      const q2 = s2[base + SLOT_Q_GB];
+      const q3 = s3[base + SLOT_Q_GB];
+      const dtGB = cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
       if (dtGB < minDt) minDt = dtGB;
     }
 

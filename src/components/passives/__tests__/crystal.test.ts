@@ -444,8 +444,8 @@ describe("Crystal", () => {
       // Provide a minimal voltage array (matrixSize=4: nodes 1-4 map to indices 0-3)
       // node 1=A, 0=B(ground), 2=n1, 3=n2, branch 3=L_s current (index 3)
       const voltages = new Float64Array(5); // indices 0-4
-      (element as unknown as { stampCompanion: (dt: number, method: string, v: Float64Array) => void })
-        .stampCompanion(1e-6, "bdf1", voltages);
+      (element as unknown as { stampCompanion: (dt: number, method: string, v: Float64Array, order: number, deltaOld: readonly number[]) => void })
+        .stampCompanion(1e-6, "bdf1", voltages, 1, [1e-6]);
 
       // After stampCompanion, pool slot 0 (GEQ_L) must be non-zero
       const pool = (element as unknown as { s0: Float64Array }).s0;

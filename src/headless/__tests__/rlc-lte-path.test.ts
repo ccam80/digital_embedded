@@ -238,30 +238,40 @@ describe('LTE/composite-tolerance path — MCP (facade) surface', () => {
   // Expected to fail if the configure path is broken (both runs identical).
   // =========================================================================
   it('reltol configurability: tight reltol produces different result and more steps', async () => {
-    const R = 1000;
-    const C = 1e-6;
-    const f = 1000; // 1 kHz
+    // Half-wave rectifier: AC source → R → Diode → RC load to ground.
+    // The diode's exponential I-V nonlinearity is reltol-sensitive: loose
+    // tolerance allows the NR linearization to accept a coarser solution,
+    // producing a measurably different output voltage than tight tolerance.
+    const R = 100;      // series resistor (Ω)
+    const Rload = 1000; // load resistor (Ω)
+    const C = 10e-6;    // filter capacitor (F)
+    const f = 500;      // 500 Hz — a few full cycles in the sim window
 
     function buildCircuit(facade: DefaultSimulatorFacade) {
       return facade.build({
         components: [
-          { id: 'vs',  type: 'AcVoltageSource', props: {
-            amplitude: 1, frequency: f, phase: 0, dcOffset: 0, waveform: 'sine', label: 'Vs',
+          { id: 'vs',    type: 'AcVoltageSource', props: {
+            amplitude: 5, frequency: f, phase: 0, dcOffset: 0, waveform: 'sine', label: 'Vs',
           }},
-          { id: 'r1',  type: 'Resistor',  props: { resistance: R } },
-          { id: 'c1',  type: 'Capacitor', props: { capacitance: C, label: 'Vc' } },
-          { id: 'gnd', type: 'Ground' },
+          { id: 'r1',    type: 'Resistor',  props: { resistance: R } },
+          { id: 'd1',    type: 'Diode',     props: { label: 'D1' } },
+          { id: 'rload', type: 'Resistor',  props: { resistance: Rload, label: 'Vc' } },
+          { id: 'c1',    type: 'Capacitor', props: { capacitance: C } },
+          { id: 'gnd',   type: 'Ground' },
         ],
         connections: [
-          ['vs:pos', 'r1:A'],
-          ['r1:B',   'c1:pos'],
-          ['c1:neg', 'gnd:out'],
-          ['vs:neg', 'gnd:out'],
+          ['vs:pos',    'r1:A'],
+          ['r1:B',      'd1:A'],
+          ['d1:K',      'rload:A'],
+          ['d1:K',      'c1:pos'],
+          ['rload:B',   'gnd:out'],
+          ['c1:neg',    'gnd:out'],
+          ['vs:neg',    'gnd:out'],
         ],
       });
     }
 
-    const target = 5e-4; // 0.5 ms
+    const target = 4e-3; // 4 ms — two full cycles at 500 Hz
 
     // Loose reltol compile
     const facadeLoose = new DefaultSimulatorFacade(registry);
@@ -269,9 +279,10 @@ describe('LTE/composite-tolerance path — MCP (facade) surface', () => {
     // Access the analog engine and configure reltol = 1e-2 (loose)
     const coordLoose = facadeLoose.getActiveCoordinator()!;
     const analogLoose = coordLoose.getAnalogEngine() as MNAEngine;
-    analogLoose.configure({ reltol: 1e-2 });
+    // Large maxTimeStep so LTE (not the cap) governs step size selection.
+    analogLoose.configure({ reltol: 1e-2, maxTimeStep: 1e-3 });
     await facadeLoose.stepToTime(engineLoose, target);
-    const vcLoose = facadeLoose.readSignal(engineLoose, 'Vc:pos');
+    const vcLoose = facadeLoose.readSignal(engineLoose, 'Vc:A');
     const stepCountLoose = (analogLoose as unknown as { _stepCount: number })._stepCount;
 
     // Tight reltol compile
@@ -279,9 +290,9 @@ describe('LTE/composite-tolerance path — MCP (facade) surface', () => {
     const engineTight = facadeTight.compile(buildCircuit(facadeTight));
     const coordTight = facadeTight.getActiveCoordinator()!;
     const analogTight = coordTight.getAnalogEngine() as MNAEngine;
-    analogTight.configure({ reltol: 1e-6 });
+    analogTight.configure({ reltol: 1e-6, maxTimeStep: 1e-3 });
     await facadeTight.stepToTime(engineTight, target);
-    const vcTight = facadeTight.readSignal(engineTight, 'Vc:pos');
+    const vcTight = facadeTight.readSignal(engineTight, 'Vc:A');
     const stepCountTight = (analogTight as unknown as { _stepCount: number })._stepCount;
 
     // Two different reltol values must produce numerically different results

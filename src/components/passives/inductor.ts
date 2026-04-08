@@ -23,10 +23,7 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import {
-  inductorConductance,
-  inductorHistoryCurrent,
-} from "../../solver/analog/integration.js";
+import { integrateInductor } from "../../solver/analog/integration.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -149,22 +146,24 @@ export class InductorElement extends AbstractCircuitElement {
 // AnalogInductorElement — MNA implementation
 // ---------------------------------------------------------------------------
 
-// Slot layout — 4 slots total. Previous values are read from s1/s2/s3
+// Slot layout — 5 slots total. Previous values are read from s1/s2/s3
 // at the same offsets (pointer-rotation history).
 const INDUCTOR_SCHEMA: StateSchema = defineStateSchema("AnalogInductorElement", [
-  { name: "GEQ", doc: "Companion conductance",          init: { kind: "zero" } },
-  { name: "IEQ", doc: "Companion history current",      init: { kind: "zero" } },
-  { name: "I",   doc: "Branch current this step",       init: { kind: "zero" } },
-  { name: "PHI", doc: "Flux phi=L*i this step",         init: { kind: "zero" } },
+  { name: "GEQ",  doc: "Companion conductance",          init: { kind: "zero" } },
+  { name: "IEQ",  doc: "Companion history current",      init: { kind: "zero" } },
+  { name: "I",    doc: "Branch current this step",       init: { kind: "zero" } },
+  { name: "PHI",  doc: "Flux phi=L*i this step",         init: { kind: "zero" } },
+  { name: "CCAP", doc: "Companion current (NIintegrate)", init: { kind: "zero" } },
 ]);
 
 // Slot indices within the state pool
-const SLOT_GEQ = 0;
-const SLOT_IEQ = 1;
-const SLOT_I   = 2;
-const SLOT_PHI = 3;
+const SLOT_GEQ  = 0;
+const SLOT_IEQ  = 1;
+const SLOT_I    = 2;
+const SLOT_PHI  = 3;
+const SLOT_CCAP = 4;
 
-class AnalogInductorElement implements ReactiveAnalogElementCore {
+export class AnalogInductorElement implements ReactiveAnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number;
   readonly isNonlinear = false;
@@ -205,19 +204,25 @@ class AnalogInductorElement implements ReactiveAnalogElementCore {
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const b = this.branchIndex;
-    const geq = this.s0[this.base + SLOT_GEQ];
-    const ieq = this.s0[this.base + SLOT_IEQ];
 
     // B sub-matrix: branch current incidence in node KCL equations.
     // I_branch flows from n0 through the inductor to n1.
     if (n0 !== 0) solver.stamp(n0 - 1, b, 1);
     if (n1 !== 0) solver.stamp(n1 - 1, b, -1);
 
-    // C sub-matrix: branch equation  V_n0 - V_n1 - geq * I_branch = ieq
-    // Before first stampCompanion, geq=0 and ieq=0 → V_n0 - V_n1 = 0
+    // C sub-matrix: voltage incidence (topology-constant ±1 entries).
+    // Before first stampReactiveCompanion, geq=0 and ieq=0 → V_n0 - V_n1 = 0
     // (short circuit — correct DC operating point for an inductor).
     if (n0 !== 0) solver.stamp(b, n0 - 1, 1);
     if (n1 !== 0) solver.stamp(b, n1 - 1, -1);
+  }
+
+  stampReactiveCompanion(solver: SparseSolver): void {
+    const b = this.branchIndex;
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const ieq = this.s0[this.base + SLOT_IEQ];
+
+    // Branch diagonal: -geq (companion conductance term)
     solver.stamp(b, b, -geq);
 
     // RHS: branch equation source
@@ -229,50 +234,39 @@ class AnalogInductorElement implements ReactiveAnalogElementCore {
     return [I, -I];
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
     const iNow = voltages[this.branchIndex];
-    const v0 = this.pinNodeIds[0] > 0 ? voltages[this.pinNodeIds[0] - 1] : 0;
-    const v1 = this.pinNodeIds[1] > 0 ? voltages[this.pinNodeIds[1] - 1] : 0;
-    const vNow = v0 - v1;
 
-    // Read previous step's values from s1 (rotated history)
-    const iPrev = this.s1[this.base + SLOT_I];
-
-    // Write new companion model into s0
-    this.s0[this.base + SLOT_GEQ] = inductorConductance(this.L, dt, method);
-    this.s0[this.base + SLOT_IEQ] = inductorHistoryCurrent(this.L, dt, method, iNow, iPrev, vNow);
-    this.s0[this.base + SLOT_I]   = iNow;
+    const phi0 = this.L * iNow;
+    const phi1 = this.s1[this.base + SLOT_PHI];
+    const phi2 = this.s2[this.base + SLOT_PHI];
+    const ccapPrev = this.s1[this.base + SLOT_CCAP];
+    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+    const { geq, ceq, ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrev);
+    this.s0[this.base + SLOT_GEQ]  = geq;
+    this.s0[this.base + SLOT_IEQ]  = ceq;
+    this.s0[this.base + SLOT_I]    = iNow;
+    this.s0[this.base + SLOT_CCAP] = ccap;
+    // SLOT_PHI is written by updateChargeFlux after the Newton-Raphson solve converges.
   }
 
-  updateChargeFlux(voltages: Float64Array): void {
+  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
     const iNow = voltages[this.branchIndex];
     this.s0[this.base + SLOT_PHI] = this.L * iNow;
-  }
 
-  getLteEstimate(dt: number): { truncationError: number; toleranceReference: number } {
-    // LTE estimate for trapezoidal integration of an inductor.
-    //
-    // Parallels the capacitor derivation. The first-difference of stored branch
-    // currents across the previous two step boundaries, scaled by dt/12, produces
-    // an error that scales linearly with dt.
-    //
-    // `toleranceReference` is the inductor flux φ = L · i_prev, the natural
-    // stored quantity used by ngspice's relative LTE tolerance formula. The
-    // engine composes the rejection threshold as
-    //   local_tol = trtol · (reltol · |φ| + chargeTol)
-    // keeping the per-step tolerance proportional to the flux the inductor
-    // is actually storing.
-    //
-    // Retrospective by one step — zero on the first two calls, valid thereafter.
-    if (dt <= 0) return { truncationError: 0, toleranceReference: 0 };
-    const iPrev     = this.s1[this.base + SLOT_I];
-    const iPrevPrev = this.s2[this.base + SLOT_I];
-    const deltaI = Math.abs(iPrev - iPrevPrev);
-    const fluxRef = this.L * Math.max(Math.abs(iPrev), Math.abs(iPrevPrev));
-    return {
-      truncationError: (dt / 12) * deltaI,
-      toleranceReference: fluxRef,
-    };
+    // Recompute ccap from converged flux so the next step's trapezoidal
+    // recursion starts from the correct companion current (fixes stale SLOT_CCAP).
+    if (dt > 0) {
+      const phi0 = this.s0[this.base + SLOT_PHI];
+      const phi1 = this.s1[this.base + SLOT_PHI];
+      const phi2 = this.s2[this.base + SLOT_PHI];
+      const ccapPrev = this.s1[this.base + SLOT_CCAP];
+      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+      const { ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrev);
+      this.s0[this.base + SLOT_CCAP] = ccap;
+    }
   }
 
   getLteTimestep(
@@ -286,10 +280,8 @@ class AnalogInductorElement implements ReactiveAnalogElementCore {
     const phi1 = this.s1[this.base + SLOT_PHI];
     const phi2 = this.s2[this.base + SLOT_PHI];
     const phi3 = this.s3[this.base + SLOT_PHI];
-    const h0 = dt;
-    const h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
-    const ccap0 = h0 > 0 ? (phi0 - phi1) / h0 : 0;
-    const ccap1 = h1 > 0 ? (phi1 - phi2) / h1 : 0;
+    const ccap0 = this.s0[this.base + SLOT_CCAP];
+    const ccap1 = this.s1[this.base + SLOT_CCAP];
     return cktTerr(dt, deltaOld, order, method, phi0, phi1, phi2, phi3, ccap0, ccap1, lteParams);
   }
 }

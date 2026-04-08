@@ -58,9 +58,9 @@ const GMIN = 1e-12;
 // JFET state-pool slots
 // ---------------------------------------------------------------------------
 
-export const SLOT_VGS_JUNCTION = 35;
-export const SLOT_GD_JUNCTION  = 36;
-export const SLOT_ID_JUNCTION  = 37;
+export const SLOT_VGS_JUNCTION = 45;
+export const SLOT_GD_JUNCTION  = 46;
+export const SLOT_ID_JUNCTION  = 47;
 
 const JFET_SCHEMA = defineStateSchema("NJfetAnalogElement", [
   ...FET_BASE_SCHEMA.slots,

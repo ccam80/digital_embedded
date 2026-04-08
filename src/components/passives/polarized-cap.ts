@@ -45,10 +45,7 @@ import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import type { Diagnostic } from "../../compile/types.js";
-import {
-  capacitorConductance,
-  capacitorHistoryCurrent,
-} from "../../solver/analog/integration.js";
+import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
 import {
   defineStateSchema,
@@ -68,19 +65,21 @@ const MIN_RESISTANCE = 1e-9;
 // State schema
 // ---------------------------------------------------------------------------
 
-// Slot layout — 4 slots total. Previous values are read from s1/s2/s3
+// Slot layout — 5 slots total. Previous values are read from s1/s2/s3
 // at the same offsets (pointer-rotation history).
 const POLARIZED_CAP_SCHEMA: StateSchema = defineStateSchema("AnalogPolarizedCapElement", [
-  { name: "GEQ", doc: "Companion conductance",       init: { kind: "zero" } },
-  { name: "IEQ", doc: "Companion history current",   init: { kind: "zero" } },
-  { name: "V",   doc: "Terminal voltage this step",  init: { kind: "zero" } },
-  { name: "Q",   doc: "Charge Q=C*V this step",      init: { kind: "zero" } },
+  { name: "GEQ",  doc: "Companion conductance",       init: { kind: "zero" } },
+  { name: "IEQ",  doc: "Companion history current",   init: { kind: "zero" } },
+  { name: "V",    doc: "Terminal voltage this step",  init: { kind: "zero" } },
+  { name: "Q",    doc: "Charge Q=C*V this step",      init: { kind: "zero" } },
+  { name: "CCAP", doc: "Companion current (NIintegrate)", init: { kind: "zero" } },
 ]);
 
-const SLOT_GEQ = 0;
-const SLOT_IEQ = 1;
-const SLOT_V   = 2;
-const SLOT_Q   = 3;
+const SLOT_GEQ  = 0;
+const SLOT_IEQ  = 1;
+const SLOT_V    = 2;
+const SLOT_Q    = 3;
+const SLOT_CCAP = 4;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -240,7 +239,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   setParam(_key: string, _value: number): void {}
 
   readonly stateSchema = POLARIZED_CAP_SCHEMA;
-  readonly stateSize = POLARIZED_CAP_SCHEMA.size; // 4 slots
+  readonly stateSize = POLARIZED_CAP_SCHEMA.size; // 5 slots
   stateBaseOffset = -1;
 
   private C: number;
@@ -294,20 +293,25 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
     const nCap = this.pinNodeIds[2];
-    const geq = this.s0[this.base + SLOT_GEQ];
-    const ieq = this.s0[this.base + SLOT_IEQ];
 
-    // ESR: conductance between n_pos and n_cap
+    // ESR: conductance between n_pos and n_cap (topology-constant)
     stampG(solver, nPos, nPos, this.G_esr);
     stampG(solver, nPos, nCap, -this.G_esr);
     stampG(solver, nCap, nPos, -this.G_esr);
     stampG(solver, nCap, nCap, this.G_esr);
 
-    // Leakage: conductance between n_cap and n_neg
+    // Leakage: conductance between n_cap and n_neg (topology-constant)
     stampG(solver, nCap, nCap, this.G_leak);
     stampG(solver, nCap, nNeg, -this.G_leak);
     stampG(solver, nNeg, nCap, -this.G_leak);
     stampG(solver, nNeg, nNeg, this.G_leak);
+  }
+
+  stampReactiveCompanion(solver: SparseSolver): void {
+    const nNeg = this.pinNodeIds[1];
+    const nCap = this.pinNodeIds[2];
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const ieq = this.s0[this.base + SLOT_IEQ];
 
     // Capacitor companion model: conductance + history current between n_cap and n_neg
     // RHS sign: -ieq at nCap, +ieq at nNeg (standard Norton convention: ieq = -geq*v(n))
@@ -374,7 +378,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     this.reverseMax = reverseMax;
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
     const nCap = this.pinNodeIds[2];
     const nNeg = this.pinNodeIds[1];
 
@@ -382,24 +386,40 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
     const vNow = vCapNode - vNeg;
 
-    // Read previous step's companion model from s1 (rotated history)
-    const geqPrev = this.s1[this.base + SLOT_GEQ];
-    const ieqPrev = this.s1[this.base + SLOT_IEQ];
-    const vPrev   = this.s1[this.base + SLOT_V];
-    const iPrev   = geqPrev * vNow + ieqPrev;
-
-    // Write new companion model into s0
-    this.s0[this.base + SLOT_GEQ] = capacitorConductance(this.C, dt, method);
-    this.s0[this.base + SLOT_IEQ] = capacitorHistoryCurrent(this.C, dt, method, vNow, vPrev, iPrev);
-    this.s0[this.base + SLOT_V]   = vNow;
+    const q0 = this.C * vNow;
+    const q1 = this.s1[this.base + SLOT_Q];
+    const q2 = this.s2[this.base + SLOT_Q];
+    const ccapPrev = this.s1[this.base + SLOT_CCAP];
+    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+    const { geq, ceq, ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+    this.s0[this.base + SLOT_GEQ]  = geq;
+    this.s0[this.base + SLOT_IEQ]  = ceq;
+    this.s0[this.base + SLOT_V]    = vNow;
+    this.s0[this.base + SLOT_CCAP] = ccap;
+    // SLOT_Q is written by updateChargeFlux after the Newton-Raphson solve converges.
   }
 
-  updateChargeFlux(voltages: Float64Array): void {
+  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
     const nCap = this.pinNodeIds[2];
     const nNeg = this.pinNodeIds[1];
     const vCapNode = nCap > 0 ? voltages[nCap - 1] : 0;
     const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
-    this.s0[this.base + SLOT_Q] = this.C * (vCapNode - vNeg);
+    const vNow = vCapNode - vNeg;
+    this.s0[this.base + SLOT_Q] = this.C * vNow;
+
+    // Recompute ccap from converged charge so the next step's trapezoidal
+    // recursion starts from the correct companion current (fixes stale SLOT_CCAP).
+    if (dt > 0) {
+      const q0 = this.s0[this.base + SLOT_Q];
+      const q1 = this.s1[this.base + SLOT_Q];
+      const q2 = this.s2[this.base + SLOT_Q];
+      const ccapPrev = this.s1[this.base + SLOT_CCAP];
+      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+      const { ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      this.s0[this.base + SLOT_CCAP] = ccap;
+    }
   }
 
   getLteTimestep(
@@ -413,10 +433,8 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     const q1 = this.s1[this.base + SLOT_Q];
     const q2 = this.s2[this.base + SLOT_Q];
     const q3 = this.s3[this.base + SLOT_Q];
-    const h0 = dt;
-    const h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
-    const ccap0 = h0 > 0 ? (q0 - q1) / h0 : 0;
-    const ccap1 = h1 > 0 ? (q1 - q2) / h1 : 0;
+    const ccap0 = this.s0[this.base + SLOT_CCAP];
+    const ccap1 = this.s1[this.base + SLOT_CCAP];
     return cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
   }
 }

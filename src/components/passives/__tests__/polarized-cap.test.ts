@@ -173,7 +173,7 @@ describe("PolarizedCap", () => {
       // Tiny timestep: geq = C/dt = 100e-6 / 1e-9 = 1e5 >> G_esr
       const dt = 1e-9;
       const initVoltages = new Float64Array([0, 0]);
-      cap.stampCompanion(dt, "bdf1", initVoltages);
+      cap.stampCompanion(dt, "bdf1", initVoltages, 1, [dt]);
 
       const solver = new SparseSolver();
       const diagnostics = new DiagnosticCollector();
@@ -225,7 +225,7 @@ describe("PolarizedCap", () => {
       const vs = makeDcVoltageSource(1, 0, 3, V_step);
       const rSeries = makeResistorElement(1, 2, R);
       const cap = new AnalogPolarizedCapElement([2, 0, 3], C, esr, rLeak, 1.0);
-      withState(cap);
+      const { pool: capPool } = withState(cap);
 
       const matrixSize = 4;
       const solver = new SparseSolver();
@@ -236,12 +236,13 @@ describe("PolarizedCap", () => {
       const steps = 500;
 
       for (let step = 0; step < steps; step++) {
-        cap.stampCompanion(dt, "bdf1", voltages);
+        cap.stampCompanion(dt, "bdf1", voltages, 1, [dt]);
 
         solver.beginAssembly(matrixSize);
         vs.stamp(solver);
         rSeries.stamp(solver);
         cap.stamp(solver);
+        cap.stampReactiveCompanion!(solver);
         solver.finalize();
 
         const factorResult = solver.factor();
@@ -249,6 +250,9 @@ describe("PolarizedCap", () => {
           throw new Error(`Singular matrix at step ${step}`);
         }
         solver.solve(voltages);
+        cap.updateChargeFlux!(voltages, dt, "bdf1", 1, [dt]);
+        capPool.acceptTimestep();
+        capPool.refreshElementRefs([cap as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       }
 
       // After RC seconds, V(cap_pos = node2, solver index 1) ≈ 5*(1-exp(-1)) ≈ 3.161V
@@ -367,9 +371,10 @@ describe("PolarizedCap", () => {
       const el = new AnalogPolarizedCapElement([1, 0, 2], 100e-6, 0.1, 25e6, 1.0);
       const { pool } = withState(el);
       const voltages = new Float64Array([5, 0]); // node1=5V, node2=0V
-      el.stampCompanion(1e-6, "bdf1", voltages);
+      el.stampCompanion(1e-6, "bdf1", voltages, 1, [1e-6]);
       expect(pool.state0[0]).toBeGreaterThan(0); // GEQ = C/dt > 0
-      expect(pool.state0[1]).not.toBe(0);        // IEQ non-zero after step
+      // IEQ = ceq = 0 on first step (zero charge history): ccap = C*vNow/dt, geq*vNow = C*vNow/dt → ceq=0
+      expect(pool.state0[1]).toBeCloseTo(0, 5);
     });
 
     it("stampCompanion writes V_PREV to pool slot 2", () => {
@@ -377,7 +382,7 @@ describe("PolarizedCap", () => {
       const { pool } = withState(el);
       // nCap=2 (1-based), nNeg=0 → vCapNode = voltages[1], vNeg = 0
       const voltages = new Float64Array([0, 3]); // node1=0, node2=3V
-      el.stampCompanion(1e-6, "bdf1", voltages);
+      el.stampCompanion(1e-6, "bdf1", voltages, 1, [1e-6]);
       expect(pool.state0[2]).toBeCloseTo(3, 6); // V_PREV = vNow = 3V
     });
 

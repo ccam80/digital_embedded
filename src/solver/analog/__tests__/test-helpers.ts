@@ -30,11 +30,11 @@ import { isPoolBacked } from "../element.js";
 import { pnjlim } from "../newton-raphson.js";
 import { StatePool } from "../state-pool.js";
 import type { StatePoolRef } from "../../../core/analog-types.js";
+import { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
+import { AnalogInductorElement } from "../../../components/passives/inductor.js";
 import {
-  capacitorConductance,
-  capacitorHistoryCurrent,
-  inductorConductance,
-  inductorHistoryCurrent,
+  integrateCapacitor,
+  integrateInductor,
 } from "../integration.js";
 import {
   defineStateSchema,
@@ -421,9 +421,13 @@ export function makeCapacitor(
 ): AnalogElement {
   let geq = 0;
   let ieq = 0;
-  // History for BDF-2: track previous terminal voltage v(n-1).
-  // Initialized to NaN so we can detect the first call.
-  let vPrev = NaN;
+  // History for BDF-2: track previous terminal voltages v(n-1) and v(n-2).
+  let vPrev = 0;
+  let vPrev2 = 0;
+  let ccapPrevCap = 0;
+  // Saved ccap from before stampCompanion ran, so updateChargeFlux can use the
+  // correct ccap_{n-1} seed (stampCompanion overwrites ccapPrevCap with ccap_n).
+  let ccapBeforeStamp = 0;
   let firstCall = true;
 
   return {
@@ -447,26 +451,69 @@ export function makeCapacitor(
       RHS(solver, nodeB, ieq);
     },
 
-    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order = 1, deltaOld: readonly number[] = []): void {
+      // Save ccap_{n-1} before overwriting it, so updateChargeFlux can use the
+      // correct seed for the trapezoidal recursion at the converged voltage.
+      ccapBeforeStamp = ccapPrevCap;
+
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
       const vNow = vA - vB;
 
-      // Recover capacitor current at the previous accepted step from the
-      // companion model: i_cap(n) = geq_prev * v(n) + ieq_prev
-      // On the first call geq=0 and ieq=0, so iNow=0 (correct: DC steady state).
-      const iNow = geq * vNow + ieq;
+      // q0 = charge at the current accepted voltage (the operating point for the
+      // new step). q1 = charge at the PREVIOUS accepted voltage (from vPrev).
+      // On the first call, vPrev has not been set yet, so q1 = q0 (DC IC).
+      //
+      // IMPORTANT: vNow here is the ACCEPTED voltage from the previous solve.
+      // vPrev is the ACCEPTED voltage from two solves ago.
+      // The companion model for the upcoming step uses:
+      //   ceq = ccap - geq * vNow  where ccap = (q0 - q1) / dt for BDF-1
+      //       = (C*vNow - C*vPrev)/dt - C/dt * vNow = -C*vPrev/dt
+      // So we need q1 = C * (PREVIOUS ACCEPTED VOLTAGE).
+      // vPrev is saved as the vNow from the PREVIOUS stampCompanion call,
+      // which IS the previous accepted voltage. ✓
+      // vNow is the most recently accepted voltage (post-solve from the previous step).
+      // For BDF-1: companion is geq = C/dt, ceq = -C*vNow/dt.
+      // We pass q0 = q1 = C*vNow so that ccap = 0 and ceq = 0 - geq*vNow = -C*vNow/dt.
+      // For BDF-2 (order=2): q1 = C*vPrev (voltage from 2 steps back), q2 = C*vPrev2.
+      const q0 = capacitance * vNow;
+      const q1 = order <= 1 ? q0 : capacitance * (firstCall ? vNow : vPrev);
+      const q2 = order <= 1 ? q0 : capacitance * (firstCall ? vNow : vPrev2);
+      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+      const result = integrateCapacitor(capacitance, vNow, q0, q1, q2, dt, h1, h2, order, method, firstCall ? 0 : ccapPrevCap);
+      geq = result.geq;
+      ieq = result.ceq;
+      ccapPrevCap = result.ccap;
 
-      // For BDF-2: on the first call there is no valid v(n-1), so we use v(n)
-      // as a warm-start approximation (equivalent to assuming the circuit was at
-      // the same voltage one step earlier — the DC initial condition).
-      const vPrevForFormula = firstCall ? vNow : vPrev;
+      // Save history for BDF-2.
+      vPrev2 = firstCall ? vNow : vPrev;
       vPrev = vNow;
       firstCall = false;
-
-      geq = capacitorConductance(capacitance, dt, method);
-      ieq = capacitorHistoryCurrent(capacitance, dt, method, vNow, vPrevForFormula, iNow);
     },
+
+    updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
+      // Write ONLY the _NOW slot — never shift history (per interface contract).
+      // Recompute ccap from converged voltage so the next step's trapezoidal
+      // recursion starts from the correct companion current.
+      // Use ccapBeforeStamp (ccap_{n-1}) as the seed — ccapPrevCap was already
+      // overwritten by stampCompanion with the initial-guess ccap_n.
+      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
+      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vNow = vA - vB;
+      const q0 = capacitance * vNow;
+      const q1 = capacitance * vPrev;
+      const q2 = capacitance * vPrev2;
+      if (dt > 0) {
+        const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+        const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+        const result = integrateCapacitor(capacitance, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapBeforeStamp);
+        ccapPrevCap = result.ccap;
+      }
+      // Do NOT shift vPrev/vPrev2 — stampCompanion owns history advancement.
+    },
+
+    getLteTimestep(): number { return Infinity; },
 
     getPinCurrents(voltages: Float64Array): number[] {
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
@@ -517,6 +564,11 @@ export function makeInductor(
   // DC operating point for an inductor.
   let geq = 0;
   let ieq = 0;
+  // History for BDF-2: track previous flux values phi(n-1) and phi(n-2).
+  let phi1 = 0;
+  let phi2 = 0;
+  let ccapPrevInd = 0;
+  let indFirstCall = true;
   // true after stampCompanion has been called at least once
   let companionActive = false;
 
@@ -555,25 +607,73 @@ export function makeInductor(
       }
     },
 
-    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-      // Read previous branch current I_L and terminal voltage V_AB from solution.
+    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order = 1, deltaOld: readonly number[] = []): void {
+      // Read previous branch current I_L from solution.
       const iNow = voltages[branchIdx];
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
-      const vNow = vA - vB;
+      const phi0 = inductance * iNow;
+      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+      // For BDF-1 (order=1): phi1 = phi0 so ccap=0, ceq = -L*iNow/dt.
+      // For BDF-2: phi1 = L*i_prev (from previous step), phi2 = L*i_2prev.
+      const phi1Eff = order <= 1 ? phi0 : (indFirstCall ? phi0 : phi1);
+      const phi2Eff = order <= 1 ? phi0 : (indFirstCall ? phi0 : phi2);
+      const result = integrateInductor(inductance, iNow, phi0, phi1Eff, phi2Eff, dt, h1, h2, order, method, indFirstCall ? 0 : ccapPrevInd);
+      geq = result.geq;
+      ieq = result.ceq;
+      ccapPrevInd = result.ccap;
 
-      geq = inductorConductance(inductance, dt, method);
-      // iPrev not tracked in this simple test element (BDF-2 needs it).
-      ieq = inductorHistoryCurrent(inductance, dt, method, iNow, 0, vNow);
+      // Save history for BDF-2.
+      phi2 = indFirstCall ? phi0 : phi1;
+      phi1 = phi0;
+      indFirstCall = false;
 
       companionActive = true;
     },
+
+    updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
+      // Write ONLY the _NOW slot — never shift history (per interface contract).
+      // Recompute ccap from converged current so the next step's trapezoidal
+      // recursion starts from the correct companion current.
+      const iNow = voltages[branchIdx];
+      const phi0 = inductance * iNow;
+      if (dt > 0) {
+        const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+        const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+        const result = integrateInductor(inductance, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrevInd);
+        ccapPrevInd = result.ccap;
+      }
+      // Do NOT shift phi1/phi2 — stampCompanion owns history advancement.
+    },
+
+    getLteTimestep(): number { return Infinity; },
 
     getPinCurrents(voltages: Float64Array): number[] {
       const I = voltages[branchIdx];
       return [I, -I];
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// createTestCapacitor / createTestInductor — real element wrappers
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a real AnalogCapacitorElement for use in tests.
+ * Parameter order differs from makeCapacitor: capacitance first, then nodes.
+ */
+export function createTestCapacitor(capacitance: number, nodeA: number, nodeB: number): AnalogElement {
+  const el = new AnalogCapacitorElement(capacitance);
+  return withNodeIds(el, [nodeA, nodeB]);
+}
+
+/**
+ * Create a real AnalogInductorElement for use in tests.
+ * Parameter order differs from makeInductor: inductance first, then nodes, then branch.
+ */
+export function createTestInductor(inductance: number, nodeA: number, nodeB: number, branchIdx: number): AnalogElement {
+  const el = new AnalogInductorElement(branchIdx, inductance);
+  return withNodeIds(el, [nodeA, nodeB]);
 }
 
 // ---------------------------------------------------------------------------

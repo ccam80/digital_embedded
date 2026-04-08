@@ -75,7 +75,8 @@ function getCapacitanceAtBias(element: AnalogElementCore, vd: number, dt = 1e-6)
   }
 
   // Call stampCompanion to compute capacitance at this bias
-  element.stampCompanion!(dt, "trapezoidal", voltages);
+  // order=2 so trapezoidal uses ag0=2/dt; recovery below is geq*dt/2 = C
+  element.stampCompanion!(dt, "trapezoidal", voltages, 2, [dt, dt]);
 
   // Read the companion conductance from stamp() output
   // capGeq is stamped as (nodeAnode-1, nodeAnode-1) = (0, 0) diagonal entry
@@ -86,6 +87,7 @@ function getCapacitanceAtBias(element: AnalogElementCore, vd: number, dt = 1e-6)
   } as unknown as SparseSolverType;
 
   element.stamp(solver);
+  element.stampReactiveCompanion?.(solver);
 
   // The diagonal (0,0) entry = capGeq for trapezoidal = 2*C/dt
   const diag = calls.find((c) => c[0] === 0 && c[1] === 0);

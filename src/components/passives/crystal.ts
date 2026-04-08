@@ -48,10 +48,8 @@ import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
-  capacitorConductance,
-  capacitorHistoryCurrent,
-  inductorConductance,
-  inductorHistoryCurrent,
+  integrateCapacitor,
+  integrateInductor,
 } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -66,7 +64,7 @@ import { cktTerr } from "../../solver/analog/ckt-terr.js";
 // State-pool schema
 // ---------------------------------------------------------------------------
 
-// Slot layout — 12 slots total (3 reactive stores × 4 slots each).
+// Slot layout — 15 slots total (3 reactive stores × 4 slots each + 3 CCAP slots).
 // Previous values are read from s1/s2/s3 at the same offsets.
 const CRYSTAL_SCHEMA: StateSchema = defineStateSchema("AnalogCrystalElement", [
   // L_s (inductor motional arm)
@@ -84,6 +82,10 @@ const CRYSTAL_SCHEMA: StateSchema = defineStateSchema("AnalogCrystalElement", [
   { name: "IEQ_C0", doc: "C_0 companion history current",     init: { kind: "zero" } },
   { name: "V_C0",   doc: "C_0 terminal voltage this step",    init: { kind: "zero" } },
   { name: "Q_C0",   doc: "C_0 charge C0*V this step",         init: { kind: "zero" } },
+  // CCAP slots (NIintegrate companion current, stored for LTE reuse)
+  { name: "CCAP_L",  doc: "L_s companion current",  init: { kind: "zero" } },
+  { name: "CCAP_CS", doc: "C_s companion current",  init: { kind: "zero" } },
+  { name: "CCAP_C0", doc: "C_0 companion current",  init: { kind: "zero" } },
 ]);
 
 // Slot indices — must match the layout above.
@@ -99,6 +101,9 @@ const SLOT_GEQ_C0 = 8;
 const SLOT_IEQ_C0 = 9;
 const SLOT_V_C0   = 10;
 const SLOT_Q_C0   = 11;
+const SLOT_CCAP_L  = 12;
+const SLOT_CCAP_CS = 13;
+const SLOT_CCAP_C0 = 14;
 
 // ---------------------------------------------------------------------------
 // Derived parameter helpers
@@ -309,8 +314,28 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
 
   stamp(solver: SparseSolver): void {
     const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
     const n1 = this.pinNodeIds[2];
+    const n2 = this.pinNodeIds[3];
+    const b = this.branchIndex;
+
+    // R_s: conductance between n_A and n1 (topology-constant)
+    stampG(solver, nA, nA, this.G_s);
+    stampG(solver, nA, n1, -this.G_s);
+    stampG(solver, n1, nA, -this.G_s);
+    stampG(solver, n1, n1, this.G_s);
+
+    // L_s: B sub-matrix — branch current I_L flows into n1, out of n2 (KCL node rows)
+    if (n1 !== 0) solver.stamp(n1 - 1, b, 1);
+    if (n2 !== 0) solver.stamp(n2 - 1, b, -1);
+
+    // L_s: C sub-matrix — voltage incidence (topology-constant ±1 entries)
+    if (n1 !== 0) solver.stamp(b, n1 - 1, 1);
+    if (n2 !== 0) solver.stamp(b, n2 - 1, -1);
+  }
+
+  stampReactiveCompanion(solver: SparseSolver): void {
+    const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
     const n2 = this.pinNodeIds[3];
     const b = this.branchIndex;
 
@@ -321,24 +346,11 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const geqC0 = this.s0[this.base + SLOT_GEQ_C0];
     const ieqC0 = this.s0[this.base + SLOT_IEQ_C0];
 
-    // R_s: conductance between n_A and n1
-    stampG(solver, nA, nA, this.G_s);
-    stampG(solver, nA, n1, -this.G_s);
-    stampG(solver, n1, nA, -this.G_s);
-    stampG(solver, n1, n1, this.G_s);
-
-    // L_s: B sub-matrix — branch current I_L flows into n1, out of n2 (KCL node rows)
-    if (n1 !== 0) solver.stamp(n1 - 1, b, 1);
-    if (n2 !== 0) solver.stamp(n2 - 1, b, -1);
-
-    // L_s: C sub-matrix + companion conductance — branch equation row
-    // V(n1) - V(n2) - geqL * I_branch = ieqL
-    if (n1 !== 0) solver.stamp(b, n1 - 1, 1);
-    if (n2 !== 0) solver.stamp(b, n2 - 1, -1);
+    // L_s: branch diagonal -geqL and RHS ieqL
     solver.stamp(b, b, -geqL);
     solver.stampRHS(b, ieqL);
 
-    // C_s: companion model between n2 and n_B (with corrected RHS sign convention)
+    // C_s: companion model between n2 and n_B
     stampG(solver, n2, n2, geqCs);
     stampG(solver, n2, nB, -geqCs);
     stampG(solver, nB, n2, -geqCs);
@@ -346,7 +358,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     stampRHS(solver, n2, -ieqCs);
     stampRHS(solver, nB, ieqCs);
 
-    // C_0: shunt capacitance between n_A and n_B (with corrected RHS sign convention)
+    // C_0: shunt capacitance between n_A and n_B
     stampG(solver, nA, nA, geqC0);
     stampG(solver, nA, nB, -geqC0);
     stampG(solver, nB, nA, -geqC0);
@@ -377,50 +389,60 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     return [I, -I];
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
     const n1 = this.pinNodeIds[2];
     const n2 = this.pinNodeIds[3];
     const b = this.branchIndex;
 
+    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+
     // L_s companion model — uses branch current row
-    const iNowL = voltages[b];
-    const vN1 = n1 > 0 ? voltages[n1 - 1] : 0;
-    const vN2 = n2 > 0 ? voltages[n2 - 1] : 0;
-    const vNowL = vN1 - vN2;
-    // Read previous step's L_s values from s1 (rotated history)
-    const iPrevL = this.s1[this.base + SLOT_I_L];
-    this.s0[this.base + SLOT_GEQ_L] = inductorConductance(this.L_s, dt, method);
-    this.s0[this.base + SLOT_IEQ_L] = inductorHistoryCurrent(this.L_s, dt, method, iNowL, iPrevL, vNowL);
-    this.s0[this.base + SLOT_I_L]   = iNowL;
+    const iNow = voltages[b];
+    const phi0 = this.L_s * iNow;
+    const phi1 = this.s1[this.base + SLOT_PHI_L];
+    const phi2 = this.s2[this.base + SLOT_PHI_L];
+    const ccapPrevL = this.s1[this.base + SLOT_CCAP_L];
+    const resL = integrateInductor(this.L_s, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrevL);
+    this.s0[this.base + SLOT_GEQ_L]  = resL.geq;
+    this.s0[this.base + SLOT_IEQ_L]  = resL.ceq;
+    this.s0[this.base + SLOT_I_L]    = iNow;
+    this.s0[this.base + SLOT_PHI_L]  = phi0;
+    this.s0[this.base + SLOT_CCAP_L] = resL.ccap;
 
     // C_s companion model — voltage across n2 and n_B
-    const vB = nB > 0 ? voltages[nB - 1] : 0;
+    const vN2 = n2 > 0 ? voltages[n2 - 1] : 0;
+    const vB  = nB > 0 ? voltages[nB - 1] : 0;
     const vCs_now = vN2 - vB;
-    // Read previous step's C_s values from s1 (rotated history)
-    const geqCsPrev = this.s1[this.base + SLOT_GEQ_CS];
-    const ieqCsPrev = this.s1[this.base + SLOT_IEQ_CS];
-    const vPrevCs   = this.s1[this.base + SLOT_V_CS];
-    const iPrevCs   = geqCsPrev * vCs_now + ieqCsPrev;
-    this.s0[this.base + SLOT_GEQ_CS] = capacitorConductance(this.C_s, dt, method);
-    this.s0[this.base + SLOT_IEQ_CS] = capacitorHistoryCurrent(this.C_s, dt, method, vCs_now, vPrevCs, iPrevCs);
-    this.s0[this.base + SLOT_V_CS]   = vCs_now;
+    const q0Cs = this.C_s * vCs_now;
+    const q1Cs = this.s1[this.base + SLOT_Q_CS];
+    const q2Cs = this.s2[this.base + SLOT_Q_CS];
+    const ccapPrevCs = this.s1[this.base + SLOT_CCAP_CS];
+    const resCs = integrateCapacitor(this.C_s, vCs_now, q0Cs, q1Cs, q2Cs, dt, h1, h2, order, method, ccapPrevCs);
+    this.s0[this.base + SLOT_GEQ_CS]  = resCs.geq;
+    this.s0[this.base + SLOT_IEQ_CS]  = resCs.ceq;
+    this.s0[this.base + SLOT_V_CS]    = vCs_now;
+    this.s0[this.base + SLOT_Q_CS]    = q0Cs;
+    this.s0[this.base + SLOT_CCAP_CS] = resCs.ccap;
 
     // C_0 companion model — voltage across n_A and n_B
     const vA = nA > 0 ? voltages[nA - 1] : 0;
     const vC0_now = vA - vB;
-    // Read previous step's C_0 values from s1 (rotated history)
-    const geqC0Prev = this.s1[this.base + SLOT_GEQ_C0];
-    const ieqC0Prev = this.s1[this.base + SLOT_IEQ_C0];
-    const vPrevC0   = this.s1[this.base + SLOT_V_C0];
-    const iPrevC0   = geqC0Prev * vC0_now + ieqC0Prev;
-    this.s0[this.base + SLOT_GEQ_C0] = capacitorConductance(this.C_0, dt, method);
-    this.s0[this.base + SLOT_IEQ_C0] = capacitorHistoryCurrent(this.C_0, dt, method, vC0_now, vPrevC0, iPrevC0);
-    this.s0[this.base + SLOT_V_C0]   = vC0_now;
+    const q0C0 = this.C_0 * vC0_now;
+    const q1C0 = this.s1[this.base + SLOT_Q_C0];
+    const q2C0 = this.s2[this.base + SLOT_Q_C0];
+    const ccapPrevC0 = this.s1[this.base + SLOT_CCAP_C0];
+    const resC0 = integrateCapacitor(this.C_0, vC0_now, q0C0, q1C0, q2C0, dt, h1, h2, order, method, ccapPrevC0);
+    this.s0[this.base + SLOT_GEQ_C0]  = resC0.geq;
+    this.s0[this.base + SLOT_IEQ_C0]  = resC0.ceq;
+    this.s0[this.base + SLOT_V_C0]    = vC0_now;
+    this.s0[this.base + SLOT_Q_C0]    = q0C0;
+    this.s0[this.base + SLOT_CCAP_C0] = resC0.ccap;
   }
 
-  updateChargeFlux(voltages: Float64Array): void {
+  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
     const n2 = this.pinNodeIds[3];
@@ -431,10 +453,43 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
 
     const vN2 = n2 > 0 ? voltages[n2 - 1] : 0;
     const vB = nB > 0 ? voltages[nB - 1] : 0;
-    this.s0[this.base + SLOT_Q_CS] = this.C_s * (vN2 - vB);
+    const vCs_now = vN2 - vB;
+    this.s0[this.base + SLOT_Q_CS] = this.C_s * vCs_now;
 
     const vA = nA > 0 ? voltages[nA - 1] : 0;
-    this.s0[this.base + SLOT_Q_C0] = this.C_0 * (vA - vB);
+    const vC0_now = vA - vB;
+    this.s0[this.base + SLOT_Q_C0] = this.C_0 * vC0_now;
+
+    // Recompute ccap for all 3 reactive junctions from converged charge/flux
+    // so the next step's trapezoidal recursion starts from correct companion current.
+    if (dt > 0) {
+      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+
+      // L_s flux
+      const phi0 = this.s0[this.base + SLOT_PHI_L];
+      const phi1 = this.s1[this.base + SLOT_PHI_L];
+      const phi2 = this.s2[this.base + SLOT_PHI_L];
+      const ccapPrevL = this.s1[this.base + SLOT_CCAP_L];
+      const resL = integrateInductor(this.L_s, iNowL, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrevL);
+      this.s0[this.base + SLOT_CCAP_L] = resL.ccap;
+
+      // C_s charge
+      const q0Cs = this.s0[this.base + SLOT_Q_CS];
+      const q1Cs = this.s1[this.base + SLOT_Q_CS];
+      const q2Cs = this.s2[this.base + SLOT_Q_CS];
+      const ccapPrevCs = this.s1[this.base + SLOT_CCAP_CS];
+      const resCs = integrateCapacitor(this.C_s, vCs_now, q0Cs, q1Cs, q2Cs, dt, h1, h2, order, method, ccapPrevCs);
+      this.s0[this.base + SLOT_CCAP_CS] = resCs.ccap;
+
+      // C_0 charge
+      const q0C0 = this.s0[this.base + SLOT_Q_C0];
+      const q1C0 = this.s1[this.base + SLOT_Q_C0];
+      const q2C0 = this.s2[this.base + SLOT_Q_C0];
+      const ccapPrevC0 = this.s1[this.base + SLOT_CCAP_C0];
+      const resC0 = integrateCapacitor(this.C_0, vC0_now, q0C0, q1C0, q2C0, dt, h1, h2, order, method, ccapPrevC0);
+      this.s0[this.base + SLOT_CCAP_C0] = resC0.ccap;
+    }
   }
 
   getLteTimestep(
@@ -444,32 +499,31 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     method: IntegrationMethod,
     lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
   ): number {
-    const h0 = dt;
-    const h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
-
-    // L_s (flux-based): pass 0,0 for ccap (inductor pattern)
+    // L_s (flux-based): use stored ccap from s0 and s1
     const phi0 = this.s0[this.base + SLOT_PHI_L];
     const phi1 = this.s1[this.base + SLOT_PHI_L];
     const phi2 = this.s2[this.base + SLOT_PHI_L];
     const phi3 = this.s3[this.base + SLOT_PHI_L];
-    const dtL = cktTerr(dt, deltaOld, order, method, phi0, phi1, phi2, phi3, 0, 0, lteParams);
+    const ccap0L = this.s0[this.base + SLOT_CCAP_L];
+    const ccap1L = this.s1[this.base + SLOT_CCAP_L];
+    const dtL = cktTerr(dt, deltaOld, order, method, phi0, phi1, phi2, phi3, ccap0L, ccap1L, lteParams);
 
-    // C_s (charge-based)
+    // C_s (charge-based): use stored ccap from s0 and s1
     const qCs0 = this.s0[this.base + SLOT_Q_CS];
     const qCs1 = this.s1[this.base + SLOT_Q_CS];
     const qCs2 = this.s2[this.base + SLOT_Q_CS];
     const qCs3 = this.s3[this.base + SLOT_Q_CS];
-    const ccap0Cs = h0 > 0 ? (qCs0 - qCs1) / h0 : 0;
-    const ccap1Cs = h1 > 0 ? (qCs1 - qCs2) / h1 : 0;
+    const ccap0Cs = this.s0[this.base + SLOT_CCAP_CS];
+    const ccap1Cs = this.s1[this.base + SLOT_CCAP_CS];
     const dtCs = cktTerr(dt, deltaOld, order, method, qCs0, qCs1, qCs2, qCs3, ccap0Cs, ccap1Cs, lteParams);
 
-    // C_0 (charge-based)
+    // C_0 (charge-based): use stored ccap from s0 and s1
     const qC00 = this.s0[this.base + SLOT_Q_C0];
     const qC01 = this.s1[this.base + SLOT_Q_C0];
     const qC02 = this.s2[this.base + SLOT_Q_C0];
     const qC03 = this.s3[this.base + SLOT_Q_C0];
-    const ccap0C0 = h0 > 0 ? (qC00 - qC01) / h0 : 0;
-    const ccap1C0 = h1 > 0 ? (qC01 - qC02) / h1 : 0;
+    const ccap0C0 = this.s0[this.base + SLOT_CCAP_C0];
+    const ccap1C0 = this.s1[this.base + SLOT_CCAP_C0];
     const dtC0 = cktTerr(dt, deltaOld, order, method, qC00, qC01, qC02, qC03, ccap0C0, ccap1C0, lteParams);
 
     return Math.min(dtL, dtCs, dtC0);

@@ -12,7 +12,8 @@ import { isPoolBacked } from "../../element.js";
 import { captureTopology, captureElementStates, createIterationCaptureHook, createStepCaptureHook } from "./capture.js";
 import { convergenceSummary, nodeVoltageTrajectory, findLargestDelta, querySteps } from "./query.js";
 import { compareSnapshots, formatComparison, findFirstDivergence } from "./compare.js";
-import type { CaptureSession } from "./types.js";
+import { canonicalizeNgspiceName, canonicalizeOurLabel, buildNodeMapping } from "./node-mapping.js";
+import type { CaptureSession, NgspiceTopology } from "./types.js";
 import { DEVICE_MAPPINGS } from "./device-mappings.js";
 
 function buildStatePool(elements: AnalogElementCore[]): StatePool {
@@ -239,6 +240,83 @@ describe("harness integration", () => {
     expect(mos.slotToNgspice["CCAP_GB"]).toBe(11);
   });
 
+  it("DEVICE_MAPPINGS has JFET mapping with correct ngspice offsets", () => {
+    const jfet = DEVICE_MAPPINGS.jfet;
+    expect(jfet).toBeDefined();
+    expect(jfet.deviceType).toBe("jfet");
+    expect(jfet.slotToNgspice["VGS"]).toBe(0);      // JFETvgs
+    expect(jfet.slotToNgspice["GM"]).toBe(5);        // JFETgm
+    expect(jfet.slotToNgspice["GDS"]).toBe(6);       // JFETgds
+    expect(jfet.slotToNgspice["IDS"]).toBe(3);       // JFETcd
+    expect(jfet.slotToNgspice["Q_GS"]).toBe(9);      // JFETqgs
+    expect(jfet.slotToNgspice["CCAP_GS"]).toBe(10);  // JFETcqgs
+    expect(jfet.slotToNgspice["Q_GD"]).toBe(11);     // JFETqgd
+    expect(jfet.slotToNgspice["CCAP_GD"]).toBe(12);  // JFETcqgd
+    // No bulk for JFET
+    expect(jfet.slotToNgspice["VSB"]).toBeNull();
+    expect(jfet.slotToNgspice["Q_GB"]).toBeNull();
+    // Reverse mapping
+    expect(jfet.ngspiceToSlot[0]).toBe("VGS");
+    expect(jfet.ngspiceToSlot[3]).toBe("IDS");
+    expect(jfet.ngspiceToSlot[9]).toBe("Q_GS");
+  });
+
+  it("DEVICE_MAPPINGS has tunnel-diode and varactor mappings", () => {
+    const td = DEVICE_MAPPINGS["tunnel-diode"];
+    expect(td).toBeDefined();
+    expect(td.deviceType).toBe("tunnel-diode");
+    expect(td.slotToNgspice["VD"]).toBe(0);
+    expect(td.slotToNgspice["ID"]).toBe(1);
+    expect(td.slotToNgspice["GEQ"]).toBe(2);
+    expect(td.slotToNgspice["Q"]).toBe(3);
+    expect(td.slotToNgspice["CCAP"]).toBe(4);
+
+    const v = DEVICE_MAPPINGS.varactor;
+    expect(v).toBeDefined();
+    expect(v.deviceType).toBe("varactor");
+    expect(v.slotToNgspice["VD"]).toBe(0);
+    expect(v.slotToNgspice["Q"]).toBe(3);
+  });
+
+  it("step capture hook supports finalizeAttempt for retry tracking", () => {
+    const { circuit, pool } = makeHWR();
+    engine.init(circuit);
+    const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
+    engine.postIterationHook = capture.hook;
+
+    // Simulate a failed attempt followed by a successful one
+    engine.dcOperatingPoint();
+    capture.finalizeAttempt(1e-9, false); // failed attempt
+
+    engine.dcOperatingPoint();
+    capture.finalizeStep(0, 5e-10, true); // accepted attempt with smaller dt
+
+    const steps = capture.getSteps();
+    expect(steps.length).toBe(1);
+    expect(steps[0].converged).toBe(true);
+    expect(steps[0].dt).toBe(5e-10);
+    // Should have attempts array with 2 entries (failed + accepted)
+    expect(steps[0].attempts).toBeDefined();
+    expect(steps[0].attempts!.length).toBe(2);
+    expect(steps[0].attempts![0].converged).toBe(false);
+    expect(steps[0].attempts![0].dt).toBe(1e-9);
+    expect(steps[0].attempts![1].converged).toBe(true);
+    expect(steps[0].attempts![1].dt).toBe(5e-10);
+  });
+
+  it("step capture hook omits attempts when no retries", () => {
+    const { circuit, pool } = makeHWR();
+    engine.init(circuit);
+    const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
+    engine.postIterationHook = capture.hook;
+    engine.dcOperatingPoint();
+    capture.finalizeStep(0, 0, true);
+    const steps = capture.getSteps();
+    expect(steps.length).toBe(1);
+    // No retries → attempts should be undefined (backward compat)
+    expect(steps[0].attempts).toBeUndefined();
+  });
+
   it("MNAEngine exposes accessors after init", () => {
     const { circuit } = makeHWR();
     engine.init(circuit);
@@ -283,5 +361,69 @@ describe("harness integration", () => {
     const result = findLargestDelta(session, 1);
     expect(result).not.toBeNull();
     expect(result!.delta).toBeGreaterThan(0);
+  });
+});
+
+describe("node mapping", () => {
+  it("canonicalizeNgspiceName handles BJT pin patterns", () => {
+    expect(canonicalizeNgspiceName("q1_c", "bjt")).toBe("Q1:C");
+    expect(canonicalizeNgspiceName("q1_b", "bjt")).toBe("Q1:B");
+    expect(canonicalizeNgspiceName("q1_e", "bjt")).toBe("Q1:E");
+  });
+
+  it("canonicalizeNgspiceName handles diode pin patterns", () => {
+    expect(canonicalizeNgspiceName("d1_a", "diode")).toBe("D1:A");
+    expect(canonicalizeNgspiceName("d1_k", "diode")).toBe("D1:K");
+  });
+
+  it("canonicalizeNgspiceName handles MOSFET pin patterns", () => {
+    expect(canonicalizeNgspiceName("m1_d", "mosfet")).toBe("M1:D");
+    expect(canonicalizeNgspiceName("m1_g", "mosfet")).toBe("M1:G");
+    expect(canonicalizeNgspiceName("m1_s", "mosfet")).toBe("M1:S");
+    expect(canonicalizeNgspiceName("m1_b", "mosfet")).toBe("M1:B");
+  });
+
+  it("canonicalizeNgspiceName handles resistor terminal patterns", () => {
+    expect(canonicalizeNgspiceName("r1_1", "resistor")).toBe("R1:A");
+    expect(canonicalizeNgspiceName("r1_2", "resistor")).toBe("R1:B");
+  });
+
+  it("canonicalizeNgspiceName handles branch currents", () => {
+    expect(canonicalizeNgspiceName("v1#branch")).toBe("V1:branch");
+  });
+
+  it("canonicalizeNgspiceName returns null for ground and unparseable names", () => {
+    expect(canonicalizeNgspiceName("0")).toBeNull();
+    expect(canonicalizeNgspiceName("")).toBeNull();
+    expect(canonicalizeNgspiceName("3")).toBeNull(); // bare net number
+  });
+
+  it("canonicalizeOurLabel uppercases", () => {
+    expect(canonicalizeOurLabel("Q1:C")).toBe("Q1:C");
+    expect(canonicalizeOurLabel("r1:a")).toBe("R1:A");
+  });
+
+  it("buildNodeMapping matches nodes by canonical form", () => {
+    const ourTopology = {
+      matrixSize: 3, nodeCount: 2, branchCount: 1, elementCount: 2,
+      elements: [],
+      nodeLabels: new Map<number, string>([[1, "Q1:C"], [2, "Q1:B"]]),
+    };
+    const ngTopology: NgspiceTopology = {
+      matrixSize: 3, numStates: 10,
+      nodeNames: new Map([["q1_c", 1], ["q1_b", 2]]),
+      devices: [{ name: "q1", typeName: "BJT", stateBase: 0, nodeIndices: [1, 2] }],
+    };
+
+    const mappings = buildNodeMapping(ourTopology, ngTopology);
+    expect(mappings.length).toBe(2);
+    const cMapping = mappings.find(m => m.label === "Q1:C");
+    expect(cMapping).toBeDefined();
+    expect(cMapping!.ourIndex).toBe(1);
+    expect(cMapping!.ngspiceIndex).toBe(1);
+    const bMapping = mappings.find(m => m.label === "Q1:B");
+    expect(bMapping).toBeDefined();
+    expect(bMapping!.ourIndex).toBe(2);
+    expect(bMapping!.ngspiceIndex).toBe(2);
   });
 });

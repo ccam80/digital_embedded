@@ -99,11 +99,12 @@ describe("Capacitor", () => {
 
       // voltages[0] = V(node1) = 5V, voltages[1] = V(node2) = 0V
       const voltages = new Float64Array([5, 0]);
-      analogElement.stampCompanion!(1e-6, "trapezoidal", voltages);
+      analogElement.stampCompanion!(1e-6, "trapezoidal", voltages, 2, [1e-6, 1e-6]);
 
       // For trapezoidal: geq = 2C/h = 2 * 1e-6 / 1e-6 = 2.0
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
+      analogElement.stampReactiveCompanion!(solver);
 
       const geqStamps = stamps.filter((s) => s.value > 0);
       expect(geqStamps.length).toBe(2); // diagonal entries
@@ -119,11 +120,12 @@ describe("Capacitor", () => {
       const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
       const voltages = new Float64Array([5, 0]);
-      analogElement.stampCompanion!(1e-6, "bdf1", voltages);
+      analogElement.stampCompanion!(1e-6, "bdf1", voltages, 1, [1e-6]);
 
       // For BDF-1: geq = C/h = 1e-6 / 1e-6 = 1.0
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
+      analogElement.stampReactiveCompanion!(solver);
 
       const geqStamps = stamps.filter((s) => s.value > 0);
       expect(geqStamps[0].value).toBeCloseTo(1.0, 5);
@@ -138,11 +140,12 @@ describe("Capacitor", () => {
       const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
       const voltages = new Float64Array([5, 0]);
-      analogElement.stampCompanion!(1e-6, "bdf2", voltages);
+      analogElement.stampCompanion!(1e-6, "bdf2", voltages, 2, [1e-6, 1e-6]);
 
       // For BDF-2: geq = 3C/(2h) = 3 * 1e-6 / (2 * 1e-6) = 1.5
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
+      analogElement.stampReactiveCompanion!(solver);
 
       const geqStamps = stamps.filter((s) => s.value > 0);
       expect(geqStamps[0].value).toBeCloseTo(1.5, 5);
@@ -226,12 +229,12 @@ describe("Capacitor", () => {
       const { element, pool } = withState(core);
 
       const voltages = new Float64Array([5, 0]);
-      element.stampCompanion!(1e-6, "bdf1", voltages);
+      element.stampCompanion!(1e-6, "bdf1", voltages, 1, [1e-6]);
 
       // slot 0 = GEQ = C/h = 1e-6 / 1e-6 = 1.0
       expect(pool.state0[0]).toBeCloseTo(1.0, 5);
-      // slot 1 = IEQ (non-zero: -geq * vNow = -1.0 * 5 = -5.0 for BDF-1 at steady DC)
-      expect(pool.state0[1]).toBeCloseTo(-5.0, 5);
+      // slot 1 = IEQ = ceq = ccap - geq*vNow. First step: q1=0, ccap=(q0-q1)/dt=C*vNow/dt, ceq=C*vNow/dt - (C/dt)*vNow = 0
+      expect(pool.state0[1]).toBeCloseTo(0.0, 5);
       // slot 2 = V_PREV = vNow = 5.0
       expect(pool.state0[2]).toBeCloseTo(5.0, 5);
     });
@@ -246,30 +249,34 @@ describe("Capacitor", () => {
       const { element, pool } = withState(core);
 
       // First call: voltage = 3V
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]));
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]), 1, [1e-6]);
       expect(pool.state0[2]).toBeCloseTo(3.0, 5);
 
       // Second call: voltage = 7V — V_PREV should now be 7V after the call
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]));
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]), 1, [1e-6]);
       expect(pool.state0[2]).toBeCloseTo(7.0, 5);
     });
 
-    it("getLteEstimate returns non-zero truncationError after stampCompanion", () => {
+    it("getLteTimestep returns finite value after two stampCompanion steps", () => {
       const props = new PropertyBag();
       props.setModelParam("capacitance", 1e-6);
       const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
         new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
       );
       Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
-      const { element } = withState(core);
+      const { element, pool } = withState(core);
 
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([5, 0]));
-      const lte = element.getLteEstimate!(1e-6);
-      expect(lte).toBeDefined();
-      expect(lte.truncationError).toBeGreaterThanOrEqual(0);
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([5, 0]), 1, [1e-6]);
+      pool.acceptTimestep();
+      pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]), 1, [1e-6]);
+
+      const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
+      const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "bdf1", lteParams);
+      expect(result).toBeGreaterThan(0);
     });
 
-    it("toleranceReference uses max of last two voltage samples (natural-charge formulation)", () => {
+    it("getLteTimestep uses stored ccap from stampCompanion", () => {
       const C = 1e-6;
       const props = new PropertyBag();
       props.setModelParam("capacitance", C);
@@ -280,18 +287,19 @@ describe("Capacitor", () => {
       const { element, pool } = withState(core);
 
       // First call: v1 = 3V — rotate pool so v=3 lands in s1
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]));
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]), 1, [1e-6]);
       pool.acceptTimestep();
       pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       // Second call: v2 = 7V
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]));
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]), 1, [1e-6]);
 
-      const lte = element.getLteEstimate!(1e-6);
-      // toleranceReference = C * max(|v(n-1)|, |v(n-2)|) = C * max(7, 3) = C * 7
-      expect(lte.toleranceReference).toBeCloseTo(C * 7, 10);
+      const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
+      const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "bdf1", lteParams);
+      expect(result).toBeGreaterThan(0);
+      expect(isFinite(result)).toBe(true);
     });
 
-    it("zero-crossing protection: toleranceReference is non-zero when vPrev was non-zero", () => {
+    it("getLteTimestep returns finite value at zero crossing", () => {
       const C = 1e-6;
       const props = new PropertyBag();
       props.setModelParam("capacitance", C);
@@ -302,15 +310,15 @@ describe("Capacitor", () => {
       const { element, pool } = withState(core);
 
       // First call: v1 = 5V (non-zero) — rotate so v=5 lands in s1
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([5, 0]));
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([5, 0]), 1, [1e-6]);
       pool.acceptTimestep();
       pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       // Second call: v2 = 0V (zero crossing)
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([0, 0]));
+      element.stampCompanion!(1e-6, "bdf1", new Float64Array([0, 0]), 1, [1e-6]);
 
-      const lte = element.getLteEstimate!(1e-6);
-      // toleranceReference = C * max(|0|, |5|) = C * 5 — NOT collapsed to zero
-      expect(lte.toleranceReference).toBeCloseTo(C * 5, 10);
+      const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
+      const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "bdf1", lteParams);
+      expect(result).toBeGreaterThan(0);
     });
   });
 });

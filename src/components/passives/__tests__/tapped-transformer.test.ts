@@ -135,6 +135,7 @@ describe("TappedTransformer", () => {
       solver.beginAssembly(matrixSize);
       vsrc.stamp(solver);
       tx.stamp(solver);
+      tx.stampReactiveCompanion!(solver);
       rLoad.stamp(solver);
       rCtGnd.stamp(solver);
       rS2Gnd.stamp(solver);
@@ -223,6 +224,7 @@ describe("TappedTransformer", () => {
       solver.beginAssembly(matrixSize);
       vsrc.stamp(solver);
       tx.stamp(solver);
+      tx.stampReactiveCompanion!(solver);
       rLoad1.stamp(solver);
       rLoad2.stamp(solver);
       rGnd.stamp(solver);
@@ -317,6 +319,7 @@ describe("TappedTransformer", () => {
         solver.beginAssembly(matrixSize);
         vsrc.stamp(solver);
         tx.stamp(solver);
+        tx.stampReactiveCompanion!(solver);
         rCtGnd.stamp(solver);
         cFilter.stamp(solver);
         rLoadEl.stamp(solver);

@@ -42,11 +42,9 @@ import {
   computeJunctionCapacitance,
   computeJunctionCharge,
 } from "./diode.js";
-import {
-  capacitorConductance,
-  capacitorHistoryCurrent,
-} from "../../solver/analog/integration.js";
+import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
+import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { VT } from "../../core/constants.js";
@@ -153,6 +151,7 @@ export function tunnelDiodeIV(
 // Slot index constants — shared between both schema variants.
 const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
 const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_V = 6, SLOT_Q = 7;
+const SLOT_CCAP = 8;
 
 /** Schema for resistive tunnel diode (no junction capacitance): 4 slots. */
 const TUNNEL_DIODE_STATE_SCHEMA = defineStateSchema("TunnelDiodeElement", [
@@ -162,7 +161,7 @@ const TUNNEL_DIODE_STATE_SCHEMA = defineStateSchema("TunnelDiodeElement", [
   { name: "ID",  doc: "Diode current (A)",                    init: { kind: "zero" } },
 ]);
 
-/** Schema for capacitive tunnel diode (CJO > 0 or TT > 0): 8 slots. */
+/** Schema for capacitive tunnel diode (CJO > 0 or TT > 0): 9 slots. */
 const TUNNEL_DIODE_CAP_STATE_SCHEMA = defineStateSchema("TunnelDiodeElement_cap", [
   { name: "VD",      doc: "Tunnel diode junction voltage (V)",                      init: { kind: "zero" } },
   { name: "GEQ",     doc: "Differential conductance (S)",                           init: { kind: "constant", value: 1e-12 } },
@@ -172,6 +171,7 @@ const TUNNEL_DIODE_CAP_STATE_SCHEMA = defineStateSchema("TunnelDiodeElement_cap"
   { name: "CAP_IEQ", doc: "Junction-capacitance companion history current",         init: { kind: "zero" } },
   { name: "V",       doc: "Junction voltage at current step (for companion)",       init: { kind: "zero" } },
   { name: "Q",       doc: "Junction charge at current step (history from s1/s2/s3)", init: { kind: "zero" } },
+  { name: "CCAP",    doc: "Companion current (NIintegrate)",                        init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -214,6 +214,7 @@ export function createTunnelDiodeElement(
   let s2: Float64Array;
   let s3: Float64Array;
   let base: number;
+  let pool: StatePoolRef;
 
   function recompute(v: number): void {
     const { i, dIdV } = tunnelDiodeIV(v, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
@@ -232,7 +233,7 @@ export function createTunnelDiodeElement(
     isNonlinear: true,
     isReactive: hasCapacitance,
     poolBacked: true as const,
-    stateSize: hasCapacitance ? 8 : 4,
+    stateSize: hasCapacitance ? 9 : 4,
     stateSchema: hasCapacitance ? TUNNEL_DIODE_CAP_STATE_SCHEMA : TUNNEL_DIODE_STATE_SCHEMA,
     stateBaseOffset: -1,
     s0: new Float64Array(0),
@@ -240,7 +241,8 @@ export function createTunnelDiodeElement(
     s2: new Float64Array(0),
     s3: new Float64Array(0),
 
-    initState(pool: StatePoolRef): void {
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
       s0 = pool.state0;
       s1 = pool.state1;
       s2 = pool.state2;
@@ -253,20 +255,9 @@ export function createTunnelDiodeElement(
       applyInitialValues(this.stateSchema, pool, base, params);
     },
 
-    stamp(solver: SparseSolver): void {
-      // Stamp junction capacitance companion model when active
-      if (hasCapacitance) {
-        const capGeq = s0[base + SLOT_CAP_GEQ];
-        const capIeq = s0[base + SLOT_CAP_IEQ];
-        if (capGeq !== 0 || capIeq !== 0) {
-          stampG(solver, nodeAnode,   nodeAnode,   capGeq);
-          stampG(solver, nodeAnode,   nodeCathode, -capGeq);
-          stampG(solver, nodeCathode, nodeAnode,   -capGeq);
-          stampG(solver, nodeCathode, nodeCathode, capGeq);
-          stampRHS(solver, nodeAnode,   -capIeq);
-          stampRHS(solver, nodeCathode, capIeq);
-        }
-      }
+    stamp(_solver: SparseSolver): void {
+      // No topology-constant entries.
+      // Capacitance companion model entries are stamped in stampReactiveCompanion().
     },
 
     stampNonlinear(solver: SparseSolver): void {
@@ -336,10 +327,12 @@ export function createTunnelDiodeElement(
 
   // Attach stampCompanion and getLteTimestep only when junction capacitance is present
   if (hasCapacitance) {
-    (element as unknown as { stampCompanion: (dt: number, method: IntegrationMethod, voltages: Float64Array) => void }).stampCompanion = function (
+    (element as unknown as { stampCompanion: (dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]) => void }).stampCompanion = function (
       dt: number,
       method: IntegrationMethod,
       voltages: Float64Array,
+      order: number,
+      deltaOld: readonly number[],
     ): void {
       const va = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
@@ -348,41 +341,56 @@ export function createTunnelDiodeElement(
       // Depletion + transit-time capacitance at current operating point.
       // For transit-time cap: use total dI/dV (all components) as gDiode.
       const Cj = computeJunctionCapacitance(vNow, params.CJO, params.VJ, params.M, params.FC);
-      const { dIdV: gDiode } = tunnelDiodeIV(vNow, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
+      const { dIdV: gDiode, i: iNowDiode } = tunnelDiodeIV(vNow, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
       const Ct = params.TT * gDiode;
       const Ctotal = Cj + Ct;
 
-      // Recover capacitor current from s1 (last accepted step via pool rotation)
-      const prevCapGeq = s1[base + SLOT_CAP_GEQ];
-      const prevCapIeq = s1[base + SLOT_CAP_IEQ];
-      const iNow = prevCapGeq * s1[base + SLOT_V] + prevCapIeq;
-      // First call detected by s1 voltage still zero (pool zero-initialised)
-      const vPrevForFormula = (s1[base + SLOT_V] === 0 && s1[base + SLOT_Q] === 0) ? vNow : s1[base + SLOT_V];
-
-      s0[base + SLOT_CAP_GEQ] = capacitorConductance(Ctotal, dt, method);
-      s0[base + SLOT_CAP_IEQ] = capacitorHistoryCurrent(Ctotal, dt, method, vNow, vPrevForFormula, iNow);
+      const q0 = computeJunctionCharge(vNow, params.CJO, params.VJ, params.M, params.FC, params.TT, iNowDiode);
+      const q1 = s1[base + SLOT_Q];
+      const q2 = s2[base + SLOT_Q];
+      const ccapPrev = s1[base + SLOT_CCAP];
+      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+      const { geq, ceq, ccap } = integrateCapacitor(Ctotal, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      s0[base + SLOT_CAP_GEQ] = geq;
+      s0[base + SLOT_CAP_IEQ] = ceq;
       s0[base + SLOT_V] = vNow;
+      s0[base + SLOT_Q] = q0;
+      s0[base + SLOT_CCAP] = ccap;
     };
 
-    (element as unknown as { getLteTimestep: (dt: number, deltaOld: readonly number[], order: number, method: IntegrationMethod, lteParams: import("../../solver/analog/ckt-terr.js").LteParams) => number }).getLteTimestep = function (
+    (element as unknown as { stampReactiveCompanion: (solver: SparseSolver) => void }).stampReactiveCompanion = function (
+      solver: SparseSolver,
+    ): void {
+      const capGeq = s0[base + SLOT_CAP_GEQ];
+      const capIeq = s0[base + SLOT_CAP_IEQ];
+      if (capGeq !== 0 || capIeq !== 0) {
+        stampG(solver, nodeAnode,   nodeAnode,   capGeq);
+        stampG(solver, nodeAnode,   nodeCathode, -capGeq);
+        stampG(solver, nodeCathode, nodeAnode,   -capGeq);
+        stampG(solver, nodeCathode, nodeCathode, capGeq);
+        stampRHS(solver, nodeAnode,   -capIeq);
+        stampRHS(solver, nodeCathode, capIeq);
+      }
+    };
+
+    (element as unknown as { getLteTimestep: (dt: number, deltaOld: readonly number[], order: number, method: IntegrationMethod, lteParams: LteParams) => number }).getLteTimestep = function (
       dt: number,
       deltaOld: readonly number[],
       order: number,
       method: IntegrationMethod,
-      lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
+      lteParams: LteParams,
     ): number {
       const _q0 = s0[base + SLOT_Q];
       const _q1 = s1[base + SLOT_Q];
       const _q2 = s2[base + SLOT_Q];
       const _q3 = s3[base + SLOT_Q];
-      const _h0 = dt;
-      const _h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
-      const _ccap0 = _h0 > 0 ? (_q0 - _q1) / _h0 : 0;
-      const _ccap1 = _h1 > 0 ? (_q1 - _q2) / _h1 : 0;
-      return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, _ccap0, _ccap1, lteParams);
+      const ccap0 = s0[base + SLOT_CCAP];
+      const ccap1 = s1[base + SLOT_CCAP];
+      return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, ccap0, ccap1, lteParams);
     };
 
-    (element as unknown as { updateChargeFlux: (v: Float64Array) => void }).updateChargeFlux = function(voltages: Float64Array): void {
+    (element as unknown as { updateChargeFlux: (v: Float64Array, dt: number, method: string, order: number, deltaOld: readonly number[]) => void }).updateChargeFlux = function(voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
       const va = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vd = va - vc;

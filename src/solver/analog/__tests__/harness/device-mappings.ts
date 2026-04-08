@@ -257,6 +257,158 @@ export const MOSFET_MAPPING: DeviceMapping = {
 };
 
 // ---------------------------------------------------------------------------
+// JFET (N-channel / P-channel)
+// ---------------------------------------------------------------------------
+// Our slots: FET_BASE_SCHEMA (45 slots) + 3 junction slots:
+//   0: VGS, 1: VDS, 2: GM, 3: GDS, 4: IDS, 5: SWAPPED,
+//   6-20: CAP_GEQ/IEQ, V for GS/GD/DB/SB/GB pairs,
+//   21: VSB, 22: GMBS, 23: GBD, 24: GBS, 25: CBD_I, 26: CBS_I, 27: VBD,
+//   28: VON, 29: VBS_OLD, 30: VBD_OLD, 31: MODE,
+//   32-34: Q_GS, Q_GD, Q_GB, 35-37: MEYER_GS/GD/GB,
+//   38-40: CCAP_GS/GD/GB, 41-42: Q_DB, Q_SB, 43-44: CCAP_DB, CCAP_SB,
+//   45: VGS_JUNCTION, 46: GD_JUNCTION, 47: ID_JUNCTION
+// ngspice jfet state offsets (jfetdefs.h):
+//   JFETvgs=0, JFETvgd=1, JFETcg=2, JFETcd=3, JFETcgd=4,
+//   JFETgm=5, JFETgds=6, JFETggs=7, JFETggd=8,
+//   JFETqgs=9, JFETcqgs=10, JFETqgd=11, JFETcqgd=12
+//
+// NOTE: JFET is 3-terminal (no bulk), so MOSFET-specific slots
+// (DB, SB, GB, MEYER, GMBS, etc.) have no ngspice equivalent.
+
+export const JFET_MAPPING: DeviceMapping = {
+  deviceType: "jfet",
+  slotToNgspice: {
+    VGS: 0,           // JFETvgs
+    VDS: null,        // no direct ngspice state (vds = vgs - vgd)
+    GM: 5,            // JFETgm
+    GDS: 6,           // JFETgds
+    IDS: 3,           // JFETcd (drain current)
+    SWAPPED: null,
+    CAP_GEQ_GS: null,
+    CAP_IEQ_GS: null,
+    CAP_GEQ_GD: null,
+    CAP_IEQ_GD: null,
+    V_GS: null,
+    V_GD: null,
+    CAP_GEQ_DB: null,
+    CAP_IEQ_DB: null,
+    CAP_GEQ_SB: null,
+    CAP_IEQ_SB: null,
+    V_DB: null,
+    V_SB: null,
+    CAP_GEQ_GB: null,
+    CAP_IEQ_GB: null,
+    V_GB: null,
+    VSB: null,        // no bulk in JFET
+    GMBS: null,
+    GBD: null,
+    GBS: null,
+    CBD_I: null,
+    CBS_I: null,
+    VBD: null,
+    VON: null,
+    VBS_OLD: null,
+    VBD_OLD: null,
+    MODE: null,
+    Q_GS: 9,          // JFETqgs
+    Q_GD: 11,         // JFETqgd
+    Q_GB: null,        // no bulk
+    MEYER_GS: null,    // JFET doesn't use Meyer model
+    MEYER_GD: null,
+    MEYER_GB: null,
+    CCAP_GS: 10,       // JFETcqgs
+    CCAP_GD: 12,       // JFETcqgd
+    CCAP_GB: null,
+    Q_DB: null,
+    Q_SB: null,
+    CCAP_DB: null,
+    CCAP_SB: null,
+    // JFET-specific junction slots
+    VGS_JUNCTION: null,  // our internal limiting state, not in ngspice state
+    GD_JUNCTION: 7,      // JFETggs (gate-source junction conductance)
+    ID_JUNCTION: 2,      // JFETcg (gate current)
+  },
+  ngspiceToSlot: {
+    0: "VGS",
+    2: "ID_JUNCTION",
+    3: "IDS",
+    5: "GM",
+    6: "GDS",
+    7: "GD_JUNCTION",
+    9: "Q_GS",
+    10: "CCAP_GS",
+    11: "Q_GD",
+    12: "CCAP_GD",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Tunnel Diode
+// ---------------------------------------------------------------------------
+// Our slots (TUNNEL_DIODE_STATE_SCHEMA, resistive, 4 slots):
+//   0: VD, 1: GEQ, 2: IEQ, 3: ID
+// Our slots (TUNNEL_DIODE_CAP_STATE_SCHEMA, with capacitance, 9 slots):
+//   0: VD, 1: GEQ, 2: IEQ, 3: ID,
+//   4: CAP_GEQ, 5: CAP_IEQ, 6: V, 7: Q, 8: CCAP
+// ngspice does not have a dedicated tunnel diode model.
+// It's modelled as a standard diode with extra current components.
+// Map to the diode state offsets (diodefs.h) where applicable:
+//   DIOvoltage=0, DIOcurrent=1, DIOconduct=2,
+//   DIOcapCharge=3, DIOcapCurrent=4
+
+export const TUNNEL_DIODE_MAPPING: DeviceMapping = {
+  deviceType: "tunnel-diode",
+  slotToNgspice: {
+    VD: 0,         // DIOvoltage
+    GEQ: 2,        // DIOconduct
+    IEQ: null,     // Norton current — derived
+    ID: 1,         // DIOcurrent
+    CAP_GEQ: null, // companion conductance — derived
+    CAP_IEQ: null, // companion current — derived
+    V: null,       // terminal voltage — from solution vector
+    Q: 3,          // DIOcapCharge
+    CCAP: 4,       // DIOcapCurrent
+  },
+  ngspiceToSlot: {
+    0: "VD",
+    1: "ID",
+    2: "GEQ",
+    3: "Q",
+    4: "CCAP",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Varactor
+// ---------------------------------------------------------------------------
+// Our slots (VARACTOR_STATE_SCHEMA, 9 slots):
+//   0: VD, 1: GEQ, 2: IEQ, 3: ID,
+//   4: CAP_GEQ, 5: CAP_IEQ, 6: V, 7: Q, 8: CCAP
+// ngspice: varactor is modelled as a diode — same state offsets as diode.
+
+export const VARACTOR_MAPPING: DeviceMapping = {
+  deviceType: "varactor",
+  slotToNgspice: {
+    VD: 0,         // DIOvoltage
+    GEQ: 2,        // DIOconduct
+    IEQ: null,     // Norton current — derived
+    ID: 1,         // DIOcurrent
+    CAP_GEQ: null, // companion conductance — derived
+    CAP_IEQ: null, // companion current — derived
+    V: null,       // terminal voltage — from solution vector
+    Q: 3,          // DIOcapCharge
+    CCAP: 4,       // DIOcapCurrent
+  },
+  ngspiceToSlot: {
+    0: "VD",
+    1: "ID",
+    2: "GEQ",
+    3: "Q",
+    4: "CCAP",
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -267,4 +419,7 @@ export const DEVICE_MAPPINGS: Record<string, DeviceMapping> = {
   diode: DIODE_MAPPING,
   bjt: BJT_MAPPING,
   mosfet: MOSFET_MAPPING,
+  jfet: JFET_MAPPING,
+  "tunnel-diode": TUNNEL_DIODE_MAPPING,
+  varactor: VARACTOR_MAPPING,
 };

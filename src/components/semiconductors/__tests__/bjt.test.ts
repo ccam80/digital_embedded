@@ -371,10 +371,10 @@ describe("NPN", () => {
     expect(element.isNonlinear).toBe(true);
   });
 
-  it("isReactive_true", () => {
+  it("isReactive_false", () => {
     const propsObj = makeBjtProps();
     const element = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
-    expect(element.isReactive).toBe(true);
+    expect(element.isReactive).toBe(false);
   });
 
   it("pinNodeIds_correct", () => {
@@ -849,8 +849,8 @@ describe("SPICE L1 model", () => {
 
   it("spice_l1_param_count_is_superset_of_simple", () => {
     expect(BJT_SPICE_L1_PARAM_DEFS.length).toBeGreaterThan(BJT_PARAM_DEFS.length);
-    // Simple has 14 params, SPICE adds terminal R, caps, transit time, and full GP params = 44 total
-    expect(BJT_SPICE_L1_PARAM_DEFS.length).toBe(44);
+    // Simple has 14 params, SPICE adds terminal R, caps, transit time, and full GP params = 46 total (incl. ISS, NS)
+    expect(BJT_SPICE_L1_PARAM_DEFS.length).toBe(46);
   });
 
   it("factory_produces_valid_element_with_zero_resistances", () => {

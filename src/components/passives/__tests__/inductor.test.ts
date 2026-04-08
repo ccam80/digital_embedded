@@ -101,10 +101,11 @@ describe("Inductor", () => {
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
 
-      // Should have: 2 B-matrix incidence + 3 C/D-matrix branch = 5
+      // Should have: 2 B-matrix incidence + 2 C/D-matrix branch (topology only) = 4
       // B-matrix (node rows): (0,2)=+1, (1,2)=-1
-      // C/D-matrix (branch row): (2,0)=+1, (2,1)=-1, (2,2)=-geq
-      expect(stamps.length).toBe(5);
+      // C/D-matrix (branch row): (2,0)=+1, (2,1)=-1
+      // Note: (2,2)=-geq is now stamped by stampReactiveCompanion
+      expect(stamps.length).toBe(4);
 
       // B sub-matrix: branch current incidence in node KCL rows
       const nodeEntries = stamps.filter((s) => s.row < 2);
@@ -128,11 +129,12 @@ describe("Inductor", () => {
 
       // voltages[0]=V(node1)=5V, voltages[1]=V(node2)=0V, voltages[2]=I_branch=0A
       const voltages = new Float64Array([5, 0, 0]);
-      analogElement.stampCompanion!(1e-4, "trapezoidal", voltages);
+      analogElement.stampCompanion!(1e-4, "trapezoidal", voltages, 2, [1e-4, 1e-4]);
 
       // For trapezoidal: geq = 2L/h = 2 * 0.01 / 1e-4 = 200
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
+      analogElement.stampReactiveCompanion!(solver);
 
       // geq appears as -geq on the branch diagonal (row=2, col=2)
       const branchDiag = stamps.find((s) => s.row === 2 && s.col === 2);
@@ -149,11 +151,12 @@ describe("Inductor", () => {
       const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
 
       const voltages = new Float64Array([5, 0, 0]);
-      analogElement.stampCompanion!(1e-4, "bdf1", voltages);
+      analogElement.stampCompanion!(1e-4, "bdf1", voltages, 1, [1e-4]);
 
       // For BDF-1: geq = L/h = 0.01 / 1e-4 = 100
       const { solver, stamps } = makeStubSolver();
       analogElement.stamp(solver);
+      analogElement.stampReactiveCompanion!(solver);
 
       const branchDiag = stamps.find((s) => s.row === 2 && s.col === 2);
       expect(branchDiag).toBeDefined();
@@ -243,7 +246,7 @@ describe("Inductor", () => {
 
       // voltages[0]=V(node1)=5V, voltages[1]=V(node2)=0V, voltages[2]=I_branch=0.5A
       const voltages = new Float64Array([5, 0, 0.5]);
-      element.stampCompanion!(1e-4, "bdf1", voltages);
+      element.stampCompanion!(1e-4, "bdf1", voltages, 1, [1e-4]);
 
       // slot 0 = GEQ = L/h = 0.01 / 1e-4 = 100
       expect(pool.state0[0]).toBeCloseTo(100, 3);
@@ -262,14 +265,14 @@ describe("Inductor", () => {
 
       // terminal voltage = 10V, branch current = 0.3A
       const voltages = new Float64Array([10, 0, 0.3]);
-      element.stampCompanion!(1e-4, "bdf1", voltages);
+      element.stampCompanion!(1e-4, "bdf1", voltages, 1, [1e-4]);
 
       // slot 2 must be branch current (0.3), not terminal voltage (10)
       expect(pool.state0[2]).toBeCloseTo(0.3, 5);
       expect(pool.state0[2]).not.toBeCloseTo(10, 1);
     });
 
-    it("getLteEstimate returns non-zero truncationError after stampCompanion with non-zero branch current", () => {
+    it("getLteTimestep returns finite value after two stampCompanion steps with non-zero branch current", () => {
       const props = new PropertyBag();
       props.setModelParam("inductance", 0.01);
       const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
@@ -279,15 +282,16 @@ describe("Inductor", () => {
       const { element, pool } = withState(core);
 
       // First call establishes i=0.5 in s0, then rotate so it lands in s1
-      element.stampCompanion!(1e-4, "bdf1", new Float64Array([5, 0, 0.5]));
+      element.stampCompanion!(1e-4, "bdf1", new Float64Array([5, 0, 0.5]), 1, [1e-4]);
       pool.acceptTimestep();
       pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
-      // Second call: i=0.6, s1 now has i=0.5 → getLteEstimate can compute |0.6 - 0.5|
-      element.stampCompanion!(1e-4, "bdf1", new Float64Array([5, 0, 0.6]));
+      // Second call: i=0.6, s1 now has i=0.5
+      element.stampCompanion!(1e-4, "bdf1", new Float64Array([5, 0, 0.6]), 1, [1e-4]);
 
-      const lte = element.getLteEstimate!(1e-4);
-      expect(lte).toBeDefined();
-      expect(lte.truncationError).toBeGreaterThan(0);
+      const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
+      const result = element.getLteTimestep!(1e-4, [1e-4, 1e-4], 1, "bdf1", lteParams);
+      expect(result).toBeGreaterThan(0);
+      expect(isFinite(result)).toBe(true);
     });
   });
 });

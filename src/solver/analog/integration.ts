@@ -1,144 +1,114 @@
 /**
  * Companion model coefficient functions for reactive elements.
  *
- * Capacitors and inductors are modelled as a parallel conductance (geq) plus
- * an independent current source (ieq) — the standard Norton companion model
- * used in SPICE-class simulators.
- *
- * Coefficient formulas (from circuits-engine-spec.md section 4):
- *
- *   BDF-1 (Backward Euler):
- *     capacitor  geq = C/h         ieq = -geq * v(n)
- *     inductor   geq = L/h         ieq = -geq * i(n)       (current branch)
- *
- *   Trapezoidal:
- *     capacitor  geq = 2C/h        ieq = -geq * v(n) - i(n)
- *     inductor   geq = 2L/h        ieq = -geq * i(n) - v(n) (current branch)
- *
- *   BDF-2 (Gear order 2):
- *     capacitor  geq = 3C/(2h)     ieq = -geq * (4/3 * v(n) - 1/3 * v(n-1))
- *     inductor   geq = 3L/(2h)     ieq = -geq * (4/3 * i(n) - 1/3 * i(n-1))
+ * integrateCapacitor / integrateInductor implement the NIintegrate-based
+ * companion model used by ngspice (niinteg.c / nicomcof.c). They return
+ * geq, ceq, ccap, and ag0 — the full set of coefficients needed to stamp
+ * the companion model into the MNA matrix.
  */
 
 import type { IntegrationMethod } from "./element.js";
 
-// ---------------------------------------------------------------------------
-// Capacitor companion model
-// ---------------------------------------------------------------------------
-
 /**
- * Companion model conductance for a capacitor.
+ * NIintegrate-based companion model for a capacitor.
+ * Computes geq, ceq, ccap, and ag0 from charge history.
  *
- * @param C      - Capacitance in farads
- * @param dt     - Timestep in seconds
- * @param method - Integration method
- * @returns Equivalent parallel conductance geq in siemens
+ * Per-method ccap formulas:
+ *   BDF-1 / Trap order 1: ccap = (Q_n - Q_{n-1}) / dt
+ *   Trap order 2: ccap = (2/dt)(Q_n - Q_{n-1}) - ccapPrev  [RECURSIVE]
+ *   BDF-2: ccap = ag[0]*Q_n + ag[1]*Q_{n-1} + ag[2]*Q_{n-2}
+ *
+ * Universal companion: geq = ag0 * C, ceq = ccap - geq * vNow
  */
-export function capacitorConductance(
+export function integrateCapacitor(
   C: number,
-  dt: number,
-  method: IntegrationMethod,
-): number {
-  switch (method) {
-    case "bdf1":
-      return C / dt;
-    case "trapezoidal":
-      return (2 * C) / dt;
-    case "bdf2":
-      return (3 * C) / (2 * dt);
-  }
-}
-
-/**
- * Companion model history current for a capacitor.
- *
- * The history current ieq captures the contribution from past state so the
- * companion model correctly integrates the capacitor equation over time.
- *
- * @param C      - Capacitance in farads
- * @param dt     - Timestep in seconds
- * @param method - Integration method
- * @param vNow   - Terminal voltage at the current (most recent accepted) timestep v(n)
- * @param vPrev  - Terminal voltage one timestep earlier v(n-1); used by BDF-2 only
- * @param iNow   - Capacitor current at v(n); used by trapezoidal only
- * @returns Equivalent Norton current source ieq in amperes
- */
-export function capacitorHistoryCurrent(
-  C: number,
-  dt: number,
-  method: IntegrationMethod,
   vNow: number,
-  vPrev: number,
-  iNow: number,
-): number {
-  const geq = capacitorConductance(C, dt, method);
-  switch (method) {
-    case "bdf1":
-      return -geq * vNow;
-    case "trapezoidal":
-      return -geq * vNow - iNow;
-    case "bdf2":
-      return -geq * ((4 / 3) * vNow - (1 / 3) * vPrev);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Inductor companion model
-// ---------------------------------------------------------------------------
-
-/**
- * Companion model conductance for an inductor.
- *
- * The inductor is dual to the capacitor: voltage and current roles are swapped.
- *
- * @param L      - Inductance in henries
- * @param dt     - Timestep in seconds
- * @param method - Integration method
- * @returns Equivalent parallel conductance geq in siemens
- */
-export function inductorConductance(
-  L: number,
-  dt: number,
+  q0: number, q1: number, q2: number,
+  dt: number, h1: number, h2: number,
+  order: number,
   method: IntegrationMethod,
-): number {
-  switch (method) {
-    case "bdf1":
-      return L / dt;
-    case "trapezoidal":
-      return (2 * L) / dt;
-    case "bdf2":
-      return (3 * L) / (2 * dt);
+  ccapPrev: number,
+): { geq: number; ceq: number; ccap: number; ag0: number } {
+  if (dt <= 0) return { geq: 0, ceq: 0, ccap: 0, ag0: 0 };
+
+  let ag0: number;
+  let ccap: number;
+
+  if (order <= 1) {
+    ag0 = 1 / dt;
+    ccap = (q0 - q1) / dt;
+  } else if (method === "trapezoidal") {
+    ag0 = 2 / dt;
+    ccap = (2 / dt) * (q0 - q1) - ccapPrev;
+  } else {
+    // BDF-2: ag[] from NIcomCof matrix solve (nicomcof.c:56-117)
+    const safeH1 = h1 > 0 ? h1 : dt;
+    const safeH2 = h2 > 0 ? h2 : safeH1;
+    const r1 = safeH1 / dt;
+    const r2 = (safeH1 + safeH2) / dt;
+    const u22 = r2 * (r2 - r1);
+    if (Math.abs(u22) < 1e-30) {
+      ag0 = 1 / dt;
+      ccap = (q0 - q1) / dt;
+    } else {
+      const rhs2 = r1 / dt;
+      const ag2 = rhs2 / u22;
+      const ag1 = (-1 / dt - r2 * ag2) / r1;
+      ag0 = -(ag1 + ag2);
+      ccap = ag0 * q0 + ag1 * q1 + ag2 * q2;
+    }
   }
+
+  const geq = ag0 * C;
+  const ceq = ccap - geq * vNow;
+  return { geq, ceq, ccap, ag0 };
 }
 
 /**
- * Companion model history current for an inductor.
- *
- * @param L      - Inductance in henries
- * @param dt     - Timestep in seconds
- * @param method - Integration method
- * @param iNow   - Branch current at the current (most recent accepted) timestep i(n)
- * @param iPrev  - Branch current one timestep earlier i(n-1); used by BDF-2 only
- * @param vNow   - Terminal voltage at i(n); used by trapezoidal only
- * @returns Equivalent Norton current source ieq in amperes
+ * NIintegrate-based companion model for an inductor.
+ * Dual of integrateCapacitor: flux instead of charge, L instead of C.
  */
-export function inductorHistoryCurrent(
+export function integrateInductor(
   L: number,
-  dt: number,
-  method: IntegrationMethod,
   iNow: number,
-  iPrev: number,
-  vNow: number,
-): number {
-  const geq = inductorConductance(L, dt, method);
-  switch (method) {
-    case "bdf1":
-      return -geq * iNow;
-    case "trapezoidal":
-      return -geq * iNow - vNow;
-    case "bdf2":
-      return -geq * ((4 / 3) * iNow - (1 / 3) * iPrev);
+  phi0: number, phi1: number, phi2: number,
+  dt: number, h1: number, h2: number,
+  order: number,
+  method: IntegrationMethod,
+  ccapPrev: number,
+): { geq: number; ceq: number; ccap: number; ag0: number } {
+  if (dt <= 0) return { geq: 0, ceq: 0, ccap: 0, ag0: 0 };
+
+  let ag0: number;
+  let ccap: number;
+
+  if (order <= 1) {
+    ag0 = 1 / dt;
+    ccap = (phi0 - phi1) / dt;
+  } else if (method === "trapezoidal") {
+    ag0 = 2 / dt;
+    ccap = (2 / dt) * (phi0 - phi1) - ccapPrev;
+  } else {
+    const safeH1 = h1 > 0 ? h1 : dt;
+    const safeH2 = h2 > 0 ? h2 : safeH1;
+    const r1 = safeH1 / dt;
+    const r2 = (safeH1 + safeH2) / dt;
+    const u22 = r2 * (r2 - r1);
+    if (Math.abs(u22) < 1e-30) {
+      ag0 = 1 / dt;
+      ccap = (phi0 - phi1) / dt;
+    } else {
+      const rhs2 = r1 / dt;
+      const ag2 = rhs2 / u22;
+      const ag1 = (-1 / dt - r2 * ag2) / r1;
+      ag0 = -(ag1 + ag2);
+      ccap = ag0 * phi0 + ag1 * phi1 + ag2 * phi2;
+    }
   }
+
+  const geq = ag0 * L;
+  const ceq = ccap - geq * iNow;
+  return { geq, ceq, ccap, ag0 };
 }
 
 // ---------------------------------------------------------------------------

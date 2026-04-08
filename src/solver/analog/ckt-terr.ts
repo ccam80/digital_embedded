@@ -114,8 +114,8 @@ export function cktTerr(
 
   let diff0 = q0, diff1 = q1, diff2 = q2, diff3 = q3;
   const h0 = dt;
-  const h1 = deltaOld.length > 0 ? deltaOld[0] : dt;
-  const h2 = deltaOld.length > 1 ? deltaOld[1] : h1;
+  const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+  const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
   let ddiff: number;
 
   if (order === 1) {

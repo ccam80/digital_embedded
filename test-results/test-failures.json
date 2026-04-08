@@ -1,52 +1,58 @@
 {
   "summary": {
     "vitest": {
-      "passed": 56,
-      "failed": 2,
+      "passed": 7984,
+      "failed": 4,
       "skipped": 0,
-      "totalFiles": 3,
-      "durationSeconds": 1.2
+      "totalFiles": 342,
+      "durationSeconds": 12.7
     },
     "playwright": {
       "passed": 477,
       "failed": 11,
       "skipped": 0,
       "totalFiles": 23,
-      "durationSeconds": 181.628508
+      "durationSeconds": 165.86857999999998
     },
-    "totalFailed": 13,
-    "totalPassed": 533
+    "totalFailed": 15,
+    "totalPassed": 8461
   },
   "failures": {
     "vitest": [
       {
-        "message": "V(drain) after VTO=2.5: relative error 61.9375% exceeds 0.1% (actual=1.840507626028466, expected=4.835494)",
-        "count": 1,
+        "message": "Analog engine stagnation: simTime stuck at 5.000004768371584e-9s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
+        "count": 4,
         "locations": [
           {
-            "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
-            "test": "setParam('VTO', 2.5) shifts DC OP to match SPICE reference",
-            "line": 56,
-            "column": 11
-          }
-        ]
-      },
-      {
-        "message": "V(drain) after KP=240µ: relative error 102.8913% exceeds 0.1% (actual=1.840507626028466, expected=0.9071396)",
-        "count": 1,
-        "locations": [
+            "file": "src\\solver\\coordinator.ts",
+            "test": "transient stepping does not error after 50 steps",
+            "line": 196,
+            "column": 13
+          },
           {
-            "file": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
-            "test": "setParam('KP', 240µ) shifts DC OP to match SPICE reference",
-            "line": 56,
-            "column": 11
+            "file": "src\\solver\\coordinator.ts",
+            "test": "survives 2000 transient steps without ERROR state",
+            "line": 196,
+            "column": 13
+          },
+          {
+            "file": "src\\solver\\coordinator.ts",
+            "test": "survives 600µs of sim time (matches UI run duration)",
+            "line": 196,
+            "column": 13
+          },
+          {
+            "file": "src\\solver\\coordinator.ts",
+            "test": "50 steps advance simTime > 0 without ERROR (regression: stale t=0 breakpoints must not freeze getClampedDt)",
+            "line": 196,
+            "column": 13
           }
         ]
       }
     ],
     "playwright": [
       {
-        "message": "Error: Expected 0.020900161470425022 to be close to 0.02084652 (err=0.00005364147042502196, limit=2.084652e-8)",
+        "message": "Error: Expected 0.020922521791300004 to be close to 0.02084652 (err=0.00007600179130000384, limit=2.084652e-8)",
         "count": 1,
         "locations": [
           {
@@ -106,7 +112,7 @@
         ]
       },
       {
-        "message": "Error: Expected 0.09577162815079189 to be close to 0.0957744513 (err=0.000002823149208103226, limit=9.577445129999999e-8)",
+        "message": "Error: Expected 0.09577162816208429 to be close to 0.0957744513 (err=0.0000028231379157056535, limit=9.577445129999999e-8)",
         "count": 1,
         "locations": [
           {

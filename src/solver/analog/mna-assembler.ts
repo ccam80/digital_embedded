@@ -80,6 +80,25 @@ export class MNAAssembler {
   }
 
   /**
+   * Stamp previously-computed companion model entries (geq/ieq) from all
+   * reactive elements into the MNA matrix.
+   *
+   * Calls `element.stampReactiveCompanion!(solver)` only for elements where
+   * both `isReactive === true` and `stampReactiveCompanion` is implemented.
+   *
+   * Called every NR iteration after `stampNonlinear`.
+   *
+   * @param elements - The full element list for this circuit.
+   */
+  stampReactiveCompanion(elements: readonly AnalogElement[]): void {
+    for (const el of elements) {
+      if (el.isReactive && el.stampReactiveCompanion) {
+        el.stampReactiveCompanion(this._solver);
+      }
+    }
+  }
+
+  /**
    * Update internal linearization state for all nonlinear elements from the
    * latest NR solution vector.
    *

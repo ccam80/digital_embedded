@@ -41,6 +41,10 @@ Never propose "pragmatic", "simple", "fastest", or "minimal" solutions. Always i
 
 When implementing or fixing any SPICE-derived algorithm (convergence, stamps, limiting, integration), match the corresponding ngspice source function exactly (e.g., `BJTconvTest`, `DIOload`). Provide a mapping table from ngspice variables to ours.
 
+### ngspice Comparison Harness — First Tool for Numerical Issues
+
+For ANY numerical discrepancy, convergence failure, or model correctness question, the **first step** is to compare per-NR-iteration internal node/branch values against ngspice using the instrumented test harness. Do not theorize about code differences — run the comparison and find the exact iteration where values diverge. See `docs/ngspice-harness-howto.md` for setup and usage. The harness captures per-iteration voltages, device states (`CKTstate0`), and convergence data from both engines side-by-side.
+
 ### Serve Over HTTP
 
 All files MUST be served over HTTP, not opened as `file://` URLs.

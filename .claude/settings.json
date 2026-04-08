@@ -4,7 +4,10 @@
       "mcp__circuit_simulator__",
       "Circuit-simulator",
       "Read",
-      "Fetch"
+      "Fetch",
+      "WebFetch",
+      "Search",
+      "Grep"
     ],
     "ask": [
       "Write"

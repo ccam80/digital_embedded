@@ -132,7 +132,7 @@ describe("Diode", () => {
     // At Vd = 0.7V, geq = IS * exp(Vd/nVt) / nVt + GMIN
     const expVal = Math.exp(0.7 / nVt);
     const expectedGeq = (IS * expVal) / nVt + GMIN;
-    const expectedId = IS * (expVal - 1);
+    const expectedId = IS * (expVal - 1) + GMIN * 0.7;
     const expectedIeq = expectedId - expectedGeq * 0.7;
 
     // 4 conductance stamps (nodes 1 and 2 → solver indices 0 and 1)
@@ -225,11 +225,12 @@ describe("Diode", () => {
     // Now call stampCompanion
     expect(element.stampCompanion).toBeDefined();
 
-    element.stampCompanion!(1e-6, "trapezoidal", voltages);
+    element.stampCompanion!(1e-6, "trapezoidal", voltages, 1, [1e-6]);
 
     // Now stamp should include capacitor contributions
     const solver2 = makeMockSolver();
     element.stamp(solver2);
+    element.stampReactiveCompanion?.(solver2);
 
     // Verify Cj computation: CJO / (1 - Vd/VJ)^M at Vd = -2V
     // Cj = 10pF / (1 - (-2)/0.7)^0.5 = 10pF / (1 + 2/0.7)^0.5

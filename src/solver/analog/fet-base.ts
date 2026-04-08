@@ -19,12 +19,11 @@
 import type { AnalogElementCore, IntegrationMethod, StatePoolRef } from "../../core/analog-types.js";
 import type { SparseSolver } from "./sparse-solver.js";
 import { stampG, stampRHS } from "./stamp-helpers.js";
-import {
-  capacitorConductance,
-  capacitorHistoryCurrent,
-} from "./integration.js";
+import { integrateCapacitor } from "./integration.js";
 import { defineStateSchema, applyInitialValues } from "./state-schema.js";
 import type { StateSchema } from "./state-schema.js";
+import { cktTerr } from "./ckt-terr.js";
+import type { LteParams } from "./ckt-terr.js";
 
 // ---------------------------------------------------------------------------
 // FetCapacitances interface
@@ -88,6 +87,17 @@ export const SLOT_MODE                  = 31;  // +1 normal, -1 reverse (for con
 export const SLOT_Q_GS                  = 32;  // Gate-source charge at current step
 export const SLOT_Q_GD                  = 33;  // Gate-drain charge at current step
 export const SLOT_Q_GB                  = 34;  // Gate-bulk charge at current step
+// Meyer half-cap averaging slots (mos1load.c:769-786)
+export const SLOT_MEYER_GS              = 35;  // Meyer half-cap for gate-source
+export const SLOT_MEYER_GD              = 36;  // Meyer half-cap for gate-drain
+export const SLOT_MEYER_GB              = 37;  // Meyer half-cap for gate-bulk
+export const SLOT_CCAP_GS               = 38;  // Gate-source companion current (for LTE)
+export const SLOT_CCAP_GD               = 39;  // Gate-drain companion current (for LTE)
+export const SLOT_CCAP_GB               = 40;  // Gate-bulk companion current (for LTE)
+export const SLOT_Q_DB                  = 41;  // Drain-bulk junction charge
+export const SLOT_Q_SB                  = 42;  // Source-bulk junction charge
+export const SLOT_CCAP_DB               = 43;  // Drain-bulk companion current (for LTE)
+export const SLOT_CCAP_SB               = 44;  // Source-bulk companion current (for LTE)
 
 // Keep legacy names as aliases so mosfet.ts imports still resolve during transition
 /** @deprecated Use SLOT_V_GS */
@@ -177,6 +187,16 @@ export const FET_BASE_SCHEMA: StateSchema = defineStateSchema("AbstractFetElemen
   { name: "Q_GS",      doc: "Gate-source charge at current step",                init: { kind: "zero" } },
   { name: "Q_GD",      doc: "Gate-drain charge at current step",                 init: { kind: "zero" } },
   { name: "Q_GB",      doc: "Gate-bulk charge at current step",                  init: { kind: "zero" } },
+  { name: "MEYER_GS",  doc: "Meyer half-cap for gate-source averaging",          init: { kind: "zero" } },
+  { name: "MEYER_GD",  doc: "Meyer half-cap for gate-drain averaging",           init: { kind: "zero" } },
+  { name: "MEYER_GB",  doc: "Meyer half-cap for gate-bulk averaging",            init: { kind: "zero" } },
+  { name: "CCAP_GS",   doc: "Gate-source companion current",                     init: { kind: "zero" } },
+  { name: "CCAP_GD",   doc: "Gate-drain companion current",                      init: { kind: "zero" } },
+  { name: "CCAP_GB",   doc: "Gate-bulk companion current",                       init: { kind: "zero" } },
+  { name: "Q_DB",      doc: "Drain-bulk junction charge",                        init: { kind: "zero" } },
+  { name: "Q_SB",      doc: "Source-bulk junction charge",                       init: { kind: "zero" } },
+  { name: "CCAP_DB",   doc: "Drain-bulk companion current",                      init: { kind: "zero" } },
+  { name: "CCAP_SB",   doc: "Source-bulk companion current",                     init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -215,6 +235,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
   s1!: Float64Array;
   s2!: Float64Array;
   s3!: Float64Array;
+  protected _pool!: StatePoolRef;
 
   // Source-stepping scale factor — not stored in pool (not state)
   protected _sourceScale: number = 1.0;
@@ -234,6 +255,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     this.s1 = pool.state1;
     this.s2 = pool.state2;
     this.s3 = pool.state3;
+    this._pool = pool;
     applyInitialValues(FET_BASE_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
@@ -281,12 +303,20 @@ export abstract class AbstractFetElement implements AnalogElementCore {
   /**
    * Stamp the linear part: topology-constant entries only.
    *
-   * For basic FETs there are no purely linear terms (no gate resistance etc.).
-   * Subclasses with gate resistance override this method and call super.stamp(solver).
-   * Capacitance companion model entries are stamped here from previously
-   * computed companion coefficients (updated once per timestep in stampCompanion).
+   * Base FET has no topology-constant entries. Subclasses may override.
+   * Capacitance companion model entries are stamped in stampReactiveCompanion().
    */
-  stamp(solver: SparseSolver): void {
+  stamp(_solver: SparseSolver): void {
+    // Base FET has no topology-constant entries. Subclasses may override.
+  }
+
+  /**
+   * Stamp GS and GD gate capacitance companion model entries.
+   *
+   * Called every NR iteration after stampNonlinear. Subclasses with additional
+   * junction capacitances (e.g. MOSFET GB, DB, SB) override this and call super.
+   */
+  stampReactiveCompanion(solver: SparseSolver): void {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -444,31 +474,34 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     const cbdI = s0[base + SLOT_CBD_I];
     const cbsI = s0[base + SLOT_CBS_I];
 
-    // cd = channel current minus drain junction current (ngspice MOS1convTest)
-    const cd = ids - cbdI;
+    // cd = mode * channel current minus drain junction current (ngspice MOS1convTest mos1load.c:543)
     const mode = s0[base + SLOT_MODE];
+    const cd = mode * ids - cbdI;
+    // Subtract drain junction cap companion current (ngspice mos1load.c:699)
+    const cqbd = s0[base + SLOT_CAP_IEQ_DB];
+    const cdFinal = cd - cqbd;
 
     // MOS1convTest: predicted drain current — mode-dependent formula
     let cdhat: number;
     if (mode >= 0) {
       // Normal mode
-      cdhat = cd + gm * delvgs + gds * delvds + gmbs * delvbs - gbd * delvbd;
+      cdhat = cdFinal + gm * delvgs + gds * delvds + gmbs * delvbs - gbd * delvbd;
     } else {
       // Reverse mode: vgd = vgs - vds
       const delvgd = delvgs - delvds;
-      cdhat = cd - (gbd - gmbs) * delvbd - gm * delvgd + gds * delvds;
+      cdhat = cdFinal - (gbd - gmbs) * delvbd - gm * delvgd + gds * delvds;
     }
 
     // MOS1convTest: predicted bulk current
     const cbhat = cbsI + cbdI + gbd * delvbd + gbs * delvbs;
 
-    const tolD = reltol * Math.max(Math.abs(cdhat), Math.abs(cd)) + abstol;
+    const tolD = reltol * Math.max(Math.abs(cdhat), Math.abs(cdFinal)) + abstol;
     const tolB = reltol * Math.max(Math.abs(cbhat), Math.abs(cbsI + cbdI)) + abstol;
 
-    return Math.abs(cdhat - cd) <= tolD && Math.abs(cbhat - (cbsI + cbdI)) <= tolB;
+    return Math.abs(cdhat - cdFinal) <= tolD && Math.abs(cbhat - (cbsI + cbdI)) <= tolB;
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -481,47 +514,66 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     const vgdNow = vG - vD;
 
     const base = this.stateBaseOffset;
+    const isFirstCall = this._pool.tranStep === 0;
 
-    // Recover capacitor currents at previous accepted step from s1
-    const capGeqGS = this.s1[base + SLOT_CAP_GEQ_GS];
-    const capIeqGS = this.s1[base + SLOT_CAP_IEQ_GS];
-    const capGeqGD = this.s1[base + SLOT_CAP_GEQ_GD];
-    const capIeqGD = this.s1[base + SLOT_CAP_IEQ_GD];
-    const iGS = capGeqGS * vgsNow + capIeqGS;
-    const iGD = capGeqGD * vgdNow + capIeqGD;
-
-    // Previous voltages from s1 — first call: s1[V_GS]==0, use vgsNow as warm start
-    const prevVgsStored = this.s1[base + SLOT_V_GS];
-    const prevVgdStored = this.s1[base + SLOT_V_GD];
-    const isFirstCall = prevVgsStored === 0 && this.s1[base + SLOT_Q_GS] === 0;
-    const prevVgs = isFirstCall ? vgsNow : prevVgsStored;
-    const prevVgd = isFirstCall ? vgdNow : prevVgdStored;
-
-    // Write current voltages and charges to s0
+    // Write current voltages to s0
     this._s0[base + SLOT_V_GS] = vgsNow;
     this._s0[base + SLOT_V_GD] = vgdNow;
 
     const caps = this.computeCapacitances(this._vgs, this._vds);
+    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
 
     if (caps.cgs > 0) {
-      this._s0[base + SLOT_CAP_GEQ_GS] = capacitorConductance(caps.cgs, dt, method);
-      this._s0[base + SLOT_CAP_IEQ_GS] = capacitorHistoryCurrent(caps.cgs, dt, method, vgsNow, prevVgs, iGS);
+      // Meyer incremental charge: Q = cgs*(vgs - prevVgs) + prevQ
+      const prevVgs = this.s1[base + SLOT_V_GS];
+      const prevQgs = this.s1[base + SLOT_Q_GS];
+      const q0 = isFirstCall ? caps.cgs * vgsNow : caps.cgs * (vgsNow - prevVgs) + prevQgs;
+      const q1 = this.s1[base + SLOT_Q_GS];
+      const q2 = this.s2[base + SLOT_Q_GS];
+      const ccapPrev = this.s1[base + SLOT_CCAP_GS];
+      const res = integrateCapacitor(caps.cgs, vgsNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      this._s0[base + SLOT_CAP_GEQ_GS] = res.geq;
+      this._s0[base + SLOT_CAP_IEQ_GS] = res.ceq;
+      this._s0[base + SLOT_CCAP_GS] = res.ccap;
+      this._s0[base + SLOT_Q_GS] = q0;
     } else {
       this._s0[base + SLOT_CAP_GEQ_GS] = 0;
       this._s0[base + SLOT_CAP_IEQ_GS] = 0;
+      this._s0[base + SLOT_CCAP_GS] = 0;
     }
 
     if (caps.cgd > 0) {
-      this._s0[base + SLOT_CAP_GEQ_GD] = capacitorConductance(caps.cgd, dt, method);
-      this._s0[base + SLOT_CAP_IEQ_GD] = capacitorHistoryCurrent(caps.cgd, dt, method, vgdNow, prevVgd, iGD);
+      // Meyer incremental charge: Q = cgd*(vgd - prevVgd) + prevQ
+      const prevVgd = this.s1[base + SLOT_V_GD];
+      const prevQgd = this.s1[base + SLOT_Q_GD];
+      const q0 = isFirstCall ? caps.cgd * vgdNow : caps.cgd * (vgdNow - prevVgd) + prevQgd;
+      const q1 = this.s1[base + SLOT_Q_GD];
+      const q2 = this.s2[base + SLOT_Q_GD];
+      const ccapPrev = this.s1[base + SLOT_CCAP_GD];
+      const res = integrateCapacitor(caps.cgd, vgdNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      this._s0[base + SLOT_CAP_GEQ_GD] = res.geq;
+      this._s0[base + SLOT_CAP_IEQ_GD] = res.ceq;
+      this._s0[base + SLOT_CCAP_GD] = res.ccap;
+      this._s0[base + SLOT_Q_GD] = q0;
     } else {
       this._s0[base + SLOT_CAP_GEQ_GD] = 0;
       this._s0[base + SLOT_CAP_IEQ_GD] = 0;
+      this._s0[base + SLOT_CCAP_GD] = 0;
     }
 
+    // ngspice mos1load.c:842-853 — zero gate cap companions during MODEINITTRAN
+    if (isFirstCall) {
+      this._s0[base + SLOT_CAP_GEQ_GS] = 0;
+      this._s0[base + SLOT_CAP_IEQ_GS] = 0;
+      this._s0[base + SLOT_CCAP_GS] = 0;
+      this._s0[base + SLOT_CAP_GEQ_GD] = 0;
+      this._s0[base + SLOT_CAP_IEQ_GD] = 0;
+      this._s0[base + SLOT_CCAP_GD] = 0;
+    }
   }
 
-  updateChargeFlux(voltages: Float64Array): void {
+  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -536,8 +588,81 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     const base = this.stateBaseOffset;
     const caps = this.computeCapacitances(this._vgs, this._vds);
 
-    this._s0[base + SLOT_Q_GS] = caps.cgs * vgsNow;
-    this._s0[base + SLOT_Q_GD] = caps.cgd * vgdNow;
+    const isFirstCall = this._pool.tranStep === 0;
+    const prevVgs = this.s1[base + SLOT_V_GS];
+    const prevVgd = this.s1[base + SLOT_V_GD];
+    const prevQgs = this.s1[base + SLOT_Q_GS];
+    const prevQgd = this.s1[base + SLOT_Q_GD];
+
+    if (isFirstCall) {
+      // TRANOP: Q = C*V (mos1load.c:829-831)
+      this._s0[base + SLOT_Q_GS] = caps.cgs * vgsNow;
+      this._s0[base + SLOT_Q_GD] = caps.cgd * vgdNow;
+    } else {
+      // Transient: incremental accumulation (mos1load.c:820-826)
+      this._s0[base + SLOT_Q_GS] = caps.cgs * (vgsNow - prevVgs) + prevQgs;
+      this._s0[base + SLOT_Q_GD] = caps.cgd * (vgdNow - prevVgd) + prevQgd;
+    }
+
+    // Recompute ccap from converged charges so the next step's trapezoidal
+    // recursion starts from the correct companion current (fixes stale CCAP_GS/GD).
+    if (dt > 0) {
+      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+
+      if (caps.cgs > 0) {
+        const q0gs = this._s0[base + SLOT_Q_GS];
+        const q1gs = this.s1[base + SLOT_Q_GS];
+        const q2gs = this.s2[base + SLOT_Q_GS];
+        const ccapPrevGs = this.s1[base + SLOT_CCAP_GS];
+        const resGs = integrateCapacitor(caps.cgs, vgsNow, q0gs, q1gs, q2gs, dt, h1, h2, order, method, ccapPrevGs);
+        this._s0[base + SLOT_CCAP_GS] = resGs.ccap;
+      }
+
+      if (caps.cgd > 0) {
+        const q0gd = this._s0[base + SLOT_Q_GD];
+        const q1gd = this.s1[base + SLOT_Q_GD];
+        const q2gd = this.s2[base + SLOT_Q_GD];
+        const ccapPrevGd = this.s1[base + SLOT_CCAP_GD];
+        const resGd = integrateCapacitor(caps.cgd, vgdNow, q0gd, q1gd, q2gd, dt, h1, h2, order, method, ccapPrevGd);
+        this._s0[base + SLOT_CCAP_GD] = resGd.ccap;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // LTE timestep estimation — GS and GD gate charges
+  // ---------------------------------------------------------------------------
+
+  getLteTimestep(dt: number, deltaOld: readonly number[], order: number, method: IntegrationMethod, lteParams: LteParams): number {
+    const base = this.stateBaseOffset;
+    let minDt = Infinity;
+
+    // Gate-source
+    {
+      const ccap0 = this._s0[base + SLOT_CCAP_GS];
+      const ccap1 = this.s1[base + SLOT_CCAP_GS];
+      const q0 = this._s0[base + SLOT_Q_GS];
+      const q1 = this.s1[base + SLOT_Q_GS];
+      const q2 = this.s2[base + SLOT_Q_GS];
+      const q3 = this.s3[base + SLOT_Q_GS];
+      const dtGS = cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
+      if (dtGS < minDt) minDt = dtGS;
+    }
+
+    // Gate-drain
+    {
+      const ccap0 = this._s0[base + SLOT_CCAP_GD];
+      const ccap1 = this.s1[base + SLOT_CCAP_GD];
+      const q0 = this._s0[base + SLOT_Q_GD];
+      const q1 = this.s1[base + SLOT_Q_GD];
+      const q2 = this.s2[base + SLOT_Q_GD];
+      const q3 = this.s3[base + SLOT_Q_GD];
+      const dtGD = cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
+      if (dtGD < minDt) minDt = dtGD;
+    }
+
+    return minDt;
   }
 
   // ---------------------------------------------------------------------------

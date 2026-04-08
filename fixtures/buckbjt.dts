@@ -185,10 +185,12 @@
         },
         "properties": {
           "_modelParams": {
-            "amplitude": 4.983907855756475,
-            "dcOffset": 0,
+            "amplitude": 2.4919539278782377,
+            "dcOffset": 2.4919539278782377,
+            "fallTime": 1e-9,
             "frequency": 10000,
-            "phase": 0
+            "phase": 0,
+            "riseTime": 1e-9
           },
           "_pinElectrical": {
             "neg": {
@@ -214,7 +216,7 @@
               "vOL": 0
             }
           },
-          "amplitude": 4.983907855756475,
+          "amplitude": 2.4919539278782377,
           "frequency": 10000,
           "waveform": "square"
         },

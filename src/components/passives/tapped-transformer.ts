@@ -371,26 +371,39 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     if (ct !== 0) solver.stamp(ct - 1, b3, 1);
     if (s2 !== 0) solver.stamp(s2 - 1, b3, -1);
 
-    // Branch rows (C sub-matrix + RHS).
-    // Primary:     V(P1) - V(P2) - (g11 + R_pri)·I1 - g12·I2 - g13·I3 = hist1
+    // C sub-matrix: voltage incidence (topology-constant ±1 entries).
+    // Primary:     V(P1) - V(P2) ...
     if (p1 !== 0) solver.stamp(b1, p1 - 1, 1);
     if (p2 !== 0) solver.stamp(b1, p2 - 1, -1);
+
+    // Sec half-1: V(S1) - V(CT) ...
+    if (s1 !== 0) solver.stamp(b2, s1 - 1, 1);
+    if (ct !== 0) solver.stamp(b2, ct - 1, -1);
+
+    // Sec half-2: V(CT) - V(S2) ...
+    if (ct !== 0) solver.stamp(b3, ct - 1, 1);
+    if (s2 !== 0) solver.stamp(b3, s2 - 1, -1);
+  }
+
+  stampReactiveCompanion(solver: SparseSolver): void {
+    const b1 = this.branchIndex;
+    const b2 = this._b2;
+    const b3 = this._b3;
+
+    // Branch diagonals: companion + winding resistance; off-diagonals: mutual terms.
+    // Primary: -(g11 + R_pri)·I1 - g12·I2 - g13·I3 = hist1
     solver.stamp(b1, b1, -(this.s0[this.base + SLOT_G11] + this._rPri));
     solver.stamp(b1, b2, -this.s0[this.base + SLOT_G12]);
     solver.stamp(b1, b3, -this.s0[this.base + SLOT_G13]);
     solver.stampRHS(b1, this.s0[this.base + SLOT_HIST1]);
 
-    // Sec half-1: V(S1) - V(CT) - g12·I1 - (g22 + R_sec)·I2 - g23·I3 = hist2
-    if (s1 !== 0) solver.stamp(b2, s1 - 1, 1);
-    if (ct !== 0) solver.stamp(b2, ct - 1, -1);
+    // Sec half-1: -g12·I1 - (g22 + R_sec)·I2 - g23·I3 = hist2
     solver.stamp(b2, b1, -this.s0[this.base + SLOT_G12]);
     solver.stamp(b2, b2, -(this.s0[this.base + SLOT_G22] + this._rSec));
     solver.stamp(b2, b3, -this.s0[this.base + SLOT_G23]);
     solver.stampRHS(b2, this.s0[this.base + SLOT_HIST2]);
 
-    // Sec half-2: V(CT) - V(S2) - g13·I1 - g23·I2 - (g33 + R_sec)·I3 = hist3
-    if (ct !== 0) solver.stamp(b3, ct - 1, 1);
-    if (s2 !== 0) solver.stamp(b3, s2 - 1, -1);
+    // Sec half-2: -g13·I1 - g23·I2 - (g33 + R_sec)·I3 = hist3
     solver.stamp(b3, b1, -this.s0[this.base + SLOT_G13]);
     solver.stamp(b3, b2, -this.s0[this.base + SLOT_G23]);
     solver.stamp(b3, b3, -(this.s0[this.base + SLOT_G33] + this._rSec));
@@ -466,7 +479,7 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     s[b + SLOT_I3]   = i3Now;
   }
 
-  updateChargeFlux(voltages: Float64Array): void {
+  updateChargeFlux(voltages: Float64Array, _dt: number, _method: IntegrationMethod, _order: number, _deltaOld: readonly number[]): void {
     const b1 = this.branchIndex;
     const b2 = this._b2;
     const b3 = this._b3;

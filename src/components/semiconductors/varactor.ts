@@ -31,15 +31,13 @@ import type { ReactiveAnalogElementCore, IntegrationMethod } from "../../solver/
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import {
-  capacitorConductance,
-  capacitorHistoryCurrent,
-} from "../../solver/analog/integration.js";
+import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { VT } from "../../core/constants.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
+import type { LteParams } from "../../solver/analog/ckt-terr.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -105,6 +103,7 @@ const VARACTOR_STATE_SCHEMA = defineStateSchema("VaractorElement", [
   { name: "CAP_IEQ", doc: "Capacitance history current (A)",                      init: { kind: "zero" } },
   { name: "V",       doc: "Junction voltage at current step (for companion)",     init: { kind: "zero" } },
   { name: "Q",       doc: "Charge Cj*V at current step (history from s1/s2/s3)", init: { kind: "zero" } },
+  { name: "CCAP",    doc: "Companion current (NIintegrate)",                      init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -134,6 +133,7 @@ export function createVaractorElement(
   // State pool slot indices
   const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
   const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_V = 6, SLOT_Q = 7;
+  const SLOT_CCAP = 8;
 
   // Pool binding — set by initState
   let s0: Float64Array;
@@ -141,6 +141,7 @@ export function createVaractorElement(
   let s2: Float64Array;
   let s3: Float64Array;
   let base: number;
+  let pool: StatePoolRef;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
   let pnjlimLimited = false;
@@ -150,7 +151,7 @@ export function createVaractorElement(
     isNonlinear: true,
     isReactive: true,
     poolBacked: true as const,
-    stateSize: 8,
+    stateSize: 9,
     stateSchema: VARACTOR_STATE_SCHEMA,
     stateBaseOffset: -1,
     s0: new Float64Array(0),
@@ -158,7 +159,8 @@ export function createVaractorElement(
     s2: new Float64Array(0),
     s3: new Float64Array(0),
 
-    initState(pool: StatePoolRef): void {
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
       s0 = pool.state0;
       s1 = pool.state1;
       s2 = pool.state2;
@@ -168,8 +170,12 @@ export function createVaractorElement(
       applyInitialValues(VARACTOR_STATE_SCHEMA, pool, base, {});
     },
 
-    stamp(solver: SparseSolver): void {
-      // Stamp capacitance companion model (computed in stampCompanion)
+    stamp(_solver: SparseSolver): void {
+      // No topology-constant entries.
+      // Capacitance companion model entries are stamped in stampReactiveCompanion().
+    },
+
+    stampReactiveCompanion(solver: SparseSolver): void {
       const capGeq = s0[base + SLOT_CAP_GEQ];
       const capIeq = s0[base + SLOT_CAP_IEQ];
       if (capGeq !== 0 || capIeq !== 0) {
@@ -216,7 +222,7 @@ export function createVaractorElement(
       s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
     },
 
-    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vNow = vA - vC;
@@ -225,16 +231,18 @@ export function createVaractorElement(
       const vReverse = -vNow;
       const Cj = computeVaractorCapacitance(vReverse, p.cjo, p.vj, p.m);
 
-      // Recover previous capacitor current from s1 (last accepted step via pool rotation)
-      const prevCapGeq = s1[base + SLOT_CAP_GEQ];
-      const prevCapIeq = s1[base + SLOT_CAP_IEQ];
-      const iNow = prevCapGeq * s1[base + SLOT_V] + prevCapIeq;
-      // First call detected by s1 voltage still zero (pool zero-initialised)
-      const vPrevForFormula = (s1[base + SLOT_V] === 0 && s1[base + SLOT_Q] === 0) ? vNow : s1[base + SLOT_V];
-
-      s0[base + SLOT_CAP_GEQ] = capacitorConductance(Cj, dt, method);
-      s0[base + SLOT_CAP_IEQ] = capacitorHistoryCurrent(Cj, dt, method, vNow, vPrevForFormula, iNow);
+      const q0 = Cj * vNow;
+      const q1 = s1[base + SLOT_Q];
+      const q2 = s2[base + SLOT_Q];
+      const ccapPrev = s1[base + SLOT_CCAP];
+      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+      const { geq, ceq, ccap } = integrateCapacitor(Cj, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      s0[base + SLOT_CAP_GEQ] = geq;
+      s0[base + SLOT_CAP_IEQ] = ceq;
       s0[base + SLOT_V] = vNow;
+      s0[base + SLOT_Q] = q0;
+      s0[base + SLOT_CCAP] = ccap;
     },
 
     getLteTimestep(
@@ -242,14 +250,14 @@ export function createVaractorElement(
       deltaOld: readonly number[],
       order: number,
       method: IntegrationMethod,
-      lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
+      lteParams: LteParams,
     ): number {
       const q0 = s0[base + SLOT_Q];
       const q1 = s1[base + SLOT_Q];
       const q2 = s2[base + SLOT_Q];
       const q3 = s3[base + SLOT_Q];
-      const ccap0 = dt > 0 ? (q0 - q1) / dt : 0;
-      const ccap1 = deltaOld.length > 0 && deltaOld[0] > 0 ? (q1 - q2) / deltaOld[0] : 0;
+      const ccap0 = s0[base + SLOT_CCAP];
+      const ccap1 = s1[base + SLOT_CCAP];
       return cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
     },
 
@@ -292,7 +300,7 @@ export function createVaractorElement(
       }
     },
 
-    updateChargeFlux(voltages: Float64Array): void {
+    updateChargeFlux(voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vNow = vA - vC;

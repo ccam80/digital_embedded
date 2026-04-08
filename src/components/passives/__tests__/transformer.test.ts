@@ -155,6 +155,7 @@ describe("Transformer", () => {
       solver.beginAssembly(matrixSize);
       vsrc.stamp(solver);
       transformer.stamp(solver);
+      transformer.stampReactiveCompanion!(solver);
       rLoad.stamp(solver);
       solver.finalize();
       const result = solver.factor();
@@ -227,6 +228,7 @@ describe("Transformer", () => {
       solver.beginAssembly(matrixSize);
       vsrc.stamp(solver);
       transformer.stamp(solver);
+      transformer.stampReactiveCompanion!(solver);
       rLoad.stamp(solver);
       solver.finalize();
       const result = solver.factor();
@@ -300,6 +302,7 @@ describe("Transformer", () => {
       solver.beginAssembly(matrixSize);
       vsrc.stamp(solver);
       transformer.stamp(solver);
+      transformer.stampReactiveCompanion!(solver);
       rLoad.stamp(solver);
       solver.finalize();
       const result = solver.factor();
@@ -374,6 +377,7 @@ describe("Transformer", () => {
         solver.beginAssembly(matrixSize);
         vsrc.stamp(solver);
         transformer.stamp(solver);
+        transformer.stampReactiveCompanion!(solver);
         rLoad.stamp(solver);
         solver.finalize();
         const result = solver.factor();
@@ -440,6 +444,7 @@ describe("Transformer", () => {
       solver.beginAssembly(matrixSize);
       vsrc.stamp(solver);
       transformer.stamp(solver);
+      transformer.stampReactiveCompanion!(solver);
       rLoad.stamp(solver);
       solver.finalize();
       const result = solver.factor();

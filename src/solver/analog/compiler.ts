@@ -69,7 +69,7 @@ function modelEntryToMnaModel(entry: ModelEntry): MnaModel | null {
   if (entry.kind === "inline") {
     const model: MnaModel = {
       factory: entry.factory,
-      branchCount: entry.branchCount ?? 0,
+      branchCount: entry.branchCount,
     };
     if (entry.getInternalNodeCount) {
       model.getInternalNodeCount = entry.getInternalNodeCount;
@@ -330,8 +330,8 @@ function compileSubcircuitToMnaModel(
       }
 
       if (anyReactive) {
-        core.stampCompanion = (dt: number, method: import("../../core/analog-types.js").IntegrationMethod, voltages: Float64Array): void => {
-          for (const sub of subElements) sub.stampCompanion?.(dt, method, voltages);
+        core.stampCompanion = (dt: number, method: import("../../core/analog-types.js").IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void => {
+          for (const sub of subElements) sub.stampCompanion?.(dt, method, voltages, order, deltaOld);
         };
       }
 
@@ -654,12 +654,7 @@ function runPassA_partition(
         continue;
       }
       case 'stamp': {
-        const modelBranchCount = route.model.branchCount ?? 0;
-        const branchIdx = modelBranchCount > 0 ? branchCount : -1;
-        branchCount += modelBranchCount;
         const props = el.getProperties();
-        // Populate model params early so getInternalNodeCount can read them
-        // (e.g. SPICE L1 BJT needs RB/RC/RE to determine internal node count)
         if (route.entry) {
           const merged: Record<string, number> = { ...paramDefDefaults(route.entry.paramDefs), ...route.entry.params };
           for (const k of props.getModelParamKeys()) {
@@ -667,6 +662,10 @@ function runPassA_partition(
           }
           props.replaceModelParams(merged);
         }
+        const rawBc = route.model.branchCount;
+        const modelBranchCount = typeof rawBc === 'function' ? rawBc(props) : (rawBc ?? 0);
+        const branchIdx = modelBranchCount > 0 ? branchCount : -1;
+        branchCount += modelBranchCount;
         const internalCount = route.model.getInternalNodeCount?.(props) ?? 0;
         const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
         nextInternalNode += internalCount;

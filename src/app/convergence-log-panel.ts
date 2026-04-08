@@ -18,6 +18,84 @@ import type { SimulationCoordinator } from '../solver/coordinator-types.js';
 let _loggingDesired = false;
 
 // ---------------------------------------------------------------------------
+// CSV export helpers
+// ---------------------------------------------------------------------------
+
+function csvEscape(value: string): string {
+  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+    return '"' + value.replace(/"/g, '""') + '"';
+  }
+  return value;
+}
+
+function buildCsv(records: StepRecord[]): string {
+  const headers = [
+    'stepNumber', 'simTime_s', 'entryDt_s', 'acceptedDt_s',
+    'entryMethod', 'exitMethod', 'totalNRIters',
+    'lteWorstRatio', 'lteProposedDt_s', 'lteRejected', 'outcome',
+    'attemptIndex', 'attemptTrigger', 'attemptDt_s', 'attemptMethod',
+    'attemptIterations', 'attemptConverged', 'attemptBlameElement', 'attemptBlameNode',
+  ];
+  const rows: string[] = [headers.join(',')];
+
+  for (const rec of records) {
+    const totalIters = rec.attempts.reduce((sum, a) => sum + a.iterations, 0);
+    const base = [
+      String(rec.stepNumber),
+      String(rec.simTime),
+      String(rec.entryDt),
+      String(rec.acceptedDt),
+      rec.entryMethod,
+      rec.exitMethod,
+      String(totalIters),
+      String(rec.lteWorstRatio),
+      String(rec.lteProposedDt),
+      rec.lteRejected ? 'true' : 'false',
+      rec.outcome,
+    ];
+
+    if (rec.attempts.length === 0) {
+      rows.push([...base, '', '', '', '', '', '', '', ''].map(csvEscape).join(','));
+    } else {
+      for (let i = 0; i < rec.attempts.length; i++) {
+        const att = rec.attempts[i]!;
+        const attCells = [
+          String(i),
+          att.trigger,
+          String(att.dt),
+          att.method,
+          String(att.iterations),
+          att.converged ? 'true' : 'false',
+          String(att.blameElement),
+          String(att.blameNode),
+        ];
+        rows.push([...base, ...attCells].map(csvEscape).join(','));
+      }
+    }
+  }
+
+  return rows.join('\r\n');
+}
+
+function downloadTextFile(content: string, filename: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function makeTimestampedFilename(ext: string): string {
+  const now = new Date();
+  const pad = (n: number, len = 2) => String(n).padStart(len, '0');
+  const datePart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const timePart = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return `convergence-log-${datePart}-${timePart}.${ext}`;
+}
+
+// ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
 
@@ -244,9 +322,25 @@ export function openConvergenceLogPanel(ctx: AppContext): void {
   }
   lastNSelect.addEventListener('change', () => refreshRecords());
 
+  const saveLogBtn = document.createElement('button');
+  saveLogBtn.textContent = 'Save Log';
+  saveLogBtn.title = 'Save all visible log entries as CSV';
+  saveLogBtn.addEventListener('click', () => {
+    const coord = getCoord();
+    if (!coord.supportsConvergenceLog()) return;
+    const lastN = parseInt(lastNSelect.value, 10);
+    const records = lastN > 0
+      ? (coord.getConvergenceLog(lastN) ?? [])
+      : (coord.getConvergenceLog() ?? []);
+    if (records.length === 0) return;
+    const csv = buildCsv(records);
+    downloadTextFile(csv, makeTimestampedFilename('csv'), 'text/csv;charset=utf-8;');
+  });
+
   toolbar.appendChild(toggleBtn);
   toolbar.appendChild(refreshBtn);
   toolbar.appendChild(clearBtn);
+  toolbar.appendChild(saveLogBtn);
   toolbar.appendChild(lastNLabel);
   toolbar.appendChild(lastNSelect);
 

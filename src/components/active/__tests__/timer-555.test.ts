@@ -158,6 +158,7 @@ function buildHandCircuit(opts: {
   nodeCount: number;
   branchCount: number;
   elements: AnalogElement[];
+  statePool?: StatePool;
 }): ConcreteCompiledAnalogCircuit {
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: opts.nodeCount,
@@ -167,7 +168,7 @@ function buildHandCircuit(opts: {
     wireToNodeId: new Map(),
     models: new Map(),
     elementToCircuitElement: new Map(),
-    statePool: new StatePool(0),
+    statePool: opts.statePool ?? new StatePool(0),
   });
 }
 
@@ -201,9 +202,10 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
 // ---------------------------------------------------------------------------
 
 import {
-  makeCapacitor,
+  createTestCapacitor,
   makeVoltageSource,
   withNodeIds,
+  allocateStatePool,
 } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
@@ -492,12 +494,16 @@ function buildAstableCircuit(R1: number, R2: number, C: number, VCC: number, vDr
   const vsVcc  = makeVoltageSource(nVcc, 0, brVcc, VCC);
   const r1El   = makeResistor(nVcc, nDis, R1);
   const r2El   = makeResistor(nDis, nCap, R2);
-  const capEl  = makeCapacitor(nCap, 0, C);
+  const capEl  = createTestCapacitor(C, nCap, 0);
+
+  const elements = [timer, vsVcc, r1El, r2El, capEl];
+  const statePool = allocateStatePool(elements);
 
   const compiled = buildHandCircuit({
     nodeCount,
     branchCount,
-    elements: [timer, vsVcc, r1El, r2El, capEl],
+    elements,
+    statePool,
   });
 
   const engine = new MNAEngine();
@@ -706,7 +712,7 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
 
   const vsVcc  = makeVoltageSource(nVcc, 0, brVcc, VCC);
   const rEl    = makeResistor(nVcc, nThr, R);
-  const capEl  = makeCapacitor(nThr, 0, Cval);
+  const capEl  = createTestCapacitor(Cval, nThr, 0);
 
   // Mutable trigger voltage source
   let _trigVoltage = VCC; // starts HIGH (idle)
@@ -728,10 +734,14 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
     },
   };
 
+  const elements = [timer, vsVcc, rEl, capEl, vsTrig];
+  const statePool = allocateStatePool(elements);
+
   const compiled = buildHandCircuit({
     nodeCount,
     branchCount,
-    elements: [timer, vsVcc, rEl, capEl, vsTrig],
+    elements,
+    statePool,
   });
 
   const engine = new MNAEngine();

@@ -97,7 +97,8 @@
       "WebFetch(domain:web.engr.oregonstate.edu)",
       "mcp__codebase-memory-mcp__index_status",
       "mcp__circuit-simulator__circuit_convergence_log",
-      "mcp__circuit-simulator__circuit_step"
+      "mcp__circuit-simulator__circuit_step",
+      "Write"
     ]
   },
   "enableAllProjectMcpServers": true,

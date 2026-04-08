@@ -2,6 +2,7 @@ export class StatePool {
   /** Ring buffer of state arrays. [0]=current, [1]=prev, [2]=prev2, [3]=prev3. */
   states: Float64Array[];
   readonly totalSlots: number;
+  tranStep: number = 0;
 
   constructor(totalSlots: number) {
     this.totalSlots = totalSlots;
@@ -46,6 +47,9 @@ export class StatePool {
         (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array }).s1 = s1;
         (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array }).s2 = s2;
         (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array }).s3 = s3;
+        if (typeof (el as any).refreshSubElementRefs === 'function') {
+          (el as any).refreshSubElementRefs(s0, s1, s2, s3);
+        }
       }
     }
   }
@@ -53,6 +57,17 @@ export class StatePool {
   /** Zero all state arrays. */
   reset(): void {
     for (const buf of this.states) buf.fill(0);
+    this.tranStep = 0;
+  }
+
+  /**
+   * Seed state2 and state3 from state1 (ngspice dctran.c:782-786).
+   * Called after first transient step acceptance.
+   */
+  seedFromState1(): void {
+    const s1 = this.states[1];
+    this.states[2].set(s1);
+    this.states[3].set(s1);
   }
 
   /** Seed history from current operating point (post-DCOP). */

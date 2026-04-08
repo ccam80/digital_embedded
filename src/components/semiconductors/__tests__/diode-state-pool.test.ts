@@ -204,7 +204,7 @@ describe("diode state pool migration", () => {
 
     const voltages = new Float64Array([-1.0, 0.0]);
     element.updateOperatingPoint!(voltages);
-    element.stampCompanion!(1e-6, "trapezoidal", voltages);
+    element.stampCompanion!(1e-6, "trapezoidal", voltages, 1, [1e-6]);
 
     // After first stampCompanion, SLOT_V should hold the current junction voltage
     // vNow = voltages[0] - voltages[1] = -1.0

@@ -261,7 +261,7 @@
       - generic "Circuit editor canvas" [ref=f1e348]
     - generic [ref=f1e349]:
       - generic [ref=f1e350]: ⚠️
-      - generic [ref=f1e351]: "Simulation error: Analog engine stagnation: simTime stuck at 0s. The engine exhausted all internal retries without advancing. Check convergence log for details."
+      - generic [ref=f1e351]: "Simulation error: Analog engine stagnation: simTime stuck at 5.000004768371584e-9s. The engine exhausted all internal retries without advancing. Check convergence log for details."
       - button "×" [ref=f1e352] [cursor=pointer]
       - button "100%" [ref=f1e354] [cursor=pointer]
 ```

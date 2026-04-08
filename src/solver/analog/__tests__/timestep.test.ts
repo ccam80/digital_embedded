@@ -11,9 +11,10 @@
 import { describe, it, expect } from "vitest";
 import { TimestepController } from "../timestep.js";
 import { HistoryStore } from "../integration.js";
-import type { AnalogElement } from "../element.js";
+import type { AnalogElement, IntegrationMethod } from "../element.js";
 import type { SimulationParams } from "../../../core/analog-engine-interface.js";
 import type { SparseSolver } from "../sparse-solver.js";
+import type { LteParams } from "../ckt-terr.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,10 +40,10 @@ const DEFAULT_PARAMS: SimulationParams = {
 /**
  * Create a minimal reactive element that returns a fixed LTE estimate.
  *
- * isReactive = true, getLteEstimate returns the given truncationError with
- * toleranceReference=0 so the ngspice composite `local_tol = trtol · (reltol ·
- * |ref| + chargeTol)` collapses to the pure-absolute `trtol · chargeTol`
- * form — this keeps the rejection/ratio math easy to reason about in tests.
+ * isReactive = true, getLteTimestep computes a new dt from the given truncationError
+ * using the ngspice composite `local_tol = trtol · chgtol` (toleranceReference=0
+ * so the reltol term vanishes) — this keeps the rejection/ratio math easy to
+ * reason about in tests.
  */
 function makeReactiveElement(truncationError: number): AnalogElement {
   return {
@@ -52,8 +53,17 @@ function makeReactiveElement(truncationError: number): AnalogElement {
     isNonlinear: false,
     isReactive: true,
     stamp(_solver: SparseSolver): void {},
-    getLteEstimate(_dt: number): { truncationError: number; toleranceReference: number } {
-      return { truncationError, toleranceReference: 0 };
+    getLteTimestep(
+      dt: number,
+      _deltaOld: readonly number[],
+      _order: number,
+      _method: IntegrationMethod,
+      lteParams: LteParams,
+    ): number {
+      const localTol = lteParams.trtol * lteParams.chgtol;
+      const ratio = truncationError / localTol;
+      if (ratio <= 0) return Infinity;
+      return 0.9 * dt * Math.pow(1 / ratio, 1 / 3);
     },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },

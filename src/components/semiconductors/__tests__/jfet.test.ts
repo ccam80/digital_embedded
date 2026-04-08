@@ -428,18 +428,18 @@ describe("Registration", () => {
 // ---------------------------------------------------------------------------
 
 describe("JFET state-pool extension schema", () => {
-  it("extension_slot_constants_are_35_36_37", () => {
-    // FET_BASE_SCHEMA has 35 slots (0-34); JFET extension starts at 35.
-    expect(SLOT_VGS_JUNCTION).toBe(35);
-    expect(SLOT_GD_JUNCTION).toBe(36);
-    expect(SLOT_ID_JUNCTION).toBe(37);
+  it("extension_slot_constants_are_45_46_47", () => {
+    // FET_BASE_SCHEMA has 45 slots (0-44); JFET extension starts at 45.
+    expect(SLOT_VGS_JUNCTION).toBe(45);
+    expect(SLOT_GD_JUNCTION).toBe(46);
+    expect(SLOT_ID_JUNCTION).toBe(47);
   });
 
   it("initState_initializes_VGS_JUNCTION_to_zero", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
     const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    const pool = new StatePool(38);
+    const pool = new StatePool(48);
     element.stateBaseOffset = 0;
     element.initState(pool);
     expect(pool.state0[SLOT_VGS_JUNCTION]).toBe(0);
@@ -449,7 +449,7 @@ describe("JFET state-pool extension schema", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
     const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    const pool = new StatePool(38);
+    const pool = new StatePool(48);
     element.stateBaseOffset = 0;
     element.initState(pool);
     expect(pool.state0[SLOT_ID_JUNCTION]).toBe(0);
@@ -483,7 +483,7 @@ describe("JFET state-pool extension schema", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(PJFET_PARAMS);
     const element = createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj);
-    const pool = new StatePool(38);
+    const pool = new StatePool(48);
     element.stateBaseOffset = 0;
     element.initState(pool);
     expect(pool.state0[SLOT_VGS_JUNCTION]).toBe(0);
@@ -495,7 +495,7 @@ describe("JFET state-pool extension schema", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
     const element = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
-    const pool = new StatePool(38);
+    const pool = new StatePool(48);
     element.stateBaseOffset = 0;
     element.initState(pool);
     // Base FET slots: GM=1e-12, GDS=1e-12 (device-off linearization)

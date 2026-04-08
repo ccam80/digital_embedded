@@ -18,8 +18,7 @@ import type { SparseSolver } from "./sparse-solver.js";
 import type { IntegrationMethod } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
-  capacitorConductance,
-  capacitorHistoryCurrent,
+  integrateCapacitor,
 } from "./integration.js";
 
 /**
@@ -180,17 +179,12 @@ export class DigitalOutputPinModel {
     const C = this._spec.cOut;
     if (C <= 0) return;
     const idx = node - 1;
-    const geq = capacitorConductance(C, dt, method);
-    const ieq = capacitorHistoryCurrent(
-      C,
-      dt,
-      method,
-      this._prevVoltage,
-      0,
-      this._prevCurrent,
-    );
+    const vNow = this._prevVoltage;
+    const q0 = C * vNow;
+    const q1 = C * vNow; // no previous charge history — treat as BDF-1
+    const { geq, ceq } = integrateCapacitor(C, vNow, q0, q1, 0, dt, 0, 0, 1, method, 0);
     solver.stamp(idx, idx, geq);
-    solver.stampRHS(idx, -ieq);
+    solver.stampRHS(idx, -ceq);
   }
 
   /**
@@ -204,16 +198,10 @@ export class DigitalOutputPinModel {
     if (!this._loaded) return;
     const C = this._spec.cOut;
     if (C <= 0) return;
-    const geq = capacitorConductance(C, dt, method);
-    const ieq = capacitorHistoryCurrent(
-      C,
-      dt,
-      method,
-      this._prevVoltage,
-      0,
-      this._prevCurrent,
-    );
-    const iNow = geq * voltage + ieq;
+    const q0 = C * voltage;
+    const q1 = C * this._prevVoltage;
+    const { geq, ceq } = integrateCapacitor(C, voltage, q0, q1, 0, dt, 0, 0, 1, method, 0);
+    const iNow = geq * voltage - ceq; // ceq = ccap - geq*vNow => geq*v - ceq = ccap
     this._prevCurrent = iNow;
     this._prevVoltage = voltage;
   }
@@ -321,17 +309,12 @@ export class DigitalInputPinModel {
     const C = this._spec.cIn;
     if (C <= 0) return;
     const idx = node - 1;
-    const geq = capacitorConductance(C, dt, method);
-    const ieq = capacitorHistoryCurrent(
-      C,
-      dt,
-      method,
-      this._prevVoltage,
-      0,
-      this._prevCurrent,
-    );
+    const vNow = this._prevVoltage;
+    const q0 = C * vNow;
+    const q1 = C * vNow;
+    const { geq, ceq } = integrateCapacitor(C, vNow, q0, q1, 0, dt, 0, 0, 1, method, 0);
     solver.stamp(idx, idx, geq);
-    solver.stampRHS(idx, -ieq);
+    solver.stampRHS(idx, -ceq);
   }
 
   /**
@@ -345,16 +328,10 @@ export class DigitalInputPinModel {
     if (!this._loaded) return;
     const C = this._spec.cIn;
     if (C <= 0) return;
-    const geq = capacitorConductance(C, dt, method);
-    const ieq = capacitorHistoryCurrent(
-      C,
-      dt,
-      method,
-      this._prevVoltage,
-      0,
-      this._prevCurrent,
-    );
-    const iNow = geq * voltage + ieq;
+    const q0 = C * voltage;
+    const q1 = C * this._prevVoltage;
+    const { geq, ceq } = integrateCapacitor(C, voltage, q0, q1, 0, dt, 0, 0, 1, method, 0);
+    const iNow = geq * voltage - ceq;
     this._prevCurrent = iNow;
     this._prevVoltage = voltage;
   }

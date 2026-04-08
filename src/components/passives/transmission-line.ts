@@ -53,11 +53,11 @@ import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement, Integrati
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG } from "../../solver/analog/stamp-helpers.js";
 import {
-  capacitorConductance,
-  capacitorHistoryCurrent,
-  inductorConductance,
-  inductorHistoryCurrent,
+  integrateCapacitor,
+  integrateInductor,
 } from "../../solver/analog/integration.js";
+import { cktTerr } from "../../solver/analog/ckt-terr.js";
+import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import {
@@ -81,22 +81,35 @@ const SHORT_CIRCUIT_CONDUCTANCE = 1e9;
 
 const SEGMENT_INDUCTOR_SCHEMA: StateSchema = defineStateSchema("SegmentInductorElement", [
   ...L_COMPANION_SLOTS,
+  { name: "PHI",  doc: "Flux at current step",      init: { kind: "zero" } },
+  { name: "CCAP", doc: "Companion current",          init: { kind: "zero" } },
 ]);
 
 const SLOT_GEQ    = 0;
 const SLOT_IEQ    = 1;
 const SLOT_I_PREV = 2;
+const SLOT_L_PHI  = 3;
+const SLOT_L_CCAP = 4;
 
 const SEGMENT_CAPACITOR_SCHEMA: StateSchema = defineStateSchema("SegmentCapacitorElement", [
   ...CAP_COMPANION_SLOTS,
+  { name: "Q",    doc: "Charge at current step",    init: { kind: "zero" } },
+  { name: "CCAP", doc: "Companion current",          init: { kind: "zero" } },
 ]);
 
 // CAP slots reuse same offsets: GEQ=0, IEQ=1, V_PREV=2
 const SLOT_V_PREV = 2;
+const SLOT_C_Q    = 3;
+const SLOT_C_CCAP = 4;
 
 const COMBINED_RL_SCHEMA: StateSchema = defineStateSchema("CombinedRLElement", [
   ...L_COMPANION_SLOTS,
+  { name: "PHI",  doc: "Flux at current step",      init: { kind: "zero" } },
+  { name: "CCAP", doc: "Companion current",          init: { kind: "zero" } },
 ]);
+
+const SLOT_RL_PHI  = 3;
+const SLOT_RL_CCAP = 4;
 
 // ---------------------------------------------------------------------------
 // Model parameter declarations
@@ -340,7 +353,10 @@ class SegmentInductorElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.state0;
+    this.s0 = pool.states[0];
+    this.s1 = pool.states[1];
+    this.s2 = pool.states[2];
+    this.s3 = pool.states[3];
     this.base = this.stateBaseOffset;
     applyInitialValues(SEGMENT_INDUCTOR_SCHEMA, pool, this.base, {});
   }
@@ -349,30 +365,56 @@ class SegmentInductorElement implements ReactiveAnalogElement {
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
     const b = this.branchIndex;
-    const geq = this.s0[this.base + SLOT_GEQ];
-    const ieq = this.s0[this.base + SLOT_IEQ];
 
     // B sub-matrix: I_b flows into nA, out of nB (KCL at both nodes).
     if (nA !== 0) solver.stamp(nA - 1, b, 1);
     if (nB !== 0) solver.stamp(nB - 1, b, -1);
 
-    // C sub-matrix: branch equation V_A - V_B - geq*I_b = ieq
+    // C sub-matrix: voltage incidence (topology-constant ±1 entries).
     // When geq=0 this reduces to V_A = V_B (short circuit at DC).
     if (nA !== 0) solver.stamp(b, nA - 1, 1);
     if (nB !== 0) solver.stamp(b, nB - 1, -1);
+  }
+
+  stampReactiveCompanion(solver: SparseSolver): void {
+    const b = this.branchIndex;
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const ieq = this.s0[this.base + SLOT_IEQ];
+
     solver.stamp(b, b, -geq);
     solver.stampRHS(b, ieq);
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
     const iNow = voltages[this.branchIndex];
-    const v0 = this.pinNodeIds[0] > 0 ? voltages[this.pinNodeIds[0] - 1] : 0;
-    const v1 = this.pinNodeIds[1] > 0 ? voltages[this.pinNodeIds[1] - 1] : 0;
-    const vNow = v0 - v1;
-
-    this.s0[this.base + SLOT_GEQ]    = inductorConductance(this.L, dt, method);
-    this.s0[this.base + SLOT_IEQ]    = inductorHistoryCurrent(this.L, dt, method, iNow, this.s0[this.base + SLOT_I_PREV], vNow);
+    const phi0 = this.L * iNow;
+    const phi1 = this.s1[this.base + SLOT_L_PHI];
+    const phi2 = this.s2[this.base + SLOT_L_PHI];
+    const ccapPrev = this.s1[this.base + SLOT_L_CCAP];
+    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+    const { geq, ceq, ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrev);
+    this.s0[this.base + SLOT_GEQ]    = geq;
+    this.s0[this.base + SLOT_IEQ]    = ceq;
     this.s0[this.base + SLOT_I_PREV] = iNow;
+    this.s0[this.base + SLOT_L_PHI]  = phi0;
+    this.s0[this.base + SLOT_L_CCAP] = ccap;
+  }
+
+  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
+    const iNow = voltages[this.branchIndex];
+    this.s0[this.base + SLOT_L_PHI] = this.L * iNow;
+
+    if (dt > 0) {
+      const phi0 = this.s0[this.base + SLOT_L_PHI];
+      const phi1 = this.s1[this.base + SLOT_L_PHI];
+      const phi2 = this.s2[this.base + SLOT_L_PHI];
+      const ccapPrev = this.s1[this.base + SLOT_L_CCAP];
+      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+      const { ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrev);
+      this.s0[this.base + SLOT_L_CCAP] = ccap;
+    }
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -415,12 +457,20 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.state0;
+    this.s0 = pool.states[0];
+    this.s1 = pool.states[1];
+    this.s2 = pool.states[2];
+    this.s3 = pool.states[3];
     this.base = this.stateBaseOffset;
     applyInitialValues(SEGMENT_CAPACITOR_SCHEMA, pool, this.base, {});
   }
 
-  stamp(solver: SparseSolver): void {
+  stamp(_solver: SparseSolver): void {
+    // No topology-constant entries for a capacitor.
+    // All companion model entries are stamped in stampReactiveCompanion().
+  }
+
+  stampReactiveCompanion(solver: SparseSolver): void {
     const n0 = this.pinNodeIds[0];
     if (n0 !== 0) {
       solver.stamp(n0 - 1, n0 - 1, this.s0[this.base + SLOT_GEQ]);
@@ -428,14 +478,38 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
     }
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
     const n0 = this.pinNodeIds[0];
     const vNow = n0 > 0 ? voltages[n0 - 1] : 0;
-    const iNow = this.s0[this.base + SLOT_GEQ] * vNow + this.s0[this.base + SLOT_IEQ];
-
-    this.s0[this.base + SLOT_GEQ]    = capacitorConductance(this.C, dt, method);
-    this.s0[this.base + SLOT_IEQ]    = capacitorHistoryCurrent(this.C, dt, method, vNow, this.s0[this.base + SLOT_V_PREV], iNow);
+    const q0 = this.C * vNow;
+    const q1 = this.s1[this.base + SLOT_C_Q];
+    const q2 = this.s2[this.base + SLOT_C_Q];
+    const ccapPrev = this.s1[this.base + SLOT_C_CCAP];
+    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+    const { geq, ceq, ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+    this.s0[this.base + SLOT_GEQ]    = geq;
+    this.s0[this.base + SLOT_IEQ]    = ceq;
     this.s0[this.base + SLOT_V_PREV] = vNow;
+    this.s0[this.base + SLOT_C_Q]    = q0;
+    this.s0[this.base + SLOT_C_CCAP] = ccap;
+  }
+
+  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
+    const n0 = this.pinNodeIds[0];
+    const vNow = n0 > 0 ? voltages[n0 - 1] : 0;
+    this.s0[this.base + SLOT_C_Q] = this.C * vNow;
+
+    if (dt > 0) {
+      const q0 = this.s0[this.base + SLOT_C_Q];
+      const q1 = this.s1[this.base + SLOT_C_Q];
+      const q2 = this.s2[this.base + SLOT_C_Q];
+      const ccapPrev = this.s1[this.base + SLOT_C_CCAP];
+      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+      const { ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      this.s0[this.base + SLOT_C_CCAP] = ccap;
+    }
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -485,7 +559,10 @@ class CombinedRLElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.state0;
+    this.s0 = pool.states[0];
+    this.s1 = pool.states[1];
+    this.s2 = pool.states[2];
+    this.s3 = pool.states[3];
     this.base = this.stateBaseOffset;
     applyInitialValues(COMBINED_RL_SCHEMA, pool, this.base, {});
   }
@@ -494,30 +571,59 @@ class CombinedRLElement implements ReactiveAnalogElement {
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
     const b = this.branchIndex;
-    const geq = this.s0[this.base + SLOT_GEQ];
-    const ieq = this.s0[this.base + SLOT_IEQ];
 
     // B sub-matrix: I_b flows into nA, out of nB.
     if (nA !== 0) solver.stamp(nA - 1, b, 1);
     if (nB !== 0) solver.stamp(nB - 1, b, -1);
 
-    // C sub-matrix: branch equation V_A - V_B - (R + geq)*I_b = ieq
+    // C sub-matrix: voltage incidence (topology-constant ±1 entries).
+    // Series R is topology-constant and stamped here on branch diagonal.
     // When geq=0 and R=0 this reduces to V_A = V_B (short circuit at DC).
     if (nA !== 0) solver.stamp(b, nA - 1, 1);
     if (nB !== 0) solver.stamp(b, nB - 1, -1);
-    solver.stamp(b, b, -(this.R + geq));
+    solver.stamp(b, b, -this.R);
+  }
+
+  stampReactiveCompanion(solver: SparseSolver): void {
+    const b = this.branchIndex;
+    const geq = this.s0[this.base + SLOT_GEQ];
+    const ieq = this.s0[this.base + SLOT_IEQ];
+
+    // Companion diagonal -geq and RHS ieq (R is already in stamp())
+    solver.stamp(b, b, -geq);
     solver.stampRHS(b, ieq);
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
     const iNow = voltages[this.branchIndex];
-    const v0 = this.pinNodeIds[0] > 0 ? voltages[this.pinNodeIds[0] - 1] : 0;
-    const v1 = this.pinNodeIds[1] > 0 ? voltages[this.pinNodeIds[1] - 1] : 0;
-    const vNow = v0 - v1;
+    const phi0 = this.L * iNow;
+    const phi1 = this.s1[this.base + SLOT_RL_PHI];
+    const phi2 = this.s2[this.base + SLOT_RL_PHI];
+    const ccapPrev = this.s1[this.base + SLOT_RL_CCAP];
+    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+    const { geq, ceq, ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrev);
+    this.s0[this.base + SLOT_GEQ]     = geq;
+    this.s0[this.base + SLOT_IEQ]     = ceq;
+    this.s0[this.base + SLOT_I_PREV]  = iNow;
+    this.s0[this.base + SLOT_RL_PHI]  = phi0;
+    this.s0[this.base + SLOT_RL_CCAP] = ccap;
+  }
 
-    this.s0[this.base + SLOT_GEQ]    = inductorConductance(this.L, dt, method);
-    this.s0[this.base + SLOT_IEQ]    = inductorHistoryCurrent(this.L, dt, method, iNow, this.s0[this.base + SLOT_I_PREV], vNow);
-    this.s0[this.base + SLOT_I_PREV] = iNow;
+  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
+    const iNow = voltages[this.branchIndex];
+    this.s0[this.base + SLOT_RL_PHI] = this.L * iNow;
+
+    if (dt > 0) {
+      const phi0 = this.s0[this.base + SLOT_RL_PHI];
+      const phi1 = this.s1[this.base + SLOT_RL_PHI];
+      const phi2 = this.s2[this.base + SLOT_RL_PHI];
+      const ccapPrev = this.s1[this.base + SLOT_RL_CCAP];
+      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+      const { ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrev);
+      this.s0[this.base + SLOT_RL_CCAP] = ccap;
+    }
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -536,6 +642,14 @@ export class TransmissionLineElement implements AnalogElement {
   readonly branchIndex: number;
   readonly isNonlinear = false;
   readonly isReactive = true;
+  readonly poolBacked = true as const;
+  stateSize: number = 0;
+  stateBaseOffset = -1;
+  readonly stateSchema: StateSchema;
+  s0!: Float64Array;
+  s1!: Float64Array;
+  s2!: Float64Array;
+  s3!: Float64Array;
   setParam(_key: string, _value: number): void {}
 
   private readonly _subElements: AnalogElement[];
@@ -623,33 +737,39 @@ export class TransmissionLineElement implements AnalogElement {
     this._firstBranchIdx = firstBranchIdx;
     this._lastBranchIdx = firstBranchIdx + N - 1;
 
-    // Compute total private pool size from all reactive sub-elements.
+    // Compute total state size from all reactive sub-elements.
     let totalState = 0;
     for (const el of this._subElements) {
       if (el.isReactive) {
         totalState += (el as ReactiveAnalogElement).stateSize;
       }
     }
+    this.stateSize = totalState;
+    // stateSchema is unused for the composite but must be set; use empty schema.
+    this.stateSchema = defineStateSchema("TransmissionLineElement", []);
+  }
 
-    // Bind sub-elements to a private pool so they are immediately usable.
-    // The outer element declares stateSize=0 so the compiler allocates no engine
-    // pool slots for it; the private pool provides the backing storage.
-    const _pBufs = [new Float64Array(totalState), new Float64Array(totalState), new Float64Array(totalState), new Float64Array(totalState)];
-    const privatePool: StatePoolRef = {
-      states: _pBufs,
-      get state0() { return _pBufs[0]; },
-      get state1() { return _pBufs[1]; },
-      get state2() { return _pBufs[2]; },
-      get state3() { return _pBufs[3]; },
-      totalSlots: totalState,
-    };
-    let offset = 0;
+  initState(pool: StatePoolRef): void {
+    this.s0 = pool.states[0];
+    this.s1 = pool.states[1];
+    this.s2 = pool.states[2];
+    this.s3 = pool.states[3];
+    let offset = this.stateBaseOffset;
     for (const el of this._subElements) {
       if (el.isReactive) {
         const re = el as ReactiveAnalogElement;
         re.stateBaseOffset = offset;
-        re.initState(privatePool);
+        re.initState(pool);
         offset += re.stateSize;
+      }
+    }
+  }
+
+  refreshSubElementRefs(s0: Float64Array, s1: Float64Array, s2: Float64Array, s3: Float64Array): void {
+    for (const el of this._subElements) {
+      if (el.isReactive) {
+        const re = el as any;
+        re.s0 = s0; re.s1 = s1; re.s2 = s2; re.s3 = s3;
       }
     }
   }
@@ -660,10 +780,46 @@ export class TransmissionLineElement implements AnalogElement {
     }
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
     for (const el of this._subElements) {
       if (el.isReactive && el.stampCompanion) {
-        el.stampCompanion(dt, method, voltages);
+        el.stampCompanion(dt, method, voltages, order, deltaOld);
+      }
+    }
+  }
+
+  getLteTimestep(dt: number, deltaOld: readonly number[], order: number, method: IntegrationMethod, lteParams: LteParams): number {
+    let minDt = Infinity;
+    const SLOT_Q_PHI = 3;
+    const SLOT_CCAP_SUB = 4;
+    for (const el of this._subElements) {
+      if (!el.isReactive) continue;
+      const re = el as any;
+      const base = re.stateBaseOffset;
+      const ccap0 = re.s0[base + SLOT_CCAP_SUB];
+      const ccap1 = re.s1[base + SLOT_CCAP_SUB];
+      const q0 = re.s0[base + SLOT_Q_PHI];
+      const q1 = re.s1[base + SLOT_Q_PHI];
+      const q2 = re.s2[base + SLOT_Q_PHI];
+      const q3 = re.s3[base + SLOT_Q_PHI];
+      const proposed = cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
+      if (proposed < minDt) minDt = proposed;
+    }
+    return minDt;
+  }
+
+  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
+    for (const el of this._subElements) {
+      if (el.isReactive && (el as any).updateChargeFlux) {
+        (el as any).updateChargeFlux(voltages, dt, method, order, deltaOld);
+      }
+    }
+  }
+
+  stampReactiveCompanion(solver: SparseSolver): void {
+    for (const el of this._subElements) {
+      if (el.isReactive && el.stampReactiveCompanion) {
+        el.stampReactiveCompanion(solver);
       }
     }
   }
@@ -805,16 +961,19 @@ export const TRANSMISSION_LINE_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
   {
     xmlName: "lossPerMeter",
     propertyKey: "lossPerMeter",
+    modelParam: true,
     convert: (v) => parseFloat(v),
   },
   {
     xmlName: "length",
     propertyKey: "length",
+    modelParam: true,
     convert: (v) => parseFloat(v),
   },
   {
     xmlName: "segments",
     propertyKey: "segments",
+    modelParam: true,
     convert: (v) => parseInt(v, 10),
   },
   {
@@ -857,7 +1016,15 @@ export const TransmissionLineDefinition: ComponentDefinition = {
       factory: createTransmissionLineElement,
       paramDefs: TRANSMISSION_LINE_PARAM_DEFS,
       params: TRANSMISSION_LINE_DEFAULTS,
-      branchCount: 1,
+      branchCount: (props: PropertyBag) => {
+        const seg = props.getModelParam<number>('segments');
+        return seg != null ? seg : 10;
+      },
+      getInternalNodeCount: (props: PropertyBag) => {
+        const seg = props.getModelParam<number>('segments');
+        const N = seg != null ? seg : 10;
+        return 2 * (N - 1);
+      },
     },
   },
   defaultModel: "behavioral",

@@ -51,7 +51,7 @@ function boxMuller(): number {
 }
 
 /**
- * Extended waveform parameters for sweep, AM, FM, and noise modes.
+ * Extended waveform parameters for sweep, AM, FM, noise, and square wave modes.
  */
 export interface ExtendedWaveformParams {
   freqStart?: number;
@@ -61,6 +61,10 @@ export interface ExtendedWaveformParams {
   modulationFreq?: number;
   modulationDepth?: number;
   modulationIndex?: number;
+  /** Rise time for square wave transitions (seconds). Default 0 = instantaneous. */
+  riseTime?: number;
+  /** Fall time for square wave transitions (seconds). Default 0 = instantaneous. */
+  fallTime?: number;
 }
 
 /**
@@ -88,8 +92,40 @@ export function computeWaveformValue(
     case "sine":
       return dcOffset + amplitude * Math.sin(arg);
 
-    case "square":
-      return dcOffset + amplitude * Math.sign(Math.sin(arg));
+    case "square": {
+      const riseTime = ext?.riseTime ?? 0;
+      const fallTime = ext?.fallTime ?? 0;
+      if (riseTime === 0 && fallTime === 0) {
+        return dcOffset + amplitude * Math.sign(Math.sin(arg));
+      }
+      // Trapezoidal square wave (ngspice PULSE style).
+      // Map t into position within current period [0, period).
+      const period = frequency > 0 ? 1 / frequency : Infinity;
+      const halfPeriod = period / 2;
+      // Phase offset in time: positive phase shifts waveform left (earlier)
+      const phaseShift = phase / (2 * Math.PI * frequency);
+      const tShifted = t - phaseShift;
+      // Position within the full period, always in [0, period)
+      const tMod = ((tShifted % period) + period) % period;
+      if (tMod < halfPeriod) {
+        // Rising half: rise from -amplitude to +amplitude over riseTime,
+        // then hold at +amplitude
+        if (tMod < riseTime) {
+          // Linear ramp: 0..riseTime → -amplitude..+amplitude
+          return dcOffset + amplitude * (-1 + 2 * tMod / riseTime);
+        }
+        return dcOffset + amplitude;
+      } else {
+        // Falling half: fall from +amplitude to -amplitude over fallTime,
+        // then hold at -amplitude
+        const tInHalf = tMod - halfPeriod;
+        if (tInHalf < fallTime) {
+          // Linear ramp: 0..fallTime → +amplitude..-amplitude
+          return dcOffset + amplitude * (1 - 2 * tInHalf / fallTime);
+        }
+        return dcOffset - amplitude;
+      }
+    }
 
     case "triangle":
       return dcOffset + amplitude * (2 / Math.PI) * Math.asin(Math.sin(arg));
@@ -181,8 +217,10 @@ export const { paramDefs: AC_VOLTAGE_SOURCE_PARAM_DEFS, defaults: AC_VOLTAGE_SOU
     frequency: { default: 1000, unit: "Hz",  description: "Frequency in Hz" },
   },
   secondary: {
-    phase:    { default: 0, unit: "rad", description: "Phase offset in radians" },
-    dcOffset: { default: 0, unit: "V",   description: "DC offset added to waveform" },
+    phase:    { default: 0,    unit: "rad", description: "Phase offset in radians" },
+    dcOffset: { default: 0,    unit: "V",   description: "DC offset added to waveform" },
+    riseTime: { default: 1e-9, unit: "s",   description: "Rise time for square wave transitions" },
+    fallTime: { default: 1e-9, unit: "s",   description: "Fall time for square wave transitions" },
   },
 });
 
@@ -424,11 +462,15 @@ function createAcVoltageSourceElement(
     frequency: props.getModelParam<number>("frequency"),
     phase:     props.getModelParam<number>("phase"),
     dcOffset:  props.getModelParam<number>("dcOffset"),
+    riseTime:  props.hasModelParam("riseTime") ? props.getModelParam<number>("riseTime") : 1e-9,
+    fallTime:  props.hasModelParam("fallTime") ? props.getModelParam<number>("fallTime") : 1e-9,
   };
   let amplitude = p.amplitude;
   let frequency = p.frequency;
   let phase = p.phase;
   let dcOffset = p.dcOffset;
+  let riseTime = p.riseTime;
+  let fallTime = p.fallTime;
   let refreshCallback: (() => void) | null = null;
   const waveform = props.getOrDefault<string>("waveform", "sine") as Waveform;
   const ext: ExtendedWaveformParams = {
@@ -439,6 +481,8 @@ function createAcVoltageSourceElement(
     modulationFreq: props.getOrDefault<number>("modulationFreq", 100),
     modulationDepth: props.getOrDefault<number>("modulationDepth", 1),
     modulationIndex: props.getOrDefault<number>("modulationIndex", 1),
+    riseTime,
+    fallTime,
   };
 
   let scale = 1;
@@ -470,6 +514,10 @@ function createAcVoltageSourceElement(
         frequency = p.frequency;
         phase = p.phase;
         dcOffset = p.dcOffset;
+        riseTime = p.riseTime;
+        fallTime = p.fallTime;
+        ext.riseTime = riseTime;
+        ext.fallTime = fallTime;
         if ((key === "frequency" || key === "phase") && refreshCallback !== null) {
           refreshCallback();
         }
@@ -519,10 +567,37 @@ function createAcVoltageSourceElement(
 
     nextBreakpoint(afterTime: number): number | null {
       if (waveform === "square") {
-        const halfPeriod = 1 / (2 * frequency);
-        const idx = Math.floor((afterTime - phase) / halfPeriod) + 1;
-        const result = phase + idx * halfPeriod;
-        return result > afterTime ? result : phase + (idx + 1) * halfPeriod;
+        const period = 1 / frequency;
+        const halfPeriod = period / 2;
+        const phaseShift = phase / (2 * Math.PI * frequency);
+
+        // Collect all candidate breakpoints: for each half-period edge n,
+        // the candidates are: t_edge, t_edge + riseTime, t_edge + fallTime.
+        // Find the smallest candidate strictly greater than afterTime.
+        //
+        // Half-period edge n occurs at: n * halfPeriod + phaseShift
+        // Find the first edge index whose candidates could be > afterTime.
+        const nMin = Math.floor((afterTime - phaseShift) / halfPeriod);
+
+        let best: number | null = null;
+
+        for (let n = nMin; n <= nMin + 2; n++) {
+          const tEdge = n * halfPeriod + phaseShift;
+          // On odd half-periods (n odd) the edge starts the falling half,
+          // so the transition time is fallTime; on even it is riseTime.
+          const transitionTime = (n % 2 === 0) ? riseTime : fallTime;
+
+          const candidates = [tEdge, tEdge + transitionTime];
+          for (const c of candidates) {
+            if (c > afterTime + 1e-18) {
+              if (best === null || c < best) {
+                best = c;
+              }
+            }
+          }
+        }
+
+        return best;
       }
       if (waveform === "noise") {
         return afterTime + 1 / (20 * frequency);

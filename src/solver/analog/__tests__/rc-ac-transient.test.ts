@@ -23,11 +23,11 @@
 import { describe, it, expect } from "vitest";
 import { MNAEngine } from "../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../analog-engine.js";
-import { StatePool } from "../state-pool.js";
 import {
   makeResistor,
-  makeCapacitor,
+  createTestCapacitor,
   makeAcVoltageSource,
+  allocateStatePool,
 } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
@@ -57,7 +57,10 @@ function makeAcRcCircuit(timeRef: { value: number }): ConcreteCompiledAnalogCirc
 
   const vs  = makeAcVoltageSource(1, 0, 2, A, F, 0, 0, getTime);
   const r   = makeResistor(1, 2, R);
-  const cap = makeCapacitor(2, 0, C);
+  const cap = createTestCapacitor(C, 2, 0);
+
+  const elements = [vs, r, cap];
+  const statePool = allocateStatePool(elements);
 
   return {
     netCount: 2,
@@ -65,9 +68,9 @@ function makeAcRcCircuit(timeRef: { value: number }): ConcreteCompiledAnalogCirc
     nodeCount: 2,
     branchCount: 1,
     matrixSize: 3,
-    elements: [vs, r, cap],
+    elements,
     labelToNodeId: new Map([["Vout", 2]]),
-    statePool: new StatePool(0),
+    statePool,
     timeRef,
   };
 }
@@ -250,7 +253,10 @@ describe("RC lowpass AC transient — hand-built", () => {
     const getTime = () => timeRef.value;
     const vs  = makeAcVoltageSource(1, 0, 2, A, highF, 0, 0, getTime);
     const r   = makeResistor(1, 2, R);
-    const cap = makeCapacitor(2, 0, C);
+    const cap = createTestCapacitor(C, 2, 0);
+
+    const highFElements = [vs, r, cap];
+    const highFPool = allocateStatePool(highFElements);
 
     const circuit: ConcreteCompiledAnalogCircuit & { timeRef: { value: number } } = {
       netCount: 2,
@@ -258,9 +264,9 @@ describe("RC lowpass AC transient — hand-built", () => {
       nodeCount: 2,
       branchCount: 1,
       matrixSize: 3,
-      elements: [vs, r, cap],
+      elements: highFElements,
       labelToNodeId: new Map(),
-      statePool: new StatePool(0),
+      statePool: highFPool,
       timeRef,
     };
 

@@ -141,7 +141,7 @@ export interface MnaModel {
     getTime: () => number,
   ) => AnalogElementCore;
   getInternalNodeCount?: (props: PropertyBag) => number;
-  branchCount?: number;
+  branchCount?: number | ((props: PropertyBag) => number);
 }
 
 // ---------------------------------------------------------------------------

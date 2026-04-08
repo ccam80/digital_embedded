@@ -289,9 +289,7 @@
       - button "×" [ref=e387] [cursor=pointer]
     - button "×" [ref=e391] [cursor=pointer]
   - generic [ref=e393]:
-    - generic [ref=e394]: ⚠️
-    - generic [ref=e395]: "Simulation error: Analog engine stagnation: simTime stuck at 0.000008042546037421391s. The engine exhausted all internal retries without advancing. Check convergence log for details."
-    - button "×" [ref=e396] [cursor=pointer]
-    - button "96%" [ref=e398] [cursor=pointer]
-    - generic [ref=e399]: 31, 9
+    - generic [ref=e394]: Ready
+    - button "96%" [ref=e396] [cursor=pointer]
+    - generic [ref=e397]: 31, 9
 ```

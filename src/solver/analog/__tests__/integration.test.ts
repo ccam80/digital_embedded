@@ -10,10 +10,8 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  capacitorConductance,
-  capacitorHistoryCurrent,
-  inductorConductance,
-  inductorHistoryCurrent,
+  integrateCapacitor,
+  integrateInductor,
   HistoryStore,
 } from "../integration.js";
 import { SparseSolver } from "../sparse-solver.js";
@@ -30,68 +28,105 @@ describe("CompanionModels", () => {
 
   it("capacitor_bdf1_coefficients", () => {
     // geq = C/h = 1e-6 / 1e-6 = 1.0 S
-    const geq = capacitorConductance(C, h, "bdf1");
+    const vNow = 0;
+    const { geq } = integrateCapacitor(C, vNow, 0, 0, 0, h, 0, 0, 1, "bdf1", 0);
     expect(geq).toBeCloseTo(1.0, 10);
   });
 
   it("capacitor_trapezoidal_coefficients", () => {
-    // geq = 2C/h = 2 * 1e-6 / 1e-6 = 2.0 S
-    const geq = capacitorConductance(C, h, "trapezoidal");
+    // geq = 2C/h = 2 * 1e-6 / 1e-6 = 2.0 S (trapezoidal requires order >= 2)
+    const vNow = 0;
+    const { geq } = integrateCapacitor(C, vNow, 0, 0, 0, h, 0, 0, 2, "trapezoidal", 0);
     expect(geq).toBeCloseTo(2.0, 10);
   });
 
   it("capacitor_bdf2_coefficients", () => {
-    // geq = 3C/(2h) = 3*1e-6/(2*1e-6) = 1.5 S
-    const geq = capacitorConductance(C, h, "bdf2");
+    // geq = 3C/(2h) for equal steps (h1=h, h2=h)
+    // With h1=h, h2=h: r1 = h/h = 1, r2 = 2h/h = 2, u22 = 2*(2-1) = 2
+    // rhs2 = 1/h, ag2 = (1/h)/2 = 1/(2h), ag1 = (-1/h - 2/(2h))/1 = -2/h
+    // ag0 = -(ag1+ag2) = 2/h - 1/(2h) = 3/(2h); geq = C*ag0 = 3C/(2h)
+    const vNow = 0;
+    const { geq } = integrateCapacitor(C, vNow, 0, 0, 0, h, h, h, 2, "bdf2", 0);
     expect(geq).toBeCloseTo(1.5, 10);
   });
 
   it("inductor_coefficients_dual_of_capacitor", () => {
     const L = 1e-6; // 1 uH — same numeric value as C so geq formula equals capacitor
     // BDF-1: inductor geq = L/h
-    expect(inductorConductance(L, h, "bdf1")).toBeCloseTo(capacitorConductance(C, h, "bdf1"), 10);
-    // Trapezoidal: inductor geq = 2L/h
-    expect(inductorConductance(L, h, "trapezoidal")).toBeCloseTo(
-      capacitorConductance(C, h, "trapezoidal"),
-      10,
-    );
+    const { geq: geqL1 } = integrateInductor(L, 0, 0, 0, 0, h, 0, 0, 1, "bdf1", 0);
+    const { geq: geqC1 } = integrateCapacitor(C, 0, 0, 0, 0, h, 0, 0, 1, "bdf1", 0);
+    expect(geqL1).toBeCloseTo(geqC1, 10);
+    // Trapezoidal: inductor geq = 2L/h (requires order >= 2)
+    const { geq: geqLT } = integrateInductor(L, 0, 0, 0, 0, h, 0, 0, 2, "trapezoidal", 0);
+    const { geq: geqCT } = integrateCapacitor(C, 0, 0, 0, 0, h, 0, 0, 2, "trapezoidal", 0);
+    expect(geqLT).toBeCloseTo(geqCT, 10);
     // BDF-2: inductor geq = 3L/(2h)
-    expect(inductorConductance(L, h, "bdf2")).toBeCloseTo(capacitorConductance(C, h, "bdf2"), 10);
+    const { geq: geqL2 } = integrateInductor(L, 0, 0, 0, 0, h, h, h, 2, "bdf2", 0);
+    const { geq: geqC2 } = integrateCapacitor(C, 0, 0, 0, 0, h, h, h, 2, "bdf2", 0);
+    expect(geqL2).toBeCloseTo(geqC2, 10);
   });
 
   it("capacitor_bdf1_history_current", () => {
-    // ieq = -geq * v(n)
-    const geq = capacitorConductance(C, h, "bdf1");
+    // BDF-1: ccap = (q0 - q1)/dt = (C*vNow - C*vPrev)/dt
+    // ceq = ccap - geq*vNow = (C*vNow - C*vPrev)/dt - (C/dt)*vNow = -C*vPrev/dt
+    // This is the history term (independent of vNow once we set it up correctly).
+    // Test with vNow=3V, vPrev=0: ceq = 0 (no prior charge)
     const vNow = 3.0;
-    const ieq = capacitorHistoryCurrent(C, h, "bdf1", vNow, 0, 0);
-    expect(ieq).toBeCloseTo(-geq * vNow, 10);
+    const vPrev = 0.0;
+    const q0 = C * vNow;
+    const q1 = C * vPrev;
+    const { geq, ceq } = integrateCapacitor(C, vNow, q0, q1, 0, h, 0, 0, 1, "bdf1", 0);
+    // ceq = ccap - geq*vNow = (q0-q1)/h - (C/h)*vNow = C*(vNow-vPrev)/h - C*vNow/h = -C*vPrev/h
+    const expected_ceq = -C * vPrev / h;
+    expect(ceq).toBeCloseTo(expected_ceq, 10);
+    // geq = C/h
+    expect(geq).toBeCloseTo(C / h, 10);
   });
 
   it("capacitor_trapezoidal_history_current", () => {
-    // ieq = -geq * v(n) - i(n)
-    const geq = capacitorConductance(C, h, "trapezoidal");
+    // Trapezoidal requires order >= 2: geq = 2C/h
+    // ccap = 2(q0-q1)/h - ccapPrev; with ccapPrev=0 and q1=C*vPrev: ccap = 2C(vNow-vPrev)/h
+    // ceq = ccap - geq*vNow = 2C(vNow-vPrev)/h - 2C*vNow/h = -2C*vPrev/h
     const vNow = 3.0;
-    const iNow = 0.5e-3; // 0.5 mA
-    const ieq = capacitorHistoryCurrent(C, h, "trapezoidal", vNow, 0, iNow);
-    expect(ieq).toBeCloseTo(-geq * vNow - iNow, 10);
+    const vPrev = 1.0;
+    const q0 = C * vNow;
+    const q1 = C * vPrev;
+    const { geq, ceq } = integrateCapacitor(C, vNow, q0, q1, 0, h, 0, 0, 2, "trapezoidal", 0);
+    expect(geq).toBeCloseTo(2 * C / h, 10);
+    const expected_ceq = -2 * C * vPrev / h;
+    expect(ceq).toBeCloseTo(expected_ceq, 10);
   });
 
   it("capacitor_bdf2_history_current", () => {
-    // ieq = -geq * (4/3 * v(n) - 1/3 * v(n-1))
-    const geq = capacitorConductance(C, h, "bdf2");
+    // BDF-2 with h1=h, h2=h: geq = 3C/(2h)
+    // ag0=3/(2h), ag1=-2/h, ag2=1/(2h)
+    // ccap = ag0*q0 + ag1*q1 + ag2*q2 = (3*C*vNow - 4*C*vPrev + C*vPrev2)/(2h)
+    // ceq = ccap - geq*vNow = (3C*vNow - 4C*vPrev + C*vPrev2)/(2h) - 3C*vNow/(2h)
+    //      = (-4C*vPrev + C*vPrev2)/(2h)
     const vNow = 3.0;
     const vPrev = 2.0;
-    const ieq = capacitorHistoryCurrent(C, h, "bdf2", vNow, vPrev, 0);
-    const expected = -geq * ((4 / 3) * vNow - (1 / 3) * vPrev);
-    expect(ieq).toBeCloseTo(expected, 10);
+    const vPrev2 = 1.0;
+    const q0 = C * vNow;
+    const q1 = C * vPrev;
+    const q2 = C * vPrev2;
+    const { geq, ceq } = integrateCapacitor(C, vNow, q0, q1, q2, h, h, h, 2, "bdf2", 0);
+    expect(geq).toBeCloseTo(1.5 * C / h, 10);
+    const expected_ceq = (-4 * C * vPrev + C * vPrev2) / (2 * h);
+    expect(ceq).toBeCloseTo(expected_ceq, 10);
   });
 
   it("inductor_bdf1_history_current", () => {
     const L = 1e-3; // 1 mH
-    const geq = inductorConductance(L, h, "bdf1");
     const iNow = 2e-3; // 2 mA
-    const ieq = inductorHistoryCurrent(L, h, "bdf1", iNow, 0, 0);
-    expect(ieq).toBeCloseTo(-geq * iNow, 10);
+    const iOld = 0;
+    const phi0 = L * iNow;
+    const phi1 = L * iOld;
+    const { geq, ceq } = integrateInductor(L, iNow, phi0, phi1, 0, h, 0, 0, 1, "bdf1", 0);
+    // BDF-1: geq = L/h, ccap = (phi0-phi1)/h = L*(iNow-iOld)/h
+    // ceq = ccap - geq*iNow = L*(iNow-iOld)/h - L*iNow/h = -L*iOld/h
+    expect(geq).toBeCloseTo(L / h, 10);
+    const expected_ceq = -L * iOld / h;
+    expect(ceq).toBeCloseTo(expected_ceq, 10);
   });
 });
 
@@ -224,10 +259,10 @@ function runRcDecay(
   // Initial condition: V(node1) = 5.0V
   let voltages = new Float64Array([5.0]);
 
-  // Run transient steps
+  // Run transient steps — order=1 for the test helper (BDF-1 path for all methods)
   for (let step = 0; step < steps; step++) {
     // Update companion model coefficients from previous solution
-    capacitor.stampCompanion!(dt, method, voltages);
+    capacitor.stampCompanion!(dt, method, voltages, 1, [dt]);
 
     solver.beginAssembly(matrixSize);
 
@@ -321,10 +356,10 @@ function runRlRise(steps: number, dt: number): number {
 
   let voltages = new Float64Array(matrixSize);
 
-  // Transient steps
+  // Transient steps — order=1 for the test helper
   for (let step = 0; step < steps; step++) {
     // Update inductor companion model coefficients from previous solution
-    inductor.stampCompanion!(dt, "trapezoidal", voltages);
+    inductor.stampCompanion!(dt, "trapezoidal", voltages, 1, [dt]);
 
     solver.beginAssembly(matrixSize);
 

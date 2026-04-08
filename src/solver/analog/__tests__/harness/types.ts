@@ -7,6 +7,20 @@
  */
 
 // ---------------------------------------------------------------------------
+// Compared value — the fundamental triple for side-by-side comparison
+// ---------------------------------------------------------------------------
+
+/** A single numeric value from both engines, with computed delta. */
+export interface ComparedValue {
+  ours: number;
+  ngspice: number;
+  delta: number;       // ours - ngspice (signed)
+  absDelta: number;    // |delta|
+  relDelta: number;    // |delta| / max(|ours|, |ngspice|), 0 if both zero
+  withinTol: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Topology snapshot — captured once per compile
 // ---------------------------------------------------------------------------
 
@@ -17,14 +31,51 @@ export interface MatrixEntry {
   value: number;
 }
 
-/** Maps our MNA node IDs to ngspice node numbers. */
+/**
+ * Maps a single node between our engine and ngspice.
+ *
+ * Built by the structural node-mapping pass which canonicalizes
+ * ngspice node names ("q1_c", "v1#branch") to our labels ("Q1:C", "V1:branch").
+ */
 export interface NodeMapping {
   /** Our MNA node index (0-based, solver row). */
   ourIndex: number;
-  /** ngspice node number (from CKTnodes linked list). */
+  /** ngspice node number (from CKTnodes linked list, 0-based). */
   ngspiceIndex: number;
-  /** Human-readable label (e.g. "R1:A", "Q1:C"). */
+  /** Canonical label in our format (e.g. "Q1:C", "R1:A"). */
   label: string;
+  /** Original ngspice node name (e.g. "q1_c", "r1_1"). */
+  ngspiceName: string;
+}
+
+/**
+ * Maps a single device's state base offset in the ngspice CKTstate0 vector.
+ * Received from the ngspice topology callback.
+ */
+export interface NgspiceDeviceInfo {
+  /** Device instance name in ngspice (e.g. "q1", "d1"). */
+  name: string;
+  /** Device type name in ngspice (e.g. "BJT", "Diode", "Capacitor"). */
+  typeName: string;
+  /** Base offset of this device's state in CKTstate0. */
+  stateBase: number;
+  /** Node indices connected to this device (from the ngspice CKT). */
+  nodeIndices: number[];
+}
+
+/**
+ * Full topology from ngspice, received via the one-time topology callback.
+ * Used to build NodeMapping[] and unpack CKTstate0 into per-device slots.
+ */
+export interface NgspiceTopology {
+  /** Matrix dimension (CKTmaxEqNum + 1). */
+  matrixSize: number;
+  /** Number of state entries (CKTnumStates). */
+  numStates: number;
+  /** Node name → node number mapping. */
+  nodeNames: Map<string, number>;
+  /** Per-device info for state unpacking. */
+  devices: NgspiceDeviceInfo[];
 }
 
 /** Captured once after compile — describes the circuit structure. */
@@ -41,6 +92,7 @@ export interface TopologySnapshot {
   elements: Array<{
     index: number;
     label: string;
+    type?: string;
     isNonlinear: boolean;
     isReactive: boolean;
     pinNodeIds: readonly number[];
@@ -61,8 +113,10 @@ export interface IterationSnapshot {
   voltages: Float64Array;
   /** Node voltages from previous iteration (copy). */
   prevVoltages: Float64Array;
-  /** RHS vector snapshot (copy). */
+  /** RHS vector snapshot (copy) — the loaded RHS before solve (stamp contributions). */
   rhs: Float64Array;
+  /** Pre-solve RHS (if available from ngspice extended callback). */
+  preSolveRhs?: Float64Array;
   /** Assembled matrix non-zeros. */
   matrix: MatrixEntry[];
   /** Per-element device state (if pool-backed). */
@@ -89,18 +143,45 @@ export interface ElementStateSnapshot {
 // Per-step snapshot (aggregates iterations within one timestep attempt)
 // ---------------------------------------------------------------------------
 
-/** All iterations for one NR solve (one timestep attempt). */
+/**
+ * A single NR solve attempt. A step may have multiple attempts if the
+ * timestep is cut after NR failure. Each attempt has its own dt and
+ * iteration history.
+ */
+export interface NRAttempt {
+  /** Attempted timestep dt. */
+  dt: number;
+  /** All NR iterations in this attempt. */
+  iterations: IterationSnapshot[];
+  /** Whether NR converged in this attempt. */
+  converged: boolean;
+  /** Total iteration count in this attempt. */
+  iterationCount: number;
+}
+
+/** All iterations for one timestep (may include failed attempts before the accepted one). */
 export interface StepSnapshot {
   /** Simulation time at step entry. */
   simTime: number;
-  /** Timestep dt. */
+  /** Timestep dt (of the accepted attempt). */
   dt: number;
-  /** All NR iterations. */
+  /** All NR iterations of the accepted attempt (shortcut into attempts[last]). */
   iterations: IterationSnapshot[];
-  /** Whether NR converged. */
+  /** Whether NR converged (for the accepted attempt). */
   converged: boolean;
-  /** Total iteration count. */
+  /** Total iteration count (for the accepted attempt). */
   iterationCount: number;
+  /**
+   * All NR attempts for this step, including failed ones where dt was cut.
+   * The last entry is the accepted attempt. Undefined means legacy data
+   * where only the accepted attempt was captured (use iterations/converged directly).
+   */
+  attempts?: NRAttempt[];
+  /**
+   * ngspice CKTmode at this step (if available from extended callback).
+   * Useful for distinguishing DC OP phases, transient init, float, etc.
+   */
+  cktMode?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -228,4 +309,137 @@ export interface SnapshotQuery {
   elementLabel?: string;
   /** Filter by node index (returns only that node's voltages). */
   nodeIndex?: number;
+}
+
+// ---------------------------------------------------------------------------
+// ComparisonSession query result types
+// ---------------------------------------------------------------------------
+
+/** Step-end report: converged values from both engines, keyed by label. */
+export interface StepEndReport {
+  stepIndex: number;
+  simTime: ComparedValue;
+  dt: ComparedValue;
+  converged: { ours: boolean; ngspice: boolean };
+  iterationCount: ComparedValue;
+  /** Node voltages keyed by canonical label ("Q1:C", "R1:A"). */
+  nodes: Record<string, ComparedValue>;
+  /** Branch currents keyed by label ("V1:branch"). */
+  branches: Record<string, ComparedValue>;
+  /** Device states keyed by component label, then slot name. */
+  components: Record<string, Record<string, ComparedValue>>;
+}
+
+/** Per-iteration report: intermediate NR state from both engines. */
+export interface IterationReport {
+  stepIndex: number;
+  iteration: number;
+  simTime: number;
+  noncon: ComparedValue;
+  /** Node voltages keyed by canonical label. */
+  nodes: Record<string, ComparedValue>;
+  /** RHS values keyed by node label. */
+  rhs: Record<string, ComparedValue>;
+  /** Matrix entry differences (only mismatches). */
+  matrixDiffs: Array<{
+    row: number;
+    col: number;
+    ours: number;
+    ngspice: number;
+    absDelta: number;
+  }>;
+  /** Device states keyed by component label, then slot name. */
+  components: Record<string, Record<string, ComparedValue>>;
+}
+
+/** Full trace for one component across all steps and iterations. */
+export interface ComponentTrace {
+  label: string;
+  deviceType: string;
+  steps: Array<{
+    stepIndex: number;
+    simTime: number;
+    iterations: Array<{
+      iteration: number;
+      states: Record<string, ComparedValue>;
+      pinVoltages: Record<string, ComparedValue>;
+    }>;
+  }>;
+}
+
+/** Full trace for one node across all steps and iterations. */
+export interface NodeTrace {
+  label: string;
+  ourIndex: number;
+  ngspiceIndex: number;
+  steps: Array<{
+    stepIndex: number;
+    simTime: number;
+    iterations: Array<{
+      iteration: number;
+      voltage: ComparedValue;
+    }>;
+  }>;
+}
+
+/** Aggregate session summary. */
+export interface SessionSummary {
+  analysis: "dcop" | "tran";
+  stepCount: ComparedValue;
+  convergence: {
+    ours: { totalSteps: number; convergedSteps: number; failedSteps: number; avgIterations: number; maxIterations: number };
+    ngspice: { totalSteps: number; convergedSteps: number; failedSteps: number; avgIterations: number; maxIterations: number };
+  };
+  /** First iteration where any value exceeds tolerance. */
+  firstDivergence: { stepIndex: number; iterationIndex: number; simTime: number; worstLabel: string; absDelta: number } | null;
+  /** Total comparison count and pass/fail breakdown. */
+  totals: { compared: number; passed: number; failed: number };
+}
+
+// ---------------------------------------------------------------------------
+// Raw ngspice callback data (extended)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extended raw data from the ngspice NR instrumentation callback.
+ * Matches the C typedef in niiter.c after the callback is expanded
+ * to include time, dt, mode, and pre-solve RHS.
+ */
+export interface RawNgspiceIterationEx {
+  iteration: number;
+  matrixSize: number;
+  /** Post-solve voltages (CKTrhs after SMPsolve). */
+  rhs: Float64Array;
+  /** Previous voltages (CKTrhsOld). */
+  rhsOld: Float64Array;
+  /** Pre-solve RHS (copy of CKTrhs after CKTload, before SMPsolve). */
+  preSolveRhs: Float64Array;
+  /** Full CKTstate0 flat array. */
+  state0: Float64Array;
+  numStates: number;
+  noncon: number;
+  converged: boolean;
+  /** Simulation time (CKTtime). */
+  simTime: number;
+  /** Current timestep (CKTdelta). */
+  dt: number;
+  /** CKTmode flags. */
+  cktMode: number;
+}
+
+/**
+ * One-time topology data from ngspice (sent before first NR iteration).
+ */
+export interface RawNgspiceTopology {
+  matrixSize: number;
+  numStates: number;
+  /** Node name → node number. */
+  nodes: Array<{ name: string; number: number }>;
+  /** Per-device state base offsets. */
+  devices: Array<{
+    name: string;
+    typeName: string;
+    stateBase: number;
+    nodeIndices: number[];
+  }>;
 }

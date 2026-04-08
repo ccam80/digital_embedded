@@ -16,11 +16,11 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import {
   makeResistor,
-  makeCapacitor,
+  createTestCapacitor,
+  allocateStatePool,
 } from "../../../solver/analog/__tests__/test-helpers.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
-import { StatePool } from "../../../solver/analog/state-pool.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -196,12 +196,21 @@ describe("AcSource", () => {
   });
 
   it("square_wave_breakpoints", () => {
+    // Default riseTime=fallTime=1ns. For 1kHz, halfPeriod=0.5ms.
+    // Each half-period edge produces 2 breakpoints: t_edge and t_edge+transitionTime.
+    // Edges in (0, 0.002]: 0.5ms, 1ms, 1.5ms — each with a +1ns companion.
+    // Also the first rise-end at 1ns (n=0, tEdge=0, tEdge+riseTime=1e-9 > 0).
+    // Total: 1e-9, 0.5ms, 0.5ms+1ns, 1ms, 1ms+1ns, 1.5ms, 1.5ms+1ns = 7
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "square" }, 1, 0, 2, 0);
     const bps = el.getBreakpoints(0, 0.002);
-    expect(bps).toHaveLength(3);
-    expect(bps[0]).toBeCloseTo(0.0005, 8);
-    expect(bps[1]).toBeCloseTo(0.001, 8);
-    expect(bps[2]).toBeCloseTo(0.0015, 8);
+    expect(bps).toHaveLength(7);
+    expect(bps[0]).toBeCloseTo(1e-9,     12); // end of first rise (n=0 edge is at t=0, which is excluded)
+    expect(bps[1]).toBeCloseTo(0.0005,   8);  // n=1 edge (fall start)
+    expect(bps[2]).toBeCloseTo(0.0005 + 1e-9, 12); // end of fall
+    expect(bps[3]).toBeCloseTo(0.001,    8);  // n=2 edge (rise start)
+    expect(bps[4]).toBeCloseTo(0.001 + 1e-9,  12); // end of rise
+    expect(bps[5]).toBeCloseTo(0.0015,   8);  // n=3 edge (fall start)
+    expect(bps[6]).toBeCloseTo(0.0015 + 1e-9, 12); // end of fall
   });
 
   it("set_scale_applied", () => {
@@ -250,7 +259,10 @@ describe("Integration", () => {
     ) as AcVoltageSourceAnalogElement;
 
     const r = makeResistor(1, 2, 1000);
-    const cap = makeCapacitor(2, 0, 1e-6);
+    const cap = createTestCapacitor(1e-6, 2, 0);
+
+    const acElements = [acSrc as unknown as import("../../../solver/analog/element.js").AnalogElement, r, cap];
+    const acStatePool = allocateStatePool(acElements);
 
     const circuit: ConcreteCompiledAnalogCircuit = {
       netCount: 2,
@@ -258,9 +270,9 @@ describe("Integration", () => {
       nodeCount: 2,
       branchCount: 1,
       matrixSize: 3,
-      elements: [acSrc as unknown as import("../../../solver/analog/element.js").AnalogElement, r, cap],
+      elements: acElements,
       labelToNodeId: new Map(),
-      statePool: new StatePool(0),
+      statePool: acStatePool,
     };
 
     const engine = new MNAEngine();

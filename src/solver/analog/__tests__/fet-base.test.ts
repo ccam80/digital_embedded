@@ -251,7 +251,7 @@ describe("Refactor", () => {
 
     // stampCompanion should run without throwing
     const dt = 1e-9;
-    expect(() => element.stampCompanion!(dt, "bdf1", voltages)).not.toThrow();
+    expect(() => element.stampCompanion!(dt, "bdf1", voltages, 1, [dt])).not.toThrow();
 
     // After stampCompanion, stamp should produce nonzero entries for capacitance
     const solver = makeMockSolver();

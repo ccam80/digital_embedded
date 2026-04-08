@@ -470,7 +470,7 @@ function buildMinimalAnalogDomain(): ConcreteCompiledAnalogCircuit {
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: 1,
     branchCount: 0,
-    elements: [],
+    elements: [makeResistorAnalogEl(1, 0, 1e6)],
     labelToNodeId: new Map(),
     wireToNodeId: new Map(),
     models: new Map(),

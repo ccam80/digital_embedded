@@ -97,6 +97,7 @@ describe("AnalogEngineTypes", () => {
         state2: new Float64Array(0),
         state3: new Float64Array(0),
         totalSlots: 0,
+        tranStep: 0,
       },
     };
 

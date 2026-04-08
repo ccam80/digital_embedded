@@ -70,15 +70,32 @@ function buildTLineCircuit(opts: {
   branchCount: number;
   elements: (import("../../../solver/analog/element.js").AnalogElement | import("../../../core/analog-types.js").AnalogElementCore)[];
 }): ConcreteCompiledAnalogCircuit {
+  // Allocate state pool for all pool-backed elements before creating the compiled circuit.
+  // This mirrors what the real compiler does in src/solver/analog/compiler.ts.
+  const allElements = opts.elements as import("../../../solver/analog/element.js").AnalogElement[];
+  let offset = 0;
+  for (const el of allElements) {
+    if ((el as any).poolBacked) {
+      (el as any).stateBaseOffset = offset;
+      offset += (el as any).stateSize ?? 0;
+    }
+  }
+  const statePool = new StatePool(Math.max(offset, 1));
+  for (const el of allElements) {
+    if ((el as any).poolBacked && (el as any).initState) {
+      (el as any).initState(statePool);
+    }
+  }
+
   return new ConcreteCompiledAnalogCircuit({
     nodeCount: opts.nodeCount,
     branchCount: opts.branchCount,
-    elements: opts.elements as import("../../../solver/analog/element.js").AnalogElement[],
+    elements: allElements,
     labelToNodeId: new Map(),
     wireToNodeId: new Map(),
     models: new Map(),
     elementToCircuitElement: new Map(),
-    statePool: new StatePool(0),
+    statePool,
   });
 }
 
@@ -131,12 +148,18 @@ describe("TLine", () => {
 
       const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
 
+      // Pool setup required before stampCompanion (pool-backed architecture)
+      { const re = el as import("../../../solver/analog/element.js").ReactiveAnalogElement;
+        const pool = new StatePool(Math.max(re.stateSize, 1));
+        re.stateBaseOffset = 0; re.initState(pool); }
+
       // Set up companion model (dt=1ns, BDF-1) before stamping so inductors are active
       const voltages = new Float64Array(6 + N);
-      el.stampCompanion!(1e-9, "bdf1", voltages);
+      el.stampCompanion!(1e-9, "bdf1", voltages, 1, [1e-9]);
 
       const { solver, stamps } = makeStubSolver();
       el.stamp(solver);
+      el.stampReactiveCompanion?.(solver);
 
       // For a lossless line all resistive stamps (R_seg) should be zero conductance
       // or equivalent to MIN_CONDUCTANCE (1e-12 S). The inductors will also stamp
@@ -196,12 +219,18 @@ describe("TLine", () => {
         new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0,
       );
 
+      // Pool setup required before stampCompanion (pool-backed architecture)
+      { const re = el as import("../../../solver/analog/element.js").ReactiveAnalogElement;
+        const pool = new StatePool(Math.max(re.stateSize, 1));
+        re.stateBaseOffset = 0; re.initState(pool); }
+
       const dt = 1e-9;
       const voltages = new Float64Array(nodeCount + N);
-      el.stampCompanion!(dt, "bdf1", voltages);
+      el.stampCompanion!(dt, "bdf1", voltages, 1, [dt]);
 
       const { solver, stamps } = makeStubSolver();
       el.stamp(solver);
+      el.stampReactiveCompanion?.(solver);
 
       // BDF-1 geq = L/dt. For each segment's inductor (SegmentInductorElement):
       // geq = lSeg / dt = 50e-9 / 1e-9 = 50
@@ -637,7 +666,18 @@ describe("TransmissionLine", () => {
     });
 
     it("requires branch row", () => {
-      expect((TransmissionLineDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBe(1);
+      type BehavioralEntry = {kind:"inline";factory:AnalogFactory;branchCount?:number|((props:PropertyBag)=>number);getInternalNodeCount?:(props:PropertyBag)=>number};
+      const behavioral = TransmissionLineDefinition.modelRegistry?.behavioral as BehavioralEntry|undefined;
+      expect(typeof behavioral?.branchCount).toBe("function");
+      const props10 = new PropertyBag();
+      props10.setModelParam("segments", 10);
+      const props1 = new PropertyBag();
+      props1.setModelParam("segments", 1);
+      expect((behavioral?.branchCount as (props:PropertyBag)=>number)(props10)).toBe(10);
+      expect((behavioral?.branchCount as (props:PropertyBag)=>number)(props1)).toBe(1);
+      expect(typeof behavioral?.getInternalNodeCount).toBe("function");
+      expect(behavioral?.getInternalNodeCount?.(props10)).toBe(18);
+      expect(behavioral?.getInternalNodeCount?.(props1)).toBe(0);
     });
 
     it("has behavioral model entry", () => {
@@ -731,11 +771,17 @@ describe("TransmissionLine", () => {
       const firstBranch = nodeCount;
       const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
 
+      // Pool setup required before stampCompanion (pool-backed architecture)
+      { const re = el as import("../../../solver/analog/element.js").ReactiveAnalogElement;
+        const pool = new StatePool(Math.max(re.stateSize, 1));
+        re.stateBaseOffset = 0; re.initState(pool); }
+
       const voltages = new Float64Array(nodeCount + 3);
-      el.stampCompanion!(1e-9, "bdf1", voltages);
+      el.stampCompanion!(1e-9, "bdf1", voltages, 1, [1e-9]);
 
       const { solver, stamps } = makeStubSolver();
       el.stamp(solver);
+      el.stampReactiveCompanion?.(solver);
       expect(stamps.length).toBeGreaterThan(0);
     });
 
@@ -784,51 +830,62 @@ describe("TransmissionLine", () => {
     }
 
     it("outer TransmissionLineElement is not pool-backed", () => {
+      // After the NIintegrate refactor, TransmissionLineElement IS pool-backed
+      // (it allocates state for all sub-elements and delegates initState).
       const el = makeEl(5);
-      expect((el as any).poolBacked).toBeUndefined();
+      expect((el as any).poolBacked).toBe(true);
     });
 
     it("sub-elements are pool-bound immediately after construction — stampCompanion works without initState", () => {
+      // Sub-elements now require initState to be called (pool-backed architecture).
+      // Set up pool before calling stampCompanion.
       const N = 3;
       const el = makeEl(N);
+      const pool = new StatePool(Math.max((el as any).stateSize, 1));
+      (el as any).stateBaseOffset = 0;
+      el.initState!(pool);
       const voltages = new Float64Array(2 + 2 * (N - 1) + N);
-      expect(() => el.stampCompanion!(1e-9, "bdf1", voltages)).not.toThrow();
+      expect(() => el.stampCompanion!(1e-9, "bdf1", voltages, 1, [1e-9])).not.toThrow();
     });
 
-    it("SegmentInductorElement sub-elements declare stateSchema with 3 slots", () => {
+    it("SegmentInductorElement sub-elements declare stateSchema with 5 slots", () => {
       const N = 3;
       const el = makeEl(N);
       const subEls = (el as unknown as { _subElements: { stateSchema?: { size: number; owner: string } }[] })._subElements;
       const inductors = subEls.filter(s => s.stateSchema?.owner === "SegmentInductorElement");
       expect(inductors.length).toBe(N - 1);
       for (const ind of inductors) {
-        expect(ind.stateSchema!.size).toBe(3);
+        expect(ind.stateSchema!.size).toBe(5);
       }
     });
 
-    it("SegmentCapacitorElement sub-elements declare stateSchema with 3 slots", () => {
+    it("SegmentCapacitorElement sub-elements declare stateSchema with 5 slots", () => {
       const N = 3;
       const el = makeEl(N);
       const subEls = (el as unknown as { _subElements: { stateSchema?: { size: number; owner: string } }[] })._subElements;
       const caps = subEls.filter(s => s.stateSchema?.owner === "SegmentCapacitorElement");
       expect(caps.length).toBe(N - 1);
       for (const cap of caps) {
-        expect(cap.stateSchema!.size).toBe(3);
+        expect(cap.stateSchema!.size).toBe(5);
       }
     });
 
-    it("CombinedRLElement sub-element declares stateSchema with 3 slots", () => {
+    it("CombinedRLElement sub-element declares stateSchema with 5 slots", () => {
       const N = 3;
       const el = makeEl(N);
       const subEls = (el as unknown as { _subElements: { stateSchema?: { size: number; owner: string } }[] })._subElements;
       const combRL = subEls.filter(s => s.stateSchema?.owner === "CombinedRLElement");
       expect(combRL.length).toBe(1);
-      expect(combRL[0].stateSchema!.size).toBe(3);
+      expect(combRL[0].stateSchema!.size).toBe(5);
     });
 
-    it("all reactive sub-elements have stateBaseOffset >= 0 after construction", () => {
+    it("all reactive sub-elements have stateBaseOffset >= 0 after initState", () => {
+      // Sub-elements get stateBaseOffset assigned during initState, not construction.
       const N = 4;
       const el = makeEl(N);
+      const pool = new StatePool(Math.max((el as any).stateSize, 1));
+      (el as any).stateBaseOffset = 0;
+      el.initState!(pool);
       const subEls = (el as unknown as { _subElements: { stateSize?: number; stateBaseOffset?: number }[] })._subElements;
       const reactive = subEls.filter(s => (s.stateSize ?? 0) > 0);
       for (const sub of reactive) {
@@ -839,6 +896,9 @@ describe("TransmissionLine", () => {
     it("reactive sub-elements have non-overlapping stateBaseOffset values", () => {
       const N = 4;
       const el = makeEl(N);
+      const pool = new StatePool(Math.max((el as any).stateSize, 1));
+      (el as any).stateBaseOffset = 0;
+      el.initState!(pool);
       const subEls = (el as unknown as { _subElements: { stateSize?: number; stateBaseOffset?: number }[] })._subElements;
       const reactive = subEls.filter(s => (s.stateSize ?? 0) > 0);
       const offsets = reactive.map(s => s.stateBaseOffset!);
