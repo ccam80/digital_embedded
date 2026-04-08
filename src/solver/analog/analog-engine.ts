@@ -264,7 +264,7 @@ export class MNAEngine implements AnalogEngine {
               () => {
                 element.stamp(solver);
                 if (element.isReactive && element.stampCompanion) {
-                  element.stampCompanion(dt, method, voltages);
+                  element.stampCompanion(dt, method, voltages, this._timestep.currentOrder, this._timestep.deltaOld);
                 }
                 if (element.isNonlinear && element.updateOperatingPoint) {
                   element.updateOperatingPoint(voltages);
@@ -325,6 +325,8 @@ export class MNAEngine implements AnalogEngine {
     this._timestep.rotateDeltaOld();
 
     for (;;) {
+      statePool?.state0.set(statePool.state1);
+
       // ngspice dctran.c:735 — deltaOld[0] = delta each iteration.
       this._timestep.setDeltaOldCurrent(dt);
 
@@ -332,9 +334,14 @@ export class MNAEngine implements AnalogEngine {
       this._simTime += dt;
 
       // --- Companion stamp (ngspice dctran.c:736 NIcomCof) ---
+      // Always called, including step 0. ngspice recomputes ag[] to real values
+      // (1/h, -1/h) via NIcomCof BEFORE the first Newton solve (dctran.c:736).
+      // The MODEINITTRAN "transparent at DC OP" behavior comes from seedHistory
+      // copying Q_dcop into s1: BDF-1 produces geq=C/h (cap in matrix) but
+      // zero net current at the DC operating point voltage.
       for (const el of elements) {
         if (el.isReactive && el.stampCompanion) {
-          el.stampCompanion(dt, this._timestep.currentMethod, this._voltages);
+          el.stampCompanion(dt, this._timestep.currentMethod, this._voltages, this._timestep.currentOrder, this._timestep.deltaOld);
         }
       }
 
@@ -353,6 +360,15 @@ export class MNAEngine implements AnalogEngine {
         voltagesBuffer: this._nrVoltages,
         prevVoltagesBuffer: this._nrPrevVoltages,
         enableBlameTracking: logging,
+        postIterationHook: this.postIterationHook ?? undefined,
+        preIterationHook: (_iteration, iterVoltages) => {
+          const currentMethod = this._timestep.currentMethod;
+          for (const el of elements) {
+            if (el.isReactive && el.isNonlinear && el.stampCompanion) {
+              el.stampCompanion(dt, currentMethod, iterVoltages, this._timestep.currentOrder, this._timestep.deltaOld);
+            }
+          }
+        },
       });
 
       // --- Logging (merged from initial and retry blocks) ---
@@ -381,13 +397,21 @@ export class MNAEngine implements AnalogEngine {
         this._timestep.currentDt = dt;
         this._voltages.set(nrResult.voltages);
 
-        // Update charge/flux _NOW slots with converged voltages.
-        // stampCompanion wrote _NOW from previous-step voltages; overwrite
-        // with the converged NR solution so LTE sees accurate values.
+        // Update charge/flux with converged voltages so LTE sees accurate Q.
+        // Also recomputes ccap from the converged charge so the next step's
+        // trapezoidal recursion starts from the correct companion current.
         for (const el of elements) {
           if (el.isReactive && el.updateChargeFlux) {
-            el.updateChargeFlux(this._voltages);
+            el.updateChargeFlux(this._voltages, dt, this._timestep.currentMethod, this._timestep.currentOrder, this._timestep.deltaOld);
           }
+        }
+
+        // MODEINITTRAN (ngspice capload.c:60-62, bjtload.c:691-699):
+        // On the first transient step, copy s0 → s1 so that q0 == q1.
+        // Without this, cktTerr sees a step function (post-NR Q vs DCOP Q)
+        // and rejects with a massive divided difference.
+        if (this._stepCount === 0 && statePool) {
+          statePool.states[1].set(statePool.states[0]);
         }
 
         const lte = this._timestep.computeNewDt(
@@ -449,6 +473,10 @@ export class MNAEngine implements AnalogEngine {
     // Accept the timestep
     if (statePool) {
       statePool.acceptTimestep();
+      if (this._stepCount === 0) {
+        statePool.seedFromState1();
+      }
+      statePool.tranStep++;
       statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
     }
 
@@ -620,6 +648,7 @@ export class MNAEngine implements AnalogEngine {
       params: this._params,
       diagnostics: this._diagnostics,
       statePool: cac.statePool ?? null,
+      postIterationHook: this.postIterationHook ?? undefined,
     });
 
     if (result.converged) {
@@ -631,9 +660,10 @@ export class MNAEngine implements AnalogEngine {
       // on the first transient step → LTE rejection → stagnation.
       // (ngspice equivalent: CAPload writes state0[qcap] during DCOP,
       // then dctran.c:342 bcopy seeds state1 from state0.)
+      // dt=0 and dummy params: ccap recomputation is irrelevant at DC OP.
       for (const el of elements) {
         if (el.isReactive && el.updateChargeFlux) {
-          el.updateChargeFlux(this._voltages);
+          el.updateChargeFlux(this._voltages, 0, "bdf1", 1, []);
         }
       }
 
@@ -811,6 +841,44 @@ export class MNAEngine implements AnalogEngine {
   get convergenceLog(): ConvergenceLog {
     return this._convergenceLog;
   }
+
+  // -------------------------------------------------------------------------
+  // Harness instrumentation accessors
+  // -------------------------------------------------------------------------
+
+  /** Expose the sparse solver for matrix/RHS snapshots. Null before init(). */
+  get solver(): SparseSolver | null {
+    return this._compiled ? this._solver : null;
+  }
+
+  /** Expose the shared state pool for device-state snapshots. Null before init(). */
+  get statePool(): StatePool | null {
+    return (this._compiled as CompiledWithBridges | undefined)?.statePool ?? null;
+  }
+
+  /** Expose the compiled element array. Empty before init(). */
+  get elements(): readonly AnalogElement[] {
+    return this._elements;
+  }
+
+  /** Expose the compiled circuit for topology inspection. Null before init(). */
+  get compiled(): ConcreteCompiledAnalogCircuit | null {
+    return this._compiled;
+  }
+
+  /**
+   * Optional post-NR-iteration hook. When set, passed through to every
+   * newtonRaphson() call in step() and dcOperatingPoint(). The harness
+   * sets this to capture per-iteration snapshots.
+   */
+  postIterationHook: ((
+    iteration: number,
+    voltages: Float64Array,
+    prevVoltages: Float64Array,
+    noncon: number,
+    globalConverged: boolean,
+    elemConverged: boolean,
+  ) => void) | null = null;
 
   // -------------------------------------------------------------------------
   // AnalogEngine interface — Breakpoints

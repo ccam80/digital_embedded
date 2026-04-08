@@ -31,3 +31,10 @@ Added optional `iterationDetails` field to `NRAttemptRecord` interface in conver
 - **Files created**: None
 - **Files modified**: src/solver/analog/newton-raphson.ts
 - **Tests**: 7966/7967 passing in full suite run (4 pre-existing coordinator stagnation failures from baseline; 1 wire-current-resolver timeout was flaky under load — passes when run in isolation, not caused by this change)
+
+## Task P1c: MNAEngine harness accessors + hook wiring
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/analog-engine.ts
+- **Tests**: 7967/7971 passing (4 pre-existing failures unchanged)

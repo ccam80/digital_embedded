@@ -51,6 +51,15 @@ export interface DcOpOptions {
   nodeCount: number;
   /** Optional shared state pool for per-element operating-point state. */
   statePool?: { state0: Float64Array; reset(): void } | null;
+  /** Optional post-NR-iteration hook for harness instrumentation. */
+  postIterationHook?: (
+    iteration: number,
+    voltages: Float64Array,
+    prevVoltages: Float64Array,
+    noncon: number,
+    globalConverged: boolean,
+    elemConverged: boolean,
+  ) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +156,7 @@ function restoreSnapshot(
  * @returns DC operating point result with node voltages and convergence metadata
  */
 export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
-  const { solver, elements, matrixSize, params, diagnostics, nodeCount, statePool } = opts;
+  const { solver, elements, matrixSize, params, diagnostics, nodeCount, statePool, postIterationHook } = opts;
 
   const nrBase = {
     solver,
@@ -160,6 +169,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
     diagnostics,
     nodeDamping: params.nodeDamping ?? false,
     statePool: statePool ?? null,
+    postIterationHook,
   };
 
   // -------------------------------------------------------------------------
