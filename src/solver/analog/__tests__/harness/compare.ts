@@ -1,0 +1,190 @@
+/**
+ * Comparison engine: diffs our CaptureSession against ngspice's
+ * CaptureSession and produces ComparisonResult objects.
+ */
+
+import type {
+  CaptureSession,
+  ComparisonResult,
+  Tolerance,
+  DeviceMapping,
+} from "./types.js";
+import { DEFAULT_TOLERANCE } from "./types.js";
+import { DEVICE_MAPPINGS } from "./device-mappings.js";
+
+// ---------------------------------------------------------------------------
+// Tolerance check helpers
+// ---------------------------------------------------------------------------
+
+function withinTol(ours: number, theirs: number, absTol: number, relTol: number): boolean {
+  const absDelta = Math.abs(ours - theirs);
+  const refMag = Math.max(Math.abs(ours), Math.abs(theirs));
+  return absDelta <= absTol + relTol * refMag;
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot comparison
+// ---------------------------------------------------------------------------
+
+/**
+ * Compare two capture sessions iteration-by-iteration.
+ *
+ * Both sessions must have the same number of steps. Within each step,
+ * iterations are compared pairwise up to the minimum count (if one
+ * side converged in fewer iterations, trailing iterations are skipped).
+ *
+ * @param ours     - Our engine's capture session
+ * @param ref      - ngspice reference capture session
+ * @param tolerance - Comparison tolerances
+ * @returns Array of ComparisonResult, one per compared iteration
+ */
+export function compareSnapshots(
+  ours: CaptureSession,
+  ref: CaptureSession,
+  tolerance: Tolerance = DEFAULT_TOLERANCE,
+): ComparisonResult[] {
+  const results: ComparisonResult[] = [];
+  const stepCount = Math.min(ours.steps.length, ref.steps.length);
+
+  for (let si = 0; si < stepCount; si++) {
+    const ourStep = ours.steps[si];
+    const refStep = ref.steps[si];
+    const iterCount = Math.min(ourStep.iterations.length, refStep.iterations.length);
+
+    for (let ii = 0; ii < iterCount; ii++) {
+      const ourIter = ourStep.iterations[ii];
+      const refIter = refStep.iterations[ii];
+
+      // Voltage diffs
+      const voltageDiffs: ComparisonResult["voltageDiffs"] = [];
+      const nodeCount = Math.min(ourIter.voltages.length, refIter.voltages.length);
+      for (let n = 0; n < nodeCount; n++) {
+        const o = ourIter.voltages[n];
+        const t = refIter.voltages[n];
+        const absDelta = Math.abs(o - t);
+        const refMag = Math.max(Math.abs(o), Math.abs(t));
+        const wt = withinTol(o, t, tolerance.vAbsTol, tolerance.relTol);
+        voltageDiffs.push({
+          nodeIndex: n,
+          label: ours.topology.nodeLabels.get(n + 1) ?? `node_${n}`,
+          ours: o,
+          theirs: t,
+          absDelta,
+          relDelta: refMag > 0 ? absDelta / refMag : absDelta,
+          withinTol: wt,
+        });
+      }
+
+      // RHS diffs
+      const rhsDiffs: ComparisonResult["rhsDiffs"] = [];
+      const rhsLen = Math.min(ourIter.rhs.length, refIter.rhs.length);
+      for (let r = 0; r < rhsLen; r++) {
+        const o = ourIter.rhs[r];
+        const t = refIter.rhs[r];
+        const absDelta = Math.abs(o - t);
+        rhsDiffs.push({
+          index: r,
+          ours: o,
+          theirs: t,
+          absDelta,
+          withinTol: withinTol(o, t, tolerance.iAbsTol, tolerance.relTol),
+        });
+      }
+
+      // Matrix diffs — build maps keyed by "row,col"
+      const matrixDiffs: ComparisonResult["matrixDiffs"] = [];
+      const ourMap = new Map<string, number>();
+      for (const e of ourIter.matrix) ourMap.set(`${e.row},${e.col}`, e.value);
+      const refMap = new Map<string, number>();
+      for (const e of refIter.matrix) refMap.set(`${e.row},${e.col}`, e.value);
+      const allKeys = new Set([...ourMap.keys(), ...refMap.keys()]);
+      for (const key of allKeys) {
+        const [r, c] = key.split(",").map(Number);
+        const o = ourMap.get(key) ?? 0;
+        const t = refMap.get(key) ?? 0;
+        const absDelta = Math.abs(o - t);
+        if (!withinTol(o, t, tolerance.iAbsTol, tolerance.relTol)) {
+          matrixDiffs.push({ row: r, col: c, ours: o, theirs: t, absDelta, withinTol: false });
+        }
+      }
+
+      // Device state diffs
+      const stateDiffs: ComparisonResult["stateDiffs"] = [];
+      // (State comparison requires device mappings and ngspice-side state capture;
+      //  deferred to Phase 3 when ngspice bridge provides state snapshots.)
+
+      const allWithinTol = voltageDiffs.every(d => d.withinTol)
+        && rhsDiffs.every(d => d.withinTol)
+        && matrixDiffs.length === 0
+        && stateDiffs.every(d => d.withinTol);
+
+      results.push({
+        stepIndex: si,
+        iterationIndex: ii,
+        simTime: ourStep.simTime,
+        voltageDiffs,
+        rhsDiffs,
+        matrixDiffs,
+        stateDiffs,
+        allWithinTol,
+      });
+    }
+  }
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Output formatting
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a ComparisonResult as a human-readable diff string.
+ */
+export function formatComparison(result: ComparisonResult): string {
+  const lines: string[] = [];
+  lines.push(`=== Step ${result.stepIndex}, Iteration ${result.iterationIndex} (t=${result.simTime.toExponential(4)}) ===`);
+  lines.push(`  Overall: ${result.allWithinTol ? "PASS" : "FAIL"}`);
+
+  const vFails = result.voltageDiffs.filter(d => !d.withinTol);
+  if (vFails.length > 0) {
+    lines.push(`  Voltage mismatches (${vFails.length}):`);
+    for (const d of vFails.slice(0, 10)) {
+      lines.push(`    node ${d.nodeIndex} (${d.label}): ours=${d.ours.toExponential(6)} ref=${d.theirs.toExponential(6)} delta=${d.absDelta.toExponential(3)}`);
+    }
+    if (vFails.length > 10) lines.push(`    ... and ${vFails.length - 10} more`);
+  }
+
+  const rFails = result.rhsDiffs.filter(d => !d.withinTol);
+  if (rFails.length > 0) {
+    lines.push(`  RHS mismatches (${rFails.length}):`);
+    for (const d of rFails.slice(0, 10)) {
+      lines.push(`    row ${d.index}: ours=${d.ours.toExponential(6)} ref=${d.theirs.toExponential(6)} delta=${d.absDelta.toExponential(3)}`);
+    }
+  }
+
+  if (result.matrixDiffs.length > 0) {
+    lines.push(`  Matrix mismatches (${result.matrixDiffs.length}):`);
+    for (const d of result.matrixDiffs.slice(0, 10)) {
+      lines.push(`    [${d.row},${d.col}]: ours=${d.ours.toExponential(6)} ref=${d.theirs.toExponential(6)} delta=${d.absDelta.toExponential(3)}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Find the first iteration where divergence exceeds a threshold.
+ * Useful for pinpointing when our engine starts deviating from ngspice.
+ */
+export function findFirstDivergence(
+  results: ComparisonResult[],
+  threshold: number = 1e-3,
+): ComparisonResult | null {
+  for (const r of results) {
+    for (const d of r.voltageDiffs) {
+      if (d.absDelta > threshold) return r;
+    }
+  }
+  return null;
+}

@@ -38,3 +38,43 @@ Added optional `iterationDetails` field to `NRAttemptRecord` interface in conver
 - **Files created**: none
 - **Files modified**: src/solver/analog/analog-engine.ts
 - **Tests**: 7967/7971 passing (4 pre-existing failures unchanged)
+
+## Task P2a: Common harness types (types.ts)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/harness/types.ts
+- **Files modified**: none
+- **Tests**: N/A (types-only file, no runtime behaviour to test; TypeScript compile check passes with no errors in new file)
+- **Notes**: All interfaces and constants specified in Phase 2a verbatim: MatrixEntry, NodeMapping, TopologySnapshot, IterationSnapshot, ElementStateSnapshot, StepSnapshot, DeviceMapping, Tolerance, DEFAULT_TOLERANCE, ComparisonResult, CaptureSession, SnapshotQuery. Pre-existing TS errors in bjt.ts, analog-engine.ts, compiler.ts etc. are unrelated to this file.
+
+## Task P2b: Capture functions (capture.ts)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/harness/capture.ts
+- **Files modified**: none
+- **Tests**: N/A (utility module; TypeScript compile check passes with no errors in new file)
+- **Notes**: All functions specified in Phase 2b: captureTopology, captureElementStates, PostIterationHook type, createIterationCaptureHook, createStepCaptureHook. isPoolBacked already existed in element.ts. All pre-existing TS errors are in other files unrelated to this task.
+
+## Task P2c: Device mappings (device-mappings.ts)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/harness/device-mappings.ts
+- **Files modified**: none
+- **Tests**: N/A (data-only module; TypeScript compile check passes with no errors in new file)
+- **Notes**: All mappings specified in Phase 2c: CAPACITOR_MAPPING, INDUCTOR_MAPPING, DIODE_MAPPING, BJT_MAPPING, MOSFET_MAPPING, DEVICE_MAPPINGS registry. Actual slot names verified against CAPACITOR_SCHEMA, INDUCTOR_SCHEMA, DIODE_CAP_SCHEMA, BJT_L1_SCHEMA — all match spec exactly. BJT_L1_SCHEMA has additional slots (OP_CBE, OP_GBE, VSUB, GDSUB, etc.) beyond what spec covers; these are not in the mapping since spec does not require them.
+
+## Task P2d: Comparison engine (compare.ts)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/harness/compare.ts
+- **Files modified**: none
+- **Tests**: N/A (utility module; TypeScript compile check passes with no errors in new file)
+- **Notes**: All functions specified in Phase 2d: withinTol (internal), compareSnapshots, formatComparison, findFirstDivergence. DeviceMapping is imported as type (spec requirement) but not used in function bodies since state diff comparison is deferred to Phase 3 per spec comment. DEVICE_MAPPINGS imported from device-mappings.js as spec requires.
+
+## Task P2e: Query API (query.ts)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/harness/query.ts
+- **Files modified**: none
+- **Tests**: N/A (utility module; TypeScript compile check passes with no errors in new file)
+- **Notes**: All functions specified in Phase 2e: querySteps, nodeVoltageTrajectory, elementStateTrajectory, convergenceSummary, findLargestDelta. IterationSnapshot import included per spec (used implicitly via StepSnapshot.iterations).
