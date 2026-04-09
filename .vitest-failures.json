@@ -1,59 +1,10 @@
 {
   "summary": {
-    "passed": 8048,
-    "failed": 4,
+    "passed": 64,
+    "failed": 0,
     "skipped": 0,
-    "totalFiles": 347,
-    "durationSeconds": 12.7
+    "totalFiles": 3,
+    "durationSeconds": 2.2
   },
-  "failures": [
-    {
-      "message": "Analog engine stagnation: simTime stuck at 1.0000000000000003e-9s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\coordinator.ts",
-          "test": "transient stepping does not error after 50 steps",
-          "line": 201,
-          "column": 13
-        }
-      ]
-    },
-    {
-      "message": "Engine entered ERROR state at step 2, simTime=1.0000000000000003e-9",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
-          "test": "survives 2000 transient steps without ERROR state",
-          "line": 79,
-          "column": 15
-        }
-      ]
-    },
-    {
-      "message": "Engine ERROR at step 2, simTime=1.000e-9",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
-          "test": "survives 600µs of sim time (matches UI run duration)",
-          "line": 103,
-          "column": 15
-        }
-      ]
-    },
-    {
-      "message": "step 1 transitioned engine to ERROR (simTime=1.0000000000000003e-9): expected 'ERROR' not to be 'ERROR' // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\buckbjt-mcp-surface.test.ts",
-          "test": "50 steps advance simTime > 0 without ERROR (regression: stale t=0 breakpoints must not freeze getClampedDt)",
-          "line": 74,
-          "column": 13
-        }
-      ]
-    }
-  ]
+  "failures": []
 }

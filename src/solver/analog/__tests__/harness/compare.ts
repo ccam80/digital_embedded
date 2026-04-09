@@ -42,13 +42,16 @@ export function compareSnapshots(
   ours: CaptureSession,
   ref: CaptureSession,
   tolerance: Tolerance = DEFAULT_TOLERANCE,
+  alignment?: Map<number, number>,
 ): ComparisonResult[] {
   const results: ComparisonResult[] = [];
-  const stepCount = Math.min(ours.steps.length, ref.steps.length);
+  const stepCount = ours.steps.length;
 
   for (let si = 0; si < stepCount; si++) {
     const ourStep = ours.steps[si];
-    const refStep = ref.steps[si];
+    const refStepIndex = alignment ? (alignment.get(si) ?? si) : si;
+    const refStep = ref.steps[refStepIndex];
+    if (!refStep) continue;
     const iterCount = Math.min(ourStep.iterations.length, refStep.iterations.length);
 
     for (let ii = 0; ii < iterCount; ii++) {

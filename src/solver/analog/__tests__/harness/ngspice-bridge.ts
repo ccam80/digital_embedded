@@ -27,6 +27,8 @@ import type {
   RawNgspiceIterationEx,
   RawNgspiceTopology,
   IntegrationCoefficients,
+  MatrixEntry,
+  LimitingEvent,
 } from "./types.js";
 import { DEVICE_MAPPINGS } from "./device-mappings.js";
 
@@ -58,6 +60,19 @@ function _ngspiceIntegCoeff(raw: RawNgspiceIterationEx | undefined): Integration
     },
   };
 }
+
+/** Junction ID to string name mapping for limiting events. */
+const JUNCTION_ID_MAP: Record<number, string> = {
+  0: "AK",
+  1: "BE",
+  2: "BC",
+  3: "GS",
+  4: "DS",
+  5: "GD",
+  6: "BS",
+  7: "BD",
+  8: "CS",
+};
 
 // ---------------------------------------------------------------------------
 // NgspiceBridge
@@ -139,18 +154,20 @@ export class NgspiceBridge {
   /**
    * Register the one-time topology callback.
    *
-   * String arrays arrive as single null-delimited buffers (char*) because
-   * koffi cannot marshal char** across FFI callbacks. We split on '\0'.
+   * Extended signature includes devNodeIndicesFlat and devNodeCounts (Item 4).
+   * String arrays arrive as single pipe-delimited buffers (char*) because
+   * koffi cannot marshal char** across FFI callbacks. We split on '|'.
    */
   private _registerTopologyCallback(koffi: any, uid: string): void {
-    // Callback signature matches the C typedef:
-    //   void(char*, int*, int, char*, char*, int*, int, int, int)
+    // Extended callback signature (Item 4):
+    //   void(char*, int*, int, char*, char*, int*, int, int, int, int*, int*)
     const topoCbType = koffi.proto(
       `void ni_topo_cb${uid}(` +
       `str, _Inout_ int*, int, ` +
       `str, str, ` +
       `_Inout_ int*, int, ` +
-      `int, int)`,
+      `int, int, ` +
+      `_Inout_ int*, _Inout_ int*)`,
     );
 
     const registerFn = this._lib.func(
@@ -161,7 +178,8 @@ export class NgspiceBridge {
       (nodeNamesJoined: string, nodeNumbersPtr: any, nodeCount: number,
        devNamesJoined: string, devTypesJoined: string,
        devStateBasesPtr: any, devCount: number,
-       matrixSize: number, numStates: number) => {
+       matrixSize: number, numStates: number,
+       devNodeFlatRaw: any, devNodeCountsRaw: any) => {
 
         // Split pipe-delimited strings back into arrays
         const nodeNames = nodeNamesJoined ? nodeNamesJoined.split("|") : [];
@@ -175,18 +193,32 @@ export class NgspiceBridge {
           ? Array.from(koffi.decode(devStateBasesPtr, "int", devCount))
           : [];
 
+        // Item 4: Decode per-device node counts and flat node index array
+        const nodeCounts: number[] | null = devNodeCountsRaw
+          ? Array.from(koffi.decode(devNodeCountsRaw, "int", devCount))
+          : null;
+
+        const totalNodeIndices = nodeCounts ? nodeCounts.reduce((a, b) => a + b, 0) : 0;
+        const devNodeFlat: number[] | null = devNodeFlatRaw && nodeCounts && totalNodeIndices > 0
+          ? Array.from(koffi.decode(devNodeFlatRaw, "int", totalNodeIndices))
+          : null;
+
         const nodes: RawNgspiceTopology["nodes"] = [];
         for (let i = 0; i < nodeCount; i++) {
           nodes.push({ name: nodeNames[i] ?? "", number: nodeNumbers[i] ?? i });
         }
 
         const devices: RawNgspiceTopology["devices"] = [];
+        let flatOffset = 0;
         for (let i = 0; i < devCount; i++) {
+          const count = nodeCounts?.[i] ?? 0;
+          const nodeIndices = devNodeFlat ? devNodeFlat.slice(flatOffset, flatOffset + count) : [];
+          flatOffset += count;
           devices.push({
             name: devNames[i] ?? "",
             typeName: devTypes[i] ?? "",
             stateBase: devStateBases[i] ?? 0,
-            nodeIndices: [],
+            nodeIndices,
           });
         }
 
@@ -200,44 +232,148 @@ export class NgspiceBridge {
   }
 
   /**
-   * Register the per-iteration instrumentation callback (extended format).
+   * Register the per-iteration instrumentation callback.
+   *
+   * The C side passes a pointer to a NiIterationData struct (Items 2, 3, 7, 8, 9, 15).
+   * We define the struct layout in koffi and decode each field via the pointer.
    */
   private _registerIterationCallback(koffi: any, uid: string): void {
+    // Define the NiIterationData struct layout matching the C typedef
+    const NiIterationData = koffi.struct(`NiIterationData${uid}`, {
+      iteration:        "int",
+      matrixSize:       "int",
+      rhs:              koffi.pointer("double"),
+      rhsOld:           koffi.pointer("double"),
+      preSolveRhs:      koffi.pointer("double"),
+      state0:           koffi.pointer("double"),
+      state1:           koffi.pointer("double"),
+      state2:           koffi.pointer("double"),
+      numStates:        "int",
+      noncon:           "int",
+      converged:        "int",
+      simTime:          "double",
+      dt:               "double",
+      cktMode:          "int",
+      ag0:              "double",
+      ag1:              "double",
+      integrateMethod:  "int",
+      order:            "int",
+      matrixColPtr:     koffi.pointer("int"),
+      matrixRowIdx:     koffi.pointer("int"),
+      matrixVals:       koffi.pointer("double"),
+      matrixNnz:        "int",
+      devConvFailed:    koffi.pointer("int"),
+      devConvCount:     "int",
+      numLimitEvents:   "int",
+      limitDevIdx:      koffi.pointer("int"),
+      limitJunctionId:  koffi.pointer("int"),
+      limitVBefore:     koffi.pointer("double"),
+      limitVAfter:      koffi.pointer("double"),
+      limitWasLimited:  koffi.pointer("int"),
+    });
+
     const callbackType = koffi.proto(
-      `void ni_instrument_cb_ex${uid}(` +
-      `int, int, ` +
-      `_Inout_ double*, _Inout_ double*, _Inout_ double*, ` +
-      `_Inout_ double*, int, int, int, ` +
-      `double, double, int)`,
+      `void ni_instrument_cb_v2${uid}(_Inout_ NiIterationData${uid}*)`,
     );
 
     const registerFn = this._lib.func(
-      `void ni_instrument_register(ni_instrument_cb_ex${uid}*)`,
+      `void ni_instrument_register(ni_instrument_cb_v2${uid}*)`,
     );
 
     const callback = koffi.register(
-      (iteration: number, matrixSize: number,
-       rhsPtr: any, rhsOldPtr: any, preSolveRhsPtr: any,
-       state0Ptr: any, numStates: number, noncon: number, converged: number,
-       simTime: number, dt: number, cktMode: number) => {
+      (dataPtr: any) => {
+        const d = koffi.decode(dataPtr, NiIterationData);
 
-        const rhs = rhsPtr
-          ? Float64Array.from(koffi.decode(rhsPtr, "double", matrixSize))
+        const { iteration, matrixSize, numStates, noncon, simTime, dt, cktMode,
+                ag0, ag1, integrateMethod, order, matrixNnz, devConvCount, numLimitEvents } = d;
+
+        const rhs = d.rhs
+          ? Float64Array.from(koffi.decode(d.rhs, "double", matrixSize))
           : new Float64Array(matrixSize);
-        const rhsOld = rhsOldPtr
-          ? Float64Array.from(koffi.decode(rhsOldPtr, "double", matrixSize))
+        const rhsOld = d.rhsOld
+          ? Float64Array.from(koffi.decode(d.rhsOld, "double", matrixSize))
           : new Float64Array(matrixSize);
-        const preSolveRhs = preSolveRhsPtr
-          ? Float64Array.from(koffi.decode(preSolveRhsPtr, "double", matrixSize))
+        const preSolveRhs = d.preSolveRhs
+          ? Float64Array.from(koffi.decode(d.preSolveRhs, "double", matrixSize))
           : new Float64Array(matrixSize);
-        const state0 = state0Ptr
-          ? Float64Array.from(koffi.decode(state0Ptr, "double", numStates))
+        const state0 = d.state0
+          ? Float64Array.from(koffi.decode(d.state0, "double", numStates))
           : new Float64Array(numStates);
 
+        // Item 2: state1 and state2
+        const state1 = d.state1
+          ? Float64Array.from(koffi.decode(d.state1, "double", numStates))
+          : new Float64Array(numStates);
+        const state2 = d.state2
+          ? Float64Array.from(koffi.decode(d.state2, "double", numStates))
+          : new Float64Array(numStates);
+
+        // Item 3: Matrix CSC decode and convert to MatrixEntry[]
+        const matrixColPtrArr = matrixNnz > 0 && d.matrixColPtr
+          ? Array.from(koffi.decode(d.matrixColPtr, "int", matrixSize + 1))
+          : null;
+        const matrixRowIdxArr = matrixNnz > 0 && d.matrixRowIdx
+          ? Array.from(koffi.decode(d.matrixRowIdx, "int", matrixNnz))
+          : null;
+        const matrixValsArr = matrixNnz > 0 && d.matrixVals
+          ? Array.from(koffi.decode(d.matrixVals, "double", matrixNnz))
+          : null;
+
+        const matrix: MatrixEntry[] = [];
+        if (matrixColPtrArr && matrixRowIdxArr && matrixValsArr) {
+          for (let col = 0; col < matrixSize; col++) {
+            for (let p = matrixColPtrArr[col]; p < matrixColPtrArr[col + 1]; p++) {
+              matrix.push({ row: matrixRowIdxArr[p], col, value: matrixValsArr[p] });
+            }
+          }
+        }
+
+        // Item 8: Per-device convergence failure decode
+        const devConvFailedArr = devConvCount > 0 && d.devConvFailed
+          ? Array.from(koffi.decode(d.devConvFailed, "int", devConvCount))
+          : [];
+
+        const ngspiceConvergenceFailedDevices: string[] = (devConvFailedArr as number[]).map((devIdx: number) => {
+          const dev = this._topology?.devices[devIdx];
+          return dev ? dev.name : `device_${devIdx}`;
+        });
+
+        // Item 9: Limiting event decode
+        const rawLimitingEvents: RawNgspiceIterationEx["limitingEvents"] = [];
+        if (numLimitEvents > 0 && d.limitDevIdx && d.limitJunctionId && d.limitVBefore && d.limitVAfter && d.limitWasLimited) {
+          const devIdxArr = Array.from(koffi.decode(d.limitDevIdx, "int", numLimitEvents)) as number[];
+          const junctionIdArr = Array.from(koffi.decode(d.limitJunctionId, "int", numLimitEvents)) as number[];
+          const vBeforeArr = Array.from(koffi.decode(d.limitVBefore, "double", numLimitEvents)) as number[];
+          const vAfterArr = Array.from(koffi.decode(d.limitVAfter, "double", numLimitEvents)) as number[];
+          const wasLimitedArr = Array.from(koffi.decode(d.limitWasLimited, "int", numLimitEvents)) as number[];
+
+          for (let i = 0; i < numLimitEvents; i++) {
+            const devIdx = devIdxArr[i];
+            const dev = this._topology?.devices[devIdx];
+            const deviceName = dev ? dev.name : `device_${devIdx}`;
+            const junctionId = junctionIdArr[i];
+            const junction = JUNCTION_ID_MAP[junctionId] ?? `J${junctionId}`;
+            rawLimitingEvents.push({
+              deviceName,
+              junction,
+              vBefore: vBeforeArr[i],
+              vAfter: vAfterArr[i],
+              wasLimited: wasLimitedArr[i] !== 0,
+            });
+          }
+        }
+
         this._iterations.push({
-          iteration, matrixSize, rhs, rhsOld, preSolveRhs, state0,
-          numStates, noncon, converged: converged !== 0,
+          iteration, matrixSize, rhs, rhsOld, preSolveRhs,
+          state0, state1, state2,
+          numStates, noncon, converged: d.converged !== 0,
           simTime, dt, cktMode,
+          ag0, ag1, integrateMethod, order,
+          matrix,
+          ngspiceConvergenceFailedDevices: ngspiceConvergenceFailedDevices.length > 0
+            ? ngspiceConvergenceFailedDevices
+            : undefined,
+          limitingEvents: rawLimitingEvents,
         });
       },
       koffi.pointer(callbackType),
@@ -315,36 +451,50 @@ export class NgspiceBridge {
   }
 
   /**
-   * Unpack the flat CKTstate0 array into per-device ElementStateSnapshot[]
+   * Unpack the flat CKTstate arrays into per-device ElementStateSnapshot[]
    * using the topology callback data and device mappings.
+   *
+   * Reads state0, state1, and state2 to populate all three slot maps (Item 2).
    */
-  private _unpackElementStates(state0: Float64Array): ElementStateSnapshot[] {
+  private _unpackElementStates(
+    state0: Float64Array,
+    state1: Float64Array,
+    state2: Float64Array,
+  ): ElementStateSnapshot[] {
     if (!this._topology || this._topology.devices.length === 0) return [];
 
     const snapshots: ElementStateSnapshot[] = [];
 
     for (const dev of this._topology.devices) {
-      // Canonicalize ngspice type name to our device type key
       const deviceType = this._canonicalizeDeviceType(dev.typeName);
       const mapping = deviceType ? DEVICE_MAPPINGS[deviceType] : undefined;
       if (!mapping) continue;
 
       const slots: Record<string, number> = {};
+      const state1Slots: Record<string, number> = {};
+      const state2Slots: Record<string, number> = {};
 
-      // Use ngspiceToSlot (offset → our slot name) to extract values
       for (const [offsetStr, slotName] of Object.entries(mapping.ngspiceToSlot)) {
         const offset = Number(offsetStr);
         const absOffset = dev.stateBase + offset;
         if (absOffset < state0.length) {
           slots[slotName] = state0[absOffset];
         }
+        if (absOffset < state1.length) {
+          state1Slots[slotName] = state1[absOffset];
+        }
+        if (absOffset < state2.length) {
+          state2Slots[slotName] = state2[absOffset];
+        }
       }
 
       if (Object.keys(slots).length > 0) {
         snapshots.push({
-          elementIndex: -1, // ngspice doesn't have a stable element index
-          label: dev.name.toUpperCase(), // ngspice uses lowercase, we use uppercase
+          elementIndex: -1,
+          label: dev.name.toUpperCase(),
           slots,
+          state1Slots,
+          state2Slots,
         });
       }
     }
@@ -405,7 +555,18 @@ export class NgspiceBridge {
         currentStepIterations = [];
       }
 
-      const elementStates = this._unpackElementStates(raw.state0);
+      const elementStates = this._unpackElementStates(raw.state0, raw.state1, raw.state2);
+
+      // Map ngspice raw limiting events to LimitingEvent[] for the iteration snapshot
+      const limitingEvents: LimitingEvent[] = raw.limitingEvents.map(ev => ({
+        elementIndex: -1,
+        label: ev.deviceName.toUpperCase(),
+        junction: ev.junction,
+        limitType: "pnjlim" as const,
+        vBefore: ev.vBefore,
+        vAfter: ev.vAfter,
+        wasLimited: ev.wasLimited,
+      }));
 
       const iterSnap: IterationSnapshot = {
         iteration: raw.iteration,
@@ -417,7 +578,7 @@ export class NgspiceBridge {
         noncon: raw.noncon,
         globalConverged: raw.converged,
         elemConverged: raw.converged,
-        limitingEvents: [],
+        limitingEvents,
         convergenceFailedElements: [],
         ngspiceConvergenceFailedDevices: raw.ngspiceConvergenceFailedDevices,
       };

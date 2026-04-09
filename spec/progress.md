@@ -62,3 +62,46 @@
   - `src/solver/analog/dc-operating-point.ts` — updated postIterationHook type to include new params
   - `src/solver/analog/__tests__/buckbjt-nr-probe.test.ts` — switched rhs→preSolveRhs
 - **Tests**: 8048/8052 passing (4 pre-existing failures, 0 new failures)
+
+## Task S1-G: Verify and complete all capture.ts changes (Items 2,6,7,9,10,11,15)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none (all items already implemented by S1-D agent)
+- **Tests**: 60/60 passing (src/solver/analog/__tests__/harness/)
+- **Verification summary**:
+  - Item 2: `captureElementStates` reads state0, state1, state2 from statePool — DONE (lines 215-246)
+  - Item 6: `createIterationCaptureHook` calls `solver.enablePreSolveRhsCapture(true)` and `solver.getPreSolveRhsSnapshot()` — DONE (lines 282, 293)
+  - Item 7: `finalizeStep` accepts and stores `integrationCoefficients` and `analysisPhase` — DONE (lines 373-402)
+  - Item 9: `PostIterationHook` has 8 parameters; stores `limitingEvents` and `convergenceFailedElements` — DONE (lines 255-264, 285-302)
+  - Item 10: `captureTopology` builds `matrixRowLabels` and `matrixColLabels` maps — DONE (lines 151-179)
+  - Item 11: Strategy 3 node label loop uses `elementLabels.get(i)` not `el.label` — DONE (lines 130-133)
+  - Item 15: `finalizeStep` receives `analysisPhase` — DONE (same as Item 7)
+- **Known TS error (not introduced by this task)**: capture.ts line 393 has a TS2379 error with `exactOptionalPropertyTypes: true` — `attempts: allAttempts` where `allAttempts` is `NRAttempt[] | undefined`. This is a pre-existing issue from S1-D's cascading changes. The file lock for capture.ts was held by S1-E, preventing this agent from fixing it. The fix requires changing the `steps.push({...})` call to omit `attempts` when `allAttempts` is `undefined` (conditional spread). All 60 harness tests still pass despite the TS error (Vitest uses esbuild which skips type-checking).
+
+## Task S1-I: Time-based step alignment (Item 1)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/__tests__/harness/comparison-session.ts`
+  - `src/solver/analog/__tests__/harness/compare.ts`
+  - `src/solver/analog/__tests__/harness/harness-integration.test.ts`
+- **Tests**: 33/33 passing (4 new tests added to harness-integration.test.ts)
+
+## Task S1-H: Verify and complete all ngspice-bridge.ts changes (Items 2,3,4,7,8,9,15)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/__tests__/harness/ngspice-bridge.ts
+- **Tests**: 64/64 passing (all harness tests)
+- **Changes implemented**:
+  - **Item 2**: Extended `_registerIterationCallback` to receive `NiIterationData` struct pointer (replacing flat 12-param callback). Decodes `state1` and `state2` pointers from struct. Extended `_unpackElementStates` to accept `state0`, `state1`, `state2` and populate `state1Slots`/`state2Slots` on each `ElementStateSnapshot`.
+  - **Item 3**: Decodes `matrixColPtr`, `matrixRowIdx`, `matrixVals`, `matrixNnz` from struct. Converts CSC format to `MatrixEntry[]` and stores on `RawNgspiceIterationEx.matrix`. Passes through to `IterationSnapshot.matrix` in `getCaptureSession()`.
+  - **Item 4**: Extended `_registerTopologyCallback` koffi proto to include `devNodeIndicesFlat` and `devNodeCounts` as two new `_Inout_ int*` parameters. Decodes them in callback body and assigns per-device `nodeIndices` arrays (replacing the previous `nodeIndices: []` stub).
+  - **Item 7**: Already complete from prior wave (ag0/ag1/integrateMethod/order in `_ngspiceIntegCoeff` and `getCaptureSession`). Struct approach preserves these fields from the NiIterationData struct.
+  - **Item 8**: Decodes `devConvFailed`/`devConvCount` from struct. Resolves device indices to names via `_topology.devices`. Stores as `ngspiceConvergenceFailedDevices` on iteration snapshot.
+  - **Item 9**: Decodes `numLimitEvents`, `limitDevIdx`, `limitJunctionId`, `limitVBefore`, `limitVAfter`, `limitWasLimited` from struct. Maps junction IDs to strings via `JUNCTION_ID_MAP`. Builds `rawLimitingEvents` on `RawNgspiceIterationEx`. Maps to `LimitingEvent[]` in `getCaptureSession()` and stores on `IterationSnapshot.limitingEvents`.
+  - **Item 15**: `cktModeToPhase()` and `analysisPhase` in `getCaptureSession()` already complete from prior wave. Struct approach preserves `cktMode` field.
+  - Added `MatrixEntry` and `LimitingEvent` to imports. Added `JUNCTION_ID_MAP` constant.
+  - Callback registration now uses `koffi.struct()` to define `NiIterationData` layout, `koffi.decode(dataPtr, NiIterationData)` to unpack, then individual field decodes for pointer members.

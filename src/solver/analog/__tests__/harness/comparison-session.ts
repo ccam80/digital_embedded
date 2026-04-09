@@ -148,6 +148,9 @@ export class ComparisonSession {
   private _ngSession: CaptureSession | null = null;
   private _ngSessionReindexed: CaptureSession | null = null;
 
+  // Time-alignment index: maps our step index → aligned ngspice step index
+  private _alignedNgIndex: Map<number, number> = new Map();
+
   // Node mapping
   private _nodeMap: NodeMapping[] = [];
 
@@ -233,6 +236,7 @@ export class ComparisonSession {
     }
 
     this._reindexNgSession();
+    this._buildTimeAlignment();
   }
 
   /**
@@ -292,6 +296,7 @@ export class ComparisonSession {
     }
 
     this._reindexNgSession();
+    this._buildTimeAlignment();
   }
 
   // --------------------------------------------------------------------------
@@ -304,7 +309,7 @@ export class ComparisonSession {
   getStepEnd(stepIndex: number): StepEndReport {
     this._ensureRun();
     const ourStep = this._ourSession!.steps[stepIndex];
-    const ngStep = this._ngSessionAligned()?.steps[stepIndex];
+    const ngStep = this._ngSessionAligned()?.steps[this._alignedNgIndex.get(stepIndex) ?? stepIndex];
 
     const ourFinal = ourStep?.iterations[ourStep.iterations.length - 1];
     const ngFinal = ngStep?.iterations[ngStep.iterations.length - 1];
@@ -358,7 +363,7 @@ export class ComparisonSession {
   getIterations(stepIndex: number): IterationReport[] {
     this._ensureRun();
     const ourStep = this._ourSession!.steps[stepIndex];
-    const ngStep = this._ngSessionAligned()?.steps[stepIndex];
+    const ngStep = this._ngSessionAligned()?.steps[this._alignedNgIndex.get(stepIndex) ?? stepIndex];
     if (!ourStep) return [];
 
     const reports: IterationReport[] = [];
@@ -457,7 +462,7 @@ export class ComparisonSession {
 
     for (let si = 0; si < ourSteps.length; si++) {
       const ourStep = ourSteps[si];
-      const ngStep = ngSteps[si];
+      const ngStep = ngSteps[this._alignedNgIndex.get(si) ?? si];
       const iters: ComponentTrace["steps"][number]["iterations"] = [];
 
       const maxIter = Math.max(
@@ -535,7 +540,7 @@ export class ComparisonSession {
 
     for (let si = 0; si < ourSteps.length; si++) {
       const ourStep = ourSteps[si];
-      const ngStep = ngSteps[si];
+      const ngStep = ngSteps[this._alignedNgIndex.get(si) ?? si];
       const iters: NodeTrace["steps"][number]["iterations"] = [];
 
       const maxIter = Math.max(
@@ -652,6 +657,43 @@ export class ComparisonSession {
     }
   }
 
+  private _buildTimeAlignment(): void {
+    this._alignedNgIndex.clear();
+    const ngSteps = this._ngSessionAligned()?.steps ?? [];
+    if (ngSteps.length === 0) return;
+
+    const ourSteps = this._ourSession?.steps ?? [];
+    for (let i = 0; i < ourSteps.length; i++) {
+      const tOurs = ourSteps[i].simTime;
+      const dtOurs = ourSteps[i].dt;
+
+      // Binary search ngspice steps by simTime for nearest match
+      let lo = 0;
+      let hi = ngSteps.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >>> 1;
+        if (ngSteps[mid].simTime < tOurs) lo = mid + 1;
+        else hi = mid;
+      }
+
+      // Check lo and lo-1 for the nearest
+      const candidates = [lo - 1, lo, lo + 1].filter(j => j >= 0 && j < ngSteps.length);
+      let bestJ = candidates[0];
+      let bestDelta = Infinity;
+      for (const j of candidates) {
+        const delta = Math.abs(ngSteps[j].simTime - tOurs);
+        if (delta < bestDelta) { bestDelta = delta; bestJ = j; }
+      }
+
+      // Accept match only within tolerance: |t_ours - t_ng| < 0.5 * min(dt_ours, dt_ng)
+      const dtNg = ngSteps[bestJ].dt;
+      const halfMinDt = 0.5 * Math.min(dtOurs > 0 ? dtOurs : Infinity, dtNg > 0 ? dtNg : Infinity);
+      if (bestDelta <= halfMinDt || halfMinDt <= 0) {
+        this._alignedNgIndex.set(i, bestJ);
+      }
+    }
+  }
+
   private _ngSessionAligned(): CaptureSession | null {
     return this._ngSessionReindexed ?? this._ngSession;
   }
@@ -660,7 +702,7 @@ export class ComparisonSession {
     if (!this._comparisons) {
       const ng = this._ngSessionAligned();
       if (this._ourSession && ng) {
-        this._comparisons = compareSnapshots(this._ourSession, ng, this._tol);
+        this._comparisons = compareSnapshots(this._ourSession, ng, this._tol, this._alignedNgIndex);
       } else {
         this._comparisons = [];
       }

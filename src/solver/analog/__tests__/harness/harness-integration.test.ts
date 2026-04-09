@@ -369,6 +369,123 @@ describe("harness integration", () => {
   });
 });
 
+describe("time-alignment: compareSnapshots with alignment map", () => {
+  function makeMinimalTopology() {
+    return {
+      matrixSize: 1, nodeCount: 1, branchCount: 0, elementCount: 0,
+      elements: [],
+      nodeLabels: new Map<number, string>([[1, "N1"]]),
+      matrixRowLabels: new Map<number, string>(),
+      matrixColLabels: new Map<number, string>(),
+    };
+  }
+
+  function makeStep(simTime: number, dt: number, voltage: number): import("./types.js").StepSnapshot {
+    const iter: import("./types.js").IterationSnapshot = {
+      iteration: 0,
+      voltages: new Float64Array([voltage]),
+      prevVoltages: new Float64Array([voltage]),
+      preSolveRhs: new Float64Array([0]),
+      matrix: [],
+      elementStates: [],
+      noncon: 0,
+      globalConverged: true,
+      elemConverged: true,
+      limitingEvents: [],
+      convergenceFailedElements: [],
+    };
+    return {
+      simTime,
+      dt,
+      iterations: [iter],
+      converged: true,
+      iterationCount: 1,
+      integrationCoefficients: ZERO_INTEG_COEFF,
+      analysisPhase: "tranFloat",
+    };
+  }
+
+  it("compareSnapshots without alignment uses array index pairing", () => {
+    const topo = makeMinimalTopology();
+    const ours: CaptureSession = {
+      source: "ours", topology: topo,
+      steps: [makeStep(1e-9, 1e-9, 1.0), makeStep(2e-9, 1e-9, 2.0)],
+    };
+    const ref: CaptureSession = {
+      source: "ngspice", topology: topo,
+      steps: [makeStep(1e-9, 1e-9, 1.0), makeStep(2e-9, 1e-9, 2.0)],
+    };
+    const results = compareSnapshots(ours, ref);
+    expect(results).toHaveLength(2);
+    for (const r of results) expect(r.allWithinTol).toBe(true);
+  });
+
+  it("compareSnapshots with alignment map uses remapped ngspice step index", () => {
+    const topo = makeMinimalTopology();
+    // Our step 0 at t=1ns should align to ng step 1 (also at t=1ns)
+    // ng step 0 is at t=0 (different time)
+    const ours: CaptureSession = {
+      source: "ours", topology: topo,
+      steps: [makeStep(1e-9, 1e-9, 5.0)],
+    };
+    const ref: CaptureSession = {
+      source: "ngspice", topology: topo,
+      steps: [
+        makeStep(0, 1e-9, 999.0), // index 0 — wrong time, different voltage
+        makeStep(1e-9, 1e-9, 5.0), // index 1 — correct match
+      ],
+    };
+
+    // Without alignment: pairs our[0] with ref[0] → voltages differ → not within tol
+    const noAlign = compareSnapshots(ours, ref);
+    expect(noAlign[0].voltageDiffs[0].ours).toBe(5.0);
+    expect(noAlign[0].voltageDiffs[0].theirs).toBe(999.0);
+    expect(noAlign[0].allWithinTol).toBe(false);
+
+    // With alignment: pairs our[0] with ref[1] → same voltage → within tol
+    const alignment = new Map([[0, 1]]);
+    const aligned = compareSnapshots(ours, ref, undefined, alignment);
+    expect(aligned[0].voltageDiffs[0].ours).toBe(5.0);
+    expect(aligned[0].voltageDiffs[0].theirs).toBe(5.0);
+    expect(aligned[0].allWithinTol).toBe(true);
+  });
+
+  it("compareSnapshots with alignment skips our steps with no ref match", () => {
+    const topo = makeMinimalTopology();
+    const ours: CaptureSession = {
+      source: "ours", topology: topo,
+      steps: [makeStep(1e-9, 1e-9, 1.0), makeStep(2e-9, 1e-9, 2.0), makeStep(3e-9, 1e-9, 3.0)],
+    };
+    const ref: CaptureSession = {
+      source: "ngspice", topology: topo,
+      steps: [makeStep(1e-9, 1e-9, 1.0), makeStep(3e-9, 1e-9, 3.0)],
+    };
+    // Alignment: our[0]→ref[0], our[1] has no entry (falls back to ref[1]=t=3ns), our[2]→ref[1]
+    const alignment = new Map([[0, 0], [2, 1]]);
+    const results = compareSnapshots(ours, ref, undefined, alignment);
+    // our[0] → ref[0]: voltage match
+    expect(results.find(r => r.stepIndex === 0)?.allWithinTol).toBe(true);
+    // our[2] → ref[1]: voltage match
+    expect(results.find(r => r.stepIndex === 2)?.allWithinTol).toBe(true);
+  });
+
+  it("compareSnapshots with alignment falls back to si when key not in map", () => {
+    const topo = makeMinimalTopology();
+    const ours: CaptureSession = {
+      source: "ours", topology: topo,
+      steps: [makeStep(0, 1e-9, 7.0)],
+    };
+    const ref: CaptureSession = {
+      source: "ngspice", topology: topo,
+      steps: [makeStep(0, 1e-9, 7.0)],
+    };
+    // Empty alignment map — should fall back to si=0
+    const results = compareSnapshots(ours, ref, undefined, new Map());
+    expect(results).toHaveLength(1);
+    expect(results[0].allWithinTol).toBe(true);
+  });
+});
+
 describe("node mapping", () => {
   it("canonicalizeNgspiceName handles BJT pin patterns", () => {
     expect(canonicalizeNgspiceName("q1_c", "bjt")).toBe("Q1:C");

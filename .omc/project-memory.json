@@ -292,16 +292,16 @@
       "type": "directory"
     },
     {
+      "path": "src",
+      "accessCount": 53,
+      "lastAccessed": 1775694284898,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\passives\\transmission-line.ts",
       "accessCount": 51,
       "lastAccessed": 1775624648241,
       "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 51,
-      "lastAccessed": 1775693966167,
-      "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\mosfet.ts",
@@ -418,6 +418,12 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\__tests__",
+      "accessCount": 10,
+      "lastAccessed": 1775694319423,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\semiconductors\\__tests__\\diode.test.ts",
       "accessCount": 9,
       "lastAccessed": 1775616637527,
@@ -434,12 +440,6 @@
       "accessCount": 9,
       "lastAccessed": 1775681721671,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__",
-      "accessCount": 8,
-      "lastAccessed": 1775640056898,
-      "type": "directory"
     },
     {
       "path": "src\\components\\passives\\crystal.ts",
