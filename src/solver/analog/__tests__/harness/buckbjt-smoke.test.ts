@@ -66,8 +66,8 @@ describeIfDll("ComparisonSession — buckbjt smoke test", () => {
       }
 
       // CCAP slots in each component
-      for (const [label, slots] of Object.entries(stepEnd.components)) {
-        const ccapSlots = Object.entries(slots).filter(([name]) =>
+      for (const [label, entry] of Object.entries(stepEnd.components)) {
+        const ccapSlots = Object.entries(entry.slots).filter(([name]) =>
           name.startsWith("CCAP") || name === "Q_BE" || name === "Q_BC" || name === "Q_CS");
         if (ccapSlots.length > 0) {
           console.log(`  ${label}:`);
@@ -155,16 +155,16 @@ describeIfDll("ComparisonSession — buckbjt smoke test", () => {
     const stepEnd = session.getStepEnd(1);
 
     // Show all BJT component states
-    for (const [label, slots] of Object.entries(stepEnd.components)) {
+    for (const [label, entry] of Object.entries(stepEnd.components)) {
       // Check if it looks like a BJT (has VBE, VBC slots)
-      if ("VBE" in slots || "VBC" in slots) {
+      if ("VBE" in entry.slots || "VBC" in entry.slots) {
         console.log(`\n  ${label} (BJT):`);
 
         // Group by agreement
         const agreeing: string[] = [];
         const disagreeing: string[] = [];
 
-        for (const [slotName, cv] of Object.entries(slots)) {
+        for (const [slotName, cv] of Object.entries(entry.slots)) {
           if (isNaN(cv.ngspice)) continue; // no ngspice data for this slot
           if (cv.withinTol) {
             agreeing.push(slotName);

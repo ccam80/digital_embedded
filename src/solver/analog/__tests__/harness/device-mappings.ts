@@ -429,3 +429,41 @@ export const DEVICE_MAPPINGS: Record<string, DeviceMapping> = {
   "tunnel-diode": TUNNEL_DIODE_MAPPING,
   varactor: VARACTOR_MAPPING,
 };
+
+// ---------------------------------------------------------------------------
+// Type normalization
+// ---------------------------------------------------------------------------
+
+const TYPE_ID_TO_CANONICAL: Record<string, string> = {
+  NpnBJT: "bjt",
+  PnpBJT: "bjt",
+  NMOS: "mosfet",
+  PMOS: "mosfet",
+  NJFET: "jfet",
+  PJFET: "jfet",
+  Diode: "diode",
+  Zener: "diode",
+  Varactor: "varactor",
+  TunnelDiode: "tunnel-diode",
+  Capacitor: "capacitor",
+  Inductor: "inductor",
+  Resistor: "resistor",
+  DcVoltageSource: "vsource",
+  AcVoltageSource: "vsource",
+  DcCurrentSource: "isource",
+  AcCurrentSource: "isource",
+  SCR: "scr",
+  Triac: "triac",
+};
+
+/**
+ * Normalize a circuit element typeId to a canonical device type string
+ * matching the keys in DEVICE_MAPPINGS.
+ *
+ * @param typeId - The typeId from CircuitElement (e.g. "NpnBJT", "NMOS")
+ * @returns Canonical lowercase device type ("bjt", "mosfet", "diode", etc.)
+ *          or "unknown" if unrecognized.
+ */
+export function normalizeDeviceType(typeId: string): string {
+  return TYPE_ID_TO_CANONICAL[typeId] ?? "unknown";
+}

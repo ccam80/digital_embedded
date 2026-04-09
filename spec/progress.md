@@ -105,3 +105,22 @@
   - **Item 15**: `cktModeToPhase()` and `analysisPhase` in `getCaptureSession()` already complete from prior wave. Struct approach preserves `cktMode` field.
   - Added `MatrixEntry` and `LimitingEvent` to imports. Added `JUNCTION_ID_MAP` constant.
   - Callback registration now uses `koffi.struct()` to define `NiIterationData` layout, `koffi.decode(dataPtr, NiIterationData)` to unpack, then individual field decodes for pointer members.
+
+## Task S3-A: Create glob.ts + format.ts utility modules
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/harness/glob.ts, src/solver/analog/__tests__/harness/format.ts, src/solver/analog/__tests__/harness/query-methods.test.ts
+- **Files modified**: none
+- **Tests**: 13/13 passing
+
+## Task S3-B: normalizeDeviceType + captureTopology fix + all new types
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/__tests__/harness/device-mappings.ts` — added `normalizeDeviceType()` function with full normalization table (19 typeId → canonical mappings, fallback "unknown")
+  - `src/solver/analog/__tests__/harness/capture.ts` — imported `normalizeDeviceType`, updated `captureTopology()` elements mapping to include `type: normalizeDeviceType(typeId)` field
+  - `src/solver/analog/__tests__/harness/types.ts` — added all 20+ new Stream 3 types (PaginationOpts, ComponentInfo, NodeInfo, ComponentSlotsSnapshot, ComponentSlotsTrace, ComponentSlotsResult, DivergenceCategory, DivergenceEntry, DivergenceReport, SlotTrace, StateHistoryReport, LabeledMatrixEntry, LabeledMatrix, LabeledRhsEntry, LabeledRhs, MatrixComparisonEntry, MatrixComparison, IntegrationCoefficientsReport, JunctionLimitingEntry, LimitingComparisonReport, ConvergenceElementEntry, ConvergenceDetailReport, StepEndComponentEntry, SessionReport); updated StepEndReport.components to Record<string, StepEndComponentEntry>; added perElementConvergence to IterationReport; added perDeviceType/integrationMethod/stateHistoryIssues to SessionSummary
+  - `src/solver/analog/__tests__/harness/comparison-session.ts` — updated getStepEnd() to build StepEndComponentEntry objects (deviceType + slots), imported StepEndComponentEntry
+  - `src/solver/analog/__tests__/harness/buckbjt-smoke.test.ts` — updated two usages of stepEnd.components to access .slots and .slots on the new StepEndComponentEntry shape
+- **Tests**: 77/77 passing (harness test suite); full suite 5 pre-existing failures (all in test-baseline.md), 0 new regressions

@@ -374,8 +374,8 @@ export interface StepEndReport {
   nodes: Record<string, ComparedValue>;
   /** Branch currents keyed by label ("V1:branch"). */
   branches: Record<string, ComparedValue>;
-  /** Device states keyed by component label, then slot name. */
-  components: Record<string, Record<string, ComparedValue>>;
+  /** Device states keyed by component label. */
+  components: Record<string, StepEndComponentEntry>;
 }
 
 /** Per-iteration report: intermediate NR state from both engines. */
@@ -398,6 +398,12 @@ export interface IterationReport {
   }>;
   /** Device states keyed by component label, then slot name. */
   components: Record<string, Record<string, ComparedValue>>;
+  perElementConvergence: Array<{
+    label: string;
+    deviceType: string;
+    converged: boolean;
+    worstDelta: number;
+  }>;
 }
 
 /** Full trace for one component across all steps and iterations. */
@@ -442,6 +448,12 @@ export interface SessionSummary {
   firstDivergence: { stepIndex: number; iterationIndex: number; simTime: number; worstLabel: string; absDelta: number } | null;
   /** Total comparison count and pass/fail breakdown. */
   totals: { compared: number; passed: number; failed: number };
+  perDeviceType: Record<string, { divergenceCount: number; worstAbsDelta: number }>;
+  integrationMethod: string | null;
+  stateHistoryIssues: {
+    state1Mismatches: number;
+    state2Mismatches: number;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -513,5 +525,340 @@ export interface RawNgspiceTopology {
     typeName: string;
     stateBase: number;
     nodeIndices: number[];
+  }>;
+}
+
+// ---------------------------------------------------------------------------
+// Pagination
+// ---------------------------------------------------------------------------
+
+export interface PaginationOpts {
+  /** Skip first N results. Default: 0. */
+  offset?: number;
+  /** Return at most N results. Default: unlimited for discovery methods,
+   *  100 for getDivergences. */
+  limit?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Discovery types
+// ---------------------------------------------------------------------------
+
+export interface ComponentInfo {
+  /** Human-readable label (e.g. "Q1", "R2"). */
+  label: string;
+  /** Canonical device type (e.g. "bjt", "capacitor"). "unknown" if unrecognized. */
+  deviceType: string;
+  /** Available state slot names for this component. Empty array if not pool-backed. */
+  slotNames: string[];
+  /** Pin node labels (e.g. ["Q1:B", "Q1:C", "Q1:E"]). */
+  pinLabels: string[];
+}
+
+export interface NodeInfo {
+  /** Canonical label (e.g. "Q1:C", "R1:A/C1:A"). */
+  label: string;
+  /** Our MNA node index (1-based, matching TopologySnapshot.nodeLabels key). */
+  ourIndex: number;
+  /** ngspice node number (-1 if no mapping exists). */
+  ngspiceIndex: number;
+  /** Labels of components connected to this node. */
+  connectedComponents: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Component slot query types
+// ---------------------------------------------------------------------------
+
+/** Snapshot mode: one step, one ComparedValue per matched slot. */
+export interface ComponentSlotsSnapshot {
+  mode: "snapshot";
+  label: string;
+  stepIndex: number;
+  simTime: number;
+  /** Matched slot name → ComparedValue from the final (converged) iteration. */
+  slots: Record<string, ComparedValue>;
+  /** Slot names that matched the glob patterns. */
+  matchedSlots: string[];
+  /** Total slots available on this component (before pattern filter). */
+  totalSlots: number;
+}
+
+/** Trace mode: all steps, converged values only. */
+export interface ComponentSlotsTrace {
+  mode: "trace";
+  label: string;
+  /** Step count after stepsRange filter (if any). */
+  totalSteps: number;
+  /** Matched slot names. */
+  matchedSlots: string[];
+  /** Per-step converged values for each matched slot. */
+  steps: Array<{
+    stepIndex: number;
+    simTime: number;
+    /** slot name → ComparedValue (final iteration of this step). */
+    slots: Record<string, ComparedValue>;
+  }>;
+}
+
+export type ComponentSlotsResult = ComponentSlotsSnapshot | ComponentSlotsTrace;
+
+// ---------------------------------------------------------------------------
+// Divergence report types
+// ---------------------------------------------------------------------------
+
+export type DivergenceCategory = "voltage" | "state" | "rhs" | "matrix";
+
+export interface DivergenceEntry {
+  stepIndex: number;
+  iteration: number;
+  simTime: number;
+  category: DivergenceCategory;
+  /** For voltage/rhs: node label. For state: "ComponentLabel:slotName". For matrix: "row,col". */
+  label: string;
+  ours: number;
+  ngspice: number;
+  absDelta: number;
+  relDelta: number;
+  withinTol: boolean;
+  /** For state entries: component label. Null for voltage/rhs/matrix. */
+  componentLabel: string | null;
+  /** For state entries: slot name. Null for voltage/rhs/matrix. */
+  slotName: string | null;
+}
+
+export interface DivergenceReport {
+  /** Total out-of-tolerance entries (before pagination). */
+  totalCount: number;
+  /** Worst entry per category (absDelta). Null if no divergences in that category. */
+  worstByCategory: Record<DivergenceCategory, DivergenceEntry | null>;
+  /** Paginated entries sorted by absDelta descending. */
+  entries: DivergenceEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Slot trace
+// ---------------------------------------------------------------------------
+
+export interface SlotTrace {
+  label: string;
+  slotName: string;
+  /** Total steps (before pagination). */
+  totalSteps: number;
+  /** Converged value per accepted step (final iteration). */
+  steps: Array<{
+    stepIndex: number;
+    simTime: number;
+    value: ComparedValue;
+  }>;
+}
+
+// ---------------------------------------------------------------------------
+// State history
+// ---------------------------------------------------------------------------
+
+export interface StateHistoryReport {
+  label: string;
+  stepIndex: number;
+  iteration: number;
+  /** state0 slots from our engine. */
+  state0: Record<string, number>;
+  /** state1 slots from our engine (previous step accepted values). */
+  state1: Record<string, number>;
+  /** state2 slots from our engine (two steps back). */
+  state2: Record<string, number>;
+  /** state0 slots from ngspice. */
+  ngspiceState0: Record<string, number>;
+  /** state1 slots from ngspice (CKTstate1). */
+  ngspiceState1: Record<string, number>;
+  /** state2 slots from ngspice (CKTstate2). */
+  ngspiceState2: Record<string, number>;
+}
+
+// ---------------------------------------------------------------------------
+// Labeled matrix / RHS
+// ---------------------------------------------------------------------------
+
+export interface LabeledMatrixEntry {
+  row: number;
+  col: number;
+  rowLabel: string;
+  colLabel: string;
+  ours: number;
+  ngspice: number;
+  absDelta: number;
+  withinTol: boolean;
+}
+
+export interface LabeledMatrix {
+  stepIndex: number;
+  iteration: number;
+  matrixSize: number;
+  entries: LabeledMatrixEntry[];
+}
+
+export interface LabeledRhsEntry {
+  index: number;
+  label: string;
+  ours: number;
+  ngspice: number;
+  absDelta: number;
+  withinTol: boolean;
+}
+
+export interface LabeledRhs {
+  stepIndex: number;
+  iteration: number;
+  entries: LabeledRhsEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Matrix comparison
+// ---------------------------------------------------------------------------
+
+export interface MatrixComparisonEntry {
+  row: number;
+  col: number;
+  rowLabel: string;
+  colLabel: string;
+  ours: number;
+  ngspice: number;
+  delta: number;
+  absDelta: number;
+  withinTol: boolean;
+}
+
+export interface MatrixComparison {
+  stepIndex: number;
+  iteration: number;
+  filter: "all" | "mismatches";
+  totalEntries: number;
+  mismatchCount: number;
+  maxAbsDelta: number;
+  entries: MatrixComparisonEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Integration coefficients
+// ---------------------------------------------------------------------------
+
+export interface IntegrationCoefficientsReport {
+  stepIndex: number;
+  ours: { ag0: number; ag1: number; method: string; order: number };
+  ngspice: { ag0: number; ag1: number; method: string; order: number };
+  /** True if method and order agree between engines. */
+  methodMatch: boolean;
+  ag0Compared: ComparedValue;
+  ag1Compared: ComparedValue;
+}
+
+// ---------------------------------------------------------------------------
+// Junction limiting
+// ---------------------------------------------------------------------------
+
+export interface JunctionLimitingEntry {
+  junction: string;
+  ourPreLimit: number;
+  ourPostLimit: number;
+  ourDelta: number;
+  ngspicePreLimit: number;
+  ngspicePostLimit: number;
+  ngspiceDelta: number;
+  /** Signed difference of applied limiting: ourDelta - ngspiceDelta */
+  limitingDiff: number;
+}
+
+export interface LimitingComparisonReport {
+  label: string;
+  stepIndex: number;
+  iteration: number;
+  /** One entry per junction that had a limiting event in either engine. */
+  junctions: JunctionLimitingEntry[];
+  /** True if no limiting events found for this component at this iteration. */
+  noEvents: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Convergence detail
+// ---------------------------------------------------------------------------
+
+export interface ConvergenceElementEntry {
+  label: string;
+  deviceType: string;
+  ourConverged: boolean;
+  ngspiceConverged: boolean;
+  /** Worst absDelta across all slots for this component at this iteration. */
+  worstDelta: number;
+  /** True if both engines agree on convergence status. */
+  agree: boolean;
+}
+
+export interface ConvergenceDetailReport {
+  stepIndex: number;
+  iteration: number;
+  ourNoncon: number;
+  ngspiceNoncon: number;
+  ourGlobalConverged: boolean;
+  ngspiceGlobalConverged: boolean;
+  elements: ConvergenceElementEntry[];
+  /** Count of elements where engines disagree on convergence. */
+  disagreementCount: number;
+}
+
+// ---------------------------------------------------------------------------
+// Enhanced StepEndReport component entry
+// ---------------------------------------------------------------------------
+
+/** Replaces Record<string, ComparedValue> in StepEndReport.components */
+export interface StepEndComponentEntry {
+  deviceType: string;
+  slots: Record<string, ComparedValue>;
+}
+
+// ---------------------------------------------------------------------------
+// Session report (toJSON output)
+// ---------------------------------------------------------------------------
+
+export interface SessionReport {
+  analysis: "dcop" | "tran";
+  stepCount: { ours: number; ngspice: number };
+  nodeCount: number;
+  elementCount: number;
+  summary: {
+    totalCompared: number;
+    passed: number;
+    failed: number;
+    firstDivergence: {
+      stepIndex: number;
+      iterationIndex: number;
+      simTime: number;
+      worstLabel: string;
+      absDelta: number;
+    } | null;
+    perDeviceType: Record<string, { divergenceCount: number; worstAbsDelta: number }>;
+    integrationMethod: string | null;
+    stateHistoryIssues: { state1Mismatches: number; state2Mismatches: number };
+  };
+  steps: Array<{
+    stepIndex: number;
+    simTime: number;
+    dt: number;
+    converged: { ours: boolean; ngspice: boolean };
+    iterationCount: { ours: number; ngspice: number };
+    nodes: Record<string, {
+      ours: number | null;
+      ngspice: number | null;
+      absDelta: number | null;
+      withinTol: boolean;
+    }>;
+    components: Record<string, {
+      deviceType: string;
+      slots: Record<string, {
+        ours: number | null;
+        ngspice: number | null;
+        absDelta: number | null;
+        withinTol: boolean;
+      }>;
+    }>;
   }>;
 }

@@ -17,6 +17,7 @@ import type {
   LimitingEvent,
   IntegrationCoefficients,
 } from "./types.js";
+import { normalizeDeviceType } from "./device-mappings.js";
 
 // ---------------------------------------------------------------------------
 // Topology capture (once per compile)
@@ -183,13 +184,18 @@ export function captureTopology(
     nodeCount: compiled.nodeCount,
     branchCount: compiled.branchCount,
     elementCount: compiled.elements.length,
-    elements: compiled.elements.map((el, i) => ({
-      index: i,
-      label: elementLabels?.get(i) ?? el.label ?? `element_${i}`,
-      isNonlinear: el.isNonlinear,
-      isReactive: el.isReactive,
-      pinNodeIds: el.pinNodeIds,
-    })),
+    elements: compiled.elements.map((el, i) => {
+      const ce = compiled.elementToCircuitElement?.get(i);
+      const typeId = ce?.typeId ?? "";
+      return {
+        index: i,
+        label: elementLabels?.get(i) ?? el.label ?? `element_${i}`,
+        type: normalizeDeviceType(typeId),
+        isNonlinear: el.isNonlinear,
+        isReactive: el.isReactive,
+        pinNodeIds: el.pinNodeIds,
+      };
+    }),
     nodeLabels,
     matrixRowLabels,
     matrixColLabels,

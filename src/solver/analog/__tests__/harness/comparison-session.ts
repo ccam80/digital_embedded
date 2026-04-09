@@ -38,6 +38,7 @@ import type {
   NodeMapping,
   ComparedValue,
   StepEndReport,
+  StepEndComponentEntry,
   IterationReport,
   ComponentTrace,
   NodeTrace,
@@ -316,7 +317,7 @@ export class ComparisonSession {
 
     const nodes: Record<string, ComparedValue> = {};
     const branches: Record<string, ComparedValue> = {};
-    const components: Record<string, Record<string, ComparedValue>> = {};
+    const components: Record<string, StepEndComponentEntry> = {};
 
     // Node voltages
     if (ourFinal) {
@@ -334,13 +335,15 @@ export class ComparisonSession {
       for (const es of ourFinal.elementStates) {
         const ngEs = ngFinal?.elementStates.find(e =>
           e.label.toUpperCase() === es.label.toUpperCase());
-        const comp: Record<string, ComparedValue> = {};
+        const slots: Record<string, ComparedValue> = {};
         for (const [slot, value] of Object.entries(es.slots)) {
           const ngValue = ngEs?.slots[slot] ?? NaN;
           const tol = this._slotTolerance(slot);
-          comp[slot] = makeComparedValue(value, ngValue, tol, this._tol.relTol);
+          slots[slot] = makeComparedValue(value, ngValue, tol, this._tol.relTol);
         }
-        components[es.label] = comp;
+        const topoEl = this._ourTopology.elements.find(
+          el => el.label.toUpperCase() === es.label.toUpperCase());
+        components[es.label] = { deviceType: topoEl?.type ?? "unknown", slots };
       }
     }
 
