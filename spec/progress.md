@@ -124,3 +124,21 @@
   - `src/solver/analog/__tests__/harness/comparison-session.ts` — updated getStepEnd() to build StepEndComponentEntry objects (deviceType + slots), imported StepEndComponentEntry
   - `src/solver/analog/__tests__/harness/buckbjt-smoke.test.ts` — updated two usages of stepEnd.components to access .slots and .slots on the new StepEndComponentEntry shape
 - **Tests**: 77/77 passing (harness test suite); full suite 5 pre-existing failures (all in test-baseline.md), 0 new regressions
+
+## Task S3-C: Methods 1-8 on ComparisonSession
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/__tests__/harness/comparison-session.ts` — added 8 public methods (listComponents, listNodes, getComponentsByType, getComponentSlots, getDivergences, getStepEndRange, traceComponentSlot, getStateHistory) plus `_applyPagination` helper; added imports for isPoolBacked, compileSlotMatcher, and all new types from types.ts
+  - `src/solver/analog/__tests__/harness/query-methods.test.ts` — added tests 14-39 covering normalizeDeviceType (4), captureTopology type fix (1), listComponents (3), listNodes (3), getComponentsByType (3), getDivergences (4), getStepEndRange (2), traceComponentSlot (3), getStateHistory (3); added TestableComparisonSession subclass and buildHwrSession helper
+- **Tests**: 39/39 passing
+
+## Task S3-D: Methods 9-17 + 5 Enhanced Methods on ComparisonSession
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/__tests__/harness/comparison-session.ts` — added 9 new methods (getMatrixLabeled, getRhsLabeled, compareMatrixAt, getIntegrationCoefficients, getLimitingComparison, getConvergenceDetail, toJSON, static create, dispose); enhanced 5 existing methods (traceComponent with slots/stepsRange/onlyDivergences/offset/limit opts, traceNode with stepsRange/onlyDivergences/offset/limit opts, getIterations gains perElementConvergence array, getSummary gains perDeviceType/integrationMethod/stateHistoryIssues, _ensureRun checks _disposed); added _disposed field; added imports for SessionReport/LabeledMatrix/LabeledRhs/MatrixComparison/IntegrationCoefficientsReport/LimitingComparisonReport/ConvergenceDetailReport from types.js and float64ToArray/mapToRecord from format.js
+  - `src/solver/analog/__tests__/harness/query-methods.test.ts` — added 20 new tests (40-59) covering getMatrixLabeled/getRhsLabeled/compareMatrixAt (4), getIntegrationCoefficients (2), getLimitingComparison (2), getConvergenceDetail (2), toJSON (3), enhanced traceComponent/traceNode (2), static create (1), dispose (1), getComponentSlots edge cases (3)
+- **Tests**: 59/59 passing in query-methods.test.ts; 123/123 passing in full harness suite
