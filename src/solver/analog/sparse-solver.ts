@@ -88,6 +88,10 @@ export class SparseSolver {
   // -- Scratch for solve (length n) --
   private _scratch: Float64Array = new Float64Array(0);
 
+  // -- Pre-solve RHS capture --
+  private _preSolveRhs: Float64Array | null = null;
+  private _capturePreSolveRhs = false;
+
   // -- Topology tracking --
   /**
    * When true, the next `finalize()` rebuilds CSC + AMD + symbolic LU from
@@ -216,6 +220,13 @@ export class SparseSolver {
       this._hasLinearBase = false; // topology change invalidates snapshot
     } else {
       this._refillCSC(cooStart);
+    }
+
+    if (this._capturePreSolveRhs && this._preSolveRhs) {
+      if (this._preSolveRhs.length !== this._n) {
+        this._preSolveRhs = new Float64Array(this._n);
+      }
+      this._preSolveRhs.set(this._rhs.subarray(0, this._n));
     }
   }
 
@@ -439,6 +450,26 @@ export class SparseSolver {
    */
   getRhsSnapshot(): Float64Array {
     return this._rhs.slice(0, this._n);
+  }
+
+  /**
+   * Enable or disable pre-solve RHS capture.
+   * When enabled, finalize() snapshots the RHS after stamp assembly and
+   * before factorization. Zero cost when disabled.
+   */
+  enablePreSolveRhsCapture(enabled: boolean): void {
+    this._capturePreSolveRhs = enabled;
+    if (enabled && (this._preSolveRhs === null || this._preSolveRhs.length !== this._n)) {
+      this._preSolveRhs = new Float64Array(this._n);
+    }
+  }
+
+  /**
+   * Returns the pre-solve RHS snapshot captured during the last finalize() call.
+   * Returns a zero-length array if capture is not enabled.
+   */
+  getPreSolveRhsSnapshot(): Float64Array {
+    return this._preSolveRhs ?? new Float64Array(0);
   }
 
   /**

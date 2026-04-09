@@ -229,3 +229,97 @@ describe("Convergence", () => {
     expect(converged).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// checkAllConvergedDetailed tests (Item 8)
+// ---------------------------------------------------------------------------
+
+describe("checkAllConvergedDetailed", () => {
+  function makeNonlinearElement(converges: boolean) {
+    return {
+      pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
+      branchIndex: -1,
+      isNonlinear: true,
+      isReactive: false,
+      stamp(_solver: SparseSolver): void {},
+      getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
+      setParam(_key: string, _value: number): void {},
+      checkConvergence(
+        _voltages: Float64Array,
+        _prevVoltages: Float64Array,
+        _reltol: number,
+        _iabstol: number,
+      ): boolean {
+        return converges;
+      },
+    };
+  }
+
+  it("returns allConverged=true and empty failedIndices when all elements converge", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+    const el0 = makeNonlinearElement(true);
+    const el1 = makeNonlinearElement(true);
+    const voltages = new Float64Array([1.0]);
+    const prevVoltages = new Float64Array([1.0]);
+    const result = assembler.checkAllConvergedDetailed(
+      [el0, el1], voltages, prevVoltages, 1e-3, 1e-6,
+    );
+    expect(result.allConverged).toBe(true);
+    expect(result.failedIndices).toEqual([]);
+  });
+
+  it("returns allConverged=false and collects all failing indices without short-circuiting", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+    const el0 = makeNonlinearElement(false); // fails
+    const el1 = makeNonlinearElement(true);  // passes
+    const el2 = makeNonlinearElement(false); // fails
+    const voltages = new Float64Array([1.0]);
+    const prevVoltages = new Float64Array([0.0]);
+    const result = assembler.checkAllConvergedDetailed(
+      [el0, el1, el2], voltages, prevVoltages, 1e-3, 1e-6,
+    );
+    expect(result.allConverged).toBe(false);
+    expect(result.failedIndices).toEqual([0, 2]);
+  });
+
+  it("skips elements without checkConvergence (linear elements)", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+    const R1 = makeResistor(1, 0, 1000); // no checkConvergence
+    const el = makeNonlinearElement(true);
+    const voltages = new Float64Array([5.0]);
+    const prevVoltages = new Float64Array([5.0]);
+    const result = assembler.checkAllConvergedDetailed(
+      [R1, el], voltages, prevVoltages, 1e-3, 1e-6,
+    );
+    expect(result.allConverged).toBe(true);
+    expect(result.failedIndices).toEqual([]);
+  });
+
+  it("checkAllConverged still short-circuits on first failure (unchanged)", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+    let callCount = 0;
+    const trackingEl = {
+      pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
+      branchIndex: -1,
+      isNonlinear: true,
+      isReactive: false,
+      stamp(_solver: SparseSolver): void {},
+      getPinCurrents(_v: Float64Array): number[] { return [0]; },
+      setParam(_k: string, _v: number): void {},
+      checkConvergence(): boolean { callCount++; return false; },
+    };
+    const voltages = new Float64Array([1.0]);
+    const prevVoltages = new Float64Array([0.0]);
+    assembler.checkAllConverged(
+      [trackingEl, trackingEl, trackingEl], voltages, prevVoltages, 1e-3, 1e-6,
+    );
+    // checkAllConverged short-circuits after first failure → only called once
+    expect(callCount).toBe(1);
+  });
+});

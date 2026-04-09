@@ -68,7 +68,7 @@ export interface ComparisonSessionOptions {
 // Helpers
 // ============================================================================
 
-const ROOT = resolve(__dirname, "../../../../..");
+const ROOT = process.cwd();
 
 function resolvePath(p: string): string {
   return resolve(ROOT, p);
@@ -179,6 +179,13 @@ export class ComparisonSession {
 
   /**
    * Run DC operating point analysis on both engines.
+   *
+   * NOTE: DC OP runs twice on our engine:
+   *   1. During compile() — this sets the operating point but has no capture hook.
+   *   2. Here — the capture hook is wired before the second run, so all
+   *      per-iteration data is captured from this second run.
+   * The second run starts from the DC OP solution, so it typically converges
+   * in 1-2 iterations. This is the intended behavior — see CLAUDE.md §DC OP.
    */
   async runDcOp(): Promise<void> {
     this._analysis = "dcop";

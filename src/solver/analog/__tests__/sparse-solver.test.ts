@@ -477,3 +477,85 @@ describe("SparseSolver real MNA circuit", () => {
     expect(tPerStep).toBeLessThan(2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Pre-solve RHS capture tests (Item 6)
+// ---------------------------------------------------------------------------
+
+describe("SparseSolver pre-solve RHS capture", () => {
+  it("getPreSolveRhsSnapshot returns zero-length array when capture disabled", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 1);
+    solver.stamp(1, 1, 1);
+    solver.stampRHS(0, 3);
+    solver.stampRHS(1, 7);
+    solver.finalize();
+    const snapshot = solver.getPreSolveRhsSnapshot();
+    expect(snapshot.length).toBe(0);
+  });
+
+  it("enablePreSolveRhsCapture causes finalize to snapshot the RHS before factorization", () => {
+    const solver = new SparseSolver();
+    solver.enablePreSolveRhsCapture(true);
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 4);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.finalize();
+    const snapshot = solver.getPreSolveRhsSnapshot();
+    expect(snapshot.length).toBe(2);
+    expect(snapshot[0]).toBeCloseTo(1, 12);
+    expect(snapshot[1]).toBeCloseTo(2, 12);
+  });
+
+  it("pre-solve RHS is captured before factorization — distinct from solution vector", () => {
+    // RHS = [5, 0]; after solve, solution differs from RHS
+    const solver = new SparseSolver();
+    solver.enablePreSolveRhsCapture(true);
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 2);
+    solver.stampRHS(0, 5);
+    solver.stampRHS(1, 0);
+    solver.finalize();
+    const preSolveRhs = solver.getPreSolveRhsSnapshot().slice();
+    solver.factor();
+    const x = new Float64Array(2);
+    solver.solve(x);
+    // Pre-solve RHS should be [5, 0], not the solution
+    expect(preSolveRhs[0]).toBeCloseTo(5, 12);
+    expect(preSolveRhs[1]).toBeCloseTo(0, 12);
+    // Solution should be different (x[0]=10/3, x[1]=-5/3)
+    expect(x[0]).not.toBeCloseTo(5, 1);
+  });
+
+  it("disabling capture after enable stops updating snapshot", () => {
+    const solver = new SparseSolver();
+    solver.enablePreSolveRhsCapture(true);
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 1);
+    solver.stamp(1, 1, 1);
+    solver.stampRHS(0, 11);
+    solver.stampRHS(1, 22);
+    solver.finalize();
+    const first = solver.getPreSolveRhsSnapshot().slice();
+    expect(first[0]).toBeCloseTo(11, 12);
+
+    solver.enablePreSolveRhsCapture(false);
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 1);
+    solver.stamp(1, 1, 1);
+    solver.stampRHS(0, 99);
+    solver.stampRHS(1, 88);
+    solver.finalize();
+    // Snapshot should not have updated to the new RHS values
+    const second = solver.getPreSolveRhsSnapshot();
+    expect(second[0]).toBeCloseTo(11, 12);
+  });
+});

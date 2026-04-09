@@ -150,4 +150,29 @@ export class MNAAssembler {
     }
     return true;
   }
+
+  /**
+   * Like checkAllConverged but collects all failing element indices instead of
+   * short-circuiting on the first failure.
+   *
+   * Only called when NROptions.detailedConvergence is true. The default path
+   * (checkAllConverged) is unchanged and continues to short-circuit.
+   */
+  checkAllConvergedDetailed(
+    elements: readonly AnalogElement[],
+    voltages: Float64Array,
+    prevVoltages: Float64Array,
+    reltol: number,
+    iabstol: number,
+  ): { allConverged: boolean; failedIndices: number[] } {
+    const failedIndices: number[] = [];
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i];
+      if (!el.checkConvergence) continue;
+      if (!el.checkConvergence(voltages, prevVoltages, reltol, iabstol)) {
+        failedIndices.push(i);
+      }
+    }
+    return { allConverged: failedIndices.length === 0, failedIndices };
+  }
 }

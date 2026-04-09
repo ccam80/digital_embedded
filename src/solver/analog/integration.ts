@@ -197,3 +197,42 @@ export class HistoryStore {
     this._slotIsA.fill(1);
   }
 }
+
+/**
+ * Compute integration coefficients ag0 and ag1 from step parameters.
+ * ag0 is the coefficient on Q_n (or phi_n for inductors).
+ * ag1 is the coefficient on Q_{n-1}.
+ *
+ * Used by StepSnapshot capture to record the coefficients without
+ * re-deriving them from element-level calculations.
+ */
+export function computeIntegrationCoefficients(
+  dt: number,
+  h1: number,
+  h2: number,
+  order: number,
+  method: IntegrationMethod,
+): { ag0: number; ag1: number } {
+  if (dt <= 0) return { ag0: 0, ag1: 0 };
+
+  if (order <= 1) {
+    return { ag0: 1 / dt, ag1: -1 / dt };
+  } else if (method === "trapezoidal") {
+    return { ag0: 2 / dt, ag1: -2 / dt };
+  } else {
+    // BDF-2
+    const safeH1 = h1 > 0 ? h1 : dt;
+    const safeH2 = h2 > 0 ? h2 : safeH1;
+    const r1 = safeH1 / dt;
+    const r2 = (safeH1 + safeH2) / dt;
+    const u22 = r2 * (r2 - r1);
+    if (Math.abs(u22) < 1e-30) {
+      return { ag0: 1 / dt, ag1: -1 / dt };
+    }
+    const rhs2 = r1 / dt;
+    const ag2 = rhs2 / u22;
+    const ag1val = (-1 / dt - r2 * ag2) / r1;
+    const ag0val = -(ag1val + ag2);
+    return { ag0: ag0val, ag1: ag1val };
+  }
+}

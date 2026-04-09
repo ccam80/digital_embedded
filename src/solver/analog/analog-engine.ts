@@ -570,6 +570,11 @@ export class MNAEngine implements AnalogEngine {
     return this._engineState;
   }
 
+  /** Current integration order (1 = BDF-1 startup, 2 = order-2 free-running). */
+  get integrationOrder(): number {
+    return this._timestep.currentOrder;
+  }
+
   /** Register a state-change listener. */
   addChangeListener(listener: EngineChangeListener): void {
     this._changeListeners.push(listener);

@@ -82,6 +82,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private _digitalElementIndexCache: Map<CircuitElement, number> | null = null;
   /** Reusable Map for getPinVoltages() to avoid per-call allocation. */
   private readonly _pinVoltageResult = new Map<string, number>();
+  private _analysisPhase: "dcop" | "tranInit" | "tranFloat" = "dcop";
 
   constructor(compiled: CompiledCircuitUnified, registry?: ComponentRegistry) {
     this._registry = registry ?? null;
@@ -180,6 +181,10 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   step(): void {
     const analogTimeBefore = this._analog?.simTime ?? 0;
 
+    if (this._analog !== null && this._analysisPhase === "dcop") {
+      this._analysisPhase = "tranInit";
+    }
+
     if (this._digital !== null && this._analog !== null) {
       this._stepMixed();
     } else if (this._digital !== null) {
@@ -198,6 +203,13 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
         `The engine exhausted all internal retries without advancing. ` +
         `Check convergence log for details.`,
       );
+    }
+
+    if (this._analog !== null && this._analysisPhase === "tranInit") {
+      const mnaEngine = this._analog as MNAEngine;
+      if (mnaEngine.integrationOrder >= 2) {
+        this._analysisPhase = "tranFloat";
+      }
     }
 
     this._stepCount++;
@@ -325,7 +337,18 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     if (this._digital !== null) this._digital.runToBreak();
   }
 
+  /**
+   * Current analysis phase, updated at each step boundary.
+   * "dcop"      — DC operating point (initial or re-solve)
+   * "tranInit"  — Transient initialization (first few steps at t=0)
+   * "tranFloat" — Transient free-running (t > 0)
+   */
+  get analysisPhase(): "dcop" | "tranInit" | "tranFloat" {
+    return this._analysisPhase;
+  }
+
   dcOperatingPoint(): DcOpResult | null {
+    this._analysisPhase = "dcop";
     return this._cachedDcOpResult;
   }
 

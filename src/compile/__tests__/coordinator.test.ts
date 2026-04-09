@@ -558,3 +558,52 @@ describe('DefaultSimulationCoordinator - mixed-signal', () => {
     expect(() => coord.dispose()).not.toThrow();
   });
 });
+
+// ===========================================================================
+// Tests — analysisPhase (Item 15)
+// ===========================================================================
+
+describe('DefaultSimulationCoordinator - analysisPhase', () => {
+  it('initial analysisPhase is "dcop"', () => {
+    const { circuit, registry } = buildResistorDividerCircuit();
+    const unified = compileUnified(circuit, registry);
+    const coord = new DefaultSimulationCoordinator(unified);
+    expect(coord.analysisPhase).toBe("dcop");
+    coord.dispose();
+  });
+
+  it('dcOperatingPoint() sets analysisPhase to "dcop"', () => {
+    const { circuit, registry } = buildResistorDividerCircuit();
+    const unified = compileUnified(circuit, registry);
+    const coord = new DefaultSimulationCoordinator(unified);
+    // Step first to move phase away from dcop
+    coord.step();
+    expect(coord.analysisPhase).toBe("tranInit");
+    // Calling dcOperatingPoint resets to dcop
+    coord.dcOperatingPoint();
+    expect(coord.analysisPhase).toBe("dcop");
+    coord.dispose();
+  });
+
+  it('first analog step() sets analysisPhase to "tranInit"', () => {
+    const { circuit, registry } = buildResistorDividerCircuit();
+    const unified = compileUnified(circuit, registry);
+    const coord = new DefaultSimulationCoordinator(unified);
+    expect(coord.analysisPhase).toBe("dcop");
+    coord.step();
+    expect(coord.analysisPhase).toBe("tranInit");
+    coord.dispose();
+  });
+
+  it('analysisPhase transitions to "tranFloat" after order promotion (after 3+ accepted steps)', () => {
+    const { circuit, registry } = buildResistorDividerCircuit();
+    const unified = compileUnified(circuit, registry);
+    const coord = new DefaultSimulationCoordinator(unified);
+    // After enough steps tryOrderPromotion fires and moves order from 1 to 2
+    for (let i = 0; i < 10; i++) {
+      coord.step();
+    }
+    expect(coord.analysisPhase).toBe("tranFloat");
+    coord.dispose();
+  });
+});

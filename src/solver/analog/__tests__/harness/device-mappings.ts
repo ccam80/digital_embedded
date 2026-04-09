@@ -141,6 +141,9 @@ export const BJT_MAPPING: DeviceMapping = {
     Q_BE: 8,      // BJTqbe
     Q_BC: 10,     // BJTqbc
     Q_CS: 12,     // BJTqcs
+    CCAP_BE: 9,   // BJTcqbe — companion current for BE junction
+    CCAP_BC: 11,  // BJTcqbc — companion current for BC junction
+    CCAP_CS: 13,  // BJTcqcs — companion current for CS junction
     CTOT_BE: null,
     CTOT_BC: null,
     CTOT_CS: null,
@@ -159,8 +162,11 @@ export const BJT_MAPPING: DeviceMapping = {
     6: "GM",
     7: "GO",
     8: "Q_BE",
+    9: "CCAP_BE",
     10: "Q_BC",
+    11: "CCAP_BC",
     12: "Q_CS",
+    13: "CCAP_CS",
     17: "CEXBC_NOW",
     18: "GEQCB",
   },

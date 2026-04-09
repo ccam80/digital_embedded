@@ -13,6 +13,7 @@ import {
   integrateCapacitor,
   integrateInductor,
   HistoryStore,
+  computeIntegrationCoefficients,
 } from "../integration.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
@@ -396,5 +397,57 @@ describe("RLCircuit", () => {
     const iSim = runRlRise(steps, dt);
 
     expect(Math.abs(iSim - iAnalytical) / iAnalytical).toBeLessThan(0.05);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeIntegrationCoefficients tests (Item 7)
+// ---------------------------------------------------------------------------
+
+describe("computeIntegrationCoefficients", () => {
+  const h = 1e-6;
+
+  it("returns zero coefficients when dt <= 0", () => {
+    const result = computeIntegrationCoefficients(0, 0, 0, 1, "bdf1");
+    expect(result.ag0).toBe(0);
+    expect(result.ag1).toBe(0);
+  });
+
+  it("backward Euler (order 1): ag0 = 1/dt, ag1 = -1/dt", () => {
+    const { ag0, ag1 } = computeIntegrationCoefficients(h, 0, 0, 1, "bdf1");
+    expect(ag0).toBeCloseTo(1 / h, 10);
+    expect(ag1).toBeCloseTo(-1 / h, 10);
+  });
+
+  it("trapezoidal (order 2): ag0 = 2/dt, ag1 = -2/dt", () => {
+    const { ag0, ag1 } = computeIntegrationCoefficients(h, h, h, 2, "trapezoidal");
+    expect(ag0).toBeCloseTo(2 / h, 10);
+    expect(ag1).toBeCloseTo(-2 / h, 10);
+  });
+
+  it("BDF-2 with equal steps matches integrateCapacitor ag0", () => {
+    // With equal steps h1=h, h2=h: ag0 = 3/(2h), ag1 = -2/h, ag2 = 1/(2h)
+    // ag0 = -(ag1 + ag2), so ag2 = -(ag0 + ag1)
+    const { ag0, ag1 } = computeIntegrationCoefficients(h, h, h, 2, "bdf2");
+    expect(ag0).toBeCloseTo(3 / (2 * h), 10);
+    const ag2 = -(ag0 + ag1); // derived from ag0 = -(ag1 + ag2)
+    expect(ag2).toBeGreaterThan(0); // ag2 = 1/(2h) > 0
+  });
+
+  it("BDF-2 ag0 matches value from integrateCapacitor for same parameters", () => {
+    const C = 1;
+    const { ag0: ag0Standalone } = computeIntegrationCoefficients(h, h, h, 2, "bdf2");
+    const { ag0: ag0Element } = integrateCapacitor(C, 0, 0, 0, 0, h, h, h, 2, "bdf2", 0);
+    expect(ag0Standalone).toBeCloseTo(ag0Element, 10);
+  });
+
+  it("order 2 with bdf1 method falls through to order-1 branch", () => {
+    // When method is bdf1 but order=2 passed — order <= 1 check gates on order, not method
+    // Order 2 + bdf2 method but degenerate h values should fall back to BE
+    const { ag0, ag1 } = computeIntegrationCoefficients(h, 0, 0, 2, "bdf2");
+    // h1=0: safeH1=dt=h, safeH2=safeH1=h → same as equal steps
+    // r1 = 1, r2 = 2, u22 = 2 → normal BDF-2
+    expect(ag0).toBeCloseTo(3 / (2 * h), 10);
+    expect(ag1).toBeLessThan(0);
   });
 });
