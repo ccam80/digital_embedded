@@ -14,6 +14,8 @@ import type {
   StepSnapshot,
   ElementStateSnapshot,
   NRAttempt,
+  NRPhase,
+  NRAttemptOutcome,
   LimitingEvent,
   IntegrationCoefficients,
 } from "./types.js";
@@ -40,13 +42,7 @@ const TYPE_TO_PREFIX: Record<string, string> = {
 };
 
 /**
- * Build a map from element index → human-readable component label
- * using the compiled circuit's elementToCircuitElement map.
- *
- * Priority:
- *   1. User-set "label" property on the CircuitElement
- *   2. Auto-generated SPICE-style label from typeId + counter (Q1, R2, etc.)
- *   3. el.label (UUID) as last resort
+ * Build a map from element index → human-readable component label.
  */
 export function buildElementLabelMap(
   compiled: ConcreteCompiledAnalogCircuit,
@@ -54,7 +50,6 @@ export function buildElementLabelMap(
   const map = new Map<number, string>();
   const e2ce = compiled.elementToCircuitElement;
 
-  // First pass: collect user-set labels
   for (let i = 0; i < compiled.elements.length; i++) {
     const ce = e2ce?.get(i);
     if (ce) {
@@ -65,10 +60,9 @@ export function buildElementLabelMap(
     }
   }
 
-  // Second pass: auto-generate labels for elements without user labels
   const prefixCounters = new Map<string, number>();
   for (let i = 0; i < compiled.elements.length; i++) {
-    if (map.has(i)) continue; // already has user label
+    if (map.has(i)) continue;
 
     const ce = e2ce?.get(i);
     const typeId = ce?.typeId ?? "";
@@ -84,16 +78,6 @@ export function buildElementLabelMap(
 
 /**
  * Capture the circuit topology from a compiled circuit.
- * Called once after compile, before simulation starts.
- *
- * Node labels are built in priority order:
- *   1. `labelPinNodes` → "Q1:B", "R1:A" (rich component:pin form)
- *   2. `labelToNodeId` → bare component labels
- *   3. Element pin reverse-map → "Q1_pin0", "R1_pin1" (from elements array)
- * Multiple labels per node are joined with "/".
- *
- * @param elementLabels - Optional map from element index → human label.
- *   If not provided, falls back to el.label (which may be a UUID).
  */
 export function captureTopology(
   compiled: ConcreteCompiledAnalogCircuit,
@@ -101,8 +85,6 @@ export function captureTopology(
 ): TopologySnapshot {
   const nodeLabels = new Map<number, string>();
 
-  // Build node labels from elementResolvedPins (has real pin labels for all elements)
-  // Falls back to pin index when resolvedPins unavailable.
   const perNode = new Map<number, string[]>();
   for (let i = 0; i < compiled.elements.length; i++) {
     const el = compiled.elements[i];
@@ -125,11 +107,9 @@ export function captureTopology(
     nodeLabels.set(nodeId, tags.join("/"));
   }
 
-  // Build matrix row/col label maps
   const matrixRowLabels = new Map<number, string>();
   const matrixColLabels = new Map<number, string>();
 
-  // Rows 0..nodeCount-1 map to voltage nodes (nodeId is 1-based)
   nodeLabels.forEach((label, nodeId) => {
     const row = nodeId - 1;
     if (row >= 0 && row < compiled.nodeCount) {
@@ -138,7 +118,6 @@ export function captureTopology(
     }
   });
 
-  // Rows nodeCount..matrixSize-1 are branch currents from voltage sources and inductors
   const e2ce = compiled.elementToCircuitElement;
   let branchOffset = 0;
   for (let i = 0; i < compiled.elements.length; i++) {
@@ -183,11 +162,6 @@ export function captureTopology(
 // Element state capture
 // ---------------------------------------------------------------------------
 
-/**
- * Capture the current state-pool slots for all pool-backed elements.
- *
- * @param elementLabels - Optional map from element index → human label.
- */
 export function captureElementStates(
   elements: readonly AnalogElement[],
   statePool: StatePool | null,
@@ -248,13 +222,7 @@ export type PostIterationHook = (
 
 /**
  * Create a postIterationHook that captures every NR iteration into
- * an IterationSnapshot array. Returns the hook function and a getter
- * for the accumulated snapshots.
- *
- * @param solver    - SparseSolver instance (for matrix/RHS snapshots)
- * @param elements  - Element array (for device state capture)
- * @param statePool - State pool (for device state capture)
- * @param elementLabels - Optional map from element index → human label
+ * an IterationSnapshot array.
  */
 export function createIterationCaptureHook(
   solver: SparseSolver,
@@ -292,21 +260,36 @@ export function createIterationCaptureHook(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Phase-aware step capture hook (spec §4.2)
+// ---------------------------------------------------------------------------
+
 /**
- * Create a step-level capture wrapper that uses createIterationCaptureHook
- * internally and packages iteration snapshots into StepSnapshot objects.
+ * Create a phase-aware step capture hook.
  *
- * Supports retry/attempt tracking: call `finalizeAttempt()` for failed NR
- * cycles (dt cut), and `finalizeStep()` for the accepted step. Failed
- * attempts are preserved in `step.attempts[]`.
+ * API:
+ *   beginAttempt(phase, dt, phaseParameter?) — opens a new NRAttempt.
+ *     stepStartTime is captured from simTime on the first beginAttempt call
+ *     for this step (currentStep === null).
+ *   endAttempt(outcome, converged) — closes the current NRAttempt.
+ *   endStep({ stepEndTime, integrationCoefficients, analysisPhase, acceptedAttemptIndex })
+ *     — emits the completed StepSnapshot.
+ *   peekIterations() — view current iteration snapshots without consuming.
+ *   getSteps() — all completed steps.
+ *   clear() — reset all state.
  *
- * Usage:
- *   const capture = createStepCaptureHook(solver, elements, statePool);
- *   engine.postIterationHook = capture.hook;
- *   // ... run simulation steps ...
- *   // On NR failure (dt cut): capture.finalizeAttempt(dt, false);
- *   // On accepted step:       capture.finalizeStep(simTime, dt, converged);
- *   const steps = capture.getSteps();
+ * Usage for DCOP (called from comparison-session.ts before compile()):
+ *   beginAttempt("dcopDirect", 0)
+ *   ... NR iterations fire via hook ...
+ *   endAttempt("dcopSubSolveConverged" | "nrFailedRetry", converged)
+ *   ... more sub-solves ...
+ *   endStep({ stepEndTime: 0, integrationCoefficients: zeroDcop, analysisPhase: "dcop", acceptedAttemptIndex: N })
+ *
+ * Usage for transient (called from comparison-session.ts per coordinator.step()):
+ *   beginAttempt("tranInit" | "tranNR" | "tranNrRetry" | "tranLteRetry", dt)
+ *   ... NR iterations fire via hook ...
+ *   endAttempt("accepted" | "nrFailedRetry" | "lteRejectedRetry", converged)
+ *   endStep({ stepEndTime: engine.simTime, ... })
  */
 export function createStepCaptureHook(
   solver: SparseSolver,
@@ -315,87 +298,131 @@ export function createStepCaptureHook(
   elementLabels?: Map<number, string>,
 ): {
   hook: PostIterationHook;
-  finalizeAttempt: (dt: number, converged: boolean) => void;
-  finalizeStep: (
-    simTime: number,
-    dt: number,
-    converged: boolean,
-    integrationCoefficients: IntegrationCoefficients,
-    analysisPhase: "dcop" | "tranInit" | "tranFloat",
-  ) => void;
-  /** Read current iteration snapshots without consuming them. */
+  beginAttempt(phase: NRPhase, dt: number, phaseParameter?: number): void;
+  endAttempt(outcome: NRAttemptOutcome, converged: boolean): void;
+  endStep(params: {
+    stepEndTime: number;
+    integrationCoefficients: IntegrationCoefficients;
+    analysisPhase: "dcop" | "tranInit" | "tranFloat";
+    acceptedAttemptIndex: number;
+  }): void;
+  /** Set the stepStartTime for the currently-open step (called before endStep). */
+  setStepStartTime(t: number): void;
   peekIterations: () => readonly IterationSnapshot[];
   getSteps: () => StepSnapshot[];
   clear: () => void;
 } {
   const iterCapture = createIterationCaptureHook(solver, elements, statePool, elementLabels);
   const steps: StepSnapshot[] = [];
+
+  // Current open step state
+  let currentStepStartTime: number | null = null;
   let pendingAttempts: NRAttempt[] = [];
+  let currentAttemptPhase: NRPhase = "tranNR";
+  let currentAttemptDt: number = 0;
+  let currentAttemptPhaseParameter: number | undefined = undefined;
 
   return {
     hook: iterCapture.hook,
     peekIterations: () => iterCapture.getSnapshots(),
 
     /**
-     * Finalize a failed NR attempt (timestep will be cut and retried).
-     * Preserves the iteration data in the pending attempts list.
+     * Begin a new NR attempt. If no step is currently open, opens one
+     * and captures dt as stepStartTime sentinel (actual stepStartTime is
+     * set from the first iteration's simTime context — but since we don't
+     * have engine.simTime here, callers must pass 0 for DCOP and the
+     * pre-advance simTime for transient).
+     *
+     * For the harness, the stepStartTime is tracked externally by
+     * comparison-session.ts and passed into endStep. beginAttempt only
+     * needs to open the attempt bookkeeping.
      */
-    finalizeAttempt: (dt: number, converged: boolean) => {
+    beginAttempt(phase: NRPhase, dt: number, phaseParameter?: number): void {
+      currentAttemptPhase = phase;
+      currentAttemptDt = dt;
+      currentAttemptPhaseParameter = phaseParameter;
+      iterCapture.clear();
+    },
+
+    /**
+     * Close the current NR attempt. Pushes it into pendingAttempts.
+     */
+    endAttempt(outcome: NRAttemptOutcome, converged: boolean): void {
       const iterations = iterCapture.getSnapshots();
-      if (iterations.length > 0) {
-        pendingAttempts.push({
-          dt,
+      if (iterations.length > 0 || pendingAttempts.length === 0) {
+        const attempt: NRAttempt = {
+          dt: currentAttemptDt,
           iterations: [...iterations],
           converged,
           iterationCount: iterations.length,
-        });
+          phase: currentAttemptPhase,
+          outcome,
+          ...(currentAttemptPhaseParameter !== undefined
+            ? { phaseParameter: currentAttemptPhaseParameter }
+            : {}),
+        };
+        pendingAttempts.push(attempt);
       }
       iterCapture.clear();
     },
 
     /**
-     * Finalize the accepted step. The current iteration data becomes the
-     * final attempt. All prior failed attempts are attached to the step.
+     * Close the current step and emit a StepSnapshot.
      */
-    finalizeStep: (
-      simTime: number,
-      dt: number,
-      converged: boolean,
-      integrationCoefficients: IntegrationCoefficients,
-      analysisPhase: "dcop" | "tranInit" | "tranFloat",
-    ) => {
-      const iterations = iterCapture.getSnapshots();
-      if (iterations.length > 0) {
-        const acceptedAttempt: NRAttempt = {
-          dt,
-          iterations: [...iterations],
-          converged,
-          iterationCount: iterations.length,
-        };
-
-        const allAttempts = pendingAttempts.length > 0
-          ? [...pendingAttempts, acceptedAttempt]
-          : undefined;
-
-        steps.push({
-          simTime,
-          dt,
-          iterations: acceptedAttempt.iterations,
-          converged,
-          iterationCount: acceptedAttempt.iterationCount,
-          ...(allAttempts !== undefined ? { attempts: allAttempts } : {}),
-          integrationCoefficients,
-          analysisPhase,
-        });
+    endStep(params: {
+      stepEndTime: number;
+      integrationCoefficients: IntegrationCoefficients;
+      analysisPhase: "dcop" | "tranInit" | "tranFloat";
+      acceptedAttemptIndex: number;
+    }): void {
+      if (pendingAttempts.length === 0) {
+        // Nothing to emit — no attempts were recorded
+        return;
       }
-      iterCapture.clear();
+
+      const acceptedIdx = params.acceptedAttemptIndex < 0
+        ? pendingAttempts.length - 1
+        : Math.min(params.acceptedAttemptIndex, pendingAttempts.length - 1);
+
+      const acceptedAttempt = pendingAttempts[acceptedIdx]!;
+      const stepStartTime = currentStepStartTime ?? 0;
+
+      // Determine analysisPhase from accepted attempt phase if not explicitly tranFloat
+      let analysisPhase = params.analysisPhase;
+      if (acceptedAttempt.phase === "tranInit") {
+        analysisPhase = "tranInit";
+      }
+
+      steps.push({
+        stepStartTime,
+        stepEndTime: params.stepEndTime,
+        attempts: [...pendingAttempts],
+        acceptedAttemptIndex: acceptedIdx,
+        accepted: acceptedAttempt.outcome === "accepted" || acceptedAttempt.outcome === "dcopSubSolveConverged",
+        dt: acceptedAttempt.dt,
+        iterations: acceptedAttempt.iterations,
+        converged: acceptedAttempt.converged,
+        iterationCount: acceptedAttempt.iterationCount,
+        integrationCoefficients: params.integrationCoefficients,
+        analysisPhase,
+      });
+
+      // Reset step state
+      currentStepStartTime = params.stepEndTime;
       pendingAttempts = [];
+      iterCapture.clear();
+    },
+
+    setStepStartTime(t: number): void {
+      currentStepStartTime = t;
     },
 
     getSteps: () => steps,
+
     clear: () => {
       steps.length = 0;
       pendingAttempts = [];
+      currentStepStartTime = null;
       iterCapture.clear();
     },
   };

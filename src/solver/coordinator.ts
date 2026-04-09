@@ -84,7 +84,7 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   private readonly _pinVoltageResult = new Map<string, number>();
   private _analysisPhase: "dcop" | "tranInit" | "tranFloat" = "dcop";
 
-  constructor(compiled: CompiledCircuitUnified, registry?: ComponentRegistry) {
+  constructor(compiled: CompiledCircuitUnified, registry?: ComponentRegistry, captureHook?: MNAEngine["stepPhaseHook"]) {
     this._registry = registry ?? null;
     this._compiled = compiled;
     this._bridges = compiled.bridges;
@@ -113,6 +113,11 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     if (compiled.analog !== null) {
       const engine = new MNAEngine();
       engine.init(compiled.analog);
+      // Install capture hook BEFORE dcOperatingPoint() so in-compile DCOP
+      // iterations are captured into the boot step (spec §4.3).
+      if (captureHook !== undefined) {
+        engine.stepPhaseHook = captureHook;
+      }
       this._cachedDcOpResult = engine.dcOperatingPoint();
       this._analog = engine;
 

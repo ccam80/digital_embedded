@@ -382,20 +382,15 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
       const ngStep = ngSession.steps[ngIdx];
       if (!ourStep || !ngStep) continue;
 
-      const delta = Math.abs(ourStep.simTime - ngStep.simTime);
-      const halfMinDt =
-        0.5 *
-        Math.min(
-          ourStep.dt > 0 ? ourStep.dt : Infinity,
-          ngStep.dt > 0 ? ngStep.dt : Infinity,
-        );
-      expect(delta).toBeLessThanOrEqual(halfMinDt);
+      // Per spec §7: alignment is by exact stepStartTime equality (1e-15 EPS)
+      const delta = Math.abs(ourStep.stepStartTime - ngStep.stepStartTime);
+      expect(delta).toBeLessThanOrEqual(1e-15);
     }
   });
 
   it("16. step alignment: first step at time 0", () => {
     const ourSteps = session.ourSession!.steps;
-    expect(ourSteps[0].simTime).toBeCloseTo(0, 6);
+    expect(ourSteps[0].stepStartTime).toBeCloseTo(0, 6);
   });
 
   it("17. getDivergences: non-empty for HWR", () => {
@@ -412,7 +407,7 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
     for (const entry of report.entries) {
       expect(entry.stepIndex).toBeGreaterThanOrEqual(0);
       expect(Number.isInteger(entry.iteration)).toBe(true);
-      expect(Number.isFinite(entry.simTime)).toBe(true);
+      expect(Number.isFinite(entry.stepStartTime)).toBe(true);
       expect(validCategories).toContain(entry.category);
       expect(entry.label.length).toBeGreaterThan(0);
       expect(Number.isFinite(entry.absDelta)).toBe(true);

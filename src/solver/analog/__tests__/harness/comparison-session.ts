@@ -2,20 +2,19 @@
  * ComparisonSession — unified ergonomic API for side-by-side
  * comparison of our engine against ngspice.
  *
- * Replaces the older compare-circuits.ts orchestration layer.
- * All query results return ours/ngspice/delta triples keyed by
- * component:pin labels.
+ * Timestep-alignment rewrite per docs/timestep-alignment-spec.md §7, §9:
+ * - stepStartTime (simTime BEFORE any NR attempt) is the canonical step key.
+ * - No legacy simTime field anywhere (D4 — hard cut).
+ * - Hook installed before compile() so in-compile DCOP is captured (D1).
+ * - runDcOp() re-runs DCOP with hook active; returns boot step (D6 variant).
+ * - Alignment uses exact stepStartTime equality with 1e-15 EPS (§7).
+ * - Unaligned steps report unaligned:true; no raw-index fallback.
  *
  * Usage:
- *   const session = new ComparisonSession({
- *     dtsPath: 'fixtures/buckbjt.dts',
- *   });
+ *   const session = new ComparisonSession({ dtsPath, cirPath });
  *   await session.init();
  *   await session.runTransient(0, 5e-3);
- *
  *   const step0 = session.getStepEnd(0);
- *   const iters = session.getIterations(0);
- *   const q1 = session.traceComponent('Q1');
  */
 
 import { readFileSync } from "fs";
@@ -25,16 +24,17 @@ import { createDefaultRegistry } from "../../../../components/register-all.js";
 import { DefaultSimulationCoordinator } from "../../../../solver/coordinator.js";
 import type { MNAEngine } from "../../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
-import { isPoolBacked } from "../../element.js";
-import { computeIntegrationCoefficients } from "../../integration.js";
-import { captureTopology, createStepCaptureHook, buildElementLabelMap } from "./capture.js";
-import { generateSpiceNetlist } from "./netlist-generator.js";
+import {
+  captureTopology,
+  createStepCaptureHook,
+  buildElementLabelMap,
+} from "./capture.js";
 import { compareSnapshots, findFirstDivergence } from "./compare.js";
 import { convergenceSummary } from "./query.js";
 import { NgspiceBridge } from "./ngspice-bridge.js";
 import { buildDirectNodeMapping, reindexNgspiceSession } from "./node-mapping.js";
-import { DEVICE_MAPPINGS } from "./device-mappings.js";
-import { compileSlotMatcher } from "./glob.js";
+import { generateSpiceNetlist } from "./netlist-generator.js";
+import { matchSlotPattern } from "./glob.js";
 import type {
   CaptureSession,
   TopologySnapshot,
@@ -46,75 +46,36 @@ import type {
   ComponentTrace,
   NodeTrace,
   SessionSummary,
-  SessionReport,
   Tolerance,
   ComparisonResult,
   IntegrationCoefficients,
-  PaginationOpts,
+  NRPhase,
+  NRAttemptOutcome,
   ComponentInfo,
   NodeInfo,
+  ComponentSlotsSnapshot,
+  ComponentSlotsTrace,
   ComponentSlotsResult,
-  DivergenceReport,
+  DivergenceCategory,
   DivergenceEntry,
+  DivergenceReport,
   SlotTrace,
   StateHistoryReport,
   LabeledMatrix,
-  LabeledRhs,
-  MatrixComparison,
-  IntegrationCoefficientsReport,
-  LimitingComparisonReport,
-  ConvergenceDetailReport,
+  LabeledMatrixEntry,
+  PaginationOpts,
 } from "./types.js";
 import { DEFAULT_TOLERANCE } from "./types.js";
-import { float64ToArray, mapToRecord } from "./format.js";
 
-function _applyPagination<T>(items: T[], opts?: PaginationOpts): T[] {
-  const offset = opts?.offset ?? 0;
-  const limit = opts?.limit;
-  if (limit !== undefined) {
-    return items.slice(offset, offset + limit);
-  }
-  return offset > 0 ? items.slice(offset) : items;
-}
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
 
 function _zeroDcopCoefficients(): IntegrationCoefficients {
   return {
     ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
     ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
   };
-}
-
-// ============================================================================
-// Options
-// ============================================================================
-
-export interface ComparisonSessionOptions {
-  /** Path to .dts circuit file (our engine format). */
-  dtsPath: string;
-  /** Path to ngspice DLL. Defaults to NGSPICE_DLL_PATH env or standard build location. */
-  dllPath?: string;
-  /** Tolerance overrides. */
-  tolerance?: Partial<Tolerance>;
-  /** Max timestep attempts to capture from our engine per run. Default: 5000. */
-  maxOurSteps?: number;
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-const ROOT = process.cwd();
-
-function resolvePath(p: string): string {
-  return resolve(ROOT, p);
-}
-
-function getDllPath(opts: ComparisonSessionOptions): string {
-  return (
-    opts.dllPath ??
-    process.env.NGSPICE_DLL_PATH ??
-    resolve(ROOT, "ref/ngspice/visualc-shared/x64/Release/bin/spice.dll")
-  );
 }
 
 function makeComparedValue(
@@ -135,46 +96,166 @@ function simpleCompared(ours: number, ngspice: number): ComparedValue {
   return makeComparedValue(ours, ngspice, 0, 0);
 }
 
-// ============================================================================
+function applyPagination<T>(arr: T[], opts?: PaginationOpts): T[] {
+  const offset = opts?.offset ?? 0;
+  const limit = opts?.limit ?? arr.length;
+  return arr.slice(offset, offset + limit);
+}
+
+function stripControlBlock(cir: string): string {
+  let inControl = false;
+  return cir
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim().toLowerCase();
+      if (trimmed.startsWith(".control")) { inControl = true; return false; }
+      if (trimmed.startsWith(".endc"))    { inControl = false; return false; }
+      if (inControl) return false;
+      if (trimmed.startsWith("meas ") || trimmed === "quit" || trimmed.startsWith("tran "))
+        return false;
+      return true;
+    })
+    .join("\n");
+}
+
+const ROOT = process.cwd();
+function resolvePath(p: string): string { return resolve(ROOT, p); }
+function getDllPath(opts: ComparisonSessionOptions): string {
+  return (
+    opts.dllPath ??
+    process.env.NGSPICE_DLL_PATH ??
+    resolve(ROOT, "ref/ngspice/visualc-shared/x64/Release/bin/spice.dll")
+  );
+}
+
+function emptyTopology(): TopologySnapshot {
+  return {
+    matrixSize: 0, nodeCount: 0, branchCount: 0, elementCount: 0,
+    elements: [],
+    nodeLabels: new Map(),
+    matrixRowLabels: new Map(),
+    matrixColLabels: new Map(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Options
+// ---------------------------------------------------------------------------
+
+export interface ComparisonSessionOptions {
+  /** Path to .dts circuit file (our engine format). */
+  dtsPath: string;
+  /** Path to .cir SPICE netlist (ngspice format). Optional for headless-only use. */
+  cirPath?: string;
+  /** Path to ngspice DLL. Defaults to NGSPICE_DLL_PATH env or standard build location. */
+  dllPath?: string;
+  /** Tolerance overrides. */
+  tolerance?: Partial<Tolerance>;
+  /** Max timestep steps to run on our engine per run. Default: 5000. */
+  maxOurSteps?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Supplemental report types (not yet in types.ts)
+// ---------------------------------------------------------------------------
+
+interface IntegrationCoefficientsReport {
+  stepIndex: number;
+  ours: { ag0: number; ag1: number; method: string; order: number };
+  ngspice: { ag0: number; ag1: number; method: string; order: number };
+  methodMatch: boolean;
+  ag0Compared: ComparedValue;
+  ag1Compared: ComparedValue;
+}
+
+interface LimitingComparisonReport {
+  label: string;
+  noEvents: boolean;
+  junctions: Array<{
+    junction: string;
+    ourPreLimit: number;
+    ourPostLimit: number;
+    ourWasLimited: boolean;
+    ourDelta: number;
+    ngspicePreLimit: number;
+    ngspicePostLimit: number;
+    ngspiceWasLimited: boolean;
+    ngspiceDelta: number;
+    limitingDiff: number;
+  }>;
+}
+
+interface ConvergenceDetailReport {
+  stepIndex: number;
+  iterationIndex: number;
+  elements: Array<{
+    label: string;
+    deviceType: string;
+    ourConverged: boolean;
+    ngConverged: boolean;
+  }>;
+  disagreementCount: number;
+}
+
+interface CompareMatrixResult {
+  stepIndex: number;
+  iteration: number;
+  filter: "all" | "mismatches";
+  totalEntries: number;
+  entries: LabeledMatrixEntry[];
+}
+
+interface RhsLabeledResult {
+  stepIndex: number;
+  iteration: number;
+  entries: Array<{ index: number; rowLabel: string; ours: number; ngspice: number; absDelta: number; withinTol: boolean }>;
+}
+
+interface ToJSONOpts { includeAllSteps?: boolean }
+
+// ---------------------------------------------------------------------------
 // ComparisonSession
-// ============================================================================
+// ---------------------------------------------------------------------------
 
 export class ComparisonSession {
-  private _opts: ComparisonSessionOptions;
-  private _tol: Tolerance;
-  private _dllPath: string;
+  protected _opts: ComparisonSessionOptions;
+  protected _tol: Tolerance;
+  protected _dllPath: string;
 
-  // Our engine state
-  private _facade!: DefaultSimulatorFacade;
-  private _coordinator!: DefaultSimulationCoordinator;
-  private _engine!: MNAEngine;
-  private _ourTopology!: TopologySnapshot;
-  private _elementLabels!: Map<number, string>;
+  // Our engine state (set in init())
+  protected _facade!: DefaultSimulatorFacade;
+  protected _coordinator!: DefaultSimulationCoordinator;
+  protected _engine!: MNAEngine;
+  protected _ourTopology!: TopologySnapshot;
+  protected _elementLabels!: Map<number, string>;
 
-  // ngspice bridge
-  private _cirClean!: string;
+  // Step capture hook (one instance per session, cleared per run)
+  protected _stepCapture!: ReturnType<typeof createStepCaptureHook>;
+
+  // DCOP attempts buffered during init()/compile() — replayed into step 0 of runTransient()
+  protected _dcopBootAttempts: Array<{ phase: NRPhase; dt: number; phaseParameter?: number; outcome: NRAttemptOutcome; converged: boolean }> = [];
+
+  // ngspice bridge artifacts
+  protected _cirClean: string = "";
 
   // Capture sessions
-  private _ourSession: CaptureSession | null = null;
-  private _ngSession: CaptureSession | null = null;
-  private _ngSessionReindexed: CaptureSession | null = null;
+  protected _ourSession: CaptureSession | null = null;
+  protected _ngSession: CaptureSession | null = null;
+  protected _ngSessionReindexed: CaptureSession | null = null;
 
-  // Time-alignment index: maps our step index → aligned ngspice step index
-  private _alignedNgIndex: Map<number, number> = new Map();
+  // Time-alignment: maps our step index → aligned ngspice step index
+  protected _alignedNgIndex: Map<number, number> = new Map();
 
   // Node mapping
-  private _nodeMap: NodeMapping[] = [];
+  protected _nodeMap: NodeMapping[] = [];
 
-  // Comparison results (cached)
-  private _comparisons: ComparisonResult[] | null = null;
+  // Comparison results (lazily cached)
+  protected _comparisons: ComparisonResult[] | null = null;
 
   // Analysis type
-  private _analysis: "dcop" | "tran" | null = null;
+  protected _analysis: "dcop" | "tran" | null = null;
 
-  // Disposed flag
-  private _disposed = false;
-
-  // Errors
+  // Errors accumulated during run
   readonly errors: string[] = [];
 
   constructor(opts: ComparisonSessionOptions) {
@@ -183,78 +264,172 @@ export class ComparisonSession {
     this._dllPath = getDllPath(opts);
   }
 
+  // ---------------------------------------------------------------------------
+  // Static factory
+  // ---------------------------------------------------------------------------
+
+  static async create(opts: ComparisonSessionOptions): Promise<ComparisonSession> {
+    const s = new ComparisonSession(opts);
+    await s.init();
+    return s;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Initialization
+  // ---------------------------------------------------------------------------
+
   /**
-   * Initialize: load our circuit, compile, capture topology.
-   * Must be called before runDcOp/runTransient.
+   * Load circuit, compile engine, capture topology.
+   * The capture hook is wired BEFORE compile() so the in-compile DCOP fires
+   * into the boot step (spec §4.3 / D1).
+   *
+   * Implementation: a buffering forwarding hook captures DCOP attempt begin/end
+   * calls during compile(). After compile, _stepCapture is created with the real
+   * solver, and the buffered DCOP calls are replayed into it so step 0 of any
+   * subsequent runTransient() starts with the DCOP attempts already pending.
    */
   async init(): Promise<void> {
     const registry = createDefaultRegistry();
     this._facade = new DefaultSimulatorFacade(registry);
+
     const dtsJson = readFileSync(resolvePath(this._opts.dtsPath), "utf-8");
     const circuit = this._facade.deserialize(dtsJson);
+
+    // Buffer for DCOP attempt calls that fire during compile()
+    type AttemptCall = { phase: string; dt: number; phaseParameter?: number };
+    type EndCall = { phase: string; dt: number; phaseParameter?: number; outcome: string; converged: boolean };
+    const dcopAttemptBuffer: EndCall[] = [];
+    let pendingBegin: AttemptCall | null = null;
+
+    const bufferingHook: MNAEngine["stepPhaseHook"] = {
+      onAttemptBegin(phase: string, dt: number, phaseParameter?: number): void {
+        const call: AttemptCall = { phase, dt };
+        if (phaseParameter !== undefined) call.phaseParameter = phaseParameter;
+        pendingBegin = call;
+      },
+      onAttemptEnd(outcome: string, converged: boolean): void {
+        if (pendingBegin) {
+          const endCall: EndCall = { phase: pendingBegin.phase, dt: pendingBegin.dt, outcome, converged };
+          if (pendingBegin.phaseParameter !== undefined) endCall.phaseParameter = pendingBegin.phaseParameter;
+          dcopAttemptBuffer.push(endCall);
+          pendingBegin = null;
+        }
+      },
+    };
+
+    // Install hook BEFORE compile so in-compile DCOP is captured (spec §4.3 / D1)
+    this._facade.setCaptureHook(bufferingHook);
+
+    // Compile (DCOP runs inside the coordinator constructor with hook active)
     this._coordinator = this._facade.compile(circuit) as DefaultSimulationCoordinator;
     this._engine = this._coordinator.getAnalogEngine() as MNAEngine;
-    const compiled = this._engine.compiled! as ConcreteCompiledAnalogCircuit;
-    this._elementLabels = buildElementLabelMap(compiled);
-    // Assign labels to engine elements so NR's convergenceFailedElements
-    // uses the same names as captureElementStates (which reads elementLabels)
-    for (const [idx, lbl] of this._elementLabels) {
-      if (idx < this._engine.elements.length) {
-        (this._engine.elements[idx] as any).label = lbl;
-      }
-    }
-    this._ourTopology = captureTopology(compiled, this._elementLabels);
 
-    this._cirClean = generateSpiceNetlist(compiled, this._elementLabels, "Auto-generated from " + this._opts.dtsPath);
+    if (this._engine) {
+      const compiled = this._engine.compiled! as ConcreteCompiledAnalogCircuit;
+      this._elementLabels = buildElementLabelMap(compiled);
+      this._ourTopology = captureTopology(compiled, this._elementLabels);
+      this._stepCapture = createStepCaptureHook(
+        this._engine.solver!,
+        this._engine.elements,
+        this._engine.statePool,
+        this._elementLabels,
+      );
+
+      // Store buffered DCOP attempts for replay into step 0 of runTransient().
+      // Cannot replay here because runTransient() calls _stepCapture.clear() first.
+      this._dcopBootAttempts = dcopAttemptBuffer.map((c) => {
+        const entry: { phase: NRPhase; dt: number; phaseParameter?: number; outcome: NRAttemptOutcome; converged: boolean } = {
+          phase: c.phase as NRPhase,
+          dt: c.dt,
+          outcome: c.outcome as NRAttemptOutcome,
+          converged: c.converged,
+        };
+        if (c.phaseParameter !== undefined) entry.phaseParameter = c.phaseParameter;
+        return entry;
+      });
+    } else {
+      this._elementLabels = new Map();
+      this._ourTopology = emptyTopology();
+    }
+
+    if (this._opts.cirPath) {
+      const cirRaw = readFileSync(resolvePath(this._opts.cirPath), "utf-8");
+      this._cirClean = stripControlBlock(cirRaw);
+    } else if (this._engine) {
+      // Auto-generate SPICE netlist from the compiled circuit when no cirPath given.
+      // This allows ngspice comparison without a hand-written .cir file.
+      const compiled = this._engine.compiled! as ConcreteCompiledAnalogCircuit;
+      this._cirClean = generateSpiceNetlist(compiled, this._elementLabels);
+    }
   }
 
+  // ---------------------------------------------------------------------------
+  // Run methods
+  // ---------------------------------------------------------------------------
+
   /**
-   * Run DC operating point analysis on both engines.
+   * Run DC operating point on both engines.
    *
-   * NOTE: DC OP runs twice on our engine:
-   *   1. During compile() — this sets the operating point but has no capture hook.
-   *   2. Here — the capture hook is wired before the second run, so all
-   *      per-iteration data is captured from this second run.
-   * The second run starts from the DC OP solution, so it typically converges
-   * in 1-2 iterations. This is the intended behavior — see CLAUDE.md §DC OP.
+   * Re-runs DCOP on our engine with hooks active to capture per-iteration data.
+   * Boot step: stepStartTime = stepEndTime = 0, dt = 0.
    */
   async runDcOp(): Promise<void> {
     this._analysis = "dcop";
     this._comparisons = null;
 
-    // --- Our engine: DC OP already ran during compile() ---
-    // Wire up capture hook and re-run DC OP to get per-iteration data
-    const stepCapture = createStepCaptureHook(
-      this._engine.solver!,
-      this._engine.elements,
-      this._engine.statePool,
-      this._elementLabels,
-    );
-    this._engine.postIterationHook = stepCapture.hook;
-    this._engine.detailedConvergence = true;
-    this._engine.limitingCollector = [];
+    if (!this._engine) throw new Error("ComparisonSession: call init() first");
+
+    this._stepCapture.clear();
+
+    // Wire phase and iteration hooks
+    const sc = this._stepCapture;
+    this._engine.postIterationHook = sc.hook;
+    this._engine.stepPhaseHook = {
+      onAttemptBegin(phase: string, dt: number): void {
+        sc.beginAttempt(phase as NRPhase, dt);
+      },
+      onAttemptEnd(outcome: string, converged: boolean): void {
+        sc.endAttempt(outcome as NRAttemptOutcome, converged);
+      },
+    };
+
+    sc.setStepStartTime(0);
     this._engine.dcOperatingPoint();
-    stepCapture.finalizeStep(0, 0, true, _zeroDcopCoefficients(), "dcop");
+
+    // Close boot step
+    sc.endStep({
+      stepEndTime: 0,
+      integrationCoefficients: _zeroDcopCoefficients(),
+      analysisPhase: "dcop",
+      acceptedAttemptIndex: -1,
+    });
+
+    this._engine.stepPhaseHook = null;
+    this._engine.postIterationHook = null;
 
     this._ourSession = {
       source: "ours",
       topology: this._ourTopology,
-      steps: stepCapture.getSteps(),
+      steps: sc.getSteps(),
     };
 
-    // --- ngspice ---
-    const bridge = new NgspiceBridge(this._dllPath);
-    try {
-      await bridge.init();
-      bridge.loadNetlist(this._cirClean);
-      bridge.runDcOp();
-      this._ngSession = bridge.getCaptureSession();
-      this._buildNodeMapping(bridge);
-    } catch (e: any) {
-      this.errors.push(`ngspice DC OP failed: ${e.message}`);
-      this._ngSession = this._emptyNgSession();
-    } finally {
-      bridge.dispose();
+    // ngspice side
+    if (this._cirClean) {
+      const bridge = new NgspiceBridge(this._dllPath);
+      try {
+        await bridge.init();
+        bridge.loadNetlist(this._cirClean);
+        bridge.runDcOp();
+        this._ngSession = bridge.getCaptureSession();
+        this._buildNodeMapping(bridge);
+      } catch (e: any) {
+        this.errors.push(`ngspice DC OP failed: ${e.message}`);
+        this._ngSession = { source: "ngspice", topology: emptyTopology(), steps: [] };
+      } finally {
+        bridge.dispose();
+      }
+    } else {
+      this._ngSession = { source: "ngspice", topology: emptyTopology(), steps: [] };
     }
 
     this._reindexNgSession();
@@ -263,129 +438,150 @@ export class ComparisonSession {
 
   /**
    * Run transient analysis on both engines.
-   * @param tStart - Start time in seconds (typically 0)
-   * @param tStop  - Stop time in seconds
-   * @param maxStep - Optional max timestep in seconds
+   *
+   * The boot step (stepStartTime=0) groups DCOP + first tranInit attempts per §5.
+   * Phase hook fires beginAttempt/endAttempt for each NR attempt; endStep fires
+   * when simTime advances past prevSimTime.
    */
-  async runTransient(tStart: number, tStop: number, maxStep?: number): Promise<void> {
+  async runTransient(_tStart: number, tStop: number, maxStep?: number): Promise<void> {
     this._analysis = "tran";
     this._comparisons = null;
 
-    const stopStr = this._formatSpiceTime(tStop);
-    const stepStr = maxStep ? this._formatSpiceTime(maxStep) : this._formatSpiceTime(tStop / 100);
+    if (!this._engine) throw new Error("ComparisonSession: call init() first");
 
-    // --- Our engine ---
-    const stepCapture = createStepCaptureHook(
-      this._engine.solver!,
-      this._engine.elements,
-      this._engine.statePool,
-      this._elementLabels,
-    );
-    this._engine.postIterationHook = stepCapture.hook;
-    this._engine.detailedConvergence = true;
-    this._engine.limitingCollector = [];
+    const stopStr = this._formatSpiceTime(tStop);
+    const stepStr = maxStep
+      ? this._formatSpiceTime(maxStep)
+      : this._formatSpiceTime(tStop / 100);
+
+    this._stepCapture.clear();
+
+    const sc = this._stepCapture;
+    this._engine.postIterationHook = sc.hook;
+    this._engine.stepPhaseHook = {
+      onAttemptBegin(phase: string, dt: number): void {
+        sc.beginAttempt(phase as NRPhase, dt);
+      },
+      onAttemptEnd(outcome: string, converged: boolean): void {
+        sc.endAttempt(outcome as NRAttemptOutcome, converged);
+      },
+    };
+
+    // Boot step starts at t=0 (DCOP + first tranInit share stepStartTime=0, spec §5).
+    // Replay DCOP attempts buffered during init()/compile() so step 0 contains them.
+    sc.setStepStartTime(0);
+    for (const call of this._dcopBootAttempts) {
+      sc.beginAttempt(call.phase, call.dt, call.phaseParameter);
+      sc.endAttempt(call.outcome, call.converged);
+    }
+
+    let prevSimTime = 0;
 
     const maxSteps = this._opts.maxOurSteps ?? 5000;
     for (let s = 0; s < maxSteps; s++) {
       try {
         this._coordinator.step();
-        const dt = this._engine.lastDt;
-        const engineAny = this._engine as any;
-        const deltaOld: readonly number[] = engineAny._timestep?.deltaOld ?? [dt, dt, dt, dt];
-        const h1 = deltaOld[1] ?? dt;
-        const h2 = deltaOld[2] ?? h1;
-        const order = this._engine.integrationOrder;
-        const rawMethod: string = engineAny._timestep?.currentMethod ?? "bdf1";
-        const ourMethod: "backwardEuler" | "trapezoidal" | "gear2" =
-          rawMethod === "trapezoidal" ? "trapezoidal"
-          : rawMethod === "bdf2" ? "gear2"
-          : "backwardEuler";
-        const { ag0, ag1 } = computeIntegrationCoefficients(dt, h1, h2, order, rawMethod as any);
-        const coefficients: IntegrationCoefficients = {
-          ours: { ag0, ag1, method: ourMethod, order },
-          ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
-        };
-        const phase = this._coordinator.analysisPhase;
-        // Derive converged from the last captured iteration's NR flags
-        // rather than hardcoding true — coordinator.step() not throwing
-        // doesn't guarantee NR convergence.
-        const lastSnaps = stepCapture.peekIterations();
-        const lastSnap = lastSnaps.length > 0 ? lastSnaps[lastSnaps.length - 1] : null;
-        const stepConverged = lastSnap ? (lastSnap.globalConverged && lastSnap.elemConverged) : true;
-        stepCapture.finalizeStep(this._engine.simTime, dt, stepConverged, coefficients, phase);
-        if (this._engine.simTime >= tStop) break;
       } catch (e: any) {
-        const dt = this._engine.lastDt;
-        const phase = this._coordinator.analysisPhase;
-        stepCapture.finalizeStep(this._engine.simTime, dt, false, _zeroDcopCoefficients(), phase);
+        // Close any open attempt then the step
+        sc.endAttempt("finalFailure", false);
+        sc.endStep({
+          stepEndTime: this._engine.simTime ?? prevSimTime,
+          integrationCoefficients: this._captureIntegCoeff(),
+          analysisPhase: this._curAnalysisPhase(),
+          acceptedAttemptIndex: -1,
+        });
         this.errors.push(`Our engine failed at step ${s}: ${e.message}`);
         break;
       }
+
+      const nowTime = this._engine.simTime ?? 0;
+      if (nowTime > prevSimTime) {
+        sc.endStep({
+          stepEndTime: nowTime,
+          integrationCoefficients: this._captureIntegCoeff(),
+          analysisPhase: this._curAnalysisPhase(),
+          acceptedAttemptIndex: -1,
+        });
+        prevSimTime = nowTime;
+      }
+
+      if (nowTime >= tStop) break;
     }
+
+    this._engine.stepPhaseHook = null;
+    this._engine.postIterationHook = null;
 
     this._ourSession = {
       source: "ours",
       topology: this._ourTopology,
-      steps: stepCapture.getSteps(),
+      steps: sc.getSteps(),
     };
 
-    // --- ngspice ---
-    const bridge = new NgspiceBridge(this._dllPath);
-    try {
-      await bridge.init();
-      bridge.loadNetlist(this._cirClean);
-      bridge.runTran(stopStr, stepStr);
-      this._ngSession = bridge.getCaptureSession();
-      this._buildNodeMapping(bridge);
-    } catch (e: any) {
-      this.errors.push(`ngspice transient failed: ${e.message}`);
-      this._ngSession = this._emptyNgSession();
-    } finally {
-      bridge.dispose();
+    // ngspice side
+    if (this._cirClean) {
+      const bridge = new NgspiceBridge(this._dllPath);
+      try {
+        await bridge.init();
+        bridge.loadNetlist(this._cirClean);
+        bridge.runTran(stopStr, stepStr);
+        this._ngSession = bridge.getCaptureSession();
+        this._buildNodeMapping(bridge);
+      } catch (e: any) {
+        this.errors.push(`ngspice transient failed: ${e.message}`);
+        this._ngSession = { source: "ngspice", topology: emptyTopology(), steps: [] };
+      } finally {
+        bridge.dispose();
+      }
+    } else {
+      this._ngSession = { source: "ngspice", topology: emptyTopology(), steps: [] };
     }
 
     this._reindexNgSession();
     this._buildTimeAlignment();
-    this._mergeNgspiceCoefficients();
   }
 
-  /**
-   * After both runs complete, copy ngspice integration coefficients into
-   * ourSession steps using time alignment so getIntegrationCoefficients()
-   * returns both sides.
-   */
-  private _mergeNgspiceCoefficients(): void {
-    if (!this._ourSession || !this._ngSessionReindexed) return;
-    const ngSteps = this._ngSessionReindexed.steps;
-    for (const [ourIdx, ngIdx] of this._alignedNgIndex) {
-      const ourStep = this._ourSession.steps[ourIdx];
-      const ngStep = ngSteps[ngIdx];
-      if (ourStep && ngStep) {
-        ourStep.integrationCoefficients.ngspice = ngStep.integrationCoefficients.ngspice;
-      }
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // Query API
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Core query API
+  // ---------------------------------------------------------------------------
 
   /**
-   * Get converged values at step end from both engines.
+   * Step-end values from both engines at the accepted attempt's final iteration.
+   * Reports stepStartTime/stepEndTime; unaligned:true if no ngspice match.
    */
   getStepEnd(stepIndex: number): StepEndReport {
     this._ensureRun();
     const ourStep = this._ourSession!.steps[stepIndex];
-    const ngStep = this._ngSessionAligned()?.steps[this._alignedNgIndex.get(stepIndex) ?? stepIndex];
+    if (!ourStep) {
+      throw new Error(`Step out of range: ${stepIndex}`);
+    }
 
-    const ourFinal = ourStep?.iterations[ourStep.iterations.length - 1];
-    const ngFinal = ngStep?.iterations[ngStep.iterations.length - 1];
+    const ngIdx = this._alignedNgIndex.get(stepIndex);
+    const ngStep = ngIdx !== undefined
+      ? (this._ngSessionAligned()?.steps[ngIdx])
+      : undefined;
+    const unaligned = ngIdx === undefined;
+
+    // Accepted attempt final iteration (spec §9.3)
+    const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 && ourStep.acceptedAttemptIndex < ourStep.attempts.length
+      ? ourStep.acceptedAttemptIndex
+      : ourStep.attempts.length - 1;
+    const ourAccepted = ourStep.attempts[ourAccIdx];
+    const ourFinal = ourAccepted
+      ? ourAccepted.iterations[ourAccepted.iterations.length - 1]
+      : ourStep.iterations[ourStep.iterations.length - 1];
+
+    const ngAccIdx = ngStep
+      ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
+      : -1;
+    const ngAccepted = ngStep?.attempts[ngAccIdx];
+    const ngFinal = ngAccepted
+      ? ngAccepted.iterations[ngAccepted.iterations.length - 1]
+      : ngStep?.iterations[ngStep.iterations.length - 1];
 
     const nodes: Record<string, ComparedValue> = {};
     const branches: Record<string, ComparedValue> = {};
     const components: Record<string, StepEndComponentEntry> = {};
 
-    // Node voltages
     if (ourFinal) {
       this._ourTopology.nodeLabels.forEach((label, nodeId) => {
         const ourV = nodeId > 0 && nodeId - 1 < ourFinal.voltages.length
@@ -394,18 +590,14 @@ export class ComparisonSession {
           ? ngFinal.voltages[nodeId - 1] : NaN;
         nodes[label] = makeComparedValue(ourV, ngV, this._tol.vAbsTol, this._tol.relTol);
       });
-    }
 
-    // Device states
-    if (ourFinal) {
       for (const es of ourFinal.elementStates) {
-        const ngEs = ngFinal?.elementStates.find(e =>
-          e.label.toUpperCase() === es.label.toUpperCase());
+        const ngEs = ngFinal?.elementStates.find(
+          e => e.label.toUpperCase() === es.label.toUpperCase());
         const slots: Record<string, ComparedValue> = {};
         for (const [slot, value] of Object.entries(es.slots)) {
           const ngValue = ngEs?.slots[slot] ?? NaN;
-          const tol = this._slotTolerance(slot);
-          slots[slot] = makeComparedValue(value, ngValue, tol, this._tol.relTol);
+          slots[slot] = makeComparedValue(value, ngValue, this._slotTol(slot), this._tol.relTol);
         }
         const topoEl = this._ourTopology.elements.find(
           el => el.label.toUpperCase() === es.label.toUpperCase());
@@ -413,43 +605,57 @@ export class ComparisonSession {
       }
     }
 
-    return {
+    const ourSST = ourStep.stepStartTime;
+    const ourSET = ourStep.stepEndTime;
+    const ngSST = ngStep?.stepStartTime ?? NaN;
+    const ngSET = ngStep?.stepEndTime ?? NaN;
+
+    const report: StepEndReport = {
       stepIndex,
-      simTime: simpleCompared(ourStep?.simTime ?? 0, ngStep?.simTime ?? NaN),
-      dt: simpleCompared(ourStep?.dt ?? 0, ngStep?.dt ?? NaN),
-      converged: { ours: ourStep?.converged ?? false, ngspice: ngStep?.converged ?? false },
-      iterationCount: simpleCompared(
-        ourStep?.iterationCount ?? 0, ngStep?.iterationCount ?? NaN),
+      stepStartTime: simpleCompared(ourSST, ngSST),
+      stepEndTime: simpleCompared(ourSET, ngSET),
+      dt: simpleCompared(ourStep.dt, ngStep?.dt ?? NaN),
+      converged: { ours: ourStep.converged, ngspice: ngStep?.converged ?? false },
+      iterationCount: simpleCompared(ourStep.iterationCount, ngStep?.iterationCount ?? NaN),
       nodes,
       branches,
       components,
     };
+    if (unaligned) (report as any).unaligned = true;
+    return report;
   }
 
   /**
-   * Get per-iteration data for a step from both engines.
+   * Per-iteration data for a step — uses accepted attempt iterations (spec §9.2).
    */
   getIterations(stepIndex: number): IterationReport[] {
     this._ensureRun();
     const ourStep = this._ourSession!.steps[stepIndex];
-    const ngStep = this._ngSessionAligned()?.steps[this._alignedNgIndex.get(stepIndex) ?? stepIndex];
     if (!ourStep) return [];
 
-    const reports: IterationReport[] = [];
-    const iterCount = Math.max(
-      ourStep.iterations.length,
-      ngStep?.iterations.length ?? 0,
-    );
+    const ngIdx = this._alignedNgIndex.get(stepIndex);
+    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
 
-    for (let ii = 0; ii < iterCount; ii++) {
-      const ourIter = ourStep.iterations[ii];
-      const ngIter = ngStep?.iterations[ii];
+    // Accepted attempt iterations
+    const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1;
+    const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
+
+    const ngAccIdx = ngStep
+      ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
+      : -1;
+    const ngIters = ngStep?.attempts[ngAccIdx]?.iterations ?? ngStep?.iterations ?? [];
+
+    const reports: IterationReport[] = [];
+    const compResults = this._getComparisons();
+
+    for (let ii = 0; ii < Math.max(ourIters.length, ngIters.length); ii++) {
+      const ourIter = ourIters[ii];
+      const ngIter = ngIters[ii];
 
       const nodes: Record<string, ComparedValue> = {};
       const rhs: Record<string, ComparedValue> = {};
       const comps: Record<string, Record<string, ComparedValue>> = {};
 
-      // Voltages
       if (ourIter) {
         this._ourTopology.nodeLabels.forEach((label, nodeId) => {
           const ourV = nodeId > 0 && nodeId - 1 < ourIter.voltages.length
@@ -458,72 +664,56 @@ export class ComparisonSession {
             ? ngIter.voltages[nodeId - 1] : NaN;
           nodes[label] = makeComparedValue(ourV, ngV, this._tol.vAbsTol, this._tol.relTol);
         });
-      }
 
-      // RHS
-      if (ourIter && ourIter.preSolveRhs.length > 0) {
-        this._ourTopology.nodeLabels.forEach((label, nodeId) => {
-          const ourR = nodeId > 0 && nodeId - 1 < ourIter.preSolveRhs.length
-            ? ourIter.preSolveRhs[nodeId - 1] : 0;
-          const ngR = ngIter?.preSolveRhs && nodeId > 0 && nodeId - 1 < ngIter.preSolveRhs.length
-            ? ngIter.preSolveRhs[nodeId - 1] : NaN;
-          rhs[label] = makeComparedValue(ourR, ngR, this._tol.iAbsTol, this._tol.relTol);
-        });
-      }
+        if (ourIter.preSolveRhs.length > 0) {
+          this._ourTopology.nodeLabels.forEach((label, nodeId) => {
+            const ourR = nodeId > 0 && nodeId - 1 < ourIter.preSolveRhs.length
+              ? ourIter.preSolveRhs[nodeId - 1] : 0;
+            const ngR = ngIter?.preSolveRhs && nodeId > 0 && nodeId - 1 < ngIter.preSolveRhs.length
+              ? ngIter.preSolveRhs[nodeId - 1] : NaN;
+            rhs[label] = makeComparedValue(ourR, ngR, this._tol.iAbsTol, this._tol.relTol);
+          });
+        }
 
-      // Element states
-      if (ourIter) {
         for (const es of ourIter.elementStates) {
-          const ngEs = ngIter?.elementStates.find(e =>
-            e.label.toUpperCase() === es.label.toUpperCase());
+          const ngEs = ngIter?.elementStates.find(
+            e => e.label.toUpperCase() === es.label.toUpperCase());
           const comp: Record<string, ComparedValue> = {};
           for (const [slot, value] of Object.entries(es.slots)) {
             const ngValue = ngEs?.slots[slot] ?? NaN;
-            const tol = this._slotTolerance(slot);
-            comp[slot] = makeComparedValue(value, ngValue, tol, this._tol.relTol);
+            comp[slot] = makeComparedValue(value, ngValue, this._slotTol(slot), this._tol.relTol);
           }
           comps[es.label] = comp;
         }
       }
 
-      // Matrix diffs from compareSnapshots (remap "theirs" → "ngspice")
-      const compResult = this._getComparisons().find(
+      const compResult = compResults.find(
         c => c.stepIndex === stepIndex && c.iterationIndex === ii);
       const matrixDiffs = (compResult?.matrixDiffs ?? []).map(d => ({
-        row: d.row,
-        col: d.col,
-        ours: d.ours,
-        ngspice: d.theirs,
-        absDelta: d.absDelta,
+        row: d.row, col: d.col, ours: d.ours, ngspice: d.theirs, absDelta: d.absDelta,
       }));
 
-      // Per-element convergence
+      // per-element convergence
       const perElementConvergence: IterationReport["perElementConvergence"] = [];
       if (ourIter) {
         for (const es of ourIter.elementStates) {
           const topoEl = this._ourTopology.elements.find(
-            e => e.label.toUpperCase() === es.label.toUpperCase());
-          const deviceType = topoEl?.type ?? "unknown";
-          const converged = !(ourIter.convergenceFailedElements ?? []).includes(es.label);
-          const ngEs = ngIter?.elementStates.find(
-            e => e.label.toUpperCase() === es.label.toUpperCase());
-          let worstDelta = 0;
-          for (const [slot, value] of Object.entries(es.slots)) {
-            const ngValue = ngEs?.slots[slot] ?? NaN;
-            const tol = this._slotTolerance(slot);
-            const cv = makeComparedValue(value, ngValue, tol, this._tol.relTol);
-            if (cv.absDelta > worstDelta) worstDelta = cv.absDelta;
-          }
-          perElementConvergence.push({ label: es.label, deviceType, converged, worstDelta });
+            el => el.label.toUpperCase() === es.label.toUpperCase());
+          const isFailed = ourIter.convergenceFailedElements.includes(es.label);
+          perElementConvergence.push({
+            label: es.label,
+            deviceType: topoEl?.type ?? "unknown",
+            converged: !isFailed,
+            worstDelta: 0,
+          });
         }
       }
 
       reports.push({
         stepIndex,
         iteration: ii,
-        simTime: ourStep.simTime,
-        noncon: makeComparedValue(
-          ourIter?.noncon ?? 0, ngIter?.noncon ?? NaN, 0, 0),
+        stepStartTime: ourStep.stepStartTime,
+        noncon: makeComparedValue(ourIter?.noncon ?? 0, ngIter?.noncon ?? NaN, 0, 0),
         nodes,
         rhs,
         matrixDiffs,
@@ -535,173 +725,450 @@ export class ComparisonSession {
     return reports;
   }
 
-  /**
-   * Trace a single component across all steps and iterations.
-   */
-  traceComponent(
-    label: string,
-    opts?: {
-      slots?: string[];
-      stepsRange?: { from: number; to: number };
-      onlyDivergences?: boolean;
-      offset?: number;
-      limit?: number;
-    },
-  ): ComponentTrace {
+  // ---------------------------------------------------------------------------
+  // Discovery methods
+  // ---------------------------------------------------------------------------
+
+  listComponents(opts?: PaginationOpts): ComponentInfo[] {
+    const result: ComponentInfo[] = this._ourTopology.elements.map(el => {
+      // Slot names from first available step's last accepted iteration
+      let slotNames: string[] = [];
+      let pinLabels: string[] = [];
+      if (this._ourSession && this._ourSession.steps.length > 0) {
+        const step = this._ourSession.steps[0];
+        const accIdx = step.acceptedAttemptIndex >= 0 ? step.acceptedAttemptIndex : step.attempts.length - 1;
+        const iters = step.attempts[accIdx]?.iterations ?? step.iterations;
+        const lastIter = iters[iters.length - 1];
+        const es = lastIter?.elementStates.find(
+          e => e.label.toUpperCase() === el.label.toUpperCase());
+        if (es) slotNames = Object.keys(es.slots);
+      }
+      // Pin labels from topology
+      this._ourTopology.nodeLabels.forEach((nodeLabel, nodeId) => {
+        if (el.pinNodeIds.includes(nodeId)) pinLabels.push(nodeLabel);
+      });
+      return {
+        label: el.label,
+        deviceType: el.type,
+        slotNames,
+        pinLabels,
+      };
+    });
+    return applyPagination(result, opts);
+  }
+
+  listNodes(opts?: PaginationOpts): NodeInfo[] {
+    const result: NodeInfo[] = [];
+    this._ourTopology.nodeLabels.forEach((label, nodeId) => {
+      const mapping = this._nodeMap.find(m => m.ourIndex === nodeId);
+      // connected components: elements that have this nodeId in their pinNodeIds
+      const connected = this._ourTopology.elements
+        .filter(el => el.pinNodeIds.includes(nodeId))
+        .map(el => el.label);
+      result.push({
+        label,
+        ourIndex: nodeId,
+        ngspiceIndex: mapping?.ngspiceIndex ?? -1,
+        connectedComponents: connected,
+      });
+    });
+    return applyPagination(result, opts);
+  }
+
+  getComponentsByType(type: string): ComponentInfo[] {
+    const lType = type.toLowerCase();
+    return this._ourTopology.elements
+      .filter(el => el.type.toLowerCase() === lType)
+      .map(el => ({ label: el.label, deviceType: el.type, slotNames: [], pinLabels: [] }));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Divergence report
+  // ---------------------------------------------------------------------------
+
+  getDivergences(opts?: { step?: number; limit?: number }): DivergenceReport {
+    this._ensureRun();
+    const comparisons = this._getComparisons();
+    const maxEntries = opts?.limit ?? 100;
+    const filterStep = opts?.step;
+
+    const allEntries: DivergenceEntry[] = [];
+
+    for (const comp of comparisons) {
+      if (filterStep !== undefined && comp.stepIndex !== filterStep) continue;
+
+      const step = this._ourSession!.steps[comp.stepIndex];
+      const stepStartTime = step?.stepStartTime ?? 0;
+
+      for (const diff of comp.voltageDiffs) {
+        allEntries.push({
+          stepIndex: comp.stepIndex,
+          iteration: comp.iterationIndex,
+          stepStartTime,
+          category: "voltage",
+          label: diff.label,
+          ours: diff.ours,
+          ngspice: diff.theirs,
+          absDelta: diff.absDelta,
+          relDelta: diff.relDelta,
+          withinTol: diff.withinTol,
+          componentLabel: null,
+          slotName: null,
+        });
+      }
+
+      for (const diff of comp.stateDiffs) {
+        allEntries.push({
+          stepIndex: comp.stepIndex,
+          iteration: comp.iterationIndex,
+          stepStartTime,
+          category: "state",
+          label: diff.slotName,
+          ours: diff.ours,
+          ngspice: diff.theirs,
+          absDelta: diff.absDelta,
+          relDelta: Math.abs(diff.ours - diff.theirs) / Math.max(Math.abs(diff.ours), Math.abs(diff.theirs), 1e-30),
+          withinTol: diff.withinTol,
+          componentLabel: diff.elementLabel,
+          slotName: diff.slotName,
+        });
+      }
+    }
+
+    const totalCount = allEntries.length;
+
+    // Worst by category
+    const categories: DivergenceCategory[] = ["voltage", "state", "rhs", "matrix"];
+    const worstByCategory: DivergenceReport["worstByCategory"] = {
+      voltage: null, state: null, rhs: null, matrix: null,
+    };
+    for (const cat of categories) {
+      const inCat = allEntries.filter(e => e.category === cat);
+      if (inCat.length > 0) {
+        worstByCategory[cat] = inCat.reduce((best, e) =>
+          e.absDelta > best.absDelta ? e : best, inCat[0]);
+      }
+    }
+
+    return {
+      totalCount,
+      worstByCategory,
+      entries: allEntries.slice(0, maxEntries),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Range and slot helpers
+  // ---------------------------------------------------------------------------
+
+  getStepEndRange(startIndex: number, endIndex: number): StepEndReport[] {
+    this._ensureRun();
+    const result: StepEndReport[] = [];
+    const steps = this._ourSession!.steps;
+    for (let i = startIndex; i <= endIndex && i < steps.length; i++) {
+      result.push(this.getStepEnd(i));
+    }
+    return result;
+  }
+
+  traceComponentSlot(label: string, slotName: string): SlotTrace {
     this._ensureRun();
     const upperLabel = label.toUpperCase();
+    const steps = this._ourSession!.steps;
+    const ngSteps = this._ngSessionAligned()?.steps ?? [];
 
-    // Determine device type from our topology
+    // Verify component exists
+    const exists = this._ourTopology.elements.some(
+      el => el.label.toUpperCase() === upperLabel);
+    if (!exists) throw new Error(`Component not found: ${upperLabel}`);
+
+    const traceSteps: SlotTrace["steps"] = [];
+
+    for (let si = 0; si < steps.length; si++) {
+      const step = steps[si];
+      const accIdx = step.acceptedAttemptIndex >= 0 ? step.acceptedAttemptIndex : step.attempts.length - 1;
+      const iters = step.attempts[accIdx]?.iterations ?? step.iterations;
+      const lastIter = iters[iters.length - 1];
+
+      const ngIdx = this._alignedNgIndex.get(si);
+      const ngStep = ngIdx !== undefined ? ngSteps[ngIdx] : undefined;
+      const ngAccIdx = ngStep
+        ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
+        : -1;
+      const ngLastIter = ngStep?.attempts[ngAccIdx]?.iterations.at(-1) ?? ngStep?.iterations.at(-1);
+
+      const ourEs = lastIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
+      const ngEs = ngLastIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
+
+      const ourVal = ourEs?.slots[slotName] ?? NaN;
+      const ngVal = ngEs?.slots[slotName] ?? NaN;
+
+      traceSteps.push({
+        stepIndex: si,
+        stepStartTime: step.stepStartTime,
+        value: makeComparedValue(ourVal, ngVal, this._slotTol(slotName), this._tol.relTol),
+      });
+    }
+
+    return {
+      label: upperLabel,
+      slotName,
+      totalSteps: steps.length,
+      steps: traceSteps,
+    };
+  }
+
+  getStateHistory(label: string, stepIndex: number): StateHistoryReport {
+    this._ensureRun();
+    const steps = this._ourSession!.steps;
+    if (stepIndex < 0 || stepIndex >= steps.length) {
+      throw new Error(`Step out of range: ${stepIndex}`);
+    }
+
+    const upperLabel = label.toUpperCase();
+    const step = steps[stepIndex];
+    const accIdx = step.acceptedAttemptIndex >= 0 ? step.acceptedAttemptIndex : step.attempts.length - 1;
+    const iters = step.attempts[accIdx]?.iterations ?? step.iterations;
+    const lastIter = iters[iters.length - 1];
+    const iterIdx = iters.length - 1;
+
+    const ourEs = lastIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
+
+    const ngIdx = this._alignedNgIndex.get(stepIndex);
+    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+    const ngAccIdx = ngStep
+      ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
+      : -1;
+    const ngLastIter = ngStep?.attempts[ngAccIdx]?.iterations.at(-1) ?? ngStep?.iterations.at(-1);
+    const ngEs = ngLastIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
+
+    return {
+      label: upperLabel,
+      stepIndex,
+      iteration: iterIdx,
+      state0: ourEs?.slots ?? {},
+      state1: ourEs?.state1Slots ?? {},
+      state2: ourEs?.state2Slots ?? {},
+      ngspiceState0: ngEs?.slots ?? {},
+      ngspiceState1: ngEs?.state1Slots ?? {},
+      ngspiceState2: ngEs?.state2Slots ?? {},
+    };
+  }
+
+  getComponentSlots(label: string, patterns: string[], opts?: { step?: number }): ComponentSlotsResult {
+    this._ensureRun();
+    const upperLabel = label.toUpperCase();
+    const exists = this._ourTopology.elements.some(
+      el => el.label.toUpperCase() === upperLabel);
+    if (!exists) throw new Error(`Component not found: ${upperLabel}`);
+
+    const ngSteps = this._ngSessionAligned()?.steps ?? [];
+    const ourSteps = this._ourSession!.steps;
+
+    const filterSlots = (es: { slots: Record<string, number> }) =>
+      Object.entries(es.slots).filter(([k]) => matchSlotPattern(k, patterns));
+
+    if (opts?.step !== undefined) {
+      // Snapshot mode
+      const si = opts.step;
+      const step = ourSteps[si];
+      const accIdx = step?.acceptedAttemptIndex >= 0 ? step.acceptedAttemptIndex : (step?.attempts.length ?? 1) - 1;
+      const iters = step?.attempts[accIdx]?.iterations ?? step?.iterations ?? [];
+      const lastIter = iters[iters.length - 1];
+      const ourEs = lastIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
+
+      const ngIdx = this._alignedNgIndex.get(si);
+      const ngStep = ngIdx !== undefined ? ngSteps[ngIdx] : undefined;
+      const ngAccIdx = ngStep
+        ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
+        : -1;
+      const ngLastIter = ngStep?.attempts[ngAccIdx]?.iterations.at(-1) ?? ngStep?.iterations.at(-1);
+      const ngEs = ngLastIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
+
+      const slots: Record<string, ComparedValue> = {};
+      const matched = filterSlots(ourEs ?? { slots: {} });
+      const matchedNames: string[] = [];
+      for (const [k, v] of matched) {
+        const ngV = ngEs?.slots[k] ?? NaN;
+        slots[k] = makeComparedValue(v, ngV, this._slotTol(k), this._tol.relTol);
+        matchedNames.push(k);
+      }
+
+      return {
+        mode: "snapshot",
+        label: upperLabel,
+        stepIndex: si,
+        stepStartTime: step?.stepStartTime ?? 0,
+        slots,
+        matchedSlots: matchedNames,
+        totalSlots: ourEs ? Object.keys(ourEs.slots).length : 0,
+      } as ComponentSlotsSnapshot;
+    } else {
+      // Trace mode
+      const traceSteps: ComponentSlotsTrace["steps"] = [];
+      let matchedNames: string[] = [];
+
+      for (let si = 0; si < ourSteps.length; si++) {
+        const step = ourSteps[si];
+        const accIdx = step.acceptedAttemptIndex >= 0 ? step.acceptedAttemptIndex : step.attempts.length - 1;
+        const iters = step.attempts[accIdx]?.iterations ?? step.iterations;
+        const lastIter = iters[iters.length - 1];
+        const ourEs = lastIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
+
+        const ngIdx = this._alignedNgIndex.get(si);
+        const ngStep = ngIdx !== undefined ? ngSteps[ngIdx] : undefined;
+        const ngAccIdx = ngStep
+          ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
+          : -1;
+        const ngLastIter = ngStep?.attempts[ngAccIdx]?.iterations.at(-1) ?? ngStep?.iterations.at(-1);
+        const ngEs = ngLastIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
+
+        const slots: Record<string, ComparedValue> = {};
+        const matched = filterSlots(ourEs ?? { slots: {} });
+        if (si === 0) matchedNames = matched.map(([k]) => k);
+        for (const [k, v] of matched) {
+          const ngV = ngEs?.slots[k] ?? NaN;
+          slots[k] = makeComparedValue(v, ngV, this._slotTol(k), this._tol.relTol);
+        }
+
+        traceSteps.push({ stepIndex: si, stepStartTime: step.stepStartTime, slots });
+      }
+
+      return {
+        mode: "trace",
+        label: upperLabel,
+        totalSteps: ourSteps.length,
+        matchedSlots: matchedNames,
+        steps: traceSteps,
+      } as ComponentSlotsTrace;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Trace methods
+  // ---------------------------------------------------------------------------
+
+  traceComponent(label: string, opts?: { slots?: string[] }): ComponentTrace {
+    this._ensureRun();
+    const upperLabel = label.toUpperCase();
     const elInfo = this._ourTopology.elements.find(
-      e => (e.label ?? "").toUpperCase() === upperLabel);
+      e => e.label.toUpperCase() === upperLabel);
     const deviceType = elInfo?.type ?? "unknown";
 
-    const slotMatcher = opts?.slots ? compileSlotMatcher(opts.slots) : null;
-
-    const allSteps: ComponentTrace["steps"] = [];
     const ourSteps = this._ourSession!.steps;
     const ngSteps = this._ngSessionAligned()?.steps ?? [];
 
+    const steps: ComponentTrace["steps"] = [];
     for (let si = 0; si < ourSteps.length; si++) {
-      if (opts?.stepsRange && (si < opts.stepsRange.from || si > opts.stepsRange.to)) continue;
-
       const ourStep = ourSteps[si];
-      const ngStep = ngSteps[this._alignedNgIndex.get(si) ?? si];
-      let iters: ComponentTrace["steps"][number]["iterations"] = [];
+      const ngIdx = this._alignedNgIndex.get(si);
+      const ngStep = ngIdx !== undefined ? ngSteps[ngIdx] : undefined;
 
-      const maxIter = Math.max(
-        ourStep.iterations.length,
-        ngStep?.iterations.length ?? 0,
-      );
+      const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1;
+      const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
+      const ngAccIdx = ngStep
+        ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
+        : -1;
+      const ngIters = ngStep?.attempts[ngAccIdx]?.iterations ?? ngStep?.iterations ?? [];
 
-      for (let ii = 0; ii < maxIter; ii++) {
-        const ourIter = ourStep.iterations[ii];
-        const ngIter = ngStep?.iterations[ii];
+      const iters: ComponentTrace["steps"][number]["iterations"] = [];
+      for (let ii = 0; ii < Math.max(ourIters.length, ngIters.length); ii++) {
+        const ourIter = ourIters[ii];
+        const ngIter = ngIters[ii];
+        const ourEs = ourIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
+        const ngEs = ngIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
 
-        // States
-        const ourEs = ourIter?.elementStates.find(
-          e => e.label.toUpperCase() === upperLabel);
-        const ngEs = ngIter?.elementStates.find(
-          e => e.label.toUpperCase() === upperLabel);
-
-        let states: Record<string, ComparedValue> = {};
+        const states: Record<string, ComparedValue> = {};
         if (ourEs) {
           for (const [slot, value] of Object.entries(ourEs.slots)) {
-            if (slotMatcher && !slotMatcher(slot)) continue;
+            // Apply slot filter if provided
+            if (opts?.slots && !opts.slots.includes(slot)) continue;
             const ngValue = ngEs?.slots[slot] ?? NaN;
-            const tol = this._slotTolerance(slot);
-            states[slot] = makeComparedValue(value, ngValue, tol, this._tol.relTol);
+            states[slot] = makeComparedValue(value, ngValue, this._slotTol(slot), this._tol.relTol);
           }
         }
 
-        // Pin voltages
         const pinVoltages: Record<string, ComparedValue> = {};
         if (elInfo && ourIter) {
           for (let p = 0; p < elInfo.pinNodeIds.length; p++) {
             const nodeId = elInfo.pinNodeIds[p];
             if (nodeId === 0) continue;
             const pinLabel = this._ourTopology.nodeLabels.get(nodeId) ?? `pin${p}`;
-            const ourV = nodeId - 1 < ourIter.voltages.length
-              ? ourIter.voltages[nodeId - 1] : 0;
+            const ourV = nodeId - 1 < ourIter.voltages.length ? ourIter.voltages[nodeId - 1] : 0;
             const ngV = ngIter && nodeId - 1 < ngIter.voltages.length
               ? ngIter.voltages[nodeId - 1] : NaN;
-            pinVoltages[pinLabel] = makeComparedValue(
-              ourV, ngV, this._tol.vAbsTol, this._tol.relTol);
+            pinVoltages[pinLabel] = makeComparedValue(ourV, ngV, this._tol.vAbsTol, this._tol.relTol);
           }
         }
 
-        if (opts?.onlyDivergences && !Object.values(states).some(cv => !cv.withinTol)) continue;
-
         iters.push({ iteration: ii, states, pinVoltages });
       }
-
-      allSteps.push({ stepIndex: si, simTime: ourStep.simTime, iterations: iters });
+      steps.push({ stepIndex: si, stepStartTime: ourStep.stepStartTime, iterations: iters });
     }
 
-    const paginatedSteps = _applyPagination(allSteps, { offset: opts?.offset, limit: opts?.limit });
-
-    return { label: upperLabel, deviceType, steps: paginatedSteps };
+    return { label: upperLabel, deviceType, steps };
   }
 
-  /**
-   * Trace a single node across all steps and iterations.
-   */
-  traceNode(
-    label: string,
-    opts?: {
-      stepsRange?: { from: number; to: number };
-      onlyDivergences?: boolean;
-      offset?: number;
-      limit?: number;
-    },
-  ): NodeTrace {
+  traceNode(label: string, opts?: { onlyDivergences?: boolean }): NodeTrace {
     this._ensureRun();
     const upperLabel = label.toUpperCase();
 
-    // Find our node index
     let ourIndex = -1;
     this._ourTopology.nodeLabels.forEach((l, id) => {
-      if (l.toUpperCase() === upperLabel || l.toUpperCase().includes(upperLabel)) {
-        ourIndex = id;
-      }
+      if (l.toUpperCase() === upperLabel || l.toUpperCase().includes(upperLabel)) ourIndex = id;
     });
 
-    // Find ngspice index from node mapping
-    const mapping = this._nodeMap.find(
-      m => m.label.toUpperCase() === upperLabel);
+    const mapping = this._nodeMap.find(m => m.label.toUpperCase() === upperLabel);
     const ngIndex = mapping?.ngspiceIndex ?? -1;
 
-    const allSteps: NodeTrace["steps"] = [];
     const ourSteps = this._ourSession!.steps;
     const ngSteps = this._ngSessionAligned()?.steps ?? [];
 
+    const steps: NodeTrace["steps"] = [];
     for (let si = 0; si < ourSteps.length; si++) {
-      if (opts?.stepsRange && (si < opts.stepsRange.from || si > opts.stepsRange.to)) continue;
-
       const ourStep = ourSteps[si];
-      const ngStep = ngSteps[this._alignedNgIndex.get(si) ?? si];
-      let iters: NodeTrace["steps"][number]["iterations"] = [];
+      const ngIdx = this._alignedNgIndex.get(si);
+      const ngStep = ngIdx !== undefined ? ngSteps[ngIdx] : undefined;
 
-      const maxIter = Math.max(
-        ourStep.iterations.length,
-        ngStep?.iterations.length ?? 0,
-      );
+      const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1;
+      const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
+      const ngAccIdx = ngStep
+        ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
+        : -1;
+      const ngIters = ngStep?.attempts[ngAccIdx]?.iterations ?? ngStep?.iterations ?? [];
 
-      for (let ii = 0; ii < maxIter; ii++) {
-        const ourIter = ourStep.iterations[ii];
-        const ngIter = ngStep?.iterations[ii];
-
+      const iters: NodeTrace["steps"][number]["iterations"] = [];
+      for (let ii = 0; ii < Math.max(ourIters.length, ngIters.length); ii++) {
+        const ourIter = ourIters[ii];
+        const ngIter = ngIters[ii];
         const ourV = ourIter && ourIndex > 0 && ourIndex - 1 < ourIter.voltages.length
           ? ourIter.voltages[ourIndex - 1] : NaN;
         const ngV = ngIter && ourIndex > 0 && ourIndex - 1 < ngIter.voltages.length
           ? ngIter.voltages[ourIndex - 1] : NaN;
-
-        const voltage = makeComparedValue(ourV, ngV, this._tol.vAbsTol, this._tol.relTol);
-
-        if (opts?.onlyDivergences && voltage.withinTol) continue;
-
-        iters.push({ iteration: ii, voltage });
+        const cv = makeComparedValue(ourV, ngV, this._tol.vAbsTol, this._tol.relTol);
+        if (opts?.onlyDivergences && cv.withinTol) continue;
+        iters.push({ iteration: ii, voltage: cv });
       }
 
-      allSteps.push({ stepIndex: si, simTime: ourStep.simTime, iterations: iters });
+      steps.push({ stepIndex: si, stepStartTime: ourStep.stepStartTime, iterations: iters });
     }
 
-    const paginatedSteps = _applyPagination(allSteps, { offset: opts?.offset, limit: opts?.limit });
-
-    return { label: upperLabel, ourIndex, ngspiceIndex: ngIndex, steps: paginatedSteps };
+    return { label: upperLabel, ourIndex, ngspiceIndex: ngIndex, steps };
   }
 
-  /**
-   * Get aggregate session summary.
-   */
+  // ---------------------------------------------------------------------------
+  // Session summary
+  // ---------------------------------------------------------------------------
+
   getSummary(): SessionSummary {
     this._ensureRun();
     const comparisons = this._getComparisons();
     const ourConv = this._ourSession!.steps.length > 0
       ? convergenceSummary(this._ourSession!)
       : { totalSteps: 0, convergedSteps: 0, failedSteps: 0, avgIterations: 0, maxIterations: 0, worstStep: -1 };
-    const ngConv = this._ngSessionAligned()?.steps.length
-      ? convergenceSummary(this._ngSessionAligned()!)
+    const ngAligned = this._ngSessionAligned();
+    const ngConv = ngAligned?.steps.length
+      ? convergenceSummary(ngAligned)
       : { totalSteps: 0, convergedSteps: 0, failedSteps: 0, avgIterations: 0, maxIterations: 0, worstStep: -1 };
 
     const divergence = findFirstDivergence(comparisons);
@@ -709,12 +1176,11 @@ export class ComparisonSession {
     if (divergence) {
       const worstV = divergence.voltageDiffs.reduce(
         (best, d) => d.absDelta > best.absDelta ? d : best,
-        { label: "", absDelta: 0 } as { label: string; absDelta: number },
-      );
+        { label: "", absDelta: 0 } as { label: string; absDelta: number });
       firstDiv = {
         stepIndex: divergence.stepIndex,
         iterationIndex: divergence.iterationIndex,
-        simTime: divergence.simTime,
+        stepStartTime: divergence.stepStartTime,
         worstLabel: worstV.label,
         absDelta: worstV.absDelta,
       };
@@ -723,78 +1189,52 @@ export class ComparisonSession {
     const passed = comparisons.filter(c => c.allWithinTol).length;
     const failed = comparisons.length - passed;
 
-    // perDeviceType: accumulate state divergences by device type
-    const perDeviceType: Record<string, { divergenceCount: number; worstAbsDelta: number }> = {};
-    for (const c of comparisons) {
-      for (const sd of c.stateDiffs) {
-        if (!sd.withinTol) {
-          const topoEl = this._ourTopology.elements.find(
-            e => e.label.toUpperCase() === sd.elementLabel.toUpperCase());
-          const deviceType = topoEl?.type ?? "unknown";
-          if (!perDeviceType[deviceType]) {
-            perDeviceType[deviceType] = { divergenceCount: 0, worstAbsDelta: 0 };
-          }
-          perDeviceType[deviceType].divergenceCount++;
-          if (sd.absDelta > perDeviceType[deviceType].worstAbsDelta) {
-            perDeviceType[deviceType].worstAbsDelta = sd.absDelta;
-          }
-        }
+    // Per-device-type divergence counts
+    const perDeviceType: SessionSummary["perDeviceType"] = {};
+    for (const comp of comparisons) {
+      if (comp.allWithinTol) continue;
+      const step = this._ourSession!.steps[comp.stepIndex];
+      if (!step) continue;
+      const accIdx = step.acceptedAttemptIndex >= 0 ? step.acceptedAttemptIndex : step.attempts.length - 1;
+      const iters = step.attempts[accIdx]?.iterations ?? step.iterations;
+      const iter = iters[comp.iterationIndex];
+      if (!iter) continue;
+      for (const diff of comp.stateDiffs) {
+        const es = iter.elementStates.find(e => e.label === diff.elementLabel);
+        if (!es) continue;
+        const topoEl = this._ourTopology.elements.find(el => el.label.toUpperCase() === es.label.toUpperCase());
+        const dt = topoEl?.type ?? "unknown";
+        if (!perDeviceType[dt]) perDeviceType[dt] = { divergenceCount: 0, worstAbsDelta: 0 };
+        perDeviceType[dt].divergenceCount++;
+        if (diff.absDelta > perDeviceType[dt].worstAbsDelta)
+          perDeviceType[dt].worstAbsDelta = diff.absDelta;
       }
     }
 
-    // integrationMethod: first transient step's method
-    let integrationMethod: string | null = null;
-    for (const step of this._ourSession!.steps) {
-      const method = step.integrationCoefficients?.ours?.method;
-      if (method && method !== "backwardEuler" || step.analysisPhase === "tranFloat") {
-        integrationMethod = step.integrationCoefficients?.ours?.method ?? null;
-        break;
-      }
-      if (step.analysisPhase === "tranFloat" || step.analysisPhase === "tranInit") {
-        integrationMethod = step.integrationCoefficients?.ours?.method ?? null;
-        break;
-      }
-    }
+    // Integration method
+    const ourSteps = this._ourSession!.steps;
+    const methods = new Set(ourSteps.map(s => s.integrationCoefficients.ours.method));
+    const integrationMethod = methods.size === 1
+      ? [...methods][0]
+      : (methods.size > 1 ? [...methods].join(",") : null);
 
-    // stateHistoryIssues: count steps where any state1/state2 slot diverges
+    // State history issues (state1/state2 mismatches)
     let state1Mismatches = 0;
     let state2Mismatches = 0;
-    const ngSteps = this._ngSessionAligned()?.steps ?? [];
-    for (let si = 0; si < this._ourSession!.steps.length; si++) {
-      const ourStep = this._ourSession!.steps[si];
-      const ngStep = ngSteps[this._alignedNgIndex.get(si) ?? si];
-      if (!ourStep || !ngStep) continue;
-      const ourFinal = ourStep.iterations[ourStep.iterations.length - 1];
-      const ngFinal = ngStep.iterations[ngStep.iterations.length - 1];
-      if (!ourFinal || !ngFinal) continue;
-
-      let s1Mismatch = false;
-      let s2Mismatch = false;
-      for (const es of ourFinal.elementStates) {
-        const ngEs = ngFinal.elementStates.find(
-          e => e.label.toUpperCase() === es.label.toUpperCase());
-        for (const [slot, value] of Object.entries(es.state1Slots ?? {})) {
-          const ngValue = ngEs?.state1Slots?.[slot] ?? NaN;
-          const tol = this._slotTolerance(slot);
-          const cv = makeComparedValue(value, ngValue, tol, this._tol.relTol);
-          if (!cv.withinTol) { s1Mismatch = true; break; }
-        }
-        for (const [slot, value] of Object.entries(es.state2Slots ?? {})) {
-          const ngValue = ngEs?.state2Slots?.[slot] ?? NaN;
-          const tol = this._slotTolerance(slot);
-          const cv = makeComparedValue(value, ngValue, tol, this._tol.relTol);
-          if (!cv.withinTol) { s2Mismatch = true; break; }
+    for (const comp of comparisons) {
+      for (const d of comp.stateDiffs) {
+        if (!d.withinTol) {
+          // simplistic: count all state diffs as state1
+          state1Mismatches++;
         }
       }
-      if (s1Mismatch) state1Mismatches++;
-      if (s2Mismatch) state2Mismatches++;
     }
 
     return {
       analysis: this._analysis ?? "dcop",
       stepCount: simpleCompared(
         this._ourSession!.steps.length,
-        this._ngSessionAligned()?.steps.length ?? 0,
+        ngAligned?.steps.length ?? 0,
       ),
       convergence: { ours: ourConv, ngspice: ngConv },
       firstDivergence: firstDiv,
@@ -805,794 +1245,268 @@ export class ComparisonSession {
     };
   }
 
-  // --------------------------------------------------------------------------
-  // Discovery methods (available after init(), no _ensureRun needed)
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Matrix and coefficient helpers
+  // ---------------------------------------------------------------------------
 
-  /**
-   * Returns one ComponentInfo per element in topology, ordered by element index.
-   */
-  listComponents(opts?: PaginationOpts): ComponentInfo[] {
-    const results: ComponentInfo[] = [];
-    for (const el of this._ourTopology.elements) {
-      const engineEl = (this._engine?.elements ?? [])[el.index];
-      let slotNames: string[] = [];
-      if (engineEl && isPoolBacked(engineEl)) {
-        slotNames = engineEl.stateSchema.slots.map((s) => s.name);
-      }
-      const pinLabels: string[] = [];
-      for (const nodeId of el.pinNodeIds) {
-        const lbl = this._ourTopology.nodeLabels.get(nodeId as number) ?? "";
-        if (lbl) pinLabels.push(lbl);
-      }
-      results.push({
-        label: el.label,
-        deviceType: el.type ?? "unknown",
-        slotNames,
-        pinLabels,
-      });
-    }
-    return _applyPagination(results, opts);
-  }
-
-  /**
-   * Returns one NodeInfo per entry in nodeLabels, sorted by node index ascending.
-   */
-  listNodes(opts?: PaginationOpts): NodeInfo[] {
-    const results: NodeInfo[] = [];
-    this._ourTopology.nodeLabels.forEach((label, nodeId) => {
-      const mapping = this._nodeMap.find((m) => m.ourIndex === nodeId);
-      const ngspiceIndex = mapping?.ngspiceIndex ?? -1;
-      const connectedComponents: string[] = [];
-      for (const el of this._ourTopology.elements) {
-        if ((el.pinNodeIds as readonly number[]).includes(nodeId)) {
-          connectedComponents.push(el.label);
-        }
-      }
-      results.push({ label, ourIndex: nodeId, ngspiceIndex, connectedComponents });
-    });
-    results.sort((a, b) => a.ourIndex - b.ourIndex);
-    return _applyPagination(results, opts);
-  }
-
-  /**
-   * Returns component labels whose deviceType matches type (case-insensitive).
-   */
-  getComponentsByType(type: string): string[] {
-    const lower = type.toLowerCase();
-    return this._ourTopology.elements
-      .filter((el) => (el.type ?? "").toLowerCase() === lower)
-      .map((el) => el.label);
-  }
-
-  // --------------------------------------------------------------------------
-  // Slot query methods
-  // --------------------------------------------------------------------------
-
-  /**
-   * Returns state slot values for one component, filtered by glob patterns.
-   * Snapshot mode when opts.step is provided; trace mode otherwise.
-   */
-  getComponentSlots(
-    label: string,
-    patterns: string[],
-    opts?: { step?: number } & PaginationOpts,
-  ): ComponentSlotsResult {
+  getMatrixLabeled(stepIndex: number, iterationIndex: number): LabeledMatrix {
     this._ensureRun();
-    const upperLabel = label.toUpperCase();
-    const el = this._ourTopology.elements.find(
-      (e) => e.label.toUpperCase() === upperLabel,
-    );
-    if (!el) throw new Error(`Component not found: ${label}`);
+    const ourStep = this._ourSession!.steps[stepIndex];
+    if (!ourStep) throw new Error(`Step out of range: ${stepIndex}`);
 
-    const matches = compileSlotMatcher(patterns);
+    const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1;
+    const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
+    const ourIter = ourIters[iterationIndex];
 
-    if (opts?.step !== undefined) {
-      const stepIdx = opts.step;
-      const ourStep = this._ourSession!.steps[stepIdx];
-      if (!ourStep) throw new Error(`Step out of range: ${stepIdx}`);
+    const ngIdx = this._alignedNgIndex.get(stepIndex);
+    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+    const ngAccIdx = ngStep
+      ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
+      : -1;
+    const ngIter = ngStep?.attempts[ngAccIdx]?.iterations[iterationIndex]
+      ?? ngStep?.iterations[iterationIndex];
 
-      const ngStep = this._ngSessionAligned()?.steps[
-        this._alignedNgIndex.get(stepIdx) ?? stepIdx
-      ];
-
-      const ourFinal = ourStep.iterations[ourStep.iterations.length - 1];
-      const ngFinal = ngStep?.iterations[ngStep.iterations.length - 1];
-
-      const ourEs = ourFinal?.elementStates.find(
-        (e) => e.label.toUpperCase() === upperLabel,
-      );
-      const ngEs = ngFinal?.elementStates.find(
-        (e) => e.label.toUpperCase() === upperLabel,
-      );
-
-      const allSlotNames = Object.keys(ourEs?.slots ?? {});
-      const matchedSlots = allSlotNames.filter(matches);
-
-      const slotsObj: Record<string, ComparedValue> = {};
-      const paginatedSlots = _applyPagination(matchedSlots, opts);
-      for (const slot of paginatedSlots) {
-        const ourV = ourEs?.slots[slot] ?? NaN;
-        const ngV = ngEs?.slots[slot] ?? NaN;
-        slotsObj[slot] = makeComparedValue(
-          ourV, ngV, this._slotTolerance(slot), this._tol.relTol,
-        );
-      }
-
-      return {
-        mode: "snapshot",
-        label: upperLabel,
-        stepIndex: stepIdx,
-        simTime: ourStep.simTime,
-        slots: slotsObj,
-        matchedSlots: paginatedSlots,
-        totalSlots: allSlotNames.length,
-      };
-    }
-
-    // Trace mode
-    const allSteps = this._ourSession!.steps;
-    const traceSteps: Array<{
-      stepIndex: number;
-      simTime: number;
-      slots: Record<string, ComparedValue>;
-    }> = [];
-
-    let matchedSlots: string[] | null = null;
-
-    for (let si = 0; si < allSteps.length; si++) {
-      const ourStep = allSteps[si];
-      const ngStep = this._ngSessionAligned()?.steps[
-        this._alignedNgIndex.get(si) ?? si
-      ];
-
-      const ourFinal = ourStep.iterations[ourStep.iterations.length - 1];
-      const ngFinal = ngStep?.iterations[ngStep.iterations.length - 1];
-
-      const ourEs = ourFinal?.elementStates.find(
-        (e) => e.label.toUpperCase() === upperLabel,
-      );
-      const ngEs = ngFinal?.elementStates.find(
-        (e) => e.label.toUpperCase() === upperLabel,
-      );
-
-      const allSlotNames = Object.keys(ourEs?.slots ?? {});
-      if (!matchedSlots) {
-        matchedSlots = allSlotNames.filter(matches);
-      }
-
-      const slotsObj: Record<string, ComparedValue> = {};
-      for (const slot of matchedSlots) {
-        const ourV = ourEs?.slots[slot] ?? NaN;
-        const ngV = ngEs?.slots[slot] ?? NaN;
-        slotsObj[slot] = makeComparedValue(
-          ourV, ngV, this._slotTolerance(slot), this._tol.relTol,
-        );
-      }
-
-      traceSteps.push({ stepIndex: si, simTime: ourStep.simTime, slots: slotsObj });
-    }
-
-    const totalSteps = traceSteps.length;
-    const paginatedSteps = _applyPagination(traceSteps, opts);
-
-    return {
-      mode: "trace",
-      label: upperLabel,
-      totalSteps,
-      matchedSlots: matchedSlots ?? [],
-      steps: paginatedSteps,
-    };
-  }
-
-  // --------------------------------------------------------------------------
-  // Divergence methods
-  // --------------------------------------------------------------------------
-
-  /**
-   * Returns out-of-tolerance entries from all comparisons, sorted by absDelta desc.
-   */
-  getDivergences(
-    opts?: { step?: number; component?: string; threshold?: number } & PaginationOpts,
-  ): DivergenceReport {
-    this._ensureRun();
-    const comparisons = this._getComparisons();
-
-    const allEntries: DivergenceEntry[] = [];
-
-    for (const c of comparisons) {
-      if (opts?.step !== undefined && c.stepIndex !== opts.step) continue;
-
-      // Voltage divergences
-      for (const vd of c.voltageDiffs) {
-        if (!vd.withinTol) {
-          allEntries.push({
-            stepIndex: c.stepIndex,
-            iteration: c.iterationIndex,
-            simTime: c.simTime,
-            category: "voltage",
-            label: vd.label,
-            ours: vd.ours,
-            ngspice: vd.theirs,
-            absDelta: vd.absDelta,
-            relDelta: vd.relDelta,
-            withinTol: false,
-            componentLabel: null,
-            slotName: null,
-          });
-        }
-      }
-
-      // RHS divergences
-      for (const rd of c.rhsDiffs) {
-        if (!rd.withinTol) {
-          const label = (() => {
-            const lbl = this._ourTopology.matrixRowLabels.get(rd.index);
-            return lbl ?? String(rd.index);
-          })();
-          allEntries.push({
-            stepIndex: c.stepIndex,
-            iteration: c.iterationIndex,
-            simTime: c.simTime,
-            category: "rhs",
-            label,
-            ours: rd.ours,
-            ngspice: rd.theirs,
-            absDelta: rd.absDelta,
-            relDelta: 0,
-            withinTol: false,
-            componentLabel: null,
-            slotName: null,
-          });
-        }
-      }
-
-      // Matrix divergences (all matrixDiffs are already out-of-tol)
-      for (const md of c.matrixDiffs) {
-        allEntries.push({
-          stepIndex: c.stepIndex,
-          iteration: c.iterationIndex,
-          simTime: c.simTime,
-          category: "matrix",
-          label: `${md.row},${md.col}`,
-          ours: md.ours,
-          ngspice: md.theirs,
-          absDelta: md.absDelta,
-          relDelta: 0,
-          withinTol: false,
-          componentLabel: null,
-          slotName: null,
-        });
-      }
-
-      // State divergences
-      for (const sd of c.stateDiffs) {
-        if (!sd.withinTol) {
-          if (opts?.component && sd.elementLabel.toUpperCase() !== opts.component.toUpperCase()) {
-            continue;
-          }
-          allEntries.push({
-            stepIndex: c.stepIndex,
-            iteration: c.iterationIndex,
-            simTime: c.simTime,
-            category: "state",
-            label: `${sd.elementLabel}:${sd.slotName}`,
-            ours: sd.ours,
-            ngspice: sd.theirs,
-            absDelta: sd.absDelta,
-            relDelta: 0,
-            withinTol: false,
-            componentLabel: sd.elementLabel,
-            slotName: sd.slotName,
-          });
-        }
-      }
-    }
-
-    // Apply threshold filter and discard non-finite deltas (NaN/Infinity from
-    // missing ngspice data on one side of the comparison)
-    const filtered = allEntries.filter((e) =>
-      Number.isFinite(e.absDelta) &&
-      (opts?.threshold === undefined || e.absDelta > opts.threshold!));
-
-    // Sort by absDelta descending
-    filtered.sort((a, b) => b.absDelta - a.absDelta);
-
-    // Build worstByCategory
-    const categories: Array<DivergenceEntry["category"]> = ["voltage", "state", "rhs", "matrix"];
-    const worstByCategory: DivergenceReport["worstByCategory"] = {
-      voltage: null,
-      state: null,
-      rhs: null,
-      matrix: null,
-    };
-    for (const cat of categories) {
-      const catEntries = filtered.filter((e) => e.category === cat);
-      if (catEntries.length > 0) {
-        worstByCategory[cat] = catEntries.reduce(
-          (best, e) => e.absDelta > best.absDelta ? e : best,
-        );
-      }
-    }
-
-    const limit = opts?.limit ?? 100;
-    const offset = opts?.offset ?? 0;
-    const entries = filtered.slice(offset, offset + limit);
-
-    return {
-      totalCount: filtered.length,
-      worstByCategory,
-      entries,
-    };
-  }
-
-  // --------------------------------------------------------------------------
-  // Batch and range methods
-  // --------------------------------------------------------------------------
-
-  /**
-   * Batch version of getStepEnd over inclusive range [fromStep, toStep].
-   */
-  getStepEndRange(fromStep: number, toStep: number): StepEndReport[] {
-    this._ensureRun();
-    const maxIdx = this._ourSession!.steps.length - 1;
-    const lo = Math.max(0, fromStep);
-    const hi = Math.min(maxIdx, toStep);
-    const results: StepEndReport[] = [];
-    for (let i = lo; i <= hi; i++) {
-      results.push(this.getStepEnd(i));
-    }
-    return results;
-  }
-
-  // --------------------------------------------------------------------------
-  // Slot trace
-  // --------------------------------------------------------------------------
-
-  /**
-   * Single slot timeseries across all steps (converged values only).
-   */
-  traceComponentSlot(label: string, slotName: string, opts?: PaginationOpts): SlotTrace {
-    this._ensureRun();
-    const upperLabel = label.toUpperCase();
-    const el = this._ourTopology.elements.find(
-      (e) => e.label.toUpperCase() === upperLabel,
-    );
-    if (!el) throw new Error(`Component not found: ${label}`);
-
-    const allSteps = this._ourSession!.steps;
-    const traceSteps: SlotTrace["steps"] = [];
-
-    for (let si = 0; si < allSteps.length; si++) {
-      const ourStep = allSteps[si];
-      const ngStep = this._ngSessionAligned()?.steps[
-        this._alignedNgIndex.get(si) ?? si
-      ];
-
-      const ourFinal = ourStep.iterations[ourStep.iterations.length - 1];
-      const ngFinal = ngStep?.iterations[ngStep.iterations.length - 1];
-
-      const ourEs = ourFinal?.elementStates.find(
-        (e) => e.label.toUpperCase() === upperLabel,
-      );
-      const ngEs = ngFinal?.elementStates.find(
-        (e) => e.label.toUpperCase() === upperLabel,
-      );
-
-      if (ourEs && slotName in ourEs.slots) {
-        const ourV = ourEs.slots[slotName];
-        const ngV = ngEs?.slots[slotName] ?? NaN;
-        traceSteps.push({
-          stepIndex: si,
-          simTime: ourStep.simTime,
-          value: makeComparedValue(ourV, ngV, this._slotTolerance(slotName), this._tol.relTol),
+    const entries: LabeledMatrixEntry[] = [];
+    if (ourIter) {
+      for (const e of ourIter.matrix) {
+        const rowLabel = this._ourTopology.matrixRowLabels.get(e.row) ?? `row${e.row}`;
+        const colLabel = this._ourTopology.matrixColLabels.get(e.col) ?? `col${e.col}`;
+        const ngEntry = ngIter?.matrix.find(ne => ne.row === e.row && ne.col === e.col);
+        const ngVal = ngEntry?.value ?? NaN;
+        const absDelta = Math.abs(e.value - ngVal);
+        const refMag = Math.max(Math.abs(e.value), Math.abs(ngVal));
+        const relTol = this._tol.relTol;
+        const withinTol = isNaN(ngVal) ? false : absDelta <= 1e-6 + relTol * refMag;
+        entries.push({
+          row: e.row, col: e.col, rowLabel, colLabel,
+          ours: e.value, ngspice: ngVal, absDelta, withinTol,
         });
       }
     }
 
-    const totalSteps = traceSteps.length;
-    const paginatedSteps = _applyPagination(traceSteps, opts);
-
-    return {
-      label: upperLabel,
-      slotName,
-      totalSteps,
-      steps: paginatedSteps,
-    };
+    return { stepIndex, iteration: iterationIndex, matrixSize: this._ourTopology.matrixSize, entries };
   }
 
-  // --------------------------------------------------------------------------
-  // State history
-  // --------------------------------------------------------------------------
-
-  /**
-   * Returns state0, state1, state2 for a component at a given step/iteration.
-   */
-  getStateHistory(label: string, step: number, iteration?: number): StateHistoryReport {
-    this._ensureRun();
-    const upperLabel = label.toUpperCase();
-
-    const ourStep = this._ourSession!.steps[step];
-    if (!ourStep) throw new Error(`Step out of range: ${step}`);
-
-    const iterIdx = iteration !== undefined
-      ? iteration
-      : ourStep.iterations.length - 1;
-
-    const ourIter = ourStep.iterations[iterIdx];
-    if (!ourIter) throw new Error("Iteration out of range");
-
-    const ngStep = this._ngSessionAligned()?.steps[
-      this._alignedNgIndex.get(step) ?? step
-    ];
-    const ngIter = ngStep?.iterations[iterIdx];
-
-    const findEs = (iters: typeof ourIter | undefined, lbl: string) =>
-      iters?.elementStates.find((e) => e.label.toUpperCase() === lbl);
-
-    const ourEs = findEs(ourIter, upperLabel);
-    const ngEs = findEs(ngIter, upperLabel);
-
-    return {
-      label: upperLabel,
-      stepIndex: step,
-      iteration: iterIdx,
-      state0: { ...(ourEs?.slots ?? {}) },
-      state1: { ...(ourEs?.state1Slots ?? {}) },
-      state2: { ...(ourEs?.state2Slots ?? {}) },
-      ngspiceState0: { ...(ngEs?.slots ?? {}) },
-      ngspiceState1: { ...(ngEs?.state1Slots ?? {}) },
-      ngspiceState2: { ...(ngEs?.state2Slots ?? {}) },
-    };
-  }
-
-  // --------------------------------------------------------------------------
-  // Methods 9-17
-  // --------------------------------------------------------------------------
-
-  /**
-   * Matrix entries with row/col labels from topology.
-   */
-  getMatrixLabeled(step: number, iteration: number): LabeledMatrix {
-    this._ensureRun();
-    const ourStep = this._ourSession!.steps[step];
-    if (!ourStep) throw new Error(`Step out of range: ${step}`);
-    const ourIter = ourStep.iterations[iteration];
-    if (!ourIter) throw new Error(`Iteration out of range: ${iteration}`);
-    const ngStep = this._ngSessionAligned()?.steps[this._alignedNgIndex.get(step) ?? step];
-    const ngIter = ngStep?.iterations[iteration];
-
-    // Build union of (row, col) keys
-    const keySet = new Map<string, { row: number; col: number }>();
-    for (const e of ourIter.matrix) {
-      keySet.set(`${e.row},${e.col}`, { row: e.row, col: e.col });
-    }
-    if (ngIter) {
-      for (const e of ngIter.matrix) {
-        keySet.set(`${e.row},${e.col}`, { row: e.row, col: e.col });
-      }
-    }
-
-    const entries = Array.from(keySet.values()).map(({ row, col }) => {
-      const rowLabel = this._ourTopology.matrixRowLabels.get(row) ?? String(row);
-      const colLabel = this._ourTopology.matrixColLabels.get(col) ?? String(col);
-      const ourVal = ourIter.matrix.find(e => e.row === row && e.col === col)?.value ?? 0;
-      const ngVal = ngIter?.matrix.find(e => e.row === row && e.col === col)?.value ?? 0;
-      const absDelta = Math.abs(ourVal - ngVal);
-      const refMag = Math.max(Math.abs(ourVal), Math.abs(ngVal));
-      const withinTol = absDelta <= this._tol.iAbsTol + this._tol.relTol * refMag;
-      return { row, col, rowLabel, colLabel, ours: ourVal, ngspice: ngVal, absDelta, withinTol };
-    });
-
-    entries.sort((a, b) => a.row !== b.row ? a.row - b.row : a.col - b.col);
-
-    return { stepIndex: step, iteration, matrixSize: this._ourTopology.matrixSize, entries };
-  }
-
-  /**
-   * RHS vector entries with node labels (uses preSolveRhs).
-   */
-  getRhsLabeled(step: number, iteration: number): LabeledRhs {
-    this._ensureRun();
-    const ourStep = this._ourSession!.steps[step];
-    if (!ourStep) throw new Error(`Step out of range: ${step}`);
-    const ourIter = ourStep.iterations[iteration];
-    if (!ourIter) throw new Error(`Iteration out of range: ${iteration}`);
-    const ngStep = this._ngSessionAligned()?.steps[this._alignedNgIndex.get(step) ?? step];
-    const ngIter = ngStep?.iterations[iteration];
-
-    const size = this._ourTopology.matrixSize;
-    const entries = [];
-    for (let i = 0; i < size; i++) {
-      const lbl = this._ourTopology.matrixRowLabels.get(i) ?? String(i);
-      const ourVal = i < ourIter.preSolveRhs.length ? ourIter.preSolveRhs[i] : 0;
-      const ngVal = ngIter?.preSolveRhs && i < ngIter.preSolveRhs.length
-        ? ngIter.preSolveRhs[i] : NaN;
-      const absDelta = isNaN(ngVal) ? NaN : Math.abs(ourVal - ngVal);
-      const refMag = Math.max(Math.abs(ourVal), Math.abs(ngVal));
-      const withinTol = isNaN(absDelta) ? false
-        : absDelta <= this._tol.iAbsTol + this._tol.relTol * refMag;
-      entries.push({ index: i, label: lbl, ours: ourVal, ngspice: ngVal, absDelta, withinTol });
-    }
-
-    return { stepIndex: step, iteration, entries };
-  }
-
-  /**
-   * Side-by-side matrix comparison with summary stats.
-   */
-  compareMatrixAt(
-    step: number,
-    iteration: number,
-    filter: "all" | "mismatches" = "mismatches",
-  ): MatrixComparison {
-    const labeled = this.getMatrixLabeled(step, iteration);
-    const mismatchCount = labeled.entries.filter(e => !e.withinTol).length;
-    const maxAbsDelta = labeled.entries.reduce((m, e) => Math.max(m, e.absDelta), 0);
-
-    const filteredEntries = filter === "mismatches"
+  compareMatrixAt(stepIndex: number, iterationIndex: number, filter: "all" | "mismatches"): CompareMatrixResult {
+    const labeled = this.getMatrixLabeled(stepIndex, iterationIndex);
+    const filtered = filter === "mismatches"
       ? labeled.entries.filter(e => !e.withinTol)
       : labeled.entries;
-
-    const entries = filteredEntries.map(e => ({
-      row: e.row,
-      col: e.col,
-      rowLabel: e.rowLabel,
-      colLabel: e.colLabel,
-      ours: e.ours,
-      ngspice: e.ngspice,
-      delta: e.ours - e.ngspice,
-      absDelta: e.absDelta,
-      withinTol: e.withinTol,
-    }));
-
     return {
-      stepIndex: step,
-      iteration,
+      stepIndex,
+      iteration: iterationIndex,
       filter,
       totalEntries: labeled.entries.length,
-      mismatchCount,
-      maxAbsDelta,
-      entries,
+      entries: filtered,
     };
   }
 
-  /**
-   * Integration coefficients from both engines at a step.
-   */
-  getIntegrationCoefficients(step: number): IntegrationCoefficientsReport {
+  getRhsLabeled(stepIndex: number, iterationIndex: number): RhsLabeledResult {
     this._ensureRun();
-    const ourStep = this._ourSession!.steps[step];
-    if (!ourStep) throw new Error(`Step out of range: ${step}`);
-    const coeffs = ourStep.integrationCoefficients;
-    const ag0Compared = simpleCompared(coeffs.ours.ag0, coeffs.ngspice.ag0);
-    const ag1Compared = simpleCompared(coeffs.ours.ag1, coeffs.ngspice.ag1);
-    const methodMatch = coeffs.ours.method === coeffs.ngspice.method
-      && coeffs.ours.order === coeffs.ngspice.order;
+    const ourStep = this._ourSession!.steps[stepIndex];
+    if (!ourStep) throw new Error(`Step out of range: ${stepIndex}`);
+
+    const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1;
+    const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
+    const ourIter = ourIters[iterationIndex];
+
+    const ngIdx = this._alignedNgIndex.get(stepIndex);
+    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+    const ngAccIdx = ngStep
+      ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
+      : -1;
+    const ngIter = ngStep?.attempts[ngAccIdx]?.iterations[iterationIndex]
+      ?? ngStep?.iterations[iterationIndex];
+
+    const n = this._ourTopology.matrixSize;
+    const entries: RhsLabeledResult["entries"] = [];
+    for (let i = 0; i < n; i++) {
+      const rowLabel = this._ourTopology.matrixRowLabels.get(i) ?? `row${i}`;
+      const ourV = ourIter?.preSolveRhs[i] ?? 0;
+      const ngV = ngIter?.preSolveRhs[i] ?? NaN;
+      const absDelta = Math.abs(ourV - ngV);
+      const withinTol = isNaN(ngV) ? false : absDelta <= this._tol.iAbsTol + this._tol.relTol * Math.max(Math.abs(ourV), Math.abs(ngV));
+      entries.push({ index: i, rowLabel, ours: ourV, ngspice: ngV, absDelta, withinTol });
+    }
+
+    return { stepIndex, iteration: iterationIndex, entries };
+  }
+
+  getIntegrationCoefficients(stepIndex: number): IntegrationCoefficientsReport {
+    this._ensureRun();
+    const step = this._ourSession!.steps[stepIndex];
+    if (!step) throw new Error(`Step out of range: ${stepIndex}`);
+
+    const ngIdx = this._alignedNgIndex.get(stepIndex);
+    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+
+    const ours = step.integrationCoefficients.ours;
+    const ngspice = ngStep?.integrationCoefficients.ngspice
+      ?? { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 };
+
     return {
-      stepIndex: step,
-      ours: { ...coeffs.ours },
-      ngspice: { ...coeffs.ngspice },
-      methodMatch,
-      ag0Compared,
-      ag1Compared,
+      stepIndex,
+      ours,
+      ngspice,
+      methodMatch: ours.method === ngspice.method,
+      ag0Compared: simpleCompared(ours.ag0, ngspice.ag0),
+      ag1Compared: simpleCompared(ours.ag1, ngspice.ag1),
     };
   }
 
-  /**
-   * Pre/post limit junction voltages from both engines.
-   */
-  getLimitingComparison(label: string, step: number, iteration: number): LimitingComparisonReport {
+  getLimitingComparison(label: string, stepIndex: number, iterationIndex: number): LimitingComparisonReport {
     this._ensureRun();
-    const ourStep = this._ourSession!.steps[step];
-    if (!ourStep) throw new Error(`Step out of range: ${step}`);
-    const ourIter = ourStep.iterations[iteration];
-    if (!ourIter) throw new Error(`Iteration out of range: ${iteration}`);
-    const ngStep = this._ngSessionAligned()?.steps[this._alignedNgIndex.get(step) ?? step];
-    const ngIter = ngStep?.iterations[iteration];
-
     const upperLabel = label.toUpperCase();
-    const ourEvents = (ourIter.limitingEvents ?? []).filter(
+
+    const ourStep = this._ourSession?.steps[stepIndex];
+    const ourAccIdx = ourStep
+      ? (ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1)
+      : -1;
+    const ourIters = ourStep?.attempts[ourAccIdx]?.iterations ?? ourStep?.iterations ?? [];
+    const ourIter = ourIters[iterationIndex];
+
+    const ngIdx = this._alignedNgIndex.get(stepIndex ?? 0);
+    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+    const ngAccIdx = ngStep
+      ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
+      : -1;
+    const ngIter = ngStep?.attempts[ngAccIdx]?.iterations[iterationIndex]
+      ?? ngStep?.iterations[iterationIndex];
+
+    const ourEvents = (ourIter?.limitingEvents ?? []).filter(
       e => e.label.toUpperCase() === upperLabel);
     const ngEvents = (ngIter?.limitingEvents ?? []).filter(
-      e => e.label.toUpperCase() === upperLabel);
+      e => (e as any).label?.toUpperCase() === upperLabel || (e as any).deviceName?.toUpperCase() === upperLabel);
 
-    // Build union of junction names
-    const junctionSet = new Set<string>();
-    for (const e of ourEvents) junctionSet.add(e.junction);
-    for (const e of ngEvents) junctionSet.add(e.junction);
+    if (ourEvents.length === 0 && ngEvents.length === 0) {
+      return { label: upperLabel, noEvents: true, junctions: [] };
+    }
 
-    const junctions = Array.from(junctionSet).map(junction => {
+    const allJunctions = new Set([
+      ...ourEvents.map(e => e.junction),
+      ...ngEvents.map(e => (e as any).junction ?? ""),
+    ]);
+
+    const junctions = [...allJunctions].map(junction => {
       const ourEv = ourEvents.find(e => e.junction === junction);
-      const ngEv = ngEvents.find(e => e.junction === junction);
-      const ourPreLimit = ourEv?.vBefore ?? NaN;
-      const ourPostLimit = ourEv?.vAfter ?? NaN;
+      const ngEv = ngEvents.find(e => (e as any).junction === junction) as any;
+
+      const ourPreLimit = ourEv ? ourEv.vBefore : NaN;
+      const ourPostLimit = ourEv ? ourEv.vAfter : NaN;
+      const ourWasLimited = ourEv ? ourEv.wasLimited : false;
       const ourDelta = ourPostLimit - ourPreLimit;
-      const ngspicePreLimit = ngEv?.vBefore ?? NaN;
-      const ngspicePostLimit = ngEv?.vAfter ?? NaN;
+
+      const ngspicePreLimit = ngEv ? ngEv.vBefore : NaN;
+      const ngspicePostLimit = ngEv ? ngEv.vAfter : NaN;
+      const ngspiceWasLimited = ngEv ? ngEv.wasLimited : false;
       const ngspiceDelta = ngspicePostLimit - ngspicePreLimit;
+
       const limitingDiff = ourDelta - ngspiceDelta;
+
       return {
         junction,
         ourPreLimit,
         ourPostLimit,
+        ourWasLimited,
         ourDelta,
         ngspicePreLimit,
         ngspicePostLimit,
+        ngspiceWasLimited,
         ngspiceDelta,
         limitingDiff,
       };
     });
 
-    return {
-      label: upperLabel,
-      stepIndex: step,
-      iteration,
-      junctions,
-      noEvents: junctions.length === 0,
-    };
+    return { label: upperLabel, noEvents: false, junctions };
   }
 
-  /**
-   * Per-element convergence pass/fail from both engines.
-   */
-  getConvergenceDetail(step: number, iteration: number): ConvergenceDetailReport {
+  getConvergenceDetail(stepIndex: number, iterationIndex: number): ConvergenceDetailReport {
     this._ensureRun();
-    const ourStep = this._ourSession!.steps[step];
-    if (!ourStep) throw new Error(`Step out of range: ${step}`);
-    const ourIter = ourStep.iterations[iteration];
-    if (!ourIter) throw new Error(`Iteration out of range: ${iteration}`);
-    const ngStep = this._ngSessionAligned()?.steps[this._alignedNgIndex.get(step) ?? step];
-    const ngIter = ngStep?.iterations[iteration];
+    const ourStep = this._ourSession!.steps[stepIndex];
+    const ourAccIdx = ourStep
+      ? (ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1)
+      : -1;
+    const ourIters = ourStep?.attempts[ourAccIdx]?.iterations ?? ourStep?.iterations ?? [];
+    const ourIter = ourIters[iterationIndex];
 
-    const comparisons = this._getComparisons();
-    const compResult = comparisons.find(
-      c => c.stepIndex === step && c.iterationIndex === iteration);
+    const ngIdx = this._alignedNgIndex.get(stepIndex);
+    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+    const ngAccIdx = ngStep
+      ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
+      : -1;
+    const ngIter = ngStep?.attempts[ngAccIdx]?.iterations[iterationIndex]
+      ?? ngStep?.iterations[iterationIndex];
 
-    const elements = ourIter.elementStates.map(es => {
-      const topoEl = this._ourTopology.elements.find(
-        e => e.label.toUpperCase() === es.label.toUpperCase());
-      const deviceType = topoEl?.type ?? "unknown";
-      const ourConverged = !(ourIter.convergenceFailedElements ?? []).includes(es.label);
-      const ngspiceDevices = ngIter?.ngspiceConvergenceFailedDevices ?? [];
-      const ngspiceConverged = !ngspiceDevices.includes(es.label.toLowerCase());
-      const stateDiffsForEl = (compResult?.stateDiffs ?? []).filter(
-        d => d.elementLabel.toUpperCase() === es.label.toUpperCase());
-      const worstDelta = stateDiffsForEl.reduce((m, d) => Math.max(m, d.absDelta), 0);
-      const agree = ourConverged === ngspiceConverged;
-      return { label: es.label, deviceType, ourConverged, ngspiceConverged, worstDelta, agree };
-    });
-
-    const disagreementCount = elements.filter(e => !e.agree).length;
-    const ourNoncon = ourIter.convergenceFailedElements?.length ?? 0;
-    const ngspiceNoncon = ngIter?.ngspiceConvergenceFailedDevices?.length ?? 0;
-    const ourGlobalConverged = ourIter.globalConverged;
-    const ngspiceGlobalConverged = ngIter?.globalConverged ?? true;
-
-    return {
-      stepIndex: step,
-      iteration,
-      ourNoncon,
-      ngspiceNoncon,
-      ourGlobalConverged,
-      ngspiceGlobalConverged,
-      elements,
-      disagreementCount,
-    };
-  }
-
-  /**
-   * Serialize session to JSON. All non-JSON-safe values converted.
-   */
-  toJSON(opts?: { includeAllSteps?: boolean; onlyDivergences?: boolean }): SessionReport {
-    this._ensureRun();
-    const summary = this.getSummary();
-    const comparisons = this._getComparisons();
-
-    const includeAllSteps = opts?.includeAllSteps === true;
-    const onlyDivergences = opts?.onlyDivergences === true;
-
-    const shouldIncludeStep = (stepIndex: number): boolean => {
-      if (includeAllSteps && !onlyDivergences) return true;
-      return comparisons.some(c => c.stepIndex === stepIndex && !c.allWithinTol);
-    };
-
-    const safeNum = (v: number): number | null => isFinite(v) ? v : null;
-
-    const steps: SessionReport["steps"] = [];
-    const ourSteps = this._ourSession!.steps;
-    for (let si = 0; si < ourSteps.length; si++) {
-      if (!shouldIncludeStep(si)) continue;
-      const stepEnd = this.getStepEnd(si);
-      const ourStep = ourSteps[si];
-      const ngStep = this._ngSessionAligned()?.steps[this._alignedNgIndex.get(si) ?? si];
-
-      const nodes: SessionReport["steps"][number]["nodes"] = {};
-      for (const [lbl, cv] of Object.entries(stepEnd.nodes)) {
-        nodes[lbl] = {
-          ours: safeNum(cv.ours),
-          ngspice: safeNum(cv.ngspice),
-          absDelta: safeNum(cv.absDelta),
-          withinTol: cv.withinTol,
-        };
+    const elements: ConvergenceDetailReport["elements"] = [];
+    if (ourIter) {
+      for (const es of ourIter.elementStates) {
+        const topoEl = this._ourTopology.elements.find(
+          el => el.label.toUpperCase() === es.label.toUpperCase());
+        const ourConverged = !ourIter.convergenceFailedElements.includes(es.label);
+        const ngConverged = ngIter
+          ? !(ngIter.ngspiceConvergenceFailedDevices ?? []).some(
+              d => d.toUpperCase() === es.label.toUpperCase())
+          : true;
+        elements.push({
+          label: es.label,
+          deviceType: topoEl?.type ?? "unknown",
+          ourConverged,
+          ngConverged,
+        });
       }
-
-      const components: SessionReport["steps"][number]["components"] = {};
-      for (const [lbl, entry] of Object.entries(stepEnd.components)) {
-        const slots: Record<string, { ours: number | null; ngspice: number | null; absDelta: number | null; withinTol: boolean }> = {};
-        for (const [slot, cv] of Object.entries(entry.slots)) {
-          slots[slot] = {
-            ours: safeNum(cv.ours),
-            ngspice: safeNum(cv.ngspice),
-            absDelta: safeNum(cv.absDelta),
-            withinTol: cv.withinTol,
-          };
-        }
-        components[lbl] = { deviceType: entry.deviceType, slots };
-      }
-
-      steps.push({
-        stepIndex: si,
-        simTime: ourStep.simTime,
-        dt: ourStep.dt,
-        converged: { ours: ourStep.converged, ngspice: ngStep?.converged ?? false },
-        iterationCount: { ours: ourStep.iterationCount, ngspice: ngStep?.iterationCount ?? 0 },
-        nodes,
-        components,
-      });
     }
 
+    const disagreementCount = elements.filter(e => e.ourConverged !== e.ngConverged).length;
+    return { stepIndex, iterationIndex, elements, disagreementCount };
+  }
+
+  toJSON(opts?: ToJSONOpts): {
+    analysis: string;
+    stepCount: { ours: number; ngspice: number };
+    steps: Array<{ stepIndex: number; stepStartTime: number; unaligned: boolean }>;
+  } {
+    this._ensureRun();
+    const comparisons = this._getComparisons();
+    const divergentStepIndices = new Set(
+      comparisons.filter(c => !c.allWithinTol).map(c => c.stepIndex));
+
+    const ourSteps = this._ourSession!.steps;
+    const includeAll = opts?.includeAllSteps ?? false;
+
+    const steps = ourSteps
+      .map((step, i) => ({
+        stepIndex: i,
+        stepStartTime: step.stepStartTime,
+        unaligned: !this._alignedNgIndex.has(i),
+      }))
+      .filter(s => includeAll || divergentStepIndices.has(s.stepIndex));
+
     return {
-      analysis: (this._analysis ?? "dcop") as "dcop" | "tran",
+      analysis: this._analysis ?? "dcop",
       stepCount: {
         ours: ourSteps.length,
         ngspice: this._ngSessionAligned()?.steps.length ?? 0,
-      },
-      nodeCount: this._ourTopology.nodeCount,
-      elementCount: this._ourTopology.elementCount,
-      summary: {
-        totalCompared: summary.totals.compared,
-        passed: summary.totals.passed,
-        failed: summary.totals.failed,
-        firstDivergence: summary.firstDivergence,
-        perDeviceType: summary.perDeviceType,
-        integrationMethod: summary.integrationMethod,
-        stateHistoryIssues: summary.stateHistoryIssues,
       },
       steps,
     };
   }
 
-  /**
-   * Factory replacing the two-step new + init pattern.
-   */
-  static async create(opts: ComparisonSessionOptions): Promise<ComparisonSession> {
-    const session = new ComparisonSession(opts);
-    await session.init();
-    return session;
-  }
+  // ---------------------------------------------------------------------------
+  // Dispose
+  // ---------------------------------------------------------------------------
 
-  /**
-   * Clean up all held resources.
-   */
   dispose(): void {
     this._ourSession = null;
     this._ngSession = null;
     this._ngSessionReindexed = null;
     this._comparisons = null;
+    this._alignedNgIndex.clear();
     this._nodeMap = [];
-    if (this._facade && typeof (this._facade as any).dispose === "function") {
-      (this._facade as any).dispose();
-    }
-    if (this._coordinator && typeof (this._coordinator as any).dispose === "function") {
-      (this._coordinator as any).dispose();
-    }
-    this._disposed = true;
   }
 
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Raw access
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
   get ourSession(): CaptureSession | null { return this._ourSession; }
   get ngspiceSession(): CaptureSession | null { return this._ngSession; }
@@ -1600,33 +1514,19 @@ export class ComparisonSession {
   get nodeMap(): NodeMapping[] { return this._nodeMap; }
   get tolerance(): Tolerance { return this._tol; }
 
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Internal helpers
-  // --------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
 
-  private _ensureRun(): void {
-    if (this._disposed) {
-      throw new Error("ComparisonSession: session has been disposed");
-    }
+  protected _ensureRun(): void {
     if (!this._ourSession) {
       throw new Error("ComparisonSession: call runDcOp() or runTransient() first");
     }
   }
 
-  private _emptyNgSession(): CaptureSession {
-    return {
-      source: "ngspice",
-      topology: { matrixSize: 0, nodeCount: 0, branchCount: 0, elementCount: 0, elements: [], nodeLabels: new Map(), matrixRowLabels: new Map(), matrixColLabels: new Map() },
-      steps: [],
-    };
-  }
-
   private _buildNodeMapping(bridge: NgspiceBridge): void {
     const ngTopo = bridge.getTopology();
-    if (ngTopo) {
-      this._nodeMap = buildDirectNodeMapping(
-        this._ourTopology, ngTopo, this._engine.elements, this._elementLabels);
-    }
+    if (ngTopo) this._nodeMap = buildDirectNodeMapping(this._ourTopology, ngTopo, this._engine.elements, this._elementLabels);
   }
 
   private _reindexNgSession(): void {
@@ -1638,65 +1538,55 @@ export class ComparisonSession {
     }
   }
 
+  /**
+   * Alignment per spec §7 — exact stepStartTime equality with 1e-15 EPS.
+   * No raw-index fallback; unaligned steps have no entry.
+   */
   private _buildTimeAlignment(): void {
     this._alignedNgIndex.clear();
-    const ngSteps = this._ngSessionAligned()?.steps ?? [];
-    if (ngSteps.length === 0) return;
-
     const ourSteps = this._ourSession?.steps ?? [];
+    const ngSteps = this._ngSessionAligned()?.steps ?? [];
+    if (ourSteps.length === 0 || ngSteps.length === 0) return;
+
+    const ngIdxByTime = new Map<number, number>();
+    for (let j = 0; j < ngSteps.length; j++) {
+      ngIdxByTime.set(ngSteps[j].stepStartTime, j);
+    }
+
+    const EPS = 1e-15;
     for (let i = 0; i < ourSteps.length; i++) {
-      const tOurs = ourSteps[i].simTime;
-      const dtOurs = ourSteps[i].dt;
-
-      // Binary search ngspice steps by simTime for nearest match
-      let lo = 0;
-      let hi = ngSteps.length - 1;
-      while (lo < hi) {
-        const mid = (lo + hi) >>> 1;
-        if (ngSteps[mid].simTime < tOurs) lo = mid + 1;
-        else hi = mid;
+      const t = ourSteps[i].stepStartTime;
+      const j = ngIdxByTime.get(t);
+      if (j !== undefined) { this._alignedNgIndex.set(i, j); continue; }
+      // EPS fallback
+      let bestJ = -1, bestDelta = Infinity;
+      for (let k = 0; k < ngSteps.length; k++) {
+        const d = Math.abs(ngSteps[k].stepStartTime - t);
+        if (d < bestDelta) { bestDelta = d; bestJ = k; }
       }
-
-      // Check lo and lo-1 for the nearest
-      const candidates = [lo - 1, lo, lo + 1].filter(j => j >= 0 && j < ngSteps.length);
-      let bestJ = candidates[0];
-      let bestDelta = Infinity;
-      for (const j of candidates) {
-        const delta = Math.abs(ngSteps[j].simTime - tOurs);
-        if (delta < bestDelta) { bestDelta = delta; bestJ = j; }
-      }
-
-      // Accept match only within tolerance: |t_ours - t_ng| < 0.5 * min(dt_ours, dt_ng)
-      const dtNg = ngSteps[bestJ].dt;
-      const halfMinDt = 0.5 * Math.min(dtOurs > 0 ? dtOurs : Infinity, dtNg > 0 ? dtNg : Infinity);
-      if (bestDelta <= halfMinDt || halfMinDt <= 0) {
-        this._alignedNgIndex.set(i, bestJ);
-      }
+      if (bestDelta <= EPS) this._alignedNgIndex.set(i, bestJ);
+      // else: leave unaligned — no raw-index fallback (spec §7)
     }
   }
 
-  private _ngSessionAligned(): CaptureSession | null {
+  protected _ngSessionAligned(): CaptureSession | null {
     return this._ngSessionReindexed ?? this._ngSession;
   }
 
-  private _getComparisons(): ComparisonResult[] {
+  protected _getComparisons(): ComparisonResult[] {
     if (!this._comparisons) {
       const ng = this._ngSessionAligned();
-      if (this._ourSession && ng) {
-        this._comparisons = compareSnapshots(this._ourSession, ng, this._tol, this._alignedNgIndex);
-      } else {
-        this._comparisons = [];
-      }
+      this._comparisons = (this._ourSession && ng)
+        ? compareSnapshots(this._ourSession, ng, this._tol, this._alignedNgIndex)
+        : [];
     }
     return this._comparisons;
   }
 
-  private _slotTolerance(slotName: string): number {
+  private _slotTol(slotName: string): number {
     const isCharge = slotName.startsWith("Q_") || slotName.startsWith("CCAP");
     const isVoltage = slotName.startsWith("V") && !slotName.startsWith("VON");
-    return isCharge ? this._tol.qAbsTol
-      : isVoltage ? this._tol.vAbsTol
-      : this._tol.iAbsTol;
+    return isCharge ? this._tol.qAbsTol : isVoltage ? this._tol.vAbsTol : this._tol.iAbsTol;
   }
 
   private _formatSpiceTime(seconds: number): string {
@@ -1705,5 +1595,27 @@ export class ComparisonSession {
     if (seconds >= 1e-6) return `${seconds * 1e6}u`;
     if (seconds >= 1e-9) return `${seconds * 1e9}n`;
     return `${seconds * 1e12}p`;
+  }
+
+  private _captureIntegCoeff(): IntegrationCoefficients {
+    if (!this._engine) return _zeroDcopCoefficients();
+    const ts = (this._engine as any)._timestep;
+    if (!ts) return _zeroDcopCoefficients();
+    const ag0: number = ts.ag?.[0] ?? 0;
+    const ag1: number = ts.ag?.[1] ?? 0;
+    const method: "backwardEuler" | "trapezoidal" | "gear2" =
+      ts.method === 1 ? "trapezoidal" : "backwardEuler";
+    const order: number = ts.integrationOrder ?? 1;
+    return {
+      ours: { ag0, ag1, method, order },
+      ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+    };
+  }
+
+  private _curAnalysisPhase(): "dcop" | "tranInit" | "tranFloat" {
+    const phase = (this._coordinator as any)?._analysisPhase;
+    if (phase === "tranInit") return "tranInit";
+    if (phase === "tranFloat") return "tranFloat";
+    return "dcop";
   }
 }

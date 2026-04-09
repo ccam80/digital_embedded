@@ -51,7 +51,7 @@ describeIfDll("ComparisonSession — buckbjt smoke test", () => {
 
     for (let si = 0; si < maxSteps; si++) {
       const stepEnd = session.getStepEnd(si);
-      console.log(`\n--- Step ${si} (t_ours=${stepEnd.simTime.ours.toExponential(3)}, t_ng=${stepEnd.simTime.ngspice.toExponential(3)}) ---`);
+      console.log(`\n--- Step ${si} (t_ours=${stepEnd.stepStartTime.ours.toExponential(3)}, t_ng=${stepEnd.stepStartTime.ngspice.toExponential(3)}) ---`);
       console.log(`  converged: ours=${stepEnd.converged.ours} ng=${stepEnd.converged.ngspice}`);
       console.log(`  iters: ours=${stepEnd.iterationCount.ours} ng=${stepEnd.iterationCount.ngspice}`);
 

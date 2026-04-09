@@ -30,6 +30,20 @@ import { makeDiagnostic } from "./diagnostics.js";
 import { newtonRaphson } from "./newton-raphson.js";
 import type { LimitingEvent } from "./newton-raphson.js";
 
+// Phase and outcome types re-exported from harness types for use in production code.
+// Defined inline here (string literals) to avoid a production→test dependency.
+export type DcOpNRPhase =
+  | "dcopDirect"
+  | "dcopGminDynamic"
+  | "dcopGminSpice3"
+  | "dcopSrcSweep";
+
+export type DcOpNRAttemptOutcome =
+  | "accepted"
+  | "nrFailedRetry"
+  | "dcopSubSolveConverged"
+  | "finalFailure";
+
 // ---------------------------------------------------------------------------
 // DcOpOptions
 // ---------------------------------------------------------------------------
@@ -67,6 +81,20 @@ export interface DcOpOptions {
   detailedConvergence?: boolean;
   /** When non-null, elements push LimitingEvent objects here during NR. */
   limitingCollector?: LimitingEvent[] | null;
+  /**
+   * Called before each NR solve attempt during the DC OP ladder.
+   * Harness uses this to begin a new NRAttempt with correct phase annotation.
+   * @param phase - Which convergence algorithm phase is starting
+   * @param phaseParameter - Gmin value (gmin phases) or source factor (src sweep)
+   */
+  onPhaseBegin?: (phase: DcOpNRPhase, phaseParameter?: number) => void;
+  /**
+   * Called after each NR solve attempt during the DC OP ladder.
+   * Harness uses this to finalize the NRAttempt with outcome.
+   * @param outcome - How the attempt ended
+   * @param converged - Whether NR converged in this attempt
+   */
+  onPhaseEnd?: (outcome: DcOpNRAttemptOutcome, converged: boolean) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +191,7 @@ function restoreSnapshot(
  * @returns DC operating point result with node voltages and convergence metadata
  */
 export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
-  const { solver, elements, matrixSize, params, diagnostics, nodeCount, statePool, postIterationHook, detailedConvergence, limitingCollector } = opts;
+  const { solver, elements, matrixSize, params, diagnostics, nodeCount, statePool, postIterationHook, detailedConvergence, limitingCollector, onPhaseBegin, onPhaseEnd } = opts;
 
   const nrBase = {
     solver,
@@ -184,11 +212,13 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   // -------------------------------------------------------------------------
   // Level 0 — Direct NR (cktop.c:56-79)
   // -------------------------------------------------------------------------
+  onPhaseBegin?.("dcopDirect");
   const directResult = newtonRaphson({
     ...nrBase,
     maxIterations: params.maxIterations,
     elements,
   });
+  onPhaseEnd?.(directResult.converged ? "dcopSubSolveConverged" : "nrFailedRetry", directResult.converged);
 
   if (directResult.converged) {
     diagnostics.emit(
@@ -213,7 +243,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   // -------------------------------------------------------------------------
   // Level 1 — dynamicGmin (cktop.c:127-258)
   // -------------------------------------------------------------------------
-  const gminResult = dynamicGmin(nrBase, elements, params, diagnostics, statePool, matrixSize);
+  const gminResult = dynamicGmin(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
   totalIterations += gminResult.iterations;
 
   if (gminResult.converged) {
@@ -241,7 +271,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   // -------------------------------------------------------------------------
   // Level 2 — spice3Gmin (cktop.c:273-341)
   // -------------------------------------------------------------------------
-  const spice3Result = spice3Gmin(nrBase, elements, params, diagnostics, statePool, matrixSize);
+  const spice3Result = spice3Gmin(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
   totalIterations += spice3Result.iterations;
 
   if (spice3Result.converged) {
@@ -270,7 +300,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   // -------------------------------------------------------------------------
   // Level 4 — gillespieSrc (cktop.c:354-546)
   // -------------------------------------------------------------------------
-  const srcResult = gillespieSrc(nrBase, elements, params, diagnostics, statePool, matrixSize);
+  const srcResult = gillespieSrc(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
   totalIterations += srcResult.iterations;
 
   if (srcResult.converged) {
@@ -343,6 +373,9 @@ interface NrBase {
   diagnostics: DiagnosticCollector;
 }
 
+type PhaseBeginFn = ((phase: DcOpNRPhase, phaseParameter?: number) => void) | undefined;
+type PhaseEndFn = ((outcome: DcOpNRAttemptOutcome, converged: boolean) => void) | undefined;
+
 // ---------------------------------------------------------------------------
 // dynamicGmin — cktop.c:127-258
 // ---------------------------------------------------------------------------
@@ -361,6 +394,8 @@ function dynamicGmin(
   _diagnostics: DiagnosticCollector,
   statePool: { state0: Float64Array; reset(): void } | null | undefined,
   matrixSize: number,
+  onPhaseBegin?: PhaseBeginFn,
+  onPhaseEnd?: PhaseEndFn,
 ): StepResult {
   // cktop.c:140-141: zero CKTrhsOld and CKTstate0 before stepping
   const voltages = new Float64Array(matrixSize);
@@ -381,6 +416,7 @@ function dynamicGmin(
   // cktop.c:154-258: main gmin stepping loop
   while (true) {
     // cktop.c:161: solve with current diagGmin
+    onPhaseBegin?.("dcopGminDynamic", diagGmin);
     const result = newtonRaphson({
       ...nrBase,
       maxIterations: params.dcTrcvMaxIter,
@@ -392,6 +428,7 @@ function dynamicGmin(
     voltages.set(result.voltages);
 
     if (result.converged) {
+      onPhaseEnd?.("dcopSubSolveConverged", true);
       // cktop.c:168-169: check if we've reached target
       if (diagGmin <= gtarget) {
         // cktop.c:170: success — do final clean solve
@@ -430,6 +467,7 @@ function dynamicGmin(
       }
     } else {
       // cktop.c:206-240: NR failed
+      onPhaseEnd?.("nrFailedRetry", false);
       // cktop.c:208: factor < 1.00005 → give up
       if (factor < 1.00005) {
         return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
@@ -443,6 +481,7 @@ function dynamicGmin(
   }
 
   // cktop.c:253-258: final clean solve with no diagonal gmin
+  onPhaseBegin?.("dcopGminDynamic", 0);
   const cleanResult = newtonRaphson({
     ...nrBase,
     maxIterations: params.maxIterations,
@@ -450,6 +489,7 @@ function dynamicGmin(
     initialGuess: voltages,
   });
   totalIter += cleanResult.iterations;
+  onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
 
   if (cleanResult.converged) {
     return { converged: true, iterations: totalIter, voltages: cleanResult.voltages };
@@ -485,6 +525,8 @@ function spice3Gmin(
   _diagnostics: DiagnosticCollector,
   statePool: { state0: Float64Array; reset(): void } | null | undefined,
   matrixSize: number,
+  onPhaseBegin?: PhaseBeginFn,
+  onPhaseEnd?: PhaseEndFn,
 ): StepResult {
   // cktop.c:281: zero state before stepping
   const voltages = new Float64Array(matrixSize);
@@ -502,6 +544,7 @@ function spice3Gmin(
 
   // cktop.c:285-319: ramp loop — numGminSteps+1 steps (i = 0..numGminSteps)
   for (let i = 0; i <= numGminSteps; i++) {
+    onPhaseBegin?.("dcopGminSpice3", diagGmin);
     const result = newtonRaphson({
       ...nrBase,
       maxIterations: params.dcTrcvMaxIter,
@@ -513,15 +556,18 @@ function spice3Gmin(
 
     if (!result.converged) {
       // cktop.c:301: no backtracking — abort immediately
+      onPhaseEnd?.("nrFailedRetry", false);
       return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
     }
 
+    onPhaseEnd?.("dcopSubSolveConverged", true);
     voltages.set(result.voltages);
     // cktop.c:313: step down by gminFactor
     diagGmin /= gminFactor;
   }
 
   // cktop.c:323-341: final clean solve with no diagonal gmin
+  onPhaseBegin?.("dcopGminSpice3", 0);
   const cleanResult = newtonRaphson({
     ...nrBase,
     maxIterations: params.maxIterations,
@@ -529,6 +575,7 @@ function spice3Gmin(
     initialGuess: voltages,
   });
   totalIter += cleanResult.iterations;
+  onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
 
   if (cleanResult.converged) {
     return { converged: true, iterations: totalIter, voltages: cleanResult.voltages };
@@ -553,6 +600,8 @@ function gillespieSrc(
   _diagnostics: DiagnosticCollector,
   statePool: { state0: Float64Array; reset(): void } | null | undefined,
   matrixSize: number,
+  onPhaseBegin?: PhaseBeginFn,
+  onPhaseEnd?: PhaseEndFn,
 ): StepResult {
   // cktop.c:362-363: zero state and scale sources to 0
   const voltages = new Float64Array(matrixSize);
@@ -565,6 +614,7 @@ function gillespieSrc(
   let totalIter = 0;
 
   // cktop.c:370-385: zero-source NR solve
+  onPhaseBegin?.("dcopSrcSweep", 0);
   const zeroResult = newtonRaphson({
     ...nrBase,
     maxIterations: params.dcTrcvMaxIter,
@@ -575,11 +625,13 @@ function gillespieSrc(
   voltages.set(zeroResult.voltages);
 
   if (!zeroResult.converged) {
+    onPhaseEnd?.("nrFailedRetry", false);
     // cktop.c:386-418: gmin bootstrap for zero-source circuit
     // Apply gmin bootstrap: diagGmin = gmin * 1e10, step down 10 decades
     let diagGmin = params.gmin * 1e10;
     let bootstrapConverged = false;
     for (let decade = 0; decade < 10; decade++) {
+      onPhaseBegin?.("dcopSrcSweep", 0);
       const bResult = newtonRaphson({
         ...nrBase,
         maxIterations: params.dcTrcvMaxIter,
@@ -590,8 +642,10 @@ function gillespieSrc(
       totalIter += bResult.iterations;
       voltages.set(bResult.voltages);
       if (!bResult.converged) {
+        onPhaseEnd?.("nrFailedRetry", false);
         break;
       }
+      onPhaseEnd?.("dcopSubSolveConverged", true);
       diagGmin /= 10;
       if (decade === 9) {
         bootstrapConverged = true;
@@ -601,6 +655,8 @@ function gillespieSrc(
       scaleAllSources(elements, 1);
       return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
     }
+  } else {
+    onPhaseEnd?.("dcopSubSolveConverged", true);
   }
 
   // cktop.c:420-424: initialise stepping parameters
@@ -616,6 +672,7 @@ function gillespieSrc(
   while (raise >= 1e-7 && convFact < 1) {
     // cktop.c:436: scale sources and solve
     scaleAllSources(elements, srcFact);
+    onPhaseBegin?.("dcopSrcSweep", srcFact);
     const stepResult = newtonRaphson({
       ...nrBase,
       maxIterations: params.dcTrcvMaxIter,
@@ -625,6 +682,7 @@ function gillespieSrc(
     totalIter += stepResult.iterations;
 
     if (stepResult.converged) {
+      onPhaseEnd?.("dcopSubSolveConverged", true);
       // cktop.c:446-481: save state, adapt raise
       voltages.set(stepResult.voltages);
       saveSnapshot(voltages, savedVoltages, statePool, savedState0);
@@ -645,6 +703,7 @@ function gillespieSrc(
       }
       // srcIterLo < iters <= srcIterHi: keep raise unchanged
     } else {
+      onPhaseEnd?.("nrFailedRetry", false);
       // cktop.c:483-530: NR failed
       // cktop.c:485: if gap too small, give up
       if ((srcFact - convFact) < 1e-8) {

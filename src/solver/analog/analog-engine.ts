@@ -25,6 +25,7 @@ import { ConvergenceLog } from "./convergence-log.js";
 import type { StepRecord } from "./convergence-log.js";
 
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
+import type { DcOpNRPhase, DcOpNRAttemptOutcome } from "./dc-operating-point.js";
 import { newtonRaphson } from "./newton-raphson.js";
 import type { LimitingEvent } from "./newton-raphson.js";
 import type { AnalogElement, PoolBackedAnalogElement } from "./element.js";
@@ -325,6 +326,10 @@ export class MNAEngine implements AnalogEngine {
     // ngspice dctran.c:704-706 — rotate deltaOld BEFORE entering the loop.
     this._timestep.rotateDeltaOld();
 
+    // Phase tracking for stepPhaseHook: first attempt is tranInit on step 0, tranNR thereafter.
+    // Subsequent loop iterations in the same step are retries.
+    let _stepAttemptCount = 0;
+
     for (;;) {
       statePool?.state0.set(statePool.state1);
 
@@ -333,6 +338,22 @@ export class MNAEngine implements AnalogEngine {
 
       // ngspice dctran.c:731 — advance simTime at top of each iteration.
       this._simTime += dt;
+
+      // --- Phase hook: begin attempt ---
+      if (this.stepPhaseHook) {
+        let attemptPhase: "tranInit" | "tranNR" | "tranNrRetry" | "tranLteRetry";
+        if (this._stepCount === 0 && _stepAttemptCount === 0) {
+          attemptPhase = "tranInit";
+        } else if (_stepAttemptCount === 0) {
+          attemptPhase = "tranNR";
+        } else {
+          // Retry: we can't distinguish NR retry from LTE retry here; mark generic retry.
+          // The actual outcome is set by the NR/LTE exit paths below.
+          attemptPhase = "tranNrRetry";
+        }
+        this.stepPhaseHook.onAttemptBegin(attemptPhase, dt);
+      }
+      _stepAttemptCount++;
 
       // --- Companion stamp (ngspice dctran.c:736 NIcomCof) ---
       // Always called, including step 0. ngspice recomputes ag[] to real values
@@ -389,6 +410,7 @@ export class MNAEngine implements AnalogEngine {
 
       if (!nrResult.converged) {
         // --- NR FAILED (ngspice dctran.c:793-810) ---
+        this.stepPhaseHook?.onAttemptEnd("nrFailedRetry", false);
         this._simTime -= dt;                              // ngspice dctran.c:796
         this._voltages.set(this._prevVoltages);
         dt = dt / 8;                                    // ngspice dctran.c:802
@@ -430,10 +452,12 @@ export class MNAEngine implements AnalogEngine {
 
         if (!this._timestep.shouldReject(worstRatio)) {
           // --- LTE ACCEPTED (ngspice dctran.c:862-912) ---
+          this.stepPhaseHook?.onAttemptEnd("accepted", true);
           break;  // exit the for(;;) — proceed to acceptance block
         }
 
         // --- LTE REJECTED (ngspice dctran.c:917-931) ---
+        this.stepPhaseHook?.onAttemptEnd("lteRejectedRetry", true);
         this._simTime -= dt;                            // ngspice dctran.c:920
         if (logging) stepRec!.lteRejected = true;
 
@@ -451,6 +475,7 @@ export class MNAEngine implements AnalogEngine {
           this._timestep.currentDt = dt;
         } else {
           // Second consecutive delmin — give up (ngspice dctran.c:941-943)
+          this.stepPhaseHook?.onAttemptEnd("finalFailure", false);
           this._diagnostics.emit(
             makeDiagnostic("convergence-failed", "error",
               "Timestep too small", {
@@ -648,6 +673,7 @@ export class MNAEngine implements AnalogEngine {
       }
     }
 
+    const phaseHook = this.stepPhaseHook;
     const result = solveDcOperatingPoint({
       solver: this._solver,
       elements,
@@ -659,6 +685,8 @@ export class MNAEngine implements AnalogEngine {
       postIterationHook: this.postIterationHook ?? undefined,
       detailedConvergence: this.detailedConvergence,
       limitingCollector: this.limitingCollector,
+      onPhaseBegin: phaseHook ? (phase, param) => phaseHook.onAttemptBegin(phase, param ?? 0) : undefined,
+      onPhaseEnd: phaseHook ? (outcome, converged) => phaseHook.onAttemptEnd(outcome, converged) : undefined,
     });
 
     if (result.converged) {
@@ -897,6 +925,20 @@ export class MNAEngine implements AnalogEngine {
 
   /** When non-null, elements push LimitingEvent objects here during NR iterations. */
   limitingCollector: LimitingEvent[] | null = null;
+
+  /**
+   * Optional phase-aware hook for harness instrumentation of step() attempts.
+   * Called before each NR attempt (onAttemptBegin) and after each attempt
+   * (onAttemptEnd) inside the transient retry loop.
+   *
+   * Also wired into dcOperatingPoint() via onPhaseBegin/onPhaseEnd on
+   * DcOpOptions, so boot-step DCOP sub-solves are captured into the same
+   * session as the first transient solve.
+   */
+  stepPhaseHook: {
+    onAttemptBegin(phase: DcOpNRPhase | "tranInit" | "tranNR" | "tranNrRetry" | "tranLteRetry", dt: number): void;
+    onAttemptEnd(outcome: DcOpNRAttemptOutcome | "accepted" | "nrFailedRetry" | "lteRejectedRetry" | "finalFailure", converged: boolean): void;
+  } | null = null;
 
   // -------------------------------------------------------------------------
   // AnalogEngine interface — Breakpoints

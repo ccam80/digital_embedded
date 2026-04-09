@@ -44,10 +44,14 @@ import { parseTestData } from '../testing/parser.js';
 import { executeTests } from '../testing/executor.js';
 import { DefaultSimulationCoordinator } from '../solver/coordinator.js';
 import { NullSimulationCoordinator } from '../solver/null-coordinator.js';
+import type { MNAEngine } from '../solver/analog/analog-engine.js';
 
 // ---------------------------------------------------------------------------
 // Step options — facade-specific, not on the SimulatorFacade interface
 // ---------------------------------------------------------------------------
+
+/** Phase-aware capture hook — installed on MNAEngine before compile() fires DCOP. */
+type CaptureHook = MNAEngine["stepPhaseHook"];
 
 interface StepOptions {
   /** When false, clocks are not advanced before the engine step. Default: true. */
@@ -66,6 +70,8 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // Active session state (reset on each compile())
   private _circuit: Circuit | null = null;
   private _coordinator: SimulationCoordinator = new NullSimulationCoordinator();
+  /** Optional capture hook installed on MNAEngine before compile() fires DCOP. */
+  private _captureHook: CaptureHook = null;
 
   constructor(registry: ComponentRegistry) {
     this._registry = registry;
@@ -101,6 +107,18 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
   // Compilation (F2: fresh engine per compile)
   // =========================================================================
 
+  /**
+   * Install a phase-aware capture hook that will be active during the
+   * in-compile DCOP solve. Must be called BEFORE compile().
+   *
+   * This satisfies spec §4.3 / D1: hook-before-compile, not defer-DCOP.
+   * The hook fires during the DCOP inside compile(), so the boot step
+   * is captured without a second DCOP re-run.
+   */
+  setCaptureHook(hook: CaptureHook): void {
+    this._captureHook = hook;
+  }
+
   compile(circuit: Circuit): SimulationCoordinator {
     this._disposeCurrentEngine();
 
@@ -108,7 +126,7 @@ export class DefaultSimulatorFacade implements SimulatorFacade {
     this._coordinator = new NullSimulationCoordinator();
 
     const unified = compileUnified(circuit, this._registry);
-    const coordinator = new DefaultSimulationCoordinator(unified, this._registry);
+    const coordinator = new DefaultSimulationCoordinator(unified, this._registry, this._captureHook ?? undefined);
     this._coordinator = coordinator;
     this._circuit = circuit;
 

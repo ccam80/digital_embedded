@@ -121,8 +121,16 @@ function buildHwrSession(): { session: TestableComparisonSession; topology: Topo
 
   const stepCapture = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
   engine.postIterationHook = stepCapture.hook;
+  // Wire phase hook so beginAttempt/endAttempt fire around DCOP phases
+  engine.stepPhaseHook = {
+    onAttemptBegin(phase: string, dt: number) { stepCapture.beginAttempt(phase as any, dt); },
+    onAttemptEnd(outcome: string, converged: boolean) { stepCapture.endAttempt(outcome as any, converged); },
+  };
+  stepCapture.setStepStartTime(0);
   engine.dcOperatingPoint();
-  stepCapture.finalizeStep(0, 0, true, ZERO_INTEG_COEFF, "dcop");
+  stepCapture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1 });
+  engine.stepPhaseHook = null;
+  engine.postIterationHook = undefined;
 
   const ourSession: CaptureSession = {
     source: "ours",
