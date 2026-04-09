@@ -1,10 +1,10 @@
 {
   "summary": {
-    "passed": 8203,
-    "failed": 6,
+    "passed": 8201,
+    "failed": 5,
     "skipped": 0,
     "totalFiles": 353,
-    "durationSeconds": 13.5
+    "durationSeconds": 13.9
   },
   "failures": [
     {
@@ -57,14 +57,8 @@
     },
     {
       "message": "Unexpected Null value for variable, expected external or TypedArray",
-      "count": 2,
+      "count": 1,
       "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
-          "test": "step 0 and step 1 iteration-by-iteration",
-          "line": 285,
-          "column": 25
-        },
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
           "test": "loads DLL and runs voltage divider DC OP",
