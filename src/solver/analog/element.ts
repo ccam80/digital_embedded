@@ -278,6 +278,15 @@ export interface AnalogElement {
   label?: string;
 
   /**
+   * Element index in the compiled circuit's element array.
+   *
+   * Set by the compiler after factory construction via Object.assign.
+   * Used by elements when pushing LimitingEvent records so the harness
+   * can correlate events back to specific circuit elements.
+   */
+  elementIndex?: number;
+
+  /**
    * Return simulation times within (tStart, tEnd) at which this element has
    * a discontinuity (e.g. a square-wave edge, a PWL corner).
    *

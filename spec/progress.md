@@ -163,3 +163,23 @@
 - **Files created**: (none)
 - **Files modified**: `scripts/mcp/harness-tools.ts`, `scripts/mcp/__tests__/harness-tools.test.ts`
 - **Tests**: 63/63 passing (harness-tools.test.ts); full suite 5 pre-existing failures unchanged
+
+## Task C-Items-8-9: C-side Items 8 and 9 in ngspice fork
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `ref/ngspice/src/maths/ni/niiter.c` — Added limiting event collector (globals, ni_limit_record, ni_limit_reset, ni_get_dev_index), device-index map (ni_dev_map built during ni_send_topology), ni_convTestAll static function (replicates BJT/DIO/MOS1 convergence checks without short-circuit), instrumentation block populates devConvFailed/devConvCount and all limit* fields, ni_limit_reset called before each CKTload, added const.h include
+  - `ref/ngspice/src/spicelib/devices/bjt/bjtload.c` — Instrumented 3 DEVpnjlim calls (VBE junction=1, VBC junction=2, Vsub junction=8) with ni_limit_record
+  - `ref/ngspice/src/spicelib/devices/dio/dioload.c` — Instrumented 2 DEVpnjlim call paths (breakdown and normal, both junction=0) with ni_limit_record
+  - `ref/ngspice/src/spicelib/devices/mos1/mos1load.c` — Instrumented DEVfetlim (GS=3, GD=5), DEVlimvds (DS=4), DEVpnjlim (BS=6, BD=7) with ni_limit_record
+  - `ref/ngspice/src/spicelib/devices/jfet/jfetload.c` — Instrumented DEVpnjlim (GS=3, GD=5) and DEVfetlim (GS=3, GD=5) with ni_limit_record
+- **Tests**: 0/0 (C source files — no automated test infrastructure; JS bridge already decodes these fields)
+- **Junction ID mapping verified against JUNCTION_ID_MAP in ngspice-bridge.ts**: 0=AK, 1=BE, 2=BC, 3=GS, 4=DS, 5=GD, 6=BS, 7=BD, 8=CS
+
+## Task mcp-verification-test: Write harness-mcp-verification.test.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: scripts/mcp/__tests__/harness-mcp-verification.test.ts
+- **Files modified**: (none)
+- **Tests**: 20/20 passing

@@ -68,26 +68,11 @@ export function registerHarnessTools(
     {
       title: "Start Comparison Session",
       description:
-        "Load a .dts circuit file and a .cir SPICE netlist, initialize both " +
-        "engines, and return a handle for subsequent tool calls. The session " +
-        "captures topology information immediately on init. Analysis is deferred " +
-        "until harness_run.",
+        "Load a .dts circuit file, initialize both engines (ours + ngspice), " +
+        "and return a handle for subsequent tool calls. The SPICE netlist is " +
+        "auto-generated from the compiled circuit. Analysis is deferred until harness_run.",
       inputSchema: z.object({
         dtsPath: z.string().describe("Absolute path to the .dts circuit file"),
-        cirPath: z
-          .string()
-          .optional()
-          .describe(
-            "Absolute path to the .cir SPICE netlist. " +
-              "Required unless autoGenerate is true.",
-          ),
-        autoGenerate: z
-          .boolean()
-          .optional()
-          .describe(
-            "When true, derive the .cir path by replacing the .dts extension with .cir " +
-              "and looking in the same directory. Ignored if cirPath is provided.",
-          ),
         dllPath: z
           .string()
           .optional()
@@ -143,28 +128,6 @@ export function registerHarnessTools(
         throw new Error(`harness_start: file not found: ${args.dtsPath}`);
       }
 
-      // Resolve cirPath
-      let cirPath: string;
-      if (args.cirPath) {
-        const resolvedCir = resolve(args.cirPath);
-        if (!existsSync(resolvedCir)) {
-          throw new Error(`harness_start: file not found: ${args.cirPath}`);
-        }
-        cirPath = args.cirPath;
-      } else if (args.autoGenerate) {
-        const autoCirPath = dtsPath.replace(/\.dts$/i, ".cir");
-        if (!existsSync(autoCirPath)) {
-          throw new Error(
-            `harness_start: auto-generated cir path not found: ${autoCirPath}`,
-          );
-        }
-        cirPath = autoCirPath;
-      } else {
-        throw new Error(
-          "harness_start: cirPath required or set autoGenerate: true",
-        );
-      }
-
       // Validate dllPath if provided
       if (args.dllPath && !existsSync(resolve(args.dllPath))) {
         throw new Error(
@@ -174,7 +137,6 @@ export function registerHarnessTools(
 
       const session = new ComparisonSession({
         dtsPath: args.dtsPath,
-        cirPath,
         dllPath: args.dllPath,
         tolerance: args.tolerance,
         maxOurSteps: args.maxOurSteps,
@@ -191,7 +153,6 @@ export function registerHarnessTools(
       const handle = harnessState.store({
         session,
         dtsPath: args.dtsPath,
-        cirPath,
         createdAt: new Date(),
         lastRunAt: null,
         analysis: null,
@@ -242,7 +203,6 @@ export function registerHarnessTools(
         handle,
         status: "ready",
         dtsPath: args.dtsPath,
-        cirPath,
         topology: {
           matrixSize: topology.matrixSize,
           nodeCount: topology.nodeCount,
@@ -596,7 +556,8 @@ export function registerHarnessTools(
           label: e.label,
           deviceType: e.deviceType,
           converged: e.ourConverged,
-          noncon: e.ourConverged ? 0 : 1,
+          noncon: (e as any).noncon ?? (e.ourConverged ? 0 : 1),
+          worstSlot: e.worstSlot,
           worstDelta: e.worstDelta !== undefined ? formatNumber(e.worstDelta) : undefined,
         }));
         return JSON.stringify({
@@ -617,7 +578,8 @@ export function registerHarnessTools(
           label: e.label,
           deviceType: e.deviceType,
           converged: e.ourConverged,
-          noncon: e.ourConverged ? 0 : 1,
+          noncon: (e as any).noncon ?? (e.ourConverged ? 0 : 1),
+          worstSlot: e.worstSlot,
           worstDelta: e.worstDelta !== undefined ? formatNumber(e.worstDelta) : undefined,
         }));
         return JSON.stringify({
@@ -637,7 +599,7 @@ export function registerHarnessTools(
         // getStateHistory returns a snapshot at a single iteration; reformat as iterations array
         const slots = Object.keys(report.state0);
         const filteredSlots = args.slots
-          ? slots.filter((s) => args.slots!.some((pat) => new RegExp("^" + pat.replace(/\*/g, ".*") + "$").test(s)))
+          ? slots.filter((s) => args.slots!.some((pat) => new RegExp("^" + pat.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$", "i").test(s)))
           : slots;
         const iterations = [{
           iteration: report.iteration,
@@ -689,7 +651,7 @@ export function registerHarnessTools(
             method: report.ngspice.method,
             order: report.ngspice.order,
           },
-          cktMode: 0,
+          cktMode: (session as any)._ourSession?.steps[args.step]?.cktMode ?? 0,
           ag0Compared: formatComparedValue(report.ag0Compared),
           ag1Compared: formatComparedValue(report.ag1Compared),
           methodMatch: report.methodMatch,
@@ -707,8 +669,20 @@ export function registerHarnessTools(
       // P7: step + iterations
       if (args.step !== undefined && args.iterations) {
         const iterReports = session.getIterations(args.step);
+        const rawOurStep = (session as any)._ourSession?.steps[args.step];
+        const ourTopology = (session as any)._ourTopology;
         const { items, total } = paginate(iterReports, 100);
-        const iterationData = items.map((r: any) => ({
+        const iterationData = items.map((r: any) => {
+          const rawIter = rawOurStep?.iterations[r.iteration];
+          const prevNodes: Record<string, any> = {};
+          if (rawIter?.prevVoltages && ourTopology?.nodeLabels) {
+            (ourTopology.nodeLabels as Map<number, string>).forEach((label, nodeId) => {
+              if (nodeId > 0 && nodeId - 1 < rawIter.prevVoltages.length) {
+                prevNodes[label] = formatNumber(rawIter.prevVoltages[nodeId - 1]);
+              }
+            });
+          }
+          return {
           stepIndex: r.stepIndex,
           iteration: r.iteration,
           simTime: formatNumber(r.simTime),
@@ -716,7 +690,7 @@ export function registerHarnessTools(
           nodes: Object.fromEntries(
             Object.entries(r.nodes).map(([k, v]) => [k, formatComparedValue(v as any)]),
           ),
-          prevNodes: {},
+          prevNodes,
           rhs: Object.fromEntries(
             Object.entries(r.rhs).map(([k, v]) => [k, formatComparedValue(v as any)]),
           ),
@@ -735,7 +709,8 @@ export function registerHarnessTools(
               ),
             ]),
           ),
-        }));
+          };
+        });
         return JSON.stringify({
           handle: args.handle,
           queryMode: "step-iterations",
@@ -960,7 +935,7 @@ export function registerHarnessTools(
         let entries: any[] = divergenceReport.entries;
         if (args.filter === "worst") {
           const n = args.worstN ?? 10;
-          entries = entries.slice(0, n);
+          entries = entries.slice().sort((a: any, b: any) => b.absDelta - a.absDelta).slice(0, n);
         }
         const { items, total } = paginate(entries, 100);
         const divergences = items.map((e: any) => ({
@@ -1027,6 +1002,13 @@ export function registerHarnessTools(
       if (args.step >= totalSteps) {
         throw new Error(
           `harness_compare_matrix: step ${args.step} out of range [0, ${totalSteps - 1}]. Run has ${totalSteps} steps.`,
+        );
+      }
+
+      const stepIterations: number = (session as any)._ourSession?.steps[args.step]?.iterations?.length ?? 0;
+      if (args.iteration >= stepIterations) {
+        throw new Error(
+          `harness_compare_matrix: iteration ${args.iteration} out of range [0, ${stepIterations - 1}] at step ${args.step}`,
         );
       }
 
@@ -1167,7 +1149,6 @@ export function registerHarnessTools(
         handle: args.handle,
         exportedAt: new Date().toISOString(),
         dtsPath: entry.dtsPath,
-        cirPath: entry.cirPath,
         analysis: entry.analysis,
         summary: serializeSummary(summary),
         topology: { components, nodes },

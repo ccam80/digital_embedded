@@ -31,6 +31,7 @@ import type { ReactiveAnalogElementCore, IntegrationMethod } from "../../solver/
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -200,7 +201,7 @@ export function createVaractorElement(
       stampRHS(solver, nodeCathode, ieq);
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): void {
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;
@@ -210,6 +211,18 @@ export function createVaractorElement(
       const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
       const vdLimited = vdResult.value;
       pnjlimLimited = vdResult.limited;
+
+      if (limitingCollector) {
+        limitingCollector.push({
+          elementIndex: (this as any).elementIndex ?? -1,
+          label: (this as any).label ?? "",
+          junction: "AK",
+          limitType: "pnjlim",
+          vBefore: vdRaw,
+          vAfter: vdLimited,
+          wasLimited: pnjlimLimited,
+        });
+      }
 
       s0[base + SLOT_VD] = vdLimited;
 

@@ -24,7 +24,7 @@ describeIfDll("ComparisonSession — buckbjt smoke test", () => {
   it("transient: CCAP in capacitor and BJT junctions over first steps/retries", async () => {
     const session = new ComparisonSession({
       dtsPath: "fixtures/buckbjt.dts",
-      cirPath: "e2e/spice-ref/buckbjt.cir",
+
       dllPath: DLL_PATH,
       maxOurSteps: 20,
     });
@@ -85,7 +85,7 @@ describeIfDll("ComparisonSession — buckbjt smoke test", () => {
   it("transient: inductor current divergence over iterations in step 1", async () => {
     const session = new ComparisonSession({
       dtsPath: "fixtures/buckbjt.dts",
-      cirPath: "e2e/spice-ref/buckbjt.cir",
+
       dllPath: DLL_PATH,
       maxOurSteps: 20,
     });
@@ -137,7 +137,7 @@ describeIfDll("ComparisonSession — buckbjt smoke test", () => {
   it("transient: PNP BJT internal node agreement in step 1", async () => {
     const session = new ComparisonSession({
       dtsPath: "fixtures/buckbjt.dts",
-      cirPath: "e2e/spice-ref/buckbjt.cir",
+
       dllPath: DLL_PATH,
       maxOurSteps: 20,
     });

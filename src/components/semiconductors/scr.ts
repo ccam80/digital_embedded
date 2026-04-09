@@ -32,6 +32,7 @@ import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { VT } from "../../core/constants.js";
@@ -255,7 +256,7 @@ export function createScrElement(
       stampRHS(solver, nodeK, gGateIeq);
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
+    updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
       const vGateNode = nodeG > 0 ? voltages[nodeG - 1] : 0;
@@ -276,6 +277,27 @@ export function createScrElement(
       const vgkResult = pnjlim(vgkRaw, s0[base + SLOT_VGK], nVt, vcritGate);
       const vgkLimited = vgkResult.value;
       pnjlimLimited = vakResult.limited || vgkResult.limited;
+
+      if (limitingCollector) {
+        limitingCollector.push({
+          elementIndex: (this as any).elementIndex ?? -1,
+          label: (this as any).label ?? "",
+          junction: "AK",
+          limitType: "pnjlim",
+          vBefore: vakRaw,
+          vAfter: vakLimited,
+          wasLimited: vakResult.limited,
+        });
+        limitingCollector.push({
+          elementIndex: (this as any).elementIndex ?? -1,
+          label: (this as any).label ?? "",
+          junction: "GK",
+          limitType: "pnjlim",
+          vBefore: vgkRaw,
+          vAfter: vgkLimited,
+          wasLimited: vgkResult.limited,
+        });
+      }
 
       s0[base + SLOT_VAK] = vakLimited;
       s0[base + SLOT_VGK] = vgkLimited;

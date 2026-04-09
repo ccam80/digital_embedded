@@ -25,6 +25,7 @@ import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { VT } from "../../core/constants.js";
 import { createDiodeElement, getDiodeInternalNodeCount } from "./diode.js";
@@ -155,7 +156,7 @@ export function createZenerElement(
       stampRHS(solver, nodeCathode, ieq);
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+    updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): void {
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
@@ -169,6 +170,18 @@ export function createZenerElement(
       const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
       const vdLimited = vdResult.value;
       pnjlimLimited = vdResult.limited;
+
+      if (limitingCollector) {
+        limitingCollector.push({
+          elementIndex: (this as any).elementIndex ?? -1,
+          label: (this as any).label ?? "",
+          junction: "AK",
+          limitType: "pnjlim",
+          vBefore: vdRaw,
+          vAfter: vdLimited,
+          wasLimited: pnjlimLimited,
+        });
+      }
 
       s0[base + SLOT_VD] = vdLimited;
 

@@ -33,6 +33,7 @@ import type { IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams, deviceParams } from "../../core/model-params.js";
 import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
@@ -773,7 +774,7 @@ export function createBjtElement(
       stampRHS(solver, nodeE, m * -polarity * ieNorton);
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
+    updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
       // Read node voltages
       const vC = nodeC > 0 ? voltages[nodeC - 1] : 0;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
@@ -794,6 +795,27 @@ export function createBjtElement(
       const vbcResult = pnjlim(vbcRaw, s0[base + SLOT_VBC], tp.vt, vcritBC);
       const vbcLimited = vbcResult.value;
       icheckLimited = vbeLimFlag || vbcResult.limited;
+
+      if (limitingCollector) {
+        limitingCollector.push({
+          elementIndex: (this as any).elementIndex ?? -1,
+          label: (this as any).label ?? "",
+          junction: "BE",
+          limitType: "pnjlim",
+          vBefore: vbeRaw,
+          vAfter: vbeLimited,
+          wasLimited: vbeLimFlag,
+        });
+        limitingCollector.push({
+          elementIndex: (this as any).elementIndex ?? -1,
+          label: (this as any).label ?? "",
+          junction: "BC",
+          limitType: "pnjlim",
+          vBefore: vbcRaw,
+          vAfter: vbcLimited,
+          wasLimited: vbcResult.limited,
+        });
+      }
 
       s0[base + SLOT_VBE] = vbeLimited;
       s0[base + SLOT_VBC] = vbcLimited;
@@ -1388,7 +1410,7 @@ export function createSpiceL1BjtElement(
       }
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
+    updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
       // Read internal node voltages
       const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
@@ -1407,6 +1429,28 @@ export function createSpiceL1BjtElement(
       const vbcResult = pnjlim(vbcRaw, s0[base + L1_SLOT_VBC], tpL1.vt, vcritBC);
       const vbcLimited = vbcResult.value;
       icheckLimited = vbeLimFlag || vbcResult.limited;
+
+      if (limitingCollector) {
+        limitingCollector.push({
+          elementIndex: (this as any).elementIndex ?? -1,
+          label: (this as any).label ?? "",
+          junction: "BE",
+          limitType: "pnjlim",
+          vBefore: vbeRaw,
+          vAfter: vbeLimited,
+          wasLimited: vbeLimFlag,
+        });
+        limitingCollector.push({
+          elementIndex: (this as any).elementIndex ?? -1,
+          label: (this as any).label ?? "",
+          junction: "BC",
+          limitType: "pnjlim",
+          vBefore: vbcRaw,
+          vAfter: vbcLimited,
+          wasLimited: vbcResult.limited,
+        });
+      }
+
       // Save limited voltages to pool
       s0[base + L1_SLOT_VBE] = vbeLimited;
       s0[base + L1_SLOT_VBC] = vbcLimited;

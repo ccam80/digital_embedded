@@ -132,7 +132,6 @@ function buildHwrSession(): { session: TestableComparisonSession; topology: Topo
 
   const session = new TestableComparisonSession({
     dtsPath: "fixtures/buckbjt.dts",
-    cirPath: "e2e/spice-ref/buckbjt.cir",
   });
   session.setTestSession(ourSession, ourSession, topology, engine, []);
   return { session, topology };

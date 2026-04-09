@@ -211,6 +211,8 @@ export const FET_BASE_SCHEMA: StateSchema = defineStateSchema("AbstractFetElemen
  */
 export abstract class AbstractFetElement implements AnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
+  label?: string;        // set by compiler via Object.assign after factory returns
+  elementIndex?: number; // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
   readonly isReactive: boolean;

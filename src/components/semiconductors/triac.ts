@@ -35,6 +35,7 @@ import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { VT } from "../../core/constants.js";
@@ -290,7 +291,7 @@ export function createTriacElement(
       stampRHS(solver, nodeMT1, gGateIeq);
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
+    updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
       const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
       const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
       const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;
@@ -305,6 +306,27 @@ export function createTriacElement(
       const vg1Result = pnjlim(vg1Raw, s0[base + SLOT_VGK], nVt, vcritGate);
       const vg1Limited = vg1Result.value;
       pnjlimLimited = vmtResult.limited || vg1Result.limited;
+
+      if (limitingCollector) {
+        limitingCollector.push({
+          elementIndex: (this as any).elementIndex ?? -1,
+          label: (this as any).label ?? "",
+          junction: "MT2-MT1",
+          limitType: "pnjlim",
+          vBefore: vmtRaw,
+          vAfter: vmtLimited,
+          wasLimited: vmtResult.limited,
+        });
+        limitingCollector.push({
+          elementIndex: (this as any).elementIndex ?? -1,
+          label: (this as any).label ?? "",
+          junction: "G-MT1",
+          limitType: "pnjlim",
+          vBefore: vg1Raw,
+          vAfter: vg1Limited,
+          wasLimited: vg1Result.limited,
+        });
+      }
 
       s0[base + SLOT_VAK] = vmtLimited;
       s0[base + SLOT_VGK] = vg1Limited;

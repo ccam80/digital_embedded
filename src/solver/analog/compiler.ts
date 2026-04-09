@@ -1201,15 +1201,15 @@ export function compileAnalogPartition(
     const analogFactory = activeModel.factory;
     if (!analogFactory) continue;
     const core = analogFactory(pinNodes, internalNodeIds, absoluteBranchIdx, props, getTime);
+    const elementIndex = analogElements.length;
     const element: import("./element.js").AnalogElement = Object.assign(core, {
       pinNodeIds: pinNodeIds,
       allNodeIds: [...pinNodeIds, ...internalNodeIds],
       label: el.getProperties().has("label")
         ? String(el.getProperties().get("label") ?? el.instanceId)
         : el.instanceId,
+      elementIndex,
     });
-
-    const elementIndex = analogElements.length;
     analogElements.push(element);
     elementToCircuitElement.set(elementIndex, el);
     elementPinVertices.set(elementIndex, pinVertices);

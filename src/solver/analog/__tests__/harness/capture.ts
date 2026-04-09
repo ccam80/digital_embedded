@@ -101,51 +101,28 @@ export function captureTopology(
 ): TopologySnapshot {
   const nodeLabels = new Map<number, string>();
 
-  // Strategy 1: Rich labels from labelPinNodes
-  if (compiled.labelPinNodes?.size) {
-    const perNode = new Map<number, string[]>();
-    for (const [compLabel, pins] of compiled.labelPinNodes) {
-      for (const { pinLabel, nodeId } of pins) {
-        if (nodeId === 0) continue;
-        const tag = `${compLabel}:${pinLabel}`;
-        const existing = perNode.get(nodeId);
-        if (existing) existing.push(tag);
-        else perNode.set(nodeId, [tag]);
+  // Build node labels from elementResolvedPins (has real pin labels for all elements)
+  // Falls back to pin index when resolvedPins unavailable.
+  const perNode = new Map<number, string[]>();
+  for (let i = 0; i < compiled.elements.length; i++) {
+    const el = compiled.elements[i];
+    const elLabel = elementLabels?.get(i) ?? `element_${i}`;
+    const resolvedPins = compiled.elementResolvedPins?.get(i);
+    for (let p = 0; p < el.pinNodeIds.length; p++) {
+      const nodeId = el.pinNodeIds[p];
+      if (nodeId === 0) continue;
+      const pinLabel = resolvedPins?.[p]?.label ?? `p${p}`;
+      const tag = `${elLabel}:${pinLabel}`;
+      const existing = perNode.get(nodeId);
+      if (existing) {
+        if (existing.length < 3) existing.push(tag);
+      } else {
+        perNode.set(nodeId, [tag]);
       }
     }
-    for (const [nodeId, tags] of perNode) {
-      nodeLabels.set(nodeId, tags.join("/"));
-    }
   }
-
-  // Strategy 2: Bare component labels from labelToNodeId
-  if (nodeLabels.size === 0 && compiled.labelToNodeId.size > 0) {
-    for (const [label, nodeId] of compiled.labelToNodeId) {
-      nodeLabels.set(nodeId, label);
-    }
-  }
-
-  // Strategy 3: Reverse-map from elements array (always works)
-  if (nodeLabels.size === 0) {
-    const perNode = new Map<number, string[]>();
-    for (let i = 0; i < compiled.elements.length; i++) {
-      const el = compiled.elements[i];
-      const elLabel = elementLabels?.get(i) ?? `element_${i}`;
-      for (let p = 0; p < el.pinNodeIds.length; p++) {
-        const nodeId = el.pinNodeIds[p];
-        if (nodeId === 0) continue;
-        const tag = `${elLabel}:p${p}`;
-        const existing = perNode.get(nodeId);
-        if (existing) {
-          if (existing.length < 3) existing.push(tag); // cap to avoid huge labels
-        } else {
-          perNode.set(nodeId, [tag]);
-        }
-      }
-    }
-    for (const [nodeId, tags] of perNode) {
-      nodeLabels.set(nodeId, tags.join("/"));
-    }
+  for (const [nodeId, tags] of perNode) {
+    nodeLabels.set(nodeId, tags.join("/"));
   }
 
   // Build matrix row/col label maps
@@ -302,8 +279,9 @@ export function createIterationCaptureHook(
       noncon,
       globalConverged,
       elemConverged,
-      limitingEvents,
+      limitingEvents: [...limitingEvents],
       convergenceFailedElements,
+      ngspiceConvergenceFailedDevices: [],
     });
   };
 
@@ -345,6 +323,8 @@ export function createStepCaptureHook(
     integrationCoefficients: IntegrationCoefficients,
     analysisPhase: "dcop" | "tranInit" | "tranFloat",
   ) => void;
+  /** Read current iteration snapshots without consuming them. */
+  peekIterations: () => readonly IterationSnapshot[];
   getSteps: () => StepSnapshot[];
   clear: () => void;
 } {
@@ -354,6 +334,7 @@ export function createStepCaptureHook(
 
   return {
     hook: iterCapture.hook,
+    peekIterations: () => iterCapture.getSnapshots(),
 
     /**
      * Finalize a failed NR attempt (timestep will be cut and retried).
@@ -394,7 +375,7 @@ export function createStepCaptureHook(
 
         const allAttempts = pendingAttempts.length > 0
           ? [...pendingAttempts, acceptedAttempt]
-          : undefined; // omit if no retries (backward compat)
+          : undefined;
 
         steps.push({
           simTime,
@@ -402,7 +383,7 @@ export function createStepCaptureHook(
           iterations: acceptedAttempt.iterations,
           converged,
           iterationCount: acceptedAttempt.iterationCount,
-          attempts: allAttempts,
+          ...(allAttempts !== undefined ? { attempts: allAttempts } : {}),
           integrationCoefficients,
           analysisPhase,
         });

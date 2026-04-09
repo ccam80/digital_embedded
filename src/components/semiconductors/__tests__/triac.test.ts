@@ -280,3 +280,45 @@ describe("Triac", () => {
     expect(TriacDefinition.category).toBe("SEMICONDUCTORS");
   });
 });
+
+describe("Triac LimitingEvent instrumentation", () => {
+  function makeElement() {
+    const params = { ...TRIAC_PARAM_DEFAULTS, vOn: 1.5, iH: 10e-3, rOn: 0.01, iS: 1e-12, alpha1: 0.5, alpha2_0: 0.3, i_ref: 1e-3, n: 1 };
+    const props = createTestPropertyBag();
+    props.replaceModelParams(params);
+    const core = createTriacElement(new Map([["MT2", 1], ["MT1", 2], ["G", 3]]), [], -1, props);
+    const { pool } = withState(core);
+    const element = core as ReactiveAnalogElement & { elementIndex?: number; label?: string };
+    element.elementIndex = 7;
+    element.label = "T1";
+    return { element, pool };
+  }
+
+  it("pushes MT2-MT1 and G-MT1 events on each updateOperatingPoint call", () => {
+    const { element } = makeElement();
+    const collector: import("../../../solver/analog/newton-raphson.js").LimitingEvent[] = [];
+    const voltages = new Float64Array([0, 5, 1]);
+    element.updateOperatingPoint!(voltages, collector);
+    const junctions = collector.map((e) => e.junction);
+    expect(junctions).toContain("MT2-MT1");
+    expect(junctions).toContain("G-MT1");
+  });
+
+  it("events carry correct elementIndex and label", () => {
+    const { element } = makeElement();
+    const collector: import("../../../solver/analog/newton-raphson.js").LimitingEvent[] = [];
+    const voltages = new Float64Array([0, 5, 1]);
+    element.updateOperatingPoint!(voltages, collector);
+    for (const ev of collector) {
+      expect(ev.elementIndex).toBe(7);
+      expect(ev.label).toBe("T1");
+      expect(ev.limitType).toBe("pnjlim");
+    }
+  });
+
+  it("does not push events when limitingCollector is null", () => {
+    const { element } = makeElement();
+    const voltages = new Float64Array([0, 5, 1]);
+    expect(() => element.updateOperatingPoint!(voltages, null)).not.toThrow();
+  });
+});

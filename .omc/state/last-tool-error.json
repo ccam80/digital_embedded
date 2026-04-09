@@ -1,7 +1,7 @@
 {
   "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\docs\\\\specs\\\\harness-stream2-mcp-tooling.md\"}",
-  "error": "File content (16912 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
-  "timestamp": "2026-04-09T01:15:29.051Z",
+  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\ref\\\\ngspice\\\\src\\\\spicelib\\\\devices\\\\mos1\\\\mos1load.c\"}",
+  "error": "File content (13203 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-04-09T08:37:30.667Z",
   "retry_count": 1
 }

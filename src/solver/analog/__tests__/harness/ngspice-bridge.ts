@@ -113,7 +113,9 @@ export class NgspiceBridge {
    * Separated from constructor because koffi is an optional dependency.
    */
   async init(): Promise<void> {
-    const koffi = await import("koffi");
+    const koffiModule = await import("koffi");
+    // ESM dynamic import wraps CJS modules: load is on .default in ESM, top-level in CJS
+    const koffi = (koffiModule as any).default ?? koffiModule;
     this._koffi = koffi;
     this._lib = koffi.load(this._dllPath);
 
@@ -370,9 +372,7 @@ export class NgspiceBridge {
           simTime, dt, cktMode,
           ag0, ag1, integrateMethod, order,
           matrix,
-          ngspiceConvergenceFailedDevices: ngspiceConvergenceFailedDevices.length > 0
-            ? ngspiceConvergenceFailedDevices
-            : undefined,
+          ngspiceConvergenceFailedDevices: ngspiceConvergenceFailedDevices,
           limitingEvents: rawLimitingEvents,
         });
       },
@@ -488,6 +488,29 @@ export class NgspiceBridge {
         }
       }
 
+      // Derived slots — synthesize ngspice-side values for quantities ngspice
+      // does not store directly (Norton currents, 1/gx, etc.). Each derived
+      // entry writes into slots/state1Slots/state2Slots keyed by our slot
+      // name so the normal comparison path picks them up automatically.
+      if (mapping.derivedNgspiceSlots) {
+        for (const [slotName, derived] of Object.entries(mapping.derivedNgspiceSlots)) {
+          // Guard against devices whose state slice is out of range (shouldn't
+          // happen, but safeguards the ngspice-bridge against malformed topology).
+          const maxNeeded = derived.sourceOffsets.length === 0
+            ? 0
+            : Math.max(...derived.sourceOffsets);
+          if (dev.stateBase + maxNeeded < state0.length) {
+            slots[slotName] = derived.compute(state0, dev.stateBase);
+          }
+          if (dev.stateBase + maxNeeded < state1.length) {
+            state1Slots[slotName] = derived.compute(state1, dev.stateBase);
+          }
+          if (dev.stateBase + maxNeeded < state2.length) {
+            state2Slots[slotName] = derived.compute(state2, dev.stateBase);
+          }
+        }
+      }
+
       if (Object.keys(slots).length > 0) {
         snapshots.push({
           elementIndex: -1,
@@ -580,7 +603,7 @@ export class NgspiceBridge {
         elemConverged: raw.converged,
         limitingEvents,
         convergenceFailedElements: [],
-        ngspiceConvergenceFailedDevices: raw.ngspiceConvergenceFailedDevices,
+        ngspiceConvergenceFailedDevices: raw.ngspiceConvergenceFailedDevices ?? [],
       };
 
       // Stash dt and source raw for step finalization

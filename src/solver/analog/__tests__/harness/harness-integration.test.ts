@@ -12,8 +12,8 @@ import { isPoolBacked } from "../../element.js";
 import { captureTopology, captureElementStates, createIterationCaptureHook, createStepCaptureHook } from "./capture.js";
 import { convergenceSummary, nodeVoltageTrajectory, findLargestDelta, querySteps } from "./query.js";
 import { compareSnapshots, formatComparison, findFirstDivergence } from "./compare.js";
-import { canonicalizeNgspiceName, canonicalizeOurLabel, buildNodeMapping } from "./node-mapping.js";
-import type { CaptureSession, NgspiceTopology, IntegrationCoefficients } from "./types.js";
+import { canonicalizeNgspiceName, canonicalizeOurLabel } from "./node-mapping.js";
+import type { CaptureSession, IntegrationCoefficients } from "./types.js";
 
 const ZERO_INTEG_COEFF: IntegrationCoefficients = {
   ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
@@ -240,9 +240,15 @@ describe("harness integration", () => {
     const mos = DEVICE_MAPPINGS.mosfet;
     expect(Object.keys(mos.slotToNgspice).length).toBeGreaterThan(0);
     expect(Object.keys(mos.ngspiceToSlot).length).toBeGreaterThan(0);
-    expect(mos.slotToNgspice["VGS"]).toBe(1);
-    expect(mos.slotToNgspice["Q_GS"]).toBe(4);
-    expect(mos.slotToNgspice["CCAP_GB"]).toBe(11);
+    // ngspice mos1defs.h: MOS1vbd=0, MOS1vbs=1, MOS1vgs=2, MOS1vds=3,
+    // MOS1capgs=4, MOS1qgs=5, MOS1cqgs=6, ..., MOS1cqgb=12.
+    expect(mos.slotToNgspice["VGS"]).toBe(2);
+    expect(mos.slotToNgspice["VDS"]).toBe(3);
+    expect(mos.slotToNgspice["Q_GS"]).toBe(5);
+    expect(mos.slotToNgspice["CCAP_GB"]).toBe(12);
+    // VSB is sign-inverted vs MOS1vbs — mapped via derivedNgspiceSlots, not direct.
+    expect(mos.slotToNgspice["VSB"]).toBeNull();
+    expect(mos.derivedNgspiceSlots?.VSB).toBeDefined();
   });
 
   it("DEVICE_MAPPINGS has JFET mapping with correct ngspice offsets", () => {
@@ -318,7 +324,6 @@ describe("harness integration", () => {
     capture.finalizeStep(0, 0, true, ZERO_INTEG_COEFF, "dcop");
     const steps = capture.getSteps();
     expect(steps.length).toBe(1);
-    // No retries → attempts should be undefined (backward compat)
     expect(steps[0].attempts).toBeUndefined();
   });
 
@@ -393,6 +398,7 @@ describe("time-alignment: compareSnapshots with alignment map", () => {
       elemConverged: true,
       limitingEvents: [],
       convergenceFailedElements: [],
+      ngspiceConvergenceFailedDevices: [],
     };
     return {
       simTime,
@@ -525,29 +531,4 @@ describe("node mapping", () => {
     expect(canonicalizeOurLabel("r1:a")).toBe("R1:A");
   });
 
-  it("buildNodeMapping matches nodes by canonical form", () => {
-    const ourTopology = {
-      matrixSize: 3, nodeCount: 2, branchCount: 1, elementCount: 2,
-      elements: [],
-      nodeLabels: new Map<number, string>([[1, "Q1:C"], [2, "Q1:B"]]),
-      matrixRowLabels: new Map<number, string>(),
-      matrixColLabels: new Map<number, string>(),
-    };
-    const ngTopology: NgspiceTopology = {
-      matrixSize: 3, numStates: 10,
-      nodeNames: new Map([["q1_c", 1], ["q1_b", 2]]),
-      devices: [{ name: "q1", typeName: "BJT", stateBase: 0, nodeIndices: [1, 2] }],
-    };
-
-    const mappings = buildNodeMapping(ourTopology, ngTopology);
-    expect(mappings.length).toBe(2);
-    const cMapping = mappings.find(m => m.label === "Q1:C");
-    expect(cMapping).toBeDefined();
-    expect(cMapping!.ourIndex).toBe(1);
-    expect(cMapping!.ngspiceIndex).toBe(1);
-    const bMapping = mappings.find(m => m.label === "Q1:B");
-    expect(bMapping).toBeDefined();
-    expect(bMapping!.ourIndex).toBe(2);
-    expect(bMapping!.ngspiceIndex).toBe(2);
-  });
 });

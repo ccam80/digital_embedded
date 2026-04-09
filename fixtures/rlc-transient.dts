@@ -1,0 +1,540 @@
+{
+  "circuit": {
+    "description": "Simple RLC circuit for harness verification",
+    "elements": [
+      {
+        "id": "b08a25bc-4a56-494d-9730-45d90e106076",
+        "position": {
+          "x": 0,
+          "y": 2
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 5
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "label": "VS",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "b31bb9b7-e141-4c4c-9c46-4a1723ff8303",
+        "position": {
+          "x": 12,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 100
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "label": "R1",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 100
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "8f1339a0-69f2-4ab7-b9d6-48d3e49d9009",
+        "position": {
+          "x": 24,
+          "y": 1
+        },
+        "properties": {
+          "_modelParams": {
+            "inductance": 0.001
+          },
+          "_pinElectrical": {
+            "A": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "B": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "inductance": 0.001,
+          "label": "L1",
+          "position": [
+            0,
+            16
+          ]
+        },
+        "rotation": 0,
+        "type": "Inductor"
+      },
+      {
+        "id": "4b414fb4-1264-4952-83f8-c730f02949d1",
+        "position": {
+          "x": 36,
+          "y": 0
+        },
+        "properties": {
+          "_modelParams": {
+            "capacitance": 1e-9
+          },
+          "_pinElectrical": {
+            "neg": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            },
+            "pos": {
+              "cIn": 5e-12,
+              "cOut": 5e-12,
+              "rHiZ": 10000000,
+              "rIn": 10000000,
+              "rOut": 50,
+              "vIH": 2,
+              "vIL": 0.8,
+              "vOH": 3.3,
+              "vOL": 0
+            }
+          },
+          "capacitance": 1e-9,
+          "label": "C1",
+          "position": [
+            0,
+            24
+          ]
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "9e982d7d-7b06-40a1-a068-719ec9e61a07",
+        "position": {
+          "x": 48,
+          "y": 2
+        },
+        "properties": {
+          "label": "gnd",
+          "position": [
+            0,
+            32
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "RLC transient",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 2
+          },
+          {
+            "x": 5,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 2
+          },
+          {
+            "x": 8,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 1
+          },
+          {
+            "x": 11,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 1
+          },
+          {
+            "x": 17,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 1
+          },
+          {
+            "x": 23,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 1
+          },
+          {
+            "x": 23,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 1
+          },
+          {
+            "x": 29,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 0
+          },
+          {
+            "x": 35,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 1
+          },
+          {
+            "x": 32,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 1
+          },
+          {
+            "x": 32,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 0
+          },
+          {
+            "x": 35,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 40,
+            "y": 0
+          },
+          {
+            "x": 41,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 2
+          },
+          {
+            "x": 48,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 41,
+            "y": 0
+          },
+          {
+            "x": 45,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 45,
+            "y": 0
+          },
+          {
+            "x": 45,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 45,
+            "y": 1
+          },
+          {
+            "x": 48,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 2
+          },
+          {
+            "x": -1,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 2
+          },
+          {
+            "x": 48,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 2
+          },
+          {
+            "x": -2,
+            "y": 2
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 2
+          },
+          {
+            "x": -2,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 5
+          },
+          {
+            "x": 12,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 5
+          },
+          {
+            "x": 24,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 5
+          },
+          {
+            "x": 36,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 5
+          },
+          {
+            "x": 42,
+            "y": 5
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 5
+          },
+          {
+            "x": 42,
+            "y": 1
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 1
+          },
+          {
+            "x": 48,
+            "y": 1
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

@@ -2,7 +2,14 @@
  * Tests for Item 5 (BJT companion current mapping) and Item 12 (netlist generator).
  */
 import { describe, it, expect } from "vitest";
-import { BJT_MAPPING, DEVICE_MAPPINGS } from "./device-mappings.js";
+import {
+  BJT_MAPPING,
+  DEVICE_MAPPINGS,
+  DIODE_MAPPING,
+  JFET_MAPPING,
+  TUNNEL_DIODE_MAPPING,
+  VARACTOR_MAPPING,
+} from "./device-mappings.js";
 import { generateSpiceNetlist } from "./netlist-generator.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import { PropertyBag } from "../../../../core/properties.js";
@@ -114,7 +121,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 2])],
       new Map([[0, new TestCircuitElement("Resistor", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "R1"]]))).toContain("RR1 1 2 4700");
+    expect(generateSpiceNetlist(compiled, new Map([[0, "R1"]]))).toContain("R1 1 2 4700");
   });
 
   it("capacitor: C prefix and value", () => {
@@ -124,7 +131,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("Capacitor", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "C1"]]))).toContain("CC1 1 0");
+    expect(generateSpiceNetlist(compiled, new Map([[0, "C1"]]))).toContain("C1 1 0");
   });
 
   it("inductor: L prefix and value", () => {
@@ -134,7 +141,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("Inductor", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "L1"]]))).toContain("LL1 1 0");
+    expect(generateSpiceNetlist(compiled, new Map([[0, "L1"]]))).toContain("L1 1 0");
   });
 
   it("DcVoltageSource: V prefix with DC keyword", () => {
@@ -144,7 +151,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("DcVoltageSource", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "V1"]]))).toContain("VV1 1 0 DC 5");
+    expect(generateSpiceNetlist(compiled, new Map([[0, "V1"]]))).toContain("V1 1 0 DC 5");
   });
 
   it("AcVoltageSource: DC and AC fields", () => {
@@ -155,7 +162,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("AcVoltageSource", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "VAC"]]))).toContain("VVAC 1 0 DC 0.5 AC 1.5");
+    expect(generateSpiceNetlist(compiled, new Map([[0, "VAC"]]))).toContain("VAC 1 0 DC 0.5 AC 1.5");
   });
 
   it("DcCurrentSource: I prefix with DC keyword", () => {
@@ -165,7 +172,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("DcCurrentSource", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "I1"]]))).toContain("II1 1 0 DC 0.01");
+    expect(generateSpiceNetlist(compiled, new Map([[0, "I1"]]))).toContain("I1 1 0 DC 0.01");
   });
 
   it("NpnBJT: Q prefix, 3 nodes, NPN model card with params", () => {
@@ -177,7 +184,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("NpnBJT", props)]]),
     );
     const r = generateSpiceNetlist(compiled, new Map([[0, "Q1"]]));
-    expect(r).toContain("QQ1 3 2 1 Q1_NPN");
+    expect(r).toContain("Q1 3 2 1 Q1_NPN");
     expect(r).toContain(".model Q1_NPN NPN");
     expect(r).toContain("BF=100");
     expect(r).toContain("IS=1e-14");
@@ -191,7 +198,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("PnpBJT", props)]]),
     );
     const r = generateSpiceNetlist(compiled, new Map([[0, "Q2"]]));
-    expect(r).toContain("QQ2 3 2 1 Q2_PNP");
+    expect(r).toContain("Q2 3 2 1 Q2_PNP");
     expect(r).toContain(".model Q2_PNP PNP");
   });
 
@@ -203,7 +210,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("Diode", props)]]),
     );
     const r = generateSpiceNetlist(compiled, new Map([[0, "D1"]]));
-    expect(r).toContain("DD1 2 0 D1_D");
+    expect(r).toContain("D1 2 0 D1_D");
     expect(r).toContain(".model D1_D D");
   });
 
@@ -216,7 +223,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("NMOS", props)]]),
     );
     const r = generateSpiceNetlist(compiled, new Map([[0, "M1"]]));
-    expect(r).toContain("MM1 3 2 1 0 M1_NMOS");
+    expect(r).toContain("M1 3 2 1 0 M1_NMOS");
     expect(r).toContain(".model M1_NMOS NMOS");
   });
 
@@ -228,7 +235,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("NJFET", props)]]),
     );
     const r = generateSpiceNetlist(compiled, new Map([[0, "J1"]]));
-    expect(r).toContain("JJ1 3 2 1 J1_NMF");
+    expect(r).toContain("J1 3 2 1 J1_NMF");
     expect(r).toContain(".model J1_NMF NMF");
   });
 
@@ -240,7 +247,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("PJFET", props)]]),
     );
     const r = generateSpiceNetlist(compiled, new Map([[0, "J2"]]));
-    expect(r).toContain("JJ2 3 2 1 J2_PMF");
+    expect(r).toContain("J2 3 2 1 J2_PMF");
     expect(r).toContain(".model J2_PMF PMF");
   });
 
@@ -251,7 +258,7 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("Resistor", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map())).toContain("Relement_0");
+    expect(generateSpiceNetlist(compiled, new Map())).toContain("element_0 1 0");
   });
 
   it("skips elements with no circuitElement entry", () => {
@@ -279,5 +286,166 @@ describe("generateSpiceNetlist", () => {
     const r = generateSpiceNetlist(compiled, new Map([[0, "D1"]]));
     expect(r).toContain(".model D1_D D");
     expect(r).not.toContain("(");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Derived ngspice slots — synthesize BJT quantities (RB_EFF, Norton currents)
+// from raw CKTstate so they can be compared against our engine.
+// ---------------------------------------------------------------------------
+
+describe("BJT_MAPPING.derivedNgspiceSlots", () => {
+  // Build a synthetic per-device state slice mimicking CKTstate0 layout.
+  // Offsets used by the formulas:
+  //   0 vbe, 1 vbc, 2 cc, 3 cb, 4 gpi, 5 gmu, 6 gm, 7 go, 16 gx, 18 geqcb
+  function makeState(overrides: Partial<Record<number, number>>): Float64Array {
+    const s = new Float64Array(21);
+    for (const [k, v] of Object.entries(overrides)) s[Number(k)] = v as number;
+    return s;
+  }
+
+  it("defines the four derived slots", () => {
+    const d = BJT_MAPPING.derivedNgspiceSlots!;
+    expect(d).toBeDefined();
+    expect(Object.keys(d).sort()).toEqual(["IB_NORTON", "IC_NORTON", "IE_NORTON", "RB_EFF"]);
+  });
+
+  it("RB_EFF = 1 / gx", () => {
+    const s = makeState({ 16: 0.01 }); // gx = 10 mS → rb = 100 Ω
+    expect(BJT_MAPPING.derivedNgspiceSlots!.RB_EFF.compute(s, 0)).toBeCloseTo(100, 10);
+  });
+
+  it("RB_EFF returns +Infinity when gx is zero", () => {
+    const s = makeState({});
+    expect(BJT_MAPPING.derivedNgspiceSlots!.RB_EFF.compute(s, 0)).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("IC_NORTON matches cc - (gm+go)*vbe + (gmu+go)*vbc", () => {
+    const s = makeState({
+      0: 0.7,    // vbe
+      1: -0.3,   // vbc
+      2: 1e-3,   // cc (ic)
+      5: 2e-6,   // gmu
+      6: 40e-3,  // gm
+      7: 1e-5,   // go
+    });
+    const expected = 1e-3 - (40e-3 + 1e-5) * 0.7 + (2e-6 + 1e-5) * -0.3;
+    expect(BJT_MAPPING.derivedNgspiceSlots!.IC_NORTON.compute(s, 0)).toBeCloseTo(expected, 15);
+  });
+
+  it("IB_NORTON matches cb - gpi*vbe - gmu*vbc - geqcb*vbc", () => {
+    const s = makeState({
+      0: 0.65,   // vbe
+      1: -0.4,   // vbc
+      3: 5e-6,   // cb (ib)
+      4: 5e-4,   // gpi
+      5: 1e-7,   // gmu
+      18: 1e-8,  // geqcb
+    });
+    const expected = 5e-6 - 5e-4 * 0.65 - 1e-7 * -0.4 - 1e-8 * -0.4;
+    expect(BJT_MAPPING.derivedNgspiceSlots!.IB_NORTON.compute(s, 0)).toBeCloseTo(expected, 15);
+  });
+
+  it("IE_NORTON matches -(cc+cb) + (gm+go+gpi)*vbe - (go-geqcb)*vbc", () => {
+    const s = makeState({
+      0: 0.68,
+      1: -0.2,
+      2: 2e-3,
+      3: 2e-5,
+      4: 5e-4,
+      6: 30e-3,
+      7: 2e-5,
+      18: 3e-9,
+    });
+    const expected = -(2e-3 + 2e-5)
+      + (30e-3 + 2e-5 + 5e-4) * 0.68
+      - (2e-5 - 3e-9) * -0.2;
+    expect(BJT_MAPPING.derivedNgspiceSlots!.IE_NORTON.compute(s, 0)).toBeCloseTo(expected, 14);
+  });
+
+  it("respects the base offset — reads from state[base+offset], not state[offset]", () => {
+    const s = new Float64Array(42);
+    // Write device 2's state starting at offset 21.
+    s[21 + 16] = 0.005; // gx
+    expect(BJT_MAPPING.derivedNgspiceSlots!.RB_EFF.compute(s, 21)).toBeCloseTo(200, 10);
+    // Device at base 0 has gx=0 so gets Infinity.
+    expect(BJT_MAPPING.derivedNgspiceSlots!.RB_EFF.compute(s, 0)).toBe(Number.POSITIVE_INFINITY);
+  });
+});
+
+describe("DIODE_MAPPING.derivedNgspiceSlots", () => {
+  // ngspice diode state layout (diodefs.h): 0 vd, 1 cd, 2 gd, 3 qcap, 4 ccap.
+  function makeDioState(vd: number, id: number, geq: number): Float64Array {
+    const s = new Float64Array(5);
+    s[0] = vd;
+    s[1] = id;
+    s[2] = geq;
+    return s;
+  }
+
+  it("defines IEQ", () => {
+    expect(DIODE_MAPPING.derivedNgspiceSlots).toBeDefined();
+    expect(Object.keys(DIODE_MAPPING.derivedNgspiceSlots!)).toEqual(["IEQ"]);
+  });
+
+  it("IEQ = ID - GEQ*VD (matches dioload.c cdeq = cd - gd*vd)", () => {
+    // Forward-biased silicon diode at typical operating point:
+    // vd = 0.65 V, id = 1 mA, gd ≈ id/Vt ≈ 1e-3/25.85e-3 ≈ 0.0387 S
+    const vd = 0.65;
+    const id = 1e-3;
+    const geq = id / 25.85e-3;
+    const s = makeDioState(vd, id, geq);
+    const expected = id - geq * vd;
+    expect(DIODE_MAPPING.derivedNgspiceSlots!.IEQ.compute(s, 0)).toBeCloseTo(expected, 15);
+  });
+
+  it("IEQ is zero when diode is at VD=0, ID=0", () => {
+    const s = makeDioState(0, 0, 0);
+    expect(DIODE_MAPPING.derivedNgspiceSlots!.IEQ.compute(s, 0)).toBe(0);
+  });
+
+  it("IEQ respects base offset", () => {
+    const s = new Float64Array(15);
+    s[10 + 0] = 0.7;    // vd
+    s[10 + 1] = 2e-3;   // id
+    s[10 + 2] = 0.05;   // geq
+    const expected = 2e-3 - 0.05 * 0.7;
+    expect(DIODE_MAPPING.derivedNgspiceSlots!.IEQ.compute(s, 10)).toBeCloseTo(expected, 15);
+  });
+
+  it("tunnel-diode and varactor share the same IEQ formula", () => {
+    const s = new Float64Array(5);
+    s[0] = 0.55;
+    s[1] = 5e-4;
+    s[2] = 0.02;
+    const dio = DIODE_MAPPING.derivedNgspiceSlots!.IEQ.compute(s, 0);
+    const td  = TUNNEL_DIODE_MAPPING.derivedNgspiceSlots!.IEQ.compute(s, 0);
+    const var_ = VARACTOR_MAPPING.derivedNgspiceSlots!.IEQ.compute(s, 0);
+    expect(td).toBe(dio);
+    expect(var_).toBe(dio);
+  });
+});
+
+describe("JFET_MAPPING.derivedNgspiceSlots", () => {
+  // ngspice jfet state offsets: 0 vgs, 1 vgd, 2 cg, 3 cd, 4 cgd,
+  //                             5 gm, 6 gds, 7 ggs, 8 ggd,
+  //                             9 qgs, 10 cqgs, 11 qgd, 12 cqgd.
+  it("defines VDS", () => {
+    expect(JFET_MAPPING.derivedNgspiceSlots).toBeDefined();
+    expect(Object.keys(JFET_MAPPING.derivedNgspiceSlots!)).toEqual(["VDS"]);
+  });
+
+  it("VDS = VGS - VGD", () => {
+    const s = new Float64Array(13);
+    s[0] = 3.0;  // vgs
+    s[1] = -2.0; // vgd → vds = 5
+    expect(JFET_MAPPING.derivedNgspiceSlots!.VDS.compute(s, 0)).toBe(5);
+  });
+
+  it("VDS respects base offset", () => {
+    const s = new Float64Array(26);
+    s[13 + 0] = 1.5;
+    s[13 + 1] = 0.3;
+    expect(JFET_MAPPING.derivedNgspiceSlots!.VDS.compute(s, 13)).toBeCloseTo(1.2, 15);
   });
 });

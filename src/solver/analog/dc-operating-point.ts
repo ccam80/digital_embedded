@@ -63,6 +63,10 @@ export interface DcOpOptions {
     limitingEvents: LimitingEvent[],
     convergenceFailedElements: string[],
   ) => void;
+  /** When true, NR collects all failing element indices. */
+  detailedConvergence?: boolean;
+  /** When non-null, elements push LimitingEvent objects here during NR. */
+  limitingCollector?: LimitingEvent[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +163,7 @@ function restoreSnapshot(
  * @returns DC operating point result with node voltages and convergence metadata
  */
 export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
-  const { solver, elements, matrixSize, params, diagnostics, nodeCount, statePool, postIterationHook } = opts;
+  const { solver, elements, matrixSize, params, diagnostics, nodeCount, statePool, postIterationHook, detailedConvergence, limitingCollector } = opts;
 
   const nrBase = {
     solver,
@@ -173,6 +177,8 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
     nodeDamping: params.nodeDamping ?? false,
     statePool: statePool ?? null,
     postIterationHook,
+    detailedConvergence,
+    limitingCollector,
   };
 
   // -------------------------------------------------------------------------

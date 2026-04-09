@@ -34,6 +34,7 @@ import { NJfetAnalogElement } from "./njfet.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { VT } from "../../core/constants.js";
 
@@ -104,7 +105,7 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
     return { vgs: vgsResult.value, vds, swapped: false };
   }
 
-  override updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
+  override updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -118,6 +119,17 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
     const vDraw = -1 * (vD - vS);  // Vsd
 
     const limited = this.limitVoltages(this._vgs, this._vds, vGraw, vDraw);
+    if (limitingCollector) {
+      limitingCollector.push({
+        elementIndex: this.elementIndex ?? -1,
+        label: this.label ?? "",
+        junction: "GS",
+        limitType: "pnjlim",
+        vBefore: vGraw,
+        vAfter: limited.vgs,
+        wasLimited: limited.vgs !== vGraw,
+      });
+    }
     this._vgs = limited.vgs; // internal Vsg (positive when device on)
     this._vds = limited.vds; // internal Vsd (positive)
     this._swapped = false;
@@ -132,9 +144,21 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
     const vGSraw = vG - vS;
     const vt_n = VT * this._p.N;
     const vcrit = vt_n * Math.log(vt_n / (Math.SQRT2 * this._p.IS));
+    const vgsJunctionBefore = this._vgs_junction;
     const gateJunctionResult = pnjlim(vGSraw, this._vgs_junction, vt_n, vcrit);
     this._vgs_junction = gateJunctionResult.value;
     this._pnjlimLimited = this._pnjlimLimited || gateJunctionResult.limited;
+    if (limitingCollector) {
+      limitingCollector.push({
+        elementIndex: this.elementIndex ?? -1,
+        label: this.label ?? "",
+        junction: "GS_junction",
+        limitType: "pnjlim",
+        vBefore: vgsJunctionBefore,
+        vAfter: this._vgs_junction,
+        wasLimited: gateJunctionResult.limited,
+      });
+    }
 
     const expArg = Math.min(this._vgs_junction / vt_n, 80);
     const igJunction = this._p.IS * (Math.exp(expArg) - 1);

@@ -1,0 +1,5 @@
+{"t":0,"agent":"af931d8","agent_type":"architect","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"af931d8","agent_type":"architect","event":"agent_stop","success":true,"duration_ms":67936}
+{"t":0,"agent":"a3a9082","agent_type":"planner","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a3a9082","agent_type":"planner","event":"agent_stop","success":true,"duration_ms":1162396}
+{"t":0,"agent":"aec0c5c","agent_type":"executor","event":"agent_start","parent_mode":"none"}

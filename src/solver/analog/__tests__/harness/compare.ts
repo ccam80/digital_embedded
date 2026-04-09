@@ -133,9 +133,22 @@ export function compareSnapshots(
         }
         if (!mapping) continue;
 
-        // Compare each mapped slot
+        // Build the set of slot names to compare: direct mappings (non-null)
+        // plus any derived-ngspice slots. Derived slots are populated on the
+        // ngspice side by the bridge unpacker and keyed by our slot name, so
+        // the rest of this loop treats them identically to direct mappings.
+        const comparableSlots = new Set<string>();
         for (const [slotName, ngIdx] of Object.entries(mapping.slotToNgspice)) {
-          if (ngIdx === null) continue; // no ngspice equivalent
+          if (ngIdx !== null) comparableSlots.add(slotName);
+        }
+        if (mapping.derivedNgspiceSlots) {
+          for (const slotName of Object.keys(mapping.derivedNgspiceSlots)) {
+            comparableSlots.add(slotName);
+          }
+        }
+
+        // Compare each mapped slot
+        for (const slotName of comparableSlots) {
           if (!(slotName in ourEs.slots) || !(slotName in refEs.slots)) continue;
 
           const o = ourEs.slots[slotName];

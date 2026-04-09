@@ -43,6 +43,7 @@ import type { IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
+import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { VT } from "../../core/constants.js";
 import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
@@ -1188,7 +1189,7 @@ class MosfetAnalogElement extends AbstractFetElement {
     return { cgs: gsOverlap, cgd: gdOverlap };
   }
 
-  override updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
+  override updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
     const nodeD = this.drainNode;
     const nodeG = this.gateNode;
     const nodeS = this.sourceNode;
@@ -1206,6 +1207,26 @@ class MosfetAnalogElement extends AbstractFetElement {
 
     // Voltage limiting on Vgs via fetlim with von (Fix 2)
     const limited = this.limitVoltages(this._vgs, this._vds, vGraw, vDraw);
+    if (limitingCollector) {
+      limitingCollector.push({
+        elementIndex: this.elementIndex ?? -1,
+        label: this.label ?? "",
+        junction: "GS",
+        limitType: "fetlim",
+        vBefore: vGraw,
+        vAfter: limited.vgs,
+        wasLimited: limited.vgs !== vGraw,
+      });
+      limitingCollector.push({
+        elementIndex: this.elementIndex ?? -1,
+        label: this.label ?? "",
+        junction: "DS",
+        limitType: "limvds",
+        vBefore: vDraw,
+        vAfter: limited.vds,
+        wasLimited: limited.vds !== vDraw,
+      });
+    }
     this._vgs = limited.vgs;
     this._vds = limited.vds;
     this._swapped = limited.swapped;
@@ -1247,15 +1268,39 @@ class MosfetAnalogElement extends AbstractFetElement {
     const vbdOld = s0[base + SLOT_VBD_OLD];
     let pnjLimited = false;
     if (this._vds >= 0) {
+      const vbsBefore = vbs;
       const vbsResult = pnjlim(vbs, vbsOld, VT, this._sourceVcrit);
       vbs = vbsResult.value;
       vbd = vbs - this._vds;
       pnjLimited = vbsResult.limited;
+      if (limitingCollector) {
+        limitingCollector.push({
+          elementIndex: this.elementIndex ?? -1,
+          label: this.label ?? "",
+          junction: "BS",
+          limitType: "pnjlim",
+          vBefore: vbsBefore,
+          vAfter: vbs,
+          wasLimited: pnjLimited,
+        });
+      }
     } else {
+      const vbdBefore = vbd;
       const vbdResult = pnjlim(vbd, vbdOld, VT, this._drainVcrit);
       vbd = vbdResult.value;
       vbs = vbd + this._vds;
       pnjLimited = vbdResult.limited;
+      if (limitingCollector) {
+        limitingCollector.push({
+          elementIndex: this.elementIndex ?? -1,
+          label: this.label ?? "",
+          junction: "BD",
+          limitType: "pnjlim",
+          vBefore: vbdBefore,
+          vAfter: vbd,
+          wasLimited: pnjLimited,
+        });
+      }
     }
     s0[base + SLOT_VBS_OLD] = vbs;
     s0[base + SLOT_VBD_OLD] = vbd;
@@ -1422,7 +1467,10 @@ class MosfetAnalogElement extends AbstractFetElement {
     const nodeS = this.sourceNode;
     const nodeB = this._nodeB;
 
-    // Drain-bulk junction capacitance
+    // Drain-bulk junction capacitance. Convention: ngspice uses vbd (bulk-drain)
+    // as the controlling voltage, so the Norton companion's positive terminal
+    // is the BULK node. RHS stamp is therefore rhs[bulk] -= ceq, rhs[drain] += ceq.
+    // Matches mos1load.c stamping of qbd companion.
     const capGeqDB = s0[base + SLOT_CAP_GEQ_DB];
     const capIeqDB = s0[base + SLOT_CAP_IEQ_DB];
     if (capGeqDB !== 0 || capIeqDB !== 0) {
@@ -1430,11 +1478,11 @@ class MosfetAnalogElement extends AbstractFetElement {
       stampG(solver, nodeD, nodeB, -capGeqDB);
       stampG(solver, nodeB, nodeD, -capGeqDB);
       stampG(solver, nodeB, nodeB, capGeqDB);
-      stampRHS(solver, nodeD, -capIeqDB);
-      stampRHS(solver, nodeB, capIeqDB);
+      stampRHS(solver, nodeD, capIeqDB);
+      stampRHS(solver, nodeB, -capIeqDB);
     }
 
-    // Source-bulk junction capacitance
+    // Source-bulk junction capacitance. Same ngspice (+ = bulk) convention.
     const capGeqSB = s0[base + SLOT_CAP_GEQ_SB];
     const capIeqSB = s0[base + SLOT_CAP_IEQ_SB];
     if (capGeqSB !== 0 || capIeqSB !== 0) {
@@ -1442,8 +1490,8 @@ class MosfetAnalogElement extends AbstractFetElement {
       stampG(solver, nodeS, nodeB, -capGeqSB);
       stampG(solver, nodeB, nodeS, -capGeqSB);
       stampG(solver, nodeB, nodeB, capGeqSB);
-      stampRHS(solver, nodeS, -capIeqSB);
-      stampRHS(solver, nodeB, capIeqSB);
+      stampRHS(solver, nodeS, capIeqSB);
+      stampRHS(solver, nodeB, -capIeqSB);
     }
   }
 
@@ -1489,28 +1537,40 @@ class MosfetAnalogElement extends AbstractFetElement {
     const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
     const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
 
-    // --- Drain-bulk junction capacitance using precomputed f2/f3/f4 (mos1load.c:629-669) ---
+    // Junction-cap formulas follow ngspice mos1load.c exactly, which uses
+    // vbd = V_bulk - V_drain and vbs = V_bulk - V_source as the controlling
+    // voltages. Prior code here used vdb/vsbCap (opposite sign) with ngspice's
+    // formula shape, which is wrong: tDepCap guard fired on the wrong
+    // polarity, the linear-extension branch was used for normal reverse-biased
+    // operation, and the depletion formula (when taken) evaluated with a
+    // flipped argument. SLOT_Q_DB / SLOT_Q_SB now hold ngspice's qbd / qbs
+    // directly (bulk-drain / bulk-source charge), matching the harness
+    // mapping one-to-one.
+    const vbd = -vdb;           // = vBulkV - vD, ngspice convention
+    const vbs = -vsbCap;        // = vBulkV - vS, ngspice convention
+
+    // --- Drain-bulk junction capacitance (mos1load.c:629-669) ---
     const czbd = this._czbd;
     const czbdsw = this._czbdsw;
     if (czbd > 0 || czbdsw > 0) {
       let capbd: number;
       let qbd: number;
-      if (vdb < this._tDepCap) {
-        const argD = 1 - vdb / pb;
+      if (vbd < this._tDepCap) {
+        const argD = 1 - vbd / pb;
         const sargD = Math.exp(-mj * Math.log(argD));
         const sargswD = Math.exp(-mjsw * Math.log(argD));
         capbd = czbd * sargD + czbdsw * sargswD;
         qbd = pb * (czbd * (1 - argD * sargD) / (1 - mj)
           + czbdsw * (1 - argD * sargswD) / (1 - mjsw));
       } else {
-        capbd = this._f2d + vdb * this._f3d;
-        qbd = this._f4d + vdb * (this._f2d + vdb * this._f3d / 2);
+        capbd = this._f2d + vbd * this._f3d;
+        qbd = this._f4d + vbd * (this._f2d + vbd * this._f3d / 2);
       }
       s0[base + SLOT_Q_DB] = qbd;
       const q1_db = s1[base + SLOT_Q_DB];
       const q2_db = this.s2[base + SLOT_Q_DB];
       const ccapPrev_db = s1[base + SLOT_CCAP_DB];
-      const resDB = integrateCapacitor(capbd, vdb, qbd, q1_db, q2_db, dt, h1, h2, order, method, ccapPrev_db);
+      const resDB = integrateCapacitor(capbd, vbd, qbd, q1_db, q2_db, dt, h1, h2, order, method, ccapPrev_db);
       s0[base + SLOT_CAP_GEQ_DB] = resDB.geq;
       s0[base + SLOT_CAP_IEQ_DB] = resDB.ceq;
       s0[base + SLOT_CCAP_DB] = resDB.ccap;
@@ -1521,28 +1581,28 @@ class MosfetAnalogElement extends AbstractFetElement {
       s0[base + SLOT_Q_DB] = 0;
     }
 
-    // --- Source-bulk junction capacitance using precomputed f2/f3/f4 (mos1load.c:569-614) ---
+    // --- Source-bulk junction capacitance (mos1load.c:569-614) ---
     const czbs = this._czbs;
     const czbssw = this._czbssw;
     if (czbs > 0 || czbssw > 0) {
       let capbs: number;
       let qbs: number;
-      if (vsbCap < this._tDepCap) {
-        const argS = 1 - vsbCap / pb;
+      if (vbs < this._tDepCap) {
+        const argS = 1 - vbs / pb;
         const sargS = Math.exp(-mj * Math.log(argS));
         const sargswS = Math.exp(-mjsw * Math.log(argS));
         capbs = czbs * sargS + czbssw * sargswS;
         qbs = pb * (czbs * (1 - argS * sargS) / (1 - mj)
           + czbssw * (1 - argS * sargswS) / (1 - mjsw));
       } else {
-        capbs = this._f2s + vsbCap * this._f3s;
-        qbs = this._f4s + vsbCap * (this._f2s + vsbCap * this._f3s / 2);
+        capbs = this._f2s + vbs * this._f3s;
+        qbs = this._f4s + vbs * (this._f2s + vbs * this._f3s / 2);
       }
       s0[base + SLOT_Q_SB] = qbs;
       const q1_sb = s1[base + SLOT_Q_SB];
       const q2_sb = this.s2[base + SLOT_Q_SB];
       const ccapPrev_sb = s1[base + SLOT_CCAP_SB];
-      const resSB = integrateCapacitor(capbs, vsbCap, qbs, q1_sb, q2_sb, dt, h1, h2, order, method, ccapPrev_sb);
+      const resSB = integrateCapacitor(capbs, vbs, qbs, q1_sb, q2_sb, dt, h1, h2, order, method, ccapPrev_sb);
       s0[base + SLOT_CAP_GEQ_SB] = resSB.geq;
       s0[base + SLOT_CAP_IEQ_SB] = resSB.ceq;
       s0[base + SLOT_CCAP_SB] = resSB.ccap;
@@ -1659,10 +1719,13 @@ class MosfetAnalogElement extends AbstractFetElement {
 
     // Recompute Q_DB and Q_SB from converged voltages, then recompute ccap for
     // GB/DB/SB so the next step's trapezoidal recursion starts from the correct
-    // companion current (fixes stale CCAP slots).
+    // companion current (fixes stale CCAP slots). Uses ngspice vbd/vbs
+    // convention to match stampCompanion above.
     if (dt > 0) {
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
       const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+      const vbd = -vdb;
+      const vbs = -vsbCap;
 
       // Drain-bulk charge recomputation
       const czbd = this._czbd;
@@ -1673,22 +1736,22 @@ class MosfetAnalogElement extends AbstractFetElement {
         const mjsw = this._p.MJSW;
         let capbd: number;
         let qbd: number;
-        if (vdb < this._tDepCap) {
-          const argD = 1 - vdb / pb;
+        if (vbd < this._tDepCap) {
+          const argD = 1 - vbd / pb;
           const sargD = Math.exp(-mj * Math.log(argD));
           const sargswD = Math.exp(-mjsw * Math.log(argD));
           capbd = czbd * sargD + czbdsw * sargswD;
           qbd = pb * (czbd * (1 - argD * sargD) / (1 - mj)
             + czbdsw * (1 - argD * sargswD) / (1 - mjsw));
         } else {
-          capbd = this._f2d + vdb * this._f3d;
-          qbd = this._f4d + vdb * (this._f2d + vdb * this._f3d / 2);
+          capbd = this._f2d + vbd * this._f3d;
+          qbd = this._f4d + vbd * (this._f2d + vbd * this._f3d / 2);
         }
         s0[base + SLOT_Q_DB] = qbd;
         const q1_db = s1[base + SLOT_Q_DB];
         const q2_db = this.s2[base + SLOT_Q_DB];
         const ccapPrev_db = s1[base + SLOT_CCAP_DB];
-        const resDB = integrateCapacitor(capbd, vdb, qbd, q1_db, q2_db, dt, h1, h2, order, method, ccapPrev_db);
+        const resDB = integrateCapacitor(capbd, vbd, qbd, q1_db, q2_db, dt, h1, h2, order, method, ccapPrev_db);
         s0[base + SLOT_CCAP_DB] = resDB.ccap;
       }
 
@@ -1701,22 +1764,22 @@ class MosfetAnalogElement extends AbstractFetElement {
         const mjsw = this._p.MJSW;
         let capbs: number;
         let qbs: number;
-        if (vsbCap < this._tDepCap) {
-          const argS = 1 - vsbCap / pb;
+        if (vbs < this._tDepCap) {
+          const argS = 1 - vbs / pb;
           const sargS = Math.exp(-mj * Math.log(argS));
           const sargswS = Math.exp(-mjsw * Math.log(argS));
           capbs = czbs * sargS + czbssw * sargswS;
           qbs = pb * (czbs * (1 - argS * sargS) / (1 - mj)
             + czbssw * (1 - argS * sargswS) / (1 - mjsw));
         } else {
-          capbs = this._f2s + vsbCap * this._f3s;
-          qbs = this._f4s + vsbCap * (this._f2s + vsbCap * this._f3s / 2);
+          capbs = this._f2s + vbs * this._f3s;
+          qbs = this._f4s + vbs * (this._f2s + vbs * this._f3s / 2);
         }
         s0[base + SLOT_Q_SB] = qbs;
         const q1_sb = s1[base + SLOT_Q_SB];
         const q2_sb = this.s2[base + SLOT_Q_SB];
         const ccapPrev_sb = s1[base + SLOT_CCAP_SB];
-        const resSB = integrateCapacitor(capbs, vsbCap, qbs, q1_sb, q2_sb, dt, h1, h2, order, method, ccapPrev_sb);
+        const resSB = integrateCapacitor(capbs, vbs, qbs, q1_sb, q2_sb, dt, h1, h2, order, method, ccapPrev_sb);
         s0[base + SLOT_CCAP_SB] = resSB.ccap;
       }
 

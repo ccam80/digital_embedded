@@ -5,7 +5,6 @@ import type { ComparisonSession } from "../../src/solver/analog/__tests__/harnes
 export interface HarnessEntry {
   session: ComparisonSession;
   dtsPath: string;
-  cirPath: string;
   createdAt: Date;
   lastRunAt: Date | null;
   analysis: "dcop" | "tran" | null;

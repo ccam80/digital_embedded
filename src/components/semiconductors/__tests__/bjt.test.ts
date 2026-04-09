@@ -1148,3 +1148,92 @@ describe("stateSchema — BJT SPICE L1", () => {
     expect(pool.state0[10]).toBe(15); // L1_SLOT_RB_EFF = 10, value = RB param
   });
 });
+
+// ---------------------------------------------------------------------------
+// LimitingEvent instrumentation tests — BJT
+// ---------------------------------------------------------------------------
+
+import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
+
+describe("BJT simple LimitingEvent instrumentation", () => {
+  function makeNpnWithState(): any {
+    const props = makeBjtProps();
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, props) as any;
+    core.label = "Q1";
+    core.elementIndex = 5;
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    return core;
+  }
+
+  it("pushes BE and BC pnjlim events when limitingCollector provided", () => {
+    const core = makeNpnWithState();
+    const voltages = new Float64Array(10);
+    voltages[0] = 5.0; // B = node 1
+    voltages[1] = 3.0; // C = node 2
+    voltages[2] = 0.0; // E = node 3
+
+    const collector: LimitingEvent[] = [];
+    core.updateOperatingPoint(voltages, collector);
+
+    expect(collector.length).toBeGreaterThanOrEqual(2);
+    const beEv = collector.find((e: LimitingEvent) => e.junction === "BE");
+    const bcEv = collector.find((e: LimitingEvent) => e.junction === "BC");
+    expect(beEv).toBeDefined();
+    expect(bcEv).toBeDefined();
+
+    for (const ev of [beEv!, bcEv!]) {
+      expect(ev.elementIndex).toBe(5);
+      expect(ev.label).toBe("Q1");
+      expect(ev.limitType).toBe("pnjlim");
+      expect(Number.isFinite(ev.vBefore)).toBe(true);
+      expect(Number.isFinite(ev.vAfter)).toBe(true);
+      expect(typeof ev.wasLimited).toBe("boolean");
+    }
+  });
+
+  it("does not throw when limitingCollector is null or undefined", () => {
+    const core = makeNpnWithState();
+    const voltages = new Float64Array(10);
+    voltages[0] = 5.0;
+    expect(() => core.updateOperatingPoint(voltages, null)).not.toThrow();
+    expect(() => core.updateOperatingPoint(voltages, undefined)).not.toThrow();
+  });
+});
+
+describe("BJT L1 LimitingEvent instrumentation", () => {
+  function makeL1NpnWithState(): any {
+    const props = makeSpiceL1Props();
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, props) as any;
+    core.label = "Q1";
+    core.elementIndex = 5;
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    return core;
+  }
+
+  it("pushes BE and BC pnjlim events", () => {
+    const core = makeL1NpnWithState();
+    const voltages = new Float64Array(10);
+    voltages[0] = 5.0; // B = node 1
+    voltages[1] = 3.0; // C = node 2
+    voltages[2] = 0.0; // E = node 3
+
+    const collector: LimitingEvent[] = [];
+    core.updateOperatingPoint(voltages, collector);
+
+    expect(collector.length).toBeGreaterThanOrEqual(2);
+    const beEv = collector.find((e: LimitingEvent) => e.junction === "BE");
+    const bcEv = collector.find((e: LimitingEvent) => e.junction === "BC");
+    expect(beEv).toBeDefined();
+    expect(bcEv).toBeDefined();
+
+    expect(beEv!.elementIndex).toBe(5);
+    expect(beEv!.label).toBe("Q1");
+    expect(beEv!.limitType).toBe("pnjlim");
+    expect(Number.isFinite(beEv!.vBefore)).toBe(true);
+    expect(Number.isFinite(beEv!.vAfter)).toBe(true);
+  });
+});

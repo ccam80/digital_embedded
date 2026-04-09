@@ -636,3 +636,87 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 4.092860e-03, "Id after KP=240µ");
   });
 });
+
+// ---------------------------------------------------------------------------
+// LimitingEvent instrumentation tests — MOSFET
+// ---------------------------------------------------------------------------
+
+import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
+
+describe("MOSFET LimitingEvent instrumentation", () => {
+  function makeNmosWithState(): ReactiveAnalogElement & { label: string; elementIndex: number } {
+    const propsObj = new PropertyBag();
+    propsObj.replaceModelParams({ VTO: 1.0, KP: 2e-5, GAMMA: 0, PHI: 0.6, LAMBDA: 0, W: 1e-6, L: 1e-6 });
+    // Gate=1, Drain=2, Source=3; bulk tied to source internally by factory
+    const pinNodes = new Map([["G", 1], ["D", 2], ["S", 3]]);
+    const core = createMosfetElement(1, pinNodes, [], -1, propsObj);
+    const re = withState(core) as any;
+    re.label = "M1";
+    re.elementIndex = 6;
+    return re;
+  }
+
+  it("pushes GS (fetlim) event to limitingCollector", () => {
+    const el = makeNmosWithState() as any;
+    const voltages = new Float64Array(10);
+    voltages[0] = 5.0; // G = node 1
+    voltages[1] = 3.0; // D = node 2
+    voltages[2] = 0.0; // S = node 3
+
+    const collector: LimitingEvent[] = [];
+    el.updateOperatingPoint(voltages, collector);
+
+    const gsEv = collector.find((e: LimitingEvent) => e.junction === "GS");
+    expect(gsEv).toBeDefined();
+    expect(gsEv!.limitType).toBe("fetlim");
+    expect(gsEv!.elementIndex).toBe(6);
+    expect(gsEv!.label).toBe("M1");
+    expect(Number.isFinite(gsEv!.vBefore)).toBe(true);
+    expect(Number.isFinite(gsEv!.vAfter)).toBe(true);
+    expect(typeof gsEv!.wasLimited).toBe("boolean");
+  });
+
+  it("pushes DS (limvds) event to limitingCollector", () => {
+    const el = makeNmosWithState() as any;
+    const voltages = new Float64Array(10);
+    voltages[0] = 5.0;
+    voltages[1] = 3.0;
+    voltages[2] = 0.0;
+
+    const collector: LimitingEvent[] = [];
+    el.updateOperatingPoint(voltages, collector);
+
+    const dsEv = collector.find((e: LimitingEvent) => e.junction === "DS");
+    expect(dsEv).toBeDefined();
+    expect(dsEv!.limitType).toBe("limvds");
+    expect(dsEv!.elementIndex).toBe(6);
+    expect(Number.isFinite(dsEv!.vBefore)).toBe(true);
+    expect(Number.isFinite(dsEv!.vAfter)).toBe(true);
+  });
+
+  it("pushes BS or BD (pnjlim) bulk junction event", () => {
+    const el = makeNmosWithState() as any;
+    const voltages = new Float64Array(10);
+    voltages[0] = 5.0;
+    voltages[1] = 3.0;
+    voltages[2] = 0.0;
+
+    const collector: LimitingEvent[] = [];
+    el.updateOperatingPoint(voltages, collector);
+
+    const bulkEv = collector.find((e: LimitingEvent) => e.junction === "BS" || e.junction === "BD");
+    expect(bulkEv).toBeDefined();
+    expect(bulkEv!.limitType).toBe("pnjlim");
+    expect(bulkEv!.elementIndex).toBe(6);
+    expect(bulkEv!.label).toBe("M1");
+  });
+
+  it("does not throw when limitingCollector is null", () => {
+    const el = makeNmosWithState() as any;
+    const voltages = new Float64Array(10);
+    voltages[0] = 5.0;
+    voltages[1] = 3.0;
+    expect(() => el.updateOperatingPoint(voltages, null)).not.toThrow();
+    expect(() => el.updateOperatingPoint(voltages, undefined)).not.toThrow();
+  });
+});

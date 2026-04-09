@@ -72,65 +72,64 @@ export function generateSpiceNetlist(
 
     let line: string;
 
+    // elementLabels already include the SPICE prefix (e.g., "Q1", "R1"),
+    // so we use label directly as the instance name.
+
     if (typeId === "Resistor") {
       const R = getPropNumber(props, "resistance", 1000);
-      line = `${spec.prefix}${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${R}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${R}`;
 
     } else if (typeId === "Capacitor") {
       const C = getPropNumber(props, "capacitance", 1e-6);
-      line = `${spec.prefix}${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${C}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${C}`;
 
     } else if (typeId === "Inductor") {
       const L = getPropNumber(props, "inductance", 1e-3);
-      line = `${spec.prefix}${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${L}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${L}`;
 
     } else if (typeId === "DcVoltageSource") {
       const V = getPropNumber(props, "voltage", 0);
-      line = `${spec.prefix}${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} DC ${V}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} DC ${V}`;
 
     } else if (typeId === "AcVoltageSource") {
       const amp = getPropNumber(props, "amplitude", 1);
       const dc = getPropNumber(props, "dcOffset", 0);
-      line = `${spec.prefix}${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} DC ${dc} AC ${amp}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} DC ${dc} AC ${amp}`;
 
     } else if (typeId === "DcCurrentSource") {
       const I = getPropNumber(props, "current", 0);
-      line = `${spec.prefix}${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} DC ${I}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} DC ${I}`;
 
     } else if (typeId === "AcCurrentSource") {
       const amp = getPropNumber(props, "amplitude", 1);
-      line = `${spec.prefix}${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} AC ${amp}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} AC ${amp}`;
 
     } else if (spec.prefix === "D") {
-      // Diode variants: D name A K modelName
       const modelName = `${label}_${spec.modelType}`;
-      line = `${spec.prefix}${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${modelName}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${modelName}`;
       if (!modelCards.has(modelName)) {
         modelCards.set(modelName, buildModelCard(modelName, spec.modelType!, props));
       }
 
     } else if (spec.prefix === "Q") {
-      // BJT: Q name C B E modelName
       const modelName = `${label}_${spec.modelType}`;
-      line = `${spec.prefix}${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${nodes[2] ?? 0} ${modelName}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${nodes[2] ?? 0} ${modelName}`;
       if (!modelCards.has(modelName)) {
         modelCards.set(modelName, buildModelCard(modelName, spec.modelType!, props));
       }
 
     } else if (spec.prefix === "M") {
-      // MOSFET: M name D G S B modelName W=... L=...
       const modelName = `${label}_${spec.modelType}`;
       const W = getPropNumber(props, "W", 1e-6);
       const L = getPropNumber(props, "L", 1e-6);
-      line = `${spec.prefix}${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${nodes[2] ?? 0} ${nodes[3] ?? 0} ${modelName} W=${W} L=${L}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${nodes[2] ?? 0} ${nodes[3] ?? 0} ${modelName} W=${W} L=${L}`;
       if (!modelCards.has(modelName)) {
         modelCards.set(modelName, buildModelCard(modelName, spec.modelType!, props));
       }
 
     } else if (spec.prefix === "J") {
-      // JFET: J name D G S modelName
       const modelName = `${label}_${spec.modelType}`;
-      line = `${spec.prefix}${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${nodes[2] ?? 0} ${modelName}`;
+      line = `${label} ${nodes[0] ?? 0} ${nodes[1] ?? 0} ${nodes[2] ?? 0} ${modelName}`;
       if (!modelCards.has(modelName)) {
         modelCards.set(modelName, buildModelCard(modelName, spec.modelType!, props));
       }
@@ -167,7 +166,7 @@ function buildModelCard(
   for (const key of paramKeys) {
     if (!isSpiceModelParam(key)) continue;
     const value = props.getModelParam<number>(key);
-    if (typeof value === "number") {
+    if (typeof value === "number" && isFinite(value)) {
       paramParts.push(`${key}=${value}`);
     }
   }
@@ -196,11 +195,15 @@ function getPropNumber(props: PropertyBag, key: string, defaultValue: number): n
 // Filter out non-SPICE model param keys
 // ---------------------------------------------------------------------------
 
-const NON_SPICE_KEYS = new Set([
-  "label", "model", "waveform", "expression",
-  "bits", "bitWidth",
+const NON_MODEL_KEYS = new Set([
+  // UI / component metadata
+  "label", "model", "waveform", "expression", "bits", "bitWidth",
+  // Instance parameters (belong on the element line, not the .model card)
+  "W", "L", "AREA", "M", "TNOM",
+  // Zero-valued substrate doping is physically invalid in ngspice
+  "NSUB", "NSS",
 ]);
 
 function isSpiceModelParam(key: string): boolean {
-  return !NON_SPICE_KEYS.has(key);
+  return !NON_MODEL_KEYS.has(key);
 }

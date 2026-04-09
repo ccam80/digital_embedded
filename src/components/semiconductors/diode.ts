@@ -32,6 +32,7 @@ import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/e
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
@@ -336,7 +337,7 @@ export function createDiodeElement(
       stampRHS(solver, nodeCathode, ieq);
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
+    updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
       const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
@@ -358,11 +359,33 @@ export function createDiodeElement(
         vdtemp = reflResult.value;
         pnjlimLimited = reflResult.limited;
         vdLimited = -(vdtemp + params.BV);
+        if (limitingCollector) {
+          limitingCollector.push({
+            elementIndex: (this as any).elementIndex ?? -1,
+            label: (this as any).label ?? "",
+            junction: "AK",
+            limitType: "pnjlim",
+            vBefore: vdRaw,
+            vAfter: vdLimited,
+            wasLimited: pnjlimLimited,
+          });
+        }
       } else {
         // Normal forward/reverse limiting: dioload.c:189-191
         const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
         vdLimited = vdResult.value;
         pnjlimLimited = vdResult.limited;
+        if (limitingCollector) {
+          limitingCollector.push({
+            elementIndex: (this as any).elementIndex ?? -1,
+            label: (this as any).label ?? "",
+            junction: "AK",
+            limitType: "pnjlim",
+            vBefore: vdRaw,
+            vAfter: vdLimited,
+            wasLimited: pnjlimLimited,
+          });
+        }
       }
 
       s0[base + SLOT_VD] = vdLimited;

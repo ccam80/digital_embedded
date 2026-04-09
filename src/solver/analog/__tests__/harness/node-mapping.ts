@@ -31,6 +31,7 @@ import type {
   IterationSnapshot,
   StepSnapshot,
 } from "./types.js";
+import type { AnalogElement } from "../../element.js";
 
 // ---------------------------------------------------------------------------
 // Canonicalization
@@ -116,70 +117,66 @@ function canonicalizeOurLabel(label: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Mapping builder
+// Direct mapping (auto-generated netlist)
 // ---------------------------------------------------------------------------
 
 /**
- * Build node mappings between our engine and ngspice.
+ * Build node mapping by exploiting the identity relationship between our
+ * node IDs and ngspice node names.
  *
- * Strategy:
- *   1. For each ngspice node, try to canonicalize its name
- *   2. For each of our nodes, canonicalize our label
- *   3. Match by canonical form (exact match)
- *   4. For unmatched nodes, attempt net-number fallback
+ * Since generateSpiceNetlist writes our pinNodeIds directly as ngspice node
+ * numbers, ngspice creates nodes named "1", "2", ... matching our IDs.
+ * We just look up each of our node IDs in ngspice's nodeNames map to get
+ * the ngspice internal index.
  *
- * @param ourTopology  - Our engine's topology snapshot
- * @param ngTopology   - ngspice's topology (from topology callback)
- * @param deviceTypes  - Optional map of ngspice device name → device type
- *                       (helps disambiguate pin suffixes)
+ * For branch currents (voltage sources), ngspice creates entries like
+ * "v<label>#branch" which we match against our branch matrix rows.
  */
-export function buildNodeMapping(
+export function buildDirectNodeMapping(
   ourTopology: TopologySnapshot,
   ngTopology: NgspiceTopology,
+  elements: readonly AnalogElement[],
+  elementLabels: Map<number, string>,
 ): NodeMapping[] {
   const mappings: NodeMapping[] = [];
 
-  // Build canonical → ourIndex map
-  const ourCanonical = new Map<string, { index: number; label: string }>();
-  ourTopology.nodeLabels.forEach((label, nodeId) => {
-    // nodeLabels may have multiple labels joined by "/", try each
-    for (const part of label.split("/")) {
-      const canon = canonicalizeOurLabel(part.trim());
-      if (canon && !ourCanonical.has(canon)) {
-        ourCanonical.set(canon, { index: nodeId, label: part.trim() });
-      }
-    }
-  });
+  // 1. Voltage nodes: our node ID N → ngspice node named "N"
+  for (let nodeId = 1; nodeId <= ourTopology.nodeCount; nodeId++) {
+    const ngspiceIndex = ngTopology.nodeNames.get(String(nodeId));
+    if (ngspiceIndex === undefined) continue;
 
-  // Build device type hints from ngspice topology
-  const deviceTypeByPrefix = new Map<string, string>();
-  for (const dev of ngTopology.devices) {
-    deviceTypeByPrefix.set(dev.name.toLowerCase(), dev.typeName.toLowerCase());
+    const label = ourTopology.nodeLabels.get(nodeId) ?? `node_${nodeId}`;
+    mappings.push({
+      ourIndex: nodeId - 1,       // 0-based solver row
+      ngspiceIndex,
+      label,
+      ngspiceName: String(nodeId),
+    });
   }
 
-  // For each ngspice node, try to match
-  ngTopology.nodeNames.forEach((nodeNum, ngName) => {
-    if (ngName === "0" || nodeNum === 0) return; // skip ground
+  // 2. Branch currents: voltage/current source elements with branchIndex >= 0
+  for (let ei = 0; ei < elements.length; ei++) {
+    const el = elements[ei];
+    if (el.branchIndex < 0) continue;
 
-    // Determine device type hint from the node name prefix
-    const prefixMatch = ngName.match(/^([a-zA-Z]\w*?)_/);
-    const deviceType = prefixMatch
-      ? deviceTypeByPrefix.get(prefixMatch[1].toLowerCase())
-      : undefined;
+    const elLabel = elementLabels.get(ei);
+    if (!elLabel) continue;
 
-    const canon = canonicalizeNgspiceName(ngName, deviceType);
-    if (!canon) return;
+    // ngspice names branch currents as "v<label>#branch" (lowercase)
+    const ngBranchName = `v${elLabel.toLowerCase()}#branch`;
+    const ngspiceIndex = ngTopology.nodeNames.get(ngBranchName);
+    if (ngspiceIndex === undefined) continue;
 
-    const ourMatch = ourCanonical.get(canon);
-    if (ourMatch) {
-      mappings.push({
-        ourIndex: ourMatch.index,
-        ngspiceIndex: nodeNum,
-        label: ourMatch.label,
-        ngspiceName: ngName,
-      });
-    }
-  });
+    const ourIndex = ourTopology.nodeCount + el.branchIndex;
+    const label = ourTopology.nodeLabels.get(-(el.branchIndex + 1))
+      ?? `${elLabel}:branch`;
+    mappings.push({
+      ourIndex,
+      ngspiceIndex,
+      label,
+      ngspiceName: ngBranchName,
+    });
+  }
 
   return mappings;
 }
@@ -214,9 +211,9 @@ export function reindexNgspiceSession(
     const out = new Float64Array(ourSize);
     out.fill(NaN);
     ngToOur.forEach((ourIdx, ngIdx) => {
-      if (ngIdx < ngArr.length && ourIdx - 1 < ourSize && ourIdx > 0) {
-        // Our voltages are 0-based (solver indices), nodeIds are 1-based
-        out[ourIdx - 1] = ngArr[ngIdx];
+      if (ngIdx < ngArr.length && ourIdx >= 0 && ourIdx < ourSize) {
+        // ourIdx is already 0-based (nodeId - 1 from buildDirectNodeMapping)
+        out[ourIdx] = ngArr[ngIdx];
       }
     });
     return out;
@@ -233,13 +230,14 @@ export function reindexNgspiceSession(
   }
 
   function reindexStep(step: StepSnapshot): StepSnapshot {
+    const reindexedAttempts = step.attempts?.map(a => ({
+      ...a,
+      iterations: a.iterations.map(reindexIteration),
+    }));
     return {
       ...step,
       iterations: step.iterations.map(reindexIteration),
-      attempts: step.attempts?.map(a => ({
-        ...a,
-        iterations: a.iterations.map(reindexIteration),
-      })),
+      ...(reindexedAttempts !== undefined ? { attempts: reindexedAttempts } : {}),
     };
   }
 

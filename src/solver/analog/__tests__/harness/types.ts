@@ -92,7 +92,7 @@ export interface TopologySnapshot {
   elements: Array<{
     index: number;
     label: string;
-    type?: string;
+    type: string;
     isNonlinear: boolean;
     isReactive: boolean;
     pinNodeIds: readonly number[];
@@ -156,7 +156,7 @@ export interface IterationSnapshot {
   /** Our element labels that failed convergence this iteration. Empty on converged iteration. */
   convergenceFailedElements: string[];
   /** ngspice device names that failed convergence this iteration (from C callback). */
-  ngspiceConvergenceFailedDevices?: string[];
+  ngspiceConvergenceFailedDevices: string[];
 }
 
 /** Device state for one element at one iteration. */
@@ -217,8 +217,7 @@ export interface StepSnapshot {
   iterationCount: number;
   /**
    * All NR attempts for this step, including failed ones where dt was cut.
-   * The last entry is the accepted attempt. Undefined means legacy data
-   * where only the accepted attempt was captured (use iterations/converged directly).
+   * The last entry is the accepted attempt.
    */
   attempts?: NRAttempt[];
   /**
@@ -236,6 +235,28 @@ export interface StepSnapshot {
 // Device mapping — maps our state slots to ngspice state offsets
 // ---------------------------------------------------------------------------
 
+/**
+ * A slot whose ngspice-side value is SYNTHESIZED from a formula over the
+ * device's CKTstate rather than read from a single offset.
+ *
+ * Use for our-slots that do not correspond 1:1 to an ngspice state-vector
+ * entry — e.g. Norton companion currents (ngspice re-computes these inside
+ * the device load routine and discards them), or values held by us in a
+ * different form than ngspice stores them (RB_EFF = 1/BJTgx).
+ *
+ * The `compute` callback receives the full state array and the device's
+ * base offset; it should return the synthesized scalar for comparison
+ * against our corresponding slot.
+ */
+export interface DerivedNgspiceSlot {
+  /** ngspice state offsets this derived value depends on (documentation/debug). */
+  sourceOffsets: readonly number[];
+  /** Compute the value from the device's slice of a CKTstate array. */
+  compute: (state: Float64Array, base: number) => number;
+  /** Optional short explanation for diagnostics. */
+  doc?: string;
+}
+
 /** Maps one element type's internal state to ngspice state vector offsets. */
 export interface DeviceMapping {
   /** Element type name (e.g. "capacitor", "diode", "bjt"). */
@@ -243,14 +264,27 @@ export interface DeviceMapping {
   /**
    * Maps our slot name (from StateSchema) to ngspice state offset.
    * The ngspice offset is relative to the device's base in CKTstate0.
-   * null means "no corresponding ngspice state" (skip comparison).
+   * null means "no corresponding ngspice state" (skip direct comparison).
+   * Slots also listed in `derivedNgspiceSlots` ARE compared — the derived
+   * entry supplies the ngspice-side value.
    */
   slotToNgspice: Record<string, number | null>;
   /**
    * Maps ngspice state offset (relative) to our slot name.
-   * Inverse of slotToNgspice for entries where the mapping exists.
+   * Inverse of slotToNgspice for entries where the mapping is a direct read.
    */
   ngspiceToSlot: Record<number, string>;
+  /**
+   * Our-slot-name → formula for synthesizing the ngspice-side value from
+   * raw CKTstate. Applied by the ngspice-bridge unpacker after the direct
+   * `ngspiceToSlot` loop, so these values appear in
+   * `ElementStateSnapshot.slots` keyed by the our-slot name and are
+   * picked up by the normal comparison path.
+   *
+   * Formulas should mirror ngspice's own computation (e.g. from bjtload.c)
+   * so the comparison is meaningful — not a tautology against our engine.
+   */
+  derivedNgspiceSlots?: Record<string, DerivedNgspiceSlot>;
 }
 
 // ---------------------------------------------------------------------------
@@ -500,7 +534,7 @@ export interface RawNgspiceIterationEx {
   /** Assembled G matrix non-zeros for this iteration. */
   matrix: MatrixEntry[];
   /** ngspice device names that failed convergence this iteration. */
-  ngspiceConvergenceFailedDevices?: string[];
+  ngspiceConvergenceFailedDevices: string[];
   /** Voltage limiting events recorded during this iteration. */
   limitingEvents: Array<{
     deviceName: string;

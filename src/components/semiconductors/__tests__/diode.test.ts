@@ -408,3 +408,85 @@ describe("setParam mutates params object (not captured locals)", () => {
     expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 3.623504e-03, "I(diode) after N=2");
   });
 });
+
+// ---------------------------------------------------------------------------
+// LimitingEvent instrumentation tests
+// ---------------------------------------------------------------------------
+
+import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
+
+describe("Diode LimitingEvent instrumentation", () => {
+  function makeDiodeWithState(modelParams: Record<string, number> = {}) {
+    const props = makeParamBag({ IS: 1e-14, N: 1, ...modelParams });
+    const pinNodes = new Map([["A", 1], ["K", 2]]);
+    const core = createDiodeElement(pinNodes, [], -1, props) as any;
+    core.label = "D1";
+    core.elementIndex = 3;
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    return core;
+  }
+
+  it("pushes AK pnjlim event when limitingCollector provided", () => {
+    const core = makeDiodeWithState();
+    const voltages = new Float64Array(10);
+    voltages[0] = 5.0; // node 1 = anode
+
+    const collector: LimitingEvent[] = [];
+    core.updateOperatingPoint(voltages, collector);
+
+    expect(collector.length).toBeGreaterThanOrEqual(1);
+    const ev = collector[0];
+    expect(ev.elementIndex).toBe(3);
+    expect(ev.label).toBe("D1");
+    expect(ev.junction).toBe("AK");
+    expect(ev.limitType).toBe("pnjlim");
+    expect(Number.isFinite(ev.vBefore)).toBe(true);
+    expect(Number.isFinite(ev.vAfter)).toBe(true);
+    expect(typeof ev.wasLimited).toBe("boolean");
+    expect(ev.wasLimited).toBe(ev.vAfter !== ev.vBefore);
+  });
+
+  it("does not throw when limitingCollector is null or undefined", () => {
+    const core = makeDiodeWithState();
+    const voltages = new Float64Array(10);
+    voltages[0] = 5.0;
+    expect(() => core.updateOperatingPoint(voltages, null)).not.toThrow();
+    expect(() => core.updateOperatingPoint(voltages, undefined)).not.toThrow();
+  });
+
+  it("wasLimited=true when large forward step forces pnjlim to clamp", () => {
+    const core = makeDiodeWithState({ IS: 1e-14, N: 1 });
+    // First call to establish vdOld near 0
+    const voltages = new Float64Array(10);
+    voltages[0] = 0.0;
+    core.updateOperatingPoint(voltages, null);
+
+    // Now a large jump: should be limited
+    voltages[0] = 10.0;
+    const collector: LimitingEvent[] = [];
+    core.updateOperatingPoint(voltages, collector);
+
+    const ev = collector[0];
+    expect(ev.wasLimited).toBe(true);
+    expect(ev.vAfter).not.toBe(ev.vBefore);
+  });
+
+  it("wasLimited=false for small voltage steps near operating point", () => {
+    const core = makeDiodeWithState({ IS: 1e-14, N: 1 });
+    const voltages = new Float64Array(10);
+    voltages[0] = 0.6;
+    // Warm up to vdOld ≈ 0.6
+    core.updateOperatingPoint(voltages, null);
+
+    // Tiny step — should not be limited
+    voltages[0] = 0.601;
+    const collector: LimitingEvent[] = [];
+    core.updateOperatingPoint(voltages, collector);
+
+    const ev = collector[0];
+    expect(ev.wasLimited).toBe(false);
+    expect(ev.vAfter).toBe(ev.vBefore);
+  });
+});

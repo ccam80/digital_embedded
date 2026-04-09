@@ -522,6 +522,13 @@ export function newtonRaphson(opts: NROptions): NRResult {
       } else {
         elemConverged = assembler.checkAllConverged(elements, voltages, prevVoltages, reltol, iabstol);
       }
+    } else if (assembler.noncon > 0 && iteration > 0 && opts.detailedConvergence) {
+      // 7a. When noncon > 0, convergence already failed — but when
+      //     detailedConvergence is requested, still collect per-element
+      //     failure data for harness instrumentation.
+      const detailed = assembler.checkAllConvergedDetailed(elements, voltages, prevVoltages, reltol, iabstol);
+      elemConverged = false;
+      convergenceFailedElements = detailed.failedIndices.map(i => elements[i].label ?? `element_${i}`);
     }
 
     // 8. Find element with largest contribution to non-convergence (blame tracking)

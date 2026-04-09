@@ -9,7 +9,6 @@
  * Usage:
  *   const session = new ComparisonSession({
  *     dtsPath: 'fixtures/buckbjt.dts',
- *     cirPath: 'e2e/spice-ref/buckbjt.cir',
  *   });
  *   await session.init();
  *   await session.runTransient(0, 5e-3);
@@ -27,11 +26,13 @@ import { DefaultSimulationCoordinator } from "../../../../solver/coordinator.js"
 import type { MNAEngine } from "../../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import { isPoolBacked } from "../../element.js";
+import { computeIntegrationCoefficients } from "../../integration.js";
 import { captureTopology, createStepCaptureHook, buildElementLabelMap } from "./capture.js";
+import { generateSpiceNetlist } from "./netlist-generator.js";
 import { compareSnapshots, findFirstDivergence } from "./compare.js";
 import { convergenceSummary } from "./query.js";
 import { NgspiceBridge } from "./ngspice-bridge.js";
-import { buildNodeMapping, reindexNgspiceSession } from "./node-mapping.js";
+import { buildDirectNodeMapping, reindexNgspiceSession } from "./node-mapping.js";
 import { DEVICE_MAPPINGS } from "./device-mappings.js";
 import { compileSlotMatcher } from "./glob.js";
 import type {
@@ -90,8 +91,6 @@ function _zeroDcopCoefficients(): IntegrationCoefficients {
 export interface ComparisonSessionOptions {
   /** Path to .dts circuit file (our engine format). */
   dtsPath: string;
-  /** Path to .cir SPICE netlist (ngspice format). */
-  cirPath: string;
   /** Path to ngspice DLL. Defaults to NGSPICE_DLL_PATH env or standard build location. */
   dllPath?: string;
   /** Tolerance overrides. */
@@ -116,22 +115,6 @@ function getDllPath(opts: ComparisonSessionOptions): string {
     process.env.NGSPICE_DLL_PATH ??
     resolve(ROOT, "ref/ngspice/visualc-shared/x64/Release/bin/spice.dll")
   );
-}
-
-function stripControlBlock(cir: string): string {
-  let inControl = false;
-  return cir
-    .split("\n")
-    .filter((line) => {
-      const trimmed = line.trim().toLowerCase();
-      if (trimmed.startsWith(".control")) { inControl = true; return false; }
-      if (trimmed.startsWith(".endc")) { inControl = false; return false; }
-      if (inControl) return false;
-      if (trimmed.startsWith("meas ") || trimmed === "quit" || trimmed.startsWith("tran "))
-        return false;
-      return true;
-    })
-    .join("\n");
 }
 
 function makeComparedValue(
@@ -213,10 +196,16 @@ export class ComparisonSession {
     this._engine = this._coordinator.getAnalogEngine() as MNAEngine;
     const compiled = this._engine.compiled! as ConcreteCompiledAnalogCircuit;
     this._elementLabels = buildElementLabelMap(compiled);
+    // Assign labels to engine elements so NR's convergenceFailedElements
+    // uses the same names as captureElementStates (which reads elementLabels)
+    for (const [idx, lbl] of this._elementLabels) {
+      if (idx < this._engine.elements.length) {
+        (this._engine.elements[idx] as any).label = lbl;
+      }
+    }
     this._ourTopology = captureTopology(compiled, this._elementLabels);
 
-    const cirRaw = readFileSync(resolvePath(this._opts.cirPath), "utf-8");
-    this._cirClean = stripControlBlock(cirRaw);
+    this._cirClean = generateSpiceNetlist(compiled, this._elementLabels, "Auto-generated from " + this._opts.dtsPath);
   }
 
   /**
@@ -242,6 +231,8 @@ export class ComparisonSession {
       this._elementLabels,
     );
     this._engine.postIterationHook = stepCapture.hook;
+    this._engine.detailedConvergence = true;
+    this._engine.limitingCollector = [];
     this._engine.dcOperatingPoint();
     stepCapture.finalizeStep(0, 0, true, _zeroDcopCoefficients(), "dcop");
 
@@ -291,15 +282,42 @@ export class ComparisonSession {
       this._elementLabels,
     );
     this._engine.postIterationHook = stepCapture.hook;
+    this._engine.detailedConvergence = true;
+    this._engine.limitingCollector = [];
 
     const maxSteps = this._opts.maxOurSteps ?? 5000;
     for (let s = 0; s < maxSteps; s++) {
       try {
         this._coordinator.step();
-        stepCapture.finalizeStep(this._engine.simTime, this._engine.lastDt, true, _zeroDcopCoefficients(), "tranFloat");
+        const dt = this._engine.lastDt;
+        const engineAny = this._engine as any;
+        const deltaOld: readonly number[] = engineAny._timestep?.deltaOld ?? [dt, dt, dt, dt];
+        const h1 = deltaOld[1] ?? dt;
+        const h2 = deltaOld[2] ?? h1;
+        const order = this._engine.integrationOrder;
+        const rawMethod: string = engineAny._timestep?.currentMethod ?? "bdf1";
+        const ourMethod: "backwardEuler" | "trapezoidal" | "gear2" =
+          rawMethod === "trapezoidal" ? "trapezoidal"
+          : rawMethod === "bdf2" ? "gear2"
+          : "backwardEuler";
+        const { ag0, ag1 } = computeIntegrationCoefficients(dt, h1, h2, order, rawMethod as any);
+        const coefficients: IntegrationCoefficients = {
+          ours: { ag0, ag1, method: ourMethod, order },
+          ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+        };
+        const phase = this._coordinator.analysisPhase;
+        // Derive converged from the last captured iteration's NR flags
+        // rather than hardcoding true — coordinator.step() not throwing
+        // doesn't guarantee NR convergence.
+        const lastSnaps = stepCapture.peekIterations();
+        const lastSnap = lastSnaps.length > 0 ? lastSnaps[lastSnaps.length - 1] : null;
+        const stepConverged = lastSnap ? (lastSnap.globalConverged && lastSnap.elemConverged) : true;
+        stepCapture.finalizeStep(this._engine.simTime, dt, stepConverged, coefficients, phase);
         if (this._engine.simTime >= tStop) break;
       } catch (e: any) {
-        stepCapture.finalizeStep(this._engine.simTime, this._engine.lastDt, false, _zeroDcopCoefficients(), "tranFloat");
+        const dt = this._engine.lastDt;
+        const phase = this._coordinator.analysisPhase;
+        stepCapture.finalizeStep(this._engine.simTime, dt, false, _zeroDcopCoefficients(), phase);
         this.errors.push(`Our engine failed at step ${s}: ${e.message}`);
         break;
       }
@@ -328,6 +346,24 @@ export class ComparisonSession {
 
     this._reindexNgSession();
     this._buildTimeAlignment();
+    this._mergeNgspiceCoefficients();
+  }
+
+  /**
+   * After both runs complete, copy ngspice integration coefficients into
+   * ourSession steps using time alignment so getIntegrationCoefficients()
+   * returns both sides.
+   */
+  private _mergeNgspiceCoefficients(): void {
+    if (!this._ourSession || !this._ngSessionReindexed) return;
+    const ngSteps = this._ngSessionReindexed.steps;
+    for (const [ourIdx, ngIdx] of this._alignedNgIndex) {
+      const ourStep = this._ourSession.steps[ourIdx];
+      const ngStep = ngSteps[ngIdx];
+      if (ourStep && ngStep) {
+        ourStep.integrationCoefficients.ngspice = ngStep.integrationCoefficients.ngspice;
+      }
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -1053,10 +1089,11 @@ export class ComparisonSession {
       }
     }
 
-    // Apply threshold filter
-    const filtered = opts?.threshold !== undefined
-      ? allEntries.filter((e) => e.absDelta > opts.threshold!)
-      : allEntries;
+    // Apply threshold filter and discard non-finite deltas (NaN/Infinity from
+    // missing ngspice data on one side of the comparison)
+    const filtered = allEntries.filter((e) =>
+      Number.isFinite(e.absDelta) &&
+      (opts?.threshold === undefined || e.absDelta > opts.threshold!));
 
     // Sort by absDelta descending
     filtered.sort((a, b) => b.absDelta - a.absDelta);
@@ -1370,10 +1407,10 @@ export class ComparisonSession {
       const ngEv = ngEvents.find(e => e.junction === junction);
       const ourPreLimit = ourEv?.vBefore ?? NaN;
       const ourPostLimit = ourEv?.vAfter ?? NaN;
-      const ourDelta = ourPreLimit - ourPostLimit;
+      const ourDelta = ourPostLimit - ourPreLimit;
       const ngspicePreLimit = ngEv?.vBefore ?? NaN;
       const ngspicePostLimit = ngEv?.vAfter ?? NaN;
-      const ngspiceDelta = ngspicePreLimit - ngspicePostLimit;
+      const ngspiceDelta = ngspicePostLimit - ngspicePreLimit;
       const limitingDiff = ourDelta - ngspiceDelta;
       return {
         junction,
@@ -1587,7 +1624,8 @@ export class ComparisonSession {
   private _buildNodeMapping(bridge: NgspiceBridge): void {
     const ngTopo = bridge.getTopology();
     if (ngTopo) {
-      this._nodeMap = buildNodeMapping(this._ourTopology, ngTopo);
+      this._nodeMap = buildDirectNodeMapping(
+        this._ourTopology, ngTopo, this._engine.elements, this._elementLabels);
     }
   }
 

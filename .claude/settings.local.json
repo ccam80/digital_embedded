@@ -98,6 +98,13 @@
       "mcp__codebase-memory-mcp__index_status",
       "mcp__circuit-simulator__circuit_convergence_log",
       "mcp__circuit-simulator__circuit_step",
+      "mcp__circuit-simulator__harness_start",
+      "mcp__circuit-simulator__harness_run",
+      "mcp__circuit-simulator__harness_describe",
+      "mcp__circuit-simulator__harness_dispose",
+      "mcp__circuit-simulator__harness_query",
+      "mcp__circuit-simulator__harness_compare_matrix",
+      "mcp__circuit-simulator__harness_export",
       "Write"
     ]
   },

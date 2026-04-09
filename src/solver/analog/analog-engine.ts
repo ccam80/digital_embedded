@@ -362,6 +362,8 @@ export class MNAEngine implements AnalogEngine {
         prevVoltagesBuffer: this._nrPrevVoltages,
         enableBlameTracking: logging,
         postIterationHook: this.postIterationHook ?? undefined,
+        detailedConvergence: this.detailedConvergence,
+        limitingCollector: this.limitingCollector,
         preIterationHook: (_iteration, iterVoltages) => {
           const currentMethod = this._timestep.currentMethod;
           for (const el of elements) {
@@ -655,6 +657,8 @@ export class MNAEngine implements AnalogEngine {
       diagnostics: this._diagnostics,
       statePool: cac.statePool ?? null,
       postIterationHook: this.postIterationHook ?? undefined,
+      detailedConvergence: this.detailedConvergence,
+      limitingCollector: this.limitingCollector,
     });
 
     if (result.converged) {
@@ -887,6 +891,12 @@ export class MNAEngine implements AnalogEngine {
     limitingEvents: LimitingEvent[],
     convergenceFailedElements: string[],
   ) => void) | null = null;
+
+  /** When true, NR collects all failing element indices instead of short-circuiting. */
+  detailedConvergence = false;
+
+  /** When non-null, elements push LimitingEvent objects here during NR iterations. */
+  limitingCollector: LimitingEvent[] | null = null;
 
   // -------------------------------------------------------------------------
   // AnalogEngine interface — Breakpoints
