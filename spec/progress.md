@@ -142,3 +142,24 @@
   - `src/solver/analog/__tests__/harness/comparison-session.ts` — added 9 new methods (getMatrixLabeled, getRhsLabeled, compareMatrixAt, getIntegrationCoefficients, getLimitingComparison, getConvergenceDetail, toJSON, static create, dispose); enhanced 5 existing methods (traceComponent with slots/stepsRange/onlyDivergences/offset/limit opts, traceNode with stepsRange/onlyDivergences/offset/limit opts, getIterations gains perElementConvergence array, getSummary gains perDeviceType/integrationMethod/stateHistoryIssues, _ensureRun checks _disposed); added _disposed field; added imports for SessionReport/LabeledMatrix/LabeledRhs/MatrixComparison/IntegrationCoefficientsReport/LimitingComparisonReport/ConvergenceDetailReport from types.js and float64ToArray/mapToRecord from format.js
   - `src/solver/analog/__tests__/harness/query-methods.test.ts` — added 20 new tests (40-59) covering getMatrixLabeled/getRhsLabeled/compareMatrixAt (4), getIntegrationCoefficients (2), getLimitingComparison (2), getConvergenceDetail (2), toJSON (3), enhanced traceComponent/traceNode (2), static create (1), dispose (1), getComponentSlots edge cases (3)
 - **Tests**: 59/59 passing in query-methods.test.ts; 123/123 passing in full harness suite
+
+## Task S2-A: HarnessSessionState + FormattedNumber/serialization utilities
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: scripts/mcp/__tests__/harness-session-state.test.ts, scripts/mcp/__tests__/harness-format.test.ts
+- **Files modified**: scripts/mcp/harness-session-state.ts, scripts/mcp/harness-format.ts
+- **Tests**: 31/31 passing
+
+## Task S2-B: harness_start, harness_run, harness_describe, harness_dispose
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `scripts/mcp/__tests__/harness-tools.test.ts`
+- **Files modified**: `scripts/mcp/harness-tools.ts`, `scripts/circuit-mcp-server.ts`
+- **Tests**: 28/28 passing
+
+## Task S2-C: harness_query + harness_compare_matrix + harness_export
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: `scripts/mcp/harness-tools.ts`, `scripts/mcp/__tests__/harness-tools.test.ts`
+- **Tests**: 63/63 passing (harness-tools.test.ts); full suite 5 pre-existing failures unchanged

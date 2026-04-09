@@ -1,0 +1,10 @@
+import { writeFileSync } from "fs";
+const t = [];
+t.push(import { describe, it, expect, vi, beforeEach } from "vitest";);
+t.push(import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";);
+t.push(import { HarnessSessionState } from "../harness-session-state.js";);
+t.push(import { registerHarnessTools } from "../harness-tools.js";);
+t.push();
+t.push(const mockTopology = {);
+t.push(  matrixSize: 4, nodeCount: 3, branchCount: 1, elementCount: 2,);
+t.push(  elements: [);

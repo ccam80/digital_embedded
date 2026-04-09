@@ -16,6 +16,8 @@ import { SessionState } from "./mcp/tool-helpers.js";
 import { registerCircuitTools } from "./mcp/circuit-tools.js";
 import { registerTutorialTools } from "./mcp/tutorial-tools.js";
 import { registerSimulationTools } from "./mcp/simulation-tools.js";
+import { HarnessSessionState } from "./mcp/harness-session-state.js";
+import { registerHarnessTools } from "./mcp/harness-tools.js";
 
 // ---------------------------------------------------------------------------
 // Registry + facade (initialized once)
@@ -24,6 +26,7 @@ import { registerSimulationTools } from "./mcp/simulation-tools.js";
 const registry = createDefaultRegistry();
 const facade = new DefaultSimulatorFacade(registry);
 const session = new SessionState();
+const harnessState = new HarnessSessionState();
 
 // ---------------------------------------------------------------------------
 // MCP Server
@@ -36,13 +39,18 @@ const server = new McpServer(
     instructions:
       "Use this server to load, inspect, build, patch, compile, and test digital, analog, and mixed-signal circuits. " +
       "Always start with circuit_load or circuit_build to get a handle, then use circuit_netlist to inspect topology. " +
-      "Addresses use the format 'componentLabel:pinLabel'. Read netlist output to get exact addresses for patches.",
+      "Addresses use the format 'componentLabel:pinLabel'. Read netlist output to get exact addresses for patches. " +
+      "To compare our engine against ngspice: use harness_start to create a session, " +
+      "harness_run to execute analysis, then harness_query or harness_compare_matrix " +
+      "to inspect results. harness_describe shows circuit topology. " +
+      "harness_dispose releases resources when done.",
   },
 );
 
 registerCircuitTools(server, facade, registry, session);
 registerTutorialTools(server, facade, registry, session);
 registerSimulationTools(server, facade, registry, session);
+registerHarnessTools(server, harnessState);
 
 // ---------------------------------------------------------------------------
 // Start server

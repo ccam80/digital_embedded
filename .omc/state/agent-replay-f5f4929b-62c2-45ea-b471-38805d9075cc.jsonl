@@ -28,3 +28,8 @@
 {"t":0,"agent":"aeba6d8","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true}
 {"t":0,"agent":"abf18cc","agent_type":"claude-orchestrator:implementer","event":"agent_start","parent_mode":"none"}
 {"t":0,"agent":"abf18cc","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true}
+{"t":0,"agent":"a9c52f5","agent_type":"claude-orchestrator:implementer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a9c52f5","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true}
+{"t":0,"agent":"a4238e7","agent_type":"claude-orchestrator:implementer","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"aeedd60","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"a4238e7","agent_type":"claude-orchestrator:implementer","event":"agent_stop","success":true}
