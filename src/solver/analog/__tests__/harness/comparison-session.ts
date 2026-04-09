@@ -44,8 +44,16 @@ import type {
   SessionSummary,
   Tolerance,
   ComparisonResult,
+  IntegrationCoefficients,
 } from "./types.js";
 import { DEFAULT_TOLERANCE } from "./types.js";
+
+function _zeroDcopCoefficients(): IntegrationCoefficients {
+  return {
+    ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+    ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+  };
+}
 
 // ============================================================================
 // Options
@@ -201,7 +209,7 @@ export class ComparisonSession {
     );
     this._engine.postIterationHook = stepCapture.hook;
     this._engine.dcOperatingPoint();
-    stepCapture.finalizeStep(0, 0, true);
+    stepCapture.finalizeStep(0, 0, true, _zeroDcopCoefficients(), "dcop");
 
     this._ourSession = {
       source: "ours",
@@ -253,10 +261,10 @@ export class ComparisonSession {
     for (let s = 0; s < maxSteps; s++) {
       try {
         this._coordinator.step();
-        stepCapture.finalizeStep(this._engine.simTime, this._engine.lastDt, true);
+        stepCapture.finalizeStep(this._engine.simTime, this._engine.lastDt, true, _zeroDcopCoefficients(), "tranFloat");
         if (this._engine.simTime >= tStop) break;
       } catch (e: any) {
-        stepCapture.finalizeStep(this._engine.simTime, this._engine.lastDt, false);
+        stepCapture.finalizeStep(this._engine.simTime, this._engine.lastDt, false, _zeroDcopCoefficients(), "tranFloat");
         this.errors.push(`Our engine failed at step ${s}: ${e.message}`);
         break;
       }
@@ -379,12 +387,12 @@ export class ComparisonSession {
       }
 
       // RHS
-      if (ourIter && ourIter.rhs.length > 0) {
+      if (ourIter && ourIter.preSolveRhs.length > 0) {
         this._ourTopology.nodeLabels.forEach((label, nodeId) => {
-          const ourR = nodeId > 0 && nodeId - 1 < ourIter.rhs.length
-            ? ourIter.rhs[nodeId - 1] : 0;
-          const ngR = ngIter?.rhs && nodeId > 0 && nodeId - 1 < ngIter.rhs.length
-            ? ngIter.rhs[nodeId - 1] : NaN;
+          const ourR = nodeId > 0 && nodeId - 1 < ourIter.preSolveRhs.length
+            ? ourIter.preSolveRhs[nodeId - 1] : 0;
+          const ngR = ngIter?.preSolveRhs && nodeId > 0 && nodeId - 1 < ngIter.preSolveRhs.length
+            ? ngIter.preSolveRhs[nodeId - 1] : NaN;
           rhs[label] = makeComparedValue(ourR, ngR, this._tol.iAbsTol, this._tol.relTol);
         });
       }
@@ -623,7 +631,7 @@ export class ComparisonSession {
   private _emptyNgSession(): CaptureSession {
     return {
       source: "ngspice",
-      topology: { matrixSize: 0, nodeCount: 0, branchCount: 0, elementCount: 0, elements: [], nodeLabels: new Map() },
+      topology: { matrixSize: 0, nodeCount: 0, branchCount: 0, elementCount: 0, elements: [], nodeLabels: new Map(), matrixRowLabels: new Map(), matrixColLabels: new Map() },
       steps: [],
     };
   }

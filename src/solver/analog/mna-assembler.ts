@@ -14,6 +14,7 @@
 
 import type { SparseSolver } from "./sparse-solver.js";
 import type { AnalogElement } from "./element.js";
+import type { LimitingEvent } from "./newton-raphson.js";
 
 // ---------------------------------------------------------------------------
 // MNAAssembler
@@ -102,22 +103,26 @@ export class MNAAssembler {
    * Update internal linearization state for all nonlinear elements from the
    * latest NR solution vector.
    *
-   * Calls `element.updateOperatingPoint!(voltages)` for each element where
-   * `isNonlinear === true` and `updateOperatingPoint` is implemented.
+   * Calls `element.updateOperatingPoint!(voltages, limitingCollector)` for each
+   * element where `isNonlinear === true` and `updateOperatingPoint` is implemented.
    *
    * Called after `solver.solve()` and before the next `stampNonlinear`.
    *
-   * @param elements - The full element list for this circuit.
-   * @param voltages - The current MNA solution vector.
+   * @param elements         - The full element list for this circuit.
+   * @param voltages         - The current MNA solution vector.
+   * @param limitingCollector - When non-null, passed to each element so it can
+   *   push LimitingEvent records for harness instrumentation. Null when harness
+   *   capture is inactive (zero-overhead path).
    */
   updateOperatingPoints(
     elements: readonly AnalogElement[],
     voltages: Float64Array,
+    limitingCollector: LimitingEvent[] | null = null,
   ): void {
     this.noncon = 0;
     for (const el of elements) {
       if (el.isNonlinear && el.updateOperatingPoint) {
-        const limited = el.updateOperatingPoint(voltages);
+        const limited = el.updateOperatingPoint(voltages, limitingCollector);
         if (limited) this.noncon++;
       }
     }

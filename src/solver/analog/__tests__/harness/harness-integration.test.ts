@@ -13,7 +13,12 @@ import { captureTopology, captureElementStates, createIterationCaptureHook, crea
 import { convergenceSummary, nodeVoltageTrajectory, findLargestDelta, querySteps } from "./query.js";
 import { compareSnapshots, formatComparison, findFirstDivergence } from "./compare.js";
 import { canonicalizeNgspiceName, canonicalizeOurLabel, buildNodeMapping } from "./node-mapping.js";
-import type { CaptureSession, NgspiceTopology } from "./types.js";
+import type { CaptureSession, NgspiceTopology, IntegrationCoefficients } from "./types.js";
+
+const ZERO_INTEG_COEFF: IntegrationCoefficients = {
+  ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+  ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+};
 import { DEVICE_MAPPINGS } from "./device-mappings.js";
 
 function buildStatePool(elements: AnalogElementCore[]): StatePool {
@@ -87,7 +92,7 @@ describe("harness integration", () => {
     expect(first.iteration).toBe(0);
     expect(first.voltages).toBeInstanceOf(Float64Array);
     expect(first.voltages.length).toBeGreaterThan(0);
-    expect(first.rhs).toBeInstanceOf(Float64Array);
+    expect(first.preSolveRhs).toBeInstanceOf(Float64Array);
     expect(first.matrix.length).toBeGreaterThan(0);
     expect(typeof first.noncon).toBe("number");
     expect(typeof first.globalConverged).toBe("boolean");
@@ -102,7 +107,7 @@ describe("harness integration", () => {
     const { circuit, pool } = makeHWR();
     engine.init(circuit);
     let hookCallCount = 0;
-    engine.postIterationHook = (_i: number, _v: Float64Array, _p: Float64Array, _n: number, _g: boolean, _e: boolean) => { hookCallCount++; };
+    engine.postIterationHook = (_i: number, _v: Float64Array, _p: Float64Array, _n: number, _g: boolean, _e: boolean, _le: unknown[], _cf: string[]) => { hookCallCount++; };
     const result = engine.dcOperatingPoint();
     expect(result.converged).toBe(true);
     expect(hookCallCount).toBeGreaterThan(0);
@@ -113,7 +118,7 @@ describe("harness integration", () => {
     engine.init(circuit);
     let hookCallCount = 0;
     let lastGlobalConverged = false;
-    engine.postIterationHook = (_i: number, _v: Float64Array, _p: Float64Array, _n: number, g: boolean, _e: boolean) => {
+    engine.postIterationHook = (_i: number, _v: Float64Array, _p: Float64Array, _n: number, g: boolean, _e: boolean, _le: unknown[], _cf: string[]) => {
       hookCallCount++;
       lastGlobalConverged = g;
     };
@@ -129,11 +134,11 @@ describe("harness integration", () => {
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.hook;
     engine.dcOperatingPoint();
-    capture.finalizeStep(0, 0, true);
+    capture.finalizeStep(0, 0, true, ZERO_INTEG_COEFF, "dcop");
     for (let i = 0; i < 10; i++) {
       engine.step();
       if (engine.getState() === EngineState.ERROR) break;
-      capture.finalizeStep(engine.simTime, 0, true);
+      capture.finalizeStep(engine.simTime, 0, true, ZERO_INTEG_COEFF, "tranFloat");
     }
     const steps = capture.getSteps();
     expect(steps.length).toBeGreaterThan(1);
@@ -147,11 +152,11 @@ describe("harness integration", () => {
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.hook;
     engine.dcOperatingPoint();
-    capture.finalizeStep(0, 0, true);
+    capture.finalizeStep(0, 0, true, ZERO_INTEG_COEFF, "dcop");
     for (let i = 0; i < 5; i++) {
       engine.step();
       if (engine.getState() === EngineState.ERROR) break;
-      capture.finalizeStep(engine.simTime, 0, true);
+      capture.finalizeStep(engine.simTime, 0, true, ZERO_INTEG_COEFF, "tranFloat");
     }
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     const summary = convergenceSummary(session);
@@ -167,11 +172,11 @@ describe("harness integration", () => {
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.hook;
     engine.dcOperatingPoint();
-    capture.finalizeStep(0, 0, true);
+    capture.finalizeStep(0, 0, true, ZERO_INTEG_COEFF, "dcop");
     for (let i = 0; i < 5; i++) {
       engine.step();
       if (engine.getState() === EngineState.ERROR) break;
-      capture.finalizeStep(engine.simTime, 0, true);
+      capture.finalizeStep(engine.simTime, 0, true, ZERO_INTEG_COEFF, "tranFloat");
     }
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     const trajectory = nodeVoltageTrajectory(session, 0);
@@ -185,7 +190,7 @@ describe("harness integration", () => {
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.hook;
     engine.dcOperatingPoint();
-    capture.finalizeStep(0, 0, true);
+    capture.finalizeStep(0, 0, true, ZERO_INTEG_COEFF, "dcop");
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     expect(querySteps(session, { converged: true }).length).toBe(session.steps.length);
     expect(querySteps(session, { converged: false }).length).toBe(0);
@@ -197,7 +202,7 @@ describe("harness integration", () => {
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.hook;
     engine.dcOperatingPoint();
-    capture.finalizeStep(0, 0, true);
+    capture.finalizeStep(0, 0, true, ZERO_INTEG_COEFF, "dcop");
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     const results = compareSnapshots(session, session);
     expect(results.length).toBeGreaterThan(0);
@@ -213,7 +218,7 @@ describe("harness integration", () => {
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.hook;
     engine.dcOperatingPoint();
-    capture.finalizeStep(0, 0, true);
+    capture.finalizeStep(0, 0, true, ZERO_INTEG_COEFF, "dcop");
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     const formatted = formatComparison(compareSnapshots(session, session)[0]);
     expect(formatted).toContain("Step 0");
@@ -226,7 +231,7 @@ describe("harness integration", () => {
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.hook;
     engine.dcOperatingPoint();
-    capture.finalizeStep(0, 0, true);
+    capture.finalizeStep(0, 0, true, ZERO_INTEG_COEFF, "dcop");
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     expect(findFirstDivergence(compareSnapshots(session, session))).toBeNull();
   });
@@ -289,7 +294,7 @@ describe("harness integration", () => {
     capture.finalizeAttempt(1e-9, false); // failed attempt
 
     engine.dcOperatingPoint();
-    capture.finalizeStep(0, 5e-10, true); // accepted attempt with smaller dt
+    capture.finalizeStep(0, 5e-10, true, ZERO_INTEG_COEFF, "dcop"); // accepted attempt with smaller dt
 
     const steps = capture.getSteps();
     expect(steps.length).toBe(1);
@@ -310,7 +315,7 @@ describe("harness integration", () => {
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.hook;
     engine.dcOperatingPoint();
-    capture.finalizeStep(0, 0, true);
+    capture.finalizeStep(0, 0, true, ZERO_INTEG_COEFF, "dcop");
     const steps = capture.getSteps();
     expect(steps.length).toBe(1);
     // No retries → attempts should be undefined (backward compat)
@@ -356,7 +361,7 @@ describe("harness integration", () => {
     const capture = createStepCaptureHook(engine.solver!, engine.elements, pool);
     engine.postIterationHook = capture.hook;
     engine.dcOperatingPoint();
-    capture.finalizeStep(0, 0, true);
+    capture.finalizeStep(0, 0, true, ZERO_INTEG_COEFF, "dcop");
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     const result = findLargestDelta(session, 1);
     expect(result).not.toBeNull();
@@ -408,6 +413,8 @@ describe("node mapping", () => {
       matrixSize: 3, nodeCount: 2, branchCount: 1, elementCount: 2,
       elements: [],
       nodeLabels: new Map<number, string>([[1, "Q1:C"], [2, "Q1:B"]]),
+      matrixRowLabels: new Map<number, string>(),
+      matrixColLabels: new Map<number, string>(),
     };
     const ngTopology: NgspiceTopology = {
       matrixSize: 3, numStates: 10,

@@ -77,10 +77,10 @@ export function compareSnapshots(
 
       // RHS diffs
       const rhsDiffs: ComparisonResult["rhsDiffs"] = [];
-      const rhsLen = Math.min(ourIter.rhs.length, refIter.rhs.length);
+      const rhsLen = Math.min(ourIter.preSolveRhs.length, refIter.preSolveRhs.length);
       for (let r = 0; r < rhsLen; r++) {
-        const o = ourIter.rhs[r];
-        const t = refIter.rhs[r];
+        const o = ourIter.preSolveRhs[r];
+        const t = refIter.preSolveRhs[r];
         const absDelta = Math.abs(o - t);
         rhsDiffs.push({
           index: r,

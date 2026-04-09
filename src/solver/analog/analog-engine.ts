@@ -26,6 +26,7 @@ import type { StepRecord } from "./convergence-log.js";
 
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import { newtonRaphson } from "./newton-raphson.js";
+import type { LimitingEvent } from "./newton-raphson.js";
 import type { AnalogElement, PoolBackedAnalogElement } from "./element.js";
 import { isPoolBacked } from "./element.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledWithBridges } from "./compiled-analog-circuit.js";
@@ -883,6 +884,8 @@ export class MNAEngine implements AnalogEngine {
     noncon: number,
     globalConverged: boolean,
     elemConverged: boolean,
+    limitingEvents: LimitingEvent[],
+    convergenceFailedElements: string[],
   ) => void) | null = null;
 
   // -------------------------------------------------------------------------

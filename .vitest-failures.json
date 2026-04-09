@@ -1,38 +1,56 @@
 {
   "summary": {
-    "passed": 7984,
+    "passed": 8048,
     "failed": 4,
     "skipped": 0,
-    "totalFiles": 342,
+    "totalFiles": 347,
     "durationSeconds": 12.7
   },
   "failures": [
     {
-      "message": "Analog engine stagnation: simTime stuck at 5.000004768371584e-9s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
-      "count": 4,
+      "message": "Analog engine stagnation: simTime stuck at 1.0000000000000003e-9s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
+      "count": 1,
       "locations": [
         {
           "file": "src\\solver\\coordinator.ts",
           "test": "transient stepping does not error after 50 steps",
-          "line": 196,
+          "line": 201,
           "column": 13
-        },
+        }
+      ]
+    },
+    {
+      "message": "Engine entered ERROR state at step 2, simTime=1.0000000000000003e-9",
+      "count": 1,
+      "locations": [
         {
-          "file": "src\\solver\\coordinator.ts",
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
           "test": "survives 2000 transient steps without ERROR state",
-          "line": 196,
-          "column": 13
-        },
+          "line": 79,
+          "column": 15
+        }
+      ]
+    },
+    {
+      "message": "Engine ERROR at step 2, simTime=1.000e-9",
+      "count": 1,
+      "locations": [
         {
-          "file": "src\\solver\\coordinator.ts",
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
           "test": "survives 600µs of sim time (matches UI run duration)",
-          "line": 196,
-          "column": 13
-        },
+          "line": 103,
+          "column": 15
+        }
+      ]
+    },
+    {
+      "message": "step 1 transitioned engine to ERROR (simTime=1.0000000000000003e-9): expected 'ERROR' not to be 'ERROR' // Object.is equality",
+      "count": 1,
+      "locations": [
         {
-          "file": "src\\solver\\coordinator.ts",
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-mcp-surface.test.ts",
           "test": "50 steps advance simTime > 0 without ERROR (regression: stale t=0 breakpoints must not freeze getClampedDt)",
-          "line": 196,
+          "line": 74,
           "column": 13
         }
       ]

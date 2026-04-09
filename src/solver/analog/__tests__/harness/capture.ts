@@ -14,6 +14,8 @@ import type {
   StepSnapshot,
   ElementStateSnapshot,
   NRAttempt,
+  LimitingEvent,
+  IntegrationCoefficients,
 } from "./types.js";
 
 // ---------------------------------------------------------------------------
@@ -125,8 +127,9 @@ export function captureTopology(
   // Strategy 3: Reverse-map from elements array (always works)
   if (nodeLabels.size === 0) {
     const perNode = new Map<number, string[]>();
-    for (const el of compiled.elements) {
-      const elLabel = el.label ?? `element`;
+    for (let i = 0; i < compiled.elements.length; i++) {
+      const el = compiled.elements[i];
+      const elLabel = elementLabels?.get(i) ?? `element_${i}`;
       for (let p = 0; p < el.pinNodeIds.length; p++) {
         const nodeId = el.pinNodeIds[p];
         if (nodeId === 0) continue;
@@ -144,6 +147,37 @@ export function captureTopology(
     }
   }
 
+  // Build matrix row/col label maps
+  const matrixRowLabels = new Map<number, string>();
+  const matrixColLabels = new Map<number, string>();
+
+  // Rows 0..nodeCount-1 map to voltage nodes (nodeId is 1-based)
+  nodeLabels.forEach((label, nodeId) => {
+    const row = nodeId - 1;
+    if (row >= 0 && row < compiled.nodeCount) {
+      matrixRowLabels.set(row, label);
+      matrixColLabels.set(row, label);
+    }
+  });
+
+  // Rows nodeCount..matrixSize-1 are branch currents from voltage sources and inductors
+  const e2ce = compiled.elementToCircuitElement;
+  let branchOffset = 0;
+  for (let i = 0; i < compiled.elements.length; i++) {
+    const label = elementLabels?.get(i) ?? `element_${i}`;
+    const typeId = e2ce?.get(i)?.typeId ?? "";
+    const isBranchElement =
+      typeId === "DcVoltageSource" ||
+      typeId === "AcVoltageSource" ||
+      typeId === "Inductor";
+    if (isBranchElement) {
+      const branchRow = compiled.nodeCount + branchOffset;
+      matrixRowLabels.set(branchRow, `${label}:branch`);
+      matrixColLabels.set(branchRow, `${label}:branch`);
+      branchOffset++;
+    }
+  }
+
   return {
     matrixSize: compiled.matrixSize,
     nodeCount: compiled.nodeCount,
@@ -157,6 +191,8 @@ export function captureTopology(
       pinNodeIds: el.pinNodeIds,
     })),
     nodeLabels,
+    matrixRowLabels,
+    matrixColLabels,
   };
 }
 
@@ -177,6 +213,8 @@ export function captureElementStates(
   if (!statePool) return [];
   const snapshots: ElementStateSnapshot[] = [];
   const s0 = statePool.state0;
+  const s1 = statePool.state1;
+  const s2 = statePool.state2;
 
   for (let i = 0; i < elements.length; i++) {
     const el = elements[i];
@@ -185,15 +223,22 @@ export function captureElementStates(
     const schema = el.stateSchema;
     const base = el.stateBaseOffset;
     const slots: Record<string, number> = {};
+    const state1Slots: Record<string, number> = {};
+    const state2Slots: Record<string, number> = {};
 
     for (let s = 0; s < schema.slots.length; s++) {
-      slots[schema.slots[s].name] = s0[base + s];
+      const name = schema.slots[s].name;
+      slots[name] = s0[base + s];
+      if (s1) state1Slots[name] = s1[base + s];
+      if (s2) state2Slots[name] = s2[base + s];
     }
 
     snapshots.push({
       elementIndex: i,
       label: elementLabels?.get(i) ?? el.label ?? `element_${i}`,
       slots,
+      state1Slots,
+      state2Slots,
     });
   }
 
@@ -214,6 +259,8 @@ export type PostIterationHook = (
   noncon: number,
   globalConverged: boolean,
   elemConverged: boolean,
+  limitingEvents: LimitingEvent[],
+  convergenceFailedElements: string[],
 ) => void;
 
 /**
@@ -232,21 +279,25 @@ export function createIterationCaptureHook(
   statePool: StatePool | null,
   elementLabels?: Map<number, string>,
 ): { hook: PostIterationHook; getSnapshots: () => IterationSnapshot[]; clear: () => void } {
+  solver.enablePreSolveRhsCapture(true);
   let snapshots: IterationSnapshot[] = [];
 
   const hook: PostIterationHook = (
     iteration, voltages, prevVoltages, noncon, globalConverged, elemConverged,
+    limitingEvents, convergenceFailedElements,
   ) => {
     snapshots.push({
       iteration,
       voltages: voltages.slice(),
       prevVoltages: prevVoltages.slice(),
-      rhs: solver.getRhsSnapshot(),
+      preSolveRhs: solver.getPreSolveRhsSnapshot().slice(),
       matrix: solver.getCSCNonZeros(),
       elementStates: captureElementStates(elements, statePool, elementLabels),
       noncon,
       globalConverged,
       elemConverged,
+      limitingEvents,
+      convergenceFailedElements,
     });
   };
 
@@ -281,7 +332,13 @@ export function createStepCaptureHook(
 ): {
   hook: PostIterationHook;
   finalizeAttempt: (dt: number, converged: boolean) => void;
-  finalizeStep: (simTime: number, dt: number, converged: boolean) => void;
+  finalizeStep: (
+    simTime: number,
+    dt: number,
+    converged: boolean,
+    integrationCoefficients: IntegrationCoefficients,
+    analysisPhase: "dcop" | "tranInit" | "tranFloat",
+  ) => void;
   getSteps: () => StepSnapshot[];
   clear: () => void;
 } {
@@ -313,7 +370,13 @@ export function createStepCaptureHook(
      * Finalize the accepted step. The current iteration data becomes the
      * final attempt. All prior failed attempts are attached to the step.
      */
-    finalizeStep: (simTime: number, dt: number, converged: boolean) => {
+    finalizeStep: (
+      simTime: number,
+      dt: number,
+      converged: boolean,
+      integrationCoefficients: IntegrationCoefficients,
+      analysisPhase: "dcop" | "tranInit" | "tranFloat",
+    ) => {
       const iterations = iterCapture.getSnapshots();
       if (iterations.length > 0) {
         const acceptedAttempt: NRAttempt = {
@@ -334,6 +397,8 @@ export function createStepCaptureHook(
           converged,
           iterationCount: acceptedAttempt.iterationCount,
           attempts: allAttempts,
+          integrationCoefficients,
+          analysisPhase,
         });
       }
       iterCapture.clear();

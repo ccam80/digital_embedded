@@ -99,6 +99,32 @@ export interface TopologySnapshot {
   }>;
   /** Node label map for display. */
   nodeLabels: Map<number, string>;
+  /** Row index → label (voltage node or branch current). */
+  matrixRowLabels: Map<number, string>;
+  /** Column index → label. */
+  matrixColLabels: Map<number, string>;
+}
+
+// ---------------------------------------------------------------------------
+// Limiting event — captured per junction per NR iteration
+// ---------------------------------------------------------------------------
+
+/** Voltage limiting event for one junction in one NR iteration. */
+export interface LimitingEvent {
+  /** Element index in compiled.elements[]. */
+  elementIndex: number;
+  /** Element label. */
+  label: string;
+  /** Junction name: "BE", "BC", "GS", "DS", "AK", etc. */
+  junction: string;
+  /** Limiting function applied. */
+  limitType: "pnjlim" | "fetlim" | "limvds";
+  /** Input voltage before limiting. */
+  vBefore: number;
+  /** Output voltage after limiting. */
+  vAfter: number;
+  /** Whether limiting was actually applied (vAfter differs from vBefore). */
+  wasLimited: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,10 +139,8 @@ export interface IterationSnapshot {
   voltages: Float64Array;
   /** Node voltages from previous iteration (copy). */
   prevVoltages: Float64Array;
-  /** RHS vector snapshot (copy) — the loaded RHS before solve (stamp contributions). */
-  rhs: Float64Array;
-  /** Pre-solve RHS (if available from ngspice extended callback). */
-  preSolveRhs?: Float64Array;
+  /** RHS after stamp assembly, before factorization and solve. */
+  preSolveRhs: Float64Array;
   /** Assembled matrix non-zeros. */
   matrix: MatrixEntry[];
   /** Per-element device state (if pool-backed). */
@@ -127,6 +151,12 @@ export interface IterationSnapshot {
   globalConverged: boolean;
   /** Element convergence flag. */
   elemConverged: boolean;
+  /** Limiting events recorded during this iteration. */
+  limitingEvents: LimitingEvent[];
+  /** Our element labels that failed convergence this iteration. Empty on converged iteration. */
+  convergenceFailedElements: string[];
+  /** ngspice device names that failed convergence this iteration (from C callback). */
+  ngspiceConvergenceFailedDevices?: string[];
 }
 
 /** Device state for one element at one iteration. */
@@ -135,8 +165,22 @@ export interface ElementStateSnapshot {
   elementIndex: number;
   /** Element label. */
   label: string;
-  /** Named state values (slot name -> value). */
+  /** Named state values (slot name -> value). State at current timepoint (state0). */
   slots: Record<string, number>;
+  /** State at previous timepoint (state1). Empty Record for non-pool elements. */
+  state1Slots: Record<string, number>;
+  /** State two timepoints ago (state2). Empty Record for non-pool elements. */
+  state2Slots: Record<string, number>;
+}
+
+// ---------------------------------------------------------------------------
+// Integration coefficients — captured per step for both engines
+// ---------------------------------------------------------------------------
+
+/** Integration coefficients ag0/ag1 for a single timestep, from both engines. */
+export interface IntegrationCoefficients {
+  ours: { ag0: number; ag1: number; method: "backwardEuler" | "trapezoidal" | "gear2"; order: number };
+  ngspice: { ag0: number; ag1: number; method: string; order: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +226,10 @@ export interface StepSnapshot {
    * Useful for distinguishing DC OP phases, transient init, float, etc.
    */
   cktMode?: number;
+  /** Integration coefficients for this step, populated for both engines. */
+  integrationCoefficients: IntegrationCoefficients;
+  /** Analysis phase at this step. */
+  analysisPhase: "dcop" | "tranInit" | "tranFloat";
 }
 
 // ---------------------------------------------------------------------------
@@ -416,6 +464,10 @@ export interface RawNgspiceIterationEx {
   preSolveRhs: Float64Array;
   /** Full CKTstate0 flat array. */
   state0: Float64Array;
+  /** Full CKTstate1 flat array (previous timepoint). */
+  state1: Float64Array;
+  /** Full CKTstate2 flat array (prev-prev timepoint). */
+  state2: Float64Array;
   numStates: number;
   noncon: number;
   converged: boolean;
@@ -425,6 +477,26 @@ export interface RawNgspiceIterationEx {
   dt: number;
   /** CKTmode flags. */
   cktMode: number;
+  /** CKTag[0] — integration coefficient ag0. */
+  ag0: number;
+  /** CKTag[1] — integration coefficient ag1. */
+  ag1: number;
+  /** CKTintegrateMethod — 0=BE, 1=trap, 2=gear. */
+  integrateMethod: number;
+  /** CKTorder — integration order (1 or 2). */
+  order: number;
+  /** Assembled G matrix non-zeros for this iteration. */
+  matrix: MatrixEntry[];
+  /** ngspice device names that failed convergence this iteration. */
+  ngspiceConvergenceFailedDevices?: string[];
+  /** Voltage limiting events recorded during this iteration. */
+  limitingEvents: Array<{
+    deviceName: string;
+    junction: string;
+    vBefore: number;
+    vAfter: number;
+    wasLimited: boolean;
+  }>;
 }
 
 /**

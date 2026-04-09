@@ -263,21 +263,33 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 132,
-      "lastAccessed": 1775688284010,
+      "accessCount": 151,
+      "lastAccessed": 1775693970536,
       "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 85,
-      "lastAccessed": 1775649031596,
+      "accessCount": 86,
+      "lastAccessed": 1775692715381,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
-      "accessCount": 59,
-      "lastAccessed": 1775681354615,
+      "accessCount": 60,
+      "lastAccessed": 1775693012609,
       "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\element.ts",
+      "accessCount": 54,
+      "lastAccessed": 1775693674693,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\newton-raphson.ts",
+      "accessCount": 54,
+      "lastAccessed": 1775693993993,
+      "type": "directory"
     },
     {
       "path": "src\\components\\passives\\transmission-line.ts",
@@ -286,58 +298,46 @@
       "type": "file"
     },
     {
+      "path": "src",
+      "accessCount": 51,
+      "lastAccessed": 1775693966167,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\semiconductors\\mosfet.ts",
       "accessCount": 48,
       "lastAccessed": 1775638608290,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 46,
-      "lastAccessed": 1775688596571,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 45,
-      "lastAccessed": 1775689786884,
-      "type": "directory"
-    },
-    {
-      "path": "src",
-      "accessCount": 44,
-      "lastAccessed": 1775683197374,
-      "type": "directory"
-    },
-    {
       "path": "src\\solver\\analog",
-      "accessCount": 39,
-      "lastAccessed": 1775690691231,
+      "accessCount": 45,
+      "lastAccessed": 1775693679487,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\sparse-solver.ts",
+      "accessCount": 45,
+      "lastAccessed": 1775694005122,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\integration.ts",
-      "accessCount": 38,
-      "lastAccessed": 1775690700132,
+      "accessCount": 40,
+      "lastAccessed": 1775692731991,
       "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\timestep.ts",
+      "accessCount": 34,
+      "lastAccessed": 1775693066147,
+      "type": "directory"
     },
     {
       "path": "src\\components\\passives\\inductor.ts",
       "accessCount": 33,
       "lastAccessed": 1775644583148,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\sparse-solver.ts",
-      "accessCount": 33,
-      "lastAccessed": 1775689785588,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\timestep.ts",
-      "accessCount": 32,
-      "lastAccessed": 1775643360080,
-      "type": "directory"
     },
     {
       "path": "src\\components\\passives\\capacitor.ts",
@@ -358,15 +358,27 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\mna-assembler.ts",
+      "accessCount": 23,
+      "lastAccessed": 1775693659535,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
+      "accessCount": 22,
+      "lastAccessed": 1775692610690,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\passives\\__tests__\\transmission-line.test.ts",
       "accessCount": 21,
       "lastAccessed": 1775625141085,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
+      "path": "src\\solver\\analog\\__tests__\\integration.test.ts",
       "accessCount": 21,
-      "lastAccessed": 1775690698708,
+      "lastAccessed": 1775693089157,
       "type": "file"
     },
     {
@@ -376,28 +388,16 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\state-pool.ts",
+      "accessCount": 19,
+      "lastAccessed": 1775693660210,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\diode.ts",
       "accessCount": 18,
       "lastAccessed": 1775643405577,
       "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\state-pool.ts",
-      "accessCount": 18,
-      "lastAccessed": 1775690680861,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\mna-assembler.ts",
-      "accessCount": 17,
-      "lastAccessed": 1775688328271,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\integration.test.ts",
-      "accessCount": 15,
-      "lastAccessed": 1775624649912,
-      "type": "file"
     },
     {
       "path": "src\\core\\analog-types.ts",
@@ -406,15 +406,15 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 12,
-      "lastAccessed": 1775624650728,
+      "path": ".vitest-failures.json",
+      "accessCount": 13,
+      "lastAccessed": 1775693049017,
       "type": "file"
     },
     {
-      "path": ".vitest-failures.json",
-      "accessCount": 11,
-      "lastAccessed": 1775643136348,
+      "path": "src\\solver\\analog\\digital-pin-model.ts",
+      "accessCount": 12,
+      "lastAccessed": 1775624650728,
       "type": "file"
     },
     {
@@ -502,6 +502,12 @@
       "type": "directory"
     },
     {
+      "path": "src\\core",
+      "accessCount": 5,
+      "lastAccessed": 1775693165043,
+      "type": "directory"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\fet-base.test.ts",
       "accessCount": 4,
       "lastAccessed": 1775620987061,
@@ -542,12 +548,6 @@
       "accessCount": 2,
       "lastAccessed": 1775613587038,
       "type": "file"
-    },
-    {
-      "path": "src\\core",
-      "accessCount": 2,
-      "lastAccessed": 1775684071750,
-      "type": "directory"
     },
     {
       "path": "ref\\ngspice\\src\\spicelib\\analysis\\traninit.c",

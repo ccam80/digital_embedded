@@ -26,8 +26,38 @@ import type {
   NgspiceDeviceInfo,
   RawNgspiceIterationEx,
   RawNgspiceTopology,
+  IntegrationCoefficients,
 } from "./types.js";
 import { DEVICE_MAPPINGS } from "./device-mappings.js";
+
+function cktModeToPhase(mode: number): "dcop" | "tranInit" | "tranFloat" {
+  const MODEDCOP   = 0x0001;
+  const MODETRANOP = 0x0002;
+  const MODETRAN   = 0x0004;
+  if (mode & MODEDCOP)   return "dcop";
+  if (mode & MODETRANOP) return "tranInit";
+  if (mode & MODETRAN)   return "tranFloat";
+  return "dcop";
+}
+
+function _ngspiceIntegCoeff(raw: RawNgspiceIterationEx | undefined): IntegrationCoefficients {
+  if (!raw) {
+    return {
+      ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+      ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+    };
+  }
+  const methodMap: Record<number, string> = { 0: "backwardEuler", 1: "trapezoidal", 2: "gear2" };
+  return {
+    ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+    ngspice: {
+      ag0: raw.ag0 ?? 0,
+      ag1: raw.ag1 ?? 0,
+      method: methodMap[raw.integrateMethod ?? 0] ?? "backwardEuler",
+      order: raw.order ?? 1,
+    },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // NgspiceBridge
@@ -360,6 +390,7 @@ export class NgspiceBridge {
 
       if (isNewStep) {
         const lastIter = currentStepIterations[currentStepIterations.length - 1];
+        const lastRaw = (currentStepIterations[currentStepIterations.length - 1] as any)?._sourceRaw as RawNgspiceIterationEx | undefined;
         steps.push({
           simTime: currentTime >= 0 ? currentTime : 0,
           dt: this._iterations.length > 0
@@ -368,6 +399,8 @@ export class NgspiceBridge {
           iterations: currentStepIterations,
           converged: lastIter?.globalConverged ?? false,
           iterationCount: currentStepIterations.length,
+          integrationCoefficients: _ngspiceIntegCoeff(lastRaw),
+          analysisPhase: cktModeToPhase(lastRaw.cktMode),
         });
         currentStepIterations = [];
       }
@@ -378,17 +411,20 @@ export class NgspiceBridge {
         iteration: raw.iteration,
         voltages: raw.rhs.slice(),
         prevVoltages: raw.rhsOld.slice(),
-        rhs: raw.preSolveRhs.length > 0 ? raw.preSolveRhs.slice() : new Float64Array(0),
-        preSolveRhs: raw.preSolveRhs.length > 0 ? raw.preSolveRhs.slice() : undefined,
-        matrix: [], // matrix entries not available from callback
+        preSolveRhs: raw.preSolveRhs.length > 0 ? raw.preSolveRhs.slice() : new Float64Array(0),
+        matrix: raw.matrix ?? [],
         elementStates,
         noncon: raw.noncon,
         globalConverged: raw.converged,
         elemConverged: raw.converged,
+        limitingEvents: [],
+        convergenceFailedElements: [],
+        ngspiceConvergenceFailedDevices: raw.ngspiceConvergenceFailedDevices,
       };
 
-      // Stash dt for step finalization
+      // Stash dt and source raw for step finalization
       (iterSnap as any)._rawDt = raw.dt;
+      (iterSnap as any)._sourceRaw = raw;
 
       currentStepIterations.push(iterSnap);
       currentTime = raw.simTime;
@@ -398,12 +434,15 @@ export class NgspiceBridge {
     // Flush last step
     if (currentStepIterations.length > 0) {
       const lastIter = currentStepIterations[currentStepIterations.length - 1];
+      const lastRaw = this._iterations[this._iterations.length - 1];
       steps.push({
         simTime: currentTime >= 0 ? currentTime : 0,
         dt: (currentStepIterations[0] as any)?._rawDt ?? 0,
         iterations: currentStepIterations,
         converged: lastIter?.globalConverged ?? false,
         iterationCount: currentStepIterations.length,
+        integrationCoefficients: _ngspiceIntegCoeff(lastRaw),
+        analysisPhase: cktModeToPhase(lastRaw?.cktMode ?? 0),
       });
     }
 
@@ -429,6 +468,8 @@ export class NgspiceBridge {
         elementCount: 0,
         elements: [],
         nodeLabels: new Map(),
+        matrixRowLabels: new Map(),
+        matrixColLabels: new Map(),
       };
     }
 
@@ -437,11 +478,21 @@ export class NgspiceBridge {
       nodeLabels.set(nodeNum, nodeName);
     });
 
+    const matrixRowLabels = new Map<number, string>();
+    const matrixColLabels = new Map<number, string>();
+    nodeLabels.forEach((label, nodeId) => {
+      const row = nodeId - 1;
+      if (row >= 0) {
+        matrixRowLabels.set(row, label);
+        matrixColLabels.set(row, label);
+      }
+    });
+
     const elements = this._topology.devices.map((d, i) => ({
       index: i,
       label: d.name,
       type: d.typeName,
-      isNonlinear: false, // we don't know this from ngspice topology
+      isNonlinear: false,
       isReactive: false,
       pinNodeIds: d.nodeIndices as readonly number[],
     }));
@@ -449,10 +500,12 @@ export class NgspiceBridge {
     return {
       matrixSize: this._topology.matrixSize,
       nodeCount: this._topology.nodeNames.size,
-      branchCount: 0, // not directly available
+      branchCount: 0,
       elementCount: this._topology.devices.length,
       elements,
       nodeLabels,
+      matrixRowLabels,
+      matrixColLabels,
     };
   }
 

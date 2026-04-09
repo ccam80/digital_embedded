@@ -1,7 +1,7 @@
 {
   "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"C:\\\\local_working_projects\\\\digital_in_browser\\\\docs\\\\specs\\\\harness-stream2-mcp-tooling.md\"}",
-  "error": "File content (16912 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
-  "timestamp": "2026-04-08T23:45:17.135Z",
-  "retry_count": 3
+  "tool_input_preview": "{\"file_path\":\"C:\\\\Users\\\\cca79\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--local-working-projects-digital-in-browser\\\\f5f4929b-62c2-45ea-b471-38805d9075cc\\\\tasks\\\\aac75e6873e08f43c.output\",\"offset\":1,\"limit\":80...",
+  "error": "File content (78599 tokens) exceeds maximum allowed tokens (10000). Use offset and limit parameters to read specific portions of the file, or search for specific content instead of reading the whole file.",
+  "timestamp": "2026-04-09T00:14:55.478Z",
+  "retry_count": 1
 }

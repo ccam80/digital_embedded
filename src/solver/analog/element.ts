@@ -19,6 +19,7 @@ export type {
 
 import type { AnalogElementCore, ComplexSparseSolver, IntegrationMethod, SparseSolverStamp, StatePoolRef } from "../../core/analog-types.js";
 import type { StateSchema } from "./state-schema.js";
+import type { LimitingEvent } from "./newton-raphson.js";
 
 // ---------------------------------------------------------------------------
 // AnalogElement
@@ -101,7 +102,7 @@ export interface AnalogElement {
    *
    * @param voltages - Full MNA solution vector (size = nodeCount + branchCount)
    */
-  updateOperatingPoint?(voltages: Readonly<Float64Array>): boolean | void;
+  updateOperatingPoint?(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean | void;
 
   /**
    * Recompute companion model coefficients and stamp them into the solver.

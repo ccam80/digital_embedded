@@ -227,8 +227,7 @@ export function reindexNgspiceSession(
       ...iter,
       voltages: reindexArray(iter.voltages),
       prevVoltages: reindexArray(iter.prevVoltages),
-      rhs: iter.rhs.length > 0 ? reindexArray(iter.rhs) : iter.rhs,
-      preSolveRhs: iter.preSolveRhs ? reindexArray(iter.preSolveRhs) : undefined,
+      preSolveRhs: iter.preSolveRhs.length > 0 ? reindexArray(iter.preSolveRhs) : iter.preSolveRhs,
       // elementStates and matrix are not reindexed — they use labels
     };
   }

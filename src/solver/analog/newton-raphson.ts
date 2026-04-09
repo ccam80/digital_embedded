@@ -13,6 +13,35 @@ import type { DiagnosticCollector } from "./diagnostics.js";
 import { makeDiagnostic } from "./diagnostics.js";
 
 // ---------------------------------------------------------------------------
+// LimitingEvent — records a single voltage-limiting call per junction per NR iteration
+// ---------------------------------------------------------------------------
+
+/**
+ * Records one voltage-limiting function application (pnjlim, fetlim, or limvds)
+ * on a specific junction of a specific element during one NR iteration.
+ *
+ * Elements push events into the NROptions.limitingCollector array after each
+ * limiting function call. The NR loop resets the collector at the start of
+ * each iteration.
+ */
+export interface LimitingEvent {
+  /** Element index in compiled.elements[]. */
+  elementIndex: number;
+  /** Element label. */
+  label: string;
+  /** Junction name: "BE", "BC", "GS", "DS", "AK", etc. */
+  junction: string;
+  /** Limiting function applied. */
+  limitType: "pnjlim" | "fetlim" | "limvds";
+  /** Input voltage before limiting. */
+  vBefore: number;
+  /** Output voltage after limiting. */
+  vAfter: number;
+  /** Whether limiting was actually applied (vAfter differs from vBefore). */
+  wasLimited: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // NROptions / NRResult
 // ---------------------------------------------------------------------------
 
@@ -83,6 +112,11 @@ export interface NROptions {
    *
    * Called unconditionally on every iteration (not just converged ones).
    * The hook must not mutate voltages or prevVoltages.
+   *
+   * The last two parameters carry harness instrumentation data:
+   *   limitingEvents — events from opts.limitingCollector (or empty array when null)
+   *   convergenceFailedElements — labels of elements that failed convergence this
+   *     iteration (populated only when detailedConvergence is true, otherwise empty)
    */
   postIterationHook?: (
     iteration: number,
@@ -91,7 +125,22 @@ export interface NROptions {
     noncon: number,
     globalConverged: boolean,
     elemConverged: boolean,
+    limitingEvents: LimitingEvent[],
+    convergenceFailedElements: string[],
   ) => void;
+  /**
+   * When true, call checkAllConvergedDetailed instead of checkAllConverged.
+   * Collects all failing element indices rather than short-circuiting.
+   * Defaults to false — existing short-circuit path unchanged.
+   */
+  detailedConvergence?: boolean;
+  /**
+   * When non-null, elements push LimitingEvent objects here after each
+   * limiting function call. The NR loop resets this array at the start
+   * of each iteration before passing it to the assembler.
+   * When null, elements skip limiting event collection (zero overhead).
+   */
+  limitingCollector?: LimitingEvent[] | null;
 }
 
 /** Result of a Newton-Raphson solve. */
@@ -400,14 +449,19 @@ export function newtonRaphson(opts: NROptions): NRResult {
     // 5. For purely linear circuits, the first solve gives the exact answer.
     //    Return immediately — no convergence iteration needed.
     if (!hasNonlinear) {
-      opts.postIterationHook?.(iteration, voltages, prevVoltages, 0, true, true);
+      opts.postIterationHook?.(iteration, voltages, prevVoltages, 0, true, true, [], []);
       return { converged: true, iterations: iteration + 1, voltages, largestChangeElement: -1, largestChangeNode: -1 };
     }
 
     // 5a. Update operating points BEFORE damping (DO12 reorder):
     //     elements apply voltage limiting, recompute their companion model
     //     (geq/ieq) for the next stampNonlinear. Sets assembler.noncon.
-    assembler.updateOperatingPoints(elements, voltages);
+    //     Reset limitingCollector before each update so elements accumulate
+    //     fresh events for this iteration.
+    if (opts.limitingCollector != null) {
+      opts.limitingCollector.length = 0;
+    }
+    assembler.updateOperatingPoints(elements, voltages, opts.limitingCollector ?? null);
 
     // 5b. Node damping (ngspice niiter.c:204-229):
     //     Guards: nodeDamping enabled, noncon != 0, isDcOp, iteration > 0.
@@ -439,6 +493,7 @@ export function newtonRaphson(opts: NROptions): NRResult {
     let elemConverged = false;
     let largestChangeNode = 0;
     let largestChangeMag = 0;
+    let convergenceFailedElements: string[] = [];
 
     if (assembler.noncon === 0 && iteration > 0) {
       // 6. Check global node-voltage convergence criterion (ngspice NIconvTest / niconv.c)
@@ -460,7 +515,13 @@ export function newtonRaphson(opts: NROptions): NRResult {
       }
 
       // 7. Element-specific convergence check
-      elemConverged = assembler.checkAllConverged(elements, voltages, prevVoltages, reltol, iabstol);
+      if (opts.detailedConvergence) {
+        const detailed = assembler.checkAllConvergedDetailed(elements, voltages, prevVoltages, reltol, iabstol);
+        elemConverged = detailed.allConverged;
+        convergenceFailedElements = detailed.failedIndices.map(i => elements[i].label ?? `element_${i}`);
+      } else {
+        elemConverged = assembler.checkAllConverged(elements, voltages, prevVoltages, reltol, iabstol);
+      }
     }
 
     // 8. Find element with largest contribution to non-convergence (blame tracking)
@@ -485,7 +546,8 @@ export function newtonRaphson(opts: NROptions): NRResult {
     }
 
     // 9a. Post-iteration hook for external instrumentation
-    opts.postIterationHook?.(iteration, voltages, prevVoltages, assembler.noncon, globalConverged, elemConverged);
+    const limitingEvents = opts.limitingCollector ?? [];
+    opts.postIterationHook?.(iteration, voltages, prevVoltages, assembler.noncon, globalConverged, elemConverged, limitingEvents, convergenceFailedElements);
 
     // 10. Return on convergence
     if (globalConverged && elemConverged) {

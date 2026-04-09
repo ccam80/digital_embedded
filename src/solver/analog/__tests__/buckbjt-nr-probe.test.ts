@@ -83,7 +83,7 @@ describe('buckbjt NR iteration probe', () => {
 
       for (const snap of toPrint) {
         const vStr = Array.from(snap.voltages).map(v => v.toExponential(4)).join(', ');
-        const rhsStr = Array.from(snap.rhs).map(v => v.toExponential(4)).join(', ');
+        const rhsStr = Array.from(snap.preSolveRhs).map(v => v.toExponential(4)).join(', ');
         console.log(`  iter ${snap.iteration}: noncon=${snap.noncon} gConv=${snap.globalConverged} eConv=${snap.elemConverged}`);
         console.log(`    V: [${vStr}]`);
         console.log(`    RHS: [${rhsStr}]`);

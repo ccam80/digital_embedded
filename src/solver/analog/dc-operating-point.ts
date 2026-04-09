@@ -28,6 +28,7 @@ import type { DiagnosticCollector } from "./diagnostics.js";
 import type { SimulationParams, DcOpResult } from "../../core/analog-engine-interface.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import { newtonRaphson } from "./newton-raphson.js";
+import type { LimitingEvent } from "./newton-raphson.js";
 
 // ---------------------------------------------------------------------------
 // DcOpOptions
@@ -59,6 +60,8 @@ export interface DcOpOptions {
     noncon: number,
     globalConverged: boolean,
     elemConverged: boolean,
+    limitingEvents: LimitingEvent[],
+    convergenceFailedElements: string[],
   ) => void;
 }
 
