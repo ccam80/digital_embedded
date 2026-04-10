@@ -54,3 +54,21 @@
 
 ## Wave 1 Summary
 All four tasks completed as specified. Type changes are additive; interface declarations compile. Downstream test code (comparison-session.ts, harness-integration.ts, etc.) has expected type errors that Wave 3 will resolve by implementing the consumers of these new types.
+
+---
+
+## Wave 1 Fix Round — TypeScript Compilation Errors
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: 
+  - `src/solver/analog/__tests__/harness/types.ts` (2 fixes)
+  - `src/solver/coordinator-types.ts` (1 fix)
+- **Changes made**:
+  - **Failure 1 Fix**: Changed import path from `../analog-engine.js` to `../../analog-engine.js` (line 10) — MNAEngine is in the parent `analog/` directory, not sibling `__tests__/`
+  - **Failure 1b Fix**: Updated `PhaseAwareCaptureHook.phaseHook` type from `AnalogEngine["stepPhaseHook"]` to `MNAEngine["stepPhaseHook"]` (line 70) — analog-engine.ts exports MNAEngine, not AnalogEngine
+  - **Failure 2 Fix**: Added re-export of `PhaseAwareCaptureHook` in coordinator-types.ts (line 23) — allows stub files to access it via `import('./coordinator-types.js').PhaseAwareCaptureHook`
+- **Verification**:
+  - No `TS2307` error on types.ts import
+  - Zero remaining `unaligned?` references (verified via Grep)
+  - convergence-log.ts contract comment unchanged (§11.1 Q5)
+  - Stub files (null-coordinator.ts, mock-coordinator.ts) can now resolve PhaseAwareCaptureHook type

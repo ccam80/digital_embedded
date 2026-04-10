@@ -279,14 +279,14 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\types.ts",
-      "accessCount": 90,
-      "lastAccessed": 1775781082927,
+      "accessCount": 108,
+      "lastAccessed": 1775781584306,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 68,
-      "lastAccessed": 1775781064968,
+      "accessCount": 72,
+      "lastAccessed": 1775781409722,
       "type": "directory"
     },
     {
@@ -357,8 +357,8 @@
     },
     {
       "path": "src\\solver\\analog",
-      "accessCount": 19,
-      "lastAccessed": 1775776447632,
+      "accessCount": 20,
+      "lastAccessed": 1775781402160,
       "type": "directory"
     },
     {
@@ -386,6 +386,12 @@
       "type": "file"
     },
     {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 15,
+      "lastAccessed": 1775781393880,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\element.ts",
       "accessCount": 13,
       "lastAccessed": 1775713210692,
@@ -398,12 +404,6 @@
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 13,
-      "lastAccessed": 1775780921805,
-      "type": "file"
-    },
-    {
       "path": "scripts\\mcp\\__tests__\\harness-tools.test.ts",
       "accessCount": 12,
       "lastAccessed": 1775700489796,
@@ -413,6 +413,12 @@
       "path": "src\\solver\\analog\\__tests__\\harness\\stream1-gate.test.ts",
       "accessCount": 12,
       "lastAccessed": 1775706635183,
+      "type": "file"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 10,
+      "lastAccessed": 1775781550739,
       "type": "file"
     },
     {
@@ -434,21 +440,15 @@
       "type": "directory"
     },
     {
+      "path": "CLAUDE.md",
+      "accessCount": 7,
+      "lastAccessed": 1775781394088,
+      "type": "file"
+    },
+    {
       "path": "spec\\reviews\\phase-3.md",
       "accessCount": 6,
       "lastAccessed": 1775700828330,
-      "type": "file"
-    },
-    {
-      "path": "CLAUDE.md",
-      "accessCount": 6,
-      "lastAccessed": 1775780924870,
-      "type": "file"
-    },
-    {
-      "path": "spec\\progress.md",
-      "accessCount": 6,
-      "lastAccessed": 1775781131323,
       "type": "file"
     },
     {

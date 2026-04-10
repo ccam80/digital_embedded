@@ -7,7 +7,7 @@
  */
 
 import type { PostIterationHook } from "./capture.js";
-import type { AnalogEngine } from "../analog-engine.js";
+import type { MNAEngine } from "../../analog-engine.js";
 
 // ---------------------------------------------------------------------------
 // Asymmetric step presence (Goal B)
@@ -67,7 +67,7 @@ export interface PhaseAwareCaptureHook {
   /** Per-NR-iteration hook (fires inside newton-raphson.ts loop). */
   iterationHook: PostIterationHook;
   /** Phase begin/end hook (fires from analog-engine and dc-operating-point). */
-  phaseHook: AnalogEngine["stepPhaseHook"];
+  phaseHook: MNAEngine["stepPhaseHook"];
 }
 
 // ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ import type { CircuitElement } from "../core/element.js";
 import type { AnalogElement } from "./analog/element.js";
 import type { ResolvedPin } from "../core/pin.js";
 import type { PhaseAwareCaptureHook } from "./analog/__tests__/harness/types.js";
+export type { PhaseAwareCaptureHook };
 
 /**
  * Result of computeFrameSteps — describes how to advance simulation this frame.
