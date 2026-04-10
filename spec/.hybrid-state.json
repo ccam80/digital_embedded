@@ -1,0 +1,114 @@
+{
+  "batches": [
+    {
+      "id": "batch-1",
+      "task_groups": [
+        "W1"
+      ],
+      "tasks": [
+        [
+          "W1.T1",
+          "W1.T2",
+          "W1.T3",
+          "W1.T4"
+        ]
+      ],
+      "spawned": 1,
+      "completed": 1,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "W1": "pending"
+      }
+    },
+    {
+      "id": "batch-2",
+      "task_groups": [
+        "W2"
+      ],
+      "tasks": [
+        [
+          "W2.T1",
+          "W2.T2",
+          "W2.T3",
+          "W2.T4"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "W2": "pending"
+      }
+    },
+    {
+      "id": "batch-3",
+      "task_groups": [
+        "W3"
+      ],
+      "tasks": [
+        [
+          "W3.T1",
+          "W3.T2",
+          "W3.T3"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "W3": "pending"
+      }
+    },
+    {
+      "id": "batch-4",
+      "task_groups": [
+        "W4",
+        "W5",
+        "W6"
+      ],
+      "tasks": [
+        [
+          "W4.T1",
+          "W4.T2",
+          "W4.T3"
+        ],
+        [
+          "W5.T1",
+          "W5.T2",
+          "W5.T3",
+          "W5.T4"
+        ],
+        [
+          "W6.T1",
+          "W6.T2",
+          "W6.T3"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "W4": "pending",
+        "W5": "pending",
+        "W6": "pending"
+      }
+    }
+  ],
+  "last_updated": "2026-04-10T00:31:52.747Z"
+}

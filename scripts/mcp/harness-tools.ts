@@ -522,8 +522,8 @@ export function registerHarnessTools(
         const report = session.getLimitingComparison(label, args.step, args.iteration);
         const limitingData = {
           component: report.label,
-          stepIndex: report.stepIndex,
-          iteration: report.iteration,
+          stepIndex: args.step,
+          iteration: args.iteration,
           junctions: report.junctions.map((j: any) => ({
             junction: j.junction,
             ourPreLimit: formatNumber(j.ourPreLimit),
@@ -555,10 +555,12 @@ export function registerHarnessTools(
         const convergenceData = items.map((e: any) => ({
           label: e.label,
           deviceType: e.deviceType,
+          ourConverged: e.ourConverged,
+          ngspiceConverged: e.ngspiceConverged,
           converged: e.ourConverged,
-          noncon: (e as any).noncon ?? (e.ourConverged ? 0 : 1),
-          worstSlot: e.worstSlot,
+          noncon: e.ourConverged ? 0 : 1,
           worstDelta: e.worstDelta !== undefined ? formatNumber(e.worstDelta) : undefined,
+          agree: e.agree,
         }));
         return JSON.stringify({
           handle: args.handle,
@@ -577,10 +579,12 @@ export function registerHarnessTools(
         const convergenceData = items.map((e: any) => ({
           label: e.label,
           deviceType: e.deviceType,
+          ourConverged: e.ourConverged,
+          ngspiceConverged: e.ngspiceConverged,
           converged: e.ourConverged,
-          noncon: (e as any).noncon ?? (e.ourConverged ? 0 : 1),
-          worstSlot: e.worstSlot,
+          noncon: e.ourConverged ? 0 : 1,
           worstDelta: e.worstDelta !== undefined ? formatNumber(e.worstDelta) : undefined,
+          agree: e.agree,
         }));
         return JSON.stringify({
           handle: args.handle,
@@ -751,11 +755,12 @@ export function registerHarnessTools(
       if (args.component !== undefined && args.filter === "divergences") {
         const label = requireComponent(args.component);
         const divergenceReport = session.getDivergences({ component: label });
-        const { items, total } = paginate(divergenceReport.entries, 100);
+        const validEntries9 = divergenceReport.entries.filter((e: any) => Number.isFinite(e.absDelta) && e.absDelta > 0);
+        const { items, total } = paginate(validEntries9, 100);
         const divergences = items.map((e: any) => ({
           stepIndex: e.stepIndex,
           iterationIndex: e.iteration,
-          simTime: formatNumber(e.simTime),
+          stepStartTime: formatNumber(e.stepStartTime),
           type: e.category as "node" | "rhs" | "matrix" | "state",
           label: e.label,
           ours: formatNumber(e.ours),
@@ -866,7 +871,8 @@ export function registerHarnessTools(
           limit: args.limit ?? 100,
           stepEnd: {
             stepIndex: stepEnd.stepIndex,
-            simTime: formatComparedValue(stepEnd.simTime),
+            stepStartTime: formatComparedValue(stepEnd.stepStartTime),
+            stepEndTime: formatComparedValue(stepEnd.stepEndTime),
             dt: formatComparedValue(stepEnd.dt),
             converged: stepEnd.converged,
             iterationCount: formatComparedValue(stepEnd.iterationCount),
@@ -900,7 +906,8 @@ export function registerHarnessTools(
           const stepEnd = session.getStepEnd(si);
           const ourStep = (session as any)._ourSession?.steps[si];
           const comps: Record<string, Record<string, any>> = {};
-          for (const label of matching) {
+          for (const comp of matching) {
+            const label = comp.label;
             const upper = label.toUpperCase();
             const compEntry = stepEnd.components[upper] ?? stepEnd.components[label];
             if (compEntry) {
@@ -932,7 +939,7 @@ export function registerHarnessTools(
       // P14: filter: "divergences" or "worst" (no component)
       if (args.filter === "divergences" || args.filter === "worst") {
         const divergenceReport = session.getDivergences();
-        let entries: any[] = divergenceReport.entries;
+        let entries: any[] = divergenceReport.entries.filter((e: any) => Number.isFinite(e.absDelta) && e.absDelta > 0);
         if (args.filter === "worst") {
           const n = args.worstN ?? 10;
           entries = entries.slice().sort((a: any, b: any) => b.absDelta - a.absDelta).slice(0, n);
@@ -941,7 +948,7 @@ export function registerHarnessTools(
         const divergences = items.map((e: any) => ({
           stepIndex: e.stepIndex,
           iterationIndex: e.iteration,
-          simTime: formatNumber(e.simTime),
+          stepStartTime: formatNumber(e.stepStartTime),
           type: e.category as "node" | "rhs" | "matrix" | "state",
           label: e.label,
           ours: formatNumber(e.ours),
@@ -1027,7 +1034,7 @@ export function registerHarnessTools(
         colIndex: e.col,
         ours: formatNumber(e.ours),
         ngspice: formatNumber(e.ngspice),
-        delta: formatNumber(e.delta),
+        delta: formatNumber(e.ours - e.ngspice),
         absDelta: formatNumber(e.absDelta),
         withinTol: e.withinTol,
       }));

@@ -85,6 +85,14 @@ export class MockCoordinator implements SimulationCoordinator {
   dcOperatingPoint(): DcOpResult | null { return null; }
   acAnalysis(_params: AcParams): AcResult | null { return null; }
 
+  applyCaptureHook(_bundle: import("@/solver/coordinator-types.js").PhaseAwareCaptureHook | null): void {
+    // mock coordinator does not run real instrumentation
+  }
+
+  initialize(): void {
+    // mock coordinator does not run DCOP
+  }
+
   // §1.11 Convergence logging
   getElementLabel(_index: number): string | undefined { return undefined; }
   supportsConvergenceLog(): boolean { return false; }

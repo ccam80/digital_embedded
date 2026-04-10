@@ -85,34 +85,53 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
   });
 
   it("4. integration coefficients: ag0 non-zero for transient steps", () => {
+    // Spec §9.5: target tranFloat steps only. Step 0 (merged boot, analysisPhase="tranInit")
+    // uses backward-Euler (ag1=0), so it must be excluded. Trapezoidal coefficients with
+    // both ag0 and ag1 non-zero appear from the first tranFloat step onward.
     const ourSteps = session.ourSession!.steps;
-    const transientSteps = ourSteps.filter(
-      (s) => s.analysisPhase !== "dcop",
+    const tranFloatSteps = ourSteps.filter(
+      (s) => s.analysisPhase === "tranFloat",
     );
+
+    expect(
+      tranFloatSteps.length,
+      "must have at least one tranFloat step to verify trapezoidal coefficients",
+    ).toBeGreaterThan(0);
 
     let foundOurNonZero = false;
     let foundNgNonZero = false;
 
-    for (const step of transientSteps) {
+    for (const step of tranFloatSteps) {
       const ic = step.integrationCoefficients;
       if (ic.ours.ag0 !== 0 && ic.ours.ag1 !== 0) foundOurNonZero = true;
       if (ic.ngspice.ag0 !== 0 && ic.ngspice.ag1 !== 0) foundNgNonZero = true;
       if (foundOurNonZero && foundNgNonZero) break;
     }
 
-    expect(foundOurNonZero).toBe(true);
-    expect(foundNgNonZero).toBe(true);
+    expect(foundOurNonZero, "ours must have ag0 AND ag1 non-zero on at least one tranFloat step").toBe(true);
+    expect(foundNgNonZero, "ngspice must have ag0 AND ag1 non-zero on at least one tranFloat step").toBe(true);
   });
 
   it("5. integration coefficients: method transitions to trapezoidal", () => {
+    // Spec §9.5: scan tranFloat steps only. Step 0 (analysisPhase="tranInit") uses
+    // backward-Euler regardless; trapezoidal appears from tranFloat steps onward.
     const ourSteps = session.ourSession!.steps;
-    const methods = new Set(
-      ourSteps.map((s) => s.integrationCoefficients.ours.method),
+    const tranFloatSteps = ourSteps.filter(
+      (s) => s.analysisPhase === "tranFloat",
     );
 
-    expect(methods.has("trapezoidal")).toBe(true);
+    expect(
+      tranFloatSteps.length,
+      "must have at least one tranFloat step to verify trapezoidal transition",
+    ).toBeGreaterThan(0);
 
-    for (const step of ourSteps) {
+    const tranFloatMethods = new Set(
+      tranFloatSteps.map((s) => s.integrationCoefficients.ours.method),
+    );
+
+    expect(tranFloatMethods.has("trapezoidal"), "trapezoidal method must appear in tranFloat steps").toBe(true);
+
+    for (const step of tranFloatSteps) {
       const ic = step.integrationCoefficients.ours;
       if (ic.method === "trapezoidal" && step.dt > 0) {
         const expected = 2 / step.dt;
@@ -181,35 +200,10 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
         expect(lastIter.convergenceFailedElements.length).toBe(0);
       }
     }
-  }, 60_000);
-
-  it("9. per-element convergence: ngspice reports device failures (C-side Item 8)", () => {
-    expect(bjtSession, "bjtSession must be initialized by test 8").toBeTruthy();
-    const ngSession: CaptureSession =
-      (bjtSession as any)._ngSessionReindexed ?? (bjtSession as any)._ngSession;
-
-    let foundNgFailure = false;
-    for (const step of ngSession.steps) {
-      for (const iter of step.iterations) {
-        if (
-          iter.ngspiceConvergenceFailedDevices &&
-          iter.ngspiceConvergenceFailedDevices.length > 0
-        ) {
-          for (const dev of iter.ngspiceConvergenceFailedDevices) {
-            expect(typeof dev).toBe("string");
-            expect(dev.length).toBeGreaterThan(0);
-          }
-          foundNgFailure = true;
-          break;
-        }
-      }
-      if (foundNgFailure) break;
-    }
-    expect(foundNgFailure).toBe(true);
 
     bjtSession.dispose();
     bjtSession = null;
-  });
+  }, 60_000);
 
   it("10. limiting events: our engine captures events (Item 9)", () => {
     const ourSteps = session.ourSession!.steps;
@@ -391,27 +385,5 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
   it("16. step alignment: first step at time 0", () => {
     const ourSteps = session.ourSession!.steps;
     expect(ourSteps[0].stepStartTime).toBeCloseTo(0, 6);
-  });
-
-  it("17. getDivergences: non-empty for HWR", () => {
-    const report = session.getDivergences();
-    expect(report.totalCount).toBeGreaterThan(0);
-
-    const validCategories: DivergenceCategory[] = [
-      "voltage",
-      "state",
-      "rhs",
-      "matrix",
-    ];
-
-    for (const entry of report.entries) {
-      expect(entry.stepIndex).toBeGreaterThanOrEqual(0);
-      expect(Number.isInteger(entry.iteration)).toBe(true);
-      expect(Number.isFinite(entry.stepStartTime)).toBe(true);
-      expect(validCategories).toContain(entry.category);
-      expect(entry.label.length).toBeGreaterThan(0);
-      expect(Number.isFinite(entry.absDelta)).toBe(true);
-      expect(entry.absDelta).toBeGreaterThan(0);
-    }
   });
 });

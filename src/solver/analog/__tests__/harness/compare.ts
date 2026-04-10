@@ -181,7 +181,7 @@ export function compareSnapshots(
       results.push({
         stepIndex: si,
         iterationIndex: ii,
-        simTime: ourStep.simTime,
+        stepStartTime: ourStep.stepStartTime,
         voltageDiffs,
         rhsDiffs,
         matrixDiffs,
@@ -203,7 +203,7 @@ export function compareSnapshots(
  */
 export function formatComparison(result: ComparisonResult): string {
   const lines: string[] = [];
-  lines.push(`=== Step ${result.stepIndex}, Iteration ${result.iterationIndex} (t=${result.simTime.toExponential(4)}) ===`);
+  lines.push(`=== Step ${result.stepIndex}, Iteration ${result.iterationIndex} (tStart=${result.stepStartTime.toExponential(4)}) ===`);
   lines.push(`  Overall: ${result.allWithinTol ? "PASS" : "FAIL"}`);
 
   const vFails = result.voltageDiffs.filter(d => !d.withinTol);

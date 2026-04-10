@@ -6,6 +6,70 @@
  * sides produce data in these types; the comparator operates on them.
  */
 
+import type { PostIterationHook } from "./capture.js";
+import type { AnalogEngine } from "../analog-engine.js";
+
+// ---------------------------------------------------------------------------
+// Asymmetric step presence (Goal B)
+// ---------------------------------------------------------------------------
+
+/** Indicates which side(s) actually produced a step at a given index. */
+export type SidePresence = "both" | "oursOnly" | "ngspiceOnly";
+
+/** Side selector for time-based queries. Disjoint from SidePresence. */
+export type Side = "ours" | "ngspice";
+
+/** Compact summary of one NR attempt — used in shape reports. */
+export interface AttemptSummary {
+  phase: NRPhase;
+  outcome: NRAttemptOutcome;
+  dt: number;
+  iterationCount: number;
+  converged: boolean;
+}
+
+/** Counts of attempts grouped by phase / outcome — used for fast diff. */
+export interface AttemptCounts {
+  byPhase: Partial<Record<NRPhase, number>>;
+  byOutcome: Partial<Record<NRAttemptOutcome, number>>;
+  total: number;
+}
+
+/** Per-step shape descriptor. Always populated for both sides where present. */
+export interface StepShape {
+  stepIndex: number;
+  presence: SidePresence;
+  /** stepStartTime as reported by each side; null when that side is absent. */
+  stepStartTime: { ours: number | null; ngspice: number | null };
+  stepEndTime:   { ours: number | null; ngspice: number | null };
+  /** Difference of stepStartTime in seconds (ours - ngspice). null if any side absent. */
+  stepStartTimeDelta: number | null;
+  /** Per-side attempt counts. Each is null when that side is absent. */
+  attemptCounts: { ours: AttemptCounts | null; ngspice: AttemptCounts | null };
+  /** Per-side attempt summaries (length-limited; full detail is on the StepSnapshot). */
+  attempts: { ours: AttemptSummary[] | null; ngspice: AttemptSummary[] | null };
+  /** Final integration method per side; null when absent. */
+  integrationMethod: { ours: string | null; ngspice: string | null };
+}
+
+/** Whole-session shape descriptor. */
+export interface SessionShape {
+  analysis: "dcop" | "tran";
+  stepCount: { ours: number; ngspice: number; max: number };
+  presenceCounts: { both: number; oursOnly: number; ngspiceOnly: number };
+  steps: StepShape[];
+  /** Indices where stepStartTimeDelta exceeds tolerance (reported, not filtered). */
+  largeTimeDeltas: Array<{ stepIndex: number; delta: number }>;
+}
+
+/** Bundle of all instrumentation hooks the comparison harness needs. */
+export interface PhaseAwareCaptureHook {
+  /** Per-NR-iteration hook (fires inside newton-raphson.ts loop). */
+  iterationHook: PostIterationHook;
+  /** Phase begin/end hook (fires from analog-engine and dc-operating-point). */
+  phaseHook: AnalogEngine["stepPhaseHook"];
+}
+
 // ---------------------------------------------------------------------------
 // Compared value — the fundamental triple for side-by-side comparison
 // ---------------------------------------------------------------------------
@@ -225,6 +289,7 @@ export interface Tolerance {
   iAbsTol: number;
   relTol: number;
   qAbsTol: number;
+  timeDeltaTol: number;
 }
 
 /** Default tolerances matching ngspice SPICE3 defaults. */
@@ -233,6 +298,7 @@ export const DEFAULT_TOLERANCE: Tolerance = {
   iAbsTol: 1e-12,
   relTol: 1e-3,
   qAbsTol: 1e-14,
+  timeDeltaTol: 1e-12,
 };
 
 /** One comparison between our snapshot and ngspice's at one iteration. */
@@ -240,6 +306,7 @@ export interface ComparisonResult {
   stepIndex: number;
   iterationIndex: number;
   stepStartTime: number;
+  presence: SidePresence;
   voltageDiffs: Array<{
     nodeIndex: number;
     label: string;
@@ -307,12 +374,12 @@ export interface SnapshotQuery {
 /** Step-end report: converged values from both engines, keyed by label. */
 export interface StepEndReport {
   stepIndex: number;
+  presence: SidePresence;
   stepStartTime: ComparedValue;
   stepEndTime: ComparedValue;
   dt: ComparedValue;
   converged: { ours: boolean; ngspice: boolean };
   iterationCount: ComparedValue;
-  unaligned?: boolean;
   nodes: Record<string, ComparedValue>;
   branches: Record<string, ComparedValue>;
   components: Record<string, StepEndComponentEntry>;
@@ -376,6 +443,8 @@ export interface NodeTrace {
 export interface SessionSummary {
   analysis: "dcop" | "tran";
   stepCount: ComparedValue;
+  presenceCounts: { both: number; oursOnly: number; ngspiceOnly: number };
+  worstStepStartTimeDelta: number;
   convergence: {
     ours: { totalSteps: number; convergedSteps: number; failedSteps: number; avgIterations: number; maxIterations: number };
     ngspice: { totalSteps: number; convergedSteps: number; failedSteps: number; avgIterations: number; maxIterations: number };
@@ -520,7 +589,7 @@ export type ComponentSlotsResult = ComponentSlotsSnapshot | ComponentSlotsTrace;
 // Divergence report types
 // ---------------------------------------------------------------------------
 
-export type DivergenceCategory = "voltage" | "state" | "rhs" | "matrix";
+export type DivergenceCategory = "voltage" | "state" | "rhs" | "matrix" | "shape";
 
 export interface DivergenceEntry {
   stepIndex: number;
@@ -535,6 +604,7 @@ export interface DivergenceEntry {
   withinTol: boolean;
   componentLabel: string | null;
   slotName: string | null;
+  presence: SidePresence;
 }
 
 export interface DivergenceReport {
@@ -735,7 +805,7 @@ export interface SessionReport {
     stepStartTime: number;
     stepEndTime: number;
     dt: number;
-    unaligned?: boolean;
+    presence: SidePresence;
     converged: { ours: boolean; ngspice: boolean };
     iterationCount: { ours: number; ngspice: number };
     nodes: Record<string, {

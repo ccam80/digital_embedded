@@ -1,138 +1,66 @@
-# Harness Streams Implementation Plan
+# Implementation Plan: Harness Redesign
 
-## Spec Files
+> Source spec: `docs/harness-redesign-spec.md` (24K tokens, do not load directly into implementer context).
+> Per-wave specs are in `spec/wave-{n}-{name}.md` — each wave file is the implementer-facing phase spec.
 
-- Phase 1: `docs/specs/harness-stream1-data-accuracy.md`
-- Phase 2: `docs/specs/harness-stream3-interface-methods.md`
-- Phase 3: `docs/specs/harness-stream2-mcp-tooling.md`
+## Phase 1 — Harness Redesign (only phase)
 
-## Phase Dependency Graph
+### Wave dependency graph
 
 ```
-Phase 1 (Stream 1: Data Accuracy) → Phase 2 (Stream 3: Interface Methods) → Phase 3 (Stream 2: MCP Tooling)
+Wave 1 (types + interfaces)              [batch-1]
+   ↓
+Wave 2 (coordinator + facade + drain)    [batch-2]
+   ↓
+Wave 3 (comparison-session bulk)         [batch-3]
+   ↓
+Wave 4 (test migrations)  +  Wave 5 (MCP/UI surfaces)  +  Wave 6 (new tests)   [batch-4 — parallel]
 ```
 
-## Phases and Waves
+Waves 1, 2, 3 are strictly sequential. Waves 4, 5, 6 run in parallel after Wave 3.
 
-### Phase 1: Stream 1 — Data Completeness and Accuracy
+### Batch list
 
-Spec: `docs/specs/harness-stream1-data-accuracy.md`
+| Batch | Wave(s) | Task groups | Spec file |
+|-------|---------|-------------|-----------|
+| batch-1 | Wave 1 | W1 (types) | `spec/wave-1-types.md` |
+| batch-2 | Wave 2 | W2 (coordinator+facade+engine) | `spec/wave-2-coordinator.md` |
+| batch-3 | Wave 3 | W3 (comparison-session bulk) | `spec/wave-3-bulk.md` |
+| batch-4 | Waves 4, 5, 6 in parallel | W4 (tests), W5 (surfaces), W6 (new tests) | `spec/wave-4-test-migrations.md`, `spec/wave-5-surfaces.md`, `spec/wave-6-new-tests.md` |
 
-16 items covering type extensions, engine instrumentation, capture enhancements, ngspice bridge updates, and C callback struct redesign.
+### Test command
 
-#### Wave 1.1 (parallel — independent files, no overlap)
+`npm run test:q` — quiet vitest run, writes `test-results/test-failures.json`.
+`npm test` — full vitest sweep with compact reporter.
+`npm run test:e2e -- {filter}` — Playwright E2E tests.
+`npx tsc --noEmit` — typecheck only.
 
-| ID | Title | Complexity | Files |
-|----|-------|------------|-------|
-| S1-A | BJT companion mapping (Item 5) + Netlist generator (Item 12) | M | `src/solver/analog/__tests__/harness/device-mappings.ts`, `src/solver/analog/__tests__/harness/netlist-generator.ts` (new) |
-| S1-B | comparison-session.ts fixes: DC OP doc (Item 13) + __dirname fix (Item 14) | S | `src/solver/analog/__tests__/harness/comparison-session.ts` |
-| S1-C | Engine instrumentation: pre-solve RHS (Item 6 sparse-solver), checkAllConvergedDetailed (Item 8 mna-assembler), computeIntegrationCoefficients (Item 7 integration.ts), analysisPhase (Item 15 coordinator) | M | `src/solver/analog/sparse-solver.ts`, `src/solver/analog/mna-assembler.ts`, `src/solver/analog/integration.ts`, `src/solver/analog/coordinator.ts` |
+### Verification measures (after all waves)
 
-#### Wave 1.2 (parallel — types, NR engine, C callback)
+1. `npm run test:q` — full vitest sweep. Target: 12 → ≤4 failures (only known-BJT carry over).
+2. `npm test -- harness` — focused harness module sweep.
+3. `npm run test:e2e -- convergence-log-panel` — UI conflict notification test.
+4. MCP harness end-to-end test — all `harness_*` modes including new `"shape"` mode.
+5. `npx tsc --noEmit` — no type errors anywhere.
 
-| ID | Title | Complexity | Files |
-|----|-------|------------|-------|
-| S1-D | All types.ts additions: Items 2,3,6,7,8,9,10,15 + remove rhs field | L | `src/solver/analog/__tests__/harness/types.ts` |
-| S1-E | newton-raphson.ts: detailedConvergence (Item 8) + limitingCollector (Item 9) + extended postIterationHook signature | M | `src/solver/analog/newton-raphson.ts` |
-| S1-F | niiter.c struct-based callback (Item 15 C summary): NiIterationData struct + ni_instrument_cb_v2 | L | `ref/ngspice/src/maths/ni/niiter.c` |
+### Carry-over (already in working tree, do not redo)
 
-#### Wave 1.3 (parallel — capture, bridge, comparison integration)
+- D1 `getDivergences` `withinTol` filter — already added in `comparison-session.ts:789-892`.
+- D3 `traceNode` segment-match — already in `:1153-1156`, `_findNodeIdByLabel` at `:1629-1649`.
+- Cat A `simTime` → `stepStartTime` rename in `compare.ts` and `query.ts`.
+- Cat B/C `runDcOp` re-run path deletion + `analysisPhase === "tranFloat"` filter.
+- Cat E minimal `detailedConvergence = true` + `limitingCollector = []` — Wave 3 supersedes.
+- Cat F MCP handler serialization fixes.
+- MCP-5 `getConvergenceDetail()` populated, MCP-7 NaN absDelta filter, MCP-12 stepIndex/iteration from args, MCP-15 delta computed.
 
-| ID | Title | Complexity | Files |
-|----|-------|------------|-------|
-| S1-G | All capture.ts changes: Items 2,6,7,9,10,11,15 — state history, preSolveRhs, matrix labels, limiting, convergence, node label fix, analysisPhase | L | `src/solver/analog/__tests__/harness/capture.ts` |
-| S1-H | All ngspice-bridge.ts changes: Items 2,3,4,7,8,9,15 — struct callback decode, state1/state2, matrix CSC, device nodes, ag0/ag1, conv detail, limiting events | L | `src/solver/analog/__tests__/harness/ngspice-bridge.ts` |
-| S1-I | Time-based step alignment (Item 1) + compare.ts alignment parameter | M | `src/solver/analog/__tests__/harness/comparison-session.ts`, `src/solver/analog/__tests__/harness/compare.ts` |
+### Vitest baseline entering Wave 1
 
-### Phase 2: Stream 3 — Query/Discovery/Filtering Layer
-
-Spec: `docs/specs/harness-stream3-interface-methods.md`
-
-17 new methods, 5 enhanced methods, 2 utility modules, type additions, 59 test cases.
-
-#### Wave 2.1 (parallel — foundations: utilities + types + capture fix)
-
-| ID | Title | Complexity | Files |
-|----|-------|------------|-------|
-| S3-A | glob.ts + format.ts (new utility modules) | M | `src/solver/analog/__tests__/harness/glob.ts` (new), `src/solver/analog/__tests__/harness/format.ts` (new) |
-| S3-B | normalizeDeviceType (device-mappings.ts) + captureTopology fix (capture.ts) + all new types (types.ts): PaginationOpts, ComponentInfo, NodeInfo, ComparedValue types, DivergenceReport, SlotTrace, StateHistoryReport, LabeledMatrix, LabeledRhs, MatrixComparison, IntegrationCoefficientsReport, LimitingComparisonReport, ConvergenceDetailReport, StepEndComponentEntry, SessionReport, enhanced type changes | L | `src/solver/analog/__tests__/harness/device-mappings.ts`, `src/solver/analog/__tests__/harness/capture.ts`, `src/solver/analog/__tests__/harness/types.ts` |
-
-#### Wave 2.2 (parallel — ComparisonSession methods)
-
-| ID | Title | Complexity | Files |
-|----|-------|------------|-------|
-| S3-C | Methods 1-8: listComponents, listNodes, getComponentsByType, getComponentSlots, getDivergences, getStepEndRange, traceComponentSlot, getStateHistory | L | `src/solver/analog/__tests__/harness/comparison-session.ts` |
-| S3-D | Methods 9-17: getMatrixLabeled, getRhsLabeled, compareMatrixAt, getIntegrationCoefficients, getLimitingComparison, getConvergenceDetail, toJSON, create, dispose + 5 enhanced methods (traceComponent, traceNode, getStepEnd, getIterations, getSummary) | L | `src/solver/analog/__tests__/harness/comparison-session.ts` |
-
-Note: S3-C and S3-D both touch comparison-session.ts. They MUST run sequentially (S3-C first, then S3-D).
-
-#### Wave 2.3 (sequential — tests)
-
-| ID | Title | Complexity | Files |
-|----|-------|------------|-------|
-| S3-E | query-methods.test.ts: 59 test cases covering glob, format, normalizeDeviceType, captureTopology fix, all 17 new methods, 5 enhanced methods, edge cases | L | `src/solver/analog/__tests__/harness/query-methods.test.ts` (new) |
-
-### Phase 3: Stream 2 — MCP Tool Layer
-
-Spec: `docs/specs/harness-stream2-mcp-tooling.md`
-
-7 MCP tools, session management, query routing, JSON serialization, pagination.
-
-#### Wave 3.1 (parallel — foundations + tools)
-
-| ID | Title | Complexity | Files |
-|----|-------|------------|-------|
-| S2-A | HarnessSessionState + FormattedNumber/serialization utilities | M | `scripts/mcp/harness-session-state.ts` (new), `scripts/mcp/harness-format.ts` (new) |
-| S2-B | harness_start + harness_run + harness_dispose + harness_describe tools | L | `scripts/mcp/harness-tools.ts` (new) |
-
-Note: S2-B depends on S2-A for HarnessSessionState and format utilities. Run sequentially.
-
-#### Wave 3.2 (sequential — query tool + remaining tools)
-
-| ID | Title | Complexity | Files |
-|----|-------|------------|-------|
-| S2-C | harness_query (full routing table, 15 query modes) + harness_compare_matrix + harness_export | L | `scripts/mcp/harness-tools.ts` |
-
-#### Wave 3.3 (sequential — integration + tests)
-
-| ID | Title | Complexity | Files |
-|----|-------|------------|-------|
-| S2-D | circuit-mcp-server.ts integration (imports, harnessState, registerHarnessTools) + server instructions update + MCP tool tests | L | `scripts/circuit-mcp-server.ts`, test files |
-
-## Test Command
-
-```bash
-npm run test:q
-```
-
-## Acceptance Criteria
-
-### Phase 1
-- All 16 Stream 1 items implemented per spec
-- types.ts has all extended interfaces (state1Slots, state2Slots, preSolveRhs required, limitingEvents, convergenceFailedElements, integrationCoefficients, analysisPhase, matrixRowLabels, matrixColLabels, LimitingEvent, IntegrationCoefficients, RawNgspiceIterationEx extensions)
-- rhs field removed from IterationSnapshot (no shim)
-- niiter.c uses struct-based callback (NiIterationData + ni_instrument_cb_v2)
-- Pre-solve RHS capture gated by boolean flag (zero cost when disabled)
-- All engine changes performance-neutral when no capture active
-- Existing tests pass
-
-### Phase 2
-- All 17 new methods on ComparisonSession
-- All 5 enhanced methods with backward-compatible optional parameters
-- glob.ts and format.ts utility modules created
-- normalizeDeviceType exported from device-mappings.ts
-- captureTopology populates type field on all elements
-- StepEndReport.components uses StepEndComponentEntry
-- 59 test cases in query-methods.test.ts pass
-- toJSON output passes JSON.parse(JSON.stringify()) roundtrip
-
-### Phase 3
-- 7 MCP tools registered: harness_start, harness_run, harness_query, harness_describe, harness_compare_matrix, harness_export, harness_dispose
-- HarnessSessionState manages session lifecycle
-- harness_query implements full 15-row routing table
-- All numeric output uses FormattedNumber (engineering notation)
-- ComparedValueJSON serialization (NaN→null, Map→Record, Float64Array→number[])
-- Pagination on all collection results with total/offset/limit
-- "Did you mean" suggestions for unknown component labels
-- Integration in circuit-mcp-server.ts
-- Existing tests pass
+12 failures (captured 2026-04-10):
+- 1-4: BJT convergence (out of scope — known model divergence)
+- 5: query-methods 41 "matrix NaN self-compare" — Wave 3 fixes via Goal F
+- 6: query-methods 54 "traceNode self-compare 6 iters" — Wave 3
+- 7: stream-verif 4 "ag0 on tranFloat" — Wave 3
+- 8: stream-verif 5 "trapezoidal on tranFloat" — Wave 3
+- 9: MCP-4 "integration coefficients on tranFloat" — Wave 3
+- 10: MCP-5 "convergence detail per-element" — already fixed in Round 3, verify at Wave 3 exit
+- 11-12: misc — verify at Wave 3 exit

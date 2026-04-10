@@ -33,9 +33,13 @@ export interface NRAttemptRecord {
   /** Trigger: "initial" | "nr-retry" | "lte-retry" */
   trigger: "initial" | "nr-retry" | "lte-retry";
   /**
-   * Optional per-NR-iteration convergence detail. Populated only when the
-   * comparison harness postIterationHook is active alongside convergence
-   * logging. Absent in normal (non-harness) operation.
+   * Per-iteration detail records for this attempt.
+   *
+   * CONTRACT: When `engine.convergenceLog.enabled === true`, this field MUST be
+   * populated with one entry per NR iteration. Per Q5 resolution (§11.1), the
+   * harness `postIterationHook` is NOT a precondition — convergence logging is
+   * an independent capability. The drain at `analog-engine.ts:400-408` and
+   * `:676-687` fires on the log-enabled gate alone.
    */
   iterationDetails?: Array<{
     iteration: number;

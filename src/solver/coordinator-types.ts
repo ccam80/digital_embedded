@@ -19,6 +19,7 @@ import type { Wire } from "../core/circuit.js";
 import type { CircuitElement } from "../core/element.js";
 import type { AnalogElement } from "./analog/element.js";
 import type { ResolvedPin } from "../core/pin.js";
+import type { PhaseAwareCaptureHook } from "./analog/__tests__/harness/types.js";
 
 /**
  * Result of computeFrameSteps — describes how to advance simulation this frame.
@@ -124,6 +125,12 @@ export interface SimulationCoordinator {
 
   /** AC sweep analysis. Returns null if not supported. */
   acAnalysis(params: AcParams): AcResult | null;
+
+  /** Apply a phase-aware capture hook (master switch). Pass null to clear. */
+  applyCaptureHook(bundle: PhaseAwareCaptureHook | null): void;
+
+  /** Run the deferred initialization (DCOP for analog backends). Idempotent. */
+  initialize(): void;
 
   // -------------------------------------------------------------------------
   // §1.11 Convergence logging

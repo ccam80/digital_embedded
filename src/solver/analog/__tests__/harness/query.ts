@@ -27,7 +27,7 @@ export function querySteps(
 
   if (query.timeRange) {
     const { from, to } = query.timeRange;
-    steps = steps.filter(s => s.simTime >= from && s.simTime <= to);
+    steps = steps.filter(s => s.stepStartTime >= from && s.stepStartTime <= to);
   }
 
   if (query.converged !== undefined) {
@@ -54,7 +54,7 @@ export function nodeVoltageTrajectory(
     for (const iter of step.iterations) {
       if (nodeIndex < iter.voltages.length) {
         result.push({
-          simTime: step.simTime,
+          simTime: step.stepStartTime,
           iteration: iter.iteration,
           voltage: iter.voltages[nodeIndex],
         });
@@ -79,7 +79,7 @@ export function elementStateTrajectory(
       const es = iter.elementStates.find(e => e.label === elementLabel);
       if (es && slotName in es.slots) {
         result.push({
-          simTime: step.simTime,
+          simTime: step.stepStartTime,
           iteration: iter.iteration,
           value: es.slots[slotName],
         });

@@ -103,6 +103,14 @@ export class NullSimulationCoordinator implements SimulationCoordinator {
   dcOperatingPoint(): DcOpResult | null { return null; }
   acAnalysis(_params: AcParams): AcResult | null { return null; }
 
+  applyCaptureHook(_bundle: import('./coordinator-types.js').PhaseAwareCaptureHook | null): void {
+    // null coordinator has no engine to apply the hook to
+  }
+
+  initialize(): void {
+    // null coordinator has nothing to initialize
+  }
+
   // §1.11 Convergence logging
   getElementLabel(_index: number): string | undefined { return undefined; }
   supportsConvergenceLog(): boolean { return false; }

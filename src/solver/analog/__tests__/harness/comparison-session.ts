@@ -84,6 +84,10 @@ function makeComparedValue(
   absTol: number,
   relTol: number,
 ): ComparedValue {
+  // Both NaN means data is simply unavailable — treat as matching with zero delta.
+  if (isNaN(ours) && isNaN(ngspice)) {
+    return { ours, ngspice, delta: 0, absDelta: 0, relDelta: 0, withinTol: true };
+  }
   const delta = ours - ngspice;
   const absDelta = Math.abs(delta);
   const refMag = Math.max(Math.abs(ours), Math.abs(ngspice));
@@ -187,12 +191,18 @@ interface LimitingComparisonReport {
 
 interface ConvergenceDetailReport {
   stepIndex: number;
-  iterationIndex: number;
+  iteration: number;
+  ourNoncon: number;
+  ngspiceNoncon: number;
+  ourGlobalConverged: boolean;
+  ngspiceGlobalConverged: boolean;
   elements: Array<{
     label: string;
     deviceType: string;
     ourConverged: boolean;
-    ngConverged: boolean;
+    ngspiceConverged: boolean;
+    worstDelta: number;
+    agree: boolean;
   }>;
   disagreementCount: number;
 }
@@ -325,6 +335,9 @@ export class ComparisonSession {
     this._engine = this._coordinator.getAnalogEngine() as MNAEngine;
 
     if (this._engine) {
+      // Enable detailed-convergence + limiting capture; TODO: replaced by captureHook master switch per redesign spec.
+      this._engine.detailedConvergence = true;
+      this._engine.limitingCollector = [];
       const compiled = this._engine.compiled! as ConcreteCompiledAnalogCircuit;
       this._elementLabels = buildElementLabelMap(compiled);
       this._ourTopology = captureTopology(compiled, this._elementLabels);
@@ -370,7 +383,10 @@ export class ComparisonSession {
   /**
    * Run DC operating point on both engines.
    *
-   * Re-runs DCOP on our engine with hooks active to capture per-iteration data.
+   * Per spec §9.4/D6: the DCOP inside compile() IS already captured via the
+   * buffering hook installed in init(). This method does NOT re-run dcOperatingPoint().
+   * It replays the buffered DCOP attempts into step 0 of _stepCapture (identical to
+   * what runTransient() does) and returns _ourSession.steps[0] as the boot step.
    * Boot step: stepStartTime = stepEndTime = 0, dt = 0.
    */
   async runDcOp(): Promise<void> {
@@ -378,23 +394,22 @@ export class ComparisonSession {
     this._comparisons = null;
 
     if (!this._engine) throw new Error("ComparisonSession: call init() first");
+    if (this._dcopBootAttempts.length === 0) {
+      throw new Error(
+        "ComparisonSession.runDcOp(): no boot DCOP attempts captured — " +
+        "ensure the capture hook was installed before compile() (spec §9.4/D1).",
+      );
+    }
 
-    this._stepCapture.clear();
-
-    // Wire phase and iteration hooks
+    // Build the boot step from buffered DCOP attempts (single capture path, no re-run).
     const sc = this._stepCapture;
-    this._engine.postIterationHook = sc.hook;
-    this._engine.stepPhaseHook = {
-      onAttemptBegin(phase: string, dt: number): void {
-        sc.beginAttempt(phase as NRPhase, dt);
-      },
-      onAttemptEnd(outcome: string, converged: boolean): void {
-        sc.endAttempt(outcome as NRAttemptOutcome, converged);
-      },
-    };
+    sc.clear();
 
     sc.setStepStartTime(0);
-    this._engine.dcOperatingPoint();
+    for (const call of this._dcopBootAttempts) {
+      sc.beginAttempt(call.phase, call.dt, call.phaseParameter);
+      sc.endAttempt(call.outcome, call.converged);
+    }
 
     // Close boot step
     sc.endStep({
@@ -403,9 +418,6 @@ export class ComparisonSession {
       analysisPhase: "dcop",
       acceptedAttemptIndex: -1,
     });
-
-    this._engine.stepPhaseHook = null;
-    this._engine.postIterationHook = null;
 
     this._ourSession = {
       source: "ours",
@@ -801,6 +813,7 @@ export class ComparisonSession {
       const stepStartTime = step?.stepStartTime ?? 0;
 
       for (const diff of comp.voltageDiffs) {
+        if (diff.withinTol) continue;
         allEntries.push({
           stepIndex: comp.stepIndex,
           iteration: comp.iterationIndex,
@@ -818,6 +831,7 @@ export class ComparisonSession {
       }
 
       for (const diff of comp.stateDiffs) {
+        if (diff.withinTol) continue;
         allEntries.push({
           stepIndex: comp.stepIndex,
           iteration: comp.iterationIndex,
@@ -831,6 +845,42 @@ export class ComparisonSession {
           withinTol: diff.withinTol,
           componentLabel: diff.elementLabel,
           slotName: diff.slotName,
+        });
+      }
+
+      for (const diff of comp.rhsDiffs) {
+        if (diff.withinTol) continue;
+        allEntries.push({
+          stepIndex: comp.stepIndex,
+          iteration: comp.iterationIndex,
+          stepStartTime,
+          category: "rhs",
+          label: `rhs[${diff.index}]`,
+          ours: diff.ours,
+          ngspice: diff.theirs,
+          absDelta: diff.absDelta,
+          relDelta: Math.abs(diff.ours - diff.theirs) / Math.max(Math.abs(diff.ours), Math.abs(diff.theirs), 1e-30),
+          withinTol: diff.withinTol,
+          componentLabel: null,
+          slotName: null,
+        });
+      }
+
+      for (const diff of comp.matrixDiffs) {
+        if (diff.withinTol) continue;
+        allEntries.push({
+          stepIndex: comp.stepIndex,
+          iteration: comp.iterationIndex,
+          stepStartTime,
+          category: "matrix",
+          label: `M[${diff.row},${diff.col}]`,
+          ours: diff.ours,
+          ngspice: diff.theirs,
+          absDelta: diff.absDelta,
+          relDelta: Math.abs(diff.ours - diff.theirs) / Math.max(Math.abs(diff.ours), Math.abs(diff.theirs), 1e-30),
+          withinTol: diff.withinTol,
+          componentLabel: null,
+          slotName: null,
         });
       }
     }
@@ -1113,10 +1163,8 @@ export class ComparisonSession {
     this._ensureRun();
     const upperLabel = label.toUpperCase();
 
-    let ourIndex = -1;
-    this._ourTopology.nodeLabels.forEach((l, id) => {
-      if (l.toUpperCase() === upperLabel || l.toUpperCase().includes(upperLabel)) ourIndex = id;
-    });
+    const foundId = this._findNodeIdByLabel(label, this._ourTopology.nodeLabels);
+    const ourIndex = foundId ?? -1;
 
     const mapping = this._nodeMap.find(m => m.label.toUpperCase() === upperLabel);
     const ngIndex = mapping?.ngspiceIndex ?? -1;
@@ -1443,21 +1491,46 @@ export class ComparisonSession {
         const topoEl = this._ourTopology.elements.find(
           el => el.label.toUpperCase() === es.label.toUpperCase());
         const ourConverged = !ourIter.convergenceFailedElements.includes(es.label);
-        const ngConverged = ngIter
+        const ngspiceConverged = ngIter
           ? !(ngIter.ngspiceConvergenceFailedDevices ?? []).some(
               d => d.toUpperCase() === es.label.toUpperCase())
           : true;
+        const ngEs = ngIter?.elementStates.find(
+          e => e.label.toUpperCase() === es.label.toUpperCase());
+        let worstDelta = 0;
+        if (ngEs) {
+          for (const [slot, value] of Object.entries(es.slots)) {
+            const ngValue = ngEs.slots[slot];
+            if (ngValue !== undefined) {
+              const delta = Math.abs(value - ngValue);
+              if (delta > worstDelta) worstDelta = delta;
+            }
+          }
+        }
         elements.push({
           label: es.label,
           deviceType: topoEl?.type ?? "unknown",
           ourConverged,
-          ngConverged,
+          ngspiceConverged,
+          worstDelta,
+          agree: ourConverged === ngspiceConverged,
         });
       }
     }
 
-    const disagreementCount = elements.filter(e => e.ourConverged !== e.ngConverged).length;
-    return { stepIndex, iterationIndex, elements, disagreementCount };
+    const ourNoncon = elements.filter(e => !e.ourConverged).length;
+    const ngspiceNoncon = elements.filter(e => !e.ngspiceConverged).length;
+    const disagreementCount = elements.filter(e => !e.agree).length;
+    return {
+      stepIndex,
+      iteration: iterationIndex,
+      ourNoncon,
+      ngspiceNoncon,
+      ourGlobalConverged: ourNoncon === 0,
+      ngspiceGlobalConverged: ngspiceNoncon === 0,
+      elements,
+      disagreementCount,
+    };
   }
 
   toJSON(opts?: ToJSONOpts): {
@@ -1587,6 +1660,26 @@ export class ComparisonSession {
     const isCharge = slotName.startsWith("Q_") || slotName.startsWith("CCAP");
     const isVoltage = slotName.startsWith("V") && !slotName.startsWith("VON");
     return isCharge ? this._tol.qAbsTol : isVoltage ? this._tol.vAbsTol : this._tol.iAbsTol;
+  }
+
+  private _findNodeIdByLabel(label: string, nodeLabels: Map<number, string>): number | null {
+    const target = label.trim().toUpperCase();
+    let exactMatch: number | null = null;
+    const segmentMatches: number[] = [];
+    nodeLabels.forEach((stored, nodeId) => {
+      if (nodeId <= 0) return;
+      const storedUpper = stored.toUpperCase();
+      if (storedUpper === target) { exactMatch = nodeId; return; }
+      const segments = storedUpper.split("/");
+      if (segments.some(s => s === target)) segmentMatches.push(nodeId);
+    });
+    if (exactMatch !== null) return exactMatch;
+    if (segmentMatches.length === 0) return null;
+    if (segmentMatches.length > 1) {
+      const matchedLabels = segmentMatches.map(id => nodeLabels.get(id));
+      throw new Error(`Ambiguous node label: '${label}' matches stored labels [${matchedLabels.join(", ")}]`);
+    }
+    return segmentMatches[0];
   }
 
   private _formatSpiceTime(seconds: number): string {

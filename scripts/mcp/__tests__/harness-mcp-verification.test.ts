@@ -187,13 +187,15 @@ describeGate("Harness MCP Verification -- HWR square-wave transient", () => {
 
   // MCP-4: step + integrationCoefficients
   it("MCP-4: integration coefficients have correct structure", async () => {
-    // Find a transient step with non-zero ours.ag0 (early steps may be DCOP
-    // or not aligned with ngspice, so search dynamically)
+    // Spec §9.5: scan tranFloat steps only. Step 0 (analysisPhase="tranInit") uses
+    // backward-Euler (ag1=0) and would match ic.ag0 !== 0 spuriously. We require
+    // analysisPhase === "tranFloat" to guarantee trapezoidal coefficients on both sides.
     const ourSession = session.ourSession!;
     let targetStep = -1;
     for (let si = 0; si < ourSession.steps.length; si++) {
-      const ic = ourSession.steps[si].integrationCoefficients;
-      if (ic.ours.ag0 !== 0 && ic.ngspice.ag0 !== 0) {
+      const step = ourSession.steps[si];
+      const ic = step.integrationCoefficients;
+      if (step.analysisPhase === "tranFloat" && ic.ours.ag0 !== 0 && ic.ngspice.ag0 !== 0) {
         targetStep = si;
         break;
       }
@@ -274,7 +276,7 @@ describeGate("Harness MCP Verification -- HWR square-wave transient", () => {
     }
 
     // buckbjt has convergence issues — at least one element should NOT be converged
-    expect(result.convergenceData.some((e: any) => !e.converged)).toBe(true);
+    expect(result.convergenceData.some((e: any) => !e.ourConverged)).toBe(true);
 
     bjtSession.dispose();
   }, 60_000);
@@ -371,10 +373,11 @@ describeGate("Harness MCP Verification -- HWR square-wave transient", () => {
   });
 
   // MCP-10: step-end (step only)
-  it("MCP-10: step-end returns simTime, dt, iterationCount, nodes, components", async () => {
+  it("MCP-10: step-end returns stepStartTime, stepEndTime, dt, iterationCount, nodes, components", async () => {
     const result = await tools.call("harness_query", { handle, step: 0 });
     expect(result.queryMode).toBe("step-end");
-    assertComparedValueJSON(result.stepEnd.simTime, "stepEnd.simTime");
+    assertComparedValueJSON(result.stepEnd.stepStartTime, "stepEnd.stepStartTime");
+    assertComparedValueJSON(result.stepEnd.stepEndTime, "stepEnd.stepEndTime");
     assertComparedValueJSON(result.stepEnd.dt, "stepEnd.dt");
     assertComparedValueJSON(
       result.stepEnd.iterationCount,

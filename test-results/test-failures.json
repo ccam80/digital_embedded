@@ -1,21 +1,21 @@
 {
   "summary": {
     "vitest": {
-      "passed": 8146,
-      "failed": 23,
+      "passed": 8219,
+      "failed": 10,
       "skipped": 0,
-      "totalFiles": 351,
-      "durationSeconds": 14.4
+      "totalFiles": 357,
+      "durationSeconds": 13.5
     },
     "playwright": {
       "passed": 477,
       "failed": 11,
       "skipped": 0,
       "totalFiles": 23,
-      "durationSeconds": 169.71542499999998
+      "durationSeconds": 205.575732
     },
-    "totalFailed": 34,
-    "totalPassed": 8623
+    "totalFailed": 21,
+    "totalPassed": 8696
   },
   "failures": {
     "vitest": [
@@ -26,7 +26,7 @@
           {
             "file": "src\\solver\\coordinator.ts",
             "test": "transient stepping does not error after 50 steps",
-            "line": 201,
+            "line": 206,
             "column": 13
           }
         ]
@@ -68,152 +68,74 @@
         ]
       },
       {
-        "message": "expected 0 to be greater than 0",
-        "count": 6,
+        "message": "expected NaN to be +0 // Object.is equality",
+        "count": 1,
         "locations": [
           {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "1. topology: node mapping populated",
-            "line": 51,
-            "column": 28
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "15. step alignment: paired steps have matching simTime",
-            "line": 357,
-            "column": 33
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "17. getDivergences: non-empty for buckbjt",
-            "line": 386,
-            "column": 31
-          },
-          {
-            "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
-            "test": "MCP-1: summary mode returns analysis and convergence totals",
-            "line": 122,
-            "column": 59
-          },
-          {
-            "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
-            "test": "MCP-6: worst divergences sorted descending by absDelta",
-            "line": 256,
-            "column": 39
-          },
-          {
-            "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
-            "test": "MCP-18: export returns sizeBytes, steps, analysis, topology",
-            "line": 490,
-            "column": 33
+            "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+            "test": "41. Self-comparison: all matrix entries withinTol:true, absDelta:0",
+            "line": 587,
+            "column": 26
           }
         ]
       },
       {
-        "message": "expected false to be true // Object.is equality",
-        "count": 9,
+        "message": "expected 6 to be +0 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+            "test": "54. traceNode with onlyDivergences:true returns empty iterations in self-comparison (none diverge)",
+            "line": 741,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "message": "ours must have ag0 AND ag1 non-zero on at least one tranFloat step: expected false to be true // Object.is equality",
+        "count": 1,
         "locations": [
           {
             "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
             "test": "4. integration coefficients: ag0 non-zero for transient steps",
-            "line": 104,
-            "column": 28
-          },
+            "line": 111,
+            "column": 99
+          }
+        ]
+      },
+      {
+        "message": "trapezoidal method must appear in tranFloat steps: expected false to be true // Object.is equality",
+        "count": 1,
+        "locations": [
           {
             "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
             "test": "5. integration coefficients: method transitions to trapezoidal",
-            "line": 113,
-            "column": 40
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "8. per-element convergence: our engine reports failures",
-            "line": 163,
-            "column": 35
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "9. per-element convergence: ngspice reports device failures (C-side Item 8)",
-            "line": 194,
-            "column": 28
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "10. limiting events: our engine captures events (Item 9)",
-            "line": 211,
-            "column": 49
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "11. limiting events: ngspice captures events (C-side Item 9)",
-            "line": 237,
-            "column": 29
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "12. state history: state1Slots and state2Slots populated",
-            "line": 269,
-            "column": 27
-          },
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "13. pre-solve RHS: populated and not all zero",
-            "line": 295,
-            "column": 28
-          },
-          {
-            "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
-            "test": "MCP-5: convergence detail has per-element flags",
-            "line": 244,
-            "column": 67
+            "line": 132,
+            "column": 102
           }
         ]
       },
       {
-        "message": "expected 1 to be greater than 1",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "6. analysis phase: not all steps are tranFloat",
-            "line": 129,
-            "column": 25
-          }
-        ]
-      },
-      {
-        "message": "expected -1 to be greater than or equal to 0",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "7. analysis phase: tranInit precedes tranFloat",
-            "line": 143,
-            "column": 22
-          }
-        ]
-      },
-      {
-        "message": "ngspice.ag0 must not be zero: expected +0 not to be +0 // Object.is equality",
+        "message": "must find a transient step with non-zero coefficients on both sides: expected -1 to be greater than or equal to 0",
         "count": 1,
         "locations": [
           {
             "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
             "test": "MCP-4: integration coefficients have correct structure",
             "line": 203,
-            "column": 68
+            "column": 95
           }
         ]
       },
       {
-        "message": "limiting events must exist for BJT: expected true to be false // Object.is equality",
+        "message": "expected false to be true // Object.is equality",
         "count": 1,
         "locations": [
           {
             "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
-            "test": "MCP-12: limiting data returns valid structure",
-            "line": 389,
-            "column": 63
+            "test": "MCP-5: convergence detail has per-element flags",
+            "line": 279,
+            "column": 70
           }
         ]
       }
