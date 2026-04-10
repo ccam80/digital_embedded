@@ -1,9 +1,0 @@
-RL Circuit Transient
-Vs 1 0 PULSE(0 5 0 1n 1n 100u 200u)
-R1 1 2 1k
-L1 2 0 1m IC=0
-.tran 50n 10u UIC
-.meas tran v_at_tau    FIND V(2) AT=1u
-.meas tran v_at_5tau   FIND V(2) AT=5u
-.meas tran v_max       MAX V(2)
-.end

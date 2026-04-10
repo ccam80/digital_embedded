@@ -278,3 +278,20 @@ The TypeScript errors in the full codebase (`npx tsc --noEmit`) are all in:
 - `query-methods.test.ts` tests 41 and 54 now PASSING (were pre-existing failures per baseline)
 - Pre-existing baseline failures still failing: boot-step-merge (2), stream-verif 4/5 — unchanged
 - Stream-verification test 15 now failing: Wave 3 regression (deleted `_alignedNgIndex`), Wave 4 owns
+
+---
+
+## Wave 3 Fix Round — Rule Violation Cleanup
+
+### Task: Delete stale historical-provenance JSDoc block (comparison-session.ts)
+- **Status**: complete
+- **Agent**: implementer
+- **File modified**: `src/solver/analog/__tests__/harness/comparison-session.ts` (lines 1–18)
+- **Change**: Replaced the pre-Wave-3 architectural description (lines 5–11) with a current, clean JSDoc that describes the class responsibility only:
+  - Removed: references to `docs/timestep-alignment-spec.md`, "stepStartTime equality", "1e-15 EPS", "D1"/"D4"/"D6" markers, "unaligned steps", and all other pre-Wave-3 terminology.
+  - Added: current description of ComparisonSession as a paired-engine comparison API supporting both real ngspice runs and self-compare unit-testing.
+  - Referenced: `docs/harness-redesign-spec.md` as the current design document (not a historical log).
+- **Verification**: 
+  - No new TypeScript errors introduced (pre-existing Wave 4 consumer test errors remain).
+  - Zero matches for stale terminology: `timestep-alignment-spec`, `unaligned`, `_alignedNgIndex`, `exact stepStartTime`, `1e-15 EPS`, `D1`, `D4`, `D6`.
+  - Scope respected: only JSDoc header touched; no other changes to `comparison-session.ts` or related test files.

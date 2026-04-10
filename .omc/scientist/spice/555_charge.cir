@@ -1,8 +1,0 @@
-* 555 Charge Phase: cap charges from Vcc/3 toward Vcc via Ra+Rb
-Vcc   vcc  0   DC 5
-Ra    vcc  n1  1k
-Rb    n1   nc  10k
-C1    nc   0   1u  IC=1.6667
-.tran 0.01ms 15ms uic
-.print tran V(nc)
-.end

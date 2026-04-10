@@ -1,21 +1,21 @@
 {
   "summary": {
     "vitest": {
-      "passed": 8221,
-      "failed": 12,
+      "passed": 8188,
+      "failed": 45,
       "skipped": 0,
       "totalFiles": 358,
-      "durationSeconds": 21.4
+      "durationSeconds": 21.5
     },
     "playwright": {
-      "passed": 234,
-      "failed": 254,
+      "passed": 477,
+      "failed": 11,
       "skipped": 0,
       "totalFiles": 23,
-      "durationSeconds": 325.22111700000005
+      "durationSeconds": 250.784547
     },
-    "totalFailed": 266,
-    "totalPassed": 8455
+    "totalFailed": 56,
+    "totalPassed": 8665
   },
   "failures": {
     "vitest": [
@@ -81,13 +81,31 @@
       },
       {
         "message": "expected false to be true // Object.is equality",
-        "count": 2,
+        "count": 5,
         "locations": [
           {
             "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
-            "test": "step 0 contains a DCOP-phase attempt",
-            "line": 59,
+            "test": "step 0 contains a transient-phase attempt (tranInit or tranNR)",
+            "line": 67,
             "column": 21
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+            "test": "step capture hook supports retry tracking via beginAttempt/endAttempt",
+            "line": 376,
+            "column": 32
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+            "test": "compareSnapshots with alignment skips our steps with no ref match",
+            "line": 569,
+            "column": 64
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\lte-retry-grouping.test.ts",
+            "test": "step.converged and step.accepted reflect the accepted attempt",
+            "line": 321,
+            "column": 31
           },
           {
             "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
@@ -98,26 +116,278 @@
         ]
       },
       {
-        "message": "expected NaN to be +0 // Object.is equality",
+        "message": "expected true to be false // Object.is equality",
         "count": 1,
         "locations": [
           {
-            "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
-            "test": "41. Self-comparison: all matrix entries withinTol:true, absDelta:0",
-            "line": 587,
-            "column": 26
+            "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
+            "test": "acceptedAttemptIndex points at a transient-phase attempt (not a DCOP sub-solve)",
+            "line": 79,
+            "column": 56
           }
         ]
       },
       {
-        "message": "expected 6 to be +0 // Object.is equality",
+        "message": "expected 0 to be greater than 0",
+        "count": 5,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
+            "test": "subsequent steps have stepStartTime > 0",
+            "line": 93,
+            "column": 38
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+            "test": "step capture hook packages iterations into step snapshots",
+            "line": 158,
+            "column": 40
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+            "test": "convergenceSummary reports correct statistics",
+            "line": 190,
+            "column": 35
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+            "test": "nodeVoltageTrajectory returns voltage history",
+            "line": 219,
+            "column": 31
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+            "test": "compareSnapshots returns all-pass for self-comparison",
+            "line": 258,
+            "column": 28
+          }
+        ]
+      },
+      {
+        "message": "expected 0 to be greater than or equal to 1",
         "count": 1,
         "locations": [
           {
-            "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
-            "test": "54. traceNode with onlyDivergences:true returns empty iterations in self-comparison (none diverge)",
-            "line": 741,
+            "file": "src\\solver\\analog\\__tests__\\harness\\boot-step.test.ts",
+            "test": "step has at least 1 NR iteration captured",
+            "line": 144,
+            "column": 37
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading 'stepIndex')",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\compare.ts",
+            "test": "formatComparison produces readable output",
+            "line": 223,
+            "column": 33
+          }
+        ]
+      },
+      {
+        "message": "expected null not to be null",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+            "test": "findLargestDelta identifies worst convergence point",
+            "line": 454,
+            "column": 24
+          }
+        ]
+      },
+      {
+        "message": "expected 999 to be 5 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+            "test": "compareSnapshots with alignment map uses remapped ngspice step index",
+            "line": 549,
+            "column": 47
+          }
+        ]
+      },
+      {
+        "message": "expected 1 to be 2 // Object.is equality",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\lte-retry-grouping.test.ts",
+            "test": "LTE-rejected attempt followed by accepted → 1 step, 2 attempts",
+            "line": 125,
             "column": 38
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\lte-retry-grouping.test.ts",
+            "test": "two sequential steps each with LTE retry → 2 steps total",
+            "line": 369,
+            "column": 38
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading 'outcome')",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\lte-retry-grouping.test.ts",
+            "test": "accepted attempt has outcome === 'accepted' and converged === true",
+            "line": 191,
+            "column": 33
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading 'dt')",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\lte-retry-grouping.test.ts",
+            "test": "LTE-rejected attempt uses larger dt; retry uses smaller dt",
+            "line": 225,
+            "column": 33
+          }
+        ]
+      },
+      {
+        "message": "expected +0 to be 1 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\lte-retry-grouping.test.ts",
+            "test": "acceptedAttemptIndex === 1",
+            "line": 289,
+            "column": 43
+          }
+        ]
+      },
+      {
+        "message": "engine.postIterationHook is not a function",
+        "count": 7,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+            "test": "two attempts with nrFailedRetry then accepted → 1 step, 2 attempts",
+            "line": 85,
+            "column": 13
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+            "test": "failed attempt has outcome === 'nrFailedRetry'",
+            "line": 137,
+            "column": 13
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+            "test": "accepted attempt has outcome === 'accepted' and converged === true",
+            "line": 170,
+            "column": 13
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+            "test": "both attempts share the same stepStartTime",
+            "line": 203,
+            "column": 13
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+            "test": "acceptedAttemptIndex correctly points at the accepted attempt",
+            "line": 239,
+            "column": 13
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+            "test": "step accepted === true even though first attempt failed",
+            "line": 272,
+            "column": 13
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+            "test": "multiple NR retries before acceptance → all grouped in 1 step",
+            "line": 307,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "message": "expected undefined to be defined",
+        "count": 6,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+            "test": "34. Returns SlotTrace with correct label and slotName",
+            "line": 499,
+            "column": 24
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+            "test": "35. totalSteps equals number of simulation steps captured",
+            "line": 510,
+            "column": 24
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+            "test": "37. Returns StateHistoryReport with all six state objects",
+            "line": 534,
+            "column": 24
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+            "test": "38. state0 matches elementStates from the iteration",
+            "line": 548,
+            "column": 24
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+            "test": "57. getComponentSlots with step provided returns ComponentSlotsSnapshot",
+            "line": 787,
+            "column": 24
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+            "test": "58. getComponentSlots without step returns ComponentSlotsTrace",
+            "line": 796,
+            "column": 24
+          }
+        ]
+      },
+      {
+        "message": "Cannot read properties of undefined (reading 'size')",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+            "test": "alignment map is non-empty",
+            "line": 56,
+            "column": 27
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+            "test": "15. step alignment: paired steps have matching simTime",
+            "line": 368,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "message": "alignedNgIndex is not iterable",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+            "test": "every aligned pair has |stepStartTime delta| <= 1e-15",
+            "line": 65,
+            "column": 35
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+            "test": "no raw-index fallback: aligned pairs use exact time equality only",
+            "line": 92,
+            "column": 35
           }
         ]
       },
@@ -184,489 +454,9 @@
         ]
       },
       {
-        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-        "count": 6,
+        "message": "Error: Status bar shows an error",
+        "count": 5,
         "locations": [
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Add at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Add at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Add at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Add at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Add at bitWidth=32: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Sub at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          }
-        ]
-      },
-      {
-        "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:5173/simulator.html",
-        "count": 211,
-        "locations": [
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Sub at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Sub at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Sub at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Sub at bitWidth=32: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Mul at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Mul at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Mul at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Mul at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Mul at bitWidth=32: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Div at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Div at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Div at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Div at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Div at bitWidth=32: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "MagnitudeComparator at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "MagnitudeComparator at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "MagnitudeComparator at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "MagnitudeComparator at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Counter at bitWidth=2: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Counter at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Counter at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Counter at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "CounterPreset at bitWidth=2: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "CounterPreset at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "CounterPreset at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "CounterPreset at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Register at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Register at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Register at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Register at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Register at bitWidth=32: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "D_FF at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "D_FF at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "D_FF at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "D_FF_AS at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "D_FF_AS at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "D_FF_AS at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "JK_FF at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "JK_FF at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "JK_FF at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "JK_FF_AS at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "JK_FF_AS at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "JK_FF_AS at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Decoder at selectorBits=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Decoder at selectorBits=2: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Decoder at selectorBits=3: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Decoder at selectorBits=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BitSelector at selectorBits=2: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BitSelector at selectorBits=3: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BitSelector at selectorBits=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BitSelector at selectorBits=5: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "PriorityEncoder at selectorBits=2: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "PriorityEncoder at selectorBits=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BarrelShifter at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BarrelShifter at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BarrelShifter at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BarrelShifter at bitWidth=32: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Driver at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Driver at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Driver at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Driver at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "DriverInvSel at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "DriverInvSel at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "DriverInvSel at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "DriverInvSel at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Delay at bitWidth=1: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Delay at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Delay at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Delay at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BusSplitter at bitWidth=2: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BusSplitter at bitWidth=4: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BusSplitter at bitWidth=8: set property and compile",
-            "line": 532,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BusSplitter at bitWidth=16: set property and compile",
-            "line": 532,
-            "column": 9
-          },
           {
             "file": "gui/component-sweep.spec.ts",
             "test": "DAC at bits=4: set property and compile",
@@ -692,1023 +482,57 @@
             "column": 9
           },
           {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Multiplexer sel=1 data=1: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Multiplexer sel=1 data=4: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Multiplexer sel=1 data=8: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Multiplexer sel=2 data=1: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Multiplexer sel=2 data=4: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Multiplexer sel=3 data=1: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Multiplexer sel=4 data=1: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Demultiplexer sel=1 data=1: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Demultiplexer sel=1 data=4: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Demultiplexer sel=2 data=1: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Demultiplexer sel=2 data=4: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Demultiplexer sel=3 data=1: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Demultiplexer sel=4 data=1: set properties and compile",
-            "line": 604,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "ROM addr=2 data=4: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "ROM addr=4 data=8: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "ROM addr=8 data=16: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "ROMDualPort addr=2 data=8: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "ROMDualPort addr=4 data=16: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "RAMSinglePort addr=2 data=4: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "RAMSinglePort addr=4 data=8: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "RAMSinglePort addr=8 data=16: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "RAMDualPort addr=2 data=8: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "RAMDualPort addr=4 data=16: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "RAMAsync addr=2 data=4: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "RAMAsync addr=4 data=8: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "EEPROM addr=2 data=4: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "EEPROM addr=4 data=8: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "EEPROM addr=8 data=16: set properties and compile",
-            "line": 646,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BitExtender 4→8: set properties and compile",
-            "line": 680,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BitExtender 8→16: set properties and compile",
-            "line": 680,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "BitExtender 16→32: set properties and compile",
-            "line": 680,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Splitter 4,4→8: set properties and compile",
-            "line": 707,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Splitter 8,8→16: set properties and compile",
-            "line": 707,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Splitter 4,4,4,4→16: set properties and compile",
-            "line": 707,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Splitter 16,16→32: set properties and compile",
-            "line": 707,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Tunnel at bitWidth=1: set property and compile",
-            "line": 724,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Tunnel at bitWidth=4: set property and compile",
-            "line": 724,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Tunnel at bitWidth=8: set property and compile",
-            "line": 724,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Tunnel at bitWidth=16: set property and compile",
-            "line": 724,
-            "column": 7
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "And works in digital mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "And works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Or works in digital mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Or works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Not works in digital mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "Not works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "NAnd works in digital mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "NAnd works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "NOr works in digital mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "NOr works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "XOr works in digital mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "XOr works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "XNOr works in digital mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "XNOr works in cmos mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "D_FF works in digital mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "D_FF works in behavioral mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "JK_FF works in digital mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "JK_FF works in behavioral mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "RS_FF works in digital mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "RS_FF works in behavioral mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "T_FF works in digital mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "T_FF works in behavioral mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "VoltageComparator works in analog mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "VoltageComparator works in mixed mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "DAC works in mixed mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/component-sweep.spec.ts",
-            "test": "ADC works in mixed mode",
-            "line": 766,
-            "column": 9
-          },
-          {
-            "file": "gui/hotload-params-e2e.spec.ts",
-            "test": "changing BF on BJT via primary param row changes output voltage",
-            "line": 103,
-            "column": 3
-          },
-          {
-            "file": "gui/hotload-params-e2e.spec.ts",
-            "test": "rOut override on And gate output pin persists after close and reopen",
-            "line": 189,
-            "column": 3
-          },
-          {
-            "file": "gui/hotload-params-e2e.spec.ts",
-            "test": "rOut override affects simulation output in mixed-signal mode",
-            "line": 217,
-            "column": 3
-          },
-          {
-            "file": "gui/hotload-params-e2e.spec.ts",
-            "test": "context menu on digital-to-analog wire shows all three Pin Loading options",
-            "line": 279,
-            "column": 3
-          },
-          {
-            "file": "gui/hotload-params-e2e.spec.ts",
-            "test": "selecting Pin Loading: Loaded shows checkmark and simulation continues without error",
-            "line": 301,
-            "column": 3
-          },
-          {
-            "file": "gui/hotload-params-e2e.spec.ts",
-            "test": "switching to Pin Loading: Ideal produces valid finite simulation output",
-            "line": 343,
-            "column": 3
-          },
-          {
             "file": "gui/master-circuit-assembly.spec.ts",
             "test": "Master 1: digital logic — gates, flip-flop, counter",
             "line": 46,
-            "column": 3
-          },
-          {
-            "file": "gui/master-circuit-assembly.spec.ts",
-            "test": "Master 2: analog — switched divider, RC, opamp, BJT",
-            "line": 207,
-            "column": 3
-          },
-          {
-            "file": "gui/master-circuit-assembly.spec.ts",
-            "test": "Master 3: mixed-signal — DAC, RC, comparator, counter",
-            "line": 417,
-            "column": 3
-          },
-          {
-            "file": "gui/menu-actions.spec.ts",
-            "test": "File > New resets the circuit",
-            "line": 20,
-            "column": 3
-          },
-          {
-            "file": "gui/menu-actions.spec.ts",
-            "test": "Edit > Undo/Redo menu items exist",
-            "line": 28,
-            "column": 3
-          },
-          {
-            "file": "gui/menu-actions.spec.ts",
-            "test": "View > Fit to Content does not crash",
-            "line": 34,
-            "column": 3
-          },
-          {
-            "file": "gui/menu-actions.spec.ts",
-            "test": "Simulation > View Traces opens viewer panel",
-            "line": 41,
-            "column": 3
-          },
-          {
-            "file": "gui/menu-actions.spec.ts",
-            "test": "viewer panel close button works",
-            "line": 49,
-            "column": 3
-          },
-          {
-            "file": "gui/menu-actions.spec.ts",
-            "test": "Simulation > Step menu item exists",
-            "line": 62,
-            "column": 3
-          },
-          {
-            "file": "gui/menu-actions.spec.ts",
-            "test": "View > Dark Mode toggle works via menu",
-            "line": 69,
-            "column": 3
-          },
-          {
-            "file": "gui/model-selector.spec.ts",
-            "test": "multi-model component shows Model dropdown with labels",
-            "line": 23,
-            "column": 3
-          },
-          {
-            "file": "gui/model-selector.spec.ts",
-            "test": "component with empty modelRegistry does not show Model dropdown",
-            "line": 49,
-            "column": 3
-          },
-          {
-            "file": "gui/model-selector.spec.ts",
-            "test": "BJT shows primary model params (IS, BF) directly in popup",
-            "line": 71,
-            "column": 3
-          },
-          {
-            "file": "gui/pin-loading-wire-override.spec.ts",
-            "test": "right-clicking a wire shows Pin Loading menu items",
-            "line": 68,
-            "column": 3
-          },
-          {
-            "file": "gui/pin-loading-wire-override.spec.ts",
-            "test": "clicking Pin Loading: Loaded adds override and canvas renders without error",
-            "line": 92,
-            "column": 3
-          },
-          {
-            "file": "gui/pin-loading-wire-override.spec.ts",
-            "test": "after setting Loaded, right-clicking wire shows checkmark on Loaded",
-            "line": 115,
-            "column": 3
-          },
-          {
-            "file": "gui/pin-loading-wire-override.spec.ts",
-            "test": "selecting Pin Loading: Default removes the override",
-            "line": 142,
-            "column": 3
-          },
-          {
-            "file": "gui/pin-loading-wire-override.spec.ts",
-            "test": "loading mode persists after recompile (canvas re-render)",
-            "line": 178,
-            "column": 3
-          },
-          {
-            "file": "gui/simulation-controls.spec.ts",
-            "test": "Step-time dropdown button is clickable and shows dropdown",
-            "line": 15,
-            "column": 3
-          },
-          {
-            "file": "gui/simulation-controls.spec.ts",
-            "test": "Run and Stop buttons toggle simulation state",
-            "line": 27,
-            "column": 3
-          },
-          {
-            "file": "gui/simulation-controls.spec.ts",
-            "test": "Fit button works",
-            "line": 44,
-            "column": 3
-          },
-          {
-            "file": "gui/simulation-controls.spec.ts",
-            "test": "Undo/Redo buttons exist and are initially disabled",
-            "line": 51,
-            "column": 3
-          },
-          {
-            "file": "gui/simulation-controls.spec.ts",
-            "test": "Speed controls exist",
-            "line": 60,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL import menu item visible for NPN BJT",
-            "line": 51,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL import dialog opens with textarea when menu item clicked",
-            "line": 70,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL dialog shows parse preview for valid .MODEL card",
-            "line": 94,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".MODEL Apply stores overrides visible in SPICE panel",
-            "line": 129,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".SUBCKT import menu item visible for component with subcircuitModel support",
-            "line": 172,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": ".SUBCKT dialog opens and shows parse preview",
-            "line": 188,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-import-flows.spec.ts",
-            "test": "no .MODEL import menu item for Resistor (no deviceType)",
-            "line": 213,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-model-panel.spec.ts",
-            "test": "panel visible for NPN BJT in analog mode",
-            "line": 71,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-model-panel.spec.ts",
-            "test": "panel not shown for resistor",
-            "line": 89,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-model-panel.spec.ts",
-            "test": "panel not shown when model is logical",
-            "line": 105,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-model-panel.spec.ts",
-            "test": "edited IS value persists after closing and reopening popup",
-            "line": 123,
-            "column": 3
-          },
-          {
-            "file": "gui/spice-model-panel.spec.ts",
-            "test": "IS override affects BJT collector current",
-            "line": 156,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "partial selection shows correct boundary ports in the dialog",
-            "line": 165,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "dialog auto-generates subcircuit_1 name",
-            "line": 208,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "Create button rejects empty name",
-            "line": 228,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "changing a port face dropdown updates the chip preview",
-            "line": 254,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "creating a subcircuit replaces selection with correctly-sized chip",
-            "line": 304,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "subcircuit compiles and passes test vectors",
-            "line": 337,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "new subcircuit appears in the palette",
-            "line": 360,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "double-click on subcircuit navigates inside with breadcrumb",
-            "line": 392,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "right-click \"Open Subcircuit\" navigates into definition",
-            "line": 446,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "right-click \"Edit Symbol…\" re-opens dialog with existing port data",
-            "line": 485,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "Ctrl+Z undoes subcircuit creation, restoring original elements",
-            "line": 539,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "duplicate subcircuit name is rejected by the dialog",
-            "line": 573,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "second subcircuit auto-names as subcircuit_2",
-            "line": 626,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "subcircuit chip has pins distributed on left and right faces",
-            "line": 661,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-workflow.spec.ts",
-            "test": "moving all ports to left face puts all pins on the left side",
-            "line": 703,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "place In, And, Out from palette onto canvas",
-            "line": 216,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "Escape cancels placement mode without placing",
-            "line": 246,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "R key rotates component during placement",
-            "line": 256,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "select component and edit label in property panel",
-            "line": 281,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "select component and edit numeric property",
-            "line": 314,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "place component, undo removes it, redo restores it",
-            "line": 356,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "delete component, undo restores it",
-            "line": 383,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "manual speed entry via text field",
-            "line": 465,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "toolbar Run/Step/Stop cycle works without crash",
-            "line": 487,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "palette shows analog components without mode switching",
-            "line": 525,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "build RC, run simulation, select capacitor, see slider",
-            "line": 556,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "slider panel lifecycle: created on run, disposed on stop",
-            "line": 587,
-            "column": 3
-          },
-          {
-            "file": "gui/workflow-tests.spec.ts",
-            "test": "speed control affects analog simulation rate",
-            "line": 619,
             "column": 3
           }
         ]
       },
       {
-        "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:5173/e2e/fixtures/harness.html",
-        "count": 35,
+        "message": "Error: Expected 0.09577162816208429 to be close to 0.0957744513 (err=0.0000028231379157056535, limit=9.577445129999999e-8)",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/hotload-params-e2e.spec.ts",
+            "test": "changing BF on BJT via primary param row changes output voltage",
+            "line": 103,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeLessThan\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/master-circuit-assembly.spec.ts",
+            "test": "Master 2: analog — switched divider, RC, opamp, BJT",
+            "line": 207,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "Error: simTime only advanced 0.0us — expected at least 500us",
+        "count": 1,
         "locations": [
           {
             "file": "gui/stepping-perf.spec.ts",
             "test": "buckbjt at 1ms/s — simTime advances at least 500us in 2s wall time",
             "line": 48,
             "column": 3
-          },
+          }
+        ]
+      },
+      {
+        "message": "Error: FF only advanced 0.0us — expected ~1ms",
+        "count": 1,
+        "locations": [
           {
             "file": "gui/stepping-perf.spec.ts",
             "test": "buckbjt fast-forward 1ms — completes within 5s wall budget",
             "line": 93,
-            "column": 3
-          },
-          {
-            "file": "gui/stress-speed.spec.ts",
-            "test": "buckbjt at 1 ms/s — 3s wall time",
-            "line": 39,
-            "column": 3
-          },
-          {
-            "file": "gui/stress-speed.spec.ts",
-            "test": "buckbjt at 10 ms/s — 3s wall time",
-            "line": 39,
-            "column": 3
-          },
-          {
-            "file": "gui/stress-speed.spec.ts",
-            "test": "buckbjt at 100 ms/s — 3s wall time",
-            "line": 39,
-            "column": 3
-          },
-          {
-            "file": "gui/stress-speed.spec.ts",
-            "test": "buckbjt at 500 ms/s — 3s wall time",
-            "line": 39,
-            "column": 3
-          },
-          {
-            "file": "gui/stress-speed.spec.ts",
-            "test": "buckbjt at 1 s/s — 3s wall time",
-            "line": 39,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-creation.spec.ts",
-            "test": "right-click with 2+ elements selected shows \"Make Subcircuit…\" menu item",
-            "line": 172,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-creation.spec.ts",
-            "test": "\"Make Subcircuit…\" is disabled when simulation is running",
-            "line": 186,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-creation.spec.ts",
-            "test": "dialog opens with auto-populated port table matching boundary wire count",
-            "line": 238,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-creation.spec.ts",
-            "test": "changing a port face in the dialog updates the chip preview",
-            "line": 268,
-            "column": 3
-          },
-          {
-            "file": "gui/subcircuit-creation.spec.ts",
-            "test": "clicking \"Create\" replaces selection with a subcircuit instance on the canvas",
-            "line": 379,
-            "column": 3
-          },
-          {
-            "file": "parity/error-handling.spec.ts",
-            "test": "loading invalid base64 data returns error",
-            "line": 18,
-            "column": 3
-          },
-          {
-            "file": "parity/error-handling.spec.ts",
-            "test": "loading empty data returns error",
-            "line": 27,
-            "column": 3
-          },
-          {
-            "file": "parity/error-handling.spec.ts",
-            "test": "running test with no testData returns error",
-            "line": 35,
-            "column": 3
-          },
-          {
-            "file": "parity/error-handling.spec.ts",
-            "test": "test with mismatched signal names returns error",
-            "line": 47,
-            "column": 3
-          },
-          {
-            "file": "parity/headless-simulation.spec.ts",
-            "test": "set-signal + step + read-signal — AND gate truth table",
-            "line": 26,
-            "column": 3
-          },
-          {
-            "file": "parity/headless-simulation.spec.ts",
-            "test": "read-all-signals returns labeled signals",
-            "line": 53,
-            "column": 3
-          },
-          {
-            "file": "parity/headless-simulation.spec.ts",
-            "test": "half adder — step-by-step signal verification",
-            "line": 71,
-            "column": 3
-          },
-          {
-            "file": "parity/headless-simulation.spec.ts",
-            "test": "set-signal without loaded circuit returns error",
-            "line": 99,
-            "column": 3
-          },
-          {
-            "file": "parity/headless-simulation.spec.ts",
-            "test": "sim-run-tests also works (canonical message type)",
-            "line": 105,
-            "column": 3
-          },
-          {
-            "file": "parity/import-subcircuit.spec.ts",
-            "test": "imports subcircuit and responds with name and pin list",
-            "line": 78,
-            "column": 3
-          },
-          {
-            "file": "parity/import-subcircuit.spec.ts",
-            "test": "pins array length matches number of declared interface pins",
-            "line": 100,
-            "column": 3
-          },
-          {
-            "file": "parity/import-subcircuit.spec.ts",
-            "test": "missing name field returns sim-error",
-            "line": 118,
-            "column": 3
-          },
-          {
-            "file": "parity/import-subcircuit.spec.ts",
-            "test": "missing data field returns sim-error",
-            "line": 134,
-            "column": 3
-          },
-          {
-            "file": "parity/import-subcircuit.spec.ts",
-            "test": "malformed DTS JSON data returns sim-error",
-            "line": 148,
-            "column": 3
-          },
-          {
-            "file": "parity/import-subcircuit.spec.ts",
-            "test": "importing multiple subcircuits yields distinct sim-subcircuit-imported responses",
-            "line": 161,
-            "column": 3
-          },
-          {
-            "file": "parity/load-and-simulate.spec.ts",
-            "test": "AND gate — load .dig and run test vectors",
-            "line": 26,
-            "column": 3
-          },
-          {
-            "file": "parity/load-and-simulate.spec.ts",
-            "test": "Half adder — load .dig and run test vectors",
-            "line": 35,
-            "column": 3
-          },
-          {
-            "file": "parity/load-and-simulate.spec.ts",
-            "test": "AND gate — load via URL and run test vectors",
-            "line": 46,
-            "column": 3
-          },
-          {
-            "file": "parity/load-and-simulate.spec.ts",
-            "test": "AND gate — failing test vector detected",
-            "line": 54,
-            "column": 3
-          },
-          {
-            "file": "parity/load-and-simulate.spec.ts",
-            "test": "get-circuit round-trip — export produces dts-json-base64 format",
-            "line": 64,
-            "column": 3
-          },
-          {
-            "file": "parity/load-and-simulate.spec.ts",
-            "test": "get-circuit round-trip — export then reimport preserves circuit",
-            "line": 82,
-            "column": 3
-          },
-          {
-            "file": "parity/load-and-simulate.spec.ts",
-            "test": "sim-get-circuit / sim-load-data — modelParamDeltas survive round-trip",
-            "line": 96,
-            "column": 3
-          },
-          {
-            "file": "parity/rlc-lte-path.spec.ts",
-            "test": "RC zero-crossing progression through the postMessage bridge",
-            "line": 40,
             "column": 3
           }
         ]

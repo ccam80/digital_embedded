@@ -1,6 +1,0 @@
-rOut Override 100k
-Voh source 0 5.0
-Rout source junction 100000
-Rload junction 0 10k
-.op
-.end

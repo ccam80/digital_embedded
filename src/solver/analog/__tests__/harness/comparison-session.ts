@@ -1,20 +1,13 @@
 /**
- * ComparisonSession — unified ergonomic API for side-by-side
- * comparison of our engine against ngspice.
+ * ComparisonSession — pairs an "our engine" CaptureSession against an
+ * ngspice reference CaptureSession by step index and exposes shape,
+ * divergence, and trace queries over the paired result. In self-compare
+ * mode the ngspice side is a deep clone of the our side for zero-drift
+ * unit-testing of the query surface.
  *
- * Timestep-alignment rewrite per docs/timestep-alignment-spec.md §7, §9:
- * - stepStartTime (simTime BEFORE any NR attempt) is the canonical step key.
- * - No legacy simTime field anywhere (D4 — hard cut).
- * - Hook installed before compile() so in-compile DCOP is captured (D1).
- * - runDcOp() re-runs DCOP with hook active; returns boot step (D6 variant).
- * - Alignment uses exact stepStartTime equality with 1e-15 EPS (§7).
- * - Unaligned steps report unaligned:true; no raw-index fallback.
- *
- * Usage:
- *   const session = new ComparisonSession({ dtsPath, cirPath });
- *   await session.init();
- *   await session.runTransient(0, 5e-3);
- *   const step0 = session.getStepEnd(0);
+ * Use `createSelfCompare({ buildCircuit, analysis })` for unit tests and
+ * `new ComparisonSession({ dtsPath, cirPath, ... })` for real ngspice runs.
+ * See `docs/harness-redesign-spec.md` for the design (not a historical log).
  */
 
 import { readFileSync } from "fs";

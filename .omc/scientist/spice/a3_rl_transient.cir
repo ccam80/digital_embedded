@@ -1,9 +1,0 @@
-RL Circuit DC Transient
-Vs 1 0 DC 5
-R1 1 2 1k
-L1 2 0 1m
-.tran 200n 10u
-.meas tran v_at_tau FIND V(2) AT=1u
-.meas tran v_at_5tau FIND V(2) AT=5u
-.meas tran v_steady FIND V(2) AT=9.9u
-.end

@@ -1,8 +1,0 @@
-Pin Loading Loaded
-Vs vs 0 5
-R1 vs div 10k
-R2 div 0 10k
-* Pin loading: rIn=10M to ground, cIn=5pF (DC only, so C doesn't matter)
-Rload div 0 10Meg
-.op
-.end

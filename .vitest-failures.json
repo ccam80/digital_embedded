@@ -1,12 +1,60 @@
 {
   "summary": {
-    "passed": 24,
-    "failed": 8,
+    "passed": 8188,
+    "failed": 45,
     "skipped": 0,
-    "totalFiles": 3,
-    "durationSeconds": 2.4
+    "totalFiles": 358,
+    "durationSeconds": 21.5
   },
   "failures": [
+    {
+      "message": "Analog engine stagnation: simTime stuck at 1.0000000000000003e-9s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\coordinator.ts",
+          "test": "transient stepping does not error after 50 steps",
+          "line": 203,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "Engine entered ERROR state at step 2, simTime=1.0000000000000003e-9",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
+          "test": "survives 2000 transient steps without ERROR state",
+          "line": 79,
+          "column": 15
+        }
+      ]
+    },
+    {
+      "message": "Engine ERROR at step 2, simTime=1.000e-9",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
+          "test": "survives 600µs of sim time (matches UI run duration)",
+          "line": 103,
+          "column": 15
+        }
+      ]
+    },
+    {
+      "message": "step 1 transitioned engine to ERROR (simTime=1.0000000000000003e-9): expected 'ERROR' not to be 'ERROR' // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-mcp-surface.test.ts",
+          "test": "50 steps advance simTime > 0 without ERROR (regression: stale t=0 breakpoints must not freeze getClampedDt)",
+          "line": 74,
+          "column": 13
+        }
+      ]
+    },
     {
       "message": "expected 1 to be greater than or equal to 2",
       "count": 1,
@@ -21,13 +69,37 @@
     },
     {
       "message": "expected false to be true // Object.is equality",
-      "count": 1,
+      "count": 5,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
           "test": "step 0 contains a transient-phase attempt (tranInit or tranNR)",
           "line": 67,
           "column": 21
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+          "test": "step capture hook supports retry tracking via beginAttempt/endAttempt",
+          "line": 376,
+          "column": 32
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+          "test": "compareSnapshots with alignment skips our steps with no ref match",
+          "line": 569,
+          "column": 64
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\lte-retry-grouping.test.ts",
+          "test": "step.converged and step.accepted reflect the accepted attempt",
+          "line": 321,
+          "column": 31
+        },
+        {
+          "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
+          "test": "MCP-5: convergence detail has per-element flags",
+          "line": 279,
+          "column": 70
         }
       ]
     },
@@ -45,13 +117,37 @@
     },
     {
       "message": "expected 0 to be greater than 0",
-      "count": 1,
+      "count": 5,
       "locations": [
         {
           "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
           "test": "subsequent steps have stepStartTime > 0",
           "line": 93,
           "column": 38
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+          "test": "step capture hook packages iterations into step snapshots",
+          "line": 158,
+          "column": 40
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+          "test": "convergenceSummary reports correct statistics",
+          "line": 190,
+          "column": 35
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+          "test": "nodeVoltageTrajectory returns voltage history",
+          "line": 219,
+          "column": 31
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+          "test": "compareSnapshots returns all-pass for self-comparison",
+          "line": 258,
+          "column": 28
         }
       ]
     },
@@ -64,6 +160,222 @@
           "test": "step has at least 1 NR iteration captured",
           "line": 144,
           "column": 37
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'stepIndex')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\compare.ts",
+          "test": "formatComparison produces readable output",
+          "line": 223,
+          "column": 33
+        }
+      ]
+    },
+    {
+      "message": "expected null not to be null",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+          "test": "findLargestDelta identifies worst convergence point",
+          "line": 454,
+          "column": 24
+        }
+      ]
+    },
+    {
+      "message": "expected 999 to be 5 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+          "test": "compareSnapshots with alignment map uses remapped ngspice step index",
+          "line": 549,
+          "column": 47
+        }
+      ]
+    },
+    {
+      "message": "expected 1 to be 2 // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\lte-retry-grouping.test.ts",
+          "test": "LTE-rejected attempt followed by accepted → 1 step, 2 attempts",
+          "line": 125,
+          "column": 38
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\lte-retry-grouping.test.ts",
+          "test": "two sequential steps each with LTE retry → 2 steps total",
+          "line": 369,
+          "column": 38
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'outcome')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\lte-retry-grouping.test.ts",
+          "test": "accepted attempt has outcome === 'accepted' and converged === true",
+          "line": 191,
+          "column": 33
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'dt')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\lte-retry-grouping.test.ts",
+          "test": "LTE-rejected attempt uses larger dt; retry uses smaller dt",
+          "line": 225,
+          "column": 33
+        }
+      ]
+    },
+    {
+      "message": "expected +0 to be 1 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\lte-retry-grouping.test.ts",
+          "test": "acceptedAttemptIndex === 1",
+          "line": 289,
+          "column": 43
+        }
+      ]
+    },
+    {
+      "message": "engine.postIterationHook is not a function",
+      "count": 7,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+          "test": "two attempts with nrFailedRetry then accepted → 1 step, 2 attempts",
+          "line": 85,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+          "test": "failed attempt has outcome === 'nrFailedRetry'",
+          "line": 137,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+          "test": "accepted attempt has outcome === 'accepted' and converged === true",
+          "line": 170,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+          "test": "both attempts share the same stepStartTime",
+          "line": 203,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+          "test": "acceptedAttemptIndex correctly points at the accepted attempt",
+          "line": 239,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+          "test": "step accepted === true even though first attempt failed",
+          "line": 272,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\nr-retry-grouping.test.ts",
+          "test": "multiple NR retries before acceptance → all grouped in 1 step",
+          "line": 307,
+          "column": 15
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be defined",
+      "count": 6,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+          "test": "34. Returns SlotTrace with correct label and slotName",
+          "line": 499,
+          "column": 24
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+          "test": "35. totalSteps equals number of simulation steps captured",
+          "line": 510,
+          "column": 24
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+          "test": "37. Returns StateHistoryReport with all six state objects",
+          "line": 534,
+          "column": 24
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+          "test": "38. state0 matches elementStates from the iteration",
+          "line": 548,
+          "column": 24
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+          "test": "57. getComponentSlots with step provided returns ComponentSlotsSnapshot",
+          "line": 787,
+          "column": 24
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+          "test": "58. getComponentSlots without step returns ComponentSlotsTrace",
+          "line": 796,
+          "column": 24
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'size')",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "alignment map is non-empty",
+          "line": 56,
+          "column": 27
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "15. step alignment: paired steps have matching simTime",
+          "line": 368,
+          "column": 27
+        }
+      ]
+    },
+    {
+      "message": "alignedNgIndex is not iterable",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "every aligned pair has |stepStartTime delta| <= 1e-15",
+          "line": 65,
+          "column": 35
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "no raw-index fallback: aligned pairs use exact time equality only",
+          "line": 92,
+          "column": 35
         }
       ]
     },
@@ -92,14 +404,14 @@
       ]
     },
     {
-      "message": "Cannot read properties of undefined (reading 'size')",
+      "message": "must find a transient step with non-zero coefficients on both sides: expected -1 to be greater than or equal to 0",
       "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-          "test": "15. step alignment: paired steps have matching simTime",
-          "line": 368,
-          "column": 27
+          "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
+          "test": "MCP-4: integration coefficients have correct structure",
+          "line": 203,
+          "column": 95
         }
       ]
     }

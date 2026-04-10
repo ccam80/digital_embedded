@@ -1,8 +1,0 @@
-* SCR test
-Vcc vcc 0 DC 12
-R1 vcc anode 1k
-Qscr anode gate 0 SCRMOD
-.model SCRMOD SCR(IH=5m IGT=200u VTM=1.7)
-Vg gate 0 DC 0
-.op
-.end

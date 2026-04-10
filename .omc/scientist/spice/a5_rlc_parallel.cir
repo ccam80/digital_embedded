@@ -1,9 +1,0 @@
-RLC Parallel Anti-resonance
-Vs 1 0 SIN(0 1 5033)
-R1 1 2 1k
-L1 1 3 1m
-C1 3 2 1u
-.tran 2u 10m
-.meas tran v_out_peak MAX V(2)
-.meas tran v_out_pp   PP  V(2)
-.end

@@ -1,6 +1,0 @@
-rOut Override 75ohm
-Voh source 0 5.0
-Rout source junction 75
-Rload junction 0 10k
-.op
-.end
