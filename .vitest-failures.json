@@ -1,10 +1,107 @@
 {
   "summary": {
-    "passed": 4,
-    "failed": 0,
+    "passed": 24,
+    "failed": 8,
     "skipped": 0,
-    "totalFiles": 1,
-    "durationSeconds": 2.1
+    "totalFiles": 3,
+    "durationSeconds": 2.4
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "expected 1 to be greater than or equal to 2",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
+          "test": "step 0 has at least 2 attempts (DCOP attempt + tranInit attempt)",
+          "line": 51,
+          "column": 35
+        }
+      ]
+    },
+    {
+      "message": "expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
+          "test": "step 0 contains a transient-phase attempt (tranInit or tranNR)",
+          "line": 67,
+          "column": 21
+        }
+      ]
+    },
+    {
+      "message": "expected true to be false // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
+          "test": "acceptedAttemptIndex points at a transient-phase attempt (not a DCOP sub-solve)",
+          "line": 79,
+          "column": 56
+        }
+      ]
+    },
+    {
+      "message": "expected 0 to be greater than 0",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
+          "test": "subsequent steps have stepStartTime > 0",
+          "line": 93,
+          "column": 38
+        }
+      ]
+    },
+    {
+      "message": "expected 0 to be greater than or equal to 1",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\boot-step.test.ts",
+          "test": "step has at least 1 NR iteration captured",
+          "line": 144,
+          "column": 37
+        }
+      ]
+    },
+    {
+      "message": "ours must have ag0 AND ag1 non-zero on at least one tranFloat step: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "4. integration coefficients: ag0 non-zero for transient steps",
+          "line": 111,
+          "column": 99
+        }
+      ]
+    },
+    {
+      "message": "trapezoidal method must appear in tranFloat steps: expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "5. integration coefficients: method transitions to trapezoidal",
+          "line": 132,
+          "column": 102
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'size')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "15. step alignment: paired steps have matching simTime",
+          "line": 368,
+          "column": 27
+        }
+      ]
+    }
+  ]
 }

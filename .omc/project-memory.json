@@ -267,8 +267,8 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-      "accessCount": 294,
-      "lastAccessed": 1775782715950,
+      "accessCount": 344,
+      "lastAccessed": 1775784362178,
       "type": "file"
     },
     {
@@ -279,14 +279,14 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\types.ts",
-      "accessCount": 108,
-      "lastAccessed": 1775781584306,
+      "accessCount": 113,
+      "lastAccessed": 1775784290129,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 98,
-      "lastAccessed": 1775783494054,
+      "accessCount": 99,
+      "lastAccessed": 1775783775381,
       "type": "directory"
     },
     {
@@ -297,8 +297,8 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\capture.ts",
-      "accessCount": 58,
-      "lastAccessed": 1775781064587,
+      "accessCount": 62,
+      "lastAccessed": 1775783811756,
       "type": "file"
     },
     {
@@ -309,15 +309,21 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness",
-      "accessCount": 49,
-      "lastAccessed": 1775778891339,
+      "accessCount": 50,
+      "lastAccessed": 1775783692641,
       "type": "directory"
     },
     {
       "path": "",
-      "accessCount": 43,
-      "lastAccessed": 1775781738893,
+      "accessCount": 44,
+      "lastAccessed": 1775784554270,
       "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+      "accessCount": 37,
+      "lastAccessed": 1775784540832,
+      "type": "file"
     },
     {
       "path": "src\\solver\\coordinator.ts",
@@ -326,21 +332,21 @@
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
-      "accessCount": 35,
-      "lastAccessed": 1775777799905,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
-      "accessCount": 29,
-      "lastAccessed": 1775777134372,
+      "accessCount": 30,
+      "lastAccessed": 1775784635129,
       "type": "file"
     },
     {
       "path": "src",
       "accessCount": 27,
       "lastAccessed": 1775782178739,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog",
+      "accessCount": 21,
+      "lastAccessed": 1775783768131,
       "type": "directory"
     },
     {
@@ -356,33 +362,27 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog",
+      "path": "src\\solver\\analog\\__tests__\\harness\\compare.ts",
       "accessCount": 20,
-      "lastAccessed": 1775781402160,
-      "type": "directory"
+      "lastAccessed": 1775783750504,
+      "type": "file"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 20,
+      "lastAccessed": 1775784666961,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 19,
+      "lastAccessed": 1775783653488,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\newton-raphson.ts",
       "accessCount": 18,
       "lastAccessed": 1775777778155,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\compare.ts",
-      "accessCount": 18,
-      "lastAccessed": 1775778107762,
-      "type": "file"
-    },
-    {
-      "path": "spec\\progress.md",
-      "accessCount": 18,
-      "lastAccessed": 1775783476002,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 18,
-      "lastAccessed": 1775783480367,
       "type": "file"
     },
     {

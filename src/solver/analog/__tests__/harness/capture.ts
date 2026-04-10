@@ -8,6 +8,7 @@ import type { AnalogElement } from "../../element.js";
 import { isPoolBacked } from "../../element.js";
 import type { StatePool } from "../../state-pool.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
+import type { NRAttemptRecord } from "../../convergence-log.js";
 import type {
   TopologySnapshot,
   IterationSnapshot,
@@ -222,21 +223,36 @@ export type PostIterationHook = (
 
 /**
  * Create a postIterationHook that captures every NR iteration into
- * an IterationSnapshot array.
+ * an IterationSnapshot array and maintains a drainable IterationDetail buffer.
  */
 export function createIterationCaptureHook(
   solver: SparseSolver,
   elements: readonly AnalogElement[],
   statePool: StatePool | null,
   elementLabels?: Map<number, string>,
-): { hook: PostIterationHook; getSnapshots: () => IterationSnapshot[]; clear: () => void } {
+): {
+  hook: PostIterationHook;
+  getSnapshots: () => IterationSnapshot[];
+  clear: () => void;
+  drainForLog: () => NRAttemptRecord["iterationDetails"];
+} {
   solver.enablePreSolveRhsCapture(true);
   let snapshots: IterationSnapshot[] = [];
+  let detailBuffer: NonNullable<NRAttemptRecord["iterationDetails"]> = [];
 
   const hook: PostIterationHook = (
     iteration, voltages, prevVoltages, noncon, globalConverged, elemConverged,
     limitingEvents, convergenceFailedElements,
   ) => {
+    let maxDelta = 0;
+    let maxDeltaNode = -1;
+    for (let i = 0; i < voltages.length; i++) {
+      const d = Math.abs(voltages[i] - prevVoltages[i]);
+      if (d > maxDelta) { maxDelta = d; maxDeltaNode = i; }
+    }
+
+    detailBuffer.push({ iteration, maxDelta, maxDeltaNode, noncon, converged: globalConverged });
+
     snapshots.push({
       iteration,
       voltages: voltages.slice(),
@@ -256,7 +272,12 @@ export function createIterationCaptureHook(
   return {
     hook,
     getSnapshots: () => snapshots,
-    clear: () => { snapshots = []; },
+    clear: () => { snapshots = []; detailBuffer = []; },
+    drainForLog(): NRAttemptRecord["iterationDetails"] {
+      const drained = detailBuffer.slice();
+      detailBuffer = [];
+      return drained;
+    },
   };
 }
 
@@ -297,7 +318,7 @@ export function createStepCaptureHook(
   statePool: StatePool | null,
   elementLabels?: Map<number, string>,
 ): {
-  hook: PostIterationHook;
+  iterationHook: PostIterationHook & { drainForLog: () => NRAttemptRecord["iterationDetails"] };
   beginAttempt(phase: NRPhase, dt: number, phaseParameter?: number): void;
   endAttempt(outcome: NRAttemptOutcome, converged: boolean): void;
   endStep(params: {
@@ -322,8 +343,12 @@ export function createStepCaptureHook(
   let currentAttemptDt: number = 0;
   let currentAttemptPhaseParameter: number | undefined = undefined;
 
+  const iterationHook = Object.assign(iterCapture.hook, {
+    drainForLog: iterCapture.drainForLog,
+  });
+
   return {
-    hook: iterCapture.hook,
+    iterationHook,
     peekIterations: () => iterCapture.getSnapshots(),
 
     /**

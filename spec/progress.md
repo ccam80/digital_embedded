@@ -201,3 +201,80 @@ The TypeScript errors in the full codebase (`npx tsc --noEmit`) are all in:
 - Other pre-existing errors (harness-mcp-verification.test.ts, query-methods.test.ts) — pre-existing
 
 **Conclusion**: Wave 2 implementation is complete and correct. No code changes needed. All acceptance criteria from the spec are met, and all expected test state is accounted for in the updated baseline.
+
+---
+
+## Wave 3 Implementation Progress
+
+## Task W3.T1: compare.ts — drop alignment param, switch to index pairing, add asymmetric branch
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/solver/analog/__tests__/harness/compare.ts`
+- **Tests**: N/A (tested via W3.T3 stream-verification)
+- **Changes made**:
+  - Dropped 4th `alignment?` parameter from `compareSnapshots` signature
+  - Changed loop bound to `Math.max(ours.steps.length, ref.steps.length)` for asymmetric step counts
+  - Added asymmetric branch: when one side is missing a step, emits sentinel `ComparisonResult` with `iterationIndex: -1`, `presence: "oursOnly" | "ngspiceOnly"`, `allWithinTol: false`, empty diff arrays
+  - Added `presence: "both"` to all symmetric iteration results
+  - All inner diff loops (voltage, rhs, matrix, state) preserved verbatim
+
+## Task W3.T2: capture.ts — rename hook → iterationHook, add drainForLog()
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/solver/analog/__tests__/harness/capture.ts`
+- **Tests**: N/A (tested implicitly via boot-step and harness-integration)
+- **Changes made**:
+  - Added `import type { NRAttemptRecord } from "../../convergence-log.js"`
+  - Added `detailBuffer` tracking `{ iteration, maxDelta, maxDeltaNode, noncon, converged }` in `createIterationCaptureHook`
+  - Added `drainForLog()` method that snapshots and resets `detailBuffer`
+  - Updated `clear()` to reset `detailBuffer`
+  - Renamed `createStepCaptureHook` return field `hook` → `iterationHook`
+  - `iterationHook` is `Object.assign(iterCapture.hook, { drainForLog: iterCapture.drainForLog })`
+  - Return type: `iterationHook: PostIterationHook & { drainForLog: () => NRAttemptRecord["iterationDetails"] }`
+- **Known Wave 4 regressions** (per spec: "Wave 4 owns test files"):
+  - `nr-retry-grouping.test.ts` (7 tests): uses `sc.hook` → undefined, "postIterationHook is not a function"
+  - `lte-retry-grouping.test.ts` (multiple tests): same `.hook` usage
+  - `harness-integration.test.ts` (multiple tests): same `.hook` usage
+  - `boot-step.test.ts` "step has at least 1 NR iteration captured": same `.hook` usage
+  - `query-methods.test.ts` (tests 34, 35, 37, 38, 57, 58): same `.hook` usage in `buildHwrSession()`
+  Wave 4 must update all `.hook` → `.iterationHook` in these test files.
+
+## Task W3.T3: comparison-session.ts — bulk rewrite
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/solver/analog/__tests__/harness/comparison-session.ts`
+- **Tests**: comparison-session tests + query-methods tests 41/54 now passing
+- **Changes made**:
+  - Added imports: `ComponentRegistry`, `Circuit`, `SidePresence`, `Side`, `StepShape`, `SessionShape`, `AttemptSummary`, `AttemptCounts`, `PhaseAwareCaptureHook`
+  - Deleted fields: `_dcopBootAttempts`, `_alignedNgIndex`
+  - Added fields: `_inited: boolean = false`, `_hasRun: boolean = false`
+  - `ComparisonSessionOptions.dtsPath` now optional; added `selfCompare?: boolean`
+  - Added `static async createSelfCompare(opts)` factory
+  - Simplified `init()` to read DTS + call `_initWithCircuit(circuit)`
+  - New `private async initSelfCompare(buildCircuit?)` method
+  - New `private async _initWithCircuit(circuit)` — installs `PhaseAwareCaptureHook` bundle before `coordinator.initialize()`, emits DCOP boot step
+  - `runDcOp()`: uses `_ensureInited()`, selfCompare gating, `deepCloneSession` in selfCompare mode
+  - `runTransient()`: uses `_ensureInited()`, no hook rewiring, calls `setCaptureHook(null)` at end
+  - All 18 `_alignedNgIndex.get(si)` sites replaced with `this._ngSessionAligned()?.steps[si]`
+  - `_buildTimeAlignment()` method entirely deleted
+  - `_getComparisons()` no longer passes alignment arg to `compareSnapshots`
+  - `getStepEnd()` adds `presence` field, removes `unaligned`
+  - `toJSON()`: `unaligned: !has(i)` → `presence: _stepPresence(i)`
+  - Added `_ensureInited()`, `_stepPresence()`, `_stepStartTimeDelta()` helpers
+  - Added `getSessionShape()`, `getStepShape(i)`, `getStepAtTime(t, side)` public methods
+  - `getDivergences()`: added `presence` to all entries, added `shape` category
+  - `getSummary()`: added `presenceCounts` and `worstStepStartTimeDelta`
+  - Added `deepCloneSession()` and `buildIdentityNodeMap()` module-level functions
+- **Known Wave 4 regressions** (per spec: "Wave 4 owns test files"):
+  - `step-alignment.test.ts` (tests about `_alignedNgIndex`): field deleted, Wave 4 must rewrite these tests
+  - `stream-verification.test.ts` test 15 "step alignment": same `_alignedNgIndex` access
+  - `harness-integration.test.ts` tests about alignment map: `compareSnapshots` 4-arg call dropped
+
+## Wave 3 Exit Gate Verification
+- Zero `_alignedNgIndex` references in production code (Grep confirmed)
+- Zero `_dcopBootAttempts` references in production code (Grep confirmed)
+- Zero `unaligned?` references in harness production code (Grep confirmed)
+- Three Wave 3 production files compile with zero TypeScript errors
+- `query-methods.test.ts` tests 41 and 54 now PASSING (were pre-existing failures per baseline)
+- Pre-existing baseline failures still failing: boot-step-merge (2), stream-verif 4/5 — unchanged
+- Stream-verification test 15 now failing: Wave 3 regression (deleted `_alignedNgIndex`), Wave 4 owns

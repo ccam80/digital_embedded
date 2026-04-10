@@ -21,7 +21,9 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { DefaultSimulatorFacade } from "../../../../headless/default-facade.js";
 import { createDefaultRegistry } from "../../../../components/register-all.js";
+import { ComponentRegistry } from "../../../../core/registry.js";
 import { DefaultSimulationCoordinator } from "../../../../solver/coordinator.js";
+import type { Circuit } from "../../../../core/circuit.js";
 import type { MNAEngine } from "../../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import {
@@ -64,6 +66,13 @@ import type {
   LabeledMatrix,
   LabeledMatrixEntry,
   PaginationOpts,
+  SidePresence,
+  Side,
+  StepShape,
+  SessionShape,
+  AttemptSummary,
+  AttemptCounts,
+  PhaseAwareCaptureHook,
 } from "./types.js";
 import { DEFAULT_TOLERANCE } from "./types.js";
 
@@ -147,8 +156,8 @@ function emptyTopology(): TopologySnapshot {
 // ---------------------------------------------------------------------------
 
 export interface ComparisonSessionOptions {
-  /** Path to .dts circuit file (our engine format). */
-  dtsPath: string;
+  /** Path to .dts circuit file (our engine format). Optional when selfCompare + buildCircuit is used. */
+  dtsPath?: string;
   /** Path to .cir SPICE netlist (ngspice format). Optional for headless-only use. */
   cirPath?: string;
   /** Path to ngspice DLL. Defaults to NGSPICE_DLL_PATH env or standard build location. */
@@ -157,6 +166,8 @@ export interface ComparisonSessionOptions {
   tolerance?: Partial<Tolerance>;
   /** Max timestep steps to run on our engine per run. Default: 5000. */
   maxOurSteps?: number;
+  /** When true, skip ngspice and compare our engine against a deep clone of itself. */
+  selfCompare?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,9 +253,6 @@ export class ComparisonSession {
   // Step capture hook (one instance per session, cleared per run)
   protected _stepCapture!: ReturnType<typeof createStepCaptureHook>;
 
-  // DCOP attempts buffered during init()/compile() — replayed into step 0 of runTransient()
-  protected _dcopBootAttempts: Array<{ phase: NRPhase; dt: number; phaseParameter?: number; outcome: NRAttemptOutcome; converged: boolean }> = [];
-
   // ngspice bridge artifacts
   protected _cirClean: string = "";
 
@@ -252,9 +260,6 @@ export class ComparisonSession {
   protected _ourSession: CaptureSession | null = null;
   protected _ngSession: CaptureSession | null = null;
   protected _ngSessionReindexed: CaptureSession | null = null;
-
-  // Time-alignment: maps our step index → aligned ngspice step index
-  protected _alignedNgIndex: Map<number, number> = new Map();
 
   // Node mapping
   protected _nodeMap: NodeMapping[] = [];
@@ -264,6 +269,12 @@ export class ComparisonSession {
 
   // Analysis type
   protected _analysis: "dcop" | "tran" | null = null;
+
+  // Whether init() has completed
+  protected _inited: boolean = false;
+
+  // Whether runDcOp()/runTransient() has completed
+  protected _hasRun: boolean = false;
 
   // Errors accumulated during run
   readonly errors: string[] = [];
@@ -284,134 +295,103 @@ export class ComparisonSession {
     return s;
   }
 
+  static async createSelfCompare(opts: {
+    dtsPath?: string;
+    buildCircuit?: (registry: ComponentRegistry) => Circuit;
+    analysis: "dcop" | "tran";
+    tStop?: number;
+    maxStep?: number;
+    tolerance?: Partial<Tolerance>;
+  }): Promise<ComparisonSession> {
+    const session = new ComparisonSession({
+      dtsPath: opts.dtsPath ?? "<inline>",
+      ...(opts.tolerance ? { tolerance: opts.tolerance } : {}),
+      selfCompare: true,
+    });
+    await session.initSelfCompare(opts.buildCircuit);
+
+    if (opts.analysis === "dcop") {
+      await session.runDcOp();
+    } else {
+      if (opts.tStop === undefined) {
+        throw new Error("createSelfCompare: tStop required for transient analysis");
+      }
+      await session.runTransient(0, opts.tStop, opts.maxStep);
+    }
+    return session;
+  }
+
   // ---------------------------------------------------------------------------
   // Initialization
   // ---------------------------------------------------------------------------
 
   /**
-   * Load circuit, compile engine, capture topology.
-   * The capture hook is wired BEFORE compile() so the in-compile DCOP fires
-   * into the boot step (spec §4.3 / D1).
-   *
-   * Implementation: a buffering forwarding hook captures DCOP attempt begin/end
-   * calls during compile(). After compile, _stepCapture is created with the real
-   * solver, and the buffered DCOP calls are replayed into it so step 0 of any
-   * subsequent runTransient() starts with the DCOP attempts already pending.
+   * Load circuit, compile engine without running DCOP, capture topology,
+   * install the master-switch PhaseAwareCaptureHook, run DCOP via initialize(),
+   * and close the boot step directly into _stepCapture.
    */
   async init(): Promise<void> {
     const registry = createDefaultRegistry();
     this._facade = new DefaultSimulatorFacade(registry);
 
-    const dtsJson = readFileSync(resolvePath(this._opts.dtsPath), "utf-8");
+    const dtsJson = readFileSync(resolvePath(this._opts.dtsPath!), "utf-8");
     const circuit = this._facade.deserialize(dtsJson);
 
-    // Buffer for DCOP attempt calls that fire during compile()
-    type AttemptCall = { phase: string; dt: number; phaseParameter?: number };
-    type EndCall = { phase: string; dt: number; phaseParameter?: number; outcome: string; converged: boolean };
-    const dcopAttemptBuffer: EndCall[] = [];
-    let pendingBegin: AttemptCall | null = null;
+    await this._initWithCircuit(circuit);
+  }
 
-    const bufferingHook: MNAEngine["stepPhaseHook"] = {
-      onAttemptBegin(phase: string, dt: number, phaseParameter?: number): void {
-        const call: AttemptCall = { phase, dt };
-        if (phaseParameter !== undefined) call.phaseParameter = phaseParameter;
-        pendingBegin = call;
-      },
-      onAttemptEnd(outcome: string, converged: boolean): void {
-        if (pendingBegin) {
-          const endCall: EndCall = { phase: pendingBegin.phase, dt: pendingBegin.dt, outcome, converged };
-          if (pendingBegin.phaseParameter !== undefined) endCall.phaseParameter = pendingBegin.phaseParameter;
-          dcopAttemptBuffer.push(endCall);
-          pendingBegin = null;
-        }
+  private async initSelfCompare(buildCircuit?: (registry: ComponentRegistry) => Circuit): Promise<void> {
+    const registry = createDefaultRegistry();
+    this._facade = new DefaultSimulatorFacade(registry);
+
+    const circuit = buildCircuit
+      ? buildCircuit(registry)
+      : this._facade.deserialize(readFileSync(resolvePath(this._opts.dtsPath!), "utf-8"));
+
+    await this._initWithCircuit(circuit);
+  }
+
+  private async _initWithCircuit(circuit: Circuit): Promise<void> {
+    this._coordinator = this._facade.compile(
+      circuit, { deferInitialize: true }
+    ) as DefaultSimulationCoordinator;
+    this._engine = this._coordinator.getAnalogEngine() as MNAEngine;
+
+    if (!this._engine) {
+      this._elementLabels = new Map();
+      this._ourTopology = emptyTopology();
+      this._inited = true;
+      return;
+    }
+
+    const compiled = this._engine.compiled! as ConcreteCompiledAnalogCircuit;
+    this._elementLabels = buildElementLabelMap(compiled);
+    this._ourTopology = captureTopology(compiled, this._elementLabels);
+
+    this._stepCapture = createStepCaptureHook(
+      this._engine.solver!,
+      this._engine.elements,
+      this._engine.statePool,
+      this._elementLabels,
+    );
+
+    const sc = this._stepCapture;
+    const bundle: PhaseAwareCaptureHook = {
+      iterationHook: sc.iterationHook,
+      phaseHook: {
+        onAttemptBegin(phase: string, dt: number, phaseParameter?: number): void {
+          sc.beginAttempt(phase as NRPhase, dt, phaseParameter);
+        },
+        onAttemptEnd(outcome: string, converged: boolean): void {
+          sc.endAttempt(outcome as NRAttemptOutcome, converged);
+        },
       },
     };
 
-    // Install hook BEFORE compile so in-compile DCOP is captured (spec §4.3 / D1)
-    this._facade.setCaptureHook(bufferingHook);
-
-    // Compile (DCOP runs inside the coordinator constructor with hook active)
-    this._coordinator = this._facade.compile(circuit) as DefaultSimulationCoordinator;
-    this._engine = this._coordinator.getAnalogEngine() as MNAEngine;
-
-    if (this._engine) {
-      // Enable detailed-convergence + limiting capture; TODO: replaced by captureHook master switch per redesign spec.
-      this._engine.detailedConvergence = true;
-      this._engine.limitingCollector = [];
-      const compiled = this._engine.compiled! as ConcreteCompiledAnalogCircuit;
-      this._elementLabels = buildElementLabelMap(compiled);
-      this._ourTopology = captureTopology(compiled, this._elementLabels);
-      this._stepCapture = createStepCaptureHook(
-        this._engine.solver!,
-        this._engine.elements,
-        this._engine.statePool,
-        this._elementLabels,
-      );
-
-      // Store buffered DCOP attempts for replay into step 0 of runTransient().
-      // Cannot replay here because runTransient() calls _stepCapture.clear() first.
-      this._dcopBootAttempts = dcopAttemptBuffer.map((c) => {
-        const entry: { phase: NRPhase; dt: number; phaseParameter?: number; outcome: NRAttemptOutcome; converged: boolean } = {
-          phase: c.phase as NRPhase,
-          dt: c.dt,
-          outcome: c.outcome as NRAttemptOutcome,
-          converged: c.converged,
-        };
-        if (c.phaseParameter !== undefined) entry.phaseParameter = c.phaseParameter;
-        return entry;
-      });
-    } else {
-      this._elementLabels = new Map();
-      this._ourTopology = emptyTopology();
-    }
-
-    if (this._opts.cirPath) {
-      const cirRaw = readFileSync(resolvePath(this._opts.cirPath), "utf-8");
-      this._cirClean = stripControlBlock(cirRaw);
-    } else if (this._engine) {
-      // Auto-generate SPICE netlist from the compiled circuit when no cirPath given.
-      // This allows ngspice comparison without a hand-written .cir file.
-      const compiled = this._engine.compiled! as ConcreteCompiledAnalogCircuit;
-      this._cirClean = generateSpiceNetlist(compiled, this._elementLabels);
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Run methods
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Run DC operating point on both engines.
-   *
-   * Per spec §9.4/D6: the DCOP inside compile() IS already captured via the
-   * buffering hook installed in init(). This method does NOT re-run dcOperatingPoint().
-   * It replays the buffered DCOP attempts into step 0 of _stepCapture (identical to
-   * what runTransient() does) and returns _ourSession.steps[0] as the boot step.
-   * Boot step: stepStartTime = stepEndTime = 0, dt = 0.
-   */
-  async runDcOp(): Promise<void> {
-    this._analysis = "dcop";
-    this._comparisons = null;
-
-    if (!this._engine) throw new Error("ComparisonSession: call init() first");
-    if (this._dcopBootAttempts.length === 0) {
-      throw new Error(
-        "ComparisonSession.runDcOp(): no boot DCOP attempts captured — " +
-        "ensure the capture hook was installed before compile() (spec §9.4/D1).",
-      );
-    }
-
-    // Build the boot step from buffered DCOP attempts (single capture path, no re-run).
-    const sc = this._stepCapture;
-    sc.clear();
+    this._facade.setCaptureHook(bundle);
 
     sc.setStepStartTime(0);
-    for (const call of this._dcopBootAttempts) {
-      sc.beginAttempt(call.phase, call.dt, call.phaseParameter);
-      sc.endAttempt(call.outcome, call.converged);
-    }
-
-    // Close boot step
+    this._coordinator.initialize();
     sc.endStep({
       stepEndTime: 0,
       integrationCoefficients: _zeroDcopCoefficients(),
@@ -419,14 +399,41 @@ export class ComparisonSession {
       acceptedAttemptIndex: -1,
     });
 
+    if (this._opts.cirPath) {
+      const cirRaw = readFileSync(resolvePath(this._opts.cirPath), "utf-8");
+      this._cirClean = stripControlBlock(cirRaw);
+    } else if (!this._opts.selfCompare) {
+      this._cirClean = generateSpiceNetlist(compiled, this._elementLabels);
+    }
+
+    this._inited = true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Run methods
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Run DC operating point comparison.
+   *
+   * The boot step was already built into _stepCapture during init(). This method
+   * snapshots it as _ourSession, then runs the ngspice side (or deep-clones for
+   * self-compare mode).
+   */
+  async runDcOp(): Promise<void> {
+    this._ensureInited();
+    if (this._hasRun) return;
+
+    this._analysis = "dcop";
+    this._comparisons = null;
+
     this._ourSession = {
       source: "ours",
       topology: this._ourTopology,
-      steps: sc.getSteps(),
+      steps: this._stepCapture.getSteps(),
     };
 
-    // ngspice side
-    if (this._cirClean) {
+    if (!this._opts.selfCompare && this._cirClean) {
       const bridge = new NgspiceBridge(this._dllPath);
       try {
         await bridge.init();
@@ -440,53 +447,41 @@ export class ComparisonSession {
       } finally {
         bridge.dispose();
       }
+    } else if (this._opts.selfCompare) {
+      this._ngSession = deepCloneSession(this._ourSession, "ngspice");
+      this._ngSessionReindexed = this._ngSession;
+      this._nodeMap = buildIdentityNodeMap(this._ourSession);
     } else {
       this._ngSession = { source: "ngspice", topology: emptyTopology(), steps: [] };
     }
 
-    this._reindexNgSession();
-    this._buildTimeAlignment();
+    if (!this._opts.selfCompare) {
+      this._reindexNgSession();
+    }
+
+    this._hasRun = true;
   }
 
   /**
    * Run transient analysis on both engines.
    *
-   * The boot step (stepStartTime=0) groups DCOP + first tranInit attempts per §5.
-   * Phase hook fires beginAttempt/endAttempt for each NR attempt; endStep fires
-   * when simTime advances past prevSimTime.
+   * The boot step (stepStartTime=0) is already in _stepCapture from init().
+   * The master-switch hook bundle was installed in init(), so the per-step loop
+   * needs no hook rewiring. At the end, the master switch is released.
    */
   async runTransient(_tStart: number, tStop: number, maxStep?: number): Promise<void> {
+    this._ensureInited();
+    if (this._hasRun) return;
+
     this._analysis = "tran";
     this._comparisons = null;
-
-    if (!this._engine) throw new Error("ComparisonSession: call init() first");
 
     const stopStr = this._formatSpiceTime(tStop);
     const stepStr = maxStep
       ? this._formatSpiceTime(maxStep)
       : this._formatSpiceTime(tStop / 100);
 
-    this._stepCapture.clear();
-
     const sc = this._stepCapture;
-    this._engine.postIterationHook = sc.hook;
-    this._engine.stepPhaseHook = {
-      onAttemptBegin(phase: string, dt: number): void {
-        sc.beginAttempt(phase as NRPhase, dt);
-      },
-      onAttemptEnd(outcome: string, converged: boolean): void {
-        sc.endAttempt(outcome as NRAttemptOutcome, converged);
-      },
-    };
-
-    // Boot step starts at t=0 (DCOP + first tranInit share stepStartTime=0, spec §5).
-    // Replay DCOP attempts buffered during init()/compile() so step 0 contains them.
-    sc.setStepStartTime(0);
-    for (const call of this._dcopBootAttempts) {
-      sc.beginAttempt(call.phase, call.dt, call.phaseParameter);
-      sc.endAttempt(call.outcome, call.converged);
-    }
-
     let prevSimTime = 0;
 
     const maxSteps = this._opts.maxOurSteps ?? 5000;
@@ -494,7 +489,6 @@ export class ComparisonSession {
       try {
         this._coordinator.step();
       } catch (e: any) {
-        // Close any open attempt then the step
         sc.endAttempt("finalFailure", false);
         sc.endStep({
           stepEndTime: this._engine.simTime ?? prevSimTime,
@@ -520,17 +514,13 @@ export class ComparisonSession {
       if (nowTime >= tStop) break;
     }
 
-    this._engine.stepPhaseHook = null;
-    this._engine.postIterationHook = null;
-
     this._ourSession = {
       source: "ours",
       topology: this._ourTopology,
       steps: sc.getSteps(),
     };
 
-    // ngspice side
-    if (this._cirClean) {
+    if (!this._opts.selfCompare && this._cirClean) {
       const bridge = new NgspiceBridge(this._dllPath);
       try {
         await bridge.init();
@@ -544,12 +534,21 @@ export class ComparisonSession {
       } finally {
         bridge.dispose();
       }
+    } else if (this._opts.selfCompare) {
+      this._ngSession = deepCloneSession(this._ourSession, "ngspice");
+      this._ngSessionReindexed = this._ngSession;
+      this._nodeMap = buildIdentityNodeMap(this._ourSession);
     } else {
       this._ngSession = { source: "ngspice", topology: emptyTopology(), steps: [] };
     }
 
-    this._reindexNgSession();
-    this._buildTimeAlignment();
+    if (!this._opts.selfCompare) {
+      this._reindexNgSession();
+    }
+
+    this._facade.setCaptureHook(null);
+
+    this._hasRun = true;
   }
 
   // ---------------------------------------------------------------------------
@@ -558,7 +557,7 @@ export class ComparisonSession {
 
   /**
    * Step-end values from both engines at the accepted attempt's final iteration.
-   * Reports stepStartTime/stepEndTime; unaligned:true if no ngspice match.
+   * Reports stepStartTime/stepEndTime; presence reflects which sides are present.
    */
   getStepEnd(stepIndex: number): StepEndReport {
     this._ensureRun();
@@ -567,11 +566,8 @@ export class ComparisonSession {
       throw new Error(`Step out of range: ${stepIndex}`);
     }
 
-    const ngIdx = this._alignedNgIndex.get(stepIndex);
-    const ngStep = ngIdx !== undefined
-      ? (this._ngSessionAligned()?.steps[ngIdx])
-      : undefined;
-    const unaligned = ngIdx === undefined;
+    const ngStep = this._ngSessionAligned()?.steps[stepIndex];
+    const presence = this._stepPresence(stepIndex);
 
     // Accepted attempt final iteration (spec §9.3)
     const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 && ourStep.acceptedAttemptIndex < ourStep.attempts.length
@@ -622,8 +618,9 @@ export class ComparisonSession {
     const ngSST = ngStep?.stepStartTime ?? NaN;
     const ngSET = ngStep?.stepEndTime ?? NaN;
 
-    const report: StepEndReport = {
+    return {
       stepIndex,
+      presence,
       stepStartTime: simpleCompared(ourSST, ngSST),
       stepEndTime: simpleCompared(ourSET, ngSET),
       dt: simpleCompared(ourStep.dt, ngStep?.dt ?? NaN),
@@ -633,8 +630,6 @@ export class ComparisonSession {
       branches,
       components,
     };
-    if (unaligned) (report as any).unaligned = true;
-    return report;
   }
 
   /**
@@ -645,8 +640,7 @@ export class ComparisonSession {
     const ourStep = this._ourSession!.steps[stepIndex];
     if (!ourStep) return [];
 
-    const ngIdx = this._alignedNgIndex.get(stepIndex);
-    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+    const ngStep = this._ngSessionAligned()?.steps[stepIndex];
 
     // Accepted attempt iterations
     const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1;
@@ -811,6 +805,7 @@ export class ComparisonSession {
 
       const step = this._ourSession!.steps[comp.stepIndex];
       const stepStartTime = step?.stepStartTime ?? 0;
+      const presence = comp.presence;
 
       for (const diff of comp.voltageDiffs) {
         if (diff.withinTol) continue;
@@ -827,6 +822,7 @@ export class ComparisonSession {
           withinTol: diff.withinTol,
           componentLabel: null,
           slotName: null,
+          presence,
         });
       }
 
@@ -845,6 +841,7 @@ export class ComparisonSession {
           withinTol: diff.withinTol,
           componentLabel: diff.elementLabel,
           slotName: diff.slotName,
+          presence,
         });
       }
 
@@ -863,6 +860,7 @@ export class ComparisonSession {
           withinTol: diff.withinTol,
           componentLabel: null,
           slotName: null,
+          presence,
         });
       }
 
@@ -881,16 +879,49 @@ export class ComparisonSession {
           withinTol: diff.withinTol,
           componentLabel: null,
           slotName: null,
+          presence,
         });
       }
     }
 
+    // Shape divergences (appear after value entries)
+    const sessionShape = this.getSessionShape();
+    for (const shape of sessionShape.steps) {
+      if (filterStep !== undefined && shape.stepIndex !== filterStep) continue;
+      const isShapeDivergence =
+        shape.presence !== "both"
+        || (shape.attemptCounts.ours?.total ?? 0) !== (shape.attemptCounts.ngspice?.total ?? 0);
+      if (!isShapeDivergence) continue;
+
+      const ourStep = this._ourSession?.steps[shape.stepIndex];
+      const ngStep = this._ngSessionAligned()?.steps[shape.stepIndex];
+      const stepStartTime = ourStep?.stepStartTime ?? ngStep?.stepStartTime ?? 0;
+      const ourTotal = shape.attemptCounts.ours?.total ?? 0;
+      const ngTotal = shape.attemptCounts.ngspice?.total ?? 0;
+      const absDelta = Math.abs(ourTotal - ngTotal);
+
+      allEntries.push({
+        stepIndex: shape.stepIndex,
+        iteration: -1,
+        stepStartTime,
+        category: "shape",
+        label: `step_shape[${shape.stepIndex}]`,
+        ours: ourTotal,
+        ngspice: ngTotal,
+        absDelta,
+        relDelta: 0,
+        withinTol: false,
+        componentLabel: null,
+        slotName: null,
+        presence: shape.presence,
+      });
+    }
+
     const totalCount = allEntries.length;
 
-    // Worst by category
-    const categories: DivergenceCategory[] = ["voltage", "state", "rhs", "matrix"];
+    const categories: DivergenceCategory[] = ["voltage", "state", "rhs", "matrix", "shape"];
     const worstByCategory: DivergenceReport["worstByCategory"] = {
-      voltage: null, state: null, rhs: null, matrix: null,
+      voltage: null, state: null, rhs: null, matrix: null, shape: null,
     };
     for (const cat of categories) {
       const inCat = allEntries.filter(e => e.category === cat);
@@ -905,6 +936,106 @@ export class ComparisonSession {
       worstByCategory,
       entries: allEntries.slice(0, maxEntries),
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Shape API
+  // ---------------------------------------------------------------------------
+
+  getSessionShape(): SessionShape {
+    this._ensureRun();
+    const oursLen = this._ourSession!.steps.length;
+    const ngLen   = this._ngSessionAligned()?.steps.length ?? 0;
+    const max     = Math.max(oursLen, ngLen);
+
+    const steps: StepShape[] = [];
+    const presenceCounts = { both: 0, oursOnly: 0, ngspiceOnly: 0 };
+    const largeTimeDeltas: Array<{ stepIndex: number; delta: number }> = [];
+
+    for (let i = 0; i < max; i++) {
+      const shape = this.getStepShape(i);
+      steps.push(shape);
+      presenceCounts[shape.presence]++;
+      if (shape.stepStartTimeDelta !== null
+          && Math.abs(shape.stepStartTimeDelta) > this._tol.timeDeltaTol) {
+        largeTimeDeltas.push({ stepIndex: i, delta: shape.stepStartTimeDelta });
+      }
+    }
+
+    return {
+      analysis: this._analysis ?? "dcop",
+      stepCount: { ours: oursLen, ngspice: ngLen, max },
+      presenceCounts,
+      steps,
+      largeTimeDeltas,
+    };
+  }
+
+  getStepShape(stepIndex: number): StepShape {
+    this._ensureRun();
+    const ours = this._ourSession!.steps[stepIndex];
+    const ng   = this._ngSessionAligned()?.steps[stepIndex];
+    if (!ours && !ng) {
+      throw new Error(`getStepShape: step ${stepIndex} out of range on both sides`);
+    }
+    const presence: SidePresence =
+      ours && ng ? "both" : ours ? "oursOnly" : "ngspiceOnly";
+
+    const summarize = (s: typeof ours | undefined): AttemptSummary[] | null =>
+      s ? s.attempts.map(a => ({
+        phase: a.phase,
+        outcome: a.outcome,
+        dt: a.dt,
+        iterationCount: a.iterationCount,
+        converged: a.converged,
+      })) : null;
+
+    const counts = (s: typeof ours | undefined): AttemptCounts | null => {
+      if (!s) return null;
+      const byPhase: Partial<Record<NRPhase, number>> = {};
+      const byOutcome: Partial<Record<NRAttemptOutcome, number>> = {};
+      for (const a of s.attempts) {
+        byPhase[a.phase] = (byPhase[a.phase] ?? 0) + 1;
+        byOutcome[a.outcome] = (byOutcome[a.outcome] ?? 0) + 1;
+      }
+      return { byPhase, byOutcome, total: s.attempts.length };
+    };
+
+    return {
+      stepIndex,
+      presence,
+      stepStartTime: { ours: ours?.stepStartTime ?? null, ngspice: ng?.stepStartTime ?? null },
+      stepEndTime:   { ours: ours?.stepEndTime   ?? null, ngspice: ng?.stepEndTime   ?? null },
+      stepStartTimeDelta: this._stepStartTimeDelta(stepIndex),
+      attemptCounts: { ours: counts(ours), ngspice: counts(ng) },
+      attempts: { ours: summarize(ours), ngspice: summarize(ng) },
+      integrationMethod: {
+        ours: ours?.integrationCoefficients.ours.method ?? null,
+        ngspice: ng?.integrationCoefficients.ngspice.method ?? null,
+      },
+    };
+  }
+
+  getStepAtTime(t: number, side: Side = "ours"): number | null {
+    this._ensureRun();
+    const steps = (side === "ours"
+      ? this._ourSession!.steps
+      : this._ngSessionAligned()?.steps) ?? [];
+    if (steps.length === 0) return null;
+
+    if (t === 0) {
+      for (let i = 0; i < steps.length; i++) {
+        if (steps[i].stepStartTime === 0 && steps[i].stepEndTime === 0) return i;
+      }
+    }
+
+    for (let i = 0; i < steps.length; i++) {
+      const s = steps[i];
+      if (s.stepStartTime <= t && t < s.stepEndTime) return i;
+    }
+    const last = steps[steps.length - 1];
+    if (t === last.stepEndTime) return steps.length - 1;
+    return null;
   }
 
   // ---------------------------------------------------------------------------
@@ -940,8 +1071,7 @@ export class ComparisonSession {
       const iters = step.attempts[accIdx]?.iterations ?? step.iterations;
       const lastIter = iters[iters.length - 1];
 
-      const ngIdx = this._alignedNgIndex.get(si);
-      const ngStep = ngIdx !== undefined ? ngSteps[ngIdx] : undefined;
+      const ngStep = ngSteps[si];
       const ngAccIdx = ngStep
         ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
         : -1;
@@ -984,8 +1114,7 @@ export class ComparisonSession {
 
     const ourEs = lastIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
 
-    const ngIdx = this._alignedNgIndex.get(stepIndex);
-    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+    const ngStep = this._ngSessionAligned()?.steps[stepIndex];
     const ngAccIdx = ngStep
       ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
       : -1;
@@ -1027,8 +1156,7 @@ export class ComparisonSession {
       const lastIter = iters[iters.length - 1];
       const ourEs = lastIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
 
-      const ngIdx = this._alignedNgIndex.get(si);
-      const ngStep = ngIdx !== undefined ? ngSteps[ngIdx] : undefined;
+      const ngStep = ngSteps[si];
       const ngAccIdx = ngStep
         ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
         : -1;
@@ -1065,8 +1193,7 @@ export class ComparisonSession {
         const lastIter = iters[iters.length - 1];
         const ourEs = lastIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
 
-        const ngIdx = this._alignedNgIndex.get(si);
-        const ngStep = ngIdx !== undefined ? ngSteps[ngIdx] : undefined;
+        const ngStep = ngSteps[si];
         const ngAccIdx = ngStep
           ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
           : -1;
@@ -1111,8 +1238,7 @@ export class ComparisonSession {
     const steps: ComponentTrace["steps"] = [];
     for (let si = 0; si < ourSteps.length; si++) {
       const ourStep = ourSteps[si];
-      const ngIdx = this._alignedNgIndex.get(si);
-      const ngStep = ngIdx !== undefined ? ngSteps[ngIdx] : undefined;
+      const ngStep = ngSteps[si];
 
       const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1;
       const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
@@ -1175,8 +1301,7 @@ export class ComparisonSession {
     const steps: NodeTrace["steps"] = [];
     for (let si = 0; si < ourSteps.length; si++) {
       const ourStep = ourSteps[si];
-      const ngIdx = this._alignedNgIndex.get(si);
-      const ngStep = ngIdx !== undefined ? ngSteps[ngIdx] : undefined;
+      const ngStep = ngSteps[si];
 
       const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1;
       const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
@@ -1278,12 +1403,23 @@ export class ComparisonSession {
       }
     }
 
+    const sessionShape = this.getSessionShape();
+
+    let worstStepStartTimeDelta = 0;
+    for (const shape of sessionShape.steps) {
+      if (shape.stepStartTimeDelta !== null && Math.abs(shape.stepStartTimeDelta) > worstStepStartTimeDelta) {
+        worstStepStartTimeDelta = Math.abs(shape.stepStartTimeDelta);
+      }
+    }
+
     return {
       analysis: this._analysis ?? "dcop",
       stepCount: simpleCompared(
         this._ourSession!.steps.length,
         ngAligned?.steps.length ?? 0,
       ),
+      presenceCounts: sessionShape.presenceCounts,
+      worstStepStartTimeDelta,
       convergence: { ours: ourConv, ngspice: ngConv },
       firstDivergence: firstDiv,
       totals: { compared: comparisons.length, passed, failed },
@@ -1306,8 +1442,7 @@ export class ComparisonSession {
     const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
     const ourIter = ourIters[iterationIndex];
 
-    const ngIdx = this._alignedNgIndex.get(stepIndex);
-    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+    const ngStep = this._ngSessionAligned()?.steps[stepIndex];
     const ngAccIdx = ngStep
       ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
       : -1;
@@ -1358,8 +1493,7 @@ export class ComparisonSession {
     const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
     const ourIter = ourIters[iterationIndex];
 
-    const ngIdx = this._alignedNgIndex.get(stepIndex);
-    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+    const ngStep = this._ngSessionAligned()?.steps[stepIndex];
     const ngAccIdx = ngStep
       ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
       : -1;
@@ -1385,8 +1519,7 @@ export class ComparisonSession {
     const step = this._ourSession!.steps[stepIndex];
     if (!step) throw new Error(`Step out of range: ${stepIndex}`);
 
-    const ngIdx = this._alignedNgIndex.get(stepIndex);
-    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+    const ngStep = this._ngSessionAligned()?.steps[stepIndex];
 
     const ours = step.integrationCoefficients.ours;
     const ngspice = ngStep?.integrationCoefficients.ngspice
@@ -1413,8 +1546,7 @@ export class ComparisonSession {
     const ourIters = ourStep?.attempts[ourAccIdx]?.iterations ?? ourStep?.iterations ?? [];
     const ourIter = ourIters[iterationIndex];
 
-    const ngIdx = this._alignedNgIndex.get(stepIndex ?? 0);
-    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+    const ngStep = this._ngSessionAligned()?.steps[stepIndex ?? 0];
     const ngAccIdx = ngStep
       ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
       : -1;
@@ -1477,8 +1609,7 @@ export class ComparisonSession {
     const ourIters = ourStep?.attempts[ourAccIdx]?.iterations ?? ourStep?.iterations ?? [];
     const ourIter = ourIters[iterationIndex];
 
-    const ngIdx = this._alignedNgIndex.get(stepIndex);
-    const ngStep = ngIdx !== undefined ? this._ngSessionAligned()?.steps[ngIdx] : undefined;
+    const ngStep = this._ngSessionAligned()?.steps[stepIndex];
     const ngAccIdx = ngStep
       ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
       : -1;
@@ -1536,7 +1667,7 @@ export class ComparisonSession {
   toJSON(opts?: ToJSONOpts): {
     analysis: string;
     stepCount: { ours: number; ngspice: number };
-    steps: Array<{ stepIndex: number; stepStartTime: number; unaligned: boolean }>;
+    steps: Array<{ stepIndex: number; stepStartTime: number; presence: SidePresence }>;
   } {
     this._ensureRun();
     const comparisons = this._getComparisons();
@@ -1550,7 +1681,7 @@ export class ComparisonSession {
       .map((step, i) => ({
         stepIndex: i,
         stepStartTime: step.stepStartTime,
-        unaligned: !this._alignedNgIndex.has(i),
+        presence: this._stepPresence(i),
       }))
       .filter(s => includeAll || divergentStepIndices.has(s.stepIndex));
 
@@ -1573,7 +1704,6 @@ export class ComparisonSession {
     this._ngSession = null;
     this._ngSessionReindexed = null;
     this._comparisons = null;
-    this._alignedNgIndex.clear();
     this._nodeMap = [];
   }
 
@@ -1591,10 +1721,31 @@ export class ComparisonSession {
   // Internal helpers
   // ---------------------------------------------------------------------------
 
+  protected _ensureInited(): void {
+    if (!this._inited) {
+      throw new Error("ComparisonSession: call init() first");
+    }
+  }
+
   protected _ensureRun(): void {
     if (!this._ourSession) {
       throw new Error("ComparisonSession: call runDcOp() or runTransient() first");
     }
+  }
+
+  private _stepPresence(stepIndex: number): SidePresence {
+    const ours = this._ourSession?.steps[stepIndex];
+    const ng   = this._ngSessionAligned()?.steps[stepIndex];
+    if (ours && ng) return "both";
+    if (ours)       return "oursOnly";
+    return "ngspiceOnly";
+  }
+
+  private _stepStartTimeDelta(stepIndex: number): number | null {
+    const ours = this._ourSession?.steps[stepIndex];
+    const ng   = this._ngSessionAligned()?.steps[stepIndex];
+    if (!ours || !ng) return null;
+    return ours.stepStartTime - ng.stepStartTime;
   }
 
   private _buildNodeMapping(bridge: NgspiceBridge): void {
@@ -1611,37 +1762,6 @@ export class ComparisonSession {
     }
   }
 
-  /**
-   * Alignment per spec §7 — exact stepStartTime equality with 1e-15 EPS.
-   * No raw-index fallback; unaligned steps have no entry.
-   */
-  private _buildTimeAlignment(): void {
-    this._alignedNgIndex.clear();
-    const ourSteps = this._ourSession?.steps ?? [];
-    const ngSteps = this._ngSessionAligned()?.steps ?? [];
-    if (ourSteps.length === 0 || ngSteps.length === 0) return;
-
-    const ngIdxByTime = new Map<number, number>();
-    for (let j = 0; j < ngSteps.length; j++) {
-      ngIdxByTime.set(ngSteps[j].stepStartTime, j);
-    }
-
-    const EPS = 1e-15;
-    for (let i = 0; i < ourSteps.length; i++) {
-      const t = ourSteps[i].stepStartTime;
-      const j = ngIdxByTime.get(t);
-      if (j !== undefined) { this._alignedNgIndex.set(i, j); continue; }
-      // EPS fallback
-      let bestJ = -1, bestDelta = Infinity;
-      for (let k = 0; k < ngSteps.length; k++) {
-        const d = Math.abs(ngSteps[k].stepStartTime - t);
-        if (d < bestDelta) { bestDelta = d; bestJ = k; }
-      }
-      if (bestDelta <= EPS) this._alignedNgIndex.set(i, bestJ);
-      // else: leave unaligned — no raw-index fallback (spec §7)
-    }
-  }
-
   protected _ngSessionAligned(): CaptureSession | null {
     return this._ngSessionReindexed ?? this._ngSession;
   }
@@ -1650,7 +1770,7 @@ export class ComparisonSession {
     if (!this._comparisons) {
       const ng = this._ngSessionAligned();
       this._comparisons = (this._ourSession && ng)
-        ? compareSnapshots(this._ourSession, ng, this._tol, this._alignedNgIndex)
+        ? compareSnapshots(this._ourSession, ng, this._tol)
         : [];
     }
     return this._comparisons;
@@ -1711,4 +1831,27 @@ export class ComparisonSession {
     if (phase === "tranFloat") return "tranFloat";
     return "dcop";
   }
+}
+
+// ---------------------------------------------------------------------------
+// Self-compare helpers
+// ---------------------------------------------------------------------------
+
+function deepCloneSession(src: CaptureSession, newSource: "ours" | "ngspice"): CaptureSession {
+  const cloned = structuredClone(src);
+  cloned.source = newSource;
+  return cloned;
+}
+
+function buildIdentityNodeMap(session: CaptureSession): NodeMapping[] {
+  const result: NodeMapping[] = [];
+  session.topology.nodeLabels.forEach((label, nodeId) => {
+    result.push({
+      ourIndex: nodeId,
+      ngspiceIndex: nodeId,
+      label,
+      ngspiceName: label,
+    });
+  });
+  return result;
 }

@@ -29,29 +29,45 @@ function withinTol(ours: number, theirs: number, absTol: number, relTol: number)
 /**
  * Compare two capture sessions iteration-by-iteration.
  *
- * Both sessions must have the same number of steps. Within each step,
- * iterations are compared pairwise up to the minimum count (if one
- * side converged in fewer iterations, trailing iterations are skipped).
+ * Steps are paired by index. When one side has more steps than the other,
+ * the unpaired steps emit a sentinel ComparisonResult with iterationIndex: -1
+ * and presence set to "oursOnly" or "ngspiceOnly". Within each paired step,
+ * iterations are compared pairwise up to the minimum count.
  *
  * @param ours     - Our engine's capture session
  * @param ref      - ngspice reference capture session
  * @param tolerance - Comparison tolerances
- * @returns Array of ComparisonResult, one per compared iteration
+ * @returns Array of ComparisonResult, one per compared iteration (or sentinel for asymmetric steps)
  */
 export function compareSnapshots(
   ours: CaptureSession,
-  ref: CaptureSession,
+  ref:  CaptureSession,
   tolerance: Tolerance = DEFAULT_TOLERANCE,
-  alignment?: Map<number, number>,
 ): ComparisonResult[] {
   const results: ComparisonResult[] = [];
-  const stepCount = ours.steps.length;
+  const stepCount = Math.max(ours.steps.length, ref.steps.length);
 
   for (let si = 0; si < stepCount; si++) {
     const ourStep = ours.steps[si];
-    const refStepIndex = alignment ? (alignment.get(si) ?? si) : si;
-    const refStep = ref.steps[refStepIndex];
-    if (!refStep) continue;
+    const refStep = ref.steps[si];
+
+    if (!ourStep && !refStep) continue;
+
+    if (!ourStep || !refStep) {
+      results.push({
+        stepIndex: si,
+        iterationIndex: -1,
+        stepStartTime: (ourStep ?? refStep)!.stepStartTime,
+        presence: ourStep ? "oursOnly" : "ngspiceOnly",
+        voltageDiffs: [],
+        rhsDiffs: [],
+        matrixDiffs: [],
+        stateDiffs: [],
+        allWithinTol: false,
+      });
+      continue;
+    }
+
     const iterCount = Math.min(ourStep.iterations.length, refStep.iterations.length);
 
     for (let ii = 0; ii < iterCount; ii++) {
@@ -182,6 +198,7 @@ export function compareSnapshots(
         stepIndex: si,
         iterationIndex: ii,
         stepStartTime: ourStep.stepStartTime,
+        presence: "both",
         voltageDiffs,
         rhsDiffs,
         matrixDiffs,
