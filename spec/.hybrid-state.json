@@ -96,19 +96,19 @@
           "W6.T3"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
-      "verifications_passed": 0,
-      "verifications_failed": 0,
+      "spawned": 5,
+      "completed": 4,
+      "verifications_passed": 3,
+      "verifications_failed": 1,
       "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "dead_implementers": 1,
       "dead_verifiers": 0,
       "group_status": {
-        "W4": "pending",
-        "W5": "pending",
-        "W6": "pending"
+        "W4": "passed",
+        "W5": "passed",
+        "W6": "passed"
       }
     }
   ],
-  "last_updated": "2026-04-10T01:43:28.961Z"
+  "last_updated": "2026-04-10T02:30:51.492Z"
 }

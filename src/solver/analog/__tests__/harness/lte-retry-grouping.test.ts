@@ -97,7 +97,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(1e-9);
 
@@ -132,7 +132,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(1e-9);
 
@@ -166,7 +166,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(1e-9);
 
@@ -199,7 +199,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(1e-9);
 
@@ -232,7 +232,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(1e-9);
 
@@ -264,7 +264,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(1e-9);
 
@@ -296,7 +296,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(1e-9);
 
@@ -329,7 +329,7 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     // Step 1 at t=1e-9
     sc.setStepStartTime(1e-9);

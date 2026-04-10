@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1775699731675,
+  "lastScanned": 1775786400680,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -83,7 +83,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1775699731627,
+      "lastAccessed": 1775786400647,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -95,7 +95,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 5,
-      "lastAccessed": 1775699731627,
+      "lastAccessed": 1775786400647,
       "keyFiles": [
         "simulator.html",
         "tutorial-editor.html",
@@ -107,28 +107,25 @@
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 6,
-      "lastAccessed": 1775699731628,
+      "fileCount": 2,
+      "lastAccessed": 1775786400647,
       "keyFiles": [
-        "domain-leak-inventory.md",
-        "harness-implementation-spec.md",
-        "harness-open-issues.md",
-        "harness-test-template.txt",
-        "ngspice-harness-howto.md"
+        "harness-redesign-spec.md",
+        "timestep-alignment-spec.md"
       ]
     },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1775699731628,
+      "lastAccessed": 1775786400647,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
-      "fileCount": 10,
-      "lastAccessed": 1775699731655,
+      "fileCount": 12,
+      "lastAccessed": 1775786400648,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -141,28 +138,28 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1775699731655,
+      "lastAccessed": 1775786400663,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1775699731655,
+      "lastAccessed": 1775786400664,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1775699731655,
+      "lastAccessed": 1775786400664,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 19,
-      "lastAccessed": 1775699731656,
+      "lastAccessed": 1775786400664,
       "keyFiles": [
         "circuit-mcp-server.ts",
         "cleanup-unused-imports.mjs",
@@ -174,21 +171,21 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 19,
-      "lastAccessed": 1775699731656,
+      "fileCount": 12,
+      "lastAccessed": 1775786400665,
       "keyFiles": [
         "analog-snapshot-analysis.md",
-        "analog-state-pool-and-writeback-removal.md",
-        "app-modules-test-plan.md",
-        "breakpoint-push-once.md",
-        "circuit-scoped-subcircuits.md"
+        "plan.md",
+        "progress.md",
+        "test-baseline.md",
+        "timed-simulation.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1775699731657,
+      "lastAccessed": 1775786400665,
       "keyFiles": [
         "main.ts"
       ]
@@ -197,7 +194,7 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1775699731657,
+      "lastAccessed": 1775786400665,
       "keyFiles": [
         "playwright-failures.json",
         "test-failures.json"
@@ -207,7 +204,7 @@
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1775699731657,
+      "lastAccessed": 1775786400665,
       "keyFiles": [
         "index.json"
       ]
@@ -216,7 +213,7 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1775699731658,
+      "lastAccessed": 1775786400666,
       "keyFiles": [
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js",
@@ -227,7 +224,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1775699731659,
+      "lastAccessed": 1775786400666,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -238,7 +235,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1775699731660,
+      "lastAccessed": 1775786400667,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -249,7 +246,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1775699731660,
+      "lastAccessed": 1775786400667,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -260,34 +257,40 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1775699731661,
+      "lastAccessed": 1775786400668,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-      "accessCount": 369,
-      "lastAccessed": 1775785295328,
+      "accessCount": 384,
+      "lastAccessed": 1775787296224,
       "type": "file"
     },
     {
       "path": "scripts\\mcp\\harness-tools.ts",
-      "accessCount": 164,
-      "lastAccessed": 1775778946789,
+      "accessCount": 198,
+      "lastAccessed": 1775787306919,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\types.ts",
-      "accessCount": 113,
-      "lastAccessed": 1775784290129,
+      "accessCount": 114,
+      "lastAccessed": 1775785584667,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 99,
-      "lastAccessed": 1775783775381,
+      "accessCount": 100,
+      "lastAccessed": 1775785671528,
       "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
+      "accessCount": 78,
+      "lastAccessed": 1775786974573,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
@@ -297,9 +300,15 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\capture.ts",
-      "accessCount": 65,
-      "lastAccessed": 1775785288687,
+      "accessCount": 66,
+      "lastAccessed": 1775785521154,
       "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\harness",
+      "accessCount": 66,
+      "lastAccessed": 1775787213979,
+      "type": "directory"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\ni\\niiter.c",
@@ -308,33 +317,33 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\harness",
-      "accessCount": 50,
-      "lastAccessed": 1775783692641,
-      "type": "directory"
-    },
-    {
       "path": "",
-      "accessCount": 44,
-      "lastAccessed": 1775784554270,
+      "accessCount": 50,
+      "lastAccessed": 1775787483683,
       "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
-      "accessCount": 37,
-      "lastAccessed": 1775784540832,
-      "type": "file"
     },
     {
       "path": "src\\solver\\coordinator.ts",
-      "accessCount": 36,
-      "lastAccessed": 1775783493150,
+      "accessCount": 38,
+      "lastAccessed": 1775785677136,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
-      "accessCount": 30,
-      "lastAccessed": 1775784635129,
+      "accessCount": 38,
+      "lastAccessed": 1775786960881,
+      "type": "file"
+    },
+    {
+      "path": "spec\\progress.md",
+      "accessCount": 33,
+      "lastAccessed": 1775787877936,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 29,
+      "lastAccessed": 1775787883726,
       "type": "file"
     },
     {
@@ -347,18 +356,6 @@
       "path": "src\\solver\\analog\\__tests__\\harness\\compare.ts",
       "accessCount": 25,
       "lastAccessed": 1775785288136,
-      "type": "file"
-    },
-    {
-      "path": "spec\\progress.md",
-      "accessCount": 23,
-      "lastAccessed": 1775785195887,
-      "type": "file"
-    },
-    {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 22,
-      "lastAccessed": 1775785278024,
       "type": "file"
     },
     {
@@ -422,21 +419,21 @@
       "type": "file"
     },
     {
+      "path": "scripts\\mcp",
+      "accessCount": 12,
+      "lastAccessed": 1775787412546,
+      "type": "directory"
+    },
+    {
       "path": "scripts\\mcp\\harness-session-state.ts",
-      "accessCount": 9,
-      "lastAccessed": 1775778114452,
+      "accessCount": 10,
+      "lastAccessed": 1775785931063,
       "type": "file"
     },
     {
       "path": "ref\\ngspice\\src",
       "accessCount": 8,
       "lastAccessed": 1775778120730,
-      "type": "directory"
-    },
-    {
-      "path": "scripts\\mcp",
-      "accessCount": 7,
-      "lastAccessed": 1775778867304,
       "type": "directory"
     },
     {

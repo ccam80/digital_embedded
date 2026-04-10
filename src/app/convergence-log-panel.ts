@@ -264,6 +264,36 @@ export function openConvergenceLogPanel(ctx: AppContext): void {
     },
   });
 
+  let _noticeTimer = -1;
+  const noticeEl = document.createElement('div');
+  noticeEl.className = 'conv-notice';
+  noticeEl.style.cssText = 'display:none;padding:4px 8px;background:#fffbe6;border:1px solid #e6c700;color:#5a4a00;font-size:0.85em;';
+
+  function showPanelNotification(msg: string): void {
+    noticeEl.textContent = msg;
+    noticeEl.style.display = '';
+    if (_noticeTimer !== -1) clearTimeout(_noticeTimer);
+    _noticeTimer = window.setTimeout(() => {
+      noticeEl.style.display = 'none';
+      _noticeTimer = -1;
+    }, 6000);
+  }
+
+  function tryDisableLog(): void {
+    try {
+      getCoord().setConvergenceLogEnabled(false);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes("comparison harness")) {
+        showPanelNotification(
+          "Convergence log cannot be disabled while a comparison harness is running. " +
+          "The log will remain enabled until the harness session ends."
+        );
+        return;
+      }
+      throw err;
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Toolbar
   // -------------------------------------------------------------------------
@@ -286,10 +316,12 @@ export function openConvergenceLogPanel(ctx: AppContext): void {
   toggleBtn.addEventListener('click', () => {
     _logEnabled = !_logEnabled;
     _loggingDesired = _logEnabled;
-    // Apply to live coordinator if one exists; otherwise applyPreRunState
-    // will pick up _loggingDesired when the next coordinator is compiled.
     if (getCoord().supportsConvergenceLog()) {
-      getCoord().setConvergenceLogEnabled(_logEnabled);
+      if (_logEnabled) {
+        getCoord().setConvergenceLogEnabled(true);
+      } else {
+        tryDisableLog();
+      }
     }
     updateToggleBtn();
     refreshRecords();
@@ -343,6 +375,7 @@ export function openConvergenceLogPanel(ctx: AppContext): void {
   toolbar.appendChild(saveLogBtn);
   toolbar.appendChild(lastNLabel);
   toolbar.appendChild(lastNSelect);
+  toolbar.appendChild(noticeEl);
 
   // -------------------------------------------------------------------------
   // Table container
@@ -360,7 +393,11 @@ export function openConvergenceLogPanel(ctx: AppContext): void {
 
     // Re-apply desired logging state to the live coordinator (catches recompiles)
     if (coord.supportsConvergenceLog()) {
-      coord.setConvergenceLogEnabled(_loggingDesired);
+      if (_loggingDesired) {
+        coord.setConvergenceLogEnabled(true);
+      } else {
+        tryDisableLog();
+      }
       _logEnabled = _loggingDesired;
       updateToggleBtn();
     }

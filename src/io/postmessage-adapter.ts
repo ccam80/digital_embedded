@@ -435,8 +435,20 @@ export class PostMessageAdapter {
         this._post({ type: 'sim-convergence-log-data', records: [], enabled: true });
         break;
       case 'disable':
-        coord.setConvergenceLogEnabled(false);
-        this._post({ type: 'sim-convergence-log-data', records: [], enabled: false });
+        try {
+          coord.setConvergenceLogEnabled(false);
+          this._post({ type: 'sim-convergence-log-data', records: [], enabled: false });
+        } catch (err: unknown) {
+          if (err instanceof Error && err.message.includes("comparison harness")) {
+            this._post({
+              type: 'sim-error',
+              message: "Cannot toggle convergence log while comparison harness is active.",
+              code: "harness-active",
+            });
+            return;
+          }
+          throw err;
+        }
         break;
       case 'clear':
         coord.clearConvergenceLog();

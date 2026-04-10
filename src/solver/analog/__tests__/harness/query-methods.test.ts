@@ -14,7 +14,7 @@
  * Tests 37-39: getStateHistory
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { compileSlotMatcher, matchSlotPattern } from "./glob.js";
 import {
   formatComparedValue,
@@ -24,24 +24,20 @@ import {
   float64ToArray,
 } from "./format.js";
 import { normalizeDeviceType } from "./device-mappings.js";
-import { captureTopology, createStepCaptureHook, buildElementLabelMap } from "./capture.js";
+import { captureTopology, buildElementLabelMap } from "./capture.js";
 import { ComparisonSession } from "./comparison-session.js";
-import type { ComparedValue, CaptureSession, TopologySnapshot, NodeMapping, IntegrationCoefficients } from "./types.js";
-import { MNAEngine } from "../../analog-engine.js";
+import type { ComparedValue } from "./types.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../analog-engine.js";
 import { isPoolBacked } from "../../element.js";
 import type { AnalogElementCore } from "../../element.js";
 import { StatePool } from "../../state-pool.js";
-import { makeResistor, makeVoltageSource, makeDiode, makeCapacitor } from "../test-helpers.js";
+import { makeResistor, makeVoltageSource, makeDiode } from "../test-helpers.js";
+import type { ComponentRegistry } from "../../../../core/registry.js";
+import { DefaultSimulatorFacade } from "../../../../headless/default-facade.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers — copied from harness-integration.test.ts
 // ---------------------------------------------------------------------------
-
-const ZERO_INTEG_COEFF: IntegrationCoefficients = {
-  ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
-  ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
-};
 
 function buildStatePool(elements: AnalogElementCore[]): StatePool {
   let offset = 0;
@@ -70,78 +66,30 @@ function makeHWR() {
   };
 }
 
-function makeRC() {
-  const vs = makeVoltageSource(1, 0, 2, 5.0);
-  const r = makeResistor(1, 2, 1000);
-  const cap = makeCapacitor(2, 0, 1e-6);
-  const elements = [vs, r, cap];
-  const pool = buildStatePool(elements);
-  return {
-    circuit: {
-      netCount: 2, componentCount: 3, nodeCount: 2, branchCount: 1, matrixSize: 3,
-      elements, labelToNodeId: new Map([["Vs", 1], ["C1:A", 2]]), statePool: pool,
-    } as ConcreteCompiledAnalogCircuit,
-    pool,
-  };
-}
-
-/**
- * Subclass that exposes private state for test injection.
- */
-class TestableComparisonSession extends ComparisonSession {
-  setTestSession(
-    ourSession: CaptureSession,
-    ngSession: CaptureSession,
-    topology: TopologySnapshot,
-    engine: MNAEngine,
-    nodeMap: NodeMapping[],
-  ): void {
-    (this as any)._ourSession = ourSession;
-    (this as any)._ngSession = ngSession;
-    (this as any)._ngSessionReindexed = ngSession;
-    (this as any)._ourTopology = topology;
-    (this as any)._engine = engine;
-    (this as any)._nodeMap = nodeMap;
-    (this as any)._analysis = "dcop";
-    (this as any)._alignedNgIndex = new Map();
-    (this as any)._comparisons = null;
-  }
-}
-
-/**
- * Build a TestableComparisonSession backed by a self-comparison run on the HWR circuit.
- */
-function buildHwrSession(): { session: TestableComparisonSession; topology: TopologySnapshot } {
-  const { circuit, pool } = makeHWR();
-  const engine = new MNAEngine();
-  engine.init(circuit);
-
-  const elementLabels = buildElementLabelMap(circuit);
-  const topology = captureTopology(circuit, elementLabels);
-
-  const stepCapture = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-  engine.postIterationHook = stepCapture.hook;
-  // Wire phase hook so beginAttempt/endAttempt fire around DCOP phases
-  engine.stepPhaseHook = {
-    onAttemptBegin(phase: string, dt: number) { stepCapture.beginAttempt(phase as any, dt); },
-    onAttemptEnd(outcome: string, converged: boolean) { stepCapture.endAttempt(outcome as any, converged); },
-  };
-  stepCapture.setStepStartTime(0);
-  engine.dcOperatingPoint();
-  stepCapture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1 });
-  engine.stepPhaseHook = null;
-  engine.postIterationHook = undefined;
-
-  const ourSession: CaptureSession = {
-    source: "ours",
-    topology,
-    steps: stepCapture.getSteps(),
-  };
-
-  const session = new TestableComparisonSession({
-    dtsPath: "fixtures/buckbjt.dts",
+function buildHwrCircuit(registry: ComponentRegistry) {
+  const facade = new DefaultSimulatorFacade(registry);
+  return facade.build({
+    components: [
+      { id: "vs",  type: "DcVoltageSource", props: { voltage: 5 } },
+      { id: "r1",  type: "Resistor",        props: { resistance: 1000 } },
+      { id: "d1",  type: "Diode",           props: {} },
+      { id: "gnd", type: "Ground" },
+    ],
+    connections: [
+      ["vs:pos", "r1:A"],
+      ["r1:B",   "d1:A"],
+      ["d1:K",   "gnd:out"],
+      ["vs:neg",  "gnd:out"],
+    ],
   });
-  session.setTestSession(ourSession, ourSession, topology, engine, []);
+}
+
+async function createHwrSession(): Promise<{ session: ComparisonSession; topology: ReturnType<typeof captureTopology> }> {
+  const session = await ComparisonSession.createSelfCompare({
+    buildCircuit: buildHwrCircuit,
+    analysis: "dcop",
+  });
+  const topology = (session as any)._ourTopology;
   return { session, topology };
 }
 
@@ -309,14 +257,14 @@ describe("captureTopology — type field population", () => {
 // ---------------------------------------------------------------------------
 
 describe("listComponents", () => {
-  it("19. Returns one entry per element in topology", () => {
-    const { session, topology } = buildHwrSession();
+  it("19. Returns one entry per element in topology", async () => {
+    const { session, topology } = await createHwrSession();
     const components = session.listComponents();
     expect(components.length).toBe(topology.elements.length);
   });
 
-  it("20. Each ComponentInfo has non-empty label and deviceType", () => {
-    const { session } = buildHwrSession();
+  it("20. Each ComponentInfo has non-empty label and deviceType", async () => {
+    const { session } = await createHwrSession();
     const components = session.listComponents();
     for (const c of components) {
       expect(c.label.length).toBeGreaterThan(0);
@@ -324,8 +272,8 @@ describe("listComponents", () => {
     }
   });
 
-  it("21. PaginationOpts offset=1, limit=1 returns exactly one entry", () => {
-    const { session } = buildHwrSession();
+  it("21. PaginationOpts offset=1, limit=1 returns exactly one entry", async () => {
+    const { session } = await createHwrSession();
     const components = session.listComponents({ offset: 1, limit: 1 });
     expect(components.length).toBe(1);
   });
@@ -336,14 +284,14 @@ describe("listComponents", () => {
 // ---------------------------------------------------------------------------
 
 describe("listNodes", () => {
-  it("22. Returns one entry per unique node in nodeLabels", () => {
-    const { session, topology } = buildHwrSession();
+  it("22. Returns one entry per unique node in nodeLabels", async () => {
+    const { session, topology } = await createHwrSession();
     const nodes = session.listNodes();
     expect(nodes.length).toBe(topology.nodeLabels.size);
   });
 
-  it("23. NodeInfo.ourIndex matches key in nodeLabels", () => {
-    const { session, topology } = buildHwrSession();
+  it("23. NodeInfo.ourIndex matches key in nodeLabels", async () => {
+    const { session, topology } = await createHwrSession();
     const nodes = session.listNodes();
     for (const node of nodes) {
       expect(topology.nodeLabels.has(node.ourIndex)).toBe(true);
@@ -351,8 +299,8 @@ describe("listNodes", () => {
     }
   });
 
-  it("24. connectedComponents is non-empty for nodes connected to elements", () => {
-    const { session } = buildHwrSession();
+  it("24. connectedComponents is non-empty for nodes connected to elements", async () => {
+    const { session } = await createHwrSession();
     const nodes = session.listNodes();
     const hasConnected = nodes.some((n) => n.connectedComponents.length > 0);
     expect(hasConnected).toBe(true);
@@ -364,23 +312,25 @@ describe("listNodes", () => {
 // ---------------------------------------------------------------------------
 
 describe("getComponentsByType", () => {
-  it("25. Returns labels for matching type in HWR circuit (type sourced from topology)", () => {
-    const { session, topology } = buildHwrSession();
-    // The mock circuit has no elementToCircuitElement, so all types resolve to "unknown".
-    // Verify getComponentsByType correctly filters by whatever type is present.
-    const unknownLabels = session.getComponentsByType("unknown");
-    const allLabels = topology.elements.map((e) => e.label);
-    expect(unknownLabels.length).toBe(allLabels.length);
+  it("25. Returns labels for matching type in HWR circuit (type sourced from topology)", async () => {
+    const { session } = await createHwrSession();
+    // HWR circuit has a diode — verify getComponentsByType returns it.
+    const diodeComponents = session.getComponentsByType("diode");
+    expect(diodeComponents.length).toBeGreaterThanOrEqual(1);
+    // All returned components should have non-empty labels.
+    for (const comp of diodeComponents) {
+      expect(comp.label.length).toBeGreaterThan(0);
+    }
   });
 
-  it("26. Returns empty array for nonexistent type 'scr'", () => {
-    const { session } = buildHwrSession();
+  it("26. Returns empty array for nonexistent type 'scr'", async () => {
+    const { session } = await createHwrSession();
     const labels = session.getComponentsByType("scr");
     expect(labels).toEqual([]);
   });
 
-  it("27. Case-insensitive: getComponentsByType('DIODE') matches same as 'diode'", () => {
-    const { session } = buildHwrSession();
+  it("27. Case-insensitive: getComponentsByType('DIODE') matches same as 'diode'", async () => {
+    const { session } = await createHwrSession();
     const lower = session.getComponentsByType("diode");
     const upper = session.getComponentsByType("DIODE");
     expect(upper).toEqual(lower);
@@ -392,15 +342,15 @@ describe("getComponentsByType", () => {
 // ---------------------------------------------------------------------------
 
 describe("getDivergences", () => {
-  it("28. Self-comparison: getDivergences() returns totalCount: 0 and empty entries", () => {
-    const { session } = buildHwrSession();
+  it("28. Self-comparison: getDivergences() returns totalCount: 0 and empty entries", async () => {
+    const { session } = await createHwrSession();
     const report = session.getDivergences();
     expect(report.totalCount).toBe(0);
     expect(report.entries).toHaveLength(0);
   });
 
-  it("29. worstByCategory has all null values when no divergences", () => {
-    const { session } = buildHwrSession();
+  it("29. worstByCategory has all null values when no divergences", async () => {
+    const { session } = await createHwrSession();
     const report = session.getDivergences();
     expect(report.worstByCategory.voltage).toBeNull();
     expect(report.worstByCategory.state).toBeNull();
@@ -408,8 +358,8 @@ describe("getDivergences", () => {
     expect(report.worstByCategory.matrix).toBeNull();
   });
 
-  it("30. Default limit is 100: with 200 artificial divergences, entries.length === 100", () => {
-    const { session } = buildHwrSession();
+  it("30. Default limit is 100: with 200 artificial divergences, entries.length === 100", async () => {
+    const { session } = await createHwrSession();
     const fakeEntries = Array.from({ length: 200 }, (_, i) => ({
       nodeIndex: i,
       label: `N${i}`,
@@ -419,7 +369,6 @@ describe("getDivergences", () => {
       relDelta: 0.5,
       withinTol: false,
     }));
-    // Inject artificial comparisons via monkey-patch
     (session as any)._comparisons = [{
       stepIndex: 0,
       iterationIndex: 0,
@@ -429,14 +378,15 @@ describe("getDivergences", () => {
       matrixDiffs: [],
       stateDiffs: [],
       allWithinTol: false,
+      presence: "both",
     }];
     const report = session.getDivergences();
     expect(report.totalCount).toBe(200);
     expect(report.entries.length).toBe(100);
   });
 
-  it("31. opts.step filter: only returns divergences from that step", () => {
-    const { session } = buildHwrSession();
+  it("31. opts.step filter: only returns divergences from that step", async () => {
+    const { session } = await createHwrSession();
     const fakeComparisons = [
       {
         stepIndex: 0,
@@ -447,6 +397,7 @@ describe("getDivergences", () => {
         matrixDiffs: [],
         stateDiffs: [],
         allWithinTol: false,
+        presence: "both",
       },
       {
         stepIndex: 1,
@@ -457,6 +408,7 @@ describe("getDivergences", () => {
         matrixDiffs: [],
         stateDiffs: [],
         allWithinTol: false,
+        presence: "both",
       },
     ];
     (session as any)._comparisons = fakeComparisons;
@@ -471,16 +423,16 @@ describe("getDivergences", () => {
 // ---------------------------------------------------------------------------
 
 describe("getStepEndRange", () => {
-  it("32. getStepEndRange(0, 0) returns exactly 1 element matching getStepEnd(0)", () => {
-    const { session } = buildHwrSession();
+  it("32. getStepEndRange(0, 0) returns exactly 1 element matching getStepEnd(0)", async () => {
+    const { session } = await createHwrSession();
     const range = session.getStepEndRange(0, 0);
     expect(range.length).toBe(1);
     const single = session.getStepEnd(0);
     expect(range[0].stepIndex).toBe(single.stepIndex);
   });
 
-  it("33. Out-of-range: getStepEndRange(100, 200) returns empty array", () => {
-    const { session } = buildHwrSession();
+  it("33. Out-of-range: getStepEndRange(100, 200) returns empty array", async () => {
+    const { session } = await createHwrSession();
     const range = session.getStepEndRange(100, 200);
     expect(range).toHaveLength(0);
   });
@@ -491,8 +443,8 @@ describe("getStepEndRange", () => {
 // ---------------------------------------------------------------------------
 
 describe("traceComponentSlot", () => {
-  it("34. Returns SlotTrace with correct label and slotName", () => {
-    const { session } = buildHwrSession();
+  it("34. Returns SlotTrace with correct label and slotName", async () => {
+    const { session } = await createHwrSession();
     // Find a pool-backed component with a known slot
     const components = session.listComponents();
     const poolBacked = components.find((c) => c.slotNames.length > 0);
@@ -503,8 +455,8 @@ describe("traceComponentSlot", () => {
     expect(trace.slotName).toBe(slotName);
   });
 
-  it("35. totalSteps equals number of simulation steps captured", () => {
-    const { session } = buildHwrSession();
+  it("35. totalSteps equals number of simulation steps captured", async () => {
+    const { session } = await createHwrSession();
     const components = session.listComponents();
     const poolBacked = components.find((c) => c.slotNames.length > 0);
     expect(poolBacked).toBeDefined();
@@ -514,8 +466,8 @@ describe("traceComponentSlot", () => {
     expect(trace.totalSteps).toBe(stepCount);
   });
 
-  it("36. Nonexistent component throws 'Component not found: ...'", () => {
-    const { session } = buildHwrSession();
+  it("36. Nonexistent component throws 'Component not found: ...'", async () => {
+    const { session } = await createHwrSession();
     expect(() => session.traceComponentSlot("NONEXISTENT_COMP", "VD")).toThrow(
       "Component not found: NONEXISTENT_COMP",
     );
@@ -527,8 +479,8 @@ describe("traceComponentSlot", () => {
 // ---------------------------------------------------------------------------
 
 describe("getStateHistory", () => {
-  it("37. Returns StateHistoryReport with all six state objects", () => {
-    const { session } = buildHwrSession();
+  it("37. Returns StateHistoryReport with all six state objects", async () => {
+    const { session } = await createHwrSession();
     const components = session.listComponents();
     const poolBacked = components.find((c) => c.slotNames.length > 0);
     expect(poolBacked).toBeDefined();
@@ -541,8 +493,8 @@ describe("getStateHistory", () => {
     expect(typeof report.ngspiceState2).toBe("object");
   });
 
-  it("38. state0 matches elementStates from the iteration", () => {
-    const { session } = buildHwrSession();
+  it("38. state0 matches elementStates from the iteration", async () => {
+    const { session } = await createHwrSession();
     const components = session.listComponents();
     const poolBacked = components.find((c) => c.slotNames.length > 0);
     expect(poolBacked).toBeDefined();
@@ -558,8 +510,8 @@ describe("getStateHistory", () => {
     expect(report.state0).toEqual(es.slots);
   });
 
-  it("39. Out-of-range step throws 'Step out of range: ...'", () => {
-    const { session } = buildHwrSession();
+  it("39. Out-of-range step throws 'Step out of range: ...'", async () => {
+    const { session } = await createHwrSession();
     expect(() => session.getStateHistory("D1", 9999)).toThrow("Step out of range: 9999");
   });
 });
@@ -569,8 +521,8 @@ describe("getStateHistory", () => {
 // ---------------------------------------------------------------------------
 
 describe("getMatrixLabeled / getRhsLabeled / compareMatrixAt", () => {
-  it("40. getMatrixLabeled entries have non-empty rowLabel and colLabel", () => {
-    const { session } = buildHwrSession();
+  it("40. getMatrixLabeled entries have non-empty rowLabel and colLabel", async () => {
+    const { session } = await createHwrSession();
     const labeled = session.getMatrixLabeled(0, 0);
     expect(labeled.stepIndex).toBe(0);
     expect(labeled.iteration).toBe(0);
@@ -580,8 +532,8 @@ describe("getMatrixLabeled / getRhsLabeled / compareMatrixAt", () => {
     }
   });
 
-  it("41. Self-comparison: all matrix entries withinTol:true, absDelta:0", () => {
-    const { session } = buildHwrSession();
+  it("41. Self-comparison: all matrix entries withinTol:true, absDelta:0", async () => {
+    const { session } = await createHwrSession();
     const labeled = session.getMatrixLabeled(0, 0);
     for (const e of labeled.entries) {
       expect(e.absDelta).toBe(0);
@@ -589,16 +541,16 @@ describe("getMatrixLabeled / getRhsLabeled / compareMatrixAt", () => {
     }
   });
 
-  it("42. compareMatrixAt filter 'all' has totalEntries >= mismatch-filtered count", () => {
-    const { session } = buildHwrSession();
+  it("42. compareMatrixAt filter 'all' has totalEntries >= mismatch-filtered count", async () => {
+    const { session } = await createHwrSession();
     const allResult = session.compareMatrixAt(0, 0, "all");
     const mismatchResult = session.compareMatrixAt(0, 0, "mismatches");
     expect(allResult.totalEntries).toBe(mismatchResult.totalEntries);
     expect(allResult.entries.length).toBeGreaterThanOrEqual(mismatchResult.entries.length);
   });
 
-  it("43. getRhsLabeled entries count equals matrixSize", () => {
-    const { session, topology } = buildHwrSession();
+  it("43. getRhsLabeled entries count equals matrixSize", async () => {
+    const { session, topology } = await createHwrSession();
     const rhs = session.getRhsLabeled(0, 0);
     expect(rhs.entries.length).toBe(topology.matrixSize);
   });
@@ -609,8 +561,8 @@ describe("getMatrixLabeled / getRhsLabeled / compareMatrixAt", () => {
 // ---------------------------------------------------------------------------
 
 describe("getIntegrationCoefficients", () => {
-  it("44. Returns IntegrationCoefficientsReport with both ours and ngspice fields", () => {
-    const { session } = buildHwrSession();
+  it("44. Returns IntegrationCoefficientsReport with both ours and ngspice fields", async () => {
+    const { session } = await createHwrSession();
     const report = session.getIntegrationCoefficients(0);
     expect(report.stepIndex).toBe(0);
     expect(typeof report.ours.ag0).toBe("number");
@@ -624,8 +576,8 @@ describe("getIntegrationCoefficients", () => {
     expect(typeof report.ag1Compared.ours).toBe("number");
   });
 
-  it("45. Out-of-range step throws 'Step out of range'", () => {
-    const { session } = buildHwrSession();
+  it("45. Out-of-range step throws 'Step out of range'", async () => {
+    const { session } = await createHwrSession();
     expect(() => session.getIntegrationCoefficients(9999)).toThrow("Step out of range: 9999");
   });
 });
@@ -635,15 +587,15 @@ describe("getIntegrationCoefficients", () => {
 // ---------------------------------------------------------------------------
 
 describe("getLimitingComparison", () => {
-  it("46. Nonexistent label with no limiting events returns noEvents:true, junctions:[]", () => {
-    const { session } = buildHwrSession();
+  it("46. Nonexistent label with no limiting events returns noEvents:true, junctions:[]", async () => {
+    const { session } = await createHwrSession();
     const report = session.getLimitingComparison("NONEXISTENT_LABEL", 0, 0);
     expect(report.noEvents).toBe(true);
     expect(report.junctions).toHaveLength(0);
   });
 
-  it("47. Nonexistent label does not throw — returns empty report", () => {
-    const { session } = buildHwrSession();
+  it("47. Nonexistent label does not throw — returns empty report", async () => {
+    const { session } = await createHwrSession();
     expect(() => session.getLimitingComparison("DOES_NOT_EXIST", 0, 0)).not.toThrow();
     const report = session.getLimitingComparison("DOES_NOT_EXIST", 0, 0);
     expect(report.label).toBe("DOES_NOT_EXIST");
@@ -656,8 +608,8 @@ describe("getLimitingComparison", () => {
 // ---------------------------------------------------------------------------
 
 describe("getConvergenceDetail", () => {
-  it("48. Self-comparison with converged circuit: all elements have ourConverged:true", () => {
-    const { session } = buildHwrSession();
+  it("48. Self-comparison with converged circuit: all elements have ourConverged:true", async () => {
+    const { session } = await createHwrSession();
     const steps = (session as any)._ourSession.steps;
     const lastIter = steps[0].iterations.length - 1;
     const report = session.getConvergenceDetail(0, lastIter);
@@ -666,8 +618,8 @@ describe("getConvergenceDetail", () => {
     }
   });
 
-  it("49. disagreementCount is 0 when both engines agree (self-comparison)", () => {
-    const { session } = buildHwrSession();
+  it("49. disagreementCount is 0 when both engines agree (self-comparison)", async () => {
+    const { session } = await createHwrSession();
     const steps = (session as any)._ourSession.steps;
     const lastIter = steps[0].iterations.length - 1;
     const report = session.getConvergenceDetail(0, lastIter);
@@ -680,14 +632,14 @@ describe("getConvergenceDetail", () => {
 // ---------------------------------------------------------------------------
 
 describe("toJSON", () => {
-  it("50. toJSON() returns an object serializable by JSON.stringify without error", () => {
-    const { session } = buildHwrSession();
+  it("50. toJSON() returns an object serializable by JSON.stringify without error", async () => {
+    const { session } = await createHwrSession();
     const json = session.toJSON();
     expect(() => JSON.stringify(json)).not.toThrow();
   });
 
-  it("51. No Map, Float64Array, NaN, or Infinity in JSON.stringify(session.toJSON())", () => {
-    const { session } = buildHwrSession();
+  it("51. No Map, Float64Array, NaN, or Infinity in JSON.stringify(session.toJSON())", async () => {
+    const { session } = await createHwrSession();
     const json = session.toJSON();
     const str = JSON.stringify(json);
     // JSON.stringify converts NaN and Infinity to null — verify no raw NaN/Infinity strings
@@ -698,8 +650,8 @@ describe("toJSON", () => {
     expect(typeof parsed).toBe("object");
   });
 
-  it("52. opts.includeAllSteps:true includes step entries; default includes none for self-comparison (no divergences)", () => {
-    const { session } = buildHwrSession();
+  it("52. opts.includeAllSteps:true includes step entries; default includes none for self-comparison (no divergences)", async () => {
+    const { session } = await createHwrSession();
     const defaultJson = session.toJSON();
     const allJson = session.toJSON({ includeAllSteps: true });
     // Self-comparison has no divergences, so default omits all steps
@@ -715,8 +667,8 @@ describe("toJSON", () => {
 // ---------------------------------------------------------------------------
 
 describe("Enhanced traceComponent / traceNode", () => {
-  it("53. traceComponent with slots filter returns only matching slots in states", () => {
-    const { session } = buildHwrSession();
+  it("53. traceComponent with slots filter returns only matching slots in states", async () => {
+    const { session } = await createHwrSession();
     const components = session.listComponents();
     const poolBacked = components.find((c) => c.slotNames.length > 0);
     if (!poolBacked) return; // skip if no pool-backed component in HWR
@@ -732,8 +684,8 @@ describe("Enhanced traceComponent / traceNode", () => {
     }
   });
 
-  it("54. traceNode with onlyDivergences:true returns empty iterations in self-comparison (none diverge)", () => {
-    const { session, topology } = buildHwrSession();
+  it("54. traceNode with onlyDivergences:true returns empty iterations in self-comparison (none diverge)", async () => {
+    const { session, topology } = await createHwrSession();
     // Get any node label
     const firstNode = Array.from(topology.nodeLabels.values())[0];
     const trace = session.traceNode(firstNode, { onlyDivergences: true });
@@ -749,10 +701,7 @@ describe("Enhanced traceComponent / traceNode", () => {
 
 describe("ComparisonSession.create", () => {
   it("55. create(opts) is equivalent to new + init: listComponents works without calling init manually", async () => {
-    // We can't call the real create() in unit tests (needs DLL), so verify the
-    // static method exists and delegates to init by testing the method signature
-    // and verifying a manually constructed session behaves identically.
-    const { session } = buildHwrSession();
+    const { session } = await createHwrSession();
     const components = session.listComponents();
     expect(components.length).toBeGreaterThan(0);
     // Verify static create method exists on the class
@@ -765,8 +714,8 @@ describe("ComparisonSession.create", () => {
 // ---------------------------------------------------------------------------
 
 describe("dispose", () => {
-  it("56. After dispose(), ourSession and ngspiceSession are null; dispose() is idempotent", () => {
-    const { session } = buildHwrSession();
+  it("56. After dispose(), ourSession and ngspiceSession are null; dispose() is idempotent", async () => {
+    const { session } = await createHwrSession();
     session.dispose();
     expect(session.ourSession).toBeNull();
     expect(session.ngspiceSession).toBeNull();
@@ -780,8 +729,8 @@ describe("dispose", () => {
 // ---------------------------------------------------------------------------
 
 describe("getComponentSlots edge cases", () => {
-  it("57. getComponentSlots with step provided returns ComponentSlotsSnapshot", () => {
-    const { session } = buildHwrSession();
+  it("57. getComponentSlots with step provided returns ComponentSlotsSnapshot", async () => {
+    const { session } = await createHwrSession();
     const components = session.listComponents();
     const poolBacked = components.find((c) => c.slotNames.length > 0);
     expect(poolBacked).toBeDefined();
@@ -789,8 +738,8 @@ describe("getComponentSlots edge cases", () => {
     expect(result.mode).toBe("snapshot");
   });
 
-  it("58. getComponentSlots without step returns ComponentSlotsTrace", () => {
-    const { session } = buildHwrSession();
+  it("58. getComponentSlots without step returns ComponentSlotsTrace", async () => {
+    const { session } = await createHwrSession();
     const components = session.listComponents();
     const poolBacked = components.find((c) => c.slotNames.length > 0);
     expect(poolBacked).toBeDefined();
@@ -798,8 +747,8 @@ describe("getComponentSlots edge cases", () => {
     expect(result.mode).toBe("trace");
   });
 
-  it("59. getComponentSlots with nonexistent component throws 'Component not found'", () => {
-    const { session } = buildHwrSession();
+  it("59. getComponentSlots with nonexistent component throws 'Component not found'", async () => {
+    const { session } = await createHwrSession();
     expect(() => session.getComponentSlots("NONEXISTENT", ["*"])).toThrow("Component not found");
   });
 });

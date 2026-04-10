@@ -362,23 +362,14 @@ describeGate("Stream Verification -- full pipeline (HWR square wave)", () => {
     }
   });
 
-  it("15. step alignment: paired steps have matching simTime", () => {
-    const alignedNgIndex: Map<number, number> = (session as any)
-      ._alignedNgIndex;
-    expect(alignedNgIndex.size).toBeGreaterThan(0);
+  it("15. step shape: getSessionShape reports both-sided presence for a real run", () => {
+    const shape = session.getSessionShape();
+    expect(shape.presenceCounts.both).toBeGreaterThan(0);
 
     const ourSteps = session.ourSession!.steps;
-    const ngSession: CaptureSession =
-      (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
-
-    for (const [ourIdx, ngIdx] of alignedNgIndex) {
-      const ourStep = ourSteps[ourIdx];
-      const ngStep = ngSession.steps[ngIdx];
-      if (!ourStep || !ngStep) continue;
-
-      // Per spec §7: alignment is by exact stepStartTime equality (1e-15 EPS)
-      const delta = Math.abs(ourStep.stepStartTime - ngStep.stepStartTime);
-      expect(delta).toBeLessThanOrEqual(1e-15);
+    for (let i = 0; i < ourSteps.length; i++) {
+      const stepShape = session.getStepShape(i);
+      expect(["both", "oursOnly", "ngspiceOnly"]).toContain(stepShape.presence);
     }
   });
 

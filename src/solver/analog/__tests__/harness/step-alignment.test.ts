@@ -51,24 +51,17 @@ describeGate("step-alignment: exact stepStartTime equality between engines", () 
     expect(ngSession.steps.length).toBeGreaterThan(0);
   });
 
-  it("alignment map is non-empty", () => {
-    const alignedNgIndex: Map<number, number> = (session as any)._alignedNgIndex;
-    expect(alignedNgIndex.size).toBeGreaterThan(0);
+  it("session has steps on both sides (presence counts have both > 0)", () => {
+    const shape = session.getSessionShape();
+    expect(shape.presenceCounts.both).toBeGreaterThan(0);
   });
 
-  it("every aligned pair has |stepStartTime delta| <= 1e-15", () => {
-    const alignedNgIndex: Map<number, number> = (session as any)._alignedNgIndex;
+  it("every paired step has a finite stepStartTimeDelta", () => {
     const ourSteps = session.ourSession!.steps;
-    const ngSession: CaptureSession =
-      (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
-
-    for (const [ourIdx, ngIdx] of alignedNgIndex) {
-      const ourStep = ourSteps[ourIdx];
-      const ngStep = ngSession.steps[ngIdx];
-      if (!ourStep || !ngStep) continue;
-
-      const delta = Math.abs(ourStep.stepStartTime - ngStep.stepStartTime);
-      expect(delta).toBeLessThanOrEqual(1e-15);
+    for (let i = 0; i < ourSteps.length; i++) {
+      const stepShape = session.getStepShape(i);
+      if (stepShape.presence !== "both") continue;
+      expect(Number.isFinite(stepShape.stepStartTimeDelta)).toBe(true);
     }
   });
 
@@ -80,41 +73,17 @@ describeGate("step-alignment: exact stepStartTime equality between engines", () 
     expect(ngSession.steps[0].stepStartTime).toBe(0);
   });
 
-  it("no raw-index fallback: aligned pairs use exact time equality only", () => {
-    // Verify that the alignment map never maps our step i to ng step i unless
-    // the times actually match. Any pair where times differ by more than 1e-15
-    // must NOT appear in the alignment map.
-    const alignedNgIndex: Map<number, number> = (session as any)._alignedNgIndex;
+  it("index-paired steps report stepStartTimeDelta = ours.stepStartTime - ng.stepStartTime", () => {
     const ourSteps = session.ourSession!.steps;
     const ngSession: CaptureSession =
       (session as any)._ngSessionReindexed ?? (session as any)._ngSession;
-
-    for (const [ourIdx, ngIdx] of alignedNgIndex) {
-      const ourStep = ourSteps[ourIdx];
-      const ngStep = ngSession.steps[ngIdx];
-      if (!ourStep || !ngStep) continue;
-
-      // Every entry in the map must have matching times
-      const delta = Math.abs(ourStep.stepStartTime - ngStep.stepStartTime);
-      expect(delta).toBeLessThanOrEqual(1e-15);
-    }
-
-    // All non-aligned our steps must not have a matching ngspice step by time
-    const alignedOurIndices = new Set(alignedNgIndex.keys());
     for (let i = 0; i < ourSteps.length; i++) {
-      if (alignedOurIndices.has(i)) continue;
-      // This our step has no aligned ngspice step — verify no ng step has the same time
-      const ourTime = ourSteps[i].stepStartTime;
-      const matchingNg = ngSession.steps.findIndex(
-        (s) => Math.abs(s.stepStartTime - ourTime) <= 1e-15,
-      );
-      // If there IS a matching ng step, the alignment map should have caught it
-      // (this would indicate a bug). We only soft-check here — the strict
-      // assertion is that aligned pairs are correct, not that all pairs are found.
-      if (matchingNg >= 0) {
-        // The alignment map missed a valid pair — flag it
-        expect(alignedNgIndex.has(i)).toBe(true);
-      }
+      const stepShape = session.getStepShape(i);
+      if (stepShape.presence !== "both") continue;
+      const ngStep = ngSession.steps[i];
+      if (!ngStep) continue;
+      const expectedDelta = ourSteps[i].stepStartTime - ngStep.stepStartTime;
+      expect(stepShape.stepStartTimeDelta).toBeCloseTo(expectedDelta, 12);
     }
   });
 

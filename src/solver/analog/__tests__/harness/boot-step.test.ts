@@ -8,8 +8,7 @@
  *   - attempts reflect DCOP path (phase = "dcopDirect" or variant)
  *   - accepted === true
  *
- * No DLL required — uses our engine only via the low-level hook API
- * (same pattern as query-methods.test.ts buildHwrSession).
+ * No DLL required — uses our engine only via the low-level hook API.
  */
 
 import { describe, it, expect } from "vitest";
@@ -72,7 +71,7 @@ function runDcopCapture() {
   const elementLabels = buildElementLabelMap(circuit);
   const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
 
-  engine.postIterationHook = sc.hook;
+  engine.postIterationHook = sc.iterationHook;
   engine.stepPhaseHook = {
     onAttemptBegin(phase: string, dt: number) { sc.beginAttempt(phase as NRPhase, dt); },
     onAttemptEnd(outcome: string, converged: boolean) { sc.endAttempt(outcome as NRAttemptOutcome, converged); },

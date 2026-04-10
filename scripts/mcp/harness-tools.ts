@@ -407,6 +407,12 @@ export function registerHarnessTools(
         "All result collections are paginated with offset/limit.",
       inputSchema: z.object({
         handle: z.string().describe("Harness session handle"),
+        mode: z.enum(["shape", "stepAtTime"]).optional().describe(
+          "'shape' returns the SessionShape (step counts, presence, attempt counts for both sides). " +
+          "'stepAtTime' finds the nearest step index at a given simulation time on the specified side.",
+        ),
+        time: z.number().optional().describe("Simulation time in seconds (required for mode='stepAtTime')."),
+        side: z.enum(["ours", "ngspice"]).optional().describe("Which engine's timeline to search for mode='stepAtTime'. Default: 'ours'."),
         component: z.string().optional().describe("Component label to query (e.g. 'Q1'). Case-insensitive."),
         node: z.string().optional().describe("Node label to trace (e.g. 'Q1:C'). Case-insensitive."),
         step: z.number().int().min(0).optional().describe("Step index to inspect."),
@@ -497,6 +503,25 @@ export function registerHarnessTools(
           });
         }
         return result;
+      }
+
+      // -----------------------------------------------------------------------
+      // Mode dispatch (explicit mode parameter takes priority over field-based dispatch)
+      // -----------------------------------------------------------------------
+
+      if (args.mode === "shape") {
+        const shape = session.getSessionShape();
+        return JSON.stringify({ handle: args.handle, queryMode: "shape", shape });
+      }
+
+      if (args.mode === "stepAtTime") {
+        if (args.time === undefined) {
+          throw new Error(`harness_query: mode='stepAtTime' requires a 'time' parameter.`);
+        }
+        const t = args.time as number;
+        const side = (args.side as "ours" | "ngspice") ?? "ours";
+        const idx = session.getStepAtTime(t, side);
+        return JSON.stringify({ handle: args.handle, queryMode: "stepAtTime", stepIndex: idx, time: t, side });
       }
 
       // -----------------------------------------------------------------------
@@ -871,6 +896,7 @@ export function registerHarnessTools(
           limit: args.limit ?? 100,
           stepEnd: {
             stepIndex: stepEnd.stepIndex,
+            presence: stepEnd.presence,
             stepStartTime: formatComparedValue(stepEnd.stepStartTime),
             stepEndTime: formatComparedValue(stepEnd.stepEndTime),
             dt: formatComparedValue(stepEnd.dt),

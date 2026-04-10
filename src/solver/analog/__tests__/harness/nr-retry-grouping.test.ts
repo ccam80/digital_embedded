@@ -74,7 +74,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     // Simulate: at stepStartTime=1e-9, first attempt fails NR, second succeeds
     sc.setStepStartTime(1e-9);
@@ -129,7 +129,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(1e-9);
 
@@ -162,7 +162,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(1e-9);
 
@@ -195,7 +195,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(1e-9);
 
@@ -231,7 +231,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(1e-9);
 
@@ -264,7 +264,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(1e-9);
 
@@ -297,7 +297,7 @@ describe("nr-retry-grouping: failed attempt + retry grouped in same step", () =>
 
     const elementLabels = buildElementLabelMap(circuit);
     const sc = createStepCaptureHook(engine.solver!, engine.elements, pool, elementLabels);
-    engine.postIterationHook = sc.hook;
+    engine.postIterationHook = sc.iterationHook;
 
     sc.setStepStartTime(2e-9);
 

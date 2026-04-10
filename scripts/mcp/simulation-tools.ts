@@ -448,9 +448,20 @@ export function registerSimulationTools(
           case "enable":
             coordinator.setConvergenceLogEnabled(true);
             return "Convergence logging enabled.";
-          case "disable":
-            coordinator.setConvergenceLogEnabled(false);
-            return "Convergence logging disabled.";
+          case "disable": {
+            try {
+              coordinator.setConvergenceLogEnabled(false);
+              return "Convergence logging disabled.";
+            } catch (err: unknown) {
+              if (err instanceof Error && err.message.includes("comparison harness")) {
+                throw new Error(
+                  "Cannot disable convergence log: a comparison harness capture hook is currently installed. " +
+                  "Stop the harness session before disabling the log."
+                );
+              }
+              throw err;
+            }
+          }
           case "clear":
             coordinator.clearConvergenceLog();
             return "Convergence log cleared.";

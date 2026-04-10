@@ -295,3 +295,172 @@ The TypeScript errors in the full codebase (`npx tsc --noEmit`) are all in:
   - No new TypeScript errors introduced (pre-existing Wave 4 consumer test errors remain).
   - Zero matches for stale terminology: `timestep-alignment-spec`, `unaligned`, `_alignedNgIndex`, `exact stepStartTime`, `1e-15 EPS`, `D1`, `D4`, `D6`.
   - Scope respected: only JSDoc header touched; no other changes to `comparison-session.ts` or related test files.
+
+---
+
+## Task W6.T1: Headless tests for shape, getStepAtTime, master switch, throw-on-conflict, defer initialize, idempotency
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/solver/analog/__tests__/harness/shape.test.ts` (5 tests: 3 getSessionShape + 2 getStepAtTime)
+  - `src/headless/__tests__/master-switch.test.ts` (3 tests: atomic flag flip, throw-on-conflict, pre-hook log restore)
+- **Files modified**: none
+- **Tests**: 8/8 passing (plus the 4 deferInitialize tests from W2.T4 which already cover §10.4's 3 deferInitialize items)
+- **Notes**: 
+  - deferInitialize/idempotency tests already exist in `src/headless/__tests__/compile-defer-initialize.test.ts` (W2.T4). Not duplicated per spec "If Wave 2 already added the smoke tests, extend that file." — they already cover the spec requirement.
+  - Zero new TypeScript errors introduced (all tsc errors are pre-existing from Wave 4 targets).
+
+---
+
+## Wave 5 Implementation Progress
+
+## Task W5.T1: Add shape/stepAtTime modes to harness_query; surface presence in step-end
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `scripts/mcp/harness-tools.ts`
+- **Tests**: 18/20 passing (2 pre-existing failures: MCP-4 integration coefficients, MCP-5 convergence detail — listed in test-baseline.md)
+- **Changes made**:
+  - Added `mode`, `time`, `side` fields to harness_query inputSchema with descriptions
+  - Added mode dispatch block before the P1 priority dispatch:
+    - `mode="shape"`: calls `session.getSessionShape()` and returns `{ handle, queryMode: "shape", shape }`
+    - `mode="stepAtTime"`: calls `session.getStepAtTime(t, side)`, returns `{ handle, queryMode: "stepAtTime", stepIndex, time, side }`
+  - Updated P12 (step-end) response to include `presence: stepEnd.presence` instead of the removed `unaligned` field
+
+## Task W5.T2: circuit_convergence_log disable: catch harness-installed throw
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `scripts/mcp/simulation-tools.ts`
+- **Changes made**:
+  - Wrapped `coordinator.setConvergenceLogEnabled(false)` in try/catch
+  - When error message includes "comparison harness", re-throws a clear descriptive Error (wrapTool catches it and returns isError response to MCP caller — does not crash server)
+  - All other errors re-thrown unchanged
+
+## Task W5.T3: postMessage setConvergenceLogEnabled: catch harness throw, send sim-error
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/io/postmessage-adapter.ts`
+- **Changes made**:
+  - Wrapped `coord.setConvergenceLogEnabled(false)` in _handleConvergenceLog 'disable' case
+  - When error includes "comparison harness": posts `{ type: 'sim-error', message: "...", code: "harness-active" }` and returns
+  - All other errors re-thrown unchanged
+
+## Task W5.T4: UI convergence-log-panel: wrap disable in try/catch with panel notification
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/app/convergence-log-panel.ts`
+- **Changes made**:
+  - Added `noticeEl` (inline div with styled warning appearance) and `showPanelNotification(msg)` helper
+  - Added `tryDisableLog()` helper that wraps `setConvergenceLogEnabled(false)` — shows notification when harness is active, re-throws unexpected errors
+  - Replaced direct `setConvergenceLogEnabled(_logEnabled)` in toggleBtn click handler with conditional: enable calls directly, disable calls `tryDisableLog()`
+  - Replaced direct `setConvergenceLogEnabled(_loggingDesired)` in `refreshRecords()` with same conditional pattern
+  - Appended `noticeEl` to toolbar so notification appears in the panel UI
+  - TypeScript: zero errors in all 4 touched files (verified with targeted tsc filter)
+
+---
+
+## Task W4.T1: Delete `TestableComparisonSession` and `buildHwrSession`; migrate callers to `createSelfCompare`
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/solver/analog/__tests__/harness/query-methods.test.ts`
+- **Tests**: 59/59 passing
+- **Changes made**:
+  - Deleted `TestableComparisonSession` class (back-door subclass)
+  - Deleted `buildHwrSession()` function (manual engine setup)
+  - Added `buildHwrCircuit(registry)` helper using `facade.build()` with proper Circuit spec
+  - Added `createHwrSession()` async helper using `ComparisonSession.createSelfCompare`
+  - Migrated all 41 callers (tests 19-59) from `buildHwrSession()` to `await createHwrSession()`
+  - Made all affected test functions async
+  - Tests 30 and 31: kept monkey-patch `(session as any)._comparisons` (still valid on real ComparisonSession); added `presence: "both"` to fake comparison objects to match new ComparisonResult shape
+  - Test 25: updated assertion to use `comp.label.length` (getComponentsByType returns ComponentInfo[], not string[]) and check for "diode" type (real circuit has real types)
+  - Removed unused imports: `beforeEach`, `IntegrationCoefficients`, `makeCapacitor`, `ZERO_INTEG_COEFF`, `makeRC`
+  - Added imports: `ComponentRegistry`, `DefaultSimulatorFacade`
+
+## Task W4.T2: Migrate test 30 (pagination)
+- **Status**: complete (incorporated into W4.T1)
+- **Agent**: implementer
+- **Notes**: Test 30 retained with monkey-patch on real ComparisonSession (the `_comparisons` protected field is still accessible via `as any`). No `TestableComparisonSession` needed.
+
+## Task W4.T3: Sweep harness tests for `unaligned` and `alignment` references
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**:
+  - `src/solver/analog/__tests__/harness/nr-retry-grouping.test.ts`
+  - `src/solver/analog/__tests__/harness/lte-retry-grouping.test.ts`
+  - `src/solver/analog/__tests__/harness/boot-step.test.ts`
+  - `src/solver/analog/__tests__/harness/harness-integration.test.ts`
+  - `src/solver/analog/__tests__/harness/step-alignment.test.ts`
+  - `src/solver/analog/__tests__/harness/stream-verification.test.ts`
+- **Tests**: 200/206 passing (6 are pre-existing baseline failures)
+- **Changes made**:
+  - `nr-retry-grouping.test.ts`: replaced `sc.hook` with `sc.iterationHook` (7 occurrences)
+  - `lte-retry-grouping.test.ts`: replaced `sc.hook` with `sc.iterationHook` (8 occurrences)
+  - `boot-step.test.ts`: replaced `sc.hook` with `sc.iterationHook` (1 occurrence)
+  - `harness-integration.test.ts`: replaced `capture.hook` with `capture.iterationHook` (11 occurrences); rewrote time-alignment describe block (3 tests) — replaced 4-arg `compareSnapshots` tests with index-pairing shape API tests
+  - `step-alignment.test.ts`: replaced `_alignedNgIndex` tests with shape API equivalents; fixed 2 tests that incorrectly asserted `stepStartTimeDelta <= 1e-15` (index pairing does not guarantee time equality) — replaced with finite-delta assertion and delta-formula verification
+  - `stream-verification.test.ts`: rewrote test 15 to use `getSessionShape()`/`getStepShape()` shape API instead of `_alignedNgIndex`
+- **Pre-existing failures (not caused by this wave)**:
+  - `boot-step-merge.test.ts` tests 1-4: baseline says "EXPECTED FAIL after Wave 2, Wave 3 fixes"
+  - `stream-verification.test.ts` tests 4 and 5: baseline integration-coefficient failures
+
+## Recovery events
+
+### 2026-04-10T02:03Z — Wave 6 implementer died mid-run (agentId a697fd559f2b771be)
+- Agent spawned in Batch 4 alongside W4 and W5 parallel implementers.
+- Agent created three new test files: `scripts/mcp/__tests__/harness-shape-mcp.test.ts`, `src/headless/__tests__/master-switch.test.ts`, `src/solver/analog/__tests__/harness/shape.test.ts`.
+- Agent was mid-debugging the MCP shape test accessor (wrote `parsed.presenceCounts` but the handler returns `{ handle, queryMode: "shape", shape }` so it needed `parsed.shape.presenceCounts`). Hit a "File has not been read yet" error and the output stream stopped at line 183.
+- `TaskOutput` returned `No task found with ID: a697fd559f2b771be` and the output file stopped growing. Positive evidence of death.
+- Invoked `mark-dead-implementer.sh` at 02:03:30Z. Batch 4 `dead_implementers=1`, retry slot opened.
+- Next action: spawn a replacement W6 implementer to fix the in-flight MCP test and run the completion protocol.
+
+## Wave 4 Fix Round: Historical-Provenance Comment Cleanup
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/solver/analog/__tests__/harness/boot-step.test.ts`
+- **Changes made**:
+  - Removed historical-provenance parenthetical `(same pattern as query-methods.test.ts buildHwrSession)` from line 12 JSDoc comment
+  - Sentence now reads: "No DLL required — uses our engine only via the low-level hook API." describing current code behavior only
+- **Verification**:
+  - Grep confirmed zero references to `buildHwrSession` remain in harness directory
+  - `npx vitest run boot-step.test.ts`: 8 passed, 0 failed
+- **Rule compliance**: Removed banned historical-provenance comment per `spec/.context/rules.md` §Code Hygiene
+
+## Wave 6 Completion (resume — dead agent recovery)
+
+### Task W6.T1: Headless tests for shape, getStepAtTime, master switch
+- **Status**: complete (files created by dead agent; verified passing by this agent)
+- **Agent**: implementer (recovery)
+- **Files created**: 
+  - `src/solver/analog/__tests__/harness/shape.test.ts` (5 tests)
+  - `src/headless/__tests__/master-switch.test.ts` (3 tests)
+- **Files modified**: none
+- **Tests**: 8/8 passing
+- **Notes**: deferInitialize/idempotency tests already exist in `src/headless/__tests__/compile-defer-initialize.test.ts` (W2.T4). Not duplicated per spec instruction.
+
+### Task W6.T2: MCP tests for harness_query shape/stepEnd and circuit_convergence_log disable
+- **Status**: complete
+- **Agent**: implementer (recovery)
+- **Files modified**: `scripts/mcp/__tests__/harness-shape-mcp.test.ts`
+- **Tests**: 3/3 passing
+- **Bug fixed**: `parsed.presenceCounts` → `parsed.shape.presenceCounts` in Test 1 (handler returns `{ handle, queryMode: "shape", shape: SessionShape }`)
+- **Test 1**: Uses `tools.call()` to call `harness_query { mode: "shape" }`, verifies `parsed.shape` has `presenceCounts`, `steps`, `largeTimeDeltas`, and `analysis` matches `/dcop|tran/`
+- **Test 2**: Calls `harness_query { handle, step: 0 }` and checks `result.stepEnd.presence` matches `/^(both|oursOnly|ngspiceOnly)$/`
+- **Test 3**: Rewrote from facade-direct to full MCP tool path — imports `registerSimulationTools` and `SessionState`, compiles circuit via facade, pre-stores coordinator in SessionState, registers simulation tools, calls `circuit_convergence_log { handle, action: "disable" }` via `callRaw`, verifies `raw.isError === true` and message matches `/comparison harness|harness session/`
+
+### Task W6.T3: E2E tests for UI panel conflict notification and iterationDetails
+- **Status**: partial — test file created but tests will fail until production code adds required infrastructure
+- **Agent**: implementer (recovery)
+- **Files created**: `e2e/parity/harness-convergence-log-conflict.spec.ts`
+- **Tests**: 0/2 passing (2 new Playwright failures added; all pre-existing Playwright failures unchanged)
+- **Missing production prerequisites (follow-up required)**:
+  1. `src/io/postmessage-adapter.ts` must handle `'sim-start-comparison-harness'` message and post `'sim-harness-started'` when the comparison harness capture hook is installed on the coordinator.
+  2. `e2e/fixtures/simulator-harness.ts` needs a `startComparisonHarness()` helper method (thin wrapper posting `sim-start-comparison-harness` and waiting for `sim-harness-started`).
+  3. `src/app/convergence-log-panel.ts` must add `data-testid="convergence-log-panel-toggle"` to the panel toggle button.
+  4. `src/app/convergence-log-panel.ts` must add `data-testid="convergence-log-disable-button"` to the disable button.
+  5. `src/app/convergence-log-panel.ts` must add `data-testid="notification"` to the inline notification element rendered by `showPanelNotification()`.
+  6. The convergence log panel row template must add `data-testid="iteration-details"` to the iteration details expand element.
+- **Test structure**: Tests are written in full with correct Playwright assertions. They will begin passing as soon as the production selectors and postMessage handler are added. No `test.skip()` used.
+
+### Regression sweep
+- Vitest: 8232/8244 passing, 12 failed — identical to pre-W6 baseline (all 12 are pre-existing)
+- Playwright: 477/490 passing, 13 failed — 11 pre-existing + 2 new W6.T3 failures (expected; production UI not yet instrumented)
+- No regressions introduced by W6 changes
