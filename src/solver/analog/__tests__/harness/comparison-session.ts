@@ -1147,16 +1147,20 @@ export class ComparisonSession {
   getStateHistory(label: string, stepIndex: number): StateHistoryReport {
     this._ensureRun();
     const steps = this._ourSession!.steps;
-    if (stepIndex < 0 || stepIndex >= steps.length) {
+    const ngSteps = this._ngSessionAligned()?.steps;
+    const maxSteps = Math.max(steps.length, ngSteps?.length ?? 0);
+    if (stepIndex < 0 || stepIndex >= maxSteps) {
       throw new Error(`Step out of range: ${stepIndex}`);
     }
 
     const upperLabel = label.toUpperCase();
     const step = steps[stepIndex];
-    const accIdx = step.acceptedAttemptIndex >= 0 ? step.acceptedAttemptIndex : step.attempts.length - 1;
-    const iters = step.attempts[accIdx]?.iterations ?? step.iterations;
+    const accIdx = step
+      ? (step.acceptedAttemptIndex >= 0 ? step.acceptedAttemptIndex : step.attempts.length - 1)
+      : -1;
+    const iters = step?.attempts[accIdx]?.iterations ?? step?.iterations ?? [];
     const lastIter = iters[iters.length - 1];
-    const iterIdx = iters.length - 1;
+    const iterIdx = Math.max(iters.length - 1, 0);
 
     const ourEs = lastIter?.elementStates.find(e => e.label.toUpperCase() === upperLabel);
 
@@ -1487,7 +1491,8 @@ export class ComparisonSession {
   getMatrixLabeled(stepIndex: number, iterationIndex: number): LabeledMatrix {
     this._ensureRun();
     const ourStep = this._ourSession!.steps[stepIndex];
-    if (!ourStep) throw new Error(`Step out of range: ${stepIndex}`);
+    const ngStepCheck = this._ngSessionAligned()?.steps[stepIndex];
+    if (!ourStep && !ngStepCheck) throw new Error(`Step out of range: ${stepIndex}`);
 
     const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1;
     const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
@@ -1538,7 +1543,8 @@ export class ComparisonSession {
   getRhsLabeled(stepIndex: number, iterationIndex: number): RhsLabeledResult {
     this._ensureRun();
     const ourStep = this._ourSession!.steps[stepIndex];
-    if (!ourStep) throw new Error(`Step out of range: ${stepIndex}`);
+    const ngStepCheck = this._ngSessionAligned()?.steps[stepIndex];
+    if (!ourStep && !ngStepCheck) throw new Error(`Step out of range: ${stepIndex}`);
 
     const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1;
     const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
@@ -1568,11 +1574,11 @@ export class ComparisonSession {
   getIntegrationCoefficients(stepIndex: number): IntegrationCoefficientsReport {
     this._ensureRun();
     const step = this._ourSession!.steps[stepIndex];
-    if (!step) throw new Error(`Step out of range: ${stepIndex}`);
-
     const ngStep = this._ngSessionAligned()?.steps[stepIndex];
+    if (!step && !ngStep) throw new Error(`Step out of range: ${stepIndex}`);
 
-    const ours = step.integrationCoefficients.ours;
+    const ours = step?.integrationCoefficients.ours
+      ?? { ag0: 0, ag1: 0, method: "backwardEuler" as const, order: 1 };
     const ngspice = ngStep?.integrationCoefficients.ngspice
       ?? { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 };
 
