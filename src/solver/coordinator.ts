@@ -23,7 +23,7 @@ import type { StepRecord } from './analog/convergence-log.js';
 import { BitVector } from '../core/signal.js';
 import { FacadeError } from '../headless/types.js';
 import { DiagnosticCollector } from './analog/diagnostics.js';
-import type { SimulationCoordinator, FrameStepResult, CurrentResolverContext, SliderPropertyDescriptor } from './coordinator-types.js';
+import type { SimulationCoordinator, FrameStepResult, CurrentResolverContext, SliderPropertyDescriptor, PhaseAwareCaptureHook } from './coordinator-types.js';
 import type { CircuitElement } from '../core/element.js';
 import type { Wire } from '../core/circuit.js';
 import type { AcParams, AcResult } from './analog/ac-analysis.js';
@@ -83,8 +83,11 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   /** Reusable Map for getPinVoltages() to avoid per-call allocation. */
   private readonly _pinVoltageResult = new Map<string, number>();
   private _analysisPhase: "dcop" | "tranInit" | "tranFloat" = "dcop";
+  private _initialized: boolean = false;
+  private _convergenceLogPreHookState: boolean = false;
+  private _captureHookInstalled: boolean = false;
 
-  constructor(compiled: CompiledCircuitUnified, registry?: ComponentRegistry, captureHook?: MNAEngine["stepPhaseHook"]) {
+  constructor(compiled: CompiledCircuitUnified, registry?: ComponentRegistry) {
     this._registry = registry ?? null;
     this._compiled = compiled;
     this._bridges = compiled.bridges;
@@ -113,12 +116,6 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     if (compiled.analog !== null) {
       const engine = new MNAEngine();
       engine.init(compiled.analog);
-      // Install capture hook BEFORE dcOperatingPoint() so in-compile DCOP
-      // iterations are captured into the boot step (spec §4.3).
-      if (captureHook !== undefined) {
-        engine.stepPhaseHook = captureHook;
-      }
-      this._cachedDcOpResult = engine.dcOperatingPoint();
       this._analog = engine;
 
     } else {
@@ -352,6 +349,41 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
     return this._analysisPhase;
   }
 
+  initialize(): void {
+    if (this._initialized) return;
+    if (!this._analog) {
+      this._initialized = true;
+      return;
+    }
+    this._cachedDcOpResult = (this._analog as MNAEngine).dcOperatingPoint();
+    this._initialized = true;
+  }
+
+  applyCaptureHook(bundle: PhaseAwareCaptureHook | null): void {
+    if (!this._analog) return;
+    const e = this._analog as MNAEngine;
+
+    if (bundle === null) {
+      e.postIterationHook = null;
+      e.stepPhaseHook = null;
+      e.detailedConvergence = false;
+      e.limitingCollector = null;
+      e.convergenceLog.enabled = this._convergenceLogPreHookState;
+      this._captureHookInstalled = false;
+      return;
+    }
+
+    if (!this._captureHookInstalled) {
+      this._convergenceLogPreHookState = e.convergenceLog.enabled;
+    }
+    e.postIterationHook = bundle.iterationHook;
+    e.stepPhaseHook = bundle.phaseHook;
+    e.detailedConvergence = true;
+    e.limitingCollector = [];
+    e.convergenceLog.enabled = true;
+    this._captureHookInstalled = true;
+  }
+
   dcOperatingPoint(): DcOpResult | null {
     this._analysisPhase = "dcop";
     return this._cachedDcOpResult;
@@ -380,6 +412,12 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
   supportsConvergenceLog(): boolean { return this._analog !== null; }
 
   setConvergenceLogEnabled(enabled: boolean): void {
+    if (this._captureHookInstalled && enabled === false) {
+      throw new Error(
+        "Cannot disable convergence log while a comparison harness capture hook is installed. " +
+        "Call setCaptureHook(null) first."
+      );
+    }
     if (this._analog === null) return;
     this._analog.convergenceLog.enabled = enabled;
   }

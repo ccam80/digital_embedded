@@ -215,6 +215,7 @@ function buildRcCoordinator() {
 
   const unified = compileUnified(circuit, registry);
   const coordinator = new DefaultSimulationCoordinator(unified);
+  coordinator.initialize();
   return { coordinator };
 }
 
@@ -491,6 +492,7 @@ describe('unified execution methods — analog-only coordinator', () => {
     const circuit = buildAnalogCircuit(registry);
     const unified = compileUnified(circuit, registry);
     const coord = new DefaultSimulationCoordinator(unified);
+    coord.initialize();
     const result = coord.dcOperatingPoint();
     expect(result).not.toBeNull();
     expect(typeof result!.converged).toBe('boolean');

@@ -37,8 +37,8 @@
           "W2.T4"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 1,
+      "completed": 1,
       "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
@@ -110,5 +110,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-10T00:40:37.604Z"
+  "last_updated": "2026-04-10T00:54:06.937Z"
 }

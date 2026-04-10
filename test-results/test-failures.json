@@ -1,21 +1,21 @@
 {
   "summary": {
     "vitest": {
-      "passed": 8219,
-      "failed": 10,
+      "passed": 8221,
+      "failed": 12,
       "skipped": 0,
-      "totalFiles": 357,
-      "durationSeconds": 13.5
+      "totalFiles": 358,
+      "durationSeconds": 25.5
     },
     "playwright": {
-      "passed": 477,
-      "failed": 11,
+      "passed": 474,
+      "failed": 14,
       "skipped": 0,
       "totalFiles": 23,
-      "durationSeconds": 205.575732
+      "durationSeconds": 231.221818
     },
-    "totalFailed": 21,
-    "totalPassed": 8696
+    "totalFailed": 26,
+    "totalPassed": 8695
   },
   "failures": {
     "vitest": [
@@ -26,7 +26,7 @@
           {
             "file": "src\\solver\\coordinator.ts",
             "test": "transient stepping does not error after 50 steps",
-            "line": 206,
+            "line": 203,
             "column": 13
           }
         ]
@@ -64,6 +64,36 @@
             "test": "50 steps advance simTime > 0 without ERROR (regression: stale t=0 breakpoints must not freeze getClampedDt)",
             "line": 74,
             "column": 13
+          }
+        ]
+      },
+      {
+        "message": "expected 1 to be greater than or equal to 2",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
+            "test": "step 0 has at least 2 attempts (DCOP attempt + tranInit attempt)",
+            "line": 51,
+            "column": 35
+          }
+        ]
+      },
+      {
+        "message": "expected false to be true // Object.is equality",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
+            "test": "step 0 contains a DCOP-phase attempt",
+            "line": 59,
+            "column": 21
+          },
+          {
+            "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
+            "test": "MCP-5: convergence detail has per-element flags",
+            "line": 279,
+            "column": 70
           }
         ]
       },
@@ -124,18 +154,6 @@
             "test": "MCP-4: integration coefficients have correct structure",
             "line": 203,
             "column": 95
-          }
-        ]
-      },
-      {
-        "message": "expected false to be true // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
-            "test": "MCP-5: convergence detail has per-element flags",
-            "line": 279,
-            "column": 70
           }
         ]
       }
@@ -245,6 +263,30 @@
             "file": "gui/stepping-perf.spec.ts",
             "test": "buckbjt fast-forward 1ms — completes within 5s wall budget",
             "line": 93,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+        "count": 3,
+        "locations": [
+          {
+            "file": "gui/stress-speed.spec.ts",
+            "test": "buckbjt at 1 ms/s — 3s wall time",
+            "line": 39,
+            "column": 3
+          },
+          {
+            "file": "gui/stress-speed.spec.ts",
+            "test": "buckbjt at 100 ms/s — 3s wall time",
+            "line": 39,
+            "column": 3
+          },
+          {
+            "file": "gui/stress-speed.spec.ts",
+            "test": "buckbjt at 500 ms/s — 3s wall time",
+            "line": 39,
             "column": 3
           }
         ]

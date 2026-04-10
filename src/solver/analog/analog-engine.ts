@@ -22,7 +22,7 @@ import { TimestepController } from "./timestep.js";
 import { HistoryStore } from "./integration.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { ConvergenceLog } from "./convergence-log.js";
-import type { StepRecord } from "./convergence-log.js";
+import type { StepRecord, NRAttemptRecord } from "./convergence-log.js";
 
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import type { DcOpNRPhase, DcOpNRAttemptOutcome } from "./dc-operating-point.js";
@@ -406,6 +406,12 @@ export class MNAEngine implements AnalogEngine {
           blameNode: nrResult.largestChangeNode,
           trigger: stepRec!.attempts.length === 0 ? "initial" : "nr-retry",
         });
+        if (this._convergenceLog.enabled) {
+          const drainable = this.postIterationHook as unknown as { drainForLog?: () => NRAttemptRecord["iterationDetails"] };
+          if (typeof drainable?.drainForLog === "function") {
+            stepRec!.attempts[stepRec!.attempts.length - 1].iterationDetails = drainable.drainForLog();
+          }
+        }
       }
 
       if (!nrResult.converged) {
@@ -688,6 +694,35 @@ export class MNAEngine implements AnalogEngine {
       onPhaseBegin: phaseHook ? (phase, param) => phaseHook.onAttemptBegin(phase, param ?? 0) : undefined,
       onPhaseEnd: phaseHook ? (outcome, converged) => phaseHook.onAttemptEnd(outcome, converged) : undefined,
     });
+
+    if (this._convergenceLog.enabled) {
+      const drainable = this.postIterationHook as unknown as { drainForLog?: () => NRAttemptRecord["iterationDetails"] };
+      if (typeof drainable?.drainForLog === "function") {
+        const dcopRec: StepRecord = {
+          stepNumber: -1,
+          simTime: 0,
+          entryDt: 0,
+          acceptedDt: 0,
+          entryMethod: "bdf1",
+          exitMethod: "bdf1",
+          lteWorstRatio: 0,
+          lteProposedDt: 0,
+          lteRejected: false,
+          outcome: result.converged ? "accepted" : "error",
+          attempts: [{
+            dt: 0,
+            method: "bdf1",
+            iterations: result.iterations,
+            converged: result.converged,
+            blameElement: -1,
+            blameNode: -1,
+            trigger: "initial",
+            iterationDetails: drainable.drainForLog(),
+          }],
+        };
+        this._convergenceLog.record(dcopRec);
+      }
+    }
 
     if (result.converged) {
       this._voltages.set(result.nodeVoltages);

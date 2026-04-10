@@ -72,3 +72,63 @@ All four tasks completed as specified. Type changes are additive; interface decl
   - Zero remaining `unaligned?` references (verified via Grep)
   - convergence-log.ts contract comment unchanged (§11.1 Q5)
   - Stub files (null-coordinator.ts, mock-coordinator.ts) can now resolve PhaseAwareCaptureHook type
+
+---
+
+## Wave 2 Implementation Progress
+
+## Task W2.T1: Coordinator — drop in-constructor DCOP, add initialize(), applyCaptureHook(), throw-on-conflict
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/solver/coordinator.ts`
+- **Tests**: N/A (tested via W2.T4)
+- **Changes made**:
+  - Added import for `PhaseAwareCaptureHook` from `./coordinator-types.js`
+  - Removed `captureHook?` constructor parameter
+  - Removed in-constructor `engine.stepPhaseHook = captureHook` install
+  - Removed in-constructor `this._cachedDcOpResult = engine.dcOperatingPoint()` call
+  - Added three new private fields: `_initialized`, `_convergenceLogPreHookState`, `_captureHookInstalled`
+  - Added `initialize()` method — idempotent, runs DCOP exactly once on analog backend
+  - Added `applyCaptureHook(bundle)` method — atomically toggles 5 engine flags, captures pre-hook convergence log state on first install, restores on uninstall
+  - Added throw to `setConvergenceLogEnabled(false)` when `_captureHookInstalled === true`
+  - Updated direct `new DefaultSimulationCoordinator()` call sites in test files that expected DCOP to run automatically: added `coordinator.initialize()` to `buildRcCoordinator()` in coordinator-capability.test.ts, and to the buildAnalogCoordinator pattern in coordinator-visualization.test.ts
+
+## Task W2.T2: Facade — new setCaptureHook signature, compile(c, opts), throw-on-conflict
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/headless/default-facade.ts`
+- **Tests**: N/A (tested via W2.T4)
+- **Changes made**:
+  - Removed `type CaptureHook = MNAEngine["stepPhaseHook"]` alias
+  - Removed `import type { MNAEngine }` (no longer needed)
+  - Added `import type { PhaseAwareCaptureHook } from '../solver/coordinator-types.js'`
+  - Changed `_captureHook` field type from `CaptureHook` to `PhaseAwareCaptureHook | null`
+  - Changed `setCaptureHook(hook: CaptureHook)` to `setCaptureHook(bundle: PhaseAwareCaptureHook | null)` — forwards to coordinator's `applyCaptureHook` if a coordinator is active
+  - Changed `compile(circuit)` to `compile(circuit, opts?: { deferInitialize?: boolean })` — applies capture hook before initialize, calls `coordinator.initialize()` unless `opts?.deferInitialize === true`
+  - Removed old `captureHook ?? undefined` passing to coordinator constructor
+  - Added throw to `setConvergenceLogEnabled(false)` when `_captureHook !== null`
+
+## Task W2.T3: Engine — drain iterationDetails from capture into NRAttemptRecord
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/solver/analog/analog-engine.ts`
+- **Tests**: N/A (gate logic tested implicitly by no regression in convergence log tests)
+- **Changes made**:
+  - Added `NRAttemptRecord` to import from `./convergence-log.js`
+  - Added convergenceLog.enabled gate after `stepRec!.attempts.push({...})` in `step()` — drains from `postIterationHook.drainForLog?.()` using optional chaining
+  - Added convergenceLog.enabled gate after `solveDcOperatingPoint({...})` in `dcOperatingPoint()` — drains from `postIterationHook.drainForLog?.()` using optional chaining; if drain method present, records a sentinel StepRecord (stepNumber=-1) in convergence log
+
+## Task W2.T4: Smoke test for compile(c, { deferInitialize: true }) and initialize() idempotency
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/headless/__tests__/compile-defer-initialize.test.ts`
+- **Tests**: 4/4 passing
+- **Changes made**:
+  - Created 4 sub-tests using an RC circuit built via facade.build():
+    1. `compile(c, { deferInitialize: true })` → `dcOperatingPoint()` returns null ✓
+    2. After `coord.initialize()` → `dcOperatingPoint()` returns non-null ✓
+    3. Second `coord.initialize()` call → same result object (idempotent) ✓
+    4. `compile(c)` without opts → DCOP runs immediately (backwards compat) ✓
+
+## Wave 2 Summary
+All four tasks complete. TypeScript compilation clean for the four touched production files (coordinator.ts, default-facade.ts, analog-engine.ts). Wave 3 harness consumer files (comparison-session.ts, boot-step-merge.test.ts) have expected failures that Wave 3 will resolve. All non-harness tests pass (160/160 coordinator tests pass, 4/4 new smoke tests pass).

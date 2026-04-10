@@ -285,8 +285,8 @@
     },
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 72,
-      "lastAccessed": 1775781409722,
+      "accessCount": 93,
+      "lastAccessed": 1775781985186,
       "type": "directory"
     },
     {
@@ -315,8 +315,8 @@
     },
     {
       "path": "",
-      "accessCount": 42,
-      "lastAccessed": 1775778143025,
+      "accessCount": 43,
+      "lastAccessed": 1775781738893,
       "type": "directory"
     },
     {
@@ -326,6 +326,12 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\coordinator.ts",
+      "accessCount": 31,
+      "lastAccessed": 1775782130339,
+      "type": "directory"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
       "accessCount": 29,
       "lastAccessed": 1775777134372,
@@ -333,14 +339,8 @@
     },
     {
       "path": "src",
-      "accessCount": 26,
-      "lastAccessed": 1775781061945,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\coordinator.ts",
-      "accessCount": 24,
-      "lastAccessed": 1775777769942,
+      "accessCount": 27,
+      "lastAccessed": 1775782178739,
       "type": "directory"
     },
     {
@@ -380,15 +380,15 @@
       "type": "file"
     },
     {
-      "path": "docs\\specs\\harness-stream1-data-accuracy.md",
-      "accessCount": 15,
-      "lastAccessed": 1775702313033,
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 16,
+      "lastAccessed": 1775781718370,
       "type": "file"
     },
     {
-      "path": "spec\\.context\\rules.md",
+      "path": "docs\\specs\\harness-stream1-data-accuracy.md",
       "accessCount": 15,
-      "lastAccessed": 1775781393880,
+      "lastAccessed": 1775702313033,
       "type": "file"
     },
     {
@@ -417,8 +417,8 @@
     },
     {
       "path": "spec\\progress.md",
-      "accessCount": 10,
-      "lastAccessed": 1775781550739,
+      "accessCount": 12,
+      "lastAccessed": 1775782410036,
       "type": "file"
     },
     {

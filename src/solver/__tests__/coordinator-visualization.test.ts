@@ -112,6 +112,7 @@ function buildRcCoordinator() {
 
   const unified = compileUnified(circuit, registry);
   const coordinator = new DefaultSimulationCoordinator(unified);
+  coordinator.initialize();
   return { coordinator, circuit, elements: { vcc, res: r1, cap: r2, gnd, gnd2 }, wires: { wire1, wire2, wire3, wire4 } };
 }
 
