@@ -42,7 +42,7 @@ function serializeSummary(summary: SessionSummary) {
       ? {
           stepIndex: summary.firstDivergence.stepIndex,
           iterationIndex: summary.firstDivergence.iterationIndex,
-          simTime: formatNumber(summary.firstDivergence.simTime),
+          simTime: formatNumber(summary.firstDivergence.stepStartTime),
           worstLabel: summary.firstDivergence.worstLabel,
           absDelta: formatNumber(summary.firstDivergence.absDelta),
         }
@@ -458,12 +458,14 @@ export function registerHarnessTools(
 
       const offset = args.offset ?? 0;
       const topology = (session as any)._ourTopology;
-      const totalSteps: number = (session as any)._ourSession?.steps?.length ?? 0;
+      const ourStepCount: number = (session as any)._ourSession?.steps?.length ?? 0;
+      const ngStepCount: number = (session as any)._ngSessionAligned?.()?.steps?.length ?? 0;
+      const totalSteps: number = Math.max(ourStepCount, ngStepCount);
 
       // Validate step range if provided
       if (args.step !== undefined && totalSteps > 0 && args.step >= totalSteps) {
         throw new Error(
-          `harness_query: step ${args.step} out of range [0, ${totalSteps - 1}]. Run has ${totalSteps} steps.`,
+          `harness_query: step ${args.step} out of range [0, ${totalSteps - 1}]. Run has ${totalSteps} steps (ours: ${ourStepCount}, ngspice: ${ngStepCount}).`,
         );
       }
 
@@ -498,7 +500,9 @@ export function registerHarnessTools(
         if (args.timeRange && (session as any)._ourSession) {
           const [tFrom, tTo] = args.timeRange;
           result = result.filter((i) => {
-            const t = (session as any)._ourSession.steps[i]?.simTime ?? 0;
+            const t = (session as any)._ourSession.steps[i]?.stepStartTime
+              ?? (session as any)._ngSessionAligned?.()?.steps[i]?.stepStartTime
+              ?? 0;
             return t >= tFrom && t <= tTo;
           });
         }
@@ -656,7 +660,7 @@ export function registerHarnessTools(
           stateHistory: {
             component: label,
             stepIndex: args.step,
-            simTime: formatNumber(report.stepIndex >= 0 ? (session as any)._ourSession?.steps[args.step]?.simTime ?? 0 : 0),
+            simTime: formatNumber(report.stepIndex >= 0 ? (session as any)._ourSession?.steps[args.step]?.stepStartTime ?? 0 : 0),
             slots: filteredSlots,
             iterations: items,
           },
@@ -700,7 +704,7 @@ export function registerHarnessTools(
         const iterReports = session.getIterations(args.step);
         const rawOurStep = (session as any)._ourSession?.steps[args.step];
         const ourTopology = (session as any)._ourTopology;
-        const { items, total } = paginate(iterReports, 100);
+        const { items, total } = paginate(iterReports, 5);
         const iterationData = items.map((r: any) => {
           const rawIter = rawOurStep?.iterations[r.iteration];
           const prevNodes: Record<string, any> = {};
@@ -714,7 +718,7 @@ export function registerHarnessTools(
           return {
           stepIndex: r.stepIndex,
           iteration: r.iteration,
-          simTime: formatNumber(r.simTime),
+          simTime: formatNumber(r.stepStartTime),
           noncon: formatComparedValue(r.noncon),
           nodes: Object.fromEntries(
             Object.entries(r.nodes).map(([k, v]) => [k, formatComparedValue(v as any)]),
@@ -745,7 +749,7 @@ export function registerHarnessTools(
           queryMode: "step-iterations",
           total,
           offset,
-          limit: args.limit ?? 100,
+          limit: args.limit ?? 5,
           iterationData,
         });
       }
@@ -816,7 +820,7 @@ export function registerHarnessTools(
           deviceType: trace.deviceType,
           steps: trace.steps.map((s: any) => ({
             stepIndex: s.stepIndex,
-            simTime: formatNumber(s.simTime),
+            simTime: formatNumber(s.stepStartTime),
             iterations: s.iterations.map((it: any) => ({
               iteration: it.iteration,
               states: Object.fromEntries(
@@ -862,7 +866,7 @@ export function registerHarnessTools(
           ngspiceIndex: trace.ngspiceIndex,
           steps: trace.steps.map((s: any) => ({
             stepIndex: s.stepIndex,
-            simTime: formatNumber(s.simTime),
+            simTime: formatNumber(s.stepStartTime),
             iterations: s.iterations.map((it: any) => ({
               iteration: it.iteration,
               voltage: formatComparedValue(it.voltage),
@@ -944,7 +948,7 @@ export function registerHarnessTools(
           }
           return {
             stepIndex: si,
-            simTime: formatNumber(ourStep?.simTime ?? 0),
+            simTime: formatNumber(ourStep?.stepStartTime ?? (session as any)._ngSessionAligned?.()?.steps[si]?.stepStartTime ?? 0),
             components: comps,
           };
         });
@@ -1031,14 +1035,18 @@ export function registerHarnessTools(
         throw new Error(`harness_compare_matrix: run harness_run first`);
       }
 
-      const totalSteps: number = (session as any)._ourSession?.steps?.length ?? 0;
-      if (args.step >= totalSteps) {
+      const ourStepCountM: number = (session as any)._ourSession?.steps?.length ?? 0;
+      const ngStepCountM: number = (session as any)._ngSessionAligned?.()?.steps?.length ?? 0;
+      const totalStepsM: number = Math.max(ourStepCountM, ngStepCountM);
+      if (args.step >= totalStepsM) {
         throw new Error(
-          `harness_compare_matrix: step ${args.step} out of range [0, ${totalSteps - 1}]. Run has ${totalSteps} steps.`,
+          `harness_compare_matrix: step ${args.step} out of range [0, ${totalStepsM - 1}]. Run has ${totalStepsM} steps (ours: ${ourStepCountM}, ngspice: ${ngStepCountM}).`,
         );
       }
 
-      const stepIterations: number = (session as any)._ourSession?.steps[args.step]?.iterations?.length ?? 0;
+      const ourStepM = (session as any)._ourSession?.steps[args.step];
+      const ngStepM = (session as any)._ngSessionAligned?.()?.steps[args.step];
+      const stepIterations: number = ourStepM?.iterations?.length ?? ngStepM?.iterations?.length ?? 0;
       if (args.iteration >= stepIterations) {
         throw new Error(
           `harness_compare_matrix: iteration ${args.iteration} out of range [0, ${stepIterations - 1}] at step ${args.step}`,

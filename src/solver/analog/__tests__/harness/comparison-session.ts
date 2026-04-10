@@ -567,11 +567,47 @@ export class ComparisonSession {
   getStepEnd(stepIndex: number): StepEndReport {
     this._ensureRun();
     const ourStep = this._ourSession!.steps[stepIndex];
-    if (!ourStep) {
+    const ngAligned = this._ngSessionAligned();
+    const ngStep = ngAligned?.steps[stepIndex];
+
+    if (!ourStep && !ngStep) {
       throw new Error(`Step out of range: ${stepIndex}`);
     }
 
-    const ngStep = this._ngSessionAligned()?.steps[stepIndex];
+    // ngspice-only step: ours is absent, return ngspice data with null ours values
+    if (!ourStep && ngStep) {
+      const presence = this._stepPresence(stepIndex);
+      const nodes: Record<string, ComparedValue> = {};
+      const branches: Record<string, ComparedValue> = {};
+      const components: Record<string, StepEndComponentEntry> = {};
+
+      const ngAccIdx = ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1;
+      const ngAccepted = ngStep.attempts[ngAccIdx];
+      const ngFinal = ngAccepted
+        ? ngAccepted.iterations[ngAccepted.iterations.length - 1]
+        : ngStep.iterations[ngStep.iterations.length - 1];
+
+      if (ngFinal) {
+        this._ourTopology.nodeLabels.forEach((label, nodeId) => {
+          const ngV = nodeId > 0 && nodeId - 1 < ngFinal.voltages.length
+            ? ngFinal.voltages[nodeId - 1] : NaN;
+          nodes[label] = makeComparedValue(NaN, ngV, this._tol.vAbsTol, this._tol.relTol);
+        });
+      }
+
+      return {
+        stepIndex,
+        presence,
+        stepStartTime: simpleCompared(NaN, ngStep.stepStartTime),
+        stepEndTime: simpleCompared(NaN, ngStep.stepEndTime),
+        dt: simpleCompared(NaN, ngStep.dt),
+        converged: { ours: false, ngspice: ngStep.converged },
+        iterationCount: simpleCompared(NaN, ngStep.iterationCount),
+        nodes,
+        branches,
+        components,
+      };
+    }
     const presence = this._stepPresence(stepIndex);
 
     // Accepted attempt final iteration (spec §9.3)
@@ -642,14 +678,19 @@ export class ComparisonSession {
    */
   getIterations(stepIndex: number): IterationReport[] {
     this._ensureRun();
-    const ourStep = this._ourSession!.steps[stepIndex];
-    if (!ourStep) return [];
+    const ourStep = this._ourSession!.steps[stepIndex] ?? null;
 
     const ngStep = this._ngSessionAligned()?.steps[stepIndex];
 
+    if (!ourStep && !ngStep) return [];
+
     // Accepted attempt iterations
-    const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1;
-    const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
+    const ourAccIdx = ourStep
+      ? (ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1)
+      : -1;
+    const ourIters = ourStep
+      ? (ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations)
+      : [];
 
     const ngAccIdx = ngStep
       ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
@@ -723,7 +764,7 @@ export class ComparisonSession {
       reports.push({
         stepIndex,
         iteration: ii,
-        stepStartTime: ourStep.stepStartTime,
+        stepStartTime: ourStep?.stepStartTime ?? ngStep?.stepStartTime ?? 0,
         noncon: makeComparedValue(ourIter?.noncon ?? 0, ngIter?.noncon ?? NaN, 0, 0),
         nodes,
         rhs,
@@ -1304,12 +1345,17 @@ export class ComparisonSession {
     const ngSteps = this._ngSessionAligned()?.steps ?? [];
 
     const steps: NodeTrace["steps"] = [];
-    for (let si = 0; si < ourSteps.length; si++) {
-      const ourStep = ourSteps[si];
-      const ngStep = ngSteps[si];
+    const totalStepCount = Math.max(ourSteps.length, ngSteps.length);
+    for (let si = 0; si < totalStepCount; si++) {
+      const ourStep = ourSteps[si] ?? null;
+      const ngStep = ngSteps[si] ?? null;
 
-      const ourAccIdx = ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1;
-      const ourIters = ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations;
+      const ourAccIdx = ourStep
+        ? (ourStep.acceptedAttemptIndex >= 0 ? ourStep.acceptedAttemptIndex : ourStep.attempts.length - 1)
+        : -1;
+      const ourIters = ourStep
+        ? (ourStep.attempts[ourAccIdx]?.iterations ?? ourStep.iterations)
+        : [];
       const ngAccIdx = ngStep
         ? (ngStep.acceptedAttemptIndex >= 0 ? ngStep.acceptedAttemptIndex : ngStep.attempts.length - 1)
         : -1;
@@ -1328,7 +1374,7 @@ export class ComparisonSession {
         iters.push({ iteration: ii, voltage: cv });
       }
 
-      steps.push({ stepIndex: si, stepStartTime: ourStep.stepStartTime, iterations: iters });
+      steps.push({ stepIndex: si, stepStartTime: ourStep?.stepStartTime ?? ngStep?.stepStartTime ?? 0, iterations: iters });
     }
 
     return { label: upperLabel, ourIndex, ngspiceIndex: ngIndex, steps };

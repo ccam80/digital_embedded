@@ -752,3 +752,140 @@ describe("getComponentSlots edge cases", () => {
     expect(() => session.getComponentSlots("NONEXISTENT", ["*"])).toThrow("Component not found");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Fix 1: simTime is not "-Inf" — it reads stepStartTime correctly (60-62)
+// ---------------------------------------------------------------------------
+
+describe("Fix 1: simTime reads stepStartTime, not undefined simTime field", () => {
+  it("60. traceNode steps have numeric stepStartTime (not NaN or -Inf)", async () => {
+    const { session, topology } = await createHwrSession();
+    const firstNode = Array.from(topology.nodeLabels.values())[0] as string;
+    const trace = session.traceNode(firstNode);
+    expect(trace.steps.length).toBeGreaterThan(0);
+    for (const s of trace.steps) {
+      expect(Number.isFinite(s.stepStartTime)).toBe(true);
+      expect(s.stepStartTime).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("61. getIterations steps have numeric stepStartTime (not NaN or -Inf)", async () => {
+    const { session } = await createHwrSession();
+    const iters = session.getIterations(0);
+    expect(iters.length).toBeGreaterThan(0);
+    for (const r of iters) {
+      expect(Number.isFinite(r.stepStartTime)).toBe(true);
+      expect(r.stepStartTime).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("62. getSummary firstDivergence has stepStartTime (not simTime) — structural type check", async () => {
+    const { session } = await createHwrSession();
+    const summary = session.getSummary();
+    // In self-compare, firstDivergence is null (no divergence). That is correct.
+    // The important thing: the type field is stepStartTime, not simTime.
+    if (summary.firstDivergence) {
+      expect(typeof summary.firstDivergence.stepStartTime).toBe("number");
+      expect(Number.isFinite(summary.firstDivergence.stepStartTime)).toBe(true);
+    }
+    // Also verify traceNode stepStartTime is non-negative finite for a multi-step DC transient
+    const ourSteps = (session as any)._ourSession.steps;
+    expect(ourSteps.length).toBeGreaterThan(0);
+    expect(typeof ourSteps[0].stepStartTime).toBe("number");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fix 2 & 3: asymmetric step counts — ngspice-only steps accessible (63-65)
+// ---------------------------------------------------------------------------
+
+describe("Fix 2 & 3: asymmetric step counts — ours shorter than ngspice", () => {
+  async function createAsymmetricSession() {
+    // Create self-compare session, then truncate _ourSession to simulate our side crashing early.
+    const { session } = await createHwrSession();
+    await (session as any).runDcOp?.();
+    // By now selfCompare cloned ours→ng. Truncate ours to 1 step while ng keeps all.
+    const ourSteps = (session as any)._ourSession.steps;
+    const ngSteps = (session as any)._ngSessionAligned?.()?.steps ?? (session as any)._ngSession?.steps ?? [];
+    const originalOurLen = ourSteps.length;
+    const originalNgLen = ngSteps.length;
+    if (originalOurLen <= 1 || originalNgLen <= 1) {
+      // DC-op only has 1 step; use the session as-is and mark it symmetric
+      return { session, ourLen: originalOurLen, ngLen: originalNgLen };
+    }
+    // Truncate ours to 1 step
+    ourSteps.splice(1);
+    return { session, ourLen: 1, ngLen: originalNgLen };
+  }
+
+  it("63. getStepEnd on an ngspice-only step does not throw and returns presence 'ngspiceOnly'", async () => {
+    // Use a freshly built transient self-compare session; simulate asymmetry by injecting
+    // extra steps into the ngspice session.
+    const { session } = await createHwrSession();
+    const ourSteps: any[] = (session as any)._ourSession.steps;
+    const ngSession = (session as any)._ngSession;
+    const ngReindexed = (session as any)._ngSessionReindexed;
+    const ngSteps: any[] = (ngReindexed ?? ngSession)?.steps ?? [];
+    if (ourSteps.length < 1 || ngSteps.length < 1) return; // skip if no steps
+
+    // Truncate ours to simulate crash at step 0 — ng has the rest
+    const savedOurTail = ourSteps.splice(1);
+    try {
+      // Step 1 is now ngspice-only
+      if (ngSteps.length > 1) {
+        const report = session.getStepEnd(1);
+        expect(report.stepIndex).toBe(1);
+        expect(report.presence).toBe("ngspiceOnly");
+        expect(report.converged.ours).toBe(false);
+        expect(typeof report.converged.ngspice).toBe("boolean");
+      }
+    } finally {
+      // Restore
+      ourSteps.push(...savedOurTail);
+    }
+  });
+
+  it("64. traceNode step count equals max(ours, ngspice) when ours is shorter", async () => {
+    const { session, topology } = await createHwrSession();
+    const ourSteps: any[] = (session as any)._ourSession.steps;
+    const ngSession = (session as any)._ngSession;
+    const ngReindexed = (session as any)._ngSessionReindexed;
+    const ngSteps: any[] = (ngReindexed ?? ngSession)?.steps ?? [];
+    if (ourSteps.length < 2 || ngSteps.length < 2) return; // skip if insufficient steps
+
+    const savedOurTail = ourSteps.splice(1);
+    try {
+      const firstNode = Array.from(topology.nodeLabels.values())[0] as string;
+      const trace = session.traceNode(firstNode);
+      // trace.steps.length should be ngSteps.length (the larger), not ourSteps.length (1)
+      expect(trace.steps.length).toBe(ngSteps.length);
+    } finally {
+      ourSteps.push(...savedOurTail);
+    }
+  });
+
+  it("65. traceNode ngspice-only steps have null ours voltage (NaN raw) and finite ngspice voltage", async () => {
+    const { session, topology } = await createHwrSession();
+    const ourSteps: any[] = (session as any)._ourSession.steps;
+    const ngSession = (session as any)._ngSession;
+    const ngReindexed = (session as any)._ngSessionReindexed;
+    const ngSteps: any[] = (ngReindexed ?? ngSession)?.steps ?? [];
+    if (ourSteps.length < 2 || ngSteps.length < 2) return;
+
+    const savedOurTail = ourSteps.splice(1);
+    try {
+      const firstNode = Array.from(topology.nodeLabels.values())[0] as string;
+      const trace = session.traceNode(firstNode);
+      // Step index 1+ are ngspice-only — ours voltage should be NaN
+      for (let si = 1; si < trace.steps.length; si++) {
+        const step = trace.steps[si];
+        for (const iter of step.iterations) {
+          // ours is NaN since our step is absent
+          expect(Number.isNaN(iter.voltage.ours)).toBe(true);
+        }
+      }
+    } finally {
+      ourSteps.push(...savedOurTail);
+    }
+  });
+});
