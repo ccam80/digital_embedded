@@ -68,6 +68,7 @@ import type {
   PhaseAwareCaptureHook,
 } from "./types.js";
 import { DEFAULT_TOLERANCE } from "./types.js";
+import { computeIntegrationCoefficients } from "../../integration.js";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -385,12 +386,10 @@ export class ComparisonSession {
 
     sc.setStepStartTime(0);
     this._coordinator.initialize();
-    sc.endStep({
-      stepEndTime: 0,
-      integrationCoefficients: _zeroDcopCoefficients(),
-      analysisPhase: "dcop",
-      acceptedAttemptIndex: -1,
-    });
+    // NOTE: do NOT call endStep() here. DCOP attempts must remain pending so
+    // runTransient() can merge them with the first tranInit attempt into a
+    // single boot step (stepStartTime=0). Standalone DCOP users go through
+    // runDcOp(), which flushes the pending attempts itself.
 
     if (this._opts.cirPath) {
       const cirRaw = readFileSync(resolvePath(this._opts.cirPath), "utf-8");
@@ -419,6 +418,19 @@ export class ComparisonSession {
 
     this._analysis = "dcop";
     this._comparisons = null;
+
+    // Flush the pending DCOP attempts captured during init() into step 0.
+    // _initWithCircuit() deliberately leaves them in the buffer so that
+    // runTransient() can merge them with the first tranInit attempt; for
+    // standalone DCOP runs we close the step ourselves here.
+    if (this._stepCapture) {
+      this._stepCapture.endStep({
+        stepEndTime: 0,
+        integrationCoefficients: _zeroDcopCoefficients(),
+        analysisPhase: "dcop",
+        acceptedAttemptIndex: -1,
+      });
+    }
 
     this._ourSession = {
       source: "ours",
@@ -1753,6 +1765,24 @@ export class ComparisonSession {
     } else {
       this._ngSessionReindexed = this._ngSession;
     }
+    this._backfillNgspiceIntegCoeff();
+  }
+
+  /**
+   * After the ngspice session is indexed, copy the ngspice half of
+   * integrationCoefficients into the aligned our-session steps so that
+   * step.integrationCoefficients.ngspice reflects real ngspice data.
+   * The ours half is already filled by _captureIntegCoeff() during the run.
+   */
+  private _backfillNgspiceIntegCoeff(): void {
+    const ourSteps = this._ourSession?.steps;
+    const ngSteps = this._ngSessionAligned()?.steps;
+    if (!ourSteps || !ngSteps) return;
+    const count = Math.min(ourSteps.length, ngSteps.length);
+    for (let i = 0; i < count; i++) {
+      const ngCoeff = ngSteps[i]!.integrationCoefficients.ngspice;
+      ourSteps[i]!.integrationCoefficients.ngspice = ngCoeff;
+    }
   }
 
   protected _ngSessionAligned(): CaptureSession | null {
@@ -1807,11 +1837,19 @@ export class ComparisonSession {
     if (!this._engine) return _zeroDcopCoefficients();
     const ts = (this._engine as any)._timestep;
     if (!ts) return _zeroDcopCoefficients();
-    const ag0: number = ts.ag?.[0] ?? 0;
-    const ag1: number = ts.ag?.[1] ?? 0;
+    const order: number = ts.currentOrder ?? 1;
+    const rawMethod: string = ts.currentMethod ?? "bdf1";
     const method: "backwardEuler" | "trapezoidal" | "gear2" =
-      ts.method === 1 ? "trapezoidal" : "backwardEuler";
-    const order: number = ts.integrationOrder ?? 1;
+      rawMethod === "trapezoidal" ? "trapezoidal"
+      : rawMethod === "bdf2" ? "gear2"
+      : "backwardEuler";
+    // After a step completes: _deltaOld[0] = dt used in this step (set by setDeltaOldCurrent),
+    // _deltaOld[1] = dt of the previous step (h1), _deltaOld[2] = h_{n-2}.
+    const deltaOld: number[] = (ts as any)._deltaOld ?? [];
+    const dt: number = deltaOld[0] > 0 ? deltaOld[0] : (ts.currentDt ?? 0);
+    const h1: number = deltaOld[1] > 0 ? deltaOld[1] : dt;
+    const h2: number = deltaOld[2] > 0 ? deltaOld[2] : h1;
+    const { ag0, ag1 } = computeIntegrationCoefficients(dt, h1, h2, order, rawMethod as any);
     return {
       ours: { ag0, ag1, method, order },
       ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },

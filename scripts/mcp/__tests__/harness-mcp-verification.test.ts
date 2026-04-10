@@ -243,21 +243,25 @@ describeGate("Harness MCP Verification -- HWR square-wave transient", () => {
     const bjtTools = new ToolCapture();
     registerHarnessTools(bjtTools as any, bjtState);
 
-    // Find a step/iteration with non-empty convergenceFailedElements
+    // Find the FIRST step/iteration with non-empty convergenceFailedElements
     // (requires iteration > 0, since NR can't check convergence at iteration 0)
     const bjtOurSession = bjtSession.ourSession!;
-    let targetStep = 0;
-    let targetIter = 1;
-    for (let si = 0; si < bjtOurSession.steps.length; si++) {
+    let targetStep = -1;
+    let targetIter = -1;
+    outer: for (let si = 0; si < bjtOurSession.steps.length; si++) {
       const step = bjtOurSession.steps[si];
       for (let ii = 1; ii < step.iterations.length; ii++) {
         if (step.iterations[ii].convergenceFailedElements?.length > 0) {
           targetStep = si;
           targetIter = ii;
-          break;
+          break outer;
         }
       }
     }
+    expect(
+      targetStep,
+      "no step with a non-converged element found — buckbjt should diverge by step ~2",
+    ).toBeGreaterThanOrEqual(0);
 
     const result = await bjtTools.call("harness_query", {
       handle: bjtHandle,

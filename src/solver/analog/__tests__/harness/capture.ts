@@ -240,6 +240,19 @@ export function createIterationCaptureHook(
   let snapshots: IterationSnapshot[] = [];
   let detailBuffer: NonNullable<NRAttemptRecord["iterationDetails"]> = [];
 
+  // Build a map from raw el.label (used by newton-raphson convergenceFailedElements)
+  // to the human label (used by elementStates / elementLabels). This ensures
+  // convergenceFailedElements and elementStates use the same label namespace.
+  const rawLabelToHumanLabel = new Map<string, string>();
+  if (elementLabels) {
+    for (let i = 0; i < elements.length; i++) {
+      const human = elementLabels.get(i);
+      if (human === undefined) continue;
+      const raw = elements[i].label ?? `element_${i}`;
+      if (raw !== human) rawLabelToHumanLabel.set(raw, human);
+    }
+  }
+
   const hook: PostIterationHook = (
     iteration, voltages, prevVoltages, noncon, globalConverged, elemConverged,
     limitingEvents, convergenceFailedElements,
@@ -253,6 +266,12 @@ export function createIterationCaptureHook(
 
     detailBuffer.push({ iteration, maxDelta, maxDeltaNode, noncon, converged: globalConverged });
 
+    // Remap convergenceFailedElements from raw el.label to human labels so they
+    // match the labels used in elementStates (built from elementLabels).
+    const remappedFailedElements = rawLabelToHumanLabel.size > 0
+      ? convergenceFailedElements.map(l => rawLabelToHumanLabel.get(l) ?? l)
+      : convergenceFailedElements;
+
     snapshots.push({
       iteration,
       voltages: voltages.slice(),
@@ -264,7 +283,7 @@ export function createIterationCaptureHook(
       globalConverged,
       elemConverged,
       limitingEvents: [...limitingEvents],
-      convergenceFailedElements,
+      convergenceFailedElements: remappedFailedElements,
       ngspiceConvergenceFailedDevices: [],
     });
   };

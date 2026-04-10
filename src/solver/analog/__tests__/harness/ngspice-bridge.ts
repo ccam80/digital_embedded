@@ -78,22 +78,17 @@ function cktModeToAnalysisPhase(mode: number): "dcop" | "tranInit" | "tranFloat"
   return "dcop";
 }
 
-function _ngspiceIntegCoeff(raw: RawNgspiceIterationEx | undefined): IntegrationCoefficients {
+/** Extract only the ngspice-side integration coefficients from a raw iteration. */
+function _ngspiceIntegCoeff(raw: RawNgspiceIterationEx | undefined): IntegrationCoefficients["ngspice"] {
   if (!raw) {
-    return {
-      ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
-      ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
-    };
+    return { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 };
   }
   const methodMap: Record<number, string> = { 0: "backwardEuler", 1: "trapezoidal", 2: "gear2" };
   return {
-    ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
-    ngspice: {
-      ag0: raw.ag0 ?? 0,
-      ag1: raw.ag1 ?? 0,
-      method: methodMap[raw.integrateMethod ?? 0] ?? "backwardEuler",
-      order: raw.order ?? 1,
-    },
+    ag0: raw.ag0 ?? 0,
+    ag1: raw.ag1 ?? 0,
+    method: methodMap[raw.integrateMethod ?? 0] ?? "backwardEuler",
+    order: raw.order ?? 1,
   };
 }
 
@@ -563,13 +558,17 @@ export class NgspiceBridge {
 
       const acceptedAttempt = step.attempts[acceptedIdx]!;
       const lastRaw = acceptedAttempt.iterations[acceptedAttempt.iterations.length - 1];
-      const integCoeff = _ngspiceIntegCoeff(
+      const ngspiceCoeff = _ngspiceIntegCoeff(
         // Find the raw iteration for the last accepted iteration
         this._iterations.find(r =>
           r.simTimeStart === step.stepStartTime &&
           r.iteration === (lastRaw as any)?._rawIteration
         ) ?? this._iterations.find(r => r.simTimeStart === step.stepStartTime),
       );
+      const integCoeff: IntegrationCoefficients = {
+        ours: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },
+        ngspice: ngspiceCoeff,
+      };
 
       const analysisPhase = step.attempts[0]
         ? cktModeToAnalysisPhase((step.attempts[0].iterations[0] as any)?._rawCktMode ?? 0)
