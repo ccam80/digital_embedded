@@ -132,3 +132,72 @@ All four tasks completed as specified. Type changes are additive; interface decl
 
 ## Wave 2 Summary
 All four tasks complete. TypeScript compilation clean for the four touched production files (coordinator.ts, default-facade.ts, analog-engine.ts). Wave 3 harness consumer files (comparison-session.ts, boot-step-merge.test.ts) have expected failures that Wave 3 will resolve. All non-harness tests pass (160/160 coordinator tests pass, 4/4 new smoke tests pass).
+
+---
+
+## Wave 2 Completion Confirmation
+
+**Verification date**: 2026-04-10  
+**Verifier role**: no-code-change confirmation pass
+
+### Verification Summary
+
+Per the Wave 2 exit gate in `spec/wave-2-coordinator.md`, this confirmation pass checks that:
+1. All four Wave 2 tasks are present and implemented
+2. The two expected test regressions (boot-step-merge) are documented as Wave 2 intentional
+3. No new regressions beyond the expected 12 failures
+4. The deferred-initialize smoke test passes 4/4
+
+### Findings
+
+**W2.T1 — Coordinator (src/solver/coordinator.ts)**
+- Constructor no longer calls `engine.dcOperatingPoint()` ✓
+- `coordinator.initialize()` exists, is idempotent, runs DCOP exactly once ✓
+- `coordinator.applyCaptureHook(bundle)` atomically toggles all five engine flags ✓
+- `coordinator.setConvergenceLogEnabled(false)` throws when `_captureHookInstalled === true` ✓
+
+**W2.T2 — Facade (src/headless/default-facade.ts)**
+- `setCaptureHook(bundle: PhaseAwareCaptureHook | null)` new signature ✓
+- `compile(circuit, { deferInitialize?: boolean })` implemented ✓
+- `compile(circuit)` without opts calls `initialize()` immediately (backwards compatible) ✓
+- `setConvergenceLogEnabled(false)` throws when capture hook installed ✓
+
+**W2.T3 — Engine (src/solver/analog/analog-engine.ts)**
+- Both `step()` and `dcOperatingPoint()` have `convergenceLog.enabled` gate ✓
+- Gate wraps `iterationDetails` attachment, uses optional chaining for drainForLog() ✓
+- Gate compiles despite Wave 3's drain method not yet existing ✓
+
+**W2.T4 — Smoke test (src/headless/__tests__/compile-defer-initialize.test.ts)**
+- Test suite: 4/4 passing ✓
+- Sub-test 1: `compile(c, { deferInitialize: true })` → `dcOperatingPoint() === null` ✓
+- Sub-test 2: after `coord.initialize()` → `dcOperatingPoint() !== null` ✓
+- Sub-test 3: `initialize()` idempotent → second call returns same object ✓
+- Sub-test 4: `compile(c)` without opts → DCOP runs immediately ✓
+
+### Test Suite Status
+
+**Vitest Summary**
+- Total: 8221 passed, **12 failed**, 0 skipped
+- Expected failures (per baseline + Wave 2 exit gate): exactly 12
+
+**Failure Breakdown**
+- Pre-existing (10): BJT convergence (4) + harness self-compare (2) + stream verification (2) + MCP harness (2)
+- Wave 2 intended (2): boot-step-merge.ts "at least 2 attempts" + "contains DCOP-phase"
+
+Per `spec/wave-2-coordinator.md` exit gate: "Do not attempt to make comparison-session tests pass at this wave. Wave 3 owns that." The two boot-step-merge regressions are now documented in `spec/test-baseline.md` as expected failures after Wave 2.
+
+**No new regressions detected.** All 12 failures are either pre-existing or explicitly permitted by the wave spec.
+
+### TypeScript Compilation
+
+The four Wave 2 production files compile cleanly:
+- `src/solver/coordinator.ts` — no errors
+- `src/headless/default-facade.ts` — no errors
+- `src/solver/analog/analog-engine.ts` — no errors
+- `src/headless/__tests__/compile-defer-initialize.test.ts` — no errors
+
+The TypeScript errors in the full codebase (`npx tsc --noEmit`) are all in:
+- Harness consumer files (comparison-session.ts, harness-integration.test.ts) — expected, Wave 3 fixes these
+- Other pre-existing errors (harness-mcp-verification.test.ts, query-methods.test.ts) — pre-existing
+
+**Conclusion**: Wave 2 implementation is complete and correct. No code changes needed. All acceptance criteria from the spec are met, and all expected test state is accounted for in the updated baseline.

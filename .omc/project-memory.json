@@ -267,8 +267,8 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-      "accessCount": 291,
-      "lastAccessed": 1775778919425,
+      "accessCount": 294,
+      "lastAccessed": 1775782715950,
       "type": "file"
     },
     {
@@ -285,8 +285,8 @@
     },
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 93,
-      "lastAccessed": 1775781985186,
+      "accessCount": 98,
+      "lastAccessed": 1775783494054,
       "type": "directory"
     },
     {
@@ -320,16 +320,16 @@
       "type": "directory"
     },
     {
+      "path": "src\\solver\\coordinator.ts",
+      "accessCount": 36,
+      "lastAccessed": 1775783493150,
+      "type": "directory"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\harness\\query-methods.test.ts",
       "accessCount": 35,
       "lastAccessed": 1775777799905,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\coordinator.ts",
-      "accessCount": 31,
-      "lastAccessed": 1775782130339,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
@@ -374,15 +374,21 @@
       "type": "file"
     },
     {
-      "path": "docs\\specs\\harness-stream3-interface-methods.md",
-      "accessCount": 17,
-      "lastAccessed": 1775702313912,
+      "path": "spec\\progress.md",
+      "accessCount": 18,
+      "lastAccessed": 1775783476002,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 16,
-      "lastAccessed": 1775781718370,
+      "accessCount": 18,
+      "lastAccessed": 1775783480367,
+      "type": "file"
+    },
+    {
+      "path": "docs\\specs\\harness-stream3-interface-methods.md",
+      "accessCount": 17,
+      "lastAccessed": 1775702313912,
       "type": "file"
     },
     {
@@ -413,12 +419,6 @@
       "path": "src\\solver\\analog\\__tests__\\harness\\stream1-gate.test.ts",
       "accessCount": 12,
       "lastAccessed": 1775706635183,
-      "type": "file"
-    },
-    {
-      "path": "spec\\progress.md",
-      "accessCount": 12,
-      "lastAccessed": 1775782410036,
       "type": "file"
     },
     {

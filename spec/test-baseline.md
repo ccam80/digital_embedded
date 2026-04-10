@@ -33,6 +33,16 @@
 | scripts/mcp/__tests__/harness-mcp-verification.test.ts: "MCP-4: integration coefficients" | FAIL | Same family as stream-verif 4/5 |
 | scripts/mcp/__tests__/harness-mcp-verification.test.ts: "MCP-5: convergence detail per-element" | FAIL | Already fixed in Round 3 carry-over; verify after Wave 3 |
 
+### Vitest — Expected to break at Wave 2 exit (Wave 3 fixes them)
+
+These tests were passing at the original baseline but are EXPECTED to break the moment Wave 2 lands, because Wave 2 changes `setCaptureHook` to accept a `PhaseAwareCaptureHook` bundle while `comparison-session.ts` still passes the old single-hook shape (Wave 3 rewrites `comparison-session.ts` per §9.3 and §8.5). Per `spec/wave-2-coordinator.md` exit gate: "Do not attempt to make comparison-session tests pass at this wave."
+
+| Test | Wave 2 status | Wave 3 status |
+|------|---------------|---------------|
+| src/solver/analog/__tests__/harness/boot-step-merge.test.ts: "step 0 has at least 2 attempts (DCOP attempt + tranInit attempt)" | EXPECTED FAIL after Wave 2 | Wave 3 fixes |
+| src/solver/analog/__tests__/harness/boot-step-merge.test.ts: "step 0 contains a DCOP-phase attempt" | EXPECTED FAIL after Wave 2 | Wave 3 fixes |
+| (any other test that depends on `comparison-session.ts._dcopBootAttempts` or the old `setCaptureHook` shape) | EXPECTED FAIL after Wave 2 | Wave 3 fixes |
+
 ### Playwright — GUI status (out of scope for harness redesign)
 | Test | Status | Summary |
 |------|--------|---------|

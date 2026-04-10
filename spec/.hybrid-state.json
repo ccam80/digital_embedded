@@ -37,15 +37,15 @@
           "W2.T4"
         ]
       ],
-      "spawned": 1,
-      "completed": 1,
-      "verifications_passed": 0,
-      "verifications_failed": 0,
+      "spawned": 2,
+      "completed": 2,
+      "verifications_passed": 1,
+      "verifications_failed": 1,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "W2": "pending"
+        "W2": "passed"
       }
     },
     {
@@ -110,5 +110,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-10T00:54:06.937Z"
+  "last_updated": "2026-04-10T01:12:26.824Z"
 }
