@@ -71,11 +71,11 @@ export const INDUCTOR_MAPPING: DeviceMapping = {
     IEQ: null,
     I: null,      // branch current — read from solution vector
     PHI: 0,       // flux
-    CCAP: 1,      // ccap
+    CCAP: null,   // our-side slot, no ngspice equivalent
   },
   ngspiceToSlot: {
     0: "PHI",
-    1: "CCAP",
+    1: "NG_VOLT",  // inductor terminal voltage (diagnostic, ngspice-side only)
   },
 };
 
@@ -383,8 +383,8 @@ export const MOSFET_MAPPING: DeviceMapping = {
     },
     VBD: {
       sourceOffsets: [0],
-      doc: "Drain-bulk voltage = -MOS1vbd (sign-flipped convention)",
-      compute: (s, b) => -s[b + 0],
+      doc: "Bulk-drain voltage = MOS1vbd (same convention as our VBD slot)",
+      compute: (s, b) => s[b + 0],
     },
   },
 };

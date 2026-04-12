@@ -162,12 +162,17 @@ export function buildDirectNodeMapping(
     const elLabel = elementLabels.get(ei);
     if (!elLabel) continue;
 
-    // ngspice names branch currents as "v<label>#branch" (lowercase)
-    const ngBranchName = `v${elLabel.toLowerCase()}#branch`;
+    const ngBranchName = `${elLabel.toLowerCase()}#branch`;
     const ngspiceIndex = ngTopology.nodeNames.get(ngBranchName);
     if (ngspiceIndex === undefined) continue;
 
-    const ourIndex = ourTopology.nodeCount + el.branchIndex;
+    // el.branchIndex is already an absolute matrix row index (set by the
+    // compiler at compiler.ts:1145-1146 as `totalNodeCount + meta.branchIdx`).
+    // Consumers like inductor.ts and transmission-line.ts index directly into
+    // the full solution vector with voltages[branchIndex], which only works
+    // if branchIndex is absolute. Do NOT add nodeCount here — that would
+    // double-count and produce out-of-range ourIndex values.
+    const ourIndex = el.branchIndex;
     const label = ourTopology.nodeLabels.get(-(el.branchIndex + 1))
       ?? `${elLabel}:branch`;
     mappings.push({

@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd \\\"C:/local_working_projects/digital_in_browser\\\" && npm run test:q 2>&1\",\"timeout\":300000,\"description\":\"Run full Vitest suite quiet mode for regression check\"}",
-  "error": "Exit code 1\n\n> digits-sim@0.1.0 test:q\n> node scripts/run-all-tests.mjs -q\n\nStarting dynamic gmin steppingOne successful gmin stepOne successful gmin stepOne successful gmin stepOne successful gmin stepOne successful gmin stepOne successful gmin stepOne successful gmin stepOne successful gmin stepOne successful gmin stepOne successful gmin stepOne successful gmin stepDynamic gmin stepping completedStarting dynamic gmin steppingOne successful gmin stepOne successful gmin stepOne successful gmin s...",
-  "timestamp": "2026-04-10T02:30:23.555Z",
-  "retry_count": 1
-}

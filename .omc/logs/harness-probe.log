@@ -1,0 +1,35 @@
+=== _buildNodeMapping diagnostic dump ===
+ourTopology: matrixSize=7 nodeCount=5
+ngTopology.nodeNames (8 entries):
+  "0" => 0
+  "1" => 1
+  "2" => 2
+  "3" => 3
+  "4" => 4
+  "5" => 5
+  "vin#branch" => 6
+  "v1#branch" => 7
+_nodeMap (7 entries):
+  ourIndex=0 ngspiceIndex=1 label="V1:pos/Rc:A" ngspiceName="1"
+  ourIndex=1 ngspiceIndex=2 label="Rb:A/Vin:pos" ngspiceName="2"
+  ourIndex=2 ngspiceIndex=3 label="Rb:B/Q1:B" ngspiceName="3"
+  ourIndex=3 ngspiceIndex=4 label="Rc:B/Q1:C" ngspiceName="4"
+  ourIndex=4 ngspiceIndex=5 label="Re:A/Q1:E" ngspiceName="5"
+  ourIndex=10 ngspiceIndex=7 label="V1:branch" ngspiceName="v1#branch"
+  ourIndex=11 ngspiceIndex=6 label="Vin:branch" ngspiceName="vin#branch"
+ngspice step-0 iter-0 matrix (first 15 of 19):
+  row=1 col=0 value=1
+  row=4 col=0 value=0.0002127659574468085
+  row=7 col=0 value=-0.0002127659574468085
+  row=2 col=1 value=1
+  row=3 col=1 value=0.000021276595744680852
+  row=6 col=1 value=-0.000021276595744680852
+  row=3 col=2 value=1
+  row=4 col=3 value=1
+  row=5 col=4 value=32.37504641620727
+  row=6 col=4 value=-0.0002959206604332923
+  row=7 col=4 value=-0.029592065943329228
+  row=3 col=5 value=-0.000021276595744680852
+  row=5 col=5 value=-0.9676249535837926
+  row=6 col=5 value=32407.513477189426
+  row=7 col=5 value=0.0009580445074667543

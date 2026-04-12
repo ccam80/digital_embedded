@@ -98,32 +98,33 @@ export function computeWaveformValue(
       if (riseTime === 0 && fallTime === 0) {
         return dcOffset + amplitude * Math.sign(Math.sin(arg));
       }
-      // Trapezoidal square wave (ngspice PULSE style).
-      // Map t into position within current period [0, period).
+      // Trapezoidal square wave — ngspice PULSE semantics (vsrcload.c).
+      // V1 = dcOffset - amplitude (LOW), V2 = dcOffset + amplitude (HIGH)
+      // Rising edge: [0, TR]; HIGH plateau: [TR, TR+PW]; falling edge: [TR+PW, TR+PW+TF]; LOW: rest.
       const period = frequency > 0 ? 1 / frequency : Infinity;
       const halfPeriod = period / 2;
-      // Phase offset in time: positive phase shifts waveform left (earlier)
+      // Positive phase shifts waveform left (earlier) in time.
       const phaseShift = phase / (2 * Math.PI * frequency);
       const tShifted = t - phaseShift;
-      // Position within the full period, always in [0, period)
+      // Position within the full period, always in [0, period).
       const tMod = ((tShifted % period) + period) % period;
-      if (tMod < halfPeriod) {
-        // Rising half: rise from -amplitude to +amplitude over riseTime,
-        // then hold at +amplitude
-        if (tMod < riseTime) {
-          // Linear ramp: 0..riseTime → -amplitude..+amplitude
-          return dcOffset + amplitude * (-1 + 2 * tMod / riseTime);
-        }
-        return dcOffset + amplitude;
+
+      const TR = riseTime;
+      const TF = fallTime;
+      // HIGH plateau width: period/2 - TR. Clamp to 0 if rise time exceeds half period.
+      const PW = Math.max(0, halfPeriod - TR);
+      const V1 = dcOffset - amplitude;
+      const V2 = dcOffset + amplitude;
+
+      if (tMod <= 0 || tMod >= TR + PW + TF) {
+        return V1;
+      } else if (tMod >= TR && tMod <= TR + PW) {
+        return V2;
+      } else if (tMod > 0 && tMod < TR) {
+        return V1 + (V2 - V1) * tMod / TR;
       } else {
-        // Falling half: fall from +amplitude to -amplitude over fallTime,
-        // then hold at -amplitude
-        const tInHalf = tMod - halfPeriod;
-        if (tInHalf < fallTime) {
-          // Linear ramp: 0..fallTime → +amplitude..-amplitude
-          return dcOffset + amplitude * (1 - 2 * tInHalf / fallTime);
-        }
-        return dcOffset - amplitude;
+        // tMod in (TR+PW, TR+PW+TF)
+        return V2 + (V1 - V2) * (tMod - TR - PW) / TF;
       }
     }
 
@@ -170,37 +171,57 @@ export function computeWaveformValue(
 }
 
 /**
- * Return the times of square-wave transitions within [tStart, tEnd].
+ * Return the times of square-wave edge breakpoints within (tStart, tEnd).
  *
- * A 1kHz square wave has transitions at 0, 0.5ms, 1ms, 1.5ms, ...
- * (half-period edges). Only times strictly inside (tStart, tEnd] are returned.
+ * Under ngspice PULSE semantics, within each period starting at t0 = n*period - phaseShift,
+ * the four breakpoints are:
+ *   t0 + 0      (start of rising edge — only useful when > tStart)
+ *   t0 + TR     (end of rising edge)
+ *   t0 + halfPeriod          (start of falling edge)
+ *   t0 + halfPeriod + TF     (end of falling edge)
+ *
+ * Only times strictly inside (tStart, tEnd) are returned.
  *
  * @param frequency - Frequency in Hz
  * @param phase     - Phase offset in radians
  * @param tStart    - Interval start (exclusive) in seconds
- * @param tEnd      - Interval end (inclusive) in seconds
+ * @param tEnd      - Interval end (exclusive) in seconds
  */
 export function squareWaveBreakpoints(
   frequency: number,
   phase: number,
   tStart: number,
   tEnd: number,
+  riseTime = 0,
+  fallTime = 0,
 ): number[] {
   if (frequency <= 0) return [];
-  const halfPeriod = 1 / (2 * frequency);
+  const period = 1 / frequency;
+  const halfPeriod = period / 2;
   const phaseShift = phase / (2 * Math.PI * frequency);
+
+  // Offsets within a period for the four breakpoints.
+  const offsets = [0, riseTime, halfPeriod, halfPeriod + fallTime];
 
   const breakpoints: number[] = [];
 
-  // Transitions occur at t = n*halfPeriod - phaseShift for all integers n.
-  // Find first n such that n*halfPeriod - phaseShift > tStart.
-  // Include transitions strictly inside (tStart, tEnd) — both endpoints excluded.
-  const nMin = Math.ceil((tStart + phaseShift) / halfPeriod);
+  // Period n starts at: n * period - phaseShift.
+  // Find the first period n whose last breakpoint (halfPeriod + fallTime) could exceed tStart.
+  const nMin = Math.floor((tStart + phaseShift - halfPeriod - fallTime) / period);
+
+  let lastPushed = -Infinity;
   for (let n = nMin; ; n++) {
-    const t = n * halfPeriod - phaseShift;
-    if (t >= tEnd) break;
-    if (t > tStart) {
-      breakpoints.push(t);
+    const tPeriodStart = n * period - phaseShift;
+    // Earliest candidate for this period: tPeriodStart + 0.
+    // If the earliest candidate is already past tEnd we can stop.
+    if (tPeriodStart > tEnd) break;
+
+    for (const offset of offsets) {
+      const t = tPeriodStart + offset;
+      if (t > tStart && t < tEnd && t !== lastPushed) {
+        breakpoints.push(t);
+        lastPushed = t;
+      }
     }
   }
 
@@ -571,24 +592,20 @@ function createAcVoltageSourceElement(
         const halfPeriod = period / 2;
         const phaseShift = phase / (2 * Math.PI * frequency);
 
-        // Collect all candidate breakpoints: for each half-period edge n,
-        // the candidates are: t_edge, t_edge + riseTime, t_edge + fallTime.
-        // Find the smallest candidate strictly greater than afterTime.
-        //
-        // Half-period edge n occurs at: n * halfPeriod + phaseShift
-        // Find the first edge index whose candidates could be > afterTime.
-        const nMin = Math.floor((afterTime - phaseShift) / halfPeriod);
+        // Under ngspice PULSE semantics, the breakpoints within period n
+        // (starting at n*period - phaseShift) are at offsets:
+        //   0, riseTime, halfPeriod, halfPeriod + fallTime
+        const offsets = [0, riseTime, halfPeriod, halfPeriod + fallTime];
+
+        // Start searching from the period that could contain afterTime.
+        const nMin = Math.floor((afterTime + phaseShift) / period) - 1;
 
         let best: number | null = null;
 
         for (let n = nMin; n <= nMin + 2; n++) {
-          const tEdge = n * halfPeriod + phaseShift;
-          // On odd half-periods (n odd) the edge starts the falling half,
-          // so the transition time is fallTime; on even it is riseTime.
-          const transitionTime = (n % 2 === 0) ? riseTime : fallTime;
-
-          const candidates = [tEdge, tEdge + transitionTime];
-          for (const c of candidates) {
+          const tPeriodStart = n * period - phaseShift;
+          for (const offset of offsets) {
+            const c = tPeriodStart + offset;
             if (c > afterTime + 1e-18) {
               if (best === null || c < best) {
                 best = c;

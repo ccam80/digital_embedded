@@ -33,6 +33,8 @@ import type { LimitingEvent } from "./newton-raphson.js";
 // Phase and outcome types re-exported from harness types for use in production code.
 // Defined inline here (string literals) to avoid a production→test dependency.
 export type DcOpNRPhase =
+  | "dcopInitJct"
+  | "dcopInitFloat"
   | "dcopDirect"
   | "dcopGminDynamic"
   | "dcopGminSpice3"
@@ -42,6 +44,7 @@ export type DcOpNRAttemptOutcome =
   | "accepted"
   | "nrFailedRetry"
   | "dcopSubSolveConverged"
+  | "dcopPhaseHandoff"
   | "finalFailure";
 
 // ---------------------------------------------------------------------------
@@ -210,13 +213,70 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   };
 
   // -------------------------------------------------------------------------
-  // Level 0 — Direct NR (cktop.c:56-79)
+  // Phase: dcopInitJct — per-device junction priming (no NR iterations)
+  //
+  // Matches ngspice MODEINITJCT (bjtload.c:265-274). Each nonlinear element
+  // stores tVcrit-derived junction voltages in its OWN internal state; NR's
+  // shared voltage vector is NOT touched. The primed values are consumed by
+  // the first updateOperatingPoint call on iteration 0, then cleared so
+  // iteration 1 onward reads from voltages as normal.
+  //
+  // This per-device local override correctly handles grounded-terminal and
+  // shared-node topologies (e.g. PNP CC with grounded collector) that the
+  // old "write into shared MNA vector" scheme could not.
   // -------------------------------------------------------------------------
-  onPhaseBegin?.("dcopDirect");
+  {
+    if (onPhaseBegin) {
+      onPhaseBegin("dcopInitJct");
+    }
+
+    for (const el of elements) {
+      if (el.isNonlinear && el.primeJunctions) {
+        el.primeJunctions();
+      }
+    }
+
+    // Phase emits a handoff marker (no iterations ran).
+    onPhaseEnd?.("dcopPhaseHandoff", false);
+  }
+
+  // -------------------------------------------------------------------------
+  // Level 0 — Direct NR (cktop.c:56-79)
+  //
+  // Split into two phases for the harness:
+  //   dcopInitFloat — iteration 0 (cold linearization from initial voltages)
+  //   dcopDirect    — iterations 1..N (refinement from iter 0's solution)
+  //
+  // Mirrors ngspice CKTop's firstmode/continuemode pattern so the side-by-side
+  // comparison can pair our cold-start work against ngspice's MODEINITJCT
+  // pass. When NR converges in one iteration, no split happens — the attempt
+  // remains a single "dcopInitFloat" entry.
+  // -------------------------------------------------------------------------
+  // When no phase hook is installed the split machinery is fully skipped:
+  // no closure allocation, no onIteration0Complete wiring, no extra calls.
+  // Keeps the non-harness hot path strictly zero-cost.
+  if (onPhaseBegin) {
+    onPhaseBegin("dcopInitFloat");
+  }
   const directResult = newtonRaphson({
     ...nrBase,
     maxIterations: params.maxIterations,
     elements,
+    // Only wire the split callback when there's somewhere for it to fire to.
+    // Leaving `onIteration0Complete` absent entirely avoids the closure
+    // allocation on every analysis run.
+    ...(onPhaseBegin && onPhaseEnd
+      ? {
+          onIteration0Complete: () => {
+            // Iter 0 ran but didn't converge — end the dcopInitFloat sub-attempt
+            // and begin dcopDirect for iterations 1..N. Use "dcopSubSolveConverged"
+            // as the outcome for the init-float pass so the grouping treats it as
+            // a non-terminal phase that handed off successfully.
+            onPhaseEnd("dcopPhaseHandoff", false);
+            onPhaseBegin("dcopDirect");
+          },
+        }
+      : {}),
   });
   onPhaseEnd?.(directResult.converged ? "dcopSubSolveConverged" : "nrFailedRetry", directResult.converged);
 

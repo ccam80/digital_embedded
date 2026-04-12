@@ -46,6 +46,8 @@ import type {
   IntegrationCoefficients,
   NRPhase,
   NRAttemptOutcome,
+  NRAttempt,
+  StepSnapshot,
   ComponentInfo,
   NodeInfo,
   ComponentSlotsSnapshot,
@@ -63,9 +65,20 @@ import type {
   Side,
   StepShape,
   SessionShape,
+  AttemptShapeSummary,
   AttemptSummary,
   AttemptCounts,
   PhaseAwareCaptureHook,
+  SessionMap,
+  StepShapeRow,
+  AttemptShapeRow,
+  StepDetail,
+  StepQuery,
+  PairedAttempt,
+  PairedIteration,
+  IterationSideData,
+  AttemptDetail,
+  AttemptQuery,
 } from "./types.js";
 import { DEFAULT_TOLERANCE } from "./types.js";
 import { computeIntegrationCoefficients } from "../../integration.js";
@@ -107,6 +120,25 @@ function applyPagination<T>(arr: T[], opts?: PaginationOpts): T[] {
   const offset = opts?.offset ?? 0;
   const limit = opts?.limit ?? arr.length;
   return arr.slice(offset, offset + limit);
+}
+
+function prettyPrintNgspiceNodeName(name: string): string {
+  const lower = name.toLowerCase();
+  const suffixMap: Array<[string, string]> = [
+    ["#base", ":B'"],
+    ["#collector", ":C'"],
+    ["#emitter", ":E'"],
+    ["#source", ":S'"],
+    ["#drain", ":D'"],
+    ["#internal", ":int"],
+  ];
+  for (const [suffix, rep] of suffixMap) {
+    if (lower.endsWith(suffix)) {
+      const dev = name.slice(0, name.length - suffix.length).toUpperCase();
+      return `${dev}${rep}`;
+    }
+  }
+  return name;
 }
 
 function stripControlBlock(cir: string): string {
@@ -229,6 +261,33 @@ interface RhsLabeledResult {
 interface ToJSONOpts { includeAllSteps?: boolean }
 
 // ---------------------------------------------------------------------------
+// L2 norm helpers (file-scoped)
+// ---------------------------------------------------------------------------
+
+/** L2 norm of (a[start..end) - b[start..end)). NaN if either undefined. */
+function _l2Norm(a: Float64Array | undefined, b: Float64Array | undefined, start: number, end: number): number {
+  if (!a || !b) return NaN;
+  const n = Math.min(a.length, b.length, end);
+  if (n <= start) return NaN;
+  let s = 0;
+  for (let i = start; i < n; i++) {
+    const d = a[i] - b[i];
+    s += d * d;
+  }
+  return Math.sqrt(s);
+}
+
+/** L2 norm of v[start..end). NaN if undefined or empty range. */
+function _vectorL2(v: Float64Array | undefined, start: number, end: number): number {
+  if (!v) return NaN;
+  const n = Math.min(v.length, end);
+  if (n <= start) return NaN;
+  let s = 0;
+  for (let i = start; i < n; i++) s += v[i] * v[i];
+  return Math.sqrt(s);
+}
+
+// ---------------------------------------------------------------------------
 // ComparisonSession
 // ---------------------------------------------------------------------------
 
@@ -257,6 +316,13 @@ export class ComparisonSession {
 
   // Node mapping
   protected _nodeMap: NodeMapping[] = [];
+  protected _ngTopology: import("./types.js").NgspiceTopology | null = null;
+
+  // Matrix row/col mapping (for semantic joins of BJT internal nodes)
+  protected _ngMatrixRowMap: Map<number, number> = new Map();
+  protected _ngMatrixColMap: Map<number, number> = new Map();
+  protected _ngspiceOnlyRows: number[] = [];
+  protected _ngspiceOnlyRowLabels: Map<number, string> = new Map();
 
   // Comparison results (lazily cached)
   protected _comparisons: ComparisonResult[] | null = null;
@@ -563,12 +629,35 @@ export class ComparisonSession {
   /**
    * Step-end values from both engines at the accepted attempt's final iteration.
    * Reports stepStartTime/stepEndTime; presence reflects which sides are present.
+   *
+   * When timeAlign=true (default for transient), treats stepIndex as our-side index,
+   * computes t=ourStep.stepEndTime, and finds the nearest ngspice step by time.
+   * When timeAlign=false (default for DC op), uses positional indexing (index=index).
    */
-  getStepEnd(stepIndex: number): StepEndReport {
+  getStepEnd(stepIndex: number, opts?: { timeAlign?: boolean }): StepEndReport {
     this._ensureRun();
+    const timeAlign = opts?.timeAlign ?? (this._analysis === "tran");
     const ourStep = this._ourSession!.steps[stepIndex];
+
+    let ngStepIndex = stepIndex;
     const ngAligned = this._ngSessionAligned();
-    const ngStep = ngAligned?.steps[stepIndex];
+    let ngStep = ngAligned?.steps[stepIndex];
+
+    if (timeAlign && ourStep && ngAligned && ngAligned.steps.length > 0) {
+      const t = ourStep.stepEndTime;
+      const ngSteps = ngAligned.steps;
+      let bestIdx = 0;
+      let bestDelta = Math.abs(ngSteps[0].stepEndTime - t);
+      for (let i = 1; i < ngSteps.length; i++) {
+        const d = Math.abs(ngSteps[i].stepEndTime - t);
+        if (d < bestDelta) {
+          bestDelta = d;
+          bestIdx = i;
+        }
+      }
+      ngStepIndex = bestIdx;
+      ngStep = ngSteps[bestIdx];
+    }
 
     if (!ourStep && !ngStep) {
       throw new Error(`Step out of range: ${stepIndex}`);
@@ -593,10 +682,19 @@ export class ComparisonSession {
             ? ngFinal.voltages[nodeId - 1] : NaN;
           nodes[label] = makeComparedValue(NaN, ngV, this._tol.vAbsTol, this._tol.relTol);
         });
+
+        this._ourTopology.matrixRowLabels.forEach((label, row) => {
+          if (row < this._ourTopology.nodeCount) return;
+          const ourV = NaN;
+          const ngV = row < ngFinal.voltages.length ? ngFinal.voltages[row] : NaN;
+          branches[label] = makeComparedValue(ourV, ngV, this._tol.iAbsTol, this._tol.relTol);
+        });
       }
 
       return {
         stepIndex,
+        ourStepIndex: -1,
+        ngspiceStepIndex: ngStepIndex,
         presence,
         stepStartTime: simpleCompared(NaN, ngStep.stepStartTime),
         stepEndTime: simpleCompared(NaN, ngStep.stepEndTime),
@@ -640,6 +738,13 @@ export class ComparisonSession {
         nodes[label] = makeComparedValue(ourV, ngV, this._tol.vAbsTol, this._tol.relTol);
       });
 
+      this._ourTopology.matrixRowLabels.forEach((label, row) => {
+        if (row < this._ourTopology.nodeCount) return;
+        const ourV = ourFinal && row < ourFinal.voltages.length ? ourFinal.voltages[row] : NaN;
+        const ngV = ngFinal && row < ngFinal.voltages.length ? ngFinal.voltages[row] : NaN;
+        branches[label] = makeComparedValue(ourV, ngV, this._tol.iAbsTol, this._tol.relTol);
+      });
+
       for (const es of ourFinal.elementStates) {
         const ngEs = ngFinal?.elementStates.find(
           e => e.label.toUpperCase() === es.label.toUpperCase());
@@ -661,6 +766,8 @@ export class ComparisonSession {
 
     return {
       stepIndex,
+      ourStepIndex: stepIndex,
+      ngspiceStepIndex: ngStepIndex,
       presence,
       stepStartTime: simpleCompared(ourSST, ngSST),
       stepEndTime: simpleCompared(ourSET, ngSET),
@@ -715,6 +822,13 @@ export class ComparisonSession {
           const ngV = ngIter && nodeId > 0 && nodeId - 1 < ngIter.voltages.length
             ? ngIter.voltages[nodeId - 1] : NaN;
           nodes[label] = makeComparedValue(ourV, ngV, this._tol.vAbsTol, this._tol.relTol);
+        });
+
+        this._ourTopology.matrixRowLabels.forEach((label, row) => {
+          if (row < this._ourTopology.nodeCount) return;
+          const ourV = row < ourIter.voltages.length ? ourIter.voltages[row] : NaN;
+          const ngV = ngIter && row < ngIter.voltages.length ? ngIter.voltages[row] : NaN;
+          rhs[label] = makeComparedValue(ourV, ngV, this._tol.iAbsTol, this._tol.relTol);
         });
 
         if (ourIter.preSolveRhs.length > 0) {
@@ -1027,7 +1141,7 @@ export class ComparisonSession {
     const presence: SidePresence =
       ours && ng ? "both" : ours ? "oursOnly" : "ngspiceOnly";
 
-    const summarize = (s: typeof ours | undefined): AttemptSummary[] | null =>
+    const summarize = (s: typeof ours | undefined): AttemptShapeSummary[] | null =>
       s ? s.attempts.map(a => ({
         phase: a.phase,
         outcome: a.outcome,
@@ -1082,6 +1196,423 @@ export class ComparisonSession {
     const last = steps[steps.length - 1];
     if (t === last.stepEndTime) return steps.length - 1;
     return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Paired session-shape API (sessionMap / getStep / getAttempt)
+  // ---------------------------------------------------------------------------
+
+  sessionMap(): SessionMap {
+    this._ensureRun();
+    const shape = (session: CaptureSession | null): { stepCount: number; steps: StepShapeRow[] } => {
+      if (!session) return { stepCount: 0, steps: [] };
+      const steps: StepShapeRow[] = session.steps.map((step, i) => ({
+        index: i,
+        stepStartTime: step.stepStartTime,
+        stepEndTime: step.stepEndTime,
+        converged: step.converged,
+        iterationCount: step.iterationCount,
+        totalIterationCount: step.totalIterationCount ?? step.iterationCount,
+        analysisPhase: step.analysisPhase,
+        attempts: step.attempts.map((a, ai): AttemptShapeRow => ({
+          index: ai,
+          phase: a.phase,
+          outcome: a.outcome,
+          iterationCount: a.iterationCount,
+          ...(a.phaseParameter !== undefined ? { phaseParameter: a.phaseParameter } : {}),
+          accepted: ai === step.acceptedAttemptIndex,
+        })),
+      }));
+      return { stepCount: steps.length, steps };
+    };
+    return {
+      analysis: this._analysis ?? "dcop",
+      ours: shape(this._ourSession),
+      ngspice: shape(this._ngSessionAligned()),
+    };
+  }
+
+  getStep(query: StepQuery): StepDetail {
+    this._ensureRun();
+
+    let ourStepIndex: number;
+    let ngStepIndex: number;
+
+    const ngAligned = this._ngSessionAligned();
+
+    if ("index" in query) {
+      ourStepIndex = query.index;
+      ngStepIndex = query.index;
+      if (ngAligned && ngAligned.steps.length > 0) {
+        const ourStep = this._ourSession?.steps[query.index];
+        if (ourStep && this._analysis === "tran") {
+          const t = ourStep.stepEndTime;
+          const ngSteps = ngAligned.steps;
+          let bestIdx = 0;
+          let bestDelta = Math.abs(ngSteps[0].stepEndTime - t);
+          for (let i = 1; i < ngSteps.length; i++) {
+            const d = Math.abs(ngSteps[i].stepEndTime - t);
+            if (d < bestDelta) { bestDelta = d; bestIdx = i; }
+          }
+          ngStepIndex = bestIdx;
+        }
+      }
+    } else {
+      const side = query.side ?? "ours";
+      const steps = side === "ours"
+        ? this._ourSession?.steps ?? []
+        : ngAligned?.steps ?? [];
+      let bestIdx = 0;
+      let bestDelta = Infinity;
+      for (let i = 0; i < steps.length; i++) {
+        const d = Math.abs(steps[i].stepEndTime - query.time);
+        if (d < bestDelta) { bestDelta = d; bestIdx = i; }
+      }
+      if (side === "ours") {
+        ourStepIndex = bestIdx;
+        ngStepIndex = bestIdx;
+        if (ngAligned && ngAligned.steps.length > 0) {
+          const ourStep = this._ourSession?.steps[bestIdx];
+          if (ourStep) {
+            const t = ourStep.stepEndTime;
+            const ngSteps = ngAligned.steps;
+            let ni = 0; let nd = Infinity;
+            for (let i = 0; i < ngSteps.length; i++) {
+              const d = Math.abs(ngSteps[i].stepEndTime - t);
+              if (d < nd) { nd = d; ni = i; }
+            }
+            ngStepIndex = ni;
+          }
+        }
+      } else {
+        ngStepIndex = bestIdx;
+        ourStepIndex = bestIdx;
+      }
+    }
+
+    const ourStep = this._ourSession?.steps[ourStepIndex] ?? null;
+    const ngStep = ngAligned?.steps[ngStepIndex] ?? null;
+
+    if (!ourStep && !ngStep) {
+      throw new Error(`getStep: step index out of range`);
+    }
+
+    const matrixSize = this._ourTopology.matrixSize;
+    const nodeCount = this._ourTopology.nodeCount;
+
+    const ourAttempts: AttemptSummary[] = ourStep
+      ? ourStep.attempts.map((_, ai) => this._summariseAttempt(ourStep, ai, matrixSize, nodeCount))
+      : [];
+    const ngAttempts: AttemptSummary[] = ngStep
+      ? ngStep.attempts.map((_, ai) => this._summariseAttempt(ngStep, ai, matrixSize, nodeCount))
+      : [];
+
+    const pairing = this._pairAttemptsByPhase(
+      ourStep?.attempts ?? [],
+      ngStep?.attempts ?? [],
+      nodeCount,
+    );
+
+    const ourSST = ourStep?.stepStartTime ?? NaN;
+    const ourSET = ourStep?.stepEndTime ?? NaN;
+    const ngSST = ngStep?.stepStartTime ?? NaN;
+    const ngSET = ngStep?.stepEndTime ?? NaN;
+
+    return {
+      stepIndex: "index" in query ? query.index : ourStepIndex,
+      ourStepIndex,
+      ngspiceStepIndex: ngStepIndex,
+      stepStartTime: simpleCompared(ourSST, ngSST),
+      stepEndTime: simpleCompared(ourSET, ngSET),
+      dt: simpleCompared(ourStep?.dt ?? NaN, ngStep?.dt ?? NaN),
+      ours: ourAttempts,
+      ngspice: ngAttempts,
+      pairing,
+    };
+  }
+
+  getAttempt(query: AttemptQuery): AttemptDetail {
+    this._ensureRun();
+
+    const ngAligned = this._ngSessionAligned();
+    const ourStep = this._ourSession?.steps[query.stepIndex] ?? null;
+    const ngStep = ngAligned?.steps[query.stepIndex] ?? null;
+
+    const matrixSize = this._ourTopology.matrixSize;
+    const nodeCount = this._ourTopology.nodeCount;
+
+    // Filter attempts by phase on each side, then pick by phaseAttemptIndex
+    const ourPhaseAtts = (ourStep?.attempts ?? []).filter(a => a.phase === query.phase);
+    const ngPhaseAtts  = (ngStep?.attempts ?? []).filter(a => a.phase === query.phase);
+
+    const ourAtt = ourPhaseAtts[query.phaseAttemptIndex] ?? null;
+    const ngAtt  = ngPhaseAtts[query.phaseAttemptIndex] ?? null;
+
+    // Find absolute indices in the step.attempts array
+    const ourAbsIdx = ourAtt ? (ourStep?.attempts ?? []).indexOf(ourAtt) : -1;
+    const ngAbsIdx  = ngAtt  ? (ngStep?.attempts ?? []).indexOf(ngAtt) : -1;
+
+    const ourAttSummary = ourAtt && ourStep
+      ? this._summariseAttempt(ourStep, ourAbsIdx, matrixSize, nodeCount)
+      : null;
+    const ngAttSummary = ngAtt && ngStep
+      ? this._summariseAttempt(ngStep, ngAbsIdx, matrixSize, nodeCount)
+      : null;
+
+    const ourIters = ourAtt?.iterations ?? [];
+    const ngIters  = ngAtt?.iterations ?? [];
+
+    const totalIters = Math.max(ourIters.length, ngIters.length);
+    let iterRange: [number, number] = [0, totalIters - 1];
+    if (query.iterationRange) {
+      iterRange = [query.iterationRange[0], Math.min(query.iterationRange[1], totalIters - 1)];
+    }
+
+    const allPaired: PairedIteration[] = [];
+    for (let ii = iterRange[0]; ii <= iterRange[1]; ii++) {
+      const ourIter = ourIters[ii] ?? null;
+      const ngIter  = ngIters[ii] ?? null;
+
+      const ourData: IterationSideData | null = ourIter ? {
+        rawIteration: ourIter.iteration,
+        globalConverged: ourIter.globalConverged,
+        noncon: ourIter.noncon,
+        nodeVoltages: this._buildNodeVoltages(ourIter.voltages),
+        branchValues: this._buildBranchValues(ourIter.voltages, nodeCount),
+        elementStates: Object.fromEntries(
+          ourIter.elementStates.map(es => [es.label, es.slots]),
+        ),
+        limitingEvents: ourIter.limitingEvents,
+      } : null;
+
+      const ngData: IterationSideData | null = ngIter ? {
+        rawIteration: ngIter.iteration,
+        globalConverged: ngIter.globalConverged,
+        noncon: ngIter.noncon,
+        nodeVoltages: this._buildNodeVoltages(ngIter.voltages),
+        branchValues: this._buildBranchValues(ngIter.voltages, nodeCount),
+        elementStates: Object.fromEntries(
+          ngIter.elementStates.map(es => [es.label, es.slots]),
+        ),
+        limitingEvents: ngIter.limitingEvents,
+      } : null;
+
+      const divergenceNorm = _l2Norm(
+        ourIter?.voltages, ngIter?.voltages, 0, nodeCount,
+      );
+
+      allPaired.push({ iterationIndex: ii - iterRange[0], ours: ourData, ngspice: ngData, divergenceNorm });
+    }
+
+    // Apply offset/limit pagination
+    const offset = query.offset ?? 0;
+    const limit  = query.limit ?? allPaired.length;
+    const iterations = allPaired.slice(offset, offset + limit);
+
+    return {
+      stepIndex: query.stepIndex,
+      phase: query.phase,
+      phaseAttemptIndex: query.phaseAttemptIndex,
+      ourAttempt: ourAttSummary,
+      ngspiceAttempt: ngAttSummary,
+      iterations,
+    };
+  }
+
+  private _buildNodeVoltages(voltages: Float64Array): Record<string, number> {
+    const result: Record<string, number> = {};
+    this._ourTopology.nodeLabels.forEach((label, nodeId) => {
+      if (nodeId > 0 && nodeId - 1 < voltages.length) {
+        result[label] = voltages[nodeId - 1];
+      }
+    });
+    return result;
+  }
+
+  private _buildBranchValues(voltages: Float64Array, nodeCount: number): Record<string, number> {
+    const result: Record<string, number> = {};
+    this._ourTopology.matrixRowLabels.forEach((label, row) => {
+      if (row >= nodeCount && row < voltages.length) {
+        result[label] = voltages[row];
+      }
+    });
+    return result;
+  }
+
+  private _summariseAttempt(
+    step: StepSnapshot,
+    attemptIndex: number,
+    matrixSize: number,
+    nodeCount: number,
+  ): AttemptSummary {
+    const att = step.attempts[attemptIndex];
+    const lastIter = att.iterations[att.iterations.length - 1];
+    return {
+      index: attemptIndex,
+      phase: att.phase,
+      ...(att.role !== undefined ? { role: att.role } : {}),
+      outcome: att.outcome,
+      iterationCount: att.iterationCount,
+      ...(att.phaseParameter !== undefined ? { phaseParameter: att.phaseParameter } : {}),
+      accepted: attemptIndex === step.acceptedAttemptIndex,
+      endNodeNorm: _vectorL2(lastIter?.voltages, 0, nodeCount),
+      endBranchNorm: _vectorL2(lastIter?.voltages, nodeCount, matrixSize),
+    };
+  }
+
+  private _pairAttemptsByPhase(
+    ourAtts: NRAttempt[],
+    ngAtts: NRAttempt[],
+    nodeCount: number,
+  ): PairedAttempt[] {
+    // Pair attempts by (phase, role) composite key, then emit rows in
+    // chronological order by interleaving both sequences by their absolute index.
+    type Entry = { a: NRAttempt; i: number; key: string };
+    // Use role as the sole pairing key when present — this allows cross-phase pairing
+    // (e.g. our tranInit::tranSolve matches ngspice's tranNR::tranSolve). Fall back to
+    // phase-only for untagged attempts to preserve existing DC OP pairing behaviour.
+    const makeKey = (a: NRAttempt): string =>
+      a.role !== undefined
+        ? `role::${a.role}`
+        : `phase::${a.phase}`;
+
+    const ourEntries: Entry[] = ourAtts.map((a, i) => ({ a, i, key: makeKey(a) }));
+    const ngEntries:  Entry[] = ngAtts.map((a, i)  => ({ a, i, key: makeKey(a) }));
+
+    // Build a map from key → list of ngspice entries (in order) for O(1) lookup
+    const ngByKey = new Map<string, Entry[]>();
+    for (const e of ngEntries) {
+      let list = ngByKey.get(e.key);
+      if (!list) { list = []; ngByKey.set(e.key, list); }
+      list.push(e);
+    }
+
+    // Walk both sequences chronologically: at each step take the side with
+    // the lower absolute index. When the ours-side entry pairs with the
+    // next unconsumed ng entry of the same key, emit paired and advance both.
+    // Otherwise emit a side-only row and advance only that side.
+    const ngConsumed = new Set<number>(); // ngspice absolute indices already paired
+    const ourConsumed = new Set<number>();
+
+    // We'll build rows by iterating over a merged sequence of (side, entry).
+    // Merge: pick whichever unconsumed head has the lower index; if tied, ours first.
+    const result: PairedAttempt[] = [];
+    let oi = 0; // pointer into ourEntries
+    let ni = 0; // pointer into ngEntries
+
+    while (oi < ourEntries.length || ni < ngEntries.length) {
+      // Skip already-consumed entries
+      while (oi < ourEntries.length && ourConsumed.has(oi)) oi++;
+      while (ni < ngEntries.length && ngConsumed.has(ni)) ni++;
+
+      const ourHead = oi < ourEntries.length ? ourEntries[oi]! : null;
+      const ngHead  = ni < ngEntries.length  ? ngEntries[ni]!  : null;
+
+      // Determine which side to process next
+      const takeOurs = ourHead !== null && (ngHead === null || ourHead.i <= ngHead.i);
+
+      if (takeOurs && ourHead) {
+        // Try to find a matching ng entry by key
+        const keyList = ngByKey.get(ourHead.key);
+        const matchNg = keyList?.find(e => !ngConsumed.has(e.i)) ?? null;
+
+        if (matchNg) {
+          // Before emitting the paired row, flush any unconsumed ng entries whose
+          // absolute index is less than the match — preserves chronological order.
+          while (ni < matchNg.i) {
+            if (!ngConsumed.has(ni)) {
+              const skipped = ngEntries[ni]!;
+              result.push({
+                phase: skipped.a.phase,
+                ...(skipped.a.role !== undefined ? { role: skipped.a.role } : {}),
+                ourIndex: null,
+                ngspiceIndex: skipped.i,
+                divergenceNorm: NaN,
+              });
+              ngConsumed.add(ni);
+            }
+            ni++;
+          }
+          // Paired row
+          const ourLast = ourHead.a.iterations[ourHead.a.iterations.length - 1];
+          const ngLast  = matchNg.a.iterations[matchNg.a.iterations.length - 1];
+          const divergenceNorm = _l2Norm(ourLast?.voltages, ngLast?.voltages, 0, nodeCount);
+          result.push({
+            phase: ourHead.a.phase,
+            ...(ourHead.a.role !== undefined ? { role: ourHead.a.role } : {}),
+            ourIndex: ourHead.i,
+            ngspiceIndex: matchNg.i,
+            divergenceNorm,
+          });
+          ourConsumed.add(oi);
+          ngConsumed.add(matchNg.i);
+          oi++;
+          if (ni === matchNg.i) ni++;
+        } else {
+          // Ours-only row
+          result.push({
+            phase: ourHead.a.phase,
+            ...(ourHead.a.role !== undefined ? { role: ourHead.a.role } : {}),
+            ourIndex: ourHead.i,
+            ngspiceIndex: null,
+            divergenceNorm: NaN,
+          });
+          ourConsumed.add(oi);
+          oi++;
+        }
+      } else if (ngHead) {
+        // Try to find a matching ours entry by key
+        const ourKeyList = ourEntries.filter(e => e.key === ngHead.key && !ourConsumed.has(e.i));
+        const matchOurs = ourKeyList[0] ?? null;
+
+        if (matchOurs) {
+          // Before emitting the paired row, flush any unconsumed ours entries whose
+          // absolute index is less than the match — preserves chronological order.
+          while (oi < matchOurs.i) {
+            if (!ourConsumed.has(oi)) {
+              const skipped = ourEntries[oi]!;
+              result.push({
+                phase: skipped.a.phase,
+                ...(skipped.a.role !== undefined ? { role: skipped.a.role } : {}),
+                ourIndex: skipped.i,
+                ngspiceIndex: null,
+                divergenceNorm: NaN,
+              });
+              ourConsumed.add(oi);
+            }
+            oi++;
+          }
+          // Paired row
+          const ourLast = matchOurs.a.iterations[matchOurs.a.iterations.length - 1];
+          const ngLast  = ngHead.a.iterations[ngHead.a.iterations.length - 1];
+          const divergenceNorm = _l2Norm(ourLast?.voltages, ngLast?.voltages, 0, nodeCount);
+          result.push({
+            phase: ngHead.a.phase,
+            ...(ngHead.a.role !== undefined ? { role: ngHead.a.role } : {}),
+            ourIndex: matchOurs.i,
+            ngspiceIndex: ngHead.i,
+            divergenceNorm,
+          });
+          ngConsumed.add(ni);
+          ourConsumed.add(matchOurs.i);
+          ni++;
+          if (oi === matchOurs.i) oi++;
+        } else {
+          // Ngspice-only row (no matching ours entry for this key)
+          result.push({
+            phase: ngHead.a.phase,
+            ...(ngHead.a.role !== undefined ? { role: ngHead.a.role } : {}),
+            ourIndex: null,
+            ngspiceIndex: ngHead.i,
+            divergenceNorm: NaN,
+          });
+          ngConsumed.add(ni);
+          ni++;
+        }
+      }
+    }
+
+    return result;
   }
 
   // ---------------------------------------------------------------------------
@@ -1506,19 +2037,94 @@ export class ComparisonSession {
       ?? ngStep?.iterations[iterationIndex];
 
     const entries: LabeledMatrixEntry[] = [];
+    const seenNgEntries = new Set<string>();
+
+    const identityMode = this._opts.selfCompare || this._ngMatrixRowMap.size === 0;
+    const ourToNgRow = new Map<number, number>();
+    const ourToNgCol = new Map<number, number>();
+    if (identityMode) {
+      if (ourIter) {
+        for (const e of ourIter.matrix) {
+          ourToNgRow.set(e.row, e.row);
+          ourToNgCol.set(e.col, e.col);
+        }
+      }
+    } else {
+      this._ngMatrixRowMap.forEach((ourIdx, ngIdx) => ourToNgRow.set(ourIdx, ngIdx));
+      this._ngMatrixColMap.forEach((ourIdx, ngIdx) => ourToNgCol.set(ourIdx, ngIdx));
+    }
+
+    const ngEntryByRowCol = new Map<string, number>();
+    if (ngIter) {
+      for (const ne of ngIter.matrix) {
+        ngEntryByRowCol.set(`${ne.row},${ne.col}`, ne.value);
+      }
+    }
+
     if (ourIter) {
       for (const e of ourIter.matrix) {
         const rowLabel = this._ourTopology.matrixRowLabels.get(e.row) ?? `row${e.row}`;
         const colLabel = this._ourTopology.matrixColLabels.get(e.col) ?? `col${e.col}`;
-        const ngEntry = ngIter?.matrix.find(ne => ne.row === e.row && ne.col === e.col);
-        const ngVal = ngEntry?.value ?? NaN;
-        const absDelta = Math.abs(e.value - ngVal);
+
+        const ngRow = ourToNgRow.get(e.row);
+        const ngCol = ourToNgCol.get(e.col);
+        let ngVal: number = NaN;
+        if (ngRow !== undefined && ngCol !== undefined) {
+          const key = `${ngRow},${ngCol}`;
+          const v = ngEntryByRowCol.get(key);
+          if (v !== undefined) {
+            ngVal = v;
+            seenNgEntries.add(key);
+          }
+        }
+
+        const hasMapping = ngRow !== undefined && ngCol !== undefined;
+        const absDelta = hasMapping && !isNaN(ngVal) ? Math.abs(e.value - ngVal) : NaN;
         const refMag = Math.max(Math.abs(e.value), Math.abs(ngVal));
         const relTol = this._tol.relTol;
-        const withinTol = isNaN(ngVal) ? false : absDelta <= 1e-6 + relTol * refMag;
+        const withinTol = hasMapping && !isNaN(ngVal) ? absDelta <= 1e-6 + relTol * refMag : false;
+
+        if (hasMapping && !isNaN(ngVal)) {
+          entries.push({
+            row: e.row, col: e.col, rowLabel, colLabel,
+            entryKind: "both",
+            ours: e.value, ngspice: ngVal, absDelta, withinTol,
+          });
+        } else {
+          entries.push({
+            row: e.row, col: e.col, rowLabel, colLabel,
+            entryKind: "captureMissing",
+            ours: e.value,
+            ngspice: { kind: "captureMissing", side: "ngspice" },
+            absDelta: NaN, withinTol: false,
+          });
+        }
+      }
+    }
+
+    if (ngIter) {
+      for (const ngEntry of ngIter.matrix) {
+        const key = `${ngEntry.row},${ngEntry.col}`;
+        if (seenNgEntries.has(key)) continue;
+
+        const isNgspiceOnly = this._ngspiceOnlyRows.includes(ngEntry.row) ||
+                              this._ngspiceOnlyRows.includes(ngEntry.col);
+        if (!isNgspiceOnly) continue;
+
+        const rowLabel = this._ngspiceOnlyRowLabels.get(ngEntry.row)
+          ?? (this._ngMatrixRowMap.has(ngEntry.row)
+            ? (this._ourTopology.matrixRowLabels.get(this._ngMatrixRowMap.get(ngEntry.row)!) ?? `row${ngEntry.row}`)
+            : `ngspice_row${ngEntry.row}`);
+        const colLabel = this._ngspiceOnlyRowLabels.get(ngEntry.col)
+          ?? (this._ngMatrixColMap.has(ngEntry.col)
+            ? (this._ourTopology.matrixColLabels.get(this._ngMatrixColMap.get(ngEntry.col)!) ?? `col${ngEntry.col}`)
+            : `ngspice_col${ngEntry.col}`);
+
         entries.push({
-          row: e.row, col: e.col, rowLabel, colLabel,
-          ours: e.value, ngspice: ngVal, absDelta, withinTol,
+          row: ngEntry.row, col: ngEntry.col, rowLabel, colLabel,
+          entryKind: "engineSpecific",
+          ours: { kind: "engineSpecific", presentSide: "ngspice" },
+          ngspice: ngEntry.value, absDelta: NaN, withinTol: true,
         });
       }
     }
@@ -1529,7 +2135,7 @@ export class ComparisonSession {
   compareMatrixAt(stepIndex: number, iterationIndex: number, filter: "all" | "mismatches"): CompareMatrixResult {
     const labeled = this.getMatrixLabeled(stepIndex, iterationIndex);
     const filtered = filter === "mismatches"
-      ? labeled.entries.filter(e => !e.withinTol)
+      ? labeled.entries.filter(e => e.entryKind !== "engineSpecific" && !e.withinTol)
       : labeled.entries;
     return {
       stepIndex,
@@ -1807,7 +2413,10 @@ export class ComparisonSession {
 
   private _buildNodeMapping(bridge: NgspiceBridge): void {
     const ngTopo = bridge.getTopology();
-    if (ngTopo) this._nodeMap = buildDirectNodeMapping(this._ourTopology, ngTopo, this._engine.elements, this._elementLabels);
+    if (ngTopo) {
+      this._ngTopology = ngTopo;
+      this._nodeMap = buildDirectNodeMapping(this._ourTopology, ngTopo, this._engine.elements, this._elementLabels);
+    }
   }
 
   private _reindexNgSession(): void {
@@ -1817,7 +2426,52 @@ export class ComparisonSession {
     } else {
       this._ngSessionReindexed = this._ngSession;
     }
+    this._buildMatrixMaps();
     this._backfillNgspiceIntegCoeff();
+  }
+
+  private _buildMatrixMaps(): void {
+    this._ngMatrixRowMap.clear();
+    this._ngMatrixColMap.clear();
+    this._ngspiceOnlyRows = [];
+    this._ngspiceOnlyRowLabels.clear();
+
+    if (this._nodeMap.length === 0) return;
+
+    const rowMapEntries = new Map<number, number>();
+    for (const nm of this._nodeMap) {
+      rowMapEntries.set(nm.ngspiceIndex, nm.ourIndex);
+    }
+
+    this._ngMatrixRowMap = new Map(rowMapEntries);
+    this._ngMatrixColMap = new Map(rowMapEntries);
+
+    const ngIndexToName = new Map<number, string>();
+    if (this._ngTopology) {
+      this._ngTopology.nodeNames.forEach((ngIdx, name) => {
+        ngIndexToName.set(ngIdx, name);
+      });
+    }
+
+    if (this._ngSession && this._ngSession.steps.length > 0) {
+      const seenRows = new Set<number>();
+      for (const step of this._ngSession.steps) {
+        for (const iter of step.iterations) {
+          for (const entry of iter.matrix) {
+            const rows = [entry.row, entry.col];
+            for (const r of rows) {
+              if (this._ngMatrixRowMap.has(r)) continue;
+              if (seenRows.has(r)) continue;
+              seenRows.add(r);
+              this._ngspiceOnlyRows.push(r);
+              const rawName = ngIndexToName.get(r) ?? `ngspice_row${r}`;
+              this._ngspiceOnlyRowLabels.set(r, prettyPrintNgspiceNodeName(rawName));
+            }
+          }
+        }
+        if (seenRows.size > 0) break;
+      }
+    }
   }
 
   /**
@@ -1844,8 +2498,15 @@ export class ComparisonSession {
   protected _getComparisons(): ComparisonResult[] {
     if (!this._comparisons) {
       const ng = this._ngSessionAligned();
+      const matrixMaps = (this._ngMatrixRowMap.size > 0 && !this._opts.selfCompare)
+        ? {
+            ngRowToOurRow: this._ngMatrixRowMap,
+            ngColToOurCol: this._ngMatrixColMap,
+            ngspiceOnlyRows: new Set(this._ngspiceOnlyRows),
+          }
+        : undefined;
       this._comparisons = (this._ourSession && ng)
-        ? compareSnapshots(this._ourSession, ng, this._tol)
+        ? compareSnapshots(this._ourSession, ng, this._tol, matrixMaps)
         : [];
     }
     return this._comparisons;

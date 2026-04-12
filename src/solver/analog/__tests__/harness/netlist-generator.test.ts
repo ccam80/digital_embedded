@@ -151,18 +151,90 @@ describe("generateSpiceNetlist", () => {
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("DcVoltageSource", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "V1"]]))).toContain("V1 1 0 DC 5");
+    expect(generateSpiceNetlist(compiled, new Map([[0, "V1"]]))).toContain("V1 0 1 DC 5");
   });
 
-  it("AcVoltageSource: DC and AC fields", () => {
+  it("AcVoltageSource sine: emits SIN transient specifier", () => {
     const props = new PropertyBag();
     props.setModelParam("amplitude", 1.5);
     props.setModelParam("dcOffset", 0.5);
+    props.setModelParam("frequency", 1000);
+    props.setModelParam("phase", 0);
+    props.set("waveform", "sine");
     const compiled = makeCompiled(
       [makeAnalogEl([1, 0])],
       new Map([[0, new TestCircuitElement("AcVoltageSource", props)]]),
     );
-    expect(generateSpiceNetlist(compiled, new Map([[0, "VAC"]]))).toContain("VAC 1 0 DC 0.5 AC 1.5");
+    const netlist = generateSpiceNetlist(compiled, new Map([[0, "VAC"]]));
+    // Should emit SIN(VO VA FREQ TD THETA PHASE_DEG), NOT the old "DC 0.5 AC 1.5"
+    expect(netlist).toContain("VAC 0 1 SIN(0.5 1.5 1000 0 0 0)");
+    expect(netlist).not.toContain("DC 0.5 AC 1.5");
+  });
+
+  it("AcVoltageSource sine with non-zero phase: converts radians to degrees", () => {
+    const props = new PropertyBag();
+    props.setModelParam("amplitude", 2);
+    props.setModelParam("dcOffset", 0);
+    props.setModelParam("frequency", 500);
+    props.setModelParam("phase", Math.PI / 2); // 90 degrees
+    props.set("waveform", "sine");
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 0])],
+      new Map([[0, new TestCircuitElement("AcVoltageSource", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, new Map([[0, "Vin"]]));
+    expect(netlist).toContain("Vin 0 1 SIN(0 2 500 0 0 90)");
+  });
+
+  it("AcVoltageSource square: emits PULSE transient specifier", () => {
+    // dcOffset=1.9, amplitude=0.1, frequency=1000, riseTime=1e-9, fallTime=1e-9, phase=0
+    // ngspice PULSE semantics:
+    //   period = 1e-3, halfPeriod = 5e-4
+    //   phaseShift = 0 / (2π*1000) = 0
+    //   TD = ((-0 % 1e-3) + 1e-3) % 1e-3 = 0
+    //   PW = halfPeriod - riseTime = 5e-4 - 1e-9 = 4.99999e-4
+    //   V1 = 1.9 - 0.1 = 1.7999999999999998, V2 = 2.0
+    const props = new PropertyBag();
+    props.setModelParam("amplitude", 0.1);
+    props.setModelParam("dcOffset", 1.9);
+    props.setModelParam("frequency", 1000);
+    props.setModelParam("phase", 0);
+    props.setModelParam("riseTime", 1e-9);
+    props.setModelParam("fallTime", 1e-9);
+    props.set("waveform", "square");
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 0])],
+      new Map([[0, new TestCircuitElement("AcVoltageSource", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, new Map([[0, "Vin"]]));
+    // V1 = 1.9 - 0.1 = 1.7999999999999998 (floating point), V2 = 2, PER = 0.001
+    expect(netlist).toContain("Vin 0 1 PULSE(");
+    expect(netlist).toContain("1.7999999999999998"); // V1 = dc - amp (floating point)
+    expect(netlist).toContain("1e-9");  // TR and TF
+    expect(netlist).toContain("0.001)"); // PER at end of PULSE args
+    expect(netlist).not.toContain("DC 1.9 AC 0.1");
+  });
+
+  it("AcVoltageSource square: V1/V2 values and PER are exact", () => {
+    // Verify the exact PULSE string for a simple square wave with phase=0
+    const props = new PropertyBag();
+    props.setModelParam("amplitude", 5);
+    props.setModelParam("dcOffset", 0);
+    props.setModelParam("frequency", 1000);
+    props.setModelParam("phase", 0);
+    props.setModelParam("riseTime", 0);
+    props.setModelParam("fallTime", 0);
+    props.set("waveform", "square");
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 0])],
+      new Map([[0, new TestCircuitElement("AcVoltageSource", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, new Map([[0, "Vsq"]]));
+    // period=0.001, halfPeriod=0.0005
+    // riseTime=0, fallTime=0
+    // phaseShift=0, rawTD=-0, td=(0%0.001+0.001)%0.001=0
+    // PW = 0.0005 - 0 - 0 = 0.0005
+    expect(netlist).toContain("Vsq 0 1 PULSE(-5 5 0 0 0 0.0005 0.001)");
   });
 
   it("DcCurrentSource: I prefix with DC keyword", () => {
@@ -175,6 +247,61 @@ describe("generateSpiceNetlist", () => {
     expect(generateSpiceNetlist(compiled, new Map([[0, "I1"]]))).toContain("I1 1 0 DC 0.01");
   });
 
+  it("AcCurrentSource square: emits PULSE transient specifier with correct values", () => {
+    // amplitude=2, dcOffset=0, frequency=1000, riseTime=0, fallTime=0, phase=0
+    // period=0.001, halfPeriod=0.0005
+    // phaseShift=0, rawTD=0, td=0
+    // PW = 0.0005 - 0 - 0 = 0.0005
+    // V1 = 0-2 = -2, V2 = 0+2 = 2
+    // pins: [neg=1, pos=0] → posNode=nodes[1]=0, negNode=nodes[0]=1
+    const props = new PropertyBag();
+    props.setModelParam("amplitude", 2);
+    props.setModelParam("dcOffset", 0);
+    props.setModelParam("frequency", 1000);
+    props.setModelParam("phase", 0);
+    props.setModelParam("riseTime", 0);
+    props.setModelParam("fallTime", 0);
+    props.set("waveform", "square");
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 0])],
+      new Map([[0, new TestCircuitElement("AcCurrentSource", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, new Map([[0, "Iac"]]));
+    expect(netlist).toContain("Iac 0 1 PULSE(-2 2 0 0 0 0.0005 0.001)");
+    expect(netlist).not.toContain("AC 2");
+  });
+
+  it("AcCurrentSource sine with phase=0: emits SIN specifier", () => {
+    const props = new PropertyBag();
+    props.setModelParam("amplitude", 1.5);
+    props.setModelParam("dcOffset", 0);
+    props.setModelParam("frequency", 500);
+    props.setModelParam("phase", 0);
+    props.set("waveform", "sine");
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 0])],
+      new Map([[0, new TestCircuitElement("AcCurrentSource", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, new Map([[0, "Iac"]]));
+    expect(netlist).toContain("Iac 0 1 SIN(0 1.5 500 0 0 0)");
+    expect(netlist).not.toContain("AC 1.5");
+  });
+
+  it("AcCurrentSource sine with phase=π/2: converts radians to degrees (90°)", () => {
+    const props = new PropertyBag();
+    props.setModelParam("amplitude", 3);
+    props.setModelParam("dcOffset", 0);
+    props.setModelParam("frequency", 1000);
+    props.setModelParam("phase", Math.PI / 2);
+    props.set("waveform", "sine");
+    const compiled = makeCompiled(
+      [makeAnalogEl([1, 0])],
+      new Map([[0, new TestCircuitElement("AcCurrentSource", props)]]),
+    );
+    const netlist = generateSpiceNetlist(compiled, new Map([[0, "Iac"]]));
+    expect(netlist).toContain("Iac 0 1 SIN(0 3 1000 0 0 90)");
+  });
+
   it("NpnBJT: Q prefix, 3 nodes, NPN model card with params", () => {
     const props = new PropertyBag();
     props.setModelParam("BF", 100);
@@ -184,7 +311,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("NpnBJT", props)]]),
     );
     const r = generateSpiceNetlist(compiled, new Map([[0, "Q1"]]));
-    expect(r).toContain("Q1 3 2 1 Q1_NPN");
+    expect(r).toContain("Q1 2 3 1 Q1_NPN");
     expect(r).toContain(".model Q1_NPN NPN");
     expect(r).toContain("BF=100");
     expect(r).toContain("IS=1e-14");
@@ -198,7 +325,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("PnpBJT", props)]]),
     );
     const r = generateSpiceNetlist(compiled, new Map([[0, "Q2"]]));
-    expect(r).toContain("Q2 3 2 1 Q2_PNP");
+    expect(r).toContain("Q2 2 3 1 Q2_PNP");
     expect(r).toContain(".model Q2_PNP PNP");
   });
 
@@ -223,7 +350,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("NMOS", props)]]),
     );
     const r = generateSpiceNetlist(compiled, new Map([[0, "M1"]]));
-    expect(r).toContain("M1 3 2 1 0 M1_NMOS");
+    expect(r).toContain("M1 1 3 2 2 M1_NMOS");
     expect(r).toContain(".model M1_NMOS NMOS");
   });
 
@@ -235,7 +362,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("NJFET", props)]]),
     );
     const r = generateSpiceNetlist(compiled, new Map([[0, "J1"]]));
-    expect(r).toContain("J1 3 2 1 J1_NMF");
+    expect(r).toContain("J1 1 3 2 J1_NMF");
     expect(r).toContain(".model J1_NMF NMF");
   });
 
@@ -247,7 +374,7 @@ describe("generateSpiceNetlist", () => {
       new Map([[0, new TestCircuitElement("PJFET", props)]]),
     );
     const r = generateSpiceNetlist(compiled, new Map([[0, "J2"]]));
-    expect(r).toContain("J2 3 2 1 J2_PMF");
+    expect(r).toContain("J2 1 3 2 J2_PMF");
     expect(r).toContain(".model J2_PMF PMF");
   });
 

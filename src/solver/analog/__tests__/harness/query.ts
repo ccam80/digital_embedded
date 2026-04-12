@@ -105,9 +105,10 @@ export function convergenceSummary(session: CaptureSession): {
   for (let i = 0; i < session.steps.length; i++) {
     const s = session.steps[i];
     if (s.converged) converged++; else failed++;
-    totalIter += s.iterationCount;
-    if (s.iterationCount > maxIter) {
-      maxIter = s.iterationCount;
+    const iterCount = s.totalIterationCount ?? s.iterationCount;
+    totalIter += iterCount;
+    if (iterCount > maxIter) {
+      maxIter = iterCount;
       worstStep = i;
     }
   }

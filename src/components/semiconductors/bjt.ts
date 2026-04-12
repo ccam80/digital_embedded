@@ -599,7 +599,7 @@ function computeBjtOp(
 // State schema — BJT simple (10 slots)
 // ---------------------------------------------------------------------------
 
-const BJT_SIMPLE_SCHEMA: StateSchema = defineStateSchema("BjtSimpleElement", [
+export const BJT_SIMPLE_SCHEMA: StateSchema = defineStateSchema("BjtSimpleElement", [
   { name: "VBE",       doc: "pnjlim-limited B-E junction voltage",          init: { kind: "fromParams", compute: (_p) => _p["polarity"] === 1 ? 0.6 : -0.6 } },
   { name: "VBC",       doc: "pnjlim-limited B-C junction voltage",          init: { kind: "zero" } },
   { name: "GPI",       doc: "dIb/dVbe input conductance",                   init: { kind: "zero" } },
@@ -686,6 +686,12 @@ export function createBjtElement(
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, BJTload sets CKTnoncon++)
   let icheckLimited = false;
+
+  // One-shot cold-start seeds from dcopInitJct. Non-null only between
+  // primeJunctions() and the next updateOperatingPoint() call, which
+  // consumes and re-nulls them. Matches ngspice MODEINITJCT local override.
+  let primedVbe: number | null = null;
+  let primedVbc: number | null = null;
 
   return {
     branchIndex: -1,
@@ -784,9 +790,20 @@ export function createBjtElement(
       const vcritBE = tp.tVcrit;
       const vcritBC = tp.tVcrit;
 
-      // Junction voltages (polarity-corrected for PNP)
-      const vbeRaw = polarity * (vB - vE);
-      const vbcRaw = polarity * (vB - vC);
+      // Junction voltages (polarity-corrected for PNP). If primeJunctions
+      // armed a cold-start seed for iteration 0, consume it here and clear
+      // so iteration 1 onward reads from the shared voltages array.
+      let vbeRaw: number;
+      let vbcRaw: number;
+      if (primedVbe !== null) {
+        vbeRaw = primedVbe;
+        vbcRaw = primedVbc!;
+        primedVbe = null;
+        primedVbc = null;
+      } else {
+        vbeRaw = polarity * (vB - vE);
+        vbcRaw = polarity * (vB - vC);
+      }
 
       // Apply pnjlim to both junctions using vold from pool
       const vbeResult = pnjlim(vbeRaw, s0[base + SLOT_VBE], tp.vt, vcritBE);
@@ -877,6 +894,24 @@ export function createBjtElement(
       const ib = polarity * s0[base + SLOT_IB];
       const ie = -(ic + ib); // KCL: ib + ic + ie = 0
       return [ib, ic, ie];
+    },
+
+    primeJunctions(): void {
+      // Arm cold-start seed: Vbe = tVcrit, Vbc = 0.
+      // Matches ngspice MODEINITJCT (bjtload.c:265-274), where BJTload reads
+      //   vbe = here->BJTtVcrit; vbc = 0;
+      // as a LOCAL linearization-point override, never touching the shared
+      // node-voltage vector. Consumed and cleared by the next
+      // updateOperatingPoint call.
+      //
+      // Seeds are the RAW junction-bias magnitudes (unsigned-positive for
+      // forward bias), NOT polarity-signed node differences. updateOperatingPoint
+      // computes `vbeRaw = polarity * (vB - vE)`, which is already
+      // polarity-corrected to be positive when the junction is forward-biased.
+      // The primed value slots into that same convention directly — so both
+      // NPN and PNP use +tVcrit regardless of `polarity`.
+      primedVbe = tp.tVcrit;
+      primedVbc = 0;
     },
 
     setParam(key: string, value: number): void {
@@ -1043,7 +1078,7 @@ function computeSpiceL1BjtOp(
 // State schema — BJT SPICE L1 (33 slots)
 // ---------------------------------------------------------------------------
 
-const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element", [
+export const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element", [
   { name: "VBE",            doc: "pnjlim-limited B-E junction voltage",              init: { kind: "fromParams", compute: (_p) => _p["polarity"] === 1 ? 0.6 : -0.6 } },
   { name: "VBC",            doc: "pnjlim-limited B-C junction voltage",              init: { kind: "zero" } },
   { name: "GPI",            doc: "dIb/dVbe input conductance",                       init: { kind: "zero" } },
@@ -1267,6 +1302,12 @@ export function createSpiceL1BjtElement(
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, BJTload sets CKTnoncon++)
   let icheckLimited = false;
 
+  // One-shot cold-start seeds from dcopInitJct. Non-null only between
+  // primeJunctions() and the next updateOperatingPoint() call, which
+  // consumes and re-nulls them. Matches ngspice MODEINITJCT local override.
+  let primedVbe: number | null = null;
+  let primedVbc: number | null = null;
+
   const element: ReactiveAnalogElementCore = {
     branchIndex: -1,
     isNonlinear: true,
@@ -1420,8 +1461,18 @@ export function createSpiceL1BjtElement(
       const vcritBE = tpL1.tVcrit;
       const vcritBC = tpL1.tVcrit;
 
-      const vbeRaw = polarity * (vBi - vEi);
-      const vbcRaw = polarity * (vBi - vCi);
+      // Consume one-shot cold-start seed from dcopInitJct, if armed.
+      let vbeRaw: number;
+      let vbcRaw: number;
+      if (primedVbe !== null) {
+        vbeRaw = primedVbe;
+        vbcRaw = primedVbc!;
+        primedVbe = null;
+        primedVbc = null;
+      } else {
+        vbeRaw = polarity * (vBi - vEi);
+        vbcRaw = polarity * (vBi - vCi);
+      }
 
       const vbeResult = pnjlim(vbeRaw, s0[base + L1_SLOT_VBE], tpL1.vt, vcritBE);
       const vbeLimited = vbeResult.value;
@@ -1590,6 +1641,22 @@ export function createSpiceL1BjtElement(
       const ib = polarity * s0[base + L1_SLOT_IB];
       const ie = -(ic + ib);
       return [ib, ic, ie];
+    },
+
+    primeJunctions(): void {
+      // Arm cold-start seed: Vbe = tVcrit, Vbc = 0.
+      // Matches ngspice MODEINITJCT (bjtload.c:265-274). Local override
+      // consumed by the next updateOperatingPoint; the shared node-voltage
+      // vector is NOT touched, so grounded-terminal and shared-node
+      // topologies work correctly. Substrate node stays at its default 0.
+      //
+      // Seeds are raw junction-bias magnitudes (unsigned-positive for forward
+      // bias). updateOperatingPoint's non-primed branch computes
+      // `vbeRaw = polarity * (vBi - vEi)` which is already polarity-corrected
+      // to positive for a forward-biased junction — both NPN and PNP use
+      // +tVcrit regardless of `polarity`.
+      primedVbe = tpL1.tVcrit;
+      primedVbc = 0;
     },
 
     setParam(key: string, value: number): void {

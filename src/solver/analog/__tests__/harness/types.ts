@@ -20,7 +20,7 @@ export type SidePresence = "both" | "oursOnly" | "ngspiceOnly";
 export type Side = "ours" | "ngspice";
 
 /** Compact summary of one NR attempt — used in shape reports. */
-export interface AttemptSummary {
+export interface AttemptShapeSummary {
   phase: NRPhase;
   outcome: NRAttemptOutcome;
   dt: number;
@@ -47,7 +47,7 @@ export interface StepShape {
   /** Per-side attempt counts. Each is null when that side is absent. */
   attemptCounts: { ours: AttemptCounts | null; ngspice: AttemptCounts | null };
   /** Per-side attempt summaries (length-limited; full detail is on the StepSnapshot). */
-  attempts: { ours: AttemptSummary[] | null; ngspice: AttemptSummary[] | null };
+  attempts: { ours: AttemptShapeSummary[] | null; ngspice: AttemptShapeSummary[] | null };
   /** Final integration method per side; null when absent. */
   integrationMethod: { ours: string | null; ngspice: string | null };
 }
@@ -203,9 +203,26 @@ export interface IntegrationCoefficients {
 // ---------------------------------------------------------------------------
 
 /**
+ * Semantic role of a single NR solve attempt — orthogonal to phase name.
+ * Two attempts can share a phase name (e.g. "dcopInitFloat") but represent
+ * entirely different operations; role disambiguates them for pairing.
+ */
+export type AttemptRole =
+  // DC OP (existing)
+  | "coldStart"      // first iterate with zero/default initial guess (our dcopInitFloat)
+  | "mainSolve"      // the real NR refinement pass (both sides' dcopDirect)
+  | "finalVerify"    // 1-iter verification after converged state (ngspice's last dcopInitFloat)
+  | "junctionPrime"  // ngspice MODEINITJCT priming pass
+  // Tran
+  | "predictorPass"  // ngspice MODEINITPRED retry — always fails by design
+  | "tranSolve";     // the NR pass that produces the accepted step result (both sides)
+
+/**
  * Identifies the algorithmic phase of a single NR solve attempt.
  */
 export type NRPhase =
+  | "dcopInitJct"
+  | "dcopInitFloat"
   | "dcopDirect"
   | "dcopGminDynamic"
   | "dcopGminSpice3"
@@ -224,6 +241,7 @@ export type NRAttemptOutcome =
   | "nrFailedRetry"
   | "lteRejectedRetry"
   | "dcopSubSolveConverged"
+  | "dcopPhaseHandoff"
   | "finalFailure";
 
 // ---------------------------------------------------------------------------
@@ -241,6 +259,7 @@ export interface NRAttempt {
   phase: NRPhase;
   outcome: NRAttemptOutcome;
   phaseParameter?: number;
+  role?: AttemptRole;
 }
 
 /**
@@ -257,6 +276,7 @@ export interface StepSnapshot {
   iterations: IterationSnapshot[];
   converged: boolean;
   iterationCount: number;
+  totalIterationCount: number;
   cktMode?: number;
   integrationCoefficients: IntegrationCoefficients;
   analysisPhase: "dcop" | "tranInit" | "tranFloat";
@@ -374,6 +394,8 @@ export interface SnapshotQuery {
 /** Step-end report: converged values from both engines, keyed by label. */
 export interface StepEndReport {
   stepIndex: number;
+  ourStepIndex: number;
+  ngspiceStepIndex: number;
   presence: SidePresence;
   stepStartTime: ComparedValue;
   stepEndTime: ComparedValue;
@@ -648,13 +670,18 @@ export interface StateHistoryReport {
 // Labeled matrix / RHS
 // ---------------------------------------------------------------------------
 
+export type MatrixEntrySentinel =
+  | { kind: "engineSpecific"; presentSide: "ngspice" }
+  | { kind: "captureMissing"; side: "ours" | "ngspice" };
+
 export interface LabeledMatrixEntry {
   row: number;
   col: number;
   rowLabel: string;
   colLabel: string;
-  ours: number;
-  ngspice: number;
+  entryKind: "both" | "engineSpecific" | "captureMissing";
+  ours: number | MatrixEntrySentinel;
+  ngspice: number | MatrixEntrySentinel;
   absDelta: number;
   withinTol: boolean;
 }
@@ -705,6 +732,107 @@ export interface MatrixComparison {
   mismatchCount: number;
   maxAbsDelta: number;
   entries: MatrixComparisonEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Paired session-shape API
+// ---------------------------------------------------------------------------
+
+export interface AttemptShapeRow {
+  index: number;
+  phase: NRPhase;
+  outcome: NRAttemptOutcome;
+  iterationCount: number;
+  phaseParameter?: number;
+  accepted: boolean;
+}
+
+export interface StepShapeRow {
+  index: number;
+  stepStartTime: number;
+  stepEndTime: number;
+  converged: boolean;
+  iterationCount: number;        // accepted attempt
+  totalIterationCount: number;   // sum over attempts
+  analysisPhase: "dcop" | "tranInit" | "tranFloat";
+  attempts: AttemptShapeRow[];
+}
+
+export interface SessionMap {
+  analysis: "dcop" | "tran";
+  ours:    { stepCount: number; steps: StepShapeRow[] };
+  ngspice: { stepCount: number; steps: StepShapeRow[] };
+}
+
+export interface AttemptSummary {
+  index: number;
+  phase: NRPhase;
+  role?: AttemptRole;
+  outcome: NRAttemptOutcome;
+  iterationCount: number;
+  phaseParameter?: number;
+  accepted: boolean;
+  endNodeNorm: number;    // L2 norm over final iter rows [1, nodeCount]
+  endBranchNorm: number;  // L2 norm over final iter rows [nodeCount, matrixSize]
+}
+
+export interface PairedAttempt {
+  phase: NRPhase;
+  role?: AttemptRole;
+  ourIndex: number | null;
+  ngspiceIndex: number | null;
+  divergenceNorm: number;   // L2 norm of (ours.voltages - ngspice.voltages) over matching rows; NaN if either side null
+}
+
+export interface StepDetail {
+  stepIndex: number;
+  ourStepIndex: number;
+  ngspiceStepIndex: number;
+  stepStartTime: ComparedValue;
+  stepEndTime: ComparedValue;
+  dt: ComparedValue;
+  ours: AttemptSummary[];
+  ngspice: AttemptSummary[];
+  pairing: PairedAttempt[];
+}
+
+export type StepQuery =
+  | { index: number }
+  | { time: number; side?: "ours" | "ngspice" };
+
+export interface IterationSideData {
+  rawIteration: number;
+  globalConverged: boolean;
+  noncon: number;
+  nodeVoltages: Record<string, number>;
+  branchValues: Record<string, number>;
+  elementStates: Record<string, Record<string, number>>;
+  limitingEvents: LimitingEvent[];
+}
+
+export interface PairedIteration {
+  iterationIndex: number;   // position within attempt
+  ours: IterationSideData | null;
+  ngspice: IterationSideData | null;
+  divergenceNorm: number;   // L2 norm of node-voltage delta at this iteration
+}
+
+export interface AttemptDetail {
+  stepIndex: number;
+  phase: NRPhase;
+  phaseAttemptIndex: number;
+  ourAttempt: AttemptSummary | null;
+  ngspiceAttempt: AttemptSummary | null;
+  iterations: PairedIteration[];
+}
+
+export interface AttemptQuery {
+  stepIndex: number;
+  phase: NRPhase;
+  phaseAttemptIndex: number;
+  iterationRange?: [number, number];
+  limit?: number;
+  offset?: number;
 }
 
 // ---------------------------------------------------------------------------

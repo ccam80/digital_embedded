@@ -22,6 +22,7 @@ import type {
   StepSnapshot,
   NRAttempt,
   NRPhase,
+  AttemptRole,
   NRAttemptOutcome,
   IterationSnapshot,
   ElementStateSnapshot,
@@ -37,14 +38,15 @@ import type {
 import { DEVICE_MAPPINGS } from "./device-mappings.js";
 
 // ---------------------------------------------------------------------------
-// CKTmode constants
+// CKTmode constants (from ref/ngspice/src/include/ngspice/cktdefs.h:166-182)
 // ---------------------------------------------------------------------------
-const MODEDCOP      = 0x0001;
-const MODETRANOP    = 0x0002;
-const MODETRAN      = 0x0004;
-const MODEINITFLOAT = 0x0010;
-const MODEINITPRED  = 0x0100;
-const MODEINITTRAN  = 0x0200;
+const MODETRAN       = 0x0001;
+const MODEDCOP       = 0x0010;
+const MODETRANOP     = 0x0020;
+const MODEINITFLOAT  = 0x0100;
+const MODEINITJCT    = 0x0200;
+const MODEINITTRAN   = 0x1000;
+const MODEINITPRED   = 0x2000;
 
 // phaseFlags bits (from ni_set_phase_flags)
 const PF_GMIN_DYN = 0x1;
@@ -56,13 +58,18 @@ function cktModeToPhase(mode: number, phaseFlags: number): NRPhase {
   const inSrcStep = (phaseFlags & PF_SRC_STEP) !== 0;
   const inGminSp3 = (phaseFlags & PF_GMIN_SP3) !== 0;
 
-  if (mode & MODEDCOP) {
+  // Standalone `op`: CKTop(firstmode=MODEDCOP|MODEINITJCT, continuemode=MODEDCOP|MODEINITFLOAT).
+  // Transient's DC OP: dctran.c uses MODETRANOP|MODEINITJCT → MODETRANOP|MODEINITFLOAT.
+  // Treat both as DCOP phases; stepping sub-solves are distinguished by phaseFlags.
+  const isDcOpFamily = (mode & (MODEDCOP | MODETRANOP)) !== 0;
+  if (isDcOpFamily) {
     if (inSrcStep) return "dcopSrcSweep";
     if (inGminSp3) return "dcopGminSpice3";
     if (inGminDyn) return "dcopGminDynamic";
+    if (mode & MODEINITJCT)   return "dcopInitJct";
+    if (mode & MODEINITFLOAT) return "dcopInitFloat";
     return "dcopDirect";
   }
-  if (mode & MODETRANOP)    return "tranInit";
   if (mode & MODEINITPRED)  return "tranPredictor";
   if (mode & MODEINITTRAN)  return "tranInit";
   if (mode & MODETRAN)      return "tranNR";
@@ -70,11 +77,25 @@ function cktModeToPhase(mode: number, phaseFlags: number): NRPhase {
   return "tranNR";
 }
 
+function cktModeToRole(
+  mode: number,
+  phaseFlags: number,
+  attemptIndexInStep: number,
+): AttemptRole | undefined {
+  const phase = cktModeToPhase(mode, phaseFlags);
+  if (phase === "dcopInitJct")    return "junctionPrime";
+  if (phase === "dcopDirect")     return "mainSolve";
+  // dcopInitFloat at index 0 is a cold-start; finalVerify is assigned retroactively
+  // in flushStep after the full attempt list is known.
+  if (phase === "dcopInitFloat" && attemptIndexInStep === 0) return "coldStart";
+  return undefined;
+}
+
 function cktModeToAnalysisPhase(mode: number): "dcop" | "tranInit" | "tranFloat" {
-  if (mode & MODEDCOP)    return "dcop";
-  if (mode & MODETRANOP)  return "tranInit";
+  if (mode & MODEDCOP)     return "dcop";
+  if (mode & MODETRANOP)   return "dcop";  // transient's internal DC OP is still a DC OP
   if (mode & MODEINITTRAN) return "tranInit";
-  if (mode & MODETRAN)    return "tranFloat";
+  if (mode & MODETRAN)     return "tranFloat";
   return "dcop";
 }
 
@@ -402,7 +423,11 @@ export class NgspiceBridge {
   private _parseTopology(raw: RawNgspiceTopology): NgspiceTopology {
     const nodeNames = new Map<string, number>();
     for (const n of raw.nodes) {
-      if (n.name) nodeNames.set(n.name, n.number);
+      // Filter out ngspice's ground slot ("0" => 0). Our engine eliminates
+      // ground from the MNA system; keeping it in nodeNames would cause
+      // ngspice's ground-column stamps to surface as spurious engineSpecific
+      // rows in the matrix comparison.
+      if (n.name && n.name !== "0") nodeNames.set(n.name, n.number);
     }
     const devices: NgspiceDeviceInfo[] = raw.devices.map(d => ({
       name: d.name, typeName: d.typeName, stateBase: d.stateBase, nodeIndices: d.nodeIndices,
@@ -517,13 +542,15 @@ export class NgspiceBridge {
     let prevIteration = -1;
     let prevPhase: NRPhase | null = null;
 
-    const flushAttempt = (step: PendingStep, outcome: NRAttemptOutcome): void => {
+    const flushAttempt = (step: PendingStep, outcome: NRAttemptOutcome, isLastInStep = false): void => {
       const pa = step.pendingAttempt;
       if (!pa || pa.iterations.length === 0) {
         step.pendingAttempt = null;
         return;
       }
       const lastIter = pa.iterations[pa.iterations.length - 1]!;
+      const attemptIndexInStep = step.attempts.length;
+      const role = cktModeToRole(pa.firstRaw.cktMode, pa.firstRaw.phaseFlags, attemptIndexInStep);
       const attempt: NRAttempt = {
         dt: pa.firstRaw.dt,
         iterations: pa.iterations,
@@ -531,6 +558,7 @@ export class NgspiceBridge {
         iterationCount: pa.iterations.length,
         phase: pa.phase,
         outcome,
+        ...(role !== undefined ? { role } : {}),
         ...(pa.phase === "dcopGminDynamic" || pa.phase === "dcopGminSpice3"
           ? { phaseParameter: pa.firstRaw.phaseGmin }
           : pa.phase === "dcopSrcSweep"
@@ -580,6 +608,30 @@ export class NgspiceBridge {
         ? step.stepStartTime + acceptedAttempt.dt
         : step.stepStartTime;
 
+      const totalIterationCount = step.attempts.reduce((sum, att) => sum + att.iterationCount, 0);
+
+      // Retroactively assign finalVerify: a dcopInitFloat that follows a dcopDirect
+      // in the same step is a post-convergence verification pass, not a cold start.
+      let sawDcopDirect = false;
+      for (const att of step.attempts) {
+        if (att.phase === "dcopDirect") sawDcopDirect = true;
+        else if (att.phase === "dcopInitFloat" && sawDcopDirect && att.role !== "coldStart") {
+          att.role = "finalVerify";
+        }
+      }
+
+      // Assign tran-phase roles: the accepted tran attempt is the real solve (tranSolve);
+      // any tran attempt that failed with nrFailedRetry is a predictor pass (predictorPass).
+      const isTranPhase = (p: string) => p === "tranInit" || p === "tranPredictor" || p === "tranNR";
+      for (const att of step.attempts) {
+        if (!isTranPhase(att.phase)) continue;
+        if (att.outcome === "accepted") {
+          att.role = "tranSolve";
+        } else if (att.outcome === "nrFailedRetry") {
+          att.role = "predictorPass";
+        }
+      }
+
       steps.push({
         stepStartTime: step.stepStartTime,
         stepEndTime,
@@ -590,6 +642,7 @@ export class NgspiceBridge {
         iterations: acceptedAttempt.iterations,
         converged: acceptedAttempt.converged,
         iterationCount: acceptedAttempt.iterationCount,
+        totalIterationCount,
         integrationCoefficients: integCoeff,
         analysisPhase,
       });
@@ -613,7 +666,7 @@ export class NgspiceBridge {
             else if (outerEv.finalFailure) outcome = "finalFailure";
             else if (outerEv.accepted) outcome = "accepted";
           }
-          flushAttempt(currentStep, outcome);
+          flushAttempt(currentStep, outcome, true);
         }
         flushStep(currentStep);
         currentStep = { stepStartTime: stepStartTimeOfRaw, attempts: [], pendingAttempt: null };
@@ -705,7 +758,7 @@ export class NgspiceBridge {
           const lastIter = currentStep.pendingAttempt.iterations[currentStep.pendingAttempt.iterations.length - 1]!;
           outcome = lastIter.globalConverged ? "accepted" : "finalFailure";
         }
-        flushAttempt(currentStep, outcome);
+        flushAttempt(currentStep, outcome, true);
       }
       flushStep(currentStep);
     }

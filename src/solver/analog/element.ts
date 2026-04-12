@@ -270,6 +270,19 @@ export interface AnalogElement {
   getPinCurrents(voltages: Float64Array): number[];
 
   /**
+   * Arm a one-shot per-device junction seed for cold-start NR convergence.
+   * Called once by the dcopInitJct phase before the main NR runs. The device
+   * stores tVcrit-derived junction voltages in internal state; the next call
+   * to updateOperatingPoint consumes and clears that state, overriding the
+   * values it would otherwise compute from the shared voltages array.
+   *
+   * Matches ngspice MODEINITJCT (bjtload.c:265-274): a per-device
+   * linearization-point override, NOT a write into the shared MNA vector.
+   * Optional; linear elements do not implement this.
+   */
+  primeJunctions?(): void;
+
+  /**
    * Optional display label for diagnostic attribution.
    *
    * When present, used in `Diagnostic.involvedElements` descriptions

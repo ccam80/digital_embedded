@@ -43,6 +43,11 @@ export function compareSnapshots(
   ours: CaptureSession,
   ref:  CaptureSession,
   tolerance: Tolerance = DEFAULT_TOLERANCE,
+  matrixMaps?: {
+    ngRowToOurRow: ReadonlyMap<number, number>;
+    ngColToOurCol: ReadonlyMap<number, number>;
+    ngspiceOnlyRows: ReadonlySet<number>;
+  },
 ): ComparisonResult[] {
   const results: ComparisonResult[] = [];
   const stepCount = Math.max(ours.steps.length, ref.steps.length);
@@ -110,12 +115,21 @@ export function compareSnapshots(
         });
       }
 
-      // Matrix diffs — build maps keyed by "row,col"
       const matrixDiffs: ComparisonResult["matrixDiffs"] = [];
       const ourMap = new Map<string, number>();
       for (const e of ourIter.matrix) ourMap.set(`${e.row},${e.col}`, e.value);
       const refMap = new Map<string, number>();
-      for (const e of refIter.matrix) refMap.set(`${e.row},${e.col}`, e.value);
+      for (const e of refIter.matrix) {
+        if (matrixMaps) {
+          if (matrixMaps.ngspiceOnlyRows.has(e.row) || matrixMaps.ngspiceOnlyRows.has(e.col)) continue;
+          const ourR = matrixMaps.ngRowToOurRow.get(e.row);
+          const ourC = matrixMaps.ngColToOurCol.get(e.col);
+          if (ourR === undefined || ourC === undefined) continue;
+          refMap.set(`${ourR},${ourC}`, e.value);
+        } else {
+          refMap.set(`${e.row},${e.col}`, e.value);
+        }
+      }
       const allKeys = new Set([...ourMap.keys(), ...refMap.keys()]);
       for (const key of allKeys) {
         const [r, c] = key.split(",").map(Number);

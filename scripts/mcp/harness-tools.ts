@@ -9,7 +9,7 @@ import { HarnessSessionState } from "./harness-session-state.js";
 import { ComparisonSession } from "../../src/solver/analog/__tests__/harness/comparison-session.js";
 import { formatNumber, formatComparedValue, suggestComponents } from "./harness-format.js";
 import { writeFileSync } from "fs";
-import type { SessionSummary } from "../../src/solver/analog/__tests__/harness/types.js";
+import type { SessionSummary, NRPhase } from "../../src/solver/analog/__tests__/harness/types.js";
 import { isPoolBacked } from "../../src/solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
@@ -222,23 +222,18 @@ export function registerHarnessTools(
   server.registerTool(
     "harness_run",
     {
-      title: "Run Analysis",
+      title: "Run Transient Analysis",
       description:
-        "Execute the analysis on both engines. Runs once; subsequent calls with the " +
-        "same handle replace the previous result. Cached results are cleared on re-run.",
+        "Run transient analysis on both engines (ours + ngspice). Runs once; subsequent " +
+        "calls with the same handle replace the previous result. Cached results are cleared on re-run.",
       inputSchema: z.object({
         handle: z.string().describe("Harness session handle from harness_start"),
-        analysis: z
-          .enum(["dcop", "tran"])
-          .describe(
-            "'dcop' for DC operating point. 'tran' for transient analysis.",
-          ),
         stopTime: z
           .number()
           .positive()
           .optional()
           .describe(
-            "Transient stop time in seconds (required for tran). E.g. 5e-3 for 5 ms.",
+            "Transient stop time in seconds. Default: 1e-5 (10 µs). E.g. 5e-3 for 5 ms.",
           ),
         startTime: z
           .number()
@@ -255,27 +250,20 @@ export function registerHarnessTools(
     wrapTool("harness_run", async (args) => {
       const entry = harnessState.get(args.handle, "harness_run");
 
-      if (args.analysis === "tran" && args.stopTime === undefined) {
-        throw new Error("harness_run: stopTime is required for tran analysis");
-      }
-
       const { session } = entry;
 
-      if (args.analysis === "dcop") {
-        await session.runDcOp();
-      } else {
-        const startTime = args.startTime ?? 0;
-        await session.runTransient(startTime, args.stopTime!, args.maxStep);
-      }
+      const startTime = args.startTime ?? 0;
+      const stopTime = args.stopTime ?? 1e-5;
+      await session.runTransient(startTime, stopTime, args.maxStep);
 
       entry.lastRunAt = new Date();
-      entry.analysis = args.analysis;
+      entry.analysis = "tran";
 
       const summary = session.getSummary();
 
       return JSON.stringify({
         handle: args.handle,
-        analysis: args.analysis,
+        analysis: "tran",
         summary: serializeSummary(summary),
         errors: session.errors,
       });
@@ -394,697 +382,123 @@ export function registerHarnessTools(
   );
 
   // -------------------------------------------------------------------------
-  // harness_query
+  // harness_session_map
   // -------------------------------------------------------------------------
 
   server.registerTool(
-    "harness_query",
+    "harness_session_map",
     {
-      title: "Query Harness Data",
+      title: "Session Map",
       description:
-        "The primary data-extraction tool. Dispatches to the appropriate " +
-        "ComparisonSession method based on the presence and combination of input fields. " +
-        "All result collections are paginated with offset/limit.",
+        "Return the paired session shape: step counts, per-step attempt lists, " +
+        "and timing for both engines. Lightweight — no iteration data included. " +
+        "Use harness_get_step for per-step detail and harness_get_attempt for iterations.",
       inputSchema: z.object({
-        handle: z.string().describe("Harness session handle"),
-        mode: z.enum(["shape", "stepAtTime"]).optional().describe(
-          "'shape' returns the SessionShape (step counts, presence, attempt counts for both sides). " +
-          "'stepAtTime' finds the nearest step index at a given simulation time on the specified side.",
-        ),
-        time: z.number().optional().describe("Simulation time in seconds (required for mode='stepAtTime')."),
-        side: z.enum(["ours", "ngspice"]).optional().describe("Which engine's timeline to search for mode='stepAtTime'. Default: 'ours'."),
-        component: z.string().optional().describe("Component label to query (e.g. 'Q1'). Case-insensitive."),
-        node: z.string().optional().describe("Node label to trace (e.g. 'Q1:C'). Case-insensitive."),
-        step: z.number().int().min(0).optional().describe("Step index to inspect."),
-        deviceType: z.string().optional().describe("Filter by device type (e.g. 'bjt', 'diode')."),
-        type: z.literal("summary").optional().describe("Return session summary."),
-        slots: z.array(z.string()).optional().describe("Glob patterns for state slot names."),
-        iterations: z.boolean().optional().describe("When true and step is set, return per-iteration data."),
-        stateHistory: z.boolean().optional().describe("When true, return state history for component+step."),
-        integrationCoefficients: z.boolean().optional().describe("When true and step is set, return integration method coefficients."),
-        limiting: z.boolean().optional().describe("When true with component+step+iteration, return limiting data."),
-        convergence: z.boolean().optional().describe("When true with step+iteration, return per-element convergence flags."),
-        filter: z.enum(["all", "divergences", "worst"]).optional().describe("'all', 'divergences', or 'worst'. Default: 'all'."),
-        worstN: z.number().int().min(1).optional().describe("When filter='worst', number of entries to return. Default: 10."),
-        stepRange: z.tuple([z.number().int().min(0), z.number().int().min(0)]).optional().describe("Inclusive [from, to] step index range."),
-        timeRange: z.tuple([z.number(), z.number()]).optional().describe("Inclusive [from, to] simulation time range in seconds."),
-        iteration: z.number().int().min(0).optional().describe("Specific NR iteration index within a step (0-based)."),
-        offset: z.number().int().min(0).optional().describe("Result page offset. Default: 0."),
-        limit: z.number().int().min(1).optional().describe("Maximum entries to return."),
+        handle: z.string().describe("Harness session handle from harness_start"),
       }),
     },
-    wrapTool("harness_query", async (args) => {
-      const entry = harnessState.get(args.handle, "harness_query");
-      const { session } = entry;
-
-      // Check analysis has been run
+    wrapTool("harness_session_map", async (args) => {
+      const entry = harnessState.get(args.handle, "harness_session_map");
       if (!entry.analysis) {
-        throw new Error(`harness_query: run harness_run first`);
+        throw new Error("harness_session_map: run harness_run first");
       }
-
-      // Conflict detection
-      if (args.component && args.node) {
-        throw new Error(`harness_query: ambiguous — cannot combine component and node.`);
-      }
-      if (args.iterations && args.stateHistory) {
-        throw new Error(`harness_query: ambiguous — cannot combine iterations and stateHistory.`);
-      }
-      if (args.limiting && args.convergence) {
-        throw new Error(`harness_query: ambiguous — cannot combine limiting and convergence.`);
-      }
-      if (args.integrationCoefficients && args.iterations) {
-        throw new Error(`harness_query: ambiguous — cannot combine integrationCoefficients and iterations.`);
-      }
-
-      const offset = args.offset ?? 0;
-      const topology = (session as any)._ourTopology;
-      const ourStepCount: number = (session as any)._ourSession?.steps?.length ?? 0;
-      const ngStepCount: number = (session as any)._ngSessionAligned?.()?.steps?.length ?? 0;
-      const totalSteps: number = Math.max(ourStepCount, ngStepCount);
-
-      // Validate step range if provided
-      if (args.step !== undefined && totalSteps > 0 && args.step >= totalSteps) {
-        throw new Error(
-          `harness_query: step ${args.step} out of range [0, ${totalSteps - 1}]. Run has ${totalSteps} steps (ours: ${ourStepCount}, ngspice: ${ngStepCount}).`,
-        );
-      }
-
-      // Helper: validate component label
-      function requireComponent(label: string): string {
-        const upper = label.toUpperCase();
-        const found = topology.elements.some((el: any) => el.label.toUpperCase() === upper);
-        if (!found) {
-          const labels = topology.elements.map((el: any) => el.label as string);
-          const suggestions = suggestComponents(label, labels);
-          throw new Error(
-            `harness_query: component "${label}" not found. Did you mean: ${suggestions.join(", ")}?`,
-          );
-        }
-        return upper;
-      }
-
-      // Helper: paginate array
-      function paginate<T>(items: T[], defaultLimit: number): { items: T[]; total: number } {
-        const total = items.length;
-        const lim = args.limit ?? defaultLimit;
-        return { items: items.slice(offset, offset + lim), total };
-      }
-
-      // Helper: apply step/time range filters to steps array
-      function filterStepIndices(indices: number[]): number[] {
-        let result = indices;
-        if (args.stepRange) {
-          const [from, to] = args.stepRange;
-          result = result.filter((i) => i >= from && i <= to);
-        }
-        if (args.timeRange && (session as any)._ourSession) {
-          const [tFrom, tTo] = args.timeRange;
-          result = result.filter((i) => {
-            const t = (session as any)._ourSession.steps[i]?.stepStartTime
-              ?? (session as any)._ngSessionAligned?.()?.steps[i]?.stepStartTime
-              ?? 0;
-            return t >= tFrom && t <= tTo;
-          });
-        }
-        return result;
-      }
-
-      // -----------------------------------------------------------------------
-      // Mode dispatch (explicit mode parameter takes priority over field-based dispatch)
-      // -----------------------------------------------------------------------
-
-      if (args.mode === "shape") {
-        const shape = session.getSessionShape();
-        return JSON.stringify({ handle: args.handle, queryMode: "shape", shape });
-      }
-
-      if (args.mode === "stepAtTime") {
-        if (args.time === undefined) {
-          throw new Error(`harness_query: mode='stepAtTime' requires a 'time' parameter.`);
-        }
-        const t = args.time as number;
-        const side = (args.side as "ours" | "ngspice") ?? "ours";
-        const idx = session.getStepAtTime(t, side);
-        return JSON.stringify({ handle: args.handle, queryMode: "stepAtTime", stepIndex: idx, time: t, side });
-      }
-
-      // -----------------------------------------------------------------------
-      // Priority dispatch
-      // -----------------------------------------------------------------------
-
-      // P1: type === "summary"
-      if (args.type === "summary") {
-        const summary = session.getSummary();
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "summary",
-          total: 1,
-          offset: 0,
-          limit: 1,
-          summary: serializeSummary(summary),
-        });
-      }
-
-      // P2: component + step + iteration + limiting
-      if (args.component !== undefined && args.step !== undefined && args.iteration !== undefined && args.limiting) {
-        const label = requireComponent(args.component);
-        const report = session.getLimitingComparison(label, args.step, args.iteration);
-        const limitingData = {
-          component: report.label,
-          stepIndex: args.step,
-          iteration: args.iteration,
-          junctions: report.junctions.map((j: any) => ({
-            junction: j.junction,
-            ourPreLimit: formatNumber(j.ourPreLimit),
-            ourPostLimit: formatNumber(j.ourPostLimit),
-            ourDelta: formatNumber(j.ourDelta),
-            ngspicePreLimit: formatNumber(j.ngspicePreLimit),
-            ngspicePostLimit: formatNumber(j.ngspicePostLimit),
-            ngspiceDelta: formatNumber(j.ngspiceDelta),
-            limitingDiff: formatNumber(j.limitingDiff),
-          })),
-          noEvents: report.noEvents,
-        };
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "limiting",
-          total: report.junctions.length,
-          offset,
-          limit: args.limit ?? 100,
-          limitingData,
-        });
-      }
-
-      // P3: component + step + iteration + convergence
-      if (args.component !== undefined && args.step !== undefined && args.iteration !== undefined && args.convergence) {
-        const label = requireComponent(args.component);
-        const detail = session.getConvergenceDetail(args.step, args.iteration);
-        const filtered = detail.elements.filter((e: any) => e.label.toUpperCase() === label);
-        const { items, total } = paginate(filtered, 100);
-        const convergenceData = items.map((e: any) => ({
-          label: e.label,
-          deviceType: e.deviceType,
-          ourConverged: e.ourConverged,
-          ngspiceConverged: e.ngspiceConverged,
-          converged: e.ourConverged,
-          noncon: e.ourConverged ? 0 : 1,
-          worstDelta: e.worstDelta !== undefined ? formatNumber(e.worstDelta) : undefined,
-          agree: e.agree,
-        }));
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "per-element-convergence",
-          total,
-          offset,
-          limit: args.limit ?? 100,
-          convergenceData,
-        });
-      }
-
-      // P4: step + iteration + convergence (all elements)
-      if (args.step !== undefined && args.iteration !== undefined && args.convergence) {
-        const detail = session.getConvergenceDetail(args.step, args.iteration);
-        const { items, total } = paginate(detail.elements, 100);
-        const convergenceData = items.map((e: any) => ({
-          label: e.label,
-          deviceType: e.deviceType,
-          ourConverged: e.ourConverged,
-          ngspiceConverged: e.ngspiceConverged,
-          converged: e.ourConverged,
-          noncon: e.ourConverged ? 0 : 1,
-          worstDelta: e.worstDelta !== undefined ? formatNumber(e.worstDelta) : undefined,
-          agree: e.agree,
-        }));
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "per-element-convergence",
-          total,
-          offset,
-          limit: args.limit ?? 100,
-          convergenceData,
-        });
-      }
-
-      // P5: component + step + stateHistory
-      if (args.component !== undefined && args.step !== undefined && args.stateHistory) {
-        const label = requireComponent(args.component);
-        const report = session.getStateHistory(label, args.step);
-        // getStateHistory returns a snapshot at a single iteration; reformat as iterations array
-        const slots = Object.keys(report.state0);
-        const filteredSlots = args.slots
-          ? slots.filter((s) => args.slots!.some((pat) => new RegExp("^" + pat.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$", "i").test(s)))
-          : slots;
-        const iterations = [{
-          iteration: report.iteration,
-          states: Object.fromEntries(
-            filteredSlots.map((slot) => [
-              slot,
-              formatComparedValue({
-                ours: report.state0[slot] ?? NaN,
-                ngspice: report.ngspiceState0[slot] ?? NaN,
-                delta: (report.state0[slot] ?? NaN) - (report.ngspiceState0[slot] ?? NaN),
-                absDelta: Math.abs((report.state0[slot] ?? NaN) - (report.ngspiceState0[slot] ?? NaN)),
-                relDelta: NaN,
-                withinTol: false,
-              }),
-            ]),
-          ),
-        }];
-        const { items, total } = paginate(iterations, 100);
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "step-state-history",
-          total,
-          offset,
-          limit: args.limit ?? 100,
-          stateHistory: {
-            component: label,
-            stepIndex: args.step,
-            simTime: formatNumber(report.stepIndex >= 0 ? (session as any)._ourSession?.steps[args.step]?.stepStartTime ?? 0 : 0),
-            slots: filteredSlots,
-            iterations: items,
-          },
-        });
-      }
-
-      // P6: step + integrationCoefficients
-      if (args.step !== undefined && args.integrationCoefficients) {
-        const report = session.getIntegrationCoefficients(args.step);
-        const integrationCoefficients = {
-          stepIndex: report.stepIndex,
-          ours: {
-            ag0: formatNumber(report.ours.ag0),
-            ag1: formatNumber(report.ours.ag1),
-            method: report.ours.method,
-            order: report.ours.order,
-          },
-          ngspice: {
-            ag0: formatNumber(report.ngspice.ag0),
-            ag1: formatNumber(report.ngspice.ag1),
-            method: report.ngspice.method,
-            order: report.ngspice.order,
-          },
-          cktMode: (session as any)._ourSession?.steps[args.step]?.cktMode ?? 0,
-          ag0Compared: formatComparedValue(report.ag0Compared),
-          ag1Compared: formatComparedValue(report.ag1Compared),
-          methodMatch: report.methodMatch,
-        };
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "integration-coefficients",
-          total: 1,
-          offset,
-          limit: 1,
-          integrationCoefficients,
-        });
-      }
-
-      // P7: step + iterations
-      if (args.step !== undefined && args.iterations) {
-        const iterReports = session.getIterations(args.step);
-        const rawOurStep = (session as any)._ourSession?.steps[args.step];
-        const ourTopology = (session as any)._ourTopology;
-        const { items, total } = paginate(iterReports, 5);
-        const iterationData = items.map((r: any) => {
-          const rawIter = rawOurStep?.iterations[r.iteration];
-          const prevNodes: Record<string, any> = {};
-          if (rawIter?.prevVoltages && ourTopology?.nodeLabels) {
-            (ourTopology.nodeLabels as Map<number, string>).forEach((label, nodeId) => {
-              if (nodeId > 0 && nodeId - 1 < rawIter.prevVoltages.length) {
-                prevNodes[label] = formatNumber(rawIter.prevVoltages[nodeId - 1]);
-              }
-            });
-          }
-          return {
-          stepIndex: r.stepIndex,
-          iteration: r.iteration,
-          simTime: formatNumber(r.stepStartTime),
-          noncon: formatComparedValue(r.noncon),
-          nodes: Object.fromEntries(
-            Object.entries(r.nodes).map(([k, v]) => [k, formatComparedValue(v as any)]),
-          ),
-          prevNodes,
-          rhs: Object.fromEntries(
-            Object.entries(r.rhs).map(([k, v]) => [k, formatComparedValue(v as any)]),
-          ),
-          matrixDiffs: (r.matrixDiffs ?? []).map((md: any) => ({
-            rowLabel: md.rowLabel ?? String(md.row),
-            colLabel: md.colLabel ?? String(md.col),
-            ours: formatNumber(md.ours),
-            ngspice: formatNumber(md.ngspice),
-            absDelta: formatNumber(md.absDelta),
-          })),
-          components: Object.fromEntries(
-            Object.entries(r.components).map(([comp, slots]) => [
-              comp,
-              Object.fromEntries(
-                Object.entries(slots as Record<string, any>).map(([slot, cv]) => [slot, formatComparedValue(cv)]),
-              ),
-            ]),
-          ),
-          };
-        });
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "step-iterations",
-          total,
-          offset,
-          limit: args.limit ?? 5,
-          iterationData,
-        });
-      }
-
-      // P8: component + step (no modifiers)
-      if (args.component !== undefined && args.step !== undefined) {
-        const label = requireComponent(args.component);
-        const stepEnd = session.getStepEnd(args.step);
-        const compEntry = stepEnd.components[label] ?? stepEnd.components[label.toUpperCase()];
-        const rawSlots = compEntry ? Object.entries(compEntry.slots) : [];
-        let filteredSlots = rawSlots;
-        if (args.filter === "divergences") {
-          filteredSlots = rawSlots.filter(([, cv]) => !(cv as any).withinTol);
-        }
-        const { items, total } = paginate(filteredSlots, 50);
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "component-step-end",
-          total,
-          offset,
-          limit: args.limit ?? 50,
-          stepEnd: {
-            stepIndex: args.step,
-            label,
-            deviceType: compEntry?.deviceType ?? "unknown",
-            slots: Object.fromEntries(items.map(([k, v]) => [k, formatComparedValue(v as any)])),
-          },
-        });
-      }
-
-      // P9: component + filter: "divergences"
-      if (args.component !== undefined && args.filter === "divergences") {
-        const label = requireComponent(args.component);
-        const divergenceReport = session.getDivergences({ component: label });
-        const validEntries9 = divergenceReport.entries.filter((e: any) => Number.isFinite(e.absDelta) && e.absDelta > 0);
-        const { items, total } = paginate(validEntries9, 100);
-        const divergences = items.map((e: any) => ({
-          stepIndex: e.stepIndex,
-          iterationIndex: e.iteration,
-          stepStartTime: formatNumber(e.stepStartTime),
-          type: e.category as "node" | "rhs" | "matrix" | "state",
-          label: e.label,
-          ours: formatNumber(e.ours),
-          ngspice: formatNumber(e.ngspice),
-          absDelta: formatNumber(e.absDelta),
-          relDelta: formatNumber(e.relDelta),
-        }));
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "component-divergences",
-          total,
-          offset,
-          limit: args.limit ?? 100,
-          divergences,
-        });
-      }
-
-      // P10: component only (trace)
-      if (args.component !== undefined) {
-        const label = requireComponent(args.component);
-        const traceOpts: any = { offset, limit: args.limit ?? 50 };
-        if (args.slots) traceOpts.slots = args.slots;
-        if (args.stepRange) traceOpts.stepsRange = { from: args.stepRange[0], to: args.stepRange[1] };
-        const trace = session.traceComponent(label, traceOpts);
-        const total = trace.steps.length;
-        const componentTrace = {
-          label: trace.label,
-          deviceType: trace.deviceType,
-          steps: trace.steps.map((s: any) => ({
-            stepIndex: s.stepIndex,
-            simTime: formatNumber(s.stepStartTime),
-            iterations: s.iterations.map((it: any) => ({
-              iteration: it.iteration,
-              states: Object.fromEntries(
-                Object.entries(it.states).map(([k, v]) => [k, formatComparedValue(v as any)]),
-              ),
-              pinVoltages: Object.fromEntries(
-                Object.entries(it.pinVoltages).map(([k, v]) => [k, formatComparedValue(v as any)]),
-              ),
-            })),
-          })),
-        };
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "component-trace",
-          total,
-          offset,
-          limit: args.limit ?? 50,
-          componentTrace,
-        });
-      }
-
-      // P11: node
-      if (args.node !== undefined) {
-        const upper = args.node.toUpperCase();
-        let found = false;
-        topology.nodeLabels.forEach((label: string) => {
-          if (label.toUpperCase() === upper) found = true;
-        });
-        if (!found) {
-          const knownNodes: string[] = [];
-          topology.nodeLabels.forEach((label: string) => knownNodes.push(label));
-          throw new Error(
-            `harness_query: node "${args.node}" not found. Known nodes (first 10): ${knownNodes.slice(0, 10).join(", ")}.`,
-          );
-        }
-        const traceOpts: any = { offset, limit: args.limit ?? 50 };
-        if (args.stepRange) traceOpts.stepsRange = { from: args.stepRange[0], to: args.stepRange[1] };
-        const trace = session.traceNode(upper, traceOpts);
-        const total = trace.steps.length;
-        const nodeTrace = {
-          label: trace.label,
-          ourIndex: trace.ourIndex,
-          ngspiceIndex: trace.ngspiceIndex,
-          steps: trace.steps.map((s: any) => ({
-            stepIndex: s.stepIndex,
-            simTime: formatNumber(s.stepStartTime),
-            iterations: s.iterations.map((it: any) => ({
-              iteration: it.iteration,
-              voltage: formatComparedValue(it.voltage),
-            })),
-          })),
-        };
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "node-trace",
-          total,
-          offset,
-          limit: args.limit ?? 50,
-          nodeTrace,
-        });
-      }
-
-      // P12: step only (step-end)
-      if (args.step !== undefined) {
-        const stepEnd = session.getStepEnd(args.step);
-        let nodeEntries = Object.entries(stepEnd.nodes);
-        let branchEntries = Object.entries(stepEnd.branches ?? {});
-        if (args.filter === "divergences") {
-          nodeEntries = nodeEntries.filter(([, cv]) => !(cv as any).withinTol);
-          branchEntries = branchEntries.filter(([, cv]) => !(cv as any).withinTol);
-        }
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "step-end",
-          total: nodeEntries.length + branchEntries.length,
-          offset,
-          limit: args.limit ?? 100,
-          stepEnd: {
-            stepIndex: stepEnd.stepIndex,
-            presence: stepEnd.presence,
-            stepStartTime: formatComparedValue(stepEnd.stepStartTime),
-            stepEndTime: formatComparedValue(stepEnd.stepEndTime),
-            dt: formatComparedValue(stepEnd.dt),
-            converged: stepEnd.converged,
-            iterationCount: formatComparedValue(stepEnd.iterationCount),
-            nodes: Object.fromEntries(nodeEntries.map(([k, v]) => [k, formatComparedValue(v as any)])),
-            branches: Object.fromEntries(branchEntries.map(([k, v]) => [k, formatComparedValue(v as any)])),
-            components: Object.fromEntries(
-              Object.entries(stepEnd.components).map(([comp, entry]) => [
-                comp,
-                Object.fromEntries(
-                  Object.entries((entry as any).slots).map(([slot, cv]) => [slot, formatComparedValue(cv as any)]),
-                ),
-              ]),
-            ),
-          },
-        });
-      }
-
-      // P13: deviceType
-      if (args.deviceType !== undefined) {
-        const matching = session.getComponentsByType(args.deviceType);
-        if (matching.length === 0) {
-          const availableTypes = [...new Set(topology.elements.map((el: any) => el.type ?? "unknown"))];
-          throw new Error(
-            `harness_query: no components of type "${args.deviceType}". Types present: ${availableTypes.join(", ")}.`,
-          );
-        }
-        const allStepIndices = Array.from({ length: totalSteps }, (_, i) => i);
-        const filteredIndices = filterStepIndices(allStepIndices);
-        const { items: stepSlice, total } = paginate(filteredIndices, 50);
-        const steps = stepSlice.map((si: number) => {
-          const stepEnd = session.getStepEnd(si);
-          const ourStep = (session as any)._ourSession?.steps[si];
-          const comps: Record<string, Record<string, any>> = {};
-          for (const comp of matching) {
-            const label = comp.label;
-            const upper = label.toUpperCase();
-            const compEntry = stepEnd.components[upper] ?? stepEnd.components[label];
-            if (compEntry) {
-              comps[label] = Object.fromEntries(
-                Object.entries(compEntry.slots).map(([slot, cv]) => [slot, formatComparedValue(cv as any)]),
-              );
-            }
-          }
-          return {
-            stepIndex: si,
-            simTime: formatNumber(ourStep?.stepStartTime ?? (session as any)._ngSessionAligned?.()?.steps[si]?.stepStartTime ?? 0),
-            components: comps,
-          };
-        });
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "device-type",
-          total,
-          offset,
-          limit: args.limit ?? 50,
-          deviceTypeData: {
-            deviceType: args.deviceType,
-            components: matching,
-            steps,
-          },
-        });
-      }
-
-      // P14: filter: "divergences" or "worst" (no component)
-      if (args.filter === "divergences" || args.filter === "worst") {
-        const divergenceReport = session.getDivergences();
-        let entries: any[] = divergenceReport.entries.filter((e: any) => Number.isFinite(e.absDelta) && e.absDelta > 0);
-        if (args.filter === "worst") {
-          const n = args.worstN ?? 10;
-          entries = entries.slice().sort((a: any, b: any) => b.absDelta - a.absDelta).slice(0, n);
-        }
-        const { items, total } = paginate(entries, 100);
-        const divergences = items.map((e: any) => ({
-          stepIndex: e.stepIndex,
-          iterationIndex: e.iteration,
-          stepStartTime: formatNumber(e.stepStartTime),
-          type: e.category as "node" | "rhs" | "matrix" | "state",
-          label: e.label,
-          ours: formatNumber(e.ours),
-          ngspice: formatNumber(e.ngspice),
-          absDelta: formatNumber(e.absDelta),
-          relDelta: formatNumber(e.relDelta),
-        }));
-        return JSON.stringify({
-          handle: args.handle,
-          queryMode: "divergences",
-          total,
-          offset,
-          limit: args.limit ?? 100,
-          divergences,
-        });
-      }
-
-      // P15: no primary mode
-      throw new Error(
-        `harness_query: no query mode selected. Provide: component, node, step, deviceType, or type.`,
-      );
+      const map = entry.session.sessionMap();
+      return JSON.stringify({ handle: args.handle, sessionMap: map });
     }),
   );
 
   // -------------------------------------------------------------------------
-  // harness_compare_matrix
+  // harness_get_step
   // -------------------------------------------------------------------------
 
   server.registerTool(
-    "harness_compare_matrix",
+    "harness_get_step",
     {
-      title: "Compare MNA Matrix",
+      title: "Get Step Detail",
       description:
-        "Return a labeled comparison of MNA matrix entries for a specific step and NR iteration. " +
-        "Each entry contains the row and column labels and both engine values. " +
-        "Supports filtering to mismatches only.",
+        "Return paired attempt summaries and divergence norms for one step. " +
+        "Query by index (positional) or by simulation time on a chosen side.",
       inputSchema: z.object({
         handle: z.string().describe("Harness session handle"),
-        step: z.number().int().min(0).describe("Step index"),
-        iteration: z.number().int().min(0).describe("NR iteration index within the step"),
-        filter: z.enum(["all", "mismatches"]).optional().describe(
-          "'all' returns every captured matrix entry. " +
-          "'mismatches' returns only entries where |ours - ngspice| exceeds tolerance. Default: 'mismatches'.",
+        index: z.number().int().min(0).optional().describe(
+          "Step index (0-based). Mutually exclusive with 'time'.",
+        ),
+        time: z.number().optional().describe(
+          "Simulation time in seconds — finds the nearest step by stepEndTime. " +
+          "Mutually exclusive with 'index'.",
+        ),
+        side: z.enum(["ours", "ngspice"]).optional().describe(
+          "Which engine timeline to search when using 'time'. Default: 'ours'.",
+        ),
+      }),
+    },
+    wrapTool("harness_get_step", async (args) => {
+      const entry = harnessState.get(args.handle, "harness_get_step");
+      if (!entry.analysis) {
+        throw new Error("harness_get_step: run harness_run first");
+      }
+      if (args.index !== undefined && args.time !== undefined) {
+        throw new Error("harness_get_step: provide either 'index' or 'time', not both");
+      }
+      if (args.index === undefined && args.time === undefined) {
+        throw new Error("harness_get_step: provide 'index' or 'time'");
+      }
+      const query = args.index !== undefined
+        ? { index: args.index }
+        : { time: args.time!, side: args.side as "ours" | "ngspice" | undefined };
+      const detail = entry.session.getStep(query);
+      return JSON.stringify({ handle: args.handle, step: detail });
+    }),
+  );
+
+  // -------------------------------------------------------------------------
+  // harness_get_attempt
+  // -------------------------------------------------------------------------
+
+  server.registerTool(
+    "harness_get_attempt",
+    {
+      title: "Get Attempt Detail",
+      description:
+        "Return paired per-iteration data for a specific NR solve attempt within a step. " +
+        "Identifies the attempt by step index, phase name, and position within that phase. " +
+        "Supports iteration range and pagination.",
+      inputSchema: z.object({
+        handle: z.string().describe("Harness session handle"),
+        stepIndex: z.number().int().min(0).describe("Step index (0-based)"),
+        phase: z.enum([
+          "dcopInitJct", "dcopInitFloat",
+          "dcopDirect", "dcopGminDynamic", "dcopGminSpice3", "dcopSrcSweep",
+          "tranInit", "tranPredictor", "tranNR", "tranNrRetry", "tranLteRetry",
+        ] as [NRPhase, ...NRPhase[]]).describe("NR phase name"),
+        phaseAttemptIndex: z.number().int().min(0).describe(
+          "0-based index within attempts of this phase (usually 0).",
+        ),
+        iterationRange: z.tuple([z.number().int().min(0), z.number().int().min(0)]).optional().describe(
+          "Inclusive [from, to] iteration indices within the attempt.",
         ),
         offset: z.number().int().min(0).optional().describe("Pagination offset. Default: 0."),
-        limit: z.number().int().min(1).optional().describe("Maximum entries to return. Default: 100."),
+        limit: z.number().int().min(1).optional().describe("Maximum iterations to return."),
       }),
     },
-    wrapTool("harness_compare_matrix", async (args) => {
-      const entry = harnessState.get(args.handle, "harness_compare_matrix");
-      const { session } = entry;
-
+    wrapTool("harness_get_attempt", async (args) => {
+      const entry = harnessState.get(args.handle, "harness_get_attempt");
       if (!entry.analysis) {
-        throw new Error(`harness_compare_matrix: run harness_run first`);
+        throw new Error("harness_get_attempt: run harness_run first");
       }
-
-      const ourStepCountM: number = (session as any)._ourSession?.steps?.length ?? 0;
-      const ngStepCountM: number = (session as any)._ngSessionAligned?.()?.steps?.length ?? 0;
-      const totalStepsM: number = Math.max(ourStepCountM, ngStepCountM);
-      if (args.step >= totalStepsM) {
-        throw new Error(
-          `harness_compare_matrix: step ${args.step} out of range [0, ${totalStepsM - 1}]. Run has ${totalStepsM} steps (ours: ${ourStepCountM}, ngspice: ${ngStepCountM}).`,
-        );
-      }
-
-      const ourStepM = (session as any)._ourSession?.steps[args.step];
-      const ngStepM = (session as any)._ngSessionAligned?.()?.steps[args.step];
-      const stepIterations: number = ourStepM?.iterations?.length ?? ngStepM?.iterations?.length ?? 0;
-      if (args.iteration >= stepIterations) {
-        throw new Error(
-          `harness_compare_matrix: iteration ${args.iteration} out of range [0, ${stepIterations - 1}] at step ${args.step}`,
-        );
-      }
-
-      const filter = args.filter ?? "mismatches";
-      const comparison = session.compareMatrixAt(args.step, args.iteration, filter);
-
-      const offset = args.offset ?? 0;
-      const limit = args.limit ?? 100;
-      const total = comparison.entries.length;
-      const pageEntries = comparison.entries.slice(offset, offset + limit);
-
-      const entries = pageEntries.map((e: any) => ({
-        rowLabel: e.rowLabel,
-        colLabel: e.colLabel,
-        rowIndex: e.row,
-        colIndex: e.col,
-        ours: formatNumber(e.ours),
-        ngspice: formatNumber(e.ngspice),
-        delta: formatNumber(e.ours - e.ngspice),
-        absDelta: formatNumber(e.absDelta),
-        withinTol: e.withinTol,
-      }));
-
-      return JSON.stringify({
-        handle: args.handle,
-        step: args.step,
-        iteration: args.iteration,
-        filter,
-        total,
-        offset,
-        limit,
-        entries,
+      const detail = entry.session.getAttempt({
+        stepIndex: args.stepIndex,
+        phase: args.phase as NRPhase,
+        phaseAttemptIndex: args.phaseAttemptIndex,
+        iterationRange: args.iterationRange as [number, number] | undefined,
+        limit: args.limit,
+        offset: args.offset,
       });
+      return JSON.stringify({ handle: args.handle, attempt: detail });
     }),
   );
+
+  // harness_query and harness_compare_matrix removed — replaced by harness_session_map / harness_get_step / harness_get_attempt
 
   // -------------------------------------------------------------------------
   // harness_export

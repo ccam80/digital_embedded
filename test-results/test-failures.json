@@ -1,163 +1,24 @@
 {
   "summary": {
     "vitest": {
-      "passed": 8232,
-      "failed": 12,
+      "passed": 8,
+      "failed": 0,
       "skipped": 0,
-      "totalFiles": 361,
-      "durationSeconds": 22.5
+      "totalFiles": 1,
+      "durationSeconds": 5.5
     },
     "playwright": {
-      "passed": 477,
-      "failed": 13,
+      "passed": 476,
+      "failed": 12,
       "skipped": 0,
-      "totalFiles": 24,
-      "durationSeconds": 236.35848199999998
+      "totalFiles": 23,
+      "durationSeconds": 361.008703
     },
-    "totalFailed": 25,
-    "totalPassed": 8709
+    "totalFailed": 12,
+    "totalPassed": 484
   },
   "failures": {
-    "vitest": [
-      {
-        "message": "Analog engine stagnation: simTime stuck at 1.0000000000000003e-9s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\coordinator.ts",
-            "test": "transient stepping does not error after 50 steps",
-            "line": 203,
-            "column": 13
-          }
-        ]
-      },
-      {
-        "message": "Engine entered ERROR state at step 2, simTime=1.0000000000000003e-9",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
-            "test": "survives 2000 transient steps without ERROR state",
-            "line": 79,
-            "column": 15
-          }
-        ]
-      },
-      {
-        "message": "Engine ERROR at step 2, simTime=1.000e-9",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
-            "test": "survives 600µs of sim time (matches UI run duration)",
-            "line": 103,
-            "column": 15
-          }
-        ]
-      },
-      {
-        "message": "step 1 transitioned engine to ERROR (simTime=1.0000000000000003e-9): expected 'ERROR' not to be 'ERROR' // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\buckbjt-mcp-surface.test.ts",
-            "test": "50 steps advance simTime > 0 without ERROR (regression: stale t=0 breakpoints must not freeze getClampedDt)",
-            "line": 74,
-            "column": 13
-          }
-        ]
-      },
-      {
-        "message": "expected 1 to be greater than or equal to 2",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
-            "test": "step 0 has at least 2 attempts (DCOP attempt + tranInit attempt)",
-            "line": 51,
-            "column": 35
-          }
-        ]
-      },
-      {
-        "message": "expected false to be true // Object.is equality",
-        "count": 2,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
-            "test": "step 0 contains a transient-phase attempt (tranInit or tranNR)",
-            "line": 67,
-            "column": 21
-          },
-          {
-            "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
-            "test": "MCP-5: convergence detail has per-element flags",
-            "line": 279,
-            "column": 70
-          }
-        ]
-      },
-      {
-        "message": "expected true to be false // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
-            "test": "acceptedAttemptIndex points at a transient-phase attempt (not a DCOP sub-solve)",
-            "line": 79,
-            "column": 56
-          }
-        ]
-      },
-      {
-        "message": "expected 0 to be greater than 0",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
-            "test": "subsequent steps have stepStartTime > 0",
-            "line": 93,
-            "column": 38
-          }
-        ]
-      },
-      {
-        "message": "ours must have ag0 AND ag1 non-zero on at least one tranFloat step: expected false to be true // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "4. integration coefficients: ag0 non-zero for transient steps",
-            "line": 111,
-            "column": 99
-          }
-        ]
-      },
-      {
-        "message": "trapezoidal method must appear in tranFloat steps: expected false to be true // Object.is equality",
-        "count": 1,
-        "locations": [
-          {
-            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-            "test": "5. integration coefficients: method transitions to trapezoidal",
-            "line": 132,
-            "column": 102
-          }
-        ]
-      },
-      {
-        "message": "must find a transient step with non-zero coefficients on both sides: expected -1 to be greater than or equal to 0",
-        "count": 1,
-        "locations": [
-          {
-            "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
-            "test": "MCP-4: integration coefficients have correct structure",
-            "line": 203,
-            "column": 95
-          }
-        ]
-      }
-    ],
+    "vitest": [],
     "playwright": [
       {
         "message": "Error: Expected 0.02092469043192962 to be close to 0.02084652 (err=0.00007817043192961948, limit=2.084652e-8)",
@@ -167,6 +28,18 @@
             "file": "gui/analog-bjt-convergence.spec.ts",
             "test": "compile and step — no convergence error, supply rail is 10V",
             "line": 251,
+            "column": 3
+          }
+        ]
+      },
+      {
+        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
+        "count": 1,
+        "locations": [
+          {
+            "file": "gui/analog-bjt-convergence.spec.ts",
+            "test": "run continuously — voltages remain bounded",
+            "line": 355,
             "column": 3
           }
         ]
@@ -220,7 +93,7 @@
         ]
       },
       {
-        "message": "Error: Expected 0.09577162816208429 to be close to 0.0957744513 (err=0.0000028231379157056535, limit=9.577445129999999e-8)",
+        "message": "Error: Expected 0.09577162816208397 to be close to 0.0957744513 (err=0.0000028231379160248427, limit=9.577445129999999e-8)",
         "count": 1,
         "locations": [
           {
@@ -263,24 +136,6 @@
             "file": "gui/stepping-perf.spec.ts",
             "test": "buckbjt fast-forward 1ms — completes within 5s wall budget",
             "line": 93,
-            "column": 3
-          }
-        ]
-      },
-      {
-        "message": "Error: page.evaluate: Error: Timed out waiting for message: sim-harness-started",
-        "count": 2,
-        "locations": [
-          {
-            "file": "parity/harness-convergence-log-conflict.spec.ts",
-            "test": "panel toggle while harness active surfaces conflict notification",
-            "line": 22,
-            "column": 3
-          },
-          {
-            "file": "parity/harness-convergence-log-conflict.spec.ts",
-            "test": "panel shows iterationDetails for harness-enabled sessions",
-            "line": 51,
             "column": 3
           }
         ]

@@ -196,21 +196,24 @@ describe("AcSource", () => {
   });
 
   it("square_wave_breakpoints", () => {
-    // Default riseTime=fallTime=1ns. For 1kHz, halfPeriod=0.5ms.
-    // Each half-period edge produces 2 breakpoints: t_edge and t_edge+transitionTime.
-    // Edges in (0, 0.002]: 0.5ms, 1ms, 1.5ms — each with a +1ns companion.
-    // Also the first rise-end at 1ns (n=0, tEdge=0, tEdge+riseTime=1e-9 > 0).
-    // Total: 1e-9, 0.5ms, 0.5ms+1ns, 1ms, 1ms+1ns, 1.5ms, 1.5ms+1ns = 7
+    // ngspice PULSE convention: default riseTime=fallTime=1ns (from AC_VOLTAGE_SOURCE_DEFAULTS).
+    // For 1kHz, period=1ms, halfPeriod=0.5ms.
+    // Breakpoints per period at offsets: [0, TR=1ns, halfPeriod=0.5ms, halfPeriod+TF=0.5ms+1ns].
+    // In (0, 0.002) exclusive:
+    //   Period 0 (t=0): t=0 excluded, 1ns, 0.5ms, 0.5ms+1ns
+    //   Period 1 (t=1ms): 1ms, 1ms+1ns, 1.5ms, 1.5ms+1ns
+    //   Period 2 (t=2ms): all >= 2ms excluded
+    // Total: 7 breakpoints.
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "square" }, 1, 0, 2, 0);
     const bps = el.getBreakpoints(0, 0.002);
     expect(bps).toHaveLength(7);
-    expect(bps[0]).toBeCloseTo(1e-9,     12); // end of first rise (n=0 edge is at t=0, which is excluded)
-    expect(bps[1]).toBeCloseTo(0.0005,   8);  // n=1 edge (fall start)
-    expect(bps[2]).toBeCloseTo(0.0005 + 1e-9, 12); // end of fall
-    expect(bps[3]).toBeCloseTo(0.001,    8);  // n=2 edge (rise start)
-    expect(bps[4]).toBeCloseTo(0.001 + 1e-9,  12); // end of rise
-    expect(bps[5]).toBeCloseTo(0.0015,   8);  // n=3 edge (fall start)
-    expect(bps[6]).toBeCloseTo(0.0015 + 1e-9, 12); // end of fall
+    expect(bps[0]).toBeCloseTo(1e-9,          12); // end of first rising edge
+    expect(bps[1]).toBeCloseTo(0.0005,         12); // start of falling edge
+    expect(bps[2]).toBeCloseTo(0.0005 + 1e-9,  12); // end of falling edge
+    expect(bps[3]).toBeCloseTo(0.001,           12); // start of next rising edge
+    expect(bps[4]).toBeCloseTo(0.001  + 1e-9,  12); // end of next rising edge
+    expect(bps[5]).toBeCloseTo(0.0015,          12); // start of next falling edge
+    expect(bps[6]).toBeCloseTo(0.0015 + 1e-9,  12); // end of next falling edge
   });
 
   it("set_scale_applied", () => {

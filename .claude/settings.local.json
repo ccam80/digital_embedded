@@ -105,7 +105,11 @@
       "mcp__circuit-simulator__harness_query",
       "mcp__circuit-simulator__harness_compare_matrix",
       "mcp__circuit-simulator__harness_export",
-      "Write"
+      "Write",
+      "Bash(npm run:*)",
+      "mcp__circuit-simulator__harness_session_map",
+      "mcp__circuit-simulator__harness_get_step",
+      "mcp__circuit-simulator__harness_get_attempt"
     ]
   },
   "enableAllProjectMcpServers": true,

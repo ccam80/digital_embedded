@@ -394,6 +394,20 @@ export function createStepCaptureHook(
     endAttempt(outcome: NRAttemptOutcome, converged: boolean): void {
       const iterations = iterCapture.getSnapshots();
       if (iterations.length > 0 || pendingAttempts.length === 0) {
+        // Derive role from phase and position within the step
+        let role: import("./types.js").AttemptRole | undefined;
+        if (currentAttemptPhase === "dcopInitFloat" && pendingAttempts.length === 0) {
+          role = "coldStart";
+        } else if (currentAttemptPhase === "dcopDirect") {
+          role = "mainSolve";
+        } else if (
+          (currentAttemptPhase === "tranInit" ||
+           currentAttemptPhase === "tranPredictor" ||
+           currentAttemptPhase === "tranNR") &&
+          converged
+        ) {
+          role = "tranSolve";
+        }
         const attempt: NRAttempt = {
           dt: currentAttemptDt,
           iterations: [...iterations],
@@ -401,6 +415,7 @@ export function createStepCaptureHook(
           iterationCount: iterations.length,
           phase: currentAttemptPhase,
           outcome,
+          ...(role !== undefined ? { role } : {}),
           ...(currentAttemptPhaseParameter !== undefined
             ? { phaseParameter: currentAttemptPhaseParameter }
             : {}),
@@ -447,6 +462,7 @@ export function createStepCaptureHook(
         iterations: acceptedAttempt.iterations,
         converged: acceptedAttempt.converged,
         iterationCount: acceptedAttempt.iterationCount,
+        totalIterationCount: pendingAttempts.reduce((sum, a) => sum + a.iterationCount, 0),
         integrationCoefficients: params.integrationCoefficients,
         analysisPhase,
       });

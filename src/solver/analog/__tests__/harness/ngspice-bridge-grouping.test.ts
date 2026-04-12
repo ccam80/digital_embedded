@@ -187,4 +187,37 @@ describe("ngspice-bridge grouping — §6.1 state machine", () => {
     // All three sub-solves are in the gminDynamic phase — each iteration reset creates a new attempt
     expect(session.steps[0].attempts.length).toBe(3);
   });
+
+  it("DCOP multi-attempt step: totalIterationCount > iterationCount", () => {
+    const iters = [
+      makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, phaseFlags: 0x1, phaseGmin: 1e-3, iteration: 0, converged: false }),
+      makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, phaseFlags: 0x1, phaseGmin: 1e-3, iteration: 1, converged: false }),
+      makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, phaseFlags: 0x1, phaseGmin: 1e-3, iteration: 2, converged: true }),
+      makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, phaseFlags: 0x2, phaseSrcFact: 0.5, iteration: 0, converged: false }),
+      makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, phaseFlags: 0x2, phaseSrcFact: 0.5, iteration: 1, converged: true }),
+      makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, phaseFlags: 0,   iteration: 0, converged: true }),
+    ];
+    const bridge = makeBridge(iters);
+    const session = bridge.getCaptureSession();
+    expect(session.steps.length).toBe(1);
+    const step = session.steps[0];
+    expect(step.attempts.length).toBeGreaterThanOrEqual(2);
+    const sumOfAttempts = step.attempts.reduce((s, a) => s + a.iterationCount, 0);
+    expect(step.totalIterationCount).toBe(sumOfAttempts);
+    expect(step.totalIterationCount).toBeGreaterThan(step.iterationCount);
+  });
+
+  it("single-attempt step: totalIterationCount === iterationCount", () => {
+    const iters = [
+      makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, iteration: 0, converged: false }),
+      makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, iteration: 1, converged: false }),
+      makeRaw({ simTimeStart: 0, cktMode: MODEDCOP, iteration: 2, converged: true }),
+    ];
+    const bridge = makeBridge(iters);
+    const session = bridge.getCaptureSession();
+    expect(session.steps.length).toBe(1);
+    const step = session.steps[0];
+    expect(step.attempts.length).toBe(1);
+    expect(step.totalIterationCount).toBe(step.iterationCount);
+  });
 });

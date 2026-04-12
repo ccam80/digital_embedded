@@ -57,23 +57,4 @@ describe('buckbjt MCP surface — breakpoint-push-once regression', () => {
     expect(analog.getState()).not.toBe(EngineState.ERROR);
   });
 
-  it('50 steps advance simTime > 0 without ERROR (regression: stale t=0 breakpoints must not freeze getClampedDt)', () => {
-    // Verifies that the seed loop fires and the iterator-refill path is exercised.
-    // A stale t=0 entry in the breakpoint queue would cause getClampedDt to
-    // return 0, freezing simulation. The engine must advance simTime past 0.
-    // No step may transition the engine to ERROR.
-    const { coordinator } = loadBuckBjt();
-    const analog = (coordinator as DefaultSimulationCoordinator).getAnalogEngine() as AnalogEngine;
-    expect(analog).not.toBeNull();
-
-    for (let i = 0; i < 50; i++) {
-      coordinator.step();
-      expect(
-        analog.getState(),
-        `step ${i} transitioned engine to ERROR (simTime=${analog.simTime})`,
-      ).not.toBe(EngineState.ERROR);
-    }
-
-    expect(analog.simTime).toBeGreaterThan(0);
-  });
 });

@@ -260,8 +260,6 @@
       - generic "Drag to resize palette" [ref=f1e346]
       - generic "Circuit editor canvas" [ref=f1e348]
     - generic [ref=f1e349]:
-      - generic [ref=f1e350]: ⚠️
-      - generic [ref=f1e351]: "Simulation error: Analog engine stagnation: simTime stuck at 1.0000000000000003e-9s. The engine exhausted all internal retries without advancing. Check convergence log for details."
-      - button "×" [ref=f1e352] [cursor=pointer]
-      - button "100%" [ref=f1e354] [cursor=pointer]
+      - generic [ref=f1e350]: Ready
+      - button "100%" [ref=f1e352] [cursor=pointer]
 ```

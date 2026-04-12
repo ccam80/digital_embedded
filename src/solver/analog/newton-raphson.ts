@@ -129,6 +129,14 @@ export interface NROptions {
     convergenceFailedElements: string[],
   ) => void;
   /**
+   * Hook fired exactly once, after iteration 0's postIterationHook and before
+   * iteration 1 begins. Lets the harness observe the cold linearization
+   * (element load at the initial voltages) as a distinct sub-attempt before
+   * the main NR refinement loop. No-op when NR returns in iteration 0 (linear
+   * short-circuit or immediate convergence).
+   */
+  onIteration0Complete?: () => void;
+  /**
    * When true, call checkAllConvergedDetailed instead of checkAllConverged.
    * Collects all failing element indices rather than short-circuiting.
    * Defaults to false — existing short-circuit path unchanged.
@@ -399,6 +407,10 @@ export function newtonRaphson(opts: NROptions): NRResult {
   // the linear COO portion [0, linearCooCount) into a separate buffer).
   solver.saveLinearBase(linearCooCount);
 
+  // Hoist the iter-0 split hook into a local so the per-iteration hot path
+  // pays nothing (not even a property lookup) when no harness is attached.
+  const onIter0Complete = opts.onIteration0Complete;
+
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     // Save previous voltages for convergence check
     prevVoltages.set(voltages);
@@ -559,6 +571,17 @@ export function newtonRaphson(opts: NROptions): NRResult {
     // 10. Return on convergence
     if (globalConverged && elemConverged) {
       return { converged: true, iterations: iteration + 1, voltages, largestChangeElement, largestChangeNode };
+    }
+
+    // 10a. Split marker: after iteration 0 completes without converging, let
+    //      the harness split the NR attempt into a cold-linearization phase
+    //      ("dcopInitFloat", just iter 0) and a refinement phase ("dcopDirect",
+    //      iterations 1..N). Mirrors ngspice's CKTop(firstmode, continuemode)
+    //      two-pass structure. `onIter0Complete` is a hoisted local, so when
+    //      no harness is attached the check below is a single register-level
+    //      short-circuit and iteration > 0 pays nothing at all.
+    if (onIter0Complete && iteration === 0) {
+      onIter0Complete();
     }
   }
 

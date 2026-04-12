@@ -292,6 +292,11 @@ export function createDiodeElement(
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
   let pnjlimLimited = false;
 
+  // One-shot cold-start seed from dcopInitJct. Non-null only between
+  // primeJunctions() and the next updateOperatingPoint() call, which
+  // consumes and re-nulls it. Matches ngspice MODEINITJCT local override.
+  let primedVd: number | null = null;
+
   const element = {
     branchIndex: -1,
     isNonlinear: true,
@@ -338,9 +343,15 @@ export function createDiodeElement(
     },
 
     updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
-      const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vdRaw = va - vc;
+      let vdRaw: number;
+      if (primedVd !== null) {
+        vdRaw = primedVd;
+        primedVd = null;
+      } else {
+        const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
+        const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+        vdRaw = va - vc;
+      }
 
       // Recompute derived values from mutable params
       const nVt = params.N * VT;
@@ -426,6 +437,14 @@ export function createDiodeElement(
       // Positive = current flowing INTO element at that pin.
       const id = s0[base + SLOT_ID];
       return [id, -id];
+    },
+
+    primeJunctions(): void {
+      // Arm cold-start seed: Vd = tVcrit. Matches ngspice MODEINITJCT
+      // (dioload.c MODEINITJCT branch). Local override consumed by the next
+      // updateOperatingPoint call; no writes to the shared voltages vector.
+      const nVt = params.N * VT;
+      primedVd = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
     },
 
     setParam(key: string, value: number): void {
