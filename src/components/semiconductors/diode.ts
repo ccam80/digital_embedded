@@ -316,6 +316,13 @@ export function createDiodeElement(
       applyInitialValues(this.stateSchema, pool, base, params);
     },
 
+    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array): void {
+      s0 = newS0;
+      s1 = newS1;
+      s2 = newS2;
+      s3 = newS3;
+    },
+
     stamp(solver: SparseSolver): void {
       // Stamp series resistance RS between anode pin and internal junction node
       if (params.RS > 0 && nodeJunction !== nodeAnode) {

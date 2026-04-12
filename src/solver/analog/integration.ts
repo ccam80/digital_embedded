@@ -198,6 +198,85 @@ export class HistoryStore {
   }
 }
 
+// ---------------------------------------------------------------------------
+// NodeVoltageHistory — circular buffer of full node-voltage vectors for NIpred
+// ---------------------------------------------------------------------------
+
+/**
+ * Depth of the node-voltage history buffer.
+ * GEAR-6 requires sols[0..6] (7 entries). ngspice: CKTsols[0..7][].
+ */
+const NODE_VOLTAGE_HISTORY_DEPTH = 7;
+
+/**
+ * Circular buffer of accepted node-voltage snapshots for the NIpred predictor.
+ *
+ * Equivalent to ngspice's CKTsols[0..7][]. Index 0 = most recently accepted
+ * solution, index k = k steps back.
+ *
+ * Allocation: call initNodeVoltages() once after the matrix size is known.
+ * Population: call rotateNodeVoltages() on every accepted transient step.
+ * Query: call getNodeVoltage(nodeIndex, stepsBack).
+ */
+export class NodeVoltageHistory {
+  private _buf: Float64Array[] = [];
+  private _head: number = 0;
+  private _filled: number = 0;
+
+  /**
+   * Allocate `NODE_VOLTAGE_HISTORY_DEPTH` Float64Arrays, each of length `nodeCount`.
+   * Safe to call multiple times — reallocates on each call.
+   */
+  initNodeVoltages(nodeCount: number): void {
+    this._buf = [];
+    for (let i = 0; i < NODE_VOLTAGE_HISTORY_DEPTH; i++) {
+      this._buf.push(new Float64Array(nodeCount));
+    }
+    this._head = 0;
+    this._filled = 0;
+  }
+
+  /**
+   * Push a new accepted solution into the circular buffer.
+   * _head moves backward (mod depth) so index 0 always maps to _head.
+   * ngspice equivalent: CKTsols rotation in dctran.c after NIpred.
+   */
+  rotateNodeVoltages(voltages: Float64Array): void {
+    if (this._buf.length === 0) return;
+    // Move head backward: new head holds the most recent solution.
+    this._head = (this._head - 1 + NODE_VOLTAGE_HISTORY_DEPTH) % NODE_VOLTAGE_HISTORY_DEPTH;
+    this._buf[this._head].set(voltages);
+    if (this._filled < NODE_VOLTAGE_HISTORY_DEPTH) {
+      this._filled++;
+    }
+  }
+
+  /**
+   * Return voltage at node `nodeIndex` from `stepsBack` accepted steps ago.
+   * stepsBack=0 → most recent accepted solution (CKTsols[0]).
+   * Returns 0 if insufficient history has been accumulated.
+   */
+  getNodeVoltage(nodeIndex: number, stepsBack: number): number {
+    if (stepsBack >= this._filled || this._buf.length === 0) return 0;
+    const idx = (this._head + stepsBack) % NODE_VOLTAGE_HISTORY_DEPTH;
+    return this._buf[idx][nodeIndex];
+  }
+
+  /** Number of accepted steps stored so far (saturates at NODE_VOLTAGE_HISTORY_DEPTH). */
+  get filled(): number {
+    return this._filled;
+  }
+
+  /** Zero all history and reset counters. */
+  reset(): void {
+    for (const arr of this._buf) {
+      arr.fill(0);
+    }
+    this._head = 0;
+    this._filled = 0;
+  }
+}
+
 /**
  * Compute integration coefficients ag0 and ag1 from step parameters.
  * ag0 is the coefficient on Q_n (or phi_n for inductors).

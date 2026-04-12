@@ -68,14 +68,21 @@ export interface SimulationParams {
   gmin: number;
   /** Enable node damping in NR iteration (ngspice niiter.c). Default: false */
   nodeDamping: boolean;
+  /**
+   * Transient stop time in seconds (ngspice CKTfinalTime). Optional — only
+   * available in batch/harness runs, not in streaming mode. When provided,
+   * the initial timestep uses `MIN(tStop / 100, maxTimeStep) / 10` matching
+   * ngspice dctran.c:118. When absent, falls back to `maxTimeStep / 10`.
+   */
+  tStop?: number;
 }
 
 /**
  * Default values for all SimulationParams fields, matching circuits-engine-spec.md section 2.
  */
 export const DEFAULT_SIMULATION_PARAMS: SimulationParams = {
-  maxTimeStep: 5e-6,
-  minTimeStep: 5e-6 * 1e-11,  // 1e-11 * maxTimeStep (ngspice traninit.c:34)
+  maxTimeStep: 10e-6,
+  minTimeStep: 10e-6 * 1e-11,  // 1e-11 * maxTimeStep (ngspice traninit.c:34)
   reltol: 1e-3,
   abstol: 1e-6,
   iabstol: 1e-12,

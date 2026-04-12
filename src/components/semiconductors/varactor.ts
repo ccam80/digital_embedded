@@ -171,6 +171,13 @@ export function createVaractorElement(
       applyInitialValues(VARACTOR_STATE_SCHEMA, pool, base, {});
     },
 
+    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array): void {
+      s0 = newS0;
+      s1 = newS1;
+      s2 = newS2;
+      s3 = newS3;
+    },
+
     stamp(_solver: SparseSolver): void {
       // No topology-constant entries.
       // Capacitance companion model entries are stamped in stampReactiveCompanion().

@@ -18,7 +18,7 @@ import { EngineState } from "../../../core/engine-interface.js";
 import {
   makeResistor,
   makeVoltageSource,
-  makeCapacitor,
+  createTestCapacitor,
   makeDiode,
 } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
@@ -136,7 +136,7 @@ function makeDiodeCircuit(): ConcreteCompiledAnalogCircuit {
 function makeRCCircuit(): ConcreteCompiledAnalogCircuit {
   const vs = makeVoltageSource(1, 0, 2, 5.0);
   const r = makeResistor(1, 2, 1000);
-  const cap = makeCapacitor(2, 0, 1e-6);
+  const cap = createTestCapacitor(1e-6, 2, 0);
   const elements = [vs, r, cap];
   const statePool = buildStatePool(elements);
 

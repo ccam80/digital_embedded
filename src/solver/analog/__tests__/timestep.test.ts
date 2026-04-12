@@ -181,10 +181,20 @@ describe("LTE", () => {
 
 describe("Rejection", () => {
   it("shouldReject_true_when_worstRatio_gt_1", () => {
+    // Threshold is 1/0.9 ≈ 1.111 — values at or above this are rejected.
     const ctrl = new TimestepController(DEFAULT_PARAMS);
-    expect(ctrl.shouldReject(1.001)).toBe(true);
+    expect(ctrl.shouldReject(1.2)).toBe(true);
     expect(ctrl.shouldReject(2.0)).toBe(true);
     expect(ctrl.shouldReject(100)).toBe(true);
+  });
+
+  it("shouldReject_false_within_hysteresis_band", () => {
+    // Values below threshold (1/0.9 ≈ 1.111) are accepted — hysteresis band.
+    const ctrl = new TimestepController(DEFAULT_PARAMS);
+    // worstRatio == 1.05: below threshold → accept (within hysteresis band)
+    expect(ctrl.shouldReject(1.05)).toBe(false);
+    // worstRatio == 1.0: tolerance exactly met → accept
+    expect(ctrl.shouldReject(1.0)).toBe(false);
   });
 
   it("shouldReject_false_when_worstRatio_le_1", () => {

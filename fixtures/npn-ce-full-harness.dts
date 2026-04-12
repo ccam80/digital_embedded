@@ -1,0 +1,825 @@
+{
+  "circuit": {
+    "description": "NPN CE amplifier exercising full BJT model (caps, Early, high-injection, parasitic R, substrate) with 1 MHz sine",
+    "elements": [
+      {
+        "id": "e6fa856e-d4e3-486b-8241-bffc5bfb4d4e",
+        "position": {
+          "x": 0,
+          "y": 4
+        },
+        "properties": {
+          "_modelParams": {
+            "voltage": 10
+          },
+          "label": "V1",
+          "position": [
+            0,
+            0
+          ],
+          "voltage": 10
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "d277ebef-b6ec-4e8d-b91b-cb0bda6b4e34",
+        "position": {
+          "x": 0,
+          "y": 9
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 47000
+          },
+          "label": "Rb",
+          "position": [
+            0,
+            8
+          ],
+          "resistance": 47000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "1b5a61b9-a4a6-43fa-814c-58cbbbc6c84d",
+        "position": {
+          "x": 12,
+          "y": 4
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 2200
+          },
+          "label": "Rc",
+          "position": [
+            0,
+            16
+          ],
+          "resistance": 2200
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "6cbfccda-91e2-4393-91d0-29cee7ff915d",
+        "position": {
+          "x": 36,
+          "y": 7
+        },
+        "properties": {
+          "_modelParams": {
+            "resistance": 220
+          },
+          "label": "Re",
+          "position": [
+            0,
+            24
+          ],
+          "resistance": 220
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "b1aab911-dac0-4962-afe0-5fd1a663c13b",
+        "position": {
+          "x": 48,
+          "y": 7
+        },
+        "properties": {
+          "label": "GND",
+          "position": [
+            0,
+            40
+          ]
+        },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "d7b2d39e-602d-4fa5-bf47-9504b0ec596a",
+        "position": {
+          "x": 12,
+          "y": 12
+        },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 1.5,
+            "dcOffset": 2,
+            "fallTime": 1e-9,
+            "frequency": 1000000,
+            "phase": 0,
+            "riseTime": 1e-9
+          },
+          "amplitude": 1.5,
+          "dcOffset": 2,
+          "frequency": 1000000,
+          "label": "Vin",
+          "phase": 0,
+          "position": [
+            0,
+            48
+          ],
+          "waveform": "sine"
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "26f46c0d-ecd5-45bf-a782-4e11119843c5",
+        "position": {
+          "x": 24,
+          "y": 7
+        },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "AREA": 1,
+            "BF": 100,
+            "BR": 1,
+            "CJC": 8e-12,
+            "CJE": 20e-12,
+            "CJS": 3e-12,
+            "EG": 1.11,
+            "FC": 0.5,
+            "IKF": 0.5,
+            "IKR": "_inf",
+            "IRB": 0,
+            "IS": 1e-16,
+            "ISC": 0,
+            "ISE": 0,
+            "ISS": 1e-16,
+            "ITF": 0.5,
+            "KF": 0,
+            "M": 1,
+            "MJC": 0.33,
+            "MJE": 0.33,
+            "MJS": 0,
+            "NC": 2,
+            "NE": 1.5,
+            "NF": 1,
+            "NKF": 0.5,
+            "NR": 1,
+            "NS": 1,
+            "PTF": 0,
+            "RB": 10,
+            "RBM": 5,
+            "RC": 1,
+            "RE": 0.1,
+            "TF": 400e-12,
+            "TNOM": 300.15,
+            "TR": 50e-9,
+            "VAF": 100,
+            "VAR": "_inf",
+            "VJC": 0.75,
+            "VJE": 0.75,
+            "VJS": 0.75,
+            "VTF": 2,
+            "XCJC": 1,
+            "XTB": 0,
+            "XTF": 3,
+            "XTI": 3
+          },
+          "label": "Q1",
+          "position": [
+            24,
+            7
+          ]
+        },
+        "rotation": 0,
+        "type": "NpnBJT"
+      }
+    ],
+    "name": "NPN CE Full Harness",
+    "wires": [
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 4
+          },
+          {
+            "x": 5,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 4
+          },
+          {
+            "x": 11,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 4
+          },
+          {
+            "x": 11,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 4
+          },
+          {
+            "x": 17,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 17,
+            "y": 4
+          },
+          {
+            "x": 30,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 4
+          },
+          {
+            "x": 30,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 6
+          },
+          {
+            "x": 29,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 4,
+            "y": 9
+          },
+          {
+            "x": 5,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 5,
+            "y": 9
+          },
+          {
+            "x": 9,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 9
+          },
+          {
+            "x": 9,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 9,
+            "y": 8
+          },
+          {
+            "x": 12,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 8
+          },
+          {
+            "x": 18,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 8
+          },
+          {
+            "x": 18,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 7
+          },
+          {
+            "x": 23,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 9
+          },
+          {
+            "x": -1,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 16,
+            "y": 12
+          },
+          {
+            "x": 17,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 9
+          },
+          {
+            "x": 8,
+            "y": 9
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 9
+          },
+          {
+            "x": 8,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 8,
+            "y": 12
+          },
+          {
+            "x": 17,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 7
+          },
+          {
+            "x": 35,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 29,
+            "y": 8
+          },
+          {
+            "x": 32,
+            "y": 8
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 8
+          },
+          {
+            "x": 32,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 32,
+            "y": 7
+          },
+          {
+            "x": 35,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 40,
+            "y": 7
+          },
+          {
+            "x": 41,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 7
+          },
+          {
+            "x": 48,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 41,
+            "y": 7
+          },
+          {
+            "x": 45,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 45,
+            "y": 7
+          },
+          {
+            "x": 45,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 45,
+            "y": 6
+          },
+          {
+            "x": 48,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 0,
+            "y": 4
+          },
+          {
+            "x": -1,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 7
+          },
+          {
+            "x": 48,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -1,
+            "y": 4
+          },
+          {
+            "x": -2,
+            "y": 4
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 4
+          },
+          {
+            "x": -2,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": -2,
+            "y": 0
+          },
+          {
+            "x": 12,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 0
+          },
+          {
+            "x": 18,
+            "y": 0
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 0
+          },
+          {
+            "x": 18,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 18,
+            "y": 3
+          },
+          {
+            "x": 24,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 3
+          },
+          {
+            "x": 36,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 3
+          },
+          {
+            "x": 42,
+            "y": 3
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 3
+          },
+          {
+            "x": 42,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 42,
+            "y": 6
+          },
+          {
+            "x": 48,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 12,
+            "y": 12
+          },
+          {
+            "x": 11,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 48,
+            "y": 7
+          },
+          {
+            "x": 48,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 11,
+            "y": 12
+          },
+          {
+            "x": 24,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 12
+          },
+          {
+            "x": 30,
+            "y": 12
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 12
+          },
+          {
+            "x": 30,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 30,
+            "y": 11
+          },
+          {
+            "x": 36,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 36,
+            "y": 11
+          },
+          {
+            "x": 43,
+            "y": 11
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 11
+          },
+          {
+            "x": 43,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 43,
+            "y": 6
+          },
+          {
+            "x": 48,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 24,
+            "y": 7
+          },
+          {
+            "x": 23,
+            "y": 7
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 6
+          },
+          {
+            "x": 29,
+            "y": 6
+          }
+        ]
+      },
+      {
+        "points": [
+          {
+            "x": 28,
+            "y": 8
+          },
+          {
+            "x": 29,
+            "y": 8
+          }
+        ]
+      }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

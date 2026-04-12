@@ -229,6 +229,10 @@ export function createScrElement(
       applyInitialValues(SCR_STATE_SCHEMA, pool, base, {});
     },
 
+    refreshSubElementRefs(newS0: Float64Array): void {
+      s0 = newS0;
+    },
+
     stamp(_solver: SparseSolver): void {
       // No topology-constant linear contributions
     },

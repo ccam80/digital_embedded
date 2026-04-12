@@ -34,6 +34,7 @@ import type { LimitingEvent } from "./newton-raphson.js";
 // Defined inline here (string literals) to avoid a production→test dependency.
 export type DcOpNRPhase =
   | "dcopInitJct"
+  | "dcopInitFix"
   | "dcopInitFloat"
   | "dcopDirect"
   | "dcopGminDynamic"
@@ -225,10 +226,15 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   // shared-node topologies (e.g. PNP CC with grounded collector) that the
   // old "write into shared MNA vector" scheme could not.
   // -------------------------------------------------------------------------
+  // -------------------------------------------------------------------------
+  // Phase: dcopInitJct + dcopInitFix
+  //
+  // Matches ngspice MODEINITJCT → MODEINITFIX → MODEINITFLOAT (niiter.c:991-997).
+  // Runs unconditionally on all circuits (including pure linear), matching ngspice.
+  // -------------------------------------------------------------------------
+  let initVoltages: Float64Array | undefined;
   {
-    if (onPhaseBegin) {
-      onPhaseBegin("dcopInitJct");
-    }
+    onPhaseBegin?.("dcopInitJct");
 
     for (const el of elements) {
       if (el.isNonlinear && el.primeJunctions) {
@@ -236,8 +242,50 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
       }
     }
 
-    // Phase emits a handoff marker (no iterations ran).
+    const jctResult = newtonRaphson({
+      ...nrBase,
+      maxIterations: 1,
+      exactMaxIterations: true,
+      elements,
+    });
+
+    initVoltages = jctResult.voltages;
     onPhaseEnd?.("dcopPhaseHandoff", false);
+  }
+
+  // Phase: dcopInitFix — one NR iteration to re-stamp after INITJCT.
+  // Matches MODEINITFIX (niiter.c:994-997).
+  {
+    onPhaseBegin?.("dcopInitFix");
+
+    const fixResult = newtonRaphson({
+      ...nrBase,
+      maxIterations: 1,
+      exactMaxIterations: true,
+      elements,
+      initialGuess: initVoltages,
+    });
+
+    initVoltages = fixResult.voltages;
+    onPhaseEnd?.(fixResult.converged ? "dcopSubSolveConverged" : "dcopPhaseHandoff", fixResult.converged);
+
+    if (fixResult.converged) {
+      diagnostics.emit(
+        makeDiagnostic(
+          "dc-op-converged",
+          "info",
+          `DC operating point converged in INITFIX phase (2 iterations).`,
+          { explanation: "Converged after junction priming and single re-stamp." },
+        ),
+      );
+      return {
+        converged: true,
+        method: "direct",
+        iterations: 2,
+        nodeVoltages: fixResult.voltages,
+        diagnostics: diagnostics.getDiagnostics(),
+      };
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -262,6 +310,8 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
     ...nrBase,
     maxIterations: params.maxIterations,
     elements,
+    // Chain from INITFIX solution so NR starts from the primed operating point.
+    initialGuess: initVoltages,
     // Only wire the split callback when there's somewhere for it to fire to.
     // Leaving `onIteration0Complete` absent entirely avoids the closure
     // allocation on every analysis run.

@@ -1,27 +1,21 @@
 {
   "summary": {
-    "passed": 10,
-    "failed": 2,
+    "passed": 63,
+    "failed": 1,
     "skipped": 0,
-    "totalFiles": 1,
-    "durationSeconds": 0.4
+    "totalFiles": 5,
+    "durationSeconds": 0.8
   },
   "failures": [
     {
-      "message": "expected 'tranNR' to be 'dcopDirect' // Object.is equality",
-      "count": 2,
+      "message": "expected 0.000001 to be 1e-12 // Object.is equality",
+      "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge-grouping.test.ts",
-          "test": "single DCOP iteration → one step, one attempt, stepStartTime=0",
-          "line": 67,
-          "column": 48
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge-grouping.test.ts",
-          "test": "phase change → new attempt boundary within same step",
-          "line": 125,
-          "column": 48
+          "file": "src\\core\\__tests__\\analog-engine-interface.test.ts",
+          "test": "simulation_params_has_all_fields",
+          "line": 59,
+          "column": 46
         }
       ]
     }

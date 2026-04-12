@@ -323,8 +323,9 @@ interface BjtTempParams {
   // BJ10: Temperature-adjusted substrate cap
   tSubcap: number;
   tSubpot: number;
-  // BJ11: Temperature-adjusted substrate saturation current
+  // BJ11: Temperature-adjusted substrate saturation current and critical voltage
   tSubSatCur: number;
+  tSubVcrit: number;
   // BJ12: Temperature-adjusted transit times and junction exponents
   ttransitTimeF: number;
   ttransitTimeR: number;
@@ -434,6 +435,9 @@ function computeBjtTempParams(p: {
   const f7 = 1 - p.FC * (1 + p.MJC);
 
   const tVcrit = vt * Math.log(vt / (Math.SQRT2 * tSatCur * p.AREA));
+  // BJ11: Substrate critical voltage — ngspice bjttemp.c:258-259, same formula using tSubSatCur.
+  // When ISS=0, tSubSatCur=0 → tSubVcrit=+Infinity, pnjlim never triggers (inactive substrate).
+  const tSubVcrit = tSubSatCur > 0 ? vt * Math.log(vt / (Math.SQRT2 * tSubSatCur * p.AREA)) : Infinity;
 
   // BJ12: Temperature-adjusted transit times and junction exponents
   // With default polynomial coefficients = 0, these equal raw params
@@ -452,7 +456,7 @@ function computeBjtTempParams(p: {
     tcollectorConduct, temitterConduct,
     tbaseResist, tminBaseResist, tbaseCurrentHalfResist,
     tBEcap, tBEpot, tBCcap, tBCpot, tDepCap, tf1, f2, f3, tf4, tf5, f6, f7,
-    tVcrit, tSubcap, tSubpot, tSubSatCur,
+    tVcrit, tSubVcrit, tSubcap, tSubpot, tSubSatCur,
     ttransitTimeF, ttransitTimeR, tjunctionExpBE, tjunctionExpBC, tjunctionExpSub,
     excessPhaseFactor,
   };
@@ -731,6 +735,13 @@ export function createBjtElement(
       s0[base + SLOT_IB]  = op0.ib;
       s0[base + SLOT_IC_NORTON] = op0.ic - op0.gm * 0 + op0.go * 0;
       s0[base + SLOT_IB_NORTON] = op0.ib - op0.gpi * 0 - op0.gmu * 0;
+    },
+
+    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array): void {
+      s0 = newS0;
+      s1 = newS1;
+      s2 = newS2;
+      s3 = newS3;
     },
 
     stamp(_solver: SparseSolver): void {
@@ -1361,6 +1372,13 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_OP_GBC] = op0.gbc;
     },
 
+    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array): void {
+      s0 = newS0;
+      s1 = newS1;
+      s2 = newS2;
+      s3 = newS3;
+    },
+
     stamp(solver: SparseSolver): void {
       // BJ5: M multiplier on terminal resistance conductances
       const m = params.M;
@@ -1442,12 +1460,19 @@ export function createSpiceL1BjtElement(
       stampRHS(solver, nodeE_int, m * -polarity * ieNorton);
 
       // BJ11: Substrate diode DC current stamp
+      // substConNode: VERTICAL (NPN, subs=+1) → nodeC_int (BJTcolPrimeNode),
+      //               LATERAL (PNP, subs=-1) → nodeB_int (BJTbasePrimeNode)
+      // Matches ngspice bjtsetup.c:454-460 and bjtload.c:799-815.
+      const subs = polarity > 0 ? 1 : -1; // NPN → VERTICAL (+1), PNP → LATERAL (-1)
+      const substConNode = subs > 0 ? nodeC_int : nodeB_int;
       const gdsub = s0[base + L1_SLOT_GDSUB];
       const cdsub = s0[base + L1_SLOT_CDSUB];
       const vsub = s0[base + L1_SLOT_VSUB];
       if (gdsub !== 0 || cdsub !== 0) {
-        stampG(solver, nodeC_ext, nodeC_ext, m * gdsub);
-        stampRHS(solver, nodeC_ext, m * -polarity * (cdsub - gdsub * vsub));
+        // ceqsub = BJTtype * BJTsubs * (cdsub - vsub * geqsub)  [bjtload.c:799-800, DC: cqsub=0]
+        // stamped +ceqsub onto substConNode row  [bjtload.c:810]
+        stampG(solver, substConNode, substConNode, m * gdsub);
+        stampRHS(solver, substConNode, m * polarity * subs * (cdsub - gdsub * vsub));
       }
     },
 
@@ -1479,7 +1504,17 @@ export function createSpiceL1BjtElement(
       const vbeLimFlag = vbeResult.limited;
       const vbcResult = pnjlim(vbcRaw, s0[base + L1_SLOT_VBC], tpL1.vt, vcritBC);
       const vbcLimited = vbcResult.value;
-      icheckLimited = vbeLimFlag || vbcResult.limited;
+      // CS pnjlim: bjtload.c:407-415 — compute vsub from current voltages then limit it.
+      // vsub = polarity * subs * (V_substNode - V_substConNode); substrate pin tied to ground so
+      // V_substNode = 0. substConNode: VERTICAL(NPN)→nodeC_int, LATERAL(PNP)→nodeB_int.
+      // subs defined here; same value reused in the BJ11 section below.
+      const subs_op = polarity > 0 ? 1 : -1; // NPN → VERTICAL (+1), PNP → LATERAL (-1)
+      const substConNode_op = subs_op > 0 ? nodeC_int : nodeB_int;
+      const vSubConRaw = substConNode_op > 0 ? voltages[substConNode_op - 1] : 0;
+      const vsubRaw = polarity * subs_op * (0 - vSubConRaw); // V_substNode=0 (substrate tied to ground)
+      const vsubResult = pnjlim(vsubRaw, s0[base + L1_SLOT_VSUB], tpL1.vt, tpL1.tSubVcrit);
+      const vsubLimited = vsubResult.value;
+      icheckLimited = vbeLimFlag || vbcResult.limited || vsubResult.limited;
 
       if (limitingCollector) {
         limitingCollector.push({
@@ -1562,8 +1597,9 @@ export function createSpiceL1BjtElement(
       // BJ11: Substrate diode DC current
       // tSubSatCur derives from ISS (defaults to 0), so csubsat is 0 unless
       // the user specified ISS. Guard on csubsat > 0 to skip inactive substrate diodes.
-      const vCe = nodeC_ext > 0 ? voltages[nodeC_ext - 1] : 0;
-      const vsub = polarity * vCe;
+      // vsub was computed and pnjlim-limited above (ngspice bjtload.c:317-319, 407-415).
+      // Formula: polarity * subs * (V_substNode - V_substConNode), V_substNode=0.
+      const vsub = vsubLimited;
       const csubsat = tpL1.tSubSatCur * params.AREA;
       const vts = tpL1.vt * params.NS;
       let gdsub: number, cdsub: number;
@@ -1679,13 +1715,16 @@ export function createSpiceL1BjtElement(
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
       const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
       const vEi = nodeE_int > 0 ? voltages[nodeE_int - 1] : 0;
-      const vBe = nodeB_ext > 0 ? voltages[nodeB_ext - 1] : 0;
-      const vCe = nodeC_ext > 0 ? voltages[nodeC_ext - 1] : 0;
 
       const vbeNow = polarity * (vBi - vEi);
       const vbcNow = polarity * (vBi - vCi);
-      // Collector-substrate voltage: Vc_ext referenced to substrate (ground = 0).
-      const vcsNow = polarity * vCe;
+      // Substrate-junction voltage: polarity * subs * (V_substNode - V_substConNode).
+      // V_substNode=0 (substrate tied to ground). substConNode: VERTICAL→nodeC_int, LATERAL→nodeB_int.
+      // Matches ngspice bjtload.c:317-319 and bjtsetup.c:454-460.
+      const subs_cap = polarity > 0 ? 1 : -1;
+      const substConNode_cap = subs_cap > 0 ? nodeC_int : nodeB_int;
+      const vSubCon_cap = substConNode_cap > 0 ? voltages[substConNode_cap - 1] : 0;
+      const vcsNow = polarity * subs_cap * (0 - vSubCon_cap);
 
       // Read history voltages from s1 (last accepted step via StatePool rotation).
       // First call detected by tranStep === 0 (pool not yet advanced).
@@ -1708,6 +1747,9 @@ export function createSpiceL1BjtElement(
       // BJ13: XTF-modified diffusion cap using gbe (ngspice bjtload.c:584-585,593)
       const CjBE = computeJunctionCapacitance(vbeNow, tpL1.tBEcap * params.AREA, tpL1.tBEpot, mje_eff, params.FC);
       let CdBE: number;
+      // cbe_for_q: transport current If*(1+argtf)/qb for charge computation.
+      // Hoisted so both XTF and non-XTF branches set it for Q_BE below.
+      let cbe_for_q = 0;
       if (tf_eff_base > 0 && params.XTF > 0 && vbeNow > 0) {
         const If_val = s0[base + L1_SLOT_OP_IF];
         const qb_val = s0[base + L1_SLOT_OP_QB];
@@ -1719,11 +1761,15 @@ export function createSpiceL1BjtElement(
         const argtf = params.XTF * icRatio * icRatio * expTerm;
         const arg2 = argtf * (3 - icRatio - icRatio);
         const cbe_mod = If_val * (1 + argtf) / Math.max(qb_val, 1e-30);
+        cbe_for_q = cbe_mod;
         const dqbdVbe = s0[base + L1_SLOT_OP_DQBDVE];
         const gbe_mod = (gbe_raw * (1 + arg2) - cbe_mod * dqbdVbe) / Math.max(qb_val, 1e-30);
         CdBE = tf_eff_base * gbe_mod;
       } else {
         CdBE = tf_eff_base * s0[base + L1_SLOT_GM];
+        if (tf_eff_base > 0) {
+          cbe_for_q = s0[base + L1_SLOT_OP_IF] / Math.max(s0[base + L1_SLOT_OP_QB], 1e-30);
+        }
       }
       const CtotalBE = CjBE + CdBE;
 
@@ -1731,6 +1777,16 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_CTOT_BE] = CtotalBE;
 
       // BJ8: OP_CBE slot is set in updateOperatingPoint; CTOT_BE is the canonical cap value here
+
+      // Compute Q_BE from current voltages (ngspice bjtload.c:591-601,703-706).
+      // ngspice recomputes charge inside bjtload on EVERY NR iteration so that
+      // NIintegrate sees fresh Q. Without this, Q stays frozen at the DC OP value
+      // and the companion model's ccap=(Q0-Q1)/dt is always zero — making
+      // capacitors electrically invisible and preventing transient convergence.
+      {
+        const Q_depl_BE = computeJunctionCharge(vbeNow, tpL1.tBEcap * params.AREA, tpL1.tBEpot, mje_eff, params.FC, 0, 0);
+        s0[base + L1_SLOT_Q_BE] = Q_depl_BE + tf_eff_base * cbe_for_q;
+      }
 
       let beAg0 = 1 / dt;
       if (CtotalBE > 0) {
@@ -1766,6 +1822,14 @@ export function createSpiceL1BjtElement(
       // Store total BC capacitance for LTE tolerance reference
       s0[base + L1_SLOT_CTOT_BC] = CtotalBC;
 
+      // Compute Q_BC from current voltages (ngspice bjtload.c:611-621).
+      // Same rationale as Q_BE above — charge must be fresh for NIintegrate.
+      {
+        const Q_depl_BC = computeJunctionCharge(vbcNow, tpL1.tBCcap * params.AREA, tpL1.tBCpot, mjc_eff, params.FC, 0, 0);
+        const Ir_for_q = s0[base + L1_SLOT_OP_IR];
+        s0[base + L1_SLOT_Q_BC] = Q_depl_BC + tr_eff * Ir_for_q;
+      }
+
       if (CtotalBC > 0) {
         const q0_bc = s0[base + L1_SLOT_Q_BC];
         const q1_bc = s1[base + L1_SLOT_Q_BC];
@@ -1788,13 +1852,32 @@ export function createSpiceL1BjtElement(
         s0[base + L1_SLOT_CAP_IEQ_BC_EXT] = 0;
       }
 
-      // BC charge written by updateChargeFlux after NR convergence
-
       // BJ10: Collector-substrate capacitance using temperature-adjusted values.
       if (tpL1.tSubcap > 0 || params.CJS > 0) {
         // BJ12: Use temp-adjusted substrate exponent
         const CjCS = computeJunctionCapacitance(vcsNow, tpL1.tSubcap, tpL1.tSubpot, mjs_eff, params.FC);
         s0[base + L1_SLOT_CTOT_CS] = CjCS;
+
+        // Compute Q_CS from current voltages (ngspice bjtload.c:631-641).
+        // Same rationale as Q_BE — charge must be fresh for NIintegrate.
+        {
+          const czsub = tpL1.tSubcap;
+          const ps = tpL1.tSubpot;
+          const xms = mjs_eff;
+          let Q_CS: number;
+          if (vcsNow < 0) {
+            const arg = Math.max(1 - vcsNow / ps, 1e-6);
+            if (Math.abs(xms - 1) < 1e-10) {
+              Q_CS = -ps * czsub * Math.log(arg);
+            } else {
+              Q_CS = ps * czsub * (1 - Math.pow(arg, 1 - xms)) / (1 - xms);
+            }
+          } else {
+            Q_CS = vcsNow * czsub * (1 + xms * vcsNow / (2 * ps));
+          }
+          s0[base + L1_SLOT_Q_CS] = Q_CS;
+        }
+
         if (CjCS > 0) {
           const q0_cs = s0[base + L1_SLOT_Q_CS];
           const q1_cs = s1[base + L1_SLOT_Q_CS];
@@ -1992,21 +2075,29 @@ export function createSpiceL1BjtElement(
       const geqCS = s0[base + L1_SLOT_CAP_GEQ_CS];
       const ieqCS = s0[base + L1_SLOT_CAP_IEQ_CS];
       if (geqCS !== 0 || ieqCS !== 0) {
-        // Substrate is ground (node 0); only stamp C_ext row/col
-        stampG(solver, nodeC_ext, nodeC_ext, m * geqCS);
-        stampRHS(solver, nodeC_ext, m * -polarity * ieqCS);
+        // Substrate is ground (node 0); stamp on substConNode row/col.
+        // VERTICAL(NPN): substConNode=nodeC_int; LATERAL(PNP): substConNode=nodeB_int.
+        // Matches ngspice bjtsetup.c:454-460, bjtload.c:823,839.
+        const subs_csstamp = polarity > 0 ? 1 : -1;
+        const substConNode_cs = subs_csstamp > 0 ? nodeC_int : nodeB_int;
+        stampG(solver, substConNode_cs, substConNode_cs, m * geqCS);
+        stampRHS(solver, substConNode_cs, m * -polarity * subs_csstamp * ieqCS);
       }
     };
 
-    element.updateChargeFlux = function(voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
+    element.updateChargeFlux = function(voltages: Float64Array, dt: number, method: string, order: number, deltaOld: readonly number[]): void {
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
       const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
       const vEi = nodeE_int > 0 ? voltages[nodeE_int - 1] : 0;
-      const vCe = nodeC_ext > 0 ? voltages[nodeC_ext - 1] : 0;
 
       const vbeNow = polarity * (vBi - vEi);
       const vbcNow = polarity * (vBi - vCi);
-      const vcsNow = polarity * vCe;
+      // Substrate-junction voltage: polarity * subs * (V_substNode - V_substConNode).
+      // V_substNode=0 (substrate tied to ground). substConNode: VERTICAL→nodeC_int, LATERAL→nodeB_int.
+      const subs_cfl = polarity > 0 ? 1 : -1;
+      const substConNode_cfl = subs_cfl > 0 ? nodeC_int : nodeB_int;
+      const vSubCon_cfl = substConNode_cfl > 0 ? voltages[substConNode_cfl - 1] : 0;
+      const vcsNow = polarity * subs_cfl * (0 - vSubCon_cfl);
 
       // B-E junction charge: depletion integral + diffusion charge
       // Depletion: analytical integral matching ngspice bjtload.c:591-601
@@ -2032,6 +2123,23 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_V_BE] = vbeNow;
       s0[base + L1_SLOT_CTOT_BE] = CtotalBE + TF * s0[base + L1_SLOT_GM];
 
+      // Recompute CCAP_BE from converged charge so the next step's trapezoidal
+      // recursion and LTE tolerance start from the correct companion current.
+      // Without this, s0[CCAP_BE] retains the mid-NR value from stampCompanion
+      // and s1[CCAP_BE] carries a stale zero forward after acceptTimestep().
+      // ngspice: bjtload.c recomputes ccap via NIintegrate after charge update.
+      {
+        const CtotalBE_full = s0[base + L1_SLOT_CTOT_BE];
+        const q0_be = s0[base + L1_SLOT_Q_BE];
+        const q1_be = s1[base + L1_SLOT_Q_BE];
+        const q2_be = s2[base + L1_SLOT_Q_BE];
+        const ccapPrevBE = s1[base + L1_SLOT_CCAP_BE];
+        const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+        const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+        const resBE = integrateCapacitor(CtotalBE_full, vbeNow, q0_be, q1_be, q2_be, dt, h1, h2, order, method as IntegrationMethod, ccapPrevBE);
+        s0[base + L1_SLOT_CCAP_BE] = resBE.ccap;
+      }
+
       // B-C junction charge: depletion integral + diffusion charge
       const Q_depl_BC = computeJunctionCharge(vbcNow, tpL1.tBCcap * params.AREA, tpL1.tBCpot, tpL1.tjunctionExpBC, params.FC, 0, 0);
       const Ir_val = s0[base + L1_SLOT_OP_IR];
@@ -2040,6 +2148,19 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_Q_BC] = Q_depl_BC + Q_diff_BC;
       s0[base + L1_SLOT_V_BC] = vbcNow;
       s0[base + L1_SLOT_CTOT_BC] = CtotalBC + tpL1.ttransitTimeR * s0[base + L1_SLOT_GMU];
+
+      // Recompute CCAP_BC from converged charge (same rationale as CCAP_BE above).
+      {
+        const CtotalBC_full = s0[base + L1_SLOT_CTOT_BC];
+        const q0_bc = s0[base + L1_SLOT_Q_BC];
+        const q1_bc = s1[base + L1_SLOT_Q_BC];
+        const q2_bc = s2[base + L1_SLOT_Q_BC];
+        const ccapPrevBC = s1[base + L1_SLOT_CCAP_BC];
+        const h1_bc = deltaOld.length > 1 ? deltaOld[1] : dt;
+        const h2_bc = deltaOld.length > 2 ? deltaOld[2] : h1_bc;
+        const resBC = integrateCapacitor(CtotalBC_full, vbcNow, q0_bc, q1_bc, q2_bc, dt, h1_bc, h2_bc, order, method as IntegrationMethod, ccapPrevBC);
+        s0[base + L1_SLOT_CCAP_BC] = resBC.ccap;
+      }
 
       // C-S substrate charge (ngspice bjtload.c:631-641)
       if (tpL1.tSubcap > 0) {
@@ -2060,11 +2181,36 @@ export function createSpiceL1BjtElement(
         s0[base + L1_SLOT_Q_CS] = Q_CS;
         s0[base + L1_SLOT_V_CS] = vcsNow;
         s0[base + L1_SLOT_CTOT_CS] = computeJunctionCapacitance(vcsNow, tpL1.tSubcap, tpL1.tSubpot, tpL1.tjunctionExpSub, params.FC);
+
+        // Recompute CCAP_CS from converged charge (same rationale as CCAP_BE above).
+        {
+          const CjCS_ucf = s0[base + L1_SLOT_CTOT_CS];
+          const q0_cs = s0[base + L1_SLOT_Q_CS];
+          const q1_cs = s1[base + L1_SLOT_Q_CS];
+          const q2_cs = s2[base + L1_SLOT_Q_CS];
+          const ccapPrevCS = s1[base + L1_SLOT_CCAP_CS];
+          const h1_cs = deltaOld.length > 1 ? deltaOld[1] : dt;
+          const h2_cs = deltaOld.length > 2 ? deltaOld[2] : h1_cs;
+          const resCS = integrateCapacitor(CjCS_ucf, vcsNow, q0_cs, q1_cs, q2_cs, dt, h1_cs, h2_cs, order, method as IntegrationMethod, ccapPrevCS);
+          s0[base + L1_SLOT_CCAP_CS] = resCS.ccap;
+        }
       } else if (params.CJS > 0) {
         const CjCS = computeJunctionCapacitance(vcsNow, tpL1.tSubcap, tpL1.tSubpot, tpL1.tjunctionExpSub, params.FC);
         s0[base + L1_SLOT_Q_CS] = CjCS * vcsNow;
         s0[base + L1_SLOT_V_CS] = vcsNow;
         s0[base + L1_SLOT_CTOT_CS] = CjCS;
+
+        // Recompute CCAP_CS for the CJS-only path.
+        {
+          const q0_cs = s0[base + L1_SLOT_Q_CS];
+          const q1_cs = s1[base + L1_SLOT_Q_CS];
+          const q2_cs = s2[base + L1_SLOT_Q_CS];
+          const ccapPrevCS = s1[base + L1_SLOT_CCAP_CS];
+          const h1_cs = deltaOld.length > 1 ? deltaOld[1] : dt;
+          const h2_cs = deltaOld.length > 2 ? deltaOld[2] : h1_cs;
+          const resCS = integrateCapacitor(CjCS, vcsNow, q0_cs, q1_cs, q2_cs, dt, h1_cs, h2_cs, order, method as IntegrationMethod, ccapPrevCS);
+          s0[base + L1_SLOT_CCAP_CS] = resCS.ccap;
+        }
       }
     };
   }

@@ -1,45 +1,250 @@
 {
   "summary": {
     "vitest": {
-      "passed": 8,
-      "failed": 0,
+      "passed": 8247,
+      "failed": 20,
       "skipped": 0,
-      "totalFiles": 1,
-      "durationSeconds": 5.5
+      "totalFiles": 363,
+      "durationSeconds": 14
     },
     "playwright": {
-      "passed": 476,
-      "failed": 12,
+      "passed": 477,
+      "failed": 11,
       "skipped": 0,
       "totalFiles": 23,
-      "durationSeconds": 361.008703
+      "durationSeconds": 191.96725099999998
     },
-    "totalFailed": 12,
-    "totalPassed": 484
+    "totalFailed": 31,
+    "totalPassed": 8724
   },
   "failures": {
-    "vitest": [],
+    "vitest": [
+      {
+        "message": "expected 0.00001 to be 0.000005 // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\core\\__tests__\\analog-engine-interface.test.ts",
+            "test": "simulation_params_has_all_fields",
+            "line": 56,
+            "column": 51
+          }
+        ]
+      },
+      {
+        "message": "expected 1.5164555170670222 to be less than 0.8644719901267445",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
+            "test": "rc_lowpass",
+            "line": 307,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "message": "expected -20806778.660380933 to be greater than 4.5",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
+            "test": "transient_rc_decay",
+            "line": 252,
+            "column": 16
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\convergence-regression.test.ts",
+            "test": "RC circuit runs transient steps stably with capacitor near Vs",
+            "line": 164,
+            "column": 16
+          }
+        ]
+      },
+      {
+        "message": "Analog engine stagnation: simTime stuck at 1.0000000000000009e-9s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\coordinator.ts",
+            "test": "transient stepping does not error after 50 steps",
+            "line": 203,
+            "column": 13
+          }
+        ]
+      },
+      {
+        "message": "Engine entered ERROR state at step 2, simTime=1.0000000000000009e-9",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
+            "test": "survives 2000 transient steps without ERROR state",
+            "line": 79,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "message": "Engine ERROR at step 2, simTime=1.000e-9",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\buckbjt-convergence.test.ts",
+            "test": "survives 600µs of sim time (matches UI run duration)",
+            "line": 103,
+            "column": 15
+          }
+        ]
+      },
+      {
+        "message": "expected 0 to be less than -1",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\dcop-init-jct.test.ts",
+            "test": "emits dcopInitJct phase marker before dcopInitFloat",
+            "line": 379,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "message": "expected 1.2176606834060546e+44 to be less than 0.1",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+            "test": "rc_steady_state_no_drift",
+            "line": 299,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "message": "expected 1.4261065592558985e+37 to be less than 0.01",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\mna-end-to-end.test.ts",
+            "test": "rc_steady_state_current_zero",
+            "line": 332,
+            "column": 22
+          }
+        ]
+      },
+      {
+        "message": "expected false to be true // Object.is equality",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\timestep.test.ts",
+            "test": "shouldReject_true_when_worstRatio_gt_1",
+            "line": 185,
+            "column": 38
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\boot-step-merge.test.ts",
+            "test": "step 0 contains a DCOP-phase attempt",
+            "line": 59,
+            "column": 21
+          }
+        ]
+      },
+      {
+        "message": "expected 'tranNR' to be 'dcopDirect' // Object.is equality",
+        "count": 2,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge-grouping.test.ts",
+            "test": "single DCOP iteration → one step, one attempt, stepStartTime=0",
+            "line": 67,
+            "column": 48
+          },
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge-grouping.test.ts",
+            "test": "phase change → new attempt boundary within same step",
+            "line": 125,
+            "column": 48
+          }
+        ]
+      },
+      {
+        "message": "buckbjt must have at least one iteration with convergenceFailedElements populated: expected false to be true // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+            "test": "8. per-element convergence: our engine reports failures",
+            "line": 195,
+            "column": 111
+          }
+        ]
+      },
+      {
+        "message": "session.getSessionMap is not a function",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\test-npn-harness.test.ts",
+            "test": "captures branch values on both sides",
+            "line": 22,
+            "column": 25
+          }
+        ]
+      },
+      {
+        "message": "step.stepStartTime.ours.display must be string: expected 'undefined' to be 'string' // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
+            "test": "MCP-2: get_step by index returns paired attempt summaries and pairing array",
+            "line": 59,
+            "column": 64
+          }
+        ]
+      },
+      {
+        "message": "expected 'object' to be 'number' // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "scripts\\mcp\\__tests__\\harness-mcp-verification.test.ts",
+            "test": "MCP-12: get_step pairing has non-empty rows for a well-converged step",
+            "line": 330,
+            "column": 42
+          }
+        ]
+      },
+      {
+        "message": "Tool harness_query not registered",
+        "count": 2,
+        "locations": [
+          {
+            "file": "scripts\\mcp\\__tests__\\harness-shape-mcp.test.ts",
+            "test": "returns a SessionShape object with presenceCounts, steps, and largeTimeDeltas",
+            "line": 53,
+            "column": 25
+          },
+          {
+            "file": "scripts\\mcp\\__tests__\\harness-shape-mcp.test.ts",
+            "test": "returns the presence field on stepEnd responses",
+            "line": 53,
+            "column": 25
+          }
+        ]
+      }
+    ],
     "playwright": [
       {
-        "message": "Error: Expected 0.02092469043192962 to be close to 0.02084652 (err=0.00007817043192961948, limit=2.084652e-8)",
+        "message": "Error: Expected 0.020924690488282334 to be close to 0.02084652 (err=0.00007817048828233364, limit=2.084652e-8)",
         "count": 1,
         "locations": [
           {
             "file": "gui/analog-bjt-convergence.spec.ts",
             "test": "compile and step — no convergence error, supply rail is 10V",
             "line": 251,
-            "column": 3
-          }
-        ]
-      },
-      {
-        "message": "\u001b[31mTest timeout of 30000ms exceeded while running \"beforeEach\" hook.\u001b[39m",
-        "count": 1,
-        "locations": [
-          {
-            "file": "gui/analog-bjt-convergence.spec.ts",
-            "test": "run continuously — voltages remain bounded",
-            "line": 355,
             "column": 3
           }
         ]
@@ -93,7 +298,7 @@
         ]
       },
       {
-        "message": "Error: Expected 0.09577162816208397 to be close to 0.0957744513 (err=0.0000028231379160248427, limit=9.577445129999999e-8)",
+        "message": "Error: Expected 0.0957716281620844 to be close to 0.0957744513 (err=0.0000028231379155946312, limit=9.577445129999999e-8)",
         "count": 1,
         "locations": [
           {

@@ -62,6 +62,12 @@ export interface NROptions {
   nodeCount?: number;
   /** Maximum number of NR iterations before declaring failure. */
   maxIterations: number;
+  /**
+   * When true, use maxIterations as-is without the ngspice floor of 100.
+   * Required for INITJCT/INITFIX DC op phases that need exactly 1 iteration
+   * before transitioning modes (ngspice niiter.c:991-997).
+   */
+  exactMaxIterations?: boolean;
   /** Relative convergence tolerance. */
   reltol: number;
   /** Absolute voltage convergence tolerance in volts. */
@@ -361,7 +367,8 @@ export function limvds(vnew: number, vold: number): number {
 export function newtonRaphson(opts: NROptions): NRResult {
   const { solver, elements, matrixSize, maxIterations: rawMaxIter, reltol, abstol, iabstol, diagnostics } = opts;
   // ngspice niiter.c:37-38 — unconditional floor: if (maxIter < 100) maxIter = 100;
-  const maxIterations = Math.max(rawMaxIter, 100);
+  // Bypassed when exactMaxIterations is set (INITJCT/INITFIX need exactly 1 iteration).
+  const maxIterations = opts.exactMaxIterations ? rawMaxIter : Math.max(rawMaxIter, 100);
   const nodeCount = opts.nodeCount ?? matrixSize;
 
   const assembler = new MNAAssembler(solver);

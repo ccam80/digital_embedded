@@ -32,7 +32,7 @@ import { EngineState } from "../../../core/engine-interface.js";
 import {
   makeResistor,
   makeVoltageSource,
-  makeCapacitor,
+  createTestCapacitor,
   makeDiode,
   makeInductor,
   allocateStatePool,
@@ -271,7 +271,7 @@ describe("End-to-end: tight transient tolerances", () => {
     // Run 2ms transient — voltage must not drift from 5V.
     const vs = makeVoltageSource(1, 0, 2, 5.0);
     const r = makeResistor(1, 2, 1000);
-    const cap = makeCapacitor(2, 0, 1e-6);
+    const cap = createTestCapacitor(1e-6, 2, 0);
 
     const compiled = buildHandCircuit({
       nodeCount: 2, branchCount: 1, elements: [vs, r, cap],
@@ -303,7 +303,7 @@ describe("End-to-end: tight transient tolerances", () => {
     // At steady state with C fully charged, current through R should be ~0.
     const vs = makeVoltageSource(1, 0, 2, 5.0);
     const r = makeResistor(1, 2, 1000);
-    const cap = makeCapacitor(2, 0, 1e-6);
+    const cap = createTestCapacitor(1e-6, 2, 0);
 
     const compiled = buildHandCircuit({
       nodeCount: 2, branchCount: 1, elements: [vs, r, cap],

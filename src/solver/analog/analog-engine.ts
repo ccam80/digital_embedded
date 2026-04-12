@@ -19,7 +19,8 @@ import { AcAnalysis } from "./ac-analysis.js";
 import type { AcParams, AcResult } from "./ac-analysis.js";
 import { SparseSolver } from "./sparse-solver.js";
 import { TimestepController } from "./timestep.js";
-import { HistoryStore } from "./integration.js";
+import { HistoryStore, NodeVoltageHistory } from "./integration.js";
+import { computeAgp, predictVoltages } from "./ni-pred.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { ConvergenceLog } from "./convergence-log.js";
 import type { StepRecord, NRAttemptRecord } from "./convergence-log.js";
@@ -99,6 +100,12 @@ export class MNAEngine implements AnalogEngine {
   private _nrPrevVoltages: Float64Array = new Float64Array(0);
 
   // -------------------------------------------------------------------------
+  // NIpred predictor state (ngspice: CKTagp[], CKTsols[])
+  // -------------------------------------------------------------------------
+  private _agp: Float64Array = new Float64Array(7);
+  private _nodeVoltageHistory: NodeVoltageHistory = new NodeVoltageHistory();
+
+  // -------------------------------------------------------------------------
   // Compiled circuit reference
   // -------------------------------------------------------------------------
   private _compiled: ConcreteCompiledAnalogCircuit | null = null;
@@ -153,6 +160,8 @@ export class MNAEngine implements AnalogEngine {
     this._solver = new SparseSolver();
     this._timestep = new TimestepController(this._params);
     this._history = new HistoryStore(elements.length);
+    this._nodeVoltageHistory = new NodeVoltageHistory();
+    this._nodeVoltageHistory.initNodeVoltages(matrixSize);
     this._diagnostics = new DiagnosticCollector();
     this._convergenceLog.clear();
 
@@ -339,6 +348,17 @@ export class MNAEngine implements AnalogEngine {
       // ngspice dctran.c:731 — advance simTime at top of each iteration.
       this._simTime += dt;
 
+      // NIpred: compute agp[] then predict voltages as NR initial guess.
+      // Fires on every retry iteration (dt changes on NR-failure/LTE-rejection).
+      // Matches ngspice dctran.c:734 NIcomCof + dctran.c:750 NIpred.
+      computeAgp(this._timestep.currentMethod, this._timestep.currentOrder,
+        dt, this._timestep.deltaOld, this._agp);
+      if (predictVoltages(this._nodeVoltageHistory, this._timestep.deltaOld,
+          this._timestep.currentOrder, this._timestep.currentMethod,
+          this._agp, this._voltages)) {
+        // _voltages now holds the predicted values as NR initial guess
+      }
+
       // --- Phase hook: begin attempt ---
       if (this.stepPhaseHook) {
         let attemptPhase: "tranInit" | "tranNR" | "tranNrRetry" | "tranLteRetry";
@@ -513,6 +533,11 @@ export class MNAEngine implements AnalogEngine {
       statePool.tranStep++;
       statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
     }
+
+    // NIpred: push fully-accepted solution into history for next step predictor.
+    // Only fires after both NR convergence AND LTE acceptance — never on rejected attempts.
+    // ngspice: CKTsols rotation in dctran.c acceptance block.
+    this._nodeVoltageHistory.rotateNodeVoltages(this._voltages);
 
     if (logging) {
       stepRec!.acceptedDt = dt;

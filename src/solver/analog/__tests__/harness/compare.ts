@@ -69,9 +69,13 @@ export function compareSnapshots(
         matrixDiffs: [],
         stateDiffs: [],
         allWithinTol: false,
+        timeMismatched: false,
       });
       continue;
     }
+
+    const stepEndTimeDelta = Math.abs(ourStep.stepEndTime - refStep.stepEndTime);
+    const timeMismatched = stepEndTimeDelta > tolerance.timeDeltaTol;
 
     const iterCount = Math.min(ourStep.iterations.length, refStep.iterations.length);
 
@@ -218,6 +222,7 @@ export function compareSnapshots(
         matrixDiffs,
         stateDiffs,
         allWithinTol,
+        timeMismatched,
       });
     }
   }
@@ -273,6 +278,7 @@ export function findFirstDivergence(
   threshold: number = 1e-3,
 ): ComparisonResult | null {
   for (const r of results) {
+    if (r.timeMismatched) continue;
     for (const d of r.voltageDiffs) {
       if (d.absDelta > threshold) return r;
     }

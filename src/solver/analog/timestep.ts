@@ -128,11 +128,18 @@ export class TimestepController {
 
   constructor(params: SimulationParams) {
     this._params = params;
-    // ngspice dctran.c:112: initial delta = MIN(finalTime/100, step) / 10.
-    // We have no finalTime in an interactive simulator; maxTimeStep is
-    // our userStep equivalent.  The /10 divisor matches ngspice's outer
-    // divisor on the MIN result — total factor is 1000×.
-    this.currentDt = params.maxTimeStep / 1000;
+    // Initial delta: ngspice dctran.c:118 + dctran.c:575-580.
+    //   base = MIN(tStop/100, maxTimeStep) / 10
+    //   firsttime: base /= 10  (dctran.c:580)
+    // With tStop (batch): base / 10. Without tStop: maxTimeStep / 100 / 10.
+    const step = params.maxTimeStep;
+    const fin100 = params.tStop != null ? params.tStop / 100 : step;
+    const divisor = params.tStop != null ? 10 : 100;
+    let initDt = Math.min(fin100, step) / divisor;
+    // ngspice dctran.c:575-580 — firsttime delta cut (additional /10).
+    initDt /= 10;
+    initDt = Math.max(initDt, 2 * params.minTimeStep);
+    this.currentDt = initDt;
     this.currentMethod = "bdf1";
     this._breakpoints = [];
     this._lastAcceptedSimTime = -Infinity;
@@ -143,7 +150,10 @@ export class TimestepController {
     this._lteParams = {
       trtol: params.trtol,
       reltol: params.reltol,
-      abstol: params.abstol,
+      // ngspice CKTterr uses CKTabstol (current tolerance, 1e-12), not
+      // CKTvoltTol (voltage tolerance, 1e-6). The LTE operates on charge
+      // and companion-model currents, so the current tolerance applies.
+      abstol: params.iabstol,
       chgtol: params.chargeTol,
     };
 
@@ -237,8 +247,9 @@ export class TimestepController {
       // CKTterr path: use the proposed dt directly (already incorporates
       // tolerance, safety factors, and order-dependent root extraction).
       newDt = minProposedDt;
-      // Clamp step change to [1/4, 4] of current dt.
-      newDt = Math.max(dt / 4, Math.min(2 * dt, newDt));
+      // Clamp step growth to 2*dt (ngspice ckttrunc.c:53).
+      // No lower clamp — ngspice allows arbitrary shrinkage per LTE.
+      newDt = Math.min(2 * dt, newDt);
       // worstRatio: >1 means step should be rejected (proposed < current dt)
       worstRatio = minProposedDt < dt ? dt / minProposedDt : 0;
     } else {
@@ -293,18 +304,25 @@ export class TimestepController {
   // -------------------------------------------------------------------------
 
   /**
-   * Returns true when the LTE ratio `worstRatio = maxError / tolerance` is
-   * greater than 1, meaning the current step must be rejected.
+   * Returns true when the proposed timestep is too small relative to the
+   * current step, meaning the step must be rejected and retried.
+   *
+   * ngspice dctran.c:880: `if(newdelta > .9 * ckt->CKTdelta)` → accept.
+   * Reject when `proposedDt <= 0.9 * dt`, i.e., `worstRatio >= 1/0.9`.
+   *
+   * The 0.9 hysteresis band prevents cascading rejections when the proposed
+   * timestep is only marginally smaller than the current one.
    *
    * Semantics:
-   *   - worstRatio == 0 → accept (no reactive errors reported)
-   *   - worstRatio == 1 → accept (tolerance exactly met)
-   *   - worstRatio > 1  → reject (tolerance exceeded)
+   *   - worstRatio == 0        → accept (no reactive errors reported)
+   *   - worstRatio < 1/0.9     → accept (within hysteresis band)
+   *   - worstRatio >= 1/0.9    → reject (proposed dt ≤ 90% of current dt)
    *
-   * @param worstRatio - Largest per-element LTE/tolerance ratio from computeNewDt
+   * @param worstRatio - dt / proposedDt from computeNewDt (0 when no constraint)
    */
   shouldReject(worstRatio: number): boolean {
-    return worstRatio > 1;
+    // ngspice dctran.c:880 — reject when newdelta <= .9 * CKTdelta
+    return worstRatio >= 1 / 0.9;
   }
 
   // -------------------------------------------------------------------------

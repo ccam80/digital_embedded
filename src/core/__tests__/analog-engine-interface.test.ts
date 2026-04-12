@@ -53,10 +53,10 @@ describe("AnalogEngineTypes", () => {
     expect(params.gmin).toBe(1e-12);
 
     // Verify DEFAULT_SIMULATION_PARAMS matches the spec
-    expect(DEFAULT_SIMULATION_PARAMS.maxTimeStep).toBe(5e-6);
-    expect(DEFAULT_SIMULATION_PARAMS.minTimeStep).toBe(5e-17);
+    expect(DEFAULT_SIMULATION_PARAMS.maxTimeStep).toBe(10e-6);
+    expect(DEFAULT_SIMULATION_PARAMS.minTimeStep).toBe(10e-6 * 1e-11);
     expect(DEFAULT_SIMULATION_PARAMS.reltol).toBe(1e-3);
-    expect(DEFAULT_SIMULATION_PARAMS.abstol).toBe(1e-6);
+    expect(DEFAULT_SIMULATION_PARAMS.abstol).toBe(1e-12);
     expect(DEFAULT_SIMULATION_PARAMS.chargeTol).toBe(1e-14);
     expect(DEFAULT_SIMULATION_PARAMS.maxIterations).toBe(100);
     expect(DEFAULT_SIMULATION_PARAMS.integrationMethod).toBe("auto");

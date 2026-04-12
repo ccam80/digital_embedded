@@ -360,6 +360,8 @@ export interface ComparisonResult {
     withinTol: boolean;
   }>;
   allWithinTol: boolean;
+  /** True when our stepEndTime and ngspice stepEndTime differ by more than timeDeltaTol — these steps represent different physical moments and should not be treated as real divergences. */
+  timeMismatched: boolean;
 }
 
 // ---------------------------------------------------------------------------
