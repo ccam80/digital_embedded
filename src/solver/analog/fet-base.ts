@@ -476,12 +476,9 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     const cbdI = s0[base + SLOT_CBD_I];
     const cbsI = s0[base + SLOT_CBS_I];
 
-    // cd = mode * channel current minus drain junction current (ngspice MOS1convTest mos1load.c:543)
+    // cd = mode * channel current minus drain junction current (ngspice MOS1convTest mos1load.c:36)
     const mode = s0[base + SLOT_MODE];
-    const cd = mode * ids - cbdI;
-    // Subtract drain junction cap companion current (ngspice mos1load.c:699)
-    const cqbd = s0[base + SLOT_CAP_IEQ_DB];
-    const cdFinal = cd - cqbd;
+    const cdFinal = mode * ids - cbdI;
 
     // MOS1convTest: predicted drain current — mode-dependent formula
     let cdhat: number;

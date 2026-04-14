@@ -490,3 +490,251 @@ describe("Diode LimitingEvent instrumentation", () => {
     expect(ev.vAfter).toBe(ev.vBefore);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Change 31: Temperature scaling (dioTemp)
+// ---------------------------------------------------------------------------
+
+import { dioTemp } from "../diode.js";
+
+describe("dioTemp temperature scaling (Change 31)", () => {
+  const REFTEMP = 300.15;
+  const CONSTboltz = 1.3806226e-23;
+  const CHARGE = 1.6021918e-19;
+
+  it("vt equals kT/q at REFTEMP", () => {
+    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
+    const tp = dioTemp(p, REFTEMP);
+    const expected = REFTEMP * CONSTboltz / CHARGE;
+    expect(Math.abs(tp.vt - expected) / expected).toBeLessThan(1e-10);
+  });
+
+  it("tIS equals IS at T=TNOM (no scaling)", () => {
+    const IS = 1e-14;
+    const p = { IS, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
+    const tp = dioTemp(p, REFTEMP);
+    expect(Math.abs(tp.tIS - IS) / IS).toBeLessThan(1e-8);
+  });
+
+  it("tIS increases with temperature (XTI=3, EG=1.11)", () => {
+    const IS = 1e-14;
+    const p = { IS, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
+    const tp_cold = dioTemp(p, REFTEMP);
+    const tp_hot  = dioTemp(p, REFTEMP + 50);
+    expect(tp_hot.tIS).toBeGreaterThan(tp_cold.tIS);
+  });
+
+  it("tVJ is reduced at higher temperature", () => {
+    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
+    const tp_nom = dioTemp(p, REFTEMP);
+    const tp_hot = dioTemp(p, REFTEMP + 50);
+    expect(tp_hot.tVJ).toBeLessThan(tp_nom.tVJ);
+  });
+
+  it("tCJO equals CJO when CJO=0", () => {
+    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
+    const tp = dioTemp(p, REFTEMP + 30);
+    expect(tp.tCJO).toBe(0);
+  });
+
+  it("tCJO approximately equals CJO at T=TNOM", () => {
+    const CJO = 10e-12;
+    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
+    const tp = dioTemp(p, REFTEMP);
+    expect(Math.abs(tp.tCJO - CJO) / CJO).toBeLessThan(1e-6);
+  });
+
+  it("tVcrit = nVt * log(nVt / (tIS * sqrt(2)))", () => {
+    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
+    const tp = dioTemp(p, REFTEMP);
+    const expected = tp.vt * Math.log(tp.vt / (tp.tIS * Math.SQRT2));
+    expect(Math.abs(tp.tVcrit - expected) / Math.abs(expected)).toBeLessThan(1e-10);
+  });
+
+  it("tBV is Infinity when BV is Infinity", () => {
+    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV: Infinity, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
+    const tp = dioTemp(p, REFTEMP);
+    expect(tp.tBV).toBe(Infinity);
+  });
+
+  it("tBV is finite and close to BV when BV is finite", () => {
+    const BV = 5.0;
+    const p = { IS: 1e-14, N: 1, VJ: 1.0, CJO: 0, M: 0.5, BV, IBV: 1e-3, NBV: 1, EG: 1.11, XTI: 3, TNOM: REFTEMP };
+    const tp = dioTemp(p, REFTEMP);
+    expect(isFinite(tp.tBV)).toBe(true);
+    expect(Math.abs(tp.tBV - BV)).toBeLessThan(1.0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Change 32: IBV knee iteration
+// ---------------------------------------------------------------------------
+
+describe("IBV knee iteration (Change 32)", () => {
+  it("tBV satisfies knee equation: tIS*(exp((BV-tBV)/(NBV*vt))-1) ≈ IBV", () => {
+    const BV = 5.0;
+    const IBV = 1e-3;
+    const IS = 1e-14;
+    const N = 1;
+    const REFTEMP = 300.15;
+    const p = { IS, N, VJ: 1.0, CJO: 0, M: 0.5, BV, IBV, NBV: N, EG: 1.11, XTI: 3, TNOM: REFTEMP };
+    const tp = dioTemp(p, REFTEMP);
+    const nbvVt = N * tp.vt;
+    const residual = tp.tIS * (Math.exp((BV - tp.tBV) / nbvVt) - 1) - IBV;
+    expect(Math.abs(residual) / IBV).toBeLessThan(1e-6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Change 33: IKF/IKR high-injection correction
+// ---------------------------------------------------------------------------
+
+describe("IKF/IKR high-injection correction (Change 33)", () => {
+  function diodeGd(vd: number, overrides: Record<string, number> = {}): number {
+    const props = makeParamBag({ IS: 1e-14, N: 1, ...overrides });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as any;
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    const voltages = new Float64Array(10);
+    voltages[0] = vd;
+    for (let i = 0; i < 50; i++) {
+      core.updateOperatingPoint(voltages);
+      voltages[0] = vd;
+    }
+    return pool.state0[1]; // SLOT_GEQ
+  }
+
+  function diodeId(vd: number, overrides: Record<string, number> = {}): number {
+    const props = makeParamBag({ IS: 1e-14, N: 1, ...overrides });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as any;
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    const voltages = new Float64Array(10);
+    voltages[0] = vd;
+    for (let i = 0; i < 50; i++) {
+      core.updateOperatingPoint(voltages);
+      voltages[0] = vd;
+    }
+    return pool.state0[3]; // SLOT_ID
+  }
+
+  it("IKF=Infinity leaves gd equal to IKF=Infinity case", () => {
+    const vd = 0.7;
+    const gd1 = diodeGd(vd, { IKF: Infinity });
+    const gd2 = diodeGd(vd, { IKF: Infinity });
+    expect(gd1).toBe(gd2);
+  });
+
+  it("IKF correction reduces gd compared to IKF=Infinity at same Vd", () => {
+    const vd = 0.7;
+    const gdNoIkf  = diodeGd(vd, { IKF: Infinity });
+    // IKF = 1mA: id at vd=0.7 is ~4mA, so id/ikf = 4 — strong correction
+    const gdWithIkf = diodeGd(vd, { IKF: 1e-3 });
+    expect(gdWithIkf).toBeLessThan(gdNoIkf);
+  });
+
+  it("IKF correction matches formula: gdRaw / (sqrt(1+id/ikf) * (1+sqrt(1+id/ikf)))", () => {
+    const vd = 0.8;
+    const IKF = 1e-4;
+    const IS = 1e-14;
+    const N = 1;
+    const nVt = N * VT;
+
+    // Compute expected gd from the formula
+    const expArg = Math.min(vd / nVt, 700);
+    const evd = Math.exp(expArg);
+    const idRaw = IS * (evd - 1);
+    const gdRaw = IS * evd / nVt;
+    const sqrtTerm = Math.sqrt(1 + idRaw / IKF);
+    const expectedGd = gdRaw / (sqrtTerm * (1 + sqrtTerm)) + 1e-12; // + GMIN
+
+    const actualGd = diodeGd(vd, { IS, IKF });
+    expect(Math.abs(actualGd - expectedGd) / expectedGd).toBeLessThan(0.001);
+  });
+
+  it("IKF=Infinity applies no correction (denominator stays at 2, same as no IKF branch)", () => {
+    // When IKF=Infinity, the correction branch is skipped entirely
+    const vd = 0.7;
+    const gdWithInfIkf = diodeGd(vd, { IKF: Infinity });
+    // Compute expected raw gd (no correction applied)
+    const IS = 1e-14;
+    const nVt = VT;
+    const expArg = Math.min(vd / nVt, 700);
+    const evd = Math.exp(expArg);
+    const gdRaw = IS * evd / nVt;
+    const expectedGd = gdRaw + 1e-12; // + GMIN
+    expect(Math.abs(gdWithInfIkf - expectedGd) / expectedGd).toBeLessThan(0.001);
+  });
+
+  it("IKR correction reduces gd for reverse-biased diode with finite IKR", () => {
+    const vd = -0.05;
+    const gdNoIkr  = diodeGd(vd, { IKR: Infinity });
+    const gdWithIkr = diodeGd(vd, { IKR: 1e-12 });
+    expect(gdWithIkr).toBeLessThan(gdNoIkr);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Change 34: Area scaling
+// ---------------------------------------------------------------------------
+
+describe("AREA scaling (Change 34)", () => {
+  function diodeOP(vd: number, overrides: Record<string, number> = {}): { id: number; gd: number } {
+    const props = makeParamBag({ IS: 1e-14, N: 1, RS: 0, CJO: 0, ...overrides });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as any;
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    const voltages = new Float64Array(10);
+    voltages[0] = vd;
+    for (let i = 0; i < 50; i++) {
+      core.updateOperatingPoint(voltages);
+      voltages[0] = vd;
+    }
+    return { id: pool.state0[3], gd: pool.state0[1] }; // SLOT_ID, SLOT_GEQ
+  }
+
+  it("AREA=1 (default) gives same result as no AREA override", () => {
+    const vd = 0.7;
+    const op1 = diodeOP(vd, { AREA: 1 });
+    const op2 = diodeOP(vd);
+    expect(Math.abs(op1.id - op2.id) / Math.abs(op2.id)).toBeLessThan(1e-6);
+  });
+
+  it("AREA=2 doubles IS and thus id (and gd) relative to AREA=1", () => {
+    const vd = 0.7;
+    const op1 = diodeOP(vd, { AREA: 1, IS: 1e-14 });
+    const op2 = diodeOP(vd, { AREA: 2, IS: 1e-14 });
+    expect(op2.id / op1.id).toBeGreaterThan(1.9);
+  });
+
+  it("AREA=2 halves RS conductance stamp (diode with RS>0 uses internal node)", () => {
+    const props1 = makeParamBag({ IS: 1e-14, N: 1, RS: 10, AREA: 1 });
+    const props2 = makeParamBag({ IS: 1e-14, N: 1, RS: 10, AREA: 2 });
+    const solver1 = makeMockSolver();
+    const solver2 = makeMockSolver();
+
+    const core1 = createDiodeElement(new Map([["A", 1], ["K", 2]]), [3], -1, props1) as any;
+    const pool1 = new StatePool(Math.max(core1.stateSize, 1));
+    core1.stateBaseOffset = 0;
+    core1.initState(pool1);
+    core1.stamp(solver1);
+
+    const core2 = createDiodeElement(new Map([["A", 1], ["K", 2]]), [3], -1, props2) as any;
+    const pool2 = new StatePool(Math.max(core2.stateSize, 1));
+    core2.stateBaseOffset = 0;
+    core2.initState(pool2);
+    core2.stamp(solver2);
+
+    const calls1 = (solver1 as any).stamp.mock.calls;
+    const calls2 = (solver2 as any).stamp.mock.calls;
+    expect(calls1.length).toBeGreaterThan(0);
+    expect(calls2.length).toBeGreaterThan(0);
+    // AREA=2 halves RS, so conductance 1/RS doubles
+    const gRS1 = calls1[0][2];
+    const gRS2 = calls2[0][2];
+    expect(Math.abs(gRS2 / gRS1 - 2)).toBeLessThan(1e-6);
+  });
+});

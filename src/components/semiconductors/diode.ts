@@ -38,7 +38,6 @@ import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
-import { VT } from "../../core/constants.js";
 import {
   defineStateSchema,
   applyInitialValues,
@@ -46,10 +45,12 @@ import {
 } from "../../solver/analog/state-schema.js";
 
 // ---------------------------------------------------------------------------
-// Physical constants
+// Physical constants (ngspice const.h values)
 // ---------------------------------------------------------------------------
 
-// VT (thermal voltage) imported from ../../core/constants.js
+const CONSTboltz = 1.3806226e-23;
+const CHARGE = 1.6021918e-19;
+const REFTEMP = 300.15;
 
 /** Minimum conductance for numerical stability (GMIN). */
 const GMIN = 1e-12;
@@ -103,10 +104,14 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     BV:  { default: Infinity, unit: "V", description: "Reverse breakdown voltage" },
     IBV: { default: 1e-3, unit: "A",  description: "Reverse breakdown current" },
     NBV: { default: NaN, unit: "",     description: "Breakdown emission coefficient (default=N)" },
+    IKF: { default: Infinity, unit: "A", description: "High-injection knee current (forward)" },
+    IKR: { default: Infinity, unit: "A", description: "High-injection knee current (reverse)" },
     EG:  { default: 1.11, unit: "eV", description: "Activation energy" },
     XTI: { default: 3,                description: "Saturation current temperature exponent" },
     KF:  { default: 0,                description: "Flicker noise coefficient" },
     AF:  { default: 1,                description: "Flicker noise exponent" },
+    AREA: { default: 1,               description: "Area scaling factor" },
+    TNOM: { default: REFTEMP, unit: "K", description: "Parameter measurement temperature" },
   },
 });
 
@@ -207,6 +212,108 @@ export function computeJunctionCharge(
 }
 
 // ---------------------------------------------------------------------------
+// DioTempParams — result of dioTemp()
+// ---------------------------------------------------------------------------
+
+export interface DioTempParams {
+  /** Temperature-scaled thermal voltage kT/q */
+  vt: number;
+  /** Temperature-scaled saturation current (DIOtSatCur) */
+  tIS: number;
+  /** Temperature-scaled junction potential (DIOtJctPot) */
+  tVJ: number;
+  /** Temperature-scaled zero-bias cap (DIOtJctCap) */
+  tCJO: number;
+  /** Critical voltage for pnjlim (DIOtVcrit) */
+  tVcrit: number;
+  /** Effective breakdown voltage after knee iteration (DIOtBrkdwnV) */
+  tBV: number;
+}
+
+// ---------------------------------------------------------------------------
+// dioTemp — ngspice diotemp.c temperature scaling
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute temperature-scaled diode parameters, matching ngspice diotemp.c.
+ *
+ * Scaling formulas (diotemp.c):
+ *   fact1 = TNOM / REFTEMP
+ *   fact2 = T / REFTEMP
+ *   egfet = 1.16 - (7.02e-4 * T^2) / (T + 1108)
+ *   pbfact = -2 * vt * (1.5 * log(fact2) + q * arg)
+ *     where arg = -egfet/(2*k*T) + 1.1150877/(k*600.3)
+ *   tIS = IS * exp((T/TNOM - 1) * EG / (N*vt) + XTI/N * log(T/TNOM))
+ *   pbo = (VJ - pbfact1) / fact1
+ *   tVJ = fact2 * pbo + pbfact
+ *   capfact = (1 + M*(4e-4*(TNOM-REFTEMP) - gmaold)) / (1 + M*(4e-4*(T-REFTEMP) - gmanew))
+ *   tCJO = CJO * capfact
+ */
+export function dioTemp(p: {
+  IS: number; N: number; VJ: number; CJO: number; M: number;
+  BV: number; IBV: number; NBV: number; EG: number; XTI: number; TNOM: number;
+}, T: number = REFTEMP): DioTempParams {
+  const vt = T * CONSTboltz / CHARGE;
+  const vtnom = p.TNOM * CONSTboltz / CHARGE;
+
+  const fact1 = p.TNOM / REFTEMP;
+  const fact2 = T / REFTEMP;
+
+  // egfet at operating temperature T
+  const egfet = 1.16 - (7.02e-4 * T * T) / (T + 1108);
+  const arg = -egfet / (2 * CONSTboltz * T) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP));
+  const pbfact = -2 * vt * (1.5 * Math.log(fact2) + CHARGE * arg);
+
+  // egfet at nominal temperature TNOM
+  const egfet1 = 1.16 - (7.02e-4 * p.TNOM * p.TNOM) / (p.TNOM + 1108);
+  const arg1 = -egfet1 / (2 * CONSTboltz * p.TNOM) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP));
+  const pbfact1 = -2 * vtnom * (1.5 * Math.log(fact1) + CHARGE * arg1);
+
+  // tIS: diotemp.c — IS * exp((T/TNOM - 1)*EG/(N*vt) + XTI/N * log(T/TNOM))
+  const ratlog = Math.log(T / p.TNOM);
+  const ratio1 = T / p.TNOM - 1;
+  const factlog = ratio1 * p.EG / (p.N * vt) + (p.XTI / p.N) * ratlog;
+  const tIS = p.IS * Math.exp(factlog);
+
+  // tVJ: junction potential temperature scaling (diotemp.c)
+  const pbo = (p.VJ - pbfact1) / fact1;
+  const tVJ = fact2 * pbo + pbfact;
+
+  // tCJO: capacitance temperature scaling (diotemp.c)
+  let tCJO = p.CJO;
+  if (p.CJO > 0 && p.VJ > 0) {
+    const gmaold = (p.VJ - pbo) / pbo;
+    const gmanew = (tVJ - pbo) / pbo;
+    const capfact = (1 + p.M * (4e-4 * (p.TNOM - REFTEMP) - gmaold)) /
+                    (1 + p.M * (4e-4 * (T - REFTEMP) - gmanew));
+    tCJO = p.CJO * capfact;
+  }
+
+  // tVcrit: critical voltage for pnjlim (diotemp.c)
+  const nVt = p.N * vt;
+  const tVcrit = nVt * Math.log(nVt / (tIS * Math.SQRT2));
+
+  // tBV: Newton-iterate 25 steps to find effective breakdown voltage (Change 32)
+  // diotemp.c: xbv = BV - vt*log(1 + cbv/IS)  (cbv = IBV, using NBV emission)
+  let tBV = p.BV;
+  if (isFinite(p.BV)) {
+    const nbvVt = p.NBV * vt;
+    let xbv = p.BV;
+    for (let i = 0; i < 25; i++) {
+      xbv = p.BV - nbvVt * Math.log(1 + p.IBV / tIS);
+      const f = tIS * (Math.exp((p.BV - xbv) / nbvVt) - 1) - p.IBV;
+      const df = tIS * Math.exp((p.BV - xbv) / nbvVt) / nbvVt;
+      const dx = f / df;
+      xbv -= dx;
+      if (Math.abs(dx) < 1e-12) break;
+    }
+    tBV = xbv;
+  }
+
+  return { vt, tIS, tVJ, tCJO, tVcrit, tBV };
+}
+
+// ---------------------------------------------------------------------------
 // computeDiodeIV — 3-region I-V model
 // ---------------------------------------------------------------------------
 
@@ -264,14 +371,49 @@ export function createDiodeElement(
     BV:  props.getModelParam<number>("BV"),
     IBV: props.getModelParam<number>("IBV"),
     NBV: props.getModelParam<number>("NBV"),
+    IKF: props.getModelParam<number>("IKF"),
+    IKR: props.getModelParam<number>("IKR"),
     EG:  props.getModelParam<number>("EG"),
     XTI: props.getModelParam<number>("XTI"),
     KF:  props.getModelParam<number>("KF"),
     AF:  props.getModelParam<number>("AF"),
+    AREA: props.getModelParam<number>("AREA"),
+    TNOM: props.getModelParam<number>("TNOM"),
   };
 
   // diosetup.c:93-95: NBV defaults to N when not explicitly given
   if (isNaN(params.NBV)) params.NBV = params.N;
+
+  // Change 34: Area scaling — applied once at construction
+  params.IS  *= params.AREA;
+  if (params.RS > 0) params.RS /= params.AREA;
+  params.CJO *= params.AREA;
+
+  // Change 31: Mutable temperature-scaled working values — recomputed when params change.
+  let tIS: number;
+  let tVJ: number;
+  let tCJO: number;
+  let tVcrit: number;
+  let tBV: number;
+  let vt: number;
+  let nVt: number;
+
+  function recomputeTemp(): void {
+    const tp = dioTemp({
+      IS: params.IS, N: params.N, VJ: params.VJ, CJO: params.CJO, M: params.M,
+      BV: params.BV, IBV: params.IBV, NBV: params.NBV, EG: params.EG,
+      XTI: params.XTI, TNOM: params.TNOM,
+    }, REFTEMP);
+    tIS = tp.tIS;
+    tVJ = tp.tVJ;
+    tCJO = tp.tCJO;
+    tVcrit = tp.tVcrit;
+    tBV = tp.tBV;
+    vt = tp.vt;
+    nVt = params.N * vt;
+  }
+
+  recomputeTemp();
 
   // When RS > 0, use an internal node between the anode pin and the junction.
   // nodeJunction is the node the Shockley junction connects from (internal side of RS).
@@ -360,23 +502,19 @@ export function createDiodeElement(
         vdRaw = va - vc;
       }
 
-      // Recompute derived values from mutable params
-      const nVt = params.N * VT;
-      const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
-
-      const vtebrk = params.NBV * VT;  // DD3: breakdown emission voltage
+      const vtebrk = params.NBV * vt;
 
       // Apply pnjlim — dioload.c:180-191
       const vdOld = s0[base + SLOT_VD];
       let vdLimited: number;
-      if (params.BV < Infinity && vdRaw < Math.min(0, -params.BV + 10 * vtebrk)) {
+      if (tBV < Infinity && vdRaw < Math.min(0, -tBV + 10 * vtebrk)) {
         // Breakdown reflection: limit in the reflected domain
-        let vdtemp = -(vdRaw + params.BV);
-        const vdtempOld = -(vdOld + params.BV);
-        const reflResult = pnjlim(vdtemp, vdtempOld, vtebrk, vcrit);
+        let vdtemp = -(vdRaw + tBV);
+        const vdtempOld = -(vdOld + tBV);
+        const reflResult = pnjlim(vdtemp, vdtempOld, vtebrk, tVcrit);
         vdtemp = reflResult.value;
         pnjlimLimited = reflResult.limited;
-        vdLimited = -(vdtemp + params.BV);
+        vdLimited = -(vdtemp + tBV);
         if (limitingCollector) {
           limitingCollector.push({
             elementIndex: (this as any).elementIndex ?? -1,
@@ -390,7 +528,7 @@ export function createDiodeElement(
         }
       } else {
         // Normal forward/reverse limiting: dioload.c:189-191
-        const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
+        const vdResult = pnjlim(vdRaw, vdOld, nVt, tVcrit);
         vdLimited = vdResult.value;
         pnjlimLimited = vdResult.limited;
         if (limitingCollector) {
@@ -408,11 +546,23 @@ export function createDiodeElement(
 
       s0[base + SLOT_VD] = vdLimited;
 
-      // 3-region I-V: dioload.c:232-252 (vtebrk already computed above for DD4)
-      const { id: idRaw, gd: gdRaw } = computeDiodeIV(vdLimited, params.IS, nVt, params.BV, vtebrk);
+      // 3-region I-V: dioload.c:232-252
+      const { id: idRaw, gd: gdRaw } = computeDiodeIV(vdLimited, tIS, nVt, tBV, vtebrk);
+
+      // Change 33: High-injection correction (IKF forward, IKR reverse)
+      let gdCorr = gdRaw;
+      if (isFinite(params.IKF) && params.IKF > 0 && idRaw > 0) {
+        const ikfRatio = idRaw / params.IKF;
+        const sqrtTerm = Math.sqrt(1 + ikfRatio);
+        gdCorr /= sqrtTerm * (1 + sqrtTerm);
+      } else if (isFinite(params.IKR) && params.IKR > 0 && idRaw < 0) {
+        const ikrRatio = (-idRaw) / params.IKR;
+        const sqrtTerm = Math.sqrt(1 + ikrRatio);
+        gdCorr /= sqrtTerm * (1 + sqrtTerm);
+      }
 
       // Add GMIN — dioload.c:283-300
-      const gd = gdRaw + GMIN;
+      const gd = gdCorr + GMIN;
       const id = idRaw + GMIN * vdLimited;  // DD5: store id + GMIN*vd
 
       s0[base + SLOT_ID] = id;
@@ -450,12 +600,14 @@ export function createDiodeElement(
       // Arm cold-start seed: Vd = tVcrit. Matches ngspice MODEINITJCT
       // (dioload.c MODEINITJCT branch). Local override consumed by the next
       // updateOperatingPoint call; no writes to the shared voltages vector.
-      const nVt = params.N * VT;
-      primedVd = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
+      primedVd = tVcrit;
     },
 
     setParam(key: string, value: number): void {
-      if (key in params) params[key] = value;
+      if (key in params) {
+        params[key] = value;
+        recomputeTemp();
+      }
     },
   };
 
@@ -474,29 +626,26 @@ export function createDiodeElement(
       const va_sc = nodeJunction > 0 ? _voltages[nodeJunction - 1] : 0;
       const vc_sc = nodeCathode > 0 ? _voltages[nodeCathode - 1] : 0;
       const vdRaw_sc = va_sc - vc_sc;
-      const nVt = params.N * VT;
-      const vcrit_sc = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
-      const vtebrk_sc = params.NBV * VT;
+      const vtebrk_sc = params.NBV * vt;
       const vdOld_sc = s0[base + SLOT_VD];
       let vNow: number;
-      if (params.BV < Infinity && vdRaw_sc < Math.min(0, -params.BV + 10 * vtebrk_sc)) {
-        const vdtemp_sc = -(vdRaw_sc + params.BV);
-        const vdtempOld_sc = -(vdOld_sc + params.BV);
-        const reflRes_sc = pnjlim(vdtemp_sc, vdtempOld_sc, vtebrk_sc, vcrit_sc);
-        vNow = -(reflRes_sc.value + params.BV);
+      if (tBV < Infinity && vdRaw_sc < Math.min(0, -tBV + 10 * vtebrk_sc)) {
+        const vdtemp_sc = -(vdRaw_sc + tBV);
+        const vdtempOld_sc = -(vdOld_sc + tBV);
+        const reflRes_sc = pnjlim(vdtemp_sc, vdtempOld_sc, vtebrk_sc, tVcrit);
+        vNow = -(reflRes_sc.value + tBV);
       } else {
-        vNow = pnjlim(vdRaw_sc, vdOld_sc, nVt, vcrit_sc).value;
+        vNow = pnjlim(vdRaw_sc, vdOld_sc, nVt, tVcrit).value;
       }
       s0[base + SLOT_VD] = vNow;
 
       // Depletion + transit-time capacitance at current operating point
-      const Cj = computeJunctionCapacitance(vNow, params.CJO, params.VJ, params.M, params.FC);
-      const vtebrk = params.NBV * VT;
-      const { gd: gDiode, id: idRaw } = computeDiodeIV(vNow, params.IS, nVt, params.BV, vtebrk);
+      const Cj = computeJunctionCapacitance(vNow, tCJO, tVJ, params.M, params.FC);
+      const { gd: gDiode, id: idRaw } = computeDiodeIV(vNow, tIS, nVt, tBV, params.NBV * vt);
       const Ct = params.TT * gDiode;  // dioload.c:338: diffcap = TT * gdb
       const Ctotal = Cj + Ct;
 
-      const q0 = computeJunctionCharge(vNow, params.CJO, params.VJ, params.M, params.FC, params.TT, idRaw);
+      const q0 = computeJunctionCharge(vNow, tCJO, tVJ, params.M, params.FC, params.TT, idRaw);
       const q1 = s1[base + SLOT_Q];
       const q2 = s2[base + SLOT_Q];
       const ccapPrev = s1[base + SLOT_CCAP];
@@ -547,23 +696,20 @@ export function createDiodeElement(
       const va_uc = nodeJunction > 0 ? _voltages[nodeJunction - 1] : 0;
       const vc_uc = nodeCathode > 0 ? _voltages[nodeCathode - 1] : 0;
       const vdRaw_uc = va_uc - vc_uc;
-      const nVt = params.N * VT;
-      const vcrit_uc = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
-      const vtebrkLim_uc = params.NBV * VT;
+      const vtebrkLim_uc = params.NBV * vt;
       const vdOld_uc = s0[base + SLOT_VD];
       let vd: number;
-      if (params.BV < Infinity && vdRaw_uc < Math.min(0, -params.BV + 10 * vtebrkLim_uc)) {
-        const vdtemp_uc = -(vdRaw_uc + params.BV);
-        const vdtempOld_uc = -(vdOld_uc + params.BV);
-        const reflRes_uc = pnjlim(vdtemp_uc, vdtempOld_uc, vtebrkLim_uc, vcrit_uc);
-        vd = -(reflRes_uc.value + params.BV);
+      if (tBV < Infinity && vdRaw_uc < Math.min(0, -tBV + 10 * vtebrkLim_uc)) {
+        const vdtemp_uc = -(vdRaw_uc + tBV);
+        const vdtempOld_uc = -(vdOld_uc + tBV);
+        const reflRes_uc = pnjlim(vdtemp_uc, vdtempOld_uc, vtebrkLim_uc, tVcrit);
+        vd = -(reflRes_uc.value + tBV);
       } else {
-        vd = pnjlim(vdRaw_uc, vdOld_uc, nVt, vcrit_uc).value;
+        vd = pnjlim(vdRaw_uc, vdOld_uc, nVt, tVcrit).value;
       }
       s0[base + SLOT_VD] = vd;
-      const vtebrk = params.NBV * VT;
-      const { id: idRaw } = computeDiodeIV(vd, params.IS, nVt, params.BV, vtebrk);
-      s0[base + SLOT_Q] = computeJunctionCharge(vd, params.CJO, params.VJ, params.M, params.FC, params.TT, idRaw);
+      const { id: idRaw } = computeDiodeIV(vd, tIS, nVt, tBV, params.NBV * vt);
+      s0[base + SLOT_Q] = computeJunctionCharge(vd, tCJO, tVJ, params.M, params.FC, params.TT, idRaw);
       s0[base + SLOT_V] = vd;
     };
   }

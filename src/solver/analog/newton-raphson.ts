@@ -556,6 +556,7 @@ export function newtonRaphson(opts: NROptions): NRResult {
     if (!ladder && opts.statePool) {
       const pool = opts.statePool as { initMode: string };
       if (pool.initMode === "initTran" && iteration === 0) {
+        opts.solver.forceReorder();
         pool.initMode = "initFloat";
       } else if (pool.initMode === "initPred") {
         pool.initMode = "initFloat";
@@ -668,6 +669,7 @@ export function newtonRaphson(opts: NROptions): NRResult {
         // niiter.c:991-993: unconditional → initFix after iter 0
         nextMode = "initFix";
         ladderModeIter = 0;
+        opts.solver.forceReorder();
       } else if (curMode === "initFix") {
         // niiter.c:994-997 + niiter.c:885-889: → initFloat only if noncon === 0
         // AND this is not the first iteration in initFix (ngspice forces noncon=1

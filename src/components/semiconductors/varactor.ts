@@ -32,6 +32,7 @@ import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
+import { computeJunctionCapacitance, computeJunctionCharge } from "./diode.js";
 import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -59,6 +60,8 @@ export const { paramDefs: VARACTOR_PARAM_DEFS, defaults: VARACTOR_PARAM_DEFAULTS
     vj:  { default: 0.7,    unit: "V", description: "Junction built-in potential" },
     m:   { default: 0.5,               description: "Junction grading coefficient (0.5 = abrupt junction)" },
     iS:  { default: 1e-14,  unit: "A", description: "Reverse saturation current" },
+    fc:  { default: 0.5,               description: "Forward-bias capacitance linearization coefficient" },
+    tt:  { default: 0,      unit: "s", description: "Transit time" },
   },
 });
 
@@ -125,6 +128,8 @@ export function createVaractorElement(
     vj:  props.getModelParam<number>("vj"),
     m:   props.getModelParam<number>("m"),
     iS:  props.getModelParam<number>("iS"),
+    fc:  props.getModelParam<number>("fc"),
+    tt:  props.getModelParam<number>("tt"),
   };
   const nParam = 1; // emission coefficient fixed at 1 for varactor
 
@@ -251,17 +256,22 @@ export function createVaractorElement(
       const vNow = pnjlim(vdRaw_sc, s0[base + SLOT_VD], nVt, vcrit).value;
       s0[base + SLOT_VD] = vNow;
 
-      // Reverse bias voltage: V_R = -V_d (positive when reverse biased)
-      const vReverse = -vNow;
-      const Cj = computeVaractorCapacitance(vReverse, p.cjo, p.vj, p.m);
+      // Change 36: use computeJunctionCapacitance with FC linearization (vd = vNow)
+      const Cj = computeJunctionCapacitance(vNow, p.cjo, p.vj, p.m, p.fc);
 
-      const q0 = Cj * vNow;
+      // Change 37: Ctotal = Cj + TT * gd
+      const gd = s0[base + SLOT_GEQ];
+      const Ctotal = Cj + p.tt * gd;
+
+      // Change 35: use computeJunctionCharge instead of Cj * vNow
+      const id = s0[base + SLOT_ID];
+      const q0 = computeJunctionCharge(vNow, p.cjo, p.vj, p.m, p.fc, p.tt, id);
       const q1 = s1[base + SLOT_Q];
       const q2 = s2[base + SLOT_Q];
       const ccapPrev = s1[base + SLOT_CCAP];
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
       const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-      const { geq, ceq, ccap } = integrateCapacitor(Cj, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      const { geq, ceq, ccap } = integrateCapacitor(Ctotal, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
       s0[base + SLOT_CAP_GEQ] = geq;
       s0[base + SLOT_CAP_IEQ] = ceq;
       s0[base + SLOT_V] = vNow;
@@ -325,11 +335,9 @@ export function createVaractorElement(
     },
 
     updateChargeFlux(_voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
-      // dioload.c:308-341: use pnjlim-limited vd from state pool, not raw node voltages.
       const vNow = s0[base + SLOT_VD];
-      const vReverse = -vNow;
-      const Cj = computeVaractorCapacitance(vReverse, p.cjo, p.vj, p.m);
-      s0[base + SLOT_Q] = Cj * vNow;
+      const id = s0[base + SLOT_ID];
+      s0[base + SLOT_Q] = computeJunctionCharge(vNow, p.cjo, p.vj, p.m, p.fc, p.tt, id);
       s0[base + SLOT_V] = vNow;
     },
   };

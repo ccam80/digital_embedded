@@ -92,7 +92,7 @@ const GMIN = 1e-12;
 /** Elementary charge (C) — ngspice CHARGE from const.h. */
 const Q = 1.6021918e-19;
 /** Permittivity of free space (F/m). */
-const EPS0 = 8.854187817e-12;
+const EPS0 = 8.854214871e-12;
 /** Relative permittivity of SiO2. */
 const EPS_OX = 3.9;
 /** Relative permittivity of Si. */
@@ -154,6 +154,8 @@ interface MosfetParams {
   // Noise params (optional, default 0/1)
   KF?: number;
   AF?: number;
+  // Parallel device multiplier (optional, default 1)
+  M?: number;
 }
 
 /** MosfetParams with all fields guaranteed present (after resolveParams). */
@@ -194,6 +196,7 @@ interface ResolvedMosfetParams {
   UO: number;
   KF: number;
   AF: number;
+  M: number;
   // Temperature-corrected values threaded from _recomputeTempParams
   _tKP?: number;
   _tPhi?: number;
@@ -244,6 +247,7 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     KF:     { default: 0,                    description: "Flicker noise coefficient" },
     AF:     { default: 1,                    description: "Flicker noise exponent" },
     FC:     { default: 0.5,                  description: "Forward-bias depletion capacitance coefficient" },
+    M:      { default: 1,                    description: "Parallel device multiplier" },
   },
 });
 
@@ -338,6 +342,7 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     KF:     { default: 0,                    description: "Flicker noise coefficient" },
     AF:     { default: 1,                    description: "Flicker noise exponent" },
     FC:     { default: 0.5,                  description: "Forward-bias depletion capacitance coefficient" },
+    M:      { default: 1,                    description: "Parallel device multiplier" },
   },
 });
 
@@ -455,6 +460,7 @@ function resolveParams(raw: MosfetParams, kpDefault: number): ResolvedMosfetPara
     UO:   raw.UO   ?? 600,
     KF:   raw.KF   ?? 0,
     AF:   raw.AF   ?? 1,
+    M:    raw.M    ?? 1,
   };
 
   if (p.NSUB > 0 && p.TOX > 0) {
@@ -478,6 +484,12 @@ function resolveParams(raw: MosfetParams, kpDefault: number): ResolvedMosfetPara
       const phi = 2 * VT * Math.log(p.NSUB / NI);
       if (phi > 0.1) p.PHI = phi;
     }
+  }
+
+  if (p.M !== 1) {
+    p.CGDO *= p.M;
+    p.CGSO *= p.M;
+    p.CGBO *= p.M;
   }
 
   return p;
@@ -535,7 +547,7 @@ export function computeIds(
 
   const ld = p.LD ?? 0;
   const effectiveLength = p.L - 2 * ld;
-  const Beta = tKP * p.W / effectiveLength;
+  const Beta = tKP * p.W / effectiveLength * (p.M ?? 1);
   const lambda = p.LAMBDA;
   const betap = Beta * (1 + lambda * vds);
 
@@ -581,12 +593,12 @@ export function computeGm(
   const vgst = vgs - vth;
 
   if (vgst <= 0) {
-    return GMIN;
+    return 0;
   }
 
   const ld = p.LD ?? 0;
   const effectiveLength = p.L - 2 * ld;
-  const Beta = tKP * p.W / effectiveLength;
+  const Beta = tKP * p.W / effectiveLength * (p.M ?? 1);
   const lambda = p.LAMBDA;
   const betap = Beta * (1 + lambda * vds);
 
@@ -628,12 +640,12 @@ export function computeGds(
   const vgst = vgs - vth;
 
   if (vgst <= 0) {
-    return GMIN;
+    return 0;
   }
 
   const ld = p.LD ?? 0;
   const effectiveLength = p.L - 2 * ld;
-  const Beta = tKP * p.W / effectiveLength;
+  const Beta = tKP * p.W / effectiveLength * (p.M ?? 1);
   const lambda = p.LAMBDA;
 
   if (vds < vgst) {
@@ -996,10 +1008,11 @@ class MosfetAnalogElement extends AbstractFetElement {
     this._tPhi = fact2 * phio + pbfact;
 
     // mos1temp.c:170-176: temperature-adjusted vbi and vto
-    this._tVbi = p.VTO - (p.GAMMA * Math.sqrt(p.PHI))
+    const type = this.polaritySign;
+    this._tVbi = p.VTO - type * (p.GAMMA * Math.sqrt(p.PHI))
       + 0.5 * (egfet1 - egfet)
-      + 0.5 * (this._tPhi - p.PHI);
-    this._tVto = this._tVbi + p.GAMMA * Math.sqrt(this._tPhi);
+      + type * 0.5 * (this._tPhi - p.PHI);
+    this._tVto = this._tVbi + type * p.GAMMA * Math.sqrt(this._tPhi);
 
     // mos1temp.c:177-180: saturation currents
     const tempFactor = Math.exp(-egfet / vt + egfet1 / vtnom);
@@ -1025,13 +1038,14 @@ class MosfetAnalogElement extends AbstractFetElement {
     this._tCjsw *= capfact;
     this._tDepCap = p.FC * this._tBulkPot;
 
-    // mos1load.c:128-138: drain/source saturation currents
+    // mos1load.c:128-138: drain/source saturation currents scaled by multiplicity M
+    const m = p.M ?? 1;
     if (this._tSatCurDens === 0 || p.AD === 0 || p.AS === 0) {
-      this._drainSatCur = this._tSatCur;
-      this._sourceSatCur = this._tSatCur;
+      this._drainSatCur = this._tSatCur * m;
+      this._sourceSatCur = this._tSatCur * m;
     } else {
-      this._drainSatCur = this._tSatCurDens * p.AD;
-      this._sourceSatCur = this._tSatCurDens * p.AS;
+      this._drainSatCur = this._tSatCurDens * p.AD * m;
+      this._sourceSatCur = this._tSatCurDens * p.AS * m;
     }
 
     // mos1temp.c:202-216: separate drain/source vcrit
@@ -1310,13 +1324,15 @@ class MosfetAnalogElement extends AbstractFetElement {
     const drainSatCur = this._drainSatCur;
     const sourceSatCur = this._sourceSatCur;
 
+    const MAX_EXP_ARG = 709.78;
+
     // Source-bulk junction
     let gbs: number, cbsI: number;
     if (vbs <= -3 * VT) {
       gbs = GMIN;
       cbsI = GMIN * vbs - sourceSatCur;
     } else {
-      const evbs = Math.exp(Math.min(vbs / VT, 80));
+      const evbs = Math.exp(Math.min(vbs / VT, MAX_EXP_ARG));
       gbs = sourceSatCur * evbs / VT + GMIN;
       cbsI = sourceSatCur * (evbs - 1) + GMIN * vbs;
     }
@@ -1327,7 +1343,7 @@ class MosfetAnalogElement extends AbstractFetElement {
       gbd = GMIN;
       cbdI = GMIN * vbd - drainSatCur;
     } else {
-      const evbd = Math.exp(Math.min(vbd / VT, 80));
+      const evbd = Math.exp(Math.min(vbd / VT, MAX_EXP_ARG));
       gbd = drainSatCur * evbd / VT + GMIN;
       cbdI = drainSatCur * (evbd - 1) + GMIN * vbd;
     }
@@ -1912,6 +1928,7 @@ export function createMosfetElement(
     KF:     mp("KF", 0),
     AF:     mp("AF", 1),
     FC:     mp("FC", 0.5),
+    M:      mp("M", 1),
   };
 
   const p = resolveParams(rawParams, kpDefault);

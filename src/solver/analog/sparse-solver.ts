@@ -26,7 +26,10 @@ export interface FactorResult {
 }
 
 const INITIAL_TRIPLET_CAPACITY = 256;
-const PIVOT_THRESHOLD = 0.01;
+// ngspice spconfig.h:331: DEFAULT_THRESHOLD = 1e-3
+const PIVOT_THRESHOLD = 1e-3;
+// ngspice cktinit.c:66-67: CKTpivotAbsTol = 1e-13
+const PIVOT_ABS_THRESHOLD = 1e-13;
 
 export class SparseSolver {
   // -- COO triplet storage --
@@ -139,6 +142,9 @@ export class SparseSolver {
   /** Whether a valid linear-base snapshot exists. */
   private _hasLinearBase = false;
 
+  // -- Mode-driven reorder flag --
+  private _needsReorder: boolean = false;
+
   // -- Scratch buffers for _buildCSC (hoisted, grown lazily) --
   /** Per-column nonzero counts + prefix-summed column start offsets. */
   private _bldColCount: Int32Array = new Int32Array(0);
@@ -231,6 +237,10 @@ export class SparseSolver {
   }
 
   factor(): FactorResult {
+    if (this._needsReorder) {
+      this._needsReorder = false;
+      this._topologyDirty = true;
+    }
     const result = this._numericLU();
     if (!result.success && result.singularRow === undefined) {
       // Pivot threshold failure: force a full topology rebuild and retry.
@@ -308,6 +318,14 @@ export class SparseSolver {
 
   invalidateTopology(): void {
     this._topologyDirty = true;
+  }
+
+  /**
+   * Force full symbolic reorder on next factor() call.
+   * ngspice: NISHOULDREORDER trigger (niiter.c:858, 861-880).
+   */
+  forceReorder(): void {
+    this._needsReorder = true;
   }
 
   /**
@@ -942,29 +960,47 @@ export class SparseSolver {
         }
       }
 
-      // Step 3: PARTIAL PIVOT — find best |x[i]| among unpivoted rows
-      // Scan only the nonzero entries in x[]
-      let maxVal = 0;
-      let pivotRow = -1;
+      // Step 3: PARTIAL PIVOT -- find best |x[i]| among unpivoted rows
+      // Apply RelThreshold and AbsThreshold DURING search (ngspice spfactor.c:219)
+
+      // First pass: find absolute maximum among unpivoted rows (for relative threshold)
+      let absMax = 0;
       for (let idx = 0; idx < xNzCount; idx++) {
         const i = xNzIdx[idx];
-        if (pinv[i] >= 0) continue; // already pivoted
-        if (x[i] === 0) continue; // cancelled to zero
+        if (pinv[i] >= 0) continue;
         const v = Math.abs(x[i]);
-        if (v > maxVal) { maxVal = v; pivotRow = i; }
+        if (v > absMax) absMax = v;
       }
 
-      if (maxVal === 0 || pivotRow < 0) {
-        // Clear workspace via tracked indices
+      if (absMax === 0) {
         for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
         return { success: false, singularRow: k };
       }
 
-      // Threshold pivoting
-      const threshold = PIVOT_THRESHOLD * maxVal;
-      if (Math.abs(x[pivotRow]) < threshold) {
-        for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
-        return { success: false };
+      const relThreshold = PIVOT_THRESHOLD * absMax;
+
+      // Second pass: among candidates meeting BOTH thresholds, pick largest
+      let maxVal = 0;
+      let pivotRow = -1;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (pinv[i] >= 0) continue;
+        if (x[i] === 0) continue;
+        const v = Math.abs(x[i]);
+        if (v < relThreshold || v < PIVOT_ABS_THRESHOLD) continue;
+        if (v > maxVal) { maxVal = v; pivotRow = i; }
+      }
+
+      // Fallback: if no candidate met threshold, accept largest anyway
+      // (ngspice spSMALL_PIVOT warning path)
+      if (pivotRow < 0) {
+        maxVal = 0;
+        for (let idx = 0; idx < xNzCount; idx++) {
+          const i = xNzIdx[idx];
+          if (pinv[i] >= 0) continue;
+          const v = Math.abs(x[i]);
+          if (v > maxVal) { maxVal = v; pivotRow = i; }
+        }
       }
 
       // Step 4: Record pivot

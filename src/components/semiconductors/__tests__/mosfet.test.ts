@@ -720,3 +720,135 @@ describe("MOSFET LimitingEvent instrumentation", () => {
     expect(() => el.updateOperatingPoint(voltages, undefined)).not.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Change 16: PMOS temperature scaling — type multiplier on tVbi/tVto
+// ---------------------------------------------------------------------------
+
+describe("PMOS temperature scaling (Change 16)", () => {
+  it("pmos_tVto_differs_from_nmos_tVto_at_elevated_tnom", () => {
+    // NMOS and PMOS with same magnitude VTO=0.7 and elevated TNOM=350K
+    // The type multiplier (-1 for PMOS) must flip the GAMMA and delta-phi terms.
+    // At TNOM != REFTEMP, tVbi and tVto will differ between NMOS and PMOS.
+
+    const params = {
+      VTO: 0.7, KP: 120e-6, LAMBDA: 0, PHI: 0.6, GAMMA: 0.37,
+      CBD: 0, CBS: 0, CGDO: 0, CGSO: 0, W: 1e-6, L: 1e-6,
+      TNOM: 350,
+    };
+
+    const nmosProps = makeParamBag({ ...params });
+    const pmosProps = makeParamBag({ ...params, VTO: -0.7 });
+
+    const nmos = withState(createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, nmosProps)) as any;
+    const pmos = withState(createMosfetElement(-1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, pmosProps)) as any;
+
+    const nmosTVto: number = nmos._p._tVto;
+    const pmosTVto: number = pmos._p._tVto;
+
+    // Both tVto should be defined (temperature correction was applied)
+    expect(nmosTVto).toBeDefined();
+    expect(pmosTVto).toBeDefined();
+
+    // PMOS _p stores VTO as absolute value (see constructor); _tVto represents
+    // the magnitude. With type multiplier, PMOS tVto diverges from NMOS tVto
+    // when TNOM != REFTEMP and GAMMA != 0.
+    expect(nmosTVto).not.toBeCloseTo(pmosTVto, 6);
+  });
+
+  it("pmos_tVto_symmetry_at_tnom_equals_reftemp", () => {
+    // At TNOM = REFTEMP (300.15K), temperature correction terms vanish.
+    // Both NMOS and PMOS should yield tVto ≈ their respective VTO.
+    const nmosProps = makeParamBag({
+      VTO: 0.7, KP: 120e-6, LAMBDA: 0, PHI: 0.6, GAMMA: 0.37,
+      CBD: 0, CBS: 0, CGDO: 0, CGSO: 0, W: 1e-6, L: 1e-6,
+      TNOM: 300.15,
+    });
+    const pmosProps = makeParamBag({
+      VTO: -0.7, KP: 120e-6, LAMBDA: 0, PHI: 0.6, GAMMA: 0.37,
+      CBD: 0, CBS: 0, CGDO: 0, CGSO: 0, W: 1e-6, L: 1e-6,
+      TNOM: 300.15,
+    });
+
+    const nmos = withState(createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, nmosProps)) as any;
+    const pmos = withState(createMosfetElement(-1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, pmosProps)) as any;
+
+    const nmosTVto: number = nmos._p._tVto;
+    const pmosTVto: number = pmos._p._tVto;
+
+    // At nominal temperature both should be close to |VTO|=0.7
+    expect(nmosTVto).toBeCloseTo(0.7, 2);
+    expect(pmosTVto).toBeCloseTo(0.7, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Change 18: gm and gds return 0 in cutoff (not GMIN)
+// ---------------------------------------------------------------------------
+
+describe("Cutoff gm/gds return 0 (Change 18)", () => {
+  it("gm_is_zero_in_cutoff", () => {
+    // Vgs=0 < VTO=0.7: device is in cutoff
+    const gm = computeGm(0, 5, 0, { ...NMOS_DEFAULTS });
+    expect(gm).toBe(0);
+  });
+
+  it("gds_is_zero_in_cutoff", () => {
+    // Vgs=0 < VTO=0.7: device is in cutoff
+    const gds = computeGds(0, 5, 0, { ...NMOS_DEFAULTS });
+    expect(gds).toBe(0);
+  });
+
+  it("gm_nonzero_above_threshold", () => {
+    // Vgs=2 > VTO=0.7: device is active
+    const gm = computeGm(2, 1, 0, { ...NMOS_DEFAULTS });
+    expect(gm).toBeGreaterThan(0);
+  });
+
+  it("gds_nonzero_above_threshold", () => {
+    // Vgs=2 > VTO=0.7: device is active
+    const gds = computeGds(2, 1, 0, { ...NMOS_DEFAULTS });
+    expect(gds).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Change 27: M multiplicity parameter scales current and capacitances
+// ---------------------------------------------------------------------------
+
+describe("MOSFET M multiplicity (Change 27)", () => {
+  it("m2_doubles_drain_current_in_saturation", () => {
+    // Two parallel MOSFETs = one MOSFET with M=2: drain current doubles
+    const idM1 = computeIds(2, 5, 0, { ...NMOS_DEFAULTS }).ids;
+    const idM2 = computeIds(2, 5, 0, { ...NMOS_DEFAULTS, M: 2 }).ids;
+    expect(idM2).toBeCloseTo(2 * idM1, 10);
+  });
+
+  it("m2_doubles_gm", () => {
+    const gmM1 = computeGm(2, 5, 0, { ...NMOS_DEFAULTS });
+    const gmM2 = computeGm(2, 5, 0, { ...NMOS_DEFAULTS, M: 2 });
+    expect(gmM2).toBeCloseTo(2 * gmM1, 10);
+  });
+
+  it("m2_doubles_gds", () => {
+    const gdsM1 = computeGds(2, 1, 0, { ...NMOS_DEFAULTS });
+    const gdsM2 = computeGds(2, 1, 0, { ...NMOS_DEFAULTS, M: 2 });
+    expect(gdsM2).toBeCloseTo(2 * gdsM1, 10);
+  });
+
+  it("m2_doubles_overlap_capacitances", () => {
+    const params = { ...NMOS_DEFAULTS, CGDO: 1e-10, CGSO: 2e-10, CGBO: 0.5e-10 };
+    const capsM1 = computeCapacitances(params);
+    const capsM2 = computeCapacitances({ ...params, M: 2 });
+    expect(capsM2.cgd).toBeCloseTo(2 * capsM1.cgd, 15);
+    expect(capsM2.cgs).toBeCloseTo(2 * capsM1.cgs, 15);
+    expect(capsM2.cgb).toBeCloseTo(2 * capsM1.cgb, 15);
+  });
+
+  it("m1_is_default_unity", () => {
+    // M=1 should produce the same result as no M specified
+    const idDefault = computeIds(2, 5, 0, { ...NMOS_DEFAULTS }).ids;
+    const idM1 = computeIds(2, 5, 0, { ...NMOS_DEFAULTS, M: 1 }).ids;
+    expect(idM1).toBe(idDefault);
+  });
+});

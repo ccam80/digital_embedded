@@ -51,6 +51,7 @@ export const { paramDefs: ZENER_PARAM_DEFS, defaults: ZENER_PARAM_DEFAULTS } = d
     N:   { default: 1,                description: "Emission coefficient" },
     BV:  { default: 5.1,  unit: "V", description: "Reverse breakdown voltage" },
     IBV: { default: 1e-3, unit: "A", description: "Reverse breakdown current" },
+    NBV: { default: NaN,              description: "Breakdown emission coefficient (defaults to N)" },
   },
 });
 
@@ -104,6 +105,8 @@ export function createZenerElement(
   for (const key of props.getModelParamKeys()) {
     params[key] = props.getModelParam<number>(key);
   }
+  // NBV defaults to N when not explicitly given (diosetup.c:93-95)
+  if (isNaN(params.NBV)) params.NBV = params.N;
 
   // State pool slot indices
   const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
@@ -171,12 +174,24 @@ export function createZenerElement(
       // Recompute derived values from mutable params
       const nVt = params.N * VT;
       const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
+      const nbvVt = params.NBV * VT;
 
-      // Apply pnjlim to prevent exponential runaway in forward region
       const vdOld = s0[base + SLOT_VD];
-      const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
-      const vdLimited = vdResult.value;
-      pnjlimLimited = vdResult.limited;
+      let vdLimited: number;
+
+      if (vdRaw < Math.min(0, -params.BV + 10 * nbvVt)) {
+        // Breakdown region: apply pnjlim in reflected domain (dioload.c:180-191)
+        const vdtemp = -(vdRaw + params.BV);
+        const vdtempOld = -(vdOld + params.BV);
+        const reflResult = pnjlim(vdtemp, vdtempOld, nbvVt, vcrit);
+        pnjlimLimited = reflResult.limited;
+        vdLimited = -(reflResult.value + params.BV);
+      } else {
+        // Forward/normal reverse: standard pnjlim
+        const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
+        vdLimited = vdResult.value;
+        pnjlimLimited = vdResult.limited;
+      }
 
       if (limitingCollector) {
         limitingCollector.push({
@@ -192,7 +207,6 @@ export function createZenerElement(
 
       s0[base + SLOT_VD] = vdLimited;
 
-      // Compute diode current and linearized conductance
       if (vdLimited >= -params.BV) {
         // Forward region and normal reverse region: standard Shockley
         const expArg = Math.min(vdLimited / nVt, 700);
@@ -202,14 +216,12 @@ export function createZenerElement(
         s0[base + SLOT_GEQ] = (params.IS * expVal) / nVt + GMIN;
         s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
       } else {
-        // Reverse breakdown region: Id = -IBV * exp(-(Vd + BV) / (N*Vt))
-        // IBV is the reference current at the breakdown voltage BV.
-        const bdExpArg = Math.min(-(vdLimited + params.BV) / nVt, 700);
+        // Reverse breakdown region: Id = -IS * exp(-(Vd + BV) / (NBV*Vt))
+        const bdExpArg = Math.min(-(vdLimited + params.BV) / nbvVt, 700);
         const bdExpVal = Math.exp(bdExpArg);
-        const id = -params.IBV * bdExpVal;
+        const id = -params.IS * bdExpVal;
         s0[base + SLOT_ID] = id;
-        // geq = |dId/dVd| = IBV * exp(-(Vd+BV)/nVt) / nVt
-        s0[base + SLOT_GEQ] = (params.IBV * bdExpVal) / nVt + GMIN;
+        s0[base + SLOT_GEQ] = (params.IS * bdExpVal) / nbvVt + GMIN;
         s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
       }
     },

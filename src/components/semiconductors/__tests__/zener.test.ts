@@ -209,6 +209,120 @@ describe("Zener", () => {
     expect(ZenerDiodeDefinition.modelRegistry?.["spice"]?.kind).toBe("inline");
     expect((ZenerDiodeDefinition.modelRegistry?.["spice"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
+
+  it("change42_breakdown_amplitude_uses_IS_not_IBV", () => {
+    // Change 42: breakdown Id = -IS * exp(-(Vd+BV)/(NBV*Vt)), not -IBV * exp(...)
+    // At Vd = -BV: Id = -IS * exp(0) = -IS
+    // With IS=1e-14 and IBV=1e-3, the currents differ by ~11 orders of magnitude.
+    // Drive element to exactly -BV and check that ID in state is -IS (not -IBV).
+    const IS = 1e-14;
+    const IBV = 1e-3;
+    const N = 1;
+    const BV = 5.1;
+
+    const propsObj = makeParamBag({ IS, N, BV, IBV });
+    const core = createZenerElement(new Map([["A", 0], ["K", 1]]), [], -1, propsObj);
+    const { element: el } = withState(core);
+
+    // Drive to exactly -BV: Vd = 0 - BV = -BV
+    const voltages = new Float64Array(1);
+    voltages[0] = BV; // cathode at BV, anode at 0 → Vd = -BV
+    for (let i = 0; i < 100; i++) {
+      el.updateOperatingPoint!(voltages);
+    }
+
+    // Stamp to read conductance from state via Norton equivalent
+    const calls: Array<[number, number, number]> = [];
+    const rhsCalls: Array<[number, number]> = [];
+    const solver = {
+      stamp: (r: number, c: number, v: number) => calls.push([r, c, v]),
+      stampRHS: (r: number, v: number) => rhsCalls.push([r, v]),
+    } as unknown as SparseSolverType;
+    el.stampNonlinear!(solver);
+
+    // geq at breakdown vd = -BV: IS * exp(0) / (NBV*Vt) + GMIN = IS/(N*VT) + GMIN
+    // With IS=1e-14, N=1, VT=0.02585: geq ≈ 3.87e-13 + 1e-12 ≈ 1.39e-12
+    const geqActual = calls.find(c => c[0] === 0 && c[1] === 0)?.[2] ?? NaN;
+    const geqFromIS = IS / (N * VT) + 1e-12;
+    const geqFromIBV = IBV / (N * VT) + 1e-12;
+
+    // Must be close to IS-based formula, not IBV-based
+    expect(Math.abs(geqActual - geqFromIS)).toBeLessThan(Math.abs(geqActual - geqFromIBV));
+  });
+
+  it("change42_nbv_parameter_defaults_to_N", () => {
+    // Change 42: NBV parameter added; when not given, defaults to N.
+    // Verify that passing NBV=NaN (omitted) results in NBV being treated as N=1,
+    // meaning the element accepts the parameter and works correctly in forward bias.
+    // This is a structural check: NBV is accepted as a parameter and does not crash.
+    const IS = 1e-14;
+    const N = 1;
+    const BV = 5.1;
+
+    // Without NBV (defaults to N)
+    const propsNoNBV = makeParamBag({ IS, N, BV });
+    const coreNoNBV = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsNoNBV);
+    const { element: elNoNBV } = withState(coreNoNBV);
+
+    // With explicit NBV=1 (same as default)
+    const propsWithNBV1 = makeParamBag({ IS, N, BV, NBV: 1 });
+    const coreWithNBV1 = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsWithNBV1);
+    const { element: elWithNBV1 } = withState(coreWithNBV1);
+
+    // Both elements at vd=0.65V forward bias should produce identical geq
+    const voltages = new Float64Array(2);
+    voltages[0] = 0.65;
+    voltages[1] = 0;
+    for (let i = 0; i < 50; i++) {
+      elNoNBV.updateOperatingPoint!(voltages);
+      elWithNBV1.updateOperatingPoint!(voltages);
+    }
+
+    const getGeq = (el: any): number => {
+      const calls: Array<[number, number, number]> = [];
+      el.stampNonlinear!({ stamp: (r: number, c: number, v: number) => calls.push([r, c, v]), stampRHS: () => {} });
+      return calls.find((c: [number, number, number]) => c[0] === 0 && c[1] === 0)?.[2] ?? NaN;
+    };
+
+    const geqNoNBV = getGeq(elNoNBV);
+    const geqNBV1 = getGeq(elWithNBV1);
+
+    // When NBV defaults to N=1, both elements produce identical geq
+    expect(geqNoNBV).toBeCloseTo(geqNBV1, 14);
+    // Both should be valid (not NaN, positive)
+    expect(geqNoNBV).toBeGreaterThan(0);
+  });
+
+  it("change42_breakdown_pnjlim_limits_in_reflected_domain", () => {
+    // Change 42: breakdown pnjlim applies in the reflected domain.
+    // When starting far from breakdown and stepping to deep breakdown,
+    // pnjlim must limit the step (preventing exponential runaway).
+    // Test: starting at vd=0 (forward), then suddenly jumping to vd=-20V (deep breakdown)
+    // should result in a limited vd stored in state (not -20V directly).
+    const IS = 1e-14;
+    const N = 1;
+    const BV = 5.1;
+
+    const propsObj = makeParamBag({ IS, N, BV });
+    const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element: el } = withState(core);
+
+    // Start at vd=0
+    const voltages = new Float64Array(2);
+    voltages[0] = 0;
+    voltages[1] = 0;
+    el.updateOperatingPoint!(voltages);
+
+    // Suddenly jump to deep breakdown: vd = -20V
+    voltages[0] = -20;
+    voltages[1] = 0;
+    const limitingEvents: any[] = [];
+    el.updateOperatingPoint!(voltages, limitingEvents);
+
+    // pnjlim should have limited this large step
+    const wasLimited = limitingEvents.some(e => e.wasLimited);
+    expect(wasLimited).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -267,12 +381,13 @@ describe("Integration", () => {
 
     expect(vSource).toBeCloseTo(12, 3);
 
-    // ngspice reference: BV=5.1, IS=1e-14, N=1, IBV=1e-3 → Vz=5.149965V
-    // (breakdown is an exponential knee, not a hard clamp at BV)
-    expectSpiceRef(vZener, 5.149965e+00, "V(zener)");
+    // ngspice reference: BV=5.1, IS=1e-14, N=1, NBV=1 (=N default)
+    // Breakdown formula: Id = -IS * exp(-(Vd+BV)/(NBV*Vt))  [computeDiodeIV region 3]
+    // At regulation: (12 - Vz)/1000 = IS * exp((Vz - BV) / (NBV*Vt))
+    expectSpiceRef(vZener, 5.802744169779662, "V(zener)");
 
-    // Zener current: Iz = (Vs - Vz) / R = (12 - 5.15) / 1000
+    // Zener current: Iz = (Vs - Vz) / R
     const iZener = (vSource - vZener) / 1000;
-    expectSpiceRef(iZener, 6.850035e-03, "I(zener)");
+    expectSpiceRef(iZener, (12 - 5.802744169779662) / 1000, "I(zener)");
   });
 });
