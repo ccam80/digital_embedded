@@ -852,3 +852,68 @@ describe("MOSFET M multiplicity (Change 27)", () => {
     expect(idM1).toBe(idDefault);
   });
 });
+
+// ---------------------------------------------------------------------------
+// primeJunctions — Change 21: MOSFET MODEINITJCT non-zero startup voltages
+// ---------------------------------------------------------------------------
+
+describe("MOSFET primeJunctions", () => {
+  // SLOT indices from fet-base (must match the actual slot layout)
+  const SLOT_VGS = 0;
+  const SLOT_VDS = 1;
+  const SLOT_VBS_OLD = 29;
+  const SLOT_VBD_OLD = 30;
+
+  function makeNmosElement(params: Record<string, number> = {}): { element: any; pool: StatePool } {
+    const bag = makeParamBag({ ...NMOS_DEFAULTS, ...params });
+    const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, bag) as any;
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    core.pinNodeIds = [2, 1, 3, 3];
+    core.allNodeIds = [2, 1, 3, 3];
+    return { element: core, pool };
+  }
+
+  it("primeJunctions_sets_vgs_to_tVto_and_vds_to_zero", () => {
+    const { element, pool } = makeNmosElement();
+    element.primeJunctions();
+    // SLOT_VGS = tVto (temperature-corrected VTO, equals VTO at room temp)
+    const vgs = pool.states[0][SLOT_VGS];
+    const vds = pool.states[0][SLOT_VDS];
+    expect(vgs).toBeCloseTo(NMOS_DEFAULTS.VTO, 6);
+    expect(vds).toBeCloseTo(0, 6);
+  });
+
+  it("primeJunctions_sets_vbs_old_to_minus_one", () => {
+    const { element, pool } = makeNmosElement();
+    element.primeJunctions();
+    const vbsOld = pool.states[0][SLOT_VBS_OLD];
+    const vbdOld = pool.states[0][SLOT_VBD_OLD];
+    expect(vbsOld).toBeCloseTo(-1, 6);
+    expect(vbdOld).toBeCloseTo(-1, 6);
+  });
+
+  it("primeJunctions_with_OFF_sets_all_voltages_to_zero", () => {
+    const { element, pool } = makeNmosElement({ OFF: 1 });
+    element.primeJunctions();
+    // primeJunctions writes directly to s0 slots; check before calling updateOperatingPoint
+    const vgs = pool.states[0][SLOT_VGS];
+    const vds = pool.states[0][SLOT_VDS];
+    const vbsOld = pool.states[0][SLOT_VBS_OLD];
+    const vbdOld = pool.states[0][SLOT_VBD_OLD];
+    expect(vgs).toBeCloseTo(0, 6);
+    expect(vds).toBeCloseTo(0, 6);
+    expect(vbsOld).toBeCloseTo(0, 6);
+    expect(vbdOld).toBeCloseTo(0, 6);
+  });
+
+  it("checkConvergence_returns_true_during_initFix_when_OFF", () => {
+    const { element, pool } = makeNmosElement({ OFF: 1 });
+    pool.initMode = "initFix";
+    const voltages = new Float64Array(4);
+    const prevVoltages = new Float64Array(4);
+    const result = element.checkConvergence(voltages, prevVoltages, 1e-3, 1e-6);
+    expect(result).toBe(true);
+  });
+});

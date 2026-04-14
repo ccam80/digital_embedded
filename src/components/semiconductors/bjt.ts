@@ -77,6 +77,9 @@ export const { paramDefs: BJT_PARAM_DEFS, defaults: BJT_NPN_DEFAULTS } = defineM
     AREA: { default: 1,     description: "Device area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
+    OFF:   { default: 0,    description: "Initial condition: device off (0=false, 1=true)" },
+    ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
+    ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
   },
 });
 
@@ -98,6 +101,9 @@ export const { defaults: BJT_PNP_DEFAULTS } = defineModelParams({
     AREA: { default: 1,     description: "Device area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
+    OFF:   { default: 0,    description: "Initial condition: device off (0=false, 1=true)" },
+    ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
+    ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
   },
 });
 
@@ -155,6 +161,9 @@ export const { paramDefs: BJT_SPICE_L1_PARAM_DEFS, defaults: BJT_SPICE_L1_NPN_DE
     AREA: { default: 1,     description: "Device area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
+    OFF:   { default: 0,    description: "Initial condition: device off (0=false, 1=true)" },
+    ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
+    ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
   },
 });
 
@@ -208,6 +217,9 @@ export const { defaults: BJT_SPICE_L1_PNP_DEFAULTS } = defineModelParams({
     AREA: { default: 1,     description: "Device area factor" },
     M:   { default: 1,      description: "Parallel device multiplier" },
     TNOM: { default: 300.15, unit: "K", description: "Nominal temperature" },
+    OFF:   { default: 0,    description: "Initial condition: device off (0=false, 1=true)" },
+    ICVBE: { default: NaN,  unit: "V",  description: "Initial condition: B-E voltage for UIC" },
+    ICVCE: { default: NaN,  unit: "V",  description: "Initial condition: C-E voltage for UIC" },
   },
 });
 
@@ -650,6 +662,9 @@ export function createBjtElement(
     AREA: props.getModelParam<number>("AREA"),
     M: props.getModelParam<number>("M"),
     TNOM: props.getModelParam<number>("TNOM"),
+    OFF:   props.getModelParam<number>("OFF"),
+    ICVBE: props.getModelParam<number>("ICVBE"),
+    ICVCE: props.getModelParam<number>("ICVCE"),
   };
 
   // Simple model doesn't have L1 params — supply defaults for computeBjtTempParams
@@ -795,6 +810,17 @@ export function createBjtElement(
     },
 
     updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
+      if (pool.initMode === "initPred") {
+        s0[base + SLOT_VBE] = s1[base + SLOT_VBE];
+        s0[base + SLOT_VBC] = s1[base + SLOT_VBC];
+        s0[base + SLOT_IC]  = s1[base + SLOT_IC];
+        s0[base + SLOT_IB]  = s1[base + SLOT_IB];
+        s0[base + SLOT_GPI] = s1[base + SLOT_GPI];
+        s0[base + SLOT_GMU] = s1[base + SLOT_GMU];
+        s0[base + SLOT_GM]  = s1[base + SLOT_GM];
+        s0[base + SLOT_GO]  = s1[base + SLOT_GO];
+      }
+
       // Read node voltages
       const vC = nodeC > 0 ? voltages[nodeC - 1] : 0;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
@@ -872,6 +898,8 @@ export function createBjtElement(
     },
 
     checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      if (params.OFF && pool.initMode === "initFix") return true;
+
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
       const vC = nodeC > 0 ? voltages[nodeC - 1] : 0;
       const vE = nodeE > 0 ? voltages[nodeE - 1] : 0;
@@ -911,21 +939,16 @@ export function createBjtElement(
     },
 
     primeJunctions(): void {
-      // Arm cold-start seed: Vbe = tVcrit, Vbc = 0.
-      // Matches ngspice MODEINITJCT (bjtload.c:265-274), where BJTload reads
-      //   vbe = here->BJTtVcrit; vbc = 0;
-      // as a LOCAL linearization-point override, never touching the shared
-      // node-voltage vector. Consumed and cleared by the next
-      // updateOperatingPoint call.
-      //
-      // Seeds are the RAW junction-bias magnitudes (unsigned-positive for
-      // forward bias), NOT polarity-signed node differences. updateOperatingPoint
-      // computes `vbeRaw = polarity * (vB - vE)`, which is already
-      // polarity-corrected to be positive when the junction is forward-biased.
-      // The primed value slots into that same convention directly — so both
-      // NPN and PNP use +tVcrit regardless of `polarity`.
-      primedVbe = tp.tVcrit;
-      primedVbc = 0;
+      if (params.OFF) {
+        primedVbe = 0;
+        primedVbc = 0;
+      } else if (pool.uic && !isNaN(params.ICVBE) && !isNaN(params.ICVCE)) {
+        primedVbe = params.ICVBE;
+        primedVbc = params.ICVBE - params.ICVCE;
+      } else {
+        primedVbe = tp.tVcrit;
+        primedVbc = 0;
+      }
     },
 
     setParam(key: string, value: number): void {
@@ -1221,6 +1244,9 @@ export function createSpiceL1BjtElement(
     AREA: props.getModelParam<number>("AREA"),
     M: props.getModelParam<number>("M"),
     TNOM: props.getModelParam<number>("TNOM"),
+    OFF:   props.getModelParam<number>("OFF"),
+    ICVBE: props.getModelParam<number>("ICVBE"),
+    ICVCE: props.getModelParam<number>("ICVCE"),
   };
 
   function makeTpL1(): BjtTempParams {
@@ -1513,6 +1539,17 @@ export function createSpiceL1BjtElement(
     },
 
     updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
+      if (pool.initMode === "initPred") {
+        s0[base + L1_SLOT_VBE] = s1[base + L1_SLOT_VBE];
+        s0[base + L1_SLOT_VBC] = s1[base + L1_SLOT_VBC];
+        s0[base + L1_SLOT_IC]  = s1[base + L1_SLOT_IC];
+        s0[base + L1_SLOT_IB]  = s1[base + L1_SLOT_IB];
+        s0[base + L1_SLOT_GPI] = s1[base + L1_SLOT_GPI];
+        s0[base + L1_SLOT_GMU] = s1[base + L1_SLOT_GMU];
+        s0[base + L1_SLOT_GM]  = s1[base + L1_SLOT_GM];
+        s0[base + L1_SLOT_GO]  = s1[base + L1_SLOT_GO];
+      }
+
       // Read internal node voltages
       const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
@@ -1739,6 +1776,8 @@ export function createSpiceL1BjtElement(
     },
 
     checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      if (params.OFF && pool.initMode === "initFix") return true;
+
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
       const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
       const vEi = nodeE_int > 0 ? voltages[nodeE_int - 1] : 0;
@@ -1778,19 +1817,16 @@ export function createSpiceL1BjtElement(
     },
 
     primeJunctions(): void {
-      // Arm cold-start seed: Vbe = tVcrit, Vbc = 0.
-      // Matches ngspice MODEINITJCT (bjtload.c:265-274). Local override
-      // consumed by the next updateOperatingPoint; the shared node-voltage
-      // vector is NOT touched, so grounded-terminal and shared-node
-      // topologies work correctly. Substrate node stays at its default 0.
-      //
-      // Seeds are raw junction-bias magnitudes (unsigned-positive for forward
-      // bias). updateOperatingPoint's non-primed branch computes
-      // `vbeRaw = polarity * (vBi - vEi)` which is already polarity-corrected
-      // to positive for a forward-biased junction — both NPN and PNP use
-      // +tVcrit regardless of `polarity`.
-      primedVbe = tpL1.tVcrit;
-      primedVbc = 0;
+      if (params.OFF) {
+        primedVbe = 0;
+        primedVbc = 0;
+      } else if (pool.uic && !isNaN(params.ICVBE) && !isNaN(params.ICVCE)) {
+        primedVbe = params.ICVBE;
+        primedVbc = params.ICVBE - params.ICVCE;
+      } else {
+        primedVbe = tpL1.tVcrit;
+        primedVbc = 0;
+      }
     },
 
     setParam(key: string, value: number): void {

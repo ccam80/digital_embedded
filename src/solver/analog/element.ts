@@ -336,6 +336,15 @@ export interface AnalogElement {
    * time by MNAEngine._seedBreakpoints().
    */
   registerRefreshCallback?(cb: () => void): void;
+
+  /**
+   * Called once per accepted timestep so the element can schedule its next
+   * waveform edge as a timestep breakpoint.
+   *
+   * @param simTime      - The just-accepted simulation time (seconds)
+   * @param addBreakpoint - Callback to register the next breakpoint time
+   */
+  acceptStep?(simTime: number, addBreakpoint: (t: number) => void): void;
 }
 
 /**

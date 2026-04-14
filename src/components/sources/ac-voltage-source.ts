@@ -626,6 +626,13 @@ function createAcVoltageSourceElement(
       refreshCallback = cb;
     },
 
+    acceptStep(simTime: number, addBreakpoint: (t: number) => void): void {
+      const next = element.nextBreakpoint(simTime);
+      if (next !== null) {
+        addBreakpoint(next);
+      }
+    },
+
     getBreakpoints(tStart: number, tEnd: number): number[] {
       const out: number[] = [];
       let t = tStart;

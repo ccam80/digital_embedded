@@ -295,3 +295,111 @@ describe("Inductor", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Change 30: SLOT_VOLT — terminal voltage stored in stampCompanion
+// ---------------------------------------------------------------------------
+
+describe("Inductor SLOT_VOLT (Change 30)", () => {
+  const SLOT_VOLT = 5;
+
+  it("stampCompanion_stores_terminal_voltage_in_slot_5", () => {
+    const props = new PropertyBag();
+    props.setModelParam("inductance", 0.01);
+    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+    );
+    Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
+    const { element, pool } = withState(core);
+
+    // V(node1)=10V, V(node2)=3V → terminal voltage = 10-3 = 7V
+    const voltages = new Float64Array([10, 3, 0.5]);
+    element.stampCompanion!(1e-4, "bdf1", voltages, 1, [1e-4]);
+
+    expect(pool.states[0][SLOT_VOLT]).toBeCloseTo(7, 6);
+  });
+
+  it("stampCompanion_stores_zero_terminal_voltage_when_nodes_equal", () => {
+    const props = new PropertyBag();
+    props.setModelParam("inductance", 0.01);
+    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+    );
+    Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
+    const { element, pool } = withState(core);
+
+    // Same voltage on both terminals
+    const voltages = new Float64Array([5, 5, 0.0]);
+    element.stampCompanion!(1e-4, "bdf1", voltages, 1, [1e-4]);
+
+    expect(pool.states[0][SLOT_VOLT]).toBeCloseTo(0, 6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Change 39: Temperature coefficients TC1, TC2, TNOM, SCALE
+// ---------------------------------------------------------------------------
+
+describe("Inductor temperature coefficients (Change 39)", () => {
+  it("TC1_scales_inductance_linearly", () => {
+    const props = new PropertyBag();
+    props.setModelParam("inductance", 1e-3);
+    props.setModelParam("TC1", 1e-3);     // 0.1% per K
+    props.setModelParam("TNOM", 300.15);  // nominal at room temp
+    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+    ) as any;
+    // At T=300.15 (room temp), dT=0, factor=1, L_eff = L_nom
+    expect(core.L).toBeCloseTo(1e-3, 9);
+  });
+
+  it("TC1_non_zero_TNOM_offset_scales_inductance", () => {
+    // With TNOM=250K, at T=300.15 → dT=50.15, TC1=0.001 → factor=1.05015
+    const props = new PropertyBag();
+    props.setModelParam("inductance", 1e-3);
+    props.setModelParam("TC1", 0.001);
+    props.setModelParam("TNOM", 250);
+    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+    ) as any;
+    const dT = 300.15 - 250;
+    const expected = 1e-3 * (1 + 0.001 * dT);
+    expect(core.L).toBeCloseTo(expected, 12);
+  });
+
+  it("SCALE_multiplies_inductance", () => {
+    const props = new PropertyBag();
+    props.setModelParam("inductance", 1e-3);
+    props.setModelParam("SCALE", 2.5);
+    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+    ) as any;
+    expect(core.L).toBeCloseTo(2.5e-3, 12);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Change 40: M multiplicity divides L (parallel inductors = lower L)
+// ---------------------------------------------------------------------------
+
+describe("Inductor M multiplicity (Change 40)", () => {
+  it("M2_halves_effective_inductance", () => {
+    const props = new PropertyBag();
+    props.setModelParam("inductance", 1e-3);
+    props.setModelParam("M", 2);
+    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+    ) as any;
+    expect(core.L).toBeCloseTo(0.5e-3, 12);
+  });
+
+  it("M1_leaves_inductance_unchanged", () => {
+    const props = new PropertyBag();
+    props.setModelParam("inductance", 1e-3);
+    props.setModelParam("M", 1);
+    const core = getFactory(InductorDefinition.modelRegistry!.behavioral!)(
+      new Map([["A", 1], ["B", 2]]), [], 2, props, () => 0,
+    ) as any;
+    expect(core.L).toBeCloseTo(1e-3, 12);
+  });
+});

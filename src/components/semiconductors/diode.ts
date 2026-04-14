@@ -112,6 +112,8 @@ export const { paramDefs: DIODE_PARAM_DEFS, defaults: DIODE_PARAM_DEFAULTS } = d
     AF:  { default: 1,                description: "Flicker noise exponent" },
     AREA: { default: 1,               description: "Area scaling factor" },
     TNOM: { default: REFTEMP, unit: "K", description: "Parameter measurement temperature" },
+    OFF: { default: 0,                description: "Initial condition: device off (0=false, 1=true)" },
+    IC:  { default: NaN,   unit: "V",  description: "Initial condition: junction voltage for UIC" },
   },
 });
 
@@ -379,6 +381,8 @@ export function createDiodeElement(
     AF:  props.getModelParam<number>("AF"),
     AREA: props.getModelParam<number>("AREA"),
     TNOM: props.getModelParam<number>("TNOM"),
+    OFF:  props.getModelParam<number>("OFF"),
+    IC:   props.getModelParam<number>("IC"),
   };
 
   // diosetup.c:93-95: NBV defaults to N when not explicitly given
@@ -492,6 +496,12 @@ export function createDiodeElement(
     },
 
     updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
+      if (pool.initMode === "initPred") {
+        s0[base + SLOT_VD]  = s1[base + SLOT_VD];
+        s0[base + SLOT_ID]  = s1[base + SLOT_ID];
+        s0[base + SLOT_GEQ] = s1[base + SLOT_GEQ];
+      }
+
       let vdRaw: number;
       if (primedVd !== null) {
         vdRaw = primedVd;
@@ -572,6 +582,8 @@ export function createDiodeElement(
     },
 
     checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+      if (params.OFF && pool.initMode === "initFix") return true;
+
       // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
       // declare non-convergence immediately (DIOload sets CKTnoncon++)
       if (pnjlimLimited) return false;
@@ -597,10 +609,13 @@ export function createDiodeElement(
     },
 
     primeJunctions(): void {
-      // Arm cold-start seed: Vd = tVcrit. Matches ngspice MODEINITJCT
-      // (dioload.c MODEINITJCT branch). Local override consumed by the next
-      // updateOperatingPoint call; no writes to the shared voltages vector.
-      primedVd = tVcrit;
+      if (params.OFF) {
+        primedVd = 0;
+      } else if (pool.uic && !isNaN(params.IC)) {
+        primedVd = params.IC;
+      } else {
+        primedVd = tVcrit;
+      }
     },
 
     setParam(key: string, value: number): void {

@@ -49,6 +49,12 @@ import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import {
   AbstractFetElement,
+  SLOT_VGS,
+  SLOT_VDS,
+  SLOT_GM,
+  SLOT_GDS,
+  SLOT_IDS,
+  SLOT_SWAPPED,
   SLOT_VSB,
   SLOT_GMBS,
   SLOT_GBD,
@@ -156,6 +162,8 @@ interface MosfetParams {
   AF?: number;
   // Parallel device multiplier (optional, default 1)
   M?: number;
+  // Initial condition: device off (optional, default 0=false)
+  OFF?: number;
 }
 
 /** MosfetParams with all fields guaranteed present (after resolveParams). */
@@ -197,6 +205,7 @@ interface ResolvedMosfetParams {
   KF: number;
   AF: number;
   M: number;
+  OFF: number;
   // Temperature-corrected values threaded from _recomputeTempParams
   _tKP?: number;
   _tPhi?: number;
@@ -248,6 +257,7 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     AF:     { default: 1,                    description: "Flicker noise exponent" },
     FC:     { default: 0.5,                  description: "Forward-bias depletion capacitance coefficient" },
     M:      { default: 1,                    description: "Parallel device multiplier" },
+    OFF:    { default: 0,                    description: "Initial condition: device off (0=false, 1=true)" },
   },
 });
 
@@ -343,6 +353,7 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     AF:     { default: 1,                    description: "Flicker noise exponent" },
     FC:     { default: 0.5,                  description: "Forward-bias depletion capacitance coefficient" },
     M:      { default: 1,                    description: "Parallel device multiplier" },
+    OFF:    { default: 0,                    description: "Initial condition: device off (0=false, 1=true)" },
   },
 });
 
@@ -461,6 +472,7 @@ function resolveParams(raw: MosfetParams, kpDefault: number): ResolvedMosfetPara
     KF:   raw.KF   ?? 0,
     AF:   raw.AF   ?? 1,
     M:    raw.M    ?? 1,
+    OFF:  raw.OFF  ?? 0,
   };
 
   if (p.NSUB > 0 && p.TOX > 0) {
@@ -1204,6 +1216,20 @@ class MosfetAnalogElement extends AbstractFetElement {
   }
 
   override updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
+    if (this._pool.initMode === "initPred") {
+      // ngspice mos1load.c:206-225 (MODEINITPRED, no PREDICTOR):
+      // Only copies vgs, vds, vbs, vbd from state1 to state0.
+      // These serve as the "vold" references for fetlim/pnjlim limiting.
+      // All conductances/currents/von/mode are recomputed from fresh voltages.
+      const base = this.stateBaseOffset;
+      const s0 = this._s0;
+      const s1 = this.s1;
+      s0[base + SLOT_VGS]     = s1[base + SLOT_VGS];      // fetlim vold for vgs
+      s0[base + SLOT_VDS]     = s1[base + SLOT_VDS];      // limvds vold for vds
+      s0[base + SLOT_VBS_OLD] = s1[base + SLOT_VBS_OLD];  // pnjlim vold for vbs
+      s0[base + SLOT_VBD_OLD] = s1[base + SLOT_VBD_OLD];  // pnjlim vold for vbd
+    }
+
     const nodeD = this.drainNode;
     const nodeG = this.gateNode;
     const nodeS = this.sourceNode;
@@ -1518,6 +1544,29 @@ class MosfetAnalogElement extends AbstractFetElement {
     if (key in this._p) {
       (this._p as unknown as Record<string, number>)[key] = value;
       this._recomputeTempParams();
+    }
+  }
+
+  override checkConvergence(voltages: Float64Array, prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+    if (this._p.OFF && this._pool.initMode === "initFix") return true;
+    return super.checkConvergence(voltages, prevVoltages, reltol, abstol);
+  }
+
+  primeJunctions(): void {
+    if (this._p.OFF) {
+      this._vgs = 0;
+      this._vds = 0;
+      const base = this.stateBaseOffset;
+      this._s0[base + SLOT_VBS_OLD] = 0;
+      this._s0[base + SLOT_VBD_OLD] = 0;
+      this._vsb = 0;
+    } else {
+      this._vgs = this._tVto;
+      this._vds = 0;
+      const base = this.stateBaseOffset;
+      this._s0[base + SLOT_VBS_OLD] = -1;
+      this._s0[base + SLOT_VBD_OLD] = -1;
+      this._vsb = 1;
     }
   }
 
@@ -1929,6 +1978,7 @@ export function createMosfetElement(
     AF:     mp("AF", 1),
     FC:     mp("FC", 0.5),
     M:      mp("M", 1),
+    OFF:    mp("OFF", 0),
   };
 
   const p = resolveParams(rawParams, kpDefault);

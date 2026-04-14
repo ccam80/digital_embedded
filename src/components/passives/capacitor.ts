@@ -42,6 +42,14 @@ export const { paramDefs: CAPACITOR_PARAM_DEFS, defaults: CAPACITOR_DEFAULTS } =
   primary: {
     capacitance: { default: 1e-6, unit: "F", description: "Capacitance in farads", min: 1e-15 },
   },
+  secondary: {
+    IC:   { default: NaN,    unit: "V",    description: "Initial condition voltage for UIC" },
+    TC1:  { default: 0,                    description: "Linear temperature coefficient" },
+    TC2:  { default: 0,                    description: "Quadratic temperature coefficient" },
+    TNOM: { default: 300.15, unit: "K",    description: "Nominal temperature for TC coefficients" },
+    SCALE: { default: 1,                   description: "Instance scale factor" },
+    M:    { default: 1,                    description: "Parallel multiplicity" },
+  },
 });
 
 // ---------------------------------------------------------------------------
@@ -159,18 +167,41 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   readonly stateSize = CAPACITOR_SCHEMA.size;
   stateBaseOffset = -1;
 
+  private _nominalC: number;
   private C: number;
+  private _IC: number;
+  private _TC1: number;
+  private _TC2: number;
+  private _TNOM: number;
+  private _SCALE: number;
+  private _M: number;
+  private _pool!: StatePoolRef;
   s0!: Float64Array;
   s1!: Float64Array;
   s2!: Float64Array;
   s3!: Float64Array;
   private base!: number;
 
-  constructor(capacitance: number) {
-    this.C = capacitance;
+  constructor(capacitance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
+    this._nominalC = capacitance;
+    this._IC = IC;
+    this._TC1 = TC1;
+    this._TC2 = TC2;
+    this._TNOM = TNOM;
+    this._SCALE = SCALE;
+    this._M = M;
+    this.C = this._computeEffectiveC();
+  }
+
+  private _computeEffectiveC(): number {
+    const T = 300.15;
+    const dT = T - this._TNOM;
+    const factor = 1 + this._TC1 * dT + this._TC2 * dT * dT;
+    return this._nominalC * factor * this._SCALE * this._M;
   }
 
   initState(pool: StatePoolRef): void {
+    this._pool = pool;
     this.s0 = pool.states[0];
     this.s1 = pool.states[1];
     this.s2 = pool.states[2];
@@ -181,7 +212,25 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
 
   setParam(key: string, value: number): void {
     if (key === "capacitance") {
-      this.C = value;
+      this._nominalC = value;
+      this.C = this._computeEffectiveC();
+    } else if (key === "IC") {
+      this._IC = value;
+    } else if (key === "TC1") {
+      this._TC1 = value;
+      this.C = this._computeEffectiveC();
+    } else if (key === "TC2") {
+      this._TC2 = value;
+      this.C = this._computeEffectiveC();
+    } else if (key === "TNOM") {
+      this._TNOM = value;
+      this.C = this._computeEffectiveC();
+    } else if (key === "SCALE") {
+      this._SCALE = value;
+      this.C = this._computeEffectiveC();
+    } else if (key === "M") {
+      this._M = value;
+      this.C = this._computeEffectiveC();
     }
   }
 
@@ -225,7 +274,9 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
 
     // q0 is the charge at the current (pre-solve) voltage, used as the new-step charge.
     // q1/q2 come from the post-solve charge written by updateChargeFlux in previous steps.
-    const q0 = this.C * vNow;
+    const isInitPred = this._pool && this._pool.initMode === "initPred";
+    const isInitTranUIC = this._pool && this._pool.initMode === "initTran" && this._pool.uic === true && !isNaN(this._IC);
+    const q0 = isInitPred ? this.s1[this.base + SLOT_Q] : isInitTranUIC ? this.C * this._IC : this.C * vNow;
     const q1 = this.s1[this.base + SLOT_Q];
     const q2 = this.s2[this.base + SLOT_Q];
     const ccapPrev = this.s1[this.base + SLOT_CCAP];
@@ -284,8 +335,14 @@ function createCapacitorElement(
   _branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const C = props.getModelParam<number>("capacitance");
-  return new AnalogCapacitorElement(C);
+  const C     = props.getModelParam<number>("capacitance");
+  const IC    = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : CAPACITOR_DEFAULTS["IC"]!;
+  const TC1   = props.hasModelParam("TC1")   ? props.getModelParam<number>("TC1")   : CAPACITOR_DEFAULTS["TC1"]!;
+  const TC2   = props.hasModelParam("TC2")   ? props.getModelParam<number>("TC2")   : CAPACITOR_DEFAULTS["TC2"]!;
+  const TNOM  = props.hasModelParam("TNOM")  ? props.getModelParam<number>("TNOM")  : CAPACITOR_DEFAULTS["TNOM"]!;
+  const SCALE = props.hasModelParam("SCALE") ? props.getModelParam<number>("SCALE") : CAPACITOR_DEFAULTS["SCALE"]!;
+  const M     = props.hasModelParam("M")     ? props.getModelParam<number>("M")     : CAPACITOR_DEFAULTS["M"]!;
+  return new AnalogCapacitorElement(C, IC, TC1, TC2, TNOM, SCALE, M);
 }
 
 // ---------------------------------------------------------------------------

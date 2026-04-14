@@ -83,6 +83,10 @@ export interface SimulationParams {
   numGminSteps?: number;
   /** Number of source stepping levels. 0 or 1 = gillespie (default), >1 = spice3_src. ngspice: CKTnumSrcSteps */
   numSrcSteps?: number;
+  /** Enable voltage predictor. ngspice: #ifdef PREDICTOR. Default false. */
+  predictor?: boolean;
+  /** Use Initial Conditions mode. ngspice: MODEUIC. Default false. */
+  uic?: boolean;
 }
 
 /** SimulationParams with all optional timestep fields resolved to concrete values. */

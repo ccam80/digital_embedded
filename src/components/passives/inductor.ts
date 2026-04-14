@@ -38,6 +38,14 @@ export const { paramDefs: INDUCTOR_PARAM_DEFS, defaults: INDUCTOR_DEFAULTS } = d
   primary: {
     inductance: { default: 1e-3, unit: "H", description: "Inductance in henries", min: 1e-12 },
   },
+  secondary: {
+    IC:   { default: NaN,    unit: "A",    description: "Initial condition current for UIC" },
+    TC1:  { default: 0,                    description: "Linear temperature coefficient" },
+    TC2:  { default: 0,                    description: "Quadratic temperature coefficient" },
+    TNOM: { default: 300.15, unit: "K",    description: "Nominal temperature for TC coefficients" },
+    SCALE: { default: 1,                   description: "Instance scale factor" },
+    M:    { default: 1,                    description: "Parallel multiplicity" },
+  },
 });
 
 // ---------------------------------------------------------------------------
@@ -154,6 +162,7 @@ const INDUCTOR_SCHEMA: StateSchema = defineStateSchema("AnalogInductorElement", 
   { name: "I",    doc: "Branch current this step",       init: { kind: "zero" } },
   { name: "PHI",  doc: "Flux phi=L*i this step",         init: { kind: "zero" } },
   { name: "CCAP", doc: "Companion current (NIintegrate)", init: { kind: "zero" } },
+  { name: "VOLT", doc: "Terminal voltage this step",     init: { kind: "zero" } },
 ]);
 
 // Slot indices within the state pool
@@ -162,6 +171,7 @@ const SLOT_IEQ  = 1;
 const SLOT_I    = 2;
 const SLOT_PHI  = 3;
 const SLOT_CCAP = 4;
+const SLOT_VOLT = 5;
 
 export class AnalogInductorElement implements ReactiveAnalogElementCore {
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
@@ -173,19 +183,42 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   readonly stateSize = INDUCTOR_SCHEMA.size;
   stateBaseOffset = -1;
 
+  private _nominalL: number;
   private L: number;
+  private _IC: number;
+  private _TC1: number;
+  private _TC2: number;
+  private _TNOM: number;
+  private _SCALE: number;
+  private _M: number;
+  private _pool!: StatePoolRef;
   s0!: Float64Array;
   s1!: Float64Array;
   s2!: Float64Array;
   s3!: Float64Array;
   private base!: number;
 
-  constructor(branchIdx: number, inductance: number) {
+  constructor(branchIdx: number, inductance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
     this.branchIndex = branchIdx;
-    this.L = inductance;
+    this._nominalL = inductance;
+    this._IC = IC;
+    this._TC1 = TC1;
+    this._TC2 = TC2;
+    this._TNOM = TNOM;
+    this._SCALE = SCALE;
+    this._M = M;
+    this.L = this._computeEffectiveL();
+  }
+
+  private _computeEffectiveL(): number {
+    const T = 300.15;
+    const dT = T - this._TNOM;
+    const factor = 1 + this._TC1 * dT + this._TC2 * dT * dT;
+    return this._nominalL * factor * this._SCALE / this._M;
   }
 
   initState(pool: StatePoolRef): void {
+    this._pool = pool;
     this.s0 = pool.states[0];
     this.s1 = pool.states[1];
     this.s2 = pool.states[2];
@@ -196,7 +229,25 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
 
   setParam(key: string, value: number): void {
     if (key === "inductance") {
-      this.L = value;
+      this._nominalL = value;
+      this.L = this._computeEffectiveL();
+    } else if (key === "IC") {
+      this._IC = value;
+    } else if (key === "TC1") {
+      this._TC1 = value;
+      this.L = this._computeEffectiveL();
+    } else if (key === "TC2") {
+      this._TC2 = value;
+      this.L = this._computeEffectiveL();
+    } else if (key === "TNOM") {
+      this._TNOM = value;
+      this.L = this._computeEffectiveL();
+    } else if (key === "SCALE") {
+      this._SCALE = value;
+      this.L = this._computeEffectiveL();
+    } else if (key === "M") {
+      this._M = value;
+      this.L = this._computeEffectiveL();
     }
   }
 
@@ -237,7 +288,9 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
     const iNow = voltages[this.branchIndex];
 
-    const phi0 = this.L * iNow;
+    const isInitPred = this._pool && this._pool.initMode === "initPred";
+    const isInitTranUIC = this._pool && this._pool.initMode === "initTran" && this._pool.uic === true && !isNaN(this._IC);
+    const phi0 = isInitPred ? this.s1[this.base + SLOT_PHI] : isInitTranUIC ? this.L * this._IC : this.L * iNow;
     const phi1 = this.s1[this.base + SLOT_PHI];
     const phi2 = this.s2[this.base + SLOT_PHI];
     const ccapPrev = this.s1[this.base + SLOT_CCAP];
@@ -248,6 +301,11 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     this.s0[this.base + SLOT_IEQ]  = ceq;
     this.s0[this.base + SLOT_I]    = iNow;
     this.s0[this.base + SLOT_CCAP] = ccap;
+    const n0 = this.pinNodeIds[0];
+    const n1 = this.pinNodeIds[1];
+    const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
+    const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
+    this.s0[this.base + SLOT_VOLT] = v0 - v1;
     // SLOT_PHI is written by updateChargeFlux after the Newton-Raphson solve converges.
   }
 
@@ -292,8 +350,14 @@ function createInductorElement(
   branchIdx: number,
   props: PropertyBag,
 ): AnalogElementCore {
-  const L = props.getModelParam<number>("inductance");
-  return new AnalogInductorElement(branchIdx, L);
+  const L     = props.getModelParam<number>("inductance");
+  const IC    = props.hasModelParam("IC")    ? props.getModelParam<number>("IC")    : INDUCTOR_DEFAULTS["IC"]!;
+  const TC1   = props.hasModelParam("TC1")   ? props.getModelParam<number>("TC1")   : INDUCTOR_DEFAULTS["TC1"]!;
+  const TC2   = props.hasModelParam("TC2")   ? props.getModelParam<number>("TC2")   : INDUCTOR_DEFAULTS["TC2"]!;
+  const TNOM  = props.hasModelParam("TNOM")  ? props.getModelParam<number>("TNOM")  : INDUCTOR_DEFAULTS["TNOM"]!;
+  const SCALE = props.hasModelParam("SCALE") ? props.getModelParam<number>("SCALE") : INDUCTOR_DEFAULTS["SCALE"]!;
+  const M     = props.hasModelParam("M")     ? props.getModelParam<number>("M")     : INDUCTOR_DEFAULTS["M"]!;
+  return new AnalogInductorElement(branchIdx, L, IC, TC1, TC2, TNOM, SCALE, M);
 }
 
 // ---------------------------------------------------------------------------

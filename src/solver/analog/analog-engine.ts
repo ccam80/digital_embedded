@@ -368,7 +368,7 @@ export class MNAEngine implements AnalogEngine {
       // converged DC-OP solution (written at seedHistory). ngspice does not run
       // MODEINITPRED under MODEINITTRAN, so the DC-OP result in CKTrhsOld is
       // used directly as the NR initial guess.
-      if (this._stepCount > 0) {
+      if (this._stepCount > 0 && (this._params.predictor ?? false)) {
         computeAgp(this._timestep.currentMethod, this._timestep.currentOrder,
           dt, this._timestep.deltaOld, this._agp);
         predictVoltages(this._nodeVoltageHistory, this._timestep.deltaOld,
@@ -647,6 +647,13 @@ export class MNAEngine implements AnalogEngine {
     for (const el of elements) {
       if (el.updateState) {
         el.updateState(dt, this._voltages);
+      }
+    }
+
+    // Schedule next waveform breakpoints after acceptance
+    for (const el of elements) {
+      if (el.acceptStep) {
+        el.acceptStep(this._simTime, (t) => this._timestep.addBreakpoint(t));
       }
     }
 

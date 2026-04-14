@@ -77,6 +77,8 @@ export interface StatePoolRef {
    * Absent → treated as "dcOp" (conservative default for older callers).
    */
   readonly analysisMode?: "dcOp" | "tran";
+  /** Use Initial Conditions mode. ngspice: MODEUIC. Absent → false. */
+  readonly uic?: boolean;
   /**
    * Current transient integration timestep written by the engine before each
    * stamp pass. 0 during DC-OP. Used by elements to derive ag0 locally

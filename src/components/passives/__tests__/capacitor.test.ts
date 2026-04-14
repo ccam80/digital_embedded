@@ -322,3 +322,146 @@ describe("Capacitor", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// initPred charge test — Change 20: q0 from s1 on initPred step
+// ---------------------------------------------------------------------------
+
+describe("Capacitor initPred", () => {
+  // SLOT_Q = 3 in capacitor state schema
+  const SLOT_Q = 3;
+
+  it("stampCompanion_uses_s1_charge_when_initPred", () => {
+    const C = 1e-6; // 1µF
+    const props = new PropertyBag();
+    props.setModelParam("capacitance", C);
+    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+    );
+    Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
+    const { element, pool } = withState(core);
+
+    // First step: v=3V, accepted — charge C*3 lands in s1 after acceptTimestep
+    element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]), 1, [1e-6]);
+    pool.acceptTimestep();
+    pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
+
+    // Second step: initPred mode, v=7V (different voltage)
+    // q0 should use s1[SLOT_Q] = C*3 = 3µC, NOT C*7 = 7µC
+    pool.initMode = "initPred";
+    element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]), 1, [1e-6]);
+
+    // GEQ = C/dt regardless of q0
+    const geq = pool.states[0][0]; // SLOT_GEQ
+    expect(geq).toBeCloseTo(C / 1e-6, 3); // C/dt
+
+    // ceq = ccap - geq*vNow (BDF1: ccap = (q0-q1)/dt)
+    // When initPred: q0 = s1[SLOT_Q] = C*3 = 3e-6, q1 = 3e-6 (same as s1 after 1 rotation)
+    //   ccap = (3e-6 - 3e-6) / 1e-6 = 0
+    //   ceq = 0 - 1*7 = -7
+    // When not initPred: q0 = C*7 = 7e-6
+    //   ccap = (7e-6 - 3e-6) / 1e-6 = 4
+    //   ceq = 4 - 1*7 = -3
+    const ceq = pool.states[0][1]; // SLOT_IEQ (= ceq)
+    // ceq must NOT be -3 (which would be the case if q0 = C*vNow = C*7)
+    expect(ceq).not.toBeCloseTo(-3, 2);
+    // ceq = -7 for initPred case (q0 = last accepted charge = C*3)
+    expect(ceq).toBeCloseTo(-7, 3);
+  });
+
+  it("stampCompanion_uses_C_times_IC_on_initTran_with_UIC", () => {
+    const C = 1e-6;
+    const IC = 5.0; // initial voltage = 5V
+    const props = new PropertyBag();
+    props.setModelParam("capacitance", C);
+    props.setModelParam("IC", IC);
+    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+    );
+    Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
+    const { element, pool } = withState(core);
+
+    // initTran + uic: q0 = C * IC
+    pool.initMode = "initTran";
+    (pool as any).uic = true;
+    // Node voltage is 2V (different from IC=5V)
+    element.stampCompanion!(1e-6, "bdf1", new Float64Array([2, 0]), 1, [1e-6]);
+
+    // GEQ = C/dt = 1e-6/1e-6 = 1
+    const geq = pool.states[0][0];
+    expect(geq).toBeCloseTo(1, 6);
+    // ceq = ccap - geq*vNow (BDF1: ccap = (q0-q1)/dt, q1=0 since no previous accepted step)
+    // With UIC: q0 = C*IC = 5e-6 → ccap = 5e-6/1e-6 = 5 → ceq = 5 - 1*2 = 3
+    // Without UIC: q0 = C*vNow = 2e-6 → ccap = 2 → ceq = 2 - 2 = 0
+    const ceq = pool.states[0][1];
+    expect(ceq).not.toBeCloseTo(0, 2);
+    expect(ceq).toBeCloseTo(3, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Change 39: Temperature coefficients TC1, TC2, TNOM, SCALE
+// ---------------------------------------------------------------------------
+
+describe("Capacitor temperature coefficients (Change 39)", () => {
+  it("TC1_zero_TNOM_room_temp_gives_nominal_capacitance", () => {
+    // dT=0 → factor=1, C_eff = C_nom * SCALE * M = C_nom
+    const props = new PropertyBag();
+    props.setModelParam("capacitance", 1e-6);
+    props.setModelParam("TNOM", 300.15);
+    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+    ) as any;
+    expect(core.C).toBeCloseTo(1e-6, 12);
+  });
+
+  it("TC1_non_zero_TNOM_offset_scales_capacitance", () => {
+    // TNOM=250K → dT = 300.15-250 = 50.15, TC1=0.001 → factor=1.05015
+    const props = new PropertyBag();
+    props.setModelParam("capacitance", 1e-6);
+    props.setModelParam("TC1", 0.001);
+    props.setModelParam("TNOM", 250);
+    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+    ) as any;
+    const dT = 300.15 - 250;
+    const expected = 1e-6 * (1 + 0.001 * dT);
+    expect(core.C).toBeCloseTo(expected, 12);
+  });
+
+  it("SCALE_multiplies_capacitance", () => {
+    const props = new PropertyBag();
+    props.setModelParam("capacitance", 1e-6);
+    props.setModelParam("SCALE", 3);
+    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+    ) as any;
+    expect(core.C).toBeCloseTo(3e-6, 12);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Change 40: M multiplicity multiplies C (parallel capacitors = higher C)
+// ---------------------------------------------------------------------------
+
+describe("Capacitor M multiplicity (Change 40)", () => {
+  it("M2_doubles_effective_capacitance", () => {
+    const props = new PropertyBag();
+    props.setModelParam("capacitance", 1e-6);
+    props.setModelParam("M", 2);
+    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+    ) as any;
+    expect(core.C).toBeCloseTo(2e-6, 12);
+  });
+
+  it("M1_leaves_capacitance_unchanged", () => {
+    const props = new PropertyBag();
+    props.setModelParam("capacitance", 1e-6);
+    props.setModelParam("M", 1);
+    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
+      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
+    ) as any;
+    expect(core.C).toBeCloseTo(1e-6, 12);
+  });
+});
