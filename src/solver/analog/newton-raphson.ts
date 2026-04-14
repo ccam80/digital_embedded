@@ -105,6 +105,28 @@ export interface NROptions {
   diagonalGmin?: number;
   /** When true, compute per-element blame tracking (largestChangeElement). Only needed when convergence logging is active. */
   enableBlameTracking?: boolean;
+  /**
+   * DC operating point mode ladder (niiter.c:991-997).
+   *
+   * When provided, drives pool.initMode transitions inside the NR loop:
+   *   - iter 0: pool.initMode set to "initJct"; runPrimeJunctions() fires once before iter 0.
+   *   - after iter 0: unconditional transition to "initFix" (niiter.c:991-993).
+   *   - iter N in initFix: transition to "initFloat" only if assembler.noncon === 0 (niiter.c:994-997).
+   *   - convergence return restricted to initMode === "initFloat" (niiter.c:986-989).
+   *
+   * Phase labels emitted via onModeBegin/onModeEnd so the harness session
+   * map shows dcopInitJct, dcopInitFix, dcopInitFloat per-iteration.
+   */
+  dcopModeLadder?: {
+    /** Called before iteration 0 to prime junctions (MODEINITJCT). */
+    runPrimeJunctions(): void;
+    /** State pool reference for reading/writing initMode. */
+    pool: { initMode: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "transient" };
+    /** Emit per-iteration phase begin label. */
+    onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number): void;
+    /** Emit per-iteration phase end label. */
+    onModeEnd(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number, converged: boolean): void;
+  } | null;
   /** Optional shared state pool for state0 damping (ngspice niiter.c). */
   statePool?: { state0: Float64Array } | null;
   /** Enable node damping in NR iteration (ngspice niiter.c). Default: false */
@@ -418,6 +440,30 @@ export function newtonRaphson(opts: NROptions): NRResult {
   // pays nothing (not even a property lookup) when no harness is attached.
   const onIter0Complete = opts.onIteration0Complete;
 
+  // dcopModeLadder: prime junctions before iter 0 and set initMode (niiter.c:991-993).
+  const ladder = opts.dcopModeLadder ?? null;
+  if (ladder) {
+    ladder.pool.initMode = "initJct";
+    ladder.runPrimeJunctions();
+    // Re-run updateOperatingPoints so the primed junction seeds reach the stamp
+    // (same as the old separate jctResult NR call: one updateOP at initJct).
+    assembler.updateOperatingPoints(elements, voltages);
+    // Re-stamp nonlinear with primed OP before iter 0.
+    solver.restoreLinearBase();
+    solver.setCooCount(linearCooCount);
+    assembler.stampNonlinear(elements);
+    assembler.stampReactiveCompanion(elements);
+    solver.finalize(linearCooCount);
+  }
+
+  // Per-mode iteration counter for the initFix first-iter guard (Fix 3).
+  // Tracks how many iterations have completed in the current ladder mode.
+  // Resets to 0 on each mode transition (initJct→initFix, initFix→initFloat).
+  // Starts at 0 — after the first iteration completes in initFix, ladderModeIter
+  // becomes 1, allowing the noncon===0 check to fire on the *second* iteration,
+  // matching ngspice's "iterno!=1" guard (niiter.c:885).
+  let ladderModeIter = 0;
+
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     // Save previous voltages for convergence check
     prevVoltages.set(voltages);
@@ -467,8 +513,24 @@ export function newtonRaphson(opts: NROptions): NRResult {
 
     // 5. For purely linear circuits, the first solve gives the exact answer.
     //    Return immediately — no convergence iteration needed.
+    //    Fire ladder mode transitions (initJct→initFix→initFloat) so the harness
+    //    sees the correct phase sequence even for linear circuits. niiter.c runs
+    //    MODEINITJCT→MODEINITFIX→MODEINITFLOAT unconditionally.
     if (!hasNonlinear) {
       opts.postIterationHook?.(iteration, voltages, prevVoltages, 0, true, true, [], []);
+      if (ladder) {
+        // initJct → initFix (niiter.c:991-993)
+        ladder.onModeEnd("dcopInitJct", iteration, false);
+        ladder.pool.initMode = "initFix";
+        ladder.onModeBegin("dcopInitFix", iteration + 1);
+        // initFix → initFloat (noncon===0, niiter.c:994-997)
+        ladder.pool.initMode = "initFloat";
+        ladder.onModeEnd("dcopInitFix", iteration + 1, false);
+        ladder.onModeBegin("dcopInitFloat", iteration + 2);
+        // Convergence in initFloat
+        ladder.pool.initMode = "initFloat";
+        ladder.onModeEnd("dcopInitFloat", iteration + 2, true);
+      }
       return { converged: true, iterations: iteration + 1, voltages, largestChangeElement: -1, largestChangeNode: -1 };
     }
 
@@ -575,8 +637,62 @@ export function newtonRaphson(opts: NROptions): NRResult {
     const limitingEvents = opts.limitingCollector ?? [];
     opts.postIterationHook?.(iteration, voltages, prevVoltages, assembler.noncon, globalConverged, elemConverged, limitingEvents, convergenceFailedElements);
 
-    // 10. Return on convergence
-    if (globalConverged && elemConverged) {
+    // 9b. dcopModeLadder: emit end label for current mode, then transition.
+    // Matches niiter.c:991-997 mode-switch logic that fires after each CKTload+solve.
+    if (ladder) {
+      const curMode = ladder.pool.initMode;
+      const phaseLabel =
+        curMode === "initJct" ? "dcopInitJct" :
+        curMode === "initFix" ? "dcopInitFix" : "dcopInitFloat";
+
+      let nextMode = curMode;
+      if (curMode === "initJct") {
+        // niiter.c:991-993: unconditional → initFix after iter 0
+        nextMode = "initFix";
+        ladderModeIter = 0;
+      } else if (curMode === "initFix") {
+        // niiter.c:994-997 + niiter.c:885-889: → initFloat only if noncon === 0
+        // AND this is not the first iteration in initFix (ngspice forces noncon=1
+        // when iterno==1, i.e. the first load in the current mode, preventing
+        // MODEINITFIX from exiting on the very first iteration).
+        // Mapping: ngspice iterno==1 ↔ our ladderModeIter==0 (0-indexed, resets
+        // on each mode entry).
+        if (assembler.noncon === 0 && ladderModeIter > 0) {
+          nextMode = "initFloat";
+          ladderModeIter = 0;
+        }
+      }
+      // initFloat stays initFloat until convergence or exhaustion
+
+      // Only emit phase handoff callbacks when mode actually changes.
+      // Firing onModeEnd+onModeBegin on every iteration (even same-mode) would
+      // split each iteration into its own 1-iter attempt in the harness.
+      if (nextMode !== curMode) {
+        ladder.onModeEnd(phaseLabel, iteration, globalConverged && elemConverged);
+        ladder.pool.initMode = nextMode;
+        const nextLabel =
+          nextMode === "initJct" ? "dcopInitJct" :
+          nextMode === "initFix" ? "dcopInitFix" : "dcopInitFloat";
+        ladder.onModeBegin(nextLabel, iteration + 1);
+      } else {
+        // Same mode: increment the per-mode counter for the initFix first-iter guard.
+        ladderModeIter++;
+        // Still need to end the current attempt on terminal convergence
+        // (initFloat converged). The convergence check below will return, so emit
+        // the terminal end now so the harness records the correct outcome.
+        const converged = globalConverged && elemConverged;
+        const canConvergeNow = ladder.pool.initMode === "initFloat";
+        if (canConvergeNow && converged) {
+          ladder.onModeEnd(phaseLabel, iteration, true);
+        }
+      }
+    }
+
+    // 10. Return on convergence (niiter.c:986-989: only in MODEINITFLOAT).
+    // When ladder is active, convergence is gated on initMode === "initFloat".
+    // Without ladder, behaves as before.
+    const canConverge = !ladder || ladder.pool.initMode === "initFloat";
+    if (canConverge && globalConverged && elemConverged) {
       return { converged: true, iterations: iteration + 1, voltages, largestChangeElement, largestChangeNode };
     }
 

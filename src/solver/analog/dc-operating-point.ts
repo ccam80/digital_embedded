@@ -69,7 +69,7 @@ export interface DcOpOptions {
   /** Number of node-voltage rows (0..nodeCount-1) in the MNA solution vector. */
   nodeCount: number;
   /** Optional shared state pool for per-element operating-point state. */
-  statePool?: { state0: Float64Array; reset(): void } | null;
+  statePool?: { state0: Float64Array; reset(): void; initMode?: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "transient" } | null;
   /** Optional post-NR-iteration hook for harness instrumentation. */
   postIterationHook?: (
     iteration: number,
@@ -214,121 +214,77 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   };
 
   // -------------------------------------------------------------------------
-  // Phase: dcopInitJct — per-device junction priming (no NR iterations)
+  // Level 0 — Direct NR with mode ladder (niiter.c:609-1010)
   //
-  // Matches ngspice MODEINITJCT (bjtload.c:265-274). Each nonlinear element
-  // stores tVcrit-derived junction voltages in its OWN internal state; NR's
-  // shared voltage vector is NOT touched. The primed values are consumed by
-  // the first updateOperatingPoint call on iteration 0, then cleared so
-  // iteration 1 onward reads from voltages as normal.
+  // One NR call, one iteration budget. Mode transitions happen between
+  // iterations inside the NR loop via dcopModeLadder:
+  //   iter 0: initMode="initJct", runPrimeJunctions() fires before iter 0
+  //   after iter 0: unconditional → "initFix"  (niiter.c:991-993)
+  //   iter N in initFix: → "initFloat" only if noncon===0 (niiter.c:994-997)
+  //   convergence restricted to initMode==="initFloat" (niiter.c:986-989)
   //
-  // This per-device local override correctly handles grounded-terminal and
-  // shared-node topologies (e.g. PNP CC with grounded collector) that the
-  // old "write into shared MNA vector" scheme could not.
+  // When no pool is present (pure linear or no nonlinear elements),
+  // a minimal ladder is attached to still run primeJunctions, with
+  // no-op phase callbacks.
   // -------------------------------------------------------------------------
-  // -------------------------------------------------------------------------
-  // Phase: dcopInitJct + dcopInitFix
-  //
-  // Matches ngspice MODEINITJCT → MODEINITFIX → MODEINITFLOAT (niiter.c:991-997).
-  // Runs unconditionally on all circuits (including pure linear), matching ngspice.
-  // -------------------------------------------------------------------------
-  let initVoltages: Float64Array | undefined;
-  {
-    onPhaseBegin?.("dcopInitJct");
 
-    for (const el of elements) {
-      if (el.isNonlinear && el.primeJunctions) {
-        el.primeJunctions();
+  // -------------------------------------------------------------------------
+  // Build the mode ladder. Always emits the correct phase sequence:
+  //   dcopInitJct begin → (per iter: initJct→initFix→initFloat) → end
+  //
+  // For linear circuits (no nonlinear elements), the ladder is still used to
+  // emit the correct harness phase sequence (initJct/initFix/initFloat begin/end)
+  // even though primeJunctions is a no-op. This matches ngspice which runs
+  // MODEINITJCT/MODEINITFIX/MODEINITFLOAT transitions unconditionally.
+  // -------------------------------------------------------------------------
+  const hasNonlinear = elements.some(el => el.isNonlinear);
+  const pool = statePool ?? null;
+
+  // Emit initial dcopInitJct phase begin before the NR call (niiter.c: entry mode).
+  onPhaseBegin?.("dcopInitJct");
+
+  // Ladder drives pool.initMode transitions and emits per-iteration phase labels.
+  // Always constructed (non-null) so the NR loop always runs the mode ladder.
+  const ladder = {
+    runPrimeJunctions(): void {
+      // MODEINITJCT: prime each nonlinear element's junction voltages.
+      // niiter.c:991-993 fires before iter 0. No-op for linear circuits.
+      for (const el of elements) {
+        if (el.isNonlinear && el.primeJunctions) {
+          el.primeJunctions();
+        }
       }
-    }
+    },
+    pool: pool ?? { initMode: "initJct" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "transient" },
+    onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iteration: number): void {
+      onPhaseBegin?.(phase);
+    },
+    onModeEnd(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iteration: number, converged: boolean): void {
+      // Terminal convergence on initFloat → accepted; transitions → dcopPhaseHandoff.
+      const isTerminal = phase === "dcopInitFloat" && converged;
+      onPhaseEnd?.(isTerminal ? "dcopSubSolveConverged" : "dcopPhaseHandoff", converged);
+    },
+  };
 
-    const jctResult = newtonRaphson({
-      ...nrBase,
-      maxIterations: 1,
-      exactMaxIterations: true,
-      elements,
-    });
-
-    initVoltages = jctResult.voltages;
-    onPhaseEnd?.("dcopPhaseHandoff", false);
-  }
-
-  // Phase: dcopInitFix — one NR iteration to re-stamp after INITJCT.
-  // Matches MODEINITFIX (niiter.c:994-997).
-  {
-    onPhaseBegin?.("dcopInitFix");
-
-    const fixResult = newtonRaphson({
-      ...nrBase,
-      maxIterations: 1,
-      exactMaxIterations: true,
-      elements,
-      initialGuess: initVoltages,
-    });
-
-    initVoltages = fixResult.voltages;
-    onPhaseEnd?.(fixResult.converged ? "dcopSubSolveConverged" : "dcopPhaseHandoff", fixResult.converged);
-
-    if (fixResult.converged) {
-      diagnostics.emit(
-        makeDiagnostic(
-          "dc-op-converged",
-          "info",
-          `DC operating point converged in INITFIX phase (2 iterations).`,
-          { explanation: "Converged after junction priming and single re-stamp." },
-        ),
-      );
-      return {
-        converged: true,
-        method: "direct",
-        iterations: 2,
-        nodeVoltages: fixResult.voltages,
-        diagnostics: diagnostics.getDiagnostics(),
-      };
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // Level 0 — Direct NR (cktop.c:56-79)
-  //
-  // Split into two phases for the harness:
-  //   dcopInitFloat — iteration 0 (cold linearization from initial voltages)
-  //   dcopDirect    — iterations 1..N (refinement from iter 0's solution)
-  //
-  // Mirrors ngspice CKTop's firstmode/continuemode pattern so the side-by-side
-  // comparison can pair our cold-start work against ngspice's MODEINITJCT
-  // pass. When NR converges in one iteration, no split happens — the attempt
-  // remains a single "dcopInitFloat" entry.
-  // -------------------------------------------------------------------------
-  // When no phase hook is installed the split machinery is fully skipped:
-  // no closure allocation, no onIteration0Complete wiring, no extra calls.
-  // Keeps the non-harness hot path strictly zero-cost.
-  if (onPhaseBegin) {
-    onPhaseBegin("dcopInitFloat");
-  }
   const directResult = newtonRaphson({
     ...nrBase,
     maxIterations: params.maxIterations,
     elements,
-    // Chain from INITFIX solution so NR starts from the primed operating point.
-    initialGuess: initVoltages,
-    // Only wire the split callback when there's somewhere for it to fire to.
-    // Leaving `onIteration0Complete` absent entirely avoids the closure
-    // allocation on every analysis run.
-    ...(onPhaseBegin && onPhaseEnd
-      ? {
-          onIteration0Complete: () => {
-            // Iter 0 ran but didn't converge — end the dcopInitFloat sub-attempt
-            // and begin dcopDirect for iterations 1..N. Use "dcopSubSolveConverged"
-            // as the outcome for the init-float pass so the grouping treats it as
-            // a non-terminal phase that handed off successfully.
-            onPhaseEnd("dcopPhaseHandoff", false);
-            onPhaseBegin("dcopDirect");
-          },
-        }
-      : {}),
+    dcopModeLadder: ladder,
   });
-  onPhaseEnd?.(directResult.converged ? "dcopSubSolveConverged" : "nrFailedRetry", directResult.converged);
+  // Reset initMode to "transient" now that the DC-OP NR call is complete.
+  // The ladder may have left pool.initMode = "initFloat" (or "initFix" on
+  // exhaustion), which would cause BJT updateOperatingPoint to incorrectly
+  // treat subsequent transient NR iterations as DC-OP context.
+  if (pool) {
+    pool.initMode = "transient";
+  }
+  // Per-iteration phase labels emitted by ladder's onModeEnd/onModeBegin.
+  // When NR exhausts maxIterations without converging, the last onModeEnd
+  // already fired "dcopPhaseHandoff"; emit the overall failure label.
+  if (!directResult.converged) {
+    onPhaseEnd?.("nrFailedRetry", false);
+  }
 
   if (directResult.converged) {
     diagnostics.emit(

@@ -14,7 +14,8 @@ import type {
   SimulationParams,
 } from "../../core/analog-engine-interface.js";
 import type { Diagnostic } from "../../compile/types.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../core/analog-engine-interface.js";
+import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../core/analog-engine-interface.js";
+import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import { AcAnalysis } from "./ac-analysis.js";
 import type { AcParams, AcResult } from "./ac-analysis.js";
 import { SparseSolver } from "./sparse-solver.js";
@@ -124,11 +125,12 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
   private _simTime: number = 0;
   private _lastDt: number = 0;
+  private _firsttime: boolean = false;
 
   // -------------------------------------------------------------------------
   // Solver configuration
   // -------------------------------------------------------------------------
-  private _params: SimulationParams = { ...DEFAULT_SIMULATION_PARAMS };
+  private _params: ResolvedSimulationParams = { ...DEFAULT_SIMULATION_PARAMS };
 
   // -------------------------------------------------------------------------
   // Engine interface — Lifecycle
@@ -193,6 +195,7 @@ export class MNAEngine implements AnalogEngine {
       }
     }
 
+    this._firsttime = false;
     this._seedBreakpoints();
     this._transitionState(EngineState.STOPPED);
   }
@@ -214,6 +217,7 @@ export class MNAEngine implements AnalogEngine {
       }
     }
     this._lastDt = 0;
+    this._firsttime = false;
     this._timestep = new TimestepController(this._params);
     this._diagnostics.clear();
     this._convergenceLog.clear();
@@ -339,6 +343,8 @@ export class MNAEngine implements AnalogEngine {
     // Subsequent loop iterations in the same step are retries.
     let _stepAttemptCount = 0;
 
+    const wasFirsttime = this._firsttime;
+
     for (;;) {
       statePool?.state0.set(statePool.state1);
 
@@ -348,15 +354,26 @@ export class MNAEngine implements AnalogEngine {
       // ngspice dctran.c:731 — advance simTime at top of each iteration.
       this._simTime += dt;
 
+      // Publish the advanced simTime to timeRef so time-varying sources
+      // (AC voltage/current) evaluate at the correct time during the NR
+      // solve that follows. Previously timeRef was only updated after
+      // acceptance (line ~558), causing sources to stamp with t_prev.
+      const cac = this._compiled as CompiledWithBridges | undefined;
+      if (cac?.timeRef) cac.timeRef.value = this._simTime;
+
       // NIpred: compute agp[] then predict voltages as NR initial guess.
       // Fires on every retry iteration (dt changes on NR-failure/LTE-rejection).
       // Matches ngspice dctran.c:734 NIcomCof + dctran.c:750 NIpred.
-      computeAgp(this._timestep.currentMethod, this._timestep.currentOrder,
-        dt, this._timestep.deltaOld, this._agp);
-      if (predictVoltages(this._nodeVoltageHistory, this._timestep.deltaOld,
+      // Gated on _stepCount > 0: on step 0, _voltages already holds the
+      // converged DC-OP solution (written at seedHistory). ngspice does not run
+      // MODEINITPRED under MODEINITTRAN, so the DC-OP result in CKTrhsOld is
+      // used directly as the NR initial guess.
+      if (this._stepCount > 0) {
+        computeAgp(this._timestep.currentMethod, this._timestep.currentOrder,
+          dt, this._timestep.deltaOld, this._agp);
+        predictVoltages(this._nodeVoltageHistory, this._timestep.deltaOld,
           this._timestep.currentOrder, this._timestep.currentMethod,
-          this._agp, this._voltages)) {
-        // _voltages now holds the predicted values as NR initial guess
+          this._agp, this._voltages);
       }
 
       // --- Phase hook: begin attempt ---
@@ -381,6 +398,11 @@ export class MNAEngine implements AnalogEngine {
       // The MODEINITTRAN "transparent at DC OP" behavior comes from seedHistory
       // copying Q_dcop into s1: BDF-1 produces geq=C/h (cap in matrix) but
       // zero net current at the DC operating point voltage.
+      //
+      // Publish the current integration timestep to the state pool so
+      // stampCompanion/updateOperatingPoint can derive ag0 = 1/dt locally,
+      // matching NIcomCof (nicomcof.c:33-51) and CKTag[0] in ngspice.
+      if (statePool) statePool.dt = dt;
       for (const el of elements) {
         if (el.isReactive && el.stampCompanion) {
           el.stampCompanion(dt, this._timestep.currentMethod, this._voltages, this._timestep.currentOrder, this._timestep.deltaOld);
@@ -415,6 +437,20 @@ export class MNAEngine implements AnalogEngine {
         },
       });
 
+      if (statePool) {
+        statePool.initMode = "initPred";
+      }
+
+      // ngspice dctran.c:795-799 + capload.c:60-62:
+      // On first transient step (firsttime), copy s0->s1 for q0==q1,
+      // then seed s2/s3 from s1. Fires every NIiter return while firsttime
+      // (including retries), matching ngspice which runs these copies
+      // unconditionally after NIiter when firsttime is set.
+      if (this._firsttime && statePool) {
+        statePool.states[1].set(statePool.states[0]);
+        statePool.seedFromState1();
+      }
+
       // --- Logging (merged from initial and retry blocks) ---
       if (logging) {
         stepRec!.attempts.push({
@@ -442,6 +478,9 @@ export class MNAEngine implements AnalogEngine {
         dt = dt / 8;                                    // ngspice dctran.c:802
         this._timestep.currentDt = dt;
         this._timestep.currentOrder = 1;                // ngspice dctran.c:810 — order, NOT method
+        if (this._firsttime && statePool) {
+          statePool.initMode = "initTran";
+        }
         // fall through to delmin check below
       } else {
         // --- NR CONVERGED — evaluate LTE (ngspice dctran.c:830+) ---
@@ -457,12 +496,13 @@ export class MNAEngine implements AnalogEngine {
           }
         }
 
-        // MODEINITTRAN (ngspice capload.c:60-62, bjtload.c:691-699):
-        // On the first transient step, copy s0 → s1 so that q0 == q1.
-        // Without this, cktTerr sees a step function (post-NR Q vs DCOP Q)
-        // and rejects with a massive divided difference.
-        if (this._stepCount === 0 && statePool) {
-          statePool.states[1].set(statePool.states[0]);
+        // ngspice dctran.c:849-866: firsttime && converged -> skip LTE, accept immediately
+        if (this._firsttime) {
+          this._firsttime = false;  // ngspice dctran.c:864: firsttime = 0
+          this.stepPhaseHook?.onAttemptEnd("accepted", true);
+          newDt = dt;
+          worstRatio = 0;
+          break;  // exit for(;;) -> proceed to acceptance block
         }
 
         const lte = this._timestep.computeNewDt(
@@ -527,9 +567,6 @@ export class MNAEngine implements AnalogEngine {
     // Accept the timestep
     if (statePool) {
       statePool.acceptTimestep();
-      if (this._stepCount === 0) {
-        statePool.seedFromState1();
-      }
       statePool.tranStep++;
       statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
     }
@@ -653,7 +690,6 @@ export class MNAEngine implements AnalogEngine {
 
   private _measurementObservers: MeasurementObserver[] = [];
   private _stepCount: number = 0;
-
   /** Register an observer to receive step/reset notifications. */
   addMeasurementObserver(observer: MeasurementObserver): void {
     if (!this._measurementObservers.includes(observer)) {
@@ -768,6 +804,12 @@ export class MNAEngine implements AnalogEngine {
       if (cac.statePool) {
         cac.statePool.seedHistory();
         cac.statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
+        // ngspice dctran.c:346: CKTmode flips from MODEDCOP|MODETRANOP to
+        // MODETRAN|MODEINITTRAN at the DC-OP→transient boundary. Mirror that
+        // transition so elements (e.g. BJT geqcb) can switch from DC-form to
+        // ag0-scaled integration without relying on tranStep heuristics.
+        cac.statePool.analysisMode = "tran";
+        this._firsttime = true;
       }
 
       // Seed per-timestep companion state from the DC operating point.
@@ -921,7 +963,7 @@ export class MNAEngine implements AnalogEngine {
    * Rebuilds the timestep controller so new bounds take effect immediately.
    */
   configure(params: Partial<SimulationParams>): void {
-    this._params = { ...this._params, ...params };
+    this._params = resolveSimulationParams({ ...this._params, ...params });
     this._timestep = new TimestepController(this._params);
     this._seedBreakpoints();
   }
