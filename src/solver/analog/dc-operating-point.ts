@@ -307,27 +307,34 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   let totalIterations = directResult.iterations;
 
   // -------------------------------------------------------------------------
-  // Level 1 — dynamicGmin (cktop.c:127-258)
+  // Level 1 — gmin stepping (cktop.c:57-60: select ONE gmin method)
   // -------------------------------------------------------------------------
-  const gminResult = dynamicGmin(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
+  const numGminSteps = params.numGminSteps ?? 1;
+  let gminResult: StepResult;
+  if (numGminSteps <= 1) {
+    gminResult = dynamicGmin(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
+  } else {
+    gminResult = spice3Gmin(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
+  }
   totalIterations += gminResult.iterations;
 
   if (gminResult.converged) {
+    const gminMethod = numGminSteps <= 1 ? "dynamic-gmin" : "spice3-gmin";
+    const gminLabel = numGminSteps <= 1 ? "dynamic Gmin stepping" : "spice3 Gmin stepping";
+    const gminExplanation = numGminSteps <= 1
+      ? "Direct Newton-Raphson failed. Dynamic Gmin stepping succeeded: adaptive diagonal conductance was stepped from 1e-2 S down to params.gmin."
+      : "Direct Newton-Raphson failed. spice3 Gmin stepping succeeded: diagonal conductance was stepped from gmin*1e10 down by factor 10 over 11 decades.";
     diagnostics.emit(
       makeDiagnostic(
         "dc-op-gmin",
         "info",
-        `DC operating point converged via dynamic Gmin stepping (final gmin = ${params.gmin}).`,
-        {
-          explanation:
-            "Direct Newton-Raphson failed. Dynamic Gmin stepping succeeded: adaptive diagonal " +
-            "conductance was stepped from 1e-2 S down to params.gmin.",
-        },
+        `DC operating point converged via ${gminLabel} (final gmin = ${params.gmin}).`,
+        { explanation: gminExplanation },
       ),
     );
     return {
       converged: true,
-      method: "dynamic-gmin",
+      method: gminMethod,
       iterations: totalIterations,
       nodeVoltages: gminResult.voltages,
       diagnostics: diagnostics.getDiagnostics(),
@@ -335,56 +342,34 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   }
 
   // -------------------------------------------------------------------------
-  // Level 2 — spice3Gmin (cktop.c:273-341)
+  // Level 2 — source stepping (cktop.c:66-75: select ONE source-stepping method)
   // -------------------------------------------------------------------------
-  const spice3Result = spice3Gmin(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
-  totalIterations += spice3Result.iterations;
-
-  if (spice3Result.converged) {
-    diagnostics.emit(
-      makeDiagnostic(
-        "dc-op-gmin",
-        "info",
-        `DC operating point converged via spice3 Gmin stepping (final gmin = ${params.gmin}).`,
-        {
-          explanation:
-            "Direct Newton-Raphson and dynamic Gmin stepping both failed. spice3 Gmin stepping " +
-            "succeeded: diagonal conductance was stepped from gmin*1e10 down by factor 10 over " +
-            "11 decades.",
-        },
-      ),
-    );
-    return {
-      converged: true,
-      method: "spice3-gmin",
-      iterations: totalIterations,
-      nodeVoltages: spice3Result.voltages,
-      diagnostics: diagnostics.getDiagnostics(),
-    };
+  const numSrcSteps = params.numSrcSteps ?? 1;
+  let srcResult: StepResult;
+  if (numSrcSteps <= 1) {
+    srcResult = gillespieSrc(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
+  } else {
+    srcResult = spice3Src(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
   }
-
-  // -------------------------------------------------------------------------
-  // Level 4 — gillespieSrc (cktop.c:354-546)
-  // -------------------------------------------------------------------------
-  const srcResult = gillespieSrc(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
   totalIterations += srcResult.iterations;
 
   if (srcResult.converged) {
+    const srcMethod = numSrcSteps <= 1 ? "gillespie-src" : "gillespie-src";
+    const srcLabel = numSrcSteps <= 1 ? "Gillespie source stepping" : "spice3 source stepping";
+    const srcExplanation = numSrcSteps <= 1
+      ? "Direct NR and gmin stepping both failed. Gillespie source stepping succeeded: independent sources were adaptively ramped from 0% to 100%."
+      : "Direct NR and gmin stepping both failed. spice3 source stepping succeeded: sources were uniformly ramped from 0% to 100%.";
     diagnostics.emit(
       makeDiagnostic(
         "dc-op-source-step",
         "warning",
-        "DC operating point converged via Gillespie source stepping.",
-        {
-          explanation:
-            "Direct NR, dynamic Gmin stepping, and spice3 Gmin stepping all failed. Gillespie " +
-            "source stepping succeeded: independent sources were adaptively ramped from 0% to 100%.",
-        },
+        `DC operating point converged via ${srcLabel}.`,
+        { explanation: srcExplanation },
       ),
     );
     return {
       converged: true,
-      method: "gillespie-src",
+      method: srcMethod,
       iterations: totalIterations,
       nodeVoltages: srcResult.voltages,
       diagnostics: diagnostics.getDiagnostics(),
@@ -498,6 +483,9 @@ function dynamicGmin(
 
     if (result.converged) {
       onPhaseEnd?.("dcopSubSolveConverged", true);
+      if (statePool && 'initMode' in statePool) {
+        (statePool as any).initMode = "initFloat";
+      }
       // cktop.c:168-169: check if we've reached target
       if (diagGmin <= gtarget) {
         // cktop.c:170: success — do final clean solve
@@ -600,6 +588,9 @@ function spice3Gmin(
   // cktop.c:281: zero state before stepping
   const voltages = new Float64Array(matrixSize);
   zeroState(voltages, statePool);
+  if (statePool && 'initMode' in statePool) {
+    (statePool as any).initMode = "initJct";
+  }
 
   let totalIter = 0;
 
@@ -630,6 +621,9 @@ function spice3Gmin(
     }
 
     onPhaseEnd?.("dcopSubSolveConverged", true);
+    if (statePool && 'initMode' in statePool) {
+      (statePool as any).initMode = "initFloat";
+    }
     voltages.set(result.voltages);
     // cktop.c:313: step down by gminFactor
     diagGmin /= gminFactor;
@@ -650,6 +644,74 @@ function spice3Gmin(
     return { converged: true, iterations: totalIter, voltages: cleanResult.voltages };
   }
   return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
+}
+
+// ---------------------------------------------------------------------------
+// spice3Src — cktop.c:583-628
+// ---------------------------------------------------------------------------
+
+/**
+ * spice3 source stepping (cktop.c:583-628).
+ * Uniform linear source ramp with no backtracking.
+ */
+function spice3Src(
+  nrBase: NrBase,
+  elements: readonly AnalogElement[],
+  params: SimulationParams,
+  _diagnostics: DiagnosticCollector,
+  statePool: { state0: Float64Array; reset(): void } | null | undefined,
+  matrixSize: number,
+  onPhaseBegin?: PhaseBeginFn,
+  onPhaseEnd?: PhaseEndFn,
+): StepResult {
+  const voltages = new Float64Array(matrixSize);
+  zeroState(voltages, statePool);
+  if (statePool && 'initMode' in statePool) {
+    (statePool as any).initMode = "initJct";
+  }
+  let totalIter = 0;
+  const numSrcSteps = params.numSrcSteps ?? 1;
+
+  // cktop.c:590-620: uniform ramp i=0..numSrcSteps
+  for (let i = 0; i <= numSrcSteps; i++) {
+    const srcFact = i / numSrcSteps;
+    scaleAllSources(elements, srcFact);
+    onPhaseBegin?.("dcopSrcSweep", srcFact);
+    const result = newtonRaphson({
+      ...nrBase,
+      maxIterations: params.dcTrcvMaxIter,
+      elements,
+      initialGuess: voltages,
+    });
+    totalIter += result.iterations;
+    if (!result.converged) {
+      onPhaseEnd?.("nrFailedRetry", false);
+      scaleAllSources(elements, 1);
+      return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
+    }
+    onPhaseEnd?.("dcopSubSolveConverged", true);
+    if (statePool && 'initMode' in statePool) {
+      (statePool as any).initMode = "initFloat";
+    }
+    voltages.set(result.voltages);
+  }
+
+  scaleAllSources(elements, 1);
+
+  // Final clean solve
+  onPhaseBegin?.("dcopSrcSweep", 1);
+  const cleanResult = newtonRaphson({
+    ...nrBase,
+    maxIterations: params.maxIterations,
+    elements,
+    initialGuess: voltages,
+  });
+  totalIter += cleanResult.iterations;
+  onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
+
+  return cleanResult.converged
+    ? { converged: true, iterations: totalIter, voltages: cleanResult.voltages }
+    : { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
 }
 
 // ---------------------------------------------------------------------------
@@ -675,6 +737,9 @@ function gillespieSrc(
   // cktop.c:362-363: zero state and scale sources to 0
   const voltages = new Float64Array(matrixSize);
   zeroState(voltages, statePool);
+  if (statePool && 'initMode' in statePool) {
+    (statePool as any).initMode = "initJct";
+  }
   scaleAllSources(elements, 0);
 
   const savedVoltages = new Float64Array(matrixSize);
@@ -699,7 +764,7 @@ function gillespieSrc(
     // Apply gmin bootstrap: diagGmin = gmin * 1e10, step down 10 decades
     let diagGmin = params.gmin * 1e10;
     let bootstrapConverged = false;
-    for (let decade = 0; decade < 10; decade++) {
+    for (let decade = 0; decade <= 10; decade++) {
       onPhaseBegin?.("dcopSrcSweep", 0);
       const bResult = newtonRaphson({
         ...nrBase,
@@ -715,8 +780,11 @@ function gillespieSrc(
         break;
       }
       onPhaseEnd?.("dcopSubSolveConverged", true);
+      if (statePool && 'initMode' in statePool) {
+        (statePool as any).initMode = "initFloat";
+      }
       diagGmin /= 10;
-      if (decade === 9) {
+      if (decade === 10) {
         bootstrapConverged = true;
       }
     }
@@ -726,6 +794,9 @@ function gillespieSrc(
     }
   } else {
     onPhaseEnd?.("dcopSubSolveConverged", true);
+    if (statePool && 'initMode' in statePool) {
+      (statePool as any).initMode = "initFloat";
+    }
   }
 
   // cktop.c:420-424: initialise stepping parameters
@@ -752,6 +823,9 @@ function gillespieSrc(
 
     if (stepResult.converged) {
       onPhaseEnd?.("dcopSubSolveConverged", true);
+      if (statePool && 'initMode' in statePool) {
+        (statePool as any).initMode = "initFloat";
+      }
       // cktop.c:446-481: save state, adapt raise
       voltages.set(stepResult.voltages);
       saveSnapshot(voltages, savedVoltages, statePool, savedState0);
@@ -803,4 +877,5 @@ function gillespieSrc(
     return { converged: true, iterations: totalIter, voltages };
   }
 
- 
+  return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
+}

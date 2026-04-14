@@ -1833,8 +1833,7 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_VSUB] = vcsNow;
 
       // Read history voltages from s1 (last accepted step via StatePool rotation).
-      // First call detected by tranStep === 0 (pool not yet advanced).
-      const isFirstCall = pool.tranStep === 0;
+      const isFirstCall = pool.initMode === "initTran";
       s0[base + L1_SLOT_V_BE] = vbeNow;
       s0[base + L1_SLOT_V_BC] = vbcNow;
       s0[base + L1_SLOT_V_CS] = vcsNow;

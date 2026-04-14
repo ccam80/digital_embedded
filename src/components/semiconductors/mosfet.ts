@@ -1179,7 +1179,7 @@ class MosfetAnalogElement extends AbstractFetElement {
       // Average with previous step's half-cap (mos1load.c:769-786)
       const prevMeyerGs = this.s1[base + SLOT_MEYER_GS];
       const prevMeyerGd = this.s1[base + SLOT_MEYER_GD];
-      const firstTran = this._pool.tranStep === 0;
+      const firstTran = this._pool.initMode === "initTran";
       const cgs = (firstTran ? 2 * meyerGs : meyerGs + prevMeyerGs) + gsOverlap;
       const cgd = (firstTran ? 2 * meyerGd : meyerGd + prevMeyerGd) + gdOverlap;
       return { cgs, cgd };
@@ -1526,7 +1526,6 @@ class MosfetAnalogElement extends AbstractFetElement {
     const base = this.stateBaseOffset;
     const s0 = this._s0;
 
-    // Previous voltages from s1; first call: tranStep === 0
     const s1 = this.s1;
 
     s0[base + SLOT_V_DB] = vdb;
@@ -1641,7 +1640,7 @@ class MosfetAnalogElement extends AbstractFetElement {
       }
       s0[base + SLOT_MEYER_GB] = meyerCapgb;
       const prevMeyerGb = this.s1[base + SLOT_MEYER_GB];
-      const totalGb = (this._pool.tranStep === 0 ? 2 * meyerCapgb : meyerCapgb + prevMeyerGb) + gbOverlap;
+      const totalGb = (this._pool.initMode === "initTran" ? 2 * meyerCapgb : meyerCapgb + prevMeyerGb) + gbOverlap;
       const qgb = totalGb * vgb;
       const q1_gb = s1[base + SLOT_Q_GB];
       const q2_gb = this.s2[base + SLOT_Q_GB];
@@ -1658,7 +1657,7 @@ class MosfetAnalogElement extends AbstractFetElement {
     }
 
     // ngspice mos1load.c:842-853 — zero gate-bulk cap companions during MODEINITTRAN
-    if (this._pool.tranStep === 0) {
+    if (this._pool.initMode === "initTran") {
       s0[base + SLOT_CAP_GEQ_GB] = 0;
       s0[base + SLOT_CAP_IEQ_GB] = 0;
       s0[base + SLOT_CCAP_GB] = 0;
@@ -1709,7 +1708,7 @@ class MosfetAnalogElement extends AbstractFetElement {
         meyerCapgb = meyer.capgb;
       }
       const prevMeyerGbU = s1[base + SLOT_MEYER_GB];
-      const isFirstCallU = this._pool.tranStep === 0;
+      const isFirstCallU = this._pool.initMode === "initTran";
       const totalGb = (isFirstCallU ? 2 * meyerCapgb : meyerCapgb + prevMeyerGbU) + gbOverlap;
       const prevVgb = s1[base + SLOT_V_GB];
       const prevQgb = s1[base + SLOT_Q_GB];
@@ -1798,7 +1797,7 @@ class MosfetAnalogElement extends AbstractFetElement {
         const ccapPrev_gb = s1[base + SLOT_CCAP_GB];
         const meyerGbNow = s0[base + SLOT_MEYER_GB];
         const meyerGbPrev = s1[base + SLOT_MEYER_GB];
-        const isFirstCallU2 = this._pool.tranStep === 0;
+        const isFirstCallU2 = this._pool.initMode === "initTran";
         const totalGbRecalc = (isFirstCallU2 ? 2 * meyerGbNow : meyerGbNow + meyerGbPrev) + gbOverlap;
         if (totalGbRecalc > 0) {
           const resGB = integrateCapacitor(totalGbRecalc, vgb, q0_gb, q1_gb, q2_gb, dt, h1, h2, order, method, ccapPrev_gb);

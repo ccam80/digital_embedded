@@ -8,6 +8,7 @@ import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson, pnjlim, fetlim } from "../newton-raphson.js";
 import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
+import { StatePool } from "../state-pool.js";
 
 // ---------------------------------------------------------------------------
 // Helpers — build a simple diode+resistor circuit
@@ -250,5 +251,147 @@ describe("NR", () => {
     expect(resultNoGuess.converged).toBe(true);
     // A good initial guess should converge in fewer or equal iterations
     expect(resultWithGuess.iterations).toBeLessThanOrEqual(resultNoGuess.iterations);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Wave 2: forced 2-iteration minimum for nonlinear circuits
+  // ---------------------------------------------------------------------------
+
+  it("nonlinear_circuit_runs_at_least_2_iterations_with_state_pool", () => {
+    // A diode+resistor circuit with a statePool in initTran mode must run at
+    // least 2 NR iterations (Change 6: iteration===0 forces noncon=1).
+    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
+    const pool = new StatePool(0);
+    pool.initMode = "initTran";
+
+    const result = newtonRaphson({
+      solver,
+      elements,
+      matrixSize,
+      maxIterations: 100,
+      reltol: 1e-3,
+      abstol: 1e-6,
+      iabstol: 1e-12,
+      diagnostics,
+      statePool: pool,
+    });
+
+    expect(result.converged).toBe(true);
+    expect(result.iterations).toBeGreaterThanOrEqual(2);
+  });
+
+  it("nonlinear_circuit_forced_noncon_on_iteration_0", () => {
+    // Even when NR would otherwise converge in iteration 0 (hypothetically),
+    // Change 6 ensures assembler.noncon is forced to 1 after iteration 0,
+    // preventing early return. Verify by checking iteration count >= 2.
+    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
+
+    // No statePool: Change 6 still applies (forced noncon=1 at iteration===0)
+    const result = newtonRaphson({
+      solver,
+      elements,
+      matrixSize,
+      maxIterations: 100,
+      reltol: 1e-3,
+      abstol: 1e-6,
+      iabstol: 1e-12,
+      diagnostics,
+    });
+
+    expect(result.converged).toBe(true);
+    expect(result.iterations).toBeGreaterThanOrEqual(2);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Wave 2: convergence gate — initTran blocks convergence until initFloat
+  // ---------------------------------------------------------------------------
+
+  it("initTran_transitions_to_initFloat_after_iteration_0", () => {
+    // With statePool.initMode = "initTran", the mode automaton must transition
+    // to "initFloat" after iteration 0 completes. NR must then converge.
+    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
+    const pool = new StatePool(0);
+    pool.initMode = "initTran";
+
+    const result = newtonRaphson({
+      solver,
+      elements,
+      matrixSize,
+      maxIterations: 100,
+      reltol: 1e-3,
+      abstol: 1e-6,
+      iabstol: 1e-12,
+      diagnostics,
+      statePool: pool,
+    });
+
+    expect(result.converged).toBe(true);
+    // After NR completes, initMode must be "initFloat"
+    expect(pool.initMode).toBe("initFloat");
+  });
+
+  it("initPred_transitions_to_initFloat_immediately", () => {
+    // With statePool.initMode = "initPred", the automaton transitions to
+    // "initFloat" after the first updateOperatingPoints call (iteration 0).
+    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
+    const pool = new StatePool(0);
+    pool.initMode = "initPred";
+
+    const result = newtonRaphson({
+      solver,
+      elements,
+      matrixSize,
+      maxIterations: 100,
+      reltol: 1e-3,
+      abstol: 1e-6,
+      iabstol: 1e-12,
+      diagnostics,
+      statePool: pool,
+    });
+
+    expect(result.converged).toBe(true);
+    expect(pool.initMode).toBe("initFloat");
+  });
+
+  it("transient_mode_allows_convergence_without_ladder", () => {
+    // With statePool.initMode = "transient" and no ladder, the canConverge
+    // gate must allow convergence (initMode === "transient" is a valid terminal).
+    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
+    const pool = new StatePool(0);
+    pool.initMode = "transient";
+
+    const result = newtonRaphson({
+      solver,
+      elements,
+      matrixSize,
+      maxIterations: 100,
+      reltol: 1e-3,
+      abstol: 1e-6,
+      iabstol: 1e-12,
+      diagnostics,
+      statePool: pool,
+    });
+
+    expect(result.converged).toBe(true);
+    // "transient" mode stays unchanged (no automaton fires for it)
+    expect(pool.initMode).toBe("transient");
+  });
+
+  it("no_pool_allows_convergence", () => {
+    // Without any statePool, canConverge must be true (legacy path).
+    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
+
+    const result = newtonRaphson({
+      solver,
+      elements,
+      matrixSize,
+      maxIterations: 100,
+      reltol: 1e-3,
+      abstol: 1e-6,
+      iabstol: 1e-12,
+      diagnostics,
+    });
+
+    expect(result.converged).toBe(true);
   });
 });
