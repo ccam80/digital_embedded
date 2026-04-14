@@ -334,16 +334,21 @@ export function createTunnelDiodeElement(
 
   // Attach stampCompanion and getLteTimestep only when junction capacitance is present
   if (hasCapacitance) {
-    (element as unknown as { stampCompanion: (dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]) => void }).stampCompanion = function (
+    (element as unknown as { stampCompanion: (dt: number, method: IntegrationMethod, _voltages: Float64Array, order: number, deltaOld: readonly number[]) => void }).stampCompanion = function (
       dt: number,
       method: IntegrationMethod,
-      voltages: Float64Array,
+      _voltages: Float64Array,
       order: number,
       deltaOld: readonly number[],
     ): void {
-      const va = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vNow = va - vc;
+      // Compute vd freshly from current node voltages. stampCompanion runs at
+      // step boundaries where NR has already converged, so NDR step-clamping
+      // (which is a mid-NR stabilizer) is not needed here — vdOld and vdRaw
+      // are identical at a converged step. Never read a cross-phase cached slot.
+      const vA_sc = nodeAnode   > 0 ? _voltages[nodeAnode   - 1] : 0;
+      const vC_sc = nodeCathode > 0 ? _voltages[nodeCathode - 1] : 0;
+      const vNow = vA_sc - vC_sc;
+      s0[base + SLOT_VD] = vNow;
 
       // Depletion + transit-time capacitance at current operating point.
       // For transit-time cap: use total dI/dV (all components) as gDiode.
@@ -397,10 +402,14 @@ export function createTunnelDiodeElement(
       return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, ccap0, ccap1, lteParams);
     };
 
-    (element as unknown as { updateChargeFlux: (v: Float64Array, dt: number, method: string, order: number, deltaOld: readonly number[]) => void }).updateChargeFlux = function(voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
-      const va = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vd = va - vc;
+    (element as unknown as { updateChargeFlux: (v: Float64Array, dt: number, method: string, order: number, deltaOld: readonly number[]) => void }).updateChargeFlux = function(_voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
+      // Compute vd freshly from the converged node voltages (single-pass,
+      // ngspice bjtload-style). NDR step-clamping is a mid-NR stabilizer;
+      // at step acceptance, vdRaw equals the converged value.
+      const vA_uc = nodeAnode   > 0 ? _voltages[nodeAnode   - 1] : 0;
+      const vC_uc = nodeCathode > 0 ? _voltages[nodeCathode - 1] : 0;
+      const vd = vA_uc - vC_uc;
+      s0[base + SLOT_VD] = vd;
       const { i: iNowDiode } = tunnelDiodeIV(vd, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
       s0[base + SLOT_Q] = computeJunctionCharge(vd, params.CJO, params.VJ, params.M, params.FC, params.TT, iNowDiode);
       s0[base + SLOT_V] = vd;

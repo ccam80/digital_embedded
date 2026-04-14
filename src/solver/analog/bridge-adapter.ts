@@ -47,6 +47,7 @@ export class BridgeOutputAdapter implements AnalogElement {
 
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
+  readonly internalNodeLabels: readonly string[];
   readonly branchIndex: number;
   readonly isNonlinear: false = false;
   label?: string;
@@ -68,6 +69,7 @@ export class BridgeOutputAdapter implements AnalogElement {
     this._loaded = loaded;
     this.pinNodeIds = [pinModel.nodeId];
     this.allNodeIds = [pinModel.nodeId];
+    this.internalNodeLabels = [];
   }
 
   /**
@@ -193,6 +195,7 @@ export class BridgeInputAdapter implements AnalogElement {
 
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
+  readonly internalNodeLabels: readonly string[];
   readonly branchIndex: number = -1;
   readonly isNonlinear: false = false;
   label?: string;
@@ -208,6 +211,7 @@ export class BridgeInputAdapter implements AnalogElement {
     this._loaded = loaded;
     this.pinNodeIds = [pinModel.nodeId];
     this.allNodeIds = [pinModel.nodeId];
+    this.internalNodeLabels = [];
   }
 
   /**

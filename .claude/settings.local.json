@@ -109,7 +109,10 @@
       "Bash(npm run:*)",
       "mcp__circuit-simulator__harness_session_map",
       "mcp__circuit-simulator__harness_get_step",
-      "mcp__circuit-simulator__harness_get_attempt"
+      "mcp__circuit-simulator__harness_get_attempt",
+      "mcp__circuit-simulator__server_restart",
+      "mcp__circuit-simulator__server_reset",
+      "mcp__mermaid-mcp__validate_and_render_mermaid_diagram"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -242,10 +242,14 @@ export function createVaractorElement(
       s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
     },
 
-    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
-      const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
-      const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vNow = vA - vC;
+    stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
+      // Compute vd freshly from current node voltages + pnjlim — single-pass
+      // semantics, never read a cross-phase cached slot.
+      const vA_sc = nodeAnode   > 0 ? _voltages[nodeAnode   - 1] : 0;
+      const vC_sc = nodeCathode > 0 ? _voltages[nodeCathode - 1] : 0;
+      const vdRaw_sc = vA_sc - vC_sc;
+      const vNow = pnjlim(vdRaw_sc, s0[base + SLOT_VD], nVt, vcrit).value;
+      s0[base + SLOT_VD] = vNow;
 
       // Reverse bias voltage: V_R = -V_d (positive when reverse biased)
       const vReverse = -vNow;
@@ -320,10 +324,9 @@ export function createVaractorElement(
       }
     },
 
-    updateChargeFlux(voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
-      const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
-      const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vNow = vA - vC;
+    updateChargeFlux(_voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
+      // dioload.c:308-341: use pnjlim-limited vd from state pool, not raw node voltages.
+      const vNow = s0[base + SLOT_VD];
       const vReverse = -vNow;
       const Cj = computeVaractorCapacitance(vReverse, p.cjo, p.vj, p.m);
       s0[base + SLOT_Q] = Cj * vNow;

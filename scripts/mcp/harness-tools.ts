@@ -10,6 +10,8 @@ import { ComparisonSession } from "../../src/solver/analog/__tests__/harness/com
 import { formatNumber, formatComparedValue, suggestComponents } from "./harness-format.js";
 import { writeFileSync } from "fs";
 import type { SessionSummary, NRPhase } from "../../src/solver/analog/__tests__/harness/types.js";
+import { resolveSlice, applySliceToIteration } from "../../src/solver/analog/__tests__/harness/slice.js";
+import type { SliceFilter } from "../../src/solver/analog/__tests__/harness/slice.js";
 import { isPoolBacked } from "../../src/solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
@@ -447,7 +449,17 @@ export function registerHarnessTools(
         ? { index: args.index }
         : { time: args.time!, side: args.side as "ours" | "ngspice" | undefined };
       const detail = entry.session.getStep(query);
-      return JSON.stringify({ handle: args.handle, step: detail });
+      const formatted = {
+        ...detail,
+        stepStartTime: formatComparedValue(detail.stepStartTime),
+        stepEndTime: formatComparedValue(detail.stepEndTime),
+        dt: formatComparedValue(detail.dt),
+        pairing: detail.pairing.map(p => ({
+          ...p,
+          divergenceNorm: Number.isNaN(p.divergenceNorm) ? -1 : p.divergenceNorm,
+        })),
+      };
+      return JSON.stringify({ handle: args.handle, step: formatted });
     }),
   );
 
@@ -462,7 +474,20 @@ export function registerHarnessTools(
       description:
         "Return paired per-iteration data for a specific NR solve attempt within a step. " +
         "Identifies the attempt by step index, phase name, and position within that phase. " +
-        "Supports iteration range and pagination.",
+        "Supports iteration range and pagination.\n\n" +
+        "Slice filters (nodes / component) narrow the returned rhs, residual, and matrix to a " +
+        "K-node subspace. Both filters may be combined — their index sets are unioned, deduplicated, " +
+        "and sorted. Omit both to return the full matrix regardless of circuit size.\n\n" +
+        "nodes: array of node names (string) or 1-based node ids (integer). String lookup is " +
+        "case-insensitive; segment match (split by '/') is used when no exact match exists. " +
+        "Prime nodes (e.g. 'Q1:B\\'') are included in the full label set and are matchable by name.\n\n" +
+        "component: component label (case-insensitive). Resolves to the union of: non-ground pin " +
+        "node ids, prime nodes whose label starts with '<component>:', and branch rows in " +
+        "matrixRowLabels at index >= nodeCount whose label matches the component exactly or starts " +
+        "with '<component>#' or '<component>:'.\n\n" +
+        "When a slice is active the response shape is " +
+        "{ handle, attempt, slice: { matrixIndices, labels, fullMatrixSize } }. " +
+        "Without a slice: { handle, attempt }.",
       inputSchema: z.object({
         handle: z.string().describe("Harness session handle"),
         stepIndex: z.number().int().min(0).describe("Step index (0-based)"),
@@ -479,6 +504,12 @@ export function registerHarnessTools(
         ),
         offset: z.number().int().min(0).optional().describe("Pagination offset. Default: 0."),
         limit: z.number().int().min(1).optional().describe("Maximum iterations to return."),
+        nodes: z.array(z.union([z.string(), z.number().int().min(1)])).optional().describe(
+          "Node names or 1-based node ids to include in the matrix/rhs/residual slice.",
+        ),
+        component: z.string().optional().describe(
+          "Component label whose pins, prime nodes, and branch rows are included in the slice.",
+        ),
       }),
     },
     wrapTool("harness_get_attempt", async (args) => {
@@ -494,7 +525,52 @@ export function registerHarnessTools(
         limit: args.limit,
         offset: args.offset,
       });
-      return JSON.stringify({ handle: args.handle, attempt: detail });
+
+      // Normalize divergenceNorm: NaN → -1 so JSON round-trip preserves number type
+      const normalizeIterations = (iters: any[]) =>
+        iters.map((paired: any) => ({
+          ...paired,
+          divergenceNorm: Number.isNaN(paired.divergenceNorm) ? -1 : paired.divergenceNorm,
+        }));
+
+      const sliceFilter: SliceFilter = {};
+      if (args.nodes) sliceFilter.nodes = args.nodes as ReadonlyArray<string | number>;
+      if (args.component) sliceFilter.component = args.component;
+
+      const sliceActive = sliceFilter.nodes !== undefined || sliceFilter.component !== undefined;
+
+      if (!sliceActive) {
+        const normalizedDetail = { ...detail, iterations: normalizeIterations(detail.iterations) };
+        return JSON.stringify({ handle: args.handle, attempt: normalizedDetail });
+      }
+
+      const topology = (entry.session as any)._ourTopology;
+      const resolved = resolveSlice(sliceFilter, topology);
+
+      if (resolved.matrixIndices.length === 0) {
+        throw new Error("harness_get_attempt: slice resolved to empty index set");
+      }
+
+      const fullMatrixSize: number = topology.matrixSize;
+
+      // Apply slice to each paired iteration
+      const slicedIterations = normalizeIterations(detail.iterations).map((paired: any) => ({
+        ...paired,
+        ours: paired.ours ? applySliceToIteration(paired.ours, resolved, fullMatrixSize) : null,
+        ngspice: paired.ngspice ? applySliceToIteration(paired.ngspice, resolved, fullMatrixSize) : null,
+      }));
+
+      const slicedDetail = { ...detail, iterations: slicedIterations };
+
+      return JSON.stringify({
+        handle: args.handle,
+        attempt: slicedDetail,
+        slice: {
+          matrixIndices: resolved.matrixIndices,
+          labels: resolved.labels,
+          fullMatrixSize,
+        },
+      });
     }),
   );
 

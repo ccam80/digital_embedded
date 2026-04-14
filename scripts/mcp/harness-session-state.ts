@@ -70,4 +70,19 @@ export class HarnessSessionState {
   handles(): string[] {
     return [...this._sessions.keys()];
   }
+
+  /**
+   * Dispose all sessions, clear the map, reset the counter.
+   * Returns the number of sessions that were disposed.
+   */
+  reset(): number {
+    let disposed = 0;
+    for (const entry of this._sessions.values()) {
+      entry.session.dispose();
+      disposed++;
+    }
+    this._sessions.clear();
+    this._counter = 0;
+    return disposed;
+  }
 }

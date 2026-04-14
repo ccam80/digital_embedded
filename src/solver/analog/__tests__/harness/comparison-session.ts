@@ -94,6 +94,60 @@ function _zeroDcopCoefficients(): IntegrationCoefficients {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Matrix/residual helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute rhs, residual, residualInfinityNorm, and the full dense matrix
+ * from an IterationSnapshot's sparse matrix entries, input voltages, and preSolveRhs.
+ *
+ * The input voltages are `iter.prevVoltages` — the iterate fed INTO this NR iteration
+ * (post-solve of iter-1, or the initial guess for iter 0). Using `iter.voltages` (the
+ * POST-solve result of this iteration) would make the residual identically zero to LU
+ * precision, defeating its diagnostic value.
+ * preSolveRhs is the captured b vector before the linear solve.
+ * residual[i] = sum_j(A[i][j] * v_input[j]) - b[i].
+ *
+ * matrix is null only when sparse capture was empty (no matrix entries recorded).
+ */
+function _computeLinearSystemData(
+  iter: import("./types.js").IterationSnapshot,
+  matrixSize: number,
+): {
+  rhs: number[];
+  residual: number[];
+  residualInfinityNorm: number;
+  matrix: number[] | null;
+} {
+  const n = matrixSize;
+  const rhs = Array.from(iter.preSolveRhs.subarray(0, n));
+
+  // Build full dense matrix (row-major) from sparse entries
+  let denseA: number[] | null = null;
+  if (iter.matrix.length > 0) {
+    denseA = new Array<number>(n * n).fill(0);
+    for (const { row, col, value } of iter.matrix) {
+      if (row < n && col < n) denseA[row * n + col] += value;
+    }
+  }
+
+  const residual = new Array<number>(n).fill(0);
+  let residualInfinityNorm = 0;
+  if (denseA !== null) {
+    const v = iter.prevVoltages;
+    for (let r = 0; r < n; r++) {
+      let sum = 0;
+      for (let c = 0; c < n; c++) sum += denseA[r * n + c] * (v[c] ?? 0);
+      residual[r] = sum - rhs[r];
+      const abs = Math.abs(residual[r]);
+      if (abs > residualInfinityNorm) residualInfinityNorm = abs;
+    }
+  }
+
+  return { rhs, residual, residualInfinityNorm, matrix: denseA };
+}
+
 function makeComparedValue(
   ours: number,
   ngspice: number,
@@ -546,6 +600,16 @@ export class ComparisonSession {
 
     this._analysis = "tran";
     this._comparisons = null;
+
+    // Configure our engine with tStop (and maxStep if provided) so the
+    // timestep controller computes the correct initial dt — matching ngspice's
+    // dctran.c:118 formula MIN(tStop/100, maxStep) / 10 / 10.  Without this,
+    // the engine falls back to maxTimeStep/100/10, producing a much larger
+    // initial dt than ngspice and causing tranInit convergence failure.
+    this._engine.configure({
+      tStop,
+      ...(maxStep != null ? { maxTimeStep: maxStep } : {}),
+    });
 
     const stopStr = this._formatSpiceTime(tStop);
     const stepStr = maxStep
@@ -1336,7 +1400,20 @@ export class ComparisonSession {
 
     const ngAligned = this._ngSessionAligned();
     const ourStep = this._ourSession?.steps[query.stepIndex] ?? null;
-    const ngStep = ngAligned?.steps[query.stepIndex] ?? null;
+
+    let ngStepIndex = query.stepIndex;
+    if (ngAligned && ngAligned.steps.length > 0 && ourStep && this._analysis === "tran") {
+      const t = ourStep.stepEndTime;
+      const ngSteps = ngAligned.steps;
+      let bestIdx = 0;
+      let bestDelta = Math.abs(ngSteps[0].stepEndTime - t);
+      for (let i = 1; i < ngSteps.length; i++) {
+        const d = Math.abs(ngSteps[i].stepEndTime - t);
+        if (d < bestDelta) { bestDelta = d; bestIdx = i; }
+      }
+      ngStepIndex = bestIdx;
+    }
+    const ngStep = ngAligned?.steps[ngStepIndex] ?? null;
 
     const matrixSize = this._ourTopology.matrixSize;
     const nodeCount = this._ourTopology.nodeCount;
@@ -1373,28 +1450,40 @@ export class ComparisonSession {
       const ourIter = ourIters[ii] ?? null;
       const ngIter  = ngIters[ii] ?? null;
 
+      const ourLinSys = ourIter ? _computeLinearSystemData(ourIter, matrixSize) : null;
       const ourData: IterationSideData | null = ourIter ? {
         rawIteration: ourIter.iteration,
         globalConverged: ourIter.globalConverged,
         noncon: ourIter.noncon,
         nodeVoltages: this._buildNodeVoltages(ourIter.voltages),
+        nodeVoltagesBefore: this._buildNodeVoltages(ourIter.prevVoltages),
         branchValues: this._buildBranchValues(ourIter.voltages, nodeCount),
         elementStates: Object.fromEntries(
           ourIter.elementStates.map(es => [es.label, es.slots]),
         ),
         limitingEvents: ourIter.limitingEvents,
+        rhs: ourLinSys!.rhs,
+        residual: ourLinSys!.residual,
+        residualInfinityNorm: ourLinSys!.residualInfinityNorm,
+        matrix: ourLinSys!.matrix,
       } : null;
 
+      const ngLinSys = ngIter ? _computeLinearSystemData(ngIter, matrixSize) : null;
       const ngData: IterationSideData | null = ngIter ? {
         rawIteration: ngIter.iteration,
         globalConverged: ngIter.globalConverged,
         noncon: ngIter.noncon,
         nodeVoltages: this._buildNodeVoltages(ngIter.voltages),
+        nodeVoltagesBefore: this._buildNodeVoltages(ngIter.prevVoltages),
         branchValues: this._buildBranchValues(ngIter.voltages, nodeCount),
         elementStates: Object.fromEntries(
           ngIter.elementStates.map(es => [es.label, es.slots]),
         ),
         limitingEvents: ngIter.limitingEvents,
+        rhs: ngLinSys!.rhs,
+        residual: ngLinSys!.residual,
+        residualInfinityNorm: ngLinSys!.residualInfinityNorm,
+        matrix: ngLinSys!.matrix,
       } : null;
 
       const divergenceNorm = _l2Norm(

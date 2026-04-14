@@ -544,6 +544,24 @@ export function newtonRaphson(opts: NROptions): NRResult {
     }
     assembler.updateOperatingPoints(elements, voltages, opts.limitingCollector ?? null);
 
+    // ngspice niiter.c:957-961: iterno==1 forces noncon=1
+    // Guarantees at least 2 NR iterations (no convergence on iteration 0)
+    if (iteration === 0) {
+      assembler.noncon = 1;
+    }
+
+    // Transient mode automaton (niiter.c:1065-1073):
+    // initTran: after iter 0, unconditional -> initFloat
+    // initPred: unconditional -> initFloat (before iter 0 stamps)
+    if (!ladder && opts.statePool) {
+      const pool = opts.statePool as { initMode: string };
+      if (pool.initMode === "initTran" && iteration === 0) {
+        pool.initMode = "initFloat";
+      } else if (pool.initMode === "initPred") {
+        pool.initMode = "initFloat";
+      }
+    }
+
     // 5b. Node damping (ngspice niiter.c:204-229):
     //     Guards: nodeDamping enabled, noncon != 0, isDcOp, iteration > 0.
     //     If any voltage node changed by more than 10V, scale ALL updates
@@ -691,7 +709,15 @@ export function newtonRaphson(opts: NROptions): NRResult {
     // 10. Return on convergence (niiter.c:986-989: only in MODEINITFLOAT).
     // When ladder is active, convergence is gated on initMode === "initFloat".
     // Without ladder, behaves as before.
-    const canConverge = !ladder || ladder.pool.initMode === "initFloat";
+    let canConverge: boolean;
+    if (ladder) {
+      canConverge = ladder.pool.initMode === "initFloat";
+    } else if (opts.statePool) {
+      const pool = opts.statePool as { initMode: string };
+      canConverge = pool.initMode === "initFloat" || pool.initMode === "transient";
+    } else {
+      canConverge = true;
+    }
     if (canConverge && globalConverged && elemConverged) {
       return { converged: true, iterations: iteration + 1, voltages, largestChangeElement, largestChangeNode };
     }

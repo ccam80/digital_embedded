@@ -45,6 +45,7 @@ const MODEDCOP       = 0x0010;
 const MODETRANOP     = 0x0020;
 const MODEINITFLOAT  = 0x0100;
 const MODEINITJCT    = 0x0200;
+const MODEINITFIX    = 0x0400;
 const MODEINITTRAN   = 0x1000;
 const MODEINITPRED   = 0x2000;
 
@@ -67,7 +68,9 @@ function cktModeToPhase(mode: number, phaseFlags: number): NRPhase {
     if (inGminSp3) return "dcopGminSpice3";
     if (inGminDyn) return "dcopGminDynamic";
     if (mode & MODEINITJCT)   return "dcopInitJct";
+    if (mode & MODEINITFIX)   return "dcopInitFix";
     if (mode & MODEINITFLOAT) return "dcopInitFloat";
+    // MODEDCOP|MODETRANOP only (no init flag): pure DC-OP direct iteration.
     return "dcopDirect";
   }
   if (mode & MODEINITPRED)  return "tranPredictor";

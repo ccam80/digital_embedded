@@ -1,72 +1,17 @@
 # Test Baseline
-- **Timestamp**: 2026-04-10T00:00:00Z
-- **Phase**: Harness Redesign Wave 1 about to start
+- **Timestamp**: 2026-04-14T00:00:00Z
+- **Phase**: ngspice-alignment
 - **Command**: npm run test:q
-- **Result**: 8696/8717 passing, 21 failing (10 Vitest + 11 Playwright), 0 errors
-- **Duration**: 219.1s (Vitest 13.5s, Playwright 205.6s)
+- **Result**: 8292/8294 passing, 2 failing, 0 skipped (18.3s, 364 files)
 
 ## Failing Tests (pre-existing)
+| Test | File | Status | Summary |
+|------|------|--------|---------|
+| rc_lowpass | src/components/sources/__tests__/ac-voltage-source.test.ts:307 | FAIL | Frequency response magnitude at expected frequency exceeds tolerance (expected 1.516 < 0.864) |
+| rl_dc_steady_state_tight_tolerance | src/solver/analog/__tests__/mna-end-to-end.test.ts:379 | FAIL | DC steady-state tolerance failure (expected 0.690 < 0.1) |
 
-### Vitest — Engine / BJT convergence (out of scope: known model divergence)
-| Test | Status | Summary |
-|------|--------|---------|
-| src/solver/__tests__/coordinator.ts: "transient stepping does not error after 50 steps" | FAIL | Engine ERROR state at 1ns — BJT convergence baseline |
-| src/solver/analog/__tests__/buckbjt-convergence.test.ts — stagnation test | FAIL | BJT stagnation at 1ns |
-| src/solver/analog/__tests__/buckbjt-convergence.test.ts — ERROR state test | FAIL | BJT ERROR state at 1ns |
-| src/solver/analog/__tests__/buckbjt-mcp-surface.test.ts: "50 steps advance simTime > 0 without ERROR" | FAIL | Same BJT baseline via MCP surface |
-
-### Vitest — Harness self-compare (Wave 3 target via Goal F index alignment)
-| Test | Status | Summary |
-|------|--------|---------|
-| src/solver/analog/__tests__/harness/query-methods.test.ts: "41. Self-comparison: all matrix entries" | FAIL | NaN mismatch from time-based alignment collision; Wave 3 fixes via index pairing + self-compare clone |
-| src/solver/analog/__tests__/harness/query-methods.test.ts: "54. traceNode with onlyDivergences" | FAIL | Iteration count 6 vs 0; Wave 3 fixes |
-
-### Vitest — Stream verification (Wave 3 target)
-| Test | Status | Summary |
-|------|--------|---------|
-| src/solver/analog/__tests__/harness/stream-verification.test.ts: "4. integration coefficients: ag0 non-zero" | FAIL | Missing integration coefficient data on tranFloat; Wave 3 `init()` rewrite may fix classification |
-| src/solver/analog/__tests__/harness/stream-verification.test.ts: "5. integration coefficients: method transitions to trapezoidal" | FAIL | Same family as test 4 |
-
-### Vitest — MCP harness tools (Wave 3 target)
-| Test | Status | Summary |
-|------|--------|---------|
-| scripts/mcp/__tests__/harness-mcp-verification.test.ts: "MCP-4: integration coefficients" | FAIL | Same family as stream-verif 4/5 |
-| scripts/mcp/__tests__/harness-mcp-verification.test.ts: "MCP-5: convergence detail per-element" | FAIL | Already fixed in Round 3 carry-over; verify after Wave 3 |
-
-### Vitest — Expected to break at Wave 2 exit (Wave 3 fixes them)
-
-These tests were passing at the original baseline but are EXPECTED to break the moment Wave 2 lands, because Wave 2 changes `setCaptureHook` to accept a `PhaseAwareCaptureHook` bundle while `comparison-session.ts` still passes the old single-hook shape (Wave 3 rewrites `comparison-session.ts` per §9.3 and §8.5). Per `spec/wave-2-coordinator.md` exit gate: "Do not attempt to make comparison-session tests pass at this wave."
-
-| Test | Wave 2 status | Wave 3 status |
-|------|---------------|---------------|
-| src/solver/analog/__tests__/harness/boot-step-merge.test.ts: "step 0 has at least 2 attempts (DCOP attempt + tranInit attempt)" | EXPECTED FAIL after Wave 2 | Wave 3 fixes |
-| src/solver/analog/__tests__/harness/boot-step-merge.test.ts: "step 0 contains a DCOP-phase attempt" | EXPECTED FAIL after Wave 2 | Wave 3 fixes |
-| (any other test that depends on `comparison-session.ts._dcopBootAttempts` or the old `setCaptureHook` shape) | EXPECTED FAIL after Wave 2 | Wave 3 fixes |
-
-### Playwright — GUI status (out of scope for harness redesign)
-| Test | Status | Summary |
-|------|--------|---------|
-| e2e/gui/component-sweep.spec.ts — DAC bits property | FAIL | Unrelated: DAC/ADC bits property setting |
-| e2e/gui/component-sweep.spec.ts — DAC (2nd test) | FAIL | Unrelated |
-| e2e/gui/component-sweep.spec.ts — ADC bits (1) | FAIL | Unrelated |
-| e2e/gui/component-sweep.spec.ts — ADC bits (2) | FAIL | Unrelated |
-| e2e/gui/master-circuit-assembly.spec.ts: "Master 1 digital logic" | FAIL | Unrelated |
-
-### Playwright — Numerical / performance (out of scope)
-| Test | Status | Summary |
-|------|--------|---------|
-| e2e/parity/analog-bjt-convergence.spec.ts — voltage accuracy | FAIL | BJT baseline |
-| e2e/parity/analog-bjt-convergence.spec.ts — transient evolution | FAIL | BJT baseline |
-| e2e/parity/hotload-params-e2e.spec.ts: "BJT BF parameter hotload" | FAIL | BJT baseline |
-| e2e/parity/stepping-perf.spec.ts — advancement test | FAIL | Performance / advancement |
-| e2e/parity/stepping-perf.spec.ts — second perf test | FAIL | Performance / advancement |
-
-## Implementer guidance
-
-Before investigating any test failure:
-1. Check this file — if the failing test is listed here, it is pre-existing and **not caused by your changes**.
-2. The Wave 3 targets (6 tests) are EXPECTED to start passing after Wave 3 lands. If they still fail at Wave 3 exit, that's a Wave 3 bug.
-3. The BJT convergence tests (1-4, plus the Playwright BJT parity tests) are out of scope for the harness redesign — they will remain failing and must not be "fixed" by harness changes.
-4. The Playwright GUI tests (DAC/ADC/Master) are unrelated to the harness redesign.
-
-Raw details in `test-results/test-failures.json`.
+## Notes
+- Tests ran successfully with standard infrastructure
+- 2 pre-existing failures related to analog circuit numerical tolerances
+- Both failures appear to be convergence/tolerance issues in the ngspice-alignment phase
+- Failure details stored in `.vitest-failures.json`

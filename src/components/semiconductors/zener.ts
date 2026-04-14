@@ -28,7 +28,7 @@ import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { VT } from "../../core/constants.js";
-import { createDiodeElement, getDiodeInternalNodeCount } from "./diode.js";
+import { createDiodeElement, getDiodeInternalNodeCount, getDiodeInternalNodeLabels } from "./diode.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 
@@ -420,6 +420,7 @@ export const ZenerDiodeDefinition: ComponentDefinition = {
       paramDefs: ZENER_SPICE_L1_PARAM_DEFS,
       params: ZENER_SPICE_L1_DEFAULTS,
       getInternalNodeCount: getDiodeInternalNodeCount,
+      getInternalNodeLabels: getDiodeInternalNodeLabels,
     },
     "simplified": {
       kind: "inline",

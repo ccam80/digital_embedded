@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest";
 import { TimestepController } from "../timestep.js";
 import { HistoryStore } from "../integration.js";
 import type { AnalogElement, IntegrationMethod } from "../element.js";
-import type { SimulationParams } from "../../../core/analog-engine-interface.js";
+import type { SimulationParams, ResolvedSimulationParams } from "../../../core/analog-engine-interface.js";
 import type { SparseSolver } from "../sparse-solver.js";
 import type { LteParams } from "../ckt-terr.js";
 
@@ -21,9 +21,10 @@ import type { LteParams } from "../ckt-terr.js";
 // ---------------------------------------------------------------------------
 
 /** Default simulation params matching SimulationParams defaults. */
-const DEFAULT_PARAMS: SimulationParams = {
+const DEFAULT_PARAMS: ResolvedSimulationParams = {
   maxTimeStep: 5e-6,
   minTimeStep: 1e-14,
+  firstStep: 1e-9,
   reltol: 1e-3,
   abstol: 1e-6,
   iabstol: 1e-12,
@@ -219,12 +220,14 @@ describe("AutoSwitch", () => {
     expect(ctrl.currentMethod).toBe("bdf1");
   });
 
-  it("switches_to_trapezoidal_after_2_steps", () => {
+  it("stays_bdf1_until_tryOrderPromotion_succeeds", () => {
     const ctrl = new TimestepController(DEFAULT_PARAMS);
     const history = new HistoryStore(0);
     const elements: AnalogElement[] = [];
 
-    // Two accepted steps — still BDF-1 during these
+    // Accepted steps — BDF-1 persists because _updateMethodForStartup no
+    // longer auto-promotes; promotion requires tryOrderPromotion() to pass
+    // the 1.05× gate (ngspice dctran.c:881-891).
     ctrl.accept(1e-6);
     ctrl.checkMethodSwitch(elements, history);
     expect(ctrl.currentMethod).toBe("bdf1");
@@ -233,24 +236,27 @@ describe("AutoSwitch", () => {
     ctrl.checkMethodSwitch(elements, history);
     expect(ctrl.currentMethod).toBe("bdf1");
 
-    // Third accepted step — transitions to trapezoidal
+    // Third accepted step — still BDF-1 without tryOrderPromotion call
     ctrl.accept(3e-6);
     ctrl.checkMethodSwitch(elements, history);
-    expect(ctrl.currentMethod).toBe("trapezoidal");
+    expect(ctrl.currentMethod).toBe("bdf1");
   });
 
   it("detects_ringing_switches_to_bdf2", () => {
     const ctrl = new TimestepController(DEFAULT_PARAMS);
 
-    // Advance past startup BDF-1 phase (2 accepted steps)
+    // Advance past startup BDF-1 phase and manually set trapezoidal
+    // (in a real sim, tryOrderPromotion would have promoted by now).
     const emptyHistory = new HistoryStore(0);
     ctrl.accept(1e-6);
     ctrl.checkMethodSwitch([], emptyHistory);
     ctrl.accept(2e-6);
     ctrl.checkMethodSwitch([], emptyHistory);
-    expect(ctrl.currentMethod).toBe("bdf1");
     ctrl.accept(3e-6);
     ctrl.checkMethodSwitch([], emptyHistory);
+    // Force to trapezoidal to test ringing detection independently
+    ctrl.currentMethod = "trapezoidal";
+    ctrl.currentOrder = 2;
     expect(ctrl.currentMethod).toBe("trapezoidal");
 
     // Now feed alternating-sign voltages across 3 steps to trigger ringing.

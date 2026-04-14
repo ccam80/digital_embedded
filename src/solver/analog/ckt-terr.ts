@@ -158,7 +158,7 @@ export function cktTerr(
   // ------------------------------------------------------------------
 
   const volttol = params.abstol + params.reltol * Math.max(Math.abs(ccap0), Math.abs(ccap1));
-  const chargetol = params.reltol * Math.max(Math.abs(q0), Math.abs(q1), params.chgtol) / dt;
+  const chargetol = Math.max(params.reltol * Math.max(Math.abs(q0), Math.abs(q1)), params.chgtol) / dt;
   const tol = Math.max(volttol, chargetol);
 
   // ------------------------------------------------------------------

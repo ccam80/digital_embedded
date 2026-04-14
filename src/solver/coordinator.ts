@@ -207,9 +207,12 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       );
     }
 
+    // ngspice clears MODEINITTRAN after the first accepted transient step,
+    // regardless of integration order.  Our tranInit→tranFloat transition
+    // should match: advance after the first successful transient step, not
+    // wait for order promotion to trapezoidal.
     if (this._analog !== null && this._analysisPhase === "tranInit") {
-      const mnaEngine = this._analog as MNAEngine;
-      if (mnaEngine.integrationOrder >= 2) {
+      if (this._stepCount >= 1) {
         this._analysisPhase = "tranFloat";
       }
     }

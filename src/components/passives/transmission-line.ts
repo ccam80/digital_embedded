@@ -1025,6 +1025,15 @@ export const TransmissionLineDefinition: ComponentDefinition = {
         const N = seg != null ? seg : 10;
         return 2 * (N - 1);
       },
+      getInternalNodeLabels: (props: PropertyBag): readonly string[] => {
+        // Internal node allocation: rlMid[0..N-2] then junction[0..N-2]
+        const seg = props.getModelParam<number>('segments');
+        const N = seg != null ? seg : 10;
+        const labels: string[] = [];
+        for (let k = 0; k < N - 1; k++) labels.push(`rlMid${k}`);
+        for (let k = 0; k < N - 1; k++) labels.push(`junc${k}`);
+        return labels;
+      },
     },
   },
   defaultModel: "behavioral",

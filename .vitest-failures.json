@@ -1,21 +1,27 @@
 {
   "summary": {
-    "passed": 63,
-    "failed": 1,
+    "passed": 3,
+    "failed": 2,
     "skipped": 0,
-    "totalFiles": 5,
-    "durationSeconds": 0.8
+    "totalFiles": 1,
+    "durationSeconds": 2.5
   },
   "failures": [
     {
-      "message": "expected 0.000001 to be 1e-12 // Object.is equality",
-      "count": 1,
+      "message": "Analog engine stagnation: simTime stuck at 0.00020000299999999998s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
+      "count": 2,
       "locations": [
         {
-          "file": "src\\core\\__tests__\\analog-engine-interface.test.ts",
-          "test": "simulation_params_has_all_fields",
-          "line": 59,
-          "column": 46
+          "file": "src\\solver\\coordinator.ts",
+          "test": "survives 2000 transient steps without ERROR state",
+          "line": 203,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\coordinator.ts",
+          "test": "survives 600µs of sim time (matches UI run duration)",
+          "line": 203,
+          "column": 13
         }
       ]
     }

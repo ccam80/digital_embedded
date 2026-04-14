@@ -47,7 +47,22 @@ export interface ParamDef {
 // ---------------------------------------------------------------------------
 
 export type ModelEntry =
-  | { kind: "inline"; factory: AnalogFactory; paramDefs: ParamDef[]; params: Record<string, number>; branchCount?: number | ((props: PropertyBag) => number); getInternalNodeCount?: (props: PropertyBag) => number }
+  | {
+      kind: "inline";
+      factory: AnalogFactory;
+      paramDefs: ParamDef[];
+      params: Record<string, number>;
+      branchCount?: number | ((props: PropertyBag) => number);
+      getInternalNodeCount?: (props: PropertyBag) => number;
+      /**
+       * Labels for internal nodes allocated by this model, in the SAME ORDER
+       * as `getInternalNodeCount` consumes them. Must be length-equal to
+       * `getInternalNodeCount`. Used for diagnostics (e.g. harness node
+       * labeling like `Q1:B'`). Returned labels are short tags (no element
+       * prefix).
+       */
+      getInternalNodeLabels?: (props: PropertyBag) => readonly string[];
+    }
   | { kind: "netlist"; netlist: MnaSubcircuitNetlist; paramDefs: ParamDef[]; params: Record<string, number> };
 
 // ---------------------------------------------------------------------------

@@ -403,6 +403,11 @@ export class MNAEngine implements AnalogEngine {
       // stampCompanion/updateOperatingPoint can derive ag0 = 1/dt locally,
       // matching NIcomCof (nicomcof.c:33-51) and CKTag[0] in ngspice.
       if (statePool) statePool.dt = dt;
+      if (statePool) {
+        if (this._firsttime) {
+          statePool.initMode = "initTran";
+        }
+      }
       for (const el of elements) {
         if (el.isReactive && el.stampCompanion) {
           el.stampCompanion(dt, this._timestep.currentMethod, this._voltages, this._timestep.currentOrder, this._timestep.deltaOld);
@@ -427,6 +432,7 @@ export class MNAEngine implements AnalogEngine {
         postIterationHook: this.postIterationHook ?? undefined,
         detailedConvergence: this.detailedConvergence,
         limitingCollector: this.limitingCollector,
+        statePool: statePool ?? null,
         preIterationHook: (_iteration, iterVoltages) => {
           const currentMethod = this._timestep.currentMethod;
           for (const el of elements) {

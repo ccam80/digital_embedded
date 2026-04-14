@@ -29,10 +29,12 @@ export type { Diagnostic, DiagnosticCode };
  * `configure()` to override individual fields.
  */
 export interface SimulationParams {
-  /** Maximum allowed timestep in seconds. Default: 5e-6 */
-  maxTimeStep: number;
-  /** Minimum allowed timestep in seconds. Default: 1e-14 */
-  minTimeStep: number;
+  /** Maximum allowed timestep in seconds. Default: 10e-6 */
+  maxTimeStep?: number;
+  /** Minimum allowed timestep in seconds. Default: 1e-15 */
+  minTimeStep?: number;
+  /** Initial timestep for the first transient step, in seconds. Default: 1e-9 */
+  firstStep?: number;
   /** Relative convergence tolerance. Default: 1e-3 */
   reltol: number;
   /** Absolute voltage tolerance in volts (ngspice VNTOL). Default: 1e-6 */
@@ -75,14 +77,25 @@ export interface SimulationParams {
    * ngspice dctran.c:118. When absent, falls back to `maxTimeStep / 10`.
    */
   tStop?: number;
+  /** Shunt conductance applied to all nodes (S). ngspice: CKTgshunt. Default 0. */
+  gshunt?: number;
+  /** Number of gmin stepping levels. 1 = dynamic (default), >1 = spice3. ngspice: CKTnumGminSteps */
+  numGminSteps?: number;
+  /** Number of source stepping levels. 0 or 1 = gillespie (default), >1 = spice3_src. ngspice: CKTnumSrcSteps */
+  numSrcSteps?: number;
 }
+
+/** SimulationParams with all optional timestep fields resolved to concrete values. */
+export type ResolvedSimulationParams = SimulationParams &
+  Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>;
 
 /**
  * Default values for all SimulationParams fields, matching circuits-engine-spec.md section 2.
  */
-export const DEFAULT_SIMULATION_PARAMS: SimulationParams = {
+export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   maxTimeStep: 10e-6,
-  minTimeStep: 10e-6 * 1e-11,  // 1e-11 * maxTimeStep (ngspice traninit.c:34)
+  minTimeStep: 1e-15,
+  firstStep: 1e-9,
   reltol: 1e-3,
   abstol: 1e-6,
   iabstol: 1e-12,
@@ -95,6 +108,17 @@ export const DEFAULT_SIMULATION_PARAMS: SimulationParams = {
   gmin: 1e-12,
   nodeDamping: false,
 };
+
+/** Resolve optional timestep fields to defaults. */
+export function resolveSimulationParams(params: SimulationParams): ResolvedSimulationParams {
+  return {
+    ...DEFAULT_SIMULATION_PARAMS,
+    ...params,
+    maxTimeStep: params.maxTimeStep ?? DEFAULT_SIMULATION_PARAMS.maxTimeStep,
+    minTimeStep: params.minTimeStep ?? DEFAULT_SIMULATION_PARAMS.minTimeStep,
+    firstStep: params.firstStep ?? DEFAULT_SIMULATION_PARAMS.firstStep,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // DcOpResult — result of a DC operating-point analysis

@@ -98,4 +98,21 @@ export class SessionState {
     if (sourceDir) this.circuitSourceDirs.set(handle, sourceDir);
     return handle;
   }
+
+  /**
+   * Dispose all engines, clear all maps, reset handle counter.
+   * Returns the number of engines that were disposed.
+   */
+  reset(): number {
+    let disposed = 0;
+    for (const engine of this.engines.values()) {
+      engine.dispose();
+      disposed++;
+    }
+    this.engines.clear();
+    this.circuits.clear();
+    this.circuitSourceDirs.clear();
+    this.handleCounter = 0;
+    return disposed;
+  }
 }

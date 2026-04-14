@@ -54,7 +54,7 @@ describeIfDts("boot-step-merge: runTransient() step 0 contains DCOP + tranInit",
   it("step 0 contains a DCOP-phase attempt", async () => {
     const session = await runSession();
     const step0 = session.ourSession!.steps[0];
-    const dcopPhases: NRPhase[] = ["dcopDirect", "dcopGminDynamic", "dcopGminSpice3", "dcopSrcSweep"];
+    const dcopPhases: NRPhase[] = ["dcopInitJct", "dcopInitFix", "dcopInitFloat", "dcopDirect", "dcopGminDynamic", "dcopGminSpice3", "dcopSrcSweep"];
     const hasDcop = step0.attempts.some((a) => dcopPhases.includes(a.phase));
     expect(hasDcop).toBe(true);
   }, 30_000);

@@ -10,7 +10,7 @@
  */
 
 import type { AnalogElement, IntegrationMethod } from "./element.js";
-import type { SimulationParams } from "../../core/analog-engine-interface.js";
+import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import type { HistoryStore } from "./integration.js";
 import type { LteParams } from "./ckt-terr.js";
 
@@ -49,7 +49,7 @@ export class TimestepController {
   /** Current integration method. */
   currentMethod: IntegrationMethod;
 
-  private _params: SimulationParams;
+  private _params: ResolvedSimulationParams;
 
   /** Sorted ascending list of registered breakpoint entries. */
   private _breakpoints: BreakpointEntry[];
@@ -87,7 +87,7 @@ export class TimestepController {
    * [0] = current trial dt (set by setDeltaOldCurrent), [1] = h_{n-1} (previous accepted dt), [2] = h_{n-2}, [3] = h_{n-3}.
    * Pre-allocated once; shifted in rotateDeltaOld(). ngspice: CKTdeltaOld[].
    */
-  private _deltaOld: number[] = [0, 0, 0, 0];
+  private _deltaOld: number[] = [0, 0, 0, 0, 0, 0, 0];
 
   /**
    * Integration order derived from currentMethod.
@@ -100,9 +100,10 @@ export class TimestepController {
    * retry loop (ngspice dctran.c:704-706).
    */
   rotateDeltaOld(): void {
-    this._deltaOld[3] = this._deltaOld[2];
-    this._deltaOld[2] = this._deltaOld[1];
-    this._deltaOld[1] = this._deltaOld[0];
+    // ngspice dctran.c:715-717: shift all 7 slots
+    for (let i = 5; i >= 0; i--) {
+      this._deltaOld[i + 1] = this._deltaOld[i];
+    }
     this._deltaOld[0] = this.currentDt;
   }
 
@@ -126,20 +127,13 @@ export class TimestepController {
    */
   private _lteResult = { newDt: 0, worstRatio: 0 };
 
-  constructor(params: SimulationParams) {
+  constructor(params: ResolvedSimulationParams) {
     this._params = params;
-    // Initial delta: ngspice dctran.c:118 + dctran.c:575-580.
-    //   base = MIN(tStop/100, maxTimeStep) / 10
-    //   firsttime: base /= 10  (dctran.c:580)
-    // With tStop (batch): base / 10. Without tStop: maxTimeStep / 100 / 10.
-    const step = params.maxTimeStep;
-    const fin100 = params.tStop != null ? params.tStop / 100 : step;
-    const divisor = params.tStop != null ? 10 : 100;
-    let initDt = Math.min(fin100, step) / divisor;
-    // ngspice dctran.c:575-580 — firsttime delta cut (additional /10).
-    initDt /= 10;
-    initDt = Math.max(initDt, 2 * params.minTimeStep);
-    this.currentDt = initDt;
+    // Use the explicit firstStep parameter. Clamp to [minTimeStep, maxTimeStep].
+    this.currentDt = Math.max(
+      params.minTimeStep,
+      Math.min(params.maxTimeStep, params.firstStep),
+    );
     this.currentMethod = "bdf1";
     this._breakpoints = [];
     this._lastAcceptedSimTime = -Infinity;
@@ -157,11 +151,10 @@ export class TimestepController {
       chgtol: params.chargeTol,
     };
 
-    // ngspice dctran.c:310-311: CKTdeltaOld[i] = CKTmaxStep for all slots.
-    this._deltaOld[0] = params.maxTimeStep;
-    this._deltaOld[1] = params.maxTimeStep;
-    this._deltaOld[2] = params.maxTimeStep;
-    this._deltaOld[3] = params.maxTimeStep;
+    // ngspice dctran.c:316-317: CKTdeltaOld[i] = CKTmaxStep for all 7 slots
+    for (let i = 0; i < 7; i++) {
+      this._deltaOld[i] = params.maxTimeStep;
+    }
   }
 
   /**
@@ -405,8 +398,9 @@ export class TimestepController {
    * @param history  - HistoryStore providing v(n) and v(n-1) per element
    */
   checkMethodSwitch(elements: readonly AnalogElement[], history: HistoryStore): void {
-    // Startup BDF-1 phase: no ringing detection — method set by _updateMethodForStartup.
-    if (this._acceptedSteps <= 2) return;
+    // Startup BDF-1 phase: no ringing detection until promotion has had a
+    // chance to run (step 2+).  Method transitions handled by tryOrderPromotion.
+    if (this._acceptedSteps <= 1) return;
 
     // Collect reactive element indices.
     const reactiveIndices: number[] = [];
@@ -481,27 +475,56 @@ export class TimestepController {
    */
   tryOrderPromotion(
     elements: readonly AnalogElement[],
-    history: HistoryStore,
-    simTime: number,
+    _history: HistoryStore,
+    _simTime: number,
     executedDt: number,
   ): void {
-    // Only promote from order 1 (BDF-1), and only after startup (steps > 2).
-    if (this.currentMethod !== "bdf1" || this._acceptedSteps <= 2) return;
+    // Only promote from order 1 (BDF-1), and only after the first accepted
+    // step (ngspice clears firsttime after step 0, then skips LTE via goto
+    // nextTime on that step — promotion trial first runs from step 2 onward,
+    // matching dctran.c:864-866).
+    if (this.currentMethod !== "bdf1" || this._acceptedSteps <= 1) return;
 
     // ngspice dctran.c:864-866: re-seed and re-truncate at order 2.
+    // Compute the raw LTE-proposed dt at order 2 WITHOUT maxTimeStep clamping.
+    // ngspice's CKTtrunc (ckttrunc.c:50) only applies the 2× growth cap;
+    // the maxStep clamp is applied later by the calling code.  Using
+    // computeNewDt() here would clamp to maxTimeStep, causing the trial to
+    // always fail when dt is already at maxTimeStep (trialDt = maxTimeStep
+    // <= 1.05 * currentDt).
+    let rawTrialDt = Infinity;
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i];
+      if (!el.isReactive) continue;
+      if (typeof el.getLteTimestep === "function") {
+        const proposed = el.getLteTimestep(
+          executedDt, this._deltaOld, 2, "trapezoidal", this._lteParams,
+        );
+        if (proposed < rawTrialDt) rawTrialDt = proposed;
+      }
+    }
+    // Apply only the 2× growth cap (ngspice ckttrunc.c:50).
+    if (rawTrialDt > 2 * executedDt) rawTrialDt = 2 * executedDt;
+
+    if (rawTrialDt <= 1.05 * executedDt) {
+      // Promotion does not help — keep order 1.
+      // Still update currentDt to the (clamped) trial result, matching
+      // ngspice dctran.c:876 which always writes newdelta.
+      this.currentDt = Math.max(
+        this._params.minTimeStep,
+        Math.min(this._params.maxTimeStep, rawTrialDt),
+      );
+      return;
+    }
+
+    // Promotion succeeds — switch to trapezoidal order 2.
     this.currentMethod = "trapezoidal";
     this.currentOrder = 2;
-    const { newDt: trialDt } = this.computeNewDt(elements, history, simTime, executedDt);
-
-    if (trialDt <= 1.05 * this.currentDt) {
-      // Revert order — promotion does not help.
-      this.currentMethod = "bdf1";
-      this.currentOrder = 1;
-    }
-    // ngspice dctran.c:876: ALWAYS update delta to the (possibly order-2) newdelta.
-    // When reverted, trialDt is the order-2 result; when not reverted, it's also
-    // the order-2 result. Either way, update.
-    this.currentDt = trialDt;
+    // Clamp for actual stepping.
+    this.currentDt = Math.max(
+      this._params.minTimeStep,
+      Math.min(this._params.maxTimeStep, rawTrialDt),
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -596,21 +619,27 @@ export class TimestepController {
   // -------------------------------------------------------------------------
 
   /**
-   * Apply the startup state machine for the first 2 accepted steps.
+   * Apply the startup state machine for the first accepted step.
    *
-   * Steps 1-2: BDF-1 (suppress startup transients).
-   * Step 3+:   trapezoidal (unless ringing detection upgrades to BDF-2).
+   * Step 1: BDF-1 (suppress startup transients; ngspice dctran.c firsttime
+   *   flag skips LTE/promotion entirely on the very first accepted point).
+   * Step 2+: remain BDF-1 — promotion to trapezoidal is handled exclusively
+   *   by tryOrderPromotion() via the 1.05× trial gate, matching ngspice
+   *   dctran.c:881-891 which runs the trial on every accepted step where
+   *   CKTorder==1.  The previous unconditional step-3 promotion bypassed
+   *   this trial, causing our LTE to be ~2.45× more permissive than ngspice
+   *   (order-2 trap factor 1/12 vs order-1 BE factor 0.5).
    */
   private _updateMethodForStartup(): void {
-    if (this._acceptedSteps <= 2) {
+    // Keep BDF-1 during the startup phase.  Do NOT auto-promote to
+    // trapezoidal — let tryOrderPromotion() handle the transition via the
+    // ngspice-compatible 1.05× gate on every post-startup accepted step.
+    if (this._acceptedSteps <= 1) {
       this.currentMethod = "bdf1";
-    } else if (this.currentMethod === "bdf1") {
-      // First transition out of startup.
-      this.currentMethod = "trapezoidal";
+      this.currentOrder = 1;
     }
-    // Subsequent method changes are handled by checkMethodSwitch.
-
-    // Keep currentOrder in sync with currentMethod.
-    this.currentOrder = this.currentMethod === "bdf1" ? 1 : 2;
+    // After step 1, currentMethod stays at whatever tryOrderPromotion()
+    // or checkMethodSwitch() set it to.  currentOrder is kept in sync by
+    // those methods directly.
   }
 }

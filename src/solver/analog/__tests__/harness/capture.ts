@@ -103,6 +103,21 @@ export function captureTopology(
         perNode.set(nodeId, [tag]);
       }
     }
+
+    // Internal (prime) nodes — label from the model's getInternalNodeLabels.
+    const pinCount = el.pinNodeIds.length;
+    const internalLabels = el.internalNodeLabels ?? [];
+    for (let p = 0; p < internalLabels.length; p++) {
+      const nodeId = el.allNodeIds[pinCount + p];
+      if (nodeId === 0) continue;
+      const tag = `${elLabel}:${internalLabels[p]}`;
+      const existing = perNode.get(nodeId);
+      if (existing) {
+        if (existing.length < 3) existing.push(tag);
+      } else {
+        perNode.set(nodeId, [tag]);
+      }
+    }
   }
   for (const [nodeId, tags] of perNode) {
     nodeLabels.set(nodeId, tags.join("/"));

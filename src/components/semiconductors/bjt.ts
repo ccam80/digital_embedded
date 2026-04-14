@@ -523,9 +523,13 @@ function computeBjtOp(
   oik: number,
   oikr: number,
   vt: number,
+  NE: number,
+  NC: number,
 ): BjtOperatingPoint {
   const nfVt = NF * vt;
   const nrVt = NR * vt;
+  const neVt = NE * vt;
+  const ncVt = NC * vt;
 
   // Forward and reverse junction currents and conductances (ngspice bjtload.c:398-420)
   // Polynomial approximation for reverse-bias (vbe < -3*nfVt)
@@ -563,17 +567,16 @@ function computeBjtOp(
   const iTransport = (If - Ir) / qb;
 
   // BJ4: Non-ideal BC current computation moved before ic for -cbcn subtraction
-  const ibcNonIdealForIc = (c4 > 0 ? c4 * (Math.exp(Math.min(vbc / nrVt, 700)) - 1) : 0) + GMIN * vbc;
+  const ibcNonIdealForIc = (c4 > 0 ? c4 * (Math.exp(Math.min(vbc / ncVt, 700)) - 1) : 0) + GMIN * vbc;
 
   // Terminal collector current: transport - reverse base - cbcn (ngspice cc)
   const ic = iTransport - Ir / betaR - ibcNonIdealForIc;
 
-  // Non-ideal base current contributions (c2, c4 with emission coefficients)
-  // For simplicity we use NF and NR for c2/c4 emission (Level 1 approximation)
+  // Non-ideal base current contributions (c2, c4 with leakage emission coefficients NE/NC)
   const ibIdeal = If / betaF + Ir / betaR;
   const ibNonIdeal =
-    (c2 > 0 ? c2 * (Math.exp(Math.min(vbe / nfVt, 700)) - 1) : 0) +
-    (c4 > 0 ? c4 * (Math.exp(Math.min(vbc / nrVt, 700)) - 1) : 0);
+    (c2 > 0 ? c2 * (Math.exp(Math.min(vbe / neVt, 700)) - 1) : 0) +
+    (c4 > 0 ? c4 * (Math.exp(Math.min(vbc / ncVt, 700)) - 1) : 0);
   // GMIN current contributions to base (ngspice cben/cbcn)
   const ib = ibIdeal + ibNonIdeal + GMIN * vbe + GMIN * vbc;
 
@@ -593,8 +596,8 @@ function computeBjtOp(
   const gm = dIfdVbe / qb - iTransport * dqbdVbe / qb - go;
 
   // Input/feedback conductances with GMIN on non-ideal terms (ngspice gben/gbcn)
-  const gpi = dIfdVbe / betaF + (c2 > 0 ? c2 * Math.exp(Math.min(vbe / nfVt, 700)) / nfVt : 0) + GMIN;
-  const gmu = dIrdVbc / betaR + (c4 > 0 ? c4 * Math.exp(Math.min(vbc / nrVt, 700)) / nrVt : 0) + GMIN;
+  const gpi = dIfdVbe / betaF + (c2 > 0 ? c2 * Math.exp(Math.min(vbe / neVt, 700)) / neVt : 0) + GMIN;
+  const gmu = dIrdVbc / betaR + (c4 > 0 ? c4 * Math.exp(Math.min(vbc / ncVt, 700)) / ncVt : 0) + GMIN;
 
   return { vbe, vbc, ic, ib, gm, go, gpi, gmu, cbe: 0, gbe, dqbdvc: dqbdVbc, dqbdve: dqbdVbe, qb, gbc, If, Ir };
 }
@@ -725,7 +728,7 @@ export function createBjtElement(
         tp.tBEleakCur * params.AREA, tp.tBCleakCur * params.AREA,
         tp.tinvEarlyVoltF, tp.tinvEarlyVoltR,
         tp.tinvRollOffF / params.AREA, tp.tinvRollOffR / params.AREA,
-        tp.vt,
+        tp.vt, params.NE, params.NC,
       );
       s0[base + SLOT_GPI] = op0.gpi;
       s0[base + SLOT_GMU] = op0.gmu;
@@ -854,7 +857,7 @@ export function createBjtElement(
         tp.tBEleakCur * params.AREA, tp.tBCleakCur * params.AREA,
         tp.tinvEarlyVoltF, tp.tinvEarlyVoltR,
         tp.tinvRollOffF / params.AREA, tp.tinvRollOffR / params.AREA,
-        tp.vt,
+        tp.vt, params.NE, params.NC,
       );
 
       s0[base + SLOT_GPI] = op.gpi;
@@ -1103,7 +1106,9 @@ export const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element",
   { name: "RB_EFF",         doc: "Effective base resistance at operating point",     init: { kind: "fromParams", compute: (_p) => _p["RB"] } },
   { name: "IE_NORTON",      doc: "Norton emitter current for MNA stamp",             init: { kind: "zero" } },
   // BJ6: geqcb feedback conductance slot
-  { name: "GEQCB",          doc: "Base charge feedback conductance geqcb",           init: { kind: "zero" } },
+  { name: "GEQCB",          doc: "Base charge feedback conductance geqcb (transient-scaled)",           init: { kind: "zero" } },
+  // BJ14: DC-form geqcb before ag0 scaling — bjtload.c:591-611
+  { name: "GEQCB_DC",       doc: "DC-form geqcb (before ag0 multiply) — bjtload.c:591-611",            init: { kind: "zero" } },
   // Junction capacitance companion model state
   { name: "CAP_GEQ_BE",     doc: "B-E junction-cap companion conductance",           init: { kind: "zero" } },
   { name: "CAP_IEQ_BE",     doc: "B-E junction-cap companion history current",       init: { kind: "zero" } },
@@ -1149,6 +1154,9 @@ export const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element",
   { name: "CCAP_BE",        doc: "B-E companion current (NIintegrate)",              init: { kind: "zero" } },
   { name: "CCAP_BC",        doc: "B-C companion current (NIintegrate)",              init: { kind: "zero" } },
   { name: "CCAP_CS",        doc: "C-S companion current (NIintegrate)",              init: { kind: "zero" } },
+  // DC-only current slots (pre-cap augmentation) for getPinCurrents
+  { name: "IC_DC",          doc: "Raw DC collector current (pre-cap augmentation)",  init: { kind: "zero" } },
+  { name: "IB_DC",          doc: "Raw DC base current (pre-cap augmentation)",       init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -1256,51 +1264,54 @@ export function createSpiceL1BjtElement(
   const L1_SLOT_IB_NORTON = 9;
   const L1_SLOT_RB_EFF    = 10;
   const L1_SLOT_IE_NORTON = 11;
-  const L1_SLOT_GEQCB     = 12;  // BJ6: new slot
-  // Junction capacitance companion model state (shifted by 1)
-  const L1_SLOT_CAP_GEQ_BE     = 13;
-  const L1_SLOT_CAP_IEQ_BE     = 14;
-  const L1_SLOT_CAP_GEQ_BC_INT = 15;
-  const L1_SLOT_CAP_IEQ_BC_INT = 16;
-  const L1_SLOT_CAP_GEQ_BC_EXT = 17;
-  const L1_SLOT_CAP_IEQ_BC_EXT = 18;
-  const L1_SLOT_CAP_GEQ_CS     = 19;
-  const L1_SLOT_CAP_IEQ_CS     = 20;
+  const L1_SLOT_GEQCB     = 12;  // BJ6: transient-scaled geqcb
+  const L1_SLOT_GEQCB_DC  = 13;  // BJ14: DC-form geqcb before ag0 (bjtload.c:591-611)
+  // Junction capacitance companion model state (shifted by 1 for BJ14)
+  const L1_SLOT_CAP_GEQ_BE     = 14;
+  const L1_SLOT_CAP_IEQ_BE     = 15;
+  const L1_SLOT_CAP_GEQ_BC_INT = 16;
+  const L1_SLOT_CAP_IEQ_BC_INT = 17;
+  const L1_SLOT_CAP_GEQ_BC_EXT = 18;
+  const L1_SLOT_CAP_IEQ_BC_EXT = 19;
+  const L1_SLOT_CAP_GEQ_CS     = 20;
+  const L1_SLOT_CAP_IEQ_CS     = 21;
   // Current-step voltage slots (history read from s1/s2/s3 at same offsets)
-  const L1_SLOT_V_BE            = 21;
-  const L1_SLOT_V_BC            = 22;
-  const L1_SLOT_V_CS            = 23;
+  const L1_SLOT_V_BE            = 22;
+  const L1_SLOT_V_BC            = 23;
+  const L1_SLOT_V_CS            = 24;
   // Current-step charge slots (history read from s1/s2/s3 at same offsets)
-  const L1_SLOT_Q_BE            = 24;
-  const L1_SLOT_Q_BC            = 25;
-  const L1_SLOT_Q_CS            = 26;
+  const L1_SLOT_Q_BE            = 25;
+  const L1_SLOT_Q_BC            = 26;
+  const L1_SLOT_Q_CS            = 27;
   // Total capacitance per junction
-  const L1_SLOT_CTOT_BE         = 27;
-  const L1_SLOT_CTOT_BC         = 28;
-  const L1_SLOT_CTOT_CS         = 29;
+  const L1_SLOT_CTOT_BE         = 28;
+  const L1_SLOT_CTOT_BC         = 29;
+  const L1_SLOT_CTOT_CS         = 30;
   // BJ7: Excess phase state slots (kept inline — not pool-rotation history)
-  const L1_SLOT_CEXBC_NOW   = 30;
-  const L1_SLOT_CEXBC_PREV  = 31;
-  const L1_SLOT_CEXBC_PREV2 = 32;
-  const L1_SLOT_DT_PREV     = 33;
+  const L1_SLOT_CEXBC_NOW   = 31;
+  const L1_SLOT_CEXBC_PREV  = 32;
+  const L1_SLOT_CEXBC_PREV2 = 33;
+  const L1_SLOT_DT_PREV     = 34;
   // BJ8: Operating point storage slots
-  const L1_SLOT_OP_CBE    = 34;
-  const L1_SLOT_OP_GBE    = 35;
-  const L1_SLOT_OP_DQBDVC = 36;
-  const L1_SLOT_OP_DQBDVE = 37;
-  const L1_SLOT_OP_QB     = 38;
+  const L1_SLOT_OP_CBE    = 35;
+  const L1_SLOT_OP_GBE    = 36;
+  const L1_SLOT_OP_DQBDVC = 37;
+  const L1_SLOT_OP_DQBDVE = 38;
+  const L1_SLOT_OP_QB     = 39;
   // BJ11: Substrate diode DC current slots
-  const L1_SLOT_VSUB  = 39;
-  const L1_SLOT_GDSUB = 40;
-  const L1_SLOT_CDSUB = 41;
+  const L1_SLOT_VSUB  = 40;
+  const L1_SLOT_GDSUB = 41;
+  const L1_SLOT_CDSUB = 42;
   // BJ13: Raw junction current and conductance slots
-  const L1_SLOT_OP_IF  = 42;   // Forward junction current before qb division
-  const L1_SLOT_OP_IR  = 43;   // Reverse junction current before qb division
-  const L1_SLOT_OP_GBC = 44;   // Raw BC junction conductance
+  const L1_SLOT_OP_IF  = 43;   // Forward junction current before qb division
+  const L1_SLOT_OP_IR  = 44;   // Reverse junction current before qb division
+  const L1_SLOT_OP_GBC = 45;   // Raw BC junction conductance
 
-  const L1_SLOT_CCAP_BE = 45;  // B-E NIintegrate ccap history
-  const L1_SLOT_CCAP_BC = 46;  // B-C NIintegrate ccap history
-  const L1_SLOT_CCAP_CS = 47;  // C-S NIintegrate ccap history
+  const L1_SLOT_CCAP_BE = 46;  // B-E NIintegrate ccap history
+  const L1_SLOT_CCAP_BC = 47;  // B-C NIintegrate ccap history
+  const L1_SLOT_CCAP_CS = 48;  // C-S NIintegrate ccap history
+  const L1_SLOT_IC_DC   = 49;  // Raw DC collector current (pre-cap augmentation)
+  const L1_SLOT_IB_DC   = 50;  // Raw DC base current (pre-cap augmentation)
 
   // Pool binding — set by initState
   let s0: Float64Array;
@@ -1474,6 +1485,31 @@ export function createSpiceL1BjtElement(
         stampG(solver, substConNode, substConNode, m * gdsub);
         stampRHS(solver, substConNode, m * polarity * subs * (cdsub - gdsub * vsub));
       }
+
+      // BC external cap (1-XCJC portion) — stamps on external B/C nodes.
+      // Cannot be absorbed into augmented DC stamps because it uses different node pairs.
+      if (hasCapacitance) {
+        const geqBCext = s0[base + L1_SLOT_CAP_GEQ_BC_EXT];
+        const ieqBCext = s0[base + L1_SLOT_CAP_IEQ_BC_EXT];
+        if (geqBCext !== 0 || ieqBCext !== 0) {
+          stampG(solver, nodeB_ext, nodeB_ext, m * geqBCext);
+          stampG(solver, nodeB_ext, nodeC_ext, m * -geqBCext);
+          stampG(solver, nodeC_ext, nodeB_ext, m * -geqBCext);
+          stampG(solver, nodeC_ext, nodeC_ext, m * geqBCext);
+          stampRHS(solver, nodeB_ext, m * -polarity * ieqBCext);
+          stampRHS(solver, nodeC_ext, m * polarity * ieqBCext);
+        }
+
+        // CS cap — stamps on substConNode (C_int for NPN, B_int for PNP)
+        const geqCS = s0[base + L1_SLOT_CAP_GEQ_CS];
+        const ieqCS = s0[base + L1_SLOT_CAP_IEQ_CS];
+        if (geqCS !== 0 || ieqCS !== 0) {
+          const subs_cs = polarity > 0 ? 1 : -1;
+          const substConNode_cs = subs_cs > 0 ? nodeC_int : nodeB_int;
+          stampG(solver, substConNode_cs, substConNode_cs, m * geqCS);
+          stampRHS(solver, substConNode_cs, m * polarity * subs_cs * ieqCS);
+        }
+      }
     },
 
     updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
@@ -1569,12 +1605,50 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_GO]  = op.go;
       s0[base + L1_SLOT_IC]  = op.ic;
       s0[base + L1_SLOT_IB]  = op.ib;
+      s0[base + L1_SLOT_IC_DC] = op.ic;
+      s0[base + L1_SLOT_IB_DC] = op.ib;
 
-      // BJ6: geqcb feedback in Norton RHS
-      const geqcb_prev = s0[base + L1_SLOT_GEQCB];
+      // BJ14: Compute geqcb_dc — DC-form (bjtload.c:591-611), using LIMITED voltages.
+      // Formula: geqcb = tf*(arg3 - cbe_mod*dqbdvc)/qb
+      // This is the base-charge feedback conductance BEFORE ag0 scaling.
+      let geqcb_dc = 0;
+      const tf_dc = tpL1.ttransitTimeF;
+      if (tf_dc > 0 && op.qb > 1e-30 && vbeLimited > 0) {
+        const ovtf_dc = params.VTF === Infinity ? 0 : 1 / (1.44 * params.VTF);
+        let argtf_dc = 0;
+        if (params.XTF > 0) {
+          argtf_dc = params.XTF;
+          if (ovtf_dc !== 0) {
+            argtf_dc = argtf_dc * Math.exp(Math.min(vbcLimited * ovtf_dc, 700));
+          }
+          const xjtf_dc = params.ITF * params.AREA;
+          if (xjtf_dc > 0) {
+            const temp_dc = op.If / (op.If + xjtf_dc);
+            argtf_dc = argtf_dc * temp_dc * temp_dc;
+          }
+        }
+        const arg3_dc = op.If * argtf_dc * ovtf_dc;           // bjtload.c:604
+        const cbe_mod_dc = op.If * (1 + argtf_dc) / op.qb;   // bjtload.c:606
+        geqcb_dc = tf_dc * (arg3_dc - cbe_mod_dc * op.dqbdvc) / op.qb; // bjtload.c:608
+      }
+      s0[base + L1_SLOT_GEQCB_DC] = geqcb_dc;
+
+      // BJ14: Write GEQCB based on analysis mode (bjtload.c:727):
+      //   - DC-OP (ngspice MODETRANOP|MODEDCOP): ag0 = 0, GEQCB = 0 (cap invisible)
+      //   - Transient (ngspice MODETRAN|MODEINITTRAN): GEQCB = ag0 * geqcb_dc
+      //     where ag0 = 1/dt from NIcomCof (nicomcof.c:33-51) = CKTag[0].
+      // Source ag0 from pool.dt on every call — NO cross-phase cached value,
+      // matching ngspice's single-pass bjtload semantics.
+      const isDcOpContext = (pool.analysisMode ?? "dcOp") === "dcOp";
+      const dtForAg0 = pool.dt ?? 0;
+      const ag0 = (!isDcOpContext && dtForAg0 > 0) ? 1 / dtForAg0 : 0;
+      const geqcb_now = ag0 * geqcb_dc;
+      s0[base + L1_SLOT_GEQCB] = geqcb_now;
+
+      // BJ6/BJ14: Norton RHS uses geqcb_now (bjtload.c:803-805), LIMITED voltages.
       s0[base + L1_SLOT_IC_NORTON] = op.ic - (op.gm + op.go) * vbeLimited + (op.gmu + op.go) * vbcLimited;
-      s0[base + L1_SLOT_IB_NORTON] = op.ib - op.gpi * vbeLimited - op.gmu * vbcLimited - geqcb_prev * vbcLimited;
-      s0[base + L1_SLOT_IE_NORTON] = -(op.ic + op.ib) + (op.gm + op.go + op.gpi) * vbeLimited - (op.go - geqcb_prev) * vbcLimited;
+      s0[base + L1_SLOT_IB_NORTON] = op.ib - op.gpi * vbeLimited - op.gmu * vbcLimited - geqcb_now * vbcLimited;
+      s0[base + L1_SLOT_IE_NORTON] = -(op.ic + op.ib) + (op.gm + op.go + op.gpi) * vbeLimited - (op.go - geqcb_now) * vbcLimited;
 
       // BJ9: Update current-dependent base resistance with corrected constants and qb division
       const qb_op = op.qb;
@@ -1621,6 +1695,46 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_VSUB] = vsub;
       s0[base + L1_SLOT_GDSUB] = gdsub;
       s0[base + L1_SLOT_CDSUB] = cdsub;
+
+      // --- ngspice bjtload.c:725-734 lumping ---
+      // Augment DC conductances/currents with cap companion geq/ieq so that
+      // stampNonlinear reads cap-augmented values (matching ngspice's single-pass
+      // bjtload semantics where GPI, GMU, IC, IB contain cap contributions).
+      // This runs at the end of updateOperatingPoint so the augmented values are
+      // available whenever stampNonlinear reads the slots, regardless of NR
+      // iteration ordering (iteration 0 initial assembly or iteration > 0).
+      if (hasCapacitance) {
+        const geqBE = s0[base + L1_SLOT_CAP_GEQ_BE];
+        const ieqBE = s0[base + L1_SLOT_CAP_IEQ_BE];
+        const geqBCint = s0[base + L1_SLOT_CAP_GEQ_BC_INT];
+        const ieqBCint = s0[base + L1_SLOT_CAP_IEQ_BC_INT];
+
+        const vbeNow_aug = s0[base + L1_SLOT_VBE];
+        const vbcNow_aug = s0[base + L1_SLOT_VBC];
+        const cqbe = geqBE * vbeNow_aug + ieqBE;     // BE cap current
+        const cqbc = geqBCint * vbcNow_aug + ieqBCint; // BC cap current (internal portion)
+
+        // bjtload.c:728-734
+        s0[base + L1_SLOT_GPI] += geqBE;
+        s0[base + L1_SLOT_GMU] += geqBCint;
+        s0[base + L1_SLOT_IC] -= cqbc;            // cc -= cqbc
+        s0[base + L1_SLOT_IB] += cqbe + cqbc;     // cb += cqbe + cqbc
+
+        // Recompute Norton currents from augmented values
+        // (matches bjtload.c:803-808 which uses augmented cc/cb/gpi/gmu)
+        const gpi_aug = s0[base + L1_SLOT_GPI];
+        const gmu_aug = s0[base + L1_SLOT_GMU];
+        const gm_val = s0[base + L1_SLOT_GM];
+        const go_val = s0[base + L1_SLOT_GO];
+        const geqcb_val = s0[base + L1_SLOT_GEQCB];
+        const ic_aug = s0[base + L1_SLOT_IC];
+        const ib_aug = s0[base + L1_SLOT_IB];
+
+        s0[base + L1_SLOT_IC_NORTON] = ic_aug - (gm_val + go_val) * vbeNow_aug + (go_val + gmu_aug) * vbcNow_aug;
+        s0[base + L1_SLOT_IB_NORTON] = ib_aug - gpi_aug * vbeNow_aug - gmu_aug * vbcNow_aug - geqcb_val * vbcNow_aug;
+        s0[base + L1_SLOT_IE_NORTON] = -(ic_aug + ib_aug) + (gm_val + go_val + gpi_aug) * vbeNow_aug - (go_val - geqcb_val) * vbcNow_aug;
+      }
+
       return icheckLimited;
     },
 
@@ -1637,31 +1751,15 @@ export function createSpiceL1BjtElement(
       // ngspice icheck: if any junction was limited by pnjlim, declare non-converged
       if (icheckLimited) return false;
 
-      // ngspice BJTconvTest: predict currents from linearisation, check tolerance
-      let cc  = s0[base + L1_SLOT_IC];
-      let cb  = s0[base + L1_SLOT_IB];
+      // ngspice BJTconvTest: predict currents from linearisation, check tolerance.
+      // GPI, GMU, IC, IB now contain cap-augmented values (lumped at the end of
+      // updateOperatingPoint), matching ngspice's bjtload.c single-pass semantics.
+      const cc  = s0[base + L1_SLOT_IC];
+      const cb  = s0[base + L1_SLOT_IB];
       const gm  = s0[base + L1_SLOT_GM];
       const go  = s0[base + L1_SLOT_GO];
-      let gpi = s0[base + L1_SLOT_GPI];
-      let gmu = s0[base + L1_SLOT_GMU];
-
-      // Add cap companion contributions inline for convergence test only
-      // (ngspice bjtload.c:704-710). NOT stored — stampNonlinear must see raw DC values.
-      if (hasCapacitance) {
-        const vbe = vbeRaw;
-        const vbc = vbcRaw;
-
-        const geqBE = s0[base + L1_SLOT_CAP_GEQ_BE];
-        const cqbe = geqBE * vbe + s0[base + L1_SLOT_CAP_IEQ_BE];
-        gpi += geqBE;
-        cb  += cqbe;
-
-        const geqBCint = s0[base + L1_SLOT_CAP_GEQ_BC_INT];
-        const cqbc = geqBCint * vbc + s0[base + L1_SLOT_CAP_IEQ_BC_INT];
-        gmu += geqBCint;
-        cb  += cqbc;
-        cc  -= cqbc;
-      }
+      const gpi = s0[base + L1_SLOT_GPI];
+      const gmu = s0[base + L1_SLOT_GMU];
 
       const cchat = cc + (gm + go) * delvbe - (go + gmu) * delvbc;
       const cbhat = cb + gpi * delvbe + gmu * delvbc;
@@ -1673,8 +1771,8 @@ export function createSpiceL1BjtElement(
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {
-      const ic = polarity * s0[base + L1_SLOT_IC];
-      const ib = polarity * s0[base + L1_SLOT_IB];
+      const ic = polarity * s0[base + L1_SLOT_IC_DC];
+      const ib = polarity * s0[base + L1_SLOT_IB_DC];
       const ie = -(ic + ib);
       return [ib, ic, ie];
     },
@@ -1708,30 +1806,35 @@ export function createSpiceL1BjtElement(
     element.stampCompanion = function (
       dt: number,
       method: IntegrationMethod,
-      voltages: Float64Array,
+      _voltages: Float64Array,
       order: number,
       deltaOld: readonly number[],
     ): void {
-      const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
-      const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
-      const vEi = nodeE_int > 0 ? voltages[nodeE_int - 1] : 0;
-
-      const vbeNow = polarity * (vBi - vEi);
-      const vbcNow = polarity * (vBi - vCi);
-      // Substrate-junction voltage: polarity * subs * (V_substNode - V_substConNode).
-      // V_substNode=0 (substrate tied to ground). substConNode: VERTICAL→nodeC_int, LATERAL→nodeB_int.
-      // Matches ngspice bjtload.c:317-319 and bjtsetup.c:454-460.
-      const subs_cap = polarity > 0 ? 1 : -1;
-      const substConNode_cap = subs_cap > 0 ? nodeC_int : nodeB_int;
-      const vSubCon_cap = substConNode_cap > 0 ? voltages[substConNode_cap - 1] : 0;
-      const vcsNow = polarity * subs_cap * (0 - vSubCon_cap);
+      // Compute junction voltages freshly from current node voltages (ngspice
+      // bjtload.c:276-330). Apply pnjlim against the previously-stored limited
+      // value (used as `vold`) and write the limited result back to the slot.
+      // This makes stampCompanion self-contained — it never reads a cross-phase
+      // cached value, eliminating the staleness hazard at the DC-OP→transient
+      // boundary.
+      const vCi_sc = nodeC_int > 0 ? _voltages[nodeC_int - 1] : 0;
+      const vBi_sc = nodeB_int > 0 ? _voltages[nodeB_int - 1] : 0;
+      const vEi_sc = nodeE_int > 0 ? _voltages[nodeE_int - 1] : 0;
+      const vbeRaw_sc = polarity * (vBi_sc - vEi_sc);
+      const vbcRaw_sc = polarity * (vBi_sc - vCi_sc);
+      const subs_sc = polarity > 0 ? 1 : -1;
+      const substConNode_sc = subs_sc > 0 ? nodeC_int : nodeB_int;
+      const vSubCon_sc = substConNode_sc > 0 ? _voltages[substConNode_sc - 1] : 0;
+      const vsubRaw_sc = polarity * subs_sc * (0 - vSubCon_sc);
+      const vbeNow = pnjlim(vbeRaw_sc, s0[base + L1_SLOT_VBE], tpL1.vt, tpL1.tVcrit).value;
+      const vbcNow = pnjlim(vbcRaw_sc, s0[base + L1_SLOT_VBC], tpL1.vt, tpL1.tVcrit).value;
+      const vcsNow = pnjlim(vsubRaw_sc, s0[base + L1_SLOT_VSUB], tpL1.vt, tpL1.tSubVcrit).value;
+      s0[base + L1_SLOT_VBE] = vbeNow;
+      s0[base + L1_SLOT_VBC] = vbcNow;
+      s0[base + L1_SLOT_VSUB] = vcsNow;
 
       // Read history voltages from s1 (last accepted step via StatePool rotation).
       // First call detected by tranStep === 0 (pool not yet advanced).
       const isFirstCall = pool.tranStep === 0;
-      const prevVbe = isFirstCall ? vbeNow : s1[base + L1_SLOT_V_BE];
-      const prevVbc = isFirstCall ? vbcNow : s1[base + L1_SLOT_V_BC];
-      const prevVcs = isFirstCall ? vcsNow : s1[base + L1_SLOT_V_CS];
       s0[base + L1_SLOT_V_BE] = vbeNow;
       s0[base + L1_SLOT_V_BC] = vbcNow;
       s0[base + L1_SLOT_V_CS] = vcsNow;
@@ -1786,6 +1889,8 @@ export function createSpiceL1BjtElement(
       {
         const Q_depl_BE = computeJunctionCharge(vbeNow, tpL1.tBEcap * params.AREA, tpL1.tBEpot, mje_eff, params.FC, 0, 0);
         s0[base + L1_SLOT_Q_BE] = Q_depl_BE + tf_eff_base * cbe_for_q;
+        // ngspice bjtload.c:716-724: MODEINITTRAN — copy q0→q1 before NIintegrate
+        if (isFirstCall) s1[base + L1_SLOT_Q_BE] = s0[base + L1_SLOT_Q_BE];
       }
 
       let beAg0 = 1 / dt;
@@ -1800,6 +1905,8 @@ export function createSpiceL1BjtElement(
         s0[base + L1_SLOT_CAP_GEQ_BE] = resBE.geq;
         s0[base + L1_SLOT_CAP_IEQ_BE] = resBE.ceq;
         s0[base + L1_SLOT_CCAP_BE] = resBE.ccap;
+        // ngspice bjtload.c:735-740: MODEINITTRAN — copy ccap0→ccap1 after NIintegrate
+        if (isFirstCall) s1[base + L1_SLOT_CCAP_BE] = s0[base + L1_SLOT_CCAP_BE];
         beAg0 = resBE.ag0;
       } else {
         s0[base + L1_SLOT_CAP_GEQ_BE] = 0;
@@ -1816,8 +1923,6 @@ export function createSpiceL1BjtElement(
       const CtotalBC = CjBC + CdBC;
 
       const xcjc = Math.min(Math.max(params.XCJC, 0), 1);
-      const CtotalBC_int = xcjc * CtotalBC;
-      const CtotalBC_ext = (1 - xcjc) * CtotalBC;
 
       // Store total BC capacitance for LTE tolerance reference
       s0[base + L1_SLOT_CTOT_BC] = CtotalBC;
@@ -1828,6 +1933,8 @@ export function createSpiceL1BjtElement(
         const Q_depl_BC = computeJunctionCharge(vbcNow, tpL1.tBCcap * params.AREA, tpL1.tBCpot, mjc_eff, params.FC, 0, 0);
         const Ir_for_q = s0[base + L1_SLOT_OP_IR];
         s0[base + L1_SLOT_Q_BC] = Q_depl_BC + tr_eff * Ir_for_q;
+        // ngspice bjtload.c:716-724: MODEINITTRAN — copy q0→q1 before NIintegrate
+        if (isFirstCall) s1[base + L1_SLOT_Q_BC] = s0[base + L1_SLOT_Q_BC];
       }
 
       if (CtotalBC > 0) {
@@ -1839,6 +1946,8 @@ export function createSpiceL1BjtElement(
         const h2_bc = deltaOld.length > 2 ? deltaOld[2] : h1_bc;
         const resBC = integrateCapacitor(CtotalBC, vbcNow, q0_bc, q1_bc, q2_bc, dt, h1_bc, h2_bc, order, method, ccapPrevBC);
         s0[base + L1_SLOT_CCAP_BC] = resBC.ccap;
+        // ngspice bjtload.c:735-740: MODEINITTRAN — copy ccap0→ccap1 after NIintegrate
+        if (isFirstCall) s1[base + L1_SLOT_CCAP_BC] = s0[base + L1_SLOT_CCAP_BC];
         // Split by XCJC
         s0[base + L1_SLOT_CAP_GEQ_BC_INT] = xcjc * resBC.geq;
         s0[base + L1_SLOT_CAP_IEQ_BC_INT] = xcjc * resBC.ceq;
@@ -1876,6 +1985,8 @@ export function createSpiceL1BjtElement(
             Q_CS = vcsNow * czsub * (1 + xms * vcsNow / (2 * ps));
           }
           s0[base + L1_SLOT_Q_CS] = Q_CS;
+          // ngspice bjtload.c:716-724: MODEINITTRAN — copy q0→q1 before NIintegrate
+          if (isFirstCall) s1[base + L1_SLOT_Q_CS] = s0[base + L1_SLOT_Q_CS];
         }
 
         if (CjCS > 0) {
@@ -1889,6 +2000,8 @@ export function createSpiceL1BjtElement(
           s0[base + L1_SLOT_CAP_GEQ_CS] = resCS.geq;
           s0[base + L1_SLOT_CAP_IEQ_CS] = resCS.ceq;
           s0[base + L1_SLOT_CCAP_CS] = resCS.ccap;
+          // ngspice bjtload.c:735-740: MODEINITTRAN — copy ccap0→ccap1 after NIintegrate
+          if (isFirstCall) s1[base + L1_SLOT_CCAP_CS] = s0[base + L1_SLOT_CCAP_CS];
         } else {
           s0[base + L1_SLOT_CAP_GEQ_CS] = 0;
           s0[base + L1_SLOT_CAP_IEQ_CS] = 0;
@@ -1896,36 +2009,38 @@ export function createSpiceL1BjtElement(
         }
       }
 
-      // Transit-time charge modulation feedback (ngspice bjtload.c:567-586, 703)
-      const opQb = s0[base + L1_SLOT_OP_QB];
-      const opDqbdvc = s0[base + L1_SLOT_OP_DQBDVC];
-      const opIf = s0[base + L1_SLOT_OP_IF];
-      let geqcb = 0;
-      if (tf_eff_base > 0 && opQb > 1e-30 && vbeNow > 0) {
-        const ag0 = beAg0;
-
-        let argtf = 0;
-        const ovtf = params.VTF === Infinity ? 0 : 1 / (1.44 * params.VTF);
+      // BJ14: Recompute geqcb_dc (bjtload.c:591-611) from OP slots (fresh from
+      // the most recent updateOperatingPoint call), then write GEQCB = ag0 * geqcb_dc
+      // (bjtload.c:727). ag0 (beAg0) is sourced from this step's dt via
+      // integrateCapacitor or falls back to 1/dt — no cross-call cached value.
+      const sc_opIf = s0[base + L1_SLOT_OP_IF];
+      const sc_opQb = s0[base + L1_SLOT_OP_QB];
+      const sc_dqbdvc = s0[base + L1_SLOT_OP_DQBDVC];
+      let geqcb_dc_fresh = 0;
+      if (tf_eff_base > 0 && sc_opQb > 1e-30 && vbeNow > 0) {
+        const ovtf_dc = params.VTF === Infinity ? 0 : 1 / (1.44 * params.VTF);
+        let argtf_dc = 0;
         if (params.XTF > 0) {
-          argtf = params.XTF;
-          if (ovtf !== 0) {
-            argtf = argtf * Math.exp(Math.min(vbcNow * ovtf, 700));
+          argtf_dc = params.XTF;
+          if (ovtf_dc !== 0) {
+            argtf_dc = argtf_dc * Math.exp(Math.min(vbcNow * ovtf_dc, 700));
           }
-          const xjtf = params.ITF * params.AREA;
-          if (xjtf > 0) {
-            const temp = opIf / (opIf + xjtf);
-            argtf = argtf * temp * temp;
+          const xjtf_dc = params.ITF * params.AREA;
+          if (xjtf_dc > 0) {
+            const temp_dc = sc_opIf / (sc_opIf + xjtf_dc);
+            argtf_dc = argtf_dc * temp_dc * temp_dc;
           }
         }
-        const arg3 = opIf * argtf * ovtf;
-        const cbe_mod = opIf * (1 + argtf) / opQb;
-        geqcb = ag0 * tf_eff_base * (arg3 - cbe_mod * opDqbdvc) / opQb;
+        const arg3_dc = sc_opIf * argtf_dc * ovtf_dc;
+        const cbe_mod_dc = sc_opIf * (1 + argtf_dc) / sc_opQb;
+        geqcb_dc_fresh = tf_eff_base * (arg3_dc - cbe_mod_dc * sc_dqbdvc) / sc_opQb;
       }
-      s0[base + L1_SLOT_GEQCB] = geqcb;
+      s0[base + L1_SLOT_GEQCB_DC] = geqcb_dc_fresh;
+      s0[base + L1_SLOT_GEQCB] = beAg0 * geqcb_dc_fresh;
 
       if (tpL1.excessPhaseFactor > 0) {
         const td = tpL1.excessPhaseFactor;
-        let cc = s0[base + L1_SLOT_IC];
+        let cc = s0[base + L1_SLOT_IC_DC];
         // Read previous dt from s1 (after state rotation, s1 holds previous step's s0)
         const prevDt = s1[base + L1_SLOT_DT_PREV];
 
@@ -1958,6 +2073,33 @@ export function createSpiceL1BjtElement(
           const cex = cbe_mod_run * arg3;
           // cexbc(n) = cc + cex/qb (bjtload.c:518)
           s0[base + L1_SLOT_CEXBC_NOW] = cc + (opQb > 1e-30 ? cex / opQb : 0);
+
+          // bjtload.c:540-541,559-560: filter gbe conductance and recompute gm/go
+          // gex = gbe * arg3 (raw BE conductance scaled by filter factor)
+          // cexRaw = If * arg3 (raw transport current scaled, pre-qb, as ngspice uses)
+          // go = (gbc + (cexRaw - cbc)*dqbdvc/qb) / qb
+          // gm = (gex - (cexRaw - cbc)*dqbdve/qb) / qb - go
+          const gbe_raw_run = s0[base + L1_SLOT_OP_GBE];
+          const gex = gbe_raw_run * arg3;
+          const cexRaw = opIf * arg3;
+          const cbcRaw = s0[base + L1_SLOT_OP_IR];
+          const gbcRaw = s0[base + L1_SLOT_OP_GBC];
+          const dqbdvc_run = s0[base + L1_SLOT_OP_DQBDVC];
+          const dqbdve_run = s0[base + L1_SLOT_OP_DQBDVE];
+          const qbSafe = Math.max(opQb, 1e-30);
+          const go_filt = (gbcRaw + (cexRaw - cbcRaw) * dqbdvc_run / qbSafe) / qbSafe;
+          const gm_filt = (gex - (cexRaw - cbcRaw) * dqbdve_run / qbSafe) / qbSafe - go_filt;
+          s0[base + L1_SLOT_GM] = gm_filt;
+          s0[base + L1_SLOT_GO] = go_filt;
+          // Recompute Norton RHS with filtered gm/go (bjtload.c:803-808)
+          const ic_sc = s0[base + L1_SLOT_IC];
+          const ib_sc = s0[base + L1_SLOT_IB];
+          const gpi_sc = s0[base + L1_SLOT_GPI];
+          const gmu_sc = s0[base + L1_SLOT_GMU];
+          const geqcb_sc = s0[base + L1_SLOT_GEQCB];
+          s0[base + L1_SLOT_IC_NORTON] = ic_sc - (gm_filt + go_filt) * vbeNow + (go_filt + gmu_sc) * vbcNow;
+          s0[base + L1_SLOT_IB_NORTON] = ib_sc - gpi_sc * vbeNow - gmu_sc * vbcNow - geqcb_sc * vbcNow;
+          s0[base + L1_SLOT_IE_NORTON] = -(ic_sc + ib_sc) + (gm_filt + go_filt + gpi_sc) * vbeNow - (go_filt - geqcb_sc) * vbcNow;
         } else {
           // MODEINITTRAN: initialize history (bjtload.c:508-510)
           const opIf = s0[base + L1_SLOT_OP_IF];
@@ -2032,72 +2174,27 @@ export function createSpiceL1BjtElement(
       return minDt;
     };
 
-    element.stampReactiveCompanion = function (solver: SparseSolver): void {
-      const m = params.M;
 
-      // B-E junction capacitance companion
-      const geqBE = s0[base + L1_SLOT_CAP_GEQ_BE];
-      const ieqBE = s0[base + L1_SLOT_CAP_IEQ_BE];
-      if (geqBE !== 0 || ieqBE !== 0) {
-        stampG(solver, nodeB_int, nodeB_int, m * geqBE);
-        stampG(solver, nodeB_int, nodeE_int, m * -geqBE);
-        stampG(solver, nodeE_int, nodeB_int, m * -geqBE);
-        stampG(solver, nodeE_int, nodeE_int, m * geqBE);
-        stampRHS(solver, nodeB_int, m * -polarity * ieqBE);
-        stampRHS(solver, nodeE_int, m * polarity * ieqBE);
-      }
 
-      // B-C internal junction capacitance companion
-      const geqBCint = s0[base + L1_SLOT_CAP_GEQ_BC_INT];
-      const ieqBCint = s0[base + L1_SLOT_CAP_IEQ_BC_INT];
-      if (geqBCint !== 0 || ieqBCint !== 0) {
-        stampG(solver, nodeB_int, nodeB_int, m * geqBCint);
-        stampG(solver, nodeB_int, nodeC_int, m * -geqBCint);
-        stampG(solver, nodeC_int, nodeB_int, m * -geqBCint);
-        stampG(solver, nodeC_int, nodeC_int, m * geqBCint);
-        stampRHS(solver, nodeB_int, m * -polarity * ieqBCint);
-        stampRHS(solver, nodeC_int, m * polarity * ieqBCint);
-      }
-
-      // B-C external junction capacitance companion
-      const geqBCext = s0[base + L1_SLOT_CAP_GEQ_BC_EXT];
-      const ieqBCext = s0[base + L1_SLOT_CAP_IEQ_BC_EXT];
-      if (geqBCext !== 0 || ieqBCext !== 0) {
-        stampG(solver, nodeB_ext, nodeB_ext, m * geqBCext);
-        stampG(solver, nodeB_ext, nodeC_ext, m * -geqBCext);
-        stampG(solver, nodeC_ext, nodeB_ext, m * -geqBCext);
-        stampG(solver, nodeC_ext, nodeC_ext, m * geqBCext);
-        stampRHS(solver, nodeB_ext, m * -polarity * ieqBCext);
-        stampRHS(solver, nodeC_ext, m * polarity * ieqBCext);
-      }
-
-      // C-S junction capacitance companion
-      const geqCS = s0[base + L1_SLOT_CAP_GEQ_CS];
-      const ieqCS = s0[base + L1_SLOT_CAP_IEQ_CS];
-      if (geqCS !== 0 || ieqCS !== 0) {
-        // Substrate is ground (node 0); stamp on substConNode row/col.
-        // VERTICAL(NPN): substConNode=nodeC_int; LATERAL(PNP): substConNode=nodeB_int.
-        // Matches ngspice bjtsetup.c:454-460, bjtload.c:823,839.
-        const subs_csstamp = polarity > 0 ? 1 : -1;
-        const substConNode_cs = subs_csstamp > 0 ? nodeC_int : nodeB_int;
-        stampG(solver, substConNode_cs, substConNode_cs, m * geqCS);
-        stampRHS(solver, substConNode_cs, m * -polarity * subs_csstamp * ieqCS);
-      }
-    };
-
-    element.updateChargeFlux = function(voltages: Float64Array, dt: number, method: string, order: number, deltaOld: readonly number[]): void {
-      const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;
-      const vCi = nodeC_int > 0 ? voltages[nodeC_int - 1] : 0;
-      const vEi = nodeE_int > 0 ? voltages[nodeE_int - 1] : 0;
-
-      const vbeNow = polarity * (vBi - vEi);
-      const vbcNow = polarity * (vBi - vCi);
-      // Substrate-junction voltage: polarity * subs * (V_substNode - V_substConNode).
-      // V_substNode=0 (substrate tied to ground). substConNode: VERTICAL→nodeC_int, LATERAL→nodeB_int.
-      const subs_cfl = polarity > 0 ? 1 : -1;
-      const substConNode_cfl = subs_cfl > 0 ? nodeC_int : nodeB_int;
-      const vSubCon_cfl = substConNode_cfl > 0 ? voltages[substConNode_cfl - 1] : 0;
-      const vcsNow = polarity * subs_cfl * (0 - vSubCon_cfl);
+    element.updateChargeFlux = function(_voltages: Float64Array, dt: number, method: string, order: number, deltaOld: readonly number[]): void {
+      // Compute limited junction voltages freshly from current node voltages
+      // (ngspice bjtload.c:276-330 + 308-341). Single-pass semantics — do not
+      // read a cross-phase cached slot.
+      const vCi_uc = nodeC_int > 0 ? _voltages[nodeC_int - 1] : 0;
+      const vBi_uc = nodeB_int > 0 ? _voltages[nodeB_int - 1] : 0;
+      const vEi_uc = nodeE_int > 0 ? _voltages[nodeE_int - 1] : 0;
+      const vbeRaw_uc = polarity * (vBi_uc - vEi_uc);
+      const vbcRaw_uc = polarity * (vBi_uc - vCi_uc);
+      const subs_uc = polarity > 0 ? 1 : -1;
+      const substConNode_uc = subs_uc > 0 ? nodeC_int : nodeB_int;
+      const vSubCon_uc = substConNode_uc > 0 ? _voltages[substConNode_uc - 1] : 0;
+      const vsubRaw_uc = polarity * subs_uc * (0 - vSubCon_uc);
+      const vbeNow = pnjlim(vbeRaw_uc, s0[base + L1_SLOT_VBE], tpL1.vt, tpL1.tVcrit).value;
+      const vbcNow = pnjlim(vbcRaw_uc, s0[base + L1_SLOT_VBC], tpL1.vt, tpL1.tVcrit).value;
+      const vcsNow = pnjlim(vsubRaw_uc, s0[base + L1_SLOT_VSUB], tpL1.vt, tpL1.tSubVcrit).value;
+      s0[base + L1_SLOT_VBE] = vbeNow;
+      s0[base + L1_SLOT_VBC] = vbcNow;
+      s0[base + L1_SLOT_VSUB] = vcsNow;
 
       // B-E junction charge: depletion integral + diffusion charge
       // Depletion: analytical integral matching ngspice bjtload.c:591-601
@@ -2228,6 +2325,24 @@ function getSpiceL1InternalNodeCount(props: PropertyBag): number {
   if (props.getModelParam<number>("RC") > 0) count++;
   if (props.getModelParam<number>("RE") > 0) count++;
   return count;
+}
+
+// ---------------------------------------------------------------------------
+// getSpiceL1InternalNodeLabels — mirror of getSpiceL1InternalNodeCount
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns internal node labels for a SPICE L1 BJT instance. Order MUST
+ * match getSpiceL1InternalNodeCount and createSpiceL1BjtElement's
+ * internalNodeIds consumption (see bjt.ts:1243-1245): B' (RB>0), then
+ * C' (RC>0), then E' (RE>0).
+ */
+function getSpiceL1InternalNodeLabels(props: PropertyBag): readonly string[] {
+  const labels: string[] = [];
+  if (props.getModelParam<number>("RB") > 0) labels.push("B'");
+  if (props.getModelParam<number>("RC") > 0) labels.push("C'");
+  if (props.getModelParam<number>("RE") > 0) labels.push("E'");
+  return labels;
 }
 
 // ---------------------------------------------------------------------------
@@ -2493,6 +2608,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: BJT_SPICE_L1_NPN_DEFAULTS,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
+      getInternalNodeLabels: getSpiceL1InternalNodeLabels,
     },
     "2N3904": {
       kind: "inline",
@@ -2501,6 +2617,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: NPN_2N3904,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
+      getInternalNodeLabels: getSpiceL1InternalNodeLabels,
     },
     "BC547B": {
       kind: "inline",
@@ -2509,6 +2626,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: NPN_BC547B,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
+      getInternalNodeLabels: getSpiceL1InternalNodeLabels,
     },
     "2N2222A": {
       kind: "inline",
@@ -2517,6 +2635,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: NPN_2N2222A,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
+      getInternalNodeLabels: getSpiceL1InternalNodeLabels,
     },
     "2N2219A": {
       kind: "inline",
@@ -2525,6 +2644,7 @@ export const NpnBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: NPN_2N2219A,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
+      getInternalNodeLabels: getSpiceL1InternalNodeLabels,
     },
   },
   defaultModel: "spice",
@@ -2558,6 +2678,7 @@ export const PnpBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: BJT_SPICE_L1_PNP_DEFAULTS,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
+      getInternalNodeLabels: getSpiceL1InternalNodeLabels,
     },
     "2N3906": {
       kind: "inline",
@@ -2566,6 +2687,7 @@ export const PnpBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: PNP_2N3906,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
+      getInternalNodeLabels: getSpiceL1InternalNodeLabels,
     },
     "BC557B": {
       kind: "inline",
@@ -2574,6 +2696,7 @@ export const PnpBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: PNP_BC557B,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
+      getInternalNodeLabels: getSpiceL1InternalNodeLabels,
     },
     "2N2907A": {
       kind: "inline",
@@ -2582,6 +2705,7 @@ export const PnpBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: PNP_2N2907A,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
+      getInternalNodeLabels: getSpiceL1InternalNodeLabels,
     },
     "TIP32C": {
       kind: "inline",
@@ -2590,6 +2714,7 @@ export const PnpBjtDefinition: ComponentDefinition = {
       paramDefs: BJT_SPICE_L1_PARAM_DEFS,
       params: PNP_TIP32C,
       getInternalNodeCount: getSpiceL1InternalNodeCount,
+      getInternalNodeLabels: getSpiceL1InternalNodeLabels,
     },
   },
   defaultModel: "spice",

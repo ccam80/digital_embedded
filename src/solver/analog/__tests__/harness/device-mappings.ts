@@ -133,6 +133,15 @@ export const DIODE_MAPPING: DeviceMapping = {
 //   21: V_BE, 22: V_BC, 23: V_CS,
 //   24: Q_BE, 25: Q_BC, 26: Q_CS,
 //   27: CTOT_BE, 28: CTOT_BC, 29: CTOT_CS, ...
+//   49: IC_DC, 50: IB_DC
+//
+// NOTE: GPI, GMU, IC, IB (slots 2,3,6,7) are cap-augmented during transient
+// analysis — stampCompanion lumps cap companion geq/ieq into these slots,
+// matching ngspice bjtload.c:725-734 single-pass semantics. IC_DC/IB_DC
+// hold the raw DC values before augmentation (for getPinCurrents).
+// The slot-to-offset mappings below compare our cap-augmented values directly
+// to ngspice's CKTstate0 offsets, which are also cap-augmented.
+//
 // ngspice bjt state offsets (bjtdefs.h):
 //   BJTvbe=0, BJTvbc=1, BJTcc=2, BJTcb=3, BJTgpi=4, BJTgmu=5,
 //   BJTgm=6, BJTgo=7, BJTqbe=8, BJTcqbe=9, BJTqbc=10, BJTcqbc=11,
@@ -181,6 +190,10 @@ export const BJT_MAPPING: DeviceMapping = {
     CEXBC_PREV: null,
     CEXBC_PREV2: null,
     DT_PREV: null,
+    // DC-only current slots (pre-cap augmentation) — no ngspice equivalent
+    // (ngspice only stores the augmented values at BJTcc/BJTcb)
+    IC_DC: null,
+    IB_DC: null,
   },
   ngspiceToSlot: {
     0: "VBE",

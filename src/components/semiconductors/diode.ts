@@ -464,16 +464,30 @@ export function createDiodeElement(
     (element as unknown as { stampCompanion: AnalogElementCore["stampCompanion"] }).stampCompanion = function (
       dt: number,
       method: IntegrationMethod,
-      voltages: Float64Array,
+      _voltages: Float64Array,
       order: number,
       deltaOld: readonly number[],
     ): void {
-      const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vNow = va - vc;
-
-      // Recompute derived values from mutable params
+      // Compute vd freshly from current node voltages and apply pnjlim
+      // (dioload.c:180-191) — single-pass semantics, never read a cross-phase
+      // cached slot.
+      const va_sc = nodeJunction > 0 ? _voltages[nodeJunction - 1] : 0;
+      const vc_sc = nodeCathode > 0 ? _voltages[nodeCathode - 1] : 0;
+      const vdRaw_sc = va_sc - vc_sc;
       const nVt = params.N * VT;
+      const vcrit_sc = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
+      const vtebrk_sc = params.NBV * VT;
+      const vdOld_sc = s0[base + SLOT_VD];
+      let vNow: number;
+      if (params.BV < Infinity && vdRaw_sc < Math.min(0, -params.BV + 10 * vtebrk_sc)) {
+        const vdtemp_sc = -(vdRaw_sc + params.BV);
+        const vdtempOld_sc = -(vdOld_sc + params.BV);
+        const reflRes_sc = pnjlim(vdtemp_sc, vdtempOld_sc, vtebrk_sc, vcrit_sc);
+        vNow = -(reflRes_sc.value + params.BV);
+      } else {
+        vNow = pnjlim(vdRaw_sc, vdOld_sc, nVt, vcrit_sc).value;
+      }
+      s0[base + SLOT_VD] = vNow;
 
       // Depletion + transit-time capacitance at current operating point
       const Cj = computeJunctionCapacitance(vNow, params.CJO, params.VJ, params.M, params.FC);
@@ -527,11 +541,26 @@ export function createDiodeElement(
       return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, ccap0, ccap1, lteParams);
     };
 
-    (element as unknown as { updateChargeFlux: (v: Float64Array, dt: number, method: string, order: number, deltaOld: readonly number[]) => void }).updateChargeFlux = function(voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
-      const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vd = va - vc;
+    (element as unknown as { updateChargeFlux: (v: Float64Array, dt: number, method: string, order: number, deltaOld: readonly number[]) => void }).updateChargeFlux = function(_voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
+      // Compute vd freshly from current node voltages + pnjlim (dioload.c:180-191,
+      // 308-341). Single-pass semantics — never read a cross-phase cached slot.
+      const va_uc = nodeJunction > 0 ? _voltages[nodeJunction - 1] : 0;
+      const vc_uc = nodeCathode > 0 ? _voltages[nodeCathode - 1] : 0;
+      const vdRaw_uc = va_uc - vc_uc;
       const nVt = params.N * VT;
+      const vcrit_uc = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
+      const vtebrkLim_uc = params.NBV * VT;
+      const vdOld_uc = s0[base + SLOT_VD];
+      let vd: number;
+      if (params.BV < Infinity && vdRaw_uc < Math.min(0, -params.BV + 10 * vtebrkLim_uc)) {
+        const vdtemp_uc = -(vdRaw_uc + params.BV);
+        const vdtempOld_uc = -(vdOld_uc + params.BV);
+        const reflRes_uc = pnjlim(vdtemp_uc, vdtempOld_uc, vtebrkLim_uc, vcrit_uc);
+        vd = -(reflRes_uc.value + params.BV);
+      } else {
+        vd = pnjlim(vdRaw_uc, vdOld_uc, nVt, vcrit_uc).value;
+      }
+      s0[base + SLOT_VD] = vd;
       const vtebrk = params.NBV * VT;
       const { id: idRaw } = computeDiodeIV(vd, params.IS, nVt, params.BV, vtebrk);
       s0[base + SLOT_Q] = computeJunctionCharge(vd, params.CJO, params.VJ, params.M, params.FC, params.TT, idRaw);
@@ -548,6 +577,21 @@ export function createDiodeElement(
 
 export function getDiodeInternalNodeCount(props: PropertyBag): number {
   return props.getModelParam<number>("RS") > 0 ? 1 : 0;
+}
+
+// ---------------------------------------------------------------------------
+// getDiodeInternalNodeLabels — mirror of getDiodeInternalNodeCount's predicate
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns internal node labels for a diode instance.
+ *
+ * MUST use the same predicate as `getDiodeInternalNodeCount`: when RS > 0
+ * we allocate a single internal anode-prime node between the external anode
+ * pin and the junction ("A'").
+ */
+export function getDiodeInternalNodeLabels(props: PropertyBag): readonly string[] {
+  return props.getModelParam<number>("RS") > 0 ? ["A'"] : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -696,6 +740,7 @@ export const DiodeDefinition: ComponentDefinition = {
       paramDefs: DIODE_PARAM_DEFS,
       params: DIODE_PARAM_DEFAULTS,
       getInternalNodeCount: getDiodeInternalNodeCount,
+      getInternalNodeLabels: getDiodeInternalNodeLabels,
     },
   },
   defaultModel: "spice",

@@ -5,3 +5,6 @@ dist/
 nul
 .omc/.vitest-failures.json
 test_results/
+.omc/
+test-results/
+dist/

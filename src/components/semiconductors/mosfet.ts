@@ -1400,7 +1400,6 @@ class MosfetAnalogElement extends AbstractFetElement {
     const cbdI = s0[base + SLOT_CBD_I];
     const cbsI = s0[base + SLOT_CBS_I];
     const vbd_stored = s0[base + SLOT_VBD];
-    const vbs_stored = vbsOp;
 
     // Drain-bulk junction conductance stamps
     stampG(solver, nodeD, nodeD, gbd);
@@ -1414,9 +1413,13 @@ class MosfetAnalogElement extends AbstractFetElement {
     stampG(solver, nodeB, nodeS, -gbs);
     stampG(solver, nodeB, nodeB, gbs);
 
-    // Norton currents for junction diodes
+    // Norton currents for junction diodes.
+    // Use pnjlim-limited vbd/vbs from SLOT_VBD_OLD/SLOT_VBS_OLD (written by
+    // updateOperatingPoint) — not raw vbsOp which is the un-limited current-iter
+    // value. ngspice mos1load.c:698-703 uses the stored state0 vbs/vbd.
+    const vbs_limited = s0[base + SLOT_VBS_OLD]; // pnjlim-limited Vbs (mos1load.c:698)
     const ceqbd = cbdI - gbd * vbd_stored;
-    const ceqbs = cbsI - gbs * vbs_stored;
+    const ceqbs = cbsI - gbs * vbs_limited;
     stampRHS(solver, nodeD, -polarity * ceqbd);
     stampRHS(solver, nodeB, polarity * (ceqbd + ceqbs));
     stampRHS(solver, nodeS, -polarity * ceqbs);
@@ -1621,9 +1624,12 @@ class MosfetAnalogElement extends AbstractFetElement {
     const gbOverlap = (p.CGBO ?? 0) * effectiveLength;
 
     if (oxideCap > 0 || gbOverlap > 0) {
-      // Compute Meyer capgb for gate-bulk
-      const vgsM = this.polaritySign * (vG - vS);
-      const vgdM = this.polaritySign * (vG - vD);
+      // Compute Meyer capgb for gate-bulk.
+      // mos1load.c:773-784: DEVqmeyer receives the pnjlim/fetlim-limited vgs and
+      // vgd (stored in CKTstate0), not raw node voltages. Use this._vgs (limited)
+      // and this._vgs - this._vds (= limited vgd) to match ngspice exactly.
+      const vgsM = this._vgs; // pnjlim/fetlim-limited Vgs (mos1load.c:774)
+      const vgdM = this._vgs - this._vds; // limited Vgd = Vgs - Vds (mos1load.c:774)
       const mode = this._swapped ? -1 : 1;
       let meyerCapgb: number;
       if (mode > 0) {
@@ -1690,8 +1696,9 @@ class MosfetAnalogElement extends AbstractFetElement {
     const gbOverlap = (p.CGBO ?? 0) * effectiveLength;
 
     if (oxideCap > 0 || gbOverlap > 0) {
-      const vgsM = this.polaritySign * (vG - vS);
-      const vgdM = this.polaritySign * (vG - vD);
+      // mos1load.c:773-784: use pnjlim/fetlim-limited vgs/vgd (same as stampCompanion)
+      const vgsM = this._vgs; // pnjlim/fetlim-limited Vgs (mos1load.c:774)
+      const vgdM = this._vgs - this._vds; // limited Vgd (mos1load.c:774)
       const mode = this._swapped ? -1 : 1;
       let meyerCapgb: number;
       if (mode > 0) {
@@ -1927,6 +1934,22 @@ export function getMosfetInternalNodeCount(props: PropertyBag): number {
   if (props.hasModelParam("RD") && props.getModelParam<number>("RD") > 0) count++;
   if (props.hasModelParam("RS") && props.getModelParam<number>("RS") > 0) count++;
   return count;
+}
+
+// ---------------------------------------------------------------------------
+// getMosfetInternalNodeLabels — mirror of getMosfetInternalNodeCount
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns internal node labels for a MOSFET instance. Order MUST match
+ * getMosfetInternalNodeCount / createMosfetElement's internalNodeIds
+ * consumption: D' first (for RD > 0), then S' (for RS > 0).
+ */
+export function getMosfetInternalNodeLabels(props: PropertyBag): readonly string[] {
+  const labels: string[] = [];
+  if (props.hasModelParam("RD") && props.getModelParam<number>("RD") > 0) labels.push("D'");
+  if (props.hasModelParam("RS") && props.getModelParam<number>("RS") > 0) labels.push("S'");
+  return labels;
 }
 
 // ---------------------------------------------------------------------------
@@ -2215,6 +2238,7 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: MOSFET_NMOS_DEFAULTS,
       getInternalNodeCount: getMosfetInternalNodeCount,
+      getInternalNodeLabels: getMosfetInternalNodeLabels,
     },
     "2N7000": {
       kind: "inline",
@@ -2223,6 +2247,7 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_2N7000,
       getInternalNodeCount: getMosfetInternalNodeCount,
+      getInternalNodeLabels: getMosfetInternalNodeLabels,
     },
     "BS170": {
       kind: "inline",
@@ -2231,6 +2256,7 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_BS170,
       getInternalNodeCount: getMosfetInternalNodeCount,
+      getInternalNodeLabels: getMosfetInternalNodeLabels,
     },
     "IRF530N": {
       kind: "inline",
@@ -2239,6 +2265,7 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRF530N,
       getInternalNodeCount: getMosfetInternalNodeCount,
+      getInternalNodeLabels: getMosfetInternalNodeLabels,
     },
     "IRF540N": {
       kind: "inline",
@@ -2247,6 +2274,7 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRF540N,
       getInternalNodeCount: getMosfetInternalNodeCount,
+      getInternalNodeLabels: getMosfetInternalNodeLabels,
     },
     "IRFZ44N": {
       kind: "inline",
@@ -2255,6 +2283,7 @@ export const NmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_NMOS_PARAM_DEFS,
       params: NMOS_IRFZ44N,
       getInternalNodeCount: getMosfetInternalNodeCount,
+      getInternalNodeLabels: getMosfetInternalNodeLabels,
     },
   },
   defaultModel: "spice-l1",
@@ -2282,6 +2311,7 @@ export const PmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: MOSFET_PMOS_DEFAULTS,
       getInternalNodeCount: getMosfetInternalNodeCount,
+      getInternalNodeLabels: getMosfetInternalNodeLabels,
     },
     "BS250": {
       kind: "inline",
@@ -2290,6 +2320,7 @@ export const PmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_BS250,
       getInternalNodeCount: getMosfetInternalNodeCount,
+      getInternalNodeLabels: getMosfetInternalNodeLabels,
     },
     "IRF9520": {
       kind: "inline",
@@ -2298,6 +2329,7 @@ export const PmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF9520,
       getInternalNodeCount: getMosfetInternalNodeCount,
+      getInternalNodeLabels: getMosfetInternalNodeLabels,
     },
     "IRFP9240": {
       kind: "inline",
@@ -2306,6 +2338,7 @@ export const PmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRFP9240,
       getInternalNodeCount: getMosfetInternalNodeCount,
+      getInternalNodeLabels: getMosfetInternalNodeLabels,
     },
     "IRF5210": {
       kind: "inline",
@@ -2314,6 +2347,7 @@ export const PmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF5210,
       getInternalNodeCount: getMosfetInternalNodeCount,
+      getInternalNodeLabels: getMosfetInternalNodeLabels,
     },
     "IRF4905": {
       kind: "inline",
@@ -2322,6 +2356,7 @@ export const PmosfetDefinition: ComponentDefinition = {
       paramDefs: MOSFET_PMOS_PARAM_DEFS,
       params: PMOS_IRF4905,
       getInternalNodeCount: getMosfetInternalNodeCount,
+      getInternalNodeLabels: getMosfetInternalNodeLabels,
     },
   },
   defaultModel: "spice-l1",

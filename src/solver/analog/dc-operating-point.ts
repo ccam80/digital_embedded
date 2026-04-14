@@ -466,6 +466,9 @@ function dynamicGmin(
   // cktop.c:140-141: zero CKTrhsOld and CKTstate0 before stepping
   const voltages = new Float64Array(matrixSize);
   zeroState(voltages, statePool);
+  if (statePool && 'initMode' in statePool) {
+    (statePool as any).initMode = "initJct";
+  }
 
   const savedVoltages = new Float64Array(matrixSize);
   const savedState0 = statePool ? new Float64Array(statePool.state0.length) : new Float64Array(0);
@@ -476,7 +479,7 @@ function dynamicGmin(
   // cktop.c:155-157: OldGmin = 1e-2, CKTdiagGmin = OldGmin / factor
   let oldGmin = 1e-2;
   let diagGmin = oldGmin / factor; // 1e-3 on first entry
-  const gtarget = params.gmin; // cktop.c:149
+  const gtarget = Math.max(params.gmin, params.gshunt ?? 0); // cktop.c:148-157: gtarget = MAX(CKTgmin, CKTgshunt)
   let totalIter = 0;
 
   // cktop.c:154-258: main gmin stepping loop
@@ -800,5 +803,4 @@ function gillespieSrc(
     return { converged: true, iterations: totalIter, voltages };
   }
 
-  return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
-}
+ 

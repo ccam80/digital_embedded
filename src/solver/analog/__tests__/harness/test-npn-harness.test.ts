@@ -19,7 +19,7 @@ describeGate("NPN-CE harness branch value test", () => {
   }, 60_000);
 
   it("captures branch values on both sides", async () => {
-    const map = session.getSessionMap();
+    const map = session.sessionMap();
     console.log("\n=== SESSION MAP ===");
     console.log("Analysis:", map.analysis);
     console.log("Ours steps:", map.ours.stepCount);

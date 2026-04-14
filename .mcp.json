@@ -4,8 +4,7 @@
       "type": "stdio",
       "command": "node",
       "args": [
-        "--import", "tsx/esm",
-        "scripts/circuit-mcp-server.ts"
+        "scripts/mcp-wrapper.mjs"
       ]
     }
   }

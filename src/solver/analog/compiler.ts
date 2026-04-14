@@ -74,6 +74,9 @@ function modelEntryToMnaModel(entry: ModelEntry): MnaModel | null {
     if (entry.getInternalNodeCount) {
       model.getInternalNodeCount = entry.getInternalNodeCount;
     }
+    if (entry.getInternalNodeLabels) {
+      model.getInternalNodeLabels = entry.getInternalNodeLabels;
+    }
     return model;
   }
   // Netlist entries are resolved separately by resolveSubcircuitModels
@@ -340,6 +343,12 @@ function compileSubcircuitToMnaModel(
 
     getInternalNodeCount(_props: PropertyBag): number {
       return netlist.internalNetCount;
+    },
+
+    getInternalNodeLabels(_props: PropertyBag): readonly string[] {
+      const labels: string[] = [];
+      for (let i = 0; i < netlist.internalNetCount; i++) labels.push(`int${i}`);
+      return labels;
     },
 
     branchCount: totalBranches,
@@ -610,6 +619,7 @@ type PartitionElementMeta = {
   branchIdx: number;
   internalNodeOffset: number;
   internalNodeCount: number;
+  internalNodeLabels: readonly string[];
 };
 
 /** Result returned by `runPassA_partition`. */
@@ -641,7 +651,7 @@ function runPassA_partition(
     const el = pc.element;
 
     if (el.typeId === "Ground" || el.typeId === "Tunnel") {
-      elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+      elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0, internalNodeLabels: [] });
       continue;
     }
 
@@ -650,7 +660,7 @@ function runPassA_partition(
 
     switch (route.kind) {
       case 'skip': {
-        elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0 });
+        elementMeta.push({ pc, branchIdx: -1, internalNodeOffset: -1, internalNodeCount: 0, internalNodeLabels: [] });
         continue;
       }
       case 'stamp': {
@@ -669,7 +679,16 @@ function runPassA_partition(
         const internalCount = route.model.getInternalNodeCount?.(props) ?? 0;
         const internalNodeOffset = internalCount > 0 ? nextInternalNode : -1;
         nextInternalNode += internalCount;
-        elementMeta.push({ pc, branchIdx, internalNodeOffset, internalNodeCount: internalCount });
+        const rawLabels = route.model.getInternalNodeLabels?.(props) ?? [];
+        if (rawLabels.length !== internalCount) {
+          throw new Error(
+            `Analog compiler: model for "${pc.definition.name}" returned ` +
+            `${rawLabels.length} internal node labels but getInternalNodeCount ` +
+            `returned ${internalCount}. getInternalNodeLabels must mirror ` +
+            `getInternalNodeCount's predicate exactly.`,
+          );
+        }
+        elementMeta.push({ pc, branchIdx, internalNodeOffset, internalNodeCount: internalCount, internalNodeLabels: rawLabels });
         continue;
       }
     }
@@ -1205,6 +1224,7 @@ export function compileAnalogPartition(
     const element: import("./element.js").AnalogElement = Object.assign(core, {
       pinNodeIds: pinNodeIds,
       allNodeIds: [...pinNodeIds, ...internalNodeIds],
+      internalNodeLabels: [...meta.internalNodeLabels],
       label: el.getProperties().has("label")
         ? String(el.getProperties().get("label") ?? el.instanceId)
         : el.instanceId,

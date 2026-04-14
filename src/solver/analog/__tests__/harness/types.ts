@@ -222,6 +222,7 @@ export type AttemptRole =
  */
 export type NRPhase =
   | "dcopInitJct"
+  | "dcopInitFix"
   | "dcopInitFloat"
   | "dcopDirect"
   | "dcopGminDynamic"
@@ -806,10 +807,41 @@ export interface IterationSideData {
   rawIteration: number;
   globalConverged: boolean;
   noncon: number;
+  /** Node voltages AFTER this iteration's linear solve (post-solve result). */
   nodeVoltages: Record<string, number>;
+  /**
+   * Node voltages BEFORE this iteration's linear solve (iter.prevVoltages).
+   * For iter 0 this is the initial guess (DC-OP seed for tranInit).
+   * Used when computing the residual A·v_input − b.
+   */
+  nodeVoltagesBefore: Record<string, number>;
   branchValues: Record<string, number>;
   elementStates: Record<string, Record<string, number>>;
   limitingEvents: LimitingEvent[];
+  /**
+   * RHS vector b at the start of this iteration (before the linear solve).
+   * Sliced to K entries when a slice filter is active; full N entries otherwise.
+   */
+  rhs: number[];
+  /**
+   * A·v_input − b, computed from the captured sparse matrix, input voltages, and RHS.
+   * Sliced to K entries when a slice filter is active; full N entries otherwise.
+   */
+  residual: number[];
+  /**
+   * Infinity norm (max-abs) of residual.
+   * Recomputed over the sliced residual when a slice filter is active.
+   */
+  residualInfinityNorm: number;
+  /**
+   * Dense N×N matrix (row-major flat array) at full dimension.
+   * Null only when sparse capture was empty (no matrix entries recorded).
+   */
+  matrix: number[] | null;
+  /** Labels for each row/col of the sliced matrix, in matrix order. Length equals K. Populated only when a slice filter is active. */
+  nodeLabels?: string[];
+  /** 0-based matrix indices in the original full matrix. Length equals K. Populated only when a slice filter is active. */
+  nodeIndices?: number[];
 }
 
 export interface PairedIteration {

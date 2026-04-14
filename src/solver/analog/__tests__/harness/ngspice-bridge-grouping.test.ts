@@ -11,9 +11,10 @@ import { NgspiceBridge } from "./ngspice-bridge.js";
 import type { RawNgspiceIterationEx, RawNgspiceOuterEvent } from "./types.js";
 
 // CKTmode constants (mirror of ngspice-bridge.ts internal constants)
-const MODEDCOP   = 0x0001;
-const MODETRANOP = 0x0002;
-const MODETRAN   = 0x0004;
+// Values from ref/ngspice/src/include/ngspice/cktdefs.h:166-182
+const MODETRAN   = 0x0001;
+const MODEDCOP   = 0x0010;
+const MODETRANOP = 0x0020;
 
 function makeRaw(overrides: Partial<RawNgspiceIterationEx> = {}): RawNgspiceIterationEx {
   return {

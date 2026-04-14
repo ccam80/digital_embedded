@@ -20,8 +20,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore, PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";

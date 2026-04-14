@@ -503,17 +503,20 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     return Math.abs(cdhat - cdFinal) <= tolD && Math.abs(cbhat - (cbsI + cbdI)) <= tolB;
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
-    const nodeG = this.gateNode;
-    const nodeD = this.drainNode;
-    const nodeS = this.sourceNode;
-
-    const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-    const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
-    const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
-
-    const vgsNow = vG - vS;
-    const vgdNow = vG - vD;
+  stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
+    // Compute vgs/vgd freshly from current node voltages (ngspice mos1load.c
+    // single-pass semantics). Voltage limiting is a mid-NR stabilizer applied
+    // in updateOperatingPoint; at step boundaries / post-convergence,
+    // raw == limited. Never read a cross-phase cached field/slot.
+    const nodeG_sc = this.gateNode;
+    const nodeD_sc = this.drainNode;
+    const nodeS_sc = this.sourceNode;
+    const vG_sc = nodeG_sc > 0 ? _voltages[nodeG_sc - 1] : 0;
+    const vD_sc = nodeD_sc > 0 ? _voltages[nodeD_sc - 1] : 0;
+    const vS_sc = nodeS_sc > 0 ? _voltages[nodeS_sc - 1] : 0;
+    const vgsNow = this.polaritySign * (vG_sc - vS_sc);
+    const vdsNow = this.polaritySign * (vD_sc - vS_sc);
+    const vgdNow = vgsNow - vdsNow;
 
     const base = this.stateBaseOffset;
     const isFirstCall = this._pool.tranStep === 0;
@@ -522,7 +525,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     this._s0[base + SLOT_V_GS] = vgsNow;
     this._s0[base + SLOT_V_GD] = vgdNow;
 
-    const caps = this.computeCapacitances(this._vgs, this._vds);
+    const caps = this.computeCapacitances(vgsNow, vdsNow);
     const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
     const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
 
@@ -580,15 +583,18 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
 
+    // Compute vgs/vgd freshly from converged node voltages — single-pass,
+    // no cross-phase cache dependency. At post-NR convergence raw == limited,
+    // so this matches what updateOperatingPoint wrote on the last iteration.
     const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
     const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
     const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
-
-    const vgsNow = vG - vS;
-    const vgdNow = vG - vD;
+    const vgsNow = this.polaritySign * (vG - vS);
+    const vdsNow = this.polaritySign * (vD - vS);
+    const vgdNow = vgsNow - vdsNow;
 
     const base = this.stateBaseOffset;
-    const caps = this.computeCapacitances(this._vgs, this._vds);
+    const caps = this.computeCapacitances(vgsNow, vdsNow);
 
     const isFirstCall = this._pool.tranStep === 0;
     const prevVgs = this.s1[base + SLOT_V_GS];

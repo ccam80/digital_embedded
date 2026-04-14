@@ -2,19 +2,14 @@
  * W6.T2 — MCP harness shape mode tests (§10.4).
  *
  * Tests for:
- *   1. harness_query { mode: "shape" } returns a SessionShape object.
- *   2. harness_query stepEnd responses include a presence field.
+ *   1. harness_session_map returns a SessionMap object with step counts and attempts.
+ *   2. harness_get_step returns step-end data with presence field on step.ours/ngspice arrays.
  *   3. circuit_convergence_log { action: "disable" } returns a conflict error when
  *      a comparison harness capture hook is installed on the active coordinator.
  *
  * These tests use the same ToolCapture mock server pattern as
  * harness-mcp-verification.test.ts, but with self-compare sessions so
  * no ngspice DLL is required.
- *
- * NOTE: Tests 1 and 2 depend on the harness_query "shape" mode that was added
- * in Wave 5. If Wave 5 has not landed, these tests will fail.
- * Test 3 exercises the facade throw-on-conflict guard directly — it passes
- * independently of Wave 5.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -112,34 +107,41 @@ beforeAll(async () => {
 }, 30_000);
 
 // ---------------------------------------------------------------------------
-// Test 1: harness_query mode:"shape" returns a SessionShape object
-// NOTE: This test requires Wave 5's harness_query shape mode.
+// Test 1: harness_session_map returns a SessionMap object
 // ---------------------------------------------------------------------------
 
-describe("harness_query shape mode", () => {
-  it("returns a SessionShape object with presenceCounts, steps, and largeTimeDeltas", async () => {
-    const parsed = await tools.call("harness_query", { handle, mode: "shape" });
-    // handler returns { handle, queryMode: "shape", shape: SessionShape }
-    expect(parsed).toHaveProperty("shape");
-    expect(parsed.shape).toHaveProperty("presenceCounts");
-    expect(parsed.shape).toHaveProperty("steps");
-    expect(parsed.shape).toHaveProperty("largeTimeDeltas");
-    expect(parsed.shape.analysis).toMatch(/dcop|tran/);
+describe("harness_session_map shape", () => {
+  it("returns a SessionMap with analysis, step counts, and attempts on both sides", async () => {
+    const parsed = await tools.call("harness_session_map", { handle });
+    expect(parsed).toHaveProperty("sessionMap");
+    const map = parsed.sessionMap;
+    expect(map).toHaveProperty("analysis");
+    expect(map.analysis).toMatch(/dcop|tran/);
+    expect(map).toHaveProperty("ours");
+    expect(map).toHaveProperty("ngspice");
+    expect(typeof map.ours.stepCount).toBe("number");
+    expect(Array.isArray(map.ours.steps)).toBe(true);
+    expect(map.ours.steps.length).toBe(map.ours.stepCount);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Test 2: harness_query stepEnd returns presence field
+// Test 2: harness_get_step returns formatted timing fields
 // ---------------------------------------------------------------------------
 
-describe("harness_query stepEnd presence", () => {
-  it("returns the presence field on stepEnd responses", async () => {
-    const result = await tools.call("harness_query", { handle, step: 0 });
-    // When only step is given (no component or node), dispatch goes to the node/full stepEnd path
-    // The stepEnd object must include a presence field
-    const stepEnd = result.stepEnd;
-    expect(stepEnd).toBeDefined();
-    expect(stepEnd.presence).toMatch(/^(both|oursOnly|ngspiceOnly)$/);
+describe("harness_get_step timing fields", () => {
+  it("returns stepStartTime, stepEndTime, and dt as FormattedNumber ComparedValue objects", async () => {
+    const result = await tools.call("harness_get_step", { handle, index: 0 });
+    expect(result.step).toBeDefined();
+    const step = result.step;
+    // Each timing field must be a ComparedValueJSON with FormattedNumber sub-fields
+    for (const field of ["stepStartTime", "stepEndTime", "dt"] as const) {
+      const cv = step[field];
+      expect(cv, `${field} must be defined`).toBeDefined();
+      expect(typeof cv.ours?.display, `${field}.ours.display must be string`).toBe("string");
+      expect(typeof cv.ngspice?.display, `${field}.ngspice.display must be string`).toBe("string");
+      expect(typeof cv.withinTol, `${field}.withinTol must be boolean`).toBe("boolean");
+    }
   });
 });
 

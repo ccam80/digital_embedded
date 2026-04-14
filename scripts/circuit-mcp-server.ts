@@ -53,6 +53,66 @@ registerSimulationTools(server, facade, registry, session);
 registerHarnessTools(server, harnessState);
 
 // ---------------------------------------------------------------------------
+// Server lifecycle tools
+// ---------------------------------------------------------------------------
+
+const RESTART_EXIT_CODE = 120;
+
+server.registerTool(
+  "server_reset",
+  {
+    title: "Reset Server State",
+    description:
+      "Clear all circuit handles, compiled engines, and harness sessions. " +
+      "The server process stays alive — use this to flush stale state without " +
+      "picking up code changes. All existing handles become invalid.",
+    inputSchema: {},
+  },
+  async () => {
+    const engines = session.reset();
+    const harnesses = harnessState.reset();
+    facade.invalidate();
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text:
+            `Reset complete. Disposed ${engines} engine(s) and ${harnesses} harness session(s). ` +
+            `All handles invalidated — use circuit_load / harness_start to begin fresh.`,
+        },
+      ],
+    };
+  },
+);
+
+server.registerTool(
+  "server_restart",
+  {
+    title: "Restart Server Process",
+    description:
+      "Restart the MCP server process to pick up code changes. " +
+      "Requires the mcp-wrapper proxy (see scripts/mcp-wrapper.mjs). " +
+      "All handles are invalidated. The Claude Code session stays alive.",
+    inputSchema: {},
+  },
+  async () => {
+    session.reset();
+    harnessState.reset();
+    facade.invalidate();
+    // Schedule exit after the response is flushed
+    setTimeout(() => process.exit(RESTART_EXIT_CODE), 100);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: "Server restarting — all handles invalidated. Wait a moment, then continue.",
+        },
+      ],
+    };
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Start server
 // ---------------------------------------------------------------------------
 

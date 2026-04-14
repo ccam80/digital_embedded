@@ -122,7 +122,7 @@ describe("boot-step: runDcOp() produces exactly 1 step at time 0", () => {
     const steps = runDcopCapture();
     expect(steps[0].attempts.length).toBeGreaterThanOrEqual(1);
 
-    const dcopPhases: NRPhase[] = ["dcopDirect", "dcopGminDynamic", "dcopGminSpice3", "dcopSrcSweep"];
+    const dcopPhases: NRPhase[] = ["dcopInitJct", "dcopInitFix", "dcopInitFloat", "dcopDirect", "dcopGminDynamic", "dcopGminSpice3", "dcopSrcSweep"];
     const hasDcopPhase = steps[0].attempts.some((a) => dcopPhases.includes(a.phase));
     expect(hasDcopPhase).toBe(true);
   });

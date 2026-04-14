@@ -141,6 +141,12 @@ export interface MnaModel {
     getTime: () => number,
   ) => AnalogElementCore;
   getInternalNodeCount?: (props: PropertyBag) => number;
+  /**
+   * Labels for internal nodes allocated by this model, in the SAME ORDER
+   * as `getInternalNodeCount` consumes them. Must be length-equal to
+   * `getInternalNodeCount`.
+   */
+  getInternalNodeLabels?: (props: PropertyBag) => readonly string[];
   branchCount?: number | ((props: PropertyBag) => number);
 }
 

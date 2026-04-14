@@ -63,6 +63,16 @@ export interface AnalogElement {
   readonly allNodeIds: readonly number[];
 
   /**
+   * Labels for internal nodes allocated by this element's model, in the
+   * same order as the internal portion of `allNodeIds` (i.e. positions
+   * `pinNodeIds.length .. allNodeIds.length - 1`). Length equals
+   * `allNodeIds.length - pinNodeIds.length`. Absent or empty when the
+   * model allocates no internal nodes. Used for diagnostics / harness
+   * labeling. Treat as `[]` when undefined.
+   */
+  readonly internalNodeLabels?: readonly string[];
+
+  /**
    * Assigned branch-current row index for elements that introduce extra MNA
    * rows (voltage sources, inductors). Set to -1 for elements that do not
    * add extra rows (resistors, capacitors, current sources, diodes, etc.).

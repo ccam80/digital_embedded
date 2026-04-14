@@ -23,7 +23,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore } from "../../solver/analog/element.js";
-import { createDiodeElement, getDiodeInternalNodeCount } from "./diode.js";
+import { createDiodeElement, getDiodeInternalNodeCount, getDiodeInternalNodeLabels } from "./diode.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -222,6 +222,7 @@ export const SchottkyDiodeDefinition: ComponentDefinition = {
       paramDefs: SCHOTTKY_PARAM_DEFS,
       params: SCHOTTKY_PARAM_DEFAULTS,
       getInternalNodeCount: getDiodeInternalNodeCount,
+      getInternalNodeLabels: getDiodeInternalNodeLabels,
     },
   },
   defaultModel: "spice",
