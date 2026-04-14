@@ -663,7 +663,7 @@ export function makeInductor(
  * Parameter order differs from makeCapacitor: capacitance first, then nodes.
  */
 export function createTestCapacitor(capacitance: number, nodeA: number, nodeB: number): AnalogElement {
-  const el = new AnalogCapacitorElement(capacitance);
+  const el = new AnalogCapacitorElement(capacitance, NaN, 0, 0, 300.15, 1, 1);
   return withNodeIds(el, [nodeA, nodeB]);
 }
 
@@ -672,7 +672,7 @@ export function createTestCapacitor(capacitance: number, nodeA: number, nodeB: n
  * Parameter order differs from makeInductor: inductance first, then nodes, then branch.
  */
 export function createTestInductor(inductance: number, nodeA: number, nodeB: number, branchIdx: number): AnalogElement {
-  const el = new AnalogInductorElement(branchIdx, inductance);
+  const el = new AnalogInductorElement(branchIdx, inductance, NaN, 0, 0, 300.15, 1, 1);
   return withNodeIds(el, [nodeA, nodeB]);
 }
 
