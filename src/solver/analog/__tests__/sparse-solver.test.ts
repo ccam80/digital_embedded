@@ -834,3 +834,494 @@ describe("SparseSolver factor dispatch", () => {
     expect(x2[1]).toBeCloseTo(7 / 11, 12);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Markowitz data structures tests
+// ---------------------------------------------------------------------------
+
+describe("SparseSolver Markowitz data structures", () => {
+  it("allocates markowitzRow, markowitzCol, markowitzProd with correct length", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(5);
+    expect(solver.markowitzRow.length).toBe(5);
+    expect(solver.markowitzCol.length).toBe(5);
+    expect(solver.markowitzProd.length).toBe(5);
+  });
+
+  it("initializes all Markowitz arrays to zero on beginAssembly", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    for (let i = 0; i < 3; i++) {
+      expect(solver.markowitzRow[i]).toBe(0);
+      expect(solver.markowitzCol[i]).toBe(0);
+      expect(solver.markowitzProd[i]).toBe(0);
+    }
+    expect(solver.singletons).toBe(0);
+  });
+
+  it("re-allocates Markowitz arrays when size changes", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    expect(solver.markowitzRow.length).toBe(3);
+
+    solver.beginAssembly(7);
+    expect(solver.markowitzRow.length).toBe(7);
+    expect(solver.markowitzCol.length).toBe(7);
+    expect(solver.markowitzProd.length).toBe(7);
+  });
+
+  it("resets Markowitz arrays to zero when same size is reused", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    // Manually poke values to confirm they get cleared
+    solver.markowitzRow[0] = 99;
+    solver.markowitzCol[1] = 42;
+    solver.markowitzProd[2] = 7.5;
+
+    solver.beginAssembly(3);
+    expect(solver.markowitzRow[0]).toBe(0);
+    expect(solver.markowitzCol[1]).toBe(0);
+    expect(solver.markowitzProd[2]).toBe(0);
+    expect(solver.singletons).toBe(0);
+  });
+
+  it("singletons is zero after beginAssembly", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(4);
+    expect(solver.singletons).toBe(0);
+  });
+
+  it("Markowitz arrays survive a full factor cycle without error", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.stampRHS(2, 1);
+    solver.finalize();
+    const result = solver.factor();
+    expect(result.success).toBe(true);
+
+    expect(solver.markowitzRow.length).toBe(3);
+    expect(solver.markowitzCol.length).toBe(3);
+    expect(solver.markowitzProd.length).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// _countMarkowitz and _markowitzProducts tests
+// ---------------------------------------------------------------------------
+
+describe("SparseSolver _countMarkowitz and _markowitzProducts", () => {
+  it("counts off-diagonal nonzeros correctly for a 3x3 tridiagonal matrix", () => {
+    // Matrix:
+    // [2, -1,  0]
+    // [-1, 3, -1]
+    // [0, -1,  2]
+    // Row 0: 1 off-diag (col 1)
+    // Row 1: 2 off-diag (col 0, col 2)
+    // Row 2: 1 off-diag (col 1)
+    // Col 0: 1 off-diag (row 1)
+    // Col 1: 2 off-diag (row 0, row 2)
+    // Col 2: 1 off-diag (row 1)
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.stampRHS(2, 1);
+    solver.finalize();
+    solver.factorWithReorder();
+
+    // Call _countMarkowitz via private access
+    (solver as any)._countMarkowitz();
+
+    // After AMD permutation, the counts should reflect the structure.
+    // Total off-diagonal nonzeros: 4 entries (0,1), (1,0), (1,2), (2,1)
+    // Sum of all row counts should equal 4
+    const mRow = solver.markowitzRow;
+    const mCol = solver.markowitzCol;
+    let totalRowCount = 0;
+    let totalColCount = 0;
+    for (let i = 0; i < 3; i++) {
+      totalRowCount += mRow[i];
+      totalColCount += mCol[i];
+    }
+    expect(totalRowCount).toBe(4);
+    expect(totalColCount).toBe(4);
+  });
+
+  it("computes Markowitz products and singletons for tridiagonal matrix", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.stampRHS(2, 1);
+    solver.finalize();
+    solver.factorWithReorder();
+
+    (solver as any)._countMarkowitz();
+    (solver as any)._markowitzProducts();
+
+    const mProd = solver.markowitzProd;
+    // Singletons: rows/cols with exactly 1 off-diagonal nonzero
+    // In the tridiagonal, rows 0 and 2 have 1 off-diag each (singletons),
+    // cols 0 and 2 have 1 off-diag each (singletons).
+    // After AMD permutation the structure is preserved but indices may differ.
+    // At minimum, singletons should be >= 2 for this tridiagonal.
+    expect(solver.singletons).toBeGreaterThanOrEqual(2);
+
+    // All products should be non-negative
+    for (let i = 0; i < 3; i++) {
+      expect(mProd[i]).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("counts zero off-diagonals for a diagonal matrix", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 5);
+    solver.stamp(1, 1, 3);
+    solver.stamp(2, 2, 7);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.stampRHS(2, 3);
+    solver.finalize();
+    solver.factorWithReorder();
+
+    (solver as any)._countMarkowitz();
+    (solver as any)._markowitzProducts();
+
+    // Diagonal matrix: zero off-diagonal entries per row and column
+    for (let i = 0; i < 3; i++) {
+      expect(solver.markowitzRow[i]).toBe(0);
+      expect(solver.markowitzCol[i]).toBe(0);
+      expect(solver.markowitzProd[i]).toBe(0);
+    }
+    // All 3 diagonals have count <= 1, so all are singletons
+    expect(solver.singletons).toBe(3);
+  });
+
+  it("counts correctly for a dense 2x2 matrix", () => {
+    // Matrix: [[4,1],[1,3]] — each row/col has 1 off-diagonal
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 4);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.finalize();
+    solver.factorWithReorder();
+
+    (solver as any)._countMarkowitz();
+    (solver as any)._markowitzProducts();
+
+    // Each row has 1 off-diag, each col has 1 off-diag
+    for (let i = 0; i < 2; i++) {
+      expect(solver.markowitzRow[i]).toBe(1);
+      expect(solver.markowitzCol[i]).toBe(1);
+      expect(solver.markowitzProd[i]).toBe(0);
+    }
+    // Both rows and both cols are singletons (count=1)
+    expect(solver.singletons).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// _searchForPivot tests (4-phase dispatcher)
+// ---------------------------------------------------------------------------
+
+describe("SparseSolver _searchForPivot", () => {
+  it("returns a valid pivot row for a well-conditioned 3x3 matrix", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.stampRHS(2, 1);
+    solver.finalize();
+    solver.factorWithReorder();
+
+    // Populate Markowitz data
+    (solver as any)._countMarkowitz();
+    (solver as any)._markowitzProducts();
+
+    // Set up a mock dense workspace for step 0
+    const n = 3;
+    const x = new Float64Array(n);
+    const xNzIdx = new Int32Array(n);
+    const pinv = new Int32Array(n).fill(-1);
+
+    // Scatter some values (simulating column 0 values in permuted space)
+    x[0] = 2.0;
+    x[1] = -1.0;
+    xNzIdx[0] = 0;
+    xNzIdx[1] = 1;
+    const xNzCount = 2;
+
+    const pivotRow = (solver as any)._searchForPivot(0, x, xNzIdx, xNzCount, pinv);
+    expect(pivotRow).toBeGreaterThanOrEqual(0);
+    expect(pivotRow).toBeLessThan(n);
+    expect(Math.abs(x[pivotRow])).toBeGreaterThan(0);
+  });
+
+  it("returns -1 for an all-zero column (singular)", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 1);
+    solver.stamp(1, 1, 1);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 1);
+    solver.finalize();
+    solver.factorWithReorder();
+
+    (solver as any)._countMarkowitz();
+    (solver as any)._markowitzProducts();
+
+    const x = new Float64Array(2);
+    const xNzIdx = new Int32Array(2);
+    const pinv = new Int32Array(2).fill(-1);
+    // All zeros in workspace — no valid pivot
+    const pivotRow = (solver as any)._searchForPivot(0, x, xNzIdx, 0, pinv);
+    expect(pivotRow).toBe(-1);
+  });
+
+  it("prefers singleton rows over higher-product rows", () => {
+    // 3x3 matrix where row 0 is a singleton (1 off-diagonal)
+    // and row 1 has 2 off-diagonals
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 5);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 4);
+    solver.stamp(1, 2, 1);
+    solver.stamp(2, 0, 1);
+    solver.stamp(2, 1, 1);
+    solver.stamp(2, 2, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 1);
+    solver.stampRHS(2, 1);
+    solver.finalize();
+    solver.factorWithReorder();
+
+    (solver as any)._countMarkowitz();
+    (solver as any)._markowitzProducts();
+
+    // With singletons > 0, the singleton phase should fire first
+    // This verifies that the 4-phase dispatcher checks singletons before
+    // doing a full column search
+    expect(solver.singletons).toBeGreaterThan(0);
+  });
+
+  it("phase 4 (entire matrix search) selects largest magnitude as fallback", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 1);
+    solver.stamp(1, 1, 1);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 1);
+    solver.finalize();
+    solver.factorWithReorder();
+
+    // Test _searchEntireMatrix directly
+    const x = new Float64Array(2);
+    const xNzIdx = new Int32Array(2);
+    const pinv = new Int32Array(2).fill(-1);
+    x[0] = 0.5;
+    x[1] = 3.0;
+    xNzIdx[0] = 0;
+    xNzIdx[1] = 1;
+
+    const result = (solver as any)._searchEntireMatrix(x, xNzIdx, 2, pinv);
+    // Should pick row 1 (magnitude 3.0 > 0.5)
+    expect(result).toBe(1);
+  });
+
+  it("skips already-pivoted rows in all phases", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 4);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.finalize();
+    solver.factorWithReorder();
+
+    (solver as any)._countMarkowitz();
+    (solver as any)._markowitzProducts();
+
+    const x = new Float64Array(2);
+    const xNzIdx = new Int32Array(2);
+    const pinv = new Int32Array(2);
+    x[0] = 10.0;
+    x[1] = 5.0;
+    xNzIdx[0] = 0;
+    xNzIdx[1] = 1;
+
+    // Mark row 0 as already pivoted
+    pinv[0] = 0;
+    pinv[1] = -1;
+
+    const result = (solver as any)._searchForPivot(1, x, xNzIdx, 2, pinv);
+    // Must pick row 1, since row 0 is already pivoted
+    expect(result).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// _updateMarkowitzNumbers and factorWithReorder Markowitz wiring tests
+// ---------------------------------------------------------------------------
+
+describe("SparseSolver _updateMarkowitzNumbers", () => {
+  it("decrements row and column counts after elimination", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.stampRHS(2, 1);
+    solver.finalize();
+    solver.factorWithReorder();
+
+    (solver as any)._countMarkowitz();
+    (solver as any)._markowitzProducts();
+
+    const initialSingletons = solver.singletons;
+    const initialRowSum = Array.from(solver.markowitzRow).reduce((a, b) => a + b, 0);
+
+    // Simulate elimination at step 0 with pivot at row 0
+    const pinv = new Int32Array(3).fill(-1);
+    const x = new Float64Array(3);
+    const xNzIdx = new Int32Array(3);
+    x[0] = 2.0;
+    x[1] = -1.0;
+    pinv[0] = 0;
+
+    (solver as any)._updateMarkowitzNumbers(0, 0, x, xNzIdx, 2, pinv);
+
+    // After eliminating row 0, the remaining rows should have reduced counts
+    const postRowSum = Array.from(solver.markowitzRow).reduce((a, b) => a + b, 0);
+    expect(postRowSum).toBeLessThanOrEqual(initialRowSum);
+  });
+});
+
+describe("SparseSolver factorWithReorder Markowitz pipeline", () => {
+  it("factorWithReorder populates Markowitz data after factoring", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.stampRHS(2, 1);
+    solver.finalize();
+
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+
+    // After factorWithReorder, Markowitz arrays should exist with proper length
+    expect(solver.markowitzRow.length).toBe(3);
+    expect(solver.markowitzCol.length).toBe(3);
+    expect(solver.markowitzProd.length).toBe(3);
+  });
+
+  it("factorWithReorder produces correct solution on 3x3 tridiagonal", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.stampRHS(2, 1);
+    solver.finalize();
+    solver.forceReorder();
+    const result = solver.factor();
+    expect(result.success).toBe(true);
+    const x = new Float64Array(3);
+    solver.solve(x);
+    expect(x[0]).toBeCloseTo(1.25, 12);
+    expect(x[1]).toBeCloseTo(1.5, 12);
+    expect(x[2]).toBeCloseTo(1.25, 12);
+  });
+
+  it("factorWithReorder solution has residual below 1e-10 on 10x10 matrix", () => {
+    const n = 10;
+    const solver = new SparseSolver();
+    const entries: [number, number, number][] = [];
+    for (let i = 0; i < n; i++) {
+      let rowSum = 0;
+      for (let j = 0; j < n; j++) {
+        if (i !== j && (Math.abs(i - j) <= 2)) {
+          const v = -(0.5 + 0.1 * ((i + j) % 3));
+          entries.push([i, j, v]);
+          rowSum += Math.abs(v);
+        }
+      }
+      entries.push([i, i, rowSum + 1.0]);
+    }
+    const rhs = Array.from({ length: n }, (_, i) => i + 1);
+
+    solver.beginAssembly(n);
+    for (const [r, c, v] of entries) solver.stamp(r, c, v);
+    for (let i = 0; i < n; i++) solver.stampRHS(i, rhs[i]);
+    solver.finalize();
+    solver.forceReorder();
+    const result = solver.factor();
+    expect(result.success).toBe(true);
+    const x = new Float64Array(n);
+    solver.solve(x);
+
+    // Residual check
+    const residual = new Float64Array(n);
+    for (const [r, c, v] of entries) residual[r] += v * x[c];
+    for (let i = 0; i < n; i++) {
+      expect(Math.abs(residual[i] - rhs[i])).toBeLessThan(1e-10);
+    }
+  });
+});

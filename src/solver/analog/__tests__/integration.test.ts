@@ -14,6 +14,7 @@ import {
   integrateInductor,
   HistoryStore,
   computeIntegrationCoefficients,
+  computeNIcomCof,
 } from "../integration.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
@@ -449,5 +450,82 @@ describe("computeIntegrationCoefficients", () => {
     // r1 = 1, r2 = 2, u22 = 2 → normal BDF-2
     expect(ag0).toBeCloseTo(3 / (2 * h), 10);
     expect(ag1).toBeLessThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeNIcomCof tests (Item 5.3)
+// ---------------------------------------------------------------------------
+
+describe("computeNIcomCof", () => {
+  const h = 1e-6;
+
+  it("fills ag with zeros when dt <= 0", () => {
+    const ag = new Float64Array(8);
+    ag.fill(99); // pre-fill to confirm overwrite
+    computeNIcomCof(0, [0, 0], 1, "bdf1", ag);
+    for (let i = 0; i < ag.length; i++) {
+      expect(ag[i]).toBe(0);
+    }
+  });
+
+  it("BDF-1 order 1: ag[0]=1/dt, ag[1]=-1/dt", () => {
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h], 1, "bdf1", ag);
+    expect(ag[0]).toBeCloseTo(1 / h, 10);
+    expect(ag[1]).toBeCloseTo(-1 / h, 10);
+  });
+
+  it("trapezoidal order 1: ag[0]=1/dt, ag[1]=-1/dt", () => {
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h], 1, "trapezoidal", ag);
+    expect(ag[0]).toBeCloseTo(1 / h, 10);
+    expect(ag[1]).toBeCloseTo(-1 / h, 10);
+  });
+
+  it("trapezoidal order 2: ag[0]=2/dt, ag[1]=1 (xmu=0.5)", () => {
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h], 2, "trapezoidal", ag);
+    // xmu=0.5: ag[0] = 1/(dt*(1-0.5)) = 2/dt; ag[1] = 0.5/(1-0.5) = 1
+    expect(ag[0]).toBeCloseTo(2 / h, 10);
+    expect(ag[1]).toBeCloseTo(1, 10);
+  });
+
+  it("BDF-2 equal steps: ag[0]=3/(2h), ag[1]=-2/h, ag[2]=1/(2h)", () => {
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h], 2, "bdf2", ag);
+    // With h1=h: r1=1, r2=2, u22=2*(2-1)=2, rhs2=1/h
+    // ag2 = (1/h)/2 = 1/(2h), ag1 = (-1/h - 2/(2h))/1 = -2/h
+    // ag0 = -(ag1+ag2) = 2/h - 1/(2h) = 3/(2h)
+    expect(ag[0]).toBeCloseTo(3 / (2 * h), 10);
+    expect(ag[1]).toBeCloseTo(-2 / h, 10);
+    expect(ag[2]).toBeCloseTo(1 / (2 * h), 10);
+  });
+
+  it("BDF-2 degenerate (h1=0): falls back to BE coefficients", () => {
+    // deltaOld[1]=0 triggers safeH1=dt fallback, which gives equal-steps BDF-2, not BE.
+    // Spec: h1 = deltaOld[1] > 0 ? deltaOld[1] : dt — so h1=dt → equal steps BDF-2.
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, 0], 2, "bdf2", ag);
+    // h1=0 → safeH1=dt=h → same as equal steps
+    expect(ag[0]).toBeCloseTo(3 / (2 * h), 10);
+    expect(ag[1]).toBeCloseTo(-2 / h, 10);
+    expect(ag[2]).toBeCloseTo(1 / (2 * h), 10);
+  });
+
+  it("ag[0] matches integrateCapacitor ag0 for same dt/method/order", () => {
+    const C = 1;
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h], 2, "bdf2", ag);
+    const { ag0: ag0Cap } = integrateCapacitor(C, 0, 0, 0, 0, h, h, 2, "bdf2", 0);
+    expect(ag[0]).toBeCloseTo(ag0Cap, 10);
+  });
+
+  it("ag[0] matches integrateCapacitor ag0 for trapezoidal order 2", () => {
+    const C = 1;
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h], 2, "trapezoidal", ag);
+    const { ag0: ag0Cap } = integrateCapacitor(C, 0, 0, 0, 0, h, h, 2, "trapezoidal", 0);
+    expect(ag[0]).toBeCloseTo(ag0Cap, 10);
   });
 });

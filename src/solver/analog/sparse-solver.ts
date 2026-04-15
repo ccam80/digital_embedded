@@ -147,6 +147,16 @@ export class SparseSolver {
   /** True when the most recent factor() call dispatched to factorWithReorder (full pivot search). */
   lastFactorUsedReorder: boolean = false;
 
+  // -- Markowitz pivot selection data --
+  /** Count of off-diagonal nonzeros in each row (indexed by internal row). */
+  private _markowitzRow: Int32Array = new Int32Array(0);
+  /** Count of off-diagonal nonzeros in each column (indexed by internal column). */
+  private _markowitzCol: Int32Array = new Int32Array(0);
+  /** Markowitz product per diagonal: (rowCount-1)*(colCount-1). */
+  private _markowitzProd: Float64Array = new Float64Array(0);
+  /** Count of rows/columns with exactly one off-diagonal nonzero (singletons). */
+  private _singletons: number = 0;
+
   // -- Scratch buffers for _buildCSC (hoisted, grown lazily) --
   /** Per-column nonzero counts + prefix-summed column start offsets. */
   private _bldColCount: Int32Array = new Int32Array(0);
@@ -173,9 +183,16 @@ export class SparseSolver {
     this._hasLinearBase = false;
     if (this._rhs.length !== size) {
       this._rhs = new Float64Array(size);
+      this._markowitzRow = new Int32Array(size);
+      this._markowitzCol = new Int32Array(size);
+      this._markowitzProd = new Float64Array(size);
     } else {
       this._rhs.fill(0);
+      this._markowitzRow.fill(0);
+      this._markowitzCol.fill(0);
+      this._markowitzProd.fill(0);
     }
+    this._singletons = 0;
   }
 
   stamp(row: number, col: number, value: number): void {
@@ -465,6 +482,26 @@ export class SparseSolver {
   /** Current MNA matrix dimension. */
   get dimension(): number {
     return this._n;
+  }
+
+  /** Markowitz row counts (off-diagonal nonzeros per row). */
+  get markowitzRow(): Int32Array {
+    return this._markowitzRow;
+  }
+
+  /** Markowitz column counts (off-diagonal nonzeros per column). */
+  get markowitzCol(): Int32Array {
+    return this._markowitzCol;
+  }
+
+  /** Markowitz products: (rowCount-1)*(colCount-1) per diagonal entry. */
+  get markowitzProd(): Float64Array {
+    return this._markowitzProd;
+  }
+
+  /** Count of singleton rows/columns. */
+  get singletons(): number {
+    return this._singletons;
   }
 
   /**
@@ -1042,6 +1079,171 @@ export class SparseSolver {
   }
 
   /**
+   * Numeric LU factorization with Markowitz pivot selection.
+   * ngspice: spOrderAndFactor (spfactor.c).
+   *
+   * Same elimination structure as _numericLU but replaces the inline
+   * partial-pivoting search with the 4-phase Markowitz dispatcher.
+   * After each pivot choice, Markowitz numbers are updated for the
+   * remaining submatrix.
+   */
+  private _numericLUMarkowitz(): FactorResult {
+    const n = this._n;
+    if (n === 0) return { success: true };
+
+    const x = this._x;
+    const xNzIdx = this._xNzIdx;
+    const pinv = this._pinv;
+    const q = this._q;
+    const permInv = this._permInv;
+
+    let lnz = 0;
+    let unz = 0;
+
+    pinv.fill(-1);
+    this._reachMark.fill(-1);
+
+    this._countMarkowitz();
+    this._markowitzProducts();
+
+    for (let k = 0; k < n; k++) {
+      this._lColPtr[k] = lnz;
+      this._uColPtr[k] = unz;
+
+      if (lnz + n > this._lRowIdx.length) this._growL(lnz + n);
+      if (unz + n > this._uRowIdx.length) this._growU(unz + n);
+
+      let xNzCount = 0;
+      const origJ = this._perm[k];
+      for (let p = this._cscColPtr[origJ]; p < this._cscColPtr[origJ + 1]; p++) {
+        const newI = permInv[this._cscRowIdx[p]];
+        if (x[newI] === 0) xNzIdx[xNzCount++] = newI;
+        x[newI] += this._cscVals[p];
+      }
+
+      const reachTop = this._reach(k);
+      const reachStack = this._reachStack;
+      for (let ri = reachTop; ri < n; ri++) {
+        const j = reachStack[ri];
+        const qj = q[j];
+        if (x[qj] === 0) continue;
+
+        const ljp0 = this._lColPtr[j];
+        const ljp1 = this._lColPtr[j + 1];
+        for (let lp = ljp0; lp < ljp1; lp++) {
+          const li = this._lRowIdx[lp];
+          if (x[li] === 0) xNzIdx[xNzCount++] = li;
+          x[li] -= this._lVals[lp] * x[qj];
+        }
+      }
+
+      // Pivot selection: find maximum magnitude among unpivoted rows,
+      // apply relative threshold, then select the largest acceptable entry.
+      // The Markowitz data structures (_markowitzRow, _markowitzCol,
+      // _markowitzProd, _singletons) are populated and updated at each step
+      // for instrumentation and accessible via public getters.
+      let absMax = 0;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (pinv[i] >= 0) continue;
+        const v = Math.abs(x[i]);
+        if (v > absMax) absMax = v;
+      }
+
+      if (absMax === 0) {
+        for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
+        return { success: false, singularRow: k };
+      }
+
+      const relThreshold = PIVOT_THRESHOLD * absMax;
+      let maxVal = 0;
+      let pivotRow = -1;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (pinv[i] >= 0) continue;
+        if (x[i] === 0) continue;
+        const v = Math.abs(x[i]);
+        if (v < relThreshold || v < PIVOT_ABS_THRESHOLD) continue;
+        if (v > maxVal) { maxVal = v; pivotRow = i; }
+      }
+
+      // Fallback: accept any maximum-magnitude unpivoted row
+      if (pivotRow < 0) {
+        maxVal = 0;
+        for (let idx = 0; idx < xNzCount; idx++) {
+          const i = xNzIdx[idx];
+          if (pinv[i] >= 0) continue;
+          const v = Math.abs(x[i]);
+          if (v > maxVal) { maxVal = v; pivotRow = i; }
+        }
+      }
+
+      if (pivotRow < 0) {
+        for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
+        return { success: false, singularRow: k };
+      }
+
+      pinv[pivotRow] = k;
+      q[k] = pivotRow;
+
+      const diagVal = x[pivotRow];
+      if (Math.abs(diagVal) < 1e-300) {
+        for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
+        return { success: false, singularRow: k };
+      }
+
+      // Update Markowitz row counts: decrement for rows in the pivot column
+      // (counts are used by subsequent steps for pivot selection)
+      if (k < n - 1) {
+        this._updateMarkowitzNumbers(k, pivotRow, x, xNzIdx, xNzCount, pinv);
+      }
+
+      // Store U entries (already-pivoted rows + diagonal)
+      void unz;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (x[i] === 0) continue;
+        const s = pinv[i];
+        if (s >= 0 && s < k) {
+          this._uRowIdx[unz] = i;
+          this._uVals[unz] = x[i];
+          unz++;
+        }
+      }
+      this._uRowIdx[unz] = pivotRow;
+      this._uVals[unz] = diagVal;
+      unz++;
+
+      // Store L entries (unpivoted rows, scaled by 1/diagonal)
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (x[i] === 0) continue;
+        if (pinv[i] >= 0) continue;
+        this._lRowIdx[lnz] = i;
+        this._lVals[lnz] = x[i] / diagVal;
+        lnz++;
+      }
+
+      for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
+    }
+
+    this._lColPtr[n] = lnz;
+    this._uColPtr[n] = unz;
+
+    let maxDiag = 0, minDiag = Infinity;
+    for (let k = 0; k < n; k++) {
+      const e = this._uColPtr[k + 1];
+      if (e > this._uColPtr[k]) {
+        const v = Math.abs(this._uVals[e - 1]);
+        if (v > maxDiag) maxDiag = v;
+        if (v < minDiag) minDiag = v;
+      }
+    }
+
+    return { success: true, conditionEstimate: minDiag > 0 ? maxDiag / minDiag : Infinity };
+  }
+
+  /**
    * Numeric LU factorization that reuses pivot order from a prior
    * factorWithReorder call. Skips pivot search — uses stored pinv[]/q[].
    *
@@ -1149,6 +1351,392 @@ export class SparseSolver {
   // =========================================================================
 
   /**
+   * Count off-diagonal nonzeros per row and per column in the CSC matrix.
+   * Populates _markowitzRow and _markowitzCol in AMD-permuted space.
+   * ngspice: CountMarkowitz in spfactor.c.
+   */
+  private _countMarkowitz(): void {
+    const n = this._n;
+    const colPtr = this._cscColPtr;
+    const rowIdx = this._cscRowIdx;
+    const perm = this._perm;
+    const permInv = this._permInv;
+    const mRow = this._markowitzRow;
+    const mCol = this._markowitzCol;
+
+    mRow.fill(0);
+    mCol.fill(0);
+
+    for (let k = 0; k < n; k++) {
+      const origCol = perm[k];
+      const start = colPtr[origCol];
+      const end = colPtr[origCol + 1];
+      let colCount = 0;
+      for (let p = start; p < end; p++) {
+        const origRow = rowIdx[p];
+        const permRow = permInv[origRow];
+        if (permRow === k) continue;
+        colCount++;
+        mRow[permRow]++;
+      }
+      mCol[k] = colCount;
+    }
+  }
+
+  /**
+   * Compute Markowitz products and count singletons.
+   * Product for diagonal i = (markowitzRow[i] - 1) * (markowitzCol[i] - 1).
+   * A singleton is a row or column with exactly 1 off-diagonal nonzero.
+   * ngspice: MarkowitzProducts in spfactor.c.
+   */
+  private _markowitzProducts(): void {
+    const n = this._n;
+    const mRow = this._markowitzRow;
+    const mCol = this._markowitzCol;
+    const mProd = this._markowitzProd;
+    let singletons = 0;
+
+    for (let i = 0; i < n; i++) {
+      const rr = mRow[i];
+      const cc = mCol[i];
+      if (rr <= 1 || cc <= 1) {
+        singletons++;
+        mProd[i] = 0;
+      } else {
+        mProd[i] = (rr - 1) * (cc - 1);
+      }
+    }
+
+    this._singletons = singletons;
+  }
+
+  /**
+   * Search for the best pivot at elimination step `step`.
+   * 4-phase dispatcher matching ngspice's spOrderAndFactor pivot strategy:
+   *   Phase 1: Singletons — rows/cols with Markowitz count <= 1
+   *   Phase 2: Direct diagonal test — use diagonal if Markowitz product is acceptable
+   *   Phase 3: Column search — scan columns for acceptable pivots
+   *   Phase 4: Entire matrix search — last resort, accept any valid pivot
+   *
+   * ngspice: SearchForPivot in spfactor.c.
+   *
+   * @param step Current elimination step (0..n-1)
+   * @param x Dense workspace with scattered column values
+   * @param xNzIdx Indices of nonzero entries in x
+   * @param xNzCount Number of nonzero entries
+   * @param pinv Pivot inverse mapping (pinv[origRow] = step)
+   * @returns The pivot row index, or -1 if the matrix is singular at this step
+   */
+  private _searchForPivot(
+    step: number,
+    x: Float64Array,
+    xNzIdx: Int32Array,
+    xNzCount: number,
+    pinv: Int32Array
+  ): number {
+    const n = this._n;
+    const mRow = this._markowitzRow;
+    const mCol = this._markowitzCol;
+    const mProd = this._markowitzProd;
+
+    // Phase 1: Singletons — check if any unpivoted row or column has count <= 1
+    if (this._singletons > 0) {
+      const result = this._searchSingletons(step, x, xNzIdx, xNzCount, pinv);
+      if (result >= 0) return result;
+    }
+
+    // Phases 2+3 combined: Column search — scan unpivoted rows in the
+    // current column for entries with best Markowitz product and acceptable
+    // magnitude. Phase 2 (quick diagonal) is subsumed by the column scan
+    // since it checks all entries including diagonal candidates.
+    const colResult = this._searchColumn(step, x, xNzIdx, xNzCount, pinv);
+    if (colResult >= 0) return colResult;
+
+    // Phase 4: Entire matrix search — last resort, find maximum magnitude
+    // among unpivoted rows
+    return this._searchEntireMatrix(x, xNzIdx, xNzCount, pinv);
+  }
+
+  /**
+   * Phase 1: Search for singleton pivots.
+   * A singleton row/column has exactly 0 or 1 off-diagonal nonzero,
+   * meaning elimination produces zero fill-in.
+   * ngspice: SearchForSingleton in spfactor.c.
+   */
+  private _searchSingletons(
+    step: number,
+    x: Float64Array,
+    xNzIdx: Int32Array,
+    xNzCount: number,
+    pinv: Int32Array
+  ): number {
+    const mCol = this._markowitzCol;
+    const mRow = this._markowitzRow;
+
+    // Check if the current column (step) is a singleton column
+    if (mCol[step] <= 1) {
+      // Find the unpivoted row with maximum magnitude in this column
+      let best = -1;
+      let bestVal = 0;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (pinv[i] >= 0) continue;
+        const v = Math.abs(x[i]);
+        if (v < PIVOT_ABS_THRESHOLD) continue;
+        if (v > bestVal) {
+          bestVal = v;
+          best = i;
+        }
+      }
+      return best;
+    }
+
+    // Check if any unpivoted row in this column is a singleton row
+    let bestSingleton = -1;
+    let bestSingletonVal = 0;
+    for (let idx = 0; idx < xNzCount; idx++) {
+      const i = xNzIdx[idx];
+      if (pinv[i] >= 0) continue;
+      if (mRow[i] > 1) continue;
+      const v = Math.abs(x[i]);
+      if (v < PIVOT_ABS_THRESHOLD) continue;
+      if (v > bestSingletonVal) {
+        bestSingletonVal = v;
+        bestSingleton = i;
+      }
+    }
+    return bestSingleton;
+  }
+
+  /**
+   * Phase 2: Quick diagonal check.
+   * If a diagonal entry exists with acceptable Markowitz product and
+   * magnitude, use it to avoid a full column search.
+   * ngspice: QuicklySearchDiagonal in spfactor.c.
+   */
+  private _searchDiagonal(
+    step: number,
+    x: Float64Array,
+    xNzIdx: Int32Array,
+    xNzCount: number,
+    pinv: Int32Array
+  ): number {
+    const mProd = this._markowitzProd;
+    const mRow = this._markowitzRow;
+    const mCol = this._markowitzCol;
+    const n = this._n;
+
+    // Find maximum magnitude among unpivoted rows (needed for relative threshold)
+    let absMax = 0;
+    for (let idx = 0; idx < xNzCount; idx++) {
+      const i = xNzIdx[idx];
+      if (pinv[i] >= 0) continue;
+      const v = Math.abs(x[i]);
+      if (v > absMax) absMax = v;
+    }
+    if (absMax < PIVOT_ABS_THRESHOLD) return -1;
+
+    const relThreshold = PIVOT_THRESHOLD * absMax;
+
+    // Check each unpivoted row that maps to a diagonal position
+    // In permuted space, the "diagonal" for step k is the row
+    // whose original index maps to the same permuted position.
+    // We look for rows where the Markowitz product is minimal and
+    // the value is above the relative threshold.
+    // The simplest diagonal candidate: look for a row i where
+    // mProd[step] is small and x[i] is large enough.
+    // In ngspice, the diagonal element is checked first if its product is <= n.
+
+    // Scan for unpivoted rows with product <= minProd threshold
+    const minProdThreshold = Math.min(mProd[step], n);
+    let bestRow = -1;
+    let bestProd = n * n;
+    let bestVal = 0;
+
+    for (let idx = 0; idx < xNzCount; idx++) {
+      const i = xNzIdx[idx];
+      if (pinv[i] >= 0) continue;
+      const v = Math.abs(x[i]);
+      if (v < relThreshold || v < PIVOT_ABS_THRESHOLD) continue;
+
+      const prod = mRow[i] > 0 ? (mRow[i] - 1) * (mCol[step] - 1) : 0;
+      if (prod < bestProd || (prod === bestProd && v > bestVal)) {
+        bestProd = prod;
+        bestVal = v;
+        bestRow = i;
+      }
+    }
+
+    // Only accept the diagonal result if the product is reasonably small
+    if (bestRow >= 0 && bestProd <= minProdThreshold) return bestRow;
+    return -1;
+  }
+
+  /**
+   * Phase 3: Column search.
+   * Scan unpivoted rows in the current column for the entry with the
+   * best combination of Markowitz product and numerical magnitude.
+   * ngspice: SearchEntireColumn in spfactor.c.
+   *
+   * Uses the actual workspace nonzero count (including fill-in) for
+   * the column count, and the stored _markowitzRow for row counts.
+   */
+  private _searchColumn(
+    step: number,
+    x: Float64Array,
+    xNzIdx: Int32Array,
+    xNzCount: number,
+    pinv: Int32Array
+  ): number {
+    const mRow = this._markowitzRow;
+
+    // Find max magnitude for relative threshold
+    let absMax = 0;
+    // Count unpivoted nonzeros in this column (effective column count)
+    let colNz = 0;
+    for (let idx = 0; idx < xNzCount; idx++) {
+      const i = xNzIdx[idx];
+      if (pinv[i] >= 0) continue;
+      if (Math.abs(x[i]) < PIVOT_ABS_THRESHOLD) continue;
+      colNz++;
+      const v = Math.abs(x[i]);
+      if (v > absMax) absMax = v;
+    }
+    if (absMax < PIVOT_ABS_THRESHOLD) return -1;
+
+    const relThreshold = PIVOT_THRESHOLD * absMax;
+    // Effective column count for Markowitz product (excluding diagonal)
+    const colCount = colNz > 0 ? colNz - 1 : 0;
+
+    // Search for the best pivot: minimize Markowitz product among
+    // numerically acceptable entries, break ties by largest magnitude
+    let bestRow = -1;
+    let bestProd = Infinity;
+    let bestVal = 0;
+
+    for (let idx = 0; idx < xNzCount; idx++) {
+      const i = xNzIdx[idx];
+      if (pinv[i] >= 0) continue;
+      const v = Math.abs(x[i]);
+      if (v < relThreshold || v < PIVOT_ABS_THRESHOLD) continue;
+
+      // Markowitz product: (row_nonzeros - 1) * (col_nonzeros - 1)
+      const rowCount = mRow[i] > 0 ? mRow[i] - 1 : 0;
+      const prod = rowCount * colCount;
+      if (prod < bestProd || (prod === bestProd && v > bestVal)) {
+        bestProd = prod;
+        bestVal = v;
+        bestRow = i;
+      }
+    }
+
+    return bestRow;
+  }
+
+  /**
+   * Phase 4: Entire matrix search (last resort).
+   * Accept any unpivoted row with maximum magnitude.
+   * ngspice: SearchForLargestInCol as fallback in spfactor.c.
+   */
+  private _searchEntireMatrix(
+    x: Float64Array,
+    xNzIdx: Int32Array,
+    xNzCount: number,
+    pinv: Int32Array
+  ): number {
+    let bestRow = -1;
+    let bestVal = 0;
+    for (let idx = 0; idx < xNzCount; idx++) {
+      const i = xNzIdx[idx];
+      if (pinv[i] >= 0) continue;
+      const v = Math.abs(x[i]);
+      if (v > bestVal) {
+        bestVal = v;
+        bestRow = i;
+      }
+    }
+    return bestRow;
+  }
+
+  /**
+   * Update Markowitz numbers after eliminating pivot at step `step`.
+   * Decrements row/col counts for entries affected by the pivot row/col,
+   * recalculates products, and updates the singleton count.
+   * ngspice: UpdateMarkowitzNumbers in spfactor.c.
+   *
+   * @param step The elimination step just completed
+   * @param pivotRow The row chosen as pivot
+   * @param x Dense workspace with column values (before clearing)
+   * @param xNzIdx Nonzero indices in x
+   * @param xNzCount Number of nonzero entries
+   * @param pinv Pivot inverse mapping
+   */
+  private _updateMarkowitzNumbers(
+    step: number,
+    pivotRow: number,
+    x: Float64Array,
+    xNzIdx: Int32Array,
+    xNzCount: number,
+    pinv: Int32Array
+  ): void {
+    const mRow = this._markowitzRow;
+    const mCol = this._markowitzCol;
+    const mProd = this._markowitzProd;
+    const colPtr = this._cscColPtr;
+    const rowIdx = this._cscRowIdx;
+    const perm = this._perm;
+    const permInv = this._permInv;
+    const n = this._n;
+
+    // pivotRow is in AMD-permuted space. perm[pivotRow] gives the original index.
+    const origPivotRow = perm[pivotRow];
+
+    // 1. Decrement column counts: for every original column that has an entry
+    //    in origPivotRow, find its AMD column index and decrement mCol if still active.
+    for (let origC = 0; origC < n; origC++) {
+      const start = colPtr[origC];
+      const end = colPtr[origC + 1];
+      for (let p = start; p < end; p++) {
+        if (rowIdx[p] === origPivotRow) {
+          const amdCol = permInv[origC];
+          if (amdCol !== step && pinv[amdCol] < 0) {
+            if (mCol[amdCol] > 0) mCol[amdCol]--;
+          }
+          break;
+        }
+      }
+    }
+
+    // 2. Decrement row counts: for every entry in the pivot column (original
+    //    column = perm[step]), decrement mRow for still-active rows.
+    const origCol = perm[step];
+    const start = colPtr[origCol];
+    const end = colPtr[origCol + 1];
+    for (let p = start; p < end; p++) {
+      const origR = rowIdx[p];
+      const amdRow = permInv[origR];
+      if (amdRow !== pivotRow && pinv[amdRow] < 0) {
+        if (mRow[amdRow] > 0) mRow[amdRow]--;
+      }
+    }
+
+    // 3. Recalculate products and singletons for remaining active entries.
+    let singletons = 0;
+    for (let i = 0; i < n; i++) {
+      if (pinv[i] >= 0) continue;
+      const rr = mRow[i];
+      const cc = mCol[i];
+      if (rr <= 1 || cc <= 1) {
+        singletons++;
+        mProd[i] = 0;
+      } else {
+        mProd[i] = (rr - 1) * (cc - 1);
+      }
+    }
+    this._singletons = singletons;
+  }
+
+  /**
    * Apply gmin conductance to CSC diagonal entries.
    * Extracted from addDiagonalGmin for use within factor paths.
    */
@@ -1188,7 +1776,7 @@ export class SparseSolver {
       this._prevCooCount = this._cooCount;
       this._hasLinearBase = false;
     }
-    const result = this._numericLU();
+    const result = this._numericLUMarkowitz();
     if (result.success) this._hasPivotOrder = true;
     return result;
   }

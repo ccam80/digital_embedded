@@ -284,6 +284,57 @@ export class NodeVoltageHistory {
 }
 
 /**
+ * Centralized NIcomCof — compute integration coefficients ag[] into shared store.
+ *
+ * Mirrors ngspice nicomcof.c. Called once per transient retry iteration in
+ * analog-engine.ts step(), BEFORE companion stamping. Elements read ag[0] etc.
+ * from statePool.ag instead of deriving 1/dt locally.
+ *
+ * ag[0] = coefficient on Q_n (current timepoint)
+ * ag[1] = coefficient on Q_{n-1}
+ * ag[2] = coefficient on Q_{n-2} (BDF-2 only)
+ */
+export function computeNIcomCof(
+  dt: number,
+  deltaOld: readonly number[],
+  order: number,
+  method: IntegrationMethod,
+  ag: Float64Array,
+): void {
+  if (dt <= 0) { ag.fill(0); return; }
+
+  if (method === "trapezoidal") {
+    if (order === 1) {
+      ag[0] = 1 / dt;
+      ag[1] = -1 / dt;
+    } else {
+      const xmu = 0.5;
+      ag[0] = 1 / (dt * (1 - xmu));
+      ag[1] = xmu / (1 - xmu);
+    }
+  } else if (method === "bdf2") {
+    const h1 = deltaOld[1] > 0 ? deltaOld[1] : dt;
+    const r1 = 1;
+    const r2 = (dt + h1) / dt;
+    const u22 = r2 * (r2 - r1);
+    if (Math.abs(u22) < 1e-30) {
+      ag[0] = 1 / dt;
+      ag[1] = -1 / dt;
+    } else {
+      const rhs2 = r1 / dt;
+      const ag2 = rhs2 / u22;
+      ag[1] = (-1 / dt - r2 * ag2) / r1;
+      ag[0] = -(ag[1] + ag2);
+      ag[2] = ag2;
+    }
+  } else {
+    // BDF-1
+    ag[0] = 1 / dt;
+    ag[1] = -1 / dt;
+  }
+}
+
+/**
  * Compute integration coefficients ag0 and ag1 from step parameters.
  * ag0 is the coefficient on Q_n (or phi_n for inductors).
  * ag1 is the coefficient on Q_{n-1}.

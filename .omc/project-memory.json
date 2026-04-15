@@ -265,8 +265,8 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 324,
-      "lastAccessed": 1776252429299,
+      "accessCount": 333,
+      "lastAccessed": 1776253265227,
       "type": "file"
     },
     {
@@ -295,8 +295,8 @@
     },
     {
       "path": "",
-      "accessCount": 99,
-      "lastAccessed": 1776252441357,
+      "accessCount": 100,
+      "lastAccessed": 1776253108002,
       "type": "directory"
     },
     {
@@ -319,9 +319,15 @@
     },
     {
       "path": "src\\solver\\analog",
-      "accessCount": 62,
-      "lastAccessed": 1776252566826,
+      "accessCount": 63,
+      "lastAccessed": 1776253093284,
       "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\state-pool.ts",
+      "accessCount": 55,
+      "lastAccessed": 1776253098666,
+      "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\ni\\niiter.c",
@@ -330,15 +336,9 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\state-pool.ts",
-      "accessCount": 54,
-      "lastAccessed": 1776252419389,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\analog\\integration.ts",
-      "accessCount": 48,
-      "lastAccessed": 1776244111351,
+      "accessCount": 50,
+      "lastAccessed": 1776253144852,
       "type": "file"
     },
     {

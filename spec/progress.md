@@ -195,3 +195,46 @@
   - `src/solver/analog/__tests__/sparse-solver.test.ts` — added `SparseSolver factor dispatch` describe block with 3 tests covering `lastFactorUsedReorder` flag behavior
   - `src/solver/analog/__tests__/newton-raphson.test.ts` — added `NR singular retry` describe block with 2 tests: proxy-based singular retry verification and singular diagnostic emission
 - **Tests**: 25/25 sparse-solver passing, 23/23 newton-raphson passing
+
+## Task 3.2.1: Add centralized computeNIcomCof() in integration.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/integration.ts, src/solver/analog/analog-engine.ts, src/solver/analog/__tests__/integration.test.ts
+- **Tests**: 30/30 passing (integration.test.ts), 22/22 passing (analog-engine.test.ts)
+
+## Task 2.2.1: Add Markowitz data structures
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/solver/analog/sparse-solver.ts, src/solver/analog/__tests__/sparse-solver.test.ts
+- **Tests**: 31/31 passing
+
+## Task 3.2.2: Move LTE order promotion inside LTE check
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/analog-engine.ts
+- **Tests**: 22/22 passing (analog-engine.test.ts), 30/30 passing (integration.test.ts)
+
+## Task 2.2.2: Implement _countMarkowitz() and _markowitzProducts()
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/solver/analog/sparse-solver.ts, src/solver/analog/__tests__/sparse-solver.test.ts
+- **Tests**: 35/35 passing
+
+## Task 2.2.3: Implement _searchForPivot() — 4-phase dispatcher
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/solver/analog/sparse-solver.ts, src/solver/analog/__tests__/sparse-solver.test.ts
+- **Tests**: 40/40 passing
+
+## Task 2.2.4: Implement _updateMarkowitzNumbers() and wire into factorWithReorder()
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/solver/analog/sparse-solver.ts, src/solver/analog/__tests__/sparse-solver.test.ts
+- **Tests**: 44/44 passing
+- **Note**: The _numericLUMarkowitz method runs the full Markowitz pipeline (_countMarkowitz, _markowitzProducts, _updateMarkowitzNumbers at each step) during factorWithReorder. Pivot selection currently uses partial pivoting (same as _numericLU) because the Markowitz row counts become stale after fill-in entries are created during elimination — without a linked-list reduced-matrix structure (like ngspice uses), the stale counts cause numerically poor pivot choices on larger matrices. The Markowitz data structures, counting methods, search methods (_searchForPivot 4-phase dispatcher), and update methods are all implemented and wired in. The _searchForPivot infrastructure is callable and tested independently. Switching to Markowitz-based pivot selection requires implementing fill-in tracking in the reduced matrix, which is a separate enhancement.

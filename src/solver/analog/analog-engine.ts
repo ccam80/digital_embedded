@@ -20,7 +20,7 @@ import { AcAnalysis } from "./ac-analysis.js";
 import type { AcParams, AcResult } from "./ac-analysis.js";
 import { SparseSolver } from "./sparse-solver.js";
 import { TimestepController } from "./timestep.js";
-import { HistoryStore, NodeVoltageHistory } from "./integration.js";
+import { HistoryStore, NodeVoltageHistory, computeNIcomCof } from "./integration.js";
 import { computeAgp, predictVoltages } from "./ni-pred.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { ConvergenceLog } from "./convergence-log.js";
@@ -408,6 +408,13 @@ export class MNAEngine implements AnalogEngine {
       // stampCompanion/updateOperatingPoint can derive ag0 = 1/dt locally,
       // matching NIcomCof (nicomcof.c:33-51) and CKTag[0] in ngspice.
       if (statePool) statePool.dt = dt;
+
+      // Centralized NIcomCof (item 5.3): compute ag[] into statePool.ag before
+      // companion stamping so elements read from the shared store.
+      if (statePool) {
+        computeNIcomCof(dt, this._timestep.deltaOld, this._timestep.currentOrder,
+          this._timestep.currentMethod, statePool.ag);
+      }
       if (statePool) {
         if (this._firsttime) {
           statePool.initMode = "initTran";
@@ -527,6 +534,13 @@ export class MNAEngine implements AnalogEngine {
           stepRec!.lteProposedDt = newDt;
         }
 
+        // ngspice dctran.c:856-876 — trial promotion from BDF-1 to trapezoidal.
+        // Runs INSIDE LTE check, before accept/reject, matching ngspice CKTtrunc ordering.
+        // Gate: only attempt when order is 1 and LTE result is >= 90% of the executed step.
+        if (this._timestep.currentOrder === 1 && newDt > 0.9 * dt) {
+          this._timestep.tryOrderPromotion(elements, this._history, this._simTime, dt);
+        }
+
         if (!this._timestep.shouldReject(worstRatio)) {
           // --- LTE ACCEPTED (ngspice dctran.c:862-912) ---
           this.stepPhaseHook?.onAttemptEnd("accepted", true);
@@ -627,13 +641,6 @@ export class MNAEngine implements AnalogEngine {
       return;
     }
     this._timestep.checkMethodSwitch(elements, this._history);
-
-    // ngspice dctran.c:856-876 — trial promotion from BDF-1 to trapezoidal.
-    // Gate: only attempt when the order-1 newDt > .9 * dt (LTE result exceeds
-    // 90% of the executed step). Matches ngspice dctran.c:862.
-    if (newDt > 0.9 * dt) {
-      this._timestep.tryOrderPromotion(elements, this._history, this._simTime, dt);
-    }
 
     // Run companion-state updates (edge detection, pin companion refresh,
     // latched logic levels) once on the accepted solution. Must run BEFORE
