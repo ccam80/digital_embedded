@@ -24,10 +24,11 @@ export function integrateCapacitor(
   C: number,
   vNow: number,
   q0: number, q1: number, q2: number,
-  dt: number, h1: number, h2: number,
+  dt: number, h1: number,
   order: number,
   method: IntegrationMethod,
   ccapPrev: number,
+  xmu: number = 0.5,
 ): { geq: number; ceq: number; ccap: number; ag0: number } {
   if (dt <= 0) return { geq: 0, ceq: 0, ccap: 0, ag0: 0 };
 
@@ -38,14 +39,16 @@ export function integrateCapacitor(
     ag0 = 1 / dt;
     ccap = (q0 - q1) / dt;
   } else if (method === "trapezoidal") {
-    ag0 = 2 / dt;
-    ccap = (2 / dt) * (q0 - q1) - ccapPrev;
+    ag0 = 1 / (dt * (1 - xmu));
+    ccap = (1 / (dt * (1 - xmu))) * (q0 - q1) - ccapPrev;
   } else {
     // BDF-2: ag[] from NIcomCof matrix solve (nicomcof.c:56-117)
     const safeH1 = h1 > 0 ? h1 : dt;
-    const safeH2 = h2 > 0 ? h2 : safeH1;
-    const r1 = safeH1 / dt;
-    const r2 = (safeH1 + safeH2) / dt;
+    // nicomcof.c:79-86 GEAR order=2: Vandermonde points are cumulative
+    // distances from t_n. r1 = deltaOld[0]/dt = dt/dt = 1 (always).
+    // r2 = (deltaOld[0]+deltaOld[1])/dt = (dt+h_{n-1})/dt.
+    const r1 = 1;
+    const r2 = (dt + safeH1) / dt;
     const u22 = r2 * (r2 - r1);
     if (Math.abs(u22) < 1e-30) {
       ag0 = 1 / dt;
@@ -72,10 +75,11 @@ export function integrateInductor(
   L: number,
   iNow: number,
   phi0: number, phi1: number, phi2: number,
-  dt: number, h1: number, h2: number,
+  dt: number, h1: number,
   order: number,
   method: IntegrationMethod,
   ccapPrev: number,
+  xmu: number = 0.5,
 ): { geq: number; ceq: number; ccap: number; ag0: number } {
   if (dt <= 0) return { geq: 0, ceq: 0, ccap: 0, ag0: 0 };
 
@@ -86,13 +90,15 @@ export function integrateInductor(
     ag0 = 1 / dt;
     ccap = (phi0 - phi1) / dt;
   } else if (method === "trapezoidal") {
-    ag0 = 2 / dt;
-    ccap = (2 / dt) * (phi0 - phi1) - ccapPrev;
+    ag0 = 1 / (dt * (1 - xmu));
+    ccap = (1 / (dt * (1 - xmu))) * (phi0 - phi1) - ccapPrev;
   } else {
     const safeH1 = h1 > 0 ? h1 : dt;
-    const safeH2 = h2 > 0 ? h2 : safeH1;
-    const r1 = safeH1 / dt;
-    const r2 = (safeH1 + safeH2) / dt;
+    // nicomcof.c:79-86 GEAR order=2: Vandermonde points are cumulative
+    // distances from t_n. r1 = deltaOld[0]/dt = dt/dt = 1 (always).
+    // r2 = (deltaOld[0]+deltaOld[1])/dt = (dt+h_{n-1})/dt.
+    const r1 = 1;
+    const r2 = (dt + safeH1) / dt;
     const u22 = r2 * (r2 - r1);
     if (Math.abs(u22) < 1e-30) {
       ag0 = 1 / dt;
@@ -288,22 +294,25 @@ export class NodeVoltageHistory {
 export function computeIntegrationCoefficients(
   dt: number,
   h1: number,
-  h2: number,
   order: number,
   method: IntegrationMethod,
+  xmu: number = 0.5,
 ): { ag0: number; ag1: number } {
   if (dt <= 0) return { ag0: 0, ag1: 0 };
 
   if (order <= 1) {
     return { ag0: 1 / dt, ag1: -1 / dt };
   } else if (method === "trapezoidal") {
-    return { ag0: 2 / dt, ag1: -2 / dt };
+    const ag0 = 1 / (dt * (1 - xmu));
+    return { ag0, ag1: -ag0 };
   } else {
     // BDF-2
     const safeH1 = h1 > 0 ? h1 : dt;
-    const safeH2 = h2 > 0 ? h2 : safeH1;
-    const r1 = safeH1 / dt;
-    const r2 = (safeH1 + safeH2) / dt;
+    // nicomcof.c:79-86 GEAR order=2: Vandermonde points are cumulative
+    // distances from t_n. r1 = deltaOld[0]/dt = dt/dt = 1 (always).
+    // r2 = (deltaOld[0]+deltaOld[1])/dt = (dt+h_{n-1})/dt.
+    const r1 = 1;
+    const r2 = (dt + safeH1) / dt;
     const u22 = r2 * (r2 - r1);
     if (Math.abs(u22) < 1e-30) {
       return { ag0: 1 / dt, ag1: -1 / dt };

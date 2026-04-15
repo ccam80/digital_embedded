@@ -295,14 +295,13 @@ export function dioTemp(p: {
   const nVt = p.N * vt;
   const tVcrit = nVt * Math.log(nVt / (tIS * Math.SQRT2));
 
-  // tBV: Newton-iterate 25 steps to find effective breakdown voltage (Change 32)
+  // tBV: Newton-iterate to find effective breakdown voltage
   // diotemp.c: xbv = BV - vt*log(1 + cbv/IS)  (cbv = IBV, using NBV emission)
   let tBV = p.BV;
   if (isFinite(p.BV)) {
     const nbvVt = p.NBV * vt;
-    let xbv = p.BV;
+    let xbv = p.BV - nbvVt * Math.log(1 + p.IBV / tIS);
     for (let i = 0; i < 25; i++) {
-      xbv = p.BV - nbvVt * Math.log(1 + p.IBV / tIS);
       const f = tIS * (Math.exp((p.BV - xbv) / nbvVt) - 1) - p.IBV;
       const df = tIS * Math.exp((p.BV - xbv) / nbvVt) / nbvVt;
       const dx = f / df;
@@ -388,12 +387,12 @@ export function createDiodeElement(
   // diosetup.c:93-95: NBV defaults to N when not explicitly given
   if (isNaN(params.NBV)) params.NBV = params.N;
 
-  // Change 34: Area scaling — applied once at construction
+  // Area scaling — applied once at construction
   params.IS  *= params.AREA;
   if (params.RS > 0) params.RS /= params.AREA;
   params.CJO *= params.AREA;
 
-  // Change 31: Mutable temperature-scaled working values — recomputed when params change.
+  // Mutable temperature-scaled working values — recomputed when params change.
   let tIS: number;
   let tVJ: number;
   let tCJO: number;
@@ -517,7 +516,11 @@ export function createDiodeElement(
       // Apply pnjlim — dioload.c:180-191
       const vdOld = s0[base + SLOT_VD];
       let vdLimited: number;
-      if (tBV < Infinity && vdRaw < Math.min(0, -tBV + 10 * vtebrk)) {
+      if (pool.initMode === "initJct") {
+        // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
+        vdLimited = vdRaw;
+        pnjlimLimited = false;
+      } else if (tBV < Infinity && vdRaw < Math.min(0, -tBV + 10 * vtebrk)) {
         // Breakdown reflection: limit in the reflected domain
         let vdtemp = -(vdRaw + tBV);
         const vdtempOld = -(vdOld + tBV);
@@ -559,7 +562,7 @@ export function createDiodeElement(
       // 3-region I-V: dioload.c:232-252
       const { id: idRaw, gd: gdRaw } = computeDiodeIV(vdLimited, tIS, nVt, tBV, vtebrk);
 
-      // Change 33: High-injection correction (IKF forward, IKR reverse)
+      // High-injection correction (IKF forward, IKR reverse)
       let gdCorr = gdRaw;
       if (isFinite(params.IKF) && params.IKF > 0 && idRaw > 0) {
         const ikfRatio = idRaw / params.IKF;
@@ -665,13 +668,18 @@ export function createDiodeElement(
       const q2 = s2[base + SLOT_Q];
       const ccapPrev = s1[base + SLOT_CCAP];
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-      const { geq, ceq, ccap } = integrateCapacitor(Ctotal, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      if (pool.initMode === "initTran") {
+        s1[base + SLOT_Q] = q0;  // q0→q1 copy (dioload.c:391-393)
+      }
+      const { geq, ceq, ccap } = integrateCapacitor(Ctotal, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
       s0[base + SLOT_CAP_GEQ] = geq;
       s0[base + SLOT_CAP_IEQ] = ceq;
       s0[base + SLOT_V] = vNow;
       s0[base + SLOT_Q] = q0;
       s0[base + SLOT_CCAP] = ccap;
+      if (pool.initMode === "initTran") {
+        s1[base + SLOT_CCAP] = s0[base + SLOT_CCAP];  // ccap0→ccap1 copy (dioload.c:399-402)
+      }
     };
 
     (element as unknown as { stampReactiveCompanion: AnalogElementCore["stampReactiveCompanion"] }).stampReactiveCompanion = function (

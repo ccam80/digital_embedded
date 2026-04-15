@@ -601,14 +601,27 @@ export class ComparisonSession {
     this._analysis = "tran";
     this._comparisons = null;
 
-    // Configure our engine with tStop (and maxStep if provided) so the
-    // timestep controller computes the correct initial dt — matching ngspice's
-    // dctran.c:118 formula MIN(tStop/100, maxStep) / 10 / 10.  Without this,
-    // the engine falls back to maxTimeStep/100/10, producing a much larger
-    // initial dt than ngspice and causing tranInit convergence failure.
+    // Derive ngspice-matching transient parameters for harness comparison.
+    // CKTstep = tstep sent to ngspice .tran command.
+    const tstep = tStop / 100;
+    const tStart = _tStart;
+
+    // traninit.c:27-31: auto-compute maxStep when user omits it.
+    const resolvedMaxStep = maxStep != null
+      ? maxStep
+      : Math.min(tstep, (tStop - tStart) / 50);
+
+    // traninit.c:34: CKTdelmin = 1e-11 * CKTmaxStep
+    const resolvedMinStep = 1e-11 * resolvedMaxStep;
+
+    // dctran.c:118: delta = MIN(CKTfinalTime/100, CKTstep) / 10
+    const resolvedFirstStep = Math.min(tStop / 100, tstep) / 10;
+
     this._engine.configure({
       tStop,
-      ...(maxStep != null ? { maxTimeStep: maxStep } : {}),
+      maxTimeStep: resolvedMaxStep,
+      minTimeStep: resolvedMinStep,
+      firstStep: resolvedFirstStep,
     });
 
     const stopStr = this._formatSpiceTime(tStop);
@@ -2650,8 +2663,7 @@ export class ComparisonSession {
     const deltaOld: number[] = (ts as any)._deltaOld ?? [];
     const dt: number = deltaOld[0] > 0 ? deltaOld[0] : (ts.currentDt ?? 0);
     const h1: number = deltaOld[1] > 0 ? deltaOld[1] : dt;
-    const h2: number = deltaOld[2] > 0 ? deltaOld[2] : h1;
-    const { ag0, ag1 } = computeIntegrationCoefficients(dt, h1, h2, order, rawMethod as any);
+    const { ag0, ag1 } = computeIntegrationCoefficients(dt, h1, order, rawMethod as any);
     return {
       ours: { ag0, ag1, method, order },
       ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },

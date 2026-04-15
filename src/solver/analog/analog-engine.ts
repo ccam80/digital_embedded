@@ -346,8 +346,6 @@ export class MNAEngine implements AnalogEngine {
     const wasFirsttime = this._firsttime;
 
     for (;;) {
-      statePool?.state0.set(statePool.state1);
-
       // ngspice dctran.c:735 — deltaOld[0] = delta each iteration.
       this._timestep.setDeltaOldCurrent(dt);
 
@@ -356,8 +354,7 @@ export class MNAEngine implements AnalogEngine {
 
       // Publish the advanced simTime to timeRef so time-varying sources
       // (AC voltage/current) evaluate at the correct time during the NR
-      // solve that follows. Previously timeRef was only updated after
-      // acceptance (line ~558), causing sources to stamp with t_prev.
+      // solve that follows.
       const cac = this._compiled as CompiledWithBridges | undefined;
       if (cac?.timeRef) cac.timeRef.value = this._simTime;
 
@@ -422,8 +419,8 @@ export class MNAEngine implements AnalogEngine {
         nodeCount,
         maxIterations: params.transientMaxIterations,
         reltol: params.reltol,
-        abstol: params.abstol,
-        iabstol: params.iabstol,
+        abstol: params.voltTol,
+        iabstol: params.abstol,
         initialGuess: this._voltages,
         diagnostics: this._diagnostics,
         voltagesBuffer: this._nrVoltages,
@@ -572,7 +569,11 @@ export class MNAEngine implements AnalogEngine {
 
     // Accept the timestep
     if (statePool) {
-      statePool.acceptTimestep();
+      const recycled = statePool.states[3];
+      statePool.states[3] = statePool.states[2];
+      statePool.states[2] = statePool.states[1];
+      statePool.states[1] = statePool.states[0];
+      statePool.states[0] = recycled;
       statePool.tranStep++;
       statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
     }

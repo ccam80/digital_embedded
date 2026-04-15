@@ -138,9 +138,15 @@ export function createScrElement(
   // Pool binding — set by initState
   let s0: Float64Array;
   let base: number;
+  let pool: StatePoolRef;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, SCRload sets CKTnoncon++)
   let pnjlimLimited = false;
+
+  // One-shot cold-start seeds from dcopInitJct. Non-null only between
+  // primeJunctions() and the next updateOperatingPoint() call.
+  let primedVak: number | null = null;
+  let primedVgk: number | null = null;
 
   function recomputeDerivedConstants(): void {
     nVt = p.n * VT;
@@ -223,7 +229,8 @@ export function createScrElement(
     stateSchema: SCR_STATE_SCHEMA,
     stateBaseOffset: -1,
 
-    initState(pool: StatePoolRef): void {
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
       s0 = pool.state0;
       base = this.stateBaseOffset;
       applyInitialValues(SCR_STATE_SCHEMA, pool, base, {});
@@ -261,46 +268,63 @@ export function createScrElement(
     },
 
     updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
-      const vGateNode = nodeG > 0 ? voltages[nodeG - 1] : 0;
-
-      const vakRaw = vA - vK;
-      const vgkRaw = vGateNode - vK;
+      let vakRaw: number;
+      let vgkRaw: number;
+      if (primedVak !== null) {
+        vakRaw = primedVak;
+        vgkRaw = primedVgk!;
+        primedVak = null;
+        primedVgk = null;
+      } else {
+        const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
+        const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
+        const vGateNode = nodeG > 0 ? voltages[nodeG - 1] : 0;
+        vakRaw = vA - vK;
+        vgkRaw = vGateNode - vK;
+      }
 
       // Check breakover using raw voltage before pnjlim.
       if (s0[base + SLOT_LATCHED] === 0.0 && vakRaw > p.vBreakover) {
         s0[base + SLOT_LATCHED] = 1.0;
       }
 
-      // Apply pnjlim to anode-cathode junction voltage for NR stability
-      const vakResult = pnjlim(vakRaw, s0[base + SLOT_VAK], nVt, vcrit);
-      const vakLimited = vakResult.value;
+      let vakLimited: number;
+      let vgkLimited: number;
+      if (pool.initMode === "initJct") {
+        // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
+        vakLimited = vakRaw;
+        vgkLimited = vgkRaw;
+        pnjlimLimited = false;
+      } else {
+        // Apply pnjlim to anode-cathode junction voltage for NR stability
+        const vakResult = pnjlim(vakRaw, s0[base + SLOT_VAK], nVt, vcrit);
+        vakLimited = vakResult.value;
 
-      // Apply pnjlim to gate-cathode junction voltage for NR stability
-      const vgkResult = pnjlim(vgkRaw, s0[base + SLOT_VGK], nVt, vcritGate);
-      const vgkLimited = vgkResult.value;
-      pnjlimLimited = vakResult.limited || vgkResult.limited;
+        // Apply pnjlim to gate-cathode junction voltage for NR stability
+        const vgkResult = pnjlim(vgkRaw, s0[base + SLOT_VGK], nVt, vcritGate);
+        vgkLimited = vgkResult.value;
+        pnjlimLimited = vakResult.limited || vgkResult.limited;
 
-      if (limitingCollector) {
-        limitingCollector.push({
-          elementIndex: (this as any).elementIndex ?? -1,
-          label: (this as any).label ?? "",
-          junction: "AK",
-          limitType: "pnjlim",
-          vBefore: vakRaw,
-          vAfter: vakLimited,
-          wasLimited: vakResult.limited,
-        });
-        limitingCollector.push({
-          elementIndex: (this as any).elementIndex ?? -1,
-          label: (this as any).label ?? "",
-          junction: "GK",
-          limitType: "pnjlim",
-          vBefore: vgkRaw,
-          vAfter: vgkLimited,
-          wasLimited: vgkResult.limited,
-        });
+        if (limitingCollector) {
+          limitingCollector.push({
+            elementIndex: (this as any).elementIndex ?? -1,
+            label: (this as any).label ?? "",
+            junction: "AK",
+            limitType: "pnjlim",
+            vBefore: vakRaw,
+            vAfter: vakLimited,
+            wasLimited: vakResult.limited,
+          });
+          limitingCollector.push({
+            elementIndex: (this as any).elementIndex ?? -1,
+            label: (this as any).label ?? "",
+            junction: "GK",
+            limitType: "pnjlim",
+            vBefore: vgkRaw,
+            vAfter: vgkLimited,
+            wasLimited: vgkResult.limited,
+          });
+        }
       }
 
       s0[base + SLOT_VAK] = vakLimited;
@@ -353,6 +377,12 @@ export function createScrElement(
 
       // Return in pinLayout order [A, K, G]
       return [iA, iK, iG];
+    },
+
+    primeJunctions(): void {
+      // dioload.c:135-136: MODEINITJCT sets vd = tVcrit
+      primedVak = vcrit;   // forward junction seed
+      primedVgk = 0;       // gate initially unbiased
     },
 
     setParam(key: string, value: number): void {

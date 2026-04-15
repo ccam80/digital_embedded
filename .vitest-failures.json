@@ -1,27 +1,81 @@
 {
   "summary": {
-    "passed": 3,
-    "failed": 2,
+    "passed": 6,
+    "failed": 10,
     "skipped": 0,
     "totalFiles": 1,
-    "durationSeconds": 2.5
+    "durationSeconds": 0.6
   },
   "failures": [
     {
-      "message": "Analog engine stagnation: simTime stuck at 0.00020000299999999998s. The engine exhausted all internal retries without advancing. Check convergence log for details.",
-      "count": 2,
+      "message": "expected false to be true // Object.is equality",
+      "count": 9,
       "locations": [
         {
-          "file": "src\\solver\\coordinator.ts",
-          "test": "survives 2000 transient steps without ERROR state",
-          "line": 203,
-          "column": 13
+          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
+          "test": "solves_2x2_dense",
+          "line": 19,
+          "column": 26
         },
         {
-          "file": "src\\solver\\coordinator.ts",
-          "test": "survives 600µs of sim time (matches UI run duration)",
-          "line": 203,
-          "column": 13
+          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
+          "test": "solves_3x3_sparse_tridiagonal",
+          "line": 19,
+          "column": 26
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
+          "test": "sums_duplicate_entries",
+          "line": 87,
+          "column": 28
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
+          "test": "identity_matrix_trivial",
+          "line": 120,
+          "column": 28
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
+          "test": "reuses_symbolic_across_numeric_refactor",
+          "line": 141,
+          "column": 24
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
+          "test": "invalidate_forces_resymbolize",
+          "line": 176,
+          "column": 23
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
+          "test": "mna_resistor_divider_3x3",
+          "line": 239,
+          "column": 28
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
+          "test": "performance_50_node",
+          "line": 289,
+          "column": 28
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
+          "test": "mna_50node_realistic_circuit_performance",
+          "line": 410,
+          "column": 32
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be defined",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\sparse-solver.test.ts",
+          "test": "detects_singular_matrix",
+          "line": 106,
+          "column": 32
         }
       ]
     }

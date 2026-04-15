@@ -357,8 +357,7 @@ function createLedAnalogElement(
       const q2 = s2[base + SLOT_Q];
       const ccapPrev = s1[base + SLOT_CCAP];
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-      const { geq, ceq, ccap } = integrateCapacitor(Ctotal, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      const { geq, ceq, ccap } = integrateCapacitor(Ctotal, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
       s0[base + SLOT_CAP_GEQ] = geq;
       s0[base + SLOT_CAP_IEQ] = ceq;
       s0[base + SLOT_V] = vNow;

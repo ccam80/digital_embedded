@@ -404,6 +404,7 @@ export function newtonRaphson(opts: NROptions): NRResult {
 
   const statePool = opts.statePool ?? null;
   let oldState0: Float64Array | null = null;
+  let ipass = 0;
 
   // Initialize from initial guess if provided
   if (opts.initialGuess) {
@@ -415,72 +416,24 @@ export function newtonRaphson(opts: NROptions): NRResult {
   // need to compare consecutive iterates — the first solution is the answer.
   const hasNonlinear = elements.some((el) => el.isNonlinear);
 
-  // Initialize all nonlinear elements to the starting operating point
-  // (sets up geq/ieq for the first stampNonlinear call)
-  assembler.updateOperatingPoints(elements, voltages);
-
-  // Stamp linear contributions once before the NR loop. These values are
-  // operating-point-independent and identical on every iteration -- hoisting
-  // them avoids redundant COO rebuilds and CSC scatters.
-  // First iteration: full assembly establishes sparsity pattern + _cooToCsc.
-  solver.beginAssembly(matrixSize);
-  assembler.stampLinear(elements);
-  // Capture the linear-only RHS and COO position before nonlinear stamps.
-  const linearCooCount = solver.cooCount;
-  solver.captureLinearRhs();
-
-  assembler.stampNonlinear(elements);
-  assembler.stampReactiveCompanion(elements);
-  solver.finalize();
-  // Snapshot CSC values for linear-only contributions (scatter-adds only
-  // the linear COO portion [0, linearCooCount) into a separate buffer).
-  solver.saveLinearBase(linearCooCount);
-
   // Hoist the iter-0 split hook into a local so the per-iteration hot path
   // pays nothing (not even a property lookup) when no harness is attached.
   const onIter0Complete = opts.onIteration0Complete;
 
-  // dcopModeLadder: prime junctions before iter 0 and set initMode (niiter.c:991-993).
+  // dcopModeLadder: set initial initMode and prime junctions before iter 0.
   const ladder = opts.dcopModeLadder ?? null;
   if (ladder) {
     ladder.pool.initMode = "initJct";
     ladder.runPrimeJunctions();
-    // Re-run updateOperatingPoints so the primed junction seeds reach the stamp
-    // (same as the old separate jctResult NR call: one updateOP at initJct).
-    assembler.updateOperatingPoints(elements, voltages);
-    // Re-stamp nonlinear with primed OP before iter 0.
-    solver.restoreLinearBase();
-    solver.setCooCount(linearCooCount);
-    assembler.stampNonlinear(elements);
-    assembler.stampReactiveCompanion(elements);
-    solver.finalize(linearCooCount);
   }
 
-  // Per-mode iteration counter for the initFix first-iter guard (Fix 3).
-  // Tracks how many iterations have completed in the current ladder mode.
-  // Resets to 0 on each mode transition (initJct→initFix, initFix→initFloat).
-  // Starts at 0 — after the first iteration completes in initFix, ladderModeIter
-  // becomes 1, allowing the noncon===0 check to fire on the *second* iteration,
-  // matching ngspice's "iterno!=1" guard (niiter.c:885).
   let ladderModeIter = 0;
 
   for (let iteration = 0; iteration < maxIterations; iteration++) {
     // Save previous voltages for convergence check
     prevVoltages.set(voltages);
 
-    if (iteration === 0) {
-      // First iteration: matrix already assembled above, no work needed.
-    } else {
-      // Subsequent iterations: restore the linear base (CSC values + RHS),
-      // reset COO cursor to the linear boundary, re-stamp only nonlinear
-      // contributions, and partial-refill CSC with nonlinear entries only.
-      opts.preIterationHook?.(iteration, voltages);
-      solver.restoreLinearBase();
-      solver.setCooCount(linearCooCount);
-      assembler.stampNonlinear(elements);
-      assembler.stampReactiveCompanion(elements);
-      solver.finalize(linearCooCount);
-    }
+    opts.preIterationHook?.(iteration, voltages);
 
     // 1b. Diagonal gmin augmentation (ngspice LoadGmin, spsmp.c:448-478):
     //     Add gmin to every diagonal element before factorization.
@@ -550,13 +503,13 @@ export function newtonRaphson(opts: NROptions): NRResult {
       assembler.noncon = 1;
     }
 
-    // Transient mode automaton (niiter.c:1065-1073):
-    // initTran: after iter 0, unconditional -> initFloat
-    // initPred: unconditional -> initFloat (before iter 0 stamps)
+    // Transient mode automaton: initTran/initPred -> initFloat
     if (!ladder && opts.statePool) {
       const pool = opts.statePool as { initMode: string };
-      if (pool.initMode === "initTran" && iteration === 0) {
-        opts.solver.forceReorder();
+      if (pool.initMode === "initTran") {
+        if (iteration <= 0) {
+          opts.solver.forceReorder();
+        }
         pool.initMode = "initFloat";
       } else if (pool.initMode === "initPred") {
         pool.initMode = "initFloat";
@@ -564,7 +517,8 @@ export function newtonRaphson(opts: NROptions): NRResult {
     }
 
     // 5b. Node damping (ngspice niiter.c:204-229):
-    //     Guards: nodeDamping enabled, noncon != 0, isDcOp, iteration > 0.
+    //     Guards: nodeDamping enabled, noncon != 0, isDcOp, iteration > 0
+    //     (ngspice iterno > 1 is equivalent: iterno is 1-based after CKTload increment).
     //     If any voltage node changed by more than 10V, scale ALL updates
     //     by 10/maxDelta. Minimum scale factor 0.1.
     if (opts.nodeDamping && assembler.noncon !== 0 && opts.isDcOp && iteration > 0) {
@@ -671,15 +625,11 @@ export function newtonRaphson(opts: NROptions): NRResult {
         ladderModeIter = 0;
         opts.solver.forceReorder();
       } else if (curMode === "initFix") {
-        // niiter.c:994-997 + niiter.c:885-889: → initFloat only if noncon === 0
-        // AND this is not the first iteration in initFix (ngspice forces noncon=1
-        // when iterno==1, i.e. the first load in the current mode, preventing
-        // MODEINITFIX from exiting on the very first iteration).
-        // Mapping: ngspice iterno==1 ↔ our ladderModeIter==0 (0-indexed, resets
-        // on each mode entry).
-        if (assembler.noncon === 0 && ladderModeIter > 0) {
+        // niiter.c:994-997: → initFloat only if noncon === 0 (no extra guard)
+        if (assembler.noncon === 0) {
           nextMode = "initFloat";
           ladderModeIter = 0;
+          ipass = 1;
         }
       }
       // initFloat stays initFloat until convergence or exhaustion
@@ -721,7 +671,13 @@ export function newtonRaphson(opts: NROptions): NRResult {
       canConverge = true;
     }
     if (canConverge && globalConverged && elemConverged) {
-      return { converged: true, iterations: iteration + 1, voltages, largestChangeElement, largestChangeNode };
+      // ipass: force one extra NR pass after nodesets are released (niiter.c ipass logic).
+      if (ladder && ipass > 0) {
+        ipass--;
+        assembler.noncon = 1;
+      } else {
+        return { converged: true, iterations: iteration + 1, voltages, largestChangeElement, largestChangeNode };
+      }
     }
 
     // 10a. Split marker: after iteration 0 completes without converging, let

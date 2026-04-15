@@ -559,3 +559,33 @@ describe("SparseSolver pre-solve RHS capture", () => {
     expect(second[0]).toBeCloseTo(11, 12);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 0 stub contract: factor() returns { success: false }
+// ---------------------------------------------------------------------------
+
+describe("SparseSolver Phase 0 factor stub", () => {
+  it("factor returns success:false on any assembled matrix", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 4);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.finalize();
+    const result = solver.factor();
+    expect(result.success).toBe(false);
+  });
+
+  it("factor returns success:false for a 1x1 trivial matrix", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(1);
+    solver.stamp(0, 0, 5);
+    solver.stampRHS(0, 10);
+    solver.finalize();
+    const result = solver.factor();
+    expect(result.success).toBe(false);
+  });
+});

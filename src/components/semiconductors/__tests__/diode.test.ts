@@ -261,6 +261,69 @@ describe("Diode", () => {
     expect(DiodeDefinition.modelRegistry?.["spice"]?.kind).toBe("inline");
     expect((DiodeDefinition.modelRegistry?.["spice"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
   });
+
+  // -------------------------------------------------------------------------
+  // Gap 17: OFF parameter and UIC IC initial condition tests
+  // -------------------------------------------------------------------------
+
+  it("off_param_primeJunctions_zeroes_voltage", () => {
+    // Gap 17.1: A diode with OFF=1 (true) should have all junction voltages
+    // set to 0V after primeJunctions(). During DCOP initFix mode,
+    // checkConvergence must also return true (suppressing noncon).
+    //
+    // OFF maps to ngspice .ic OFF: dioload.c skips junction during initFix.
+    const propsObj = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, OFF: 1 });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element, pool } = withState(core);
+    const el = withNodeIds(element, [1, 2]);
+
+    // primeJunctions sets primedVd=0 (OFF path)
+    el.primeJunctions!();
+
+    // Consume the primed voltage by calling updateOperatingPoint.
+    // Voltages array values don't matter — primedVd overrides them.
+    const voltages = new Float64Array(2);
+    voltages[0] = 5; // would give Vd=5V without OFF, but primed=0 overrides
+    voltages[1] = 0;
+    el.updateOperatingPoint!(voltages);
+
+    // After primeJunctions + updateOperatingPoint, SLOT_VD (index 0) must be 0.
+    expect(pool.state0[0]).toBeCloseTo(0, 10);
+
+    // checkConvergence with initFix mode must return true (OFF suppresses noncon).
+    pool.initMode = "initFix";
+    const prevVoltages = new Float64Array(2);
+    const converged = el.checkConvergence!(voltages, prevVoltages, 1e-3, 1e-12);
+    expect(converged).toBe(true);
+  });
+
+  it("uic_ic_param_primeJunctions_sets_voltage", () => {
+    // Gap 17.2: A diode with IC=0.5 and pool.uic=true should have its junction
+    // voltage primed to 0.5V after primeJunctions().
+    //
+    // This maps to ngspice .ic V(node)=0.5 with UIC: dioload.c uses IC directly.
+    const propsObj = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, IC: 0.5 });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
+    const { element, pool } = withState(core);
+    const el = withNodeIds(element, [1, 2]);
+
+    // Enable UIC mode on pool (StatePool implements StatePoolRef; uic is an
+    // optional field on the interface — cast to add it).
+    (pool as unknown as { uic: boolean }).uic = true;
+
+    // primeJunctions sets primedVd=IC=0.5 (UIC path)
+    el.primeJunctions!();
+
+    // Consume the primed voltage.
+    const voltages = new Float64Array(2);
+    voltages[0] = 0;
+    voltages[1] = 0;
+    el.updateOperatingPoint!(voltages);
+
+    // SLOT_VD (index 0) must be 0.5V (pnjlim does not limit 0.5V from 0V
+    // because 0.5 < vcrit ≈ 0.725V, so no clamping occurs).
+    expect(pool.state0[0]).toBeCloseTo(0.5, 6);
+  });
 });
 
 // ---------------------------------------------------------------------------

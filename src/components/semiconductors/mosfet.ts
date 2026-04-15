@@ -775,10 +775,11 @@ export function limitVoltages(
 export function computeCapacitances(
   p: MosfetParams | ResolvedMosfetParams,
 ): { cgs: number; cgd: number; cgb: number; cbd: number; cbs: number } {
+  const M = p.M ?? 1;
   return {
-    cgs: (p.CGSO ?? 0) * p.W,
-    cgd: (p.CGDO ?? 0) * p.W,
-    cgb: (p.CGBO ?? 0) * (p.L - 2 * (p.LD ?? 0)),
+    cgs: (p.CGSO ?? 0) * p.W * M,
+    cgd: (p.CGDO ?? 0) * p.W * M,
+    cgb: (p.CGBO ?? 0) * (p.L - 2 * (p.LD ?? 0)) * M,
     cbd: p.CBD ?? 0,
     cbs: p.CBS ?? 0,
   };
@@ -1217,10 +1218,7 @@ class MosfetAnalogElement extends AbstractFetElement {
 
   override updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
     if (this._pool.initMode === "initPred") {
-      // ngspice mos1load.c:206-225 (MODEINITPRED, no PREDICTOR):
-      // Only copies vgs, vds, vbs, vbd from state1 to state0.
-      // These serve as the "vold" references for fetlim/pnjlim limiting.
-      // All conductances/currents/von/mode are recomputed from fresh voltages.
+      // mos1load.c:206-225: copy voltage-old references for fetlim/pnjlim limiting
       const base = this.stateBaseOffset;
       const s0 = this._s0;
       const s1 = this.s1;
@@ -1228,6 +1226,62 @@ class MosfetAnalogElement extends AbstractFetElement {
       s0[base + SLOT_VDS]     = s1[base + SLOT_VDS];      // limvds vold for vds
       s0[base + SLOT_VBS_OLD] = s1[base + SLOT_VBS_OLD];  // pnjlim vold for vbs
       s0[base + SLOT_VBD_OLD] = s1[base + SLOT_VBD_OLD];  // pnjlim vold for vbd
+    }
+
+    // mos1load.c:419-433: during MODEINITJCT, primeJunctions() has already set
+    // _vgs, _vds, _vsb directly. Skip MNA voltage reads and all voltage limiting —
+    // use primed values as-is for I-V evaluation.
+    if (this._pool.initMode === "initJct") {
+      this._pnjlimLimited = false;
+      this._swapped = false;
+      const base = this.stateBaseOffset;
+      const s0 = this._s0;
+      s0[base + SLOT_MODE] = 1;
+
+      const result = computeIds(this._vgs, this._vds, this._vsb, this._p);
+      this._ids = result.ids;
+      this._lastVdsat = result.vdsat;
+      this._gm = computeGm(this._vgs, this._vds, this._vsb, this._p);
+      this._gds = computeGds(this._vgs, this._vds, this._vsb, this._p);
+      this._gmbs = computeGmbs(this._vgs, this._vds, this._vsb, this._p);
+      s0[base + SLOT_VON] = result.vth;
+
+      // Bulk junctions: use primed vbs/vbd (reversed-biased, no pnjlim)
+      const vbs = -this._vsb;
+      const vbd = vbs - this._vds;
+      s0[base + SLOT_VBS_OLD] = vbs;
+      s0[base + SLOT_VBD_OLD] = vbd;
+
+      const drainSatCur = this._drainSatCur;
+      const sourceSatCur = this._sourceSatCur;
+      const MAX_EXP_ARG = 709.78;
+
+      let gbs: number, cbsI: number;
+      if (vbs <= -3 * VT) {
+        gbs = GMIN;
+        cbsI = GMIN * vbs - sourceSatCur;
+      } else {
+        const evbs = Math.exp(Math.min(vbs / VT, MAX_EXP_ARG));
+        gbs = sourceSatCur * evbs / VT + GMIN;
+        cbsI = sourceSatCur * (evbs - 1) + GMIN * vbs;
+      }
+
+      let gbd: number, cbdI: number;
+      if (vbd <= -3 * VT) {
+        gbd = GMIN;
+        cbdI = GMIN * vbd - drainSatCur;
+      } else {
+        const evbd = Math.exp(Math.min(vbd / VT, MAX_EXP_ARG));
+        gbd = drainSatCur * evbd / VT + GMIN;
+        cbdI = drainSatCur * (evbd - 1) + GMIN * vbd;
+      }
+
+      s0[base + SLOT_GBD] = gbd;
+      s0[base + SLOT_GBS] = gbs;
+      s0[base + SLOT_CBD_I] = cbdI;
+      s0[base + SLOT_CBS_I] = cbsI;
+      s0[base + SLOT_VBD] = vbd;
+      return false;
     }
 
     const nodeD = this.drainNode;
@@ -1602,7 +1656,6 @@ class MosfetAnalogElement extends AbstractFetElement {
     const mjsw = this._p.MJSW;
 
     const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
 
     // Junction-cap formulas follow ngspice mos1load.c exactly, which uses
     // vbd = V_bulk - V_drain and vbs = V_bulk - V_source as the controlling
@@ -1637,7 +1690,7 @@ class MosfetAnalogElement extends AbstractFetElement {
       const q1_db = s1[base + SLOT_Q_DB];
       const q2_db = this.s2[base + SLOT_Q_DB];
       const ccapPrev_db = s1[base + SLOT_CCAP_DB];
-      const resDB = integrateCapacitor(capbd, vbd, qbd, q1_db, q2_db, dt, h1, h2, order, method, ccapPrev_db);
+      const resDB = integrateCapacitor(capbd, vbd, qbd, q1_db, q2_db, dt, h1, order, method, ccapPrev_db);
       s0[base + SLOT_CAP_GEQ_DB] = resDB.geq;
       s0[base + SLOT_CAP_IEQ_DB] = resDB.ceq;
       s0[base + SLOT_CCAP_DB] = resDB.ccap;
@@ -1669,7 +1722,7 @@ class MosfetAnalogElement extends AbstractFetElement {
       const q1_sb = s1[base + SLOT_Q_SB];
       const q2_sb = this.s2[base + SLOT_Q_SB];
       const ccapPrev_sb = s1[base + SLOT_CCAP_SB];
-      const resSB = integrateCapacitor(capbs, vbs, qbs, q1_sb, q2_sb, dt, h1, h2, order, method, ccapPrev_sb);
+      const resSB = integrateCapacitor(capbs, vbs, qbs, q1_sb, q2_sb, dt, h1, order, method, ccapPrev_sb);
       s0[base + SLOT_CAP_GEQ_SB] = resSB.geq;
       s0[base + SLOT_CAP_IEQ_SB] = resSB.ceq;
       s0[base + SLOT_CCAP_SB] = resSB.ccap;
@@ -1710,7 +1763,7 @@ class MosfetAnalogElement extends AbstractFetElement {
       const q1_gb = s1[base + SLOT_Q_GB];
       const q2_gb = this.s2[base + SLOT_Q_GB];
       const ccapPrev_gb = s1[base + SLOT_CCAP_GB];
-      const resGB = integrateCapacitor(totalGb, vgb, qgb, q1_gb, q2_gb, dt, h1, h2, order, method, ccapPrev_gb);
+      const resGB = integrateCapacitor(totalGb, vgb, qgb, q1_gb, q2_gb, dt, h1, order, method, ccapPrev_gb);
       s0[base + SLOT_CAP_GEQ_GB] = resGB.geq;
       s0[base + SLOT_CAP_IEQ_GB] = resGB.ceq;
       s0[base + SLOT_CCAP_GB] = resGB.ccap;
@@ -1794,7 +1847,6 @@ class MosfetAnalogElement extends AbstractFetElement {
     // convention to match stampCompanion above.
     if (dt > 0) {
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
       const vbd = -vdb;
       const vbs = -vsbCap;
 
@@ -1822,7 +1874,7 @@ class MosfetAnalogElement extends AbstractFetElement {
         const q1_db = s1[base + SLOT_Q_DB];
         const q2_db = this.s2[base + SLOT_Q_DB];
         const ccapPrev_db = s1[base + SLOT_CCAP_DB];
-        const resDB = integrateCapacitor(capbd, vbd, qbd, q1_db, q2_db, dt, h1, h2, order, method, ccapPrev_db);
+        const resDB = integrateCapacitor(capbd, vbd, qbd, q1_db, q2_db, dt, h1, order, method, ccapPrev_db);
         s0[base + SLOT_CCAP_DB] = resDB.ccap;
       }
 
@@ -1850,7 +1902,7 @@ class MosfetAnalogElement extends AbstractFetElement {
         const q1_sb = s1[base + SLOT_Q_SB];
         const q2_sb = this.s2[base + SLOT_Q_SB];
         const ccapPrev_sb = s1[base + SLOT_CCAP_SB];
-        const resSB = integrateCapacitor(capbs, vbs, qbs, q1_sb, q2_sb, dt, h1, h2, order, method, ccapPrev_sb);
+        const resSB = integrateCapacitor(capbs, vbs, qbs, q1_sb, q2_sb, dt, h1, order, method, ccapPrev_sb);
         s0[base + SLOT_CCAP_SB] = resSB.ccap;
       }
 
@@ -1865,7 +1917,7 @@ class MosfetAnalogElement extends AbstractFetElement {
         const isFirstCallU2 = this._pool.initMode === "initTran";
         const totalGbRecalc = (isFirstCallU2 ? 2 * meyerGbNow : meyerGbNow + meyerGbPrev) + gbOverlap;
         if (totalGbRecalc > 0) {
-          const resGB = integrateCapacitor(totalGbRecalc, vgb, q0_gb, q1_gb, q2_gb, dt, h1, h2, order, method, ccapPrev_gb);
+          const resGB = integrateCapacitor(totalGbRecalc, vgb, q0_gb, q1_gb, q2_gb, dt, h1, order, method, ccapPrev_gb);
           s0[base + SLOT_CCAP_GB] = resGB.ccap;
         }
       }
@@ -1925,8 +1977,8 @@ export function createMosfetElement(
   const nodeS = pinNodes.get("S")!; // source
   const nodeD = pinNodes.get("D")!; // drain
 
-  const rawRD = props.hasModelParam("RD") ? props.getModelParam<number>("RD") : 0;
-  const rawRS = props.hasModelParam("RS") ? props.getModelParam<number>("RS") : 0;
+  const rawRD = props.getModelParam<number>("RD");
+  const rawRS = props.getModelParam<number>("RS");
 
   // 3-terminal MOSFET: bulk is always tied to source (no separate bulk pin).
   // Internal nodes are only allocated for RD/RS series resistances.
@@ -1935,50 +1987,45 @@ export function createMosfetElement(
   const nodeDint = rawRD > 0 && internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeD;
   const nodeSint = rawRS > 0 && internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeS;
 
-  /** Read a model param, returning `fallback` if the key is absent (backward compat). */
-  function mp(key: string, fallback: number): number {
-    return props.hasModelParam(key) ? props.getModelParam<number>(key) : fallback;
-  }
-
   const rawParams: MosfetParams = {
     VTO:    props.getModelParam<number>("VTO"),
     KP:     props.getModelParam<number>("KP"),
     LAMBDA: props.getModelParam<number>("LAMBDA"),
     PHI:    props.getModelParam<number>("PHI"),
     GAMMA:  props.getModelParam<number>("GAMMA"),
-    CBD:    mp("CBD", 0),
-    CBS:    mp("CBS", 0),
-    CGDO:   mp("CGDO", 0),
-    CGSO:   mp("CGSO", 0),
-    CGBO:   mp("CGBO", 0),
+    CBD:    props.getModelParam<number>("CBD"),
+    CBS:    props.getModelParam<number>("CBS"),
+    CGDO:   props.getModelParam<number>("CGDO"),
+    CGSO:   props.getModelParam<number>("CGSO"),
+    CGBO:   props.getModelParam<number>("CGBO"),
     W:      props.getModelParam<number>("W"),
     L:      props.getModelParam<number>("L"),
     RD:     rawRD,
     RS:     rawRS,
-    IS:     mp("IS", 1e-14),
-    PB:     mp("PB", 0.8),
-    CJ:     mp("CJ", 0),
-    MJ:     mp("MJ", 0.5),
-    CJSW:   mp("CJSW", 0),
-    MJSW:   mp("MJSW", 0.5),
-    JS:     mp("JS", 0),
-    RSH:    mp("RSH", 0),
-    AD:     mp("AD", 0),
-    AS:     mp("AS", 0),
-    PD:     mp("PD", 0),
-    PS:     mp("PS", 0),
-    TNOM:   mp("TNOM", 300.15),
-    TOX:    mp("TOX", 1e-7),
-    NSUB:   mp("NSUB", 0),
-    NSS:    mp("NSS", 0),
-    TPG:    mp("TPG", 1),
-    LD:     mp("LD", 0),
-    UO:     mp("UO", 600),
-    KF:     mp("KF", 0),
-    AF:     mp("AF", 1),
-    FC:     mp("FC", 0.5),
-    M:      mp("M", 1),
-    OFF:    mp("OFF", 0),
+    IS:     props.getModelParam<number>("IS"),
+    PB:     props.getModelParam<number>("PB"),
+    CJ:     props.getModelParam<number>("CJ"),
+    MJ:     props.getModelParam<number>("MJ"),
+    CJSW:   props.getModelParam<number>("CJSW"),
+    MJSW:   props.getModelParam<number>("MJSW"),
+    JS:     props.getModelParam<number>("JS"),
+    RSH:    props.getModelParam<number>("RSH"),
+    AD:     props.getModelParam<number>("AD"),
+    AS:     props.getModelParam<number>("AS"),
+    PD:     props.getModelParam<number>("PD"),
+    PS:     props.getModelParam<number>("PS"),
+    TNOM:   props.getModelParam<number>("TNOM"),
+    TOX:    props.getModelParam<number>("TOX"),
+    NSUB:   props.getModelParam<number>("NSUB"),
+    NSS:    props.getModelParam<number>("NSS"),
+    TPG:    props.getModelParam<number>("TPG"),
+    LD:     props.getModelParam<number>("LD"),
+    UO:     props.getModelParam<number>("UO"),
+    KF:     props.getModelParam<number>("KF"),
+    AF:     props.getModelParam<number>("AF"),
+    FC:     props.getModelParam<number>("FC"),
+    M:      props.getModelParam<number>("M"),
+    OFF:    props.getModelParam<number>("OFF"),
   };
 
   const p = resolveParams(rawParams, kpDefault);
@@ -1997,8 +2044,8 @@ export function createMosfetElement(
  */
 export function getMosfetInternalNodeCount(props: PropertyBag): number {
   let count = 0; // 3-terminal: bulk = source, no internal node needed
-  if (props.hasModelParam("RD") && props.getModelParam<number>("RD") > 0) count++;
-  if (props.hasModelParam("RS") && props.getModelParam<number>("RS") > 0) count++;
+  if (props.getModelParam<number>("RD") > 0) count++;
+  if (props.getModelParam<number>("RS") > 0) count++;
   return count;
 }
 
@@ -2013,8 +2060,8 @@ export function getMosfetInternalNodeCount(props: PropertyBag): number {
  */
 export function getMosfetInternalNodeLabels(props: PropertyBag): readonly string[] {
   const labels: string[] = [];
-  if (props.hasModelParam("RD") && props.getModelParam<number>("RD") > 0) labels.push("D'");
-  if (props.hasModelParam("RS") && props.getModelParam<number>("RS") > 0) labels.push("S'");
+  if (props.getModelParam<number>("RD") > 0) labels.push("D'");
+  if (props.getModelParam<number>("RS") > 0) labels.push("S'");
   return labels;
 }
 

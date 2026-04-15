@@ -50,7 +50,6 @@ export const { paramDefs: ZENER_PARAM_DEFS, defaults: ZENER_PARAM_DEFAULTS } = d
     IS:  { default: 1e-14, unit: "A", description: "Saturation current" },
     N:   { default: 1,                description: "Emission coefficient" },
     BV:  { default: 5.1,  unit: "V", description: "Reverse breakdown voltage" },
-    IBV: { default: 1e-3, unit: "A", description: "Reverse breakdown current" },
     NBV: { default: NaN,              description: "Breakdown emission coefficient (defaults to N)" },
   },
 });
@@ -117,9 +116,14 @@ export function createZenerElement(
   let s2: Float64Array;
   let s3: Float64Array;
   let base: number;
+  let pool: StatePoolRef;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
   let pnjlimLimited = false;
+
+  // One-shot cold-start seed from dcopInitJct. Non-null only between
+  // primeJunctions() and the next updateOperatingPoint() call.
+  let primedVd: number | null = null;
 
   return {
     branchIndex: -1,
@@ -134,7 +138,8 @@ export function createZenerElement(
     s2: new Float64Array(0),
     s3: new Float64Array(0),
 
-    initState(pool: StatePoolRef): void {
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
       s0 = pool.state0;
       s1 = pool.state1;
       s2 = pool.state2;
@@ -167,9 +172,15 @@ export function createZenerElement(
     },
 
     updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): void {
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vdRaw = va - vc;
+      let vdRaw: number;
+      if (primedVd !== null) {
+        vdRaw = primedVd;
+        primedVd = null;
+      } else {
+        const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
+        const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+        vdRaw = va - vc;
+      }
 
       // Recompute derived values from mutable params
       const nVt = params.N * VT;
@@ -179,7 +190,11 @@ export function createZenerElement(
       const vdOld = s0[base + SLOT_VD];
       let vdLimited: number;
 
-      if (vdRaw < Math.min(0, -params.BV + 10 * nbvVt)) {
+      if (pool.initMode === "initJct") {
+        // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
+        vdLimited = vdRaw;
+        pnjlimLimited = false;
+      } else if (vdRaw < Math.min(0, -params.BV + 10 * nbvVt)) {
         // Breakdown region: apply pnjlim in reflected domain (dioload.c:180-191)
         const vdtemp = -(vdRaw + params.BV);
         const vdtempOld = -(vdOld + params.BV);
@@ -249,6 +264,13 @@ export function createZenerElement(
       // Positive = current flowing INTO element at that pin.
       const id = s0[base + SLOT_ID];
       return [id, -id];
+    },
+
+    primeJunctions(): void {
+      // dioload.c:135-136: MODEINITJCT sets vd = tVcrit
+      const nVt = params.N * VT;
+      const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
+      primedVd = vcrit;
     },
 
     setParam(key: string, value: number): void {

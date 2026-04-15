@@ -194,7 +194,7 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   }
 
   private _computeEffectiveC(): number {
-    const T = 300.15;
+    const T = this._pool?.temperature ?? 300.15;
     const dT = T - this._TNOM;
     const factor = 1 + this._TC1 * dT + this._TC2 * dT * dT;
     return this._nominalC * factor * this._SCALE * this._M;
@@ -281,12 +281,17 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     const q2 = this.s2[this.base + SLOT_Q];
     const ccapPrev = this.s1[this.base + SLOT_CCAP];
     const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-    const { geq, ceq, ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+    if (this._pool && this._pool.initMode === "initTran") {
+      this.s1[this.base + SLOT_Q] = q0;  // q0→q1 copy (capload.c:60-63)
+    }
+    const { geq, ceq, ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
     this.s0[this.base + SLOT_GEQ]  = geq;
     this.s0[this.base + SLOT_IEQ]  = ceq;
     this.s0[this.base + SLOT_V]    = vNow;
     this.s0[this.base + SLOT_CCAP] = ccap;
+    if (this._pool && this._pool.initMode === "initTran") {
+      this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];  // ccap0→ccap1 copy (capload.c:70-73)
+    }
     // SLOT_Q is written by updateChargeFlux after the Newton-Raphson solve converges.
   }
 
@@ -306,8 +311,7 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
       const q2 = this.s2[this.base + SLOT_Q];
       const ccapPrev = this.s1[this.base + SLOT_CCAP];
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-      const { ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      const { ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
       this.s0[this.base + SLOT_CCAP] = ccap;
     }
   }

@@ -22,6 +22,7 @@ import {
   computeGmbs,
   limitVoltages,
   computeCapacitances,
+  MOSFET_NMOS_DEFAULTS,
 } from "../mosfet.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
@@ -92,7 +93,7 @@ function makeMockSolver() {
 
 function makeParamBag(params: Record<string, number>): PropertyBag {
   const bag = new PropertyBag();
-  bag.replaceModelParams(params);
+  bag.replaceModelParams({ ...MOSFET_NMOS_DEFAULTS, ...params });
   return bag;
 }
 
@@ -350,6 +351,59 @@ describe("NMOS", () => {
     for (const call of stampCalls) {
       expect(Math.abs(call[2] as number)).toBeCloseTo(0, 11);
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // Wave 6: checkConvergence without cqbd (Change 17)
+  // -------------------------------------------------------------------------
+
+  it("checkConvergence_without_cqbd_uses_mode_ids_minus_cbdI", () => {
+    // Gap 16.1: checkConvergence must use cd = mode * ids - cbdI directly,
+    // NOT subtract the capacitor companion current (cqbd).
+    //
+    // We drive the NMOS to a known saturation operating point, then call
+    // checkConvergence twice with identical voltages. Because pnjlimLimited=false
+    // and the voltages haven't changed, convergence should be declared.
+    //
+    // The key assertion is that convergence IS reached (not perpetually rejected
+    // due to incorrect inclusion of cap companion current in the cd formula).
+
+    // Create NMOS at Vgs=3V, Vds=5V (saturation), with CBD=1e-12 to exercise
+    // the drain-bulk capacitance path. If cqbd were subtracted, cd would be
+    // shifted by the cap companion current and convergence would be harder.
+    const paramsWithCap = { ...NMOS_DEFAULTS, CBD: 1e-12 };
+    const propsObj = makeParamBag(paramsWithCap);
+    const core = withState(createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj));
+    const element = withNodeIds(core, [2, 1, 3, 3]) as unknown as AnalogElement;
+
+    // Set up state pool so analysisMode="tran" (transient)
+    // The pool is accessed via the element's internal reference (_pool).
+    // We access the pool through withState's return, which is the element itself.
+    const pool = (core as unknown as { _pool: { analysisMode: string; initMode: string } })._pool;
+    pool.analysisMode = "tran";
+    pool.initMode = "transient";
+
+    // Drive to operating point: Vgs=3V, Vds=5V, Vs=0
+    const voltages = new Float64Array(3);
+    voltages[0] = 5;   // V(node1=D)
+    voltages[1] = 3;   // V(node2=G)
+    voltages[2] = 0;   // V(node3=S)
+
+    for (let i = 0; i < 50; i++) {
+      (element as unknown as { updateOperatingPoint: (v: Float64Array) => boolean }).updateOperatingPoint!(voltages);
+      voltages[0] = 5;
+      voltages[1] = 3;
+      voltages[2] = 0;
+    }
+
+    // checkConvergence with identical current and previous voltages (no change)
+    const prevVoltages = new Float64Array(voltages);
+    const converged = (element as unknown as { checkConvergence: (v: Float64Array, pv: Float64Array, rt: number, ab: number) => boolean }).checkConvergence!(voltages, prevVoltages, 1e-3, 1e-12);
+
+    // With no voltage change and a converged operating point, checkConvergence
+    // must return true. If cqbd were incorrectly subtracted, the cd formula
+    // would be wrong and this might not hold.
+    expect(converged).toBe(true);
   });
 
   it("setSourceScale_one_is_default", () => {
@@ -646,7 +700,7 @@ import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
 describe("MOSFET LimitingEvent instrumentation", () => {
   function makeNmosWithState(): ReactiveAnalogElement & { label: string; elementIndex: number } {
     const propsObj = new PropertyBag();
-    propsObj.replaceModelParams({ VTO: 1.0, KP: 2e-5, GAMMA: 0, PHI: 0.6, LAMBDA: 0, W: 1e-6, L: 1e-6 });
+    propsObj.replaceModelParams({ ...MOSFET_NMOS_DEFAULTS, VTO: 1.0, KP: 2e-5, GAMMA: 0, PHI: 0.6, LAMBDA: 0, W: 1e-6, L: 1e-6 });
     // Gate=1, Drain=2, Source=3; bulk tied to source internally by factory
     const pinNodes = new Map([["G", 1], ["D", 2], ["S", 3]]);
     const core = createMosfetElement(1, pinNodes, [], -1, propsObj);

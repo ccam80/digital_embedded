@@ -392,8 +392,7 @@ class SegmentInductorElement implements ReactiveAnalogElement {
     const phi2 = this.s2[this.base + SLOT_L_PHI];
     const ccapPrev = this.s1[this.base + SLOT_L_CCAP];
     const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-    const { geq, ceq, ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrev);
+    const { geq, ceq, ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, order, method, ccapPrev);
     this.s0[this.base + SLOT_GEQ]    = geq;
     this.s0[this.base + SLOT_IEQ]    = ceq;
     this.s0[this.base + SLOT_I_PREV] = iNow;
@@ -411,8 +410,7 @@ class SegmentInductorElement implements ReactiveAnalogElement {
       const phi2 = this.s2[this.base + SLOT_L_PHI];
       const ccapPrev = this.s1[this.base + SLOT_L_CCAP];
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-      const { ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrev);
+      const { ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, order, method, ccapPrev);
       this.s0[this.base + SLOT_L_CCAP] = ccap;
     }
   }
@@ -486,8 +484,7 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
     const q2 = this.s2[this.base + SLOT_C_Q];
     const ccapPrev = this.s1[this.base + SLOT_C_CCAP];
     const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-    const { geq, ceq, ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+    const { geq, ceq, ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
     this.s0[this.base + SLOT_GEQ]    = geq;
     this.s0[this.base + SLOT_IEQ]    = ceq;
     this.s0[this.base + SLOT_V_PREV] = vNow;
@@ -506,8 +503,7 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
       const q2 = this.s2[this.base + SLOT_C_Q];
       const ccapPrev = this.s1[this.base + SLOT_C_CCAP];
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-      const { ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      const { ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
       this.s0[this.base + SLOT_C_CCAP] = ccap;
     }
   }
@@ -601,8 +597,7 @@ class CombinedRLElement implements ReactiveAnalogElement {
     const phi2 = this.s2[this.base + SLOT_RL_PHI];
     const ccapPrev = this.s1[this.base + SLOT_RL_CCAP];
     const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-    const { geq, ceq, ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrev);
+    const { geq, ceq, ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, order, method, ccapPrev);
     this.s0[this.base + SLOT_GEQ]     = geq;
     this.s0[this.base + SLOT_IEQ]     = ceq;
     this.s0[this.base + SLOT_I_PREV]  = iNow;
@@ -620,8 +615,7 @@ class CombinedRLElement implements ReactiveAnalogElement {
       const phi2 = this.s2[this.base + SLOT_RL_PHI];
       const ccapPrev = this.s1[this.base + SLOT_RL_CCAP];
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-      const { ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrev);
+      const { ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, order, method, ccapPrev);
       this.s0[this.base + SLOT_RL_CCAP] = ccap;
     }
   }

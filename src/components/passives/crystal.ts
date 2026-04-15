@@ -397,7 +397,6 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const b = this.branchIndex;
 
     const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
 
     // L_s companion model — uses branch current row
     const iNow = voltages[b];
@@ -405,7 +404,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const phi1 = this.s1[this.base + SLOT_PHI_L];
     const phi2 = this.s2[this.base + SLOT_PHI_L];
     const ccapPrevL = this.s1[this.base + SLOT_CCAP_L];
-    const resL = integrateInductor(this.L_s, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrevL);
+    const resL = integrateInductor(this.L_s, iNow, phi0, phi1, phi2, dt, h1, order, method, ccapPrevL);
     this.s0[this.base + SLOT_GEQ_L]  = resL.geq;
     this.s0[this.base + SLOT_IEQ_L]  = resL.ceq;
     this.s0[this.base + SLOT_I_L]    = iNow;
@@ -420,7 +419,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const q1Cs = this.s1[this.base + SLOT_Q_CS];
     const q2Cs = this.s2[this.base + SLOT_Q_CS];
     const ccapPrevCs = this.s1[this.base + SLOT_CCAP_CS];
-    const resCs = integrateCapacitor(this.C_s, vCs_now, q0Cs, q1Cs, q2Cs, dt, h1, h2, order, method, ccapPrevCs);
+    const resCs = integrateCapacitor(this.C_s, vCs_now, q0Cs, q1Cs, q2Cs, dt, h1, order, method, ccapPrevCs);
     this.s0[this.base + SLOT_GEQ_CS]  = resCs.geq;
     this.s0[this.base + SLOT_IEQ_CS]  = resCs.ceq;
     this.s0[this.base + SLOT_V_CS]    = vCs_now;
@@ -434,7 +433,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const q1C0 = this.s1[this.base + SLOT_Q_C0];
     const q2C0 = this.s2[this.base + SLOT_Q_C0];
     const ccapPrevC0 = this.s1[this.base + SLOT_CCAP_C0];
-    const resC0 = integrateCapacitor(this.C_0, vC0_now, q0C0, q1C0, q2C0, dt, h1, h2, order, method, ccapPrevC0);
+    const resC0 = integrateCapacitor(this.C_0, vC0_now, q0C0, q1C0, q2C0, dt, h1, order, method, ccapPrevC0);
     this.s0[this.base + SLOT_GEQ_C0]  = resC0.geq;
     this.s0[this.base + SLOT_IEQ_C0]  = resC0.ceq;
     this.s0[this.base + SLOT_V_C0]    = vC0_now;
@@ -464,14 +463,13 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     // so the next step's trapezoidal recursion starts from correct companion current.
     if (dt > 0) {
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
 
       // L_s flux
       const phi0 = this.s0[this.base + SLOT_PHI_L];
       const phi1 = this.s1[this.base + SLOT_PHI_L];
       const phi2 = this.s2[this.base + SLOT_PHI_L];
       const ccapPrevL = this.s1[this.base + SLOT_CCAP_L];
-      const resL = integrateInductor(this.L_s, iNowL, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrevL);
+      const resL = integrateInductor(this.L_s, iNowL, phi0, phi1, phi2, dt, h1, order, method, ccapPrevL);
       this.s0[this.base + SLOT_CCAP_L] = resL.ccap;
 
       // C_s charge
@@ -479,7 +477,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
       const q1Cs = this.s1[this.base + SLOT_Q_CS];
       const q2Cs = this.s2[this.base + SLOT_Q_CS];
       const ccapPrevCs = this.s1[this.base + SLOT_CCAP_CS];
-      const resCs = integrateCapacitor(this.C_s, vCs_now, q0Cs, q1Cs, q2Cs, dt, h1, h2, order, method, ccapPrevCs);
+      const resCs = integrateCapacitor(this.C_s, vCs_now, q0Cs, q1Cs, q2Cs, dt, h1, order, method, ccapPrevCs);
       this.s0[this.base + SLOT_CCAP_CS] = resCs.ccap;
 
       // C_0 charge
@@ -487,7 +485,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
       const q1C0 = this.s1[this.base + SLOT_Q_C0];
       const q2C0 = this.s2[this.base + SLOT_Q_C0];
       const ccapPrevC0 = this.s1[this.base + SLOT_CCAP_C0];
-      const resC0 = integrateCapacitor(this.C_0, vC0_now, q0C0, q1C0, q2C0, dt, h1, h2, order, method, ccapPrevC0);
+      const resC0 = integrateCapacitor(this.C_0, vC0_now, q0C0, q1C0, q2C0, dt, h1, order, method, ccapPrevC0);
       this.s0[this.base + SLOT_CCAP_C0] = resC0.ccap;
     }
   }

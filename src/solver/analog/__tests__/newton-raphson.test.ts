@@ -378,7 +378,7 @@ describe("NR", () => {
   });
 
   it("no_pool_allows_convergence", () => {
-    // Without any statePool, canConverge must be true (legacy path).
+    // Without any statePool, canConverge must be true.
     const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
 
     const result = newtonRaphson({

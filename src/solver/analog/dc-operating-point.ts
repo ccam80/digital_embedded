@@ -13,7 +13,7 @@
  * Variable mapping (ngspice → ours):
  *   CKTdiagGmin      → diagonalGmin (NR option)
  *   CKTgmin          → params.gmin
- *   CKTgminFactor    → 10 (local, cktntask.c:103)
+ *   CKTgminFactor    → params.gminFactor (default 10, cktntask.c:103)
  *   CKTdcTrcvMaxIter → params.dcTrcvMaxIter (50)
  *   CKTdcMaxIter     → params.maxIterations (100)
  *   CKTrhsOld        → voltages
@@ -202,8 +202,8 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
     matrixSize,
     nodeCount,
     reltol: params.reltol,
-    abstol: params.abstol,
-    iabstol: params.iabstol,
+    abstol: params.voltTol,
+    iabstol: params.abstol,
     isDcOp: true,
     diagnostics,
     nodeDamping: params.nodeDamping ?? false,
@@ -354,7 +354,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   totalIterations += srcResult.iterations;
 
   if (srcResult.converged) {
-    const srcMethod = numSrcSteps <= 1 ? "gillespie-src" : "gillespie-src";
+    const srcMethod = numSrcSteps <= 1 ? "gillespie-src" : "spice3-src";
     const srcLabel = numSrcSteps <= 1 ? "Gillespie source stepping" : "spice3 source stepping";
     const srcExplanation = numSrcSteps <= 1
       ? "Direct NR and gmin stepping both failed. Gillespie source stepping succeeded: independent sources were adaptively ramped from 0% to 100%."
@@ -460,10 +460,10 @@ function dynamicGmin(
 
   // cktop.c:148-151: initial parameters
   // CKTgminFactor = 10 (cktntask.c:103)
-  let factor = 10;
-  // cktop.c:155-157: OldGmin = 1e-2, CKTdiagGmin = OldGmin / factor
+  let factor = params.gminFactor ?? 10;
+  // cktop.c:155-157: OldGmin = 1e-2, CKTdiagGmin = OldGmin (first sub-solve sees 1e-2)
   let oldGmin = 1e-2;
-  let diagGmin = oldGmin / factor; // 1e-3 on first entry
+  let diagGmin = oldGmin; // ngspice starts first sub-solve at 1e-2, divides after success
   const gtarget = Math.max(params.gmin, params.gshunt ?? 0); // cktop.c:148-157: gtarget = MAX(CKTgmin, CKTgshunt)
   let totalIter = 0;
 
@@ -537,13 +537,14 @@ function dynamicGmin(
     }
   }
 
-  // cktop.c:253-258: final clean solve with no diagonal gmin
+  // cktop.c:253-258: final clean solve with gshunt diagonal (ngspice uses dcTrcvMaxIter here)
   onPhaseBegin?.("dcopGminDynamic", 0);
   const cleanResult = newtonRaphson({
     ...nrBase,
-    maxIterations: params.maxIterations,
+    maxIterations: params.dcTrcvMaxIter,
     elements,
     initialGuess: voltages,
+    diagonalGmin: params.gshunt ?? 0,
   });
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
@@ -594,9 +595,8 @@ function spice3Gmin(
 
   let totalIter = 0;
 
-  // cktop.c:284-290: documented deviation — we use numGminSteps=10 (ngspice default=1)
-  const numGminSteps = 10;
-  const gminFactor = 10;
+  const numGminSteps = params.numGminSteps ?? 10;
+  const gminFactor = params.gminFactor ?? 10;
   let diagGmin = params.gmin;
   for (let k = 0; k < numGminSteps; k++) {
     diagGmin *= gminFactor;
@@ -629,13 +629,14 @@ function spice3Gmin(
     diagGmin /= gminFactor;
   }
 
-  // cktop.c:323-341: final clean solve with no diagonal gmin
+  // cktop.c:323-341: final clean solve with gshunt diagonal (ngspice uses dcTrcvMaxIter here)
   onPhaseBegin?.("dcopGminSpice3", 0);
   const cleanResult = newtonRaphson({
     ...nrBase,
-    maxIterations: params.maxIterations,
+    maxIterations: params.dcTrcvMaxIter,
     elements,
     initialGuess: voltages,
+    diagonalGmin: params.gshunt ?? 0,
   });
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
@@ -698,13 +699,14 @@ function spice3Src(
 
   scaleAllSources(elements, 1);
 
-  // Final clean solve
+  // Final clean solve (ngspice uses dcTrcvMaxIter, gshunt diagonal)
   onPhaseBegin?.("dcopSrcSweep", 1);
   const cleanResult = newtonRaphson({
     ...nrBase,
-    maxIterations: params.maxIterations,
+    maxIterations: params.dcTrcvMaxIter,
     elements,
     initialGuess: voltages,
+    diagonalGmin: params.gshunt ?? 0,
   });
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);

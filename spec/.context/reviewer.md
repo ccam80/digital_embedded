@@ -80,7 +80,7 @@ Your assignment includes a `Report Path` field (e.g., `spec/reviews/wave-{wave_i
 mkdir -p "spec/reviews"
 ```
 
-Use the **"reviewer: full report file format"** template from `spec/.context/` handoff-templates reference. The report is headed `# Review Report: {scope}` and contains every individual finding — never aggregate. If a section has no findings, include it with "None found."
+Use the **"reviewer: full report file format"** template from `${CLAUDE_PLUGIN_ROOT}/references/handoff-templates.md`. The report is headed `# Review Report: {scope}` and contains every individual finding — never aggregate. If a section has no findings, include it with "None found."
 
 Sections in the report file:
 - **Summary**: tasks reviewed count, violations count, gaps count, verdict (`clean` | `has-violations`)

@@ -1,0 +1,319 @@
+digraph "digiTS-mna" {
+  rankdir=TB;
+  fontname="Helvetica";
+  node [fontname="Helvetica", fontsize=10, shape=box, style="filled,rounded"];
+  edge [fontname="Helvetica", fontsize=8];
+  compound=true;
+  newrank=true;
+  label="digiTS-mna State Machine";
+  labelloc=t;
+  fontsize=16;
+
+  subgraph cluster_lifecycle {
+    label="Lifecycle";
+    style="rounded,filled";
+    fillcolor="#e0e0e0";
+    color="#999999";
+    fontcolor="#333333";
+    fontsize=12;
+
+    engine_init [label="engine init", fillcolor="white"];
+    allocate_solver_infrastructure [label="allocate solver infrastructure", fillcolor="white"];
+    seed_breakpoints [label="seed breakpoints", fillcolor="white"];
+    engine_ready [label="engine ready", fillcolor="white"];
+    engine_reset [label="engine reset", fillcolor="white"];
+    engine_configure [label="engine configure", fillcolor="white"];
+    engine_error_state [label="engine error state", fillcolor="white"];
+  }
+
+  subgraph cluster_dcop {
+    label="DC Operating Point";
+    style="rounded,filled";
+    fillcolor="#bbdefb";
+    color="#1565c0";
+    fontcolor="#0d47a1";
+    fontsize=12;
+
+    dcop_begin [label="dcop begin", fillcolor="white"];
+    dcop_reset_state_pool [label="dcop reset state pool", fillcolor="white"];
+    dcop_init_element_state [label="dcop init element state", fillcolor="white"];
+    dcop_direct_nr [label="dcop direct nr", fillcolor="white"];
+    dcop_prime_junctions [label="dcop prime junctions", fillcolor="white"];
+    dcop_direct_check_converged [label="dcop direct check converged", fillcolor="white"];
+    dcop_store_result [label="dcop store result", fillcolor="white"];
+    dcop_write_initial_charge [label="dcop write initial charge", fillcolor="white"];
+    dcop_seed_history [label="dcop seed history", fillcolor="white"];
+    dcop_set_analysis_mode_tran [label="dcop set analysis mode tran", fillcolor="white"];
+    dcop_seed_companion_state [label="dcop seed companion state", fillcolor="white"];
+    dcop_return_success [label="dcop return success", fillcolor="white"];
+    dcop_return_failure [label="dcop return failure", fillcolor="white"];
+    dcop_gmin_stepping [label="dcop gmin stepping", fillcolor="white"];
+    dcop_gmin_zero_state [label="dcop gmin zero state", fillcolor="white"];
+    dcop_gmin_sub_solve [label="dcop gmin sub solve", fillcolor="white"];
+    dcop_gmin_sub_solve_check [label="dcop gmin sub solve check", fillcolor="white"];
+    dcop_gmin_adapt_factor [label="dcop gmin adapt factor", fillcolor="white"];
+    dcop_gmin_sub_solve_failed [label="dcop gmin sub solve failed", fillcolor="white"];
+    dcop_gmin_final_clean_solve [label="dcop gmin final clean solve", fillcolor="white"];
+    dcop_source_stepping [label="dcop source stepping", fillcolor="white"];
+    dcop_src_zero_state [label="dcop src zero state", fillcolor="white"];
+    dcop_src_scale_sources [label="dcop src scale sources", fillcolor="white"];
+    dcop_src_sub_solve [label="dcop src sub solve", fillcolor="white"];
+    dcop_src_sub_solve_check [label="dcop src sub solve check", fillcolor="white"];
+    dcop_src_adapt_raise [label="dcop src adapt raise", fillcolor="white"];
+    dcop_src_sub_solve_failed [label="dcop src sub solve failed", fillcolor="white"];
+    dcop_src_final_clean_solve [label="dcop src final clean solve", fillcolor="white"];
+  }
+
+  subgraph cluster_nr {
+    label="Newton-Raphson";
+    style="rounded,filled";
+    fillcolor="#c8e6c9";
+    color="#2e7d32";
+    fontcolor="#1b5e20";
+    fontsize=12;
+
+    nr_initialize_operating_points [label="nr initialize operating points", fillcolor="white"];
+    nr_stamp_linear [label="nr stamp linear", fillcolor="white"];
+    nr_capture_linear_rhs [label="nr capture linear rhs", fillcolor="white"];
+    nr_stamp_nonlinear [label="nr stamp nonlinear", fillcolor="white"];
+    nr_stamp_reactive_companion [label="nr stamp reactive companion", fillcolor="white"];
+    nr_finalize_matrix [label="nr finalize matrix", fillcolor="white"];
+    nr_save_linear_base [label="nr save linear base", fillcolor="white"];
+    nr_add_diagonal_gmin [label="nr add diagonal gmin", fillcolor="white"];
+    nr_lu_factorize [label="nr lu factorize", fillcolor="white"];
+    nr_singular_matrix_abort [label="nr singular matrix abort", fillcolor="white"];
+    nr_save_state0_for_damping [label="nr save state0 for damping", fillcolor="white"];
+    nr_sparse_solve [label="nr sparse solve", fillcolor="white"];
+    nr_linear_shortcircuit [label="nr linear shortcircuit", fillcolor="white"];
+    nr_update_operating_points [label="nr update operating points", fillcolor="white"];
+    nr_force_noncon_iter0 [label="nr force noncon iter0", fillcolor="white"];
+    nr_transient_mode_automaton [label="nr transient mode automaton", fillcolor="white"];
+    nr_node_damping [label="nr node damping", fillcolor="white"];
+    nr_check_global_convergence [label="nr check global convergence", fillcolor="white"];
+    nr_check_element_convergence [label="nr check element convergence", fillcolor="white"];
+    nr_blame_tracking [label="nr blame tracking", fillcolor="white"];
+    nr_post_iteration_hook [label="nr post iteration hook", fillcolor="white"];
+    nr_dcop_mode_ladder_transition [label="nr dcop mode ladder transition", fillcolor="white"];
+    nr_check_can_converge [label="nr check can converge", fillcolor="white"];
+    nr_restore_linear_base [label="nr restore linear base", fillcolor="white"];
+    nr_return_success [label="nr return success", fillcolor="white"];
+    nr_return_failure [label="nr return failure", fillcolor="white"];
+  }
+
+  subgraph cluster_transient {
+    label="Transient";
+    style="rounded,filled";
+    fillcolor="#ffe0b2";
+    color="#e65100";
+    fontcolor="#bf360c";
+    fontsize=12;
+
+    transient_step_entry [label="transient step entry", fillcolor="white"];
+    transient_save_prev_voltages [label="transient save prev voltages", fillcolor="white"];
+    transient_get_clamped_dt [label="transient get clamped dt", fillcolor="white"];
+    transient_rotate_delta_old [label="transient rotate delta old", fillcolor="white"];
+    transient_retry_loop_entry [label="transient retry loop entry", fillcolor="white"];
+    transient_restore_state0_from_state1 [label="transient restore state0 from state1", fillcolor="white"];
+    transient_set_delta_old_current [label="transient set delta old current", fillcolor="white"];
+    transient_advance_sim_time [label="transient advance sim time", fillcolor="white"];
+    transient_predict_voltages [label="transient predict voltages", fillcolor="white"];
+    transient_stamp_companions [label="transient stamp companions", fillcolor="white"];
+    transient_nr_converged [label="transient nr converged", fillcolor="white"];
+    transient_set_initmode_initpred [label="transient set initmode initpred", fillcolor="white"];
+    transient_firsttime_copy_state [label="transient firsttime copy state", fillcolor="white"];
+    transient_update_charge_flux [label="transient update charge flux", fillcolor="white"];
+    transient_firsttime_accept [label="transient firsttime accept", fillcolor="white"];
+    transient_compute_lte [label="transient compute lte", fillcolor="white"];
+    transient_check_lte_rejection [label="transient check lte rejection", fillcolor="white"];
+    transient_lte_rejected_reduce_dt [label="transient lte rejected reduce dt", fillcolor="white"];
+    transient_nr_failed [label="transient nr failed", fillcolor="white"];
+    transient_nr_failed_halve_dt [label="transient nr failed halve dt", fillcolor="white"];
+    transient_delmin_check [label="transient delmin check", fillcolor="white"];
+    transient_error_timestep_too_small [label="transient error timestep too small", fillcolor="white"];
+    transient_accept_timestep [label="transient accept timestep", fillcolor="white"];
+    transient_rotate_state_pool [label="transient rotate state pool", fillcolor="white"];
+    transient_refresh_element_refs [label="transient refresh element refs", fillcolor="white"];
+    transient_push_node_voltage_history [label="transient push node voltage history", fillcolor="white"];
+    transient_push_element_history [label="transient push element history", fillcolor="white"];
+    transient_advance_timestep_controller [label="transient advance timestep controller", fillcolor="white"];
+    transient_check_method_switch [label="transient check method switch", fillcolor="white"];
+    transient_try_order_promotion [label="transient try order promotion", fillcolor="white"];
+    transient_update_companion_state [label="transient update companion state", fillcolor="white"];
+    transient_update_element_state [label="transient update element state", fillcolor="white"];
+    transient_schedule_breakpoints [label="transient schedule breakpoints", fillcolor="white"];
+    transient_step_complete [label="transient step complete", fillcolor="white"];
+  }
+
+  subgraph cluster_integration {
+    label="Integration";
+    style="rounded,filled";
+    fillcolor="#e1bee7";
+    color="#6a1b9a";
+    fontcolor="#4a148c";
+    fontsize=12;
+
+    integrate_capacitor_charge [label="integrate capacitor charge", fillcolor="white"];
+    integrate_inductor_flux [label="integrate inductor flux", fillcolor="white"];
+  }
+
+  subgraph cluster_lte {
+    label="LTE / Truncation";
+    style="rounded,filled";
+    fillcolor="#fff9c4";
+    color="#f9a825";
+    fontcolor="#f57f17";
+    fontsize=12;
+
+    truncation_error_check [label="truncation error check", fillcolor="white"];
+  }
+
+  subgraph cluster_device {
+    label="Device";
+    style="rounded,filled";
+    fillcolor="#ffccbc";
+    color="#bf360c";
+    fontcolor="#870000";
+    fontsize=12;
+
+    limit_junction_voltages_pnjlim [label="limit junction voltages pnjlim", fillcolor="white"];
+    limit_junction_voltages_fetlim [label="limit junction voltages fetlim", fillcolor="white"];
+    limit_junction_voltages_limvds [label="limit junction voltages limvds", fillcolor="white"];
+    temperature_dependent_param_calc [label="temperature dependent param calc", fillcolor="white"];
+  }
+
+  engine_init -> allocate_solver_infrastructure [label="begin allocation"];
+  allocate_solver_infrastructure -> seed_breakpoints [label="allocation complete"];
+  seed_breakpoints -> engine_ready [label="breakpoints seeded"];
+  engine_ready -> dcop_begin [label="begin DCOP"];
+  engine_ready -> transient_step_entry [label="begin step"];
+  engine_ready -> engine_reset [label="reset"];
+  engine_ready -> engine_configure [label="configure"];
+  engine_reset -> seed_breakpoints [label="post-reset"];
+  engine_configure -> seed_breakpoints [label="reconfigure"];
+  dcop_begin -> dcop_reset_state_pool [label="begin DCOP"];
+  dcop_reset_state_pool -> dcop_init_element_state [label="pool reset"];
+  dcop_reset_state_pool -> dcop_direct_nr [label="skip pool init"];
+  dcop_init_element_state -> dcop_direct_nr [label="elements initialized"];
+  dcop_direct_nr -> dcop_prime_junctions [label="begin mode ladder"];
+  dcop_prime_junctions -> nr_initialize_operating_points [label="enter NR setup"];
+  dcop_direct_check_converged -> dcop_store_result [label="success"];
+  dcop_direct_check_converged -> dcop_gmin_stepping [label="gmin fallback"];
+  dcop_store_result -> dcop_write_initial_charge [label="write charge"];
+  dcop_write_initial_charge -> dcop_seed_history [label="seed"];
+  dcop_seed_history -> dcop_set_analysis_mode_tran [label="mode switch"];
+  dcop_set_analysis_mode_tran -> dcop_seed_companion_state [label="seed companions"];
+  dcop_seed_companion_state -> dcop_return_success [label="done"];
+  dcop_return_success -> engine_ready [label="DCOP complete"];
+  dcop_return_failure -> engine_ready [label="DCOP failed"];
+  dcop_gmin_stepping -> dcop_gmin_zero_state [label="init gmin"];
+  dcop_gmin_zero_state -> dcop_gmin_sub_solve [label="begin loop"];
+  dcop_gmin_sub_solve -> dcop_gmin_sub_solve_check [label="check"];
+  dcop_gmin_sub_solve_check -> dcop_gmin_adapt_factor [label="adapt"];
+  dcop_gmin_sub_solve_check -> dcop_gmin_final_clean_solve [label="final"];
+  dcop_gmin_sub_solve_check -> dcop_gmin_sub_solve_failed [label="failed"];
+  dcop_gmin_adapt_factor -> dcop_gmin_sub_solve [label="next step"];
+  dcop_gmin_sub_solve_failed -> dcop_gmin_sub_solve [label="retry"];
+  dcop_gmin_sub_solve_failed -> dcop_source_stepping [label="gmin failed"];
+  dcop_gmin_final_clean_solve -> dcop_store_result [label="success"];
+  dcop_gmin_final_clean_solve -> dcop_source_stepping [label="failed"];
+  dcop_source_stepping -> dcop_src_zero_state [label="init src"];
+  dcop_src_zero_state -> dcop_src_scale_sources [label="scale"];
+  dcop_src_scale_sources -> dcop_src_sub_solve [label="sub-solve"];
+  dcop_src_sub_solve -> dcop_src_sub_solve_check [label="check"];
+  dcop_src_sub_solve_check -> dcop_src_adapt_raise [label="adapt"];
+  dcop_src_sub_solve_check -> dcop_src_sub_solve_failed [label="failed"];
+  dcop_src_adapt_raise -> dcop_src_scale_sources [label="next"];
+  dcop_src_adapt_raise -> dcop_src_final_clean_solve [label="done"];
+  dcop_src_sub_solve_failed -> dcop_src_scale_sources [label="retry"];
+  dcop_src_sub_solve_failed -> dcop_return_failure [label="failed"];
+  dcop_src_final_clean_solve -> dcop_store_result [label="success"];
+  dcop_src_final_clean_solve -> dcop_return_failure [label="failed"];
+  nr_initialize_operating_points -> nr_stamp_linear [label="stamp linear"];
+  nr_stamp_linear -> nr_capture_linear_rhs [label="capture"];
+  nr_capture_linear_rhs -> nr_stamp_nonlinear [label="nonlinear"];
+  nr_stamp_nonlinear -> nr_stamp_reactive_companion [label="companions"];
+  nr_stamp_reactive_companion -> nr_finalize_matrix [label="finalize"];
+  nr_finalize_matrix -> nr_save_linear_base [label="save base"];
+  nr_finalize_matrix -> nr_add_diagonal_gmin [label="gmin"];
+  nr_finalize_matrix -> nr_lu_factorize [label="factor"];
+  nr_save_linear_base -> nr_add_diagonal_gmin [label="gmin"];
+  nr_save_linear_base -> nr_lu_factorize [label="factor"];
+  nr_add_diagonal_gmin -> nr_lu_factorize [label="factor"];
+  nr_lu_factorize -> nr_save_state0_for_damping [label="ok"];
+  nr_lu_factorize -> nr_singular_matrix_abort [label="singular"];
+  nr_singular_matrix_abort -> nr_return_failure [label="abort"];
+  nr_save_state0_for_damping -> nr_sparse_solve [label="solve"];
+  nr_sparse_solve -> nr_linear_shortcircuit [label="linear"];
+  nr_sparse_solve -> nr_update_operating_points [label="update OP"];
+  nr_linear_shortcircuit -> nr_return_success [label="converged"];
+  nr_update_operating_points -> nr_force_noncon_iter0 [label="force noncon"];
+  nr_update_operating_points -> nr_transient_mode_automaton [label="mode"];
+  nr_force_noncon_iter0 -> nr_transient_mode_automaton [label="continue"];
+  nr_transient_mode_automaton -> nr_node_damping [label="damping"];
+  nr_node_damping -> nr_check_global_convergence [label="conv check"];
+  nr_check_global_convergence -> nr_check_element_convergence [label="elem check"];
+  nr_check_global_convergence -> nr_blame_tracking [label="skip"];
+  nr_check_element_convergence -> nr_blame_tracking [label="blame"];
+  nr_blame_tracking -> nr_post_iteration_hook [label="hook"];
+  nr_post_iteration_hook -> nr_dcop_mode_ladder_transition [label="ladder"];
+  nr_post_iteration_hook -> nr_check_can_converge [label="gate"];
+  nr_dcop_mode_ladder_transition -> nr_check_can_converge [label="gate"];
+  nr_check_can_converge -> nr_return_success [label="converged"];
+  nr_check_can_converge -> nr_restore_linear_base [label="next"];
+  nr_check_can_converge -> nr_return_failure [label="exhausted"];
+  nr_restore_linear_base -> nr_stamp_nonlinear [label="restamp"];
+  nr_return_success -> dcop_direct_check_converged [label="dcop"];
+  nr_return_success -> dcop_gmin_sub_solve_check [label="gmin"];
+  nr_return_success -> dcop_src_sub_solve_check [label="src"];
+  nr_return_success -> transient_nr_converged [label="tran"];
+  nr_return_failure -> dcop_direct_check_converged [label="dcop fail"];
+  nr_return_failure -> dcop_gmin_sub_solve_failed [label="gmin fail"];
+  nr_return_failure -> dcop_src_sub_solve_failed [label="src fail"];
+  nr_return_failure -> transient_nr_failed [label="tran fail"];
+  transient_step_entry -> transient_save_prev_voltages [label="save"];
+  transient_save_prev_voltages -> transient_get_clamped_dt [label="dt"];
+  transient_get_clamped_dt -> transient_rotate_delta_old [label="rotate"];
+  transient_rotate_delta_old -> transient_retry_loop_entry [label="loop"];
+  transient_retry_loop_entry -> transient_restore_state0_from_state1 [label="restore"];
+  transient_restore_state0_from_state1 -> transient_set_delta_old_current [label="delta"];
+  transient_set_delta_old_current -> transient_advance_sim_time [label="advance"];
+  transient_advance_sim_time -> transient_predict_voltages [label="predict"];
+  transient_advance_sim_time -> transient_stamp_companions [label="companions"];
+  transient_predict_voltages -> transient_stamp_companions [label="companions"];
+  transient_stamp_companions -> nr_initialize_operating_points [label="NR"];
+  transient_nr_converged -> transient_set_initmode_initpred [label="initPred"];
+  transient_set_initmode_initpred -> transient_firsttime_copy_state [label="firsttime"];
+  transient_set_initmode_initpred -> transient_update_charge_flux [label="charge"];
+  transient_firsttime_copy_state -> transient_update_charge_flux [label="charge"];
+  transient_update_charge_flux -> transient_firsttime_accept [label="skip LTE"];
+  transient_update_charge_flux -> transient_compute_lte [label="LTE"];
+  transient_firsttime_accept -> transient_accept_timestep [label="accept"];
+  transient_compute_lte -> transient_check_lte_rejection [label="check"];
+  transient_check_lte_rejection -> transient_accept_timestep [label="accepted"];
+  transient_check_lte_rejection -> transient_lte_rejected_reduce_dt [label="rejected"];
+  transient_lte_rejected_reduce_dt -> transient_delmin_check [label="delmin"];
+  transient_nr_failed -> transient_nr_failed_halve_dt [label="reduce"];
+  transient_nr_failed_halve_dt -> transient_delmin_check [label="delmin"];
+  transient_delmin_check -> transient_retry_loop_entry [label="retry"];
+  transient_delmin_check -> transient_error_timestep_too_small [label="abort"];
+  transient_error_timestep_too_small -> engine_error_state [label="ERROR"];
+  transient_accept_timestep -> transient_rotate_state_pool [label="rotate"];
+  transient_rotate_state_pool -> transient_refresh_element_refs [label="refresh"];
+  transient_refresh_element_refs -> transient_push_node_voltage_history [label="history"];
+  transient_push_node_voltage_history -> transient_push_element_history [label="elem history"];
+  transient_push_element_history -> transient_advance_timestep_controller [label="advance"];
+  transient_advance_timestep_controller -> transient_check_method_switch [label="method"];
+  transient_check_method_switch -> transient_try_order_promotion [label="promotion"];
+  transient_try_order_promotion -> transient_update_companion_state [label="companions"];
+  transient_update_companion_state -> transient_update_element_state [label="elem state"];
+  transient_update_element_state -> transient_schedule_breakpoints [label="breakpoints"];
+  transient_schedule_breakpoints -> transient_step_complete [label="done"];
+  transient_step_complete -> engine_ready [label="complete"];
+  limit_junction_voltages_pnjlim -> nr_update_operating_points [label="continue"];
+  limit_junction_voltages_fetlim -> nr_update_operating_points [label="continue"];
+  limit_junction_voltages_limvds -> nr_update_operating_points [label="continue"];
+  integrate_capacitor_charge -> transient_stamp_companions [label="continue"];
+  integrate_inductor_flux -> transient_stamp_companions [label="continue"];
+  truncation_error_check -> transient_compute_lte [label="continue"];
+  temperature_dependent_param_calc -> dcop_direct_nr [label="continue"];
+}

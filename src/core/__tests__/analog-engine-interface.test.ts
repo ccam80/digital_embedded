@@ -31,8 +31,8 @@ describe("AnalogEngineTypes", () => {
       maxTimeStep: 5e-6,
       minTimeStep: 5e-17,
       reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
+      voltTol: 1e-6,
+      abstol: 1e-12,
       chargeTol: 1e-14,
       trtol: 7.0,
       maxIterations: 100,
@@ -46,7 +46,7 @@ describe("AnalogEngineTypes", () => {
     expect(params.maxTimeStep).toBe(5e-6);
     expect(params.minTimeStep).toBe(5e-17);
     expect(params.reltol).toBe(1e-3);
-    expect(params.abstol).toBe(1e-6);
+    expect(params.voltTol).toBe(1e-6);
     expect(params.chargeTol).toBe(1e-14);
     expect(params.maxIterations).toBe(100);
     expect(params.integrationMethod).toBe("auto");
@@ -57,7 +57,7 @@ describe("AnalogEngineTypes", () => {
     expect(DEFAULT_SIMULATION_PARAMS.minTimeStep).toBe(1e-15);
     expect(DEFAULT_SIMULATION_PARAMS.firstStep).toBe(1e-9);
     expect(DEFAULT_SIMULATION_PARAMS.reltol).toBe(1e-3);
-    expect(DEFAULT_SIMULATION_PARAMS.abstol).toBe(1e-6);
+    expect(DEFAULT_SIMULATION_PARAMS.voltTol).toBe(1e-6);
     expect(DEFAULT_SIMULATION_PARAMS.chargeTol).toBe(1e-14);
     expect(DEFAULT_SIMULATION_PARAMS.maxIterations).toBe(100);
     expect(DEFAULT_SIMULATION_PARAMS.integrationMethod).toBe("auto");

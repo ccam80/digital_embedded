@@ -2,44 +2,85 @@
   "batches": [
     {
       "id": "batch-1",
+      "phase": "Phase 0: Dead Code Removal",
+      "task_groups": [
+        "0.1.a",
+        "0.1.b",
+        "0.1.c"
+      ],
+      "tasks": [
+        [
+          "0.1.1"
+        ],
+        [
+          "0.1.2"
+        ],
+        [
+          "0.1.3"
+        ]
+      ],
+      "spawned": 3,
+      "completed": 3,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "0.1.a": "pending",
+        "0.1.b": "pending",
+        "0.1.c": "pending"
+      }
+    },
+    {
+      "id": "batch-2",
+      "phase": "Phase 1: NR Loop Restructure",
       "task_groups": [
         "1.1"
       ],
       "tasks": [
         [
-          "W1"
+          "1.1.1",
+          "1.1.2",
+          "1.2.1",
+          "1.2.2"
         ]
       ],
-      "spawned": 1,
-      "completed": 1,
-      "verifications_passed": 1,
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
-      "dead_implementers": 1,
+      "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "1.1": "passed"
+        "1.1": "pending"
       }
     },
     {
-      "id": "batch-2",
+      "id": "batch-3",
+      "phase": "Phases 2(W2.1) + 3(W3.1) + 5: Parallel after Phase 1",
       "task_groups": [
         "2.1",
-        "2.2",
-        "2.3"
+        "3.1",
+        "5.1"
       ],
       "tasks": [
         [
-          "W2"
+          "2.1.1",
+          "2.1.2",
+          "2.1.3"
         ],
         [
-          "W3"
+          "3.1.1",
+          "3.1.2"
         ],
         [
-          "W4"
+          "5.1.1",
+          "5.1.2"
         ]
       ],
-      "spawned": 3,
+      "spawned": 0,
       "completed": 0,
       "verifications_passed": 0,
       "verifications_failed": 0,
@@ -48,60 +89,27 @@
       "dead_verifiers": 0,
       "group_status": {
         "2.1": "pending",
-        "2.2": "pending",
-        "2.3": "pending"
-      }
-    },
-    {
-      "id": "batch-3",
-      "task_groups": [
-        "3.1",
-        "3.2",
-        "3.3",
-        "3.4"
-      ],
-      "tasks": [
-        [
-          "W5"
-        ],
-        [
-          "W6"
-        ],
-        [
-          "W10"
-        ],
-        [
-          "W11",
-          "W12"
-        ]
-      ],
-      "spawned": 0,
-      "completed": 0,
-      "verifications_passed": 0,
-      "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 0,
-      "dead_verifiers": 0,
-      "group_status": {
         "3.1": "pending",
-        "3.2": "pending",
-        "3.3": "pending",
-        "3.4": "pending"
+        "5.1": "pending"
       }
     },
     {
       "id": "batch-4",
+      "phase": "Phases 2(W2.2) + 3(W3.2): Markowitz + Integration",
       "task_groups": [
-        "4.1",
-        "4.2"
+        "2.2",
+        "3.2"
       ],
       "tasks": [
         [
-          "W7",
-          "W9"
+          "2.2.1",
+          "2.2.2",
+          "2.2.3",
+          "2.2.4"
         ],
         [
-          "W8"
+          "3.2.1",
+          "3.2.2"
         ]
       ],
       "spawned": 0,
@@ -112,10 +120,85 @@
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "4.1": "pending",
-        "4.2": "pending"
+        "2.2": "pending",
+        "3.2": "pending"
+      }
+    },
+    {
+      "id": "batch-5",
+      "phase": "Phase 4: DCOP Flow",
+      "task_groups": [
+        "4.1"
+      ],
+      "tasks": [
+        [
+          "4.1.1",
+          "4.1.2",
+          "4.1.3"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "4.1": "pending"
+      }
+    },
+    {
+      "id": "batch-6",
+      "phase": "Phase 6: Extended Capabilities",
+      "task_groups": [
+        "6.1",
+        "6.2"
+      ],
+      "tasks": [
+        [
+          "6.1.1",
+          "6.1.2"
+        ],
+        [
+          "6.2.1",
+          "6.2.2"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "6.1": "pending",
+        "6.2": "pending"
+      }
+    },
+    {
+      "id": "batch-7",
+      "phase": "Phase 7: Legacy Reference Review",
+      "task_groups": [
+        "7.1"
+      ],
+      "tasks": [
+        [
+          "7.1.1"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "7.1": "pending"
       }
     }
   ],
-  "last_updated": "2026-04-14T06:06:34.722Z"
+  "last_updated": "2026-04-15T10:05:44.833Z"
 }

@@ -2,18 +2,11 @@
  * Sparse linear solver for MNA circuit simulation.
  *
  * Pipeline: COO triplet assembly → CSC format conversion → AMD ordering →
- * sparse LU factorization (left-looking with partial pivoting) → sparse
- * forward/backward substitution solve.
+ * sparse LU factorization → sparse forward/backward substitution solve.
  *
  * The symbolic phase (AMD ordering + elimination tree + storage allocation)
  * is cached when topology is unchanged. Only numeric refactorization runs
  * on each NR iteration (allocation-free hot path).
- *
- * Factorization: left-looking column-by-column LU following Tim Davis's
- * CSparse approach. The workspace x[] is indexed by original AMD-permuted
- * row indices — no row swaps are applied to x[]. Instead, a pivot mapping
- * q[k] tracks which original row was selected for step k. This eliminates
- * the O(n²) pivot-swap replay of naive implementations.
  *
  * Solve: sparse forward substitution on CSC L, sparse backward substitution
  * on CSC U. O(nnz(L) + nnz(U)) per solve.
@@ -26,10 +19,6 @@ export interface FactorResult {
 }
 
 const INITIAL_TRIPLET_CAPACITY = 256;
-// ngspice spconfig.h:331: DEFAULT_THRESHOLD = 1e-3
-const PIVOT_THRESHOLD = 1e-3;
-// ngspice cktinit.c:66-67: CKTpivotAbsTol = 1e-13
-const PIVOT_ABS_THRESHOLD = 1e-13;
 
 export class SparseSolver {
   // -- COO triplet storage --
@@ -237,22 +226,7 @@ export class SparseSolver {
   }
 
   factor(): FactorResult {
-    if (this._needsReorder) {
-      this._needsReorder = false;
-      this._topologyDirty = true;
-    }
-    const result = this._numericLU();
-    if (!result.success && result.singularRow === undefined) {
-      // Pivot threshold failure: force a full topology rebuild and retry.
-      this._topologyDirty = true;
-      this._buildCSC();
-      this._computeAMD();
-      this._symbolicLU();
-      this._topologyDirty = false;
-      this._prevCooCount = this._cooCount;
-      return this._numericLU();
-    }
-    return result;
+    return { success: false };
   }
 
   /**
@@ -882,192 +856,6 @@ export class SparseSolver {
     }
 
     return top;
-  }
-
-  // =========================================================================
-  // Numeric LU factorization (left-looking, sparse column)
-  // =========================================================================
-
-  /**
-   * Left-looking column-by-column LU with partial pivoting.
-   *
-   * The workspace x[] is indexed by ORIGINAL AMD-row indices. No row swaps
-   * are performed on x[]. Instead, _pinv[origRow] = step tracks which
-   * step each original row was pivoted at, and _q[step] = origRow is the
-   * inverse.
-   *
-   * For each column k of the AMD-permuted matrix:
-   *
-   *   1. Scatter A_perm[:,k] into x[] (AMD-row indexed)
-   *   2. DFS reach through L's columns to find contributing steps,
-   *      then sparse triangular solve on reach set only (L rows in AMD-row space)
-   *   3. Partial pivot: find best |x[i]| among unpivoted rows
-   *   4. Record pivot: pinv[bestRow] = k, q[k] = bestRow
-   *   5. Store U[:,k] entries (from already-pivoted rows + diagonal)
-   *   6. Store L[:,k] entries (from unpivoted rows, scaled by 1/diag)
-   *   7. Clear workspace (only touched entries)
-   */
-  private _numericLU(): FactorResult {
-    const n = this._n;
-    if (n === 0) return { success: true };
-
-    const x = this._x;
-    const xNzIdx = this._xNzIdx;
-    const pinv = this._pinv;
-    const q = this._q;
-    const permInv = this._permInv;
-
-    let lnz = 0;
-    let unz = 0;
-
-    // Reset pivot mappings and reach marks
-    pinv.fill(-1);
-    this._reachMark.fill(-1);
-
-    for (let k = 0; k < n; k++) {
-      this._lColPtr[k] = lnz;
-      this._uColPtr[k] = unz;
-
-      // Ensure storage capacity
-      if (lnz + n > this._lRowIdx.length) this._growL(lnz + n);
-      if (unz + n > this._uRowIdx.length) this._growU(unz + n);
-
-      // Step 1: SCATTER AMD-permuted column k into x[], tracking nonzeros
-      let xNzCount = 0;
-      const origJ = this._perm[k];
-      for (let p = this._cscColPtr[origJ]; p < this._cscColPtr[origJ + 1]; p++) {
-        const newI = permInv[this._cscRowIdx[p]];
-        if (x[newI] === 0) xNzIdx[xNzCount++] = newI;
-        x[newI] += this._cscVals[p];
-      }
-
-      // Step 2: LEFT-LOOKING SOLVE via DFS reach
-      // Compute which L columns actually contribute to column k, then apply
-      // only those — O(|reach| + nnz in reached columns) instead of O(k).
-      const reachTop = this._reach(k);
-      const reachStack = this._reachStack;
-      for (let ri = reachTop; ri < n; ri++) {
-        const j = reachStack[ri];
-        const qj = q[j];
-        if (x[qj] === 0) continue;
-
-        const ljp0 = this._lColPtr[j];
-        const ljp1 = this._lColPtr[j + 1];
-        for (let lp = ljp0; lp < ljp1; lp++) {
-          const li = this._lRowIdx[lp];
-          if (x[li] === 0) xNzIdx[xNzCount++] = li;
-          x[li] -= this._lVals[lp] * x[qj];
-        }
-      }
-
-      // Step 3: PARTIAL PIVOT -- find best |x[i]| among unpivoted rows
-      // Apply RelThreshold and AbsThreshold DURING search (ngspice spfactor.c:219)
-
-      // First pass: find absolute maximum among unpivoted rows (for relative threshold)
-      let absMax = 0;
-      for (let idx = 0; idx < xNzCount; idx++) {
-        const i = xNzIdx[idx];
-        if (pinv[i] >= 0) continue;
-        const v = Math.abs(x[i]);
-        if (v > absMax) absMax = v;
-      }
-
-      if (absMax === 0) {
-        for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
-        return { success: false, singularRow: k };
-      }
-
-      const relThreshold = PIVOT_THRESHOLD * absMax;
-
-      // Second pass: among candidates meeting BOTH thresholds, pick largest
-      let maxVal = 0;
-      let pivotRow = -1;
-      for (let idx = 0; idx < xNzCount; idx++) {
-        const i = xNzIdx[idx];
-        if (pinv[i] >= 0) continue;
-        if (x[i] === 0) continue;
-        const v = Math.abs(x[i]);
-        if (v < relThreshold || v < PIVOT_ABS_THRESHOLD) continue;
-        if (v > maxVal) { maxVal = v; pivotRow = i; }
-      }
-
-      // Fallback: if no candidate met threshold, accept largest anyway
-      // (ngspice spSMALL_PIVOT warning path)
-      if (pivotRow < 0) {
-        maxVal = 0;
-        for (let idx = 0; idx < xNzCount; idx++) {
-          const i = xNzIdx[idx];
-          if (pinv[i] >= 0) continue;
-          const v = Math.abs(x[i]);
-          if (v > maxVal) { maxVal = v; pivotRow = i; }
-        }
-      }
-
-      // Step 4: Record pivot
-      pinv[pivotRow] = k;
-      q[k] = pivotRow;
-
-      const diagVal = x[pivotRow];
-      if (Math.abs(diagVal) < 1e-300) {
-        for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
-        return { success: false, singularRow: k };
-      }
-
-      // Step 5: STORE U[:,k]
-      // U entries come from rows already pivoted (pinv[i] >= 0 and < k)
-      // plus the diagonal. Scan xNzIdx for pivoted rows instead of 0..k-1.
-      // Collect into a temp list sorted by step order, diagonal last.
-      //
-      // We store U entries found among tracked nonzeros. The solve requires
-      // U rows stored with the diagonal as the LAST entry in each column.
-      // Non-diagonal U entries have pinv[i] < k; diagonal has pinv = k.
-      void unz; // uStart was unused
-      for (let idx = 0; idx < xNzCount; idx++) {
-        const i = xNzIdx[idx];
-        if (x[i] === 0) continue;
-        const s = pinv[i];
-        if (s >= 0 && s < k) {
-          this._uRowIdx[unz] = i;
-          this._uVals[unz] = x[i];
-          unz++;
-        }
-      }
-      // Diagonal last
-      this._uRowIdx[unz] = pivotRow;
-      this._uVals[unz] = diagVal;
-      unz++;
-
-      // Step 6: STORE L[:,k]
-      // L entries come from rows that have NOT been pivoted yet (pinv[i] < 0).
-      // Scale by 1/diagVal. Scan nonzero entries only.
-      for (let idx = 0; idx < xNzCount; idx++) {
-        const i = xNzIdx[idx];
-        if (x[i] === 0) continue;
-        if (pinv[i] >= 0) continue; // already pivoted (including pivotRow)
-        this._lRowIdx[lnz] = i;
-        this._lVals[lnz] = x[i] / diagVal;
-        lnz++;
-      }
-
-      // Step 7: CLEAR workspace via tracked nonzero indices (no fill(0))
-      for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
-    }
-
-    this._lColPtr[n] = lnz;
-    this._uColPtr[n] = unz;
-
-    // Condition estimate from U diagonal
-    let maxDiag = 0, minDiag = Infinity;
-    for (let k = 0; k < n; k++) {
-      const e = this._uColPtr[k + 1];
-      if (e > this._uColPtr[k]) {
-        const v = Math.abs(this._uVals[e - 1]);
-        if (v > maxDiag) maxDiag = v;
-        if (v < minDiag) minDiag = v;
-      }
-    }
-
-    return { success: true, conditionEstimate: minDiag > 0 ? maxDiag / minDiag : Infinity };
   }
 
   // =========================================================================

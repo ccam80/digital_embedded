@@ -99,58 +99,6 @@ export const SLOT_Q_SB                  = 42;  // Source-bulk junction charge
 export const SLOT_CCAP_DB               = 43;  // Drain-bulk companion current (for LTE)
 export const SLOT_CCAP_SB               = 44;  // Source-bulk companion current (for LTE)
 
-// Keep legacy names as aliases so mosfet.ts imports still resolve during transition
-/** @deprecated Use SLOT_V_GS */
-export const SLOT_VGS_PREV              = SLOT_V_GS;
-/** @deprecated Use SLOT_V_GD */
-export const SLOT_VGD_PREV              = SLOT_V_GD;
-/** @deprecated Use SLOT_V_DB */
-export const SLOT_VDB_PREV              = SLOT_V_DB;
-/** @deprecated Use SLOT_V_SB */
-export const SLOT_VSB_PREV              = SLOT_V_SB;
-/** @deprecated Use SLOT_V_GB */
-export const SLOT_VGB_PREV              = SLOT_V_GB;
-/** @deprecated Eliminated — first call detection via s1[Q]===0 */
-export const SLOT_CAP_JUNCTION_FIRST_CALL = -1;
-/** @deprecated Eliminated — first call detection via s1[Q]===0 */
-export const SLOT_CAP_GB_FIRST_CALL     = -1;
-/** @deprecated Use SLOT_Q_GS */
-export const SLOT_Q_GS_NOW              = SLOT_Q_GS;
-/** @deprecated History from s1[SLOT_Q_GS] */
-export const SLOT_Q_GS_PREV             = SLOT_Q_GS;
-/** @deprecated History from s2[SLOT_Q_GS] */
-export const SLOT_Q_GS_PREV2            = SLOT_Q_GS;
-/** @deprecated History from s3[SLOT_Q_GS] */
-export const SLOT_Q_GS_PREV3            = SLOT_Q_GS;
-/** @deprecated Use SLOT_Q_GD */
-export const SLOT_Q_GD_NOW              = SLOT_Q_GD;
-/** @deprecated History from s1[SLOT_Q_GD] */
-export const SLOT_Q_GD_PREV             = SLOT_Q_GD;
-/** @deprecated History from s2[SLOT_Q_GD] */
-export const SLOT_Q_GD_PREV2            = SLOT_Q_GD;
-/** @deprecated History from s3[SLOT_Q_GD] */
-export const SLOT_Q_GD_PREV3            = SLOT_Q_GD;
-/** @deprecated Use SLOT_Q_GB */
-export const SLOT_Q_GB_NOW              = SLOT_Q_GB;
-/** @deprecated History from s1[SLOT_Q_GB] */
-export const SLOT_Q_GB_PREV             = SLOT_Q_GB;
-/** @deprecated History from s2[SLOT_Q_GB] */
-export const SLOT_Q_GB_PREV2            = SLOT_Q_GB;
-/** @deprecated History from s3[SLOT_Q_GB] */
-export const SLOT_Q_GB_PREV3            = SLOT_Q_GB;
-/** @deprecated Eliminated — history from s1/s2 */
-export const SLOT_CAP_I_GS_PREV         = -1;
-/** @deprecated Eliminated — history from s1/s2 */
-export const SLOT_CAP_I_GS_PREV_PREV    = -1;
-/** @deprecated Eliminated — history from s1/s2 */
-export const SLOT_CAP_I_GD_PREV         = -1;
-/** @deprecated Eliminated — history from s1/s2 */
-export const SLOT_CAP_I_GD_PREV_PREV    = -1;
-/** @deprecated Eliminated — history from s1/s2 */
-export const SLOT_CAP_I_GB_PREV         = -1;
-/** @deprecated Eliminated — history from s1/s2 */
-export const SLOT_CAP_I_GB_PREV_PREV    = -1;
-
 export const FET_BASE_SCHEMA: StateSchema = defineStateSchema("AbstractFetElement", [
   { name: "VGS",       doc: "Gate-source voltage",                               init: { kind: "zero" } },
   { name: "VDS",       doc: "Drain-source voltage",                              init: { kind: "zero" } },
@@ -524,7 +472,6 @@ export abstract class AbstractFetElement implements AnalogElementCore {
 
     const caps = this.computeCapacitances(vgsNow, vdsNow);
     const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
 
     if (caps.cgs > 0) {
       // Meyer incremental charge: Q = cgs*(vgs - prevVgs) + prevQ
@@ -534,7 +481,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
       const q1 = this.s1[base + SLOT_Q_GS];
       const q2 = this.s2[base + SLOT_Q_GS];
       const ccapPrev = this.s1[base + SLOT_CCAP_GS];
-      const res = integrateCapacitor(caps.cgs, vgsNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      const res = integrateCapacitor(caps.cgs, vgsNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
       this._s0[base + SLOT_CAP_GEQ_GS] = res.geq;
       this._s0[base + SLOT_CAP_IEQ_GS] = res.ceq;
       this._s0[base + SLOT_CCAP_GS] = res.ccap;
@@ -553,7 +500,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
       const q1 = this.s1[base + SLOT_Q_GD];
       const q2 = this.s2[base + SLOT_Q_GD];
       const ccapPrev = this.s1[base + SLOT_CCAP_GD];
-      const res = integrateCapacitor(caps.cgd, vgdNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      const res = integrateCapacitor(caps.cgd, vgdNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
       this._s0[base + SLOT_CAP_GEQ_GD] = res.geq;
       this._s0[base + SLOT_CAP_IEQ_GD] = res.ceq;
       this._s0[base + SLOT_CCAP_GD] = res.ccap;
@@ -613,14 +560,13 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     // recursion starts from the correct companion current (fixes stale CCAP_GS/GD).
     if (dt > 0) {
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
 
       if (caps.cgs > 0) {
         const q0gs = this._s0[base + SLOT_Q_GS];
         const q1gs = this.s1[base + SLOT_Q_GS];
         const q2gs = this.s2[base + SLOT_Q_GS];
         const ccapPrevGs = this.s1[base + SLOT_CCAP_GS];
-        const resGs = integrateCapacitor(caps.cgs, vgsNow, q0gs, q1gs, q2gs, dt, h1, h2, order, method, ccapPrevGs);
+        const resGs = integrateCapacitor(caps.cgs, vgsNow, q0gs, q1gs, q2gs, dt, h1, order, method, ccapPrevGs);
         this._s0[base + SLOT_CCAP_GS] = resGs.ccap;
       }
 
@@ -629,7 +575,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
         const q1gd = this.s1[base + SLOT_Q_GD];
         const q2gd = this.s2[base + SLOT_Q_GD];
         const ccapPrevGd = this.s1[base + SLOT_CCAP_GD];
-        const resGd = integrateCapacitor(caps.cgd, vgdNow, q0gd, q1gd, q2gd, dt, h1, h2, order, method, ccapPrevGd);
+        const resGd = integrateCapacitor(caps.cgd, vgdNow, q0gd, q1gd, q2gd, dt, h1, order, method, ccapPrevGd);
         this._s0[base + SLOT_CCAP_GD] = resGd.ccap;
       }
     }

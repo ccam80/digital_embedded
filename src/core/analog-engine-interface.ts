@@ -37,10 +37,10 @@ export interface SimulationParams {
   firstStep?: number;
   /** Relative convergence tolerance. Default: 1e-3 */
   reltol: number;
-  /** Absolute voltage tolerance in volts (ngspice VNTOL). Default: 1e-6 */
+  /** Absolute voltage tolerance in volts (ngspice CKTvoltTol). Default: 1e-6 */
+  voltTol: number;
+  /** Absolute current tolerance in amperes (ngspice CKTabstol). Default: 1e-12 */
   abstol: number;
-  /** Absolute current tolerance in amperes (ngspice ABSTOL). Default: 1e-12 */
-  iabstol: number;
   /**
    * Absolute charge tolerance for LTE control, in coulombs. Acts as the
    * floor term in the ngspice-style relative LTE tolerance formula
@@ -73,7 +73,7 @@ export interface SimulationParams {
   /**
    * Transient stop time in seconds (ngspice CKTfinalTime). Optional — only
    * available in batch/harness runs, not in streaming mode. When provided,
-   * the initial timestep uses `MIN(tStop / 100, maxTimeStep) / 10` matching
+   * the initial timestep uses `MIN(tStop / 100, outputStep) / 10` matching
    * ngspice dctran.c:118. When absent, falls back to `maxTimeStep / 10`.
    */
   tStop?: number;
@@ -87,6 +87,28 @@ export interface SimulationParams {
   predictor?: boolean;
   /** Use Initial Conditions mode. ngspice: MODEUIC. Default false. */
   uic?: boolean;
+  /** Active diagonal gmin during stepping (ngspice CKTdiagGmin). Persistent engine state. Default: 0 */
+  diagGmin?: number;
+  /** Requested output timestep for initial delta formula (ngspice CKTstep). */
+  outputStep?: number;
+  /** Start time for data output — skip initial transient (ngspice CKTinitTime). Default: 0 */
+  initTime?: number;
+  /** Maximum integration order (ngspice CKTmaxOrder). Default: 2 */
+  maxOrder?: number;
+  /** NEWTRUNC voltage-based LTE relative tolerance (ngspice CKTlteReltol). Default: 1e-3 */
+  lteReltol?: number;
+  /** NEWTRUNC voltage-based LTE absolute tolerance (ngspice CKTlteAbstol). Default: 1e-6 */
+  lteAbstol?: number;
+  /** Gmin stepping reduction factor (ngspice CKTgminFactor, cktntask.c:103). Default: 10 */
+  gminFactor?: number;
+  /**
+   * Current source scale factor for source stepping (ngspice srcFact).
+   * Runtime state that changes during source stepping — not a user-settable constant.
+   * Default: 1 (full scale).
+   */
+  srcFact?: number;
+  /** Trapezoidal integration weighting factor (0=BDF1, 0.5=trapezoidal). Default: 0.5 */
+  xmu?: number;
 }
 
 /** SimulationParams with all optional timestep fields resolved to concrete values. */
@@ -101,8 +123,8 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   minTimeStep: 1e-15,
   firstStep: 1e-9,
   reltol: 1e-3,
-  abstol: 1e-6,
-  iabstol: 1e-12,
+  voltTol: 1e-6,
+  abstol: 1e-12,
   chargeTol: 1e-14,
   trtol: 7.0,
   maxIterations: 100,
@@ -111,16 +133,48 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   dcTrcvMaxIter: 50,
   gmin: 1e-12,
   nodeDamping: false,
+  predictor: true,
+  gshunt: 0,
+  diagGmin: 0,
+  initTime: 0,
+  maxOrder: 2,
+  lteReltol: 1e-3,
+  lteAbstol: 1e-6,
+  gminFactor: 10,
+  srcFact: 1,
+  xmu: 0.5,
 };
+
+/**
+ * Compute the ngspice-correct initial timestep from transient parameters.
+ * Formula: MIN(tStop / 100, tStep) / 10  (ngspice dctran.c:118).
+ */
+export function computeFirstStep(tStop: number, tStep: number): number {
+  return Math.min(tStop / 100, tStep) / 10;
+}
 
 /** Resolve optional timestep fields to defaults. */
 export function resolveSimulationParams(params: SimulationParams): ResolvedSimulationParams {
+  const maxTimeStep = params.maxTimeStep ?? DEFAULT_SIMULATION_PARAMS.maxTimeStep;
+  // ngspice: CKTdelmin = 1e-11 * CKTmaxStep. Only compute when user hasn't set it explicitly.
+  const minTimeStep = params.minTimeStep != null ? params.minTimeStep : 1e-11 * maxTimeStep;
+  let firstStep = params.firstStep;
+  if (firstStep == null) {
+    if (params.tStop != null && params.tStop > 0) {
+      // ngspice dctran.c:118: delta = MIN(CKTfinalTime/100, CKTstep) / 10.
+      // Use params.outputStep (CKTstep) when provided; fall back to maxTimeStep.
+      const tStep = params.outputStep ?? maxTimeStep;
+      firstStep = computeFirstStep(params.tStop, tStep);
+    } else {
+      firstStep = DEFAULT_SIMULATION_PARAMS.firstStep;
+    }
+  }
   return {
     ...DEFAULT_SIMULATION_PARAMS,
     ...params,
-    maxTimeStep: params.maxTimeStep ?? DEFAULT_SIMULATION_PARAMS.maxTimeStep,
-    minTimeStep: params.minTimeStep ?? DEFAULT_SIMULATION_PARAMS.minTimeStep,
-    firstStep: params.firstStep ?? DEFAULT_SIMULATION_PARAMS.firstStep,
+    maxTimeStep,
+    minTimeStep,
+    firstStep,
   };
 }
 
@@ -135,7 +189,7 @@ export interface DcOpResult {
   /** Whether the DC operating point converged. */
   converged: boolean;
   /** Which convergence method was used. */
-  method: "direct" | "dynamic-gmin" | "spice3-gmin" | "gillespie-src";
+  method: "direct" | "dynamic-gmin" | "spice3-gmin" | "gillespie-src" | "spice3-src";
   /** Total Newton-Raphson iterations performed across all attempts. */
   iterations: number;
   /** Node voltages at the operating point (indexed by MNA node ID). */

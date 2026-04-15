@@ -19,7 +19,7 @@
       - button "■" [ref=e18] [cursor=pointer]
       - generic [ref=e20]:
         - button "▶❙" [ref=e21] [cursor=pointer]
-        - button "1.024999m ▾" [ref=e22] [cursor=pointer]
+        - button "1.024999875m ▾" [ref=e22] [cursor=pointer]
         - button "⏩" [active] [ref=e23] [cursor=pointer]
       - generic [ref=e25]: "Speed:"
       - button "−" [ref=e26] [cursor=pointer]
@@ -289,7 +289,9 @@
       - button "×" [ref=e387] [cursor=pointer]
     - button "×" [ref=e391] [cursor=pointer]
   - generic [ref=e393]:
-    - generic [ref=e394]: Ready
-    - button "96%" [ref=e396] [cursor=pointer]
-    - generic [ref=e397]: 31, 9
+    - generic [ref=e394]: ⚠️
+    - generic [ref=e395]: "Simulation error: Analog engine stagnation: simTime stuck at 0.00044075975000025806s. The engine exhausted all internal retries without advancing. Check convergence log for details."
+    - button "×" [ref=e396] [cursor=pointer]
+    - button "96%" [ref=e398] [cursor=pointer]
+    - generic [ref=e399]: 31, 9
 ```

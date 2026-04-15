@@ -211,7 +211,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   }
 
   private _computeEffectiveL(): number {
-    const T = 300.15;
+    const T = this._pool?.temperature ?? 300.15;
     const dT = T - this._TNOM;
     const factor = 1 + this._TC1 * dT + this._TC2 * dT * dT;
     return this._nominalL * factor * this._SCALE / this._M;
@@ -295,12 +295,17 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     const phi2 = this.s2[this.base + SLOT_PHI];
     const ccapPrev = this.s1[this.base + SLOT_CCAP];
     const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-    const { geq, ceq, ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrev);
+    if (this._pool && this._pool.initMode === "initTran") {
+      this.s1[this.base + SLOT_PHI] = phi0;  // flux0→flux1 copy (indload.c:99-102)
+    }
+    const { geq, ceq, ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, order, method, ccapPrev);
     this.s0[this.base + SLOT_GEQ]  = geq;
     this.s0[this.base + SLOT_IEQ]  = ceq;
     this.s0[this.base + SLOT_I]    = iNow;
     this.s0[this.base + SLOT_CCAP] = ccap;
+    if (this._pool && this._pool.initMode === "initTran") {
+      this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];  // ccap0→ccap1 copy (indload.c:114-117)
+    }
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
@@ -321,8 +326,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
       const phi2 = this.s2[this.base + SLOT_PHI];
       const ccapPrev = this.s1[this.base + SLOT_CCAP];
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-      const { ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrev);
+      const { ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, order, method, ccapPrev);
       this.s0[this.base + SLOT_CCAP] = ccap;
     }
   }

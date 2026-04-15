@@ -83,6 +83,19 @@ export class TimestepController {
   private _savedDelta: number = 0;
 
   /**
+   * CKTbreak flag: true when getClampedDt() clamped dt to a breakpoint.
+   * ngspice: CKTbreak. Devices can read this via the breakFlag getter.
+   */
+  private _breakFlag: boolean = false;
+
+  /**
+   * True until getClampedDt() is called for the first time.
+   * Used to apply ngspice's t=0 breakpoint proximity clamp and firsttime /= 10
+   * (dctran.c:572-573, 580) before the very first transient step.
+   */
+  private _isFirstGetClampedDt: boolean = true;
+
+  /**
    * Timestep history for CKTterr divided differences.
    * [0] = current trial dt (set by setDeltaOldCurrent), [1] = h_{n-1} (previous accepted dt), [2] = h_{n-2}, [3] = h_{n-3}.
    * Pre-allocated once; shifted in rotateDeltaOld(). ngspice: CKTdeltaOld[].
@@ -147,7 +160,7 @@ export class TimestepController {
       // ngspice CKTterr uses CKTabstol (current tolerance, 1e-12), not
       // CKTvoltTol (voltage tolerance, 1e-6). The LTE operates on charge
       // and companion-model currents, so the current tolerance applies.
-      abstol: params.iabstol,
+      abstol: params.abstol,
       chgtol: params.chargeTol,
     };
 
@@ -155,6 +168,13 @@ export class TimestepController {
     for (let i = 0; i < 7; i++) {
       this._deltaOld[i] = params.maxTimeStep;
     }
+
+    // dctran.c:323: CKTsaveDelta = CKTfinalTime / 50.
+    // When tStop is available (harness/batch), derive saveDelta. Otherwise
+    // fall back to maxTimeStep (closest streaming-mode analogue).
+    this._savedDelta = params.tStop != null
+      ? params.tStop / 50
+      : params.maxTimeStep;
   }
 
   /**
@@ -168,6 +188,11 @@ export class TimestepController {
   /** Timestep history for CKTterr. Read-only reference to the pre-allocated array. */
   get deltaOld(): readonly number[] {
     return this._deltaOld;
+  }
+
+  /** CKTbreak: true when the last getClampedDt() call clamped to a breakpoint. */
+  get breakFlag(): boolean {
+    return this._breakFlag;
   }
 
   /** Pre-allocated LteParams for element getLteTimestep calls. */
@@ -279,6 +304,29 @@ export class TimestepController {
     // Save unclamped delta before breakpoint clamping (ngspice saveDelta,
     // dctran.c:506). Used in accept() for post-breakpoint delta reduction.
     this._savedDelta = dt;
+
+    // ngspice dctran.c:572-580: at t=0 (firsttime), apply proximity clamp
+    // (when breakpoints exist) then divide by 10 unconditionally.
+    if (this._isFirstGetClampedDt) {
+      this._isFirstGetClampedDt = false;
+      if (this._breakpoints.length > 0) {
+        const nextBreakGap = this._breakpoints[0]!.time - simTime;
+        if (nextBreakGap > 0) {
+          // dctran.c:572-573: delta = MIN(delta, 0.1 * MIN(saveDelta, nextBreakGap)).
+          dt = Math.min(dt, 0.1 * Math.min(this._savedDelta, nextBreakGap));
+        }
+      }
+      // dctran.c:580: CKTdelta /= 10 — unconditional firsttime safety factor.
+      dt /= 10;
+      // Keep within [minTimeStep, maxTimeStep]
+      dt = Math.max(dt, this._params.minTimeStep * 2);
+      // Do NOT update this.currentDt — the clamp applies only to this step's
+      // working dt.  Persisting it would prevent NR retries from halving from
+      // the pre-clamp value, causing stagnation at t=0.
+      this._savedDelta = dt;
+    }
+
+    this._breakFlag = false;
     if (this._breakpoints.length > 0) {
       const nextBp = this._breakpoints[0]!.time;
       const remaining = nextBp - simTime;
@@ -287,6 +335,7 @@ export class TimestepController {
         // saveDelta is already captured above; accept() uses it for
         // post-breakpoint delta reduction (dctran.c:561).
         dt = remaining;
+        this._breakFlag = true;
       }
     }
     return dt;
@@ -550,11 +599,8 @@ export class TimestepController {
       else hi = mid;
     }
     // Dedup: if an existing entry at lo or lo-1 is within eps of `time`,
-    // treat as already registered. eps = 0.5 * minTimeStep collapses re-adds
-    // from overlapping lookahead windows without merging genuinely distinct
-    // breakpoints (which cannot be closer than minTimeStep without the
-    // solver being unable to separate them anyway).
-    const eps = 0.5 * this._params.minTimeStep;
+    // treat as already registered. ngspice: CKTminBreak = CKTmaxStep * 5e-5.
+    const eps = this._params.maxTimeStep * 5e-5;
     if (lo < this._breakpoints.length && this._breakpoints[lo]!.time - time < eps) {
       return;
     }
@@ -582,7 +628,7 @@ export class TimestepController {
       if (this._breakpoints[mid]!.time < time) lo = mid + 1;
       else hi = mid;
     }
-    const eps = 0.5 * this._params.minTimeStep;
+    const eps = this._params.maxTimeStep * 5e-5;
     if (lo < this._breakpoints.length && this._breakpoints[lo]!.time - time < eps) {
       return;
     }
@@ -638,7 +684,7 @@ export class TimestepController {
       this.currentMethod = "bdf1";
       this.currentOrder = 1;
     }
-    // After step 1, currentMethod stays at whatever tryOrderPromotion()
+    // After step 2, currentMethod stays at whatever tryOrderPromotion()
     // or checkMethodSwitch() set it to.  currentOrder is kept in sync by
     // those methods directly.
   }

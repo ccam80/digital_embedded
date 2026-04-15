@@ -105,7 +105,33 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
     return { vgs: vgsResult.value, vds, swapped: false };
   }
 
+  override primeJunctions(): void {
+    // jfetload.c:115-118: MODEINITJCT sets vgs=-1, vgd=-1 (polarity handled at voltage-read time)
+    this._vgs = -1;
+    this._vds = 0;  // vgs - vgd = -1 - (-1) = 0
+    this._vgs_junction = -1;
+  }
+
   override updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
+    // jfetload.c: during MODEINITJCT, primeJunctions() has already set _vgs, _vds,
+    // _vgs_junction directly. Skip MNA voltage reads and all voltage limiting.
+    if (this._pool.initMode === "initJct") {
+      this._pnjlimLimited = false;
+      this._swapped = false;
+
+      this._ids = this.computeIds(this._vgs, this._vds);
+      this._gm = this.computeGm(this._vgs, this._vds);
+      this._gds = this.computeGds(this._vgs, this._vds);
+
+      // Gate junction I-V at primed vgs_junction
+      const vt_n = VT * this._p.N;
+      const expArg = Math.min(this._vgs_junction / vt_n, 80);
+      const igJunction = this._p.IS * (Math.exp(expArg) - 1);
+      this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
+      this._id_junction = igJunction;
+      return false;
+    }
+
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;

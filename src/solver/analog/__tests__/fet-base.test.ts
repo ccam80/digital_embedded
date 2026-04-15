@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { createMosfetElement } from "../../../components/semiconductors/mosfet.js";
+import { createMosfetElement, MOSFET_NMOS_DEFAULTS, MOSFET_PMOS_DEFAULTS } from "../../../components/semiconductors/mosfet.js";
 import {
   AbstractFetElement,
   SLOT_GM,
@@ -18,8 +18,8 @@ import {
   SLOT_VDS,
   SLOT_IDS,
   SLOT_SWAPPED,
-  SLOT_VGS_PREV,
-  SLOT_VGD_PREV,
+  SLOT_V_GS,
+  SLOT_V_GD,
 } from "../fet-base.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../sparse-solver.js";
@@ -39,6 +39,7 @@ import type { ReactiveAnalogElement } from "../element.js";
 // ---------------------------------------------------------------------------
 
 const NMOS_DEFAULTS = {
+  ...MOSFET_NMOS_DEFAULTS,
   VTO: 0.7,
   KP: 120e-6,
   LAMBDA: 0.02,
@@ -53,6 +54,7 @@ const NMOS_DEFAULTS = {
 };
 
 const PMOS_DEFAULTS = {
+  ...MOSFET_PMOS_DEFAULTS,
   VTO: -0.7,
   KP: 60e-6,
   LAMBDA: 0.02,
@@ -408,10 +410,10 @@ describe("StatePool migration", () => {
     expect(pool.state0[SLOT_IDS]).toBe(0);
     // SWAPPED = 0.0
     expect(pool.state0[SLOT_SWAPPED]).toBe(0);
-    // SLOT_V_GS (alias SLOT_VGS_PREV) and SLOT_V_GD (alias SLOT_VGD_PREV) are zero-initialised;
+    // SLOT_V_GS and SLOT_V_GD are zero-initialised;
     // first-call detection is now done via s1[Q_GS]===0, not a NaN sentinel.
-    expect(pool.state0[SLOT_VGS_PREV]).toBe(0);
-    expect(pool.state0[SLOT_VGD_PREV]).toBe(0);
+    expect(pool.state0[SLOT_V_GS]).toBe(0);
+    expect(pool.state0[SLOT_V_GD]).toBe(0);
   });
 
   it("updateOperatingPoint_writes_state_to_pool", () => {

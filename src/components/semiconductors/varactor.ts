@@ -4,14 +4,13 @@
  * Implements a diode optimized for its voltage-dependent depletion capacitance.
  * The primary behavior is the C-V characteristic, not the I-V.
  *
- * C-V model (standard depletion capacitance):
- *   C_j(V_R) = CJO / (1 + V_R / VJ)^M
- *
- * where V_R = -V_d is the reverse bias voltage (positive for reverse bias).
+ * C-V model: junction capacitance with FC linearization via
+ * `computeJunctionCapacitance`, plus a TT diffusion term (Ctotal = Cj + TT*gd).
+ * Charge is integrated via `computeJunctionCharge` for accurate transient stamps.
  *
  * Also models standard Shockley forward conduction (not the primary use case).
  * The capacitance companion model is updated every timestep as C changes with
- * the applied reverse bias.
+ * the applied bias.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -64,35 +63,6 @@ export const { paramDefs: VARACTOR_PARAM_DEFS, defaults: VARACTOR_PARAM_DEFAULTS
     tt:  { default: 0,      unit: "s", description: "Transit time" },
   },
 });
-
-// ---------------------------------------------------------------------------
-// computeVaractorCapacitance — exported for tests
-// ---------------------------------------------------------------------------
-
-/**
- * Compute depletion capacitance for a varactor diode.
- *
- * Formula: C_j(V_R) = CJO / (1 + V_R / VJ)^M
- *
- * Where V_R = reverse bias voltage (positive for reverse-biased diode).
- * When V_R < 0 (forward bias), clamps to ensure denominator stays positive.
- *
- * @param vReverse - Reverse bias voltage V_R = -V_d (positive = reverse biased)
- * @param cjo      - Zero-bias junction capacitance (F)
- * @param vj       - Built-in potential (V), typically 0.7V
- * @param m        - Grading coefficient, typically 0.5 (abrupt junction)
- */
-export function computeVaractorCapacitance(
-  vReverse: number,
-  cjo: number,
-  vj: number,
-  m: number,
-): number {
-  if (cjo <= 0) return 0;
-  // Clamp to avoid singularity at V_R = -VJ (denominator = 0)
-  const arg = Math.max(1 + vReverse / vj, 1e-4);
-  return cjo / Math.pow(arg, m);
-}
 
 // ---------------------------------------------------------------------------
 // State schema declaration
@@ -151,6 +121,10 @@ export function createVaractorElement(
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
   let pnjlimLimited = false;
+
+  // One-shot cold-start seed from dcopInitJct. Non-null only between
+  // primeJunctions() and the next updateOperatingPoint() call.
+  let primedVd: number | null = null;
 
   return {
     branchIndex: -1,
@@ -214,15 +188,28 @@ export function createVaractorElement(
     },
 
     updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): void {
-      const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
-      const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vdRaw = vA - vC;
+      let vdRaw: number;
+      if (primedVd !== null) {
+        vdRaw = primedVd;
+        primedVd = null;
+      } else {
+        const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
+        const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+        vdRaw = vA - vC;
+      }
 
       // Apply pnjlim to prevent exponential runaway, using vold from pool
       const vdOld = s0[base + SLOT_VD];
-      const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
-      const vdLimited = vdResult.value;
-      pnjlimLimited = vdResult.limited;
+      let vdLimited: number;
+      if (pool.initMode === "initJct") {
+        // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
+        vdLimited = vdRaw;
+        pnjlimLimited = false;
+      } else {
+        const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
+        vdLimited = vdResult.value;
+        pnjlimLimited = vdResult.limited;
+      }
 
       if (limitingCollector) {
         limitingCollector.push({
@@ -256,22 +243,20 @@ export function createVaractorElement(
       const vNow = pnjlim(vdRaw_sc, s0[base + SLOT_VD], nVt, vcrit).value;
       s0[base + SLOT_VD] = vNow;
 
-      // Change 36: use computeJunctionCapacitance with FC linearization (vd = vNow)
       const Cj = computeJunctionCapacitance(vNow, p.cjo, p.vj, p.m, p.fc);
 
-      // Change 37: Ctotal = Cj + TT * gd
-      const gd = s0[base + SLOT_GEQ];
+      const expArg = Math.min(vNow / nVt, 700);
+      const gd = (p.iS * Math.exp(expArg)) / nVt + GMIN;
       const Ctotal = Cj + p.tt * gd;
 
-      // Change 35: use computeJunctionCharge instead of Cj * vNow
+
       const id = s0[base + SLOT_ID];
       const q0 = computeJunctionCharge(vNow, p.cjo, p.vj, p.m, p.fc, p.tt, id);
       const q1 = s1[base + SLOT_Q];
       const q2 = s2[base + SLOT_Q];
       const ccapPrev = s1[base + SLOT_CCAP];
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-      const { geq, ceq, ccap } = integrateCapacitor(Ctotal, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      const { geq, ceq, ccap } = integrateCapacitor(Ctotal, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
       s0[base + SLOT_CAP_GEQ] = geq;
       s0[base + SLOT_CAP_IEQ] = ceq;
       s0[base + SLOT_V] = vNow;
@@ -325,6 +310,11 @@ export function createVaractorElement(
       const iCap = capGeq * vNow + capIeq;
       const I = id + iCap;
       return [I, -I];
+    },
+
+    primeJunctions(): void {
+      // dioload.c:135-136: MODEINITJCT sets vd = tVcrit
+      primedVd = vcrit;
     },
 
     setParam(key: string, value: number): void {

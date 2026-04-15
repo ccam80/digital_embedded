@@ -85,6 +85,12 @@ export interface StatePoolRef {
    * (NIcomCof equivalent, nicomcof.c:33-51).
    */
   readonly dt?: number;
+  /**
+   * Circuit operating temperature in Kelvin. Absent → 300.15 K (REFTEMP).
+   * Maps to ngspice CKTtemp. Used by passive elements (capacitor, inductor)
+   * for TC1/TC2 temperature coefficient computation.
+   */
+  readonly temperature?: number;
 }
 
 // ---------------------------------------------------------------------------

@@ -391,8 +391,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     const q2 = this.s2[this.base + SLOT_Q];
     const ccapPrev = this.s1[this.base + SLOT_CCAP];
     const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-    const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-    const { geq, ceq, ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+    const { geq, ceq, ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
     this.s0[this.base + SLOT_GEQ]  = geq;
     this.s0[this.base + SLOT_IEQ]  = ceq;
     this.s0[this.base + SLOT_V]    = vNow;
@@ -416,8 +415,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
       const q2 = this.s2[this.base + SLOT_Q];
       const ccapPrev = this.s1[this.base + SLOT_CCAP];
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-      const { ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapPrev);
+      const { ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
       this.s0[this.base + SLOT_CCAP] = ccap;
     }
   }

@@ -845,13 +845,25 @@ export function createBjtElement(
         vbcRaw = polarity * (vB - vC);
       }
 
-      // Apply pnjlim to both junctions using vold from pool
-      const vbeResult = pnjlim(vbeRaw, s0[base + SLOT_VBE], tp.vt, vcritBE);
-      const vbeLimited = vbeResult.value;
-      const vbeLimFlag = vbeResult.limited;
-      const vbcResult = pnjlim(vbcRaw, s0[base + SLOT_VBC], tp.vt, vcritBC);
-      const vbcLimited = vbcResult.value;
-      icheckLimited = vbeLimFlag || vbcResult.limited;
+      // Apply pnjlim to both junctions using vold from pool.
+      // bjtload.c:258-276: during MODEINITJCT, voltages are set directly — no pnjlim applied.
+      let vbeLimited: number;
+      let vbcLimited: number;
+      let vbeLimFlag = false;
+      let vbcLimFlag = false;
+      if (pool.initMode === "initJct") {
+        vbeLimited = vbeRaw;
+        vbcLimited = vbcRaw;
+        icheckLimited = false;
+      } else {
+        const vbeResult = pnjlim(vbeRaw, s0[base + SLOT_VBE], tp.vt, vcritBE);
+        vbeLimited = vbeResult.value;
+        vbeLimFlag = vbeResult.limited;
+        const vbcResult = pnjlim(vbcRaw, s0[base + SLOT_VBC], tp.vt, vcritBC);
+        vbcLimited = vbcResult.value;
+        vbcLimFlag = vbcResult.limited;
+        icheckLimited = vbeLimFlag || vbcLimFlag;
+      }
 
       if (limitingCollector) {
         limitingCollector.push({
@@ -870,7 +882,7 @@ export function createBjtElement(
           limitType: "pnjlim",
           vBefore: vbcRaw,
           vAfter: vbcLimited,
-          wasLimited: vbcResult.limited,
+          wasLimited: vbcLimFlag,
         });
       }
 
@@ -1572,11 +1584,6 @@ export function createSpiceL1BjtElement(
         vbcRaw = polarity * (vBi - vCi);
       }
 
-      const vbeResult = pnjlim(vbeRaw, s0[base + L1_SLOT_VBE], tpL1.vt, vcritBE);
-      const vbeLimited = vbeResult.value;
-      const vbeLimFlag = vbeResult.limited;
-      const vbcResult = pnjlim(vbcRaw, s0[base + L1_SLOT_VBC], tpL1.vt, vcritBC);
-      const vbcLimited = vbcResult.value;
       // CS pnjlim: bjtload.c:407-415 — compute vsub from current voltages then limit it.
       // vsub = polarity * subs * (V_substNode - V_substConNode); substrate pin tied to ground so
       // V_substNode = 0. substConNode: VERTICAL(NPN)→nodeC_int, LATERAL(PNP)→nodeB_int.
@@ -1585,9 +1592,28 @@ export function createSpiceL1BjtElement(
       const substConNode_op = subs_op > 0 ? nodeC_int : nodeB_int;
       const vSubConRaw = substConNode_op > 0 ? voltages[substConNode_op - 1] : 0;
       const vsubRaw = polarity * subs_op * (0 - vSubConRaw); // V_substNode=0 (substrate tied to ground)
-      const vsubResult = pnjlim(vsubRaw, s0[base + L1_SLOT_VSUB], tpL1.vt, tpL1.tSubVcrit);
-      const vsubLimited = vsubResult.value;
-      icheckLimited = vbeLimFlag || vbcResult.limited || vsubResult.limited;
+      // bjtload.c:258-276: during MODEINITJCT, voltages are set directly — no pnjlim applied.
+      let vbeLimited: number;
+      let vbcLimited: number;
+      let vsubLimited: number;
+      let vbeLimFlag = false;
+      let vbcLimFlag = false;
+      if (pool.initMode === "initJct") {
+        vbeLimited = vbeRaw;
+        vbcLimited = vbcRaw;
+        vsubLimited = vsubRaw;
+        icheckLimited = false;
+      } else {
+        const vbeResult = pnjlim(vbeRaw, s0[base + L1_SLOT_VBE], tpL1.vt, vcritBE);
+        vbeLimited = vbeResult.value;
+        vbeLimFlag = vbeResult.limited;
+        const vbcResult = pnjlim(vbcRaw, s0[base + L1_SLOT_VBC], tpL1.vt, vcritBC);
+        vbcLimited = vbcResult.value;
+        vbcLimFlag = vbcResult.limited;
+        const vsubResult = pnjlim(vsubRaw, s0[base + L1_SLOT_VSUB], tpL1.vt, tpL1.tSubVcrit);
+        vsubLimited = vsubResult.value;
+        icheckLimited = vbeLimFlag || vbcLimFlag || vsubResult.limited;
+      }
 
       if (limitingCollector) {
         limitingCollector.push({
@@ -1606,7 +1632,7 @@ export function createSpiceL1BjtElement(
           limitType: "pnjlim",
           vBefore: vbcRaw,
           vAfter: vbcLimited,
-          wasLimited: vbcResult.limited,
+          wasLimited: vbcLimFlag,
         });
       }
 
@@ -1935,8 +1961,7 @@ export function createSpiceL1BjtElement(
         const q2_be = s2[base + L1_SLOT_Q_BE];
         const ccapPrevBE = s1[base + L1_SLOT_CCAP_BE];
         const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-        const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-        const resBE = integrateCapacitor(CtotalBE, vbeNow, q0_be, q1_be, q2_be, dt, h1, h2, order, method, ccapPrevBE);
+        const resBE = integrateCapacitor(CtotalBE, vbeNow, q0_be, q1_be, q2_be, dt, h1, order, method, ccapPrevBE);
         s0[base + L1_SLOT_CAP_GEQ_BE] = resBE.geq;
         s0[base + L1_SLOT_CAP_IEQ_BE] = resBE.ceq;
         s0[base + L1_SLOT_CCAP_BE] = resBE.ccap;
@@ -1978,8 +2003,7 @@ export function createSpiceL1BjtElement(
         const q2_bc = s2[base + L1_SLOT_Q_BC];
         const ccapPrevBC = s1[base + L1_SLOT_CCAP_BC];
         const h1_bc = deltaOld.length > 1 ? deltaOld[1] : dt;
-        const h2_bc = deltaOld.length > 2 ? deltaOld[2] : h1_bc;
-        const resBC = integrateCapacitor(CtotalBC, vbcNow, q0_bc, q1_bc, q2_bc, dt, h1_bc, h2_bc, order, method, ccapPrevBC);
+        const resBC = integrateCapacitor(CtotalBC, vbcNow, q0_bc, q1_bc, q2_bc, dt, h1_bc, order, method, ccapPrevBC);
         s0[base + L1_SLOT_CCAP_BC] = resBC.ccap;
         // ngspice bjtload.c:735-740: MODEINITTRAN — copy ccap0→ccap1 after NIintegrate
         if (isFirstCall) s1[base + L1_SLOT_CCAP_BC] = s0[base + L1_SLOT_CCAP_BC];
@@ -2030,8 +2054,7 @@ export function createSpiceL1BjtElement(
           const q2_cs = s2[base + L1_SLOT_Q_CS];
           const ccapPrevCS = s1[base + L1_SLOT_CCAP_CS];
           const h1_cs = deltaOld.length > 1 ? deltaOld[1] : dt;
-          const h2_cs = deltaOld.length > 2 ? deltaOld[2] : h1_cs;
-          const resCS = integrateCapacitor(CjCS, vcsNow, q0_cs, q1_cs, q2_cs, dt, h1_cs, h2_cs, order, method, ccapPrevCS);
+          const resCS = integrateCapacitor(CjCS, vcsNow, q0_cs, q1_cs, q2_cs, dt, h1_cs, order, method, ccapPrevCS);
           s0[base + L1_SLOT_CAP_GEQ_CS] = resCS.geq;
           s0[base + L1_SLOT_CAP_IEQ_CS] = resCS.ceq;
           s0[base + L1_SLOT_CCAP_CS] = resCS.ccap;
@@ -2257,8 +2280,7 @@ export function createSpiceL1BjtElement(
 
       // Recompute CCAP_BE from converged charge so the next step's trapezoidal
       // recursion and LTE tolerance start from the correct companion current.
-      // Without this, s0[CCAP_BE] retains the mid-NR value from stampCompanion
-      // and s1[CCAP_BE] carries a stale zero forward after acceptTimestep().
+      // Without this, s0[CCAP_BE] retains the mid-NR value from stampCompanion.
       // ngspice: bjtload.c recomputes ccap via NIintegrate after charge update.
       {
         const CtotalBE_full = s0[base + L1_SLOT_CTOT_BE];
@@ -2267,8 +2289,7 @@ export function createSpiceL1BjtElement(
         const q2_be = s2[base + L1_SLOT_Q_BE];
         const ccapPrevBE = s1[base + L1_SLOT_CCAP_BE];
         const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-        const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-        const resBE = integrateCapacitor(CtotalBE_full, vbeNow, q0_be, q1_be, q2_be, dt, h1, h2, order, method as IntegrationMethod, ccapPrevBE);
+        const resBE = integrateCapacitor(CtotalBE_full, vbeNow, q0_be, q1_be, q2_be, dt, h1, order, method as IntegrationMethod, ccapPrevBE);
         s0[base + L1_SLOT_CCAP_BE] = resBE.ccap;
       }
 
@@ -2289,8 +2310,7 @@ export function createSpiceL1BjtElement(
         const q2_bc = s2[base + L1_SLOT_Q_BC];
         const ccapPrevBC = s1[base + L1_SLOT_CCAP_BC];
         const h1_bc = deltaOld.length > 1 ? deltaOld[1] : dt;
-        const h2_bc = deltaOld.length > 2 ? deltaOld[2] : h1_bc;
-        const resBC = integrateCapacitor(CtotalBC_full, vbcNow, q0_bc, q1_bc, q2_bc, dt, h1_bc, h2_bc, order, method as IntegrationMethod, ccapPrevBC);
+        const resBC = integrateCapacitor(CtotalBC_full, vbcNow, q0_bc, q1_bc, q2_bc, dt, h1_bc, order, method as IntegrationMethod, ccapPrevBC);
         s0[base + L1_SLOT_CCAP_BC] = resBC.ccap;
       }
 
@@ -2322,8 +2342,7 @@ export function createSpiceL1BjtElement(
           const q2_cs = s2[base + L1_SLOT_Q_CS];
           const ccapPrevCS = s1[base + L1_SLOT_CCAP_CS];
           const h1_cs = deltaOld.length > 1 ? deltaOld[1] : dt;
-          const h2_cs = deltaOld.length > 2 ? deltaOld[2] : h1_cs;
-          const resCS = integrateCapacitor(CjCS_ucf, vcsNow, q0_cs, q1_cs, q2_cs, dt, h1_cs, h2_cs, order, method as IntegrationMethod, ccapPrevCS);
+          const resCS = integrateCapacitor(CjCS_ucf, vcsNow, q0_cs, q1_cs, q2_cs, dt, h1_cs, order, method as IntegrationMethod, ccapPrevCS);
           s0[base + L1_SLOT_CCAP_CS] = resCS.ccap;
         }
       } else if (params.CJS > 0) {
@@ -2339,8 +2358,7 @@ export function createSpiceL1BjtElement(
           const q2_cs = s2[base + L1_SLOT_Q_CS];
           const ccapPrevCS = s1[base + L1_SLOT_CCAP_CS];
           const h1_cs = deltaOld.length > 1 ? deltaOld[1] : dt;
-          const h2_cs = deltaOld.length > 2 ? deltaOld[2] : h1_cs;
-          const resCS = integrateCapacitor(CjCS, vcsNow, q0_cs, q1_cs, q2_cs, dt, h1_cs, h2_cs, order, method as IntegrationMethod, ccapPrevCS);
+          const resCS = integrateCapacitor(CjCS, vcsNow, q0_cs, q1_cs, q2_cs, dt, h1_cs, order, method as IntegrationMethod, ccapPrevCS);
           s0[base + L1_SLOT_CCAP_CS] = resCS.ccap;
         }
       }

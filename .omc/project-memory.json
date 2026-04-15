@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1776068334885,
+  "lastScanned": 1776242278530,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -83,7 +83,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1776068334844,
+      "lastAccessed": 1776242278483,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -95,7 +95,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 5,
-      "lastAccessed": 1776068334844,
+      "lastAccessed": 1776242278483,
       "keyFiles": [
         "simulator.html",
         "tutorial-editor.html",
@@ -107,10 +107,11 @@
     "docs": {
       "path": "docs",
       "purpose": "Documentation",
-      "fileCount": 2,
-      "lastAccessed": 1776068334845,
+      "fileCount": 3,
+      "lastAccessed": 1776242278483,
       "keyFiles": [
         "harness-redesign-spec.md",
+        "ngspice-state-machine-alignment-spec.md",
         "timestep-alignment-spec.md"
       ]
     },
@@ -118,14 +119,14 @@
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776068334845,
+      "lastAccessed": 1776242278506,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 16,
-      "lastAccessed": 1776068334845,
+      "lastAccessed": 1776242278507,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -138,28 +139,28 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1776068334846,
+      "lastAccessed": 1776242278507,
       "keyFiles": []
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776068334846,
+      "lastAccessed": 1776242278508,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776068334866,
+      "lastAccessed": 1776242278508,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 20,
-      "lastAccessed": 1776068334866,
+      "lastAccessed": 1776242278508,
       "keyFiles": [
         "circuit-mcp-server.ts",
         "cleanup-unused-imports.mjs",
@@ -171,11 +172,11 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 11,
-      "lastAccessed": 1776068334867,
+      "fileCount": 5,
+      "lastAccessed": 1776242278508,
       "keyFiles": [
         "analog-snapshot-analysis.md",
-        "plan.md",
+        "ngspice-alignment-implementation-spec.md",
         "progress.md",
         "test-baseline.md",
         "timed-simulation.md"
@@ -185,7 +186,7 @@
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1776068334867,
+      "lastAccessed": 1776242278509,
       "keyFiles": [
         "main.ts"
       ]
@@ -194,7 +195,7 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1776068334867,
+      "lastAccessed": 1776242278509,
       "keyFiles": [
         "playwright-failures.json",
         "test-failures.json"
@@ -204,7 +205,7 @@
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1776068334867,
+      "lastAccessed": 1776242278509,
       "keyFiles": [
         "index.json"
       ]
@@ -213,7 +214,7 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1776068334868,
+      "lastAccessed": 1776242278510,
       "keyFiles": [
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js",
@@ -224,7 +225,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1776068334868,
+      "lastAccessed": 1776242278510,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -235,7 +236,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1776068334870,
+      "lastAccessed": 1776242278512,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -246,7 +247,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1776068334870,
+      "lastAccessed": 1776242278512,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -257,172 +258,214 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1776068334871,
+      "lastAccessed": 1776242278512,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 162,
-      "lastAccessed": 1776146851710,
+      "accessCount": 292,
+      "lastAccessed": 1776247399272,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 106,
-      "lastAccessed": 1776146797454,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\spicelib\\analysis\\dctran.c",
-      "accessCount": 64,
-      "lastAccessed": 1776129593165,
+      "accessCount": 238,
+      "lastAccessed": 1776247420671,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\timestep.ts",
-      "accessCount": 53,
-      "lastAccessed": 1776146815649,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\maths\\ni\\niiter.c",
-      "accessCount": 39,
-      "lastAccessed": 1776129217373,
+      "accessCount": 149,
+      "lastAccessed": 1776243996112,
       "type": "file"
     },
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 30,
-      "lastAccessed": 1776137485723,
+      "accessCount": 129,
+      "lastAccessed": 1776201963835,
       "type": "directory"
     },
     {
-      "path": "ref\\ngspice\\src\\spicelib\\devices\\bjt\\bjtload.c",
-      "accessCount": 28,
-      "lastAccessed": 1776129199108,
+      "path": "ref\\ngspice\\src\\spicelib\\analysis\\dctran.c",
+      "accessCount": 128,
+      "lastAccessed": 1776228032258,
       "type": "file"
     },
     {
       "path": "",
-      "accessCount": 27,
-      "lastAccessed": 1776140171887,
+      "accessCount": 92,
+      "lastAccessed": 1776247495810,
       "type": "directory"
     },
     {
       "path": "src\\core\\analog-engine-interface.ts",
-      "accessCount": 25,
-      "lastAccessed": 1776146838159,
+      "accessCount": 85,
+      "lastAccessed": 1776244257991,
+      "type": "directory"
+    },
+    {
+      "path": "src",
+      "accessCount": 74,
+      "lastAccessed": 1776247444687,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
-      "accessCount": 24,
-      "lastAccessed": 1776125787808,
+      "accessCount": 68,
+      "lastAccessed": 1776243899391,
+      "type": "file"
+    },
+    {
+      "path": "ref\\ngspice\\src\\maths\\ni\\niiter.c",
+      "accessCount": 54,
+      "lastAccessed": 1776228002034,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog",
+      "accessCount": 53,
+      "lastAccessed": 1776243833553,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\integration.ts",
+      "accessCount": 48,
+      "lastAccessed": 1776244111351,
+      "type": "file"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\bjt\\bjtload.c",
+      "accessCount": 42,
+      "lastAccessed": 1776205975384,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\state-pool.ts",
+      "accessCount": 39,
+      "lastAccessed": 1776247391032,
       "type": "file"
     },
     {
       "path": "ref\\ngspice",
-      "accessCount": 24,
-      "lastAccessed": 1776135404514,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog",
-      "accessCount": 20,
-      "lastAccessed": 1776142388268,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\state-pool.ts",
-      "accessCount": 17,
-      "lastAccessed": 1776146788662,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 14,
-      "lastAccessed": 1776142404559,
+      "accessCount": 36,
+      "lastAccessed": 1776172941348,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
-      "accessCount": 13,
-      "lastAccessed": 1776130769890,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\integration.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776137461113,
+      "accessCount": 27,
+      "lastAccessed": 1776173006817,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 11,
-      "lastAccessed": 1776137441483,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\timestep.test.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776079849481,
-      "type": "file"
-    },
-    {
-      "path": ".vitest-failures.json",
-      "accessCount": 8,
-      "lastAccessed": 1776141156595,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\coordinator.ts",
-      "accessCount": 8,
-      "lastAccessed": 1776141629130,
+      "accessCount": 21,
+      "lastAccessed": 1776228008642,
       "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\ni\\nicomcof.c",
-      "accessCount": 7,
-      "lastAccessed": 1776129147861,
+      "accessCount": 17,
+      "lastAccessed": 1776228003258,
       "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\ni\\niinteg.c",
-      "accessCount": 7,
-      "lastAccessed": 1776140178322,
+      "accessCount": 14,
+      "lastAccessed": 1776227985585,
+      "type": "file"
+    },
+    {
+      "path": ".vitest-failures.json",
+      "accessCount": 13,
+      "lastAccessed": 1776247210663,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\coordinator.ts",
+      "accessCount": 12,
+      "lastAccessed": 1776171966315,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\ckt-terr.ts",
-      "accessCount": 6,
-      "lastAccessed": 1776118400436,
+      "accessCount": 12,
+      "lastAccessed": 1776243981051,
+      "type": "file"
+    },
+    {
+      "path": "scripts",
+      "accessCount": 11,
+      "lastAccessed": 1776168548836,
+      "type": "directory"
+    },
+    {
+      "path": "src\\core\\__tests__\\analog-engine-interface.test.ts",
+      "accessCount": 11,
+      "lastAccessed": 1776244012176,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\timestep.test.ts",
+      "accessCount": 11,
+      "lastAccessed": 1776244032449,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\ni-pred.ts",
-      "accessCount": 6,
-      "lastAccessed": 1776129167097,
+      "accessCount": 10,
+      "lastAccessed": 1776242868117,
       "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\ni\\nipred.c",
-      "accessCount": 6,
-      "lastAccessed": 1776129569394,
+      "accessCount": 8,
+      "lastAccessed": 1776227986000,
       "type": "file"
     },
     {
       "path": "src\\components\\sources\\__tests__\\ac-voltage-source.test.ts",
-      "accessCount": 5,
-      "lastAccessed": 1776082913763,
+      "accessCount": 7,
+      "lastAccessed": 1776158553996,
       "type": "file"
     },
     {
-      "path": "src\\core\\__tests__\\analog-engine-interface.test.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776076374168,
+      "path": "ref\\ngspice\\src\\spicelib\\analysis\\ckttrunc.c",
+      "accessCount": 7,
+      "lastAccessed": 1776227995373,
       "type": "file"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib\\analysis",
+      "accessCount": 7,
+      "lastAccessed": 1776228010738,
+      "type": "directory"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib\\analysis\\cktop.c",
+      "accessCount": 7,
+      "lastAccessed": 1776228018992,
+      "type": "file"
+    },
+    {
+      "path": "ref\\ngspice\\visualc-shared\\sharedspice.vcxproj",
+      "accessCount": 5,
+      "lastAccessed": 1776160775632,
+      "type": "file"
+    },
+    {
+      "path": "ref\\ngspice\\visualc-shared",
+      "accessCount": 5,
+      "lastAccessed": 1776160781482,
+      "type": "directory"
+    },
+    {
+      "path": "ref\\ngspice\\src\\maths\\ni",
+      "accessCount": 5,
+      "lastAccessed": 1776166413070,
+      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\device-mappings.ts",
@@ -437,57 +480,33 @@
       "type": "file"
     },
     {
-      "path": "scripts",
-      "accessCount": 4,
-      "lastAccessed": 1776116357838,
-      "type": "directory"
-    },
-    {
-      "path": "ref\\ngspice\\src\\maths\\ni",
-      "accessCount": 4,
-      "lastAccessed": 1776129167802,
-      "type": "directory"
-    },
-    {
-      "path": "ref\\ngspice\\visualc-shared\\sharedspice.vcxproj",
-      "accessCount": 4,
-      "lastAccessed": 1776130714267,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\spicelib\\analysis\\cktop.c",
-      "accessCount": 3,
-      "lastAccessed": 1776129128502,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\spicelib\\analysis\\ckttrunc.c",
-      "accessCount": 3,
-      "lastAccessed": 1776129568831,
-      "type": "file"
-    },
-    {
       "path": "src\\solver",
-      "accessCount": 3,
-      "lastAccessed": 1776141606860,
+      "accessCount": 4,
+      "lastAccessed": 1776158050368,
       "type": "directory"
     },
     {
-      "path": "ref\\ngspice\\visualc-shared",
-      "accessCount": 2,
-      "lastAccessed": 1776073972007,
+      "path": "fixtures\\npn-ce-full-harness.dts",
+      "accessCount": 4,
+      "lastAccessed": 1776172923081,
+      "type": "file"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib",
+      "accessCount": 4,
+      "lastAccessed": 1776172951739,
       "type": "directory"
+    },
+    {
+      "path": "ref\\ngspice\\src\\spicelib\\analysis\\cktterr.c",
+      "accessCount": 3,
+      "lastAccessed": 1776227995585,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
       "accessCount": 2,
       "lastAccessed": 1776074701255,
-      "type": "file"
-    },
-    {
-      "path": "fixtures\\npn-ce-full-harness.dts",
-      "accessCount": 2,
-      "lastAccessed": 1776115869914,
       "type": "file"
     },
     {
@@ -497,34 +516,16 @@
       "type": "file"
     },
     {
-      "path": "ref\\ngspice\\src\\spicelib",
+      "path": "ref\\ngspice\\src\\maths\\ni\\niinit.c",
       "accessCount": 2,
-      "lastAccessed": 1776140167765,
-      "type": "directory"
+      "lastAccessed": 1776228002946,
+      "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\bjt\\bjttrunc.c",
       "accessCount": 1,
       "lastAccessed": 1776070634444,
       "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\spicelib\\analysis\\cktterr.c",
-      "accessCount": 1,
-      "lastAccessed": 1776070634913,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\maths\\ni\\niinit.c",
-      "accessCount": 1,
-      "lastAccessed": 1776070649268,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\spicelib\\analysis",
-      "accessCount": 1,
-      "lastAccessed": 1776070959080,
-      "type": "directory"
     },
     {
       "path": "src\\core",

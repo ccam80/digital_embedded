@@ -11,7 +11,6 @@
 import { describe, it, expect } from "vitest";
 import {
   createVaractorElement,
-  computeVaractorCapacitance,
   VaractorDefinition,
   VARACTOR_PARAM_DEFAULTS,
 } from "../varactor.js";
@@ -143,24 +142,27 @@ describe("Varactor", () => {
   });
 
   it("cv_formula_correct", () => {
-    // At V_R = 2V, VJ = 0.7, M = 0.5:
-    // C = CJO / sqrt(1 + 2/0.7) = CJO / sqrt(1 + 2.857) = CJO / sqrt(3.857)
-    // = CJO / 1.964 ≈ CJO * 0.5092
+    // At V_R = 2V, VJ = 0.7, M = 0.5, FC = 0.5:
+    // In the reverse-bias region (vd = -2V, below FC*VJ), computeJunctionCapacitance
+    // uses the standard depletion formula: CJO / (1 - vd/VJ)^M
+    // = CJO / sqrt(1 + 2/0.7) = CJO / sqrt(3.857) ≈ CJO * 0.5092
     const CJO = 20e-12;
     const VJ = 0.7;
     const M = 0.5;
-    const vReverse = 2;
+    const FC = 0.5;
+    const vd = -2; // V_d = -V_R (reverse bias)
 
-    // Direct formula check
-    const cFormula = computeVaractorCapacitance(vReverse, CJO, VJ, M);
-    const expected = CJO / Math.sqrt(1 + vReverse / VJ);
-    expect(cFormula).toBeCloseTo(expected, 14);
+    // Expected from computeJunctionCapacitance (the current implementation)
+    const expected = computeJunctionCapacitance(vd, CJO, VJ, M, FC);
+    // In reverse bias this equals CJO / (1 - vd/VJ)^M = CJO / (1 + 2/0.7)^0.5
+    const expectedDirect = CJO / Math.sqrt(1 - vd / VJ);
+    expect(expected).toBeCloseTo(expectedDirect, 14);
 
     // From element at V_d = -2V (reverse bias)
     const varactor = makeVaractor({ cjo: CJO, vj: VJ, m: M });
-    const cMeasured = getCapacitanceAtBias(varactor, -vReverse, 1e-6);
+    const cMeasured = getCapacitanceAtBias(varactor, vd, 1e-6);
 
-    // Should match formula within 1% (integration timestep doesn't affect C itself)
+    // Should match computeJunctionCapacitance within 1%
     const ratio = cMeasured / expected;
     expect(ratio).toBeGreaterThan(0.99);
     expect(ratio).toBeLessThan(1.01);
@@ -170,8 +172,8 @@ describe("Varactor", () => {
     // Verify that resonant frequency f = 1/(2π√(LC(V))) changes with bias.
     // With L fixed and C(V) varying, f_resonant varies as 1/√C(V).
     //
-    // At V_R = 0: C0 = CJO = 20pF → f ∝ 1/√(20e-12)
-    // At V_R = 5V: C5 = CJO/√(1+5/0.7) ≈ CJO/2.94 ≈ 6.8pF → f ∝ 1/√(6.8e-12)
+    // At V_R = 0 (vd=0):  C0 = CJO = 20pF → f ∝ 1/√(20e-12)
+    // At V_R = 5V (vd=-5): C5 = CJO/√(1+5/0.7) ≈ CJO/2.94 ≈ 6.8pF
     //
     // f(V_R=5) / f(V_R=0) = √(C0/C5) = √(20/6.8) ≈ 1.71
     //
@@ -180,9 +182,11 @@ describe("Varactor", () => {
     const CJO = 20e-12;
     const VJ = 0.7;
     const M = 0.5;
+    const FC = 0.5;
 
-    const c0 = computeVaractorCapacitance(0, CJO, VJ, M);
-    const c5 = computeVaractorCapacitance(5, CJO, VJ, M);
+    // Use computeJunctionCapacitance (the current implementation)
+    const c0 = computeJunctionCapacitance(0,  CJO, VJ, M, FC); // vd=0
+    const c5 = computeJunctionCapacitance(-5, CJO, VJ, M, FC); // vd=-5V
 
     // Frequency ratio = √(C0/C5) > 1 (higher frequency at higher reverse bias)
     const freqRatio = Math.sqrt(c0 / c5);

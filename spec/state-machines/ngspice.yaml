@@ -1,0 +1,1605 @@
+engine:
+  name: "ngspice"
+  version: "ngspice-43"
+  source_refs:
+    - "ref/ngspice/src/spicelib/analysis/dctran.c"
+    - "ref/ngspice/src/spicelib/analysis/dcop.c"
+    - "ref/ngspice/src/spicelib/analysis/cktop.c"
+    - "ref/ngspice/src/spicelib/analysis/cktload.c"
+    - "ref/ngspice/src/spicelib/analysis/ckttrunc.c"
+    - "ref/ngspice/src/spicelib/analysis/cktterr.c"
+    - "ref/ngspice/src/spicelib/analysis/cktic.c"
+    - "ref/ngspice/src/spicelib/analysis/cktsetup.c"
+    - "ref/ngspice/src/spicelib/analysis/traninit.c"
+    - "ref/ngspice/src/spicelib/devices/cktaccept.c"
+    - "ref/ngspice/src/maths/ni/niiter.c"
+    - "ref/ngspice/src/maths/ni/niconv.c"
+    - "ref/ngspice/src/maths/ni/niniter.c"
+    - "ref/ngspice/src/maths/ni/niaciter.c"
+    - "ref/ngspice/src/maths/ni/niinit.c"
+    - "ref/ngspice/src/maths/ni/nireinit.c"
+    - "ref/ngspice/src/maths/ni/niinteg.c"
+    - "ref/ngspice/src/maths/ni/nicomcof.c"
+    - "ref/ngspice/src/maths/ni/nipred.c"
+    - "ref/ngspice/src/maths/sparse/spfactor.c"
+    - "ref/ngspice/src/maths/sparse/spsolve.c"
+    - "ref/ngspice/src/maths/sparse/spbuild.c"
+
+parameters:
+  - name: "CKTreltol"
+    value: 1.0e-3
+    unit: "ratio"
+    role: "Relative tolerance for NR convergence (node voltages and device currents)"
+    mapping: { ngspice: "ckt->CKTreltol" }
+
+  - name: "CKTvoltTol"
+    value: 1.0e-6
+    unit: "V"
+    role: "Absolute voltage tolerance for NR node convergence"
+    mapping: { ngspice: "ckt->CKTvoltTol" }
+
+  - name: "CKTabstol"
+    value: 1.0e-12
+    unit: "A"
+    role: "Absolute current tolerance for NR branch convergence"
+    mapping: { ngspice: "ckt->CKTabstol" }
+
+  - name: "CKTgmin"
+    value: 1.0e-12
+    unit: "S"
+    role: "Minimum conductance added to every node (prevents singular matrix)"
+    mapping: { ngspice: "ckt->CKTgmin" }
+
+  - name: "CKTdiagGmin"
+    value: 0.0
+    unit: "S"
+    role: "Active diagonal gmin during gmin stepping (normally equals CKTgshunt)"
+    mapping: { ngspice: "ckt->CKTdiagGmin" }
+
+  - name: "CKTgshunt"
+    value: 0.0
+    unit: "S"
+    role: "User-specified diagonal shunt conductance (rshunt option)"
+    mapping: { ngspice: "ckt->CKTgshunt" }
+
+  - name: "CKTdcMaxIter"
+    value: 100
+    unit: "count"
+    role: "Maximum NR iterations for DCOP analysis"
+    mapping: { ngspice: "ckt->CKTdcMaxIter" }
+
+  - name: "CKTtranMaxIter"
+    value: 10
+    unit: "count"
+    role: "Maximum NR iterations per transient timepoint"
+    mapping: { ngspice: "ckt->CKTtranMaxIter" }
+
+  - name: "CKTdcTrcvMaxIter"
+    value: 50
+    unit: "count"
+    role: "Maximum NR iterations per gmin/source stepping sub-solve"
+    mapping: { ngspice: "ckt->CKTdcTrcvMaxIter" }
+
+  - name: "CKTdelmin"
+    value: 0.0
+    unit: "s"
+    role: "Minimum timestep (computed as 1e-11 * CKTmaxStep)"
+    mapping: { ngspice: "ckt->CKTdelmin" }
+
+  - name: "CKTmaxStep"
+    value: 0.0
+    unit: "s"
+    role: "Maximum allowed timestep"
+    mapping: { ngspice: "ckt->CKTmaxStep" }
+
+  - name: "CKTstep"
+    value: 0.0
+    unit: "s"
+    role: "Requested output timestep"
+    mapping: { ngspice: "ckt->CKTstep" }
+
+  - name: "CKTfinalTime"
+    value: 0.0
+    unit: "s"
+    role: "End time of transient simulation"
+    mapping: { ngspice: "ckt->CKTfinalTime" }
+
+  - name: "CKTinitTime"
+    value: 0.0
+    unit: "s"
+    role: "Start time for data output (skip initial transient)"
+    mapping: { ngspice: "ckt->CKTinitTime" }
+
+  - name: "CKTorder"
+    value: 1
+    unit: "dimensionless"
+    role: "Current integration order (1=BE/trap-1, 2=trap/Gear-2, up to 6 for Gear)"
+    mapping: { ngspice: "ckt->CKTorder" }
+
+  - name: "CKTmaxOrder"
+    value: 2
+    unit: "dimensionless"
+    role: "Maximum allowed integration order"
+    mapping: { ngspice: "ckt->CKTmaxOrder" }
+
+  - name: "CKTintegrateMethod"
+    value: 0
+    unit: "enum"
+    role: "Integration method: TRAPEZOIDAL or GEAR"
+    mapping: { ngspice: "ckt->CKTintegrateMethod" }
+
+  - name: "CKTtrtol"
+    value: 7.0
+    unit: "ratio"
+    role: "Truncation error tolerance multiplier"
+    mapping: { ngspice: "ckt->CKTtrtol" }
+
+  - name: "CKTchgtol"
+    value: 1.0e-14
+    unit: "C"
+    role: "Charge tolerance for truncation error calculation"
+    mapping: { ngspice: "ckt->CKTchgtol" }
+
+  - name: "CKTlteReltol"
+    value: 1.0e-3
+    unit: "ratio"
+    role: "LTE relative tolerance (NEWTRUNC variant)"
+    mapping: { ngspice: "ckt->CKTlteReltol" }
+
+  - name: "CKTlteAbstol"
+    value: 1.0e-6
+    unit: "V"
+    role: "LTE absolute tolerance (NEWTRUNC variant)"
+    mapping: { ngspice: "ckt->CKTlteAbstol" }
+
+  - name: "CKTpivotAbsTol"
+    value: 1.0e-13
+    unit: "ratio"
+    role: "Absolute pivot tolerance for sparse matrix factorization"
+    mapping: { ngspice: "ckt->CKTpivotAbsTol" }
+
+  - name: "CKTpivotRelTol"
+    value: 1.0e-3
+    unit: "ratio"
+    role: "Relative pivot tolerance for sparse matrix factorization"
+    mapping: { ngspice: "ckt->CKTpivotRelTol" }
+
+  - name: "CKTnumGminSteps"
+    value: 1
+    unit: "count"
+    role: "Number of gmin stepping stages (1=dynamic/Gillespie, >1=SPICE3 fixed)"
+    mapping: { ngspice: "ckt->CKTnumGminSteps" }
+
+  - name: "CKTnumSrcSteps"
+    value: 1
+    unit: "count"
+    role: "Number of source stepping stages (1=dynamic/Gillespie, >1=SPICE3 fixed)"
+    mapping: { ngspice: "ckt->CKTnumSrcSteps" }
+
+  - name: "CKTgminFactor"
+    value: 10.0
+    unit: "ratio"
+    role: "Gmin reduction factor per successful step"
+    mapping: { ngspice: "ckt->CKTgminFactor" }
+
+  - name: "CKTsrcFact"
+    value: 1.0
+    unit: "ratio"
+    role: "Source scaling factor during source stepping (0 to 1)"
+    mapping: { ngspice: "ckt->CKTsrcFact" }
+
+  - name: "CKTnodeDamping"
+    value: 0
+    unit: "boolean"
+    role: "Enable Newton damping during DCOP when node voltage changes exceed 10V"
+    mapping: { ngspice: "ckt->CKTnodeDamping" }
+
+  - name: "xmu"
+    value: 0.5
+    unit: "dimensionless"
+    role: "Trapezoidal integration damping parameter (0=BE, 0.5=pure trap)"
+    mapping: { ngspice: "#define xmu in nicomcof.c" }
+
+# =============================================================================
+# STATE MACHINE
+# =============================================================================
+#
+# Hierarchy of loops (outer to inner):
+#   1. DCOP analysis (one-shot, runs CKTop which calls NIiter)
+#   2. Transient outer time loop (DCtran label 650/nextTime)
+#   3. Transient inner retry loop (DCtran label 600, for(;;))
+#   4. NR iteration loop (NIiter for(;;))
+#
+# INITF flag progression within NIiter:
+#   MODEINITJCT -> MODEINITFIX -> MODEINITFLOAT (converged = return OK)
+#   MODEINITTRAN -> MODEINITFLOAT (converged = return OK)
+#   MODEINITPRED -> MODEINITFLOAT (converged = return OK)
+#   MODEINITSMSIG -> MODEINITFLOAT (converged = return OK)
+#
+# State vector rotation happens at the TOP of DCtran time loop
+# (between nextTime and label 600), NOT inside NIiter.
+# =============================================================================
+
+states:
+  # ===========================================================================
+  # DCOP ANALYSIS ENTRY
+  # ===========================================================================
+  - id: "dcop_entry"
+    implemented: true
+    attributes: ["entry_point", "dcop"]
+    edges_in:
+      - from: "START"
+        condition: "DCop() called"
+        label: "Begin DC operating point analysis"
+    edges_out:
+      - to: "cktop_initial_solve"
+        condition: "always"
+        label: "Call CKTop(ckt, MODEDCOP|MODEINITJCT, MODEDCOP|MODEINITFLOAT, dcMaxIter)"
+    notes: >
+      DCop() in dcop.c. Sets up output plot, then delegates to CKTop.
+      Mode is (MODEUIC & existing) | MODEDCOP | MODEINITJCT for first call,
+      continuemode is MODEDCOP | MODEINITFLOAT.
+      Function: DCop() in dcop.c.
+
+  # ===========================================================================
+  # CKTop -- CONVERGENCE AID WRAPPER
+  # ===========================================================================
+  - id: "cktop_initial_solve"
+    implemented: true
+    attributes: ["convergence_aid", "dcop"]
+    edges_in:
+      - from: "dcop_entry"
+        condition: "always"
+        label: "DCop calls CKTop"
+      - from: "tran_dcop_entry"
+        condition: "always"
+        label: "DCtran calls CKTop for initial transient operating point"
+    edges_out:
+      - to: "niiter_loop_entry"
+        condition: "!ckt->CKTnoOpIter"
+        label: "Call NIiter(ckt, iterlim) with firstmode"
+      - to: "gmin_stepping"
+        condition: "ckt->CKTnoOpIter (skip direct solve)"
+        label: "Go directly to gmin stepping"
+    notes: >
+      CKTop() in cktop.c. Sets ckt->CKTmode = firstmode.
+      If CKTnoOpIter is false, first tries a direct NIiter call.
+      If that fails (converged != 0), falls through to gmin stepping.
+      Function: CKTop() in cktop.c.
+
+  - id: "gmin_stepping"
+    implemented: true
+    attributes: ["convergence_aid", "dcop"]
+    edges_in:
+      - from: "cktop_initial_solve"
+        condition: "converged != 0 && CKTnumGminSteps >= 1"
+        label: "Direct NR solve failed, try gmin stepping"
+    edges_out:
+      - to: "source_stepping"
+        condition: "converged != 0 (gmin stepping also failed)"
+        label: "Gmin stepping failed, try source stepping"
+      - to: "cktop_converged"
+        condition: "converged == 0"
+        label: "Gmin stepping succeeded"
+    notes: >
+      Two variants: dynamic_gmin (CKTnumGminSteps==1, Gillespie algorithm)
+      or spice3_gmin (CKTnumGminSteps>1, fixed factor stepping).
+      Dynamic: starts CKTdiagGmin at 1e-2, divides by factor each step,
+      adapts factor based on iteration count. Saves/restores OldRhsOld
+      and OldCKTstate0 on failure.
+      Both end with CKTdiagGmin = CKTgshunt and a final clean NIiter call.
+      Function: dynamic_gmin() or spice3_gmin() in cktop.c.
+      Each sub-step calls NIiter(ckt, CKTdcTrcvMaxIter).
+
+  - id: "source_stepping"
+    implemented: true
+    attributes: ["convergence_aid", "dcop"]
+    edges_in:
+      - from: "gmin_stepping"
+        condition: "converged != 0"
+        label: "Gmin stepping failed"
+    edges_out:
+      - to: "cktop_converged"
+        condition: "converged == 0"
+        label: "Source stepping succeeded"
+      - to: "cktop_failed"
+        condition: "converged != 0"
+        label: "Source stepping also failed"
+    notes: >
+      Two variants: gillespie_src (CKTnumSrcSteps==1, adaptive raise)
+      or spice3_src (CKTnumSrcSteps>1, linear i/N stepping).
+      Sets CKTsrcFact from 0 to 1. CKTload multiplies source values
+      by CKTsrcFact in MODEINITJCT/MODEINITFIX via nodeset/IC code.
+      On failure, tries gmin sub-bootstrap inside the zero-source solve.
+      Always resets CKTsrcFact = 1 on exit.
+      Function: gillespie_src() or spice3_src() in cktop.c.
+
+  - id: "cktop_converged"
+    implemented: true
+    attributes: ["convergence_aid", "dcop"]
+    edges_in:
+      - from: "cktop_initial_solve"
+        condition: "converged == 0 from direct NIiter"
+        label: "Direct solve converged"
+      - from: "gmin_stepping"
+        condition: "converged == 0"
+        label: "Gmin stepping converged"
+      - from: "source_stepping"
+        condition: "converged == 0"
+        label: "Source stepping converged"
+    edges_out:
+      - to: "dcop_finalize"
+        condition: "called from DCop()"
+        label: "Return to DCop"
+      - to: "tran_dcop_converged"
+        condition: "called from DCtran()"
+        label: "Return to DCtran initial OP"
+    notes: >
+      CKTop returns 0. The DCOP solution is in CKTrhsOld.
+
+  - id: "cktop_failed"
+    implemented: true
+    attributes: ["convergence_aid", "dcop", "error"]
+    edges_in:
+      - from: "source_stepping"
+        condition: "converged != 0"
+        label: "All convergence aids exhausted"
+      - from: "cktop_initial_solve"
+        condition: "converged != 0 && no gmin/src steps configured"
+        label: "Direct solve failed, no aids configured"
+    edges_out:
+      - to: "dcop_failed"
+        condition: "called from DCop()"
+        label: "Report failure"
+      - to: "tran_dcop_failed"
+        condition: "called from DCtran()"
+        label: "Report failure"
+    notes: >
+      CKTop returns non-zero. Caller handles the error.
+
+  # ===========================================================================
+  # NR ITERATION LOOP (NIiter)
+  # ===========================================================================
+  - id: "niiter_loop_entry"
+    implemented: true
+    attributes: ["nr_loop", "inner"]
+    edges_in:
+      - from: "cktop_initial_solve"
+        condition: "!CKTnoOpIter"
+        label: "CKTop calls NIiter"
+      - from: "gmin_stepping"
+        condition: "each gmin sub-step"
+        label: "Gmin stepping calls NIiter"
+      - from: "source_stepping"
+        condition: "each source sub-step"
+        label: "Source stepping calls NIiter"
+      - from: "tran_call_niiter"
+        condition: "transient timepoint"
+        label: "DCtran calls NIiter for transient step"
+    edges_out:
+      - to: "niiter_check_uic_bypass"
+        condition: "always"
+        label: "Enter NIiter"
+    notes: >
+      NIiter(ckt, maxIter) in niiter.c. Sets iterno=0, ipass=0.
+      Enforces maxIter >= 100.
+      Function: NIiter() in niiter.c.
+
+  - id: "niiter_check_uic_bypass"
+    implemented: true
+    attributes: ["nr_loop", "inner"]
+    edges_in:
+      - from: "niiter_loop_entry"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "niiter_uic_single_load"
+        condition: "(CKTmode & MODETRANOP) && (CKTmode & MODEUIC)"
+        label: "UIC bypass: single load, no iteration"
+      - to: "niiter_check_reinit"
+        condition: "!(MODETRANOP && MODEUIC)"
+        label: "Normal NR path"
+    notes: >
+      If UseInitialConditions is set during transient OP, just swap
+      rhs/rhsOld, call CKTload once, and return OK immediately.
+
+  - id: "niiter_uic_single_load"
+    implemented: true
+    attributes: ["nr_loop", "shortcut"]
+    edges_in:
+      - from: "niiter_check_uic_bypass"
+        condition: "MODETRANOP && MODEUIC"
+        label: ""
+    edges_out:
+      - to: "niiter_return_ok"
+        condition: "always"
+        label: "Return OK after single load"
+    notes: >
+      Swaps CKTrhsOld and CKTrhs, calls CKTload(ckt), returns OK.
+      No factorization, no solve, no convergence check.
+
+  - id: "niiter_check_reinit"
+    implemented: true
+    attributes: ["nr_loop", "inner"]
+    edges_in:
+      - from: "niiter_check_uic_bypass"
+        condition: "normal path"
+        label: ""
+    edges_out:
+      - to: "allocate_rhs_vectors"
+        condition: "CKTniState & NIUNINITIALIZED"
+        label: "First call: allocate vectors"
+      - to: "clear_noncon_and_load"
+        condition: "!(CKTniState & NIUNINITIALIZED)"
+        label: "Already initialized"
+    notes: >
+      Checks if NIreinit is needed. NIreinit allocates CKTrhs,
+      CKTrhsOld, CKTrhsSpare, CKTirhs, etc. Sets CKTniState =
+      NISHOULDREORDER | NIACSHOULDREORDER | NIPZSHOULDREORDER.
+
+  - id: "allocate_rhs_vectors"
+    implemented: true
+    attributes: ["initialization"]
+    edges_in:
+      - from: "niiter_check_reinit"
+        condition: "CKTniState & NIUNINITIALIZED"
+        label: ""
+    edges_out:
+      - to: "clear_noncon_and_load"
+        condition: "always"
+        label: "Vectors allocated, enter NR loop"
+    notes: >
+      NIreinit() in nireinit.c. Allocates CKTrhs[size+1],
+      CKTrhsOld[size+1], CKTrhsSpare[size+1], CKTirhs[size+1],
+      CKTirhsOld[size+1], CKTirhsSpare[size+1].
+      Also allocates CKTpred and CKTsols[8] if PREDICTOR defined.
+      Function: NIreinit() in nireinit.c.
+
+  # ===========================================================================
+  # NR ITERATION -- CORE LOOP (for(;;) in NIiter)
+  # ===========================================================================
+  - id: "clear_noncon_and_load"
+    implemented: true
+    attributes: ["nr_loop", "inner", "iteration_start"]
+    edges_in:
+      - from: "niiter_check_reinit"
+        condition: "initialized"
+        label: ""
+      - from: "allocate_rhs_vectors"
+        condition: "after reinit"
+        label: ""
+      - from: "swap_rhs_vectors"
+        condition: "NR iteration continues (noncon != 0 or INITF transition)"
+        label: "Next NR iteration"
+    edges_out:
+      - to: "cktload_devices"
+        condition: "always (standard path, NEWPRED not defined)"
+        label: "Load devices"
+    notes: >
+      Top of for(;;) loop in NIiter. Sets CKTnoncon = 0.
+      Resets limiting event collector (ni_limit_reset).
+
+  - id: "cktload_devices"
+    implemented: true
+    attributes: ["nr_loop", "inner", "device_evaluation"]
+    edges_in:
+      - from: "clear_noncon_and_load"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "apply_nodesets_and_ics"
+        condition: "CKTmode & MODEDC"
+        label: "DC mode: apply nodesets/ICs after device load"
+      - to: "preorder_matrix"
+        condition: "!(CKTmode & MODEDC)"
+        label: "Transient: skip nodeset application"
+    notes: >
+      CKTload(ckt) in cktload.c. THE device evaluation step.
+      1. Zeros CKTrhs[0..size].
+      2. Calls SMPclear(CKTmatrix) to zero the MNA matrix.
+      3. Iterates all device types: DEVices[i]->DEVload(head, ckt).
+         Each device load function reads node voltages from CKTrhsOld,
+         applies voltage limiting (DEVpnjlim, DEVfetlim), evaluates
+         device equations, calls NIintegrate for reactive elements,
+         stamps conductance matrix and RHS contributions,
+         sets CKTnoncon if device-level convergence fails,
+         stores computed values in CKTstate0.
+      4. Increments iterno.
+      INITF flags control device behavior:
+        MODEINITJCT: junction-based initial guess
+        MODEINITFIX: previous solution with nodesets
+        MODEINITFLOAT: normal NR iteration
+        MODEINITTRAN: first transient step
+        MODEINITPRED: predictor step
+      Function: CKTload() in cktload.c.
+
+  - id: "apply_nodesets_and_ics"
+    implemented: true
+    attributes: ["nr_loop", "inner", "dc_only"]
+    edges_in:
+      - from: "cktload_devices"
+        condition: "CKTmode & MODEDC"
+        label: ""
+    edges_out:
+      - to: "preorder_matrix"
+        condition: "always"
+        label: "Nodesets/ICs applied, continue to factorization"
+    notes: >
+      Inside CKTload(), after device loads, if MODEDC and
+      MODEINITJCT or MODEINITFIX: apply nodesets. For nodes with
+      nsGiven: zero non-current row entries, set
+      rhs[node] = 1e10 * nodeset * CKTsrcFact, diagonal = 1e10.
+      If MODETRANOP and not MODEUIC: apply IC values similarly.
+      Function: CKTload() in cktload.c, lines 104-158.
+
+  - id: "preorder_matrix"
+    implemented: true
+    attributes: ["nr_loop", "inner", "matrix"]
+    edges_in:
+      - from: "cktload_devices"
+        condition: "not DC mode"
+        label: ""
+      - from: "apply_nodesets_and_ics"
+        condition: "after nodeset application"
+        label: ""
+    edges_out:
+      - to: "lu_factorize_with_reorder"
+        condition: "CKTniState & NISHOULDREORDER"
+        label: "Need full pivot reorder"
+      - to: "lu_factorize_numerical"
+        condition: "!(CKTniState & NISHOULDREORDER)"
+        label: "Reuse existing pivot order"
+    notes: >
+      If !(CKTniState & NIDIDPREORDER), calls SMPpreOrder(CKTmatrix).
+      Sets NIDIDPREORDER flag. One-time column/row permutation.
+      NISHOULDREORDER is set when MODEINITJCT,
+      MODEINITTRAN && iterno==1, or SMPluFac returns E_SINGULAR.
+      Function: NIiter() in niiter.c, lines 844-858.
+
+  - id: "lu_factorize_with_reorder"
+    implemented: true
+    attributes: ["nr_loop", "inner", "matrix", "factorization"]
+    edges_in:
+      - from: "preorder_matrix"
+        condition: "CKTniState & NISHOULDREORDER"
+        label: ""
+    edges_out:
+      - to: "sparse_solve"
+        condition: "error == 0"
+        label: "Reorder + factor succeeded"
+      - to: "niiter_return_error"
+        condition: "error != 0 (singular matrix)"
+        label: "Matrix singular even after reorder"
+    notes: >
+      Calls SMPreorder(CKTmatrix, pivotAbsTol, pivotRelTol, diagGmin).
+      Performs Markowitz pivot selection + LU decomposition.
+      spOrderAndFactor in spfactor.c. diagGmin adds CKTdiagGmin to
+      each diagonal during factorization.
+      Clears NISHOULDREORDER on success.
+      Function: SMPreorder -> spOrderAndFactor() in spfactor.c.
+
+  - id: "lu_factorize_numerical"
+    implemented: true
+    attributes: ["nr_loop", "inner", "matrix", "factorization"]
+    edges_in:
+      - from: "preorder_matrix"
+        condition: "!(CKTniState & NISHOULDREORDER)"
+        label: ""
+    edges_out:
+      - to: "sparse_solve"
+        condition: "error == 0"
+        label: "LU factorization succeeded"
+      - to: "clear_noncon_and_load"
+        condition: "error == E_SINGULAR"
+        label: "Singular: set NISHOULDREORDER, retry from top of loop"
+      - to: "niiter_return_error"
+        condition: "error != 0 && error != E_SINGULAR"
+        label: "Fatal factorization error"
+    notes: >
+      Calls SMPluFac(CKTmatrix, pivotAbsTol, diagGmin).
+      Reuses existing pivot order, numeric Gaussian elimination only.
+      spFactor in spfactor.c. If E_SINGULAR, sets NISHOULDREORDER
+      and continues (loops back to clear_noncon_and_load).
+      Function: SMPluFac -> spFactor() in spfactor.c.
+
+  - id: "sparse_solve"
+    implemented: true
+    attributes: ["nr_loop", "inner", "matrix", "solve"]
+    edges_in:
+      - from: "lu_factorize_with_reorder"
+        condition: "factorization succeeded"
+        label: ""
+      - from: "lu_factorize_numerical"
+        condition: "factorization succeeded"
+        label: ""
+    edges_out:
+      - to: "check_iteration_limit"
+        condition: "always"
+        label: "Solution vector computed"
+    notes: >
+      Calls SMPsolve(CKTmatrix, CKTrhs, CKTrhsSpare).
+      spSolve in spsolve.c: forward elimination (L solve) then
+      back substitution (U solve). CKTrhs overwritten with solution.
+      Zeros CKTrhs[0], CKTrhsSpare[0], CKTrhsOld[0] (ground = 0).
+      Function: SMPsolve -> spSolve() in spsolve.c.
+
+  # ===========================================================================
+  # NR CONVERGENCE AND INITF TRANSITIONS
+  # ===========================================================================
+  - id: "check_iteration_limit"
+    implemented: true
+    attributes: ["nr_loop", "inner", "convergence"]
+    edges_in:
+      - from: "sparse_solve"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "niiter_return_iterlim"
+        condition: "iterno > maxIter"
+        label: "Too many iterations"
+      - to: "check_node_convergence"
+        condition: "iterno <= maxIter"
+        label: "Within iteration limit"
+    notes: >
+      If iterno exceeds maxIter, return E_ITERLIM.
+      maxIter is CKTdcMaxIter for DCOP, CKTtranMaxIter for transient,
+      CKTdcTrcvMaxIter for gmin/source stepping sub-solves.
+      Function: NIiter() in niiter.c, line 944.
+
+  - id: "check_node_convergence"
+    implemented: true
+    attributes: ["nr_loop", "inner", "convergence"]
+    edges_in:
+      - from: "check_iteration_limit"
+        condition: "iterno <= maxIter"
+        label: ""
+    edges_out:
+      - to: "apply_newton_damping"
+        condition: "always (convergence result stored in CKTnoncon)"
+        label: "Node convergence checked"
+    notes: >
+      Two-phase convergence check:
+      1. If CKTnoncon == 0 AND iterno != 1: call NIconvTest(ckt).
+         NIconvTest in niconv.c compares CKTrhs[i] vs CKTrhsOld[i]:
+           voltage nodes: tol = reltol * max(|old|,|new|) + voltTol
+           current branches: tol = reltol * max(|old|,|new|) + abstol
+           If |new - old| > tol for any node, returns 1 (not converged).
+           Sets CKTtroubleNode to the first non-converged node.
+         If NEWCONV defined: also calls CKTconvTest(ckt) which iterates
+           DEVices[i]->DEVconvTest for per-device convergence.
+      2. If CKTnoncon != 0 OR iterno == 1: forces CKTnoncon = 1
+         (skip convergence test, always do at least 2 iterations).
+      Function: NIconvTest() in niconv.c.
+
+  - id: "apply_newton_damping"
+    implemented: true
+    attributes: ["nr_loop", "inner", "convergence"]
+    edges_in:
+      - from: "check_node_convergence"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "check_initf_and_transition"
+        condition: "always"
+        label: "Damping applied (if needed)"
+    notes: >
+      If CKTnodeDamping != 0 AND CKTnoncon != 0
+      AND (MODETRANOP or MODEDCOP) AND iterno > 1:
+      Finds maxdiff = max(rhs[i] - rhsOld[i]) over voltage nodes.
+      If maxdiff > 10V: damp_factor = 10/maxdiff (clamped >= 0.1).
+      Applies: rhs[i] = rhsOld[i] + damp_factor * (rhs[i] - rhsOld[i]).
+      Also damps CKTstate0: state0[i] = OldState0[i] + damp_factor * diff.
+      Function: NIiter() in niiter.c, lines 1020-1045.
+
+  - id: "check_initf_and_transition"
+    implemented: true
+    attributes: ["nr_loop", "inner", "initf"]
+    edges_in:
+      - from: "apply_newton_damping"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "niiter_return_ok"
+        condition: "MODEINITFLOAT && CKTnoncon == 0"
+        label: "Converged in float mode -- NR done"
+      - to: "swap_rhs_vectors"
+        condition: "MODEINITFLOAT && CKTnoncon != 0"
+        label: "Not converged in float, iterate again"
+      - to: "transition_jct_to_fix"
+        condition: "MODEINITJCT"
+        label: "Junction init done, switch to fix mode"
+      - to: "transition_fix_to_float"
+        condition: "MODEINITFIX && CKTnoncon == 0"
+        label: "Fix mode converged, switch to float"
+      - to: "swap_rhs_vectors"
+        condition: "MODEINITFIX && CKTnoncon != 0"
+        label: "Fix mode not converged, iterate in fix"
+      - to: "transition_tran_to_float"
+        condition: "MODEINITTRAN"
+        label: "First tran iteration done, switch to float"
+      - to: "transition_pred_to_float"
+        condition: "MODEINITPRED"
+        label: "Predictor done, switch to float"
+      - to: "transition_smsig_to_float"
+        condition: "MODEINITSMSIG"
+        label: "Small-signal init done, switch to float"
+    notes: >
+      The INITF state machine inside NIiter, lines 1050-1085.
+      MODEINITFLOAT with hadNodeset: forces one extra pass (ipass logic).
+      Function: NIiter() in niiter.c.
+
+  - id: "transition_jct_to_fix"
+    implemented: true
+    attributes: ["nr_loop", "inner", "initf"]
+    edges_in:
+      - from: "check_initf_and_transition"
+        condition: "CKTmode & MODEINITJCT"
+        label: ""
+    edges_out:
+      - to: "swap_rhs_vectors"
+        condition: "always"
+        label: "Continue NR with MODEINITFIX"
+    notes: >
+      CKTmode = (CKTmode & ~INITF) | MODEINITFIX.
+      Sets NISHOULDREORDER (forces matrix reorder on next iteration).
+      Transitions from junction-based initial guess to
+      nodeset-constrained iteration.
+      Function: NIiter() in niiter.c, lines 1063-1065.
+
+  - id: "transition_fix_to_float"
+    implemented: true
+    attributes: ["nr_loop", "inner", "initf"]
+    edges_in:
+      - from: "check_initf_and_transition"
+        condition: "MODEINITFIX && CKTnoncon == 0"
+        label: ""
+    edges_out:
+      - to: "swap_rhs_vectors"
+        condition: "always"
+        label: "Continue NR with MODEINITFLOAT"
+    notes: >
+      CKTmode = (CKTmode & ~INITF) | MODEINITFLOAT.
+      Sets ipass = 1 (forces at least one more convergence check pass
+      when hadNodeset is true).
+      Function: NIiter() in niiter.c, lines 1066-1069.
+
+  - id: "transition_tran_to_float"
+    implemented: true
+    attributes: ["nr_loop", "inner", "initf"]
+    edges_in:
+      - from: "check_initf_and_transition"
+        condition: "MODEINITTRAN"
+        label: ""
+    edges_out:
+      - to: "swap_rhs_vectors"
+        condition: "always"
+        label: "Continue NR with MODEINITFLOAT"
+    notes: >
+      CKTmode = (CKTmode & ~INITF) | MODEINITFLOAT.
+      If iterno <= 1, sets NISHOULDREORDER.
+      Function: NIiter() in niiter.c, lines 1072-1074.
+
+  - id: "transition_pred_to_float"
+    implemented: true
+    attributes: ["nr_loop", "inner", "initf"]
+    edges_in:
+      - from: "check_initf_and_transition"
+        condition: "MODEINITPRED"
+        label: ""
+    edges_out:
+      - to: "swap_rhs_vectors"
+        condition: "always"
+        label: "Continue NR with MODEINITFLOAT"
+    notes: >
+      CKTmode = (CKTmode & ~INITF) | MODEINITFLOAT.
+      Function: NIiter() in niiter.c, lines 1075-1076.
+
+  - id: "transition_smsig_to_float"
+    implemented: true
+    attributes: ["nr_loop", "inner", "initf"]
+    edges_in:
+      - from: "check_initf_and_transition"
+        condition: "MODEINITSMSIG"
+        label: ""
+    edges_out:
+      - to: "swap_rhs_vectors"
+        condition: "always"
+        label: "Continue NR with MODEINITFLOAT"
+    notes: >
+      CKTmode = (CKTmode & ~INITF) | MODEINITFLOAT.
+      Function: NIiter() in niiter.c, lines 1070-1071.
+
+  - id: "swap_rhs_vectors"
+    implemented: true
+    attributes: ["nr_loop", "inner"]
+    edges_in:
+      - from: "check_initf_and_transition"
+        condition: "not converged or INITF transition"
+        label: ""
+      - from: "transition_jct_to_fix"
+        condition: "always"
+        label: ""
+      - from: "transition_fix_to_float"
+        condition: "always"
+        label: ""
+      - from: "transition_tran_to_float"
+        condition: "always"
+        label: ""
+      - from: "transition_pred_to_float"
+        condition: "always"
+        label: ""
+      - from: "transition_smsig_to_float"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "clear_noncon_and_load"
+        condition: "always"
+        label: "Back to top of NR loop"
+    notes: >
+      Swaps CKTrhsOld and CKTrhs pointers:
+      temp = CKTrhsOld; CKTrhsOld = CKTrhs; CKTrhs = temp.
+      Makes the just-computed solution the old solution for the
+      next iteration. CKTrhsOld always contains previous iteration
+      voltages that devices read during CKTload.
+      Function: NIiter() in niiter.c, lines 1087-1090.
+
+  - id: "niiter_return_ok"
+    implemented: true
+    attributes: ["nr_loop", "exit"]
+    edges_in:
+      - from: "check_initf_and_transition"
+        condition: "MODEINITFLOAT && CKTnoncon == 0"
+        label: ""
+      - from: "niiter_uic_single_load"
+        condition: "UIC bypass"
+        label: ""
+    edges_out:
+      - to: "cktop_converged"
+        condition: "called from CKTop"
+        label: "Return OK to CKTop"
+      - to: "tran_nr_converged"
+        condition: "called from DCtran transient loop"
+        label: "Return OK to DCtran"
+    notes: >
+      NIiter returns OK (0). CKTstat->STATnumIter updated.
+
+  - id: "niiter_return_iterlim"
+    implemented: true
+    attributes: ["nr_loop", "exit", "error"]
+    edges_in:
+      - from: "check_iteration_limit"
+        condition: "iterno > maxIter"
+        label: ""
+    edges_out:
+      - to: "cktop_failed"
+        condition: "called from CKTop directly"
+        label: ""
+      - to: "gmin_stepping"
+        condition: "called from CKTop first attempt"
+        label: "Triggers convergence aids"
+      - to: "tran_nr_failed"
+        condition: "called from DCtran"
+        label: "NR failed for this timepoint"
+    notes: >
+      NIiter returns E_ITERLIM.
+
+  - id: "niiter_return_error"
+    implemented: true
+    attributes: ["nr_loop", "exit", "error"]
+    edges_in:
+      - from: "lu_factorize_with_reorder"
+        condition: "singular matrix"
+        label: ""
+      - from: "lu_factorize_numerical"
+        condition: "fatal error"
+        label: ""
+    edges_out:
+      - to: "cktop_failed"
+        condition: "called from CKTop"
+        label: ""
+      - to: "tran_nr_failed"
+        condition: "called from DCtran"
+        label: ""
+    notes: >
+      NIiter returns error code from sparse matrix routines.
+
+  # ===========================================================================
+  # DCOP FINALIZATION
+  # ===========================================================================
+  - id: "dcop_finalize"
+    implemented: true
+    attributes: ["dcop", "finalize"]
+    edges_in:
+      - from: "cktop_converged"
+        condition: "called from DCop"
+        label: ""
+    edges_out:
+      - to: "dcop_set_smsig_mode"
+        condition: "converged == 0"
+        label: ""
+    notes: >
+      DCop() after CKTop returns success.
+
+  - id: "dcop_set_smsig_mode"
+    implemented: true
+    attributes: ["dcop", "finalize"]
+    edges_in:
+      - from: "dcop_finalize"
+        condition: "converged == 0"
+        label: ""
+    edges_out:
+      - to: "dcop_final_load"
+        condition: "always"
+        label: ""
+    notes: >
+      Sets CKTmode = (CKTmode & MODEUIC) | MODEDCOP | MODEINITSMSIG.
+      Prepares devices for small-signal parameter extraction.
+      Function: DCop() in dcop.c, line 127.
+
+  - id: "dcop_final_load"
+    implemented: true
+    attributes: ["dcop", "finalize"]
+    edges_in:
+      - from: "dcop_set_smsig_mode"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "dcop_output"
+        condition: "always"
+        label: ""
+    notes: >
+      Calls CKTload(ckt) one final time in MODEINITSMSIG mode.
+      Devices compute small-signal parameters (transconductances,
+      capacitances) at the operating point.
+      Function: DCop() in dcop.c, line 153.
+
+  - id: "dcop_output"
+    implemented: true
+    attributes: ["dcop", "finalize", "output"]
+    edges_in:
+      - from: "dcop_final_load"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "END_DCOP"
+        condition: "always"
+        label: "DCOP analysis complete"
+    notes: >
+      Calls CKTdump(ckt, 0.0, plot) to output results.
+      Calls CKTsoaCheck if enabled.
+      Calls OUTendPlot to close the output.
+      Function: DCop() in dcop.c, lines 161-178.
+
+  - id: "dcop_failed"
+    implemented: true
+    attributes: ["dcop", "error"]
+    edges_in:
+      - from: "cktop_failed"
+        condition: "called from DCop"
+        label: ""
+    edges_out:
+      - to: "END_DCOP"
+        condition: "always"
+        label: "Return error code"
+    notes: >
+      DCop prints failure message, calls CKTncDump, returns error.
+
+  # ===========================================================================
+  # TRANSIENT ANALYSIS -- INITIALIZATION PHASE
+  # ===========================================================================
+  - id: "tran_init"
+    implemented: true
+    attributes: ["transient", "initialization"]
+    edges_in:
+      - from: "START_TRAN"
+        condition: "DCtran(ckt, restart) called with restart=1 or CKTtime==0"
+        label: "Begin transient analysis"
+    edges_out:
+      - to: "tran_compute_initial_delta"
+        condition: "always"
+        label: ""
+    notes: >
+      TRANinit() in traninit.c sets CKTfinalTime, CKTstep, CKTinitTime,
+      CKTmaxStep, CKTdelmin (= 1e-11 * CKTmaxStep), CKTmode.
+      DCtran entry in dctran.c: sets up breakpoints, output plot.
+      Function: DCtran() in dctran.c, lines 117-200.
+
+  - id: "tran_compute_initial_delta"
+    implemented: true
+    attributes: ["transient", "initialization"]
+    edges_in:
+      - from: "tran_init"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_apply_initial_conditions"
+        condition: "always"
+        label: "Initial delta computed"
+    notes: >
+      delta = MIN(CKTfinalTime/100, CKTstep) / 10.
+      Sets up LTRA time points array.
+      Initializes breakpoint table: breaks[0]=0, breaks[1]=finalTime.
+      Sets CKTminBreak = CKTmaxStep * 5e-5.
+      Sets CKTtime=0, CKTdelta=0, CKTbreak=1, firsttime=1.
+      save_mode = (MODEUIC) | MODETRANOP | MODEINITJCT.
+      Function: DCtran() in dctran.c, lines 118-192.
+
+  - id: "tran_apply_initial_conditions"
+    implemented: true
+    attributes: ["transient", "initialization"]
+    edges_in:
+      - from: "tran_compute_initial_delta"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_dcop_entry"
+        condition: "always"
+        label: ""
+    notes: >
+      CKTic(ckt) in cktic.c. Called during setup phase (before DCtran).
+      For each node with nsGiven (nodeset): creates diagonal matrix
+      element, sets rhs[node] = nodeset, sets CKThadNodeset=1.
+      For each node with icGiven (initial condition): similar setup.
+      If MODEUIC: calls DEVsetic for each device type to set
+      device-specific initial conditions (capacitor initial voltage, etc).
+      Function: CKTic() in cktic.c.
+
+  - id: "tran_dcop_entry"
+    implemented: true
+    attributes: ["transient", "dcop"]
+    edges_in:
+      - from: "tran_apply_initial_conditions"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "cktop_initial_solve"
+        condition: "always"
+        label: "CKTop(ckt, MODETRANOP|MODEINITJCT, MODETRANOP|MODEINITFLOAT, dcMaxIter)"
+    notes: >
+      DCtran calls CKTop for the initial transient operating point.
+      Mode is (MODEUIC) | MODETRANOP | MODEINITJCT.
+      Continue mode is (MODEUIC) | MODETRANOP | MODEINITFLOAT.
+      Function: DCtran() in dctran.c, lines 230-233.
+
+  - id: "tran_dcop_converged"
+    implemented: true
+    attributes: ["transient", "dcop"]
+    edges_in:
+      - from: "cktop_converged"
+        condition: "called from DCtran"
+        label: ""
+    edges_out:
+      - to: "tran_init_state_vectors"
+        condition: "always"
+        label: "Initial OP found, prepare for transient"
+    notes: >
+      CKTop returned 0. Operating point solution is in CKTrhsOld.
+      Function: DCtran() in dctran.c, lines 270-282.
+
+  - id: "tran_dcop_failed"
+    implemented: true
+    attributes: ["transient", "dcop", "error"]
+    edges_in:
+      - from: "cktop_failed"
+        condition: "called from DCtran"
+        label: ""
+    edges_out:
+      - to: "END_TRAN"
+        condition: "always"
+        label: "Abort transient analysis"
+    notes: >
+      CKTop returned non-zero. DCtran returns the error code.
+
+  - id: "tran_init_state_vectors"
+    implemented: true
+    attributes: ["transient", "initialization"]
+    edges_in:
+      - from: "tran_dcop_converged"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_set_initial_mode"
+        condition: "always"
+        label: ""
+    notes: >
+      Increments STATtimePts. Sets CKTorder = 1.
+      Initializes CKTdeltaOld[0..6] = CKTmaxStep.
+      Sets CKTdelta = delta (initial timestep).
+      Sets CKTsaveDelta = CKTfinalTime/50.
+      Function: DCtran() in dctran.c, lines 314-323.
+
+  - id: "tran_set_initial_mode"
+    implemented: true
+    attributes: ["transient", "initialization"]
+    edges_in:
+      - from: "tran_init_state_vectors"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_copy_state0_to_state1"
+        condition: "always"
+        label: ""
+    notes: >
+      Sets CKTmode = (MODEUIC) | MODETRAN | MODEINITTRAN.
+      Critical transition from DCOP to transient mode.
+      Sets CKTag[0] = CKTag[1] = 0.
+      Function: DCtran() in dctran.c, lines 346-348.
+
+  - id: "tran_copy_state0_to_state1"
+    implemented: true
+    attributes: ["transient", "initialization", "state_vectors"]
+    edges_in:
+      - from: "tran_set_initial_mode"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_accepted_timepoint"
+        condition: "always"
+        label: "Jump to nextTime (label 650)"
+    notes: >
+      bcopy(CKTstate0, CKTstate1, numStates * sizeof(double)).
+      Copies the DCOP state into history buffer so the first
+      transient step has valid previous state.
+      Function: DCtran() in dctran.c, lines 349-350.
+
+  # ===========================================================================
+  # TRANSIENT ANALYSIS -- OUTER TIME LOOP (label 650 / nextTime)
+  # ===========================================================================
+  - id: "tran_accepted_timepoint"
+    implemented: true
+    attributes: ["transient", "outer_loop", "accepted"]
+    edges_in:
+      - from: "tran_copy_state0_to_state1"
+        condition: "first timepoint (from init)"
+        label: ""
+      - from: "tran_lte_accept"
+        condition: "LTE test passed (not first time)"
+        label: ""
+      - from: "tran_check_firsttime_skip_lte"
+        condition: "firsttime (skip LTE, goto nextTime)"
+        label: ""
+    edges_out:
+      - to: "tran_call_cktaccept"
+        condition: "always"
+        label: "Accept this timepoint"
+    notes: >
+      Label nextTime (650) in DCtran.
+      Fires outer-loop instrumentation callback (accepted=1).
+      Updates LTRA time points array.
+      Function: DCtran() in dctran.c, lines 386-392.
+
+  - id: "tran_call_cktaccept"
+    implemented: true
+    attributes: ["transient", "outer_loop", "device_accept"]
+    edges_in:
+      - from: "tran_accepted_timepoint"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_output_data"
+        condition: "always"
+        label: ""
+    notes: >
+      Calls CKTaccept(ckt) in cktaccept.c.
+      Iterates all device types: DEVices[i]->DEVaccept(ckt, head).
+      Devices perform post-acceptance work (e.g., LTRA history update).
+      If PREDICTOR defined: rotates CKTsols[0..7] ring buffer,
+      copies CKTrhs into CKTsols[0].
+      Clears outdated breakpoints: if CKTtime > breaks[0], CKTclrBreak.
+      Calls CKTsoaCheck if enabled.
+      Function: CKTaccept() in cktaccept.c.
+
+  - id: "tran_output_data"
+    implemented: true
+    attributes: ["transient", "outer_loop", "output"]
+    edges_in:
+      - from: "tran_call_cktaccept"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_check_end_time"
+        condition: "always"
+        label: ""
+    notes: >
+      Increments STATaccepted, clears CKTbreak.
+      Calls CKTdump(ckt, CKTtime, plot) if CKTtime >= CKTinitTime.
+      Function: DCtran() in dctran.c, lines 433-489.
+
+  - id: "tran_check_end_time"
+    implemented: true
+    attributes: ["transient", "outer_loop"]
+    edges_in:
+      - from: "tran_output_data"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "END_TRAN"
+        condition: "|CKTtime - CKTfinalTime| < CKTminBreak or AlmostEqualUlps"
+        label: "Simulation complete"
+      - to: "tran_compute_next_delta"
+        condition: "CKTtime < CKTfinalTime"
+        label: "Continue simulation"
+    notes: >
+      Also checks check_autostop and IFpauseTest().
+      Function: DCtran() in dctran.c, lines 499-520.
+
+  - id: "tran_compute_next_delta"
+    implemented: true
+    attributes: ["transient", "outer_loop", "timestep"]
+    edges_in:
+      - from: "tran_check_end_time"
+        condition: "CKTtime < CKTfinalTime"
+        label: ""
+    edges_out:
+      - to: "tran_breakpoint_handling"
+        condition: "always"
+        label: ""
+    notes: >
+      Clamps CKTdelta to CKTmaxStep.
+      Cuts integration order to 1 if at a breakpoint.
+      If at breakpoint: CKTdelta = MIN(delta, 0.1 * MIN(saveDelta,
+        breaks[1] - breaks[0])).
+      If firsttime: CKTdelta /= 10 (extra reduction for first step).
+      Clamps CKTdelta >= CKTdelmin * 2.
+      If not at breakpoint but next step would cross one:
+        saveDelta = CKTdelta; CKTdelta = breaks[0] - CKTtime.
+      Function: DCtran() in dctran.c, lines 540-602.
+
+  - id: "tran_breakpoint_handling"
+    implemented: true
+    attributes: ["transient", "outer_loop", "timestep"]
+    edges_in:
+      - from: "tran_compute_next_delta"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_rotate_state_vectors"
+        condition: "always"
+        label: "Delta finalized, prepare for NR"
+    notes: >
+      Clears old breakpoints <= current time.
+      Forces breakpoint if CKTtime + CKTdelta > breaks[0]:
+      CKTbreak = 1, saveDelta = CKTdelta,
+      CKTdelta = breaks[0] - CKTtime.
+      Function: DCtran() in dctran.c, lines 620-644.
+
+  - id: "tran_rotate_state_vectors"
+    implemented: true
+    attributes: ["transient", "outer_loop", "state_vectors"]
+    edges_in:
+      - from: "tran_breakpoint_handling"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_advance_time"
+        condition: "always"
+        label: "Enter inner retry loop (label 600)"
+    notes: >
+      Rotates CKTdeltaOld ring buffer:
+      deltaOld[6]=deltaOld[5], ..., deltaOld[1]=deltaOld[0],
+      deltaOld[0]=CKTdelta.
+      Rotates CKTstates ring buffer:
+      temp = states[maxOrder+1],
+      states[maxOrder+1]=states[maxOrder], ..., states[1]=states[0],
+      states[0]=temp.
+      This makes CKTstate0 point to fresh storage for the new timepoint,
+      while CKTstate1 holds the previous accepted solution.
+      Function: DCtran() in dctran.c, lines 715-723.
+
+  # ===========================================================================
+  # TRANSIENT ANALYSIS -- INNER RETRY LOOP (label 600 / for(;;))
+  # ===========================================================================
+  - id: "tran_advance_time"
+    implemented: true
+    attributes: ["transient", "inner_retry", "time"]
+    edges_in:
+      - from: "tran_rotate_state_vectors"
+        condition: "first attempt"
+        label: ""
+      - from: "tran_check_delmin"
+        condition: "CKTdelta > CKTdelmin (retry after failure)"
+        label: ""
+      - from: "tran_set_delta_to_delmin"
+        condition: "last chance at delmin"
+        label: ""
+    edges_out:
+      - to: "tran_compute_integration_coefficients"
+        condition: "always"
+        label: ""
+    notes: >
+      Top of for(;;) in DCtran (label 600).
+      olddelta = CKTdelta.
+      CKTsimTimeStart = CKTtime (before advance).
+      CKTtime += CKTdelta (advance time).
+      CKTdeltaOld[0] = CKTdelta.
+      Function: DCtran() in dctran.c, lines 740-748.
+
+  - id: "tran_compute_integration_coefficients"
+    implemented: true
+    attributes: ["transient", "inner_retry", "integration"]
+    edges_in:
+      - from: "tran_advance_time"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_predict_solution"
+        condition: "PREDICTOR defined"
+        label: ""
+      - to: "tran_call_niiter"
+        condition: "PREDICTOR not defined (standard)"
+        label: ""
+    notes: >
+      Calls NIcomCof(ckt) in nicomcof.c.
+      Computes CKTag[0..order] integration coefficients based on
+      CKTintegrateMethod and CKTorder.
+      For TRAPEZOIDAL order 1: ag[0]=1/delta, ag[1]=-1/delta.
+      For TRAPEZOIDAL order 2: ag[0]=1/(delta*(1-xmu)), ag[1]=xmu/(1-xmu).
+      For GEAR: solves Vandermonde-like system using deltaOld ratios.
+      Also computes predictor coefficients CKTagp if PREDICTOR defined.
+      Function: NIcomCof() in nicomcof.c.
+
+  - id: "tran_predict_solution"
+    implemented: true
+    attributes: ["transient", "inner_retry", "predictor"]
+    edges_in:
+      - from: "tran_compute_integration_coefficients"
+        condition: "PREDICTOR defined"
+        label: ""
+    edges_out:
+      - to: "tran_call_niiter"
+        condition: "always"
+        label: ""
+    notes: >
+      Calls NIpred(ckt) in nipred.c.
+      Computes predicted solution CKTpred[i] = CKTrhs[i] using
+      polynomial extrapolation from previous solutions CKTsols[].
+      For TRAPEZOIDAL: Adams-Bashforth predictor.
+      For GEAR: Gear predictor using CKTagp coefficients.
+      Function: NIpred() in nipred.c.
+
+  - id: "tran_call_niiter"
+    implemented: true
+    attributes: ["transient", "inner_retry"]
+    edges_in:
+      - from: "tran_compute_integration_coefficients"
+        condition: "standard (no PREDICTOR)"
+        label: ""
+      - from: "tran_predict_solution"
+        condition: "after prediction"
+        label: ""
+    edges_out:
+      - to: "niiter_loop_entry"
+        condition: "always"
+        label: "NIiter(ckt, CKTtranMaxIter)"
+    notes: >
+      Saves mode and order: save_mode = CKTmode, save_order = CKTorder.
+      Calls NIiter(ckt, CKTtranMaxIter).
+      Function: DCtran() in dctran.c, line 783.
+
+  - id: "tran_nr_converged"
+    implemented: true
+    attributes: ["transient", "inner_retry"]
+    edges_in:
+      - from: "niiter_return_ok"
+        condition: "called from DCtran transient loop"
+        label: ""
+    edges_out:
+      - to: "tran_set_initpred_mode"
+        condition: "always"
+        label: ""
+    notes: >
+      NIiter returned OK. NR converged for this timepoint.
+
+  - id: "tran_set_initpred_mode"
+    implemented: true
+    attributes: ["transient", "inner_retry"]
+    edges_in:
+      - from: "tran_nr_converged"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_firsttime_state_copy"
+        condition: "firsttime"
+        label: "First timepoint: copy states"
+      - to: "tran_truncation_error_check"
+        condition: "!firsttime"
+        label: "Check LTE"
+    edges_out:
+      - to: "tran_check_firsttime_skip_lte"
+        condition: "always"
+        label: ""
+    notes: >
+      Sets CKTmode = (MODEUIC) | MODETRAN | MODEINITPRED.
+      Increments STATtimePts.
+      Function: DCtran() in dctran.c, line 794.
+
+  - id: "tran_firsttime_state_copy"
+    implemented: true
+    attributes: ["transient", "inner_retry", "state_vectors"]
+    edges_in:
+      - from: "tran_set_initpred_mode"
+        condition: "firsttime"
+        label: ""
+    edges_out:
+      - to: "tran_check_firsttime_skip_lte"
+        condition: "always"
+        label: ""
+    notes: >
+      If firsttime: copies state1 to state2 and state3.
+      state2[i] = state1[i]; state3[i] = state1[i].
+      Ensures higher-order state history is valid for first step.
+      Function: DCtran() in dctran.c, lines 796-799.
+
+  - id: "tran_check_firsttime_skip_lte"
+    implemented: true
+    attributes: ["transient", "inner_retry"]
+    edges_in:
+      - from: "tran_set_initpred_mode"
+        condition: "not firsttime"
+        label: ""
+      - from: "tran_firsttime_state_copy"
+        condition: "after state copy"
+        label: ""
+    edges_out:
+      - to: "tran_accepted_timepoint"
+        condition: "firsttime (skip LTE check, goto nextTime)"
+        label: "First timepoint always accepted"
+      - to: "tran_truncation_error_check"
+        condition: "!firsttime"
+        label: "Check LTE before accepting"
+    notes: >
+      If firsttime: sets firsttime=0 and jumps directly to nextTime
+      (label 650), skipping the truncation error check.
+      No reference for LTE at the first step.
+      Function: DCtran() in dctran.c, lines 864-868.
+
+  - id: "tran_truncation_error_check"
+    implemented: true
+    attributes: ["transient", "inner_retry", "lte"]
+    edges_in:
+      - from: "tran_check_firsttime_skip_lte"
+        condition: "!firsttime"
+        label: ""
+    edges_out:
+      - to: "tran_lte_accept"
+        condition: "newdelta > 0.9 * CKTdelta"
+        label: "LTE OK, accept step"
+      - to: "tran_lte_reject"
+        condition: "newdelta <= 0.9 * CKTdelta"
+        label: "LTE too large, reject step"
+    notes: >
+      Calls CKTtrunc(ckt, &newdelta) in ckttrunc.c.
+      CKTtrunc iterates all device types calling DEVtrunc.
+      Each DEVtrunc calls CKTterr (cktterr.c) for each reactive element.
+      CKTterr computes divided differences of charge, then max allowed
+      timestep: del = trtol * tol / (factor * |diff[0]|), with factor
+      from gearCoeff or trapCoeff tables, raised to power 1/order.
+      Returns MIN(2 * timeStep, timetemp).
+      If newdelta > 0.9 * CKTdelta: step is acceptable.
+      Also tries order increase: if order==1 and maxOrder>1, tries
+      order 2 and re-checks. Keeps order 2 only if newdelta <= 1.05*delta.
+      Function: CKTtrunc() in ckttrunc.c, CKTterr() in cktterr.c.
+
+  - id: "tran_lte_accept"
+    implemented: true
+    attributes: ["transient", "inner_retry", "lte", "accepted"]
+    edges_in:
+      - from: "tran_truncation_error_check"
+        condition: "newdelta > 0.9 * CKTdelta"
+        label: ""
+    edges_out:
+      - to: "tran_accepted_timepoint"
+        condition: "always"
+        label: "goto nextTime (label 650)"
+    notes: >
+      LTE is acceptable. CKTdelta = newdelta (may adjust for next step).
+      Function: DCtran() in dctran.c, lines 880-894.
+
+  - id: "tran_lte_reject"
+    implemented: true
+    attributes: ["transient", "inner_retry", "lte", "rejected"]
+    edges_in:
+      - from: "tran_truncation_error_check"
+        condition: "newdelta <= 0.9 * CKTdelta"
+        label: ""
+    edges_out:
+      - to: "tran_check_delmin"
+        condition: "always"
+        label: "Reject step, reduce delta"
+    notes: >
+      CKTtime -= CKTdelta (restore time). STATrejected++.
+      CKTdelta = newdelta (smaller step from LTE calculation).
+      Fires outer-loop callback: lteRejected=1.
+      Function: DCtran() in dctran.c, lines 936-953.
+
+  - id: "tran_nr_failed"
+    implemented: true
+    attributes: ["transient", "inner_retry", "error"]
+    edges_in:
+      - from: "niiter_return_iterlim"
+        condition: "called from DCtran"
+        label: ""
+      - from: "niiter_return_error"
+        condition: "called from DCtran"
+        label: ""
+    edges_out:
+      - to: "tran_nr_failed_reduce_delta"
+        condition: "always"
+        label: "NR failed, reduce timestep"
+    notes: >
+      NIiter returned non-zero (E_ITERLIM or matrix error).
+
+  - id: "tran_nr_failed_reduce_delta"
+    implemented: true
+    attributes: ["transient", "inner_retry", "error"]
+    edges_in:
+      - from: "tran_nr_failed"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_check_delmin"
+        condition: "always"
+        label: ""
+    notes: >
+      CKTtime -= CKTdelta (restore time). STATrejected++.
+      CKTdelta /= 8 (aggressive reduction for NR failure).
+      If firsttime: reset mode to MODETRAN | MODEINITTRAN.
+      CKTorder = 1.
+      Fires outer-loop callback: nrFailed=1.
+      Function: DCtran() in dctran.c, lines 809-828.
+
+  - id: "tran_check_delmin"
+    implemented: true
+    attributes: ["transient", "inner_retry", "timestep"]
+    edges_in:
+      - from: "tran_nr_failed_reduce_delta"
+        condition: "always"
+        label: ""
+      - from: "tran_lte_reject"
+        condition: "always"
+        label: ""
+    edges_out:
+      - to: "tran_advance_time"
+        condition: "CKTdelta > CKTdelmin"
+        label: "Delta still above minimum, retry"
+      - to: "tran_set_delta_to_delmin"
+        condition: "CKTdelta <= CKTdelmin && olddelta > CKTdelmin"
+        label: "Try one more time at delmin"
+      - to: "tran_timestep_too_small"
+        condition: "CKTdelta <= CKTdelmin && olddelta <= CKTdelmin"
+        label: "Already tried delmin, give up"
+    notes: >
+      Two-strike logic: first time delta <= delmin, clamp to delmin
+      and try once more. Second time, report E_TIMESTEP.
+      Function: DCtran() in dctran.c, lines 957-972.
+
+  - id: "tran_set_delta_to_delmin"
+    implemented: true
+    attributes: ["transient", "inner_retry", "timestep"]
+    edges_in:
+      - from: "tran_check_delmin"
+        condition: "CKTdelta <= CKTdelmin && olddelta > CKTdelmin"
+        label: ""
+    edges_out:
+      - to: "tran_advance_time"
+        condition: "always"
+        label: "Retry with delta = delmin"
+    notes: >
+      CKTdelta = CKTdelmin. One last attempt at minimum timestep.
+      Function: DCtran() in dctran.c, lines 958-959.
+
+  - id: "tran_timestep_too_small"
+    implemented: true
+    attributes: ["transient", "inner_retry", "error"]
+    edges_in:
+      - from: "tran_check_delmin"
+        condition: "CKTdelta <= CKTdelmin && olddelta <= CKTdelmin"
+        label: ""
+    edges_out:
+      - to: "END_TRAN"
+        condition: "always"
+        label: "Simulation aborted"
+    notes: >
+      Fires outer-loop callback: finalFailure=1.
+      Returns E_TIMESTEP with message "Timestep too small".
+      Function: DCtran() in dctran.c, lines 964-971.

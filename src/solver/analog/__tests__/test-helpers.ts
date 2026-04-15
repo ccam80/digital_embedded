@@ -480,8 +480,7 @@ export function makeCapacitor(
       const q1 = order <= 1 ? q0 : capacitance * (firstCall ? vNow : vPrev);
       const q2 = order <= 1 ? q0 : capacitance * (firstCall ? vNow : vPrev2);
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-      const result = integrateCapacitor(capacitance, vNow, q0, q1, q2, dt, h1, h2, order, method, firstCall ? 0 : ccapPrevCap);
+      const result = integrateCapacitor(capacitance, vNow, q0, q1, q2, dt, h1, order, method, firstCall ? 0 : ccapPrevCap);
       geq = result.geq;
       ieq = result.ceq;
       ccapPrevCap = result.ccap;
@@ -506,8 +505,7 @@ export function makeCapacitor(
       const q2 = capacitance * vPrev2;
       if (dt > 0) {
         const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-        const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-        const result = integrateCapacitor(capacitance, vNow, q0, q1, q2, dt, h1, h2, order, method, ccapBeforeStamp);
+        const result = integrateCapacitor(capacitance, vNow, q0, q1, q2, dt, h1, order, method, ccapBeforeStamp);
         ccapPrevCap = result.ccap;
       }
       // Do NOT shift vPrev/vPrev2 — stampCompanion owns history advancement.
@@ -612,12 +610,11 @@ export function makeInductor(
       const iNow = voltages[branchIdx];
       const phi0 = inductance * iNow;
       const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
       // For BDF-1 (order=1): phi1 = phi0 so ccap=0, ceq = -L*iNow/dt.
       // For BDF-2: phi1 = L*i_prev (from previous step), phi2 = L*i_2prev.
       const phi1Eff = order <= 1 ? phi0 : (indFirstCall ? phi0 : phi1);
       const phi2Eff = order <= 1 ? phi0 : (indFirstCall ? phi0 : phi2);
-      const result = integrateInductor(inductance, iNow, phi0, phi1Eff, phi2Eff, dt, h1, h2, order, method, indFirstCall ? 0 : ccapPrevInd);
+      const result = integrateInductor(inductance, iNow, phi0, phi1Eff, phi2Eff, dt, h1, order, method, indFirstCall ? 0 : ccapPrevInd);
       geq = result.geq;
       ieq = result.ceq;
       ccapPrevInd = result.ccap;
@@ -638,8 +635,7 @@ export function makeInductor(
       const phi0 = inductance * iNow;
       if (dt > 0) {
         const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-        const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
-        const result = integrateInductor(inductance, iNow, phi0, phi1, phi2, dt, h1, h2, order, method, ccapPrevInd);
+        const result = integrateInductor(inductance, iNow, phi0, phi1, phi2, dt, h1, order, method, ccapPrevInd);
         ccapPrevInd = result.ccap;
       }
       // Do NOT shift phi1/phi2 — stampCompanion owns history advancement.
