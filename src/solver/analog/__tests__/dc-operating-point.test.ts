@@ -536,7 +536,7 @@ describe("DcOP", () => {
     const statePool = {
       state0: new Float64Array(1),
       reset(): void { this.initMode = "transient"; },
-      initMode: "transient" as string,
+      initMode: "transient" as const,
     };
 
     const result = solveDcOperatingPoint({

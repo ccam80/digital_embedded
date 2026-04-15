@@ -293,6 +293,18 @@ export interface AnalogElement {
   primeJunctions?(): void;
 
   /**
+   * Device bypass optimization (ngspice bypass check).
+   * When this method returns true AND the NR iteration is > 0, the element's
+   * stamp/stampNonlinear/stampReactiveCompanion calls are skipped — the
+   * contributions from iteration 0 remain in the matrix.
+   *
+   * Implementations compare current and previous node voltages to decide
+   * whether the device operating point has changed enough to warrant
+   * re-stamping. Elements that do not implement this method are always stamped.
+   */
+  shouldBypass?(voltages: Float64Array, prevVoltages: Float64Array): boolean;
+
+  /**
    * Optional display label for diagnostic attribution.
    *
    * When present, used in `Diagnostic.involvedElements` descriptions

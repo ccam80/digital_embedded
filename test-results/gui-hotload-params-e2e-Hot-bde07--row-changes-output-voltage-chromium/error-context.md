@@ -19,7 +19,7 @@
       - button "■" [ref=e18] [cursor=pointer]
       - generic [ref=e20]:
         - button "▶❙" [ref=e21] [cursor=pointer]
-        - button "999.9998750000001u ▾" [ref=e22] [cursor=pointer]
+        - button "999.9990000000001u ▾" [ref=e22] [cursor=pointer]
         - button "⏩" [active] [ref=e23] [cursor=pointer]
       - generic [ref=e25]: "Speed:"
       - button "−" [ref=e26] [cursor=pointer]

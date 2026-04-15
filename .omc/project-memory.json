@@ -294,15 +294,15 @@
       "type": "file"
     },
     {
-      "path": "",
-      "accessCount": 103,
-      "lastAccessed": 1776255028742,
+      "path": "src",
+      "accessCount": 105,
+      "lastAccessed": 1776256480490,
       "type": "directory"
     },
     {
-      "path": "src",
-      "accessCount": 94,
-      "lastAccessed": 1776256056679,
+      "path": "",
+      "accessCount": 105,
+      "lastAccessed": 1776256798919,
       "type": "directory"
     },
     {
@@ -312,16 +312,16 @@
       "type": "directory"
     },
     {
+      "path": "src\\solver\\analog",
+      "accessCount": 71,
+      "lastAccessed": 1776256287749,
+      "type": "directory"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
       "accessCount": 68,
       "lastAccessed": 1776243899391,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog",
-      "accessCount": 68,
-      "lastAccessed": 1776255853970,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\state-pool.ts",
@@ -354,15 +354,15 @@
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
-      "accessCount": 27,
-      "lastAccessed": 1776173006817,
+      "path": "src\\solver\\analog\\element.ts",
+      "accessCount": 30,
+      "lastAccessed": 1776256656414,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 24,
-      "lastAccessed": 1776255870678,
+      "path": "src\\solver\\analog\\__tests__\\harness\\ngspice-bridge.ts",
+      "accessCount": 27,
+      "lastAccessed": 1776173006817,
       "type": "file"
     },
     {

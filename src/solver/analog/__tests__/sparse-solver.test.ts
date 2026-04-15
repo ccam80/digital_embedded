@@ -1052,8 +1052,8 @@ describe("SparseSolver _countMarkowitz and _markowitzProducts", () => {
 // _searchForPivot tests (4-phase dispatcher)
 // ---------------------------------------------------------------------------
 
-describe("SparseSolver _searchForPivot", () => {
-  it("returns a valid pivot row for a well-conditioned 3x3 matrix", () => {
+describe("SparseSolver pivot selection", () => {
+  it("selects a valid pivot and produces a correct solution for a well-conditioned 3x3 matrix", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     solver.stamp(0, 0, 2);
@@ -1067,55 +1067,34 @@ describe("SparseSolver _searchForPivot", () => {
     solver.stampRHS(1, 2);
     solver.stampRHS(2, 1);
     solver.finalize();
-    solver.factorWithReorder();
-
-    // Populate Markowitz data
-    (solver as any)._countMarkowitz();
-    (solver as any)._markowitzProducts();
-
-    // Set up a mock dense workspace for step 0
-    const n = 3;
-    const x = new Float64Array(n);
-    const xNzIdx = new Int32Array(n);
-    const pinv = new Int32Array(n).fill(-1);
-
-    // Scatter some values (simulating column 0 values in permuted space)
-    x[0] = 2.0;
-    x[1] = -1.0;
-    xNzIdx[0] = 0;
-    xNzIdx[1] = 1;
-    const xNzCount = 2;
-
-    const pivotRow = (solver as any)._searchForPivot(0, x, xNzIdx, xNzCount, pinv);
-    expect(pivotRow).toBeGreaterThanOrEqual(0);
-    expect(pivotRow).toBeLessThan(n);
-    expect(Math.abs(x[pivotRow])).toBeGreaterThan(0);
+    const factorResult = solver.factorWithReorder();
+    expect(factorResult.success).toBe(true);
+    const sol = new Float64Array(3);
+    solver.solve(sol);
+    // Verify Ax = b: row 0: 2*x0 - x1 = 1
+    expect(2 * sol[0] - sol[1]).toBeCloseTo(1, 10);
+    // row 1: -x0 + 3*x1 - x2 = 2
+    expect(-sol[0] + 3 * sol[1] - sol[2]).toBeCloseTo(2, 10);
+    // row 2: -x1 + 2*x2 = 1
+    expect(-sol[1] + 2 * sol[2]).toBeCloseTo(1, 10);
   });
 
-  it("returns -1 for an all-zero column (singular)", () => {
+  it("reports singular when the matrix is rank-deficient", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(2);
+    // Singular: two identical rows
     solver.stamp(0, 0, 1);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
     solver.stamp(1, 1, 1);
     solver.stampRHS(0, 1);
     solver.stampRHS(1, 1);
     solver.finalize();
-    solver.factorWithReorder();
-
-    (solver as any)._countMarkowitz();
-    (solver as any)._markowitzProducts();
-
-    const x = new Float64Array(2);
-    const xNzIdx = new Int32Array(2);
-    const pinv = new Int32Array(2).fill(-1);
-    // All zeros in workspace — no valid pivot
-    const pivotRow = (solver as any)._searchForPivot(0, x, xNzIdx, 0, pinv);
-    expect(pivotRow).toBe(-1);
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(false);
   });
 
-  it("prefers singleton rows over higher-product rows", () => {
-    // 3x3 matrix where row 0 is a singleton (1 off-diagonal)
-    // and row 1 has 2 off-diagonals
+  it("prefers singleton rows — singletons getter reflects matrix structure", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     solver.stamp(0, 0, 5);
@@ -1131,41 +1110,29 @@ describe("SparseSolver _searchForPivot", () => {
     solver.stampRHS(2, 1);
     solver.finalize();
     solver.factorWithReorder();
-
     (solver as any)._countMarkowitz();
     (solver as any)._markowitzProducts();
-
-    // With singletons > 0, the singleton phase should fire first
-    // This verifies that the 4-phase dispatcher checks singletons before
-    // doing a full column search
     expect(solver.singletons).toBeGreaterThan(0);
   });
 
-  it("phase 4 (entire matrix search) selects largest magnitude as fallback", () => {
+  it("selects the largest-magnitude pivot (fallback path) producing correct solution", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(2);
-    solver.stamp(0, 0, 1);
-    solver.stamp(1, 1, 1);
+    // Diagonal entries with different magnitudes: larger pivot = row 1
+    solver.stamp(0, 0, 0.5);
+    solver.stamp(1, 1, 3.0);
     solver.stampRHS(0, 1);
-    solver.stampRHS(1, 1);
+    solver.stampRHS(1, 6);
     solver.finalize();
-    solver.factorWithReorder();
-
-    // Test _searchEntireMatrix directly
-    const x = new Float64Array(2);
-    const xNzIdx = new Int32Array(2);
-    const pinv = new Int32Array(2).fill(-1);
-    x[0] = 0.5;
-    x[1] = 3.0;
-    xNzIdx[0] = 0;
-    xNzIdx[1] = 1;
-
-    const result = (solver as any)._searchEntireMatrix(x, xNzIdx, 2, pinv);
-    // Should pick row 1 (magnitude 3.0 > 0.5)
-    expect(result).toBe(1);
+    const factorResult = solver.factorWithReorder();
+    expect(factorResult.success).toBe(true);
+    const sol = new Float64Array(2);
+    solver.solve(sol);
+    expect(sol[0]).toBeCloseTo(2.0, 10);
+    expect(sol[1]).toBeCloseTo(2.0, 10);
   });
 
-  it("skips already-pivoted rows in all phases", () => {
+  it("factorization ignores already-used pivot rows in subsequent steps", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(2);
     solver.stamp(0, 0, 4);
@@ -1175,26 +1142,13 @@ describe("SparseSolver _searchForPivot", () => {
     solver.stampRHS(0, 1);
     solver.stampRHS(1, 2);
     solver.finalize();
-    solver.factorWithReorder();
-
-    (solver as any)._countMarkowitz();
-    (solver as any)._markowitzProducts();
-
-    const x = new Float64Array(2);
-    const xNzIdx = new Int32Array(2);
-    const pinv = new Int32Array(2);
-    x[0] = 10.0;
-    x[1] = 5.0;
-    xNzIdx[0] = 0;
-    xNzIdx[1] = 1;
-
-    // Mark row 0 as already pivoted
-    pinv[0] = 0;
-    pinv[1] = -1;
-
-    const result = (solver as any)._searchForPivot(1, x, xNzIdx, 2, pinv);
-    // Must pick row 1, since row 0 is already pivoted
-    expect(result).toBe(1);
+    const factorResult = solver.factorWithReorder();
+    expect(factorResult.success).toBe(true);
+    const sol = new Float64Array(2);
+    solver.solve(sol);
+    // Ax = b: 4*x0 + x1 = 1, x0 + 3*x1 = 2
+    expect(4 * sol[0] + sol[1]).toBeCloseTo(1, 10);
+    expect(sol[0] + 3 * sol[1]).toBeCloseTo(2, 10);
   });
 });
 

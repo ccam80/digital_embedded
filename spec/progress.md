@@ -306,3 +306,13 @@
   - src/components/passives/__tests__/inductor.test.ts
   - src/components/passives/__tests__/polarized-cap.test.ts
 - **Tests**: 190/190 passing
+## Task fix-batch7-verifier-issues: Fix verifier-identified issues in batch-7
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/solver/analog/sparse-solver.ts (deleted _numericLU, _searchForPivot, _searchDiagonal, _searchSingletons, _searchColumn, _searchEntireMatrix; rewrote provenance comment on _numericLUMarkowitz)
+  - src/solver/analog/element.ts (added shouldBypass? to AnalogElement interface)
+  - src/solver/analog/__tests__/dc-operating-point.test.ts (fixed initMode type: 'string' -> 'const')
+  - src/solver/analog/__tests__/sparse-solver.test.ts (rewrote 4 tests that called deleted private methods to test same behaviors via public API)
+- **Tests**: 44/44 passing (sparse-solver.test.ts)
