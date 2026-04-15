@@ -320,6 +320,7 @@ function dcopFinalize(
   }
   newtonRaphson({
     ...nrBase,
+    postIterationHook: undefined,
     maxIterations: 1,
     exactMaxIterations: true,
     elements,
