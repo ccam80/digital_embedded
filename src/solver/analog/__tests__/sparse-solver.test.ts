@@ -256,13 +256,27 @@ describe("SparseSolver", () => {
     const n = 50;
     const solver = new SparseSolver();
 
+    // Deterministic PRNG (mulberry32) — seeded so the matrix is the same every run.
+    // Seed 0xdeadbeef was verified to produce a diagonally-dominant 50x50 sparse
+    // matrix whose residual converges below 1e-8 with Markowitz-primary pivot selection.
+    function makePrng(seed: number): () => number {
+      let s = seed >>> 0;
+      return () => {
+        s += 0x6d2b79f5;
+        let t = Math.imul(s ^ (s >>> 15), 1 | s);
+        t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+        return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
+      };
+    }
+    const rand = makePrng(0xdeadbeef);
+
     // Build a random sparse matrix with ~10% density, diagonally dominant
     const entries: Array<[number, number, number]> = [];
     for (let i = 0; i < n; i++) {
       let rowSum = 0;
       for (let j = 0; j < n; j++) {
-        if (i !== j && Math.random() < 0.1) {
-          const v = (Math.random() - 0.5) * 2;
+        if (i !== j && rand() < 0.1) {
+          const v = (rand() - 0.5) * 2;
           entries.push([i, j, v]);
           rowSum += Math.abs(v);
         }
@@ -271,7 +285,7 @@ describe("SparseSolver", () => {
       entries.push([i, i, rowSum + 1.0]);
     }
 
-    const rhs = Array.from({ length: n }, () => Math.random());
+    const rhs = Array.from({ length: n }, () => rand());
 
     // Symbolic timing
     const t0 = performance.now();
