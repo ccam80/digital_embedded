@@ -559,6 +559,32 @@ describe("MNAEngine", () => {
     expect(scheduledEdges.length).toBeGreaterThan(0);
   });
 
+  it("transientDcop_converges_and_seeds_state", () => {
+    // G5: Exercise _transientDcop() directly on MNAEngine.
+    // After _transientDcop() converges, voltages must be seeded and the
+    // engine should be ready for transient stepping without error.
+    const circuit = makeDiodeCircuit();
+    engine.init(circuit);
+
+    const result = engine._transientDcop();
+
+    expect(result.converged).toBe(true);
+    expect(result.method).toBeDefined();
+    expect(result.iterations).toBeGreaterThan(0);
+
+    // Diode forward voltage should be physically plausible
+    const vAnode = engine.getNodeVoltage(2);
+    expect(vAnode).toBeGreaterThan(0.6);
+    expect(vAnode).toBeLessThan(0.75);
+
+    // Engine should be ready for transient stepping without error
+    for (let i = 0; i < 10; i++) {
+      engine.step();
+      expect(engine.getState()).not.toBe(EngineState.ERROR);
+    }
+    expect(engine.simTime).toBeGreaterThan(0);
+  });
+
   it("predictor_off_rc_regression", () => {
     // Gap 15.3: RC circuit with predictor OFF (default). After charging,
     // V(node2) at t≈RC should remain close to the charged value (Vs held on).

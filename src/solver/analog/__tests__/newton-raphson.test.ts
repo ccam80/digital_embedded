@@ -92,12 +92,16 @@ describe("NR", () => {
   // Linear circuit: should converge in exactly 1 iteration
   // ---------------------------------------------------------------------------
 
-  it("linear_converges_in_one_iteration", () => {
+  it("linear_converges_in_two_iterations", () => {
     // Resistor divider: 5V source, R1=1kΩ, R2=1kΩ → midpoint = 2.5V
     // Topology:
     //   Node 1 = Vs+, Node 2 = midpoint, Node 0 = ground
     //   Branch row 2 = Vs branch
     //   matrixSize = 3
+    //
+    // Per ngspice NIiter: iteration 0 solves the system but convergence
+    // checks are skipped (noncon forced to 1). Iteration 1 confirms
+    // convergence. All circuits traverse the full Step A-K sequence.
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
 
@@ -117,7 +121,7 @@ describe("NR", () => {
     });
 
     expect(result.converged).toBe(true);
-    expect(result.iterations).toBe(1);
+    expect(result.iterations).toBe(2);
     // Node 2 (index 1 in 0-based solver) = midpoint voltage ~2.5V
     expect(result.voltages[1]).toBeCloseTo(2.5, 4);
   });

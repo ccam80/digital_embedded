@@ -407,15 +407,10 @@ export class MNAEngine implements AnalogEngine {
       // Publish the current integration timestep to the state pool so
       // stampCompanion/updateOperatingPoint can derive ag0 = 1/dt locally,
       // matching NIcomCof (nicomcof.c:33-51) and CKTag[0] in ngspice.
-      if (statePool) statePool.dt = dt;
-
-      // Centralized NIcomCof (item 5.3): compute ag[] into statePool.ag before
-      // companion stamping so elements read from the shared store.
       if (statePool) {
+        statePool.dt = dt;
         computeNIcomCof(dt, this._timestep.deltaOld, this._timestep.currentOrder,
           this._timestep.currentMethod, statePool.ag);
-      }
-      if (statePool) {
         if (this._firsttime) {
           statePool.initMode = "initTran";
         }
@@ -812,47 +807,7 @@ export class MNAEngine implements AnalogEngine {
     }
 
     if (result.converged) {
-      this._voltages.set(result.nodeVoltages);
-
-      // Write initial charge/flux from the DC operating point so that
-      // seedHistory propagates correct Q values into all history slots.
-      // Without this, Q=0 in history causes cktTerr to see a step function
-      // on the first transient step → LTE rejection → stagnation.
-      // (ngspice equivalent: CAPload writes state0[qcap] during DCOP,
-      // then dctran.c:342 bcopy seeds state1 from state0.)
-      // dt=0 and dummy params: ccap recomputation is irrelevant at DC OP.
-      for (const el of elements) {
-        if (el.isReactive && el.updateChargeFlux) {
-          el.updateChargeFlux(this._voltages, 0, "bdf1", 1, []);
-        }
-      }
-
-      if (cac.statePool) {
-        // ngspice dctran.c:346-350: set analysis mode, zero CKTag[], then copy state.
-        // Order matters: analysisMode must be "tran" and ag[] zeroed BEFORE state0→state1
-        // so that elements reading ag[0] during the first transient NR see ag0=0 (DC form)
-        // for the initial companion stamp, not a stale value.
-        cac.statePool.analysisMode = "tran";
-        cac.statePool.ag[0] = 0;
-        cac.statePool.ag[1] = 0;
-        cac.statePool.seedHistory();
-        cac.statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
-        this._firsttime = true;
-      }
-
-      // Seed per-timestep companion state from the DC operating point.
-      // Elements with sentinel-initialized edge-detection state (e.g.
-      // behavioral flip-flops with _prevClockVoltage=NaN) use this call to
-      // capture the DC steady-state voltages so the first transient step
-      // does not mis-fire an edge on a signal that was already at its level
-      // during DC op. dt=0 signals "no time elapsed"; method is irrelevant
-      // because the first real step will restamp companion models.
-      const seedMethod = this._timestep.currentMethod;
-      for (const el of elements) {
-        if (el.updateCompanion) {
-          el.updateCompanion(0, seedMethod, this._voltages);
-        }
-      }
+      this._seedFromDcop(result, elements, cac);
     }
 
     return result;
@@ -917,29 +872,7 @@ export class MNAEngine implements AnalogEngine {
     });
 
     if (result.converged) {
-      this._voltages.set(result.nodeVoltages);
-
-      for (const el of elements) {
-        if (el.isReactive && el.updateChargeFlux) {
-          el.updateChargeFlux(this._voltages, 0, "bdf1", 1, []);
-        }
-      }
-
-      if (cac.statePool) {
-        cac.statePool.analysisMode = "tran";
-        cac.statePool.ag[0] = 0;
-        cac.statePool.ag[1] = 0;
-        cac.statePool.seedHistory();
-        cac.statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
-        this._firsttime = true;
-      }
-
-      const seedMethod = this._timestep.currentMethod;
-      for (const el of elements) {
-        if (el.updateCompanion) {
-          el.updateCompanion(0, seedMethod, this._voltages);
-        }
-      }
+      this._seedFromDcop(result, elements, cac);
     }
 
     return result;
@@ -1175,6 +1108,65 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
   // Internal helpers
   // -------------------------------------------------------------------------
+
+  /**
+   * Post-convergence seeding sequence shared by dcOperatingPoint() and
+   * _transientDcop().
+   *
+   * Copies converged voltages into engine state, writes initial charge/flux,
+   * seeds state pool history, and initialises companion state from DC OP.
+   *
+   * Matches ngspice dctran.c:346-350 post-CKTop sequence:
+   *   CAPload writes state0[qcap] -> bcopy seeds state1 from state0 ->
+   *   CKTmode set to MODETRAN -> CKTag[] zeroed.
+   */
+  private _seedFromDcop(
+    result: DcOpResult,
+    elements: readonly AnalogElement[],
+    cac: CompiledWithBridges,
+  ): void {
+    this._voltages.set(result.nodeVoltages);
+
+    // Write initial charge/flux from the DC operating point so that
+    // seedHistory propagates correct Q values into all history slots.
+    // Without this, Q=0 in history causes cktTerr to see a step function
+    // on the first transient step -> LTE rejection -> stagnation.
+    // (ngspice equivalent: CAPload writes state0[qcap] during DCOP,
+    // then dctran.c:342 bcopy seeds state1 from state0.)
+    // dt=0 and dummy params: ccap recomputation is irrelevant at DC OP.
+    for (const el of elements) {
+      if (el.isReactive && el.updateChargeFlux) {
+        el.updateChargeFlux(this._voltages, 0, "bdf1", 1, []);
+      }
+    }
+
+    if (cac.statePool) {
+      // ngspice dctran.c:346-350: set analysis mode, zero CKTag[], then copy state.
+      // Order matters: analysisMode must be "tran" and ag[] zeroed BEFORE state0->state1
+      // so that elements reading ag[0] during the first transient NR see ag0=0 (DC form)
+      // for the initial companion stamp, not a stale value.
+      cac.statePool.analysisMode = "tran";
+      cac.statePool.ag[0] = 0;
+      cac.statePool.ag[1] = 0;
+      cac.statePool.seedHistory();
+      cac.statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
+      this._firsttime = true;
+    }
+
+    // Seed per-timestep companion state from the DC operating point.
+    // Elements with sentinel-initialized edge-detection state (e.g.
+    // behavioral flip-flops with _prevClockVoltage=NaN) use this call to
+    // capture the DC steady-state voltages so the first transient step
+    // does not mis-fire an edge on a signal that was already at its level
+    // during DC op. dt=0 signals "no time elapsed"; method is irrelevant
+    // because the first real step will restamp companion models.
+    const seedMethod = this._timestep.currentMethod;
+    for (const el of elements) {
+      if (el.updateCompanion) {
+        el.updateCompanion(0, seedMethod, this._voltages);
+      }
+    }
+  }
 
   private _transitionState(newState: EngineState): void {
     this._engineState = newState;

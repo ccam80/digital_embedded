@@ -212,10 +212,11 @@ describe("DcOP", () => {
     // dynamicGmin or direct — either is valid; the important check is convergence
     // and that the diagnostic chain ran.
     const diags = diagnostics.getDiagnostics();
-    // The circuit may converge via any of the three levels depending on NR behavior.
-    // Assert that exactly one outcome diagnostic is present.
-    const outcomeCodes = ["dc-op-converged", "dc-op-gmin", "dc-op-source-step", "dc-op-failed"];
-    expect(diags.some(d => outcomeCodes.includes(d.code))).toBe(true);
+    // The circuit converged, so only success diagnostics are valid.
+    const successCodes = ["dc-op-converged", "dc-op-gmin", "dc-op-source-step"];
+    expect(diags.some(d => successCodes.includes(d.code))).toBe(true);
+    // dc-op-failed must NOT be present when converged is true
+    expect(diags.some(d => d.code === "dc-op-failed")).toBe(false);
   });
 
   it("source_stepping_fallback", () => {
@@ -252,17 +253,17 @@ describe("DcOP", () => {
 
     const diags = diagnostics.getDiagnostics();
 
-    // The fallback chain must emit exactly one outcome diagnostic
-    expect(
-      diags.some(d => d.code === "dc-op-converged") ||
-      diags.some(d => d.code === "dc-op-gmin") ||
-      diags.some(d => d.code === "dc-op-source-step") ||
-      diags.some(d => d.code === "dc-op-failed")
-    ).toBe(true);
-
-    // If converged, method must be one of the three valid values
+    // The fallback chain must emit exactly one outcome diagnostic.
+    // Assert that the diagnostic matches the convergence method.
     if (result.converged) {
-      expect(["direct", "dynamic-gmin", "gillespie-src"]).toContain(result.method);
+      if (result.method === "gillespie-src") {
+        expect(diags.some(d => d.code === "dc-op-source-step")).toBe(true);
+      } else if (result.method === "dynamic-gmin") {
+        expect(diags.some(d => d.code === "dc-op-gmin")).toBe(true);
+      } else {
+        expect(result.method).toBe("direct");
+        expect(diags.some(d => d.code === "dc-op-converged")).toBe(true);
+      }
     }
   });
 
@@ -489,6 +490,24 @@ describe("DcOP", () => {
       const failedDiag = diags.find(d => d.code === "dc-op-failed");
       expect(failedDiag).toBeDefined();
       expect(failedDiag!.severity).toBe("error");
+      // cktncDump content should appear in the diagnostic message
+      expect(failedDiag!.message).toContain("DC operating point failed");
+    }
+  });
+
+  it("failure_cktncDump_uses_actual_voltages", () => {
+    // Verify that cktncDump produces meaningful output with actual voltages
+    // (not zeros). This is a unit test of cktncDump with realistic data.
+    const voltages = new Float64Array([5.0, 0.7, -0.0025]);
+    const prevVoltages = new Float64Array([4.0, 0.65, -0.002]);
+    const result = cktncDump(voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 2, 3);
+    // All three rows should be non-converged with these large deltas
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.some(n => n.node === 0)).toBe(true);
+    expect(result.some(n => n.node === 1)).toBe(true);
+    // Verify deltas are non-zero (confirming actual voltages were used)
+    for (const entry of result) {
+      expect(entry.delta).toBeGreaterThan(0);
     }
   });
 
@@ -518,6 +537,12 @@ describe("DcOP", () => {
 
     expect(result.converged).toBe(true);
     expect(result.iterations).toBe(0);
+    // Voltages should be a valid Float64Array of the correct size.
+    // The noOpIter path returns the pre-existing voltage vector (not a
+    // freshly allocated zeros array). With no prior solve the values
+    // happen to be zero, but the code path uses opts.voltages.
+    expect(result.nodeVoltages).toBeInstanceOf(Float64Array);
+    expect(result.nodeVoltages.length).toBe(matrixSize);
   });
 
   it("dcopFinalize_sets_initMode_to_transient_after_convergence", () => {
@@ -535,8 +560,8 @@ describe("DcOP", () => {
 
     const statePool = {
       state0: new Float64Array(1),
-      reset(): void { this.initMode = "transient"; },
-      initMode: "transient" as const,
+      reset(): void { this.initMode = "transient" as typeof this.initMode; },
+      initMode: "transient" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient",
     };
 
     const result = solveDcOperatingPoint({

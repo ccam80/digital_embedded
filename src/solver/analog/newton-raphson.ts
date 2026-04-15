@@ -459,10 +459,8 @@ export function newtonRaphson(opts: NROptions): NRResult {
     prevVoltages.set(opts.initialGuess);
   }
 
-  // Detect whether any nonlinear elements are present.
-  // A purely linear circuit solves exactly in one matrix solve; there is no
-  // need to compare consecutive iterates — the first solution is the answer.
-  const hasNonlinear = elements.some((el) => el.isNonlinear);
+  // Step D state: preorder runs at most once per solve.
+  let didPreorder = false;
 
   // Hoist the iter-0 split hook into a local so the per-iteration hot path
   // pays nothing (not even a property lookup) when no harness is attached.
@@ -494,7 +492,7 @@ export function newtonRaphson(opts: NROptions): NRResult {
     // On iteration 0, prevVoltages holds the initial guess (copied at entry).
     // On iteration 1+, prevVoltages holds the previous solve result (via Step K swap).
     opts.preIterationHook?.(iteration, prevVoltages);
-    assembler.stampAll(elements, matrixSize, prevVoltages, opts.limitingCollector ?? null, iteration);
+    assembler.stampAll(elements, matrixSize, prevVoltages, opts.limitingCollector ?? null, iteration, voltages);
 
     // ---- STEP C: Nodeset/IC enforcement (ngspice CKTnodeset/CKTic) ----
     // Stamp 1e10 conductance for nodeset and IC nodes after CKTload,
@@ -514,6 +512,12 @@ export function newtonRaphson(opts: NROptions): NRResult {
     }
 
     // Diagonal gmin augmentation (ngspice LoadGmin, spsmp.c:448-478):
+    // ---- STEP D: Preorder (once per solve) ----
+    if (!didPreorder) {
+      solver.preorder();
+      didPreorder = true;
+    }
+
     // Add gmin to every diagonal element before factorization.
     if (opts.diagonalGmin) {
       solver.addDiagonalGmin(opts.diagonalGmin);
@@ -549,23 +553,6 @@ export function newtonRaphson(opts: NROptions): NRResult {
 
     // ---- STEP F: Solve ----
     solver.solve(voltages);
-
-    // Linear short-circuit: purely linear circuits solve exactly in one iteration.
-    // Fire ladder mode transitions so the harness sees the correct phase sequence.
-    if (!hasNonlinear) {
-      opts.postIterationHook?.(iteration, voltages, prevVoltages, 0, true, true, [], []);
-      if (ladder) {
-        ladder.onModeEnd("dcopInitJct", iteration, false);
-        ladder.pool.initMode = "initFix";
-        ladder.onModeBegin("dcopInitFix", iteration + 1);
-        ladder.pool.initMode = "initFloat";
-        ladder.onModeEnd("dcopInitFix", iteration + 1, false);
-        ladder.onModeBegin("dcopInitFloat", iteration + 2);
-        ladder.pool.initMode = "initFloat";
-        ladder.onModeEnd("dcopInitFloat", iteration + 2, true);
-      }
-      return { converged: true, iterations: iteration + 1, voltages, largestChangeElement: -1, largestChangeNode: -1 };
-    }
 
     // ---- STEP G: Check iteration limit BEFORE convergence (ngspice niiter.c:944) ----
     // iterno is 1-based (incremented during CKTload); iteration is 0-based.

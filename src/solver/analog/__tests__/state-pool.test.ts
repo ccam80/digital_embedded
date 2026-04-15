@@ -3,7 +3,7 @@ import { StatePool } from '../state-pool';
 
 describe('StatePool', () => {
   describe('constructor', () => {
-    it('allocates four Float64Array vectors of the given size', () => {
+    it('allocates eight Float64Array vectors of the given size', () => {
       const pool = new StatePool(10);
       expect(pool.state0).toBeInstanceOf(Float64Array);
       expect(pool.state1).toBeInstanceOf(Float64Array);

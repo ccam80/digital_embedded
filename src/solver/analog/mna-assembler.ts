@@ -101,7 +101,6 @@ export class MNAAssembler {
     voltages: Float64Array,
     limitingCollector: LimitingEvent[] | null = null,
   ): void {
-    this.noncon = 0;
     for (const el of elements) {
       if (el.isNonlinear && el.updateOperatingPoint) {
         const limited = el.updateOperatingPoint(voltages, limitingCollector);

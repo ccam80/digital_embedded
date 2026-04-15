@@ -196,6 +196,13 @@ function restoreSnapshot(
 }
 
 // ---------------------------------------------------------------------------
+// InitMode — type alias for pool.initMode values
+// ---------------------------------------------------------------------------
+
+/** Pool initMode values used throughout the DCOP flow. */
+type InitMode = "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient";
+
+// ---------------------------------------------------------------------------
 // CKTop options type used by the cktop() helper
 // ---------------------------------------------------------------------------
 
@@ -229,6 +236,8 @@ interface CKTopCallOptions {
   };
   params: import("../../core/analog-engine-interface.js").SimulationParams;
   elements: readonly AnalogElement[];
+  /** Pre-existing voltage vector returned by noOpIter fast-path. */
+  voltages?: Float64Array;
   ladder: {
     runPrimeJunctions(): void;
     pool: { initMode: string };
@@ -244,28 +253,37 @@ interface CKTopCallOptions {
 /**
  * Run the direct-NR level of the DC-OP ladder (cktop.c:20-79).
  *
+ * Spec §2.1 four-parameter form: firstMode sets pool.initMode at entry,
+ * continueMode is reserved for future use (unused in current NR path).
+ *
  * When params.noOpIter is true, returns immediately with converged=true
- * and zero iterations — matching the ngspice noOpIter fast-path used when
- * the circuit is pre-initialised (MODEUIC + MODEINITTRAN).
+ * and zero iterations — returning the pre-existing voltage vector unchanged
+ * (not zeros), matching the ngspice noOpIter fast-path.
  *
  * Variable mapping (ngspice → ours):
  *   CKTnoOpIter → params.noOpIter
- *   CKTdcMaxIter → maxIterations
+ *   CKTdcMaxIter → maxIter
  */
 function cktop(
   opts: CKTopCallOptions,
-  maxIterations: number,
+  firstMode: InitMode,
+  _continueMode: InitMode,
+  maxIter: number,
 ): { converged: boolean; iterations: number; voltages: Float64Array } {
+  // Set pool.initMode to firstMode at entry (spec §2.1)
+  if (opts.ladder.pool) {
+    opts.ladder.pool.initMode = firstMode;
+  }
   if (opts.params.noOpIter) {
     return {
       converged: true,
       iterations: 0,
-      voltages: new Float64Array(opts.nrBase.matrixSize),
+      voltages: opts.voltages ?? new Float64Array(opts.nrBase.matrixSize),
     };
   }
   return newtonRaphson({
     ...opts.nrBase,
-    maxIterations,
+    maxIterations: maxIter,
     elements: opts.elements,
     dcopModeLadder: opts.ladder,
   });
@@ -449,7 +467,9 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   };
 
   const directResult = cktop(
-    { nrBase, params, elements, ladder },
+    { nrBase, params, elements, voltages: new Float64Array(matrixSize), ladder },
+    "initJct",
+    "initFloat",
     params.maxIterations,
   );
   // Per-iteration phase labels emitted by ladder's onModeEnd/onModeBegin.
@@ -555,10 +575,11 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   // -------------------------------------------------------------------------
   // Level 5 — Failure with blame attribution (cktop.c:546+)
   // -------------------------------------------------------------------------
-  const zeroVoltages = new Float64Array(matrixSize);
+  // Use actual voltage vectors from the last NR attempts for diagnostics.
+  // srcResult.voltages and directResult.voltages hold the last NR solutions.
   const ncNodes = cktncDump(
-    zeroVoltages,
-    zeroVoltages,
+    srcResult.voltages,
+    directResult.voltages,
     params.reltol,
     params.voltTol,
     params.abstol,
@@ -632,7 +653,7 @@ function dynamicGmin(
   elements: readonly AnalogElement[],
   params: SimulationParams,
   _diagnostics: DiagnosticCollector,
-  statePool: { state0: Float64Array; reset(): void } | null | undefined,
+  statePool: { state0: Float64Array; reset(): void; initMode?: InitMode } | null | undefined,
   matrixSize: number,
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
@@ -640,8 +661,8 @@ function dynamicGmin(
   // cktop.c:140-141: zero CKTrhsOld and CKTstate0 before stepping
   const voltages = new Float64Array(matrixSize);
   zeroState(voltages, statePool);
-  if (statePool && 'initMode' in statePool) {
-    (statePool as any).initMode = "initJct";
+  if (statePool) {
+    statePool.initMode = "initJct";
   }
 
   const savedVoltages = new Float64Array(matrixSize);
@@ -672,8 +693,8 @@ function dynamicGmin(
 
     if (result.converged) {
       onPhaseEnd?.("dcopSubSolveConverged", true);
-      if (statePool && 'initMode' in statePool) {
-        (statePool as any).initMode = "initFloat";
+      if (statePool) {
+        statePool.initMode = "initFloat";
       }
       // cktop.c:168-169: check if we've reached target
       if (diagGmin <= gtarget) {
@@ -770,7 +791,7 @@ function spice3Gmin(
   elements: readonly AnalogElement[],
   params: SimulationParams,
   _diagnostics: DiagnosticCollector,
-  statePool: { state0: Float64Array; reset(): void } | null | undefined,
+  statePool: { state0: Float64Array; reset(): void; initMode?: InitMode } | null | undefined,
   matrixSize: number,
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
@@ -778,8 +799,8 @@ function spice3Gmin(
   // cktop.c:281: zero state before stepping
   const voltages = new Float64Array(matrixSize);
   zeroState(voltages, statePool);
-  if (statePool && 'initMode' in statePool) {
-    (statePool as any).initMode = "initJct";
+  if (statePool) {
+    statePool.initMode = "initJct";
   }
 
   let totalIter = 0;
@@ -810,8 +831,8 @@ function spice3Gmin(
     }
 
     onPhaseEnd?.("dcopSubSolveConverged", true);
-    if (statePool && 'initMode' in statePool) {
-      (statePool as any).initMode = "initFloat";
+    if (statePool) {
+      statePool.initMode = "initFloat";
     }
     voltages.set(result.voltages);
     // cktop.c:313: step down by gminFactor
@@ -849,15 +870,15 @@ function spice3Src(
   elements: readonly AnalogElement[],
   params: SimulationParams,
   _diagnostics: DiagnosticCollector,
-  statePool: { state0: Float64Array; reset(): void } | null | undefined,
+  statePool: { state0: Float64Array; reset(): void; initMode?: InitMode } | null | undefined,
   matrixSize: number,
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
 ): StepResult {
   const voltages = new Float64Array(matrixSize);
   zeroState(voltages, statePool);
-  if (statePool && 'initMode' in statePool) {
-    (statePool as any).initMode = "initJct";
+  if (statePool) {
+    statePool.initMode = "initJct";
   }
   let totalIter = 0;
   const numSrcSteps = params.numSrcSteps ?? 1;
@@ -880,8 +901,8 @@ function spice3Src(
       return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
     }
     onPhaseEnd?.("dcopSubSolveConverged", true);
-    if (statePool && 'initMode' in statePool) {
-      (statePool as any).initMode = "initFloat";
+    if (statePool) {
+      statePool.initMode = "initFloat";
     }
     voltages.set(result.voltages);
   }
@@ -920,7 +941,7 @@ function gillespieSrc(
   elements: readonly AnalogElement[],
   params: SimulationParams,
   _diagnostics: DiagnosticCollector,
-  statePool: { state0: Float64Array; reset(): void } | null | undefined,
+  statePool: { state0: Float64Array; reset(): void; initMode?: InitMode } | null | undefined,
   matrixSize: number,
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
@@ -928,8 +949,8 @@ function gillespieSrc(
   // cktop.c:362-363: zero state and scale sources to 0
   const voltages = new Float64Array(matrixSize);
   zeroState(voltages, statePool);
-  if (statePool && 'initMode' in statePool) {
-    (statePool as any).initMode = "initJct";
+  if (statePool) {
+    statePool.initMode = "initJct";
   }
   scaleAllSources(elements, 0);
 
@@ -971,8 +992,8 @@ function gillespieSrc(
         break;
       }
       onPhaseEnd?.("dcopSubSolveConverged", true);
-      if (statePool && 'initMode' in statePool) {
-        (statePool as any).initMode = "initFloat";
+      if (statePool) {
+        statePool.initMode = "initFloat";
       }
       diagGmin /= 10;
       if (decade === 10) {
@@ -985,8 +1006,8 @@ function gillespieSrc(
     }
   } else {
     onPhaseEnd?.("dcopSubSolveConverged", true);
-    if (statePool && 'initMode' in statePool) {
-      (statePool as any).initMode = "initFloat";
+    if (statePool) {
+      statePool.initMode = "initFloat";
     }
   }
 
@@ -1014,8 +1035,8 @@ function gillespieSrc(
 
     if (stepResult.converged) {
       onPhaseEnd?.("dcopSubSolveConverged", true);
-      if (statePool && 'initMode' in statePool) {
-        (statePool as any).initMode = "initFloat";
+      if (statePool) {
+        statePool.initMode = "initFloat";
       }
       // cktop.c:446-481: save state, adapt raise
       voltages.set(stepResult.voltages);
