@@ -300,15 +300,15 @@
       "type": "directory"
     },
     {
-      "path": "src\\core\\analog-engine-interface.ts",
-      "accessCount": 90,
-      "lastAccessed": 1776254895817,
+      "path": "src",
+      "accessCount": 94,
+      "lastAccessed": 1776256056679,
       "type": "directory"
     },
     {
-      "path": "src",
-      "accessCount": 82,
-      "lastAccessed": 1776251558519,
+      "path": "src\\core\\analog-engine-interface.ts",
+      "accessCount": 90,
+      "lastAccessed": 1776254895817,
       "type": "directory"
     },
     {
@@ -319,20 +319,20 @@
     },
     {
       "path": "src\\solver\\analog",
-      "accessCount": 66,
-      "lastAccessed": 1776254933567,
+      "accessCount": 68,
+      "lastAccessed": 1776255853970,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\state-pool.ts",
-      "accessCount": 61,
-      "lastAccessed": 1776255100036,
+      "accessCount": 64,
+      "lastAccessed": 1776255832716,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\integration.ts",
-      "accessCount": 55,
-      "lastAccessed": 1776255521801,
+      "accessCount": 57,
+      "lastAccessed": 1776255715473,
       "type": "file"
     },
     {
@@ -361,14 +361,14 @@
     },
     {
       "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 23,
-      "lastAccessed": 1776255557456,
+      "accessCount": 24,
+      "lastAccessed": 1776255870678,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\ckt-terr.ts",
-      "accessCount": 18,
-      "lastAccessed": 1776255341058,
+      "accessCount": 20,
+      "lastAccessed": 1776255714433,
       "type": "file"
     },
     {

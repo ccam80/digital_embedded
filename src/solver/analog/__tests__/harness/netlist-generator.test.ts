@@ -75,7 +75,7 @@ class TestCircuitElement extends AbstractCircuitElement {
 function makeAnalogEl(pinNodeIds: number[]): AnalogElement {
   return {
     pinNodeIds, allNodeIds: pinNodeIds, branchIndex: -1,
-    stampLinear: () => {}, stampNonlinear: () => {},
+    stamp: () => {}, stampNonlinear: () => {},
     updateOperatingPoint: () => {}, isLinear: true, isReactive: false,
     label: "test", stateSchema: { slots: [] }, stateBaseOffset: 0,
     stateSize: 0, initState: () => {}, getPinCurrents: () => [],

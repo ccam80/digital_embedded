@@ -267,7 +267,7 @@ describe("Capacitor", () => {
       const { element, pool } = withState(core);
 
       element.stampCompanion!(1e-6, "bdf1", new Float64Array([5, 0]), 1, [1e-6]);
-      pool.acceptTimestep();
+      pool.rotateStateVectors();
       pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]), 1, [1e-6]);
 
@@ -288,7 +288,7 @@ describe("Capacitor", () => {
 
       // First call: v1 = 3V — rotate pool so v=3 lands in s1
       element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]), 1, [1e-6]);
-      pool.acceptTimestep();
+      pool.rotateStateVectors();
       pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       // Second call: v2 = 7V
       element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]), 1, [1e-6]);
@@ -311,7 +311,7 @@ describe("Capacitor", () => {
 
       // First call: v1 = 5V (non-zero) — rotate so v=5 lands in s1
       element.stampCompanion!(1e-6, "bdf1", new Float64Array([5, 0]), 1, [1e-6]);
-      pool.acceptTimestep();
+      pool.rotateStateVectors();
       pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       // Second call: v2 = 0V (zero crossing)
       element.stampCompanion!(1e-6, "bdf1", new Float64Array([0, 0]), 1, [1e-6]);
@@ -341,9 +341,9 @@ describe("Capacitor initPred", () => {
     Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
     const { element, pool } = withState(core);
 
-    // First step: v=3V, accepted — charge C*3 lands in s1 after acceptTimestep
+    // First step: v=3V, accepted — charge C*3 lands in s1 after rotateStateVectors
     element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]), 1, [1e-6]);
-    pool.acceptTimestep();
+    pool.rotateStateVectors();
     pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
 
     // Second step: initPred mode, v=7V (different voltage)

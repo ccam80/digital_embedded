@@ -283,7 +283,7 @@ describe("Inductor", () => {
 
       // First call establishes i=0.5 in s0, then rotate so it lands in s1
       element.stampCompanion!(1e-4, "bdf1", new Float64Array([5, 0, 0.5]), 1, [1e-4]);
-      pool.acceptTimestep();
+      pool.rotateStateVectors();
       pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       // Second call: i=0.6, s1 now has i=0.5
       element.stampCompanion!(1e-4, "bdf1", new Float64Array([5, 0, 0.6]), 1, [1e-4]);

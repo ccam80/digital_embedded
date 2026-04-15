@@ -251,7 +251,7 @@ describe("PolarizedCap", () => {
         }
         solver.solve(voltages);
         cap.updateChargeFlux!(voltages, dt, "bdf1", 1, [dt]);
-        capPool.acceptTimestep();
+        capPool.rotateStateVectors();
         capPool.refreshElementRefs([cap as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       }
 

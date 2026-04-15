@@ -1,7 +1,7 @@
 /**
  * Convergence regression integration tests for StatePool checkpoint/rollback.
  *
- * Verifies that the engine's checkpoint/rollback/acceptTimestep wiring works
+ * Verifies that the engine's checkpoint/rollback/rotateStateVectors wiring works
  * correctly and that circuits converge with the state-pool architecture.
  */
 
@@ -196,7 +196,7 @@ describe("convergence regression", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 4. acceptTimestep shifts state1 after transient step
+  // 4. rotateStateVectors shifts state1 after transient step
   // -----------------------------------------------------------------------
 
   it("statePool state1 is updated after accepted transient step", () => {
@@ -214,7 +214,7 @@ describe("convergence regression", () => {
     engine.step();
     expect(engine.getState()).not.toBe(EngineState.ERROR);
 
-    // After accepted step, acceptTimestep should have copied state0 → state1
+    // After accepted step, rotateStateVectors should have copied state0 → state1
     // state1 should now reflect the post-step state0 (which may differ slightly)
     const state1VdAfterStep = pool.state1[diodeBase + 0];
     // state1 should be updated (it was the previous state0)

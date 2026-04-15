@@ -293,3 +293,16 @@
 - **Files created**: none
 - **Files modified**: src/solver/analog/integration.ts, src/core/analog-types.ts, src/solver/analog/__tests__/integration.test.ts
 - **Tests**: 36/36 passing (6 new GEAR tests added)
+
+## Task 7.1.1: Full Legacy Audit
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/solver/analog/sparse-solver.ts
+  - src/solver/analog/__tests__/convergence-regression.test.ts
+  - src/solver/analog/__tests__/harness/netlist-generator.test.ts
+  - src/components/passives/__tests__/capacitor.test.ts
+  - src/components/passives/__tests__/inductor.test.ts
+  - src/components/passives/__tests__/polarized-cap.test.ts
+- **Tests**: 190/190 passing

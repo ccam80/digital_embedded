@@ -117,22 +117,6 @@ export class SparseSolver {
   private _cooToCsc: Int32Array = new Int32Array(0);
 
   // -- Linear-base CSC snapshot for NR loop optimization --
-  // After the first NR iteration establishes the sparsity pattern, we
-  // snapshot the CSC values produced by linear stamps alone. Subsequent
-  // iterations restore this snapshot and scatter-add only nonlinear COO
-  // entries, avoiding redundant linear stamp() calls and their COO→CSC
-  // scatter work.
-  /** Snapshot of CSC values after linear-only scatter. */
-  private _linearBaseVals: Float64Array = new Float64Array(0);
-  /** Snapshot of RHS after linear stamping (captured before nonlinear stamps). */
-  private _linearBaseRhs: Float64Array = new Float64Array(0);
-  /** Number of live CSC entries at snapshot time. */
-  private _linearBaseCscNnz = 0;
-  /** Matrix dimension at snapshot time. */
-  private _linearBaseN = 0;
-  /** Whether a valid linear-base snapshot exists. */
-  private _hasLinearBase = false;
-
   // -- Mode-driven reorder flag --
   private _needsReorder: boolean = false;
 
@@ -180,7 +164,6 @@ export class SparseSolver {
   beginAssembly(size: number): void {
     this._n = size;
     this._cooCount = 0;
-    this._hasLinearBase = false;
     if (this._rhs.length !== size) {
       this._rhs = new Float64Array(size);
       this._markowitzRow = new Int32Array(size);
@@ -225,7 +208,7 @@ export class SparseSolver {
    * a new compiled circuit and the engine constructs a fresh solver. Inside
    * the solver's lifetime the pattern is invariant.
    */
-  finalize(cooStart = 0): void {
+  finalize(): void {
     // Any change in the COO stamp count invalidates the cached CSC structure
     // and the `_cooToCsc` index map that the refill fast path relies on.
     // This covers:
@@ -242,10 +225,9 @@ export class SparseSolver {
       this._symbolicLU();
       this._topologyDirty = false;
       this._prevCooCount = this._cooCount;
-      this._hasLinearBase = false; // topology change invalidates snapshot
       this._hasPivotOrder = false; // topology change invalidates stored pivot order
     } else {
-      this._refillCSC(cooStart);
+      this._refillCSC();
     }
 
     if (this._capturePreSolveRhs && this._preSolveRhs) {
@@ -377,97 +359,6 @@ export class SparseSolver {
         }
       }
     }
-  }
-
-  // =========================================================================
-  // Linear-base snapshot for NR loop optimization
-  // =========================================================================
-
-  /**
-   * Capture the current RHS as the "linear-only" RHS snapshot.
-   *
-   * Called after stampLinear() but BEFORE stampNonlinear(), so the snapshot
-   * contains only linear RHS contributions. The CSC-values snapshot is
-   * taken separately by saveLinearBase() after finalize().
-   */
-  captureLinearRhs(): void {
-    const n = this._n;
-    if (this._linearBaseRhs.length < n) {
-      this._linearBaseRhs = new Float64Array(n);
-    }
-    const baseRhs = this._linearBaseRhs;
-    const rhs = this._rhs;
-    // Index-based copy -- no subarray() view allocation
-    for (let i = 0; i < n; i++) baseRhs[i] = rhs[i];
-    this._linearBaseN = n;
-  }
-
-  /**
-   * Snapshot the CSC values produced by linear stamps alone.
-   *
-   * Called once after the first NR iteration's full assembly (beginAssembly +
-   * stampLinear + stampNonlinear + finalize). captureLinearRhs() must have
-   * been called earlier (after stampLinear, before stampNonlinear) to capture
-   * the RHS half of the snapshot.
-   *
-   * The CSC snapshot is computed by scatter-adding only the linear portion
-   * of the COO array [0, linearCooCount) into a zeroed buffer using the
-   * existing _cooToCsc index map.
-   *
-   * @param linearCooCount - Number of COO triplets from stampLinear
-   */
-  saveLinearBase(linearCooCount: number): void {
-    const cscNnz = this._cscColPtr[this._n];
-
-    // Grow-only allocation for the CSC snapshot buffer
-    if (this._linearBaseVals.length < cscNnz) {
-      this._linearBaseVals = new Float64Array(cscNnz);
-    }
-    // Zero and scatter-add only linear COO entries [0, linearCooCount).
-    const baseVals = this._linearBaseVals;
-    baseVals.fill(0, 0, cscNnz);
-    const map = this._cooToCsc;
-    const cooVals = this._cooVals;
-    for (let k = 0; k < linearCooCount; k++) {
-      baseVals[map[k]] += cooVals[k];
-    }
-
-    this._linearBaseCscNnz = cscNnz;
-    this._hasLinearBase = true;
-  }
-
-  /**
-   * Restore CSC values and RHS to the linear-base snapshot.
-   *
-   * After this call, _cscVals contains only linear contributions and _rhs
-   * is reset to the linear-only state. The caller then re-stamps nonlinear
-   * contributions into COO (starting at linearCooCount) and calls
-   * finalize(linearCooCount) to scatter-add only the nonlinear portion.
-   *
-   * Uses index-based for loops instead of Float64Array.set(subarray()) to
-   * avoid allocating TypedArray view objects on every NR iteration.
-   *
-   * Precondition: saveLinearBase() was called earlier in this NR solve.
-   */
-  restoreLinearBase(): void {
-    const cscNnz = this._linearBaseCscNnz;
-    const n = this._linearBaseN;
-    const baseVals = this._linearBaseVals;
-    const baseRhs = this._linearBaseRhs;
-    const vals = this._cscVals;
-    const rhs = this._rhs;
-    for (let i = 0; i < cscNnz; i++) vals[i] = baseVals[i];
-    for (let i = 0; i < n; i++) rhs[i] = baseRhs[i];
-  }
-
-  /** Whether a valid linear-base snapshot exists. */
-  get hasLinearBase(): boolean {
-    return this._hasLinearBase;
-  }
-
-  /** Reset the COO write cursor to a given position (for nonlinear re-stamping). */
-  setCooCount(count: number): void {
-    this._cooCount = count;
   }
 
   /** Current COO triplet count (read-only access for the NR loop). */
@@ -682,33 +573,15 @@ export class SparseSolver {
    * recorded by the last `_buildCSC()`. Structure (`_cscColPtr`,
    * `_cscRowIdx`) is reused unchanged. Zero allocations.
    */
-  /**
-   * Refill CSC values from COO triplets.
-   *
-   * @param cooStart - First COO index to scatter. Pass 0 for a full refill
-   *   (zeros _cscVals then scatters all COO entries). Pass a nonzero value
-   *   when the linear base has already been restored into _cscVals -- only
-   *   nonlinear COO entries [cooStart, _cooCount) are scatter-added on top.
-   */
-  private _refillCSC(cooStart = 0): void {
+  private _refillCSC(): void {
     const nnz = this._cooCount;
     const vals = this._cscVals;
     const cooVals = this._cooVals;
     const map = this._cooToCsc;
-
-    if (cooStart === 0) {
-      // Full refill: zero all CSC values, scatter all COO triplets.
-      const cscNnz = this._cscColPtr[this._n];
-      vals.fill(0, 0, cscNnz);
-      for (let k = 0; k < nnz; k++) {
-        vals[map[k]] += cooVals[k];
-      }
-    } else {
-      // Partial refill: CSC already contains the linear base via
-      // restoreLinearBase(); scatter-add only the nonlinear COO triplets.
-      for (let k = cooStart; k < nnz; k++) {
-        vals[map[k]] += cooVals[k];
-      }
+    const cscNnz = this._cscColPtr[this._n];
+    vals.fill(0, 0, cscNnz);
+    for (let k = 0; k < nnz; k++) {
+      vals[map[k]] += cooVals[k];
     }
   }
 
@@ -1774,7 +1647,6 @@ export class SparseSolver {
       this._needsReorder = false;
       this._topologyDirty = false;
       this._prevCooCount = this._cooCount;
-      this._hasLinearBase = false;
     }
     const result = this._numericLUMarkowitz();
     if (result.success) this._hasPivotOrder = true;

@@ -167,14 +167,14 @@
       ],
       "spawned": 2,
       "completed": 2,
-      "verifications_passed": 0,
+      "verifications_passed": 2,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "6.1": "pending",
-        "6.2": "pending"
+        "6.1": "passed",
+        "6.2": "passed"
       }
     },
     {
@@ -188,8 +188,8 @@
           "7.1.1"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 1,
+      "completed": 1,
       "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
@@ -200,5 +200,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-15T12:20:30.559Z"
+  "last_updated": "2026-04-15T12:28:16.123Z"
 }
