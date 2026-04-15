@@ -109,6 +109,13 @@ export interface SimulationParams {
   srcFact?: number;
   /** Trapezoidal integration weighting factor (0=BDF1, 0.5=trapezoidal). Default: 0.5 */
   xmu?: number;
+  /**
+   * Skip all NR iterations in the DC-OP ladder (cktop.c noOpIter path).
+   * When true, solveDcOperatingPoint() returns immediately with converged=true
+   * and the current voltages unchanged. Used for transient DCOP when the circuit
+   * has already been initialised with UIC (ngspice: MODEUIC + MODEINITTRAN).
+   */
+  noOpIter?: boolean;
 }
 
 /** SimulationParams with all optional timestep fields resolved to concrete values. */

@@ -265,8 +265,8 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 333,
-      "lastAccessed": 1776253265227,
+      "accessCount": 345,
+      "lastAccessed": 1776254714311,
       "type": "file"
     },
     {
@@ -301,8 +301,8 @@
     },
     {
       "path": "src\\core\\analog-engine-interface.ts",
-      "accessCount": 87,
-      "lastAccessed": 1776251589722,
+      "accessCount": 89,
+      "lastAccessed": 1776254593365,
       "type": "directory"
     },
     {
@@ -319,14 +319,14 @@
     },
     {
       "path": "src\\solver\\analog",
-      "accessCount": 63,
-      "lastAccessed": 1776253093284,
+      "accessCount": 64,
+      "lastAccessed": 1776254642722,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\state-pool.ts",
-      "accessCount": 55,
-      "lastAccessed": 1776253098666,
+      "accessCount": 56,
+      "lastAccessed": 1776254552203,
       "type": "file"
     },
     {
@@ -337,8 +337,8 @@
     },
     {
       "path": "src\\solver\\analog\\integration.ts",
-      "accessCount": 50,
-      "lastAccessed": 1776253144852,
+      "accessCount": 52,
+      "lastAccessed": 1776254396761,
       "type": "file"
     },
     {

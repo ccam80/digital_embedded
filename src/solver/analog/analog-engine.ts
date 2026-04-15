@@ -859,6 +859,93 @@ export class MNAEngine implements AnalogEngine {
   }
 
   /**
+   * Find the DC operating point for transient analysis initialisation.
+   *
+   * Called by the transient solver before the first timestep to establish
+   * initial conditions. Uses MODETRANOP flags (analysisMode="dcOp" with
+   * statePool.analysisMode still in dcOp mode) to distinguish this run
+   * from a standalone dcOperatingPoint() call.
+   *
+   * Matches ngspice dctran.c:346-350 where CKTmode is set to
+   * MODETRANOP|MODEINITJCT before calling CKTop().
+   *
+   * @returns DcOpResult — same shape as dcOperatingPoint()
+   */
+  _transientDcop(): DcOpResult {
+    if (!this._compiled) {
+      return {
+        converged: false,
+        method: "direct",
+        iterations: 0,
+        nodeVoltages: new Float64Array(0),
+        diagnostics: [],
+      };
+    }
+
+    const { elements, matrixSize, nodeCount } = this._compiled;
+    this._diagnostics.clear();
+
+    const cac = this._compiled as CompiledWithBridges;
+    if (cac.statePool) {
+      cac.statePool.reset();
+      for (const el of this._elements) {
+        if (isPoolBacked(el)) {
+          el.initState(cac.statePool);
+        }
+      }
+    }
+
+    const tranOpParams = { ...this._params };
+
+    const phaseHook = this.stepPhaseHook;
+    const result = solveDcOperatingPoint({
+      solver: this._solver,
+      elements,
+      matrixSize,
+      nodeCount,
+      params: tranOpParams,
+      diagnostics: this._diagnostics,
+      statePool: cac.statePool ?? null,
+      postIterationHook: this.postIterationHook ?? undefined,
+      detailedConvergence: this.detailedConvergence,
+      limitingCollector: this.limitingCollector,
+      onPhaseBegin: phaseHook ? (phase, param) => phaseHook.onAttemptBegin(phase, param ?? 0) : undefined,
+      onPhaseEnd: phaseHook ? (outcome, converged) => phaseHook.onAttemptEnd(outcome, converged) : undefined,
+      nodesets: cac.nodesets,
+      ics: cac.ics,
+      srcFact: this._params.srcFact,
+    });
+
+    if (result.converged) {
+      this._voltages.set(result.nodeVoltages);
+
+      for (const el of elements) {
+        if (el.isReactive && el.updateChargeFlux) {
+          el.updateChargeFlux(this._voltages, 0, "bdf1", 1, []);
+        }
+      }
+
+      if (cac.statePool) {
+        cac.statePool.analysisMode = "tran";
+        cac.statePool.ag[0] = 0;
+        cac.statePool.ag[1] = 0;
+        cac.statePool.seedHistory();
+        cac.statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
+        this._firsttime = true;
+      }
+
+      const seedMethod = this._timestep.currentMethod;
+      for (const el of elements) {
+        if (el.updateCompanion) {
+          el.updateCompanion(0, seedMethod, this._voltages);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
    * Run an AC small-signal frequency sweep analysis.
    *
    * Creates an `AcAnalysis` instance using the engine's compiled circuit,

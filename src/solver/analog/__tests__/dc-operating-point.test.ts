@@ -15,7 +15,7 @@
 import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
-import { solveDcOperatingPoint } from "../dc-operating-point.js";
+import { solveDcOperatingPoint, cktncDump } from "../dc-operating-point.js";
 import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
 import type { AnalogElement } from "../element.js";
 import type { SimulationParams } from "../../../core/analog-engine-interface.js";
@@ -490,5 +490,105 @@ describe("DcOP", () => {
       expect(failedDiag).toBeDefined();
       expect(failedDiag!.severity).toBe("error");
     }
+  });
+
+  it("noOpIter_skips_all_nr_and_returns_converged", () => {
+    // When params.noOpIter=true, cktop() must return immediately with
+    // converged=true and 0 iterations — matching ngspice's noOpIter fast-path.
+    const solver = makeSolver();
+    const diagnostics = makeDiagnostics();
+    const matrixSize = 2;
+    const branchRow = 1;
+
+    const elements = [
+      makeVoltageSource(1, 0, branchRow, 5),
+      makeResistor(1, 0, 1000),
+    ];
+
+    let phaseBeginCount = 0;
+    const result = solveDcOperatingPoint({
+      solver,
+      elements,
+      matrixSize,
+      params: { ...DEFAULT_PARAMS, noOpIter: true },
+      diagnostics,
+      nodeCount: 1,
+      onPhaseBegin: () => { phaseBeginCount++; },
+    });
+
+    expect(result.converged).toBe(true);
+    expect(result.iterations).toBe(0);
+  });
+
+  it("dcopFinalize_sets_initMode_to_transient_after_convergence", () => {
+    // After solveDcOperatingPoint converges, pool.initMode must be "transient".
+    // dcopFinalize() sets initSmsig → runs one NR pass → resets to transient.
+    const solver = makeSolver();
+    const diagnostics = makeDiagnostics();
+    const matrixSize = 2;
+    const branchRow = 1;
+
+    const elements = [
+      makeVoltageSource(1, 0, branchRow, 3),
+      makeResistor(1, 0, 1000),
+    ];
+
+    const statePool = {
+      state0: new Float64Array(1),
+      reset(): void { this.initMode = "transient"; },
+      initMode: "transient" as string,
+    };
+
+    const result = solveDcOperatingPoint({
+      solver,
+      elements,
+      matrixSize,
+      params: DEFAULT_PARAMS,
+      diagnostics,
+      nodeCount: 1,
+      statePool,
+    });
+
+    expect(result.converged).toBe(true);
+    expect(statePool.initMode).toBe("transient");
+  });
+
+  it("cktncDump_returns_empty_when_all_converged", () => {
+    // When voltages and prevVoltages are identical, delta=0 everywhere
+    // and cktncDump returns an empty array.
+    const v = new Float64Array([1.0, 2.5, 0.0]);
+    const result = cktncDump(v, v, 1e-3, 1e-6, 1e-12, 2, 3);
+    expect(result).toHaveLength(0);
+  });
+
+  it("cktncDump_identifies_non_converged_nodes", () => {
+    // Node 0: delta=0.5V, tol=reltol*max(|v|,|pv|)+voltTol ≈ 0.001*5+1e-6 ≈ 0.005 → fails
+    // Node 1: delta=0, converged
+    const voltages = new Float64Array([5.0, 1.0]);
+    const prevVoltages = new Float64Array([4.5, 1.0]);
+    const result = cktncDump(voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 2, 2);
+    expect(result).toHaveLength(1);
+    expect(result[0].node).toBe(0);
+    expect(result[0].delta).toBeCloseTo(0.5, 10);
+    expect(result[0].tol).toBeGreaterThan(0);
+    expect(result[0].delta).toBeGreaterThan(result[0].tol);
+  });
+
+  it("cktncDump_uses_voltTol_for_node_rows_and_abstol_for_branch_rows", () => {
+    // Node row (i < nodeCount): tol uses voltTol floor.
+    // Branch row (i >= nodeCount): tol uses abstol floor.
+    // With very small delta that only passes voltTol (not abstol when voltTol>>abstol),
+    // we can verify the floor switches correctly.
+    //
+    // Both have delta = 1e-7.
+    // nodeCount = 1; matrixSize = 2.
+    // Node row (i=0):   tol = 1e-3 * max(0,0) + voltTol = 1e-6  → 1e-7 < 1e-6 → converged
+    // Branch row (i=1): tol = 1e-3 * max(0,0) + abstol  = 1e-12 → 1e-7 > 1e-12 → non-converged
+    const voltages = new Float64Array([1e-7, 1e-7]);
+    const prevVoltages = new Float64Array([0, 0]);
+    const result = cktncDump(voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 1, 2);
+    // Node row converged (delta 1e-7 < voltTol 1e-6), branch row failed (delta 1e-7 > abstol 1e-12)
+    expect(result).toHaveLength(1);
+    expect(result[0].node).toBe(1);
   });
 });

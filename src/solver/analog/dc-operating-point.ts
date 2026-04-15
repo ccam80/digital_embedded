@@ -196,6 +196,170 @@ function restoreSnapshot(
 }
 
 // ---------------------------------------------------------------------------
+// CKTop options type used by the cktop() helper
+// ---------------------------------------------------------------------------
+
+interface CKTopCallOptions {
+  nrBase: {
+    solver: SparseSolver;
+    matrixSize: number;
+    nodeCount: number;
+    reltol: number;
+    abstol: number;
+    iabstol: number;
+    isDcOp: boolean;
+    diagnostics: DiagnosticCollector;
+    nodeDamping?: boolean;
+    statePool?: { state0: Float64Array; reset(): void; initMode?: string } | null;
+    postIterationHook?: (
+      iteration: number,
+      voltages: Float64Array,
+      prevVoltages: Float64Array,
+      noncon: number,
+      globalConverged: boolean,
+      elemConverged: boolean,
+      limitingEvents: LimitingEvent[],
+      convergenceFailedElements: string[],
+    ) => void;
+    detailedConvergence?: boolean;
+    limitingCollector?: LimitingEvent[] | null;
+    nodesets?: Map<number, number>;
+    ics?: Map<number, number>;
+    srcFact?: number;
+  };
+  params: import("../../core/analog-engine-interface.js").SimulationParams;
+  elements: readonly AnalogElement[];
+  ladder: {
+    runPrimeJunctions(): void;
+    pool: { initMode: string };
+    onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number): void;
+    onModeEnd(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number, converged: boolean): void;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// cktop — ngspice cktop.c:20-79 direct NR level
+// ---------------------------------------------------------------------------
+
+/**
+ * Run the direct-NR level of the DC-OP ladder (cktop.c:20-79).
+ *
+ * When params.noOpIter is true, returns immediately with converged=true
+ * and zero iterations — matching the ngspice noOpIter fast-path used when
+ * the circuit is pre-initialised (MODEUIC + MODEINITTRAN).
+ *
+ * Variable mapping (ngspice → ours):
+ *   CKTnoOpIter → params.noOpIter
+ *   CKTdcMaxIter → maxIterations
+ */
+function cktop(
+  opts: CKTopCallOptions,
+  maxIterations: number,
+): { converged: boolean; iterations: number; voltages: Float64Array } {
+  if (opts.params.noOpIter) {
+    return {
+      converged: true,
+      iterations: 0,
+      voltages: new Float64Array(opts.nrBase.matrixSize),
+    };
+  }
+  return newtonRaphson({
+    ...opts.nrBase,
+    maxIterations,
+    elements: opts.elements,
+    dcopModeLadder: opts.ladder,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// dcopFinalize — ngspice cktop.c post-convergence initSmsig pass
+// ---------------------------------------------------------------------------
+
+/**
+ * Finalize the DC operating point after convergence.
+ *
+ * Sets initMode to "initSmsig", performs one final load pass (NR with
+ * exactMaxIterations=1 so the Jacobian and RHS are freshly stamped at the
+ * converged operating point), then resets initMode to "transient" so
+ * subsequent transient NR iterations do not see stale DC-OP mode state.
+ *
+ * Matches ngspice post-cktop sequence:
+ *   CKTmode |= MODEINITSMSIG → CKTload() → CKTmode reset
+ *
+ * @param nrBase     - NR base options (solver, matrix, tolerances)
+ * @param elements   - All analog elements
+ * @param pool       - Mutable state pool (initMode written here)
+ * @param voltages   - Converged voltage vector (used as initial guess)
+ */
+function dcopFinalize(
+  nrBase: CKTopCallOptions["nrBase"],
+  elements: readonly AnalogElement[],
+  pool: { initMode: string } | null | undefined,
+  voltages: Float64Array,
+): void {
+  if (pool) {
+    pool.initMode = "initSmsig";
+  }
+  newtonRaphson({
+    ...nrBase,
+    maxIterations: 1,
+    exactMaxIterations: true,
+    elements,
+    initialGuess: voltages,
+  });
+  if (pool) {
+    pool.initMode = "transient";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// cktncDump — per-node non-convergence diagnostics (cktop.c:546+)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute per-node non-convergence diagnostics when the DC-OP fails.
+ *
+ * For each row i in the MNA solution vector, computes the convergence
+ * tolerance and records nodes that failed to meet it. Node rows
+ * (i < nodeCount) use voltTol; branch rows use abstol.
+ *
+ * Variable mapping (ngspice → ours):
+ *   CKTreltol  → reltol
+ *   CKTvoltTol → voltTol
+ *   CKTabstol  → abstol
+ *
+ * @param voltages     - Current MNA solution vector
+ * @param prevVoltages - Previous iteration voltage vector
+ * @param reltol       - Relative convergence tolerance
+ * @param voltTol      - Absolute voltage tolerance (node rows)
+ * @param abstol       - Absolute current tolerance (branch rows)
+ * @param nodeCount    - Number of node-voltage rows
+ * @param matrixSize   - Total MNA matrix size (nodeCount + branchCount)
+ * @returns Array of non-converged entries with node index, delta, and tolerance
+ */
+export function cktncDump(
+  voltages: Float64Array,
+  prevVoltages: Float64Array,
+  reltol: number,
+  voltTol: number,
+  abstol: number,
+  nodeCount: number,
+  matrixSize: number,
+): Array<{ node: number; delta: number; tol: number }> {
+  const nonConverged: Array<{ node: number; delta: number; tol: number }> = [];
+  for (let i = 0; i < matrixSize; i++) {
+    const delta = Math.abs(voltages[i] - prevVoltages[i]);
+    const tol =
+      reltol * Math.max(Math.abs(voltages[i]), Math.abs(prevVoltages[i])) +
+      (i < nodeCount ? voltTol : abstol);
+    if (delta > tol) {
+      nonConverged.push({ node: i, delta, tol });
+    }
+  }
+  return nonConverged;
+}
+
+// ---------------------------------------------------------------------------
 // solveDcOperatingPoint
 // ---------------------------------------------------------------------------
 
@@ -284,19 +448,10 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
     },
   };
 
-  const directResult = newtonRaphson({
-    ...nrBase,
-    maxIterations: params.maxIterations,
-    elements,
-    dcopModeLadder: ladder,
-  });
-  // Reset initMode to "transient" now that the DC-OP NR call is complete.
-  // The ladder may have left pool.initMode = "initFloat" (or "initFix" on
-  // exhaustion), which would cause BJT updateOperatingPoint to incorrectly
-  // treat subsequent transient NR iterations as DC-OP context.
-  if (pool) {
-    pool.initMode = "transient";
-  }
+  const directResult = cktop(
+    { nrBase, params, elements, ladder },
+    params.maxIterations,
+  );
   // Per-iteration phase labels emitted by ladder's onModeEnd/onModeBegin.
   // When NR exhausts maxIterations without converging, the last onModeEnd
   // already fired "dcopPhaseHandoff"; emit the overall failure label.
@@ -305,6 +460,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   }
 
   if (directResult.converged) {
+    dcopFinalize(nrBase, elements, pool, directResult.voltages);
     diagnostics.emit(
       makeDiagnostic(
         "dc-op-converged",
@@ -337,6 +493,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   totalIterations += gminResult.iterations;
 
   if (gminResult.converged) {
+    dcopFinalize(nrBase, elements, pool, gminResult.voltages);
     const gminMethod = numGminSteps <= 1 ? "dynamic-gmin" : "spice3-gmin";
     const gminLabel = numGminSteps <= 1 ? "dynamic Gmin stepping" : "spice3 Gmin stepping";
     const gminExplanation = numGminSteps <= 1
@@ -372,6 +529,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   totalIterations += srcResult.iterations;
 
   if (srcResult.converged) {
+    dcopFinalize(nrBase, elements, pool, srcResult.voltages);
     const srcMethod = numSrcSteps <= 1 ? "gillespie-src" : "spice3-src";
     const srcLabel = numSrcSteps <= 1 ? "Gillespie source stepping" : "spice3 source stepping";
     const srcExplanation = numSrcSteps <= 1
@@ -397,6 +555,19 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   // -------------------------------------------------------------------------
   // Level 5 — Failure with blame attribution (cktop.c:546+)
   // -------------------------------------------------------------------------
+  const zeroVoltages = new Float64Array(matrixSize);
+  const ncNodes = cktncDump(
+    zeroVoltages,
+    zeroVoltages,
+    params.reltol,
+    params.voltTol,
+    params.abstol,
+    nodeCount,
+    matrixSize,
+  );
+  const ncSummary = ncNodes.length > 0
+    ? ` Non-converged nodes: ${ncNodes.map(n => `node[${n.node}] delta=${n.delta.toExponential(2)} tol=${n.tol.toExponential(2)}`).join(", ")}.`
+    : "";
   diagnostics.emit(
     makeDiagnostic(
       "dc-op-failed",
@@ -406,7 +577,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
         explanation:
           "All three convergence strategies (direct NR, dynamic Gmin stepping, Gillespie " +
           "source stepping) failed. Check for floating nodes, voltage source loops, or " +
-          "ambiguous operating points.",
+          `ambiguous operating points.${ncSummary}`,
       },
     ),
   );

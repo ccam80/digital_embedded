@@ -238,3 +238,30 @@
 - **Files modified**: src/solver/analog/sparse-solver.ts, src/solver/analog/__tests__/sparse-solver.test.ts
 - **Tests**: 44/44 passing
 - **Note**: The _numericLUMarkowitz method runs the full Markowitz pipeline (_countMarkowitz, _markowitzProducts, _updateMarkowitzNumbers at each step) during factorWithReorder. Pivot selection currently uses partial pivoting (same as _numericLU) because the Markowitz row counts become stale after fill-in entries are created during elimination — without a linked-list reduced-matrix structure (like ngspice uses), the stale counts cause numerically poor pivot choices on larger matrices. The Markowitz data structures, counting methods, search methods (_searchForPivot 4-phase dispatcher), and update methods are all implemented and wired in. The _searchForPivot infrastructure is callable and tested independently. Switching to Markowitz-based pivot selection requires implementing fill-in tracking in the reduced matrix, which is a separate enhancement.
+
+## Task 4.1.1: Add cktop() wrapper and dcopFinalize()
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/solver/analog/dc-operating-point.ts — added cktop(), dcopFinalize(), cktncDump() functions; wrapped direct NR call in cktop(); added dcopFinalize() at all three convergence paths; added cktncDump() diagnostics at failure path; removed premature pool.initMode="transient" reset after direct NR (spec 2.4 fix)
+  - src/core/analog-engine-interface.ts — added noOpIter?: boolean to SimulationParams
+  - src/solver/analog/analog-engine.ts — added _transientDcop() method (task 4.1.3)
+  - src/solver/analog/__tests__/dc-operating-point.test.ts — added 5 new tests for noOpIter, dcopFinalize initMode reset, cktncDump empty case, cktncDump non-converged identification, cktncDump voltTol/abstol floor switching
+- **Tests**: 16/16 passing
+
+## Task 4.1.2: Add cktncDump() and fix premature initMode reset
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/solver/analog/dc-operating-point.ts — cktncDump() added; pool.initMode="transient" premature reset removed (moved into dcopFinalize())
+- **Tests**: 16/16 passing (covered by Task 4.1.1 test run)
+
+## Task 4.1.3: Add separate transient DCOP entry
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/solver/analog/analog-engine.ts — added _transientDcop() method with MODETRANOP semantics; calls solveDcOperatingPoint with statePool reset, seeds history/analysisMode="tran" after convergence
+- **Tests**: 16/16 passing (covered by Task 4.1.1 test run)
