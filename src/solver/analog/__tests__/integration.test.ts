@@ -117,6 +117,58 @@ describe("CompanionModels", () => {
     expect(ceq).toBeCloseTo(expected_ceq, 10);
   });
 
+  it("capacitor_gear_order2_matches_bdf2", () => {
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h], 2, "gear", ag);
+    const { geq: geqGear } = integrateCapacitor(C, 0, 0, 0, 0, h, h, 2, "gear", 0, 0.5, [], ag);
+    const { geq: geqBdf2 } = integrateCapacitor(C, 0, 0, 0, 0, h, h, 2, "bdf2", 0);
+    expect(geqGear).toBeCloseTo(geqBdf2, 10);
+  });
+
+  it("capacitor_gear_order3_coefficients", () => {
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h, h], 3, "gear", ag);
+    const vNow = 2.0;
+    const q0 = C * 2.0, q1 = C * 1.5, q2 = C * 1.0, q3 = C * 0.5;
+    const { geq, ceq, ccap, ag0 } = integrateCapacitor(
+      C, vNow, q0, q1, q2, h, h, 3, "gear", 0, 0.5, [q3], ag,
+    );
+    expect(ag0).toBeCloseTo(ag[0], 10);
+    expect(geq).toBeCloseTo(ag[0] * C, 10);
+    const expectedCcap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2 + ag[3] * q3;
+    expect(ccap).toBeCloseTo(expectedCcap, 10);
+    expect(ceq).toBeCloseTo(expectedCcap - geq * vNow, 10);
+  });
+
+  it("capacitor_gear_order6_uses_full_history", () => {
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", ag);
+    const qs = [6, 5, 4, 3, 2, 1, 0].map(v => C * v);
+    const { geq, ccap } = integrateCapacitor(
+      C, 6.0, qs[0], qs[1], qs[2], h, h, 6, "gear", 0, 0.5,
+      [qs[3], qs[4], qs[5], qs[6]], ag,
+    );
+    expect(geq).toBeCloseTo(ag[0] * C, 8);
+    let expectedCcap = 0;
+    for (let k = 0; k <= 6; k++) expectedCcap += ag[k] * qs[k];
+    expect(ccap).toBeCloseTo(expectedCcap, 8);
+  });
+
+  it("inductor_gear_order3_dual_of_capacitor", () => {
+    const L = 1e-6;
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h, h], 3, "gear", ag);
+    const phi0 = L * 2.0, phi1 = L * 1.5, phi2 = L * 1.0, phi3 = L * 0.5;
+    const q0 = C * 2.0, q1 = C * 1.5, q2 = C * 1.0, q3 = C * 0.5;
+    const { geq: geqL } = integrateInductor(
+      L, 2.0, phi0, phi1, phi2, h, h, 3, "gear", 0, 0.5, [phi3], ag,
+    );
+    const { geq: geqC } = integrateCapacitor(
+      C, 2.0, q0, q1, q2, h, h, 3, "gear", 0, 0.5, [q3], ag,
+    );
+    expect(geqL).toBeCloseTo(geqC, 10);
+  });
+
   it("inductor_bdf1_history_current", () => {
     const L = 1e-3; // 1 mH
     const iNow = 2e-3; // 2 mA
@@ -596,7 +648,7 @@ describe("computeNIcomCof", () => {
       computeNIcomCof(h, [h, h, h, h, h, h], order, "gear", ag);
       let sum = 0;
       for (let k = 0; k <= order; k++) sum += ag[k];
-      expect(Math.abs(sum)).toBeLessThan(1e-6 / h);
+      expect(Math.abs(sum)).toBeLessThan(1e-9);
     }
   });
 });

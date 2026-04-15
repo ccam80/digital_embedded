@@ -67,6 +67,10 @@ export interface StatePoolRef {
   readonly state1: Float64Array;
   readonly state2: Float64Array;
   readonly state3: Float64Array;
+  readonly state4: Float64Array;
+  readonly state5: Float64Array;
+  readonly state6: Float64Array;
+  readonly state7: Float64Array;
   readonly totalSlots: number;
   /** Number of accepted transient steps. 0 = MODEINITTRAN equivalent. */
   readonly tranStep: number;

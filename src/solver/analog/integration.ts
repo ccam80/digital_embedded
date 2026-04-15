@@ -29,13 +29,23 @@ export function integrateCapacitor(
   method: IntegrationMethod,
   ccapPrev: number,
   xmu: number = 0.5,
+  qHistory?: readonly number[],
+  ag?: Float64Array | readonly number[],
 ): { geq: number; ceq: number; ccap: number; ag0: number } {
   if (dt <= 0) return { geq: 0, ceq: 0, ccap: 0, ag0: 0 };
 
   let ag0: number;
   let ccap: number;
 
-  if (order <= 1) {
+  if (method === "gear" && ag && order >= 2) {
+    // GEAR orders 2-6: ccap = sum(ag[k] * q[k]) for k=0..order
+    ag0 = ag[0];
+    ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
+    for (let k = 3; k <= order; k++) {
+      const qk = qHistory ? qHistory[k - 3] : 0;
+      ccap += ag[k] * qk;
+    }
+  } else if (order <= 1) {
     ag0 = 1 / dt;
     ccap = (q0 - q1) / dt;
   } else if (method === "trapezoidal") {
@@ -80,13 +90,23 @@ export function integrateInductor(
   method: IntegrationMethod,
   ccapPrev: number,
   xmu: number = 0.5,
+  phiHistory?: readonly number[],
+  ag?: Float64Array | readonly number[],
 ): { geq: number; ceq: number; ccap: number; ag0: number } {
   if (dt <= 0) return { geq: 0, ceq: 0, ccap: 0, ag0: 0 };
 
   let ag0: number;
   let ccap: number;
 
-  if (order <= 1) {
+  if (method === "gear" && ag && order >= 2) {
+    // GEAR orders 2-6: ccap = sum(ag[k] * phi[k]) for k=0..order
+    ag0 = ag[0];
+    ccap = ag[0] * phi0 + ag[1] * phi1 + ag[2] * phi2;
+    for (let k = 3; k <= order; k++) {
+      const phik = phiHistory ? phiHistory[k - 3] : 0;
+      ccap += ag[k] * phik;
+    }
+  } else if (order <= 1) {
     ag0 = 1 / dt;
     ccap = (phi0 - phi1) / dt;
   } else if (method === "trapezoidal") {
