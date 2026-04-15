@@ -1,15 +1,15 @@
 /**
  * MNA matrix assembler.
  *
- * Orchestrates the two-phase stamp protocol used by the Newton-Raphson loop:
+ * Orchestrates the stamp protocol used by the Newton-Raphson loop:
  *
- *   1. `stampLinear`   — called once per NR solve to stamp topology-constant
- *                        contributions from all elements.
- *   2. `stampNonlinear` — called every NR iteration to re-stamp linearized
- *                         nonlinear contributions at the current operating point.
+ *   `stampAll` — called every NR iteration (unified CKTload equivalent).
+ *                Clears the matrix, updates operating points, stamps all
+ *                element contributions (linear + nonlinear + reactive companion)
+ *                unconditionally, and finalizes the matrix for factorization.
  *
- * The assembler does not own the solver or the element list — it is a thin
- * coordinator that enforces the correct call sequence and filtering rules.
+ * Legacy per-phase methods (`stampLinear`, `stampNonlinear`, `stampReactiveCompanion`)
+ * remain available for direct test use.
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
@@ -21,12 +21,8 @@ import type { LimitingEvent } from "./newton-raphson.js";
 // ---------------------------------------------------------------------------
 
 /**
- * Coordinates linear and nonlinear MNA stamp passes over a list of
- * `AnalogElement` objects using a shared `SparseSolver` reference.
- *
- * The assembler does not call `solver.beginAssembly()`, `finalize()`, or
- * `factor()` — those are the caller's responsibility. This keeps the
- * assembler's contract minimal and testable in isolation.
+ * Coordinates MNA stamp passes over a list of `AnalogElement` objects
+ * using a shared `SparseSolver` reference.
  */
 export class MNAAssembler {
   private readonly _solver: SparseSolver;
@@ -97,6 +93,47 @@ export class MNAAssembler {
         el.stampReactiveCompanion(this._solver);
       }
     }
+  }
+
+  /**
+   * Unified CKTload equivalent: clear the matrix, update operating points,
+   * stamp ALL element contributions unconditionally, and finalize.
+   *
+   * Called every NR iteration. Replaces the old separate linear/nonlinear
+   * stamp hoisting with a single unconditional pass matching ngspice CKTload.
+   *
+   * @param elements          - The full element list for this circuit.
+   * @param matrixSize        - MNA matrix dimension (nodeCount + branchCount).
+   * @param voltages          - The current NR solution vector (used by updateOperatingPoint).
+   * @param limitingCollector - When non-null, passed to updateOperatingPoint for
+   *   harness instrumentation. Null when harness capture is inactive.
+   * @param iteration         - Current NR iteration (0-based). On iteration 0,
+   *   updateOperatingPoint is skipped (no previous solution to linearize from).
+   */
+  stampAll(
+    elements: readonly AnalogElement[],
+    matrixSize: number,
+    voltages: Float64Array,
+    limitingCollector: LimitingEvent[] | null,
+    iteration: number,
+  ): void {
+    this._solver.beginAssembly(matrixSize);
+
+    if (iteration > 0) {
+      this.updateOperatingPoints(elements, voltages, limitingCollector);
+    }
+
+    for (const el of elements) {
+      el.stamp(this._solver);
+      if (el.isNonlinear && el.stampNonlinear) {
+        el.stampNonlinear(this._solver);
+      }
+      if (el.isReactive && el.stampReactiveCompanion) {
+        el.stampReactiveCompanion(this._solver);
+      }
+    }
+
+    this._solver.finalize();
   }
 
   /**

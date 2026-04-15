@@ -231,6 +231,128 @@ describe("Convergence", () => {
 });
 
 // ---------------------------------------------------------------------------
+// stampAll tests — unified CKTload equivalent
+// ---------------------------------------------------------------------------
+
+describe("stampAll", () => {
+  it("stamps_linear_and_nonlinear_and_reactive_in_single_pass", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+
+    const linearStamp = vi.fn();
+    const nlStamp = vi.fn();
+    const reactiveStamp = vi.fn();
+
+    const linearEl = {
+      pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
+      branchIndex: -1,
+      isNonlinear: false,
+      isReactive: false,
+      stamp: linearStamp,
+      getPinCurrents(): number[] { return [0]; },
+      setParam(): void {},
+    };
+
+    const nlEl = {
+      pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
+      branchIndex: -1,
+      isNonlinear: true,
+      isReactive: false,
+      stamp: vi.fn(),
+      stampNonlinear: nlStamp,
+      updateOperatingPoint: vi.fn(() => false),
+      getPinCurrents(): number[] { return [0]; },
+      setParam(): void {},
+    };
+
+    const reactiveEl = {
+      pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
+      branchIndex: -1,
+      isNonlinear: false,
+      isReactive: true,
+      stamp: vi.fn(),
+      stampReactiveCompanion: reactiveStamp,
+      getPinCurrents(): number[] { return [0]; },
+      setParam(): void {},
+    };
+
+    const voltages = new Float64Array(1);
+    assembler.stampAll([linearEl, nlEl, reactiveEl], 1, voltages, null, 1);
+
+    expect(linearStamp).toHaveBeenCalledTimes(1);
+    expect(nlStamp).toHaveBeenCalledTimes(1);
+    expect(reactiveStamp).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls_updateOperatingPoints_only_after_iteration_0", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+
+    const updateOp = vi.fn(() => false);
+    const el = {
+      pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
+      branchIndex: -1,
+      isNonlinear: true,
+      isReactive: false,
+      stamp: vi.fn(),
+      stampNonlinear: vi.fn(),
+      updateOperatingPoint: updateOp,
+      getPinCurrents(): number[] { return [0]; },
+      setParam(): void {},
+    };
+
+    const voltages = new Float64Array(1);
+
+    assembler.stampAll([el], 1, voltages, null, 0);
+    expect(updateOp).not.toHaveBeenCalled();
+
+    assembler.stampAll([el], 1, voltages, null, 1);
+    expect(updateOp).toHaveBeenCalledTimes(1);
+  });
+
+  it("sets_noncon_from_limiting_during_updateOperatingPoints", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+
+    const el = {
+      pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
+      branchIndex: -1,
+      isNonlinear: true,
+      isReactive: false,
+      stamp: vi.fn(),
+      stampNonlinear: vi.fn(),
+      updateOperatingPoint: vi.fn(() => true),
+      getPinCurrents(): number[] { return [0]; },
+      setParam(): void {},
+    };
+
+    const voltages = new Float64Array(1);
+    assembler.stampAll([el], 1, voltages, null, 1);
+
+    expect(assembler.noncon).toBe(1);
+  });
+
+  it("calls_beginAssembly_and_finalize_on_solver", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+    const beginSpy = vi.spyOn(solver, "beginAssembly");
+    const finalizeSpy = vi.spyOn(solver, "finalize");
+
+    const R1 = makeResistor(1, 0, 1000);
+    const voltages = new Float64Array(1);
+    assembler.stampAll([R1], 1, voltages, null, 0);
+
+    expect(beginSpy).toHaveBeenCalledWith(1);
+    expect(finalizeSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // checkAllConvergedDetailed tests (Item 8)
 // ---------------------------------------------------------------------------
 

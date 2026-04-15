@@ -125,10 +125,35 @@
       "status": "completed",
       "completed_at": "2026-04-15T10:04:34.857Z",
       "duration_ms": 130799
+    },
+    {
+      "agent_id": "af4ad1648878ccaa1",
+      "agent_type": "claude-orchestrator:wave-verifier",
+      "started_at": "2026-04-15T10:13:27.419Z",
+      "parent_mode": "none",
+      "status": "running"
+    },
+    {
+      "agent_id": "a21970e13d75f4710",
+      "agent_type": "claude-orchestrator:wave-verifier",
+      "started_at": "2026-04-15T10:25:46.809Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-04-15T10:27:57.447Z",
+      "duration_ms": 130638
+    },
+    {
+      "agent_id": "aff9638325476c46a",
+      "agent_type": "claude-orchestrator:implementer",
+      "started_at": "2026-04-15T10:28:47.841Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-04-15T10:45:44.582Z",
+      "duration_ms": 1016741
     }
   ],
-  "total_spawned": 14,
-  "total_completed": 14,
+  "total_spawned": 17,
+  "total_completed": 16,
   "total_failed": 0,
-  "last_updated": "2026-04-15T10:05:56.792Z"
+  "last_updated": "2026-04-15T10:45:44.696Z"
 }

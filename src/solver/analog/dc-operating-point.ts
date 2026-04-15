@@ -69,7 +69,7 @@ export interface DcOpOptions {
   /** Number of node-voltage rows (0..nodeCount-1) in the MNA solution vector. */
   nodeCount: number;
   /** Optional shared state pool for per-element operating-point state. */
-  statePool?: { state0: Float64Array; reset(): void; initMode?: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "transient" } | null;
+  statePool?: { state0: Float64Array; reset(): void; initMode?: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" } | null;
   /** Optional post-NR-iteration hook for harness instrumentation. */
   postIterationHook?: (
     iteration: number,
@@ -255,7 +255,7 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
         }
       }
     },
-    pool: pool ?? { initMode: "initJct" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "transient" },
+    pool: pool ?? { initMode: "initJct" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" },
     onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iteration: number): void {
       onPhaseBegin?.(phase);
     },

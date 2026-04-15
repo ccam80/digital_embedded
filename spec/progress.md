@@ -34,3 +34,57 @@
 - **Files created**: none
 - **Files modified**: `src/solver/analog/sparse-solver.ts`, `src/solver/analog/__tests__/sparse-solver.test.ts`
 - **Tests**: 2/2 new Phase 0 stub tests passing (10 pre-existing tests now fail as expected per Phase 0 spec — all were passing before and break because `factor()` is now a stub)
+
+## Task 1.1.1: Remove linear stamp hoisting, add unified stampAll()
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/solver/analog/mna-assembler.ts, src/solver/analog/newton-raphson.ts, src/solver/analog/__tests__/mna-assembler.test.ts
+- **Tests**: 11/14 passing (3 failures are pre-existing from Phase 0 factor() stub in sparse-solver.ts — resistor_divider_dc, two_voltage_sources_series, current_source_with_resistor all fail on solver.factor().success === false)
+- **Changes made**:
+  - Added `stampAll()` method to MNAAssembler: clears matrix via beginAssembly, calls updateOperatingPoints (iteration>0), stamps all elements (linear + nonlinear + reactive companion) unconditionally, calls finalize
+  - Rewrote NR loop top to follow ngspice NIiter: Step A (noncon=0, reset limitingCollector), Step B (preIterationHook + assembler.stampAll), then gmin, factor, state0 save, prevVoltages save, solve
+  - Removed standalone updateOperatingPoints and limitingCollector reset from post-solve section (now handled by stampAll at loop top)
+  - Added 4 stampAll tests: stamps all element types, skips updateOperatingPoints on iteration 0, sets noncon from limiting, verifies beginAssembly/finalize calls
+
+## Task 1.1.2: Reorder the NR loop body
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/solver/analog/newton-raphson.ts
+- **Tests**: 3/14 passing (11 failures are pre-existing from Phase 0 factor() stub — all NR tests that call newtonRaphson() fail on solver.factor().success === false)
+- **Changes made**:
+  - Changed for loop from bounded `iteration < maxIterations` to unbounded `for(;;)` matching ngspice NIiter
+  - Added Step G: explicit iteration limit check (`iteration + 1 > maxIterations`) after solve, before convergence — returns E_ITERLIM
+  - Reordered loop body to match ngspice NIiter: Step A (noncon=0) -> Step B (stampAll) -> Step E (factor) -> Step F (solve) -> Step G (iterlim) -> Step H (convergence) -> Step I (damping) -> Step J (INITF/ladder) -> convergence return
+  - Damping (Step I) now fires AFTER convergence check (Step H), matching ngspice ordering
+  - Transient mode automaton (initTran/initPred) moved into Step J section alongside ladder
+  - Step labels (A, B, E, F, G, H, I, J) added as comments matching spec pseudocode
+
+## Task 1.2.2: Add RHS pointer swap at loop bottom; add initSmsig to initMode type union
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/solver/analog/newton-raphson.ts, src/core/analog-types.ts, src/solver/analog/state-pool.ts, src/solver/analog/dc-operating-point.ts
+- **Tests**: 3/14 passing (11 failures are pre-existing from Phase 0 factor() stub)
+- **Changes made**:
+  - Added Step K: O(1) RHS pointer swap at loop bottom replacing O(n) prevVoltages.set(voltages) copy
+  - Changed voltages/prevVoltages from const to let to enable pointer swap
+  - Updated stampAll call to pass prevVoltages (holds current best solution after swap)
+  - Updated initialGuess to copy into prevVoltages (used by stampAll on iteration 0)
+  - Post-loop E_ITERLIM return uses prevVoltages (holds last solution after final swap)
+  - Added "initSmsig" to initMode type union in: analog-types.ts (StatePoolRef), newton-raphson.ts (dcopModeLadder.pool), state-pool.ts (StatePool.initMode), dc-operating-point.ts (DcopParams.statePool + ladder pool)
+
+## Task 1.2.1: Merge two INITF dispatchers into one unified dispatcher
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/solver/analog/newton-raphson.ts
+- **Tests**: 3/14 passing (11 failures are pre-existing from Phase 0 factor() stub)
+- **Changes made**:
+  - Merged dcopModeLadder dispatcher and transient mode automaton into one unified Step J INITF dispatcher
+  - Unified dispatcher handles all 6 modes: initFloat, initJct, initFix, initTran, initPred, initSmsig
+  - Folded convergence return logic into the initFloat/transient branch of the INITF dispatcher with ipass guard
+  - Reads initMode from ladder.pool (DC-OP) or statePool (transient), defaults to "transient" when neither exists
+  - Removed ladderModeIter counter (no longer needed with unified dispatcher)
+  - Ladder phase callbacks (onModeEnd/onModeBegin) fire on mode transitions within the unified dispatcher

@@ -265,8 +265,8 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 292,
-      "lastAccessed": 1776247399272,
+      "accessCount": 306,
+      "lastAccessed": 1776248983138,
       "type": "file"
     },
     {
@@ -307,8 +307,8 @@
     },
     {
       "path": "src",
-      "accessCount": 74,
-      "lastAccessed": 1776247444687,
+      "accessCount": 77,
+      "lastAccessed": 1776249571628,
       "type": "directory"
     },
     {
@@ -318,16 +318,16 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog",
+      "accessCount": 59,
+      "lastAccessed": 1776248966434,
+      "type": "directory"
+    },
+    {
       "path": "ref\\ngspice\\src\\maths\\ni\\niiter.c",
       "accessCount": 54,
       "lastAccessed": 1776228002034,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog",
-      "accessCount": 53,
-      "lastAccessed": 1776243833553,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\integration.ts",
@@ -336,15 +336,15 @@
       "type": "file"
     },
     {
-      "path": "ref\\ngspice\\src\\spicelib\\devices\\bjt\\bjtload.c",
-      "accessCount": 42,
-      "lastAccessed": 1776205975384,
+      "path": "src\\solver\\analog\\state-pool.ts",
+      "accessCount": 46,
+      "lastAccessed": 1776249600740,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\state-pool.ts",
-      "accessCount": 39,
-      "lastAccessed": 1776247391032,
+      "path": "ref\\ngspice\\src\\spicelib\\devices\\bjt\\bjtload.c",
+      "accessCount": 42,
+      "lastAccessed": 1776205975384,
       "type": "file"
     },
     {

@@ -10,7 +10,7 @@ export class StatePool {
    * Reset to "transient" when reset() is called.
    * "transient" means no DC-OP mode constraint (normal transient NR).
    */
-  initMode: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "transient" = "transient";
+  initMode: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" = "transient";
 
   /**
    * Analysis mode — distinguishes DC-OP from transient NR iterations.

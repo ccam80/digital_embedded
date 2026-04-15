@@ -21,15 +21,15 @@
       ],
       "spawned": 3,
       "completed": 3,
-      "verifications_passed": 0,
+      "verifications_passed": 3,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
-      "dead_verifiers": 0,
+      "dead_verifiers": 1,
       "group_status": {
-        "0.1.a": "pending",
-        "0.1.b": "pending",
-        "0.1.c": "pending"
+        "0.1.a": "passed",
+        "0.1.b": "passed",
+        "0.1.c": "passed"
       }
     },
     {
@@ -46,8 +46,8 @@
           "1.2.2"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 1,
+      "completed": 1,
       "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
@@ -200,5 +200,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-15T10:05:44.833Z"
+  "last_updated": "2026-04-15T10:45:23.955Z"
 }

@@ -70,7 +70,7 @@ export interface StatePoolRef {
   /** Number of accepted transient steps. 0 = MODEINITTRAN equivalent. */
   readonly tranStep: number;
   /** Current DC-OP mode (niiter.c:991-997). "transient" during normal transient NR. Absent → treated as "transient". */
-  readonly initMode?: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "transient";
+  readonly initMode?: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient";
   /**
    * Analysis mode. "dcOp" during DC operating point, "tran" for transient NR.
    * Maps to ngspice CKTmode MODEDCOP/MODETRANOP vs MODETRAN|MODEINITTRAN.
