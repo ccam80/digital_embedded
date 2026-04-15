@@ -7,9 +7,6 @@
  *                Clears the matrix, updates operating points, stamps all
  *                element contributions (linear + nonlinear + reactive companion)
  *                unconditionally, and finalizes the matrix for factorization.
- *
- * Legacy per-phase methods (`stampLinear`, `stampNonlinear`, `stampReactiveCompanion`)
- * remain available for direct test use.
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
@@ -35,64 +32,6 @@ export class MNAAssembler {
    */
   constructor(solver: SparseSolver) {
     this._solver = solver;
-  }
-
-  /**
-   * Stamp linear (topology-dependent, operating-point-independent)
-   * contributions from every element.
-   *
-   * Calls `element.stamp(solver)` for every element in the list, including
-   * nonlinear elements (which stamp their topology-constant MNA entries here,
-   * e.g. nothing for a pure diode).
-   *
-   * Called once at the start of each Newton-Raphson solve after
-   * `solver.beginAssembly()`.
-   *
-   * @param elements - The full element list for this circuit.
-   */
-  stampLinear(elements: readonly AnalogElement[]): void {
-    for (const el of elements) {
-      el.stamp(this._solver);
-    }
-  }
-
-  /**
-   * Stamp nonlinear (operating-point-dependent) contributions from all
-   * nonlinear elements.
-   *
-   * Calls `element.stampNonlinear!(solver)` only for elements where
-   * `isNonlinear === true`. Linear elements are silently skipped.
-   *
-   * Called every NR iteration after `stampLinear`, at the current operating
-   * point established by the most recent `updateOperatingPoints` call.
-   *
-   * @param elements - The full element list for this circuit.
-   */
-  stampNonlinear(elements: readonly AnalogElement[]): void {
-    for (const el of elements) {
-      if (el.isNonlinear && el.stampNonlinear) {
-        el.stampNonlinear(this._solver);
-      }
-    }
-  }
-
-  /**
-   * Stamp previously-computed companion model entries (geq/ieq) from all
-   * reactive elements into the MNA matrix.
-   *
-   * Calls `element.stampReactiveCompanion!(solver)` only for elements where
-   * both `isReactive === true` and `stampReactiveCompanion` is implemented.
-   *
-   * Called every NR iteration after `stampNonlinear`.
-   *
-   * @param elements - The full element list for this circuit.
-   */
-  stampReactiveCompanion(elements: readonly AnalogElement[]): void {
-    for (const el of elements) {
-      if (el.isReactive && el.stampReactiveCompanion) {
-        el.stampReactiveCompanion(this._solver);
-      }
-    }
   }
 
   /**

@@ -88,3 +88,25 @@
   - Reads initMode from ladder.pool (DC-OP) or statePool (transient), defaults to "transient" when neither exists
   - Removed ladderModeIter counter (no longer needed with unified dispatcher)
   - Ladder phase callbacks (onModeEnd/onModeBegin) fire on mode transitions within the unified dispatcher
+
+## Task: Fix rule violation in mna-assembler.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/solver/analog/mna-assembler.ts
+- **Change**: Removed "Legacy" and "remain available for direct test use" from JSDoc (lines 11-12). Replaced with clean description: "Individual stamping methods stamp element subsets independently for fine-grained test control."
+- **Rules fixed**:
+  - Removed backwards compatibility shibboleth (no "Legacy" label)
+  - Removed historical-provenance comment (no "remain available for...")
+
+## Task: Delete dead MNAAssembler per-phase stamp methods
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/mna-assembler.ts`, `src/solver/analog/__tests__/mna-assembler.test.ts`
+- **Tests**: 11/14 passing (3 pre-existing failures)
+- **Notes**:
+  - Deleted `stampLinear()`, `stampNonlinear()`, `stampReactiveCompanion()` methods from MNAAssembler
+  - Removed JSDoc lines referencing those methods from the file header
+  - Updated all test call sites to use `stampAll(elements, matrixSize, voltages, null, 0)` instead
+  - Renamed test cases `linear_only_stamps_once` → `stampAll_stamps_linear_element_each_call` and `nonlinear_skips_linear_elements` → `stampAll_skips_stampNonlinear_for_linear_elements`
+  - 3 pre-existing failures (`resistor_divider_dc`, `two_voltage_sources_series`, `current_source_with_resistor`) all fail at `expect(factorResult.success).toBe(true)` because `SparseSolver.factor()` is a stub returning `{ success: false }` — identical failure was present in HEAD before this change

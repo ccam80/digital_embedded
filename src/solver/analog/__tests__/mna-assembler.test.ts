@@ -3,7 +3,7 @@
  *
  * Test groups:
  *   Stamping     — full solve with resistors, voltage sources, current sources
- *   Assembler    — stampLinear / stampNonlinear / checkAllConverged behaviour
+ *   Assembler    — stampAll / checkAllConverged behaviour
  *   Convergence  — checkAllConverged edge cases
  */
 
@@ -54,9 +54,8 @@ describe("Stamping", () => {
 
     const elements = [R1, R2, Vs];
 
-    solver.beginAssembly(matrixSize);
-    assembler.stampLinear(elements);
-    solver.finalize();
+    const voltages = new Float64Array(matrixSize);
+    assembler.stampAll(elements, matrixSize, voltages, null, 0);
 
     const factorResult = solver.factor();
     expect(factorResult.success).toBe(true);
@@ -97,9 +96,8 @@ describe("Stamping", () => {
 
     const elements = [R, V1, V2src];
 
-    solver.beginAssembly(matrixSize);
-    assembler.stampLinear(elements);
-    solver.finalize();
+    const voltages = new Float64Array(matrixSize);
+    assembler.stampAll(elements, matrixSize, voltages, null, 0);
 
     const factorResult = solver.factor();
     expect(factorResult.success).toBe(true);
@@ -137,9 +135,8 @@ describe("Stamping", () => {
 
     const elements = [I, R];
 
-    solver.beginAssembly(matrixSize);
-    assembler.stampLinear(elements);
-    solver.finalize();
+    const voltages = new Float64Array(matrixSize);
+    assembler.stampAll(elements, matrixSize, voltages, null, 0);
 
     const factorResult = solver.factor();
     expect(factorResult.success).toBe(true);
@@ -158,7 +155,7 @@ describe("Stamping", () => {
 // ---------------------------------------------------------------------------
 
 describe("Assembler", () => {
-  it("linear_only_stamps_once", () => {
+  it("stampAll_stamps_linear_element_each_call", () => {
     const solver = new SparseSolver();
     const assembler = new MNAAssembler(solver);
 
@@ -166,14 +163,14 @@ describe("Assembler", () => {
     const resistor = makeResistor(1, 0, 1000);
     const stampSpy = vi.spyOn(resistor, "stamp");
 
-    solver.beginAssembly(1);
-    assembler.stampLinear([resistor]);
-    assembler.stampLinear([resistor]);
-    // stamp called twice because stampLinear was called twice (caller controls when)
+    const voltages = new Float64Array(1);
+    assembler.stampAll([resistor], 1, voltages, null, 0);
+    assembler.stampAll([resistor], 1, voltages, null, 0);
+    // stamp called once per stampAll call
     expect(stampSpy).toHaveBeenCalledTimes(2);
   });
 
-  it("nonlinear_skips_linear_elements", () => {
+  it("stampAll_skips_stampNonlinear_for_linear_elements", () => {
     const solver = new SparseSolver();
     const assembler = new MNAAssembler(solver);
 
@@ -181,8 +178,6 @@ describe("Assembler", () => {
     const resistor = makeResistor(1, 0, 1000);
     expect(resistor.isNonlinear).toBe(false);
 
-    // The resistor does not have stampNonlinear defined
-    // Create a spy on the method — it won't be called because isNonlinear=false
     const stampNonlinearSpy = vi.fn();
 
     // Manually attach stampNonlinear to test the guard
@@ -192,8 +187,8 @@ describe("Assembler", () => {
       stampNonlinear: stampNonlinearSpy,
     };
 
-    solver.beginAssembly(1);
-    assembler.stampNonlinear([resistorWithNl]);
+    const voltages = new Float64Array(1);
+    assembler.stampAll([resistorWithNl], 1, voltages, null, 0);
 
     // Because isNonlinear=false, stampNonlinear must not be called
     expect(stampNonlinearSpy).not.toHaveBeenCalled();

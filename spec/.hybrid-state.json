@@ -46,15 +46,15 @@
           "1.2.2"
         ]
       ],
-      "spawned": 1,
-      "completed": 1,
+      "spawned": 3,
+      "completed": 3,
       "verifications_passed": 0,
-      "verifications_failed": 0,
+      "verifications_failed": 2,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "1.1": "pending"
+        "1.1": "failed"
       }
     },
     {
@@ -200,5 +200,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-15T10:45:23.955Z"
+  "last_updated": "2026-04-15T11:01:57.911Z"
 }
