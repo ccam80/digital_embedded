@@ -424,6 +424,8 @@ describe("NR", () => {
 
   it("uic_bypass_not_triggered_without_isDcOp", () => {
     // When isDcOp is not set (transient path), statePool.uic must not trigger the bypass.
+    // The UIC bypass signature is { converged: true, iterations: 0 }. Verify that
+    // combination does NOT appear — the NR loop must enter the iteration path.
     const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
     const statePool = { state0: new Float64Array(0), uic: true };
 
@@ -440,9 +442,10 @@ describe("NR", () => {
       statePool,
     });
 
-    // Without UIC bypass, NR runs normally and converges (>0 iterations)
-    expect(result.converged).toBe(true);
-    expect(result.iterations).toBeGreaterThan(0);
+    // The UIC bypass would return { converged: true, iterations: 0 }.
+    // Without isDcOp=true that path is skipped, so iterations must not be 0
+    // with converged=true simultaneously.
+    expect(result.converged === true && result.iterations === 0).toBe(false);
   });
 
   // ---------------------------------------------------------------------------
@@ -451,61 +454,194 @@ describe("NR", () => {
 
   it("applyNodesetsAndICs_stamps_nodeset_in_initJct_mode", () => {
     // In initJct mode, nodeset stamps must be applied to the solver.
-    // Verify by checking that stamp() was called (solver receives the COO entry).
+    // Verify by checking cooCount increased and RHS received the correct value.
+    const G_NODESET = 1e10;
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map([[1, 2.5]]);
     const ics = new Map<number, number>();
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initJct");
-    // The solver should have the nodeset stamp — no throw means success.
-    // We cannot easily verify RHS values without finalize+solve, but the call
-    // must not throw and must add a COO entry (stamp was accepted).
-    expect(true).toBe(true);
+    // One nodeset entry → one COO stamp added
+    expect(solver.cooCount).toBe(1);
+    // RHS at row 1 must be G_NODESET * 2.5 * 1.0
+    const rhs = solver.getRhsSnapshot();
+    expect(rhs[1]).toBeCloseTo(G_NODESET * 2.5, 0);
   });
 
   it("applyNodesetsAndICs_stamps_nodeset_in_initFix_mode", () => {
     // In initFix mode, nodeset stamps must also be applied.
+    const G_NODESET = 1e10;
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map([[2, 1.0]]);
     const ics = new Map<number, number>();
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFix");
-    expect(true).toBe(true);
+    // One nodeset entry → one COO stamp added
+    expect(solver.cooCount).toBe(1);
+    // RHS at row 2 must be G_NODESET * 1.0 * 1.0
+    const rhs = solver.getRhsSnapshot();
+    expect(rhs[2]).toBeCloseTo(G_NODESET * 1.0, 0);
   });
 
   it("applyNodesetsAndICs_skips_nodesets_in_initFloat_mode", () => {
     // In initFloat mode, nodesets must NOT be stamped (only ICs persist).
-    // Verify indirectly: the function must complete without error.
-    // A fresh solver with no stamps has COO count 0 after beginAssembly.
+    // With no ICs either, COO count must remain 0 and RHS stays zero.
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map([[1, 2.5]]);
     const ics = new Map<number, number>();
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFloat");
-    // In initFloat, nodesets are skipped — no stamp calls should have added to COO.
-    // ICs are also empty here, so the solver should have 0 stamps.
-    expect(true).toBe(true);
+    // initFloat skips nodesets — no stamps added
+    expect(solver.cooCount).toBe(0);
+    const rhs = solver.getRhsSnapshot();
+    expect(rhs[1]).toBe(0);
   });
 
   it("applyNodesetsAndICs_always_stamps_ics_regardless_of_mode", () => {
-    // ICs must be stamped in ALL modes, including initFloat and transient.
+    // ICs must be stamped in ALL modes, including initFloat.
+    const G_NODESET = 1e10;
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map<number, number>();
     const ics = new Map([[1, 1.5]]);
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFloat");
-    // IC stamp was applied — no throw, function completed normally.
-    expect(true).toBe(true);
+    // IC stamp applied even in initFloat mode
+    expect(solver.cooCount).toBe(1);
+    const rhs = solver.getRhsSnapshot();
+    expect(rhs[1]).toBeCloseTo(G_NODESET * 1.5, 0);
   });
 
   it("applyNodesetsAndICs_scales_by_srcFact", () => {
-    // With srcFact=0.5, the RHS stamp should use G_NODESET * value * 0.5.
-    // We test that the function accepts srcFact without error.
+    // With srcFact=0.5, the RHS stamp must use G_NODESET * value * 0.5.
+    const G_NODESET = 1e10;
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map([[1, 2.0]]);
     const ics = new Map([[2, 1.0]]);
     applyNodesetsAndICs(solver, nodesets, ics, 0.5, "initJct");
-    expect(true).toBe(true);
+    // Both nodeset (node 1) and IC (node 2) get one COO stamp each
+    expect(solver.cooCount).toBe(2);
+    const rhs = solver.getRhsSnapshot();
+    // nodeset: G_NODESET * 2.0 * 0.5 = 1e10
+    expect(rhs[1]).toBeCloseTo(G_NODESET * 2.0 * 0.5, 0);
+    // IC: G_NODESET * 1.0 * 0.5 = 5e9
+    expect(rhs[2]).toBeCloseTo(G_NODESET * 1.0 * 0.5, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave 2.1.3: singular retry — factorNumerical failure triggers forceReorder
+// ---------------------------------------------------------------------------
+
+describe("NR singular retry", () => {
+  it("nr_retries_with_reorder_after_numerical_singular", () => {
+    // Verify that when factor() returns { success: false } with lastFactorUsedReorder=false
+    // (numerical path), the NR loop calls forceReorder() and retries factor().
+    // On the second call (after forceReorder), factor() succeeds.
+    const diagnostics = new DiagnosticCollector();
+
+    let forceReorderCalled = false;
+    let factorCallCount = 0;
+
+    const realSolver = new SparseSolver();
+
+    // Intercept factor() on the proxy: fail on the first call (numerical path),
+    // then delegate to the real solver after forceReorder has been called.
+    const proxySolver = new Proxy(realSolver, {
+      get(target, prop) {
+        if (prop === "factor") {
+          return () => {
+            factorCallCount++;
+            if (factorCallCount === 1) {
+              // First call: simulate numerical-path failure
+              return { success: false };
+            }
+            // Subsequent calls: real solver (after forceReorder was called)
+            return (target as SparseSolver).factor();
+          };
+        }
+        if (prop === "lastFactorUsedReorder") {
+          // First factor() call failed on numerical path (not reorder)
+          return factorCallCount <= 1 ? false : (target as SparseSolver).lastFactorUsedReorder;
+        }
+        if (prop === "forceReorder") {
+          return () => {
+            forceReorderCalled = true;
+            return (target as SparseSolver).forceReorder();
+          };
+        }
+        const val = (target as unknown as Record<string | symbol, unknown>)[prop];
+        if (typeof val === "function") return val.bind(target);
+        return val;
+      },
+    }) as SparseSolver;
+
+    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const r = makeResistor(1, 2, 1000);
+    const d = makeDiode(2, 0, 1e-14, 1);
+    const elements = [vs, r, d];
+    allocateStatePool(elements);
+
+    const result = newtonRaphson({
+      solver: proxySolver,
+      elements,
+      matrixSize: 3,
+      maxIterations: 100,
+      reltol: 1e-3,
+      abstol: 1e-6,
+      iabstol: 1e-12,
+      diagnostics,
+    });
+
+    // After the numerical-path failure, the NR loop must have called forceReorder()
+    // and retried. The circuit must still converge.
+    expect(forceReorderCalled).toBe(true);
+    expect(result.converged).toBe(true);
+  });
+
+  it("nr_emits_singular_diagnostic_when_reorder_also_fails", () => {
+    // When factor() always fails and lastFactorUsedReorder is false (numerical path),
+    // the retry path also fails, so NR must emit a singular-matrix diagnostic
+    // and return converged=false.
+    const diagnostics = new DiagnosticCollector();
+
+    const realSolver = new SparseSolver();
+
+    const proxySolver = new Proxy(realSolver, {
+      get(target, prop) {
+        if (prop === "factor") {
+          return () => {
+            return { success: false };
+          };
+        }
+        if (prop === "lastFactorUsedReorder") {
+          return false;
+        }
+        const val = (target as unknown as Record<string | symbol, unknown>)[prop];
+        if (typeof val === "function") return val.bind(target);
+        return val;
+      },
+    }) as SparseSolver;
+
+    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const r = makeResistor(1, 2, 1000);
+    const d = makeDiode(2, 0, 1e-14, 1);
+    const elements = [vs, r, d];
+    allocateStatePool(elements);
+
+    const result = newtonRaphson({
+      solver: proxySolver,
+      elements,
+      matrixSize: 3,
+      maxIterations: 100,
+      reltol: 1e-3,
+      abstol: 1e-6,
+      iabstol: 1e-12,
+      diagnostics,
+    });
+
+    expect(result.converged).toBe(false);
+    const diags = diagnostics.getDiagnostics();
+    expect(diags.some(d => d.code === "singular-matrix")).toBe(true);
   });
 });

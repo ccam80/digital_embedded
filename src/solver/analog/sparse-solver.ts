@@ -139,6 +139,14 @@ export class SparseSolver {
   // -- Preorder flag --
   private _didPreorder: boolean = false;
 
+  // -- Pivot order tracking --
+  /** True after at least one factorWithReorder call has established _pinv/_q. */
+  private _hasPivotOrder: boolean = false;
+
+  // -- Last factor path tracking --
+  /** True when the most recent factor() call dispatched to factorWithReorder (full pivot search). */
+  lastFactorUsedReorder: boolean = false;
+
   // -- Scratch buffers for _buildCSC (hoisted, grown lazily) --
   /** Per-column nonzero counts + prefix-summed column start offsets. */
   private _bldColCount: Int32Array = new Int32Array(0);
@@ -218,6 +226,7 @@ export class SparseSolver {
       this._topologyDirty = false;
       this._prevCooCount = this._cooCount;
       this._hasLinearBase = false; // topology change invalidates snapshot
+      this._hasPivotOrder = false; // topology change invalidates stored pivot order
     } else {
       this._refillCSC(cooStart);
     }
@@ -231,7 +240,12 @@ export class SparseSolver {
   }
 
   factor(): FactorResult {
-    return { success: false };
+    if (this._needsReorder || !this._hasPivotOrder) {
+      this.lastFactorUsedReorder = true;
+      return this.factorWithReorder();
+    }
+    this.lastFactorUsedReorder = false;
+    return this.factorNumerical();
   }
 
   /**
@@ -297,6 +311,7 @@ export class SparseSolver {
 
   invalidateTopology(): void {
     this._topologyDirty = true;
+    this._hasPivotOrder = false;
   }
 
   /**
@@ -1173,7 +1188,9 @@ export class SparseSolver {
       this._prevCooCount = this._cooCount;
       this._hasLinearBase = false;
     }
-    return this._numericLU();
+    const result = this._numericLU();
+    if (result.success) this._hasPivotOrder = true;
+    return result;
   }
 
   /**

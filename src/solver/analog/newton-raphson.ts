@@ -520,15 +520,23 @@ export function newtonRaphson(opts: NROptions): NRResult {
     }
 
     // ---- STEP E: Factorize ----
-    const factorResult = solver.factor();
+    // ngspice niiter.c: E_SINGULAR on numerical-only path triggers NISHOULDREORDER retry.
+    let factorResult = solver.factor();
     if (!factorResult.success) {
-      diagnostics.emit(
-        makeDiagnostic("singular-matrix", "error", "Singular matrix during NR iteration", {
-          explanation: `The MNA matrix became singular at iteration ${iteration + 1}.`,
-          suggestions: [],
-        }),
-      );
-      return { converged: false, iterations: iteration + 1, voltages, largestChangeElement: -1, largestChangeNode: -1 };
+      if (!solver.lastFactorUsedReorder) {
+        // Numerical-only path failed (near-zero stored pivot). Force full reorder and retry.
+        solver.forceReorder();
+        factorResult = solver.factor();
+      }
+      if (!factorResult.success) {
+        diagnostics.emit(
+          makeDiagnostic("singular-matrix", "error", "Singular matrix during NR iteration", {
+            explanation: `The MNA matrix became singular at iteration ${iteration + 1}.`,
+            suggestions: [],
+          }),
+        );
+        return { converged: false, iterations: iteration + 1, voltages, largestChangeElement: -1, largestChangeNode: -1 };
+      }
     }
 
     // Save state0 before solve for state0 damping (DO10)

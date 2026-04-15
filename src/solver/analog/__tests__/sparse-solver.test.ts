@@ -742,3 +742,95 @@ describe("SparseSolver factorNumerical", () => {
     expect(result.success).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// factor() dispatch and lastFactorUsedReorder tests
+// ---------------------------------------------------------------------------
+
+describe("SparseSolver factor dispatch", () => {
+  it("factor() sets lastFactorUsedReorder=true when _needsReorder is true", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 4);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.finalize();
+    solver.forceReorder();
+    const result = solver.factor();
+    expect(result.success).toBe(true);
+    expect(solver.lastFactorUsedReorder).toBe(true);
+  });
+
+  it("factor() sets lastFactorUsedReorder=false on second call (numerical path)", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 4);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.finalize();
+
+    // First factor: topology is dirty so forceReorder is implied via finalize;
+    // _needsReorder starts false so numerical path is taken first.
+    // Force reorder explicitly then factor to establish pivot order.
+    solver.forceReorder();
+    solver.factor();
+    expect(solver.lastFactorUsedReorder).toBe(true);
+
+    // Second factor with same pattern: numerical path
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 4);
+    solver.stampRHS(0, 3);
+    solver.stampRHS(1, 5);
+    solver.finalize();
+    const result = solver.factor();
+    expect(result.success).toBe(true);
+    expect(solver.lastFactorUsedReorder).toBe(false);
+  });
+
+  it("factor() solves correctly on numerical path after reorder", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 4);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.finalize();
+
+    // Establish pivot order via reorder path
+    solver.forceReorder();
+    const r1 = solver.factor();
+    expect(r1.success).toBe(true);
+    const x1 = new Float64Array(2);
+    solver.solve(x1);
+    expect(x1[0]).toBeCloseTo(1 / 11, 12);
+    expect(x1[1]).toBeCloseTo(7 / 11, 12);
+
+    // Second call: numerical path, same values
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 4);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.finalize();
+    const r2 = solver.factor();
+    expect(r2.success).toBe(true);
+    expect(solver.lastFactorUsedReorder).toBe(false);
+    const x2 = new Float64Array(2);
+    solver.solve(x2);
+    expect(x2[0]).toBeCloseTo(1 / 11, 12);
+    expect(x2[1]).toBeCloseTo(7 / 11, 12);
+  });
+});

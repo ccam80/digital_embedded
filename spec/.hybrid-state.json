@@ -80,17 +80,17 @@
           "5.1.2"
         ]
       ],
-      "spawned": 3,
-      "completed": 2,
-      "verifications_passed": 0,
-      "verifications_failed": 0,
+      "spawned": 5,
+      "completed": 4,
+      "verifications_passed": 1,
+      "verifications_failed": 1,
       "stops_for_clarification": 0,
       "dead_implementers": 1,
       "dead_verifiers": 0,
       "group_status": {
         "2.1": "pending",
-        "3.1": "pending",
-        "5.1": "pending"
+        "3.1": "passed",
+        "5.1": "failed"
       }
     },
     {
@@ -200,5 +200,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-15T11:25:28.885Z"
+  "last_updated": "2026-04-15T11:34:06.097Z"
 }

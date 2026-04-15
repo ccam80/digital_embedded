@@ -177,3 +177,21 @@
   - src/solver/analog/compiled-analog-circuit.ts (nodesets/ics fields + constructor params + initialization)
 - **Tests**: 6/7 new tests passing (5 applyNodesetsAndICs tests + uic_bypass_returns_converged_with_zero_iterations pass; uic_bypass_not_triggered_without_isDcOp fails because SparseSolver.factor() is an unimplemented stub returning {success:false} from another agent's in-progress work — pre-existing failure, not caused by this task)
 - **Note**: 12 pre-existing NR test failures caused by broken SparseSolver.factor() stub. All failures existed before this task's changes.
+
+## Task fix-trivially-true-assertions: Fix trivially-true test assertions in applyNodesetsAndICs tests + fix failing UIC test
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/__tests__/newton-raphson.test.ts
+- **Tests**: 21/21 passing
+
+## Task 2.1.3: Add singular retry: factorNumerical on E_SINGULAR → NR loop sets shouldReorder=true
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/sparse-solver.ts` — added `_hasPivotOrder` flag, `lastFactorUsedReorder` public property; fixed `factor()` stub to dispatch to `factorWithReorder` (when `_needsReorder || !_hasPivotOrder`) or `factorNumerical`; set `_hasPivotOrder=true` after successful `factorWithReorder`; reset `_hasPivotOrder=false` on topology invalidation and in `finalize()` dirty path
+  - `src/solver/analog/newton-raphson.ts` — Step E: after `solver.factor()` fails, if `!solver.lastFactorUsedReorder` call `solver.forceReorder()` and retry; only emit singular diagnostic if retry also fails
+  - `src/solver/analog/__tests__/sparse-solver.test.ts` — added `SparseSolver factor dispatch` describe block with 3 tests covering `lastFactorUsedReorder` flag behavior
+  - `src/solver/analog/__tests__/newton-raphson.test.ts` — added `NR singular retry` describe block with 2 tests: proxy-based singular retry verification and singular diagnostic emission
+- **Tests**: 25/25 sparse-solver passing, 23/23 newton-raphson passing
