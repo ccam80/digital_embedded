@@ -45,6 +45,39 @@ export interface LimitingEvent {
 // NROptions / NRResult
 // ---------------------------------------------------------------------------
 
+/**
+ * Stamps 1e10 conductance to enforce nodeset and initial-condition constraints
+ * on specific nodes. Called after CKTload (stampAll) during each NR iteration.
+ *
+ * Matches ngspice CKTnodeset/CKTic enforcement: large conductance to a known
+ * voltage forces the node to that value during the early initJct/initFix phases.
+ *
+ * @param solver    - The sparse solver to stamp into.
+ * @param nodesets  - Map of nodeId → target voltage for nodeset constraints.
+ * @param ics       - Map of nodeId → target voltage for initial-condition constraints.
+ * @param srcFact   - Source stepping scale factor (0..1). Applied to target voltages.
+ * @param initMode  - Current NR init mode. Nodesets only stamp in initJct or initFix.
+ */
+export function applyNodesetsAndICs(
+  solver: SparseSolver,
+  nodesets: Map<number, number>,
+  ics: Map<number, number>,
+  srcFact: number,
+  initMode: string,
+): void {
+  const G_NODESET = 1e10;
+  if (initMode === "initJct" || initMode === "initFix") {
+    for (const [nodeId, value] of nodesets) {
+      solver.stamp(nodeId, nodeId, G_NODESET);
+      solver.stampRHS(nodeId, G_NODESET * value * srcFact);
+    }
+  }
+  for (const [nodeId, value] of ics) {
+    solver.stamp(nodeId, nodeId, G_NODESET);
+    solver.stampRHS(nodeId, G_NODESET * value * srcFact);
+  }
+}
+
 /** Configuration for a single Newton-Raphson solve. */
 export interface NROptions {
   /** Shared sparse solver instance (pre-configured for this circuit). */
@@ -128,7 +161,7 @@ export interface NROptions {
     onModeEnd(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number, converged: boolean): void;
   } | null;
   /** Optional shared state pool for state0 damping (ngspice niiter.c). */
-  statePool?: { state0: Float64Array } | null;
+  statePool?: { state0: Float64Array; uic?: boolean } | null;
   /** Enable node damping in NR iteration (ngspice niiter.c). Default: false */
   nodeDamping?: boolean;
   /** Hook for per-iteration companion recomputation. Called on iteration > 0 before re-stamping. */
@@ -177,6 +210,24 @@ export interface NROptions {
    * When null, elements skip limiting event collection (zero overhead).
    */
   limitingCollector?: LimitingEvent[] | null;
+  /**
+   * Nodeset constraints: map of MNA nodeId → target voltage.
+   * Enforced via 1e10 conductance stamp during initJct and initFix phases.
+   * See applyNodesetsAndICs().
+   */
+  nodesets?: Map<number, number>;
+  /**
+   * Initial condition constraints: map of MNA nodeId → target voltage.
+   * Enforced via 1e10 conductance stamp on every iteration (unlike nodesets
+   * which are restricted to initJct/initFix).
+   * See applyNodesetsAndICs().
+   */
+  ics?: Map<number, number>;
+  /**
+   * Source stepping scale factor (ngspice srcFact). Applied to nodeset/IC
+   * target voltages to ramp them in during source stepping. Default: 1.0.
+   */
+  srcFact?: number;
 }
 
 /** Result of a Newton-Raphson solve. */
@@ -424,6 +475,14 @@ export function newtonRaphson(opts: NROptions): NRResult {
     ladder.runPrimeJunctions();
   }
 
+  // MODETRANOP && MODEUIC: single CKTload, no iteration (ngspice dctran.c UIC path).
+  if (opts.isDcOp && opts.statePool?.uic) {
+    [voltages, prevVoltages] = [prevVoltages, voltages];
+    assembler.stampAll(elements, matrixSize, prevVoltages, null, 0);
+    solver.finalize();
+    return { converged: true, iterations: 0, voltages: prevVoltages, largestChangeElement: -1, largestChangeNode: -1 };
+  }
+
   for (let iteration = 0; ; iteration++) {
     // ---- STEP A: Clear noncon + reset limit collector (ngspice CKTnoncon=0) ----
     assembler.noncon = 0;
@@ -436,6 +495,23 @@ export function newtonRaphson(opts: NROptions): NRResult {
     // On iteration 1+, prevVoltages holds the previous solve result (via Step K swap).
     opts.preIterationHook?.(iteration, prevVoltages);
     assembler.stampAll(elements, matrixSize, prevVoltages, opts.limitingCollector ?? null, iteration);
+
+    // ---- STEP C: Nodeset/IC enforcement (ngspice CKTnodeset/CKTic) ----
+    // Stamp 1e10 conductance for nodeset and IC nodes after CKTload,
+    // then re-finalize so the new stamps are included in the CSC structure
+    // before factorization.
+    if (opts.nodesets?.size || opts.ics?.size) {
+      const initPool = ladder ? ladder.pool : (opts.statePool as { initMode: string } | null);
+      const curMode = initPool?.initMode ?? "transient";
+      applyNodesetsAndICs(
+        solver,
+        opts.nodesets ?? new Map(),
+        opts.ics ?? new Map(),
+        opts.srcFact ?? 1.0,
+        curMode,
+      );
+      solver.finalize();
+    }
 
     // Diagonal gmin augmentation (ngspice LoadGmin, spsmp.c:448-478):
     // Add gmin to every diagonal element before factorization.

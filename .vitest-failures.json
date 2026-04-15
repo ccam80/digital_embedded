@@ -1,33 +1,87 @@
 {
   "summary": {
-    "passed": 11,
-    "failed": 3,
+    "passed": 9,
+    "failed": 12,
     "skipped": 0,
     "totalFiles": 1,
-    "durationSeconds": 0.9
+    "durationSeconds": 0.7
   },
   "failures": [
     {
       "message": "expected false to be true // Object.is equality",
-      "count": 3,
+      "count": 12,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\mna-assembler.test.ts",
-          "test": "resistor_divider_dc",
-          "line": 61,
-          "column": 34
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "linear_converges_in_one_iteration",
+          "line": 119,
+          "column": 30
         },
         {
-          "file": "src\\solver\\analog\\__tests__\\mna-assembler.test.ts",
-          "test": "two_voltage_sources_series",
-          "line": 103,
-          "column": 34
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "diode_circuit_converges",
+          "line": 143,
+          "column": 30
         },
         {
-          "file": "src\\solver\\analog\\__tests__\\mna-assembler.test.ts",
-          "test": "current_source_with_resistor",
-          "line": 142,
-          "column": 34
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "diode_reverse_bias",
+          "line": 171,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "blame_scalars_populated",
+          "line": 203,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "initial_guess_used",
+          "line": 250,
+          "column": 39
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "nonlinear_circuit_runs_at_least_2_iterations_with_state_pool",
+          "line": 279,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "nonlinear_circuit_forced_noncon_on_iteration_0",
+          "line": 301,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "initTran_transitions_to_initFloat_after_iteration_0",
+          "line": 328,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "initPred_transitions_to_initFloat_immediately",
+          "line": 352,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "transient_mode_allows_convergence_without_ladder",
+          "line": 375,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "no_pool_allows_convergence",
+          "line": 395,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "uic_bypass_not_triggered_without_isDcOp",
+          "line": 444,
+          "column": 30
         }
       ]
     }

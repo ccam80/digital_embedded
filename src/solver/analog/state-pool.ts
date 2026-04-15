@@ -41,6 +41,14 @@ export class StatePool {
    */
   temperature: number = 300.15;
 
+  /**
+   * Integration coefficients shared across all elements (ngspice CKTag[]).
+   * Size 8 to support GEAR orders 3-6 in future. ag[0] = 1/dt for BDF-1/TRAP,
+   * ag[1] = -1/dt. Zeroed at DCOP-to-transient transition (dctran.c:348).
+   * Computed each transient step by computeNIcomCof() (task 3.2.1).
+   */
+  ag: Float64Array = new Float64Array(8);
+
   constructor(totalSlots: number) {
     this.totalSlots = totalSlots;
     this.states = [
@@ -76,13 +84,28 @@ export class StatePool {
     }
   }
 
-  /** Zero all state arrays. */
+  /**
+   * Ring rotation of state arrays — pointer swap, not data copy.
+   * After rotation: states[0] is fresh recycled storage (was states[n-1]),
+   * states[1] = previous states[0], states[2] = previous states[1], etc.
+   * Matches ngspice dctran.c:715-723 state rotation before the retry loop.
+   */
+  rotateStateVectors(): void {
+    const recycled = this.states[this.states.length - 1];
+    for (let i = this.states.length - 1; i > 0; i--) {
+      this.states[i] = this.states[i - 1];
+    }
+    this.states[0] = recycled;
+  }
+
+  /** Zero all state arrays and integration coefficients. */
   reset(): void {
     for (const buf of this.states) buf.fill(0);
     this.tranStep = 0;
     this.initMode = "transient";
     this.analysisMode = "dcOp";
     this.dt = 0;
+    this.ag.fill(0);
   }
 
   /**

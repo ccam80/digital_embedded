@@ -123,6 +123,12 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
   /** Shared state pool for all elements in this compiled circuit. */
   readonly statePool: StatePool;
 
+  /** Nodeset constraints: map of MNA nodeId → target voltage. */
+  readonly nodesets?: Map<number, number>;
+
+  /** Initial condition constraints: map of MNA nodeId → target voltage. */
+  readonly ics?: Map<number, number>;
+
   constructor(params: {
     nodeCount: number;
     branchCount: number;
@@ -140,6 +146,8 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     diagnostics?: Diagnostic[];
     timeRef?: { value: number };
     statePool: StatePool;
+    nodesets?: Map<number, number>;
+    ics?: Map<number, number>;
   }) {
     this.nodeCount = params.nodeCount;
     this.branchCount = params.branchCount;
@@ -158,6 +166,8 @@ export class ConcreteCompiledAnalogCircuit implements CompiledAnalogCircuit {
     this.diagnostics = params.diagnostics ?? [];
     this.timeRef = params.timeRef ?? { value: 0 };
     this.statePool = params.statePool;
+    this.nodesets = params.nodesets;
+    this.ics = params.ics;
   }
 
   // CompiledCircuit base interface

@@ -561,11 +561,11 @@ describe("SparseSolver pre-solve RHS capture", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Phase 0 stub contract: factor() returns { success: false }
+// preorder() tests
 // ---------------------------------------------------------------------------
 
-describe("SparseSolver Phase 0 factor stub", () => {
-  it("factor returns success:false on any assembled matrix", () => {
+describe("SparseSolver preorder", () => {
+  it("preorder can be called before factorWithReorder without error", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(2);
     solver.stamp(0, 0, 4);
@@ -575,17 +575,170 @@ describe("SparseSolver Phase 0 factor stub", () => {
     solver.stampRHS(0, 1);
     solver.stampRHS(1, 2);
     solver.finalize();
-    const result = solver.factor();
-    expect(result.success).toBe(false);
+    solver.preorder();
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+    const x = new Float64Array(2);
+    solver.solve(x);
+    expect(x[0]).toBeCloseTo(1 / 11, 12);
+    expect(x[1]).toBeCloseTo(7 / 11, 12);
   });
 
-  it("factor returns success:false for a 1x1 trivial matrix", () => {
+  it("preorder is idempotent — second call is a no-op", () => {
     const solver = new SparseSolver();
-    solver.beginAssembly(1);
-    solver.stamp(0, 0, 5);
-    solver.stampRHS(0, 10);
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 2);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 4);
+    solver.stampRHS(1, 6);
     solver.finalize();
-    const result = solver.factor();
+    solver.preorder();
+    solver.preorder();
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+    const x = new Float64Array(2);
+    solver.solve(x);
+    expect(x[0]).toBeCloseTo(2, 12);
+    expect(x[1]).toBeCloseTo(2, 12);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// factorWithReorder / factorNumerical tests
+// ---------------------------------------------------------------------------
+
+describe("SparseSolver factorWithReorder", () => {
+  it("solves a 2x2 system correctly", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 4);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.finalize();
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+    const x = new Float64Array(2);
+    solver.solve(x);
+    expect(x[0]).toBeCloseTo(1 / 11, 12);
+    expect(x[1]).toBeCloseTo(7 / 11, 12);
+  });
+
+  it("detects singular matrix", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 1);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 1);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 1);
+    solver.finalize();
+    const result = solver.factorWithReorder();
     expect(result.success).toBe(false);
+    expect(result.singularRow).toBeDefined();
+  });
+
+  it("applies diagGmin to diagonal before factoring", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 1);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 1);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 1);
+    solver.finalize();
+    const result = solver.factorWithReorder(1.0);
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("SparseSolver factorNumerical", () => {
+  it("reuses pivot order from prior factorWithReorder", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 4);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.finalize();
+
+    const r1 = solver.factorWithReorder();
+    expect(r1.success).toBe(true);
+    const x1 = new Float64Array(2);
+    solver.solve(x1);
+    expect(x1[0]).toBeCloseTo(1 / 11, 12);
+    expect(x1[1]).toBeCloseTo(7 / 11, 12);
+
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 4);
+    solver.stampRHS(0, 3);
+    solver.stampRHS(1, 5);
+    solver.finalize();
+
+    const r2 = solver.factorNumerical();
+    expect(r2.success).toBe(true);
+    const x2 = new Float64Array(2);
+    solver.solve(x2);
+    expect(x2[0]).toBeCloseTo(1.0, 12);
+    expect(x2[1]).toBeCloseTo(1.0, 12);
+  });
+
+  it("returns failure when pivot becomes near-zero", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 4);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.finalize();
+    solver.factorWithReorder();
+
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 1);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 1);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 1);
+    solver.finalize();
+
+    const r2 = solver.factorNumerical();
+    expect(r2.success).toBe(false);
+  });
+
+  it("applies diagGmin before numerical factorization", () => {
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 4);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 3);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.finalize();
+    solver.factorWithReorder();
+
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 1);
+    solver.stamp(0, 1, 1);
+    solver.stamp(1, 0, 1);
+    solver.stamp(1, 1, 1);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 1);
+    solver.finalize();
+
+    const result = solver.factorNumerical(1.0);
+    expect(result.success).toBe(true);
   });
 });

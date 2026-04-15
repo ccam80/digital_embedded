@@ -220,6 +220,18 @@ export interface CompiledAnalogCircuit extends CompiledCircuit {
   readonly wireToNodeId: Map<Wire, number>;
   /** Shared state pool for per-element operating-point state. */
   readonly statePool: StatePoolRef;
+  /**
+   * Nodeset constraints: map of MNA nodeId → target voltage.
+   * Passed to the NR solver to enforce voltage starting points via 1e10
+   * conductance stamps during initJct/initFix phases.
+   */
+  readonly nodesets?: Map<number, number>;
+  /**
+   * Initial condition constraints: map of MNA nodeId → target voltage.
+   * Passed to the NR solver to enforce IC node voltages via 1e10 conductance
+   * stamps on every NR iteration.
+   */
+  readonly ics?: Map<number, number>;
 }
 
 // ---------------------------------------------------------------------------

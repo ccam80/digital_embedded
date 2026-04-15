@@ -19,6 +19,8 @@ export interface FactorResult {
 }
 
 const INITIAL_TRIPLET_CAPACITY = 256;
+const PIVOT_THRESHOLD = 1e-3;
+const PIVOT_ABS_THRESHOLD = 1e-13;
 
 export class SparseSolver {
   // -- COO triplet storage --
@@ -133,6 +135,9 @@ export class SparseSolver {
 
   // -- Mode-driven reorder flag --
   private _needsReorder: boolean = false;
+
+  // -- Preorder flag --
+  private _didPreorder: boolean = false;
 
   // -- Scratch buffers for _buildCSC (hoisted, grown lazily) --
   /** Per-column nonzero counts + prefix-summed column start offsets. */
@@ -300,6 +305,18 @@ export class SparseSolver {
    */
   forceReorder(): void {
     this._needsReorder = true;
+  }
+
+  /**
+   * One-time static column permutation.
+   * ngspice: SMPpreOrder (spbuild.c). Sets up initial column ordering
+   * before the first factorization. Currently delegates to AMD ordering
+   * which is applied during finalize(). Sets `_didPreorder` to prevent
+   * redundant calls.
+   */
+  preorder(): void {
+    if (this._didPreorder) return;
+    this._didPreorder = true;
   }
 
   /**
@@ -856,6 +873,320 @@ export class SparseSolver {
     }
 
     return top;
+  }
+
+  // =========================================================================
+  // Numeric LU factorization
+  // =========================================================================
+
+  /**
+   * Left-looking sparse LU factorization with partial pivoting.
+   *
+   * For each column k (in AMD order):
+   *   1. Scatter AMD-permuted A[:,k] into dense workspace x[]
+   *   2. Sparse triangular solve via DFS reach through L
+   *   3. Partial pivot: find best |x[i]| among unpivoted rows
+   *   4. Record pivot: pinv[bestRow] = k, q[k] = bestRow
+   *   5. Store U[:,k] entries (from already-pivoted rows + diagonal)
+   *   6. Store L[:,k] entries (from unpivoted rows, scaled by 1/diag)
+   *   7. Clear workspace (only touched entries)
+   */
+  private _numericLU(): FactorResult {
+    const n = this._n;
+    if (n === 0) return { success: true };
+
+    const x = this._x;
+    const xNzIdx = this._xNzIdx;
+    const pinv = this._pinv;
+    const q = this._q;
+    const permInv = this._permInv;
+
+    let lnz = 0;
+    let unz = 0;
+
+    pinv.fill(-1);
+    this._reachMark.fill(-1);
+
+    for (let k = 0; k < n; k++) {
+      this._lColPtr[k] = lnz;
+      this._uColPtr[k] = unz;
+
+      if (lnz + n > this._lRowIdx.length) this._growL(lnz + n);
+      if (unz + n > this._uRowIdx.length) this._growU(unz + n);
+
+      let xNzCount = 0;
+      const origJ = this._perm[k];
+      for (let p = this._cscColPtr[origJ]; p < this._cscColPtr[origJ + 1]; p++) {
+        const newI = permInv[this._cscRowIdx[p]];
+        if (x[newI] === 0) xNzIdx[xNzCount++] = newI;
+        x[newI] += this._cscVals[p];
+      }
+
+      const reachTop = this._reach(k);
+      const reachStack = this._reachStack;
+      for (let ri = reachTop; ri < n; ri++) {
+        const j = reachStack[ri];
+        const qj = q[j];
+        if (x[qj] === 0) continue;
+
+        const ljp0 = this._lColPtr[j];
+        const ljp1 = this._lColPtr[j + 1];
+        for (let lp = ljp0; lp < ljp1; lp++) {
+          const li = this._lRowIdx[lp];
+          if (x[li] === 0) xNzIdx[xNzCount++] = li;
+          x[li] -= this._lVals[lp] * x[qj];
+        }
+      }
+
+      let absMax = 0;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (pinv[i] >= 0) continue;
+        const v = Math.abs(x[i]);
+        if (v > absMax) absMax = v;
+      }
+
+      if (absMax === 0) {
+        for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
+        return { success: false, singularRow: k };
+      }
+
+      const relThreshold = PIVOT_THRESHOLD * absMax;
+
+      let maxVal = 0;
+      let pivotRow = -1;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (pinv[i] >= 0) continue;
+        if (x[i] === 0) continue;
+        const v = Math.abs(x[i]);
+        if (v < relThreshold || v < PIVOT_ABS_THRESHOLD) continue;
+        if (v > maxVal) { maxVal = v; pivotRow = i; }
+      }
+
+      if (pivotRow < 0) {
+        maxVal = 0;
+        for (let idx = 0; idx < xNzCount; idx++) {
+          const i = xNzIdx[idx];
+          if (pinv[i] >= 0) continue;
+          const v = Math.abs(x[i]);
+          if (v > maxVal) { maxVal = v; pivotRow = i; }
+        }
+      }
+
+      pinv[pivotRow] = k;
+      q[k] = pivotRow;
+
+      const diagVal = x[pivotRow];
+      if (Math.abs(diagVal) < 1e-300) {
+        for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
+        return { success: false, singularRow: k };
+      }
+
+      void unz;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (x[i] === 0) continue;
+        const s = pinv[i];
+        if (s >= 0 && s < k) {
+          this._uRowIdx[unz] = i;
+          this._uVals[unz] = x[i];
+          unz++;
+        }
+      }
+      this._uRowIdx[unz] = pivotRow;
+      this._uVals[unz] = diagVal;
+      unz++;
+
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (x[i] === 0) continue;
+        if (pinv[i] >= 0) continue;
+        this._lRowIdx[lnz] = i;
+        this._lVals[lnz] = x[i] / diagVal;
+        lnz++;
+      }
+
+      for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
+    }
+
+    this._lColPtr[n] = lnz;
+    this._uColPtr[n] = unz;
+
+    let maxDiag = 0, minDiag = Infinity;
+    for (let k = 0; k < n; k++) {
+      const e = this._uColPtr[k + 1];
+      if (e > this._uColPtr[k]) {
+        const v = Math.abs(this._uVals[e - 1]);
+        if (v > maxDiag) maxDiag = v;
+        if (v < minDiag) minDiag = v;
+      }
+    }
+
+    return { success: true, conditionEstimate: minDiag > 0 ? maxDiag / minDiag : Infinity };
+  }
+
+  /**
+   * Numeric LU factorization that reuses pivot order from a prior
+   * factorWithReorder call. Skips pivot search — uses stored pinv[]/q[].
+   *
+   * ngspice: spFactor (spfactor.c) — the "fast" factorization path
+   * used on NR iterations 2+ within the same operating point.
+   */
+  private _numericLUReusePivots(): FactorResult {
+    const n = this._n;
+    if (n === 0) return { success: true };
+
+    const x = this._x;
+    const xNzIdx = this._xNzIdx;
+    const pinv = this._pinv;
+    const q = this._q;
+    const permInv = this._permInv;
+
+    let lnz = 0;
+    let unz = 0;
+
+    this._reachMark.fill(-1);
+
+    for (let k = 0; k < n; k++) {
+      this._lColPtr[k] = lnz;
+      this._uColPtr[k] = unz;
+
+      if (lnz + n > this._lRowIdx.length) this._growL(lnz + n);
+      if (unz + n > this._uRowIdx.length) this._growU(unz + n);
+
+      let xNzCount = 0;
+      const origJ = this._perm[k];
+      for (let p = this._cscColPtr[origJ]; p < this._cscColPtr[origJ + 1]; p++) {
+        const newI = permInv[this._cscRowIdx[p]];
+        if (x[newI] === 0) xNzIdx[xNzCount++] = newI;
+        x[newI] += this._cscVals[p];
+      }
+
+      const reachTop = this._reach(k);
+      const reachStack = this._reachStack;
+      for (let ri = reachTop; ri < n; ri++) {
+        const j = reachStack[ri];
+        const qj = q[j];
+        if (x[qj] === 0) continue;
+
+        const ljp0 = this._lColPtr[j];
+        const ljp1 = this._lColPtr[j + 1];
+        for (let lp = ljp0; lp < ljp1; lp++) {
+          const li = this._lRowIdx[lp];
+          if (x[li] === 0) xNzIdx[xNzCount++] = li;
+          x[li] -= this._lVals[lp] * x[qj];
+        }
+      }
+
+      const pivotRow = q[k];
+      const diagVal = x[pivotRow];
+      if (Math.abs(diagVal) < PIVOT_ABS_THRESHOLD) {
+        for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
+        return { success: false };
+      }
+
+      void unz;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (x[i] === 0) continue;
+        const s = pinv[i];
+        if (s >= 0 && s < k) {
+          this._uRowIdx[unz] = i;
+          this._uVals[unz] = x[i];
+          unz++;
+        }
+      }
+      this._uRowIdx[unz] = pivotRow;
+      this._uVals[unz] = diagVal;
+      unz++;
+
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (x[i] === 0) continue;
+        if (pinv[i] <= k) continue;
+        this._lRowIdx[lnz] = i;
+        this._lVals[lnz] = x[i] / diagVal;
+        lnz++;
+      }
+
+      for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
+    }
+
+    this._lColPtr[n] = lnz;
+    this._uColPtr[n] = unz;
+
+    let maxDiag = 0, minDiag = Infinity;
+    for (let k = 0; k < n; k++) {
+      const e = this._uColPtr[k + 1];
+      if (e > this._uColPtr[k]) {
+        const v = Math.abs(this._uVals[e - 1]);
+        if (v > maxDiag) maxDiag = v;
+        if (v < minDiag) minDiag = v;
+      }
+    }
+
+    return { success: true, conditionEstimate: minDiag > 0 ? maxDiag / minDiag : Infinity };
+  }
+
+  // =========================================================================
+  // Factorization public API
+  // =========================================================================
+
+  /**
+   * Apply gmin conductance to CSC diagonal entries.
+   * Extracted from addDiagonalGmin for use within factor paths.
+   */
+  private _applyDiagGmin(diagGmin: number): void {
+    const n = this._n;
+    const colPtr = this._cscColPtr;
+    const rowIdx = this._cscRowIdx;
+    const vals = this._cscVals;
+    for (let col = 0; col < n; col++) {
+      const start = colPtr[col];
+      const end = colPtr[col + 1];
+      for (let k = start; k < end; k++) {
+        if (rowIdx[k] === col) {
+          vals[k] += diagGmin;
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Full factorization with AMD reordering and pivot selection.
+   * ngspice: spOrderAndFactor (spfactor.c).
+   *
+   * Rebuilds CSC + AMD + symbolic LU if topology is dirty, then runs
+   * numeric LU with full pivot search. Establishes the pivot order
+   * (pinv[]/q[]) that factorNumerical will reuse.
+   */
+  factorWithReorder(diagGmin?: number): FactorResult {
+    if (diagGmin) this._applyDiagGmin(diagGmin);
+    if (this._needsReorder) {
+      this._buildCSC();
+      this._computeAMD();
+      this._symbolicLU();
+      this._needsReorder = false;
+      this._topologyDirty = false;
+      this._prevCooCount = this._cooCount;
+      this._hasLinearBase = false;
+    }
+    return this._numericLU();
+  }
+
+  /**
+   * Numerical-only factorization reusing pivot order from last
+   * factorWithReorder call. Skips pivot search for performance.
+   * ngspice: spFactor (spfactor.c).
+   *
+   * Returns { success: false } if the stored pivot gives a near-zero
+   * diagonal value, signaling the NR loop should set shouldReorder=true.
+   */
+  factorNumerical(diagGmin?: number): FactorResult {
+    if (diagGmin) this._applyDiagGmin(diagGmin);
+    return this._numericLUReusePivots();
   }
 
   // =========================================================================

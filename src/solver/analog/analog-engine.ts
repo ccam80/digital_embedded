@@ -339,6 +339,14 @@ export class MNAEngine implements AnalogEngine {
     // ngspice dctran.c:704-706 — rotate deltaOld BEFORE entering the loop.
     this._timestep.rotateDeltaOld();
 
+    // ngspice dctran.c:715-723 — rotate state vectors BEFORE retry loop.
+    // Pointer swap: states[0] is fresh recycled storage, states[1] = previous accepted.
+    // Elements read/write states[0] during NR; states[1] holds the last accepted state.
+    if (statePool) {
+      statePool.rotateStateVectors();
+      statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
+    }
+
     // Phase tracking for stepPhaseHook: first attempt is tranInit on step 0, tranNR thereafter.
     // Subsequent loop iterations in the same step are retries.
     let _stepAttemptCount = 0;
@@ -567,15 +575,9 @@ export class MNAEngine implements AnalogEngine {
     }
     // ---- End single retry loop ----
 
-    // Accept the timestep
+    // Accept the timestep — rotation already happened before the retry loop.
     if (statePool) {
-      const recycled = statePool.states[3];
-      statePool.states[3] = statePool.states[2];
-      statePool.states[2] = statePool.states[1];
-      statePool.states[1] = statePool.states[0];
-      statePool.states[0] = recycled;
       statePool.tranStep++;
-      statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
     }
 
     // NIpred: push fully-accepted solution into history for next step predictor.
@@ -768,6 +770,9 @@ export class MNAEngine implements AnalogEngine {
       limitingCollector: this.limitingCollector,
       onPhaseBegin: phaseHook ? (phase, param) => phaseHook.onAttemptBegin(phase, param ?? 0) : undefined,
       onPhaseEnd: phaseHook ? (outcome, converged) => phaseHook.onAttemptEnd(outcome, converged) : undefined,
+      nodesets: cac.nodesets,
+      ics: cac.ics,
+      srcFact: this._params.srcFact,
     });
 
     if (this._convergenceLog.enabled) {
@@ -816,13 +821,15 @@ export class MNAEngine implements AnalogEngine {
       }
 
       if (cac.statePool) {
+        // ngspice dctran.c:346-350: set analysis mode, zero CKTag[], then copy state.
+        // Order matters: analysisMode must be "tran" and ag[] zeroed BEFORE state0→state1
+        // so that elements reading ag[0] during the first transient NR see ag0=0 (DC form)
+        // for the initial companion stamp, not a stale value.
+        cac.statePool.analysisMode = "tran";
+        cac.statePool.ag[0] = 0;
+        cac.statePool.ag[1] = 0;
         cac.statePool.seedHistory();
         cac.statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
-        // ngspice dctran.c:346: CKTmode flips from MODEDCOP|MODETRANOP to
-        // MODETRAN|MODEINITTRAN at the DC-OP→transient boundary. Mirror that
-        // transition so elements (e.g. BJT geqcb) can switch from DC-form to
-        // ag0-scaled integration without relying on tranStep heuristics.
-        cac.statePool.analysisMode = "tran";
         this._firsttime = true;
       }
 

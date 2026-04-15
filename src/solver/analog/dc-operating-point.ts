@@ -99,6 +99,21 @@ export interface DcOpOptions {
    * @param converged - Whether NR converged in this attempt
    */
   onPhaseEnd?: (outcome: DcOpNRAttemptOutcome, converged: boolean) => void;
+  /**
+   * Nodeset constraints: map of MNA nodeId → target voltage.
+   * Enforced via 1e10 conductance stamp during initJct/initFix NR phases.
+   */
+  nodesets?: Map<number, number>;
+  /**
+   * Initial condition constraints: map of MNA nodeId → target voltage.
+   * Enforced via 1e10 conductance stamp on every NR iteration.
+   */
+  ics?: Map<number, number>;
+  /**
+   * Source stepping scale factor (ngspice srcFact). Applied to nodeset/IC
+   * target voltages during source stepping. Default: 1.0.
+   */
+  srcFact?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +210,7 @@ function restoreSnapshot(
  * @returns DC operating point result with node voltages and convergence metadata
  */
 export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
-  const { solver, elements, matrixSize, params, diagnostics, nodeCount, statePool, postIterationHook, detailedConvergence, limitingCollector, onPhaseBegin, onPhaseEnd } = opts;
+  const { solver, elements, matrixSize, params, diagnostics, nodeCount, statePool, postIterationHook, detailedConvergence, limitingCollector, onPhaseBegin, onPhaseEnd, nodesets, ics, srcFact } = opts;
 
   const nrBase = {
     solver,
@@ -211,6 +226,9 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
     postIterationHook,
     detailedConvergence,
     limitingCollector,
+    nodesets,
+    ics,
+    srcFact,
   };
 
   // -------------------------------------------------------------------------
