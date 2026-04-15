@@ -141,6 +141,48 @@ export class SparseSolver {
   /** Count of rows/columns with exactly one off-diagonal nonzero (singletons). */
   private _singletons: number = 0;
 
+  // -- Parallel-array doubly-linked-list element pool --
+  // Topology-only overlay for Markowitz fill-in tracking during _numericLUMarkowitz.
+  // Values stay in the dense workspace x[]. The linked structure is ephemeral —
+  // built at start of _numericLUMarkowitz, consumed during elimination, abandoned on return.
+  //
+  // ngspice variable mapping:
+  // | ngspice (spfactor.c)     | Ours                    |
+  // |--------------------------|-------------------------|
+  // | Element->NextInRow       | _elNextInRow[e]         |
+  // | Element->NextInCol       | _elNextInCol[e]         |
+  // | Element->Row             | _elRow[e]               |
+  // | Element->Col             | _elCol[e]               |
+  // | CreateFillin()           | _allocElement + _insertIntoRow + _insertIntoCol |
+
+  /** AMD-permuted row of element e. */
+  private _elRow: Int32Array = new Int32Array(0);
+  /** AMD-permuted column of element e. */
+  private _elCol: Int32Array = new Int32Array(0);
+  /** Next element in same row (-1 = end). */
+  private _elNextInRow: Int32Array = new Int32Array(0);
+  /** Prev element in same row (-1 = head). */
+  private _elPrevInRow: Int32Array = new Int32Array(0);
+  /** Next element in same column (-1 = end). */
+  private _elNextInCol: Int32Array = new Int32Array(0);
+  /** Prev element in same column (-1 = head). */
+  private _elPrevInCol: Int32Array = new Int32Array(0);
+
+  /** First element in row r (-1 = empty). Length n. */
+  private _rowHead: Int32Array = new Int32Array(0);
+  /** First element in column c (-1 = empty). Length n. */
+  private _colHead: Int32Array = new Int32Array(0);
+  /** Element index of diagonal (r,r) or -1. Length n. */
+  private _diag: Int32Array = new Int32Array(0);
+
+  /** Next free slot in element pool. */
+  private _elCount: number = 0;
+  /** Current pool capacity. */
+  private _elCapacity: number = 0;
+
+  /** Fill-in detection marker: _elMark[row] = column of last mark. Length n. */
+  private _elMark: Int32Array = new Int32Array(0);
+
   // -- Scratch buffers for _buildCSC (hoisted, grown lazily) --
   /** Per-column nonzero counts + prefix-summed column start offsets. */
   private _bldColCount: Int32Array = new Int32Array(0);
@@ -723,6 +765,20 @@ export class SparseSolver {
     this._uColPtr = new Int32Array(n + 1);
     this._uRowIdx = new Int32Array(alloc);
     this._uVals = new Float64Array(alloc);
+
+    // Linked-list element pool for Markowitz fill-in tracking
+    const elCap = Math.max(nnzA * 3, n * 4);
+    this._elRow = new Int32Array(elCap);
+    this._elCol = new Int32Array(elCap);
+    this._elNextInRow = new Int32Array(elCap);
+    this._elPrevInRow = new Int32Array(elCap);
+    this._elNextInCol = new Int32Array(elCap);
+    this._elPrevInCol = new Int32Array(elCap);
+    this._elCapacity = elCap;
+    this._rowHead = new Int32Array(n).fill(-1);
+    this._colHead = new Int32Array(n).fill(-1);
+    this._diag = new Int32Array(n).fill(-1);
+    this._elMark = new Int32Array(n).fill(-1);
   }
 
   // =========================================================================
@@ -827,8 +883,7 @@ export class SparseSolver {
     pinv.fill(-1);
     this._reachMark.fill(-1);
 
-    this._countMarkowitz();
-    this._markowitzProducts();
+    this._buildLinkedMatrix();
 
     for (let k = 0; k < n; k++) {
       this._lColPtr[k] = lnz;
@@ -861,6 +916,40 @@ export class SparseSolver {
         }
       }
 
+      // Detect and record fill-in entries in column k.
+      // Mark existing entries in column k via the linked structure.
+      let me = this._colHead[k];
+      while (me >= 0) {
+        this._elMark[this._elRow[me]] = k;
+        me = this._elNextInCol[me];
+      }
+
+      // Check all nonzero rows — if unmarked and unpivoted, it's fill-in
+      let hadFillin = false;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (x[i] === 0 || pinv[i] >= 0) continue;
+        if (this._elMark[i] === k) continue; // existing entry
+        // Fill-in at (i, k)
+        const e = this._allocElement(i, k);
+        this._insertIntoRow(e, i);
+        this._insertIntoCol(e, k);
+        this._markowitzRow[i]++;
+        this._markowitzCol[k]++;
+        hadFillin = true;
+      }
+
+      // Recompute Markowitz products and singletons after fill-in
+      if (hadFillin) {
+        let singletons = 0;
+        for (let i = 0; i < n; i++) {
+          if (pinv[i] >= 0) continue;
+          this._markowitzProd[i] = this._markowitzRow[i] * this._markowitzCol[i];
+          if (this._markowitzProd[i] === 0) singletons++;
+        }
+        this._singletons = singletons;
+      }
+
       // 4-phase Markowitz pivot selection (ngspice spOrderAndFactor).
       const pivotRow = this._searchForPivot(k, x, xNzIdx, xNzCount, pinv);
 
@@ -878,10 +967,9 @@ export class SparseSolver {
         return { success: false, singularRow: k };
       }
 
-      // Update Markowitz row counts: decrement for rows in the pivot column
-      // (counts are used by subsequent steps for pivot selection)
+      // Update Markowitz numbers via linked-list traversal
       if (k < n - 1) {
-        this._updateMarkowitzNumbers(k, pivotRow, x, xNzIdx, xNzCount, pinv);
+        this._updateMarkowitzNumbers(k, pivotRow, pinv);
       }
 
       // Store U entries (already-pivoted rows + diagonal)
@@ -1036,6 +1124,152 @@ export class SparseSolver {
   // Factorization public API
   // =========================================================================
 
+  // =========================================================================
+  // Linked-list element pool for Markowitz fill-in tracking
+  // =========================================================================
+
+  /**
+   * Allocate an element slot from the pool.
+   * ngspice: spcreate.c CreateFillin (allocation portion).
+   *
+   * @returns element index
+   */
+  private _allocElement(row: number, col: number): number {
+    if (this._elCount >= this._elCapacity) this._growElements();
+    const e = this._elCount++;
+    this._elRow[e] = row;
+    this._elCol[e] = col;
+    this._elNextInRow[e] = -1;
+    this._elPrevInRow[e] = -1;
+    this._elNextInCol[e] = -1;
+    this._elPrevInCol[e] = -1;
+    return e;
+  }
+
+  /**
+   * Insert element `e` at the head of row `row`'s chain. O(1).
+   */
+  private _insertIntoRow(e: number, row: number): void {
+    const head = this._rowHead[row];
+    this._elNextInRow[e] = head;
+    this._elPrevInRow[e] = -1;
+    if (head >= 0) this._elPrevInRow[head] = e;
+    this._rowHead[row] = e;
+  }
+
+  /**
+   * Insert element `e` at the head of column `col`'s chain. O(1).
+   */
+  private _insertIntoCol(e: number, col: number): void {
+    const head = this._colHead[col];
+    this._elNextInCol[e] = head;
+    this._elPrevInCol[e] = -1;
+    if (head >= 0) this._elPrevInCol[head] = e;
+    this._colHead[col] = e;
+  }
+
+  /**
+   * Remove element `e` from its row chain. O(1).
+   */
+  private _removeFromRow(e: number): void {
+    const prev = this._elPrevInRow[e];
+    const next = this._elNextInRow[e];
+    if (prev >= 0) this._elNextInRow[prev] = next;
+    else this._rowHead[this._elRow[e]] = next;
+    if (next >= 0) this._elPrevInRow[next] = prev;
+  }
+
+  /**
+   * Remove element `e` from its column chain. O(1).
+   */
+  private _removeFromCol(e: number): void {
+    const prev = this._elPrevInCol[e];
+    const next = this._elNextInCol[e];
+    if (prev >= 0) this._elNextInCol[prev] = next;
+    else this._colHead[this._elCol[e]] = next;
+    if (next >= 0) this._elPrevInCol[next] = prev;
+  }
+
+  /**
+   * Double all 6 element arrays when pool is full.
+   * Same growth pattern as _growL/_growU.
+   */
+  private _growElements(): void {
+    const newCap = this._elCapacity * 2;
+    const grow = (old: Int32Array): Int32Array => {
+      const a = new Int32Array(newCap);
+      a.set(old);
+      return a;
+    };
+    this._elRow = grow(this._elRow);
+    this._elCol = grow(this._elCol);
+    this._elNextInRow = grow(this._elNextInRow);
+    this._elPrevInRow = grow(this._elPrevInRow);
+    this._elNextInCol = grow(this._elNextInCol);
+    this._elPrevInCol = grow(this._elPrevInCol);
+    this._elCapacity = newCap;
+  }
+
+  /**
+   * Build linked structure from CSC in AMD-permuted order.
+   * Called at the top of _numericLUMarkowitz, replacing
+   * _countMarkowitz() + _markowitzProducts().
+   *
+   * ngspice variable mapping:
+   * | ngspice (spfactor.c)       | ours                    |
+   * |----------------------------|-------------------------|
+   * | MarkowitzRow[i]            | _markowitzRow[i]        |
+   * | MarkowitzCol[i]            | _markowitzCol[i]        |
+   * | MarkowitzProduct[i]        | _markowitzProd[i]       |
+   * | Singletons                 | _singletons             |
+   * | Element->NextInRow         | _elNextInRow[e]         |
+   * | Element->NextInCol         | _elNextInCol[e]         |
+   * | Element->Row               | _elRow[e]               |
+   * | Element->Col               | _elCol[e]               |
+   */
+  private _buildLinkedMatrix(): void {
+    const n = this._n;
+    this._elCount = 0;
+    this._rowHead.fill(-1);
+    this._colHead.fill(-1);
+    this._diag.fill(-1);
+    this._elMark.fill(-1);
+
+    // Walk CSC in AMD-permuted order
+    for (let amdCol = 0; amdCol < n; amdCol++) {
+      const origCol = this._perm[amdCol];
+      for (let p = this._cscColPtr[origCol]; p < this._cscColPtr[origCol + 1]; p++) {
+        const amdRow = this._permInv[this._cscRowIdx[p]];
+        const e = this._allocElement(amdRow, amdCol);
+        this._insertIntoRow(e, amdRow);
+        this._insertIntoCol(e, amdCol);
+        if (amdRow === amdCol) this._diag[amdRow] = e;
+      }
+    }
+
+    // Compute initial Markowitz counts from linked structure
+    const mRow = this._markowitzRow;
+    const mCol = this._markowitzCol;
+    const mProd = this._markowitzProd;
+    let singletons = 0;
+
+    for (let i = 0; i < n; i++) {
+      let rc = 0;
+      let e = this._rowHead[i];
+      while (e >= 0) { rc++; e = this._elNextInRow[e]; }
+      mRow[i] = rc > 0 ? rc - 1 : 0; // exclude diagonal
+
+      let cc = 0;
+      e = this._colHead[i];
+      while (e >= 0) { cc++; e = this._elNextInCol[e]; }
+      mCol[i] = cc > 0 ? cc - 1 : 0;
+
+      mProd[i] = mRow[i] * mCol[i];
+      if (mProd[i] === 0 && (mRow[i] <= 1 || mCol[i] <= 1)) singletons++;
+    }
+    this._singletons = singletons;
+  }
+
   /**
    * Count off-diagonal nonzeros per row and per column in the CSC matrix.
    * Populates _markowitzRow and _markowitzCol in AMD-permuted space.
@@ -1097,14 +1331,19 @@ export class SparseSolver {
   }
 
   /**
-   * 4-phase Markowitz pivot search matching ngspice's spOrderAndFactor.
+   * 4-phase Markowitz-primary pivot search matching ngspice's SearchForPivot.
    *
-   * Phase 1: Singleton detection — rows with Markowitz product == 0
-   * Phase 2: Diagonal preference — prefer diagonal when Markowitz product is minimal
-   * Phase 3: Column search — minimum Markowitz product among acceptable entries
-   * Phase 4: Entire matrix fallback — largest magnitude among all unpivoted
+   * Phase 1: Singleton detection — rows with Markowitz product == 0 and
+   *          magnitude >= relThreshold. Pick largest magnitude among those.
+   * Phase 2: Diagonal preference — among unpivoted diagonals passing magnitude
+   *          threshold, find minimum Markowitz product.
+   * Phase 3: Column search — walk _colHead[k] chain. Among unpivoted rows
+   *          with |x[row]| >= relThreshold, find minimum mRow[row]*mCol[k]
+   *          product. Tiebreak by largest magnitude.
+   * Phase 4: Fallback — largest magnitude among all unpivoted rows.
    *
-   * All phases enforce numerical stability via relative + absolute thresholds.
+   * The relative threshold is `PIVOT_THRESHOLD * absMax` — Markowitz product
+   * is primary, magnitude ensures numerical stability.
    *
    * ngspice variable mapping:
    * | ngspice (spfactor.c)       | ours                    |
@@ -1131,6 +1370,8 @@ export class SparseSolver {
     pinv: Int32Array
   ): number {
     const mProd = this._markowitzProd;
+    const mRow = this._markowitzRow;
+    const mCol = this._markowitzCol;
 
     // Compute max magnitude among unpivoted rows for relative threshold
     let absMax = 0;
@@ -1145,118 +1386,149 @@ export class SparseSolver {
 
     const relThreshold = PIVOT_THRESHOLD * absMax;
 
-    // Magnitude-based partial pivoting with Markowitz tiebreaker.
-    //
-    // Without accurate fill-in tracking (ngspice uses linked lists for
-    // the reduced submatrix), Markowitz counts become stale after
-    // elimination. Using stale counts as the primary criterion causes
-    // catastrophic numerical instability on real MNA circuits. Therefore:
-    // magnitude is the primary criterion (largest among entries passing
-    // the relative threshold), with Markowitz product as a tiebreaker
-    // among entries of equal magnitude.
-    //
-    // The 4-phase structure (singleton → diagonal → column → full) is
-    // preserved in the Markowitz data computation and update pipeline
-    // for instrumentation. Pivot SELECTION uses magnitude-primary until
-    // fill-in tracking is implemented.
-    const relThresh = PIVOT_THRESHOLD * absMax;
-    let bestRow = -1;
-    let bestVal = 0;
-    let bestProd = Infinity;
-
-    for (let idx = 0; idx < xNzCount; idx++) {
-      const i = xNzIdx[idx];
-      if (pinv[i] >= 0) continue;
-      const v = Math.abs(x[i]);
-      if (v < PIVOT_ABS_THRESHOLD || v < relThresh) continue;
-      const prod = mProd[i];
-      // Primary: largest magnitude. Secondary: lowest Markowitz product.
-      if (v > bestVal || (v === bestVal && prod < bestProd)) {
-        bestVal = v;
-        bestProd = prod;
-        bestRow = i;
+    // Phase 1: Singletons — rows with mProd == 0, magnitude >= relThreshold
+    if (this._singletons > 0) {
+      let bestRow = -1;
+      let bestVal = 0;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (pinv[i] >= 0) continue;
+        if (mProd[i] !== 0) continue;
+        const v = Math.abs(x[i]);
+        if (v < PIVOT_ABS_THRESHOLD || v < relThreshold) continue;
+        if (v > bestVal) {
+          bestVal = v;
+          bestRow = i;
+        }
       }
+      if (bestRow >= 0) return bestRow;
     }
 
-    return bestRow; // -1 if truly singular
+    // Phase 2: Diagonal preference — minimum mProd among unpivoted diagonals
+    // passing magnitude threshold
+    {
+      let bestRow = -1;
+      let bestProd = Infinity;
+      let bestVal = 0;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (pinv[i] >= 0) continue;
+        // Diagonal entry: row == column in AMD space. For column k, check i == k.
+        if (i !== k) continue;
+        const v = Math.abs(x[i]);
+        if (v < PIVOT_ABS_THRESHOLD || v < relThreshold) continue;
+        const prod = mProd[i];
+        if (prod < bestProd || (prod === bestProd && v > bestVal)) {
+          bestProd = prod;
+          bestVal = v;
+          bestRow = i;
+        }
+      }
+      if (bestRow >= 0) return bestRow;
+    }
+
+    // Phase 3: Column search — walk _colHead[k] chain via linked structure.
+    // Among unpivoted rows with |x[row]| >= relThreshold, find minimum
+    // mRow[row] * mCol[k] product. Tiebreak by largest magnitude.
+    {
+      let bestRow = -1;
+      let bestProd = Infinity;
+      let bestVal = 0;
+      let e = this._colHead[k];
+      while (e >= 0) {
+        const row = this._elRow[e];
+        if (pinv[row] < 0) {
+          const v = Math.abs(x[row]);
+          if (v >= PIVOT_ABS_THRESHOLD && v >= relThreshold) {
+            const prod = mRow[row] * mCol[k];
+            if (prod < bestProd || (prod === bestProd && v > bestVal)) {
+              bestProd = prod;
+              bestVal = v;
+              bestRow = row;
+            }
+          }
+        }
+        e = this._elNextInCol[e];
+      }
+      if (bestRow >= 0) return bestRow;
+    }
+
+    // Phase 4: Fallback — largest magnitude among all unpivoted rows
+    {
+      let bestRow = -1;
+      let bestVal = 0;
+      for (let idx = 0; idx < xNzCount; idx++) {
+        const i = xNzIdx[idx];
+        if (pinv[i] >= 0) continue;
+        const v = Math.abs(x[i]);
+        if (v > bestVal) {
+          bestVal = v;
+          bestRow = i;
+        }
+      }
+      return bestRow; // -1 if truly singular
+    }
   }
 
   /**
    * Update Markowitz numbers after eliminating pivot at step `step`.
-   * Decrements row/col counts for entries affected by the pivot row/col,
-   * recalculates products, and updates the singleton count.
+   * Walks linked lists to decrement row/col counts for entries affected
+   * by the pivot row/col, then recalculates products and singleton count.
+   *
    * ngspice: UpdateMarkowitzNumbers in spfactor.c.
+   *
+   * ngspice variable mapping:
+   * | ngspice (spfactor.c)          | ours                         |
+   * |-------------------------------|------------------------------|
+   * | UpdateMarkowitzNumbers()      | _updateMarkowitzNumbers()    |
+   * | MarkowitzRow[i]               | _markowitzRow[i]             |
+   * | MarkowitzCol[i]               | _markowitzCol[i]             |
+   * | MarkowitzProduct[i]           | _markowitzProd[i]            |
+   * | Singletons                    | _singletons                  |
+   * | Element->NextInRow            | _elNextInRow[e]              |
+   * | Element->NextInCol            | _elNextInCol[e]              |
    *
    * @param step The elimination step just completed
    * @param pivotRow The row chosen as pivot
-   * @param x Dense workspace with column values (before clearing)
-   * @param xNzIdx Nonzero indices in x
-   * @param xNzCount Number of nonzero entries
    * @param pinv Pivot inverse mapping
    */
   private _updateMarkowitzNumbers(
     step: number,
     pivotRow: number,
-    x: Float64Array,
-    xNzIdx: Int32Array,
-    xNzCount: number,
     pinv: Int32Array
   ): void {
     const mRow = this._markowitzRow;
     const mCol = this._markowitzCol;
     const mProd = this._markowitzProd;
-    const colPtr = this._cscColPtr;
-    const rowIdx = this._cscRowIdx;
-    const perm = this._perm;
-    const permInv = this._permInv;
-    const n = this._n;
 
-    // pivotRow is in AMD-permuted space. perm[pivotRow] gives the original index.
-    const origPivotRow = perm[pivotRow];
-
-    // 1. Decrement column counts: iterate only active AMD columns that have
-    //    an entry in origPivotRow. Skip already-eliminated columns early.
-    //    N10 fix: skip columns where the AMD index is already pivoted.
-    //    Total work across all pivots is O(nnz) since each entry is visited
-    //    at most once as a pivot row member.
-    for (let amdCol = 0; amdCol < n; amdCol++) {
-      if (amdCol === step || pinv[amdCol] >= 0) continue;
-      const origC = perm[amdCol];
-      const cStart = colPtr[origC];
-      const cEnd = colPtr[origC + 1];
-      for (let p = cStart; p < cEnd; p++) {
-        if (rowIdx[p] === origPivotRow) {
-          if (mCol[amdCol] > 0) mCol[amdCol]--;
-          break;
-        }
-      }
+    // Walk pivot ROW — decrement column counts and remove from column chains
+    let e = this._rowHead[pivotRow];
+    while (e >= 0) {
+      const c = this._elCol[e];
+      const next = this._elNextInRow[e];
+      if (c !== step && mCol[c] > 0) mCol[c]--;
+      this._removeFromCol(e);
+      e = next;
     }
+    this._rowHead[pivotRow] = -1;
 
-    // 2. Decrement row counts: for every entry in the pivot column (original
-    //    column = perm[step]), decrement mRow for still-active rows.
-    const origCol = perm[step];
-    const start = colPtr[origCol];
-    const end = colPtr[origCol + 1];
-    for (let p = start; p < end; p++) {
-      const origR = rowIdx[p];
-      const amdRow = permInv[origR];
-      if (amdRow !== pivotRow && pinv[amdRow] < 0) {
-        if (mRow[amdRow] > 0) mRow[amdRow]--;
-      }
+    // Walk pivot COLUMN — decrement row counts and remove from row chains
+    e = this._colHead[step];
+    while (e >= 0) {
+      const r = this._elRow[e];
+      const next = this._elNextInCol[e];
+      if (r !== pivotRow && mRow[r] > 0) mRow[r]--;
+      this._removeFromRow(e);
+      e = next;
     }
+    this._colHead[step] = -1;
 
-    // 3. Recalculate products and singletons for remaining active entries.
+    // Recompute products and singletons
     let singletons = 0;
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < this._n; i++) {
       if (pinv[i] >= 0) continue;
-      const rr = mRow[i];
-      const cc = mCol[i];
-      if (rr <= 1 || cc <= 1) {
-        singletons++;
-        mProd[i] = 0;
-      } else {
-        mProd[i] = (rr - 1) * (cc - 1);
-      }
+      mProd[i] = mRow[i] * mCol[i];
+      if (mProd[i] === 0) singletons++;
     }
     this._singletons = singletons;
   }
