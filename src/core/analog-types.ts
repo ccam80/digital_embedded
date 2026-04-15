@@ -18,8 +18,9 @@
  * 'trapezoidal' — second-order A-stable (Gear/SPICE default)
  * 'bdf1'        — first-order backward Euler (robust, low accuracy)
  * 'bdf2'        — second-order BDF (good stiffness handling)
+ * 'gear'        — general Gear BDF method, orders 3-6 (nicomcof.c Vandermonde)
  */
-export type IntegrationMethod = "trapezoidal" | "bdf1" | "bdf2";
+export type IntegrationMethod = "trapezoidal" | "bdf1" | "bdf2" | "gear";
 
 // ---------------------------------------------------------------------------
 // Minimal SparseSolver interface — structural duck-type for stamp methods
@@ -224,6 +225,18 @@ export interface AnalogElementCore {
    * Optional; linear elements do not implement this.
    */
   primeJunctions?(): void;
+
+  /**
+   * Device bypass optimization (ngspice bypass check).
+   * When this method returns true AND the NR iteration is > 0, the element's
+   * stamp/stampNonlinear/stampReactiveCompanion calls are skipped — the
+   * contributions from iteration 0 remain in the matrix.
+   *
+   * Implementations compare current and previous node voltages to decide
+   * whether the device operating point has changed enough to warrant
+   * re-stamping. Elements that do not implement this method are always stamped.
+   */
+  shouldBypass?(voltages: Float64Array, prevVoltages: Float64Array): boolean;
 
   /**
    * Optional display label for diagnostic attribution.

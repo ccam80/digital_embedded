@@ -1,10 +1,10 @@
 {
   "summary": {
-    "passed": 16,
+    "passed": 14,
     "failed": 0,
     "skipped": 0,
     "totalFiles": 1,
-    "durationSeconds": 1.1
+    "durationSeconds": 0.5
   },
   "failures": []
 }

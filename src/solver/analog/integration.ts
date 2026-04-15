@@ -294,6 +294,108 @@ export class NodeVoltageHistory {
  * ag[1] = coefficient on Q_{n-1}
  * ag[2] = coefficient on Q_{n-2} (BDF-2 only)
  */
+/**
+ * Solve the GEAR Vandermonde system for integration coefficients ag[0..order].
+ *
+ * Direct port of ngspice NIcomCof() GEAR case (nicomcof.c:53-117).
+ *
+ * Matrix layout: mat[row][col], row = equation index 0..order,
+ *   col = point index 0..order.
+ * Column 0 is a special case: mat[0][0]=1, mat[1..order][0]=0.
+ * Columns 1..order: arg = cumulative sum deltaOld[0..col-1],
+ *   mat[0][col]=1, mat[j][col] = (arg/dt)^j for j=1..order.
+ *
+ * RHS: ag[1] = -1/dt, all others 0.
+ * LU decomposition starts at i=1 (skipping the trivial first column).
+ * Forward then backward substitution on ag[0..order].
+ *
+ * Mapping (ngspice -> ours):
+ *   ckt->CKTdelta       -> dt
+ *   ckt->CKTdeltaOld[i] -> deltaOld[i]   (i=0..order-1)
+ *   ckt->CKTag[i]       -> ag[i]          (i=0..order)
+ *   mat[j][i]           -> mat[j][i]      (same layout)
+ *
+ * @param dt       Current timestep
+ * @param deltaOld Timestep history (deltaOld[0]=dt, deltaOld[1]=h_{n-1}, ...)
+ * @param order    Integration order (1..6)
+ * @param ag       Output coefficient array (length >= order+1)
+ */
+function solveGearVandermonde(
+  dt: number,
+  deltaOld: readonly number[],
+  order: number,
+  ag: Float64Array,
+): void {
+  // Allocate (order+1) x (order+1) matrix, 1-indexed to match ngspice.
+  // We use 0-based arrays but shift indices by 1 when reading ngspice.
+  const n = order + 1; // 0..order
+  const mat: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    mat.push(new Array<number>(n).fill(0));
+  }
+
+  // Initialize RHS (ag). ngspice: bzero then ag[1] = -1/delta.
+  for (let i = 0; i <= order; i++) ag[i] = 0;
+  ag[1] = -1 / dt;
+
+  // Set up matrix columns. ngspice nicomcof.c:70-86.
+  // Column 0: mat[0][0]=1, mat[j][0]=0 for j>=1 (already zeroed).
+  for (let i = 0; i <= order; i++) mat[0][i] = 1;
+  for (let i = 1; i <= order; i++) mat[i][0] = 0;
+
+  // Columns 1..order: arg accumulates deltaOld[i-1], mat[j][i] = (arg/dt)^j.
+  let arg = 0;
+  for (let i = 1; i <= order; i++) {
+    arg += deltaOld[i - 1] > 0 ? deltaOld[i - 1] : dt;
+    let arg1 = 1;
+    for (let j = 1; j <= order; j++) {
+      arg1 *= arg / dt;
+      mat[j][i] = arg1;
+    }
+  }
+
+  // LU decomposition, starting at i=1 (column 0 is trivial). nicomcof.c:95-102.
+  for (let i = 1; i <= order; i++) {
+    for (let j = i + 1; j <= order; j++) {
+      if (Math.abs(mat[i][i]) < 1e-300) {
+        ag[0] = 1 / dt; ag[1] = -1 / dt;
+        for (let k = 2; k <= order; k++) ag[k] = 0;
+        return;
+      }
+      mat[j][i] /= mat[i][i];
+      for (let k = i + 1; k <= order; k++) {
+        mat[j][k] -= mat[j][i] * mat[i][k];
+      }
+    }
+  }
+
+  // Forward substitution. nicomcof.c:104-108.
+  for (let i = 1; i <= order; i++) {
+    for (let j = i + 1; j <= order; j++) {
+      ag[j] = ag[j] - mat[j][i] * ag[i];
+    }
+  }
+
+  // Backward substitution. nicomcof.c:110-116.
+  if (Math.abs(mat[order][order]) < 1e-300) {
+    ag[0] = 1 / dt; ag[1] = -1 / dt;
+    for (let k = 2; k <= order; k++) ag[k] = 0;
+    return;
+  }
+  ag[order] /= mat[order][order];
+  for (let i = order - 1; i >= 0; i--) {
+    for (let j = i + 1; j <= order; j++) {
+      ag[i] = ag[i] - mat[i][j] * ag[j];
+    }
+    if (Math.abs(mat[i][i]) < 1e-300) {
+      ag[0] = 1 / dt; ag[1] = -1 / dt;
+      for (let k = 2; k <= order; k++) ag[k] = 0;
+      return;
+    }
+    ag[i] /= mat[i][i];
+  }
+}
+
 export function computeNIcomCof(
   dt: number,
   deltaOld: readonly number[],
@@ -327,6 +429,8 @@ export function computeNIcomCof(
       ag[0] = -(ag[1] + ag2);
       ag[2] = ag2;
     }
+  } else if (method === "gear") {
+    solveGearVandermonde(dt, deltaOld, order, ag);
   } else {
     // BDF-1
     ag[0] = 1 / dt;

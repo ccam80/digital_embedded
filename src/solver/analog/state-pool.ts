@@ -56,29 +56,44 @@ export class StatePool {
       new Float64Array(totalSlots),
       new Float64Array(totalSlots),
       new Float64Array(totalSlots),
+      new Float64Array(totalSlots),
+      new Float64Array(totalSlots),
+      new Float64Array(totalSlots),
+      new Float64Array(totalSlots),
     ];
   }
 
-  /** Backward-compatible accessors. */
   get state0(): Float64Array { return this.states[0]; }
   get state1(): Float64Array { return this.states[1]; }
   get state2(): Float64Array { return this.states[2]; }
   get state3(): Float64Array { return this.states[3]; }
+  get state4(): Float64Array { return this.states[4]; }
+  get state5(): Float64Array { return this.states[5]; }
+  get state6(): Float64Array { return this.states[6]; }
+  get state7(): Float64Array { return this.states[7]; }
 
-  /** Update all pool-backed elements' s0/s1/s2/s3 references after rotation. */
-  refreshElementRefs(elements: readonly { poolBacked?: true; s0?: Float64Array; s1?: Float64Array; s2?: Float64Array; s3?: Float64Array }[]): void {
+  /** Update all pool-backed elements' s0-s7 references after rotation. */
+  refreshElementRefs(elements: readonly { poolBacked?: true; s0?: Float64Array; s1?: Float64Array; s2?: Float64Array; s3?: Float64Array; s4?: Float64Array; s5?: Float64Array; s6?: Float64Array; s7?: Float64Array }[]): void {
     const s0 = this.states[0];
     const s1 = this.states[1];
     const s2 = this.states[2];
     const s3 = this.states[3];
+    const s4 = this.states[4];
+    const s5 = this.states[5];
+    const s6 = this.states[6];
+    const s7 = this.states[7];
     for (const el of elements) {
       if (el.poolBacked) {
-        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array }).s0 = s0;
-        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array }).s1 = s1;
-        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array }).s2 = s2;
-        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array }).s3 = s3;
+        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s0 = s0;
+        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s1 = s1;
+        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s2 = s2;
+        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s3 = s3;
+        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s4 = s4;
+        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s5 = s5;
+        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s6 = s6;
+        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s7 = s7;
         if (typeof (el as any).refreshSubElementRefs === 'function') {
-          (el as any).refreshSubElementRefs(s0, s1, s2, s3);
+          (el as any).refreshSubElementRefs(s0, s1, s2, s3, s4, s5, s6, s7);
         }
       }
     }
@@ -109,13 +124,17 @@ export class StatePool {
   }
 
   /**
-   * Seed state2 and state3 from state1 (ngspice dctran.c:782-786).
+   * Seed state2 through state7 from state1 (ngspice dctran.c:782-786).
    * Called after first transient step acceptance.
    */
   seedFromState1(): void {
     const s1 = this.states[1];
     this.states[2].set(s1);
     this.states[3].set(s1);
+    this.states[4].set(s1);
+    this.states[5].set(s1);
+    this.states[6].set(s1);
+    this.states[7].set(s1);
   }
 
   /** Seed history from current operating point (post-DCOP). */
@@ -124,5 +143,9 @@ export class StatePool {
     this.states[1].set(s0);
     this.states[2].set(s0);
     this.states[3].set(s0);
+    this.states[4].set(s0);
+    this.states[5].set(s0);
+    this.states[6].set(s0);
+    this.states[7].set(s0);
   }
 }

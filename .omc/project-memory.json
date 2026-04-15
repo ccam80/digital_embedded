@@ -265,8 +265,8 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 345,
-      "lastAccessed": 1776254714311,
+      "accessCount": 349,
+      "lastAccessed": 1776254951740,
       "type": "file"
     },
     {
@@ -295,14 +295,14 @@
     },
     {
       "path": "",
-      "accessCount": 100,
-      "lastAccessed": 1776253108002,
+      "accessCount": 103,
+      "lastAccessed": 1776255028742,
       "type": "directory"
     },
     {
       "path": "src\\core\\analog-engine-interface.ts",
-      "accessCount": 89,
-      "lastAccessed": 1776254593365,
+      "accessCount": 90,
+      "lastAccessed": 1776254895817,
       "type": "directory"
     },
     {
@@ -319,26 +319,26 @@
     },
     {
       "path": "src\\solver\\analog",
-      "accessCount": 64,
-      "lastAccessed": 1776254642722,
+      "accessCount": 66,
+      "lastAccessed": 1776254933567,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\state-pool.ts",
-      "accessCount": 56,
-      "lastAccessed": 1776254552203,
+      "accessCount": 61,
+      "lastAccessed": 1776255100036,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\integration.ts",
+      "accessCount": 55,
+      "lastAccessed": 1776255521801,
       "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\ni\\niiter.c",
       "accessCount": 54,
       "lastAccessed": 1776228002034,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\integration.ts",
-      "accessCount": 52,
-      "lastAccessed": 1776254396761,
       "type": "file"
     },
     {
@@ -361,14 +361,20 @@
     },
     {
       "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 21,
-      "lastAccessed": 1776228008642,
+      "accessCount": 23,
+      "lastAccessed": 1776255557456,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\ckt-terr.ts",
+      "accessCount": 18,
+      "lastAccessed": 1776255341058,
       "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\ni\\nicomcof.c",
-      "accessCount": 17,
-      "lastAccessed": 1776228003258,
+      "accessCount": 18,
+      "lastAccessed": 1776255482777,
       "type": "file"
     },
     {
@@ -387,12 +393,6 @@
       "path": "src\\solver\\coordinator.ts",
       "accessCount": 12,
       "lastAccessed": 1776171966315,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\ckt-terr.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776243981051,
       "type": "file"
     },
     {

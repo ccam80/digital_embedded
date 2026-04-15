@@ -34,23 +34,48 @@ describe('StatePool', () => {
       expect(pool.state0.length).toBe(0);
     });
 
-    it('exposes states ring buffer with 4 entries', () => {
+    it('allocates state4..state7 Float64Arrays of the given size', () => {
+      const pool = new StatePool(6);
+      expect(pool.state4).toBeInstanceOf(Float64Array);
+      expect(pool.state5).toBeInstanceOf(Float64Array);
+      expect(pool.state6).toBeInstanceOf(Float64Array);
+      expect(pool.state7).toBeInstanceOf(Float64Array);
+      expect(pool.state4.length).toBe(6);
+      expect(pool.state5.length).toBe(6);
+      expect(pool.state6.length).toBe(6);
+      expect(pool.state7.length).toBe(6);
+    });
+
+    it('initialises state4..state7 to zero', () => {
       const pool = new StatePool(3);
-      expect(pool.states.length).toBe(4);
+      expect(Array.from(pool.state4)).toEqual([0, 0, 0]);
+      expect(Array.from(pool.state5)).toEqual([0, 0, 0]);
+      expect(Array.from(pool.state6)).toEqual([0, 0, 0]);
+      expect(Array.from(pool.state7)).toEqual([0, 0, 0]);
+    });
+
+    it('exposes states ring buffer with 8 entries', () => {
+      const pool = new StatePool(3);
+      expect(pool.states.length).toBe(8);
       expect(pool.states[0]).toBe(pool.state0);
       expect(pool.states[1]).toBe(pool.state1);
       expect(pool.states[2]).toBe(pool.state2);
       expect(pool.states[3]).toBe(pool.state3);
+      expect(pool.states[4]).toBe(pool.state4);
+      expect(pool.states[5]).toBe(pool.state5);
+      expect(pool.states[6]).toBe(pool.state6);
+      expect(pool.states[7]).toBe(pool.state7);
     });
   });
 
   describe('rotateStateVectors()', () => {
-    it('rotates ring: state3←state2, state2←state1, state1←state0, state0←recycled old state3', () => {
+    it('rotates ring: state3←state2, state2←state1, state1←state0, state0←recycled old state7', () => {
       const pool = new StatePool(3);
       pool.state0.set([1.0, 2.0, 3.0]);
       pool.state1.set([10.0, 20.0, 30.0]);
       pool.state2.set([100.0, 200.0, 300.0]);
       pool.state3.set([1000.0, 2000.0, 3000.0]);
+      pool.state7.set([7000.0, 8000.0, 9000.0]);
 
       pool.rotateStateVectors();
 
@@ -60,17 +85,17 @@ describe('StatePool', () => {
       expect(Array.from(pool.state1)).toEqual([1.0, 2.0, 3.0]);
     });
 
-    it('state0 is the recycled old state3 — pointer swap, no data copy from state1', () => {
+    it('state0 is the recycled old state7 — pointer swap, no data copy from state1', () => {
       const pool = new StatePool(3);
       pool.state0.set([1.0, 2.0, 3.0]);
       pool.state1.set([10.0, 20.0, 30.0]);
       pool.state2.set([100.0, 200.0, 300.0]);
-      pool.state3.set([1000.0, 2000.0, 3000.0]);
+      pool.state7.set([7000.0, 8000.0, 9000.0]);
 
       pool.rotateStateVectors();
 
-      // state0 is the recycled old state3 — contents from before rotation
-      expect(Array.from(pool.state0)).toEqual([1000.0, 2000.0, 3000.0]);
+      // state0 is the recycled old state7 — contents from before rotation
+      expect(Array.from(pool.state0)).toEqual([7000.0, 8000.0, 9000.0]);
     });
 
     it('state1 and state2 are independent after rotateStateVectors — mutating state1 does not affect state2', () => {
@@ -99,34 +124,38 @@ describe('StatePool', () => {
       pool.state3.set([4.0, 4.0]);
 
       pool.rotateStateVectors();
-      // After: state0=[4,4](recycled), state1=[1,1], state2=[2,2], state3=[3,3]
+      // After: state0=recycled old state7 (zeros), state1=[1,1], state2=[2,2], state3=[3,3]
 
       pool.state0.set([5.0, 5.0]);
       pool.rotateStateVectors();
-      // After: state0=[3,3](recycled), state1=[5,5], state2=[1,1], state3=[2,2]
+      // After: state0=recycled old state6 (zeros), state1=[5,5], state2=[1,1], state3=[2,2]
 
       expect(Array.from(pool.state3)).toEqual([2.0, 2.0]);
       expect(Array.from(pool.state2)).toEqual([1.0, 1.0]);
       expect(Array.from(pool.state1)).toEqual([5.0, 5.0]);
-      expect(Array.from(pool.state0)).toEqual([3.0, 3.0]);
     });
 
-    it('four consecutive rotations return all arrays to original identity', () => {
+    it('eight consecutive rotations return all arrays to original identity', () => {
       const pool = new StatePool(2);
       const origS0 = pool.states[0];
       const origS1 = pool.states[1];
       const origS2 = pool.states[2];
       const origS3 = pool.states[3];
+      const origS4 = pool.states[4];
+      const origS5 = pool.states[5];
+      const origS6 = pool.states[6];
+      const origS7 = pool.states[7];
 
-      pool.rotateStateVectors();
-      pool.rotateStateVectors();
-      pool.rotateStateVectors();
-      pool.rotateStateVectors();
+      for (let i = 0; i < 8; i++) pool.rotateStateVectors();
 
       expect(pool.states[0]).toBe(origS0);
       expect(pool.states[1]).toBe(origS1);
       expect(pool.states[2]).toBe(origS2);
       expect(pool.states[3]).toBe(origS3);
+      expect(pool.states[4]).toBe(origS4);
+      expect(pool.states[5]).toBe(origS5);
+      expect(pool.states[6]).toBe(origS6);
+      expect(pool.states[7]).toBe(origS7);
     });
   });
 
@@ -149,6 +178,19 @@ describe('StatePool', () => {
     it('reset on a zero-slot pool does not throw', () => {
       const pool = new StatePool(0);
       expect(() => pool.reset()).not.toThrow();
+    });
+
+    it('zeros all eight vectors including state4..state7', () => {
+      const pool = new StatePool(2);
+      pool.state4.set([11.0, 12.0]);
+      pool.state5.set([13.0, 14.0]);
+      pool.state6.set([15.0, 16.0]);
+      pool.state7.set([17.0, 18.0]);
+      pool.reset();
+      expect(Array.from(pool.state4)).toEqual([0, 0]);
+      expect(Array.from(pool.state5)).toEqual([0, 0]);
+      expect(Array.from(pool.state6)).toEqual([0, 0]);
+      expect(Array.from(pool.state7)).toEqual([0, 0]);
     });
   });
 
@@ -325,13 +367,17 @@ describe('StatePool', () => {
   });
 
   describe('seedHistory()', () => {
-    it('seeds state1, state2, state3 from state0', () => {
+    it('seeds state1 through state7 from state0', () => {
       const pool = new StatePool(3);
       pool.state0.set([0.6, 5.0, 1.2]);
       pool.seedHistory();
       expect(Array.from(pool.state1)).toEqual([0.6, 5.0, 1.2]);
       expect(Array.from(pool.state2)).toEqual([0.6, 5.0, 1.2]);
       expect(Array.from(pool.state3)).toEqual([0.6, 5.0, 1.2]);
+      expect(Array.from(pool.state4)).toEqual([0.6, 5.0, 1.2]);
+      expect(Array.from(pool.state5)).toEqual([0.6, 5.0, 1.2]);
+      expect(Array.from(pool.state6)).toEqual([0.6, 5.0, 1.2]);
+      expect(Array.from(pool.state7)).toEqual([0.6, 5.0, 1.2]);
     });
   });
 

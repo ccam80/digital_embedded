@@ -40,9 +40,11 @@ const TRAP_LTE_FACTOR_1 = 1 / 12;
 /**
  * LTE error factor for Gear (BDF) methods, indexed by (order - 1).
  * gear[0] = 0.5 (BDF-1), gear[1] = 2/9 (BDF-2).
+ * gear[2..5] = factors for GEAR orders 3-6 (geardefs.h).
  */
 const GEAR_LTE_FACTOR_0 = 0.5;
 const GEAR_LTE_FACTOR_1 = 2 / 9;
+const GEAR_LTE_FACTORS = [0.5, 2 / 9, 3 / 22, 12 / 125, 10 / 137, 20 / 343];
 
 // ---------------------------------------------------------------------------
 // LteParams -- tolerance parameters passed from TimestepController
@@ -184,4 +186,123 @@ export function cktTerr(
     return Math.exp(Math.log(del) / order);  // del^(1/order)
   }
   return del;                         // order=1: no root
+}
+
+// ---------------------------------------------------------------------------
+// cktTerrVoltage -- NEWTRUNC voltage-based LTE timestep proposal
+// ---------------------------------------------------------------------------
+
+/**
+ * Voltage-based LTE timestep estimation matching ngspice CKTtrunc with
+ * NEWTRUNC enabled. Uses the same divided-difference algorithm as cktTerr
+ * but operates on node voltages instead of charge values, and uses
+ * lteReltol/lteAbstol tolerance parameters.
+ *
+ * ngspice reference: CKTtrunc() in src/ckttrunc.c (NEWTRUNC code path)
+ *
+ * Mapping table (ngspice -> ours):
+ *   CKTvoltNow         -> vNow
+ *   CKTvolt1           -> v1  (voltage at step n-1)
+ *   CKTvolt2           -> v2  (voltage at step n-2)
+ *   CKTvolt3           -> v3  (voltage at step n-3)
+ *   ckt->CKTdeltaOld[] -> deltaOld
+ *   ckt->CKTlteReltol  -> lteReltol
+ *   ckt->CKTlteAbstol  -> lteAbstol
+ *   ckt->CKTtrtol      -> trtol
+ *
+ * @param vNow      Voltage at current step V_n
+ * @param v1        Voltage at step n-1
+ * @param v2        Voltage at step n-2
+ * @param v3        Voltage at step n-3
+ * @param dt        Current timestep (seconds)
+ * @param deltaOld  Timestep history: [h_{n-1}, h_{n-2}, ...]. Length >= order.
+ * @param order     Integration order (1..6)
+ * @param method    Integration method (determines LTE coefficient)
+ * @param lteReltol Relative LTE tolerance (default 1e-3)
+ * @param lteAbstol Absolute LTE tolerance in volts (default 1e-6)
+ * @param trtol     Truncation error tolerance multiplier (default 7)
+ * @returns Proposed maximum timestep in seconds, or Infinity if no constraint.
+ */
+export function cktTerrVoltage(
+  vNow: number, v1: number, v2: number, v3: number,
+  dt: number,
+  deltaOld: readonly number[],
+  order: number,
+  method: IntegrationMethod,
+  lteReltol: number,
+  lteAbstol: number,
+  trtol: number,
+): number {
+  if (dt <= 0) return Infinity;
+
+  // ------------------------------------------------------------------
+  // Step 1: Compute the (order+1)-th divided difference of V.
+  //
+  // Same unrolled algorithm as cktTerr but applied to voltage history.
+  // ------------------------------------------------------------------
+
+  let diff0 = vNow, diff1 = v1, diff2 = v2, diff3 = v3;
+  const h0 = dt;
+  const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+  const h2 = deltaOld.length > 2 ? deltaOld[2] : h1;
+  let ddiff: number;
+
+  if (order === 1) {
+    diff0 = (diff0 - diff1) / h0;
+    diff1 = (diff1 - diff2) / h1;
+    const dt0 = h1 + h0;
+    diff0 = (diff0 - diff1) / dt0;
+    ddiff = Math.abs(diff0);
+  } else {
+    // order >= 2: 3rd divided difference from 4 points
+    diff0 = (diff0 - diff1) / h0;
+    diff1 = (diff1 - diff2) / h1;
+    diff2 = (diff2 - diff3) / h2;
+    let dt0 = h1 + h0;
+    let dt1 = h2 + h1;
+    diff0 = (diff0 - diff1) / dt0;
+    diff1 = (diff1 - diff2) / dt1;
+    dt0 = dt1 + h0;
+    diff0 = (diff0 - diff1) / dt0;
+    ddiff = Math.abs(diff0);
+  }
+
+  // ------------------------------------------------------------------
+  // Step 2: Method-specific LTE factor
+  // ------------------------------------------------------------------
+
+  let factor: number;
+  if (method === "trapezoidal") {
+    factor = order <= 1 ? TRAP_LTE_FACTOR_0 : TRAP_LTE_FACTOR_1;
+  } else {
+    const idx = Math.min(order - 1, GEAR_LTE_FACTORS.length - 1);
+    factor = GEAR_LTE_FACTORS[idx];
+  }
+
+  // ------------------------------------------------------------------
+  // Step 3: Voltage-domain tolerance
+  //   tol = lteAbstol + lteReltol * max(|vNow|, |v1|)
+  // ------------------------------------------------------------------
+
+  const tol = lteAbstol + lteReltol * Math.max(Math.abs(vNow), Math.abs(v1));
+
+  // ------------------------------------------------------------------
+  // Step 4: Timestep formula
+  //   del = trtol * tol / max(lteAbstol, factor * |ddiff|)
+  // ------------------------------------------------------------------
+
+  const denom = Math.max(lteAbstol, factor * ddiff);
+  if (!(denom > 0)) return Infinity;
+  const del = trtol * tol / denom;
+
+  // ------------------------------------------------------------------
+  // Step 5: Root extraction (same as cktTerr)
+  // ------------------------------------------------------------------
+
+  if (order === 2) {
+    return Math.sqrt(del);
+  } else if (order > 2) {
+    return Math.exp(Math.log(del) / order);
+  }
+  return del;
 }

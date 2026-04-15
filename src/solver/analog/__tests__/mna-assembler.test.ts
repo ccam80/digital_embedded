@@ -348,6 +348,147 @@ describe("stampAll", () => {
 });
 
 // ---------------------------------------------------------------------------
+// shouldBypass tests — device bypass optimization
+// ---------------------------------------------------------------------------
+
+describe("shouldBypass", () => {
+  it("skips stamp/stampNonlinear/stampReactiveCompanion when shouldBypass returns true at iteration > 0", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+
+    const stampFn = vi.fn();
+    const stampNlFn = vi.fn();
+    const stampReactiveFn = vi.fn();
+
+    const el = {
+      pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
+      branchIndex: -1,
+      isNonlinear: true,
+      isReactive: true,
+      stamp: stampFn,
+      stampNonlinear: stampNlFn,
+      stampReactiveCompanion: stampReactiveFn,
+      updateOperatingPoint: vi.fn(() => false),
+      getPinCurrents(): number[] { return [0]; },
+      setParam(): void {},
+      shouldBypass(_v: Float64Array, _pv: Float64Array): boolean { return true; },
+    };
+
+    const voltages = new Float64Array(1);
+    const prevVoltages = new Float64Array(1);
+
+    assembler.stampAll([el], 1, voltages, null, 1, prevVoltages);
+
+    expect(stampFn).not.toHaveBeenCalled();
+    expect(stampNlFn).not.toHaveBeenCalled();
+    expect(stampReactiveFn).not.toHaveBeenCalled();
+  });
+
+  it("does NOT skip stamping when shouldBypass returns true at iteration 0", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+
+    const stampFn = vi.fn();
+
+    const el = {
+      pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
+      branchIndex: -1,
+      isNonlinear: false,
+      isReactive: false,
+      stamp: stampFn,
+      getPinCurrents(): number[] { return [0]; },
+      setParam(): void {},
+      shouldBypass(_v: Float64Array, _pv: Float64Array): boolean { return true; },
+    };
+
+    const voltages = new Float64Array(1);
+    const prevVoltages = new Float64Array(1);
+
+    assembler.stampAll([el], 1, voltages, null, 0, prevVoltages);
+
+    expect(stampFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT skip stamping when shouldBypass returns false", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+
+    const stampFn = vi.fn();
+
+    const el = {
+      pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
+      branchIndex: -1,
+      isNonlinear: false,
+      isReactive: false,
+      stamp: stampFn,
+      getPinCurrents(): number[] { return [0]; },
+      setParam(): void {},
+      shouldBypass(_v: Float64Array, _pv: Float64Array): boolean { return false; },
+    };
+
+    const voltages = new Float64Array(1);
+    const prevVoltages = new Float64Array(1);
+
+    assembler.stampAll([el], 1, voltages, null, 1, prevVoltages);
+
+    expect(stampFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("does NOT skip stamping when prevVoltages is omitted even if shouldBypass exists", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+
+    const stampFn = vi.fn();
+
+    const el = {
+      pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
+      branchIndex: -1,
+      isNonlinear: false,
+      isReactive: false,
+      stamp: stampFn,
+      getPinCurrents(): number[] { return [0]; },
+      setParam(): void {},
+      shouldBypass(_v: Float64Array, _pv: Float64Array): boolean { return true; },
+    };
+
+    const voltages = new Float64Array(1);
+
+    assembler.stampAll([el], 1, voltages, null, 1);
+
+    expect(stampFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("elements without shouldBypass are always stamped at iteration > 0", () => {
+    const solver = new SparseSolver();
+    const assembler = new MNAAssembler(solver);
+
+    const stampFn = vi.fn();
+
+    const el = {
+      pinNodeIds: [1, 0],
+      allNodeIds: [1, 0],
+      branchIndex: -1,
+      isNonlinear: false,
+      isReactive: false,
+      stamp: stampFn,
+      getPinCurrents(): number[] { return [0]; },
+      setParam(): void {},
+    };
+
+    const voltages = new Float64Array(1);
+    const prevVoltages = new Float64Array(1);
+
+    assembler.stampAll([el], 1, voltages, null, 1, prevVoltages);
+
+    expect(stampFn).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // checkAllConvergedDetailed tests (Item 8)
 // ---------------------------------------------------------------------------
 

@@ -265,3 +265,31 @@
 - **Files modified**:
   - src/solver/analog/analog-engine.ts — added _transientDcop() method with MODETRANOP semantics; calls solveDcOperatingPoint with statePool reset, seeds history/analysisMode="tran" after convergence
 - **Tests**: 16/16 passing (covered by Task 4.1.1 test run)
+
+## Task 6.2.1: Expand StatePool from 4 to 8 arrays
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/state-pool.ts, src/solver/analog/__tests__/state-pool.test.ts
+- **Tests**: 26/26 passing
+
+## Task 6.2.2: Add device bypass interface
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/core/analog-types.ts, src/solver/analog/mna-assembler.ts, src/solver/analog/__tests__/mna-assembler.test.ts
+- **Tests**: 19/19 passing
+
+## Task 6.1.1: Implement NEWTRUNC voltage-based LTE
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/ckt-terr.test.ts
+- **Files modified**: src/solver/analog/ckt-terr.ts
+- **Tests**: 14/14 passing
+
+## Task 6.1.2: Implement GEAR integration orders 3-6
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/integration.ts, src/core/analog-types.ts, src/solver/analog/__tests__/integration.test.ts
+- **Tests**: 36/36 passing (6 new GEAR tests added)

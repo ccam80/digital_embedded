@@ -528,4 +528,75 @@ describe("computeNIcomCof", () => {
     const { ag0: ag0Cap } = integrateCapacitor(C, 0, 0, 0, 0, h, h, 2, "trapezoidal", 0);
     expect(ag[0]).toBeCloseTo(ag0Cap, 10);
   });
+
+  it("GEAR order 2 equal steps matches BDF-2: ag[0]=3/(2h), ag[1]=-2/h, ag[2]=1/(2h)", () => {
+    // GEAR method with order=2 and equal steps should produce same coefficients as BDF-2.
+    // nicomcof.c: Vandermonde with r[1]=1, r[2]=2 gives ag*dt = [1.5, -2, 0.5].
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h], 2, "gear", ag);
+    expect(ag[0]).toBeCloseTo(3 / (2 * h), 8);
+    expect(ag[1]).toBeCloseTo(-2 / h, 8);
+    expect(ag[2]).toBeCloseTo(1 / (2 * h), 8);
+  });
+
+  it("GEAR order 3 equal steps: ag*dt = [11/6, -3, 3/2, -1/3]", () => {
+    // Known GEAR-3 equal-step coefficients from numerical integration tables.
+    // nicomcof.c Vandermonde with r[1]=1, r[2]=2, r[3]=3.
+    // ag*dt = [11/6, -3, 3/2, -1/3]
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h, h], 3, "gear", ag);
+    expect(ag[0]).toBeCloseTo(11 / (6 * h), 6);
+    expect(ag[1]).toBeCloseTo(-3 / h, 6);
+    expect(ag[2]).toBeCloseTo(3 / (2 * h), 6);
+    expect(ag[3]).toBeCloseTo(-1 / (3 * h), 6);
+  });
+
+  it("GEAR order 4 equal steps: ag*dt = [25/12, -4, 3, -4/3, 1/4]", () => {
+    // Known GEAR-4 equal-step coefficients.
+    // ag*dt = [25/12, -4, 3, -4/3, 1/4]
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h, h, h], 4, "gear", ag);
+    expect(ag[0]).toBeCloseTo(25 / (12 * h), 6);
+    expect(ag[1]).toBeCloseTo(-4 / h, 6);
+    expect(ag[2]).toBeCloseTo(3 / h, 6);
+    expect(ag[3]).toBeCloseTo(-4 / (3 * h), 6);
+    expect(ag[4]).toBeCloseTo(1 / (4 * h), 6);
+  });
+
+  it("GEAR order 5 equal steps: ag*dt = [137/60, -5, 5, -10/3, 5/4, -1/5]", () => {
+    // Known GEAR-5 equal-step coefficients.
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h, h, h, h], 5, "gear", ag);
+    expect(ag[0]).toBeCloseTo(137 / (60 * h), 5);
+    expect(ag[1]).toBeCloseTo(-5 / h, 5);
+    expect(ag[2]).toBeCloseTo(5 / h, 5);
+    expect(ag[3]).toBeCloseTo(-10 / (3 * h), 5);
+    expect(ag[4]).toBeCloseTo(5 / (4 * h), 5);
+    expect(ag[5]).toBeCloseTo(-1 / (5 * h), 5);
+  });
+
+  it("GEAR order 6 equal steps: ag*dt = [49/20, -6, 15/2, -20/3, 15/4, -6/5, 1/6]", () => {
+    // Known GEAR-6 equal-step coefficients.
+    const ag = new Float64Array(8);
+    computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", ag);
+    expect(ag[0]).toBeCloseTo(49 / (20 * h), 5);
+    expect(ag[1]).toBeCloseTo(-6 / h, 5);
+    expect(ag[2]).toBeCloseTo(15 / (2 * h), 5);
+    expect(ag[3]).toBeCloseTo(-20 / (3 * h), 5);
+    expect(ag[4]).toBeCloseTo(15 / (4 * h), 5);
+    expect(ag[5]).toBeCloseTo(-6 / (5 * h), 5);
+    expect(ag[6]).toBeCloseTo(1 / (6 * h), 5);
+  });
+
+  it("GEAR coefficients sum to zero (interpolation constraint)", () => {
+    // For all GEAR orders, sum(ag) = 0 (the polynomial interpolates Q correctly).
+    const ag = new Float64Array(8);
+    for (const order of [2, 3, 4, 5, 6]) {
+      ag.fill(0);
+      computeNIcomCof(h, [h, h, h, h, h, h], order, "gear", ag);
+      let sum = 0;
+      for (let k = 0; k <= order; k++) sum += ag[k];
+      expect(Math.abs(sum)).toBeLessThan(1e-6 / h);
+    }
+  });
 });
