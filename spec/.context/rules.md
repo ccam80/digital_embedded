@@ -20,7 +20,7 @@ These rules are absolute. No agent may override, soften, or interpret them flexi
 - No fallbacks. No backwards compatibility shims. No safety wrappers.
 - All replaced or edited code is removed entirely. Scorched earth.
 - No commented-out code. No `# previously this was...` comments.
-- **No historical-provenance comments.** Any comment describing what code replaced, what it used to do, why it changed, or where it came from is banned. Examples: "this replaces the old X", "formerly did Y", "migrated from Z", "changed to use A instead of B." Read these as a signal that the agent knowingly failed to implement the new functionality cleanly and included a comment to make a shortcut seem acceptable.
+- **Historical-provenance comments are dead-code markers.** Any comment containing words like "legacy", "fallback", "backwards compatible", "previously", "migrated from", "replaced", "shim", "workaround", "temporary", or "for now" is almost never just a comment problem. The comment exists because an agent left dead or transitional code in place and wrote a comment to avoid deleting it — which would have required fixing tests or completing the real implementation. When you find such a comment: (1) treat the **code it decorates** as dead/broken, (2) delete both the code and the comment, (3) fix or rewrite any tests that depended on the dead code path. Removing only the comment while leaving the code is a rule violation.
 - Comments exist ONLY to explain complicated code to future developers. They never describe what was changed, what was removed, or historical behaviour.
 - No feature flags, no environment-variable toggles for old/new behaviour.
 

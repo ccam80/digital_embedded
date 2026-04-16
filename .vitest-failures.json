@@ -1,27 +1,27 @@
 {
   "summary": {
-    "passed": 186,
+    "passed": 30,
     "failed": 2,
     "skipped": 0,
-    "totalFiles": 7,
-    "durationSeconds": 1.1
+    "totalFiles": 1,
+    "durationSeconds": 0.8
   },
   "failures": [
     {
-      "message": "expected -1439571488470058200 to be greater than 4.5",
+      "message": "expected false to be true // Object.is equality",
       "count": 2,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
-          "test": "transient_rc_decay",
-          "line": 252,
-          "column": 16
+          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+          "test": "iteration capture hook records NR iterations during DC OP",
+          "line": 101,
+          "column": 34
         },
         {
-          "file": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
-          "test": "predictor_off_rc_regression",
-          "line": 609,
-          "column": 16
+          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
+          "test": "postIterationHook fires during DC OP (linear circuit)",
+          "line": 128,
+          "column": 33
         }
       ]
     }
