@@ -850,10 +850,9 @@ describe("xfact_computed_from_deltaOld", () => {
 
     const d0 = ctx.deltaOld[0];
     const d1 = ctx.deltaOld[1];
-    const expectedXfact = d1 > 0 ? d0 / d1 : 0;
 
-    // xfact must match the formula exactly.
-    expect(ctx.loadCtx.xfact).toBeCloseTo(expectedXfact, 10);
+    // xfact must match the spec-literal formula exactly.
+    expect(ctx.loadCtx.xfact).toBe(d0 / d1);
   });
 });
 

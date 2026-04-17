@@ -415,7 +415,7 @@ export class MNAEngine implements AnalogEngine {
       const ctx = this._ctx!;
       // xfact = deltaOld[0] / deltaOld[1] for predictor extrapolation in element load().
       // Written here so all elements read the correct value during this NR call.
-      ctx.loadCtx.xfact = ctx.deltaOld[1] > 0 ? ctx.deltaOld[0] / ctx.deltaOld[1] : 0;
+      ctx.loadCtx.xfact = ctx.deltaOld[0] / ctx.deltaOld[1];
       // dt for reactive elements to use in load() (CKTdelta).
       ctx.loadCtx.dt = dt;
       ctx.maxIterations = params.transientMaxIterations;

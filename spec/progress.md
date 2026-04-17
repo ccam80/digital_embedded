@@ -567,3 +567,13 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
 - **Files modified**: `src/solver/analog/analog-engine.ts` (four post-NR loops deleted; preIterationHook closure deleted; `ctx.loadCtx.xfact = ctx.deltaOld[0] / ctx.deltaOld[1]` assignment added before each NR call), `src/solver/analog/__tests__/analog-engine.test.ts` (rc_transient_without_separate_loops, xfact_computed_from_deltaOld, no_closures_in_step tests added)
 - **Tests**: Grep confirmed 0 matches for banned method-definition pattern in analog-engine.ts ✓; ctx.loadCtx.xfact present (1 match) ✓
 
+
+## Task 2.2_6.3-fix: batch-5 verifier findings remediation
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/__tests__/ckt-load.test.ts` — rewrote `e_singular_recovery_via_cktLoad` test to inject a proxy solver that fails `factor()` on its first call (returns `{ success: false }` with `lastFactorUsedReorder: false`), succeeds on subsequent calls with `lastFactorUsedReorder: true`. Added import for `SparseSolver`. Test now asserts: `converged === true`, `factorCallCount >= 2`, `solver.lastFactorUsedReorder === true` on recovery, and `iterations === 3` (observed literal after E_SINGULAR recovery adds one loop iteration to the normal 2).
+  - `src/solver/analog/analog-engine.ts` — removed `d1 > 0` guard from xfact assignment; spec-literal form `ctx.loadCtx.xfact = ctx.deltaOld[0] / ctx.deltaOld[1]` (IEEE-754 division, no guard).
+  - `src/solver/analog/__tests__/analog-engine.test.ts` — updated `xfact_computed_from_deltaOld` test: removed `d1 > 0 ? d0 / d1 : 0` compound expectation; now asserts `ctx.loadCtx.xfact === d0 / d1` with `toBe` (exact equality, not `toBeCloseTo`).
+- **Tests**: 33/33 passing

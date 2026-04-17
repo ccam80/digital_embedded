@@ -266,32 +266,32 @@
   "hotPaths": [
     {
       "path": "spec\\progress.md",
-      "accessCount": 37,
-      "lastAccessed": 1776432411559,
+      "accessCount": 41,
+      "lastAccessed": 1776432524337,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 30,
-      "lastAccessed": 1776432233183,
+      "accessCount": 32,
+      "lastAccessed": 1776432543841,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 30,
-      "lastAccessed": 1776432356687,
+      "accessCount": 31,
+      "lastAccessed": 1776432529129,
       "type": "directory"
     },
     {
       "path": "spec\\phase-6-model-rewrites.md",
-      "accessCount": 29,
-      "lastAccessed": 1776431091758,
+      "accessCount": 30,
+      "lastAccessed": 1776432499613,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\ckt-context.ts",
-      "accessCount": 28,
-      "lastAccessed": 1776432368571,
+      "accessCount": 30,
+      "lastAccessed": 1776432631856,
       "type": "file"
     },
     {
@@ -302,20 +302,20 @@
     },
     {
       "path": "src\\solver\\analog\\__tests__\\integration.test.ts",
-      "accessCount": 25,
-      "lastAccessed": 1776430798039,
+      "accessCount": 26,
+      "lastAccessed": 1776432679467,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-      "accessCount": 19,
-      "lastAccessed": 1776432228471,
+      "accessCount": 20,
+      "lastAccessed": 1776432830261,
       "type": "file"
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 17,
-      "lastAccessed": 1776430408563,
+      "accessCount": 19,
+      "lastAccessed": 1776432820235,
       "type": "file"
     },
     {
@@ -356,14 +356,20 @@
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 12,
-      "lastAccessed": 1776430408888,
+      "accessCount": 13,
+      "lastAccessed": 1776432820500,
       "type": "file"
     },
     {
       "path": "src\\components\\passives\\analog-fuse.ts",
       "accessCount": 12,
       "lastAccessed": 1776431342307,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\integration.ts",
+      "accessCount": 12,
+      "lastAccessed": 1776432571191,
       "type": "file"
     },
     {
@@ -391,9 +397,9 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\integration.ts",
+      "path": "spec\\phase-2-nr-loop-alignment.md",
       "accessCount": 9,
-      "lastAccessed": 1776432365490,
+      "lastAccessed": 1776432499042,
       "type": "file"
     },
     {
@@ -412,12 +418,6 @@
       "path": "src\\components\\sensors\\spark-gap.ts",
       "accessCount": 8,
       "lastAccessed": 1776427417495,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-2-nr-loop-alignment.md",
-      "accessCount": 8,
-      "lastAccessed": 1776431557251,
       "type": "file"
     },
     {
@@ -445,6 +445,12 @@
       "type": "file"
     },
     {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 7,
+      "lastAccessed": 1776432668675,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\io\\probe.ts",
       "accessCount": 6,
       "lastAccessed": 1776425889412,
@@ -463,21 +469,15 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\ckt-terr.ts",
-      "accessCount": 5,
-      "lastAccessed": 1776421055161,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\analog\\sparse-solver.ts",
-      "accessCount": 5,
-      "lastAccessed": 1776431576605,
+      "accessCount": 6,
+      "lastAccessed": 1776432646614,
       "type": "directory"
     },
     {
-      "path": "spec\\test-baseline.md",
+      "path": "src\\solver\\analog\\ckt-terr.ts",
       "accessCount": 5,
-      "lastAccessed": 1776431839672,
+      "lastAccessed": 1776421055161,
       "type": "file"
     },
     {

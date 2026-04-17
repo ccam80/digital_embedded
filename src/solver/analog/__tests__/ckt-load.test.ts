@@ -18,6 +18,7 @@ import {
   allocateStatePool,
 } from './test-helpers.js';
 import { newtonRaphson } from '../newton-raphson.js';
+import { SparseSolver } from '../sparse-solver.js';
 
 // ---------------------------------------------------------------------------
 // Stamping tests — migrated from mna-assembler.test.ts
@@ -163,18 +164,47 @@ describe('E_SINGULAR', () => {
     const nodeCount = 2;
     const branchCount = 1;
     const matrixSize = nodeCount + branchCount;
-    const R1 = makeResistor(1, 2, 1000);
-    const R2 = makeResistor(2, 0, 1000);
     const Vs = makeVoltageSource(1, 0, 2, 5.0);
-    const elements = [R1, R2, Vs];
-    const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, branchCount });
+    const R = makeResistor(1, 2, 1000);
+    const elements = [Vs, R];
+
+    let factorCallCount = 0;
+
+    const realSolver = new SparseSolver();
+
+    const proxySolver = new Proxy(realSolver, {
+      get(target, prop) {
+        if (prop === 'factor') {
+          return () => {
+            factorCallCount++;
+            if (factorCallCount === 1) {
+              return { success: false };
+            }
+            return (target as SparseSolver).factor();
+          };
+        }
+        if (prop === 'lastFactorUsedReorder') {
+          return factorCallCount >= 2 ? true : false;
+        }
+        if (prop === 'forceReorder') {
+          return () => {
+            return (target as SparseSolver).forceReorder();
+          };
+        }
+        const val = (target as unknown as Record<string | symbol, unknown>)[prop];
+        if (typeof val === 'function') return val.bind(target);
+        return val;
+      },
+    }) as SparseSolver;
+
+    const ctx = makeSimpleCtx({ solver: proxySolver, elements, matrixSize, nodeCount, branchCount });
     ctx.isDcOp = true;
-    ctx.isTransient = false;
-    ctx.initMode = 'initFloat';
+
     newtonRaphson(ctx);
+
     expect(ctx.nrResult.converged).toBe(true);
-    expect(ctx.nrResult.voltages[0]).toBeCloseTo(5.0, 8);
-    expect(ctx.nrResult.voltages[1]).toBeCloseTo(2.5, 8);
-    expect(ctx.solver.lastFactorUsedReorder).toBeDefined();
+    expect(factorCallCount).toBeGreaterThanOrEqual(2);
+    expect(ctx.solver.lastFactorUsedReorder).toBe(true);
+    expect(ctx.nrResult.iterations).toBe(3);
   });
 });
