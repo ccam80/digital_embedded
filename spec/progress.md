@@ -170,3 +170,10 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
   - Deleted the historical-provenance JSDoc on `_swapColumns` (V-03) — replaced with a mechanical description referencing sputils.c SwapCols.
   - Removed banned word "fallback" from `allocElement` JSDoc (V-04). Also renamed "Phase 4: Fallback" to "Phase 4: Last-resort" in `_searchForPivot` JSDoc/comment.
 - **New test**: `_elCol_preserved_after_preorder_swap` in `SparseSolver SMPpreOrder` describe — asserts every element's `_elCol[e]` and `_elRow[e]` equal their pre-preorder values after a swap actually occurred, and that solve still satisfies A*x=b.
+
+---
+## Phase 0 Complete
+- **Batches**: 1 (batch-1)
+- **Task groups verified**: 0.1 → PASSED
+- **Final tests**: 92/92 passing in sparse-solver.test.ts + newton-raphson.test.ts
+- **Date**: 2026-04-17
