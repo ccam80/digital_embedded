@@ -42,9 +42,7 @@ const TRAP_LTE_FACTOR_1 = 1 / 12;
  * gear[0] = 0.5 (BDF-1), gear[1] = 2/9 (BDF-2).
  * gear[2..5] = factors for GEAR orders 3-6 (geardefs.h).
  */
-const GEAR_LTE_FACTOR_0 = 0.5;
-const GEAR_LTE_FACTOR_1 = 2 / 9;
-const GEAR_LTE_FACTORS = [0.5, 2 / 9, 3 / 22, 12 / 125, 10 / 137, 20 / 343];
+export const GEAR_LTE_FACTORS = [0.5, 2 / 9, 3 / 22, 12 / 125, 5 / 72, 20 / 343];
 
 // ---------------------------------------------------------------------------
 // LteParams -- tolerance parameters passed from TimestepController
@@ -60,6 +58,15 @@ export interface LteParams {
   /** Absolute charge tolerance in coulombs (ngspice chgtol, default 1e-14). */
   readonly chgtol: number;
 }
+
+// ---------------------------------------------------------------------------
+// __testHooks -- test-only state for white-box assertions
+// ---------------------------------------------------------------------------
+
+/** @internal Test-only hooks. Not part of the public API. */
+export const __testHooks = {
+  lastChargetol: 0,
+};
 
 // ---------------------------------------------------------------------------
 // cktTerr -- allocation-free per-junction LTE timestep proposal
@@ -141,51 +148,64 @@ export function cktTerr(
   }
 
   // ------------------------------------------------------------------
-  // Step 2: Method-specific LTE factor
-  // ------------------------------------------------------------------
-
-  let factor: number;
-  if (method === "trapezoidal") {
-    factor = order <= 1 ? TRAP_LTE_FACTOR_0 : TRAP_LTE_FACTOR_1;
-  } else {
-    // BDF-1 or BDF-2
-    factor = order <= 1 ? GEAR_LTE_FACTOR_0 : GEAR_LTE_FACTOR_1;
-  }
-
-  // ------------------------------------------------------------------
-  // Step 3: Tolerance computation (ngspice CKTterr dual tolerance)
+  // Step 2: Tolerance computation (ngspice cktterr.c chargetol path)
   //   volttol   = abstol + reltol * max(|ccap0|, |ccap1|)
-  //   chargetol = reltol * max(|Q_now|, |Q_prev|, chgtol) / dt
+  //   chargetol = reltol * max(max(|Q_now|, |Q_prev|), chgtol) / dt
   //   tol = max(volttol, chargetol)
   // ------------------------------------------------------------------
 
   const volttol = params.abstol + params.reltol * Math.max(Math.abs(ccap0), Math.abs(ccap1));
-  const chargetol = Math.max(params.reltol * Math.max(Math.abs(q0), Math.abs(q1)), params.chgtol) / dt;
+  // ngspice cktterr.c chargetol path: reltol * MAX(MAX(|q0|,|q1|), chgtol) / delta
+  const chargetolRaw = params.reltol * Math.max(Math.max(Math.abs(q0), Math.abs(q1)), params.chgtol);
+  __testHooks.lastChargetol = chargetolRaw;
+  const chargetol = chargetolRaw / dt;
   const tol = Math.max(volttol, chargetol);
 
   // ------------------------------------------------------------------
-  // Step 4: Timestep formula
-  //   del = trtol * tol / max(abstol, factor * |ddiff|)
+  // Step 3: Method-specific LTE factor and timestep formula
+  //
+  // ngspice cktterr.c / ckttrunc.c NEWTRUNC path:
+  //   TRAP order 1: del = deltaOld[0] * sqrt(|trtol * tol * 2 / diff|)
+  //   TRAP order 2: del = |deltaOld[0] * trtol * tol * 3 * (deltaOld[0]+deltaOld[1]) / diff|
+  //   GEAR: del = trtol * tol / (factor * ddiff) then root by (order+1)
   // ------------------------------------------------------------------
+
+  if (method === "trapezoidal") {
+    if (ddiff === 0) return Infinity;
+    if (order <= 1) {
+      // ngspice cktterr.c TRAP order 1: del = deltaOld[0] * sqrt(trtol * tol * 2 / diff)
+      const d0 = deltaOld.length > 0 ? deltaOld[0] : dt;
+      const inner = params.trtol * tol * 2 / ddiff;
+      return d0 * Math.sqrt(inner);
+    } else {
+      // ngspice cktterr.c TRAP order 2: del = |deltaOld[0] * trtol * tol * 3 * (deltaOld[0]+deltaOld[1]) / diff|
+      const d0 = deltaOld.length > 0 ? deltaOld[0] : dt;
+      const d1 = deltaOld.length > 1 ? deltaOld[1] : d0;
+      return Math.abs(d0 * params.trtol * tol * 3 * (d0 + d1) / diff0);
+    }
+  }
+
+  // GEAR / BDF-1 / BDF-2: factor-based formula with root extraction
+  // ngspice geardefs.h: GEAR_LTE_FACTORS indexed by (order-1)
+  const factor = GEAR_LTE_FACTORS[Math.min(order - 1, GEAR_LTE_FACTORS.length - 1)];
 
   const denom = Math.max(params.abstol, factor * ddiff);
   if (!(denom > 0)) return Infinity;
   const del = params.trtol * tol / denom;
 
   // ------------------------------------------------------------------
-  // Step 5: Root extraction (ngspice cktterr.c:70-74)
-  //   order=1: no root (return del directly)
-  //   order=2: square root del^(1/2)
-  //   order>2: del^(1/order)
+  // Step 4: Root extraction (ngspice cktterr.c:70-74, V6 fix)
+  //   GEAR order 1: sqrt(del)
+  //   GEAR order >= 2: del^(1/(order+1))
   // ------------------------------------------------------------------
 
-  // ngspice cktterr.c:70-74
-  if (order === 2) {
-    return Math.sqrt(del);           // del^(1/2)
-  } else if (order > 2) {
-    return Math.exp(Math.log(del) / order);  // del^(1/order)
+  if (order === 1) {
+    // ngspice cktterr.c GEAR order 1: Math.sqrt(del)
+    return Math.sqrt(del);
+  } else {
+    // ngspice cktterr.c GEAR order >= 2: exp(log(tmp) / (order+1))
+    return Math.exp(Math.log(del) / (order + 1));
   }
-  return del;                         // order=1: no root
 }
 
 // ---------------------------------------------------------------------------
@@ -268,41 +288,66 @@ export function cktTerrVoltage(
   }
 
   // ------------------------------------------------------------------
-  // Step 2: Method-specific LTE factor
-  // ------------------------------------------------------------------
-
-  let factor: number;
-  if (method === "trapezoidal") {
-    factor = order <= 1 ? TRAP_LTE_FACTOR_0 : TRAP_LTE_FACTOR_1;
-  } else {
-    const idx = Math.min(order - 1, GEAR_LTE_FACTORS.length - 1);
-    factor = GEAR_LTE_FACTORS[idx];
-  }
-
-  // ------------------------------------------------------------------
-  // Step 3: Voltage-domain tolerance
+  // Step 2: Voltage-domain tolerance
   //   tol = lteAbstol + lteReltol * max(|vNow|, |v1|)
   // ------------------------------------------------------------------
 
   const tol = lteAbstol + lteReltol * Math.max(Math.abs(vNow), Math.abs(v1));
 
   // ------------------------------------------------------------------
-  // Step 4: Timestep formula
-  //   del = trtol * tol / max(lteAbstol, factor * |ddiff|)
+  // Step 3: Method-specific LTE factor and timestep formula
+  //
+  // GEAR: ngspice ckttrunc.c NEWTRUNC (V5):
+  //   tmp = (tol * trtol * delsum) / (diff * delta)
+  //   where delsum = sum(deltaOld[0..order])
+  //   then root by (order+1), multiply by delta
+  //
+  // TRAP: same as cktTerr TRAP path
   // ------------------------------------------------------------------
+
+  if (method === "trapezoidal") {
+    if (ddiff === 0) return Infinity;
+    if (order <= 1) {
+      // ngspice ckttrunc.c NEWTRUNC TRAP order 1
+      const d0 = deltaOld.length > 0 ? deltaOld[0] : dt;
+      const inner = trtol * tol * 2 / ddiff;
+      return d0 * Math.sqrt(inner);
+    } else {
+      // ngspice ckttrunc.c NEWTRUNC TRAP order 2
+      const d0 = deltaOld.length > 0 ? deltaOld[0] : dt;
+      const d1 = deltaOld.length > 1 ? deltaOld[1] : d0;
+      return Math.abs(d0 * trtol * tol * 3 * (d0 + d1) / diff0);
+    }
+  }
+
+  // GEAR / BDF-1 / BDF-2: factor-based formula
+  const idx = Math.min(order - 1, GEAR_LTE_FACTORS.length - 1);
+  const factor = GEAR_LTE_FACTORS[idx];
+
+  // ngspice ckttrunc.c NEWTRUNC GEAR (V5):
+  // delsum = sum of deltaOld[0..order], tmp = (tol*trtol*delsum)/(diff*delta)
+  const delta = dt;
+  let delsum = 0;
+  for (let i = 0; i <= order && i < deltaOld.length; i++) {
+    delsum += deltaOld[i];
+  }
+  if (delsum <= 0) delsum = dt * (order + 1);
 
   const denom = Math.max(lteAbstol, factor * ddiff);
   if (!(denom > 0)) return Infinity;
-  const del = trtol * tol / denom;
+  const tmp = (tol * trtol * delsum) / (denom * delta);
 
   // ------------------------------------------------------------------
-  // Step 5: Root extraction (same as cktTerr)
+  // Step 4: Root extraction (ngspice ckttrunc.c NEWTRUNC GEAR, V6 fix)
+  //   GEAR order 1: delta * sqrt(tmp)
+  //   GEAR order >= 2: delta * exp(log(tmp) / (order+1))
   // ------------------------------------------------------------------
 
-  if (order === 2) {
-    return Math.sqrt(del);
-  } else if (order > 2) {
-    return Math.exp(Math.log(del) / order);
+  if (order === 1) {
+    // ngspice ckttrunc.c GEAR order 1: sqrt
+    return delta * Math.sqrt(tmp);
+  } else {
+    // ngspice ckttrunc.c GEAR order >= 2: exp(log(tmp) / (order+1))
+    return delta * Math.exp(Math.log(tmp) / (order + 1));
   }
-  return del;
 }

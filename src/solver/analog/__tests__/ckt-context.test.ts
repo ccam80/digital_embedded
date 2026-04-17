@@ -256,4 +256,85 @@ describe("CKTCircuitContext", () => {
       expect(ctx.elementsWithAcceptStep).toContain(el);
     }
   });
+
+  // -------------------------------------------------------------------------
+  // Test: loadCtx_fields_populated
+  // -------------------------------------------------------------------------
+
+  it("loadCtx_fields_populated", () => {
+    const circuit = makeTestCircuit(9, 1);
+    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint);
+
+    const lc = ctx.loadCtx;
+
+    // solver field — must be the SparseSolver instance on ctx
+    expect(lc.solver).toBe(ctx.solver);
+
+    // voltages — points into rhsOld
+    expect(lc.voltages).toBeInstanceOf(Float64Array);
+    expect(lc.voltages).toBe(ctx.rhsOld);
+
+    // iteration — 0-based, starts at 0
+    expect(typeof lc.iteration).toBe("number");
+    expect(lc.iteration).toBe(0);
+
+    // initMode — one of the valid InitMode values
+    const validModes = ["initJct", "initFix", "initFloat", "initTran", "initPred", "initSmsig", "transient"];
+    expect(validModes).toContain(lc.initMode);
+
+    // dt — 0 at construction (DC mode)
+    expect(typeof lc.dt).toBe("number");
+    expect(lc.dt).toBe(0);
+
+    // method — valid integration method string
+    const validMethods = ["trapezoidal", "bdf1", "bdf2", "gear"];
+    expect(validMethods).toContain(lc.method);
+
+    // order — positive integer
+    expect(typeof lc.order).toBe("number");
+    expect(lc.order).toBeGreaterThanOrEqual(1);
+
+    // deltaOld — length-7 array
+    expect(Array.isArray(lc.deltaOld)).toBe(true);
+    expect(lc.deltaOld.length).toBe(7);
+
+    // ag — Float64Array length 7, same instance as ctx.ag
+    expect(lc.ag).toBeInstanceOf(Float64Array);
+    expect(lc.ag.length).toBe(7);
+    expect(lc.ag).toBe(ctx.ag);
+
+    // srcFact — starts at 1 (full source magnitude)
+    expect(typeof lc.srcFact).toBe("number");
+    expect(lc.srcFact).toBe(1);
+
+    // noncon — mutable ref object with numeric value
+    expect(typeof lc.noncon).toBe("object");
+    expect(lc.noncon).not.toBeNull();
+    expect(typeof lc.noncon.value).toBe("number");
+
+    // limitingCollector — null at construction
+    expect(lc.limitingCollector).toBeNull();
+
+    // isDcOp / isTransient — boolean flags
+    expect(typeof lc.isDcOp).toBe("boolean");
+    expect(typeof lc.isTransient).toBe("boolean");
+
+    // xfact — numeric
+    expect(typeof lc.xfact).toBe("number");
+
+    // gmin — positive number
+    expect(typeof lc.gmin).toBe("number");
+    expect(lc.gmin).toBeGreaterThan(0);
+
+    // uic — boolean
+    expect(typeof lc.uic).toBe("boolean");
+
+    // reltol — matches params
+    expect(typeof lc.reltol).toBe("number");
+    expect(lc.reltol).toBe(defaultParams.reltol);
+
+    // iabstol — matches params abstol
+    expect(typeof lc.iabstol).toBe("number");
+    expect(lc.iabstol).toBe(defaultParams.abstol);
+  });
 });

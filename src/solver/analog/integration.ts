@@ -49,8 +49,10 @@ export function integrateCapacitor(
     ag0 = 1 / dt;
     ccap = (q0 - q1) / dt;
   } else if (method === "trapezoidal") {
-    ag0 = 1 / (dt * (1 - xmu));
-    ccap = (1 / (dt * (1 - xmu))) * (q0 - q1) - ccapPrev;
+    // niinteg.c trap order 2: ag0 = 1/dt/(1-xmu), ag1 = xmu/(1-xmu)
+    ag0 = 1 / dt / (1 - xmu);
+    const ag1 = xmu / (1 - xmu);
+    ccap = ag0 * (q0 - q1) + ag1 * ccapPrev;
   } else {
     // BDF-2: ag[] from NIcomCof matrix solve (nicomcof.c:56-117)
     const safeH1 = h1 > 0 ? h1 : dt;
@@ -110,8 +112,10 @@ export function integrateInductor(
     ag0 = 1 / dt;
     ccap = (phi0 - phi1) / dt;
   } else if (method === "trapezoidal") {
-    ag0 = 1 / (dt * (1 - xmu));
-    ccap = (1 / (dt * (1 - xmu))) * (phi0 - phi1) - ccapPrev;
+    // niinteg.c trap order 2: ag0 = 1/dt/(1-xmu), ag1 = xmu/(1-xmu)
+    ag0 = 1 / dt / (1 - xmu);
+    const ag1 = xmu / (1 - xmu);
+    ccap = ag0 * (phi0 - phi1) + ag1 * ccapPrev;
   } else {
     const safeH1 = h1 > 0 ? h1 : dt;
     // nicomcof.c:79-86 GEAR order=2: Vandermonde points are cumulative
@@ -437,7 +441,8 @@ export function computeNIcomCof(
       ag[1] = -1 / dt;
     } else {
       const xmu = 0.5;
-      ag[0] = 1 / (dt * (1 - xmu));
+      // nicomcof.c trap order 2: two sequential divisions match ngspice operand order
+      ag[0] = 1.0 / dt / (1.0 - xmu);
       ag[1] = xmu / (1 - xmu);
     }
   } else if (method === "bdf2") {

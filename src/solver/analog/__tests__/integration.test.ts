@@ -86,8 +86,9 @@ describe("CompanionModels", () => {
   });
 
   it("capacitor_trapezoidal_history_current", () => {
-    // Trapezoidal requires order >= 2: geq = 2C/h
-    // ccap = 2(q0-q1)/h - ccapPrev; with ccapPrev=0 and q1=C*vPrev: ccap = 2C(vNow-vPrev)/h
+    // Trapezoidal requires order >= 2: geq = 2C/h (xmu=0.5 default)
+    // ag0 = 1/h/(1-0.5) = 2/h; ag1 = 0.5/(1-0.5) = 1
+    // ccap = ag0*(q0-q1) + ag1*ccapPrev; with ccapPrev=0: ccap = 2C(vNow-vPrev)/h
     // ceq = ccap - geq*vNow = 2C(vNow-vPrev)/h - 2C*vNow/h = -2C*vPrev/h
     const vNow = 3.0;
     const vPrev = 1.0;
@@ -548,7 +549,7 @@ describe("computeNIcomCof", () => {
   it("trapezoidal order 2: ag[0]=2/dt, ag[1]=1 (xmu=0.5)", () => {
     const ag = new Float64Array(8);
     computeNIcomCof(h, [h, h], 2, "trapezoidal", ag, scratch);
-    // xmu=0.5: ag[0] = 1/(dt*(1-0.5)) = 2/dt; ag[1] = 0.5/(1-0.5) = 1
+    // xmu=0.5: ag[0] = 1/dt/(1-0.5) = 2/dt; ag[1] = 0.5/(1-0.5) = 1
     expect(ag[0]).toBeCloseTo(2 / h, 10);
     expect(ag[1]).toBeCloseTo(1, 10);
   });
@@ -666,5 +667,105 @@ describe("computeNIcomCof", () => {
       for (let k = 0; k <= order; k++) sum += ag[k];
       expect(Math.abs(sum)).toBeLessThan(1e-9);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 3.2.1 — nicomcof_trap_order2_matches_ngspice_rounding (Bug 3.2.1)
+// ---------------------------------------------------------------------------
+
+describe("nicomcof_rounding", () => {
+  it("nicomcof_trap_order2_matches_ngspice_rounding", () => {
+    // dt=1.23456789e-7, xmu=1/3: 1-xmu=2/3 is not exactly representable in IEEE-754
+    // The two formulas produce different bit-level results:
+    //   correct:  1.0 / dt / (1.0 - xmu)  — two sequential divisions
+    //   old:      1 / (dt * (1 - xmu))     — one multiply then divide
+    const dt = 1.23456789e-7;
+    const xmu = 1 / 3;
+
+    // Compute reference using corrected formula (ngspice nicomcof.c operand order)
+    const correctFormula = 1.0 / dt / (1.0 - xmu);
+    // Compute old formula
+    const oldFormula = 1 / (dt * (1 - xmu));
+
+    // Confirm they differ at the bit level for these inputs
+    expect(correctFormula).not.toBe(oldFormula);
+
+    // computeNIcomCof uses xmu=0.5 internally for trap order 2, so to test the rounding
+    // we verify that the implementation uses sequential divisions.
+    // With xmu=0.5: 1-xmu=0.5, both formulas give the same result (0.5 is exactly representable).
+    // So we test correctness via integrateCapacitor which uses the same formula with external xmu.
+    const { ag0: ag0Result } = integrateCapacitor(1, 0, 0, 0, 0, dt, 0, 2, "trapezoidal", 0, xmu);
+    // ag0 from integrateCapacitor trap order 2 = 1/dt/(1-xmu)
+    const expectedAg0 = 1.0 / dt / (1.0 - xmu);
+    expect(ag0Result).toBe(expectedAg0); // bit-exact
+
+    // Also test computeNIcomCof trap order 2 with xmu=0.5 matches the formula
+    const ag = new Float64Array(8);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(dt, [dt, dt], 2, "trapezoidal", ag, scratch);
+    // xmu=0.5: ag[0] = 1.0/dt/(1.0-0.5) = 1/dt/0.5 = 2/dt
+    const expectedAg0Trap = 1.0 / dt / (1.0 - 0.5);
+    expect(ag[0]).toBe(expectedAg0Trap); // bit-exact
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 3.2.2 — trap_order2_ccap_with_nonstandard_xmu
+// ---------------------------------------------------------------------------
+
+describe("trap_order2_ccap", () => {
+  it("trap_order2_ccap_with_nonstandard_xmu", () => {
+    // xmu=0.3 (non-standard, not 0.5): old code used -ccapPrev, correct uses +ag1*ccapPrev
+    // where ag1 = xmu/(1-xmu) = 0.3/0.7
+    const xmu = 0.3;
+    const q0 = 1e-12, q1 = 0.9e-12;
+    const ccapPrev = 1e-6;
+    const dt = 1e-9;
+    const C = 1;
+
+    // Reference: ngspice niinteg.c trap order 2
+    const ag0 = 1.0 / dt / (1 - xmu);
+    const ag1 = xmu / (1 - xmu);
+    const expectedCcap = ag0 * (q0 - q1) + ag1 * ccapPrev;
+
+    const { ccap } = integrateCapacitor(C, 0, q0, q1, 0, dt, 0, 2, "trapezoidal", ccapPrev, xmu);
+    expect(ccap).toBe(expectedCcap); // bit-exact
+
+    // Verify old formula would have given different result (it used -ccapPrev)
+    const oldCcap = ag0 * (q0 - q1) - ccapPrev;
+    expect(ccap).not.toBe(oldCcap);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 3.2.3 — gear_vandermonde_flat_scratch_regression
+// ---------------------------------------------------------------------------
+
+describe("gear_vandermonde_regression", () => {
+  it("gear_vandermonde_flat_scratch_regression", () => {
+    // Regression test: Phase 1 converted solveGearVandermonde to use a flat scratch buffer.
+    // This test verifies numerical correctness of GEAR order 4 coefficients.
+    const h = 1e-6;
+    const ag = new Float64Array(8);
+    // Allocate scratch independently (not from CKTCircuitContext)
+    const scratch = new Float64Array(49);
+
+    // Verify scratch starts zeroed
+    expect(scratch[0]).toBe(0);
+
+    computeNIcomCof(h, [h, h, h, h], 4, "gear", ag, scratch);
+
+    // Assert ag[0..4] match pre-computed reference values for GEAR order 4 equal steps.
+    // Known GEAR-4 coefficients: ag*dt = [25/12, -4, 3, -4/3, 1/4]
+    const tol = 1e-6;
+    expect(Math.abs(ag[0] - 25 / (12 * h))).toBeLessThan(tol / h);
+    expect(Math.abs(ag[1] - (-4 / h))).toBeLessThan(tol / h);
+    expect(Math.abs(ag[2] - (3 / h))).toBeLessThan(tol / h);
+    expect(Math.abs(ag[3] - (-4 / (3 * h)))).toBeLessThan(tol / h);
+    expect(Math.abs(ag[4] - (1 / (4 * h)))).toBeLessThan(tol / h);
+
+    // Assert the scratch buffer was mutated — confirms it was used (not bypassed)
+    expect(scratch[0]).not.toBe(0);
   });
 });

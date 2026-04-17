@@ -2,9 +2,10 @@
  * AnalogElement interface — the sole contract that all analog circuit
  * components program against.
  *
- * Separate linear and nonlinear stamp methods allow the NR loop to stamp
- * topology-dependent contributions once per solve while re-stamping only the
- * nonlinear operating-point-dependent terms on every iteration.
+ * A single load(ctx: LoadContext) method replaces the former split of stamp /
+ * stampNonlinear / updateOperatingPoint / stampCompanion / stampReactiveCompanion.
+ * This matches ngspice's DEVload dispatch: one call per element per NR iteration
+ * that reads voltages, evaluates device equations, and stamps the MNA matrix.
  */
 
 // Core analog types are defined in core/analog-types.ts to avoid solver→core
@@ -19,7 +20,8 @@ export type {
 
 import type { AnalogElementCore, ComplexSparseSolver, IntegrationMethod, SparseSolverStamp, StatePoolRef } from "../../core/analog-types.js";
 import type { StateSchema } from "./state-schema.js";
-import type { LimitingEvent } from "./newton-raphson.js";
+export type { LoadContext, InitMode } from "./load-context.js";
+import type { LoadContext } from "./load-context.js";
 
 // ---------------------------------------------------------------------------
 // AnalogElement
@@ -38,6 +40,98 @@ import type { LimitingEvent } from "./newton-raphson.js";
  */
 export interface AnalogElement {
   /**
+   * Primary hot-path method. Called every NR iteration.
+   *
+   * Reads terminal voltages from ctx.voltages, evaluates device equations,
+   * and stamps conductance and RHS contributions into ctx.solver. For reactive
+   * elements, also integrates charge/flux inline using ctx.ag[]. Matches
+   * ngspice DEVload.
+   */
+  load(ctx: LoadContext): void;
+
+  /**
+   * Post-acceptance work: update companion state and schedule next breakpoint.
+   *
+   * Called once per accepted timestep — never on a rejected LTE retry and
+   * never inside the NR convergence loop. Absorbs the former updateCompanion
+   * and updateState responsibilities. ctx provides dt, method, and voltages
+   * needed for companion/state updates.
+   */
+  accept?(ctx: LoadContext, simTime: number, addBreakpoint: (t: number) => void): void;
+
+  /**
+   * Element-specific convergence check beyond the global node-voltage criterion.
+   *
+   * Called after every NR iteration. Return true if this element considers
+   * the current solution converged; false to signal that iteration must
+   * continue. Tolerances reltol and iabstol are available on ctx.
+   */
+  checkConvergence?(ctx: LoadContext): boolean;
+
+  /**
+   * CKTterr-based LTE timestep proposal. Returns the maximum allowable
+   * timestep for this element based on charge history divided differences.
+   *
+   * Elements implementing this method call cktTerr() internally for each
+   * reactive junction, passing charge values as individual scalars (not arrays)
+   * to avoid hot-path allocations.
+   */
+  getLteTimestep?(
+    dt: number,
+    deltaOld: readonly number[],
+    order: number,
+    method: IntegrationMethod,
+    lteParams: import("./ckt-terr.js").LteParams,
+  ): number;
+
+  /**
+   * Update a mutable parameter on a live compiled element without
+   * recompilation. Called by the coordinator for slider/property-panel
+   * hot-patching.
+   */
+  setParam(key: string, value: number): void;
+
+  /**
+   * Scale independent source magnitude for source-stepping DC convergence.
+   *
+   * Called by the DC operating point solver during source stepping. The
+   * factor argument ramps from 0 (sources disabled) to 1 (full magnitude).
+   * Elements that are not independent sources do not implement this method.
+   */
+  setSourceScale?(factor: number): void;
+
+  /**
+   * Stamp the element's frequency-domain small-signal model for AC analysis.
+   *
+   * Called once per frequency point during an AC sweep. Resistors stamp
+   * conductance (same as DC); capacitors stamp jωC admittance; inductors
+   * stamp 1/(jωL) admittance; nonlinear elements stamp linearized
+   * small-signal conductances at the DC operating point.
+   */
+  stampAc?(solver: ComplexSparseSolver, omega: number): void;
+
+  /**
+   * Arm a one-shot per-device junction seed for cold-start NR convergence.
+   * Called once by the dcopInitJct phase before the main NR runs. The device
+   * stores tVcrit-derived junction voltages in internal state; the next call
+   * to load() consumes and clears that state.
+   *
+   * Matches ngspice MODEINITJCT (bjtload.c:265-274): a per-device
+   * linearization-point override, NOT a write into the shared MNA vector.
+   * Optional; linear elements do not implement this.
+   */
+  primeJunctions?(): void;
+
+  /**
+   * Compute per-pin currents for this element.
+   *
+   * Returns an array of currents in pinLayout order (same as pinNodeIds),
+   * one per visible pin. Positive means current flowing into the element.
+   * The array must satisfy KCL: the sum of all entries is zero.
+   */
+  getPinCurrents(voltages: Float64Array): number[];
+
+  /**
    * Pin node IDs in pinLayout order.
    *
    * For elements created via the analog compiler, this array is in the same
@@ -54,9 +148,8 @@ export interface AnalogElement {
    * All node IDs for this element: [...pinNodeIds, ...internalNodeIds].
    *
    * Pin nodes appear first in pinLayout order, followed by any internal
-   * nodes allocated by the factory (e.g. the intermediate node in a BJT
-   * Darlington expansion). Used by topology validators that must account
-   * for all nodes an element participates in.
+   * nodes allocated by the factory. Used by topology validators that must
+   * account for all nodes an element participates in.
    *
    * Set by the compiler — never by factory functions.
    */
@@ -64,250 +157,38 @@ export interface AnalogElement {
 
   /**
    * Labels for internal nodes allocated by this element's model, in the
-   * same order as the internal portion of `allNodeIds` (i.e. positions
-   * `pinNodeIds.length .. allNodeIds.length - 1`). Length equals
-   * `allNodeIds.length - pinNodeIds.length`. Absent or empty when the
-   * model allocates no internal nodes. Used for diagnostics / harness
-   * labeling. Treat as `[]` when undefined.
+   * same order as the internal portion of allNodeIds. Absent or empty when
+   * the model allocates no internal nodes.
    */
   readonly internalNodeLabels?: readonly string[];
 
   /**
    * Assigned branch-current row index for elements that introduce extra MNA
    * rows (voltage sources, inductors). Set to -1 for elements that do not
-   * add extra rows (resistors, capacitors, current sources, diodes, etc.).
+   * add extra rows.
    */
   readonly branchIndex: number;
 
   /**
-   * Stamp linear (topology-dependent, operating-point-independent)
-   * contributions into the MNA matrix.
+   * True if this element performs nonlinear stamping inside load().
    *
-   * Called once at the start of each Newton-Raphson solve, after
-   * `solver.beginAssembly()` and before `solver.finalize()`.
-   *
-   * Linear elements (resistors, ideal voltage/current sources) stamp all
-   * their contributions here. Nonlinear elements stamp only the
-   * topology-constant entries here (e.g. nothing for a diode).
-   */
-  stamp(solver: SparseSolverStamp): void;
-
-  /**
-   * Stamp linearized nonlinear contributions at the current operating point.
-   *
-   * Called every NR iteration for nonlinear elements. Must not be called for
-   * linear elements (enforced by the assembler via `isNonlinear`).
-   *
-   * Implementations read the current node voltages from their internal state
-   * (set by `updateOperatingPoint`) and stamp the linearized conductance and
-   * current-source equivalent into the solver.
-   */
-  stampNonlinear?(solver: SparseSolverStamp): void;
-
-  /**
-   * Update internal linearization state from the latest NR solution vector.
-   *
-   * Called after each NR iteration for nonlinear elements, between
-   * `solver.solve()` and the next `stampNonlinear()` call.
-   *
-   * @param voltages - Full MNA solution vector (size = nodeCount + branchCount)
-   */
-  updateOperatingPoint?(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean | void;
-
-  /**
-   * Recompute companion model coefficients and stamp them into the solver.
-   *
-   * Called on reactive elements (capacitors, inductors, coupled inductors)
-   * at the start of each timestep, after `beginAssembly()` and before the
-   * first NR iteration.
-   *
-   * @param dt     - Current timestep in seconds
-   * @param method - Active integration method
-   * @param voltages - Solution vector from the previous accepted timestep
-   */
-  stampCompanion?(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void;
-
-  /**
-   * Stamp previously-computed companion model entries (geq/ieq) into the
-   * MNA matrix. Called every NR iteration. Companion entries are separated
-   * from stamp() so the linear base contains only topology-constant
-   * contributions.
-   */
-  stampReactiveCompanion?(solver: SparseSolverStamp): void;
-
-  /**
-   * Rewrite the _NOW charge/flux slot(s) using converged NR voltages, and
-   * recompute ccap from the converged charge so the next step's trapezoidal
-   * recursion starts from the correct companion current.
-   * Called after NR convergence but before LTE evaluation so that
-   * getLteTimestep sees accurate charge/flux values.
-   * Implementations must write ONLY the _NOW slot — never shift history.
-   */
-  updateChargeFlux?(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void;
-
-  /**
-   * Update non-MNA internal state variables after an accepted timestep.
-   *
-   * Used by elements with state that is not expressed as a companion model
-   * (e.g. thermal energy in a fuse, flux linkage in a memristor). Called
-   * after the timestep is accepted and `voltages` is the accepted solution.
-   *
-   * @param dt      - Accepted timestep in seconds
-   * @param voltages - Accepted solution vector
-   */
-  updateState?(dt: number, voltages: Float64Array): void;
-
-  /**
-   * Update companion-model internal state after an accepted timestep.
-   *
-   * Distinct from `updateState`: this hook is for elements whose companion
-   * model carries per-timestep state that must be refreshed from the accepted
-   * solution (edge detection, pin capacitance history, latched logic levels).
-   * Called exactly once per accepted timestep — never on a rejected LTE retry
-   * and never inside the NR convergence loop — so implementations can safely
-   * perform discrete transitions (e.g. rising-edge latching) without risking
-   * mid-NR false triggers.
-   *
-   * @param dt       - Accepted timestep in seconds
-   * @param method   - Integration method used for this accepted step
-   * @param voltages - Accepted solution vector
-   */
-  updateCompanion?(
-    dt: number,
-    method: IntegrationMethod,
-    voltages: Float64Array,
-  ): void;
-
-  /**
-   * Element-specific convergence check beyond the global node-voltage criterion.
-   *
-   * Called by the assembler after every NR iteration. Return `true` if this
-   * element considers the current solution converged; `false` to signal that
-   * iteration must continue.
-   *
-   * Elements without special convergence requirements omit this method
-   * (the assembler treats absent as converged).
-   *
-   * @param voltages     - Current NR solution vector
-   * @param prevVoltages - Solution vector from the previous NR iteration
-   */
-  checkConvergence?(voltages: Float64Array, prevVoltages: Float64Array, reltol: number, iabstol: number): boolean;
-
-  /**
-   * CKTterr-based LTE timestep proposal. Returns the maximum allowable
-   * timestep for this element based on charge history divided differences.
-   *
-   * Elements implementing this method call `cktTerr()` internally for each
-   * reactive junction, passing charge values as individual scalars (not arrays)
-   * to avoid hot-path allocations.
-   *
-   * @param dt        Current timestep in seconds
-   * @param deltaOld  Timestep history (pre-allocated array from controller)
-   * @param order     Integration order (1 or 2)
-   * @param method    Integration method
-   * @param lteParams Pre-allocated tolerance parameters from controller
-   * @returns Proposed maximum timestep in seconds, or Infinity if no constraint
-   */
-  getLteTimestep?(
-    dt: number,
-    deltaOld: readonly number[],
-    order: number,
-    method: IntegrationMethod,
-    lteParams: import("./ckt-terr.js").LteParams,
-  ): number;
-
-  /**
-   * Scale independent source magnitude for source-stepping DC convergence.
-   *
-   * Called by the DC operating point solver during source stepping. The
-   * `factor` argument ramps from 0 (sources disabled) to 1 (full magnitude).
-   * Elements that are not independent sources do not implement this method.
-   *
-   * @param factor - Scaling factor in [0, 1]
-   */
-  setSourceScale?(factor: number): void;
-
-  /**
-   * Update a mutable parameter on a live compiled element without
-   * recompilation. Called by the coordinator for slider/property-panel
-   * hot-patching.
-   */
-  setParam(key: string, value: number): void;
-
-  /**
-   * Stamp the element's frequency-domain small-signal model for AC analysis.
-   *
-   * Called once per frequency point during an AC sweep. Resistors stamp
-   * conductance (same as DC); capacitors stamp `jωC` admittance; inductors
-   * stamp `1/(jωL)` admittance; nonlinear elements stamp linearized
-   * small-signal conductances at the DC operating point.
-   *
-   * The `ComplexSparseSolver` type is fully specified in Phase 6.
-   *
-   * @param solver - Complex-valued solver for AC stamp accumulation
-   * @param omega  - Angular frequency in rad/s (2π × Hz)
-   */
-  stampAc?(solver: ComplexSparseSolver, omega: number): void;
-
-  /**
-   * True if this element implements `stampNonlinear`.
-   *
-   * The MNA assembler reads this flag to decide whether to call
-   * `stampNonlinear` and `updateOperatingPoint` during NR iteration.
-   * Linear elements set this to `false`.
+   * The engine reads this flag to decide whether to call load() for
+   * nonlinear elements during NR iteration or only once per timestep.
    */
   readonly isNonlinear: boolean;
 
   /**
-   * True if this element implements `stampCompanion`.
+   * True if this element integrates reactive state (charge/flux) inside load().
    *
    * The timestep controller reads this flag to decide whether to call
-   * `stampCompanion` and `getLteTimestep` for reactive element handling.
-   * Non-reactive elements set this to `false`.
+   * getLteTimestep() for reactive element handling.
    */
   readonly isReactive: boolean;
 
   /**
-   * Compute per-pin currents for this element.
-   *
-   * Returns an array of currents in pinLayout order (same as pinNodeIds),
-   * one per visible pin. Positive means current flowing **into** the element.
-   * The array must satisfy KCL: the sum of all entries is zero.
-   *
-   * @param voltages - Full MNA solution vector (size = nodeCount + branchCount)
-   * @returns Array of per-pin currents in amperes, in pinLayout order, length === pinNodeIds.length
-   */
-  getPinCurrents(voltages: Float64Array): number[];
-
-  /**
-   * Arm a one-shot per-device junction seed for cold-start NR convergence.
-   * Called once by the dcopInitJct phase before the main NR runs. The device
-   * stores tVcrit-derived junction voltages in internal state; the next call
-   * to updateOperatingPoint consumes and clears that state, overriding the
-   * values it would otherwise compute from the shared voltages array.
-   *
-   * Matches ngspice MODEINITJCT (bjtload.c:265-274): a per-device
-   * linearization-point override, NOT a write into the shared MNA vector.
-   * Optional; linear elements do not implement this.
-   */
-  primeJunctions?(): void;
-
-  /**
-   * Device bypass optimization (ngspice bypass check).
-   * When this method returns true AND the NR iteration is > 0, the element's
-   * stamp/stampNonlinear/stampReactiveCompanion calls are skipped — the
-   * contributions from iteration 0 remain in the matrix.
-   *
-   * Implementations compare current and previous node voltages to decide
-   * whether the device operating point has changed enough to warrant
-   * re-stamping. Elements that do not implement this method are always stamped.
-   */
-  shouldBypass?(voltages: Float64Array, prevVoltages: Float64Array): boolean;
-
-  /**
    * Optional display label for diagnostic attribution.
    *
-   * When present, used in `Diagnostic.involvedElements` descriptions
+   * When present, used in Diagnostic.involvedElements descriptions
    * to identify which element triggered a convergence failure or anomaly.
    */
   label?: string;
@@ -320,19 +201,6 @@ export interface AnalogElement {
    * can correlate events back to specific circuit elements.
    */
   elementIndex?: number;
-
-  /**
-   * Return simulation times within (tStart, tEnd) at which this element has
-   * a discontinuity (e.g. a square-wave edge, a PWL corner).
-   *
-   * The engine calls this once per step (with the upcoming step window) so
-   * it can pre-register these times as timestep breakpoints, ensuring the
-   * solver lands exactly on each discontinuity rather than stepping across it.
-   *
-   * Only elements with time-varying discontinuities (AC sources with square
-   * or pulse waveforms) need to implement this. All others may omit it.
-   */
-  getBreakpoints?(tStart: number, tEnd: number): number[];
 
   /**
    * Return the strictly-next breakpoint strictly greater than afterTime, or
@@ -352,9 +220,6 @@ export interface AnalogElement {
   /**
    * Called once per accepted timestep so the element can schedule its next
    * waveform edge as a timestep breakpoint.
-   *
-   * @param simTime      - The just-accepted simulation time (seconds)
-   * @param addBreakpoint - Callback to register the next breakpoint time
    */
   acceptStep?(simTime: number, addBreakpoint: (t: number) => void): void;
 }

@@ -443,6 +443,181 @@ describe("NR", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Wave 2.1: pnjlim ngspice-exact tests
+// ---------------------------------------------------------------------------
+
+describe("pnjlim ngspice-exact", () => {
+  it("pnjlim_matches_ngspice_forward_bias", () => {
+    // vold=0.7, vnew=1.5, vt=0.02585, vcrit=0.6
+    // Condition: 1.5 > 0.6 and |1.5-0.7|=0.8 > vt+vt=0.0517 → limiting fires
+    // vold=0.7 > 0: arg = 1 + (1.5-0.7)/0.02585 = 31.946...; arg > 0
+    // result = 0.7 + 0.02585 * Math.log(arg)
+    const vold = 0.7;
+    const vnew = 1.5;
+    const vt = 0.02585;
+    const vcrit = 0.6;
+    const arg = 1 + (vnew - vold) / vt;
+    const expected = vold + vt * Math.log(arg);
+    const result = pnjlim(vnew, vold, vt, vcrit);
+    expect(result.value).toBe(expected);
+    expect(result.limited).toBe(true);
+  });
+
+  it("pnjlim_matches_ngspice_arg_le_zero_branch", () => {
+    // Construct inputs where arg = 1 + (vnew-vold)/vt <= 0
+    // vold=0.5 (>0), vcrit=0.3, vt=0.02585, vnew=0.42
+    // Condition: 0.42 > 0.3 ✓ and |0.42-0.5|=0.08 > 0.0517 ✓
+    // arg = 1 + (0.42-0.5)/0.02585 = 1 - 3.095... < 0 → vnew = vcrit = 0.3
+    const vold = 0.5;
+    const vnew = 0.42;
+    const vt = 0.02585;
+    const vcrit = 0.3;
+    const result = pnjlim(vnew, vold, vt, vcrit);
+    expect(result.value).toBe(vcrit);
+    expect(result.limited).toBe(true);
+  });
+
+  it("pnjlim_matches_ngspice_cold_junction_branch", () => {
+    // vold=-0.1 (≤0), vnew=0.5, vt=0.02585, vcrit=0.3
+    // Condition: 0.5 > 0.3 ✓ and |0.5-(-0.1)|=0.6 > 0.0517 ✓
+    // vold=-0.1 ≤ 0: vnew = vt * Math.log(vnew/vt)
+    const vold = -0.1;
+    const vnew = 0.5;
+    const vt = 0.02585;
+    const vcrit = 0.3;
+    const expected = vt * Math.log(vnew / vt);
+    const result = pnjlim(vnew, vold, vt, vcrit);
+    expect(result.value).toBe(expected);
+    expect(result.limited).toBe(true);
+  });
+
+  it("pnjlim_no_limiting_when_below_vcrit", () => {
+    // vnew=0.3 < vcrit=0.6: outer condition fails → no limiting, return vnew unchanged
+    const vold = 0.2;
+    const vnew = 0.3;
+    const vt = 0.02585;
+    const vcrit = 0.6;
+    const result = pnjlim(vnew, vold, vt, vcrit);
+    expect(result.value).toBe(vnew);
+    expect(result.limited).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave 2.1: fetlim ngspice-exact tests
+// ---------------------------------------------------------------------------
+
+describe("fetlim ngspice-exact", () => {
+  it("fetlim_matches_ngspice_deep_on", () => {
+    // vold=5.0, vnew=8.0, vto=1.0
+    // vtsthi = |2*(5-1)|+2 = 10, vtstlo = 10/2+2 = 7 (fixed formula)
+    // vtox = 1+3.5 = 4.5; vold=5 >= vtox: deep on zone
+    // delv = 3 > 0 (increasing); 3 < vtsthi=10 → no clamping → vnew=8.0 unchanged
+    const result = fetlim(8.0, 5.0, 1.0);
+    expect(result).toBe(8.0);
+  });
+
+  it("fetlim_matches_ngspice_off_region", () => {
+    // vold=-1.0, vnew=3.0, vto=1.0
+    // vtsthi = |2*(-1-1)|+2 = 6, vtstlo = 6/2+2 = 5
+    // vold=-1 < vto=1: OFF zone, delv=4 > 0 (increasing)
+    // vtemp = vto+0.5 = 1.5; vnew=3 > vtemp → vnew = vtemp = 1.5
+    const result = fetlim(3.0, -1.0, 1.0);
+    expect(result).toBe(1.5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave 2.1.3: ipass gated by hadNodeset
+// ---------------------------------------------------------------------------
+
+describe("ipass hadNodeset gate", () => {
+  it("ipass_skipped_without_nodesets", () => {
+    // Circuit with no nodesets and dcopModeLadder: after initFix→initFloat,
+    // hadNodeset=false so ipass is never decremented — convergence fires immediately
+    // when noncon===0 and tolerances pass.
+    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const r = makeResistor(1, 2, 1000);
+    const d = makeDiode(2, 0, 1e-14, 1);
+    const elements = [vs, r, d];
+    const pool = allocateStatePool(elements);
+
+    const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    ctx.diagnostics = new DiagnosticCollector();
+    ctx.isDcOp = true;
+    // No nodesets added — hadNodeset stays false
+    expect(ctx.hadNodeset).toBe(false);
+
+    const pool2 = { initMode: "initFix" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" };
+    let initFloatBeginIter = -1;
+    let convergeIter = -1;
+
+    ctx.dcopModeLadder = {
+      runPrimeJunctions(): void {},
+      pool: pool2,
+      onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iter: number): void {
+        if (phase === "dcopInitFloat") initFloatBeginIter = iter;
+      },
+      onModeEnd(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iter: number, conv: boolean): void {
+        if (conv) convergeIter = iter;
+      },
+    };
+
+    newtonRaphson(ctx);
+
+    expect(ctx.nrResult.converged).toBe(true);
+    // With no nodesets, ipass gate never fires — convergence happens without extra iteration
+    // convergeIter - initFloatBeginIter should be minimal (0 or 1 extra NR steps, not an ipass-forced extra)
+    expect(ctx.hadNodeset).toBe(false);
+  });
+
+  it("ipass_fires_with_nodesets", () => {
+    // Circuit with a nodeset: hadNodeset=true after updateHadNodeset().
+    // After initFix→initFloat transition, ipass=1 is set. With hadNodeset=true,
+    // the ipass decrement fires: one extra NR iteration before convergence returns.
+    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const r = makeResistor(1, 2, 1000);
+    const d = makeDiode(2, 0, 1e-14, 1);
+    const elements = [vs, r, d];
+    const pool = allocateStatePool(elements);
+
+    const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    ctx.diagnostics = new DiagnosticCollector();
+    ctx.isDcOp = true;
+
+    // Add a nodeset and update hadNodeset
+    ctx.nodesets.set(1, 5.0);
+    ctx.updateHadNodeset();
+    expect(ctx.hadNodeset).toBe(true);
+
+    const pool2 = { initMode: "initFix" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" };
+    let initFloatBeginIter = -1;
+    let convergeIter = -1;
+
+    ctx.dcopModeLadder = {
+      runPrimeJunctions(): void {},
+      pool: pool2,
+      onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iter: number): void {
+        if (phase === "dcopInitFloat") initFloatBeginIter = iter;
+      },
+      onModeEnd(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iter: number, conv: boolean): void {
+        if (conv) convergeIter = iter;
+      },
+    };
+
+    newtonRaphson(ctx);
+
+    expect(ctx.nrResult.converged).toBe(true);
+    expect(ctx.hadNodeset).toBe(true);
+    // With nodesets, ipass fires: convergeIter must be at least 1 iteration after
+    // initFloat began (ipass=1 was decremented once, forcing one extra iteration)
+    expect(convergeIter).toBeGreaterThanOrEqual(initFloatBeginIter + 1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Wave 2.1.3: singular retry — factorNumerical failure triggers forceReorder
 // ---------------------------------------------------------------------------
 

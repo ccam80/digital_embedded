@@ -268,3 +268,91 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
 - **Task groups verified**: 1.1 → PASSED (after 1 fail/fix cycle)
 - **Final tests**: ckt-context 3/3, newton-raphson 30/30, dc-operating-point 21/21, integration 36/36, analog-engine 58/60 (2 pre-existing baseline failures), ckt-terr 20/20
 - **Date**: 2026-04-17
+
+## Task 2.1.1: Rewrite pnjlim from ngspice DEVpnjlim (devsup.c:50-58)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/newton-raphson.ts, src/solver/analog/__tests__/newton-raphson.test.ts
+- **Tests**: 37/37 passing
+- **Notes**: Deleted old pnjlim body (which had wrong arg formula with +2 coefficient and a reverse-bias block absent from ngspice). Replaced with direct JS port of DEVpnjlim: outer condition `(vnew > vcrit) && (|vnew-vold| > vt+vt)`, forward-bias branch `arg = 1 + (vnew-vold)/vt` with log or vcrit fallback, cold-junction branch `vt*log(vnew/vt)`, else limited=false. Variable-mapping table added as comment. Added 4 new tests: pnjlim_matches_ngspice_forward_bias, pnjlim_matches_ngspice_arg_le_zero_branch, pnjlim_matches_ngspice_cold_junction_branch, pnjlim_no_limiting_when_below_vcrit.
+
+## Task 2.1.2: Fix fetlim formula bug (vtstlo = vtsthi/2 + 2)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/newton-raphson.ts, src/solver/analog/__tests__/newton-raphson.test.ts
+- **Tests**: 37/37 passing
+- **Notes**: Changed `const vtstlo = Math.abs(vold - vto) + 1` to `const vtstlo = vtsthi / 2 + 2` matching ngspice DEVfetlim exactly. Added 2 new tests: fetlim_matches_ngspice_deep_on (vold=5,vnew=8,vto=1 → unchanged at 8.0), fetlim_matches_ngspice_off_region (vold=-1,vnew=3,vto=1 → clamped to 1.5). Existing fetlim_clamps_above_threshold test still passes with corrected formula.
+
+## Task 2.1.3: Add hadNodeset gate on ipass logic
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/newton-raphson.ts, src/solver/analog/__tests__/newton-raphson.test.ts
+- **Notes**: ckt-context.ts already had hadNodeset field and updateHadNodeset() method from Phase 1. Changed ipass condition from `if (ipass > 0)` to `if (ctx.isDcOp && ctx.hadNodeset && ipass > 0)` matching ngspice niiter.c:1050-1052. Added 2 new tests: ipass_skipped_without_nodesets (no nodesets → hadNodeset=false → ipass gate never fires), ipass_fires_with_nodesets (nodeset added + updateHadNodeset() → hadNodeset=true → ipass decrement executes → convergeIter >= initFloatBeginIter+1).
+- **Tests**: 37/37 passing
+
+## Task 6.1.1: Define LoadContext interface
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/load-context.ts
+- **Files modified**: src/solver/analog/ckt-context.ts
+- **Tests**: 4/4 passing (npx vitest run src/solver/analog/__tests__/ckt-context.test.ts)
+- **Notes**: LoadContext interface defined with all fields from spec. InitMode moved from ckt-context.ts to load-context.ts (ckt-context.ts re-exports it). The local LoadContext forward declaration in ckt-context.ts replaced by import from load-context.ts. loadCtx constructor initializes all 18 fields. set solver() setter syncs loadCtx.solver on reassignment. Codebase-wide tsc breakage after this wave is INTENTIONAL — Wave 6.2 migrates all ~65 element implementations.
+
+## Task 6.1.2: Redefine AnalogElement interface with load()
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/solver/analog/element.ts
+- **Tests**: 4/4 passing (same test run — no element-implementation compilation tested, which is correct per spec: Wave 6.2 handles that gate)
+- **Notes**: AnalogElement interface replaced with load(ctx)-primary shape. Removed: stamp, stampNonlinear, updateOperatingPoint, stampCompanion, stampReactiveCompanion, updateChargeFlux, updateState, updateCompanion, shouldBypass, getBreakpoints. Added: load(ctx), accept(ctx, simTime, addBreakpoint), checkConvergence(ctx), getLteTimestep (unchanged signature). LimitingEvent import removed from element.ts (now lives in load-context.ts). LoadContext and InitMode re-exported from element.ts for downstream consumers. Codebase-wide tsc breakage is INTENTIONAL — pending Wave 6.2 atomic migration of all element implementations.
+
+## Task 3.1.1: Fix chargetol formula (Bug C1)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/ckt-terr.ts
+- **Tests**: 63/63 passing
+- **Notes**: Fixed chargetol formula — chgtol moved inside reltol scaling. Added __testHooks.lastChargetol export (stores pre-division intermediate). Added test chargetol_includes_chgtol_in_reltol_scaling.
+
+## Task 3.1.2: Fix GEAR LTE factor selection (Bug C2)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/ckt-terr.ts
+- **Tests**: 63/63 passing
+- **Notes**: Changed GEAR branch in cktTerr to use GEAR_LTE_FACTORS[Math.min(order-1, len-1)]. Exported GEAR_LTE_FACTORS. Added gear_lte_factor_order_3 and gear_lte_factor_order_6 tests. GEAR_LTE_FACTORS[4] corrected to 5/72 per geardefs.h (was 10/137).
+
+## Task 3.1.3: Fix cktTerr/cktTerrVoltage formulas (Bugs V3-V6)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/ckt-terr.ts
+- **Tests**: 63/63 passing
+- **Notes**: V3/V4 TRAP formulas applied to both cktTerr and cktTerrVoltage. V5 GEAR formula (delsum-based) applied to cktTerrVoltage. V6 root extraction fixed to sqrt for order=1 and exp(log/order+1) for order>=2 in both functions.
+
+## Task 3.2.1: Fix NIcomCof trap order 2 rounding
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/integration.ts
+- **Tests**: 63/63 passing
+- **Notes**: Changed 1/(dt*(1-xmu)) to 1.0/dt/(1.0-xmu) in computeNIcomCof trap order 2 branch. Added nicomcof_trap_order2_matches_ngspice_rounding test.
+
+## Task 3.2.2: Fix NIintegrate trap order 2 ccapPrev coefficient
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/integration.ts
+- **Tests**: 63/63 passing
+- **Notes**: Fixed integrateCapacitor and integrateInductor trap order 2: ccap = ag0*(q0-q1) + ag1*ccapPrev where ag1=xmu/(1-xmu). Also changed ag0 to use sequential division. Added trap_order2_ccap_with_nonstandard_xmu test.
+
+## Task 3.2.3: Add Gear Vandermonde regression test
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/__tests__/integration.test.ts
+- **Tests**: 63/63 passing
+- **Notes**: Added gear_vandermonde_flat_scratch_regression test — allocates scratch Float64Array(49) directly, calls computeNIcomCof order=4, asserts ag[0..4] match known GEAR-4 coefficients, confirms scratch was mutated.

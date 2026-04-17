@@ -112,35 +112,33 @@ export interface PnjlimResult {
  */
 const _pnjlimResult: PnjlimResult = { value: 0, limited: false };
 
+/**
+ * Direct JavaScript port of ngspice DEVpnjlim (devsup.c:50-58).
+ *
+ * Variable mapping (ngspice → ours):
+ *   vnew   → vnew   (proposed new junction voltage)
+ *   vold   → vold   (previous junction voltage)
+ *   vt     → vt     (thermal voltage, kT/q ≈ 0.02585 V at 300 K)
+ *   vcrit  → vcrit  (critical voltage, ≈0.6 V for silicon)
+ *   *icheck → limited (true when ngspice sets *icheck = 1)
+ *   log    → Math.log (natural logarithm)
+ */
 export function pnjlim(vnew: number, vold: number, vt: number, vcrit: number): PnjlimResult {
-  let limited = false;
-  if (vnew > vcrit && Math.abs(vnew - vold) > 2 * vt) {
-    // Large forward-bias step: compress logarithmically to prevent exp() overflow
+  let limited: boolean;
+  if ((vnew > vcrit) && (Math.abs(vnew - vold) > (vt + vt))) {
     if (vold > 0) {
-      const arg = (vnew - vold) / vt;
+      const arg = 1 + (vnew - vold) / vt;
       if (arg > 0) {
-        vnew = vold + vt * (2 + Math.log(arg - 2));
+        vnew = vold + vt * Math.log(arg);
       } else {
-        vnew = vold - vt * (2 + Math.log(2 - arg));
+        vnew = vcrit;
       }
     } else {
       vnew = vt * Math.log(vnew / vt);
     }
     limited = true;
   } else {
-    // Reverse-bias limiting (ngspice devsup.c AlansFixes, lines 65-79)
-    if (vnew < 0) {
-      let arg: number;
-      if (vold > 0) {
-        arg = -vold - 1;
-      } else {
-        arg = 2 * vold - 1;
-      }
-      if (vnew < arg) {
-        vnew = arg;
-        limited = true;
-      }
-    }
+    limited = false;
   }
   _pnjlimResult.value = vnew;
   _pnjlimResult.limited = limited;
@@ -171,7 +169,7 @@ export function pnjlim(vnew: number, vold: number, vt: number, vcrit: number): P
  */
 export function fetlim(vnew: number, vold: number, vto: number): number {
   const vtsthi = Math.abs(2 * (vold - vto)) + 2;
-  const vtstlo = Math.abs(vold - vto) + 1;
+  const vtstlo = vtsthi / 2 + 2;
   const vtox = vto + 3.5;
   const delv = vnew - vold;
 
@@ -500,7 +498,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
     if (curInitMode === "initFloat" || curInitMode === "transient") {
       if (assembler.noncon === 0 && globalConverged && elemConverged) {
-        if (ipass > 0) {
+        if (ctx.isDcOp && ctx.hadNodeset && ipass > 0) {
           ipass--;
           assembler.noncon = 1;
         } else {

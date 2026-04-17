@@ -81,8 +81,8 @@
           "6.1.2"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 3,
+      "completed": 3,
       "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
@@ -283,5 +283,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-17T06:25:17.424Z"
+  "last_updated": "2026-04-17T06:38:21.016Z"
 }

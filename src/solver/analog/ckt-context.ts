@@ -17,20 +17,8 @@ import type { StatePool } from "./state-pool.js";
 import type { DiagnosticCollector } from "./diagnostics.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import type { LimitingEvent } from "./newton-raphson.js";
-
-// ---------------------------------------------------------------------------
-// InitMode — canonical type for pool.initMode values
-// ---------------------------------------------------------------------------
-
-/** Pool initMode values used throughout the DCOP and transient flow. */
-export type InitMode =
-  | "initJct"
-  | "initFix"
-  | "initFloat"
-  | "initTran"
-  | "initPred"
-  | "initSmsig"
-  | "transient";
+export type { InitMode, LoadContext } from "./load-context.js";
+import type { InitMode, LoadContext } from "./load-context.js";
 
 // ---------------------------------------------------------------------------
 // NRResult — mutable result class for Newton-Raphson iterations
@@ -110,35 +98,6 @@ export class DcOpResult {
 }
 
 // ---------------------------------------------------------------------------
-// LoadContext — forward declaration (populated in Phase 6 Wave 6.1)
-// ---------------------------------------------------------------------------
-
-/**
- * Per-iteration context passed to element.load() calls.
- * Defined here as a minimal opaque interface; Phase 6 Wave 6.1 expands it.
- */
-export interface LoadContext {
-  /** Current NR iteration (0-based). */
-  iteration: number;
-  /** Current solution vector. */
-  voltages: Float64Array;
-  /** Current DC-OP / transient init mode. */
-  initMode: InitMode;
-  /** Current timestep in seconds (0 during DC-OP). */
-  dt: number;
-  /** Source stepping scale factor. */
-  srcFact: number;
-  /** Whether this is a DC operating point solve. */
-  isDcOp: boolean;
-  /** Whether this is a transient solve. */
-  isTransient: boolean;
-  /** Integration coefficients (CKTag[]). */
-  ag: Float64Array;
-  /** Mutable non-convergence counter shared across elements. */
-  noncon: { value: number };
-}
-
-// ---------------------------------------------------------------------------
 // CKTCircuitContext
 // ---------------------------------------------------------------------------
 
@@ -181,6 +140,9 @@ export class CKTCircuitContext {
   set solver(s: SparseSolver) {
     this._solver = s;
     this.assembler = new MNAAssembler(s);
+    if (this.loadCtx !== undefined) {
+      this.loadCtx.solver = s;
+    }
   }
 
   /**
@@ -525,18 +487,28 @@ export class CKTCircuitContext {
     this.nrResult = new NRResult(this.rhs);
     this.dcopResult = new DcOpResult(this.dcopVoltages);
 
-    // Load context shell (Phase 6 Wave 6.1 populates field list)
+    // Load context — pre-allocated once, mutated in place each NR iteration
     const nonconRef = { value: 0 };
     this.loadCtx = {
+      solver: this._solver,
       iteration: 0,
       voltages: this.rhsOld,
       initMode: "transient",
       dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: this.deltaOld,
+      ag: this.ag,
       srcFact: 1,
+      noncon: nonconRef,
+      limitingCollector: null,
       isDcOp: false,
       isTransient: false,
-      ag: this.ag,
-      noncon: nonconRef,
+      xfact: 0,
+      gmin: params.gmin ?? 1e-12,
+      uic: false,
+      reltol: params.reltol,
+      iabstol: params.abstol,
     };
 
     // Tolerances
