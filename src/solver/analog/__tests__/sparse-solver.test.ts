@@ -1965,6 +1965,58 @@ describe("SparseSolver SMPpreOrder", () => {
     expect(x[1]).toBeCloseTo(3 / 2, 10);
     expect(x[2]).toBeCloseTo(5 / 4, 10);
   });
+
+  it("_elCol_preserved_after_preorder_swap", () => {
+    // Every element's stored _elCol must remain equal to its original column
+    // after preorder swaps (ngspice Element->Col convention: sputils.c:283-301).
+    // Build a 3x3 MNA matrix with a zero diagonal at col 2 so preorder will
+    // actually swap columns 0 and 2.
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 1);
+    solver.stamp(0, 2, 1);
+    solver.stamp(2, 0, 1);
+    solver.stamp(1, 1, 1);
+    solver.stampRHS(0, 0);
+    solver.stampRHS(1, 0);
+    solver.stampRHS(2, 5);
+    solver.finalize();
+
+    // Capture each element's original column BEFORE preorder.
+    const elCount = (solver as any)._elCount as number;
+    const elRowBefore = Array.from((solver as any)._elRow as Int32Array).slice(0, elCount);
+    const elColBefore = Array.from((solver as any)._elCol as Int32Array).slice(0, elCount);
+
+    solver.preorder();
+
+    // Verify preorder actually performed a swap.
+    const perm = Array.from((solver as any)._preorderColPerm as Int32Array);
+    const swapOccurred = perm.some((v, i) => v !== i);
+    expect(swapOccurred).toBe(true);
+
+    // Every element's _elCol must still equal its original column.
+    const elColAfter = Array.from((solver as any)._elCol as Int32Array).slice(0, elCount);
+    expect(elColAfter).toEqual(elColBefore);
+
+    // _elRow must also be untouched (only columns are swapped).
+    const elRowAfter = Array.from((solver as any)._elRow as Int32Array).slice(0, elCount);
+    expect(elRowAfter).toEqual(elRowBefore);
+
+    // Factor and solve must still satisfy A*x = b in original coordinates.
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+    const x = new Float64Array(3);
+    solver.solve(x);
+    const entries: [number, number, number][] = [[0,0,1],[0,2,1],[1,1,1],[2,0,1]];
+    const rhs = [0, 0, 5];
+    for (let i = 0; i < 3; i++) {
+      let sum = 0;
+      for (const [r, c, v] of entries) {
+        if (r === i) sum += v * x[c];
+      }
+      expect(Math.abs(sum - rhs[i])).toBeLessThan(1e-10);
+    }
+  });
 });
 
 describe("SparseSolver no-AMD Markowitz ordering", () => {

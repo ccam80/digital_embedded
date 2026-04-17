@@ -81,6 +81,14 @@ export class SparseSolver {
    */
   private _preorderColPerm: Int32Array = new Int32Array(0);
 
+  /**
+   * Inverse of _preorderColPerm: _extToIntCol[originalCol] = internalCol.
+   * Identity initially. Updated by _swapColumns in lockstep with _preorderColPerm.
+   * Used by _removeFromCol and _updateMarkowitzNumbers to translate the element's
+   * stored original column into the internal column index that keys _colHead/_markowitzCol.
+   */
+  private _extToIntCol: Int32Array = new Int32Array(0);
+
   /** Next free slot in element pool (used when no free-list entry). */
   private _elCount: number = 0;
   /** Current pool capacity. */
@@ -196,18 +204,22 @@ export class SparseSolver {
    * ngspice: spGetElement (spbuild.c) — returns a pointer used by *ElementPtr += value.
    *
    * O(1) via handle table when n <= handle table size.
-   * O(column chain length) fallback for very large matrices.
+   * O(column chain length) when the matrix exceeds the handle table size.
    */
   allocElement(row: number, col: number): number {
-    // Fast path: handle table lookup
+    // Fast path: handle table lookup keyed by the caller's (original) row/col.
     if (this._n > 0 && this._n <= this._handleTableN) {
       const idx = row * this._handleTableN + col;
       const stored = this._handleTable[idx];
       if (stored > 0) return stored - 1; // already allocated
     }
 
+    // Translate the caller's original column to the current internal column
+    // so the search walks the correct _colHead chain after preorder swaps.
+    const internalCol = this._extToIntCol[col];
+
     // Check whether this (row, col) already exists in the column chain
-    let e = this._colHead[col];
+    let e = this._colHead[internalCol];
     while (e >= 0) {
       if (this._elRow[e] === row) {
         // Record in handle table
@@ -219,11 +231,12 @@ export class SparseSolver {
       e = this._elNextInCol[e];
     }
 
-    // Allocate new element
+    // Allocate new element. _elCol stores the original column (ngspice
+    // Element->Col convention); chain membership uses the internal column.
     const newE = this._newElement(row, col, 0, 0);
     this._insertIntoRow(newE, row);
-    this._insertIntoCol(newE, col);
-    if (row === col) this._diag[row] = newE;
+    this._insertIntoCol(newE, internalCol);
+    if (row === col) this._diag[internalCol] = newE;
 
     // Record in handle table
     if (this._n <= this._handleTableN) {
@@ -437,14 +450,15 @@ export class SparseSolver {
         // Only fix columns with a structural zero on the diagonal
         if (this._diag[col] >= 0 && this._elVal[this._diag[col]] !== 0) continue;
 
-        // Walk column col looking for an entry at row R with |value| === 1.0
+        // Walk column col looking for pTwin1 at (row, col) with |value| === 1.0
         let el = this._colHead[col];
         while (el >= 0) {
           if (Math.abs(this._elVal[el]) === 1.0) {
             const row = this._elRow[el];
-            // Check column row for symmetric partner at row col with |value| === 1.0
-            if (this._countTwins(row, col)) {
-              this._swapColumns(col, row);
+            // Locate pTwin2: the element at (col, row) with |value| === 1.0
+            const pTwin2 = this._findTwin(row, col);
+            if (pTwin2 >= 0) {
+              this._swapColumns(col, row, el, pTwin2);
               didSwap = true;
               startAt = col + 1;
               break;
@@ -458,66 +472,38 @@ export class SparseSolver {
   }
 
   /**
-   * Check whether column `col` contains an entry at row `targetRow` with |value| === 1.0.
-   * Used by preorder() to find symmetric twin pairs.
+   * Locate the element in column `col` at row `targetRow` with |value| === 1.0.
+   * Returns the element handle, or -1 if no such entry exists.
+   * Used by preorder() to find the symmetric partner (pTwin2) of a twin pair.
    */
-  private _countTwins(col: number, targetRow: number): boolean {
+  private _findTwin(col: number, targetRow: number): number {
     let el = this._colHead[col];
     while (el >= 0) {
-      if (this._elRow[el] === targetRow && Math.abs(this._elVal[el]) === 1.0) return true;
+      if (this._elRow[el] === targetRow && Math.abs(this._elVal[el]) === 1.0) return el;
       el = this._elNextInCol[el];
     }
-    return false;
+    return -1;
   }
 
   /**
    * Swap columns col1 and col2 in the persistent linked structure.
-   * Unlike ngspice SwapCols (sputils.c:283-301), we MUST also update per-element
-   * _elCol fields. ngspice skips this because preorder runs before row-linking
-   * and uses IntToExtColMap to translate column indices in factor/solve. Our
-   * architecture has no IntToExtColMap: rows are linked at allocation time, and
-   * _elCol[e] is read by _removeFromCol (to find _colHead) and by
-   * _updateMarkowitzNumbers (to count column contributions). Both must see the
-   * current (post-swap) column assignment or they corrupt the factorization.
+   * pTwin1 is the element at (col2, col1); pTwin2 is the element at (col1, col2).
+   * ngspice reference: sputils.c SwapCols (lines 283-301).
    */
-  private _swapColumns(col1: number, col2: number): void {
-    // Update _elCol for all elements now moving to col2
-    let e = this._colHead[col1];
-    while (e >= 0) {
-      this._elCol[e] = col2;
-      e = this._elNextInCol[e];
-    }
-    // Update _elCol for all elements now moving to col1
-    e = this._colHead[col2];
-    while (e >= 0) {
-      this._elCol[e] = col1;
-      e = this._elNextInCol[e];
-    }
-
-    const tmp = this._colHead[col1];
+  private _swapColumns(col1: number, col2: number, pTwin1: number, pTwin2: number): void {
+    const tmpHead = this._colHead[col1];
     this._colHead[col1] = this._colHead[col2];
-    this._colHead[col2] = tmp;
+    this._colHead[col2] = tmpHead;
 
-    // Recompute _diag for both columns by scanning their (now-updated) chains.
-    // An element is on the diagonal of column c when _elRow[e] === _elCol[e] === c.
-    this._diag[col1] = -1;
-    e = this._colHead[col1];
-    while (e >= 0) {
-      if (this._elRow[e] === col1) { this._diag[col1] = e; break; }
-      e = this._elNextInCol[e];
-    }
+    const origCol1 = this._preorderColPerm[col1];
+    const origCol2 = this._preorderColPerm[col2];
+    this._preorderColPerm[col1] = origCol2;
+    this._preorderColPerm[col2] = origCol1;
+    this._extToIntCol[origCol1] = col2;
+    this._extToIntCol[origCol2] = col1;
 
-    this._diag[col2] = -1;
-    e = this._colHead[col2];
-    while (e >= 0) {
-      if (this._elRow[e] === col2) { this._diag[col2] = e; break; }
-      e = this._elNextInCol[e];
-    }
-
-    // Update preorder column permutation map: matches ngspice IntToExtColMap swap.
-    const permTmp = this._preorderColPerm[col1];
-    this._preorderColPerm[col1] = this._preorderColPerm[col2];
-    this._preorderColPerm[col2] = permTmp;
+    this._diag[col1] = pTwin2;
+    this._diag[col2] = pTwin1;
   }
 
   /**
@@ -572,7 +558,7 @@ export class SparseSolver {
       let e = this._colHead[col];
       while (e >= 0) {
         if (!(this._elFlags[e] & FLAG_FILL_IN)) {
-          result.push({ row: this._elRow[e], col, value: this._elVal[e] });
+          result.push({ row: this._elRow[e], col: this._elCol[e], value: this._elVal[e] });
         }
         e = this._elNextInCol[e];
       }
@@ -607,7 +593,11 @@ export class SparseSolver {
     this._colHead = new Int32Array(n).fill(-1);
     this._diag = new Int32Array(n).fill(-1);
     this._preorderColPerm = new Int32Array(n);
-    for (let i = 0; i < n; i++) this._preorderColPerm[i] = i;
+    this._extToIntCol = new Int32Array(n);
+    for (let i = 0; i < n; i++) {
+      this._preorderColPerm[i] = i;
+      this._extToIntCol[i] = i;
+    }
     this._elMark = new Int32Array(n).fill(-1);
     this._rowToElem = new Int32Array(n).fill(-1);
 
@@ -739,7 +729,7 @@ export class SparseSolver {
     const prev = this._elPrevInCol[e];
     const next = this._elNextInCol[e];
     if (prev >= 0) this._elNextInCol[prev] = next;
-    else this._colHead[this._elCol[e]] = next;
+    else this._colHead[this._extToIntCol[this._elCol[e]]] = next;
     if (next >= 0) this._elPrevInCol[next] = prev;
   }
 
@@ -969,12 +959,15 @@ export class SparseSolver {
 
       // Check all nonzero rows — if unmarked and unpivoted, it's fill-in
       let hadFillin = false;
+      const origColK = this._preorderColPerm[k];
       for (let idx = 0; idx < xNzCount; idx++) {
         const i = xNzIdx[idx];
         if (x[i] === 0 || pinv[i] >= 0) continue;
         if (this._elMark[i] === k) continue;
-        // Insert fill-in element at (i, k)
-        const fe = this._newElement(i, k, 0, FLAG_FILL_IN);
+        // Insert fill-in element at internal column k. _elCol stores the ORIGINAL
+        // column (matching ngspice Element->Col convention); the chain membership
+        // at _colHead[k] is the internal-column link.
+        const fe = this._newElement(i, origColK, 0, FLAG_FILL_IN);
         this._insertIntoRow(fe, i);
         this._insertIntoCol(fe, k);
         rowToElem[i] = fe; // register fill-in in row→element map
@@ -1213,7 +1206,7 @@ export class SparseSolver {
    * Phase 1: Singleton detection (mProd == 0, magnitude threshold).
    * Phase 2: Diagonal preference (minimum mProd, diagonal entry at column k).
    * Phase 3: Column search via linked structure (minimum mRow*mCol product).
-   * Phase 4: Fallback — largest magnitude among all unpivoted rows.
+   * Phase 4: Last-resort — largest magnitude among all unpivoted rows.
    *
    * ngspice variable mapping:
    *   MarkowitzRow[] → _markowitzRow[]
@@ -1302,7 +1295,7 @@ export class SparseSolver {
       if (bestRow >= 0) return bestRow;
     }
 
-    // Phase 4: Fallback — largest magnitude
+    // Phase 4: Last-resort — largest magnitude
     {
       let bestRow = -1;
       let bestVal = 0;
@@ -1328,10 +1321,13 @@ export class SparseSolver {
     const mCol = this._markowitzCol;
     const mProd = this._markowitzProd;
 
-    // Walk pivot ROW — decrement column counts for non-pivot columns
+    // Walk pivot ROW — decrement column counts for non-pivot columns.
+    // _elCol[e] is the element's ORIGINAL column; translate to the internal
+    // column via _extToIntCol so it can be compared with `step` and used to
+    // index _markowitzCol (both of which are keyed by internal column).
     let e = this._rowHead[pivotRow];
     while (e >= 0) {
-      const c = this._elCol[e];
+      const c = this._extToIntCol[this._elCol[e]];
       if (c !== step && mCol[c] > 0) mCol[c]--;
       e = this._elNextInRow[e];
     }

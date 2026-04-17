@@ -1,29 +1,10 @@
 {
   "summary": {
-    "passed": 30,
-    "failed": 2,
+    "passed": 92,
+    "failed": 0,
     "skipped": 0,
-    "totalFiles": 1,
-    "durationSeconds": 0.8
+    "totalFiles": 2,
+    "durationSeconds": 0.6
   },
-  "failures": [
-    {
-      "message": "expected false to be true // Object.is equality",
-      "count": 2,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
-          "test": "iteration capture hook records NR iterations during DC OP",
-          "line": 101,
-          "column": 34
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\harness-integration.test.ts",
-          "test": "postIterationHook fires during DC OP (linear circuit)",
-          "line": 128,
-          "column": 33
-        }
-      ]
-    }
-  ]
+  "failures": []
 }

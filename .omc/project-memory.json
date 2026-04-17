@@ -276,16 +276,16 @@
       "type": "directory"
     },
     {
+      "path": "src\\solver\\analog\\sparse-solver.ts",
+      "accessCount": 16,
+      "lastAccessed": 1776396803723,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog",
       "accessCount": 14,
       "lastAccessed": 1776371696790,
       "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\sparse-solver.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776371656224,
-      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
@@ -295,8 +295,8 @@
     },
     {
       "path": "src\\solver\\analog\\mna-assembler.ts",
-      "accessCount": 10,
-      "lastAccessed": 1776371700986,
+      "accessCount": 11,
+      "lastAccessed": 1776396798492,
       "type": "file"
     },
     {
@@ -378,6 +378,12 @@
       "type": "directory"
     },
     {
+      "path": "src",
+      "accessCount": 3,
+      "lastAccessed": 1776396789109,
+      "type": "directory"
+    },
+    {
       "path": "ref/ngspice",
       "accessCount": 2,
       "lastAccessed": 1776332589361,
@@ -402,12 +408,6 @@
       "type": "file"
     },
     {
-      "path": "src",
-      "accessCount": 2,
-      "lastAccessed": 1776336959418,
-      "type": "directory"
-    },
-    {
       "path": "ref\\ngspice\\src\\maths\\sparse",
       "accessCount": 2,
       "lastAccessed": 1776336989584,
@@ -423,6 +423,12 @@
       "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
       "accessCount": 2,
       "lastAccessed": 1776337045863,
+      "type": "file"
+    },
+    {
+      "path": "ref\\ngspice\\src\\maths\\sparse\\sputils.c",
+      "accessCount": 2,
+      "lastAccessed": 1776396809366,
       "type": "file"
     },
     {
@@ -543,12 +549,6 @@
       "path": "ref\\ngspice\\src\\spicelib\\devices\\res\\resload.c",
       "accessCount": 1,
       "lastAccessed": 1776336967999,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\maths\\sparse\\sputils.c",
-      "accessCount": 1,
-      "lastAccessed": 1776336980515,
       "type": "file"
     },
     {
