@@ -1,10 +1,29 @@
 {
   "summary": {
-    "passed": 56,
-    "failed": 0,
+    "passed": 58,
+    "failed": 2,
     "skipped": 0,
-    "totalFiles": 3,
-    "durationSeconds": 2.6
+    "totalFiles": 2,
+    "durationSeconds": 1
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "expected -1439571488470058200 to be greater than 4.5",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
+          "test": "transient_rc_decay",
+          "line": 252,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
+          "test": "predictor_off_rc_regression",
+          "line": 609,
+          "column": 16
+        }
+      ]
+    }
+  ]
 }

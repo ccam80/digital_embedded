@@ -427,7 +427,7 @@ export function computeNIcomCof(
   order: number,
   method: IntegrationMethod,
   ag: Float64Array,
-  scratch?: Float64Array,
+  scratch: Float64Array,
 ): void {
   if (dt <= 0) { ag.fill(0); return; }
 
@@ -456,8 +456,7 @@ export function computeNIcomCof(
       ag[2] = ag2;
     }
   } else if (method === "gear") {
-    const scratchBuf = scratch ?? new Float64Array(49);
-    solveGearVandermonde(dt, deltaOld, order, ag, scratchBuf);
+    solveGearVandermonde(dt, deltaOld, order, ag, scratch);
   } else {
     // BDF-1
     ag[0] = 1 / dt;

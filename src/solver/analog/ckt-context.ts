@@ -334,8 +334,8 @@ export class CKTCircuitContext {
   // Damping
   // -------------------------------------------------------------------------
 
-  /** Whether node damping is enabled (ngspice niiter.c). */
-  nodeDamping: boolean;
+  /** Node damping factor (ngspice niiter.c). 0 = disabled, non-zero = enabled. */
+  nodeDamping: number;
   /** Diagonal gmin conductance for stepping (ngspice CKTdiagGmin). */
   diagonalGmin: number;
 
@@ -549,7 +549,7 @@ export class CKTCircuitContext {
     this.dcTrcvMaxIter = params.dcTrcvMaxIter;
 
     // Damping
-    this.nodeDamping = params.nodeDamping ?? false;
+    this.nodeDamping = params.nodeDamping ? 1 : 0;
     this.diagonalGmin = params.diagGmin ?? 0;
 
     // Nodesets / ICs (populated by engine after construction)

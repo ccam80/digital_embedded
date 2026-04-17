@@ -250,3 +250,13 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
 - **Files modified**:
   - src/solver/analog/__tests__/ckt-terr.test.ts (added zero_allocations_in_lte_path test)
 - **Tests**: 20/20 passing in ckt-terr.test.ts — cktTerr/cktTerrVoltage already fully scalar; lteScratch already on CKTCircuitContext
+
+## Task 1.1-fix: batch-2 verifier findings remediation
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**:
+  - src/solver/analog/ckt-context.ts (line 338: `nodeDamping: boolean` → `nodeDamping: number`; line 552: constructor reads `params.nodeDamping ? 1 : 0`)
+  - src/solver/analog/integration.ts (line 430: `scratch?: Float64Array` → `scratch: Float64Array`; line 459: removed `?? new Float64Array(49)` fallback)
+  - src/solver/analog/analog-engine.ts (line 425-426: changed output buffer from `statePool.ag` to `this._ctx!.ag` and added `this._ctx!.gearMatScratch` as scratch argument)
+  - src/solver/analog/__tests__/integration.test.ts (all `computeNIcomCof` call sites updated to pass required scratch buffer)
+- **Tests**: integration.test.ts 36/36 passing; ckt-context.test.ts 3/3 passing; analog-engine.test.ts 58 passed / 2 pre-existing baseline failures (transient_rc_decay, predictor_off_rc_regression)

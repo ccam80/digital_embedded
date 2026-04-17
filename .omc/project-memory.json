@@ -265,8 +265,8 @@
   "hotPaths": [
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 59,
-      "lastAccessed": 1776406160719,
+      "accessCount": 70,
+      "lastAccessed": 1776406948856,
       "type": "directory"
     },
     {
@@ -277,8 +277,8 @@
     },
     {
       "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 37,
-      "lastAccessed": 1776406011504,
+      "accessCount": 43,
+      "lastAccessed": 1776406744945,
       "type": "file"
     },
     {
@@ -289,14 +289,14 @@
     },
     {
       "path": "src\\solver\\analog\\dc-operating-point.ts",
-      "accessCount": 23,
-      "lastAccessed": 1776405617334,
+      "accessCount": 27,
+      "lastAccessed": 1776406486415,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\integration.ts",
-      "accessCount": 18,
-      "lastAccessed": 1776405927736,
+      "accessCount": 25,
+      "lastAccessed": 1776406785800,
       "type": "file"
     },
     {
@@ -307,15 +307,21 @@
     },
     {
       "path": "src\\solver\\analog\\mna-assembler.ts",
-      "accessCount": 15,
-      "lastAccessed": 1776404104642,
+      "accessCount": 16,
+      "lastAccessed": 1776406469876,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 9,
-      "lastAccessed": 1776406151754,
+      "accessCount": 13,
+      "lastAccessed": 1776406725123,
       "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\ckt-terr.ts",
+      "accessCount": 9,
+      "lastAccessed": 1776406501754,
+      "type": "file"
     },
     {
       "path": "ref\\ngspice\\src",
@@ -333,12 +339,6 @@
       "path": "src\\solver\\analog\\element.ts",
       "accessCount": 6,
       "lastAccessed": 1776403013775,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\ckt-terr.ts",
-      "accessCount": 6,
-      "lastAccessed": 1776406124869,
       "type": "file"
     },
     {

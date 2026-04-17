@@ -423,7 +423,7 @@ export class MNAEngine implements AnalogEngine {
       if (statePool) {
         statePool.dt = dt;
         computeNIcomCof(dt, this._timestep.deltaOld, this._timestep.currentOrder,
-          this._timestep.currentMethod, statePool.ag);
+          this._timestep.currentMethod, this._ctx!.ag, this._ctx!.gearMatScratch);
         if (this._firsttime) {
           statePool.initMode = "initTran";
         }

@@ -119,7 +119,8 @@ describe("CompanionModels", () => {
 
   it("capacitor_gear_order2_matches_bdf2", () => {
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h], 2, "gear", ag);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(h, [h, h], 2, "gear", ag, scratch);
     const { geq: geqGear } = integrateCapacitor(C, 0, 0, 0, 0, h, h, 2, "gear", 0, 0.5, [], ag);
     const { geq: geqBdf2 } = integrateCapacitor(C, 0, 0, 0, 0, h, h, 2, "bdf2", 0);
     expect(geqGear).toBeCloseTo(geqBdf2, 10);
@@ -127,7 +128,8 @@ describe("CompanionModels", () => {
 
   it("capacitor_gear_order3_coefficients", () => {
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h, h], 3, "gear", ag);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(h, [h, h, h], 3, "gear", ag, scratch);
     const vNow = 2.0;
     const q0 = C * 2.0, q1 = C * 1.5, q2 = C * 1.0, q3 = C * 0.5;
     const { geq, ceq, ccap, ag0 } = integrateCapacitor(
@@ -142,7 +144,8 @@ describe("CompanionModels", () => {
 
   it("capacitor_gear_order6_uses_full_history", () => {
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", ag);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", ag, scratch);
     const qs = [6, 5, 4, 3, 2, 1, 0].map(v => C * v);
     const { geq, ccap } = integrateCapacitor(
       C, 6.0, qs[0], qs[1], qs[2], h, h, 6, "gear", 0, 0.5,
@@ -157,7 +160,8 @@ describe("CompanionModels", () => {
   it("inductor_gear_order3_dual_of_capacitor", () => {
     const L = 1e-6;
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h, h], 3, "gear", ag);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(h, [h, h, h], 3, "gear", ag, scratch);
     const phi0 = L * 2.0, phi1 = L * 1.5, phi2 = L * 1.0, phi3 = L * 0.5;
     const q0 = C * 2.0, q1 = C * 1.5, q2 = C * 1.0, q3 = C * 0.5;
     const { geq: geqL } = integrateInductor(
@@ -516,11 +520,12 @@ describe("gear_vandermonde_zero_alloc", () => {
 
 describe("computeNIcomCof", () => {
   const h = 1e-6;
+  const scratch = new Float64Array(49);
 
   it("fills ag with zeros when dt <= 0", () => {
     const ag = new Float64Array(8);
     ag.fill(99); // pre-fill to confirm overwrite
-    computeNIcomCof(0, [0, 0], 1, "bdf1", ag);
+    computeNIcomCof(0, [0, 0], 1, "bdf1", ag, scratch);
     for (let i = 0; i < ag.length; i++) {
       expect(ag[i]).toBe(0);
     }
@@ -528,21 +533,21 @@ describe("computeNIcomCof", () => {
 
   it("BDF-1 order 1: ag[0]=1/dt, ag[1]=-1/dt", () => {
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h], 1, "bdf1", ag);
+    computeNIcomCof(h, [h, h], 1, "bdf1", ag, scratch);
     expect(ag[0]).toBeCloseTo(1 / h, 10);
     expect(ag[1]).toBeCloseTo(-1 / h, 10);
   });
 
   it("trapezoidal order 1: ag[0]=1/dt, ag[1]=-1/dt", () => {
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h], 1, "trapezoidal", ag);
+    computeNIcomCof(h, [h, h], 1, "trapezoidal", ag, scratch);
     expect(ag[0]).toBeCloseTo(1 / h, 10);
     expect(ag[1]).toBeCloseTo(-1 / h, 10);
   });
 
   it("trapezoidal order 2: ag[0]=2/dt, ag[1]=1 (xmu=0.5)", () => {
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h], 2, "trapezoidal", ag);
+    computeNIcomCof(h, [h, h], 2, "trapezoidal", ag, scratch);
     // xmu=0.5: ag[0] = 1/(dt*(1-0.5)) = 2/dt; ag[1] = 0.5/(1-0.5) = 1
     expect(ag[0]).toBeCloseTo(2 / h, 10);
     expect(ag[1]).toBeCloseTo(1, 10);
@@ -550,7 +555,7 @@ describe("computeNIcomCof", () => {
 
   it("BDF-2 equal steps: ag[0]=3/(2h), ag[1]=-2/h, ag[2]=1/(2h)", () => {
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h], 2, "bdf2", ag);
+    computeNIcomCof(h, [h, h], 2, "bdf2", ag, scratch);
     // With h1=h: r1=1, r2=2, u22=2*(2-1)=2, rhs2=1/h
     // ag2 = (1/h)/2 = 1/(2h), ag1 = (-1/h - 2/(2h))/1 = -2/h
     // ag0 = -(ag1+ag2) = 2/h - 1/(2h) = 3/(2h)
@@ -563,7 +568,7 @@ describe("computeNIcomCof", () => {
     // deltaOld[1]=0 triggers safeH1=dt fallback, which gives equal-steps BDF-2, not BE.
     // Spec: h1 = deltaOld[1] > 0 ? deltaOld[1] : dt — so h1=dt → equal steps BDF-2.
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, 0], 2, "bdf2", ag);
+    computeNIcomCof(h, [h, 0], 2, "bdf2", ag, scratch);
     // h1=0 → safeH1=dt=h → same as equal steps
     expect(ag[0]).toBeCloseTo(3 / (2 * h), 10);
     expect(ag[1]).toBeCloseTo(-2 / h, 10);
@@ -573,7 +578,7 @@ describe("computeNIcomCof", () => {
   it("ag[0] matches integrateCapacitor ag0 for same dt/method/order", () => {
     const C = 1;
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h], 2, "bdf2", ag);
+    computeNIcomCof(h, [h, h], 2, "bdf2", ag, scratch);
     const { ag0: ag0Cap } = integrateCapacitor(C, 0, 0, 0, 0, h, h, 2, "bdf2", 0);
     expect(ag[0]).toBeCloseTo(ag0Cap, 10);
   });
@@ -581,7 +586,7 @@ describe("computeNIcomCof", () => {
   it("ag[0] matches integrateCapacitor ag0 for trapezoidal order 2", () => {
     const C = 1;
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h], 2, "trapezoidal", ag);
+    computeNIcomCof(h, [h, h], 2, "trapezoidal", ag, scratch);
     const { ag0: ag0Cap } = integrateCapacitor(C, 0, 0, 0, 0, h, h, 2, "trapezoidal", 0);
     expect(ag[0]).toBeCloseTo(ag0Cap, 10);
   });
@@ -590,7 +595,8 @@ describe("computeNIcomCof", () => {
     // GEAR method with order=2 and equal steps should produce same coefficients as BDF-2.
     // nicomcof.c: Vandermonde with r[1]=1, r[2]=2 gives ag*dt = [1.5, -2, 0.5].
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h], 2, "gear", ag);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(h, [h, h], 2, "gear", ag, scratch);
     expect(ag[0]).toBeCloseTo(3 / (2 * h), 8);
     expect(ag[1]).toBeCloseTo(-2 / h, 8);
     expect(ag[2]).toBeCloseTo(1 / (2 * h), 8);
@@ -601,7 +607,8 @@ describe("computeNIcomCof", () => {
     // nicomcof.c Vandermonde with r[1]=1, r[2]=2, r[3]=3.
     // ag*dt = [11/6, -3, 3/2, -1/3]
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h, h], 3, "gear", ag);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(h, [h, h, h], 3, "gear", ag, scratch);
     expect(ag[0]).toBeCloseTo(11 / (6 * h), 6);
     expect(ag[1]).toBeCloseTo(-3 / h, 6);
     expect(ag[2]).toBeCloseTo(3 / (2 * h), 6);
@@ -612,7 +619,8 @@ describe("computeNIcomCof", () => {
     // Known GEAR-4 equal-step coefficients.
     // ag*dt = [25/12, -4, 3, -4/3, 1/4]
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h, h, h], 4, "gear", ag);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(h, [h, h, h, h], 4, "gear", ag, scratch);
     expect(ag[0]).toBeCloseTo(25 / (12 * h), 6);
     expect(ag[1]).toBeCloseTo(-4 / h, 6);
     expect(ag[2]).toBeCloseTo(3 / h, 6);
@@ -623,7 +631,8 @@ describe("computeNIcomCof", () => {
   it("GEAR order 5 equal steps: ag*dt = [137/60, -5, 5, -10/3, 5/4, -1/5]", () => {
     // Known GEAR-5 equal-step coefficients.
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h, h, h, h], 5, "gear", ag);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(h, [h, h, h, h, h], 5, "gear", ag, scratch);
     expect(ag[0]).toBeCloseTo(137 / (60 * h), 5);
     expect(ag[1]).toBeCloseTo(-5 / h, 5);
     expect(ag[2]).toBeCloseTo(5 / h, 5);
@@ -635,7 +644,8 @@ describe("computeNIcomCof", () => {
   it("GEAR order 6 equal steps: ag*dt = [49/20, -6, 15/2, -20/3, 15/4, -6/5, 1/6]", () => {
     // Known GEAR-6 equal-step coefficients.
     const ag = new Float64Array(8);
-    computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", ag);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", ag, scratch);
     expect(ag[0]).toBeCloseTo(49 / (20 * h), 5);
     expect(ag[1]).toBeCloseTo(-6 / h, 5);
     expect(ag[2]).toBeCloseTo(15 / (2 * h), 5);
@@ -648,9 +658,10 @@ describe("computeNIcomCof", () => {
   it("GEAR coefficients sum to zero (interpolation constraint)", () => {
     // For all GEAR orders, sum(ag) = 0 (the polynomial interpolates Q correctly).
     const ag = new Float64Array(8);
+    const scratch = new Float64Array(49);
     for (const order of [2, 3, 4, 5, 6]) {
       ag.fill(0);
-      computeNIcomCof(h, [h, h, h, h, h, h], order, "gear", ag);
+      computeNIcomCof(h, [h, h, h, h, h, h], order, "gear", ag, scratch);
       let sum = 0;
       for (let k = 0; k <= order; k++) sum += ag[k];
       expect(Math.abs(sum)).toBeLessThan(1e-9);
