@@ -2,39 +2,34 @@
   "batches": [
     {
       "id": "batch-1",
-      "phase": "Phase 0: Dead Code Removal",
+      "phase": "Phase 0: Sparse Solver Rewrite",
       "task_groups": [
-        "0.1.a",
-        "0.1.b",
-        "0.1.c"
+        "0.1"
       ],
       "tasks": [
         [
-          "0.1.1"
-        ],
-        [
-          "0.1.2"
-        ],
-        [
-          "0.1.3"
+          "0.1.1",
+          "0.1.2",
+          "0.1.3",
+          "0.2.1",
+          "0.3.1",
+          "0.3.2"
         ]
       ],
       "spawned": 3,
-      "completed": 3,
-      "verifications_passed": 3,
+      "completed": 1,
+      "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
-      "dead_implementers": 0,
-      "dead_verifiers": 1,
+      "dead_implementers": 2,
+      "dead_verifiers": 0,
       "group_status": {
-        "0.1.a": "passed",
-        "0.1.b": "passed",
-        "0.1.c": "passed"
+        "0.1": "pending"
       }
     },
     {
       "id": "batch-2",
-      "phase": "Phase 1: NR Loop Restructure",
+      "phase": "Phase 1: CKTCircuitContext + Zero-Alloc",
       "task_groups": [
         "1.1"
       ],
@@ -42,28 +37,30 @@
         [
           "1.1.1",
           "1.1.2",
+          "1.1.3",
           "1.2.1",
-          "1.2.2"
+          "1.2.2",
+          "1.2.3"
         ]
       ],
-      "spawned": 3,
-      "completed": 3,
-      "verifications_passed": 1,
-      "verifications_failed": 2,
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "1.1": "passed"
+        "1.1": "pending"
       }
     },
     {
       "id": "batch-3",
-      "phase": "Phases 2(W2.1) + 3(W3.1) + 5: Parallel after Phase 1",
+      "phase": "Phase 2.1 + Phase 3 + Phase 6.1 (parallel)",
       "task_groups": [
         "2.1",
         "3.1",
-        "5.1"
+        "6.1"
       ],
       "tasks": [
         [
@@ -73,60 +70,100 @@
         ],
         [
           "3.1.1",
-          "3.1.2"
+          "3.1.2",
+          "3.1.3",
+          "3.2.1",
+          "3.2.2",
+          "3.2.3"
         ],
         [
-          "5.1.1",
-          "5.1.2"
+          "6.1.1",
+          "6.1.2"
         ]
       ],
-      "spawned": 5,
-      "completed": 4,
-      "verifications_passed": 3,
-      "verifications_failed": 1,
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
       "stops_for_clarification": 0,
-      "dead_implementers": 1,
+      "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "2.1": "passed",
-        "3.1": "passed",
-        "5.1": "passed"
+        "2.1": "pending",
+        "3.1": "pending",
+        "6.1": "pending"
       }
     },
     {
       "id": "batch-4",
-      "phase": "Phases 2(W2.2) + 3(W3.2): Markowitz + Integration",
+      "phase": "Phase 6.2: Element Rewrites (atomic, non-overlapping files)",
       "task_groups": [
-        "2.2",
-        "3.2"
+        "6.2.a",
+        "6.2.b",
+        "6.2.c",
+        "6.2.d"
+      ],
+      "tasks": [
+        [
+          "6.2.1",
+          "6.2.7"
+        ],
+        [
+          "6.2.2",
+          "6.2.4"
+        ],
+        [
+          "6.2.3"
+        ],
+        [
+          "6.2.5",
+          "6.2.6"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "6.2.a": "pending",
+        "6.2.b": "pending",
+        "6.2.c": "pending",
+        "6.2.d": "pending"
+      }
+    },
+    {
+      "id": "batch-5",
+      "phase": "Phase 2.2 + Phase 6.3: cktLoad + delete loops (atomic)",
+      "task_groups": [
+        "2.2_6.3"
       ],
       "tasks": [
         [
           "2.2.1",
           "2.2.2",
           "2.2.3",
-          "2.2.4"
-        ],
-        [
-          "3.2.1",
-          "3.2.2"
+          "6.3.1",
+          "6.3.2",
+          "6.3.3"
         ]
       ],
-      "spawned": 2,
-      "completed": 2,
-      "verifications_passed": 2,
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "2.2": "passed",
-        "3.2": "passed"
+        "2.2_6.3": "pending"
       }
     },
     {
-      "id": "batch-5",
-      "phase": "Phase 4: DCOP Flow",
+      "id": "batch-6",
+      "phase": "Phase 4: DC-OP Alignment",
       "task_groups": [
         "4.1"
       ],
@@ -134,71 +171,117 @@
         [
           "4.1.1",
           "4.1.2",
-          "4.1.3"
+          "4.2.1",
+          "4.2.2",
+          "4.2.3",
+          "4.3.1",
+          "4.4.1",
+          "4.5.1"
         ]
       ],
-      "spawned": 1,
-      "completed": 1,
-      "verifications_passed": 1,
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "4.1": "passed"
-      }
-    },
-    {
-      "id": "batch-6",
-      "phase": "Phase 6: Extended Capabilities",
-      "task_groups": [
-        "6.1",
-        "6.2"
-      ],
-      "tasks": [
-        [
-          "6.1.1",
-          "6.1.2"
-        ],
-        [
-          "6.2.1",
-          "6.2.2"
-        ]
-      ],
-      "spawned": 2,
-      "completed": 2,
-      "verifications_passed": 2,
-      "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 0,
-      "dead_verifiers": 0,
-      "group_status": {
-        "6.1": "passed",
-        "6.2": "passed"
+        "4.1": "pending"
       }
     },
     {
       "id": "batch-7",
-      "phase": "Phase 7: Legacy Reference Review",
+      "phase": "Phase 5: Transient Step Alignment",
+      "task_groups": [
+        "5.1"
+      ],
+      "tasks": [
+        [
+          "5.1.1",
+          "5.1.2",
+          "5.2.1",
+          "5.2.2",
+          "5.2.3",
+          "5.3.1"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "5.1": "pending"
+      }
+    },
+    {
+      "id": "batch-8",
+      "phase": "Phase 7.1: Parity Test Infrastructure",
       "task_groups": [
         "7.1"
       ],
       "tasks": [
         [
-          "7.1.1"
+          "7.1.1",
+          "7.1.2"
         ]
       ],
-      "spawned": 2,
-      "completed": 2,
+      "spawned": 0,
+      "completed": 0,
       "verifications_passed": 0,
-      "verifications_failed": 1,
+      "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "7.1": "failed"
+        "7.1": "pending"
+      }
+    },
+    {
+      "id": "batch-9",
+      "phase": "Phase 7.2-7.4: Parity Tests (parallel)",
+      "task_groups": [
+        "7.2a",
+        "7.2b",
+        "7.3a",
+        "7.3b"
+      ],
+      "tasks": [
+        [
+          "7.2.1",
+          "7.2.2"
+        ],
+        [
+          "7.2.3",
+          "7.2.4"
+        ],
+        [
+          "7.3.1",
+          "7.3.2"
+        ],
+        [
+          "7.3.3",
+          "7.3.4",
+          "7.4.1"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "7.2a": "pending",
+        "7.2b": "pending",
+        "7.3a": "pending",
+        "7.3b": "pending"
       }
     }
   ],
-  "last_updated": "2026-04-15T12:40:13.542Z"
+  "last_updated": "2026-04-17T01:05:29.043Z"
 }

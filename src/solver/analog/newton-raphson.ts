@@ -524,23 +524,24 @@ export function newtonRaphson(opts: NROptions): NRResult {
     }
 
     // ---- STEP E: Factorize ----
-    // ngspice niiter.c: E_SINGULAR on numerical-only path triggers NISHOULDREORDER retry.
-    let factorResult = solver.factor();
+    // ngspice niiter.c:888-891: E_SINGULAR on numerical-only path sets NISHOULDREORDER
+    // and does `continue` (returns to top of for(;;), re-executes CKTload).
+    // We must re-load before re-factoring so the matrix has fresh device stamps.
+    const factorResult = solver.factor();
     if (!factorResult.success) {
       if (!solver.lastFactorUsedReorder) {
-        // Numerical-only path failed (near-zero stored pivot). Force full reorder and retry.
+        // Numerical-only path failed (near-zero stored pivot). Force full reorder,
+        // then continue to restart from Step A (re-execute CKTload before re-factoring).
         solver.forceReorder();
-        factorResult = solver.factor();
+        continue;
       }
-      if (!factorResult.success) {
-        diagnostics.emit(
-          makeDiagnostic("singular-matrix", "error", "Singular matrix during NR iteration", {
-            explanation: `The MNA matrix became singular at iteration ${iteration + 1}.`,
-            suggestions: [],
-          }),
-        );
-        return { converged: false, iterations: iteration + 1, voltages, largestChangeElement: -1, largestChangeNode: -1 };
-      }
+      diagnostics.emit(
+        makeDiagnostic("singular-matrix", "error", "Singular matrix during NR iteration", {
+          explanation: `The MNA matrix became singular at iteration ${iteration + 1}.`,
+          suggestions: [],
+        }),
+      );
+      return { converged: false, iterations: iteration + 1, voltages, largestChangeElement: -1, largestChangeNode: -1 };
     }
 
     // Save state0 before solve for state0 damping (DO10)

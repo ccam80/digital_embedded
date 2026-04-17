@@ -969,7 +969,7 @@ describe("SparseSolver _countMarkowitz and _markowitzProducts", () => {
     // Call _countMarkowitz via private access
     (solver as any)._countMarkowitz();
 
-    // After AMD permutation, the counts should reflect the structure.
+    // The counts reflect the structure in original column order.
     // Total off-diagonal nonzeros: 4 entries (0,1), (1,0), (1,2), (2,1)
     // Sum of all row counts should equal 4
     const mRow = solver.markowitzRow;
@@ -1007,7 +1007,7 @@ describe("SparseSolver _countMarkowitz and _markowitzProducts", () => {
     // Singletons: rows/cols with exactly 1 off-diagonal nonzero
     // In the tridiagonal, rows 0 and 2 have 1 off-diag each (singletons),
     // cols 0 and 2 have 1 off-diag each (singletons).
-    // After AMD permutation the structure is preserved but indices may differ.
+    // The structure is preserved in original column order.
     // At minimum, singletons should be >= 2 for this tridiagonal.
     expect(solver.singletons).toBeGreaterThanOrEqual(2);
 
@@ -1369,9 +1369,9 @@ describe("SparseSolver Markowitz linked structure", () => {
     solver.finalize();
 
     // Get initial Markowitz counts from linked structure before factoring.
-    // After AMD permutation, indices are reordered. Sum of all off-diagonal
-    // row counts = total off-diagonal nonzeros = 6 (each of 3 sparse rows
-    // has 1 off-diag to the dense row, and the dense row has 3 off-diag).
+    // Sum of all off-diagonal row counts = total off-diagonal nonzeros = 6
+    // (each of 3 sparse rows has 1 off-diag to the dense row, and the dense
+    // row has 3 off-diag).
     (solver as any)._buildLinkedMatrix();
     const initialTotalOffDiag = Array.from(solver.markowitzRow).reduce((a, b) => a + b, 0);
     expect(initialTotalOffDiag).toBe(6); // 3 + 1 + 1 + 1
@@ -1541,5 +1541,699 @@ describe("SparseSolver Markowitz linked structure", () => {
     expect((solver as any)._elCount).toBeGreaterThan(0);
     // Initial capacity should have been set
     expect(initialCapacity).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 0.1.1: Handle-based stamp API tests
+// ---------------------------------------------------------------------------
+
+describe("SparseSolver handle-based stamp API", () => {
+  it("allocElement_returns_stable_handle", () => {
+    // allocElement(r, c) twice must return the same handle.
+    // allocElement with different (r, c) must return distinct handles.
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+
+    const h00a = solver.allocElement(0, 0);
+    const h00b = solver.allocElement(0, 0);
+    expect(h00a).toBe(h00b); // same handle for same (r, c)
+
+    const h01 = solver.allocElement(0, 1);
+    const h10 = solver.allocElement(1, 0);
+    const h11 = solver.allocElement(1, 1);
+
+    // All four handles are distinct
+    const handles = [h00a, h01, h10, h11];
+    const uniqueHandles = new Set(handles);
+    expect(uniqueHandles.size).toBe(4);
+  });
+
+  it("stampElement_accumulates_via_handle", () => {
+    // Two stampElement calls on the same handle accumulate: total = v1 + v2
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+
+    const h = solver.allocElement(0, 0);
+    solver.stampElement(h, 3.0);
+    solver.stampElement(h, 2.0);
+
+    // Verify via solve: 5*x = 10 => x = 2
+    solver.stamp(1, 1, 1.0); // complete the matrix
+    solver.stampRHS(0, 10.0);
+    solver.stampRHS(1, 1.0);
+    solver.finalize();
+    const result = solver.factor();
+    expect(result.success).toBe(true);
+    const x = new Float64Array(2);
+    solver.solve(x);
+    expect(x[0]).toBeCloseTo(2.0, 12);
+    expect(x[1]).toBeCloseTo(1.0, 12);
+  });
+
+  it("stamp_inserts_into_linked_structure", () => {
+    // After beginAssembly + 4 allocElement+stampElement cycles on a 2x2 matrix
+    // + finalize, the linked structure has 4 elements with correct row/col/value,
+    // accessible via _rowHead/_colHead chains.
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+
+    const h00 = solver.allocElement(0, 0); solver.stampElement(h00, 4.0);
+    const h01 = solver.allocElement(0, 1); solver.stampElement(h01, 1.0);
+    const h10 = solver.allocElement(1, 0); solver.stampElement(h10, 1.0);
+    const h11 = solver.allocElement(1, 1); solver.stampElement(h11, 3.0);
+
+    solver.stampRHS(0, 1.0);
+    solver.stampRHS(1, 2.0);
+    solver.finalize();
+
+    // Check linked structure via rowHead chains — 2 elements per row
+    const rowHead = (solver as any)._rowHead as Int32Array;
+    const colHead = (solver as any)._colHead as Int32Array;
+    const elNextInRow = (solver as any)._elNextInRow as Int32Array;
+    const elNextInCol = (solver as any)._elNextInCol as Int32Array;
+    const elRow = (solver as any)._elRow as Int32Array;
+    const elCol = (solver as any)._elCol as Int32Array;
+    const elVal = (solver as any)._elVal as Float64Array;
+
+    // Count elements in row 0 chain
+    let countRow0 = 0;
+    let e = rowHead[0];
+    while (e >= 0) { countRow0++; e = elNextInRow[e]; }
+    expect(countRow0).toBe(2);
+
+    // Count elements in row 1 chain
+    let countRow1 = 0;
+    e = rowHead[1];
+    while (e >= 0) { countRow1++; e = elNextInRow[e]; }
+    expect(countRow1).toBe(2);
+
+    // Verify element values via handles
+    expect(elVal[h00]).toBeCloseTo(4.0, 12);
+    expect(elVal[h01]).toBeCloseTo(1.0, 12);
+    expect(elVal[h10]).toBeCloseTo(1.0, 12);
+    expect(elVal[h11]).toBeCloseTo(3.0, 12);
+
+    // Verify solve correctness
+    const result = solver.factor();
+    expect(result.success).toBe(true);
+    const x = new Float64Array(2);
+    solver.solve(x);
+    expect(x[0]).toBeCloseTo(1 / 11, 12);
+    expect(x[1]).toBeCloseTo(7 / 11, 12);
+
+    void colHead; void elRow; void elCol; void elNextInCol; // suppress unused
+  });
+
+  it("beginAssembly_zeros_values_preserves_structure", () => {
+    // After a full solve cycle, calling beginAssembly again zeros all element
+    // values and RHS but linked chains remain intact (A-element count unchanged).
+    const solver = new SparseSolver();
+
+    // First assembly and solve
+    solver.beginAssembly(2);
+    const h00 = solver.allocElement(0, 0); solver.stampElement(h00, 4.0);
+    const h01 = solver.allocElement(0, 1); solver.stampElement(h01, 1.0);
+    const h10 = solver.allocElement(1, 0); solver.stampElement(h10, 1.0);
+    const h11 = solver.allocElement(1, 1); solver.stampElement(h11, 3.0);
+    solver.stampRHS(0, 1.0);
+    solver.stampRHS(1, 2.0);
+    solver.finalize();
+    solver.factor();
+    const x1 = new Float64Array(2);
+    solver.solve(x1);
+    expect(x1[0]).toBeCloseTo(1 / 11, 12);
+
+    // Second assembly: handles remain valid, values should be zeroed
+    solver.beginAssembly(2);
+
+    const elVal = (solver as any)._elVal as Float64Array;
+    // All A-element values zeroed after beginAssembly
+    expect(elVal[h00]).toBe(0);
+    expect(elVal[h01]).toBe(0);
+    expect(elVal[h10]).toBe(0);
+    expect(elVal[h11]).toBe(0);
+
+    // RHS zeroed
+    const rhs = (solver as any)._rhs as Float64Array;
+    expect(rhs[0]).toBe(0);
+    expect(rhs[1]).toBe(0);
+
+    // Linked chains still intact — rowHead still points to valid elements
+    const rowHead = (solver as any)._rowHead as Int32Array;
+    const elNextInRow = (solver as any)._elNextInRow as Int32Array;
+    let countRow0 = 0;
+    let e = rowHead[0];
+    while (e >= 0) { countRow0++; e = elNextInRow[e]; }
+    expect(countRow0).toBe(2); // structure preserved
+
+    // Re-stamp with new values and verify solve works
+    solver.stampElement(h00, 2.0);
+    solver.stampElement(h01, 1.0);
+    solver.stampElement(h10, 1.0);
+    solver.stampElement(h11, 4.0);
+    solver.stampRHS(0, 3.0);
+    solver.stampRHS(1, 5.0);
+    solver.finalize();
+    const r2 = solver.factor();
+    expect(r2.success).toBe(true);
+    const x2 = new Float64Array(2);
+    solver.solve(x2);
+    // A=[[2,1],[1,4]], b=[3,5]: det=8-1=7, x0=(12-5)/7=1, x1=(10-3)/7=1
+    expect(x2[0]).toBeCloseTo(1.0, 12);
+    expect(x2[1]).toBeCloseTo(1.0, 12);
+  });
+
+  it("invalidateTopology_forces_rebuild", () => {
+    // After invalidateTopology(), the next assembly clears and rebuilds
+    // the linked structure from scratch.
+    const solver = new SparseSolver();
+
+    // First topology: 2x2 diagonal
+    solver.beginAssembly(2);
+    const h00 = solver.allocElement(0, 0); solver.stampElement(h00, 3.0);
+    const h11 = solver.allocElement(1, 1); solver.stampElement(h11, 5.0);
+    solver.stampRHS(0, 6.0);
+    solver.stampRHS(1, 10.0);
+    solver.finalize();
+    let r = solver.factor();
+    expect(r.success).toBe(true);
+    const x1 = new Float64Array(2);
+    solver.solve(x1);
+    expect(x1[0]).toBeCloseTo(2.0, 12);
+    expect(x1[1]).toBeCloseTo(2.0, 12);
+
+    // Invalidate topology — next beginAssembly must rebuild from scratch
+    solver.invalidateTopology();
+
+    solver.beginAssembly(2);
+    // After invalidation, the linked structure is empty — new allocElement calls
+    // allocate fresh elements. Old handles h00/h11 should not be reused implicitly.
+    const h00b = solver.allocElement(0, 0); solver.stampElement(h00b, 4.0);
+    const h01b = solver.allocElement(0, 1); solver.stampElement(h01b, 1.0);
+    const h10b = solver.allocElement(1, 0); solver.stampElement(h10b, 1.0);
+    const h11b = solver.allocElement(1, 1); solver.stampElement(h11b, 3.0);
+    solver.stampRHS(0, 1.0);
+    solver.stampRHS(1, 2.0);
+    solver.finalize();
+
+    // Verify 4 elements in structure (full 2x2)
+    const colHead = (solver as any)._colHead as Int32Array;
+    const elNextInCol = (solver as any)._elNextInCol as Int32Array;
+    let countCol0 = 0;
+    let e = colHead[0];
+    while (e >= 0) { countCol0++; e = elNextInCol[e]; }
+    expect(countCol0).toBe(2); // both rows in col 0
+
+    r = solver.factor();
+    expect(r.success).toBe(true);
+    const x2 = new Float64Array(2);
+    solver.solve(x2);
+    expect(x2[0]).toBeCloseTo(1 / 11, 12);
+    expect(x2[1]).toBeCloseTo(7 / 11, 12);
+
+    void h00b; void h01b; void h10b; void h11b;
+  });
+});
+
+describe("SparseSolver CSC from linked structure", () => {
+  it("csc_solve_matches_linked_factor", () => {
+    // Build a 4x4 test matrix, factor with reorder (builds CSC from linked structure),
+    // then solve and verify the result matches direct computation.
+    // A = tridiagonal with diag=2, off-diag=-1, plus a non-symmetric entry.
+    // A[0][0]=4, A[0][1]=1, A[1][0]=1, A[1][1]=4, A[1][2]=1, A[2][1]=1, A[2][2]=4, A[2][3]=1, A[3][2]=1, A[3][3]=4
+    // b = [1,2,3,4]
+    const n = 4;
+    const solver = new SparseSolver();
+    solver.beginAssembly(n);
+    for (let i = 0; i < n; i++) solver.stamp(i, i, 4);
+    for (let i = 0; i < n - 1; i++) {
+      solver.stamp(i, i + 1, 1);
+      solver.stamp(i + 1, i, 1);
+    }
+    for (let i = 0; i < n; i++) solver.stampRHS(i, i + 1);
+    solver.finalize();
+
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+
+    const x = new Float64Array(n);
+    solver.solve(x);
+
+    // Verify A*x = b
+    const A = [
+      [4, 1, 0, 0],
+      [1, 4, 1, 0],
+      [0, 1, 4, 1],
+      [0, 0, 1, 4],
+    ];
+    const b = [1, 2, 3, 4];
+    for (let i = 0; i < n; i++) {
+      let sum = 0;
+      for (let j = 0; j < n; j++) sum += A[i][j] * x[j];
+      expect(sum).toBeCloseTo(b[i], 10);
+    }
+
+    // Verify _lValueIndex/_uValueIndex are recorded on pool elements
+    const lValueIndex = (solver as any)._lValueIndex as Int32Array;
+    const uValueIndex = (solver as any)._uValueIndex as Int32Array;
+    const elCount = (solver as any)._elCount as number;
+    // At least some elements should have valid CSC index entries
+    let hasLIndex = false;
+    let hasUIndex = false;
+    for (let e = 0; e < elCount; e++) {
+      if (lValueIndex[e] >= 0) hasLIndex = true;
+      if (uValueIndex[e] >= 0) hasUIndex = true;
+    }
+    expect(hasLIndex).toBe(true);
+    expect(hasUIndex).toBe(true);
+  });
+
+  it("numeric_refactor_reuses_csc_pattern", () => {
+    // Verify that factorNumerical() after factorWithReorder() produces correct results
+    // using the same CSC sparsity pattern with different numeric values.
+    // First assembly: A = [[3,1],[1,2]], b = [4,3] => solution [1,1]
+    // Second assembly (same topology, different values): A = [[5,2],[2,3]], b = [7,5] => solution [1,1]
+    const solver = new SparseSolver();
+
+    // First topology setup
+    solver.beginAssembly(2);
+    const h00 = solver.allocElement(0, 0); solver.stampElement(h00, 3);
+    const h01 = solver.allocElement(0, 1); solver.stampElement(h01, 1);
+    const h10 = solver.allocElement(1, 0); solver.stampElement(h10, 1);
+    const h11 = solver.allocElement(1, 1); solver.stampElement(h11, 2);
+    solver.stampRHS(0, 4);
+    solver.stampRHS(1, 3);
+    solver.finalize();
+
+    const r1 = solver.factorWithReorder();
+    expect(r1.success).toBe(true);
+    const x1 = new Float64Array(2);
+    solver.solve(x1);
+    expect(x1[0]).toBeCloseTo(1.0, 10);
+    expect(x1[1]).toBeCloseTo(1.0, 10);
+
+    // Second assembly: same topology, different values — factorNumerical reuses CSC structure
+    solver.beginAssembly(2);
+    solver.stampElement(h00, 5);
+    solver.stampElement(h01, 2);
+    solver.stampElement(h10, 2);
+    solver.stampElement(h11, 3);
+    solver.stampRHS(0, 7);
+    solver.stampRHS(1, 5);
+    solver.finalize();
+
+    // factorNumerical reuses the CSC sparsity pattern — no pivot search
+    const r2 = solver.factorNumerical();
+    expect(r2.success).toBe(true);
+    expect(solver.lastFactorUsedReorder).toBe(false);
+
+    const x2 = new Float64Array(2);
+    solver.solve(x2);
+    // A2 = [[5,2],[2,3]], b2=[7,5]: det=15-4=11, x0=(21-10)/11=1, x1=(15-14)/11=1/11
+    // Wait: x0=(5*7-2*5*?)... let me compute: Ax=b => 5x0+2x1=7, 2x0+3x1=5
+    // From first: x0=(7-2x1)/5. Sub: 2*(7-2x1)/5 + 3x1 = 5 => (14-4x1)/5+3x1=5 => 14-4x1+15x1=25 => 11x1=11 => x1=1
+    // x0=(7-2)/5=1
+    expect(x2[0]).toBeCloseTo(1.0, 10);
+    expect(x2[1]).toBeCloseTo(1.0, 10);
+
+    void h00; void h01; void h10; void h11;
+  });
+});
+
+describe("SparseSolver SMPpreOrder", () => {
+  it("preorder_fixes_zero_diagonal_from_voltage_source", () => {
+    // Build a 3x3 MNA matrix for a voltage source:
+    // Node 0: conductance G=1 (row 0, col 0)
+    // VS KCL: A[0][2] = 1 (current into node 0 from branch)
+    // VS KVL: A[2][0] = 1 (v0 - V = 0, so v0 coeff is 1)
+    // This creates a structural zero at diagonal [2][2].
+    // The twin pair: (2,0) in col 0 (value=1) and (0,2) in col 2 (value=1).
+    // After preorder, swapping columns 0 and 2 should put the current branch at position 0.
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 1);   // conductance
+    solver.stamp(0, 2, 1);   // VS KCL stamp
+    solver.stamp(2, 0, 1);   // VS KVL stamp
+    // diagonal [2][2] = 0 (not stamped)
+    // add a third equation: node 1 isolated (diagonal only to make solvable)
+    solver.stamp(1, 1, 1);
+    solver.stampRHS(0, 0);   // KCL: G*v0 + I_vs = 0
+    solver.stampRHS(1, 0);   // isolated node
+    solver.stampRHS(2, 5);   // KVL: v0 = 5
+    solver.finalize();
+
+    solver.preorder();
+
+    // After preorder, diagonal at col 2 should now have a non-zero entry
+    // (because column 0 and column 2 were swapped if twin pair found).
+    // Factor and solve — verify correct result.
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+
+    const x = new Float64Array(3);
+    solver.solve(x);
+    // With the voltage source circuit: v0=5, I_vs=-5 (current from branch equation)
+    // But after preorder column swap, the unknowns are reordered.
+    // The key check: factorization succeeded and solution satisfies A*x=b.
+    // A*x = b: check each row
+    // Row 0: 1*x[0] + 1*x[2] = 0
+    // Row 1: 1*x[1] = 0
+    // Row 2: 1*x[0] = 5
+    // Solution: x[0]=5, x[1]=0, x[2]=-5 (in original variable order before preorder swap)
+    // After preorder column swap of columns 0 and 2, x[2] holds the original x[0] etc.
+    // The exact permutation depends on which columns were swapped — just verify Ax=b.
+    // Use the RHS vector [0, 0, 5] and the original A matrix entries.
+    // Original A: row0: col0=1, col2=1; row1: col1=1; row2: col0=1
+    const vals: [number, number, number][] = [[0,0,1],[0,2,1],[1,1,1],[2,0,1]];
+    const rhs = [0, 0, 5];
+    for (let i = 0; i < 3; i++) {
+      let sum = 0;
+      for (const [r, c, v] of vals) {
+        if (r === i) sum += v * x[c];
+      }
+      expect(Math.abs(sum - rhs[i])).toBeLessThan(1e-10);
+    }
+  });
+
+  it("preorder_handles_multiple_twins", () => {
+    // Build a 5x5 MNA with two voltage sources (two zero diagonals).
+    // node 0: G=1 at (0,0), VS1 stamp at (0,3)=1 and (3,0)=1
+    // node 1: G=1 at (1,1), VS2 stamp at (1,4)=1 and (4,1)=1
+    // node 2: G=1 at (2,2) isolated
+    // Branch rows 3,4 have zero diagonal initially.
+    const solver = new SparseSolver();
+    solver.beginAssembly(5);
+    solver.stamp(0, 0, 1);
+    solver.stamp(0, 3, 1);
+    solver.stamp(3, 0, 1);
+    solver.stamp(1, 1, 1);
+    solver.stamp(1, 4, 1);
+    solver.stamp(4, 1, 1);
+    solver.stamp(2, 2, 1);
+    solver.stampRHS(0, 0);
+    solver.stampRHS(1, 0);
+    solver.stampRHS(2, 0);
+    solver.stampRHS(3, 3); // V1 = 3
+    solver.stampRHS(4, 7); // V2 = 7
+    solver.finalize();
+
+    solver.preorder();
+
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+
+    const x = new Float64Array(5);
+    solver.solve(x);
+
+    // Verify A*x = b in original matrix coordinates
+    const entries: [number, number, number][] = [
+      [0,0,1],[0,3,1],[3,0,1],[1,1,1],[1,4,1],[4,1,1],[2,2,1],
+    ];
+    const rhs = [0, 0, 0, 3, 7];
+    for (let i = 0; i < 5; i++) {
+      let sum = 0;
+      for (const [r, c, v] of entries) {
+        if (r === i) sum += v * x[c];
+      }
+      expect(Math.abs(sum - rhs[i])).toBeLessThan(1e-10);
+    }
+  });
+
+  it("preorder_is_idempotent", () => {
+    // Calling preorder() twice produces the same result as calling it once.
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 1);
+    solver.stamp(0, 2, 1);
+    solver.stamp(2, 0, 1);
+    solver.stamp(1, 1, 1);
+    solver.stampRHS(0, 0);
+    solver.stampRHS(1, 0);
+    solver.stampRHS(2, 5);
+    solver.finalize();
+
+    // First preorder — gated by _didPreorder flag
+    solver.preorder();
+    // Second call — must be a no-op (gated by _didPreorder)
+    solver.preorder();
+
+    // Should still factor and solve correctly
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+
+    const x = new Float64Array(3);
+    solver.solve(x);
+
+    const vals: [number, number, number][] = [[0,0,1],[0,2,1],[1,1,1],[2,0,1]];
+    const rhs = [0, 0, 5];
+    for (let i = 0; i < 3; i++) {
+      let sum = 0;
+      for (const [r, c, v] of vals) {
+        if (r === i) sum += v * x[c];
+      }
+      expect(Math.abs(sum - rhs[i])).toBeLessThan(1e-10);
+    }
+  });
+
+  it("preorder_no_swap_when_diagonal_nonzero", () => {
+    // A 3x3 matrix with all-nonzero diagonals — preorder should be a no-op.
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2); solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1); solver.stamp(1, 1, 3); solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1); solver.stamp(2, 2, 2);
+    solver.stampRHS(0, 1); solver.stampRHS(1, 2); solver.stampRHS(2, 1);
+    solver.finalize();
+
+    // Record colHead state before preorder
+    const colHeadBefore = Array.from((solver as any)._colHead as Int32Array);
+
+    solver.preorder();
+
+    // colHead should be unchanged — no swaps performed
+    const colHeadAfter = Array.from((solver as any)._colHead as Int32Array);
+    expect(colHeadAfter).toEqual(colHeadBefore);
+
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+
+    const x = new Float64Array(3);
+    solver.solve(x);
+    expect(x[0]).toBeCloseTo(5 / 4, 10);
+    expect(x[1]).toBeCloseTo(3 / 2, 10);
+    expect(x[2]).toBeCloseTo(5 / 4, 10);
+  });
+});
+
+describe("SparseSolver no-AMD Markowitz ordering", () => {
+  it("solve_without_amd_3x3", () => {
+    // A 3x3 system solved using only Markowitz pivot ordering (no AMD pre-permutation).
+    // A = [[2,-1,0],[-1,3,-1],[0,-1,2]], b = [1,2,1]
+    // Solution: x0=(1+x1)/2, x2=(1+x1)/2; from row1: 2x1-1=2 => x1=3/2
+    // x0 = 5/4, x1 = 3/2, x2 = 5/4
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.stampRHS(2, 1);
+    solver.finalize();
+
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+
+    const x = new Float64Array(3);
+    solver.solve(x);
+    expect(x[0]).toBeCloseTo(5 / 4, 10);
+    expect(x[1]).toBeCloseTo(3 / 2, 10);
+    expect(x[2]).toBeCloseTo(5 / 4, 10);
+
+    // Verify no perm/permInv arrays exist on solver
+    expect((solver as any)._perm).toBeUndefined();
+    expect((solver as any)._permInv).toBeUndefined();
+  });
+
+  it("solve_without_amd_voltage_source_branch", () => {
+    // Circuit with voltage source branch equations (off-diagonal ±1 entries).
+    // This is the classic MNA stamp for V1=5V between node 1 (ground ref) and node 0:
+    //   Node 0: G*v0 + Ivs = 0      => row 0
+    //   KVL: v0 - V1 = 0             => row 1 (branch eq)
+    // Concretely: 3-node MNA with a 1Ω resistor from node 0 to node 2, and V=5V source.
+    // Nodes: 0=top of resistor, 1=bottom of resistor (gnd ref), 2=branch current
+    // Stamp: R from node 0 to gnd:  A[0][0]+=1, A[0][0] already has conductance
+    // Simpler: use the standard voltage-divider MNA from test-helpers
+    //
+    // Manual MNA (2 nodes + 1 branch):
+    //   n=3, node0=v_top, node1=v_bot (gnd=0V effectively via source), node2=I_branch
+    //   Resistor 1Ω node0→gnd: A[0][0]+=1
+    //   Voltage source V=5 node0→gnd via branch: A[0][2]+=1, A[2][0]+=1, A[2][2]=0, rhs[2]=5
+    //   Ground: set row/col 1 to identity (or just 2-node system)
+    //
+    // Use the simpler 2-node + 1-branch MNA:
+    //   node 0 (top), node 1 (branch current Ivs)
+    //   Conductance G=1 at node 0: A[0][0]=1
+    //   VS stamp: A[0][1]=1 (KCL), A[1][0]=1 (KVL), rhs[1]=5
+    //   Solution: v0=5, Ivs=-5 (current flows out of + terminal into node 0 → Ivs=+5
+    //   but since Ivs enters KCL with +sign and current convention: Ivs=-5)
+    //   From KCL: G*v0 + Ivs = 0 => 1*5 + Ivs = 0 => Ivs = -5
+    //   From KVL: v0 = 5 => v0 = 5
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    solver.stamp(0, 0, 1);   // conductance G=1
+    solver.stamp(0, 1, 1);   // VS KCL stamp
+    solver.stamp(1, 0, 1);   // VS KVL stamp
+    // A[1][1] = 0 (no diagonal for branch current row)
+    solver.stampRHS(1, 5);   // V = 5
+    solver.finalize();
+
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+
+    const x = new Float64Array(2);
+    solver.solve(x);
+    // v0 = 5, Ivs = -5
+    expect(x[0]).toBeCloseTo(5.0, 10);
+    expect(x[1]).toBeCloseTo(-5.0, 10);
+
+    // Verify no AMD permutation arrays
+    expect((solver as any)._perm).toBeUndefined();
+    expect((solver as any)._permInv).toBeUndefined();
+  });
+
+  it("markowitz_fill_in_without_amd", () => {
+    // 5x5 matrix known to generate fill-in during Markowitz factorization.
+    // Uses a "arrowhead" structure: dense row/col 0, sparse diagonal 1..4.
+    // A[0][j]=1 for j=0..4, A[j][0]=1 for j=1..4, A[j][j]=5 for j=1..4
+    // b = [1,1,1,1,1]
+    // Solution: solve and verify A*x = b by back-substitution.
+    const n = 5;
+    const solver = new SparseSolver();
+    solver.beginAssembly(n);
+    for (let j = 0; j < n; j++) solver.stamp(0, j, 1);
+    for (let i = 1; i < n; i++) {
+      solver.stamp(i, 0, 1);
+      solver.stamp(i, i, 5);
+    }
+    for (let i = 0; i < n; i++) solver.stampRHS(i, 1);
+    solver.finalize();
+
+    const result = solver.factorWithReorder();
+    expect(result.success).toBe(true);
+
+    const x = new Float64Array(n);
+    solver.solve(x);
+
+    // Verify A*x = b within tolerance
+    // Row 0: sum(x[j]) = 1
+    let row0sum = 0;
+    for (let j = 0; j < n; j++) row0sum += x[j];
+    expect(row0sum).toBeCloseTo(1.0, 8);
+
+    // Rows 1..4: x[0] + 5*x[i] = 1
+    for (let i = 1; i < n; i++) {
+      expect(x[0] + 5 * x[i]).toBeCloseTo(1.0, 8);
+    }
+
+    // Verify no AMD permutation arrays
+    expect((solver as any)._perm).toBeUndefined();
+    expect((solver as any)._permInv).toBeUndefined();
+  });
+});
+
+describe("SparseSolver NISHOULDREORDER lifecycle", () => {
+  it("factor_uses_numeric_path_without_forceReorder", () => {
+    // After one successful factorWithReorder(), subsequent factor() calls must
+    // use the numeric-only path (factorNumerical). Verified via lastFactorUsedReorder.
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.stampRHS(0, 1);
+    solver.stampRHS(1, 2);
+    solver.stampRHS(2, 1);
+    solver.finalize();
+
+    // First factor() must use reorder (no pivot order yet)
+    const r1 = solver.factor();
+    expect(r1.success).toBe(true);
+    expect(solver.lastFactorUsedReorder).toBe(true);
+
+    // Re-assemble with same values
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.finalize();
+
+    // Second factor() must use numeric-only path (no forceReorder called)
+    const r2 = solver.factor();
+    expect(r2.success).toBe(true);
+    expect(solver.lastFactorUsedReorder).toBe(false);
+  });
+
+  it("forceReorder_triggers_full_pivot_search", () => {
+    // After forceReorder(), the next factor() call must use factorWithReorder.
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.finalize();
+
+    // First factor — builds pivot order
+    solver.factor();
+    expect(solver.lastFactorUsedReorder).toBe(true);
+
+    // Re-assemble
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.finalize();
+
+    // Second factor without forceReorder — numeric path
+    solver.factor();
+    expect(solver.lastFactorUsedReorder).toBe(false);
+
+    // Re-assemble, then forceReorder
+    solver.beginAssembly(3);
+    solver.stamp(0, 0, 2);
+    solver.stamp(0, 1, -1);
+    solver.stamp(1, 0, -1);
+    solver.stamp(1, 1, 3);
+    solver.stamp(1, 2, -1);
+    solver.stamp(2, 1, -1);
+    solver.stamp(2, 2, 2);
+    solver.finalize();
+    solver.forceReorder();
+
+    // Third factor after forceReorder — must use full pivot search
+    const r3 = solver.factor();
+    expect(r3.success).toBe(true);
+    expect(solver.lastFactorUsedReorder).toBe(true);
   });
 });

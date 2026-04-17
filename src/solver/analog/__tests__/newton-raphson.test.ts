@@ -465,8 +465,8 @@ describe("NR", () => {
     const nodesets = new Map([[1, 2.5]]);
     const ics = new Map<number, number>();
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initJct");
-    // One nodeset entry → one COO stamp added
-    expect(solver.cooCount).toBe(1);
+    // One nodeset entry → one element stamp added
+    expect(solver.elementCount).toBe(1);
     // RHS at row 1 must be G_NODESET * 2.5 * 1.0
     const rhs = solver.getRhsSnapshot();
     expect(rhs[1]).toBeCloseTo(G_NODESET * 2.5, 0);
@@ -480,8 +480,8 @@ describe("NR", () => {
     const nodesets = new Map([[2, 1.0]]);
     const ics = new Map<number, number>();
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFix");
-    // One nodeset entry → one COO stamp added
-    expect(solver.cooCount).toBe(1);
+    // One nodeset entry → one element stamp added
+    expect(solver.elementCount).toBe(1);
     // RHS at row 2 must be G_NODESET * 1.0 * 1.0
     const rhs = solver.getRhsSnapshot();
     expect(rhs[2]).toBeCloseTo(G_NODESET * 1.0, 0);
@@ -496,7 +496,7 @@ describe("NR", () => {
     const ics = new Map<number, number>();
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFloat");
     // initFloat skips nodesets — no stamps added
-    expect(solver.cooCount).toBe(0);
+    expect(solver.elementCount).toBe(0);
     const rhs = solver.getRhsSnapshot();
     expect(rhs[1]).toBe(0);
   });
@@ -510,7 +510,7 @@ describe("NR", () => {
     const ics = new Map([[1, 1.5]]);
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFloat");
     // IC stamp applied even in initFloat mode
-    expect(solver.cooCount).toBe(1);
+    expect(solver.elementCount).toBe(1);
     const rhs = solver.getRhsSnapshot();
     expect(rhs[1]).toBeCloseTo(G_NODESET * 1.5, 0);
   });
@@ -523,8 +523,8 @@ describe("NR", () => {
     const nodesets = new Map([[1, 2.0]]);
     const ics = new Map([[2, 1.0]]);
     applyNodesetsAndICs(solver, nodesets, ics, 0.5, "initJct");
-    // Both nodeset (node 1) and IC (node 2) get one COO stamp each
-    expect(solver.cooCount).toBe(2);
+    // Both nodeset (node 1) and IC (node 2) get one element stamp each
+    expect(solver.elementCount).toBe(2);
     const rhs = solver.getRhsSnapshot();
     // nodeset: G_NODESET * 2.0 * 0.5 = 1e10
     expect(rhs[1]).toBeCloseTo(G_NODESET * 2.0 * 0.5, 0);
@@ -604,9 +604,10 @@ describe("NR singular retry", () => {
   });
 
   it("nr_emits_singular_diagnostic_when_reorder_also_fails", () => {
-    // When factor() always fails and lastFactorUsedReorder is false (numerical path),
-    // the retry path also fails, so NR must emit a singular-matrix diagnostic
-    // and return converged=false.
+    // When factor() always fails and lastFactorUsedReorder is true (reorder path),
+    // NR must emit a singular-matrix diagnostic and return converged=false.
+    // (With the continue-based E_SINGULAR recovery, we only enter the error path
+    // when lastFactorUsedReorder === true, meaning the reorder path also failed.)
     const diagnostics = new DiagnosticCollector();
 
     const realSolver = new SparseSolver();
@@ -619,7 +620,9 @@ describe("NR singular retry", () => {
           };
         }
         if (prop === "lastFactorUsedReorder") {
-          return false;
+          // Simulate reorder path failure: lastFactorUsedReorder === true so
+          // the NR loop does NOT enter the continue-based recovery path.
+          return true;
         }
         const val = (target as unknown as Record<string | symbol, unknown>)[prop];
         if (typeof val === "function") return val.bind(target);
@@ -647,5 +650,269 @@ describe("NR singular retry", () => {
     expect(result.converged).toBe(false);
     const diags = diagnostics.getDiagnostics();
     expect(diags.some(d => d.code === "singular-matrix")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave 0.3.1: forceReorder at ngspice-matching points
+// ---------------------------------------------------------------------------
+
+describe("NR NISHOULDREORDER lifecycle", () => {
+  it("forceReorder_called_on_initJct_to_initFix", () => {
+    // Run NR with dcopModeLadder starting in initJct mode.
+    // The STEP J initJct branch (niiter.c:856-858) first sets initMode to "initFix"
+    // then calls solver.forceReorder(). Verify by intercepting forceReorder() and
+    // asserting it is called during the initJct pass (pool.initMode === "initFix"
+    // immediately after the transition, before the next iteration begins).
+    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
+    allocateStatePool(elements);
+
+    let forceReorderCalled = false;
+    const pool = { initMode: "initJct" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" };
+
+    const proxySolver = new Proxy(solver, {
+      get(target, prop) {
+        if (prop === "forceReorder") {
+          return () => {
+            // NR sets initMode to "initFix" before calling forceReorder()
+            forceReorderCalled = true;
+            return (target as SparseSolver).forceReorder();
+          };
+        }
+        const val = (target as unknown as Record<string | symbol, unknown>)[prop];
+        if (typeof val === "function") return val.bind(target);
+        return val;
+      },
+    }) as SparseSolver;
+
+    newtonRaphson({
+      solver: proxySolver,
+      elements,
+      matrixSize,
+      maxIterations: 50,
+      reltol: 1e-3,
+      abstol: 1e-6,
+      iabstol: 1e-12,
+      diagnostics,
+      dcopModeLadder: {
+        runPrimeJunctions(): void {},
+        pool,
+        onModeBegin(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number): void {},
+        onModeEnd(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number, _converged: boolean): void {},
+      },
+    });
+
+    // forceReorder() must have been called during the initJct→initFix transition
+    expect(forceReorderCalled).toBe(true);
+    // The transition also moved pool.initMode away from initJct
+    expect(pool.initMode).not.toBe("initJct");
+  });
+
+  it("forceReorder_called_on_initTran_first_iteration", () => {
+    // Run NR with statePool.initMode = "initTran". On iteration 0, the STEP J
+    // initTran branch calls forceReorder() when iteration <= 0.
+    // Use a synthetic statePool with initMode and state0 so the NR mode
+    // dispatcher reads it correctly.
+    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
+    allocateStatePool(elements);
+
+    let forceReorderCallCount = 0;
+
+    const proxySolver = new Proxy(solver, {
+      get(target, prop) {
+        if (prop === "forceReorder") {
+          return () => {
+            forceReorderCallCount++;
+            return (target as SparseSolver).forceReorder();
+          };
+        }
+        const val = (target as unknown as Record<string | symbol, unknown>)[prop];
+        if (typeof val === "function") return val.bind(target);
+        return val;
+      },
+    }) as SparseSolver;
+
+    // statePool must provide initMode and state0 (read by NR code)
+    const syntheticPool = {
+      initMode: "initTran" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient",
+      state0: new Float64Array(64),
+    };
+
+    newtonRaphson({
+      solver: proxySolver,
+      elements,
+      matrixSize,
+      maxIterations: 50,
+      reltol: 1e-3,
+      abstol: 1e-6,
+      iabstol: 1e-12,
+      diagnostics,
+      statePool: syntheticPool,
+    });
+
+    // forceReorder() must have been called at least once (initTran branch, iteration <= 0)
+    expect(forceReorderCallCount).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave 0.3.2: E_SINGULAR recovery re-loads then re-factors
+// ---------------------------------------------------------------------------
+
+describe("NR E_SINGULAR recovery via continue", () => {
+  it("e_singular_recovers_via_continue", () => {
+    // The E_SINGULAR recovery path must: call forceReorder(), then continue to
+    // the top of the NR loop to re-execute CKTload (stampAll) before re-factoring.
+    // This matches ngspice niiter.c:888-891 behavior.
+    //
+    // Verification strategy: count beginAssembly calls vs factor() failure count.
+    // With `continue` semantics, after factor() fails on the numeric path,
+    // beginAssembly is called again (reload) before the next factor() attempt.
+    // So total beginAssembly calls > total successful factor() calls for the
+    // iteration that failed — i.e., stampAllCount > factorSuccessCount at
+    // the point of recovery.
+    const diagnostics = new DiagnosticCollector();
+
+    let forceReorderCalledAfterFailure = false;
+    let factorCallCount = 0;
+    let beginAssemblyAfterFailure = 0;
+    let singularIterationSeen = false;
+
+    const realSolver = new SparseSolver();
+
+    const proxySolver = new Proxy(realSolver, {
+      get(target, prop) {
+        if (prop === "factor") {
+          return () => {
+            factorCallCount++;
+            if (factorCallCount === 2) {
+              // Simulate numerical-path failure (not reorder path)
+              singularIterationSeen = true;
+              return { success: false };
+            }
+            return (target as SparseSolver).factor();
+          };
+        }
+        if (prop === "lastFactorUsedReorder") {
+          // The second factor call (count === 2) is the numeric-only failure.
+          return factorCallCount === 2 ? false : (target as SparseSolver).lastFactorUsedReorder;
+        }
+        if (prop === "forceReorder") {
+          return () => {
+            if (singularIterationSeen) forceReorderCalledAfterFailure = true;
+            return (target as SparseSolver).forceReorder();
+          };
+        }
+        if (prop === "beginAssembly") {
+          return (...args: unknown[]) => {
+            if (singularIterationSeen) beginAssemblyAfterFailure++;
+            return (target as SparseSolver).beginAssembly(...(args as [number]));
+          };
+        }
+        const val = (target as unknown as Record<string | symbol, unknown>)[prop];
+        if (typeof val === "function") return val.bind(target);
+        return val;
+      },
+    }) as SparseSolver;
+
+    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const r = makeResistor(1, 2, 1000);
+    const d = makeDiode(2, 0, 1e-14, 1);
+    const elements = [vs, r, d];
+    allocateStatePool(elements);
+
+    const result = newtonRaphson({
+      solver: proxySolver,
+      elements,
+      matrixSize: 3,
+      maxIterations: 100,
+      reltol: 1e-3,
+      abstol: 1e-6,
+      iabstol: 1e-12,
+      diagnostics,
+    });
+
+    // (a) Final solution must converge — circuit recovers after E_SINGULAR
+    expect(result.converged).toBe(true);
+    // (b) The failure was observed
+    expect(singularIterationSeen).toBe(true);
+    // (c) forceReorder() was called after the failure
+    expect(forceReorderCalledAfterFailure).toBe(true);
+    // (d) beginAssembly was called after the failure — confirms NR re-loaded
+    // before re-factoring (the `continue` semantics)
+    expect(beginAssemblyAfterFailure).toBeGreaterThan(0);
+  });
+
+  it("e_singular_recovery_reloads_and_refactors", () => {
+    // Build a matrix that produces E_SINGULAR on the numeric-only path.
+    // After the NR loop completes:
+    //   (a) final solution must be correct (converged)
+    //   (b) forceReorder() was called
+    //   (c) beginAssembly was called after the failure (re-load happened before re-factor)
+    // This verifies the observable effect of the continue-based recovery without
+    // coupling to internal lastFactorUsedReorder state mid-loop.
+    const diagnostics = new DiagnosticCollector();
+
+    let forceReorderCalled = false;
+    let factorCallCount = 0;
+    let beginAssemblyAfterFailure = 0;
+    let singularSeen = false;
+
+    const realSolver = new SparseSolver();
+
+    const proxySolver = new Proxy(realSolver, {
+      get(target, prop) {
+        if (prop === "factor") {
+          return () => {
+            factorCallCount++;
+            if (factorCallCount === 2) {
+              singularSeen = true;
+              return { success: false };
+            }
+            return (target as SparseSolver).factor();
+          };
+        }
+        if (prop === "lastFactorUsedReorder") {
+          return factorCallCount === 2 ? false : (target as SparseSolver).lastFactorUsedReorder;
+        }
+        if (prop === "forceReorder") {
+          return () => {
+            forceReorderCalled = true;
+            return (target as SparseSolver).forceReorder();
+          };
+        }
+        if (prop === "beginAssembly") {
+          return (...args: unknown[]) => {
+            if (singularSeen) beginAssemblyAfterFailure++;
+            return (target as SparseSolver).beginAssembly(...(args as [number]));
+          };
+        }
+        const val = (target as unknown as Record<string | symbol, unknown>)[prop];
+        if (typeof val === "function") return val.bind(target);
+        return val;
+      },
+    }) as SparseSolver;
+
+    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const r = makeResistor(1, 2, 1000);
+    const d = makeDiode(2, 0, 1e-14, 1);
+    const elements = [vs, r, d];
+    allocateStatePool(elements);
+
+    const result = newtonRaphson({
+      solver: proxySolver,
+      elements,
+      matrixSize: 3,
+      maxIterations: 100,
+      reltol: 1e-3,
+      abstol: 1e-6,
+      iabstol: 1e-12,
+      diagnostics,
+    });
+
+    expect(result.converged).toBe(true);
+    expect(forceReorderCalled).toBe(true);
+    // beginAssembly after failure > 0 confirms re-load happened before re-factor
+    expect(beginAssemblyAfterFailure).toBeGreaterThan(0);
   });
 });
