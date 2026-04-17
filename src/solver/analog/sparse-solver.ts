@@ -245,7 +245,6 @@ export class SparseSolver {
   /**
    * Convenience method: find-or-create element at (row, col) and accumulate value.
    * Equivalent to stampElement(allocElement(row, col), value).
-   * Retained for element implementations pending Phase 6 migration to load() interface.
    */
   stamp(row: number, col: number, value: number): void {
     const h = this.allocElement(row, col);
@@ -789,8 +788,7 @@ export class SparseSolver {
 
   /**
    * Allocate/resize all factorization workspace arrays.
-   * Replaces _symbolicLU. Called by factorWithReorder on first reorder or
-   * after invalidateTopology().
+   * Called by factorWithReorder on first reorder or after invalidateTopology().
    * ngspice: no direct equivalent — workspace sizing is embedded in spOrderAndFactor.
    */
   private _allocateWorkspace(): void {
@@ -1389,12 +1387,11 @@ export class SparseSolver {
   }
 
   // =========================================================================
-  // Legacy accessor for tests that probe internal structure
+  // Accessors for tests that probe internal structure
   // =========================================================================
 
   /**
    * Count of non-fill-in elements in the linked structure.
-   * Replaces the removed _cooCount / cooCount accessor.
    */
   get elementCount(): number {
     let count = 0;
@@ -1409,79 +1406,4 @@ export class SparseSolver {
     return count;
   }
 
-  // =========================================================================
-  // Private helpers retained for existing test access (no underscore removal)
-  // =========================================================================
-
-  /**
-   * Build initial Markowitz counts from the linked structure.
-   * Called by tests via (solver as any)._buildLinkedMatrix().
-   * In the new architecture this is equivalent to re-scanning the linked structure.
-   */
-  private _buildLinkedMatrix(): void {
-    const n = this._n;
-    const mRow = this._markowitzRow;
-    const mCol = this._markowitzCol;
-    const mProd = this._markowitzProd;
-    let singletons = 0;
-
-    mRow.fill(0);
-    mCol.fill(0);
-
-    for (let i = 0; i < n; i++) {
-      let rc = 0;
-      let e = this._rowHead[i];
-      while (e >= 0) {
-        if (!(this._elFlags[e] & FLAG_FILL_IN)) rc++;
-        e = this._elNextInRow[e];
-      }
-      mRow[i] = rc > 0 ? rc - 1 : 0;
-
-      let cc = 0;
-      e = this._colHead[i];
-      while (e >= 0) {
-        if (!(this._elFlags[e] & FLAG_FILL_IN)) cc++;
-        e = this._elNextInCol[e];
-      }
-      mCol[i] = cc > 0 ? cc - 1 : 0;
-
-      mProd[i] = mRow[i] * mCol[i];
-      if (mProd[i] === 0) singletons++;
-    }
-    this._singletons = singletons;
-  }
-
-  /**
-   * Count off-diagonal nonzeros per row and column using linked structure.
-   * Called by tests via (solver as any)._countMarkowitz().
-   */
-  private _countMarkowitz(): void {
-    this._buildLinkedMatrix();
-  }
-
-  /**
-   * Compute Markowitz products from current row/col counts.
-   * Uses (rr-1)*(cc-1) formula matching original _markowitzProducts convention.
-   * Singletons: rows/cols with rr <= 1 or cc <= 1.
-   * Called by tests via (solver as any)._markowitzProducts().
-   */
-  private _markowitzProducts(): void {
-    const n = this._n;
-    const mRow = this._markowitzRow;
-    const mCol = this._markowitzCol;
-    const mProd = this._markowitzProd;
-    let singletons = 0;
-
-    for (let i = 0; i < n; i++) {
-      const rr = mRow[i];
-      const cc = mCol[i];
-      if (rr <= 1 || cc <= 1) {
-        singletons++;
-        mProd[i] = 0;
-      } else {
-        mProd[i] = (rr - 1) * (cc - 1);
-      }
-    }
-    this._singletons = singletons;
-  }
 }

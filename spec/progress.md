@@ -65,3 +65,25 @@
 - **Files modified**: src/solver/analog/newton-raphson.ts, src/solver/analog/__tests__/newton-raphson.test.ts
 - **Tests**: 92/92 passing
 - **Change**: Replaced immediate factor() retry with forceReorder() + continue, matching ngspice niiter.c:888-891. The continue returns to top of NR loop body (Step A: clear noncon, Step B: re-execute stampAll) before re-factoring. Also updated nr_emits_singular_diagnostic_when_reorder_also_fails test to use lastFactorUsedReorder===true to trigger the error path (consistent with new continue semantics).
+
+## Task 0.1-fix: batch-1 verifier findings remediation
+- **Status**: partial
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/sparse-solver.ts, src/solver/analog/__tests__/sparse-solver.test.ts
+- **Tests**: 91/91 passing (was 92; 1 test deleted — it tested two deleted private methods against each other)
+- **Findings fixed**: 2, 3, 4
+- **Finding 1 status**: clarification required (see CLARIFICATION NEEDED block below)
+
+### Changes made:
+- **Finding 3** (line 792): Removed "Replaces _symbolicLU." from `_allocateWorkspace()` JSDoc.
+- **Finding 4** (line 1397): Removed "Replaces the removed _cooCount / cooCount accessor." from `elementCount` getter JSDoc. Also updated the section header from "Legacy accessor..." to "Accessors...".
+- **Finding 2**: Deleted `_buildLinkedMatrix()`, `_countMarkowitz()`, `_markowitzProducts()` private methods and their section header ("Private helpers retained for existing test access") from sparse-solver.ts. Updated all 5 test call sites: removed `_countMarkowitz`/`_markowitzProducts` calls (counts already set by `finalize()`); removed `_buildLinkedMatrix` calls (replaced by relying on `finalize()` which computes the same data); deleted the test `_buildLinkedMatrix produces correct row/column counts matching _countMarkowitz` (it only compared two deleted private methods). Fixed 2 test assertions that had been calibrated to the deleted `_markowitzProducts()` convention (which used `rr<=1||cc<=1` as singleton threshold) to match the actual `finalize()` formula (`mProd===0` singleton threshold, `mProd = mRow * mCol`).
+- **Finding 1** (stamp method): Removed the banned deferral comment. Method retained pending cross-phase migration (see CLARIFICATION NEEDED).
+
+## Task 0.1-fix: CLARIFICATION NEEDED
+- **Agent**: implementer
+- **Blocker**: Finding 1 resolution requires cross-phase migration of 104 files across the entire codebase
+- **What the spec says**: Task 0.1.1 Files-to-modify: "Delete the value-addressed `stamp(row, col, value)` method. All callers currently invoking `solver.stamp(row, col, value)` — MNAAssembler, cktLoad (Phase 2), every element's `load()` implementation (Phase 6) — migrate to the handle-based API... This is a cross-phase API change coordinated via Appendix B cktLoad pseudocode and the Phase 6 LoadContext contract."
+- **Why it is ambiguous**: The verifier requires `stamp()` to be deleted in Phase 0 per 0.1.1 spec. However, 104 files across the entire codebase call `.stamp(` — including every element implementation (`optocoupler.ts`, `bjt.ts`, all behavioral components, MNAAssembler, compiler, bridge-adapter, etc.), all their test files, and infrastructure files. The spec also explicitly says "This is a cross-phase API change coordinated via...Phase 6 LoadContext contract." Deleting `stamp()` now would require migrating all 104 files immediately, but Phase 6 (element rewrites) is specifically designated for element migration per the master plan. The two plausible readings are: (A) delete the method in Phase 0 and pull forward all 104 callers now, or (B) retain the method without deferral comments until Phase 2 (MNAAssembler→cktLoad) and Phase 6 (element.load()) land per the spec's cross-phase note. The banned comment has been removed; the method itself is kept as a silent forwarding convenience with no historical annotation.
+- **What you checked before stopping**: Grepped all 104 caller files. Non-test production callers include: mna-assembler.ts, analog-engine.ts, ac-analysis.ts, bridge-adapter.ts, compiler.ts, digital-pin-model.ts, behavioral-*.ts, coupled-inductor.ts, stamp-helpers.ts, clock.ts, and all component implementations (capacitor, inductor, crystal, transformer, tapped-transformer, transmission-line, potentiometer, analog-fuse, ntc-thermistor, spark-gap, ldr, dc-voltage-source, ac-voltage-source, variable-rail, timer-555, schmitt-trigger, real-opamp, ota, optocoupler, opamp, dac, comparator, analog-switch, cccs, ccvs, vccs, vcvs, adc, switch.ts, switch-dt.ts, and all behavioral flipflop variants). The spec's Phase 6 section is specifically designated for element implementation rewrites. User must decide: pull all 104 callers forward into Phase 0, or accept `stamp()` retention without deferral comments until Phases 2/6 land.

@@ -403,3 +403,21 @@ Replace the split element interface (`stamp` + `stampNonlinear` + `updateOperati
   - No per-step arrow functions or closures created.
   - `ctx.loadCtx.xfact` is written once per step and read by every element's `load()`.
   - All device work happens inside `element.load()` (NR loop) and `element.accept(ctx, simTime, addBreakpoint)` (post-acceptance).
+
+### Task 6.3.4: Delete `SparseSolver.stamp(row, col, value)` method
+
+- **Description**: After every element, MNAAssembler descendant, bridge-adapter, behavioural helper, and test fixture has been migrated to the handle-based API (`allocElement` at compile time + `stampElement` in the hot path), the value-addressed convenience method `stamp(row, col, value)` on `SparseSolver` is dead code. Delete it.
+
+  Phase 0 left the method in place as a working value-addressed wrapper (it calls `allocElement` then `stampElement`) so that Phase 0 could land before the 65+ element rewrites in Wave 6.2. Wave 6.2 migrates those callers. Wave 6.3 is the atomic deletion point.
+
+- **Files to modify**:
+  - `src/solver/analog/sparse-solver.ts` — Delete the `stamp(row, col, value): number` method.
+  - Any remaining test fixtures or helpers still using `solver.stamp(...)` — migrate to `allocElement` + `stampElement`.
+
+- **Tests**:
+  - No new tests; the existing targeted sparse-solver and MNA tests must pass. Full-codebase `tsc --noEmit` must succeed (no callers remain).
+
+- **Acceptance criteria**:
+  - `SparseSolver.stamp(row, col, value)` does not exist.
+  - Zero grep hits for `.stamp(` on a `SparseSolver` instance anywhere in `src/` or test fixtures.
+  - All targeted sparse-solver / newton-raphson / element tests remain green after the deletion.

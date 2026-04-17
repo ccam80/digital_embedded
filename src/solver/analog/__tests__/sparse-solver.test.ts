@@ -936,10 +936,10 @@ describe("SparseSolver Markowitz data structures", () => {
 });
 
 // ---------------------------------------------------------------------------
-// _countMarkowitz and _markowitzProducts tests
+// Markowitz count tests (populated by finalize())
 // ---------------------------------------------------------------------------
 
-describe("SparseSolver _countMarkowitz and _markowitzProducts", () => {
+describe("SparseSolver Markowitz counts from finalize", () => {
   it("counts off-diagonal nonzeros correctly for a 3x3 tridiagonal matrix", () => {
     // Matrix:
     // [2, -1,  0]
@@ -964,12 +964,8 @@ describe("SparseSolver _countMarkowitz and _markowitzProducts", () => {
     solver.stampRHS(1, 2);
     solver.stampRHS(2, 1);
     solver.finalize();
-    solver.factorWithReorder();
 
-    // Call _countMarkowitz via private access
-    (solver as any)._countMarkowitz();
-
-    // The counts reflect the structure in original column order.
+    // finalize() populates Markowitz arrays from the linked structure.
     // Total off-diagonal nonzeros: 4 entries (0,1), (1,0), (1,2), (2,1)
     // Sum of all row counts should equal 4
     const mRow = solver.markowitzRow;
@@ -998,18 +994,19 @@ describe("SparseSolver _countMarkowitz and _markowitzProducts", () => {
     solver.stampRHS(1, 2);
     solver.stampRHS(2, 1);
     solver.finalize();
-    solver.factorWithReorder();
-
-    (solver as any)._countMarkowitz();
-    (solver as any)._markowitzProducts();
 
     const mProd = solver.markowitzProd;
-    // Singletons: rows/cols with exactly 1 off-diagonal nonzero
-    // In the tridiagonal, rows 0 and 2 have 1 off-diag each (singletons),
-    // cols 0 and 2 have 1 off-diag each (singletons).
-    // The structure is preserved in original column order.
-    // At minimum, singletons should be >= 2 for this tridiagonal.
-    expect(solver.singletons).toBeGreaterThanOrEqual(2);
+    // finalize() sets mRow[i] = (off-diagonal count in row i), mCol[i] similarly.
+    // mProd[i] = mRow[i] * mCol[i]. A singleton is any entry with mProd === 0.
+    // Tridiagonal row 0: 1 off-diag → mRow[0]=1, mCol[0]=1 → mProd[0]=1
+    // Tridiagonal row 1: 2 off-diag → mRow[1]=2, mCol[1]=2 → mProd[1]=4
+    // Tridiagonal row 2: 1 off-diag → mRow[2]=1, mCol[2]=1 → mProd[2]=1
+    expect(solver.markowitzRow[0]).toBe(1);
+    expect(solver.markowitzRow[1]).toBe(2);
+    expect(solver.markowitzRow[2]).toBe(1);
+    expect(solver.markowitzCol[0]).toBe(1);
+    expect(solver.markowitzCol[1]).toBe(2);
+    expect(solver.markowitzCol[2]).toBe(1);
 
     // All products should be non-negative
     for (let i = 0; i < 3; i++) {
@@ -1027,10 +1024,6 @@ describe("SparseSolver _countMarkowitz and _markowitzProducts", () => {
     solver.stampRHS(1, 2);
     solver.stampRHS(2, 3);
     solver.finalize();
-    solver.factorWithReorder();
-
-    (solver as any)._countMarkowitz();
-    (solver as any)._markowitzProducts();
 
     // Diagonal matrix: zero off-diagonal entries per row and column
     for (let i = 0; i < 3; i++) {
@@ -1053,19 +1046,16 @@ describe("SparseSolver _countMarkowitz and _markowitzProducts", () => {
     solver.stampRHS(0, 1);
     solver.stampRHS(1, 2);
     solver.finalize();
-    solver.factorWithReorder();
 
-    (solver as any)._countMarkowitz();
-    (solver as any)._markowitzProducts();
-
-    // Each row has 1 off-diag, each col has 1 off-diag
+    // Each row has 1 off-diag, each col has 1 off-diag.
+    // finalize() sets mRow[i]=1, mCol[i]=1, mProd[i]=1*1=1 (not a singleton).
     for (let i = 0; i < 2; i++) {
       expect(solver.markowitzRow[i]).toBe(1);
       expect(solver.markowitzCol[i]).toBe(1);
-      expect(solver.markowitzProd[i]).toBe(0);
+      expect(solver.markowitzProd[i]).toBe(1);
     }
-    // Both rows and both cols are singletons (count=1)
-    expect(solver.singletons).toBe(2);
+    // mProd[i]=1 for both rows — neither is 0, so no singletons.
+    expect(solver.singletons).toBe(0);
   });
 });
 
@@ -1131,8 +1121,6 @@ describe("SparseSolver pivot selection", () => {
     solver.stampRHS(2, 1);
     solver.finalize();
     solver.factorWithReorder();
-    (solver as any)._countMarkowitz();
-    (solver as any)._markowitzProducts();
     expect(solver.singletons).toBeGreaterThan(0);
   });
 
@@ -1192,9 +1180,6 @@ describe("SparseSolver _updateMarkowitzNumbers", () => {
     solver.stampRHS(1, 2);
     solver.stampRHS(2, 1);
     solver.finalize();
-
-    // Build the linked matrix to get accurate Markowitz counts
-    (solver as any)._buildLinkedMatrix();
 
     const initialRowSum = Array.from(solver.markowitzRow).reduce((a, b) => a + b, 0);
 
@@ -1300,48 +1285,6 @@ describe("SparseSolver factorWithReorder Markowitz pipeline", () => {
 // ---------------------------------------------------------------------------
 
 describe("SparseSolver Markowitz linked structure", () => {
-  it("_buildLinkedMatrix produces correct row/column counts matching _countMarkowitz", () => {
-    // 3x3 tridiagonal — verify linked-structure row/col counts match CSC-based counts
-    const solver = new SparseSolver();
-    solver.beginAssembly(3);
-    solver.stamp(0, 0, 2);
-    solver.stamp(0, 1, -1);
-    solver.stamp(1, 0, -1);
-    solver.stamp(1, 1, 3);
-    solver.stamp(1, 2, -1);
-    solver.stamp(2, 1, -1);
-    solver.stamp(2, 2, 2);
-    solver.stampRHS(0, 1);
-    solver.stampRHS(1, 2);
-    solver.stampRHS(2, 1);
-    solver.finalize();
-
-    // Get CSC-based row/col counts
-    (solver as any)._countMarkowitz();
-    const cscRowCounts = solver.markowitzRow.slice();
-    const cscColCounts = solver.markowitzCol.slice();
-
-    // Now build via linked matrix and compare row/col counts
-    (solver as any)._buildLinkedMatrix();
-    for (let i = 0; i < 3; i++) {
-      expect(solver.markowitzRow[i]).toBe(cscRowCounts[i]);
-      expect(solver.markowitzCol[i]).toBe(cscColCounts[i]);
-    }
-
-    // Products use mRow * mCol (not (mRow-1)*(mCol-1) as in old _markowitzProducts).
-    // This matches ngspice where counts already exclude the diagonal.
-    for (let i = 0; i < 3; i++) {
-      expect(solver.markowitzProd[i]).toBe(solver.markowitzRow[i] * solver.markowitzCol[i]);
-    }
-
-    // Singletons: any row/col with mProd === 0 is a singleton
-    let expectedSingletons = 0;
-    for (let i = 0; i < 3; i++) {
-      if (solver.markowitzProd[i] === 0) expectedSingletons++;
-    }
-    expect(solver.singletons).toBe(expectedSingletons);
-  });
-
   it("fill-in detection: factor a matrix where fill-in is guaranteed, verify Markowitz counts increase", () => {
     // Arrow matrix: column 0 is dense, other columns are sparse.
     // Eliminating the dense row/col creates fill-in between the sparse rows.
@@ -1369,10 +1312,10 @@ describe("SparseSolver Markowitz linked structure", () => {
     solver.finalize();
 
     // Get initial Markowitz counts from linked structure before factoring.
+    // finalize() computes these from the linked structure.
     // Sum of all off-diagonal row counts = total off-diagonal nonzeros = 6
     // (each of 3 sparse rows has 1 off-diag to the dense row, and the dense
     // row has 3 off-diag).
-    (solver as any)._buildLinkedMatrix();
     const initialTotalOffDiag = Array.from(solver.markowitzRow).reduce((a, b) => a + b, 0);
     expect(initialTotalOffDiag).toBe(6); // 3 + 1 + 1 + 1
 
@@ -1463,8 +1406,6 @@ describe("SparseSolver Markowitz linked structure", () => {
     solver.stampRHS(2, 1);
     solver.stampRHS(3, 1);
     solver.finalize();
-
-    (solver as any)._buildLinkedMatrix();
 
     const initialTotalRow = Array.from(solver.markowitzRow).reduce((a, b) => a + b, 0);
     const initialTotalCol = Array.from(solver.markowitzCol).reduce((a, b) => a + b, 0);
