@@ -7,10 +7,9 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement } from "./element.js";
-import { MNAAssembler } from "./mna-assembler.js";
 import type { DiagnosticCollector } from "./diagnostics.js";
 import { makeDiagnostic } from "./diagnostics.js";
+import type { CKTCircuitContext } from "./ckt-context.js";
 
 // ---------------------------------------------------------------------------
 // LimitingEvent — records a single voltage-limiting call per junction per NR iteration
@@ -20,9 +19,9 @@ import { makeDiagnostic } from "./diagnostics.js";
  * Records one voltage-limiting function application (pnjlim, fetlim, or limvds)
  * on a specific junction of a specific element during one NR iteration.
  *
- * Elements push events into the NROptions.limitingCollector array after each
- * limiting function call. The NR loop resets the collector at the start of
- * each iteration.
+ * Elements push events into the ctx.limitingCollector array after each
+ * limiting function call. The NR loop resets the collector at the start
+ * of each iteration.
  */
 export interface LimitingEvent {
   /** Element index in compiled.elements[]. */
@@ -42,7 +41,7 @@ export interface LimitingEvent {
 }
 
 // ---------------------------------------------------------------------------
-// NROptions / NRResult
+// applyNodesetsAndICs
 // ---------------------------------------------------------------------------
 
 /**
@@ -76,172 +75,6 @@ export function applyNodesetsAndICs(
     solver.stamp(nodeId, nodeId, G_NODESET);
     solver.stampRHS(nodeId, G_NODESET * value * srcFact);
   }
-}
-
-/** Configuration for a single Newton-Raphson solve. */
-export interface NROptions {
-  /** Shared sparse solver instance (pre-configured for this circuit). */
-  solver: SparseSolver;
-  /** All analog elements in the circuit. */
-  elements: readonly AnalogElement[];
-  /** MNA matrix size = nodeCount + branchCount. */
-  matrixSize: number;
-  /**
-   * Number of node-voltage rows at the front of the solution vector.
-   * Damping is restricted to node rows only (0..nodeCount-1),
-   * matching ngspice niiter.c which never damps branch-current rows.
-   * Defaults to matrixSize when omitted.
-   */
-  nodeCount?: number;
-  /** Maximum number of NR iterations before declaring failure. */
-  maxIterations: number;
-  /**
-   * When true, use maxIterations as-is without the ngspice floor of 100.
-   * Required for INITJCT/INITFIX DC op phases that need exactly 1 iteration
-   * before transitioning modes (ngspice niiter.c:991-997).
-   */
-  exactMaxIterations?: boolean;
-  /** Relative convergence tolerance. */
-  reltol: number;
-  /** Absolute voltage convergence tolerance in volts. */
-  abstol: number;
-  /** Absolute current tolerance for device convergence checks (ngspice ABSTOL). */
-  iabstol: number;
-  /**
-   * Whether this solve is a DC operating point (DCOP/TRANOP).
-   * Node damping is only applied during DC operating point solves,
-   * matching ngspice niiter.c which skips damping during transient.
-   * Defaults to false.
-   */
-  isDcOp?: boolean;
-  /** Optional initial guess for the solution vector. */
-  initialGuess?: Float64Array;
-  /** Diagnostic collector for emitting solver events. */
-  diagnostics: DiagnosticCollector;
-  /**
-   * Optional pre-allocated working buffer for the current voltages iterate.
-   * When provided, newtonRaphson() reuses it instead of allocating a new
-   * Float64Array per call. Must be at least `matrixSize` long. The caller
-   * retains ownership; contents are overwritten on each call.
-   */
-  voltagesBuffer?: Float64Array;
-  /**
-   * Optional pre-allocated working buffer for the previous-iteration voltages.
-   * Same contract as `voltagesBuffer`.
-   */
-  prevVoltagesBuffer?: Float64Array;
-  /**
-   * Optional gmin conductance to add to every diagonal of the assembled matrix
-   * before factorization. Matches ngspice LoadGmin (spsmp.c:448-478).
-   * Applied after finalize() and before factor() on each NR iteration.
-   */
-  diagonalGmin?: number;
-  /** When true, compute per-element blame tracking (largestChangeElement). Only needed when convergence logging is active. */
-  enableBlameTracking?: boolean;
-  /**
-   * DC operating point mode ladder (niiter.c:991-997).
-   *
-   * When provided, drives pool.initMode transitions inside the NR loop:
-   *   - iter 0: pool.initMode set to "initJct"; runPrimeJunctions() fires once before iter 0.
-   *   - after iter 0: unconditional transition to "initFix" (niiter.c:991-993).
-   *   - iter N in initFix: transition to "initFloat" only if assembler.noncon === 0 (niiter.c:994-997).
-   *   - convergence return restricted to initMode === "initFloat" (niiter.c:986-989).
-   *
-   * Phase labels emitted via onModeBegin/onModeEnd so the harness session
-   * map shows dcopInitJct, dcopInitFix, dcopInitFloat per-iteration.
-   */
-  dcopModeLadder?: {
-    /** Called before iteration 0 to prime junctions (MODEINITJCT). */
-    runPrimeJunctions(): void;
-    /** State pool reference for reading/writing initMode. */
-    pool: { initMode: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" };
-    /** Emit per-iteration phase begin label. */
-    onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number): void;
-    /** Emit per-iteration phase end label. */
-    onModeEnd(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number, converged: boolean): void;
-  } | null;
-  /** Optional shared state pool for state0 damping (ngspice niiter.c). */
-  statePool?: { state0: Float64Array; uic?: boolean } | null;
-  /** Enable node damping in NR iteration (ngspice niiter.c). Default: false */
-  nodeDamping?: boolean;
-  /** Hook for per-iteration companion recomputation. Called on iteration > 0 before re-stamping. */
-  preIterationHook?: (iteration: number, voltages: Float64Array) => void;
-  /**
-   * Hook called after each NR iteration's convergence check, before the
-   * convergence return. Receives the full iteration state for external
-   * instrumentation (comparison harness, convergence logging, etc.).
-   *
-   * Called unconditionally on every iteration (not just converged ones).
-   * The hook must not mutate voltages or prevVoltages.
-   *
-   * The last two parameters carry harness instrumentation data:
-   *   limitingEvents — events from opts.limitingCollector (or empty array when null)
-   *   convergenceFailedElements — labels of elements that failed convergence this
-   *     iteration (populated only when detailedConvergence is true, otherwise empty)
-   */
-  postIterationHook?: (
-    iteration: number,
-    voltages: Float64Array,
-    prevVoltages: Float64Array,
-    noncon: number,
-    globalConverged: boolean,
-    elemConverged: boolean,
-    limitingEvents: LimitingEvent[],
-    convergenceFailedElements: string[],
-  ) => void;
-  /**
-   * Hook fired exactly once, after iteration 0's postIterationHook and before
-   * iteration 1 begins. Lets the harness observe the cold linearization
-   * (element load at the initial voltages) as a distinct sub-attempt before
-   * the main NR refinement loop. No-op when NR returns in iteration 0 (linear
-   * short-circuit or immediate convergence).
-   */
-  onIteration0Complete?: () => void;
-  /**
-   * When true, call checkAllConvergedDetailed instead of checkAllConverged.
-   * Collects all failing element indices rather than short-circuiting.
-   * Defaults to false — existing short-circuit path unchanged.
-   */
-  detailedConvergence?: boolean;
-  /**
-   * When non-null, elements push LimitingEvent objects here after each
-   * limiting function call. The NR loop resets this array at the start
-   * of each iteration before passing it to the assembler.
-   * When null, elements skip limiting event collection (zero overhead).
-   */
-  limitingCollector?: LimitingEvent[] | null;
-  /**
-   * Nodeset constraints: map of MNA nodeId → target voltage.
-   * Enforced via 1e10 conductance stamp during initJct and initFix phases.
-   * See applyNodesetsAndICs().
-   */
-  nodesets?: Map<number, number>;
-  /**
-   * Initial condition constraints: map of MNA nodeId → target voltage.
-   * Enforced via 1e10 conductance stamp on every iteration (unlike nodesets
-   * which are restricted to initJct/initFix).
-   * See applyNodesetsAndICs().
-   */
-  ics?: Map<number, number>;
-  /**
-   * Source stepping scale factor (ngspice srcFact). Applied to nodeset/IC
-   * target voltages to ramp them in during source stepping. Default: 1.0.
-   */
-  srcFact?: number;
-}
-
-/** Result of a Newton-Raphson solve. */
-export interface NRResult {
-  /** Whether the iteration converged within maxIterations. */
-  converged: boolean;
-  /** Number of iterations performed. */
-  iterations: number;
-  /** Final solution vector (node voltages + branch currents). */
-  voltages: Float64Array;
-  /** Index of the element with the largest voltage change in the final iteration; -1 when unknown. */
-  largestChangeElement: number;
-  /** Index of the node with the largest voltage change in the final iteration; -1 when unknown. */
-  largestChangeNode: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -426,92 +259,94 @@ export function limvds(vnew: number, vold: number): number {
  *   I. Node damping (DCOP only)
  *   J. INITF dispatcher (mode transitions)
  *
- * Non-convergence is returned via the result object, never thrown. The caller
+ * Non-convergence is written into ctx.nrResult, never thrown. The caller
  * (DC operating point solver) decides the appropriate fallback strategy.
  *
- * @param opts - NR iteration options
- * @returns    - NRResult with convergence status, iterations, voltages, and blame scalars
+ * @param ctx - Circuit context holding all solver state, buffers, and options
  */
-export function newtonRaphson(opts: NROptions): NRResult {
-  const { solver, elements, matrixSize, maxIterations: rawMaxIter, reltol, abstol, iabstol, diagnostics } = opts;
+export function newtonRaphson(ctx: CKTCircuitContext): void {
+  const {
+    solver, assembler, elements, matrixSize, nodeCount,
+    reltol, abstol, iabstol,
+  } = ctx;
+
+  const diagnostics = ctx.diagnostics as DiagnosticCollector;
+
   // ngspice niiter.c:37-38 — unconditional floor: if (maxIter < 100) maxIter = 100;
   // Bypassed when exactMaxIterations is set (INITJCT/INITFIX need exactly 1 iteration).
-  const maxIterations = opts.exactMaxIterations ? rawMaxIter : Math.max(rawMaxIter, 100);
-  const nodeCount = opts.nodeCount ?? matrixSize;
+  const rawMaxIter = ctx.exactMaxIterations
+    ? (ctx.maxIterations)
+    : ctx.maxIterations;
+  const maxIterations = ctx.exactMaxIterations ? rawMaxIter : Math.max(rawMaxIter, 100);
 
-  const assembler = new MNAAssembler(solver);
-  // Reuse caller-provided buffers when available to avoid per-call allocation
-  // in the hot transient step loop. Zero the reused buffer so stale data from
-  // a previous call cannot leak into the first iteration before `initialGuess`
-  // or `solver.solve()` writes to it.
-  let voltages = opts.voltagesBuffer ?? new Float64Array(matrixSize);
-  if (opts.voltagesBuffer) voltages.fill(0);
-  let prevVoltages = opts.prevVoltagesBuffer ?? new Float64Array(matrixSize);
+  ctx.nrResult.reset();
 
-  const statePool = opts.statePool ?? null;
+  // Use ctx.rhs and ctx.rhsOld as the voltage ping-pong buffers.
+  // nrResult.voltages already points to ctx.rhs.
+  let voltages = ctx.rhs;
+  voltages.fill(0);
+  let prevVoltages = ctx.rhsOld;
+
+  const statePool = ctx.statePool ?? null;
   let oldState0: Float64Array | null = null;
   let ipass = 0;
 
   // Initialize from initial guess if provided.
-  // Copy into prevVoltages because stampAll uses prevVoltages for device evaluation
-  // (prevVoltages holds the "current best solution" via Step K pointer swap).
-  if (opts.initialGuess) {
-    prevVoltages.set(opts.initialGuess);
+  if (ctx.initialGuess) {
+    prevVoltages.set(ctx.initialGuess);
   }
 
   // Step D state: preorder runs at most once per solve.
   let didPreorder = false;
 
-  // Hoist the iter-0 split hook into a local so the per-iteration hot path
-  // pays nothing (not even a property lookup) when no harness is attached.
-  const onIter0Complete = opts.onIteration0Complete;
+  // Hoist the iter-0 split hook to avoid per-iteration property lookup.
+  const onIter0Complete = ctx.onIteration0Complete;
 
   // dcopModeLadder: set initial initMode and prime junctions before iter 0.
-  const ladder = opts.dcopModeLadder ?? null;
+  const ladder = ctx.dcopModeLadder ?? null;
   if (ladder) {
     ladder.pool.initMode = "initJct";
     ladder.runPrimeJunctions();
   }
 
   // MODETRANOP && MODEUIC: single CKTload, no iteration (ngspice dctran.c UIC path).
-  if (opts.isDcOp && opts.statePool?.uic) {
+  if (ctx.isDcOp && statePool && (statePool as { uic?: boolean }).uic) {
     [voltages, prevVoltages] = [prevVoltages, voltages];
     assembler.stampAll(elements, matrixSize, prevVoltages, null, 0);
     solver.finalize();
-    return { converged: true, iterations: 0, voltages: prevVoltages, largestChangeElement: -1, largestChangeNode: -1 };
+    ctx.nrResult.converged = true;
+    ctx.nrResult.iterations = 0;
+    // voltages slot now holds the solution (prevVoltages after swap)
+    // nrResult.voltages always points to ctx.rhs; copy result there
+    ctx.rhs.set(prevVoltages);
+    return;
   }
 
   for (let iteration = 0; ; iteration++) {
     // ---- STEP A: Clear noncon + reset limit collector (ngspice CKTnoncon=0) ----
     assembler.noncon = 0;
-    if (opts.limitingCollector != null) {
-      opts.limitingCollector.length = 0;
+    if (ctx.limitingCollector != null) {
+      ctx.limitingCollector.length = 0;
     }
 
     // ---- STEP B: CKTload — unified device evaluation ----
-    // On iteration 0, prevVoltages holds the initial guess (copied at entry).
-    // On iteration 1+, prevVoltages holds the previous solve result (via Step K swap).
-    opts.preIterationHook?.(iteration, prevVoltages);
-    assembler.stampAll(elements, matrixSize, prevVoltages, opts.limitingCollector ?? null, iteration, voltages);
+    ctx.preIterationHook?.(iteration, prevVoltages);
+    assembler.stampAll(elements, matrixSize, prevVoltages, ctx.limitingCollector ?? null, iteration, voltages);
 
     // ---- STEP C: Nodeset/IC enforcement (ngspice CKTnodeset/CKTic) ----
-    // Stamp 1e10 conductance for nodeset and IC nodes after CKTload,
-    // then re-finalize so the new stamps are included in the CSC structure
-    // before factorization.
-    if (opts.nodesets?.size || opts.ics?.size) {
-      const initPool = ladder ? ladder.pool : (opts.statePool as { initMode: string } | null);
+    if (ctx.nodesets.size || ctx.ics.size) {
+      const initPool = ladder ? ladder.pool : (statePool as { initMode: string } | null);
       const curMode = initPool?.initMode ?? "transient";
       applyNodesetsAndICs(
         solver,
-        opts.nodesets ?? new Map(),
-        opts.ics ?? new Map(),
-        opts.srcFact ?? 1.0,
+        ctx.nodesets,
+        ctx.ics,
+        ctx.srcFact,
         curMode,
       );
       solver.finalize();
     }
 
-    // Diagonal gmin augmentation (ngspice LoadGmin, spsmp.c:448-478):
     // ---- STEP D: Preorder (once per solve) ----
     if (!didPreorder) {
       solver.preorder();
@@ -519,19 +354,16 @@ export function newtonRaphson(opts: NROptions): NRResult {
     }
 
     // Add gmin to every diagonal element before factorization.
-    if (opts.diagonalGmin) {
-      solver.addDiagonalGmin(opts.diagonalGmin);
+    if (ctx.diagonalGmin) {
+      solver.addDiagonalGmin(ctx.diagonalGmin);
     }
 
     // ---- STEP E: Factorize ----
     // ngspice niiter.c:888-891: E_SINGULAR on numerical-only path sets NISHOULDREORDER
     // and does `continue` (returns to top of for(;;), re-executes CKTload).
-    // We must re-load before re-factoring so the matrix has fresh device stamps.
     const factorResult = solver.factor();
     if (!factorResult.success) {
       if (!solver.lastFactorUsedReorder) {
-        // Numerical-only path failed (near-zero stored pivot). Force full reorder,
-        // then continue to restart from Step A (re-execute CKTload before re-factoring).
         solver.forceReorder();
         continue;
       }
@@ -541,13 +373,17 @@ export function newtonRaphson(opts: NROptions): NRResult {
           suggestions: [],
         }),
       );
-      return { converged: false, iterations: iteration + 1, voltages, largestChangeElement: -1, largestChangeNode: -1 };
+      ctx.nrResult.converged = false;
+      ctx.nrResult.iterations = iteration + 1;
+      ctx.nrResult.largestChangeElement = -1;
+      ctx.nrResult.largestChangeNode = -1;
+      return;
     }
 
     // Save state0 before solve for state0 damping (DO10)
     if (statePool) {
       if (!oldState0) {
-        oldState0 = new Float64Array(statePool.state0.length);
+        oldState0 = ctx.dcopOldState0;
       }
       oldState0.set(statePool.state0);
     }
@@ -556,15 +392,17 @@ export function newtonRaphson(opts: NROptions): NRResult {
     solver.solve(voltages);
 
     // ---- STEP G: Check iteration limit BEFORE convergence (ngspice niiter.c:944) ----
-    // iterno is 1-based (incremented during CKTload); iteration is 0-based.
-    // Check: iterno > maxIter ↔ (iteration + 1) > maxIterations.
     if (iteration + 1 > maxIterations) {
-      return { converged: false, iterations: iteration + 1, voltages, largestChangeElement: -1, largestChangeNode: -1 };
+      ctx.nrResult.converged = false;
+      ctx.nrResult.iterations = iteration + 1;
+      ctx.nrResult.largestChangeElement = -1;
+      ctx.nrResult.largestChangeNode = -1;
+      ctx.rhs.set(voltages);
+      return;
     }
 
     // ---- STEP H: Convergence check (ngspice NIconvTest) ----
     // ngspice niiter.c:957-961: iterno==1 forces noncon=1 (guarantees >= 2 iterations).
-    // noncon was set by updateOperatingPoints inside stampAll; force on iteration 0.
     if (iteration === 0) {
       assembler.noncon = 1;
     }
@@ -576,8 +414,6 @@ export function newtonRaphson(opts: NROptions): NRResult {
     let convergenceFailedElements: string[] = [];
 
     if (assembler.noncon === 0 && iteration > 0) {
-      // Global node-voltage convergence criterion (ngspice NIconvTest / niconv.c)
-      //   tol = reltol * max(|old|, |new|) + absTol
       globalConverged = true;
       for (let i = 0; i < matrixSize; i++) {
         const delta = Math.abs(voltages[i] - prevVoltages[i]);
@@ -592,26 +428,21 @@ export function newtonRaphson(opts: NROptions): NRResult {
         }
       }
 
-      // Element-specific convergence check
-      if (opts.detailedConvergence) {
+      if (ctx.detailedConvergence) {
         const detailed = assembler.checkAllConvergedDetailed(elements, voltages, prevVoltages, reltol, iabstol);
         elemConverged = detailed.allConverged;
         convergenceFailedElements = detailed.failedIndices.map(i => elements[i].label ?? `element_${i}`);
       } else {
         elemConverged = assembler.checkAllConverged(elements, voltages, prevVoltages, reltol, iabstol);
       }
-    } else if (assembler.noncon > 0 && iteration > 0 && opts.detailedConvergence) {
-      // When noncon > 0, convergence already failed — but when
-      // detailedConvergence is requested, still collect per-element
-      // failure data for harness instrumentation.
+    } else if (assembler.noncon > 0 && iteration > 0 && ctx.detailedConvergence) {
       const detailed = assembler.checkAllConvergedDetailed(elements, voltages, prevVoltages, reltol, iabstol);
       elemConverged = false;
       convergenceFailedElements = detailed.failedIndices.map(i => elements[i].label ?? `element_${i}`);
     }
 
     // ---- STEP I: Newton damping (ngspice niiter.c:204-229) ----
-    // Guards: nodeDamping enabled, noncon != 0, isDcOp, iteration > 0
-    if (opts.nodeDamping && assembler.noncon !== 0 && opts.isDcOp && iteration > 0) {
+    if (ctx.nodeDamping && assembler.noncon !== 0 && ctx.isDcOp && iteration > 0) {
       let maxDelta = 0;
       for (let i = 0; i < nodeCount; i++) {
         const delta = Math.abs(voltages[i] - prevVoltages[i]);
@@ -622,7 +453,6 @@ export function newtonRaphson(opts: NROptions): NRResult {
         for (let i = 0; i < nodeCount; i++) {
           voltages[i] = prevVoltages[i] + dampFactor * (voltages[i] - prevVoltages[i]);
         }
-        // DO10: damp state0 alongside voltages
         if (statePool && oldState0) {
           const s0 = statePool.state0;
           for (let i = 0; i < s0.length; i++) {
@@ -632,9 +462,9 @@ export function newtonRaphson(opts: NROptions): NRResult {
       }
     }
 
-    // Blame tracking: find element with largest contribution to non-convergence
+    // Blame tracking
     let largestChangeElement = -1;
-    if (opts.enableBlameTracking) {
+    if (ctx.enableBlameTracking) {
       let largestElemDelta = -1;
       for (let ei = 0; ei < elements.length; ei++) {
         const el = elements[ei];
@@ -654,13 +484,11 @@ export function newtonRaphson(opts: NROptions): NRResult {
     }
 
     // Post-iteration hook for external instrumentation
-    const limitingEvents = opts.limitingCollector ?? [];
-    opts.postIterationHook?.(iteration, voltages, prevVoltages, assembler.noncon, globalConverged, elemConverged, limitingEvents, convergenceFailedElements);
+    const limitingEvents = ctx.limitingCollector ?? [];
+    ctx.postIterationHook?.(iteration, voltages, prevVoltages, assembler.noncon, globalConverged, elemConverged, limitingEvents, convergenceFailedElements);
 
     // ---- STEP J: Unified INITF dispatcher (ngspice niiter.c:1050-1085) ----
-    // Handles all 6 modes + convergence return with ipass guard.
-    // Reads initMode from ladder.pool (DC-OP) or statePool (transient).
-    const initPool = ladder ? ladder.pool : (opts.statePool as { initMode: string } | null);
+    const initPool = ladder ? ladder.pool : (statePool as { initMode: string } | null);
     const curInitMode = initPool?.initMode ?? "transient";
 
     if (curInitMode === "initFloat" || curInitMode === "transient") {
@@ -669,14 +497,18 @@ export function newtonRaphson(opts: NROptions): NRResult {
           ipass--;
           assembler.noncon = 1;
         } else {
-          // Emit terminal ladder end before returning
           if (ladder) {
             const phaseLabel =
               curInitMode === "initJct" ? "dcopInitJct" as const :
               curInitMode === "initFix" ? "dcopInitFix" as const : "dcopInitFloat" as const;
             ladder.onModeEnd(phaseLabel, iteration, true);
           }
-          return { converged: true, iterations: iteration + 1, voltages, largestChangeElement, largestChangeNode };
+          ctx.nrResult.converged = true;
+          ctx.nrResult.iterations = iteration + 1;
+          ctx.nrResult.largestChangeElement = largestChangeElement;
+          ctx.nrResult.largestChangeNode = largestChangeNode;
+          ctx.rhs.set(voltages);
+          return;
         }
       }
     } else if (curInitMode === "initJct") {
@@ -705,8 +537,6 @@ export function newtonRaphson(opts: NROptions): NRResult {
     } else if (curInitMode === "initSmsig") {
       if (initPool) initPool.initMode = "initFloat";
     }
-    // No pool and no ladder: convergence is unrestricted (already handled
-    // by curInitMode defaulting to "transient" above).
 
     // Split marker: after iteration 0, let the harness observe cold linearization
     if (onIter0Complete && iteration === 0) {
@@ -714,14 +544,15 @@ export function newtonRaphson(opts: NROptions): NRResult {
     }
 
     // ---- STEP K: Swap RHS vectors (O(1) pointer swap) ----
-    // After swap: prevVoltages = this iteration's solution, voltages = scratch buffer.
-    // Next iteration's stampAll will use prevVoltages for device evaluation.
     const tmp = voltages;
     voltages = prevVoltages;
     prevVoltages = tmp;
   }
 
   // After the final Step K swap, prevVoltages holds the last solution.
-  return { converged: false, iterations: maxIterations, voltages: prevVoltages, largestChangeElement: -1, largestChangeNode: -1 };
+  ctx.nrResult.converged = false;
+  ctx.nrResult.iterations = maxIterations;
+  ctx.nrResult.largestChangeElement = -1;
+  ctx.nrResult.largestChangeNode = -1;
+  ctx.rhs.set(prevVoltages);
 }
-

@@ -13,9 +13,9 @@ import {
   integrateCapacitor,
   integrateInductor,
   HistoryStore,
-  computeIntegrationCoefficients,
   computeNIcomCof,
 } from "../integration.js";
+import * as integrationModule from "../integration.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { makeResistor, makeVoltageSource, makeCapacitor, makeInductor } from "./test-helpers.js";
@@ -454,54 +454,59 @@ describe("RLCircuit", () => {
 });
 
 // ---------------------------------------------------------------------------
-// computeIntegrationCoefficients tests (Item 7)
+// Task 1.2.1 spec tests
 // ---------------------------------------------------------------------------
 
-describe("computeIntegrationCoefficients", () => {
-  const h = 1e-6;
+describe("gear_vandermonde_zero_alloc", () => {
+  it("gear_vandermonde_uses_scratch_buffer", () => {
+    // solveGearVandermonde no longer allocates — it uses the scratch buffer passed
+    // via computeNIcomCof. Verify correct coefficients for GEAR orders 2-6 and
+    // that the scratch buffer is mutated (not a new allocation path).
+    const ag = new Float64Array(8);
+    const scratch = new Float64Array(49);
+    const h = 1e-6;
 
-  it("returns zero coefficients when dt <= 0", () => {
-    const result = computeIntegrationCoefficients(0, 0, 1, "bdf1");
-    expect(result.ag0).toBe(0);
-    expect(result.ag1).toBe(0);
+    // GEAR order 2 equal steps: ag*dt = [1.5, -2, 0.5]
+    scratch.fill(0);
+    computeNIcomCof(h, [h, h], 2, "gear", ag, scratch);
+    expect(ag[0]).toBeCloseTo(3 / (2 * h), 8);
+    expect(ag[1]).toBeCloseTo(-2 / h, 8);
+    expect(ag[2]).toBeCloseTo(1 / (2 * h), 8);
+    // Scratch buffer was mutated (non-zero entries exist after the solve)
+    const scratchWasMutated = scratch.some(v => v !== 0);
+    expect(scratchWasMutated).toBe(true);
+
+    // GEAR order 3 equal steps: ag*dt = [11/6, -3, 3/2, -1/3]
+    ag.fill(0); scratch.fill(0);
+    computeNIcomCof(h, [h, h, h], 3, "gear", ag, scratch);
+    expect(ag[0]).toBeCloseTo(11 / (6 * h), 6);
+    expect(ag[1]).toBeCloseTo(-3 / h, 6);
+    expect(ag[2]).toBeCloseTo(3 / (2 * h), 6);
+    expect(ag[3]).toBeCloseTo(-1 / (3 * h), 6);
+
+    // GEAR order 4 equal steps: ag*dt = [25/12, -4, 3, -4/3, 1/4]
+    ag.fill(0); scratch.fill(0);
+    computeNIcomCof(h, [h, h, h, h], 4, "gear", ag, scratch);
+    expect(ag[0]).toBeCloseTo(25 / (12 * h), 6);
+    expect(ag[1]).toBeCloseTo(-4 / h, 6);
+    expect(ag[4]).toBeCloseTo(1 / (4 * h), 6);
+
+    // GEAR order 5 equal steps
+    ag.fill(0); scratch.fill(0);
+    computeNIcomCof(h, [h, h, h, h, h], 5, "gear", ag, scratch);
+    expect(ag[0]).toBeCloseTo(137 / (60 * h), 5);
+    expect(ag[5]).toBeCloseTo(-1 / (5 * h), 5);
+
+    // GEAR order 6 equal steps
+    ag.fill(0); scratch.fill(0);
+    computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", ag, scratch);
+    expect(ag[0]).toBeCloseTo(49 / (20 * h), 5);
+    expect(ag[6]).toBeCloseTo(1 / (6 * h), 5);
   });
 
-  it("backward Euler (order 1): ag0 = 1/dt, ag1 = -1/dt", () => {
-    const { ag0, ag1 } = computeIntegrationCoefficients(h, 0, 1, "bdf1");
-    expect(ag0).toBeCloseTo(1 / h, 10);
-    expect(ag1).toBeCloseTo(-1 / h, 10);
-  });
-
-  it("trapezoidal (order 2): ag0 = 2/dt, ag1 = -2/dt", () => {
-    const { ag0, ag1 } = computeIntegrationCoefficients(h, h, 2, "trapezoidal");
-    expect(ag0).toBeCloseTo(2 / h, 10);
-    expect(ag1).toBeCloseTo(-2 / h, 10);
-  });
-
-  it("BDF-2 with equal steps matches integrateCapacitor ag0", () => {
-    // With equal steps h1=h, h2=h: ag0 = 3/(2h), ag1 = -2/h, ag2 = 1/(2h)
-    // ag0 = -(ag1 + ag2), so ag2 = -(ag0 + ag1)
-    const { ag0, ag1 } = computeIntegrationCoefficients(h, h, 2, "bdf2");
-    expect(ag0).toBeCloseTo(3 / (2 * h), 10);
-    const ag2 = -(ag0 + ag1); // derived from ag0 = -(ag1 + ag2)
-    expect(ag2).toBeGreaterThan(0); // ag2 = 1/(2h) > 0
-  });
-
-  it("BDF-2 ag0 matches value from integrateCapacitor for same parameters", () => {
-    const C = 1;
-    const { ag0: ag0Standalone } = computeIntegrationCoefficients(h, h, 2, "bdf2");
-    const { ag0: ag0Element } = integrateCapacitor(C, 0, 0, 0, 0, h, h, 2, "bdf2", 0);
-    expect(ag0Standalone).toBeCloseTo(ag0Element, 10);
-  });
-
-  it("order 2 with bdf1 method falls through to order-1 branch", () => {
-    // When method is bdf1 but order=2 passed — order <= 1 check gates on order, not method
-    // Order 2 + bdf2 method but degenerate h values should fall back to BE
-    const { ag0, ag1 } = computeIntegrationCoefficients(h, 0, 2, "bdf2");
-    // h1=0: safeH1=dt=h, safeH2=safeH1=h → same as equal steps
-    // r1 = 1, r2 = 2, u22 = 2 → normal BDF-2
-    expect(ag0).toBeCloseTo(3 / (2 * h), 10);
-    expect(ag1).toBeLessThan(0);
+  it("computeIntegrationCoefficients_deleted", () => {
+    // computeIntegrationCoefficients must not exist as an export from integration.ts
+    expect((integrationModule as Record<string, unknown>)["computeIntegrationCoefficients"]).toBeUndefined();
   });
 });
 

@@ -1,39 +1,51 @@
 /**
- * Tests for the DC operating point solver (Task 1.3.2).
+ * Tests for the DC operating point solver (Tasks 1.1.3 and 1.3.2).
  *
  * Tests cover all four outcomes:
  *   - Direct NR convergence (Level 0)
  *   - Gmin stepping fallback (Level 1)
  *   - Source stepping fallback (Level 2)
  *   - Total failure with blame attribution (Level 3)
- *
- * Source-stepping tests use scalable source elements that implement
- * setSourceScale(), because test-elements.ts makeVoltageSource/makeCurrentSource
- * must support setSourceScale per the Task 1.3.2 spec.
  */
 
 import { describe, it, expect } from "vitest";
-import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { solveDcOperatingPoint, cktncDump } from "../dc-operating-point.js";
+import { CKTCircuitContext } from "../ckt-context.js";
 import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
 import type { AnalogElement } from "../element.js";
+import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../../core/analog-engine-interface.js";
 import type { SimulationParams } from "../../../core/analog-engine-interface.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeSolver(): SparseSolver {
-  return new SparseSolver();
-}
+const noopBreakpoint = (_t: number): void => {};
+const DEFAULT_PARAMS = resolveSimulationParams(DEFAULT_SIMULATION_PARAMS);
 
-function makeDiagnostics(): DiagnosticCollector {
-  return new DiagnosticCollector();
+/**
+ * Build a CKTCircuitContext for a test circuit.
+ */
+function makeCtx(
+  elements: readonly AnalogElement[],
+  nodeCount: number,
+  branchCount: number,
+  params: SimulationParams = DEFAULT_PARAMS,
+): CKTCircuitContext {
+  const pool = allocateStatePool(elements as AnalogElement[]);
+  const circuit = {
+    nodeCount,
+    branchCount,
+    matrixSize: nodeCount + branchCount,
+    elements,
+    statePool: pool,
+  };
+  const resolved = resolveSimulationParams(params);
+  const ctx = new CKTCircuitContext(circuit, resolved, noopBreakpoint);
+  ctx.diagnostics = new DiagnosticCollector();
+  return ctx;
 }
-
-const DEFAULT_PARAMS: SimulationParams = { ...DEFAULT_SIMULATION_PARAMS };
 
 /**
  * Create a scalable voltage source element that supports setSourceScale().
@@ -55,7 +67,7 @@ function makeScalableVoltageSource(
     setSourceScale(factor: number): void {
       scale = factor;
     },
-    stamp(solver: SparseSolver): void {
+    stamp(solver: import("../sparse-solver.js").SparseSolver): void {
       const k = branchIdx;
       if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
       if (nodeNeg !== 0) solver.stamp(nodeNeg - 1, k, -1);
@@ -75,255 +87,133 @@ function makeScalableVoltageSource(
 describe("DcOP", () => {
   it("simple_resistor_divider_direct", () => {
     // Circuit: Vs=5V, R1=1kOhm (node1→node2), R2=1kOhm (node2→gnd)
-    // Nodes: 1=Vs+, 2=mid; branch 0 = voltage source branch row = index 2
     // matrixSize = 2 nodes + 1 branch = 3
-    const solver = makeSolver();
-    const diagnostics = makeDiagnostics();
-    const matrixSize = 3; // node1, node2, branch0
-    const branchRow = 2; // absolute 0-based row in solver
-
     const elements = [
-      makeVoltageSource(1, 0, branchRow, 5),   // Vs=5V: node1(+), gnd(-)
-      makeResistor(1, 2, 1000),                 // R1=1kOhm
-      makeResistor(2, 0, 1000),                 // R2=1kOhm
+      makeVoltageSource(1, 0, 2, 5),   // Vs=5V: node1(+), gnd(-)
+      makeResistor(1, 2, 1000),         // R1=1kOhm
+      makeResistor(2, 0, 1000),         // R2=1kOhm
     ];
+    const ctx = makeCtx(elements, 2, 1);
 
-    const result = solveDcOperatingPoint({
-      solver,
-      elements,
-      matrixSize,
-      params: DEFAULT_PARAMS,
-      diagnostics,
-      nodeCount: 2,
-    });
+    solveDcOperatingPoint(ctx);
 
-    expect(result.converged).toBe(true);
-    expect(result.method).toBe("direct");
+    expect(ctx.dcopResult.converged).toBe(true);
+    expect(ctx.dcopResult.method).toBe("direct");
 
     // V1 = 5V (node 1, 0-based index 0), V2 = 2.5V (node 2, 0-based index 1)
-    expect(result.nodeVoltages[0]).toBeCloseTo(5.0, 8);
-    expect(result.nodeVoltages[1]).toBeCloseTo(2.5, 8);
+    expect(ctx.dcopResult.nodeVoltages[0]).toBeCloseTo(5.0, 8);
+    expect(ctx.dcopResult.nodeVoltages[1]).toBeCloseTo(2.5, 8);
   });
 
   it("diode_circuit_direct", () => {
-    // Circuit: Vs=5V, R=1kOhm, diode in series
-    // Node layout: 1=Vs+, 2=between R and diode anode, 3=diode cathode (gnd)
-    // Actually: Vs(node1,gnd), R(node1,node2), diode(node2,gnd)
-    // matrixSize = 2 nodes + 1 branch = 3
-    const solver = makeSolver();
-    const diagnostics = makeDiagnostics();
-    const matrixSize = 3;
-    const branchRow = 2;
-
     const elements = [
-      makeVoltageSource(1, 0, branchRow, 5),   // Vs=5V
-      makeResistor(1, 2, 1000),                 // R=1kOhm
-      makeDiode(2, 0, 1e-14, 1),               // diode: anode=node2, cathode=gnd
+      makeVoltageSource(1, 0, 2, 5),   // Vs=5V
+      makeResistor(1, 2, 1000),         // R=1kOhm
+      makeDiode(2, 0, 1e-14, 1),       // diode: anode=node2, cathode=gnd
     ];
-    allocateStatePool(elements);
+    const ctx = makeCtx(elements, 2, 1);
 
-    const result = solveDcOperatingPoint({
-      solver,
-      elements,
-      matrixSize,
-      params: DEFAULT_PARAMS,
-      diagnostics,
-      nodeCount: 2,
-    });
+    solveDcOperatingPoint(ctx);
 
-    expect(result.converged).toBe(true);
-    expect(result.method).toBe("direct");
+    expect(ctx.dcopResult.converged).toBe(true);
+    expect(ctx.dcopResult.method).toBe("direct");
 
     // Forward diode voltage should be in range [0.6V, 0.75V]
-    const vDiode = result.nodeVoltages[1]; // node2 = diode anode voltage
+    const vDiode = ctx.dcopResult.nodeVoltages[1];
     expect(vDiode).toBeGreaterThan(0.6);
     expect(vDiode).toBeLessThan(0.75);
   });
 
   it("direct_success_emits_converged_info", () => {
-    // Simple linear circuit — will converge directly
-    const solver = makeSolver();
-    const diagnostics = makeDiagnostics();
-    const matrixSize = 2; // node1 + branch0
-    const branchRow = 1;
-
     const elements = [
-      makeVoltageSource(1, 0, branchRow, 3),
+      makeVoltageSource(1, 0, 1, 3),
       makeResistor(1, 0, 1000),
     ];
+    const ctx = makeCtx(elements, 1, 1);
 
-    const result = solveDcOperatingPoint({
-      solver,
-      elements,
-      matrixSize,
-      params: DEFAULT_PARAMS,
-      diagnostics,
-      nodeCount: 1,
-    });
+    solveDcOperatingPoint(ctx);
 
-    expect(result.converged).toBe(true);
+    expect(ctx.dcopResult.converged).toBe(true);
 
-    const diags = diagnostics.getDiagnostics();
+    const diags = (ctx.diagnostics as DiagnosticCollector).getDiagnostics();
     const convergedDiag = diags.find(d => d.code === "dc-op-converged");
     expect(convergedDiag).toBeDefined();
     expect(convergedDiag!.severity).toBe("info");
   });
 
   it("gmin_stepping_fallback", () => {
-    // Circuit: Vs=200V, R=1Ohm, single diode.
-    //
     // A 200V source forward-biasing a diode through 1Ω creates an extreme
-    // operating point (~0.7V across diode, ~200A through resistor). From the
-    // zero-voltage initial guess, direct NR diverges due to exponential
-    // runaway in the diode model — even with 100 iterations it oscillates.
-    // dynamicGmin adds diagonal conductance which stabilises the Jacobian and
-    // allows stepping to the solution.
-    //
-    // Note: newtonRaphson() floors maxIterations to 100 (ngspice niiter.c:37).
-    // The params.maxIterations only controls the final clean solve; the
-    // sub-solves in dynamicGmin use params.dcTrcvMaxIter (also floored to 100).
-    const solver = makeSolver();
-    const diagnostics = makeDiagnostics();
-    const matrixSize = 3;
-    const branchRow = 2;
-
-    const params: SimulationParams = {
-      ...DEFAULT_PARAMS,
-      gmin: 1e-3,
-    };
-
+    // operating point. From zero-voltage initial guess, direct NR diverges.
+    // dynamicGmin adds diagonal conductance to stabilise the Jacobian.
     const elements = [
-      makeVoltageSource(1, 0, branchRow, 200),  // extreme 200V source
-      makeResistor(1, 2, 1),                     // 1Ω — huge current
+      makeVoltageSource(1, 0, 2, 200),  // extreme 200V source
+      makeResistor(1, 2, 1),             // 1Ω — huge current
       makeDiode(2, 0, 1e-14, 1),
     ];
-    allocateStatePool(elements);
+    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, gmin: 1e-3 });
 
-    const result = solveDcOperatingPoint({
-      solver,
-      elements,
-      matrixSize,
-      params,
-      diagnostics,
-      nodeCount: 2,
-    });
+    solveDcOperatingPoint(ctx);
 
-    expect(result.converged).toBe(true);
-    // dynamicGmin or direct — either is valid; the important check is convergence
-    // and that the diagnostic chain ran.
-    const diags = diagnostics.getDiagnostics();
-    // The circuit converged, so only success diagnostics are valid.
+    expect(ctx.dcopResult.converged).toBe(true);
+    const diags = (ctx.diagnostics as DiagnosticCollector).getDiagnostics();
     const successCodes = ["dc-op-converged", "dc-op-gmin", "dc-op-source-step"];
     expect(diags.some(d => successCodes.includes(d.code))).toBe(true);
-    // dc-op-failed must NOT be present when converged is true
     expect(diags.some(d => d.code === "dc-op-failed")).toBe(false);
   });
 
   it("source_stepping_fallback", () => {
-    // Verify that gillespieSrc is exercised and the diagnostic chain runs.
-    // A scalable source with extreme voltage exercises the source-stepping path
-    // when direct NR and dynamicGmin both fail (or succeed — either is valid).
-    // The test asserts only that one of the three outcome diagnostics is present.
-    const solver = makeSolver();
-    const diagnostics = makeDiagnostics();
-    const matrixSize = 3;
-    const branchRow = 2;
-
-    const params: SimulationParams = {
-      ...DEFAULT_PARAMS,
-      gmin: 1e-3,
-    };
-
-    // Scalable source — required for source stepping path
     const elements = [
-      makeScalableVoltageSource(1, 0, branchRow, 5),
+      makeScalableVoltageSource(1, 0, 2, 5),
       makeResistor(1, 2, 1000),
       makeDiode(2, 0, 1e-14, 1),
     ];
-    allocateStatePool(elements);
+    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, gmin: 1e-3 });
 
-    const result = solveDcOperatingPoint({
-      solver,
-      elements,
-      matrixSize,
-      params,
-      diagnostics,
-      nodeCount: 2,
-    });
+    solveDcOperatingPoint(ctx);
 
-    const diags = diagnostics.getDiagnostics();
+    const diags = (ctx.diagnostics as DiagnosticCollector).getDiagnostics();
 
-    // The fallback chain must emit exactly one outcome diagnostic.
-    // Assert that the diagnostic matches the convergence method.
-    if (result.converged) {
-      if (result.method === "gillespie-src") {
+    if (ctx.dcopResult.converged) {
+      if (ctx.dcopResult.method === "gillespie-src") {
         expect(diags.some(d => d.code === "dc-op-source-step")).toBe(true);
-      } else if (result.method === "dynamic-gmin") {
+      } else if (ctx.dcopResult.method === "dynamic-gmin") {
         expect(diags.some(d => d.code === "dc-op-gmin")).toBe(true);
       } else {
-        expect(result.method).toBe("direct");
+        expect(ctx.dcopResult.method).toBe("direct");
         expect(diags.some(d => d.code === "dc-op-converged")).toBe(true);
       }
     }
   });
 
   it("numGminSteps_1_selects_dynamicGmin", () => {
-    // When numGminSteps=1 (default), only dynamicGmin runs (not spice3Gmin).
-    // Verify by checking that phaseBegin "dcopGminDynamic" is called and
-    // "dcopGminSpice3" is NOT called.
-    const solver = makeSolver();
-    const diagnostics = makeDiagnostics();
-    const matrixSize = 3;
-    const branchRow = 2;
-
-    const phases: string[] = [];
     const elements = [
-      makeScalableVoltageSource(1, 0, branchRow, 5),
+      makeScalableVoltageSource(1, 0, 2, 5),
       makeResistor(1, 2, 1000),
       makeDiode(2, 0, 1e-14, 1),
     ];
-    allocateStatePool(elements);
+    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, numGminSteps: 1 });
 
-    solveDcOperatingPoint({
-      solver,
-      elements,
-      matrixSize,
-      params: { ...DEFAULT_PARAMS, numGminSteps: 1 },
-      diagnostics,
-      nodeCount: 2,
-      onPhaseBegin: (phase) => { phases.push(phase); },
-    });
+    const phases: string[] = [];
+    ctx._onPhaseBegin = (phase) => { phases.push(phase); };
+
+    solveDcOperatingPoint(ctx);
 
     expect(phases).not.toContain("dcopGminSpice3");
   });
 
   it("numGminSteps_10_selects_spice3Gmin", () => {
-    // When numGminSteps>1, only spice3Gmin runs (not dynamicGmin).
-    // A simple circuit that converges via gmin stepping exercises this path.
-    const solver = makeSolver();
-    const diagnostics = makeDiagnostics();
-    const matrixSize = 3;
-    const branchRow = 2;
-
-    const phases: string[] = [];
     const elements = [
-      makeScalableVoltageSource(1, 0, branchRow, 5),
+      makeScalableVoltageSource(1, 0, 2, 5),
       makeResistor(1, 2, 1000),
       makeDiode(2, 0, 1e-14, 1),
     ];
-    allocateStatePool(elements);
+    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, numGminSteps: 10 });
 
-    solveDcOperatingPoint({
-      solver,
-      elements,
-      matrixSize,
-      params: { ...DEFAULT_PARAMS, numGminSteps: 10 },
-      diagnostics,
-      nodeCount: 2,
-      onPhaseBegin: (phase) => { phases.push(phase); },
-    });
+    const phases: string[] = [];
+    ctx._onPhaseBegin = (phase) => { phases.push(phase); };
 
-    // If gmin stepping ran at all, it must be spice3, not dynamic
+    solveDcOperatingPoint(ctx);
+
     if (phases.some(p => p === "dcopGminSpice3" || p === "dcopGminDynamic")) {
       expect(phases).toContain("dcopGminSpice3");
       expect(phases).not.toContain("dcopGminDynamic");
@@ -331,264 +221,214 @@ describe("DcOP", () => {
   });
 
   it("spice3Src_emits_uniform_phase_parameters", () => {
-    // When numSrcSteps=N>1, spice3Src is selected over gillespieSrc.
-    // spice3Src emits exactly N+1 dcopSrcSweep phase parameters: 0/N, 1/N, ..., N/N.
-    // We force the source-stepping path by using a scalable source circuit
-    // that fails direct NR (200V, 1Ω creates ~200A operating point) and
-    // gmin stepping (numGminSteps=999 selects spice3Gmin which aborts when
-    // the first NR sub-solve fails with dcTrcvMaxIter=2 against an extreme
-    // initial diagGmin=1e-12*1e999=Infinity — effectively clamped, but
-    // the first sub-solve converges because diagonal gmin dominates).
-    //
-    // Actually the reliable approach: call solveDcOperatingPoint with
-    // numSrcSteps=4. Whether direct NR or gmin succeeds first is acceptable —
-    // IF source stepping runs, its phase parameters must be uniformly spaced.
-    // If direct/gmin converges, we assert only convergence (valid outcome).
     const N = 4;
-    const solver = makeSolver();
-    const diagnostics = makeDiagnostics();
-    const matrixSize = 3;
-    const branchRow = 2;
-
-    const srcSweepParams: number[] = [];
     const elements = [
-      makeScalableVoltageSource(1, 0, branchRow, 200),
+      makeScalableVoltageSource(1, 0, 2, 200),
       makeResistor(1, 2, 1),
       makeDiode(2, 0, 1e-14, 1),
     ];
-    allocateStatePool(elements);
+    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, numSrcSteps: N, gmin: 1e-3 });
 
-    const result = solveDcOperatingPoint({
-      solver,
-      elements,
-      matrixSize,
-      params: { ...DEFAULT_PARAMS, numSrcSteps: N, gmin: 1e-3 },
-      diagnostics,
-      nodeCount: 2,
-      onPhaseBegin: (phase, param) => {
-        if (phase === "dcopSrcSweep" && param !== undefined) {
-          srcSweepParams.push(param);
-        }
-      },
-    });
+    const srcSweepParams: number[] = [];
+    ctx._onPhaseBegin = (phase, param) => {
+      if (phase === "dcopSrcSweep" && param !== undefined) {
+        srcSweepParams.push(param);
+      }
+    };
 
-    // If source stepping was reached with spice3Src, the first N+1 phase parameters
-    // must be exactly the uniform fractions 0/N, 1/N, ..., N/N.
+    solveDcOperatingPoint(ctx);
+
     if (srcSweepParams.length >= N + 1) {
       for (let i = 0; i <= N; i++) {
         expect(srcSweepParams[i]).toBeCloseTo(i / N, 10);
       }
     }
-    // Circuit must converge
-    expect(result.converged).toBe(true);
+    expect(ctx.dcopResult.converged).toBe(true);
   });
 
   it("gshunt_zero_is_noop", () => {
-    // gshunt=0 (default) must not change the result vs no gshunt.
-    const solver1 = makeSolver();
-    const solver2 = makeSolver();
-    const matrixSize = 3;
-    const branchRow = 2;
-
     function makeElements() {
-      const els = [
-        makeVoltageSource(1, 0, branchRow, 5),
+      return [
+        makeVoltageSource(1, 0, 2, 5),
         makeResistor(1, 2, 1000),
         makeResistor(2, 0, 1000),
       ];
-      return els;
     }
 
-    const r1 = solveDcOperatingPoint({
-      solver: solver1, elements: makeElements(), matrixSize,
-      params: DEFAULT_PARAMS, diagnostics: makeDiagnostics(), nodeCount: 2,
-    });
-    const r2 = solveDcOperatingPoint({
-      solver: solver2, elements: makeElements(), matrixSize,
-      params: { ...DEFAULT_PARAMS, gshunt: 0 }, diagnostics: makeDiagnostics(), nodeCount: 2,
-    });
+    const ctx1 = makeCtx(makeElements(), 2, 1);
+    const ctx2 = makeCtx(makeElements(), 2, 1, { ...DEFAULT_PARAMS, gshunt: 0 });
 
-    expect(r1.converged).toBe(true);
-    expect(r2.converged).toBe(true);
-    expect(r1.nodeVoltages[0]).toBeCloseTo(r2.nodeVoltages[0], 10);
-    expect(r1.nodeVoltages[1]).toBeCloseTo(r2.nodeVoltages[1], 10);
+    solveDcOperatingPoint(ctx1);
+    solveDcOperatingPoint(ctx2);
+
+    expect(ctx1.dcopResult.converged).toBe(true);
+    expect(ctx2.dcopResult.converged).toBe(true);
+    expect(ctx1.dcopResult.nodeVoltages[0]).toBeCloseTo(ctx2.dcopResult.nodeVoltages[0], 10);
+    expect(ctx1.dcopResult.nodeVoltages[1]).toBeCloseTo(ctx2.dcopResult.nodeVoltages[1], 10);
   });
 
   it("gshunt_nonzero_used_as_gtarget", () => {
-    // gshunt > gmin means gtarget = gshunt, which terminates the gmin ramp earlier.
-    // The circuit should still converge.
-    const solver = makeSolver();
-    const diagnostics = makeDiagnostics();
-    const matrixSize = 3;
-    const branchRow = 2;
-
     const elements = [
-      makeScalableVoltageSource(1, 0, branchRow, 5),
+      makeScalableVoltageSource(1, 0, 2, 5),
       makeResistor(1, 2, 1000),
       makeDiode(2, 0, 1e-14, 1),
     ];
-    allocateStatePool(elements);
+    const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, gshunt: 1e-6 });
 
-    const result = solveDcOperatingPoint({
-      solver,
-      elements,
-      matrixSize,
-      params: { ...DEFAULT_PARAMS, gshunt: 1e-6 },
-      diagnostics,
-      nodeCount: 2,
-    });
+    solveDcOperatingPoint(ctx);
 
-    expect(result.converged).toBe(true);
+    expect(ctx.dcopResult.converged).toBe(true);
   });
 
   it("failure_reports_blame", () => {
-    // Test that every outcome emits exactly one diagnostic at the appropriate severity.
-    //
-    // This test verifies the diagnostic structure of the solver: every code path
-    // (direct, dynamic-gmin, gillespie-src, failure) emits a correctly-formed
-    // diagnostic. We use a realistic diode circuit and verify that whichever
-    // outcome occurs, the diagnostic is present and well-formed.
-    //
-    // Note: newtonRaphson() floors maxIterations to 100 (ngspice niiter.c:37),
-    // so it is not possible to force non-convergence by limiting iterations.
-    // Testing the dc-op-failed path requires a fundamentally non-convergeable
-    // circuit (e.g., KVL violation). This test instead verifies the diagnostic
-    // contract for whatever outcome occurs.
-    const solver = makeSolver();
-    const diagnostics = makeDiagnostics();
-    const matrixSize = 3;
-    const branchRow = 2;
-
-    const params: SimulationParams = { ...DEFAULT_PARAMS };
-
     const elements = [
-      makeScalableVoltageSource(1, 0, branchRow, 5),
+      makeScalableVoltageSource(1, 0, 2, 5),
       makeResistor(1, 2, 1000),
       makeDiode(2, 0, 1e-14, 1),
     ];
-    allocateStatePool(elements);
+    const ctx = makeCtx(elements, 2, 1);
 
-    const result = solveDcOperatingPoint({
-      solver,
-      elements,
-      matrixSize,
-      params,
-      diagnostics,
-      nodeCount: 2,
-    });
+    solveDcOperatingPoint(ctx);
 
-    const diags = diagnostics.getDiagnostics();
+    const diags = (ctx.diagnostics as DiagnosticCollector).getDiagnostics();
 
-    if (result.converged) {
-      // Success path: one of the three success diagnostics must be present
+    if (ctx.dcopResult.converged) {
       const successCodes = ["dc-op-converged", "dc-op-gmin", "dc-op-source-step"];
       expect(diags.some(d => successCodes.includes(d.code))).toBe(true);
       const successDiag = diags.find(d => successCodes.includes(d.code))!;
       expect(["info", "warning"]).toContain(successDiag.severity);
     } else {
-      // Failure path: dc-op-failed must be present with error severity
       const failedDiag = diags.find(d => d.code === "dc-op-failed");
       expect(failedDiag).toBeDefined();
       expect(failedDiag!.severity).toBe("error");
-      // cktncDump content should appear in the diagnostic message
       expect(failedDiag!.message).toContain("DC operating point failed");
     }
   });
 
   it("failure_cktncDump_uses_actual_voltages", () => {
-    // Verify that cktncDump produces meaningful output with actual voltages
-    // (not zeros). This is a unit test of cktncDump with realistic data.
     const voltages = new Float64Array([5.0, 0.7, -0.0025]);
     const prevVoltages = new Float64Array([4.0, 0.65, -0.002]);
     const result = cktncDump(voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 2, 3);
-    // All three rows should be non-converged with these large deltas
     expect(result.length).toBeGreaterThan(0);
     expect(result.some(n => n.node === 0)).toBe(true);
     expect(result.some(n => n.node === 1)).toBe(true);
-    // Verify deltas are non-zero (confirming actual voltages were used)
     for (const entry of result) {
       expect(entry.delta).toBeGreaterThan(0);
     }
   });
 
   it("noOpIter_skips_all_nr_and_returns_converged", () => {
-    // When params.noOpIter=true, cktop() must return immediately with
-    // converged=true and 0 iterations — matching ngspice's noOpIter fast-path.
-    const solver = makeSolver();
-    const diagnostics = makeDiagnostics();
-    const matrixSize = 2;
-    const branchRow = 1;
-
     const elements = [
-      makeVoltageSource(1, 0, branchRow, 5),
+      makeVoltageSource(1, 0, 1, 5),
       makeResistor(1, 0, 1000),
     ];
+    const ctx = makeCtx(elements, 1, 1, { ...DEFAULT_PARAMS, noOpIter: true });
 
     let phaseBeginCount = 0;
-    const result = solveDcOperatingPoint({
-      solver,
-      elements,
-      matrixSize,
-      params: { ...DEFAULT_PARAMS, noOpIter: true },
-      diagnostics,
-      nodeCount: 1,
-      onPhaseBegin: () => { phaseBeginCount++; },
-    });
+    ctx._onPhaseBegin = () => { phaseBeginCount++; };
 
-    expect(result.converged).toBe(true);
-    expect(result.iterations).toBe(0);
-    // Voltages should be a valid Float64Array of the correct size.
-    // The noOpIter path returns the pre-existing voltage vector (not a
-    // freshly allocated zeros array). With no prior solve the values
-    // happen to be zero, but the code path uses opts.voltages.
-    expect(result.nodeVoltages).toBeInstanceOf(Float64Array);
-    expect(result.nodeVoltages.length).toBe(matrixSize);
+    solveDcOperatingPoint(ctx);
+
+    expect(ctx.dcopResult.converged).toBe(true);
+    expect(ctx.dcopResult.iterations).toBe(0);
+    expect(ctx.dcopResult.nodeVoltages).toBeInstanceOf(Float64Array);
+    expect(ctx.dcopResult.nodeVoltages.length).toBe(ctx.matrixSize);
   });
 
   it("dcopFinalize_sets_initMode_to_transient_after_convergence", () => {
-    // After solveDcOperatingPoint converges, pool.initMode must be "transient".
-    // dcopFinalize() sets initSmsig → runs one NR pass → resets to transient.
-    const solver = makeSolver();
-    const diagnostics = makeDiagnostics();
-    const matrixSize = 2;
-    const branchRow = 1;
-
     const elements = [
-      makeVoltageSource(1, 0, branchRow, 3),
+      makeVoltageSource(1, 0, 1, 3),
       makeResistor(1, 0, 1000),
     ];
+    const ctx = makeCtx(elements, 1, 1);
 
-    const statePool = {
-      state0: new Float64Array(1),
-      reset(): void { this.initMode = "transient" as typeof this.initMode; },
-      initMode: "transient" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient",
-    };
+    solveDcOperatingPoint(ctx);
 
-    const result = solveDcOperatingPoint({
-      solver,
-      elements,
-      matrixSize,
-      params: DEFAULT_PARAMS,
-      diagnostics,
-      nodeCount: 1,
-      statePool,
+    expect(ctx.dcopResult.converged).toBe(true);
+    if (ctx.statePool) {
+      expect(ctx.statePool.initMode).toBe("transient");
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // New spec tests: writes_into_ctx_dcopResult and zero_alloc_gmin_stepping
+  // ---------------------------------------------------------------------------
+
+  it("writes_into_ctx_dcopResult", () => {
+    // Run DC-OP on a resistive divider.
+    // Assert ctx.dcopResult.converged === true and nodeVoltages has correct values.
+    const elements = [
+      makeVoltageSource(1, 0, 2, 5),
+      makeResistor(1, 2, 1000),
+      makeResistor(2, 0, 1000),
+    ];
+    const ctx = makeCtx(elements, 2, 1);
+
+    solveDcOperatingPoint(ctx);
+
+    expect(ctx.dcopResult.converged).toBe(true);
+    // V1 = 5V (index 0), V2 = 2.5V (index 1)
+    expect(ctx.dcopResult.nodeVoltages[0]).toBeCloseTo(5.0, 8);
+    expect(ctx.dcopResult.nodeVoltages[1]).toBeCloseTo(2.5, 8);
+    // nodeVoltages must point to ctx.dcopVoltages (no additional allocation)
+    expect(ctx.dcopResult.nodeVoltages).toBe(ctx.dcopVoltages);
+  });
+
+  it("zero_alloc_gmin_stepping", () => {
+    // Run DC-OP on a circuit requiring gmin stepping.
+    // Assert no new Float64Array calls during the entire gmin stepping sequence.
+    const RealF64 = globalThis.Float64Array;
+    let allocCount = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).Float64Array = new Proxy(RealF64, {
+      construct(target, args) {
+        allocCount++;
+        return new target(...(args as [number]));
+      },
     });
 
-    expect(result.converged).toBe(true);
-    expect(statePool.initMode).toBe("transient");
+    try {
+      // Use extreme circuit that requires gmin stepping
+      const elements = [
+        makeVoltageSource(1, 0, 2, 200),
+        makeResistor(1, 2, 1),
+        makeDiode(2, 0, 1e-14, 1),
+      ];
+      const ctx = makeCtx(elements, 2, 1, { ...DEFAULT_PARAMS, gmin: 1e-3 });
+
+      // First call: warm up
+      allocCount = 0;
+      solveDcOperatingPoint(ctx);
+      allocCount = 0;
+
+      // Reset for second call
+      ctx.dcopResult.reset();
+      ctx.dcopVoltages.fill(0);
+      ctx.dcopSavedVoltages.fill(0);
+      ctx.dcopSavedState0.fill(0);
+      ctx.dcopOldState0.fill(0);
+      if (ctx.statePool) {
+        ctx.statePool.reset();
+      }
+
+      solveDcOperatingPoint(ctx);
+
+      // No Float64Array allocations during the second DC-OP call
+      expect(allocCount).toBe(0);
+      expect(ctx.dcopResult.converged).toBe(true);
+    } finally {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (globalThis as any).Float64Array = RealF64;
+    }
   });
 
   it("cktncDump_returns_empty_when_all_converged", () => {
-    // When voltages and prevVoltages are identical, delta=0 everywhere
-    // and cktncDump returns an empty array.
     const v = new Float64Array([1.0, 2.5, 0.0]);
     const result = cktncDump(v, v, 1e-3, 1e-6, 1e-12, 2, 3);
     expect(result).toHaveLength(0);
   });
 
   it("cktncDump_identifies_non_converged_nodes", () => {
-    // Node 0: delta=0.5V, tol=reltol*max(|v|,|pv|)+voltTol ≈ 0.001*5+1e-6 ≈ 0.005 → fails
-    // Node 1: delta=0, converged
     const voltages = new Float64Array([5.0, 1.0]);
     const prevVoltages = new Float64Array([4.5, 1.0]);
     const result = cktncDump(voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 2, 2);
@@ -600,19 +440,11 @@ describe("DcOP", () => {
   });
 
   it("cktncDump_uses_voltTol_for_node_rows_and_abstol_for_branch_rows", () => {
-    // Node row (i < nodeCount): tol uses voltTol floor.
-    // Branch row (i >= nodeCount): tol uses abstol floor.
-    // With very small delta that only passes voltTol (not abstol when voltTol>>abstol),
-    // we can verify the floor switches correctly.
-    //
-    // Both have delta = 1e-7.
-    // nodeCount = 1; matrixSize = 2.
-    // Node row (i=0):   tol = 1e-3 * max(0,0) + voltTol = 1e-6  → 1e-7 < 1e-6 → converged
-    // Branch row (i=1): tol = 1e-3 * max(0,0) + abstol  = 1e-12 → 1e-7 > 1e-12 → non-converged
+    // Node row (i=0): tol = 1e-3 * max(0,0) + voltTol = 1e-6 → 1e-7 < 1e-6 → converged
+    // Branch row (i=1): tol = 1e-3 * max(0,0) + abstol = 1e-12 → 1e-7 > 1e-12 → non-converged
     const voltages = new Float64Array([1e-7, 1e-7]);
     const prevVoltages = new Float64Array([0, 0]);
     const result = cktncDump(voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 1, 2);
-    // Node row converged (delta 1e-7 < voltTol 1e-6), branch row failed (delta 1e-7 > abstol 1e-12)
     expect(result).toHaveLength(1);
     expect(result[0].node).toBe(1);
   });

@@ -5,10 +5,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { ResistorDefinition } from "../resistor.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
+import { runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
+import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
@@ -155,16 +153,10 @@ describe("Integration", () => {
     const r1 = makeResistor(1, 2, 1000);                  // 1kΩ: node1 ↔ node2
     const r2 = makeResistor(1, 0, 2000);                  // 2kΩ: node1 ↔ ground
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [vs, r1, r2],
       matrixSize,
       nodeCount: 2,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);

@@ -27,7 +27,7 @@
 import type { SparseSolver } from "../sparse-solver.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from "../element.js";
 import { isPoolBacked } from "../element.js";
-import { pnjlim } from "../newton-raphson.js";
+import { pnjlim, newtonRaphson } from "../newton-raphson.js";
 import { StatePool } from "../state-pool.js";
 import type { StatePoolRef } from "../../../core/analog-types.js";
 import { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
@@ -41,6 +41,10 @@ import {
   applyInitialValues,
   type StateSchema,
 } from "../state-schema.js";
+import { CKTCircuitContext, type DcOpResult, type NRResult } from "../ckt-context.js";
+import { solveDcOperatingPoint } from "../dc-operating-point.js";
+import { DiagnosticCollector } from "../diagnostics.js";
+import { DEFAULT_SIMULATION_PARAMS, type ResolvedSimulationParams } from "../../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
 // withNodeIds — test helper for factory-created elements
@@ -779,4 +783,95 @@ export function allocateStatePool(
     }
   }
   return pool;
+}
+
+// ---------------------------------------------------------------------------
+// makeSimpleCtx / runDcOp / runNR — migration helpers for component tests
+//
+// Component tests that previously called solveDcOperatingPoint({solver, ...})
+// with the old DcOpOptions API should call runDcOp() instead.
+// Tests that previously called newtonRaphson({...}) should call runNR() instead.
+// ---------------------------------------------------------------------------
+
+export interface SimpleCtxOptions {
+  solver?: SparseSolver;
+  elements: readonly AnalogElement[];
+  matrixSize: number;
+  nodeCount: number;
+  branchCount?: number;
+  params?: Partial<ResolvedSimulationParams>;
+  diagnostics?: DiagnosticCollector;
+  statePool?: StatePool;
+}
+
+export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
+  const branchCount = opts.branchCount ?? opts.matrixSize - opts.nodeCount;
+  const statePool = opts.statePool ?? allocateStatePool(opts.elements);
+  const params: ResolvedSimulationParams = { ...DEFAULT_SIMULATION_PARAMS, ...opts.params };
+  const diagnostics = opts.diagnostics ?? new DiagnosticCollector();
+  const ctx = new CKTCircuitContext(
+    {
+      nodeCount: opts.nodeCount,
+      branchCount,
+      matrixSize: opts.matrixSize,
+      elements: opts.elements,
+      statePool,
+    },
+    params,
+    () => {},
+  );
+  if (opts.solver) {
+    ctx.solver = opts.solver;
+  }
+  ctx.diagnostics = diagnostics;
+  return ctx;
+}
+
+export function runDcOp(opts: SimpleCtxOptions): DcOpResult {
+  const ctx = makeSimpleCtx(opts);
+  solveDcOperatingPoint(ctx);
+  return ctx.dcopResult;
+}
+
+export interface SimpleNROptions {
+  solver?: SparseSolver;
+  elements: readonly AnalogElement[];
+  matrixSize: number;
+  nodeCount: number;
+  branchCount?: number;
+  params?: Partial<ResolvedSimulationParams>;
+  diagnostics?: DiagnosticCollector;
+  statePool?: StatePool;
+  maxIterations?: number;
+  initialGuess?: Float64Array;
+}
+
+export function runNR(opts: SimpleNROptions): NRResult {
+  const branchCount = opts.branchCount ?? opts.matrixSize - opts.nodeCount;
+  const statePool = opts.statePool ?? allocateStatePool(opts.elements);
+  const params: ResolvedSimulationParams = { ...DEFAULT_SIMULATION_PARAMS, ...opts.params };
+  const diagnostics = opts.diagnostics ?? new DiagnosticCollector();
+  const ctx = new CKTCircuitContext(
+    {
+      nodeCount: opts.nodeCount,
+      branchCount,
+      matrixSize: opts.matrixSize,
+      elements: opts.elements,
+      statePool,
+    },
+    params,
+    () => {},
+  );
+  if (opts.solver) {
+    ctx.solver = opts.solver;
+  }
+  ctx.diagnostics = diagnostics;
+  if (opts.maxIterations !== undefined) {
+    ctx.maxIterations = opts.maxIterations;
+  }
+  if (opts.initialGuess !== undefined) {
+    ctx.initialGuess = opts.initialGuess;
+  }
+  newtonRaphson(ctx);
+  return ctx.nrResult;
 }

@@ -172,13 +172,22 @@ export class CKTCircuitContext {
   // -------------------------------------------------------------------------
 
   /** Shared sparse solver — the same instance used for every NR factorization. */
-  solver: SparseSolver;
+  private _solver: SparseSolver = null!;
+
+  /** Setting this also replaces the assembler so it always uses the current solver. */
+  get solver(): SparseSolver {
+    return this._solver;
+  }
+  set solver(s: SparseSolver) {
+    this._solver = s;
+    this.assembler = new MNAAssembler(s);
+  }
 
   /**
    * MNA matrix assembler (hoisted to ctx in Phase 1, deleted in Phase 2 Wave 2.2
    * when cktLoad replaces stampAll).
    */
-  assembler: MNAAssembler;
+  assembler: MNAAssembler = null!;
 
   // -------------------------------------------------------------------------
   // Node voltages (ngspice CKTrhsOld, CKTrhs, CKTrhsSpare)

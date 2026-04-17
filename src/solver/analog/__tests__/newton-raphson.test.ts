@@ -3,43 +3,76 @@
  * and the makeDiode test element.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson, pnjlim, fetlim, applyNodesetsAndICs } from "../newton-raphson.js";
+import { CKTCircuitContext } from "../ckt-context.js";
 import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
+import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
-// Helpers — build a simple diode+resistor circuit
-//
-// Topology:
-//   Node 0 = ground
-//   Node 1 = anode (Vs positive terminal)
-//   Node 2 = junction between resistor and diode cathode
-//   Branch row 2 = voltage source branch
-//
-// Circuit: 5V source → 1kΩ resistor → diode → ground
-//   Vs: nodes (1, 0), branch row 2, voltage = 5V
-//   R:  nodes (1, 2), R = 1000 Ω
-//   D:  nodes (2, 0), Is = 1e-14, n = 1
-//
-// matrixSize = 3 (2 nodes + 1 branch)
+// Helpers — build CKTCircuitContext for test circuits
 // ---------------------------------------------------------------------------
 
-function makeDiodeCircuit(sourceVoltage: number) {
-  const solver = new SparseSolver();
-  const diagnostics = new DiagnosticCollector();
+const noopBreakpoint = (_t: number): void => {};
 
-  // Node 1 = Vs+, Node 2 = anode/resistor junction, Node 0 = ground/cathode
-  // Branch row index = 2 (absolute, 0-based in solver)
+/**
+ * Build a CKTCircuitContext for the diode+resistor+voltage-source circuit.
+ *
+ * Topology:
+ *   Node 0 = ground
+ *   Node 1 = anode (Vs positive terminal)
+ *   Node 2 = junction between resistor and diode cathode
+ *   Branch row 2 = voltage source branch
+ *
+ * Circuit: Vs source → 1kΩ resistor → diode → ground
+ *   matrixSize = 3 (2 nodes + 1 branch)
+ */
+function makeDiodeCtx(sourceVoltage: number): CKTCircuitContext {
   const vs = makeVoltageSource(1, 0, 2, sourceVoltage);
   const r = makeResistor(1, 2, 1000);
   const d = makeDiode(2, 0, 1e-14, 1);
   const elements = [vs, r, d];
-  allocateStatePool(elements);
+  const pool = allocateStatePool(elements);
 
-  return { solver, diagnostics, elements, matrixSize: 3 };
+  const circuit = {
+    nodeCount: 2,
+    branchCount: 1,
+    matrixSize: 3,
+    elements,
+    statePool: pool,
+  };
+
+  const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+  ctx.diagnostics = new DiagnosticCollector();
+  return ctx;
+}
+
+/**
+ * Build a CKTCircuitContext for a resistor divider (linear circuit).
+ *
+ * Circuit: Vs=5V → R1=1kΩ → node2 → R2=1kΩ → ground
+ *   matrixSize = 3 (2 nodes + 1 branch)
+ */
+function makeResistorDividerCtx(voltage: number): CKTCircuitContext {
+  const vs = makeVoltageSource(1, 0, 2, voltage);
+  const r1 = makeResistor(1, 2, 1000);
+  const r2 = makeResistor(2, 0, 1000);
+  const elements = [vs, r1, r2];
+
+  const circuit = {
+    nodeCount: 2,
+    branchCount: 1,
+    matrixSize: 3,
+    elements,
+    statePool: null,
+  };
+
+  const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+  ctx.diagnostics = new DiagnosticCollector();
+  return ctx;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,12 +92,7 @@ describe("NR", () => {
 
   it("pnjlim_passes_small_step", () => {
     // Small step within 2*Vt: 0.60V → 0.65V, Vt=0.026, vcrit=0.6
-    // |vnew - vold| = 0.05 > 2*0.026 = 0.052 — just barely triggers
-    // But vnew = 0.65 > vcrit = 0.6, so limiting engages
-    // After limiting: vold + Vt * ln(1 + (vnew-vold)/Vt) = 0.60 + 0.026*ln(1+0.05/0.026)
-    // = 0.60 + 0.026*ln(2.923) = 0.60 + 0.026*1.073 ≈ 0.628
-    // The spec test says pnjlim(0.65, 0.60, 0.026, 0.6) returns 0.65 (unchanged)
-    // Let's check: |0.65 - 0.60| = 0.05, 2*vt = 0.052, so 0.05 <= 0.052 → no limiting
+    // |0.65 - 0.60| = 0.05, 2*vt = 0.052, so 0.05 <= 0.052 → no limiting
     const result = pnjlim(0.65, 0.60, 0.026, 0.6);
     expect(result.value).toBeCloseTo(0.65, 10);
     expect(result.limited).toBe(false);
@@ -89,41 +117,82 @@ describe("NR", () => {
   });
 
   // ---------------------------------------------------------------------------
-  // Linear circuit: should converge in exactly 1 iteration
+  // Linear circuit: should converge in exactly 2 iterations
   // ---------------------------------------------------------------------------
 
   it("linear_converges_in_two_iterations", () => {
     // Resistor divider: 5V source, R1=1kΩ, R2=1kΩ → midpoint = 2.5V
-    // Topology:
-    //   Node 1 = Vs+, Node 2 = midpoint, Node 0 = ground
-    //   Branch row 2 = Vs branch
-    //   matrixSize = 3
-    //
-    // Per ngspice NIiter: iteration 0 solves the system but convergence
-    // checks are skipped (noncon forced to 1). Iteration 1 confirms
-    // convergence. All circuits traverse the full Step A-K sequence.
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
+    // Per ngspice NIiter: iteration 0 forces noncon=1. Iteration 1 confirms convergence.
+    const ctx = makeResistorDividerCtx(5.0);
 
-    const vs = makeVoltageSource(1, 0, 2, 5.0);
-    const r1 = makeResistor(1, 2, 1000);
-    const r2 = makeResistor(2, 0, 1000);
+    newtonRaphson(ctx);
 
-    const result = newtonRaphson({
-      solver,
-      elements: [vs, r1, r2],
-      matrixSize: 3,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
+    expect(ctx.nrResult.converged).toBe(true);
+    expect(ctx.nrResult.iterations).toBe(2);
+    // Node 2 (index 1 in 0-based solver) = midpoint voltage ~2.5V
+    expect(ctx.nrResult.voltages[1]).toBeCloseTo(2.5, 4);
+  });
+
+  // ---------------------------------------------------------------------------
+  // New spec test: writes_into_ctx_nrResult
+  // ---------------------------------------------------------------------------
+
+  it("writes_into_ctx_nrResult", () => {
+    // Call newtonRaphson(ctx) on a simple resistive circuit.
+    // Assert ctx.nrResult.converged, ctx.nrResult.iterations, and ctx.nrResult.voltages.
+    const ctx = makeResistorDividerCtx(5.0);
+
+    newtonRaphson(ctx);
+
+    expect(ctx.nrResult.converged).toBe(true);
+    expect(ctx.nrResult.iterations).toBeGreaterThan(0);
+    // nrResult.voltages points into ctx.rhs — must be a valid buffer
+    expect(ctx.nrResult.voltages).toBeInstanceOf(Float64Array);
+    expect(ctx.nrResult.voltages.length).toBe(3);
+    // Midpoint node (index 1) = 2.5V for a symmetric divider at 5V
+    expect(ctx.nrResult.voltages[1]).toBeCloseTo(2.5, 4);
+  });
+
+  // ---------------------------------------------------------------------------
+  // New spec test: zero_allocations_in_nr_loop
+  // ---------------------------------------------------------------------------
+
+  it("zero_allocations_in_nr_loop", () => {
+    // Use monkey-patch pattern to count Float64Array allocations.
+    // Run NR on a nonlinear (diode) circuit. After the first NR call completes,
+    // reset the counter and run again. Assert zero allocations on the second call.
+    const RealF64 = globalThis.Float64Array;
+    let allocCount = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).Float64Array = new Proxy(RealF64, {
+      construct(target, args) {
+        allocCount++;
+        return new target(...(args as [number]));
+      },
     });
 
-    expect(result.converged).toBe(true);
-    expect(result.iterations).toBe(2);
-    // Node 2 (index 1 in 0-based solver) = midpoint voltage ~2.5V
-    expect(result.voltages[1]).toBeCloseTo(2.5, 4);
+    try {
+      const ctx = makeDiodeCtx(5.0);
+      // First call: warm up (allocations during ctx construction don't count here)
+      allocCount = 0;
+      newtonRaphson(ctx);
+      allocCount = 0;
+
+      // Reset ctx state for second call
+      ctx.rhs.fill(0);
+      ctx.rhsOld.fill(0);
+      ctx.nrResult.reset();
+      ctx.initialGuess = null;
+
+      newtonRaphson(ctx);
+
+      // No Float64Array allocations during the second NR call
+      expect(allocCount).toBe(0);
+      expect(ctx.nrResult.converged).toBe(true);
+    } finally {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (globalThis as any).Float64Array = RealF64;
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -131,25 +200,16 @@ describe("NR", () => {
   // ---------------------------------------------------------------------------
 
   it("diode_circuit_converges", () => {
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
+    const ctx = makeDiodeCtx(5.0);
 
-    const result = newtonRaphson({
-      solver,
-      elements,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-    });
+    newtonRaphson(ctx);
 
-    expect(result.converged).toBe(true);
-    expect(result.iterations).toBeLessThan(20);
+    expect(ctx.nrResult.converged).toBe(true);
+    expect(ctx.nrResult.iterations).toBeLessThan(20);
 
     // Node 2 = diode anode voltage (= forward voltage drop since cathode is grounded)
     // For Is=1e-14, n=1, Id≈4.3mA → Vd ≈ 0.026*ln(4.3e-3/1e-14) = ~0.68V
-    const vd = result.voltages[1]; // node 2, 0-based index 1
+    const vd = ctx.nrResult.voltages[1]; // node 2, 0-based index 1
     expect(vd).toBeGreaterThan(0.6);
     expect(vd).toBeLessThan(0.75);
   });
@@ -159,56 +219,34 @@ describe("NR", () => {
   // ---------------------------------------------------------------------------
 
   it("diode_reverse_bias", () => {
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(-5.0);
+    const ctx = makeDiodeCtx(-5.0);
 
-    const result = newtonRaphson({
-      solver,
-      elements,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-    });
+    newtonRaphson(ctx);
 
-    expect(result.converged).toBe(true);
+    expect(ctx.nrResult.converged).toBe(true);
 
     // In reverse bias: anode voltage ≈ -5V (clamped by Is ≈ -1e-14 A)
-    // Current through resistor = (Vs_node - anode_node)/R ≈ tiny leakage
-    // Node 1 (index 0) = Vs+ = -5V (forced by voltage source)
-    // Node 2 (index 1) = diode anode ≈ -5V (tiny reverse current)
-    // Current = (node1_v - node2_v) / 1000 should be negligible (< 1e-11 A)
-    const vNode1 = result.voltages[0]; // Vs+
-    const vNode2 = result.voltages[1]; // anode
+    const vNode1 = ctx.nrResult.voltages[0]; // Vs+
+    const vNode2 = ctx.nrResult.voltages[1]; // anode
     const current = Math.abs((vNode1 - vNode2) / 1000);
     expect(current).toBeLessThan(1e-11);
   });
 
   // ---------------------------------------------------------------------------
-  // Blame scalars on NRResult
+  // Blame scalars on nrResult
   // ---------------------------------------------------------------------------
 
   it("blame_scalars_populated", () => {
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
+    const ctx = makeDiodeCtx(5.0);
+    ctx.enableBlameTracking = true;
 
-    const result = newtonRaphson({
-      solver,
-      elements,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-      enableBlameTracking: true,
-    });
+    newtonRaphson(ctx);
 
-    expect(result.converged).toBe(true);
+    expect(ctx.nrResult.converged).toBe(true);
     // largestChangeNode is a valid node index (>= 0) after a nonlinear solve
-    expect(result.largestChangeNode).toBeGreaterThanOrEqual(0);
+    expect(ctx.nrResult.largestChangeNode).toBeGreaterThanOrEqual(0);
     // largestChangeElement is a valid element index (>= 0) for a circuit with nonlinear elements
-    expect(result.largestChangeElement).toBeGreaterThanOrEqual(0);
+    expect(ctx.nrResult.largestChangeElement).toBeGreaterThanOrEqual(0);
   });
 
   // ---------------------------------------------------------------------------
@@ -216,45 +254,25 @@ describe("NR", () => {
   // ---------------------------------------------------------------------------
 
   it("initial_guess_used", () => {
-    const { solver: solver1, diagnostics: diag1, elements: elem1, matrixSize } =
-      makeDiodeCircuit(5.0);
-
     // Solve without initial guess
-    const resultNoGuess = newtonRaphson({
-      solver: solver1,
-      elements: elem1,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics: diag1,
-    });
-
-    const { solver: solver2, diagnostics: diag2, elements: elem2 } = makeDiodeCircuit(5.0);
+    const ctx1 = makeDiodeCtx(5.0);
+    newtonRaphson(ctx1);
+    const itersNoGuess = ctx1.nrResult.iterations;
 
     // Solve with initial guess close to the solution
-    const guess = new Float64Array(matrixSize);
-    guess[0] = -5.0;  // Vs+ node (node 1, index 0) — set by voltage source
-    guess[1] = 0.68;  // diode anode (node 2, index 1) — near expected Vd
+    const ctx2 = makeDiodeCtx(5.0);
+    const guess = new Float64Array(3);
+    guess[0] = -5.0;   // Vs+ node (node 1, index 0) — set by voltage source
+    guess[1] = 0.68;   // diode anode (node 2, index 1) — near expected Vd
     guess[2] = 0.0043; // branch current (index 2)
+    ctx2.initialGuess = guess;
 
-    const resultWithGuess = newtonRaphson({
-      solver: solver2,
-      elements: elem2,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      initialGuess: guess,
-      diagnostics: diag2,
-    });
+    newtonRaphson(ctx2);
 
-    expect(resultWithGuess.converged).toBe(true);
-    expect(resultNoGuess.converged).toBe(true);
+    expect(ctx2.nrResult.converged).toBe(true);
+    expect(ctx1.nrResult.converged).toBe(true);
     // A good initial guess should converge in fewer or equal iterations
-    expect(resultWithGuess.iterations).toBeLessThanOrEqual(resultNoGuess.iterations);
+    expect(ctx2.nrResult.iterations).toBeLessThanOrEqual(itersNoGuess);
   });
 
   // ---------------------------------------------------------------------------
@@ -262,48 +280,25 @@ describe("NR", () => {
   // ---------------------------------------------------------------------------
 
   it("nonlinear_circuit_runs_at_least_2_iterations_with_state_pool", () => {
-    // A diode+resistor circuit with a statePool in initTran mode must run at
-    // least 2 NR iterations (Change 6: iteration===0 forces noncon=1).
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
-    const pool = new StatePool(0);
-    pool.initMode = "initTran";
+    const ctx = makeDiodeCtx(5.0);
+    ctx.statePool!.initMode = "initTran";
 
-    const result = newtonRaphson({
-      solver,
-      elements,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-      statePool: pool,
-    });
+    newtonRaphson(ctx);
 
-    expect(result.converged).toBe(true);
-    expect(result.iterations).toBeGreaterThanOrEqual(2);
+    expect(ctx.nrResult.converged).toBe(true);
+    expect(ctx.nrResult.iterations).toBeGreaterThanOrEqual(2);
   });
 
   it("nonlinear_circuit_forced_noncon_on_iteration_0", () => {
     // Even when NR would otherwise converge in iteration 0 (hypothetically),
     // Change 6 ensures assembler.noncon is forced to 1 after iteration 0,
     // preventing early return. Verify by checking iteration count >= 2.
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
+    const ctx = makeDiodeCtx(5.0);
 
-    // No statePool: Change 6 still applies (forced noncon=1 at iteration===0)
-    const result = newtonRaphson({
-      solver,
-      elements,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-    });
+    newtonRaphson(ctx);
 
-    expect(result.converged).toBe(true);
-    expect(result.iterations).toBeGreaterThanOrEqual(2);
+    expect(ctx.nrResult.converged).toBe(true);
+    expect(ctx.nrResult.iterations).toBeGreaterThanOrEqual(2);
   });
 
   // ---------------------------------------------------------------------------
@@ -311,92 +306,43 @@ describe("NR", () => {
   // ---------------------------------------------------------------------------
 
   it("initTran_transitions_to_initFloat_after_iteration_0", () => {
-    // With statePool.initMode = "initTran", the mode automaton must transition
-    // to "initFloat" after iteration 0 completes. NR must then converge.
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
-    const pool = new StatePool(0);
-    pool.initMode = "initTran";
+    const ctx = makeDiodeCtx(5.0);
+    ctx.statePool!.initMode = "initTran";
 
-    const result = newtonRaphson({
-      solver,
-      elements,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-      statePool: pool,
-    });
+    newtonRaphson(ctx);
 
-    expect(result.converged).toBe(true);
+    expect(ctx.nrResult.converged).toBe(true);
     // After NR completes, initMode must be "initFloat"
-    expect(pool.initMode).toBe("initFloat");
+    expect(ctx.statePool!.initMode).toBe("initFloat");
   });
 
   it("initPred_transitions_to_initFloat_immediately", () => {
-    // With statePool.initMode = "initPred", the automaton transitions to
-    // "initFloat" after the first updateOperatingPoints call (iteration 0).
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
-    const pool = new StatePool(0);
-    pool.initMode = "initPred";
+    const ctx = makeDiodeCtx(5.0);
+    ctx.statePool!.initMode = "initPred";
 
-    const result = newtonRaphson({
-      solver,
-      elements,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-      statePool: pool,
-    });
+    newtonRaphson(ctx);
 
-    expect(result.converged).toBe(true);
-    expect(pool.initMode).toBe("initFloat");
+    expect(ctx.nrResult.converged).toBe(true);
+    expect(ctx.statePool!.initMode).toBe("initFloat");
   });
 
   it("transient_mode_allows_convergence_without_ladder", () => {
-    // With statePool.initMode = "transient" and no ladder, the canConverge
-    // gate must allow convergence (initMode === "transient" is a valid terminal).
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
-    const pool = new StatePool(0);
-    pool.initMode = "transient";
+    const ctx = makeDiodeCtx(5.0);
+    ctx.statePool!.initMode = "transient";
 
-    const result = newtonRaphson({
-      solver,
-      elements,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-      statePool: pool,
-    });
+    newtonRaphson(ctx);
 
-    expect(result.converged).toBe(true);
+    expect(ctx.nrResult.converged).toBe(true);
     // "transient" mode stays unchanged (no automaton fires for it)
-    expect(pool.initMode).toBe("transient");
+    expect(ctx.statePool!.initMode).toBe("transient");
   });
 
   it("no_pool_allows_convergence", () => {
-    // Without any statePool, canConverge must be true.
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
+    const ctx = makeResistorDividerCtx(5.0);
 
-    const result = newtonRaphson({
-      solver,
-      elements,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-    });
+    newtonRaphson(ctx);
 
-    expect(result.converged).toBe(true);
+    expect(ctx.nrResult.converged).toBe(true);
   });
 
   // ---------------------------------------------------------------------------
@@ -406,50 +352,29 @@ describe("NR", () => {
   it("uic_bypass_returns_converged_with_zero_iterations", () => {
     // When isDcOp=true and statePool.uic=true, NR must skip all iteration and
     // return { converged: true, iterations: 0 } after a single CKTload.
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
-    const statePool = { state0: new Float64Array(0), uic: true };
+    const ctx = makeDiodeCtx(5.0);
+    // Replace statePool with one that has uic=true
+    (ctx.statePool as unknown as { uic: boolean }).uic = true;
+    ctx.isDcOp = true;
 
-    const result = newtonRaphson({
-      solver,
-      elements,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-      isDcOp: true,
-      statePool,
-    });
+    newtonRaphson(ctx);
 
-    expect(result.converged).toBe(true);
-    expect(result.iterations).toBe(0);
+    expect(ctx.nrResult.converged).toBe(true);
+    expect(ctx.nrResult.iterations).toBe(0);
   });
 
   it("uic_bypass_not_triggered_without_isDcOp", () => {
     // When isDcOp is not set (transient path), statePool.uic must not trigger the bypass.
-    // The UIC bypass signature is { converged: true, iterations: 0 }. Verify that
-    // combination does NOT appear — the NR loop must enter the iteration path.
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
-    const statePool = { state0: new Float64Array(0), uic: true };
+    const ctx = makeDiodeCtx(5.0);
+    (ctx.statePool as unknown as { uic: boolean }).uic = true;
+    ctx.isDcOp = false;
 
-    const result = newtonRaphson({
-      solver,
-      elements,
-      matrixSize,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-      isDcOp: false,
-      statePool,
-    });
+    newtonRaphson(ctx);
 
     // The UIC bypass would return { converged: true, iterations: 0 }.
     // Without isDcOp=true that path is skipped, so iterations must not be 0
     // with converged=true simultaneously.
-    expect(result.converged === true && result.iterations === 0).toBe(false);
+    expect(ctx.nrResult.converged === true && ctx.nrResult.iterations === 0).toBe(false);
   });
 
   // ---------------------------------------------------------------------------
@@ -457,78 +382,62 @@ describe("NR", () => {
   // ---------------------------------------------------------------------------
 
   it("applyNodesetsAndICs_stamps_nodeset_in_initJct_mode", () => {
-    // In initJct mode, nodeset stamps must be applied to the solver.
-    // Verify by checking cooCount increased and RHS received the correct value.
     const G_NODESET = 1e10;
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map([[1, 2.5]]);
     const ics = new Map<number, number>();
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initJct");
-    // One nodeset entry → one element stamp added
     expect(solver.elementCount).toBe(1);
-    // RHS at row 1 must be G_NODESET * 2.5 * 1.0
     const rhs = solver.getRhsSnapshot();
     expect(rhs[1]).toBeCloseTo(G_NODESET * 2.5, 0);
   });
 
   it("applyNodesetsAndICs_stamps_nodeset_in_initFix_mode", () => {
-    // In initFix mode, nodeset stamps must also be applied.
     const G_NODESET = 1e10;
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map([[2, 1.0]]);
     const ics = new Map<number, number>();
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFix");
-    // One nodeset entry → one element stamp added
     expect(solver.elementCount).toBe(1);
-    // RHS at row 2 must be G_NODESET * 1.0 * 1.0
     const rhs = solver.getRhsSnapshot();
     expect(rhs[2]).toBeCloseTo(G_NODESET * 1.0, 0);
   });
 
   it("applyNodesetsAndICs_skips_nodesets_in_initFloat_mode", () => {
-    // In initFloat mode, nodesets must NOT be stamped (only ICs persist).
-    // With no ICs either, COO count must remain 0 and RHS stays zero.
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map([[1, 2.5]]);
     const ics = new Map<number, number>();
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFloat");
-    // initFloat skips nodesets — no stamps added
     expect(solver.elementCount).toBe(0);
     const rhs = solver.getRhsSnapshot();
     expect(rhs[1]).toBe(0);
   });
 
   it("applyNodesetsAndICs_always_stamps_ics_regardless_of_mode", () => {
-    // ICs must be stamped in ALL modes, including initFloat.
     const G_NODESET = 1e10;
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map<number, number>();
     const ics = new Map([[1, 1.5]]);
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFloat");
-    // IC stamp applied even in initFloat mode
     expect(solver.elementCount).toBe(1);
     const rhs = solver.getRhsSnapshot();
     expect(rhs[1]).toBeCloseTo(G_NODESET * 1.5, 0);
   });
 
   it("applyNodesetsAndICs_scales_by_srcFact", () => {
-    // With srcFact=0.5, the RHS stamp must use G_NODESET * value * 0.5.
     const G_NODESET = 1e10;
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map([[1, 2.0]]);
     const ics = new Map([[2, 1.0]]);
     applyNodesetsAndICs(solver, nodesets, ics, 0.5, "initJct");
-    // Both nodeset (node 1) and IC (node 2) get one element stamp each
     expect(solver.elementCount).toBe(2);
     const rhs = solver.getRhsSnapshot();
-    // nodeset: G_NODESET * 2.0 * 0.5 = 1e10
     expect(rhs[1]).toBeCloseTo(G_NODESET * 2.0 * 0.5, 0);
-    // IC: G_NODESET * 1.0 * 0.5 = 5e9
     expect(rhs[2]).toBeCloseTo(G_NODESET * 1.0 * 0.5, 0);
   });
 });
@@ -541,7 +450,6 @@ describe("NR singular retry", () => {
   it("nr_retries_with_reorder_after_numerical_singular", () => {
     // Verify that when factor() returns { success: false } with lastFactorUsedReorder=false
     // (numerical path), the NR loop calls forceReorder() and retries factor().
-    // On the second call (after forceReorder), factor() succeeds.
     const diagnostics = new DiagnosticCollector();
 
     let forceReorderCalled = false;
@@ -549,23 +457,18 @@ describe("NR singular retry", () => {
 
     const realSolver = new SparseSolver();
 
-    // Intercept factor() on the proxy: fail on the first call (numerical path),
-    // then delegate to the real solver after forceReorder has been called.
     const proxySolver = new Proxy(realSolver, {
       get(target, prop) {
         if (prop === "factor") {
           return () => {
             factorCallCount++;
             if (factorCallCount === 1) {
-              // First call: simulate numerical-path failure
               return { success: false };
             }
-            // Subsequent calls: real solver (after forceReorder was called)
             return (target as SparseSolver).factor();
           };
         }
         if (prop === "lastFactorUsedReorder") {
-          // First factor() call failed on numerical path (not reorder)
           return factorCallCount <= 1 ? false : (target as SparseSolver).lastFactorUsedReorder;
         }
         if (prop === "forceReorder") {
@@ -584,30 +487,22 @@ describe("NR singular retry", () => {
     const r = makeResistor(1, 2, 1000);
     const d = makeDiode(2, 0, 1e-14, 1);
     const elements = [vs, r, d];
-    allocateStatePool(elements);
+    const pool = allocateStatePool(elements);
 
-    const result = newtonRaphson({
-      solver: proxySolver,
-      elements,
-      matrixSize: 3,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-    });
+    const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    ctx.diagnostics = diagnostics;
+    ctx.solver = proxySolver;
 
-    // After the numerical-path failure, the NR loop must have called forceReorder()
-    // and retried. The circuit must still converge.
+    newtonRaphson(ctx);
+
     expect(forceReorderCalled).toBe(true);
-    expect(result.converged).toBe(true);
+    expect(ctx.nrResult.converged).toBe(true);
   });
 
   it("nr_emits_singular_diagnostic_when_reorder_also_fails", () => {
     // When factor() always fails and lastFactorUsedReorder is true (reorder path),
     // NR must emit a singular-matrix diagnostic and return converged=false.
-    // (With the continue-based E_SINGULAR recovery, we only enter the error path
-    // when lastFactorUsedReorder === true, meaning the reorder path also failed.)
     const diagnostics = new DiagnosticCollector();
 
     const realSolver = new SparseSolver();
@@ -620,8 +515,6 @@ describe("NR singular retry", () => {
           };
         }
         if (prop === "lastFactorUsedReorder") {
-          // Simulate reorder path failure: lastFactorUsedReorder === true so
-          // the NR loop does NOT enter the continue-based recovery path.
           return true;
         }
         const val = (target as unknown as Record<string | symbol, unknown>)[prop];
@@ -634,20 +527,16 @@ describe("NR singular retry", () => {
     const r = makeResistor(1, 2, 1000);
     const d = makeDiode(2, 0, 1e-14, 1);
     const elements = [vs, r, d];
-    allocateStatePool(elements);
+    const pool = allocateStatePool(elements);
 
-    const result = newtonRaphson({
-      solver: proxySolver,
-      elements,
-      matrixSize: 3,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-    });
+    const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    ctx.diagnostics = diagnostics;
+    ctx.solver = proxySolver;
 
-    expect(result.converged).toBe(false);
+    newtonRaphson(ctx);
+
+    expect(ctx.nrResult.converged).toBe(false);
     const diags = diagnostics.getDiagnostics();
     expect(diags.some(d => d.code === "singular-matrix")).toBe(true);
   });
@@ -660,21 +549,25 @@ describe("NR singular retry", () => {
 describe("NR NISHOULDREORDER lifecycle", () => {
   it("forceReorder_called_on_initJct_to_initFix", () => {
     // Run NR with dcopModeLadder starting in initJct mode.
-    // The STEP J initJct branch (niiter.c:856-858) first sets initMode to "initFix"
-    // then calls solver.forceReorder(). Verify by intercepting forceReorder() and
-    // asserting it is called during the initJct pass (pool.initMode === "initFix"
-    // immediately after the transition, before the next iteration begins).
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
-    allocateStatePool(elements);
+    // The STEP J initJct branch calls forceReorder() after transitioning to initFix.
+    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const r = makeResistor(1, 2, 1000);
+    const d = makeDiode(2, 0, 1e-14, 1);
+    const elements = [vs, r, d];
+    const pool = allocateStatePool(elements);
+
+    const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    ctx.diagnostics = new DiagnosticCollector();
 
     let forceReorderCalled = false;
-    const pool = { initMode: "initJct" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" };
+    const realSolver = ctx.solver;
+    const pool2 = { initMode: "initJct" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" };
 
-    const proxySolver = new Proxy(solver, {
+    const proxySolver = new Proxy(realSolver, {
       get(target, prop) {
         if (prop === "forceReorder") {
           return () => {
-            // NR sets initMode to "initFix" before calling forceReorder()
             forceReorderCalled = true;
             return (target as SparseSolver).forceReorder();
           };
@@ -685,40 +578,38 @@ describe("NR NISHOULDREORDER lifecycle", () => {
       },
     }) as SparseSolver;
 
-    newtonRaphson({
-      solver: proxySolver,
-      elements,
-      matrixSize,
-      maxIterations: 50,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-      dcopModeLadder: {
-        runPrimeJunctions(): void {},
-        pool,
-        onModeBegin(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number): void {},
-        onModeEnd(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number, _converged: boolean): void {},
-      },
-    });
+    ctx.solver = proxySolver;
+    ctx.dcopModeLadder = {
+      runPrimeJunctions(): void {},
+      pool: pool2,
+      onModeBegin(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number): void {},
+      onModeEnd(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number, _converged: boolean): void {},
+    };
 
-    // forceReorder() must have been called during the initJct→initFix transition
+    newtonRaphson(ctx);
+
     expect(forceReorderCalled).toBe(true);
-    // The transition also moved pool.initMode away from initJct
-    expect(pool.initMode).not.toBe("initJct");
+    expect(pool2.initMode).not.toBe("initJct");
   });
 
   it("forceReorder_called_on_initTran_first_iteration", () => {
     // Run NR with statePool.initMode = "initTran". On iteration 0, the STEP J
     // initTran branch calls forceReorder() when iteration <= 0.
-    // Use a synthetic statePool with initMode and state0 so the NR mode
-    // dispatcher reads it correctly.
-    const { solver, diagnostics, elements, matrixSize } = makeDiodeCircuit(5.0);
-    allocateStatePool(elements);
+    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const r = makeResistor(1, 2, 1000);
+    const d = makeDiode(2, 0, 1e-14, 1);
+    const elements = [vs, r, d];
+    const pool = allocateStatePool(elements);
+
+    const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    ctx.diagnostics = new DiagnosticCollector();
+    ctx.statePool!.initMode = "initTran";
 
     let forceReorderCallCount = 0;
+    const realSolver = ctx.solver;
 
-    const proxySolver = new Proxy(solver, {
+    const proxySolver = new Proxy(realSolver, {
       get(target, prop) {
         if (prop === "forceReorder") {
           return () => {
@@ -732,25 +623,10 @@ describe("NR NISHOULDREORDER lifecycle", () => {
       },
     }) as SparseSolver;
 
-    // statePool must provide initMode and state0 (read by NR code)
-    const syntheticPool = {
-      initMode: "initTran" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient",
-      state0: new Float64Array(64),
-    };
+    ctx.solver = proxySolver;
 
-    newtonRaphson({
-      solver: proxySolver,
-      elements,
-      matrixSize,
-      maxIterations: 50,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-      statePool: syntheticPool,
-    });
+    newtonRaphson(ctx);
 
-    // forceReorder() must have been called at least once (initTran branch, iteration <= 0)
     expect(forceReorderCallCount).toBeGreaterThanOrEqual(1);
   });
 });
@@ -763,14 +639,6 @@ describe("NR E_SINGULAR recovery via continue", () => {
   it("e_singular_recovers_via_continue", () => {
     // The E_SINGULAR recovery path must: call forceReorder(), then continue to
     // the top of the NR loop to re-execute CKTload (stampAll) before re-factoring.
-    // This matches ngspice niiter.c:888-891 behavior.
-    //
-    // Verification strategy: count beginAssembly calls vs factor() failure count.
-    // With `continue` semantics, after factor() fails on the numeric path,
-    // beginAssembly is called again (reload) before the next factor() attempt.
-    // So total beginAssembly calls > total successful factor() calls for the
-    // iteration that failed — i.e., stampAllCount > factorSuccessCount at
-    // the point of recovery.
     const diagnostics = new DiagnosticCollector();
 
     let forceReorderCalledAfterFailure = false;
@@ -778,7 +646,17 @@ describe("NR E_SINGULAR recovery via continue", () => {
     let beginAssemblyAfterFailure = 0;
     let singularIterationSeen = false;
 
-    const realSolver = new SparseSolver();
+    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const r = makeResistor(1, 2, 1000);
+    const d = makeDiode(2, 0, 1e-14, 1);
+    const elements = [vs, r, d];
+    const pool = allocateStatePool(elements);
+
+    const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    ctx.diagnostics = diagnostics;
+
+    const realSolver = ctx.solver;
 
     const proxySolver = new Proxy(realSolver, {
       get(target, prop) {
@@ -786,7 +664,6 @@ describe("NR E_SINGULAR recovery via continue", () => {
           return () => {
             factorCallCount++;
             if (factorCallCount === 2) {
-              // Simulate numerical-path failure (not reorder path)
               singularIterationSeen = true;
               return { success: false };
             }
@@ -794,7 +671,6 @@ describe("NR E_SINGULAR recovery via continue", () => {
           };
         }
         if (prop === "lastFactorUsedReorder") {
-          // The second factor call (count === 2) is the numeric-only failure.
           return factorCallCount === 2 ? false : (target as SparseSolver).lastFactorUsedReorder;
         }
         if (prop === "forceReorder") {
@@ -815,42 +691,17 @@ describe("NR E_SINGULAR recovery via continue", () => {
       },
     }) as SparseSolver;
 
-    const vs = makeVoltageSource(1, 0, 2, 5.0);
-    const r = makeResistor(1, 2, 1000);
-    const d = makeDiode(2, 0, 1e-14, 1);
-    const elements = [vs, r, d];
-    allocateStatePool(elements);
+    ctx.solver = proxySolver;
 
-    const result = newtonRaphson({
-      solver: proxySolver,
-      elements,
-      matrixSize: 3,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-    });
+    newtonRaphson(ctx);
 
-    // (a) Final solution must converge — circuit recovers after E_SINGULAR
-    expect(result.converged).toBe(true);
-    // (b) The failure was observed
+    expect(ctx.nrResult.converged).toBe(true);
     expect(singularIterationSeen).toBe(true);
-    // (c) forceReorder() was called after the failure
     expect(forceReorderCalledAfterFailure).toBe(true);
-    // (d) beginAssembly was called after the failure — confirms NR re-loaded
-    // before re-factoring (the `continue` semantics)
     expect(beginAssemblyAfterFailure).toBeGreaterThan(0);
   });
 
   it("e_singular_recovery_reloads_and_refactors", () => {
-    // Build a matrix that produces E_SINGULAR on the numeric-only path.
-    // After the NR loop completes:
-    //   (a) final solution must be correct (converged)
-    //   (b) forceReorder() was called
-    //   (c) beginAssembly was called after the failure (re-load happened before re-factor)
-    // This verifies the observable effect of the continue-based recovery without
-    // coupling to internal lastFactorUsedReorder state mid-loop.
     const diagnostics = new DiagnosticCollector();
 
     let forceReorderCalled = false;
@@ -858,7 +709,17 @@ describe("NR E_SINGULAR recovery via continue", () => {
     let beginAssemblyAfterFailure = 0;
     let singularSeen = false;
 
-    const realSolver = new SparseSolver();
+    const vs = makeVoltageSource(1, 0, 2, 5.0);
+    const r = makeResistor(1, 2, 1000);
+    const d = makeDiode(2, 0, 1e-14, 1);
+    const elements = [vs, r, d];
+    const pool = allocateStatePool(elements);
+
+    const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    ctx.diagnostics = diagnostics;
+
+    const realSolver = ctx.solver;
 
     const proxySolver = new Proxy(realSolver, {
       get(target, prop) {
@@ -893,26 +754,12 @@ describe("NR E_SINGULAR recovery via continue", () => {
       },
     }) as SparseSolver;
 
-    const vs = makeVoltageSource(1, 0, 2, 5.0);
-    const r = makeResistor(1, 2, 1000);
-    const d = makeDiode(2, 0, 1e-14, 1);
-    const elements = [vs, r, d];
-    allocateStatePool(elements);
+    ctx.solver = proxySolver;
 
-    const result = newtonRaphson({
-      solver: proxySolver,
-      elements,
-      matrixSize: 3,
-      maxIterations: 100,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
-      diagnostics,
-    });
+    newtonRaphson(ctx);
 
-    expect(result.converged).toBe(true);
+    expect(ctx.nrResult.converged).toBe(true);
     expect(forceReorderCalled).toBe(true);
-    // beginAssembly after failure > 0 confirms re-load happened before re-factor
     expect(beginAssemblyAfterFailure).toBeGreaterThan(0);
   });
 });

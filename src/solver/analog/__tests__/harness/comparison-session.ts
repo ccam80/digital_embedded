@@ -81,7 +81,7 @@ import type {
   AttemptQuery,
 } from "./types.js";
 import { DEFAULT_TOLERANCE } from "./types.js";
-import { computeIntegrationCoefficients } from "../../integration.js";
+import { computeNIcomCof } from "../../integration.js";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -2662,8 +2662,11 @@ export class ComparisonSession {
     // _deltaOld[1] = dt of the previous step (h1), _deltaOld[2] = h_{n-2}.
     const deltaOld: number[] = (ts as any)._deltaOld ?? [];
     const dt: number = deltaOld[0] > 0 ? deltaOld[0] : (ts.currentDt ?? 0);
-    const h1: number = deltaOld[1] > 0 ? deltaOld[1] : dt;
-    const { ag0, ag1 } = computeIntegrationCoefficients(dt, h1, order, rawMethod as any);
+    const agBuf = new Float64Array(8);
+    const scratchBuf = new Float64Array(49);
+    computeNIcomCof(dt, deltaOld, order, rawMethod as any, agBuf, scratchBuf);
+    const ag0 = agBuf[0];
+    const ag1 = agBuf[1];
     return {
       ours: { ag0, ag1, method, order },
       ngspice: { ag0: 0, ag1: 0, method: "backwardEuler", order: 1 },

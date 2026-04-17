@@ -177,3 +177,23 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
 - **Task groups verified**: 0.1 → PASSED
 - **Final tests**: 92/92 passing in sparse-solver.test.ts + newton-raphson.test.ts
 - **Date**: 2026-04-17
+
+## Task 1.1.2: Convert newtonRaphson to CKTCircuitContext
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/newton-raphson.ts, src/solver/analog/__tests__/newton-raphson.test.ts, src/solver/analog/ckt-context.ts, src/solver/analog/sparse-solver.ts
+- **Tests**: 30/30 passing
+- **Notes**: Deleted NROptions/NRResult interfaces; newtonRaphson(ctx) writes into ctx.nrResult. Fixed CKTCircuitContext.solver as getter/setter so assembler always uses current solver (needed for proxy-solver tests). Fixed sparse-solver _allocateWorkspace to skip re-allocation when n unchanged (zero-alloc compliance).
+
+## Task 1.1.3: Convert solveDcOperatingPoint to CKTCircuitContext
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/dc-operating-point.ts, src/solver/analog/__tests__/dc-operating-point.test.ts
+- **Tests**: 21/21 passing (within dc-operating-point.test.ts)
+- **Notes**: Deleted DcOpOptions/CKTopCallOptions/NrBase; solveDcOperatingPoint(ctx) writes into ctx.dcopResult. runNR() helper eliminates per-call ctx setup. Phase callbacks via ctx._onPhaseBegin/ctx._onPhaseEnd. dcopResult.nodeVoltages === ctx.dcopVoltages (same buffer, no extra allocation).
+
+
+## Recovery events
+- **2026-04-17**: batch-2 implementer agent a0403d75687d2f786 returned status=completed but neither complete-implementer.sh nor stop-for-clarification.sh ran. Counters unchanged (spawned=1, completed=0). Invoked mark-dead-implementer.sh to open a retry slot. Agent died mid-cascade after completing tasks 1.1.1 + 1.1.2 + 1.1.3 (per progress entries) but with 1.2.1/1.2.2/1.2.3 incomplete and ~30 caller test files still on the old solveDcOperatingPoint(opts) API.

@@ -11,24 +11,22 @@
  *   Level 3 — Failure: emit blame diagnostics
  *
  * Variable mapping (ngspice → ours):
- *   CKTdiagGmin      → diagonalGmin (NR option)
- *   CKTgmin          → params.gmin
- *   CKTgminFactor    → params.gminFactor (default 10, cktntask.c:103)
- *   CKTdcTrcvMaxIter → params.dcTrcvMaxIter (50)
- *   CKTdcMaxIter     → params.maxIterations (100)
- *   CKTrhsOld        → voltages
- *   CKTstate0        → statePool.state0
- *   OldRhsOld        → savedVoltages
- *   OldCKTstate0     → savedState0
+ *   CKTdiagGmin      → ctx.diagonalGmin (set before each NR call)
+ *   CKTgmin          → ctx.params.gmin
+ *   CKTgminFactor    → ctx.params.gminFactor (default 10, cktntask.c:103)
+ *   CKTdcTrcvMaxIter → ctx.dcTrcvMaxIter
+ *   CKTdcMaxIter     → ctx.maxIterations
+ *   CKTrhsOld        → ctx.dcopVoltages
+ *   CKTstate0        → ctx.statePool.state0
+ *   OldRhsOld        → ctx.dcopSavedVoltages
+ *   OldCKTstate0     → ctx.dcopSavedState0
  */
 
-import type { SparseSolver } from "./sparse-solver.js";
 import type { AnalogElement } from "./element.js";
 import type { DiagnosticCollector } from "./diagnostics.js";
-import type { SimulationParams, DcOpResult } from "../../core/analog-engine-interface.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import { newtonRaphson } from "./newton-raphson.js";
-import type { LimitingEvent } from "./newton-raphson.js";
+import type { CKTCircuitContext } from "./ckt-context.js";
 
 // Phase and outcome types re-exported from harness types for use in production code.
 // Defined inline here (string literals) to avoid a production→test dependency.
@@ -49,72 +47,10 @@ export type DcOpNRAttemptOutcome =
   | "finalFailure";
 
 // ---------------------------------------------------------------------------
-// DcOpOptions
+// InitMode — type alias for pool.initMode values
 // ---------------------------------------------------------------------------
 
-/**
- * Options for the DC operating point solver.
- */
-export interface DcOpOptions {
-  /** Shared sparse solver instance (pre-allocated). */
-  solver: SparseSolver;
-  /** All analog elements in the circuit. */
-  elements: readonly AnalogElement[];
-  /** Total MNA matrix size: nodeCount + branchCount. */
-  matrixSize: number;
-  /** Solver configuration (tolerances, gmin, maxIterations, dcTrcvMaxIter). */
-  params: SimulationParams;
-  /** Diagnostic collector for emitting convergence events. */
-  diagnostics: DiagnosticCollector;
-  /** Number of node-voltage rows (0..nodeCount-1) in the MNA solution vector. */
-  nodeCount: number;
-  /** Optional shared state pool for per-element operating-point state. */
-  statePool?: { state0: Float64Array; reset(): void; initMode?: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" } | null;
-  /** Optional post-NR-iteration hook for harness instrumentation. */
-  postIterationHook?: (
-    iteration: number,
-    voltages: Float64Array,
-    prevVoltages: Float64Array,
-    noncon: number,
-    globalConverged: boolean,
-    elemConverged: boolean,
-    limitingEvents: LimitingEvent[],
-    convergenceFailedElements: string[],
-  ) => void;
-  /** When true, NR collects all failing element indices. */
-  detailedConvergence?: boolean;
-  /** When non-null, elements push LimitingEvent objects here during NR. */
-  limitingCollector?: LimitingEvent[] | null;
-  /**
-   * Called before each NR solve attempt during the DC OP ladder.
-   * Harness uses this to begin a new NRAttempt with correct phase annotation.
-   * @param phase - Which convergence algorithm phase is starting
-   * @param phaseParameter - Gmin value (gmin phases) or source factor (src sweep)
-   */
-  onPhaseBegin?: (phase: DcOpNRPhase, phaseParameter?: number) => void;
-  /**
-   * Called after each NR solve attempt during the DC OP ladder.
-   * Harness uses this to finalize the NRAttempt with outcome.
-   * @param outcome - How the attempt ended
-   * @param converged - Whether NR converged in this attempt
-   */
-  onPhaseEnd?: (outcome: DcOpNRAttemptOutcome, converged: boolean) => void;
-  /**
-   * Nodeset constraints: map of MNA nodeId → target voltage.
-   * Enforced via 1e10 conductance stamp during initJct/initFix NR phases.
-   */
-  nodesets?: Map<number, number>;
-  /**
-   * Initial condition constraints: map of MNA nodeId → target voltage.
-   * Enforced via 1e10 conductance stamp on every NR iteration.
-   */
-  ics?: Map<number, number>;
-  /**
-   * Source stepping scale factor (ngspice srcFact). Applied to nodeset/IC
-   * target voltages during source stepping. Default: 1.0.
-   */
-  srcFact?: number;
-}
+type InitMode = "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -123,11 +59,7 @@ export interface DcOpOptions {
 /**
  * Scale all independent sources by factor.
  * Elements without setSourceScale are silently skipped.
- *
- * @param elements - Full element list
- * @param factor   - Scale factor in [0, 1]
  */
-// cktop.c:354 (source scaling helper)
 function scaleAllSources(elements: readonly AnalogElement[], factor: number): void {
   for (const el of elements) {
     if (el.setSourceScale) {
@@ -138,11 +70,7 @@ function scaleAllSources(elements: readonly AnalogElement[], factor: number): vo
 
 /**
  * Zero both the voltage vector and the state pool's state0 array.
- *
- * @param voltages   - MNA solution vector to zero
- * @param statePool  - Optional state pool (state0 zeroed when present)
  */
-// cktop.c:140-141 (CKTrhsOld zeroing before gmin stepping)
 function zeroState(
   voltages: Float64Array,
   statePool: { state0: Float64Array } | null | undefined,
@@ -155,13 +83,7 @@ function zeroState(
 
 /**
  * Copy current voltages and state0 into saved buffers.
- *
- * @param voltages    - Current MNA solution vector (source)
- * @param saved       - Destination buffer for voltages
- * @param statePool   - Optional state pool (state0 saved when present)
- * @param savedState  - Destination buffer for state0
  */
-// cktop.c:224-225 (OldRhsOld / OldCKTstate0 save)
 function saveSnapshot(
   voltages: Float64Array,
   saved: Float64Array,
@@ -176,13 +98,7 @@ function saveSnapshot(
 
 /**
  * Restore voltages and state0 from saved buffers.
- *
- * @param voltages    - Destination MNA solution vector
- * @param saved       - Source buffer for voltages
- * @param statePool   - Optional state pool (state0 restored when present)
- * @param savedState  - Source buffer for state0
  */
-// cktop.c:240-241 (OldRhsOld / OldCKTstate0 restore)
 function restoreSnapshot(
   voltages: Float64Array,
   saved: Float64Array,
@@ -196,53 +112,51 @@ function restoreSnapshot(
 }
 
 // ---------------------------------------------------------------------------
-// InitMode — type alias for pool.initMode values
+// StepResult — internal return type for stepping sub-solvers
 // ---------------------------------------------------------------------------
 
-/** Pool initMode values used throughout the DCOP flow. */
-type InitMode = "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient";
+interface StepResult {
+  converged: boolean;
+  iterations: number;
+  voltages: Float64Array;
+}
+
+type PhaseBeginFn = ((phase: DcOpNRPhase, phaseParameter?: number) => void) | undefined;
+type PhaseEndFn = ((outcome: DcOpNRAttemptOutcome, converged: boolean) => void) | undefined;
 
 // ---------------------------------------------------------------------------
-// CKTop options type used by the cktop() helper
+// runNR — configure ctx for a sub-solve and call newtonRaphson
 // ---------------------------------------------------------------------------
 
-interface CKTopCallOptions {
-  nrBase: {
-    solver: SparseSolver;
-    matrixSize: number;
-    nodeCount: number;
-    reltol: number;
-    abstol: number;
-    iabstol: number;
-    isDcOp: boolean;
-    diagnostics: DiagnosticCollector;
-    nodeDamping?: boolean;
-    statePool?: { state0: Float64Array; reset(): void; initMode?: string } | null;
-    postIterationHook?: (
-      iteration: number,
-      voltages: Float64Array,
-      prevVoltages: Float64Array,
-      noncon: number,
-      globalConverged: boolean,
-      elemConverged: boolean,
-      limitingEvents: LimitingEvent[],
-      convergenceFailedElements: string[],
-    ) => void;
-    detailedConvergence?: boolean;
-    limitingCollector?: LimitingEvent[] | null;
-    nodesets?: Map<number, number>;
-    ics?: Map<number, number>;
-    srcFact?: number;
-  };
-  params: import("../../core/analog-engine-interface.js").SimulationParams;
-  elements: readonly AnalogElement[];
-  /** Pre-existing voltage vector returned by noOpIter fast-path. */
-  voltages?: Float64Array;
-  ladder: {
-    runPrimeJunctions(): void;
-    pool: { initMode: string };
-    onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number): void;
-    onModeEnd(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number, converged: boolean): void;
+/**
+ * Configure ctx for a DC-OP sub-solve and run newtonRaphson.
+ *
+ * Sets isDcOp=true, maxIterations, initialGuess, diagonalGmin, and
+ * dcopModeLadder on ctx, then calls newtonRaphson(ctx).
+ *
+ * Returns a StepResult pointing to ctx.rhs (the solved voltage vector).
+ * Callers must copy ctx.rhs before the next runNR call if they want to
+ * preserve intermediate results.
+ */
+function runNR(
+  ctx: CKTCircuitContext,
+  maxIterations: number,
+  initialGuess: Float64Array,
+  diagonalGmin: number,
+  ladder: CKTCircuitContext["dcopModeLadder"],
+  exactMaxIterations?: boolean,
+): StepResult {
+  ctx.isDcOp = true;
+  ctx.maxIterations = maxIterations;
+  ctx.initialGuess = initialGuess;
+  ctx.diagonalGmin = diagonalGmin;
+  ctx.dcopModeLadder = ladder;
+  ctx.exactMaxIterations = exactMaxIterations ?? false;
+  newtonRaphson(ctx);
+  return {
+    converged: ctx.nrResult.converged,
+    iterations: ctx.nrResult.iterations,
+    voltages: ctx.nrResult.voltages,
   };
 }
 
@@ -253,40 +167,31 @@ interface CKTopCallOptions {
 /**
  * Run the direct-NR level of the DC-OP ladder (cktop.c:20-79).
  *
- * Spec §2.1 four-parameter form: firstMode sets pool.initMode at entry,
- * continueMode is reserved for future use (unused in current NR path).
- *
  * When params.noOpIter is true, returns immediately with converged=true
- * and zero iterations — returning the pre-existing voltage vector unchanged
- * (not zeros), matching the ngspice noOpIter fast-path.
- *
- * Variable mapping (ngspice → ours):
- *   CKTnoOpIter → params.noOpIter
- *   CKTdcMaxIter → maxIter
+ * and zero iterations — returning the pre-existing voltage vector unchanged,
+ * matching the ngspice noOpIter fast-path.
  */
 function cktop(
-  opts: CKTopCallOptions,
+  ctx: CKTCircuitContext,
   firstMode: InitMode,
   _continueMode: InitMode,
   maxIter: number,
-): { converged: boolean; iterations: number; voltages: Float64Array } {
-  // Set pool.initMode to firstMode at entry (spec §2.1)
-  if (opts.ladder.pool) {
-    opts.ladder.pool.initMode = firstMode;
+  preExistingVoltages: Float64Array,
+  ladder: CKTCircuitContext["dcopModeLadder"],
+): StepResult {
+  if (ctx.statePool) {
+    ctx.statePool.initMode = firstMode;
+  } else if (ladder) {
+    ladder.pool.initMode = firstMode;
   }
-  if (opts.params.noOpIter) {
+  if (ctx.params.noOpIter) {
     return {
       converged: true,
       iterations: 0,
-      voltages: opts.voltages ?? new Float64Array(opts.nrBase.matrixSize),
+      voltages: preExistingVoltages,
     };
   }
-  return newtonRaphson({
-    ...opts.nrBase,
-    maxIterations: maxIter,
-    elements: opts.elements,
-    dcopModeLadder: opts.ladder,
-  });
+  return runNR(ctx, maxIter, preExistingVoltages, ctx.diagonalGmin, ladder);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,36 +201,21 @@ function cktop(
 /**
  * Finalize the DC operating point after convergence.
  *
- * Sets initMode to "initSmsig", performs one final load pass (NR with
- * exactMaxIterations=1 so the Jacobian and RHS are freshly stamped at the
- * converged operating point), then resets initMode to "transient" so
- * subsequent transient NR iterations do not see stale DC-OP mode state.
- *
- * Matches ngspice post-cktop sequence:
- *   CKTmode |= MODEINITSMSIG → CKTload() → CKTmode reset
- *
- * @param nrBase     - NR base options (solver, matrix, tolerances)
- * @param elements   - All analog elements
- * @param pool       - Mutable state pool (initMode written here)
- * @param voltages   - Converged voltage vector (used as initial guess)
+ * Sets initMode to "initSmsig", performs one final load pass with
+ * exactMaxIterations=1, then resets initMode to "transient".
  */
 function dcopFinalize(
-  nrBase: CKTopCallOptions["nrBase"],
-  elements: readonly AnalogElement[],
-  pool: { initMode: string } | null | undefined,
+  ctx: CKTCircuitContext,
   voltages: Float64Array,
 ): void {
+  const pool = ctx.statePool;
   if (pool) {
     pool.initMode = "initSmsig";
   }
-  newtonRaphson({
-    ...nrBase,
-    postIterationHook: undefined,
-    maxIterations: 1,
-    exactMaxIterations: true,
-    elements,
-    initialGuess: voltages,
-  });
+  const savedHook = ctx.postIterationHook;
+  ctx.postIterationHook = null;
+  runNR(ctx, 1, voltages, ctx.diagonalGmin, null, true);
+  ctx.postIterationHook = savedHook;
   if (pool) {
     pool.initMode = "transient";
   }
@@ -337,24 +227,6 @@ function dcopFinalize(
 
 /**
  * Compute per-node non-convergence diagnostics when the DC-OP fails.
- *
- * For each row i in the MNA solution vector, computes the convergence
- * tolerance and records nodes that failed to meet it. Node rows
- * (i < nodeCount) use voltTol; branch rows use abstol.
- *
- * Variable mapping (ngspice → ours):
- *   CKTreltol  → reltol
- *   CKTvoltTol → voltTol
- *   CKTabstol  → abstol
- *
- * @param voltages     - Current MNA solution vector
- * @param prevVoltages - Previous iteration voltage vector
- * @param reltol       - Relative convergence tolerance
- * @param voltTol      - Absolute voltage tolerance (node rows)
- * @param abstol       - Absolute current tolerance (branch rows)
- * @param nodeCount    - Number of node-voltage rows
- * @param matrixSize   - Total MNA matrix size (nodeCount + branchCount)
- * @returns Array of non-converged entries with node index, delta, and tolerance
  */
 export function cktncDump(
   voltages: Float64Array,
@@ -386,102 +258,64 @@ export function cktncDump(
  * Find the DC operating point of the circuit using the ngspice CKTop
  * three-level fallback stack (cktop.c:20-79).
  *
- * Returns a `DcOpResult` whose `method` field identifies which convergence
- * strategy succeeded (or 'direct' on failure).
+ * Writes results into ctx.dcopResult. Returns void.
  *
- * @param opts - Solver configuration and circuit description
- * @returns DC operating point result with node voltages and convergence metadata
+ * @param ctx - Circuit context holding all solver state, buffers, and options
  */
-export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
-  const { solver, elements, matrixSize, params, diagnostics, nodeCount, statePool, postIterationHook, detailedConvergence, limitingCollector, onPhaseBegin, onPhaseEnd, nodesets, ics, srcFact } = opts;
+export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
+  const { elements, matrixSize, statePool, params } = ctx;
+  const diagnostics = ctx.diagnostics as DiagnosticCollector;
 
-  const nrBase = {
-    solver,
-    matrixSize,
-    nodeCount,
-    reltol: params.reltol,
-    abstol: params.voltTol,
-    iabstol: params.abstol,
-    isDcOp: true,
-    diagnostics,
-    nodeDamping: params.nodeDamping ?? false,
-    statePool: statePool ?? null,
-    postIterationHook,
-    detailedConvergence,
-    limitingCollector,
-    nodesets,
-    ics,
-    srcFact,
-  };
+  ctx.dcopResult.reset();
 
-  // -------------------------------------------------------------------------
-  // Level 0 — Direct NR with mode ladder (niiter.c:609-1010)
-  //
-  // One NR call, one iteration budget. Mode transitions happen between
-  // iterations inside the NR loop via dcopModeLadder:
-  //   iter 0: initMode="initJct", runPrimeJunctions() fires before iter 0
-  //   after iter 0: unconditional → "initFix"  (niiter.c:991-993)
-  //   iter N in initFix: → "initFloat" only if noncon===0 (niiter.c:994-997)
-  //   convergence restricted to initMode==="initFloat" (niiter.c:986-989)
-  //
-  // When no pool is present (pure linear or no nonlinear elements),
-  // a minimal ladder is attached to still run primeJunctions, with
-  // no-op phase callbacks.
-  // -------------------------------------------------------------------------
+  const onPhaseBegin = ctx._onPhaseBegin as PhaseBeginFn;
+  const onPhaseEnd = ctx._onPhaseEnd as PhaseEndFn;
 
   // -------------------------------------------------------------------------
   // Build the mode ladder. Always emits the correct phase sequence:
   //   dcopInitJct begin → (per iter: initJct→initFix→initFloat) → end
-  //
-  // For linear circuits (no nonlinear elements), the ladder is still used to
-  // emit the correct harness phase sequence (initJct/initFix/initFloat begin/end)
-  // even though primeJunctions is a no-op. This matches ngspice which runs
-  // MODEINITJCT/MODEINITFIX/MODEINITFLOAT transitions unconditionally.
   // -------------------------------------------------------------------------
-  const hasNonlinear = elements.some(el => el.isNonlinear);
   const pool = statePool ?? null;
 
-  // Emit initial dcopInitJct phase begin before the NR call (niiter.c: entry mode).
   onPhaseBegin?.("dcopInitJct");
 
-  // Ladder drives pool.initMode transitions and emits per-iteration phase labels.
-  // Always constructed (non-null) so the NR loop always runs the mode ladder.
   const ladder = {
     runPrimeJunctions(): void {
-      // MODEINITJCT: prime each nonlinear element's junction voltages.
-      // niiter.c:991-993 fires before iter 0. No-op for linear circuits.
       for (const el of elements) {
         if (el.isNonlinear && el.primeJunctions) {
           el.primeJunctions();
         }
       }
     },
-    pool: pool ?? { initMode: "initJct" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" },
+    pool: pool ?? { initMode: "initJct" as InitMode },
     onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iteration: number): void {
       onPhaseBegin?.(phase);
     },
     onModeEnd(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iteration: number, converged: boolean): void {
-      // Terminal convergence on initFloat → accepted; transitions → dcopPhaseHandoff.
       const isTerminal = phase === "dcopInitFloat" && converged;
       onPhaseEnd?.(isTerminal ? "dcopSubSolveConverged" : "dcopPhaseHandoff", converged);
     },
   };
 
+  // Use dcopVoltages as the working buffer for this solve (zero it first)
+  const voltages = ctx.dcopVoltages;
+  voltages.fill(0);
+
   const directResult = cktop(
-    { nrBase, params, elements, voltages: new Float64Array(matrixSize), ladder },
+    ctx,
     "initJct",
     "initFloat",
     params.maxIterations,
+    voltages,
+    ladder,
   );
-  // Per-iteration phase labels emitted by ladder's onModeEnd/onModeBegin.
-  // When NR exhausts maxIterations without converging, the last onModeEnd
-  // already fired "dcopPhaseHandoff"; emit the overall failure label.
   if (!directResult.converged) {
     onPhaseEnd?.("nrFailedRetry", false);
   }
 
   if (directResult.converged) {
-    dcopFinalize(nrBase, elements, pool, directResult.voltages);
+    voltages.set(directResult.voltages);
+    dcopFinalize(ctx, voltages);
     diagnostics.emit(
       makeDiagnostic(
         "dc-op-converged",
@@ -490,13 +324,12 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
         { explanation: "Newton-Raphson converged without any convergence aids." },
       ),
     );
-    return {
-      converged: true,
-      method: "direct",
-      iterations: directResult.iterations,
-      nodeVoltages: directResult.voltages,
-      diagnostics: diagnostics.getDiagnostics(),
-    };
+    ctx.dcopResult.converged = true;
+    ctx.dcopResult.method = "direct";
+    ctx.dcopResult.iterations = directResult.iterations;
+    ctx.dcopResult.nodeVoltages.set(voltages);
+    ctx.dcopResult.diagnostics = diagnostics.getDiagnostics();
+    return;
   }
 
   let totalIterations = directResult.iterations;
@@ -507,14 +340,15 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   const numGminSteps = params.numGminSteps ?? 1;
   let gminResult: StepResult;
   if (numGminSteps <= 1) {
-    gminResult = dynamicGmin(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
+    gminResult = dynamicGmin(ctx, onPhaseBegin, onPhaseEnd);
   } else {
-    gminResult = spice3Gmin(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
+    gminResult = spice3Gmin(ctx, onPhaseBegin, onPhaseEnd);
   }
   totalIterations += gminResult.iterations;
 
   if (gminResult.converged) {
-    dcopFinalize(nrBase, elements, pool, gminResult.voltages);
+    voltages.set(gminResult.voltages);
+    dcopFinalize(ctx, voltages);
     const gminMethod = numGminSteps <= 1 ? "dynamic-gmin" : "spice3-gmin";
     const gminLabel = numGminSteps <= 1 ? "dynamic Gmin stepping" : "spice3 Gmin stepping";
     const gminExplanation = numGminSteps <= 1
@@ -528,13 +362,12 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
         { explanation: gminExplanation },
       ),
     );
-    return {
-      converged: true,
-      method: gminMethod,
-      iterations: totalIterations,
-      nodeVoltages: gminResult.voltages,
-      diagnostics: diagnostics.getDiagnostics(),
-    };
+    ctx.dcopResult.converged = true;
+    ctx.dcopResult.method = gminMethod;
+    ctx.dcopResult.iterations = totalIterations;
+    ctx.dcopResult.nodeVoltages.set(voltages);
+    ctx.dcopResult.diagnostics = diagnostics.getDiagnostics();
+    return;
   }
 
   // -------------------------------------------------------------------------
@@ -543,14 +376,15 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
   const numSrcSteps = params.numSrcSteps ?? 1;
   let srcResult: StepResult;
   if (numSrcSteps <= 1) {
-    srcResult = gillespieSrc(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
+    srcResult = gillespieSrc(ctx, onPhaseBegin, onPhaseEnd);
   } else {
-    srcResult = spice3Src(nrBase, elements, params, diagnostics, statePool, matrixSize, onPhaseBegin, onPhaseEnd);
+    srcResult = spice3Src(ctx, onPhaseBegin, onPhaseEnd);
   }
   totalIterations += srcResult.iterations;
 
   if (srcResult.converged) {
-    dcopFinalize(nrBase, elements, pool, srcResult.voltages);
+    voltages.set(srcResult.voltages);
+    dcopFinalize(ctx, voltages);
     const srcMethod = numSrcSteps <= 1 ? "gillespie-src" : "spice3-src";
     const srcLabel = numSrcSteps <= 1 ? "Gillespie source stepping" : "spice3 source stepping";
     const srcExplanation = numSrcSteps <= 1
@@ -564,27 +398,24 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
         { explanation: srcExplanation },
       ),
     );
-    return {
-      converged: true,
-      method: srcMethod,
-      iterations: totalIterations,
-      nodeVoltages: srcResult.voltages,
-      diagnostics: diagnostics.getDiagnostics(),
-    };
+    ctx.dcopResult.converged = true;
+    ctx.dcopResult.method = srcMethod;
+    ctx.dcopResult.iterations = totalIterations;
+    ctx.dcopResult.nodeVoltages.set(voltages);
+    ctx.dcopResult.diagnostics = diagnostics.getDiagnostics();
+    return;
   }
 
   // -------------------------------------------------------------------------
   // Level 5 — Failure with blame attribution (cktop.c:546+)
   // -------------------------------------------------------------------------
-  // Use actual voltage vectors from the last NR attempts for diagnostics.
-  // srcResult.voltages and directResult.voltages hold the last NR solutions.
   const ncNodes = cktncDump(
     srcResult.voltages,
     directResult.voltages,
     params.reltol,
     params.voltTol,
     params.abstol,
-    nodeCount,
+    ctx.nodeCount,
     matrixSize,
   );
   const ncSummary = ncNodes.length > 0
@@ -604,39 +435,12 @@ export function solveDcOperatingPoint(opts: DcOpOptions): DcOpResult {
     ),
   );
 
-  return {
-    converged: false,
-    method: "direct",
-    iterations: totalIterations,
-    nodeVoltages: new Float64Array(matrixSize),
-    diagnostics: diagnostics.getDiagnostics(),
-  };
+  ctx.dcopResult.converged = false;
+  ctx.dcopResult.method = "direct";
+  ctx.dcopResult.iterations = totalIterations;
+  ctx.dcopResult.nodeVoltages.fill(0);
+  ctx.dcopResult.diagnostics = diagnostics.getDiagnostics();
 }
-
-// ---------------------------------------------------------------------------
-// Internal types
-// ---------------------------------------------------------------------------
-
-interface StepResult {
-  converged: boolean;
-  iterations: number;
-  voltages: Float64Array;
-}
-
-/** Shared NR base options (without maxIterations or elements). */
-interface NrBase {
-  solver: SparseSolver;
-  matrixSize: number;
-  nodeCount: number;
-  reltol: number;
-  abstol: number;
-  iabstol: number;
-  isDcOp: boolean;
-  diagnostics: DiagnosticCollector;
-}
-
-type PhaseBeginFn = ((phase: DcOpNRPhase, phaseParameter?: number) => void) | undefined;
-type PhaseEndFn = ((outcome: DcOpNRAttemptOutcome, converged: boolean) => void) | undefined;
 
 // ---------------------------------------------------------------------------
 // dynamicGmin — cktop.c:127-258
@@ -646,49 +450,36 @@ type PhaseEndFn = ((outcome: DcOpNRAttemptOutcome, converged: boolean) => void) 
  * Dynamic Gmin stepping (cktop.c:127-258).
  *
  * Adds a diagonal conductance (diagGmin) to all MNA nodes, converges,
- * then adaptively reduces diagGmin toward params.gmin. Factor adapts based
- * on how many NR iterations the previous sub-solve needed.
+ * then adaptively reduces diagGmin toward params.gmin.
  */
 function dynamicGmin(
-  nrBase: NrBase,
-  elements: readonly AnalogElement[],
-  params: SimulationParams,
-  _diagnostics: DiagnosticCollector,
-  statePool: { state0: Float64Array; reset(): void; initMode?: InitMode } | null | undefined,
-  matrixSize: number,
+  ctx: CKTCircuitContext,
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
 ): StepResult {
-  // cktop.c:140-141: zero CKTrhsOld and CKTstate0 before stepping
-  const voltages = new Float64Array(matrixSize);
+  const { elements, statePool, params } = ctx;
+  const matrixSize = ctx.matrixSize;
+
+  // Use ctx.dcopVoltages as the working buffer
+  const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
   if (statePool) {
     statePool.initMode = "initJct";
   }
 
-  const savedVoltages = new Float64Array(matrixSize);
-  const savedState0 = statePool ? new Float64Array(statePool.state0.length) : new Float64Array(0);
+  // Use ctx.dcopSavedVoltages and ctx.dcopSavedState0 for snapshots
+  const savedVoltages = ctx.dcopSavedVoltages;
+  const savedState0 = ctx.dcopSavedState0;
 
-  // cktop.c:148-151: initial parameters
-  // CKTgminFactor = 10 (cktntask.c:103)
   let factor = params.gminFactor ?? 10;
-  // cktop.c:155-157: OldGmin = 1e-2, CKTdiagGmin = OldGmin (first sub-solve sees 1e-2)
   let oldGmin = 1e-2;
-  let diagGmin = oldGmin; // ngspice starts first sub-solve at 1e-2, divides after success
-  const gtarget = Math.max(params.gmin, params.gshunt ?? 0); // cktop.c:148-157: gtarget = MAX(CKTgmin, CKTgshunt)
+  let diagGmin = oldGmin;
+  const gtarget = Math.max(params.gmin, params.gshunt ?? 0);
   let totalIter = 0;
 
-  // cktop.c:154-258: main gmin stepping loop
   while (true) {
-    // cktop.c:161: solve with current diagGmin
     onPhaseBegin?.("dcopGminDynamic", diagGmin);
-    const result = newtonRaphson({
-      ...nrBase,
-      maxIterations: params.dcTrcvMaxIter,
-      elements,
-      initialGuess: voltages,
-      diagonalGmin: diagGmin,
-    });
+    const result = runNR(ctx, params.dcTrcvMaxIter, voltages, diagGmin, null);
     totalIter += result.iterations;
     voltages.set(result.voltages);
 
@@ -697,74 +488,51 @@ function dynamicGmin(
       if (statePool) {
         statePool.initMode = "initFloat";
       }
-      // cktop.c:168-169: check if we've reached target
       if (diagGmin <= gtarget) {
-        // cktop.c:170: success — do final clean solve
         break;
       }
 
-      // cktop.c:172-196: save state, adapt factor based on iteration count
       saveSnapshot(voltages, savedVoltages, statePool, savedState0);
 
       const iterLo = (params.dcTrcvMaxIter / 4) | 0;
       const iterHi = ((3 * params.dcTrcvMaxIter / 4) | 0);
 
-      // cktop.c:177-188: factor adaptation
       if (result.iterations <= iterLo) {
-        // Easy convergence — accelerate stepping
-        // cktop.c:179: factor = factor * sqrt(factor), cap at 10
         factor = Math.min(factor * Math.sqrt(factor), 10);
       } else if (result.iterations > iterHi) {
-        // Hard convergence — slow down
-        // cktop.c:185: factor = sqrt(factor)
         factor = Math.sqrt(factor);
       }
-      // iterLo < iters <= iterHi: keep factor unchanged
 
-      // cktop.c:224-225: track OldGmin before stepping
       oldGmin = diagGmin;
 
-      // cktop.c:190-196: step diagGmin down
-      // Overshoot check: if diagGmin/factor < gtarget, land exactly on gtarget
       if (diagGmin < factor * gtarget) {
-        // cktop.c:192: landing on target gmin, adjust factor
         factor = diagGmin / gtarget;
         diagGmin = gtarget;
       } else {
         diagGmin /= factor;
       }
     } else {
-      // cktop.c:206-240: NR failed
       onPhaseEnd?.("nrFailedRetry", false);
-      // cktop.c:208: factor < 1.00005 → give up
       if (factor < 1.00005) {
-        return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
+        return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
       }
-      // cktop.c:214: reduce factor, backtrack from oldGmin
       factor = Math.sqrt(Math.sqrt(factor));
       diagGmin = oldGmin / factor;
-      // cktop.c:240: restore saved state
       restoreSnapshot(voltages, savedVoltages, statePool, savedState0);
     }
   }
 
-  // cktop.c:253-258: final clean solve with gshunt diagonal (ngspice uses dcTrcvMaxIter here)
+  // Final clean solve with gshunt diagonal
   onPhaseBegin?.("dcopGminDynamic", 0);
-  const cleanResult = newtonRaphson({
-    ...nrBase,
-    maxIterations: params.dcTrcvMaxIter,
-    elements,
-    initialGuess: voltages,
-    diagonalGmin: params.gshunt ?? 0,
-  });
+  const cleanResult = runNR(ctx, params.dcTrcvMaxIter, voltages, params.gshunt ?? 0, null);
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
 
   if (cleanResult.converged) {
-    return { converged: true, iterations: totalIter, voltages: cleanResult.voltages };
+    voltages.set(cleanResult.voltages);
+    return { converged: true, iterations: totalIter, voltages };
   }
-  // cktop.c:258: if clean solve fails, gmin stepping failed
-  return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
+  return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
 }
 
 // ---------------------------------------------------------------------------
@@ -774,31 +542,17 @@ function dynamicGmin(
 /**
  * spice3 Gmin stepping (cktop.c:273-341).
  *
- * Starts with diagGmin = params.gmin * 1e10, then ramps it down by a factor
- * of 10 per step, for 11 steps (i = 0..10). Unlike dynamicGmin, there is no
- * backtracking: a single NR failure at any step aborts the whole algorithm.
- * After all ramp steps succeed, a final clean solve with no diagonal gmin is
- * attempted.
- *
- * Variable mapping (ngspice → ours):
- *   CKTgmin        → params.gmin
- *   diagGmin       → diagGmin (local)
- *   CKTdiagGmin    → diagonalGmin (NR option)
- *   CKTdcTrcvMaxIter → params.dcTrcvMaxIter
- *   CKTdcMaxIter   → params.maxIterations
+ * Starts with diagGmin = params.gmin * gminFactor^numGminSteps, then ramps
+ * it down by gminFactor per step, for numGminSteps+1 steps. No backtracking.
  */
 function spice3Gmin(
-  nrBase: NrBase,
-  elements: readonly AnalogElement[],
-  params: SimulationParams,
-  _diagnostics: DiagnosticCollector,
-  statePool: { state0: Float64Array; reset(): void; initMode?: InitMode } | null | undefined,
-  matrixSize: number,
+  ctx: CKTCircuitContext,
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
 ): StepResult {
-  // cktop.c:281: zero state before stepping
-  const voltages = new Float64Array(matrixSize);
+  const { statePool, params } = ctx;
+
+  const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
   if (statePool) {
     statePool.initMode = "initJct";
@@ -813,22 +567,14 @@ function spice3Gmin(
     diagGmin *= gminFactor;
   }
 
-  // cktop.c:285-319: ramp loop — numGminSteps+1 steps (i = 0..numGminSteps)
   for (let i = 0; i <= numGminSteps; i++) {
     onPhaseBegin?.("dcopGminSpice3", diagGmin);
-    const result = newtonRaphson({
-      ...nrBase,
-      maxIterations: params.dcTrcvMaxIter,
-      elements,
-      initialGuess: voltages,
-      diagonalGmin: diagGmin,
-    });
+    const result = runNR(ctx, params.dcTrcvMaxIter, voltages, diagGmin, null);
     totalIter += result.iterations;
 
     if (!result.converged) {
-      // cktop.c:301: no backtracking — abort immediately
       onPhaseEnd?.("nrFailedRetry", false);
-      return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
+      return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
     }
 
     onPhaseEnd?.("dcopSubSolveConverged", true);
@@ -836,26 +582,20 @@ function spice3Gmin(
       statePool.initMode = "initFloat";
     }
     voltages.set(result.voltages);
-    // cktop.c:313: step down by gminFactor
     diagGmin /= gminFactor;
   }
 
-  // cktop.c:323-341: final clean solve with gshunt diagonal (ngspice uses dcTrcvMaxIter here)
+  // Final clean solve with gshunt diagonal
   onPhaseBegin?.("dcopGminSpice3", 0);
-  const cleanResult = newtonRaphson({
-    ...nrBase,
-    maxIterations: params.dcTrcvMaxIter,
-    elements,
-    initialGuess: voltages,
-    diagonalGmin: params.gshunt ?? 0,
-  });
+  const cleanResult = runNR(ctx, params.dcTrcvMaxIter, voltages, params.gshunt ?? 0, null);
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
 
   if (cleanResult.converged) {
-    return { converged: true, iterations: totalIter, voltages: cleanResult.voltages };
+    voltages.set(cleanResult.voltages);
+    return { converged: true, iterations: totalIter, voltages };
   }
-  return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
+  return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
 }
 
 // ---------------------------------------------------------------------------
@@ -867,16 +607,13 @@ function spice3Gmin(
  * Uniform linear source ramp with no backtracking.
  */
 function spice3Src(
-  nrBase: NrBase,
-  elements: readonly AnalogElement[],
-  params: SimulationParams,
-  _diagnostics: DiagnosticCollector,
-  statePool: { state0: Float64Array; reset(): void; initMode?: InitMode } | null | undefined,
-  matrixSize: number,
+  ctx: CKTCircuitContext,
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
 ): StepResult {
-  const voltages = new Float64Array(matrixSize);
+  const { elements, statePool, params } = ctx;
+
+  const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
   if (statePool) {
     statePool.initMode = "initJct";
@@ -884,22 +621,16 @@ function spice3Src(
   let totalIter = 0;
   const numSrcSteps = params.numSrcSteps ?? 1;
 
-  // cktop.c:590-620: uniform ramp i=0..numSrcSteps
   for (let i = 0; i <= numSrcSteps; i++) {
     const srcFact = i / numSrcSteps;
     scaleAllSources(elements, srcFact);
     onPhaseBegin?.("dcopSrcSweep", srcFact);
-    const result = newtonRaphson({
-      ...nrBase,
-      maxIterations: params.dcTrcvMaxIter,
-      elements,
-      initialGuess: voltages,
-    });
+    const result = runNR(ctx, params.dcTrcvMaxIter, voltages, 0, null);
     totalIter += result.iterations;
     if (!result.converged) {
       onPhaseEnd?.("nrFailedRetry", false);
       scaleAllSources(elements, 1);
-      return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
+      return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
     }
     onPhaseEnd?.("dcopSubSolveConverged", true);
     if (statePool) {
@@ -910,21 +641,17 @@ function spice3Src(
 
   scaleAllSources(elements, 1);
 
-  // Final clean solve (ngspice uses dcTrcvMaxIter, gshunt diagonal)
+  // Final clean solve
   onPhaseBegin?.("dcopSrcSweep", 1);
-  const cleanResult = newtonRaphson({
-    ...nrBase,
-    maxIterations: params.dcTrcvMaxIter,
-    elements,
-    initialGuess: voltages,
-    diagonalGmin: params.gshunt ?? 0,
-  });
+  const cleanResult = runNR(ctx, params.dcTrcvMaxIter, voltages, params.gshunt ?? 0, null);
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
 
-  return cleanResult.converged
-    ? { converged: true, iterations: totalIter, voltages: cleanResult.voltages }
-    : { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
+  if (cleanResult.converged) {
+    voltages.set(cleanResult.voltages);
+    return { converged: true, iterations: totalIter, voltages };
+  }
+  return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
 }
 
 // ---------------------------------------------------------------------------
@@ -938,54 +665,38 @@ function spice3Src(
  * solution as the initial guess for the next step.
  */
 function gillespieSrc(
-  nrBase: NrBase,
-  elements: readonly AnalogElement[],
-  params: SimulationParams,
-  _diagnostics: DiagnosticCollector,
-  statePool: { state0: Float64Array; reset(): void; initMode?: InitMode } | null | undefined,
-  matrixSize: number,
+  ctx: CKTCircuitContext,
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
 ): StepResult {
-  // cktop.c:362-363: zero state and scale sources to 0
-  const voltages = new Float64Array(matrixSize);
+  const { elements, statePool, params } = ctx;
+
+  const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
   if (statePool) {
     statePool.initMode = "initJct";
   }
   scaleAllSources(elements, 0);
 
-  const savedVoltages = new Float64Array(matrixSize);
-  const savedState0 = statePool ? new Float64Array(statePool.state0.length) : new Float64Array(0);
+  const savedVoltages = ctx.dcopSavedVoltages;
+  const savedState0 = ctx.dcopSavedState0;
 
   let totalIter = 0;
 
   // cktop.c:370-385: zero-source NR solve
   onPhaseBegin?.("dcopSrcSweep", 0);
-  const zeroResult = newtonRaphson({
-    ...nrBase,
-    maxIterations: params.dcTrcvMaxIter,
-    elements,
-    initialGuess: voltages,
-  });
+  const zeroResult = runNR(ctx, params.dcTrcvMaxIter, voltages, 0, null);
   totalIter += zeroResult.iterations;
   voltages.set(zeroResult.voltages);
 
   if (!zeroResult.converged) {
     onPhaseEnd?.("nrFailedRetry", false);
     // cktop.c:386-418: gmin bootstrap for zero-source circuit
-    // Apply gmin bootstrap: diagGmin = gmin * 1e10, step down 10 decades
     let diagGmin = params.gmin * 1e10;
     let bootstrapConverged = false;
     for (let decade = 0; decade <= 10; decade++) {
       onPhaseBegin?.("dcopSrcSweep", 0);
-      const bResult = newtonRaphson({
-        ...nrBase,
-        maxIterations: params.dcTrcvMaxIter,
-        elements,
-        initialGuess: voltages,
-        diagonalGmin: diagGmin,
-      });
+      const bResult = runNR(ctx, params.dcTrcvMaxIter, voltages, diagGmin, null);
       totalIter += bResult.iterations;
       voltages.set(bResult.voltages);
       if (!bResult.converged) {
@@ -1003,7 +714,7 @@ function gillespieSrc(
     }
     if (!bootstrapConverged) {
       scaleAllSources(elements, 1);
-      return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
+      return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
     }
   } else {
     onPhaseEnd?.("dcopSubSolveConverged", true);
@@ -1013,25 +724,18 @@ function gillespieSrc(
   }
 
   // cktop.c:420-424: initialise stepping parameters
-  // raise = 0.001 (initial step size)
   let raise = 0.001;
-  let convFact = 0; // last converged source factor
-  let srcFact = raise; // current source factor to attempt
+  let convFact = 0;
+  let srcFact = raise;
 
-  // cktop.c:428-538: main source stepping loop
   const srcIterLo = (params.dcTrcvMaxIter / 4) | 0;
   const srcIterHi = ((3 * params.dcTrcvMaxIter / 4) | 0);
 
+  // cktop.c:428-538: main source stepping loop
   while (raise >= 1e-7 && convFact < 1) {
-    // cktop.c:436: scale sources and solve
     scaleAllSources(elements, srcFact);
     onPhaseBegin?.("dcopSrcSweep", srcFact);
-    const stepResult = newtonRaphson({
-      ...nrBase,
-      maxIterations: params.dcTrcvMaxIter,
-      elements,
-      initialGuess: voltages,
-    });
+    const stepResult = runNR(ctx, params.dcTrcvMaxIter, voltages, 0, null);
     totalIter += stepResult.iterations;
 
     if (stepResult.converged) {
@@ -1039,56 +743,40 @@ function gillespieSrc(
       if (statePool) {
         statePool.initMode = "initFloat";
       }
-      // cktop.c:446-481: save state, adapt raise
       voltages.set(stepResult.voltages);
       saveSnapshot(voltages, savedVoltages, statePool, savedState0);
       convFact = srcFact;
 
-      // cktop.c:472: advance srcFact BEFORE raise adaptation
       srcFact = convFact + raise;
 
-      // cktop.c:456-469: factor adaptation based on iteration count
       if (stepResult.iterations <= srcIterLo) {
-        // Easy: accelerate
-        // cktop.c:458: raise *= 1.5
         raise *= 1.5;
       } else if (stepResult.iterations > srcIterHi) {
-        // Hard: slow down
-        // cktop.c:466: raise *= 0.5
         raise *= 0.5;
       }
-      // srcIterLo < iters <= srcIterHi: keep raise unchanged
     } else {
       onPhaseEnd?.("nrFailedRetry", false);
-      // cktop.c:483-530: NR failed
-      // cktop.c:485: if gap too small, give up
       if ((srcFact - convFact) < 1e-8) {
         break;
       }
-      // cktop.c:490: reduce raise, cap raise
       raise /= 10;
       if (raise > 0.01) {
         raise = 0.01;
       }
-      // cktop.c:525: restore last converged state
       restoreSnapshot(voltages, savedVoltages, statePool, savedState0);
-      // cktop.c:527: retry from convFact + raise
       srcFact = convFact + raise;
     }
 
-    // cktop.c:434: clamp srcFact to 1 at END of loop body
     if (srcFact > 1) {
       srcFact = 1;
     }
   }
 
-  // cktop.c:540: restore sources to full scale
   scaleAllSources(elements, 1);
 
-  // cktop.c:541-546: report result
   if (convFact >= 1) {
     return { converged: true, iterations: totalIter, voltages };
   }
 
-  return { converged: false, iterations: totalIter, voltages: new Float64Array(matrixSize) };
+  return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
 }

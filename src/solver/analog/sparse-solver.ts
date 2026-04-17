@@ -186,6 +186,8 @@ export class SparseSolver {
   private _hasPivotOrder: boolean = false;
   /** True when linked structure has never been built, or after invalidateTopology(). */
   private _structureEmpty: boolean = true;
+  /** Matrix size for which workspace arrays were last allocated. -1 = never. */
+  private _workspaceN: number = -1;
 
   /** True when the most recent factor() call dispatched to factorWithReorder. */
   lastFactorUsedReorder: boolean = false;
@@ -809,6 +811,8 @@ export class SparseSolver {
   private _allocateWorkspace(): void {
     const n = this._n;
     if (n === 0) return;
+    if (n === this._workspaceN) return;
+    this._workspaceN = n;
 
     this._x = new Float64Array(n);
     this._xNzIdx = new Int32Array(n);

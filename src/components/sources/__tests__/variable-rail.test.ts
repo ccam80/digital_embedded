@@ -4,10 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 import { makeVariableRailElement, VariableRailDefinition } from "../variable-rail.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
+import { runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { PropertyBag } from "../../../core/properties.js";
 
@@ -48,15 +45,10 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
 }
 
 function solveCircuit(elements: AnalogElement[], nodeCount: number, branchCount: number): Float64Array {
-  const solver = new SparseSolver();
-  const diag = new DiagnosticCollector();
-  const result = solveDcOperatingPoint({
-    solver,
+  const result = runDcOp({
     elements,
     matrixSize: nodeCount + branchCount,
     nodeCount,
-    params: DEFAULT_SIMULATION_PARAMS,
-    diagnostics: diag,
   });
   if (!result.converged) throw new Error("DC OP did not converge");
   return result.nodeVoltages;

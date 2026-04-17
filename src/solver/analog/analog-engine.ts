@@ -30,6 +30,7 @@ import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import type { DcOpNRPhase, DcOpNRAttemptOutcome } from "./dc-operating-point.js";
 import { newtonRaphson } from "./newton-raphson.js";
 import type { LimitingEvent } from "./newton-raphson.js";
+import { CKTCircuitContext } from "./ckt-context.js";
 import type { AnalogElement, PoolBackedAnalogElement } from "./element.js";
 import { isPoolBacked } from "./element.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledWithBridges } from "./compiled-analog-circuit.js";
@@ -91,20 +92,17 @@ export class MNAEngine implements AnalogEngine {
   private _voltages: Float64Array = new Float64Array(0);
   private _prevVoltages: Float64Array = new Float64Array(0);
 
-  // -------------------------------------------------------------------------
-  // Hoisted working buffers — allocated once in init() and reused every step.
-  //
-  // `_nrVoltages` and `_nrPrevVoltages`: per-iteration voltage arrays for
-  // the NR solver. Sized to `matrixSize`.
-  // -------------------------------------------------------------------------
-  private _nrVoltages: Float64Array = new Float64Array(0);
-  private _nrPrevVoltages: Float64Array = new Float64Array(0);
 
   // -------------------------------------------------------------------------
   // NIpred predictor state (ngspice: CKTagp[], CKTsols[])
   // -------------------------------------------------------------------------
   private _agp: Float64Array = new Float64Array(7);
   private _nodeVoltageHistory: NodeVoltageHistory = new NodeVoltageHistory();
+
+  // -------------------------------------------------------------------------
+  // CKTCircuitContext — pre-allocated god-object for NR/DC-OP hot paths
+  // -------------------------------------------------------------------------
+  private _ctx: CKTCircuitContext | null = null;
 
   // -------------------------------------------------------------------------
   // Compiled circuit reference
@@ -155,10 +153,6 @@ export class MNAEngine implements AnalogEngine {
     this._voltages = new Float64Array(matrixSize);
     this._prevVoltages = new Float64Array(matrixSize);
 
-    // Hoisted NR working buffers (see field declarations for rationale).
-    this._nrVoltages = new Float64Array(matrixSize);
-    this._nrPrevVoltages = new Float64Array(matrixSize);
-
     this._solver = new SparseSolver();
     this._timestep = new TimestepController(this._params);
     this._history = new HistoryStore(elements.length);
@@ -196,6 +190,25 @@ export class MNAEngine implements AnalogEngine {
     }
 
     this._firsttime = false;
+
+    // Construct CKTCircuitContext for NR and DC-OP call sites.
+    // Shares the same solver and elements as the rest of init().
+    this._ctx = new CKTCircuitContext(
+      {
+        nodeCount: compiled.nodeCount,
+        branchCount: compiled.branchCount,
+        matrixSize: compiled.matrixSize,
+        elements: compiled.elements,
+        statePool: cac.statePool ?? null,
+      },
+      this._params,
+      (t) => this._timestep.addBreakpoint(t),
+    );
+    // Wire ctx's solver to the same SparseSolver instance used by the engine.
+    this._ctx.solver = this._solver;
+    // Wire diagnostics
+    this._ctx.diagnostics = this._diagnostics;
+
     this._seedBreakpoints();
     this._transitionState(EngineState.STOPPED);
   }
@@ -234,8 +247,6 @@ export class MNAEngine implements AnalogEngine {
     this._compiled = null;
     this._voltages = new Float64Array(0);
     this._prevVoltages = new Float64Array(0);
-    this._nrVoltages = new Float64Array(0);
-    this._nrPrevVoltages = new Float64Array(0);
     this._history = new HistoryStore(0);
     this._diagnostics.clear();
     this._changeListeners = [];
@@ -422,33 +433,27 @@ export class MNAEngine implements AnalogEngine {
       }
 
       // --- NR solve (ngspice dctran.c:770 NIiter) ---
-      const nrResult = newtonRaphson({
-        solver: this._solver,
-        elements,
-        matrixSize,
-        nodeCount,
-        maxIterations: params.transientMaxIterations,
-        reltol: params.reltol,
-        abstol: params.voltTol,
-        iabstol: params.abstol,
-        initialGuess: this._voltages,
-        diagnostics: this._diagnostics,
-        voltagesBuffer: this._nrVoltages,
-        prevVoltagesBuffer: this._nrPrevVoltages,
-        enableBlameTracking: logging,
-        postIterationHook: this.postIterationHook ?? undefined,
-        detailedConvergence: this.detailedConvergence,
-        limitingCollector: this.limitingCollector,
-        statePool: statePool ?? null,
-        preIterationHook: (_iteration, iterVoltages) => {
-          const currentMethod = this._timestep.currentMethod;
-          for (const el of elements) {
-            if (el.isReactive && el.isNonlinear && el.stampCompanion) {
-              el.stampCompanion(dt, currentMethod, iterVoltages, this._timestep.currentOrder, this._timestep.deltaOld);
-            }
+      const ctx = this._ctx!;
+      ctx.maxIterations = params.transientMaxIterations;
+      ctx.initialGuess = this._voltages;
+      ctx.enableBlameTracking = logging;
+      ctx.postIterationHook = this.postIterationHook;
+      ctx.detailedConvergence = this.detailedConvergence;
+      ctx.limitingCollector = this.limitingCollector;
+      ctx.isDcOp = false;
+      ctx.dcopModeLadder = null;
+      ctx.exactMaxIterations = false;
+      ctx.onIteration0Complete = null;
+      ctx.preIterationHook = (_iteration, iterVoltages) => {
+        const currentMethod = this._timestep.currentMethod;
+        for (const el of elements) {
+          if (el.isReactive && el.isNonlinear && el.stampCompanion) {
+            el.stampCompanion(dt, currentMethod, iterVoltages, this._timestep.currentOrder, this._timestep.deltaOld);
           }
-        },
-      });
+        }
+      };
+      newtonRaphson(ctx);
+      const nrResult = ctx.nrResult;
 
       if (statePool) {
         statePool.initMode = "initPred";
@@ -745,7 +750,7 @@ export class MNAEngine implements AnalogEngine {
       };
     }
 
-    const { elements, matrixSize, nodeCount } = this._compiled;
+    const { elements } = this._compiled;
     this._diagnostics.clear();
 
     const cac = this._compiled as CompiledWithBridges;
@@ -759,23 +764,17 @@ export class MNAEngine implements AnalogEngine {
     }
 
     const phaseHook = this.stepPhaseHook;
-    const result = solveDcOperatingPoint({
-      solver: this._solver,
-      elements,
-      matrixSize,
-      nodeCount,
-      params: this._params,
-      diagnostics: this._diagnostics,
-      statePool: cac.statePool ?? null,
-      postIterationHook: this.postIterationHook ?? undefined,
-      detailedConvergence: this.detailedConvergence,
-      limitingCollector: this.limitingCollector,
-      onPhaseBegin: phaseHook ? (phase, param) => phaseHook.onAttemptBegin(phase, param ?? 0) : undefined,
-      onPhaseEnd: phaseHook ? (outcome, converged) => phaseHook.onAttemptEnd(outcome, converged) : undefined,
-      nodesets: cac.nodesets,
-      ics: cac.ics,
-      srcFact: this._params.srcFact,
-    });
+    const ctx = this._ctx!;
+    ctx.postIterationHook = this.postIterationHook;
+    ctx.detailedConvergence = this.detailedConvergence;
+    ctx.limitingCollector = this.limitingCollector;
+    ctx.nodesets = cac.nodesets ?? new Map();
+    ctx.ics = cac.ics ?? new Map();
+    ctx.srcFact = this._params.srcFact ?? 1;
+    ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
+    ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
+    solveDcOperatingPoint(ctx);
+    const result = ctx.dcopResult;
 
     if (this._convergenceLog.enabled) {
       const drainable = this.postIterationHook as unknown as { drainForLog?: () => NRAttemptRecord["iterationDetails"] };
@@ -837,7 +836,7 @@ export class MNAEngine implements AnalogEngine {
       };
     }
 
-    const { elements, matrixSize, nodeCount } = this._compiled;
+    const { elements } = this._compiled;
     this._diagnostics.clear();
 
     const cac = this._compiled as CompiledWithBridges;
@@ -850,26 +849,18 @@ export class MNAEngine implements AnalogEngine {
       }
     }
 
-    const tranOpParams = { ...this._params };
-
     const phaseHook = this.stepPhaseHook;
-    const result = solveDcOperatingPoint({
-      solver: this._solver,
-      elements,
-      matrixSize,
-      nodeCount,
-      params: tranOpParams,
-      diagnostics: this._diagnostics,
-      statePool: cac.statePool ?? null,
-      postIterationHook: this.postIterationHook ?? undefined,
-      detailedConvergence: this.detailedConvergence,
-      limitingCollector: this.limitingCollector,
-      onPhaseBegin: phaseHook ? (phase, param) => phaseHook.onAttemptBegin(phase, param ?? 0) : undefined,
-      onPhaseEnd: phaseHook ? (outcome, converged) => phaseHook.onAttemptEnd(outcome, converged) : undefined,
-      nodesets: cac.nodesets,
-      ics: cac.ics,
-      srcFact: this._params.srcFact,
-    });
+    const ctx = this._ctx!;
+    ctx.postIterationHook = this.postIterationHook;
+    ctx.detailedConvergence = this.detailedConvergence;
+    ctx.limitingCollector = this.limitingCollector;
+    ctx.nodesets = cac.nodesets ?? new Map();
+    ctx.ics = cac.ics ?? new Map();
+    ctx.srcFact = this._params.srcFact ?? 1;
+    ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
+    ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
+    solveDcOperatingPoint(ctx);
+    const result = ctx.dcopResult;
 
     if (result.converged) {
       this._seedFromDcop(result, elements, cac);

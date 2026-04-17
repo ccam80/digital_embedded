@@ -345,13 +345,18 @@ function solveGearVandermonde(
   deltaOld: readonly number[],
   order: number,
   ag: Float64Array,
+  scratch: Float64Array,
 ): void {
-  // Allocate (order+1) x (order+1) matrix, 1-indexed to match ngspice.
-  // We use 0-based arrays but shift indices by 1 when reading ngspice.
-  const n = order + 1; // 0..order
-  const mat: number[][] = [];
-  for (let i = 0; i < n; i++) {
-    mat.push(new Array<number>(n).fill(0));
+  // Use flat 7x7 scratch buffer (index as scratch[row * 7 + col]).
+  // Row and col are 0-based, matching ngspice's 1-based indices shifted down by 1.
+  const stride = 7;
+
+  // Zero the scratch region for this order.
+  const n = order + 1;
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      scratch[r * stride + c] = 0;
+    }
   }
 
   // Initialize RHS (ag). ngspice: bzero then ag[1] = -1/delta.
@@ -359,32 +364,32 @@ function solveGearVandermonde(
   ag[1] = -1 / dt;
 
   // Set up matrix columns. ngspice nicomcof.c:70-86.
-  // Column 0: mat[0][0]=1, mat[j][0]=0 for j>=1 (already zeroed).
-  for (let i = 0; i <= order; i++) mat[0][i] = 1;
-  for (let i = 1; i <= order; i++) mat[i][0] = 0;
+  // Column 0: scratch[0][0]=1, scratch[j][0]=0 for j>=1 (already zeroed).
+  for (let i = 0; i <= order; i++) scratch[0 * stride + i] = 1;
+  for (let i = 1; i <= order; i++) scratch[i * stride + 0] = 0;
 
-  // Columns 1..order: arg accumulates deltaOld[i-1], mat[j][i] = (arg/dt)^j.
+  // Columns 1..order: arg accumulates deltaOld[i-1], scratch[j][i] = (arg/dt)^j.
   let arg = 0;
   for (let i = 1; i <= order; i++) {
     arg += deltaOld[i - 1] > 0 ? deltaOld[i - 1] : dt;
     let arg1 = 1;
     for (let j = 1; j <= order; j++) {
       arg1 *= arg / dt;
-      mat[j][i] = arg1;
+      scratch[j * stride + i] = arg1;
     }
   }
 
   // LU decomposition, starting at i=1 (column 0 is trivial). nicomcof.c:95-102.
   for (let i = 1; i <= order; i++) {
     for (let j = i + 1; j <= order; j++) {
-      if (Math.abs(mat[i][i]) < 1e-300) {
+      if (Math.abs(scratch[i * stride + i]) < 1e-300) {
         ag[0] = 1 / dt; ag[1] = -1 / dt;
         for (let k = 2; k <= order; k++) ag[k] = 0;
         return;
       }
-      mat[j][i] /= mat[i][i];
+      scratch[j * stride + i] /= scratch[i * stride + i];
       for (let k = i + 1; k <= order; k++) {
-        mat[j][k] -= mat[j][i] * mat[i][k];
+        scratch[j * stride + k] -= scratch[j * stride + i] * scratch[i * stride + k];
       }
     }
   }
@@ -392,27 +397,27 @@ function solveGearVandermonde(
   // Forward substitution. nicomcof.c:104-108.
   for (let i = 1; i <= order; i++) {
     for (let j = i + 1; j <= order; j++) {
-      ag[j] = ag[j] - mat[j][i] * ag[i];
+      ag[j] = ag[j] - scratch[j * stride + i] * ag[i];
     }
   }
 
   // Backward substitution. nicomcof.c:110-116.
-  if (Math.abs(mat[order][order]) < 1e-300) {
+  if (Math.abs(scratch[order * stride + order]) < 1e-300) {
     ag[0] = 1 / dt; ag[1] = -1 / dt;
     for (let k = 2; k <= order; k++) ag[k] = 0;
     return;
   }
-  ag[order] /= mat[order][order];
+  ag[order] /= scratch[order * stride + order];
   for (let i = order - 1; i >= 0; i--) {
     for (let j = i + 1; j <= order; j++) {
-      ag[i] = ag[i] - mat[i][j] * ag[j];
+      ag[i] = ag[i] - scratch[i * stride + j] * ag[j];
     }
-    if (Math.abs(mat[i][i]) < 1e-300) {
+    if (Math.abs(scratch[i * stride + i]) < 1e-300) {
       ag[0] = 1 / dt; ag[1] = -1 / dt;
       for (let k = 2; k <= order; k++) ag[k] = 0;
       return;
     }
-    ag[i] /= mat[i][i];
+    ag[i] /= scratch[i * stride + i];
   }
 }
 
@@ -422,6 +427,7 @@ export function computeNIcomCof(
   order: number,
   method: IntegrationMethod,
   ag: Float64Array,
+  scratch?: Float64Array,
 ): void {
   if (dt <= 0) { ag.fill(0); return; }
 
@@ -450,7 +456,8 @@ export function computeNIcomCof(
       ag[2] = ag2;
     }
   } else if (method === "gear") {
-    solveGearVandermonde(dt, deltaOld, order, ag);
+    const scratchBuf = scratch ?? new Float64Array(49);
+    solveGearVandermonde(dt, deltaOld, order, ag, scratchBuf);
   } else {
     // BDF-1
     ag[0] = 1 / dt;
@@ -458,44 +465,3 @@ export function computeNIcomCof(
   }
 }
 
-/**
- * Compute integration coefficients ag0 and ag1 from step parameters.
- * ag0 is the coefficient on Q_n (or phi_n for inductors).
- * ag1 is the coefficient on Q_{n-1}.
- *
- * Used by StepSnapshot capture to record the coefficients without
- * re-deriving them from element-level calculations.
- */
-export function computeIntegrationCoefficients(
-  dt: number,
-  h1: number,
-  order: number,
-  method: IntegrationMethod,
-  xmu: number = 0.5,
-): { ag0: number; ag1: number } {
-  if (dt <= 0) return { ag0: 0, ag1: 0 };
-
-  if (order <= 1) {
-    return { ag0: 1 / dt, ag1: -1 / dt };
-  } else if (method === "trapezoidal") {
-    const ag0 = 1 / (dt * (1 - xmu));
-    return { ag0, ag1: -ag0 };
-  } else {
-    // BDF-2
-    const safeH1 = h1 > 0 ? h1 : dt;
-    // nicomcof.c:79-86 GEAR order=2: Vandermonde points are cumulative
-    // distances from t_n. r1 = deltaOld[0]/dt = dt/dt = 1 (always).
-    // r2 = (deltaOld[0]+deltaOld[1])/dt = (dt+h_{n-1})/dt.
-    const r1 = 1;
-    const r2 = (dt + safeH1) / dt;
-    const u22 = r2 * (r2 - r1);
-    if (Math.abs(u22) < 1e-30) {
-      return { ag0: 1 / dt, ag1: -1 / dt };
-    }
-    const rhs2 = r1 / dt;
-    const ag2 = rhs2 / u22;
-    const ag1val = (-1 / dt - r2 * ag2) / r1;
-    const ag0val = -(ag1val + ag2);
-    return { ag0: ag0val, ag1: ag1val };
-  }
-}
