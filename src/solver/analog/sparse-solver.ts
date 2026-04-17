@@ -57,14 +57,34 @@ export class SparseSolver {
   private _elPrevInCol: Int32Array = new Int32Array(0);
   /**
    * CSC L-array index for element e (-1 if not in L).
-   * Set during _numericLUMarkowitz; used by _numericLUReusePivots for O(1) scatter.
+   * Set during _numericLUMarkowitz; used by _buildCSCFromLinked snapshot.
    */
   private _lValueIndex: Int32Array = new Int32Array(0);
   /**
    * CSC U-array index for element e (-1 if not in U).
-   * Set during _numericLUMarkowitz; used by _numericLUReusePivots for O(1) scatter.
+   * Set during _numericLUMarkowitz; used by _buildCSCFromLinked snapshot.
    */
   private _uValueIndex: Int32Array = new Int32Array(0);
+
+  /**
+   * Reverse maps: CSC position p → pool element index (or -1 if no backing
+   * pool element). Used by _numericLUReusePivots to keep _elVal[e] in sync
+   * with the factored L/U values written to the CSC arrays.
+   */
+  private _lCscToElem: Int32Array = new Int32Array(0);
+  private _uCscToElem: Int32Array = new Int32Array(0);
+
+  /**
+   * A-matrix handle CSR (ngspice-style flat pool-handle array): for each
+   * internal column k, _aMatrixHandlesByCol[_aMatrixColStart[k]..
+   * _aMatrixColStart[k+1]-1] lists the pool handles of all non-fill-in
+   * (A-matrix) entries in that column. Built inside _buildCSCFromLinked,
+   * consumed by _numericLUReusePivots — so the NR hot path scatters A
+   * values into the dense workspace without ever touching _colHead /
+   * _elNextInCol linked-list fields.
+   */
+  private _aMatrixColStart: Int32Array = new Int32Array(0);
+  private _aMatrixHandlesByCol: Int32Array = new Int32Array(0);
 
   /** First element in row r (-1 = empty). Length n. */
   private _rowHead: Int32Array = new Int32Array(0);
@@ -620,9 +640,14 @@ export class SparseSolver {
     this._lColPtr = new Int32Array(n + 1);
     this._lRowIdx = new Int32Array(alloc);
     this._lVals = new Float64Array(alloc);
+    this._lCscToElem = new Int32Array(alloc).fill(-1);
     this._uColPtr = new Int32Array(n + 1);
     this._uRowIdx = new Int32Array(alloc);
     this._uVals = new Float64Array(alloc);
+    this._uCscToElem = new Int32Array(alloc).fill(-1);
+
+    this._aMatrixColStart = new Int32Array(n + 1);
+    this._aMatrixHandlesByCol = new Int32Array(0);
 
     this._markowitzRow = new Int32Array(n);
     this._markowitzCol = new Int32Array(n);
@@ -812,9 +837,14 @@ export class SparseSolver {
     this._lColPtr = new Int32Array(n + 1);
     this._lRowIdx = new Int32Array(alloc);
     this._lVals = new Float64Array(alloc);
+    this._lCscToElem = new Int32Array(alloc).fill(-1);
     this._uColPtr = new Int32Array(n + 1);
     this._uRowIdx = new Int32Array(alloc);
     this._uVals = new Float64Array(alloc);
+    this._uCscToElem = new Int32Array(alloc).fill(-1);
+
+    this._aMatrixColStart = new Int32Array(n + 1);
+    this._aMatrixHandlesByCol = new Int32Array(0);
   }
 
   // =========================================================================
@@ -902,6 +932,7 @@ export class SparseSolver {
 
     pinv.fill(-1);
     this._reachMark.fill(-1);
+    this._elMark.fill(-1);
 
     // Reset all CSC index mappings before full re-factorization
     for (let e = 0; e < this._elCount; e++) {
@@ -918,12 +949,15 @@ export class SparseSolver {
       if (lnz + n > this._lRowIdx.length) this._growL(lnz + n);
       if (unz + n > this._uRowIdx.length) this._growU(unz + n);
 
-      // Scatter column k into dense workspace x; build row→element map
+      // Scatter column k into dense workspace x; build row→element map;
+      // stamp _elMark[row] = k so later U/L stores know rowToElem[row] is
+      // valid for this column (prevents stale reads from previous k).
       let xNzCount = 0;
       let ae = this._colHead[k];
       while (ae >= 0) {
         const row = this._elRow[ae];
         rowToElem[row] = ae;
+        this._elMark[row] = k;
         if (!(this._elFlags[ae] & FLAG_FILL_IN)) {
           if (x[row] === 0) xNzIdx[xNzCount++] = row;
           x[row] += this._elVal[ae];
@@ -948,29 +982,19 @@ export class SparseSolver {
         }
       }
 
-      // Detect fill-in: mark existing A-entries in column k
-      let me = this._colHead[k];
-      while (me >= 0) {
-        if (!(this._elFlags[me] & FLAG_FILL_IN)) {
-          this._elMark[this._elRow[me]] = k;
-        }
-        me = this._elNextInCol[me];
-      }
-
-      // Check all nonzero rows — if unmarked and unpivoted, it's fill-in
+      // Check all nonzero rows — if no pool element exists at (i, k) and
+      // row i is still unpivoted, insert an L fill-in element.
       let hadFillin = false;
       const origColK = this._preorderColPerm[k];
       for (let idx = 0; idx < xNzCount; idx++) {
         const i = xNzIdx[idx];
         if (x[i] === 0 || pinv[i] >= 0) continue;
         if (this._elMark[i] === k) continue;
-        // Insert fill-in element at internal column k. _elCol stores the ORIGINAL
-        // column (matching ngspice Element->Col convention); the chain membership
-        // at _colHead[k] is the internal-column link.
         const fe = this._newElement(i, origColK, 0, FLAG_FILL_IN);
         this._insertIntoRow(fe, i);
         this._insertIntoCol(fe, k);
-        rowToElem[i] = fe; // register fill-in in row→element map
+        rowToElem[i] = fe;
+        this._elMark[i] = k;
         this._markowitzRow[i]++;
         this._markowitzCol[k]++;
         hadFillin = true;
@@ -1008,34 +1032,53 @@ export class SparseSolver {
         this._updateMarkowitzNumbers(k, pivotRow, pinv);
       }
 
-      // Store U entries (already-pivoted rows + diagonal); record CSC index
+      // Store U entries (already-pivoted rows + diagonal). Record the pool
+      // handle backing each CSC slot (-1 if none) and mirror the factored
+      // value onto _elVal[e] so _buildCSCFromLinked can snapshot pool→CSC.
       for (let idx = 0; idx < xNzCount; idx++) {
         const i = xNzIdx[idx];
         if (x[i] === 0) continue;
         const s = pinv[i];
         if (s >= 0 && s < k) {
-          const ue = rowToElem[i];
-          if (ue >= 0) this._uValueIndex[ue] = unz;
+          const xi = x[i];
+          let ue = -1;
+          if (this._elMark[i] === k) ue = rowToElem[i];
+          this._uCscToElem[unz] = ue;
+          if (ue >= 0) {
+            this._uValueIndex[ue] = unz;
+            this._elVal[ue] = xi;
+          }
           this._uRowIdx[unz] = i;
-          this._uVals[unz] = x[i];
+          this._uVals[unz] = xi;
           unz++;
         }
       }
-      const diagElem = rowToElem[pivotRow];
-      if (diagElem >= 0) this._uValueIndex[diagElem] = unz;
+      let diagElem = -1;
+      if (this._elMark[pivotRow] === k) diagElem = rowToElem[pivotRow];
+      this._uCscToElem[unz] = diagElem;
+      if (diagElem >= 0) {
+        this._uValueIndex[diagElem] = unz;
+        this._elVal[diagElem] = diagVal;
+      }
       this._uRowIdx[unz] = pivotRow;
       this._uVals[unz] = diagVal;
       unz++;
 
-      // Store L entries (unpivoted rows, scaled by 1/diagonal); record CSC index
+      // Store L entries (unpivoted rows, scaled by 1/diagonal).
       for (let idx = 0; idx < xNzCount; idx++) {
         const i = xNzIdx[idx];
         if (x[i] === 0) continue;
         if (pinv[i] >= 0) continue;
-        const le = rowToElem[i];
-        if (le >= 0) this._lValueIndex[le] = lnz;
+        const lVal = x[i] / diagVal;
+        let le = -1;
+        if (this._elMark[i] === k) le = rowToElem[i];
+        this._lCscToElem[lnz] = le;
+        if (le >= 0) {
+          this._lValueIndex[le] = lnz;
+          this._elVal[le] = lVal;
+        }
         this._lRowIdx[lnz] = i;
-        this._lVals[lnz] = x[i] / diagVal;
+        this._lVals[lnz] = lVal;
         lnz++;
       }
 
@@ -1072,8 +1115,13 @@ export class SparseSolver {
     const x = this._x;
     const xNzIdx = this._xNzIdx;
     const q = this._q;
+    const aColStart = this._aMatrixColStart;
+    const aHandles = this._aMatrixHandlesByCol;
+    const elVal = this._elVal;
+    const elRow = this._elRow;
+    const lCscToElem = this._lCscToElem;
+    const uCscToElem = this._uCscToElem;
 
-    // Zero CSC value arrays — sparsity structure (_lRowIdx, _lColPtr etc.) is unchanged.
     const lnzTotal = this._lColPtr[n];
     const unzTotal = this._uColPtr[n];
     for (let i = 0; i < lnzTotal; i++) this._lVals[i] = 0;
@@ -1082,16 +1130,17 @@ export class SparseSolver {
     this._reachMark.fill(-1);
 
     for (let k = 0; k < n; k++) {
-      // Scatter A-matrix entries for column k into dense workspace
+      // Scatter A-matrix values via the flat per-column handle array built
+      // by _buildAMatrixHandleCSR. No _colHead / _elNextInCol access in the
+      // hot path per Task 0.1.3 acceptance ("zero linked-list operations").
       let xNzCount = 0;
-      let ae = this._colHead[k];
-      while (ae >= 0) {
-        if (!(this._elFlags[ae] & FLAG_FILL_IN)) {
-          const row = this._elRow[ae];
-          if (x[row] === 0) xNzIdx[xNzCount++] = row;
-          x[row] += this._elVal[ae];
-        }
-        ae = this._elNextInCol[ae];
+      const cs = aColStart[k];
+      const ce = aColStart[k + 1];
+      for (let p = cs; p < ce; p++) {
+        const ae = aHandles[p];
+        const row = elRow[ae];
+        if (x[row] === 0) xNzIdx[xNzCount++] = row;
+        x[row] += elVal[ae];
       }
 
       const reachTop = this._reach(k);
@@ -1117,22 +1166,29 @@ export class SparseSolver {
         return { success: false };
       }
 
-      // Scatter U entries via O(1) CSC index lookup
+      // U scatter: write CSC and mirror onto _elVal[e] via reverse map so
+      // post-factor pool state matches ngspice spMatrix (Element->Real holds
+      // the factored value after spFactor/spOrderAndFactor).
       for (let p = this._uColPtr[k]; p < this._uColPtr[k + 1]; p++) {
         const i = this._uRowIdx[p];
-        this._uVals[p] = x[i];
+        const val = x[i];
+        this._uVals[p] = val;
+        const ue = uCscToElem[p];
+        if (ue >= 0) elVal[ue] = val;
       }
 
-      // Scatter L entries via O(1) CSC index lookup
+      // L scatter: same pool mirror for L entries.
       for (let p = this._lColPtr[k]; p < this._lColPtr[k + 1]; p++) {
         const i = this._lRowIdx[p];
-        this._lVals[p] = x[i] / diagVal;
+        const val = x[i] / diagVal;
+        this._lVals[p] = val;
+        const le = lCscToElem[p];
+        if (le >= 0) elVal[le] = val;
       }
 
       for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
     }
 
-    // Verify singular check on diagonal
     let maxDiag = 0, minDiag = Infinity;
     for (let k = 0; k < n; k++) {
       const e = this._uColPtr[k + 1];
@@ -1148,20 +1204,62 @@ export class SparseSolver {
   }
 
   /**
-   * Verify CSC L/U index mappings are consistent after factorWithReorder.
-   * Called at end of factorWithReorder for integrity check.
-   * Accessible via (solver as any)._buildCSCFromLinked() in tests.
+   * Snapshot pool → CSC: walk the element pool once and copy _elVal[e] into
+   * the CSC L/U arrays via the _lValueIndex[e] / _uValueIndex[e] positions
+   * recorded during _numericLUMarkowitz. Also builds the A-matrix handle CSR
+   * that _numericLUReusePivots uses to scatter A values without touching
+   * linked-list chain fields.
    */
   private _buildCSCFromLinked(): void {
+    const elCount = this._elCount;
+    const lValueIndex = this._lValueIndex;
+    const uValueIndex = this._uValueIndex;
+    const elVal = this._elVal;
+    const lVals = this._lVals;
+    const uVals = this._uVals;
+    for (let e = 0; e < elCount; e++) {
+      const li = lValueIndex[e];
+      if (li >= 0) lVals[li] = elVal[e];
+      const ui = uValueIndex[e];
+      if (ui >= 0) uVals[ui] = elVal[e];
+    }
+
+    this._buildAMatrixHandleCSR();
+  }
+
+  /**
+   * Build the per-column flat array of A-matrix (non-fill-in) pool handles
+   * consumed by _numericLUReusePivots. Called at the tail of every
+   * factorWithReorder so the CSR tracks the current post-preorder column
+   * chain state. Fill-ins are excluded by the FLAG_FILL_IN filter.
+   */
+  private _buildAMatrixHandleCSR(): void {
     const n = this._n;
-    const lnz = this._lColPtr[n];
-    const unz = this._uColPtr[n];
-    // Walk all elements and verify their CSC index mappings are in bounds
-    for (let e = 0; e < this._elCount; e++) {
-      const li = this._lValueIndex[e];
-      if (li >= 0 && li >= lnz) this._lValueIndex[e] = -1;
-      const ui = this._uValueIndex[e];
-      if (ui >= 0 && ui >= unz) this._uValueIndex[e] = -1;
+    if (this._aMatrixColStart.length !== n + 1) {
+      this._aMatrixColStart = new Int32Array(n + 1);
+    }
+    const colStart = this._aMatrixColStart;
+    let total = 0;
+    for (let col = 0; col < n; col++) {
+      colStart[col] = total;
+      let e = this._colHead[col];
+      while (e >= 0) {
+        if (!(this._elFlags[e] & FLAG_FILL_IN)) total++;
+        e = this._elNextInCol[e];
+      }
+    }
+    colStart[n] = total;
+    if (this._aMatrixHandlesByCol.length < total) {
+      this._aMatrixHandlesByCol = new Int32Array(total);
+    }
+    const handles = this._aMatrixHandlesByCol;
+    let idx = 0;
+    for (let col = 0; col < n; col++) {
+      let e = this._colHead[col];
+      while (e >= 0) {
+        if (!(this._elFlags[e] & FLAG_FILL_IN)) handles[idx++] = e;
+        e = this._elNextInCol[e];
+      }
     }
   }
 
@@ -1373,6 +1471,9 @@ export class SparseSolver {
     const r = new Int32Array(sz), v = new Float64Array(sz);
     r.set(this._lRowIdx); v.set(this._lVals);
     this._lRowIdx = r; this._lVals = v;
+    const m = new Int32Array(sz).fill(-1);
+    m.set(this._lCscToElem);
+    this._lCscToElem = m;
   }
 
   private _growU(min: number): void {
@@ -1380,6 +1481,9 @@ export class SparseSolver {
     const r = new Int32Array(sz), v = new Float64Array(sz);
     r.set(this._uRowIdx); v.set(this._uVals);
     this._uRowIdx = r; this._uVals = v;
+    const m = new Int32Array(sz).fill(-1);
+    m.set(this._uCscToElem);
+    this._uCscToElem = m;
   }
 
   // =========================================================================

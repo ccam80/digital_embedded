@@ -1735,70 +1735,111 @@ describe("SparseSolver CSC from linked structure", () => {
       expect(sum).toBeCloseTo(b[i], 10);
     }
 
-    // Verify _lValueIndex/_uValueIndex are recorded on pool elements
+    // Verify the pool→CSC snapshot contract: _buildCSCFromLinked copies
+    // _elVal[e] into _lVals[li]/_uVals[ui] via the recorded indices. After
+    // factorWithReorder, every pool element with a valid CSC index must
+    // have _lVals[li] === _elVal[e] (IEEE-754 identity) and likewise for U.
+    const elCount = (solver as any)._elCount as number;
     const lValueIndex = (solver as any)._lValueIndex as Int32Array;
     const uValueIndex = (solver as any)._uValueIndex as Int32Array;
-    const elCount = (solver as any)._elCount as number;
-    // At least some elements should have valid CSC index entries
-    let hasLIndex = false;
-    let hasUIndex = false;
+    const elVal = (solver as any)._elVal as Float64Array;
+    const lVals = (solver as any)._lVals as Float64Array;
+    const uVals = (solver as any)._uVals as Float64Array;
+
+    let checkedL = 0, checkedU = 0;
     for (let e = 0; e < elCount; e++) {
-      if (lValueIndex[e] >= 0) hasLIndex = true;
-      if (uValueIndex[e] >= 0) hasUIndex = true;
+      const li = lValueIndex[e];
+      if (li >= 0) { expect(lVals[li]).toBe(elVal[e]); checkedL++; }
+      const ui = uValueIndex[e];
+      if (ui >= 0) { expect(uVals[ui]).toBe(elVal[e]); checkedU++; }
     }
-    expect(hasLIndex).toBe(true);
-    expect(hasUIndex).toBe(true);
+    expect(checkedL).toBeGreaterThan(0);
+    expect(checkedU).toBeGreaterThan(0);
   });
 
   it("numeric_refactor_reuses_csc_pattern", () => {
-    // Verify that factorNumerical() after factorWithReorder() produces correct results
-    // using the same CSC sparsity pattern with different numeric values.
-    // First assembly: A = [[3,1],[1,2]], b = [4,3] => solution [1,1]
-    // Second assembly (same topology, different values): A = [[5,2],[2,3]], b = [7,5] => solution [1,1]
+    // Verify the sparsity-pattern contract of Task 0.1.3: factorNumerical()
+    // after factorWithReorder() must leave _lColPtr / _lRowIdx / _uColPtr /
+    // _uRowIdx byte-identical, with only _lVals / _uVals changing to reflect
+    // the new numeric values. Use a 4x4 symmetric diagonally-dominant matrix
+    // so Markowitz pivot order stays stable under value perturbation.
+    const n = 4;
     const solver = new SparseSolver();
-
-    // First topology setup
-    solver.beginAssembly(2);
-    const h00 = solver.allocElement(0, 0); solver.stampElement(h00, 3);
+    solver.beginAssembly(n);
+    const h00 = solver.allocElement(0, 0); solver.stampElement(h00, 10);
     const h01 = solver.allocElement(0, 1); solver.stampElement(h01, 1);
+    const h03 = solver.allocElement(0, 3); solver.stampElement(h03, 2);
     const h10 = solver.allocElement(1, 0); solver.stampElement(h10, 1);
-    const h11 = solver.allocElement(1, 1); solver.stampElement(h11, 2);
-    solver.stampRHS(0, 4);
-    solver.stampRHS(1, 3);
+    const h11 = solver.allocElement(1, 1); solver.stampElement(h11, 10);
+    const h12 = solver.allocElement(1, 2); solver.stampElement(h12, 3);
+    const h21 = solver.allocElement(2, 1); solver.stampElement(h21, 3);
+    const h22 = solver.allocElement(2, 2); solver.stampElement(h22, 10);
+    const h23 = solver.allocElement(2, 3); solver.stampElement(h23, 1);
+    const h30 = solver.allocElement(3, 0); solver.stampElement(h30, 2);
+    const h32 = solver.allocElement(3, 2); solver.stampElement(h32, 1);
+    const h33 = solver.allocElement(3, 3); solver.stampElement(h33, 10);
+    solver.stampRHS(0, 10);
+    solver.stampRHS(1, 20);
+    solver.stampRHS(2, 30);
+    solver.stampRHS(3, 40);
     solver.finalize();
 
     const r1 = solver.factorWithReorder();
     expect(r1.success).toBe(true);
-    const x1 = new Float64Array(2);
-    solver.solve(x1);
-    expect(x1[0]).toBeCloseTo(1.0, 10);
-    expect(x1[1]).toBeCloseTo(1.0, 10);
 
-    // Second assembly: same topology, different values — factorNumerical reuses CSC structure
-    solver.beginAssembly(2);
-    solver.stampElement(h00, 5);
-    solver.stampElement(h01, 2);
-    solver.stampElement(h10, 2);
-    solver.stampElement(h11, 3);
-    solver.stampRHS(0, 7);
-    solver.stampRHS(1, 5);
+    // Snapshot the sparsity structure after the first reorder.
+    const lColPtrBefore = new Int32Array((solver as any)._lColPtr);
+    const lRowIdxBefore = new Int32Array((solver as any)._lRowIdx);
+    const uColPtrBefore = new Int32Array((solver as any)._uColPtr);
+    const uRowIdxBefore = new Int32Array((solver as any)._uRowIdx);
+    const lValsBefore = new Float64Array((solver as any)._lVals);
+
+    // Re-assemble with perturbed values (same sparsity, still diagonally
+    // dominant so pivot order does not change).
+    solver.beginAssembly(n);
+    solver.stampElement(h00, 12);
+    solver.stampElement(h01, 1.5);
+    solver.stampElement(h03, 2.5);
+    solver.stampElement(h10, 1.5);
+    solver.stampElement(h11, 11);
+    solver.stampElement(h12, 3.5);
+    solver.stampElement(h21, 3.5);
+    solver.stampElement(h22, 13);
+    solver.stampElement(h23, 1.5);
+    solver.stampElement(h30, 2.5);
+    solver.stampElement(h32, 1.5);
+    solver.stampElement(h33, 14);
+    solver.stampRHS(0, 10);
+    solver.stampRHS(1, 20);
+    solver.stampRHS(2, 30);
+    solver.stampRHS(3, 40);
     solver.finalize();
 
-    // factorNumerical reuses the CSC sparsity pattern — no pivot search
     const r2 = solver.factorNumerical();
     expect(r2.success).toBe(true);
+
+    expect(Array.from((solver as any)._lColPtr as Int32Array)).toEqual(Array.from(lColPtrBefore));
+    expect(Array.from((solver as any)._lRowIdx as Int32Array)).toEqual(Array.from(lRowIdxBefore));
+    expect(Array.from((solver as any)._uColPtr as Int32Array)).toEqual(Array.from(uColPtrBefore));
+    expect(Array.from((solver as any)._uRowIdx as Int32Array)).toEqual(Array.from(uRowIdxBefore));
+    expect(Array.from((solver as any)._lVals as Float64Array)).not.toEqual(Array.from(lValsBefore));
     expect(solver.lastFactorUsedReorder).toBe(false);
 
-    const x2 = new Float64Array(2);
-    solver.solve(x2);
-    // A2 = [[5,2],[2,3]], b2=[7,5]: det=15-4=11, x0=(21-10)/11=1, x1=(15-14)/11=1/11
-    // Wait: x0=(5*7-2*5*?)... let me compute: Ax=b => 5x0+2x1=7, 2x0+3x1=5
-    // From first: x0=(7-2x1)/5. Sub: 2*(7-2x1)/5 + 3x1 = 5 => (14-4x1)/5+3x1=5 => 14-4x1+15x1=25 => 11x1=11 => x1=1
-    // x0=(7-2)/5=1
-    expect(x2[0]).toBeCloseTo(1.0, 10);
-    expect(x2[1]).toBeCloseTo(1.0, 10);
-
-    void h00; void h01; void h10; void h11;
+    // Solve residual check on the perturbed matrix.
+    const x = new Float64Array(n);
+    solver.solve(x);
+    const A2: number[][] = [
+      [12, 1.5, 0, 2.5],
+      [1.5, 11, 3.5, 0],
+      [0, 3.5, 13, 1.5],
+      [2.5, 0, 1.5, 14],
+    ];
+    const b = [10, 20, 30, 40];
+    for (let i = 0; i < n; i++) {
+      let sum = 0;
+      for (let j = 0; j < n; j++) sum += A2[i][j] * x[j];
+      expect(sum).toBeCloseTo(b[i], 10);
+    }
   });
 });
 

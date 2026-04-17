@@ -264,9 +264,15 @@
   },
   "hotPaths": [
     {
+      "path": "src\\solver\\analog\\sparse-solver.ts",
+      "accessCount": 34,
+      "lastAccessed": 1776402064572,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 17,
-      "lastAccessed": 1776371725438,
+      "accessCount": 21,
+      "lastAccessed": 1776402002159,
       "type": "file"
     },
     {
@@ -276,28 +282,22 @@
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\sparse-solver.ts",
-      "accessCount": 16,
-      "lastAccessed": 1776396803723,
-      "type": "file"
+      "path": "src\\solver\\analog",
+      "accessCount": 15,
+      "lastAccessed": 1776401615134,
+      "type": "directory"
     },
     {
-      "path": "src\\solver\\analog",
-      "accessCount": 14,
-      "lastAccessed": 1776371696790,
-      "type": "directory"
+      "path": "src\\solver\\analog\\mna-assembler.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776401152922,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\analog-engine.ts",
       "accessCount": 11,
       "lastAccessed": 1776371699984,
       "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\mna-assembler.ts",
-      "accessCount": 11,
-      "lastAccessed": 1776396798492,
-      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\dc-operating-point.ts",
@@ -348,6 +348,18 @@
       "type": "file"
     },
     {
+      "path": "src",
+      "accessCount": 4,
+      "lastAccessed": 1776400496038,
+      "type": "directory"
+    },
+    {
+      "path": "ref\\ngspice",
+      "accessCount": 4,
+      "lastAccessed": 1776400574772,
+      "type": "directory"
+    },
+    {
       "path": "ref/ngspice/visualc/include/ngspice/config.h",
       "accessCount": 3,
       "lastAccessed": 1776333540436,
@@ -366,21 +378,9 @@
       "type": "directory"
     },
     {
-      "path": "ref\\ngspice",
-      "accessCount": 3,
-      "lastAccessed": 1776336143336,
-      "type": "directory"
-    },
-    {
       "path": "ref/ngspice/src/maths/sparse",
       "accessCount": 3,
       "lastAccessed": 1776336938623,
-      "type": "directory"
-    },
-    {
-      "path": "src",
-      "accessCount": 3,
-      "lastAccessed": 1776396789109,
       "type": "directory"
     },
     {
