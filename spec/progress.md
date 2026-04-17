@@ -356,3 +356,10 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
 - **Files modified**: src/solver/analog/__tests__/integration.test.ts
 - **Tests**: 63/63 passing
 - **Notes**: Added gear_vandermonde_flat_scratch_regression test — allocates scratch Float64Array(49) directly, calls computeNIcomCof order=4, asserts ag[0..4] match known GEAR-4 coefficients, confirms scratch was mutated.
+
+
+---
+## Batch-3 Verified PASS
+- **Task groups**: 2.1 → PASS (37/37), 3.1 → PASS (63/63), 6.1 → PASS (4/4)
+- **Date**: 2026-04-17
+- **Note**: Codebase-wide tsc remains intentionally broken from Task 6.1.2 interface change. Resolves atomically when batch-4 (Wave 6.2) lands.
