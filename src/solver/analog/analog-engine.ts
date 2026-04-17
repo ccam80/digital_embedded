@@ -1,7 +1,7 @@
 /**
  * MNAEngine — the concrete AnalogEngine implementation.
  *
- * Orchestrates SparseSolver, MNAAssembler, TimestepController, HistoryStore,
+ * Orchestrates SparseSolver, cktLoad, TimestepController, HistoryStore,
  * DiagnosticCollector, and the DC / transient solver functions into a working
  * analog simulator behind the AnalogEngine interface.
  */
@@ -206,8 +206,6 @@ export class MNAEngine implements AnalogEngine {
     );
     // Wire ctx's solver to the same SparseSolver instance used by the engine.
     this._ctx.solver = this._solver;
-    // Bind pre-iteration hook once so step() never allocates a new closure.
-    this._ctx.preIterationHook = this._companionPreIterationHook.bind(this);
     // Wire diagnostics
     this._ctx.diagnostics = this._diagnostics;
 
@@ -279,32 +277,23 @@ export class MNAEngine implements AnalogEngine {
       this._devProbeRan = true;
       const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;
       if (statePool) {
-        const solver = this._solver;
-        const voltages = this._voltages;
-        const dt = this._timestep.getClampedDt(this._simTime);
-        const method = this._timestep.currentMethod;
         const poolSnapshot = statePool.state0.slice();
+        const ctx = this._ctx!;
         for (const element of this._elements) {
           if (isPoolBacked(element)) {
             const violations = assertPoolIsSoleMutableState(
               element.stateSchema.owner ?? "unknown",
               element,
               () => {
-                element.stamp(solver);
-                if (element.isReactive && element.stampCompanion) {
-                  element.stampCompanion(dt, method, voltages, this._timestep.currentOrder, this._timestep.deltaOld);
-                }
-                if (element.isNonlinear && element.updateOperatingPoint) {
-                  element.updateOperatingPoint(voltages);
-                }
+                element.load(ctx.loadCtx);
               },
             );
             for (const v of violations) {
               const msg =
-                `reactive-state-outside-pool: ${v.owner}.${v.field} changed during stamp/stampCompanion\n` +
+                `reactive-state-outside-pool: ${v.owner}.${v.field} changed during load()\n` +
                 `but is not declared in the element's StateSchema. Mutable numeric state MUST\n` +
                 `live in pool.state0 so the engine can roll it back on NR-failure and LTE-\n` +
-                `rejection retries (see analog-engine.ts:297-302, 369-371). Move ${v.field} into\n` +
+                `rejection retries. Move ${v.field} into\n` +
                 `a schema slot and access it via this.s0[this.base + SLOT_${v.field.replace(/^_/, "").toUpperCase()}].`;
               this._diagnostics.emit(
                 makeDiagnostic("reactive-state-outside-pool", "error", msg, {
@@ -410,16 +399,9 @@ export class MNAEngine implements AnalogEngine {
       }
       _stepAttemptCount++;
 
-      // --- Companion stamp (ngspice dctran.c:736 NIcomCof) ---
-      // Always called, including step 0. ngspice recomputes ag[] to real values
-      // (1/h, -1/h) via NIcomCof BEFORE the first Newton solve (dctran.c:736).
-      // The MODEINITTRAN "transparent at DC OP" behavior comes from seedHistory
-      // copying Q_dcop into s1: BDF-1 produces geq=C/h (cap in matrix) but
-      // zero net current at the DC operating point voltage.
-      //
-      // Publish the current integration timestep to the state pool so
-      // stampCompanion/updateOperatingPoint can derive ag0 = 1/dt locally,
-      // matching NIcomCof (nicomcof.c:33-51) and CKTag[0] in ngspice.
+      // --- NIcomCof (ngspice dctran.c:736) ---
+      // Recompute ag[] integration coefficients before each NR solve.
+      // Elements read ag[] via ctx.loadCtx.ag inside their load() calls.
       if (statePool) {
         statePool.dt = dt;
         computeNIcomCof(dt, this._timestep.deltaOld, this._timestep.currentOrder,
@@ -428,14 +410,14 @@ export class MNAEngine implements AnalogEngine {
           statePool.initMode = "initTran";
         }
       }
-      for (const el of elements) {
-        if (el.isReactive && el.stampCompanion) {
-          el.stampCompanion(dt, this._timestep.currentMethod, this._voltages, this._timestep.currentOrder, this._timestep.deltaOld);
-        }
-      }
 
       // --- NR solve (ngspice dctran.c:770 NIiter) ---
       const ctx = this._ctx!;
+      // xfact = deltaOld[0] / deltaOld[1] for predictor extrapolation in element load().
+      // Written here so all elements read the correct value during this NR call.
+      ctx.loadCtx.xfact = ctx.deltaOld[1] > 0 ? ctx.deltaOld[0] / ctx.deltaOld[1] : 0;
+      // dt for reactive elements to use in load() (CKTdelta).
+      ctx.loadCtx.dt = dt;
       ctx.maxIterations = params.transientMaxIterations;
       ctx.initialGuess = this._voltages;
       ctx.enableBlameTracking = logging;
@@ -498,15 +480,6 @@ export class MNAEngine implements AnalogEngine {
         // --- NR CONVERGED — evaluate LTE (ngspice dctran.c:830+) ---
         this._timestep.currentDt = dt;
         this._voltages.set(nrResult.voltages);
-
-        // Update charge/flux with converged voltages so LTE sees accurate Q.
-        // Also recomputes ccap from the converged charge so the next step's
-        // trapezoidal recursion starts from the correct companion current.
-        for (const el of elements) {
-          if (el.isReactive && el.updateChargeFlux) {
-            el.updateChargeFlux(this._voltages, dt, this._timestep.currentMethod, this._timestep.currentOrder, this._timestep.deltaOld);
-          }
-        }
 
         // ngspice dctran.c:849-866: firsttime && converged -> skip LTE, accept immediately
         if (this._firsttime) {
@@ -636,26 +609,20 @@ export class MNAEngine implements AnalogEngine {
     }
     this._timestep.checkMethodSwitch(elements, this._history);
 
-    // Run companion-state updates (edge detection, pin companion refresh,
-    // latched logic levels) once on the accepted solution. Must run BEFORE
-    // updateState so any downstream consumer sees post-edge latched state.
-    // Never runs on rejected LTE retries or inside NR — both are handled by
-    // the retry loops above, which restore voltages and re-enter the solver.
+    // Post-acceptance: notify elements (companion state, flux/charge history).
+    // Matches ngspice DEVaccept — called once per accepted step.
+    // Point loadCtx.voltages at the accepted solution, and set dt to the
+    // accepted timestep, before calling accept().
+    const addBP = this._ctx!.addBreakpointBound;
+    this._ctx!.loadCtx.voltages = this._voltages;
+    this._ctx!.loadCtx.dt = this._lastDt;
     for (const el of elements) {
-      if (el.updateCompanion) {
-        el.updateCompanion(dt, method, this._voltages);
-      }
-    }
-
-    // Update non-MNA state for elements that track it
-    for (const el of elements) {
-      if (el.updateState) {
-        el.updateState(dt, this._voltages);
+      if (el.accept) {
+        el.accept(this._ctx!.loadCtx, this._simTime, addBP);
       }
     }
 
     // Schedule next waveform breakpoints after acceptance
-    const addBP = this._ctx!.addBreakpointBound;
     for (const el of elements) {
       if (el.acceptStep) {
         el.acceptStep(this._simTime, addBP);
@@ -1096,51 +1063,20 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
 
   /**
-   * Pre-iteration hook for transient NR: re-stamps reactive nonlinear companion
-   * models at the current iteration voltages. Bound once at init() and stored
-   * on ctx.preIterationHook to avoid creating a new closure per step.
-   */
-  private _companionPreIterationHook(_iteration: number, iterVoltages: Float64Array): void {
-    const currentMethod = this._timestep.currentMethod;
-    const dt = this._timestep.currentDt;
-    const elements = this._compiled!.elements;
-    for (const el of elements) {
-      if (el.isReactive && el.isNonlinear && el.stampCompanion) {
-        el.stampCompanion(dt, currentMethod, iterVoltages, this._timestep.currentOrder, this._timestep.deltaOld);
-      }
-    }
-  }
-
-  /**
    * Post-convergence seeding sequence shared by dcOperatingPoint() and
    * _transientDcop().
    *
-   * Copies converged voltages into engine state, writes initial charge/flux,
-   * seeds state pool history, and initialises companion state from DC OP.
+   * Copies converged voltages into engine state, seeds state pool history.
    *
    * Matches ngspice dctran.c:346-350 post-CKTop sequence:
-   *   CAPload writes state0[qcap] -> bcopy seeds state1 from state0 ->
-   *   CKTmode set to MODETRAN -> CKTag[] zeroed.
+   *   CKTmode set to MODETRAN -> CKTag[] zeroed -> bcopy seeds state1 from state0.
    */
   private _seedFromDcop(
     result: DcOpResult,
-    elements: readonly AnalogElement[],
+    _elements: readonly AnalogElement[],
     cac: CompiledWithBridges,
   ): void {
     this._voltages.set(result.nodeVoltages);
-
-    // Write initial charge/flux from the DC operating point so that
-    // seedHistory propagates correct Q values into all history slots.
-    // Without this, Q=0 in history causes cktTerr to see a step function
-    // on the first transient step -> LTE rejection -> stagnation.
-    // (ngspice equivalent: CAPload writes state0[qcap] during DCOP,
-    // then dctran.c:342 bcopy seeds state1 from state0.)
-    // dt=0 and dummy params: ccap recomputation is irrelevant at DC OP.
-    for (const el of elements) {
-      if (el.isReactive && el.updateChargeFlux) {
-        el.updateChargeFlux(this._voltages, 0, "bdf1", 1, []);
-      }
-    }
 
     if (cac.statePool) {
       // ngspice dctran.c:346-350: set analysis mode, zero CKTag[], then copy state.
@@ -1153,20 +1089,6 @@ export class MNAEngine implements AnalogEngine {
       cac.statePool.seedHistory();
       cac.statePool.refreshElementRefs(this._ctx!.poolBackedElements as unknown as PoolBackedAnalogElement[]);
       this._firsttime = true;
-    }
-
-    // Seed per-timestep companion state from the DC operating point.
-    // Elements with sentinel-initialized edge-detection state (e.g.
-    // behavioral flip-flops with _prevClockVoltage=NaN) use this call to
-    // capture the DC steady-state voltages so the first transient step
-    // does not mis-fire an edge on a signal that was already at its level
-    // during DC op. dt=0 signals "no time elapsed"; method is irrelevant
-    // because the first real step will restamp companion models.
-    const seedMethod = this._timestep.currentMethod;
-    for (const el of elements) {
-      if (el.updateCompanion) {
-        el.updateCompanion(0, seedMethod, this._voltages);
-      }
     }
   }
 

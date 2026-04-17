@@ -3,15 +3,13 @@
  *
  * Verifies:
  *   1. All Float64Array fields have correct lengths after construction.
- *   2. assembler field exists and is a non-null MNAAssembler instance.
- *   3. nrResult and dcopResult exist as mutable class instances with default values.
- *   4. Pre-computed element lists are populated correctly.
- *   5. Zero Float64Array allocations after initial construction (monkey-patch pattern).
+ *   2. nrResult and dcopResult exist as mutable class instances with default values.
+ *   3. Pre-computed element lists are populated correctly.
+ *   4. Zero Float64Array allocations after initial construction (monkey-patch pattern).
  */
 
 import { describe, it, expect } from "vitest";
 import { CKTCircuitContext, NRResult, DcOpResult } from "../ckt-context.js";
-import { MNAAssembler } from "../mna-assembler.js";
 import { makeResistor, makeDiode, makeCapacitor, allocateStatePool } from "./test-helpers.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { isPoolBacked } from "../element.js";
@@ -124,10 +122,6 @@ describe("CKTCircuitContext", () => {
     // LTE scratch — at least matrixSize elements
     expect(ctx.lteScratch).toBeInstanceOf(Float64Array);
     expect(ctx.lteScratch.length).toBeGreaterThanOrEqual(sz);
-
-    // assembler exists and is non-null MNAAssembler
-    expect(ctx.assembler).not.toBeNull();
-    expect(ctx.assembler).toBeInstanceOf(MNAAssembler);
 
     // nrResult exists with default values
     expect(ctx.nrResult).toBeInstanceOf(NRResult);

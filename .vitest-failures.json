@@ -1,23 +1,10 @@
 {
   "summary": {
-    "passed": 0,
-    "failed": 1,
-    "skipped": 36,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 6,
     "totalFiles": 1,
-    "durationSeconds": 0.8
+    "durationSeconds": 0.9
   },
-  "failures": [
-    {
-      "message": "expected 9 to be 2 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "ipass_skipped_without_nodesets",
-          "line": 576,
-          "column": 26
-        }
-      ]
-    }
-  ]
+  "failures": []
 }

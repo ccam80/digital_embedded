@@ -10,7 +10,6 @@
  */
 
 import { SparseSolver } from "./sparse-solver.js";
-import { MNAAssembler } from "./mna-assembler.js";
 import type { AnalogElement } from "./element.js";
 import { isPoolBacked } from "./element.js";
 import type { StatePool } from "./state-pool.js";
@@ -133,20 +132,16 @@ export class CKTCircuitContext {
   /** Shared sparse solver — the same instance used for every NR factorization. */
   private _solver: SparseSolver = null!;
 
-  /** Setting this also replaces the assembler so it always uses the current solver. */
+  /** Setting this also updates loadCtx.solver to the new instance. */
   get solver(): SparseSolver {
     return this._solver;
   }
   set solver(s: SparseSolver) {
     this._solver = s;
-    this.assembler = new MNAAssembler(s);
     if (this.loadCtx !== undefined) {
       this.loadCtx.solver = s;
     }
-  }
-
-  /** MNA matrix assembler bound to the current `solver`. */
-  assembler: MNAAssembler = null!;
+  };
 
   // -------------------------------------------------------------------------
   // Node voltages (ngspice CKTrhsOld, CKTrhs, CKTrhsSpare)
@@ -455,7 +450,6 @@ export class CKTCircuitContext {
 
     // Matrix / solver
     this.solver = new SparseSolver();
-    this.assembler = new MNAAssembler(this.solver);
 
     // Node voltage buffers
     this.rhsOld = new Float64Array(matrixSize);

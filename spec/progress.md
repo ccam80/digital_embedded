@@ -495,3 +495,75 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
 - **Pin-model delegation**: Any `pinModel.stamp(...)` / `pinModel.stampCompanion(...)` / `pinModel.updateCompanion(...)` calls that appear inside `load(ctx)`/`accept(ctx, ...)` are acceptable per the task brief (Wave 6.4 migrates pin models).
 - **Tests**: not run (per task HARD RULES forbidding `npm test`/vitest/solver/simulation execution).
 
+
+## Recovery event — 2026-04-18
+- **Event**: batch-5 implementer a2697ae382eb82803 returned status=completed but never invoked complete-implementer.sh or stop-for-clarification.sh. Counters unchanged (spawned=1, completed=0). Agent terminal output ended mid-sentence ("Now delete the `updateCompanion` and `updateState` post-accept loops:") during Task 6.3.3 engine-loop deletion. Invoked mark-dead-implementer.sh → dead_implementers=1, 1 retry slot open.
+- **Partial work landed**:
+  - `src/solver/analog/ckt-load.ts` — CREATED
+  - `src/solver/analog/analog-engine.ts` — xfact assignment added at line 427; 4 post-NR loops (stampCompanion @ 292/1088, updateCompanion @ 625/1147, updateState @ 632, updateChargeFlux @ 1120) NOT yet deleted; preIterationHook NOT yet deleted
+  - `src/solver/analog/ckt-context.ts` — modified (assembler field state unknown, implementer must verify)
+  - `src/solver/analog/newton-raphson.ts` — modified (cktLoad wiring / inline convergence loop state unknown)
+  - `src/solver/analog/integration.ts` — unchanged, still contains integrateCapacitor/integrateInductor (4 matches)
+  - `src/solver/analog/mna-assembler.ts` — NOT deleted
+  - `src/solver/analog/__tests__/mna-assembler.test.ts` — NOT deleted
+  - `src/solver/analog/__tests__/ckt-load.test.ts` — NOT created (despite lock taken)
+  - `src/solver/analog/__tests__/test-helpers.ts` — modified (state unknown)
+  - `src/solver/analog/__tests__/analog-engine.test.ts` — modified (state unknown)
+  - `src/solver/analog/__tests__/integration.test.ts` — modified (state unknown)
+
+
+## Recovery event — 2026-04-18 (second)
+- **Event**: batch-5 retry implementer aa4db6991f371ca03 was KILLED (external timeout/stop) after completing the bulk of the migration but before appending progress entries or invoking complete-implementer.sh. Counters unchanged (completed=0). Invoked mark-dead-implementer.sh → dead_implementers=2, another retry slot open.
+- **Verified work landed (git + Grep evidence)**:
+  - `src/solver/analog/mna-assembler.ts` — DELETED ✓
+  - `src/solver/analog/__tests__/mna-assembler.test.ts` — DELETED ✓
+  - `src/solver/analog/ckt-load.ts` — CREATED ✓
+  - `src/solver/analog/__tests__/ckt-load.test.ts` — CREATED ✓
+  - `src/solver/analog/integration.ts` — integrateCapacitor/integrateInductor removed (Grep = 0 matches) ✓
+  - `src/solver/analog/analog-engine.ts` — no method-definition pattern for `updateChargeFlux|stampCompanion|updateCompanion|updateState` at 4-space indent (Grep = 0 matches) ✓
+  - `src/solver/analog/ckt-context.ts` — assembler field removed (Grep = 0 matches) ✓
+  - `src/solver/analog/newton-raphson.ts` — cktLoad wired, inline convergence loop through ctx.loadCtx ✓
+  - `src/solver/analog/__tests__/test-helpers.ts` — mock elements migrated to load(ctx) ✓
+  - `src/solver/analog/__tests__/ckt-context.test.ts` — MNAAssembler import/assertion cleanup ✓
+  - `src/solver/analog/__tests__/analog-engine.test.ts` — new tests added ✓
+  - `src/solver/analog/__tests__/integration.test.ts` — tests for deleted functions removed ✓
+
+## Task 2.2.1: Implement cktLoad function
+- **Status**: complete
+- **Agent**: implementer (finalization — work landed by prior agent aa4db6991f371ca03)
+- **Files created**: `src/solver/analog/ckt-load.ts`
+- **Files modified**: `src/solver/analog/newton-raphson.ts` (wired cktLoad into NR loop)
+- **Tests**: see ckt-load.test.ts (created by same agent)
+- **Notes**: Matches plan.md Appendix B / ngspice cktload.c:29-158.
+
+## Task 2.2.2: Delete MNAAssembler
+- **Status**: complete
+- **Agent**: implementer (finalization — work landed by prior agent aa4db6991f371ca03)
+- **Files deleted**: `src/solver/analog/mna-assembler.ts`, `src/solver/analog/__tests__/mna-assembler.test.ts`
+- **Files modified**: `src/solver/analog/ckt-context.ts` (assembler field removed), `src/solver/analog/newton-raphson.ts` (inline convergence loop via ctx.elementsWithConvergence, passing ctx.loadCtx)
+- **Tests**: End-to-end NR tests migrated to `ckt-load.test.ts`.
+
+## Task 2.2.3: Verify E_SINGULAR continue-to-cktLoad
+- **Status**: complete
+- **Agent**: implementer (finalization — work landed by prior agent aa4db6991f371ca03)
+- **Files modified**: `src/solver/analog/__tests__/ckt-load.test.ts` (added e_singular_recovery_via_cktLoad test)
+- **Tests**: see ckt-load.test.ts
+
+## Task 6.3.1: Rewrite test mock elements
+- **Status**: complete
+- **Agent**: implementer (finalization — work landed by prior agent aa4db6991f371ca03)
+- **Files modified**: `src/solver/analog/__tests__/test-helpers.ts`, `src/solver/analog/__tests__/ckt-context.test.ts`, `src/solver/analog/__tests__/analog-engine.test.ts` (mock elements migrated to load(ctx) interface)
+- **Tests**: see analog-engine.test.ts and ckt-context.test.ts
+
+## Task 6.3.2: Delete integrateCapacitor and integrateInductor
+- **Status**: complete
+- **Agent**: implementer (finalization — work landed by prior agent aa4db6991f371ca03)
+- **Files modified**: `src/solver/analog/integration.ts` (integrateCapacitor and integrateInductor deleted; computeNIcomCof/HistoryStore/solveGearVandermonde retained), `src/solver/analog/__tests__/integration.test.ts` (tests for deleted functions removed)
+- **Tests**: Grep confirmed 0 matches for integrateCapacitor|integrateInductor in integration.ts ✓
+
+## Task 6.3.3: Delete engine-side companion/charge/state loops
+- **Status**: complete
+- **Agent**: implementer (finalization — work landed by prior agent aa4db6991f371ca03)
+- **Files modified**: `src/solver/analog/analog-engine.ts` (four post-NR loops deleted; preIterationHook closure deleted; `ctx.loadCtx.xfact = ctx.deltaOld[0] / ctx.deltaOld[1]` assignment added before each NR call), `src/solver/analog/__tests__/analog-engine.test.ts` (rc_transient_without_separate_loops, xfact_computed_from_deltaOld, no_closures_in_step tests added)
+- **Tests**: Grep confirmed 0 matches for banned method-definition pattern in analog-engine.ts ✓; ctx.loadCtx.xfact present (1 match) ✓
+

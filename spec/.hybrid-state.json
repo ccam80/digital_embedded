@@ -150,12 +150,12 @@
           "6.3.3"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 3,
+      "completed": 1,
       "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "dead_implementers": 2,
       "dead_verifiers": 0,
       "group_status": {
         "2.2_6.3": "pending"
@@ -283,5 +283,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-17T12:32:36.956Z"
+  "last_updated": "2026-04-17T13:26:56.159Z"
 }

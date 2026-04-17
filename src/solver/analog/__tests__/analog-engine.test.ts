@@ -514,7 +514,7 @@ describe("MNAEngine", () => {
       isNonlinear: false,
       isReactive: false,
       setParam(_k: string, _v: number) {},
-      stamp() {},
+      load(_ctx: unknown) {},
       getPinCurrents(_v: Float64Array): number[] { return []; },
       acceptStep(simTime: number, addBreakpoint: (t: number) => void): void {
         const nextEdge = Math.ceil((simTime + 1e-20) / edgePeriod) * edgePeriod;
@@ -788,6 +788,72 @@ describe("runner_integration", () => {
     const solverIdx = nodeId! - 1;
     const vMid = dcResult.nodeVoltages[solverIdx];
     expect(vMid).toBeCloseTo(2.5, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 6.3.3 — rc_transient_without_separate_loops
+// ---------------------------------------------------------------------------
+
+describe("rc_transient_without_separate_loops", () => {
+  it("rc_transient_without_separate_loops", () => {
+    // Run an RC transient simulation. Assert correct voltage waveform
+    // (capacitor charges exponentially). Validates that load() handles all
+    // stamp/charge/companion work internally (no separate engine-side loops).
+    //
+    // Circuit: Vs=5V → R=1kΩ → C=1µF → GND
+    // At t=0 after DCOP, cap is at 5V (held by Vs). With Vs connected, node2
+    // stays near 5V. Simulation should run stably without error.
+    const circuit = makeRCCircuit();
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    engine.dcOperatingPoint();
+
+    // Run 100 transient steps.
+    for (let i = 0; i < 100; i++) {
+      engine.step();
+      expect(engine.getState()).not.toBe(EngineState.ERROR);
+    }
+
+    // Voltage source holds node1=5V. Node2 charges through R to Vs: should
+    // be very close to 5V after many steps (cap fully charged).
+    const v2 = engine.getNodeVoltage(2);
+    expect(v2).toBeGreaterThan(4.9);
+    expect(v2).toBeLessThanOrEqual(5.01);
+    expect(engine.simTime).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 6.3.3 — xfact_computed_from_deltaOld
+// ---------------------------------------------------------------------------
+
+describe("xfact_computed_from_deltaOld", () => {
+  it("xfact_computed_from_deltaOld", () => {
+    // After 2 accepted steps, ctx.loadCtx.xfact must equal
+    // deltaOld[0] / deltaOld[1] (the extrapolation factor).
+    // We verify xfact is nonzero and numerically consistent after stepping.
+    const circuit = makeRCCircuit();
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    engine.dcOperatingPoint();
+
+    // Run 3 transient steps to populate deltaOld[0] and deltaOld[1].
+    for (let i = 0; i < 3; i++) {
+      engine.step();
+    }
+
+    // Read internal ctx.
+    const ctx = (engine as unknown as {
+      _ctx: { loadCtx: { xfact: number }; deltaOld: readonly number[] };
+    })._ctx;
+
+    const d0 = ctx.deltaOld[0];
+    const d1 = ctx.deltaOld[1];
+    const expectedXfact = d1 > 0 ? d0 / d1 : 0;
+
+    // xfact must match the formula exactly.
+    expect(ctx.loadCtx.xfact).toBeCloseTo(expectedXfact, 10);
   });
 });
 

@@ -1,7 +1,7 @@
 /**
  * Newton-Raphson nonlinear iteration loop for MNA circuit simulation.
  *
- * Implements the core NR loop with separate linear/nonlinear stamp passes,
+ * Implements the core NR loop with cktLoad single-pass device loading,
  * voltage limiting (pnjlim for PN junctions, fetlim for MOSFETs), global and
  * element-specific convergence checking, and blame tracking.
  */
@@ -10,6 +10,7 @@ import type { SparseSolver } from "./sparse-solver.js";
 import type { DiagnosticCollector } from "./diagnostics.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import type { CKTCircuitContext } from "./ckt-context.js";
+import { cktLoad } from "./ckt-load.js";
 
 // ---------------------------------------------------------------------------
 // LimitingEvent — records a single voltage-limiting call per junction per NR iteration
@@ -250,7 +251,7 @@ export function limvds(vnew: number, vold: number): number {
  *
  * Loop body follows ngspice NIiter ordering:
  *   A. Clear noncon + reset limit collector
- *   B. CKTload via assembler.stampAll (update OPs, stamp all elements)
+ *   B. CKTload via cktLoad (single-pass device load)
  *   E. Factorize
  *   F. Solve
  *   H. Convergence check (global + element)
@@ -264,7 +265,7 @@ export function limvds(vnew: number, vold: number): number {
  */
 export function newtonRaphson(ctx: CKTCircuitContext): void {
   const {
-    solver, assembler, elements, matrixSize, nodeCount,
+    solver, elements, matrixSize, nodeCount,
     reltol, abstol, iabstol,
   } = ctx;
 
@@ -310,40 +311,24 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   // MODETRANOP && MODEUIC: single CKTload, no iteration (ngspice dctran.c UIC path).
   if (ctx.isDcOp && statePool && (statePool as { uic?: boolean }).uic) {
     [voltages, prevVoltages] = [prevVoltages, voltages];
-    assembler.stampAll(elements, matrixSize, prevVoltages, null, 0);
-    solver.finalize();
+    ctx.rhsOld.set(prevVoltages);
+    cktLoad(ctx, 0);
     ctx.nrResult.converged = true;
     ctx.nrResult.iterations = 0;
-    // voltages slot now holds the solution (prevVoltages after swap)
-    // nrResult.voltages always points to ctx.rhs; copy result there
     ctx.rhs.set(prevVoltages);
     return;
   }
 
   for (let iteration = 0; ; iteration++) {
     // ---- STEP A: Clear noncon + reset limit collector (ngspice CKTnoncon=0) ----
-    assembler.noncon = 0;
+    ctx.noncon = 0;
     if (ctx.limitingCollector != null) {
       ctx.limitingCollector.length = 0;
     }
 
-    // ---- STEP B: CKTload — unified device evaluation ----
-    ctx.preIterationHook?.(iteration, prevVoltages);
-    assembler.stampAll(elements, matrixSize, prevVoltages, ctx.limitingCollector ?? null, iteration);
-
-    // ---- STEP C: Nodeset/IC enforcement (ngspice CKTnodeset/CKTic) ----
-    if (ctx.nodesets.size || ctx.ics.size) {
-      const initPool = ladder ? ladder.pool : (statePool as { initMode: string } | null);
-      const curMode = initPool?.initMode ?? "transient";
-      applyNodesetsAndICs(
-        solver,
-        ctx.nodesets,
-        ctx.ics,
-        ctx.srcFact,
-        curMode,
-      );
-      solver.finalize();
-    }
+    // ---- STEP B: CKTload — single-pass device evaluation ----
+    ctx.rhsOld.set(prevVoltages);
+    cktLoad(ctx, iteration);
 
     // ---- STEP D: Preorder (once per solve) ----
     if (!didPreorder) {
@@ -402,7 +387,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // ---- STEP H: Convergence check (ngspice NIconvTest) ----
     // ngspice niiter.c:957-961: iterno==1 forces noncon=1 (guarantees >= 2 iterations).
     if (iteration === 0) {
-      assembler.noncon = 1;
+      ctx.noncon = 1;
     }
 
     let globalConverged = false;
@@ -412,7 +397,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     const convergenceFailedElements = ctx.convergenceFailures;
     convergenceFailedElements.length = 0;
 
-    if (assembler.noncon === 0 && iteration > 0) {
+    if (ctx.noncon === 0 && iteration > 0) {
       globalConverged = true;
       for (let i = 0; i < matrixSize; i++) {
         const delta = Math.abs(voltages[i] - prevVoltages[i]);
@@ -428,26 +413,44 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       }
 
       if (ctx.detailedConvergence) {
-        const detailed = assembler.checkAllConvergedDetailed(elements, voltages, prevVoltages, reltol, iabstol);
-        elemConverged = detailed.allConverged;
+        const failedIndices: number[] = [];
+        for (let i = 0; i < ctx.elementsWithConvergence.length; i++) {
+          const el = ctx.elementsWithConvergence[i];
+          if (!el.checkConvergence!(ctx.loadCtx)) {
+            failedIndices.push(elements.indexOf(el));
+          }
+        }
+        elemConverged = failedIndices.length === 0;
         convergenceFailedElements.length = 0;
-        for (const i of detailed.failedIndices) {
+        for (const i of failedIndices) {
           convergenceFailedElements.push(elements[i].label ?? `element_${i}`);
         }
       } else {
-        elemConverged = assembler.checkAllConverged(elements, voltages, prevVoltages, reltol, iabstol);
+        elemConverged = true;
+        for (const el of ctx.elementsWithConvergence) {
+          if (!el.checkConvergence!(ctx.loadCtx)) {
+            elemConverged = false;
+            break;
+          }
+        }
       }
-    } else if (assembler.noncon > 0 && iteration > 0 && ctx.detailedConvergence) {
-      const detailed = assembler.checkAllConvergedDetailed(elements, voltages, prevVoltages, reltol, iabstol);
+    } else if (ctx.noncon > 0 && iteration > 0 && ctx.detailedConvergence) {
+      const failedIndices: number[] = [];
+      for (let i = 0; i < ctx.elementsWithConvergence.length; i++) {
+        const el = ctx.elementsWithConvergence[i];
+        if (!el.checkConvergence!(ctx.loadCtx)) {
+          failedIndices.push(elements.indexOf(el));
+        }
+      }
       elemConverged = false;
       convergenceFailedElements.length = 0;
-      for (const i of detailed.failedIndices) {
+      for (const i of failedIndices) {
         convergenceFailedElements.push(elements[i].label ?? `element_${i}`);
       }
     }
 
     // ---- STEP I: Newton damping (ngspice niiter.c:204-229) ----
-    if (ctx.nodeDamping && assembler.noncon !== 0 && ctx.isDcOp && iteration > 0) {
+    if (ctx.nodeDamping && ctx.noncon !== 0 && ctx.isDcOp && iteration > 0) {
       let maxDelta = 0;
       for (let i = 0; i < nodeCount; i++) {
         const delta = Math.abs(voltages[i] - prevVoltages[i]);
@@ -490,17 +493,17 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
     // Post-iteration hook for external instrumentation
     const limitingEvents = ctx.limitingCollector ?? [];
-    ctx.postIterationHook?.(iteration, voltages, prevVoltages, assembler.noncon, globalConverged, elemConverged, limitingEvents, convergenceFailedElements);
+    ctx.postIterationHook?.(iteration, voltages, prevVoltages, ctx.noncon, globalConverged, elemConverged, limitingEvents, convergenceFailedElements);
 
     // ---- STEP J: Unified INITF dispatcher (ngspice niiter.c:1050-1085) ----
     const initPool = ladder ? ladder.pool : (statePool as { initMode: string } | null);
     const curInitMode = initPool?.initMode ?? "transient";
 
     if (curInitMode === "initFloat" || curInitMode === "transient") {
-      if (assembler.noncon === 0 && globalConverged && elemConverged) {
+      if (ctx.noncon === 0 && globalConverged && elemConverged) {
         if (ctx.isDcOp && ctx.hadNodeset && ipass > 0) {
           ipass--;
-          assembler.noncon = 1;
+          ctx.noncon = 1;
         } else {
           if (ladder) {
             const phaseLabel =
@@ -524,7 +527,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
         ladder.onModeBegin("dcopInitFix", iteration + 1);
       }
     } else if (curInitMode === "initFix") {
-      if (assembler.noncon === 0) {
+      if (ctx.noncon === 0) {
         if (initPool) initPool.initMode = "initFloat";
         ipass = 1;
         if (ladder) {
