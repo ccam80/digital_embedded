@@ -41,8 +41,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
@@ -321,13 +320,23 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     this._m23 = k * Math.sqrt(this._l2 * this._l3);
   }
 
-  stamp(solver: SparseSolver): void {
+  /**
+   * Unified load() — three-winding tapped transformer.
+   *
+   * Stamps winding resistances, branch incidence, and inline NIintegrate on the
+   * 3×3 flux linkage matrix using ctx.ag[]:
+   *   φ1 = L1·I1 + M12·I2 + M13·I3
+   *   φ2 = L2·I2 + M12·I1 + M23·I3
+   *   φ3 = L3·I3 + M13·I1 + M23·I2
+   */
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
     const [p1, p2, s1, ct, s2] = this.pinNodeIds;
     const b1 = this.branchIndex;
     const b2 = this._b2;
     const b3 = this._b3;
 
-    // Primary winding resistance (Norton parallel between P1 and P2)
+    // Winding resistances.
     if (this._rPri > 0) {
       const gPri = 1 / this._rPri;
       if (p1 !== 0) solver.stamp(p1 - 1, p1 - 1, gPri);
@@ -337,21 +346,16 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
         solver.stamp(p2 - 1, p1 - 1, -gPri);
       }
     }
-
-    // Secondary half-1 winding resistance (between S1 and CT)
     if (this._rSec > 0) {
       const gSec = 1 / this._rSec;
+      // Sec half-1 (S1 ↔ CT)
       if (s1 !== 0) solver.stamp(s1 - 1, s1 - 1, gSec);
       if (ct !== 0) solver.stamp(ct - 1, ct - 1, gSec);
       if (s1 !== 0 && ct !== 0) {
         solver.stamp(s1 - 1, ct - 1, -gSec);
         solver.stamp(ct - 1, s1 - 1, -gSec);
       }
-    }
-
-    // Secondary half-2 winding resistance (between CT and S2)
-    if (this._rSec > 0) {
-      const gSec = 1 / this._rSec;
+      // Sec half-2 (CT ↔ S2)
       if (ct !== 0) solver.stamp(ct - 1, ct - 1, gSec);
       if (s2 !== 0) solver.stamp(s2 - 1, s2 - 1, gSec);
       if (ct !== 0 && s2 !== 0) {
@@ -360,10 +364,7 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
       }
     }
 
-    // B sub-matrix: branch current incidence into KCL node equations.
-    // I1 (primary) flows into P1, out of P2.
-    // I2 (sec-half-1) flows into S1, out of CT.
-    // I3 (sec-half-2) flows into CT, out of S2.
+    // Branch incidence (B and C sub-matrices, topology-constant).
     if (p1 !== 0) solver.stamp(p1 - 1, b1, 1);
     if (p2 !== 0) solver.stamp(p2 - 1, b1, -1);
     if (s1 !== 0) solver.stamp(s1 - 1, b2, 1);
@@ -371,126 +372,114 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     if (ct !== 0) solver.stamp(ct - 1, b3, 1);
     if (s2 !== 0) solver.stamp(s2 - 1, b3, -1);
 
-    // C sub-matrix: voltage incidence (topology-constant ±1 entries).
-    // Primary:     V(P1) - V(P2) ...
     if (p1 !== 0) solver.stamp(b1, p1 - 1, 1);
     if (p2 !== 0) solver.stamp(b1, p2 - 1, -1);
-
-    // Sec half-1: V(S1) - V(CT) ...
     if (s1 !== 0) solver.stamp(b2, s1 - 1, 1);
     if (ct !== 0) solver.stamp(b2, ct - 1, -1);
-
-    // Sec half-2: V(CT) - V(S2) ...
     if (ct !== 0) solver.stamp(b3, ct - 1, 1);
     if (s2 !== 0) solver.stamp(b3, s2 - 1, -1);
-  }
 
-  stampReactiveCompanion(solver: SparseSolver): void {
-    const b1 = this.branchIndex;
-    const b2 = this._b2;
-    const b3 = this._b3;
+    if (!ctx.isTransient && !ctx.isDcOp) return;
 
-    // Branch diagonals: companion + winding resistance; off-diagonals: mutual terms.
-    // Primary: -(g11 + R_pri)·I1 - g12·I2 - g13·I3 = hist1
-    solver.stamp(b1, b1, -(this.s0[this.base + SLOT_G11] + this._rPri));
-    solver.stamp(b1, b2, -this.s0[this.base + SLOT_G12]);
-    solver.stamp(b1, b3, -this.s0[this.base + SLOT_G13]);
-    solver.stampRHS(b1, this.s0[this.base + SLOT_HIST1]);
-
-    // Sec half-1: -g12·I1 - (g22 + R_sec)·I2 - g23·I3 = hist2
-    solver.stamp(b2, b1, -this.s0[this.base + SLOT_G12]);
-    solver.stamp(b2, b2, -(this.s0[this.base + SLOT_G22] + this._rSec));
-    solver.stamp(b2, b3, -this.s0[this.base + SLOT_G23]);
-    solver.stampRHS(b2, this.s0[this.base + SLOT_HIST2]);
-
-    // Sec half-2: -g13·I1 - g23·I2 - (g33 + R_sec)·I3 = hist3
-    solver.stamp(b3, b1, -this.s0[this.base + SLOT_G13]);
-    solver.stamp(b3, b2, -this.s0[this.base + SLOT_G23]);
-    solver.stamp(b3, b3, -(this.s0[this.base + SLOT_G33] + this._rSec));
-    solver.stampRHS(b3, this.s0[this.base + SLOT_HIST3]);
-  }
-
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const [p1, p2, s1, ct, s2] = this.pinNodeIds;
-    const b1 = this.branchIndex;
-    const b2 = this._b2;
-    const b3 = this._b3;
-
+    const voltages = ctx.voltages;
     const i1Now = voltages[b1];
     const i2Now = voltages[b2];
     const i3Now = voltages[b3];
-    const vp1 = p1 > 0 ? voltages[p1 - 1] : 0;
-    const vp2 = p2 > 0 ? voltages[p2 - 1] : 0;
-    const vs1 = s1 > 0 ? voltages[s1 - 1] : 0;
-    const vct = ct > 0 ? voltages[ct - 1] : 0;
-    const vs2 = s2 > 0 ? voltages[s2 - 1] : 0;
-    const v1Now = vp1 - vp2;
-    const v2Now = vs1 - vct;
-    const v3Now = vct - vs2;
+    const sRef = this.s0;
+    const base = this.base;
 
-    const s = this.s0;
-    const s1r = this.s1;
-    const b = this.base;
+    if (ctx.isTransient) {
+      const ag = ctx.ag;
 
-    switch (method) {
-      case "bdf1":
-        s[b + SLOT_G11] = this._l1 / dt;
-        s[b + SLOT_G22] = this._l2 / dt;
-        s[b + SLOT_G33] = this._l3 / dt;
-        s[b + SLOT_G12] = this._m12 / dt;
-        s[b + SLOT_G13] = this._m13 / dt;
-        s[b + SLOT_G23] = this._m23 / dt;
-        s[b + SLOT_HIST1] = -s[b + SLOT_G11] * i1Now - s[b + SLOT_G12] * i2Now - s[b + SLOT_G13] * i3Now;
-        s[b + SLOT_HIST2] = -s[b + SLOT_G12] * i1Now - s[b + SLOT_G22] * i2Now - s[b + SLOT_G23] * i3Now;
-        s[b + SLOT_HIST3] = -s[b + SLOT_G13] * i1Now - s[b + SLOT_G23] * i2Now - s[b + SLOT_G33] * i3Now;
-        break;
-      case "trapezoidal":
-        s[b + SLOT_G11] = (2 * this._l1) / dt;
-        s[b + SLOT_G22] = (2 * this._l2) / dt;
-        s[b + SLOT_G33] = (2 * this._l3) / dt;
-        s[b + SLOT_G12] = (2 * this._m12) / dt;
-        s[b + SLOT_G13] = (2 * this._m13) / dt;
-        s[b + SLOT_G23] = (2 * this._m23) / dt;
-        s[b + SLOT_HIST1] = -s[b + SLOT_G11] * i1Now - s[b + SLOT_G12] * i2Now - s[b + SLOT_G13] * i3Now - v1Now;
-        s[b + SLOT_HIST2] = -s[b + SLOT_G12] * i1Now - s[b + SLOT_G22] * i2Now - s[b + SLOT_G23] * i3Now - v2Now;
-        s[b + SLOT_HIST3] = -s[b + SLOT_G13] * i1Now - s[b + SLOT_G23] * i2Now - s[b + SLOT_G33] * i3Now - v3Now;
-        break;
-      case "bdf2": {
-        s[b + SLOT_G11] = (3 * this._l1) / (2 * dt);
-        s[b + SLOT_G22] = (3 * this._l2) / (2 * dt);
-        s[b + SLOT_G33] = (3 * this._l3) / (2 * dt);
-        s[b + SLOT_G12] = (3 * this._m12) / (2 * dt);
-        s[b + SLOT_G13] = (3 * this._m13) / (2 * dt);
-        s[b + SLOT_G23] = (3 * this._m23) / (2 * dt);
-        // Read previous step's currents from s1 (rotated history)
-        const i1H = (4 / 3) * i1Now - (1 / 3) * s1r[b + SLOT_I1];
-        const i2H = (4 / 3) * i2Now - (1 / 3) * s1r[b + SLOT_I2];
-        const i3H = (4 / 3) * i3Now - (1 / 3) * s1r[b + SLOT_I3];
-        s[b + SLOT_HIST1] = -s[b + SLOT_G11] * i1H - s[b + SLOT_G12] * i2H - s[b + SLOT_G13] * i3H;
-        s[b + SLOT_HIST2] = -s[b + SLOT_G12] * i1H - s[b + SLOT_G22] * i2H - s[b + SLOT_G23] * i3H;
-        s[b + SLOT_HIST3] = -s[b + SLOT_G13] * i1H - s[b + SLOT_G23] * i2H - s[b + SLOT_G33] * i3H;
-        break;
+      if (ctx.initMode === "initPred") {
+        sRef[base + SLOT_PHI1] = this.s1[base + SLOT_PHI1];
+        sRef[base + SLOT_PHI2] = this.s1[base + SLOT_PHI2];
+        sRef[base + SLOT_PHI3] = this.s1[base + SLOT_PHI3];
+      } else {
+        sRef[base + SLOT_PHI1] = this._l1 * i1Now + this._m12 * i2Now + this._m13 * i3Now;
+        sRef[base + SLOT_PHI2] = this._l2 * i2Now + this._m12 * i1Now + this._m23 * i3Now;
+        sRef[base + SLOT_PHI3] = this._l3 * i3Now + this._m13 * i1Now + this._m23 * i2Now;
+        if (ctx.initMode === "initTran") {
+          this.s1[base + SLOT_PHI1] = sRef[base + SLOT_PHI1];
+          this.s1[base + SLOT_PHI2] = sRef[base + SLOT_PHI2];
+          this.s1[base + SLOT_PHI3] = sRef[base + SLOT_PHI3];
+        }
       }
+
+      const phi1_0 = sRef[base + SLOT_PHI1];
+      const phi2_0 = sRef[base + SLOT_PHI2];
+      const phi3_0 = sRef[base + SLOT_PHI3];
+      const phi1_1 = this.s1[base + SLOT_PHI1];
+      const phi2_1 = this.s1[base + SLOT_PHI2];
+      const phi3_1 = this.s1[base + SLOT_PHI3];
+      let ccap1: number;
+      let ccap2: number;
+      let ccap3: number;
+      if (ctx.order >= 2 && ag.length > 2) {
+        const phi1_2 = this.s2[base + SLOT_PHI1];
+        const phi2_2 = this.s2[base + SLOT_PHI2];
+        const phi3_2 = this.s2[base + SLOT_PHI3];
+        ccap1 = ag[0] * phi1_0 + ag[1] * phi1_1 + ag[2] * phi1_2;
+        ccap2 = ag[0] * phi2_0 + ag[1] * phi2_1 + ag[2] * phi2_2;
+        ccap3 = ag[0] * phi3_0 + ag[1] * phi3_1 + ag[2] * phi3_2;
+      } else {
+        ccap1 = ag[0] * phi1_0 + ag[1] * phi1_1;
+        ccap2 = ag[0] * phi2_0 + ag[1] * phi2_1;
+        ccap3 = ag[0] * phi3_0 + ag[1] * phi3_1;
+      }
+
+      const g11 = ag[0] * this._l1;
+      const g22 = ag[0] * this._l2;
+      const g33 = ag[0] * this._l3;
+      const g12 = ag[0] * this._m12;
+      const g13 = ag[0] * this._m13;
+      const g23 = ag[0] * this._m23;
+      const hist1 = ccap1 - ag[0] * phi1_0;
+      const hist2 = ccap2 - ag[0] * phi2_0;
+      const hist3 = ccap3 - ag[0] * phi3_0;
+
+      solver.stamp(b1, b1, -g11);
+      solver.stamp(b1, b2, -g12);
+      solver.stamp(b1, b3, -g13);
+      solver.stampRHS(b1, hist1);
+      solver.stamp(b2, b1, -g12);
+      solver.stamp(b2, b2, -g22);
+      solver.stamp(b2, b3, -g23);
+      solver.stampRHS(b2, hist2);
+      solver.stamp(b3, b1, -g13);
+      solver.stamp(b3, b2, -g23);
+      solver.stamp(b3, b3, -g33);
+      solver.stampRHS(b3, hist3);
+
+      sRef[base + SLOT_G11] = g11;
+      sRef[base + SLOT_G22] = g22;
+      sRef[base + SLOT_G33] = g33;
+      sRef[base + SLOT_G12] = g12;
+      sRef[base + SLOT_G13] = g13;
+      sRef[base + SLOT_G23] = g23;
+      sRef[base + SLOT_HIST1] = hist1;
+      sRef[base + SLOT_HIST2] = hist2;
+      sRef[base + SLOT_HIST3] = hist3;
+      sRef[base + SLOT_I1] = i1Now;
+      sRef[base + SLOT_I2] = i2Now;
+      sRef[base + SLOT_I3] = i3Now;
+    } else {
+      sRef[base + SLOT_PHI1] = this._l1 * i1Now + this._m12 * i2Now + this._m13 * i3Now;
+      sRef[base + SLOT_PHI2] = this._l2 * i2Now + this._m12 * i1Now + this._m23 * i3Now;
+      sRef[base + SLOT_PHI3] = this._l3 * i3Now + this._m13 * i1Now + this._m23 * i2Now;
+      sRef[base + SLOT_I1] = i1Now;
+      sRef[base + SLOT_I2] = i2Now;
+      sRef[base + SLOT_I3] = i3Now;
+      sRef[base + SLOT_G11] = 0;
+      sRef[base + SLOT_G22] = 0;
+      sRef[base + SLOT_G33] = 0;
+      sRef[base + SLOT_G12] = 0;
+      sRef[base + SLOT_G13] = 0;
+      sRef[base + SLOT_G23] = 0;
+      sRef[base + SLOT_HIST1] = 0;
+      sRef[base + SLOT_HIST2] = 0;
+      sRef[base + SLOT_HIST3] = 0;
     }
-
-    // Write current step's values into s0 (no manual history shifting)
-    s[b + SLOT_I1]   = i1Now;
-    s[b + SLOT_I2]   = i2Now;
-    s[b + SLOT_I3]   = i3Now;
-  }
-
-  updateChargeFlux(voltages: Float64Array, _dt: number, _method: IntegrationMethod, _order: number, _deltaOld: readonly number[]): void {
-    const b1 = this.branchIndex;
-    const b2 = this._b2;
-    const b3 = this._b3;
-    const i1Now = voltages[b1];
-    const i2Now = voltages[b2];
-    const i3Now = voltages[b3];
-    const s = this.s0;
-    const b = this.base;
-    s[b + SLOT_PHI1] = this._l1 * i1Now + this._m12 * i2Now + this._m13 * i3Now;
-    s[b + SLOT_PHI2] = this._l2 * i2Now + this._m12 * i1Now + this._m23 * i3Now;
-    s[b + SLOT_PHI3] = this._l3 * i3Now + this._m13 * i1Now + this._m23 * i2Now;
   }
 
   getLteTimestep(

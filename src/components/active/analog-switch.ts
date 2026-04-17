@@ -32,7 +32,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -127,18 +127,19 @@ function createSwitchSPSTElement(
     isNonlinear: true,
     isReactive: false,
 
-    stamp(_solver: SparseSolver): void {
-      // No linear (topology-constant) contributions — all in stampNonlinear.
-    },
-
-    stampNonlinear(solver: SparseSolver): void {
-      const g = 1 / currentR;
-      stampConductance(solver, nIn, nOut, g);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+    load(ctx: LoadContext): void {
+      const voltages = ctx.voltages;
       const vCtrl = readNode(voltages, nCtrl);
-      currentR = switchResistance(vCtrl, p.threshold, Math.max(p.rOn, 1e-6), Math.max(p.rOff, p.rOn + 1), p.transitionSharpness, false);
+      currentR = switchResistance(
+        vCtrl,
+        p.threshold,
+        Math.max(p.rOn, 1e-6),
+        Math.max(p.rOff, p.rOn + 1),
+        p.transitionSharpness,
+        false,
+      );
+      const g = 1 / currentR;
+      stampConductance(ctx.solver, nIn, nOut, g);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -189,21 +190,16 @@ function createSwitchSPDTElement(
     isNonlinear: true,
     isReactive: false,
 
-    stamp(_solver: SparseSolver): void {
-      // No linear contributions — all in stampNonlinear.
-    },
-
-    stampNonlinear(solver: SparseSolver): void {
-      stampConductance(solver, nCom, nNO, 1 / rNO);
-      stampConductance(solver, nCom, nNC, 1 / rNC);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+    load(ctx: LoadContext): void {
+      const voltages = ctx.voltages;
+      const solver = ctx.solver;
       const vCtrl = readNode(voltages, nCtrl);
       const rOnNow  = Math.max(p.rOn, 1e-6);
       const rOffNow = Math.max(p.rOff, rOnNow + 1);
       rNO = switchResistance(vCtrl, p.threshold, rOnNow, rOffNow, p.transitionSharpness, false);
       rNC = switchResistance(vCtrl, p.threshold, rOnNow, rOffNow, p.transitionSharpness, true);
+      stampConductance(solver, nCom, nNO, 1 / rNO);
+      stampConductance(solver, nCom, nNC, 1 / rNC);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {

@@ -25,7 +25,8 @@ Before doing anything else, read these files in order:
 Regard all implementations with extreme suspicion. Agents under context pressure take shortcuts and write comments to justify them. A comment that explains _why_ a rule was bent is not a mitigating factor — it is proof the agent knowingly broke the rule.
 
 Specific red flags:
-- Any comment containing words like "workaround", "temporary", "for now", "legacy", "backwards compatible", "previously", "migrated from", "replaced", "fallback", "shim"
+- **User-required task deferral (critical severity — always):** Any task whose spec explicitly requires the user (e.g. "the user must configure…", "requires user to provide…", "user manually verifies…") that was marked complete without evidence of actual user action through the coordinator. Look for: placeholder values for user-provided input, comments like "user needs to…" / "to be configured by user" / "replace with your…", stub implementations assuming post-deployment user action, or a `complete`/`partial` status in `spec/progress.md` for a user-required task without coordinator confirmation. This is never minor or major — it is always **critical**.
+- Any comment containing words like "workaround", "temporary", "for now", "legacy", "backwards compatible", "previously", "migrated from", "replaced", "fallback", "shim" — **these are dead-code markers, not comment problems.** The comment exists because an agent left dead or transitional code in place to avoid deleting it and fixing tests. Report the **code the comment decorates** as the violation (severity: critical), not just the comment. The code must be deleted along with the comment, and any tests depending on the dead code path must be fixed or rewritten.
 - Use of `git stash`, `git checkout` (to discard changes), `git reset`, or `git clean` in bash commands or scripts
 - `pytest.skip`, `pytest.xfail`, `unittest.skip`, soft assertions, `pytest.approx` with loose tolerances
 - `pass`, `raise NotImplementedError`, `# TODO`, `# FIXME`, `# HACK`
@@ -71,6 +72,7 @@ For each test file:
 - Search for string references to removed APIs, config keys, or paths.
 - Search for backwards-compatibility shims, re-exports, or deprecated wrappers.
 - Search for feature flags or toggles between old and new behaviour.
+- Search for comments containing "legacy", "fallback", "workaround", "temporary", "previously", "backwards compatible", "shim", "migrated from", or "replaced." When found, examine the code the comment decorates — it is almost certainly dead or transitional code an agent left behind to avoid fixing tests. Report the code block as critical dead code, not as a comment violation.
 
 ### 7. Write Full Report to File
 

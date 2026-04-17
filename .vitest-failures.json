@@ -1,27 +1,21 @@
 {
   "summary": {
-    "passed": 58,
-    "failed": 2,
-    "skipped": 0,
-    "totalFiles": 2,
-    "durationSeconds": 1
+    "passed": 0,
+    "failed": 1,
+    "skipped": 36,
+    "totalFiles": 1,
+    "durationSeconds": 0.8
   },
   "failures": [
     {
-      "message": "expected -1439571488470058200 to be greater than 4.5",
-      "count": 2,
+      "message": "expected 9 to be 2 // Object.is equality",
+      "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
-          "test": "transient_rc_decay",
-          "line": 252,
-          "column": 16
-        },
-        {
-          "file": "src\\solver\\analog\\__tests__\\analog-engine.test.ts",
-          "test": "predictor_off_rc_regression",
-          "line": 609,
-          "column": 16
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "ipass_skipped_without_nodesets",
+          "line": 576,
+          "column": 26
         }
       ]
     }

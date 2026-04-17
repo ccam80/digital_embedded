@@ -117,13 +117,14 @@ Replace the split element interface (`stamp` + `stampNonlinear` + `updateOperati
 
 - **Files to modify**:
   - `src/solver/analog/element.ts` — Replace interface definition. Remove `stamp`, `stampNonlinear`, `updateOperatingPoint`, `stampCompanion`, `stampReactiveCompanion`, `updateChargeFlux`, `updateState`, `updateCompanion`, `shouldBypass`, `getBreakpoints`. Add `load(ctx: LoadContext): void`.
+  - `src/core/analog-types.ts` — `AnalogElementCore` is the upstream interface that `AnalogElement` extends. It MUST be kept in lockstep: remove the same methods (`stamp`, `stampNonlinear`, `updateOperatingPoint`, `stampCompanion`, `stampReactiveCompanion`, `updateChargeFlux`, `updateState`, `updateCompanion`, `shouldBypass`, `getBreakpoints`) from `AnalogElementCore` and add `load(ctx: LoadContext): void`. Two sibling interfaces with different method sets is a shim by construction — both must reflect the post-Wave-6.1 shape atomically.
 
 - **Tests**:
   - Compilation must succeed with all ~65 elements implementing the new interface (this is enforced by TypeScript after Task 6.2.*).
 
 - **Acceptance criteria**:
   - `AnalogElement` interface has `load()` as the primary hot-path method.
-  - No `stamp()`, `stampNonlinear()`, `updateOperatingPoint()`, `stampCompanion()`, `stampReactiveCompanion()` in the interface.
+  - No `stamp()`, `stampNonlinear()`, `updateOperatingPoint()`, `stampCompanion()`, `stampReactiveCompanion()` in **either** `AnalogElement` (element.ts) or `AnalogElementCore` (core/analog-types.ts).
 
 ## Wave 6.2: Rewrite All Element Implementations
 
@@ -421,3 +422,157 @@ Replace the split element interface (`stamp` + `stampNonlinear` + `updateOperati
   - `SparseSolver.stamp(row, col, value)` does not exist.
   - Zero grep hits for `.stamp(` on a `SparseSolver` instance anywhere in `src/` or test fixtures.
   - All targeted sparse-solver / newton-raphson / element tests remain green after the deletion.
+
+## Wave 6.4: Digital Pin Models in cktLoad
+
+Replace the split-interface digital pin models (`DigitalOutputPinModel`, `DigitalInputPinModel`) with unified `load(ctx: LoadContext)` / `accept(ctx, voltage)` methods. Resolve loading-mode at compile time using the compiler's existing `digitalPinLoading` + `perNetLoadingOverrides` mechanism and thread the resolution into behavioural factories via a new `_pinLoading` key on the PropertyBag.
+
+**Why this wave exists.** The digital pin models are sub-components owned by behavioural elements (gates, flip-flops, combinational, sequential, remaining). Without this wave, Wave 6.2.6's behavioural-element `load()` rewrites still delegate to `pinModel.stamp(solver)` / `pinModel.stampOutput(solver)` / `pinModel.stampCompanion(solver, dt, method)` — the old split interface at the sub-component level. That leaves two layers of interface, one migrated and one not, which is exactly the kind of partial migration the master plan bans. Wave 6.4 brings the pin-model layer into cktLoad world.
+
+**Dependencies.** Wave 6.4 depends on Wave 6.1 (`LoadContext` + `AnalogElement` interface) and Wave 6.2 (behavioural element `load()` exists to delegate from). Within Phase 6, Wave 6.4 runs after 6.2; it is independent of 6.3 and may land in parallel with it.
+
+**Mode resolution.** Compile-time, cached on the pin-model instance. No runtime map lookup on the hot path. Mode resolves per-pin using the compiler's existing rule (mirror of the bridge-adapter resolution at `compiler.ts:1281-1295`): consult `perNetLoadingOverrides.get(nodeId)` first — if present, use `override === "loaded"`; otherwise use circuit-level `digitalPinLoading` — `"none"` → false, `"all"` → true, `"cross-domain"` → true iff the pin bridges analog/digital domains. Result is a boolean `loaded` per pin, frozen for the lifetime of the compiled circuit.
+
+**Role tag on output pins.** `DigitalOutputPinModel` takes a `role: "branch" | "direct"` constructor argument. `"branch"` stamps the ideal voltage-source branch-equation form — used by bridge-output adapters. `"direct"` stamps the conductance+current-source form — used by behavioural elements that share the output node with their truth-table NR loop. Role is orthogonal to loaded / ideal and is frozen at construction.
+
+**Introspection policy.** `DigitalOutputPinModel.loaded` and `DigitalInputPinModel.loaded` are exposed as read-only getters for diagnostics and debug overlays. **No call site outside `digital-pin-model.ts` may branch on `pinModel.loaded` to alter its own stamping behaviour.** The getter is for observation only; the stamp shape is entirely the pin model's responsibility.
+
+**readLogicLevel stays outside cktLoad.** `DigitalInputPinModel.readLogicLevel(voltage)` is sense-only — it reads a voltage against `vIH` / `vIL` thresholds and returns a logic level. Behavioural elements call it after `load()` when they need logic-level readout; it is not folded into `load()`.
+
+### Task 6.4.1: Thread resolved per-pin loading mode from compiler to behavioural factories
+
+- **Description**: Extend the compiler's per-pin loading-mode resolution (today applied at `compiler.ts:1281-1295` only to bridge adapters) so every behavioural element's factory receives a per-pin-label loaded map. Write the resolved map into the `PropertyBag` under a new reserved key `_pinLoading`, alongside the existing `_pinElectrical` entry. Behavioural factories read this key during pin-model construction; factories that don't care simply ignore it.
+
+  Key shape:
+  ```typescript
+  _pinLoading: Record<string, boolean>
+  // e.g. { "In_1": true, "In_2": true, "out": true }
+  ```
+  Keys align with `_pinElectrical` keys so both are looked up the same way. `true` when the compiler resolved that pin to loaded, `false` for ideal.
+
+  Resolution rule is the same as the existing bridge-adapter logic — factor it out of the bridge-adapter code path into a shared helper (e.g. `resolvePinLoading(nodeId, mode, overrides, isCrossDomain): boolean`) that both call sites invoke.
+
+- **Files to modify**:
+  - `src/solver/analog/compiler.ts` — In the element-compilation loop, before invoking the analog factory for each element, compute `_pinLoading` for the element's pins by calling the shared helper for each (pinLabel → nodeId) pair, then set it on `props` (PropertyBag). Factor the existing bridge-adapter resolution into the shared helper.
+
+- **Tests**:
+  - `src/solver/analog/__tests__/compiler.test.ts::pin_loading_threaded_for_behavioural_gate_all_mode` — compile a circuit containing a NAND gate with `digitalPinLoading: "all"`; assert the factory is invoked with `_pinLoading: { "In_1": true, "In_2": true, "out": true }` on the PropertyBag.
+  - `src/solver/analog/__tests__/compiler.test.ts::pin_loading_threaded_for_behavioural_gate_none_mode` — same circuit with `digitalPinLoading: "none"`; assert every `_pinLoading` entry is `false`.
+  - `src/solver/analog/__tests__/compiler.test.ts::pin_loading_respects_per_net_override` — circuit with default mode plus `perNetLoadingOverrides` forcing one net to `"ideal"`; assert the corresponding pin entry is `false` while others remain `true`.
+  - `src/solver/analog/__tests__/compiler.test.ts::pin_loading_helper_shared_with_bridge_adapter` — instantiate a circuit that drives both a bridge-output adapter and a behavioural gate from the same overridden net; assert both resolve to the same loaded value (same underlying helper call).
+
+- **Acceptance criteria**:
+  - Every behavioural element's `PropertyBag` carries a `_pinLoading: Record<string, boolean>` entry whose keys match `_pinElectrical` keys.
+  - The bridge-adapter resolution and the behavioural-factory resolution call the same shared helper — no duplicated logic.
+
+### Task 6.4.2: Rewrite pin models with load(ctx), accept(ctx, voltage), role tag, and loaded getter
+
+- **Description**: Replace the pin-model stamp surface with unified load(ctx) / accept(ctx, voltage). Keep `init`, `setLogicLevel`, `setHighZ`, `setParam`, `readLogicLevel`, and all existing getters unchanged.
+
+  **DigitalOutputPinModel:**
+  - Constructor gains a `role: "branch" | "direct"` parameter.
+  - `load(ctx: LoadContext)` dispatches on `role`:
+    - `"branch"` — stamps the current `stamp(solver)` body (ideal voltage-source branch equation). When `_loaded`, also stamps `1/rOut` (drive) or `1/rHiZ` (Hi-Z) on the node diagonal.
+    - `"direct"` — stamps the current `stampOutput(solver)` body (conductance + current-source to target rail). When `_loaded`, adds `1/rHiZ` diagonal stamp in Hi-Z.
+  - When `_loaded` and `_spec.cOut > 0` and `ctx.isTransient`, `load()` performs inline `NIintegrate`-style companion stamping using `ctx.ag[]` and `ctx.dt` — mirror of the Wave 6.2.2 pattern. No call to the `integrateCapacitor` helper.
+  - `accept(ctx: LoadContext, voltage: number)` — post-accepted-timestep companion state update using `ctx.ag[]` and `ctx.dt`. Updates `_prevVoltage` and `_prevCurrent`.
+
+  **DigitalInputPinModel:**
+  - `load(ctx)` — no-op when `!_loaded`. When `_loaded`, stamps `1/rIn` on the node diagonal. When `_loaded` and `_spec.cIn > 0` and `ctx.isTransient`, inline companion stamp using `ctx.ag[]` / `ctx.dt`.
+  - `accept(ctx, voltage)` — post-accepted-timestep companion state update.
+
+  **Handle caching (both classes):** On the first `load(ctx)` call, allocate matrix handles via `ctx.solver.allocElement(row, col)` once per stamp location and cache in private `Int32Array` fields (one per handle role: `_hNodeDiag`, `_hBranchDiag`, `_hBranchNode`, `_hNodeBranch`, etc.). Subsequent iterations use `stampElement(handle, value)`. Handles are invalidated on `init()` (which reassigns `nodeId` / `branchIdx`).
+
+  **Getter:**
+  ```typescript
+  /** Read-only introspection accessor. See Wave 6.4 policy. */
+  get loaded(): boolean { return this._loaded; }
+  ```
+  on both classes.
+
+  **Import cleanup:** Delete the `import { integrateCapacitor } from "./integration.js"` line — companion integration is inline via `ctx.ag[]`. This aligns with Wave 6.3.2's deletion of `integrateCapacitor` / `integrateInductor`.
+
+- **Files to modify**:
+  - `src/solver/analog/digital-pin-model.ts` — Replace `stamp`, `stampOutput`, `stampCompanion`, `updateCompanion` methods with `load(ctx)` and `accept(ctx, voltage)` on both classes. Add `role` parameter to `DigitalOutputPinModel` constructor. Add `get loaded()` on both classes. Delete the `integrateCapacitor` import. Add private handle-cache fields.
+
+- **Tests**:
+  - `src/solver/analog/__tests__/digital-pin-model.test.ts::output_load_branch_role_drive_loaded` — construct `DigitalOutputPinModel(spec, loaded=true, role="branch")` with `setLogicLevel(true)`, `setHighZ(false)`; call `load(ctx)`; assert branch-equation stamps at `(branchIdx, nodeIdx)`, `(branchIdx, branchIdx)`, `(nodeIdx, branchIdx)`, RHS at `branchIdx` equal to `vOH`, plus `1/rOut` diagonal stamp at `(nodeIdx, nodeIdx)`. Reference values captured from the pre-migration `stamp()` body for the same config.
+  - `src/solver/analog/__tests__/digital-pin-model.test.ts::output_load_branch_role_hiz_ideal` — `loaded=false`, `role="branch"`, `setHighZ(true)`; assert branch equation `I = 0` form with NO `1/rHiZ` term.
+  - `src/solver/analog/__tests__/digital-pin-model.test.ts::output_load_direct_role_drive_loaded` — `role="direct"`, `loaded=true`, `setLogicLevel(false)`; assert `1/rOut` diagonal + `vOL/rOut` RHS. No branch-row stamps.
+  - `src/solver/analog/__tests__/digital-pin-model.test.ts::output_load_direct_role_hiz_loaded` — `role="direct"`, `loaded=true`, `setHighZ(true)`; assert `1/rHiZ` diagonal stamp and zero RHS.
+  - `src/solver/analog/__tests__/digital-pin-model.test.ts::input_load_loaded_stamps_rIn` — `DigitalInputPinModel(spec, loaded=true)`; `load(ctx)` stamps `1/rIn` on the node diagonal and nothing else.
+  - `src/solver/analog/__tests__/digital-pin-model.test.ts::input_load_ideal_is_noop` — `loaded=false`; `load(ctx)` performs zero stamps on matrix and zero writes on RHS.
+  - `src/solver/analog/__tests__/digital-pin-model.test.ts::output_load_companion_inline_uses_ag` — transient config with `ctx.ag[0]=g0`, `ctx.ag[1]=g1`, `ctx.dt > 0`, `loaded=true`, `cOut=1e-12`; spy on `integrateCapacitor` (or assert it is no longer imported via file-level grep); call `load(ctx)`; assert companion stamp geq/ceq are consistent with `ag[0] * q0 + ag[1] * q1` inline formula.
+  - `src/solver/analog/__tests__/digital-pin-model.test.ts::output_accept_updates_prev_voltage` — call `load(ctx)`, then `accept(ctx, 1.8)`; read internal `_prevVoltage` via existing private-field test hook or diagnostic accessor; assert equals 1.8.
+  - `src/solver/analog/__tests__/digital-pin-model.test.ts::loaded_getter_reads_private_field` — construct with `loaded=false`; `pin.loaded === false`. Reconstruct with `loaded=true`; `pin.loaded === true`. No setter exists — `(pin as any).loaded = true` is either a no-op or a TypeError (whichever the getter-without-setter pattern produces in strict mode).
+  - `src/solver/analog/__tests__/digital-pin-model.test.ts::handle_cache_stable_across_iterations` — spy on `ctx.solver.allocElement`; call `load(ctx)` three times with identical mode and node assignment; assert `allocElement` invoked exactly `N` times total (where `N` is the number of stamp locations), not `3N`.
+
+- **Acceptance criteria**:
+  - `DigitalOutputPinModel` and `DigitalInputPinModel` have no `stamp`, `stampOutput`, `stampCompanion`, or `updateCompanion` methods (grep returns zero matches in `digital-pin-model.ts`).
+  - `load(ctx)` is the sole matrix-stamping entry point on each class; `accept(ctx, voltage)` is the sole post-accept companion-update entry point.
+  - `role` tag on output pins is frozen at construction; `role === "branch"` only from bridge-output adapters, `role === "direct"` only from behavioural factories.
+  - `loaded` getter exists on both classes; no setter.
+  - `integrateCapacitor` is not imported in `digital-pin-model.ts`.
+
+### Task 6.4.3: Rewire behavioural factories and delegation from element load() / accept()
+
+- **Description**: Update every behavioural factory to read `_pinLoading: Record<string, boolean>` from the PropertyBag and pass the resolved boolean to each pin-model constructor. Update every behavioural element's `load(ctx)` (landed in Wave 6.2.6) to delegate stamping to `input.load(ctx)` / `output.load(ctx)` for each owned pin model, then evaluate the truth table using `input.readLogicLevel(voltage)` on each input voltage read from `ctx.voltages`. Update each behavioural element's `accept(ctx, simTime, addBreakpoint)` to delegate companion updates to `input.accept(ctx, voltage)` / `output.accept(ctx, voltage)`.
+
+  Specific hardcoded-true fixes (non-exhaustive):
+  - `behavioral-gate.ts::buildGateElement` currently constructs `new DigitalInputPinModel(spec, true)` — replace with `new DigitalInputPinModel(spec, pinLoading[label] ?? false)`. Construct `new DigitalOutputPinModel(outSpec, pinLoading["out"] ?? false, "direct")`.
+  - All other behavioural factory files: apply the same pattern — read `_pinLoading` from props, pass the per-pin boolean into each constructor, pass `"direct"` for all output pin roles (no behavioural element uses `"branch"`).
+
+- **Files to modify**:
+  - `src/solver/analog/behavioral-gate.ts` — read `_pinLoading`; pass to each pin-model constructor; rewire `BehavioralGateElement.load(ctx)` and `.accept(ctx, simTime, addBreakpoint)` to delegate to pin models.
+  - `src/solver/analog/behavioral-combinational.ts` — same treatment.
+  - `src/solver/analog/behavioral-flipflop.ts`, `behavioral-flipflop-variants.ts`, and every file under `src/solver/analog/behavioral-flipflop/` (`rs.ts`, `rs-async.ts`, `jk.ts`, `jk-async.ts`, `d-async.ts`, `t.ts`) — same treatment.
+  - `src/solver/analog/behavioral-sequential.ts` — same treatment.
+  - `src/solver/analog/behavioral-remaining.ts` — same treatment.
+  - `src/solver/analog/bridge-adapter.ts` — bridge-output adapter constructs `DigitalOutputPinModel(spec, loaded, role="branch")`. Bridge-input adapter constructs `DigitalInputPinModel(spec, loaded)`. Confirm the existing `loaded` plumbing still operates through the same shared helper introduced in Task 6.4.1 (no duplicated logic).
+
+- **Tests**:
+  - `src/solver/analog/__tests__/behavioral-gate.test.ts::pin_loading_propagates_to_pin_models_all_mode` — compile a NAND gate circuit with `digitalPinLoading: "all"`; reach the compiled element via the existing test accessor; assert every input pin's `loaded === true` and the output pin's `loaded === true`.
+  - `src/solver/analog/__tests__/behavioral-gate.test.ts::pin_loading_propagates_to_pin_models_none_mode` — same circuit with `"none"`; assert every `loaded === false`.
+  - `src/solver/analog/__tests__/behavioral-gate.test.ts::pin_loading_respects_per_net_override_on_gate_input` — circuit with default mode plus per-net override on one input net; assert that input's `loaded` reflects the override and the remaining pins use the default resolution.
+  - `src/solver/analog/__tests__/behavioral-gate.test.ts::gate_load_delegates_to_pin_models` — monkey-patch each pin-model instance's `load` with a spy; call the gate element's `load(ctx)`; assert every spy was invoked exactly once, with the same LoadContext object reference passed to each.
+  - `src/solver/analog/__tests__/behavioral-gate.test.ts::gate_accept_delegates_to_pin_models` — same pattern for `accept(ctx, simTime, addBreakpoint)`. Assert each pin-model `accept(ctx, voltage)` was called with the voltage corresponding to that pin's node in `ctx.voltages`.
+  - `src/solver/analog/__tests__/behavioral-gate.test.ts::gate_output_uses_direct_role` — after factory construction, assert the gate's output pin's role is `"direct"` (via an existing test-only accessor or by observing that the stamped shape is conductance+source, not branch-equation).
+  - `src/solver/analog/__tests__/behavioral-flipflop.test.ts::flipflop_load_delegates_to_pin_models` — equivalent delegation test for the D flip-flop family (one variant per file is sufficient).
+  - `src/solver/analog/__tests__/behavioral-combinational.test.ts::combinational_pin_loading_propagates` — one representative combinational element.
+  - `src/solver/analog/__tests__/behavioral-sequential.test.ts::sequential_pin_loading_propagates` — one representative sequential element.
+  - `src/solver/analog/__tests__/behavioral-remaining.test.ts::remaining_pin_loading_propagates` — one representative remaining element.
+  - All existing behavioural-element tests continue to pass with the new delegation under the default `"cross-domain"` setting (behavioural elements today construct inputs with `loaded=true` hardcoded; after this wave, `"cross-domain"` resolution must produce the same boolean for the test circuits so numerical behaviour is preserved).
+
+- **Acceptance criteria**:
+  - Zero hardcoded `new DigitalInputPinModel(spec, true)` or `new DigitalOutputPinModel(spec)` (without explicit loaded + role args) calls in any behavioural factory file. Grep over the listed files returns zero matches for hardcoded boolean literals in pin-model constructor calls.
+  - No behavioural element file contains `pinModel.stamp(`, `pinModel.stampOutput(`, `pinModel.stampCompanion(`, or `pinModel.updateCompanion(` calls (grep returns zero matches).
+  - Every behavioural element's `load(ctx)` delegates to owned pin models' `load(ctx)`.
+  - Every behavioural element's `accept(ctx, simTime, addBreakpoint)` delegates to owned pin models' `accept(ctx, voltage)`.
+
+### Task 6.4.4: Delete legacy pin-model stamp methods — atomic gate
+
+- **Description**: After Tasks 6.4.1–6.4.3 land, the legacy stamp methods on the pin models have no external callers. Delete them atomically and confirm full-codebase `tsc --noEmit` succeeds.
+
+  Deleted methods:
+  - `DigitalOutputPinModel.stamp(solver)`
+  - `DigitalOutputPinModel.stampOutput(solver)`
+  - `DigitalOutputPinModel.stampCompanion(solver, dt, method)`
+  - `DigitalOutputPinModel.updateCompanion(dt, method, voltage)`
+  - `DigitalInputPinModel.stamp(solver)`
+  - `DigitalInputPinModel.stampCompanion(solver, dt, method)`
+  - `DigitalInputPinModel.updateCompanion(dt, method, voltage)`
+
+  Retained: `init`, `setLogicLevel`, `setHighZ`, `setParam`, `load`, `accept`, `readLogicLevel`, all getters (including the new `loaded` getter from Task 6.4.2).
+
+- **Files to modify**:
+  - `src/solver/analog/digital-pin-model.ts` — delete the listed methods.
+
+- **Tests**:
+  - `src/solver/analog/__tests__/digital-pin-model.test.ts::legacy_stamp_methods_deleted_output` — construct a `DigitalOutputPinModel`; assert `(pin as any).stamp === undefined`, `(pin as any).stampOutput === undefined`, `(pin as any).stampCompanion === undefined`, `(pin as any).updateCompanion === undefined`.
+  - `src/solver/analog/__tests__/digital-pin-model.test.ts::legacy_stamp_methods_deleted_input` — construct a `DigitalInputPinModel`; assert `(pin as any).stamp === undefined`, `(pin as any).stampCompanion === undefined`, `(pin as any).updateCompanion === undefined`.
+
+- **Acceptance criteria**:
+  - Grep for `stampOutput\|stampCompanion\|updateCompanion` in `src/solver/analog/digital-pin-model.ts` returns zero matches.
+  - Grep for `\.stamp\(` in the same file returns zero matches.
+  - All Wave 6.4 tests pass.
+  - Full-codebase `tsc --noEmit` succeeds after Wave 6.4 lands.

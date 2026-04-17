@@ -2,18 +2,15 @@
  * Behavioral analog models for combinational digital components:
  * multiplexer, demultiplexer, and decoder.
  *
- * All three are purely combinational — they evaluate in stampNonlinear()
- * every NR iteration. Selector bits are read via threshold detection, the
- * appropriate data routing is performed, and output pin Norton equivalents
- * are re-stamped immediately.
+ * All three are purely combinational — they evaluate inside load() every NR
+ * iteration. Selector bits are read via threshold detection, the appropriate
+ * data routing is performed, and output pin Norton equivalents are re-stamped.
  *
- * No edge detection is needed. No updateCompanion() logic gate.
- * Pin capacitance companion models are stamped in stampCompanion() and
- * updated in updateCompanion() for each output and input pin.
+ * Pin capacitance companion models are stamped inside load() during transient
+ * analysis and updated in accept() once per accepted timestep.
  */
 
-import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElementCore, IntegrationMethod } from "./element.js";
+import type { AnalogElementCore, LoadContext } from "./element.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -67,12 +64,6 @@ export class BehavioralMuxElement implements AnalogElementCore {
   private readonly _bitWidth: number;
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
-  /** Cached solver reference. */
-  private _solver: SparseSolver | null = null;
-
-  /** Cached operating-point voltages. */
-  private _cachedVoltages: Float64Array = new Float64Array(0);
-
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
@@ -94,23 +85,15 @@ export class BehavioralMuxElement implements AnalogElementCore {
     this._pinModelsByLabel = pinModelsByLabel;
   }
 
-  stamp(solver: SparseSolver): void {
-    this._solver = solver;
-    for (const p of this._selPins) p.stamp(solver);
-    for (const group of this._dataPins) {
-      for (const p of group) p.stamp(solver);
-    }
-  }
-
-  stampNonlinear(solver: SparseSolver): void {
-    this._solver = solver;
-    const v = this._cachedVoltages;
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+    const voltages = ctx.voltages;
 
     // Decode selector bits into an integer
     let sel = 0;
     for (let b = 0; b < this._selPins.length; b++) {
       const nodeId = this._selPins[b].nodeId;
-      const voltage = readMnaVoltage(nodeId, v);
+      const voltage = readMnaVoltage(nodeId, voltages);
       const level = this._selPins[b].readLogicLevel(voltage);
       if (level !== undefined) {
         if (level) sel |= 1 << b;
@@ -120,45 +103,46 @@ export class BehavioralMuxElement implements AnalogElementCore {
 
     const selectedGroup = this._dataPins[sel] ?? this._dataPins[0];
 
+    // Stamp input loading conductances for all input pins
+    for (const p of this._selPins) p.stamp(solver);
+    for (const group of this._dataPins) {
+      for (const p of group) p.stamp(solver);
+    }
+
+    // Route selected data to outputs and stamp output Norton equivalents
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const inputPin = selectedGroup[bit];
       const inputNodeId = inputPin.nodeId;
-      const inputVoltage = readMnaVoltage(inputNodeId, v);
+      const inputVoltage = readMnaVoltage(inputNodeId, voltages);
       const level = inputPin.readLogicLevel(inputVoltage);
       const outLevel = level ?? false;
       this._outPins[bit].setLogicLevel(outLevel);
       this._outPins[bit].stampOutput(solver);
     }
-  }
 
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    if (this._cachedVoltages.length !== voltages.length) {
-      this._cachedVoltages = new Float64Array(voltages.length);
+    // Transient: stamp companion models for pin capacitances
+    if (ctx.isTransient && ctx.dt > 0) {
+      for (const p of this._selPins) p.stampCompanion(solver, ctx.dt, ctx.method);
+      for (const group of this._dataPins) {
+        for (const p of group) p.stampCompanion(solver, ctx.dt, ctx.method);
+      }
+      for (const p of this._outPins) p.stampCompanion(solver, ctx.dt, ctx.method);
     }
-    this._cachedVoltages.set(voltages);
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array): void {
-    const solver = this._solver;
-    if (solver === null) return;
-    for (const p of this._selPins) p.stampCompanion(solver, dt, method);
-    for (const group of this._dataPins) {
-      for (const p of group) p.stampCompanion(solver, dt, method);
-    }
-    for (const p of this._outPins) p.stampCompanion(solver, dt, method);
-  }
-
-  updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    if (ctx.dt <= 0) return;
+    const voltages = ctx.voltages;
     for (const p of this._selPins) {
-      p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
+      p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
     }
     for (const group of this._dataPins) {
       for (const p of group) {
-        p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
+        p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
       }
     }
     for (const p of this._outPins) {
-      p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
+      p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
     }
   }
 
@@ -216,13 +200,6 @@ export class BehavioralDemuxElement implements AnalogElementCore {
   private readonly _outputCount: number;
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
-  /** Latched selector value. */
-  /** Cached solver reference. */
-  private _solver: SparseSolver | null = null;
-
-  /** Cached operating-point voltages. */
-  private _cachedVoltages: Float64Array = new Float64Array(0);
-
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
@@ -243,21 +220,15 @@ export class BehavioralDemuxElement implements AnalogElementCore {
     this._pinModelsByLabel = pinModelsByLabel;
   }
 
-  stamp(solver: SparseSolver): void {
-    this._solver = solver;
-    for (const p of this._selPins) p.stamp(solver);
-    this._inPin.stamp(solver);
-  }
-
-  stampNonlinear(solver: SparseSolver): void {
-    this._solver = solver;
-    const v = this._cachedVoltages;
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+    const voltages = ctx.voltages;
 
     // Decode selector
     let sel = 0;
     for (let b = 0; b < this._selPins.length; b++) {
       const nodeId = this._selPins[b].nodeId;
-      const voltage = readMnaVoltage(nodeId, v);
+      const voltage = readMnaVoltage(nodeId, voltages);
       const level = this._selPins[b].readLogicLevel(voltage);
       if (level !== undefined) {
         if (level) sel |= 1 << b;
@@ -267,38 +238,36 @@ export class BehavioralDemuxElement implements AnalogElementCore {
 
     // Read input level
     const inNodeId = this._inPin.nodeId;
-    const inVoltage = readMnaVoltage(inNodeId, v);
+    const inVoltage = readMnaVoltage(inNodeId, voltages);
     const inLevel = this._inPin.readLogicLevel(inVoltage) ?? false;
+
+    // Stamp input loading
+    for (const p of this._selPins) p.stamp(solver);
+    this._inPin.stamp(solver);
 
     // Route: selected output gets input level, all others get LOW
     for (let i = 0; i < this._outputCount; i++) {
       this._outPins[i].setLogicLevel(i === sel ? inLevel : false);
       this._outPins[i].stampOutput(solver);
     }
-  }
 
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    if (this._cachedVoltages.length !== voltages.length) {
-      this._cachedVoltages = new Float64Array(voltages.length);
+    // Transient: stamp companion models
+    if (ctx.isTransient && ctx.dt > 0) {
+      for (const p of this._selPins) p.stampCompanion(solver, ctx.dt, ctx.method);
+      this._inPin.stampCompanion(solver, ctx.dt, ctx.method);
+      for (const p of this._outPins) p.stampCompanion(solver, ctx.dt, ctx.method);
     }
-    this._cachedVoltages.set(voltages);
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array): void {
-    const solver = this._solver;
-    if (solver === null) return;
-    for (const p of this._selPins) p.stampCompanion(solver, dt, method);
-    this._inPin.stampCompanion(solver, dt, method);
-    for (const p of this._outPins) p.stampCompanion(solver, dt, method);
-  }
-
-  updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    if (ctx.dt <= 0) return;
+    const voltages = ctx.voltages;
     for (const p of this._selPins) {
-      p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
+      p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
     }
-    this._inPin.updateCompanion(dt, method, readMnaVoltage(this._inPin.nodeId, voltages));
+    this._inPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(this._inPin.nodeId, voltages));
     for (const p of this._outPins) {
-      p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
+      p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
     }
   }
 
@@ -350,13 +319,6 @@ export class BehavioralDecoderElement implements AnalogElementCore {
   private readonly _outputCount: number;
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
-  /** Latched selector value. */
-  /** Cached solver reference. */
-  private _solver: SparseSolver | null = null;
-
-  /** Cached operating-point voltages. */
-  private _cachedVoltages: Float64Array = new Float64Array(0);
-
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
   readonly isNonlinear: true = true;
@@ -375,20 +337,15 @@ export class BehavioralDecoderElement implements AnalogElementCore {
     this._pinModelsByLabel = pinModelsByLabel;
   }
 
-  stamp(solver: SparseSolver): void {
-    this._solver = solver;
-    for (const p of this._selPins) p.stamp(solver);
-  }
-
-  stampNonlinear(solver: SparseSolver): void {
-    this._solver = solver;
-    const v = this._cachedVoltages;
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+    const voltages = ctx.voltages;
 
     // Decode selector
     let sel = 0;
     for (let b = 0; b < this._selPins.length; b++) {
       const nodeId = this._selPins[b].nodeId;
-      const voltage = readMnaVoltage(nodeId, v);
+      const voltage = readMnaVoltage(nodeId, voltages);
       const level = this._selPins[b].readLogicLevel(voltage);
       if (level !== undefined) {
         if (level) sel |= 1 << b;
@@ -396,33 +353,30 @@ export class BehavioralDecoderElement implements AnalogElementCore {
       }
     }
 
+    // Stamp selector-pin loading
+    for (const p of this._selPins) p.stamp(solver);
+
     // One-hot output: only the selected index is HIGH
     for (let i = 0; i < this._outputCount; i++) {
       this._outPins[i].setLogicLevel(i === sel);
       this._outPins[i].stampOutput(solver);
     }
-  }
 
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    if (this._cachedVoltages.length !== voltages.length) {
-      this._cachedVoltages = new Float64Array(voltages.length);
+    // Transient: stamp companion models
+    if (ctx.isTransient && ctx.dt > 0) {
+      for (const p of this._selPins) p.stampCompanion(solver, ctx.dt, ctx.method);
+      for (const p of this._outPins) p.stampCompanion(solver, ctx.dt, ctx.method);
     }
-    this._cachedVoltages.set(voltages);
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array): void {
-    const solver = this._solver;
-    if (solver === null) return;
-    for (const p of this._selPins) p.stampCompanion(solver, dt, method);
-    for (const p of this._outPins) p.stampCompanion(solver, dt, method);
-  }
-
-  updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    if (ctx.dt <= 0) return;
+    const voltages = ctx.voltages;
     for (const p of this._selPins) {
-      p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
+      p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
     }
     for (const p of this._outPins) {
-      p.updateCompanion(dt, method, readMnaVoltage(p.nodeId, voltages));
+      p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
     }
   }
 

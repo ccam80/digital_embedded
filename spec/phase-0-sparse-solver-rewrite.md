@@ -162,3 +162,140 @@ Callers (MNAAssembler, cktLoad, every element's `load()`) cache handles on first
 - **Acceptance criteria**:
   - On E_SINGULAR, the NR loop re-executes the full load sequence before re-factoring.
   - Matches ngspice niiter.c:888-891 control flow exactly.
+
+## Wave 0.4: Complex Sparse Solver Parity
+
+Port Waves 0.1–0.3 onto `ComplexSparseSolver` so AC analysis operates on the same architecture as DC/transient. Scheduled independently of 0.1/0.2/0.3 (different file, different call sites) and can run in parallel with Phase 6.
+
+**Design parity with the real sparse solver:**
+- Persistent linked-list matrix as canonical representation — mirror of the `spMatrix` replacement from Wave 0.1, with values stored as parallel `_elRe` / `_elIm` Float64Arrays.
+- Handle-based API: `allocComplexElement(row, col): number` at first stamp, `stampComplexElement(handle, re, im): void` on the hot path. No value-addressed stamp survives this wave.
+- Markowitz pivot selection on original column order. No AMD, no etree.
+- Real `SMPpreOrder` operating on the complex linked-list structure to fix zero-diagonal columns from voltage-source / inductor branch rows. Magnitude test uses `re*re + im*im === 1.0` to match ngspice's `|value| === 1.0` check.
+- Explicit `forceReorder()` lifecycle — called once by `AcAnalysis.run()` before the first frequency's factor; subsequent frequencies use the numeric-only refactor path.
+
+**Hot-path symmetry:** `element.stampAc(solver, omega)` runs once per element per frequency point. Elements cache complex handles on the first frequency's call to `allocComplexElement` and reuse them for every subsequent frequency, analogous to how `load()` callers cache real handles across NR iterations. Per-frequency stamps are strict O(1) `stampComplexElement(handle, re, im)` with no pattern rebuild.
+
+**Bit-exactness target:** Per-frequency node voltages match ngspice `.AC` output with `absDelta === 0` on both real and imaginary parts — same IEEE-754 bar applied to DC/transient in Phase 7.
+
+### Task 0.4.1: Replace COO with persistent linked-list complex matrix and handle-based stamp API
+
+- **Description**: Remove the COO triplet arrays (`_cooRows`, `_cooCols`, `_cooRe`, `_cooIm`, `_cooCount`) and the `_growCOO()`, `_buildCSC()`, `_patternChanged()` methods. Add a persistent linked-list element pool with parallel `_elRow: Int32Array`, `_elCol: Int32Array`, `_elRe: Float64Array`, `_elIm: Float64Array`, `_colHead: Int32Array`, `_rowHead: Int32Array`, `_elNextInRow: Int32Array`, `_elNextInCol: Int32Array`, `_diag: Int32Array` — the complex analogue of the Wave 0.1 pool.
+
+  New API:
+  - `allocComplexElement(row: number, col: number): number` — returns a stable handle (pool index). On the first allocation at (row, col) creates and links a new pool entry; subsequent calls for the same (row, col) return the cached handle.
+  - `stampComplexElement(handle: number, re: number, im: number): void` — O(1) accumulate: `_elRe[handle] += re; _elIm[handle] += im`.
+
+  `beginAssembly(n)` zeros `_elRe[h]` and `_elIm[h]` for every handle via chain walk, frees fill-in entries to a pool free-list, and leaves the linked structure intact. `finalize()` computes Markowitz counts from the linked structure directly — no CSC build at this point.
+
+  ngspice reference: spbuild.c `spGetElement` — complex variant uses the same cached-pointer pattern as the real-valued case, only the value type differs.
+
+- **Files to modify**:
+  - `src/solver/analog/complex-sparse-solver.ts` — Replace COO fields with linked-list pool fields. Replace the bodies of `beginAssembly()`, `finalize()`, and the stamp API. The value-addressed `stamp(row, col, re, im)` method stays as a thin wrapper (calls `allocComplexElement` then `stampComplexElement`) only until Task 0.4.4 performs the atomic deletion — analogous to how Wave 6.3 Task 6.3.4 deletes the real-side `stamp()` after Wave 6.2 migrates callers.
+  - `src/core/analog-types.ts` — Add `allocComplexElement(row, col): number` and `stampComplexElement(handle, re, im): void` to the `ComplexSparseSolver` interface.
+
+- **Tests**:
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::allocComplexElement_returns_stable_handle` — two calls with the same (row, col) return the same handle; distinct (row, col) pairs return distinct handles.
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::stampComplexElement_accumulates_both_parts` — after `stampComplexElement(h, 1, 2)` then `stampComplexElement(h, 3, -4)`, the element at handle h has `re === 4` and `im === -2`.
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::stampComplexElement_inserts_into_linked_structure` — 2×2 matrix; after 4 `allocComplexElement` + `stampComplexElement` cycles + `finalize`, linked structure has 4 elements with correct row / col / re / im accessible via `_rowHead` / `_colHead` chains.
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::beginAssembly_zeros_complex_values_preserves_structure` — after a full solve cycle, another `beginAssembly(n)` zeros all element `_elRe` / `_elIm` and RHS while leaving the linked chains intact (element count unchanged).
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::invalidateTopology_forces_complex_rebuild` — after `invalidateTopology()`, the next assembly clears and rebuilds the linked structure from scratch.
+
+- **Acceptance criteria**:
+  - No COO arrays, no `_growCOO`, no `_buildCSC`, no `_patternChanged` in `complex-sparse-solver.ts`.
+  - `stampComplexElement()` is strict O(1) in the hot path — no chain walks, pure `_elRe[h] += re; _elIm[h] += im`.
+  - `beginAssembly()` performs zero allocations — only chain-walk value zeroing and free-list pushes.
+
+### Task 0.4.2: Drop AMD and etree — Markowitz on original column order
+
+- **Description**: Delete `_computeAMD()`, `_buildEtree()`, and the `_perm` / `_permInv` fields. Markowitz pivot selection operates on the original (preordered) column order, matching ngspice `spOrderAndFactor`. Rename `_symbolicLU()` → `_allocateComplexWorkspace()`, removing the `_buildEtree()` call from within and retaining only its workspace-sizing responsibility: `_xRe`, `_xIm`, `_xNzIdx`, `_reachStack`, `_dfsStack`, `_dfsChildPtr`, `_reachMark`, `_pinv`, `_q`, `_scratchRe`, `_scratchIm`, and the L/U CSC arrays.
+
+  `_numericLU()` iterates columns `k = 0..n-1` on the original matrix — replace `perm[k]` indirections with `k` and remove `permInv[row]` indirections. `solve()` removes Step 1 (AMD permute RHS) and Step 5 (undo AMD); retains pivot permutation via `_pinv` / `_q` only.
+
+  ngspice reference: spfactor.c `spOrderAndFactor` — identical for complex and real matrices apart from the value type.
+
+- **Files to modify**:
+  - `src/solver/analog/complex-sparse-solver.ts` — Delete `_computeAMD()`, `_buildEtree()`, `_perm`, `_permInv` fields. Rename `_symbolicLU()` → `_allocateComplexWorkspace()` and remove the etree call. Update `_numericLU()` and `solve()` per the above.
+
+- **Tests**:
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::solve_without_amd_3x3_complex` — 3×3 complex system Ax=b solves correctly using only Markowitz pivot ordering.
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::solve_complex_voltage_source_branch` — complex MNA matrix with an off-diagonal ±1 branch structure solves correctly after preorder + Markowitz without AMD.
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::markowitz_complex_fill_in_without_amd` — 5×5 complex matrix known to generate fill-in produces factors matching an independently-computed reference.
+
+- **Acceptance criteria**:
+  - No `_perm`, `_permInv`, `_computeAMD`, `_buildEtree`, or `_symbolicLU` names exist in `complex-sparse-solver.ts`.
+  - `solve()` applies only pivot permutation (`_pinv` / `_q`).
+  - Existing `ac-analysis` unit tests pass.
+
+### Task 0.4.3: Implement SMPpreOrder on the complex linked structure
+
+- **Description**: Port the real-side Wave 0.2 preorder onto the complex linked-list matrix. Twin detection uses `re*re + im*im === 1.0` to match ngspice's `|value| === 1.0` check on AC branch-row entries from voltage sources and inductors. Called once per solver lifetime, gated by `_didPreorderComplex` flag, reset by `invalidateTopology()`.
+
+  Structurally follows master plan Appendix C adapted to complex values: walk column J via `_colHead[J]` looking for an entry at row R with `re² + im² === 1`; if found, check column R for a symmetric partner at row J with `re² + im² === 1`; on success, swap columns J and R via the same O(1) SwapCols equivalent implemented for the real side (see `progress.md` Task phase0-v03-v04-swapcols).
+
+  Must run after the first `finalize()` populates the linked structure but before the first `factor()`.
+
+- **Files to modify**:
+  - `src/solver/analog/complex-sparse-solver.ts` — Add `preorder()` public method. Add `_findComplexTwin(col): number` and `_swapComplexColumns(col1, col2, pTwin1, pTwin2)` private helpers. Add `_preorderComplexColPerm: Int32Array` and `_extToIntComplexCol: Int32Array` fields — mirror of the real-side pair. `solve()` applies `_preorderComplexColPerm` to map internal solution indices back to original variable indices, same as the real side.
+
+- **Tests**:
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::preorder_fixes_zero_diagonal_from_ac_voltage_source` — 3×3 AC MNA matrix with a voltage-source branch row (structural zero on the diagonal). After `preorder()`, diagonal is nonzero everywhere; `solve()` produces the correct complex solution.
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::preorder_handles_multiple_complex_twins` — 5×5 complex system with two voltage sources; both zero diagonals fixed.
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::preorder_idempotent_complex` — two sequential `preorder()` calls produce identical internal state and identical `solve()` output.
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::preorder_complex_no_swap_when_diagonal_nonzero` — full-diagonal complex matrix unchanged by preorder.
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::complex_elCol_preserved_after_preorder_swap` — after a swap actually occurs, every element's `_elCol[e]` and `_elRow[e]` equal their pre-preorder values, and solve still satisfies A*x = b to IEEE-754 precision. Mirrors the real-side V-03/V-04 remediation test.
+
+- **Acceptance criteria**:
+  - `preorder()` fixes every zero-diagonal column resolvable by twin swaps.
+  - Magnitude check uses exact `re*re + im*im === 1.0`.
+  - Called once per solver lifetime; gated by `_didPreorderComplex` flag.
+
+### Task 0.4.4: Delete value-addressed `stamp(row, col, re, im)` and migrate all stampAc implementations
+
+- **Description**: Atomic deletion gate for Wave 0.4. Every `stampAc(solver, omega)` implementation in the codebase migrates to cache complex handles on its first call and use `stampComplexElement(handle, re, im)` thereafter. Mirror of Phase 6 Wave 6.3 Task 6.3.4 for the real side.
+
+  Handle-caching pattern: on the first frequency, the element calls `solver.allocComplexElement(row, col)` once per stamp location and stores the result in a dedicated `_acHandles: Int32Array` field (or similar) allocated at first call. Subsequent frequencies call `stampComplexElement(handle, re, im)` directly.
+
+  Because AC is driven by `AcAnalysis.run()` rather than an NR loop, the handle cache is invalidated on `solver.invalidateTopology()` calls — same contract as the real-side cache.
+
+- **Files to modify**:
+  - `src/solver/analog/complex-sparse-solver.ts` — Delete the `stamp(row: number, col: number, re: number, im: number): void` method.
+  - `src/core/analog-types.ts` — Remove `stamp(row, col, re, im)` from the `ComplexSparseSolver` interface. `stampRHS(row, re, im)` is retained unchanged.
+  - Every element implementing `stampAc` — migrate to the handle-based API. Non-exhaustive list (the atomic gate is that full-codebase `tsc --noEmit` must succeed after Wave 0.4 lands):
+    - `src/components/passives/resistor.ts`, `capacitor.ts`, `polarized-cap.ts`, `inductor.ts`, `transformer.ts`, `tapped-transformer.ts`
+    - `src/components/semiconductors/diode.ts`, `bjt.ts`, `mosfet.ts`, `njfet.ts`, `pjfet.ts`, `zener.ts`, `tunnel-diode.ts`, `varactor.ts`, `triode.ts`
+    - `src/components/active/opamp.ts`, `real-opamp.ts`, `comparator.ts`, `ota.ts`, `vcvs.ts`, `vccs.ts`, `ccvs.ts`, `cccs.ts`
+    - `src/components/sources/dc-voltage-source.ts`, `ac-voltage-source.ts`, `current-source.ts`, `variable-rail.ts`
+    - `src/solver/analog/digital-pin-model.ts` — any `stampAc` path, if exposed, migrates to the handle-based API alongside Phase 6 Wave 6.4's load() rewrite.
+    - Any additional file that grep for `stampAc` surfaces across `src/`.
+
+- **Tests**:
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::value_addressed_stamp_deleted` — `(new ComplexSparseSolver() as any).stamp === undefined`.
+  - `src/solver/analog/__tests__/ac-analysis.test.ts::ac_sweep_reuses_handles_across_frequencies` — a 3-point sweep with a single resistor element; spy on `solver.allocComplexElement` and assert it is called exactly twice (once per stamp location on the first frequency) and zero times on subsequent frequencies.
+  - Existing `src/solver/analog/__tests__/ac-analysis.test.ts` assertions continue to pass bit-exact.
+
+- **Acceptance criteria**:
+  - `ComplexSparseSolver.stamp(row, col, re, im)` does not exist.
+  - Zero grep hits for `.stamp(` on a `ComplexSparseSolver` instance anywhere in `src/` or test fixtures.
+  - Every `stampAc` implementation caches complex handles on first call.
+  - Full-codebase `tsc --noEmit` succeeds after this task lands — Wave 0.4 is the atomic gate for complex-side migration, independent of Phase 6's atomic gate for real-side.
+
+### Task 0.4.5: Explicit forceReorder() on AC sweep entry
+
+- **Description**: Add a public `forceReorder()` method on `ComplexSparseSolver` mirroring the real-side Wave 0.3 implementation. `AcAnalysis.run()` calls `solver.forceReorder()` once before the first frequency's `finalize()` / `factor()`. Subsequent frequencies reuse the pivot ordering and CSC sparsity pattern — only values change — so `factor()` dispatches to the numeric-only refactor path, matching the real-side `factorNumerical` hot path.
+
+  Remove any auto-detection of reorder need based on topology-change flags; `forceReorder()` + `invalidateTopology()` are the sole triggers.
+
+- **Files to modify**:
+  - `src/solver/analog/complex-sparse-solver.ts` — Add public `forceReorder()` method (sets `_needsReorderComplex = true`). Add public `lastFactorUsedReorder: boolean` accessor. `factor()` dispatches on `_needsReorderComplex || !_hasComplexPivotOrder` to the full-reorder path; otherwise to numeric-only refactor with the existing pivot pattern. Remove `_topologyDirty` auto-detection based on CSC-pattern deep comparison.
+  - `src/solver/analog/ac-analysis.ts` — After the first frequency's `beginAssembly(N_ac)` and element stamps, call `solver.forceReorder()` exactly once; frequencies 2..N skip the call.
+
+- **Tests**:
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::factor_uses_numeric_path_after_first_complex_reorder` — after one successful `factor()` with reorder, subsequent `factor()` calls set `lastFactorUsedReorder === false`.
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::forceReorder_triggers_full_complex_pivot_search` — after `forceReorder()`, the next `factor()` sets `lastFactorUsedReorder === true`.
+  - `src/solver/analog/__tests__/ac-analysis.test.ts::ac_sweep_single_reorder_across_frequencies` — 5-point AC sweep; assert `solver.lastFactorUsedReorder === true` on frequency 1 and `false` on frequencies 2–5.
+
+- **Acceptance criteria**:
+  - `forceReorder()` is the sole trigger for full reorder on the complex side (no CSC-pattern auto-detection).
+  - `AcAnalysis.run()` calls it exactly once per sweep.
+  - Numeric-only refactor is used for every frequency after the first.

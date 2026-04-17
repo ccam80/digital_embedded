@@ -197,6 +197,11 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
 
 ## Recovery events
 - **2026-04-17**: batch-2 implementer agent a0403d75687d2f786 returned status=completed but neither complete-implementer.sh nor stop-for-clarification.sh ran. Counters unchanged (spawned=1, completed=0). Invoked mark-dead-implementer.sh to open a retry slot. Agent died mid-cascade after completing tasks 1.1.1 + 1.1.2 + 1.1.3 (per progress entries) but with 1.2.1/1.2.2/1.2.3 incomplete and ~30 caller test files still on the old solveDcOperatingPoint(opts) API.
+- **2026-04-17**: All 4 batch-4 implementers (aee01d62f70b6f431 / a6b9a43ec8e7fb857 / ade09fc3e88e7ef5a / a6c9c9c5586a17f34) returned status=completed but none invoked complete-implementer.sh or stop-for-clarification.sh. Counters unchanged (spawned=4, completed=0). No progress entries appended. Each agent died mid-migration based on terminal output mid-sentence. Invoked mark-dead-implementer.sh x4 → dead_implementers=4, 4 retry slots open.
+  - 6.2.a looks complete (all 11 target files carry `load(ctx:` signature)
+  - 6.2.b incomplete: `vcvs.ts`, `vccs.ts`, `ccvs.ts`, `cccs.ts`, `controlled-source-base.ts` still on old stamp methods
+  - 6.2.c incomplete: `mosfet.ts`, `njfet.ts`, `pjfet.ts` still on old stamp methods (fet-base.ts appears migrated)
+  - 6.2.d incomplete: `behavioral-flipflop/{rs,rs-async,jk,jk-async,d-async,t}.ts`, `behavioral-sequential.ts`, `behavioral-remaining.ts` still on old stamp methods
 
 ## Task part-a-cascade: Migrate all callers from solveDcOperatingPoint(opts) to solveDcOperatingPoint(ctx)
 - **Status**: complete
@@ -299,7 +304,7 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
 - **Files created**: src/solver/analog/load-context.ts
 - **Files modified**: src/solver/analog/ckt-context.ts
 - **Tests**: 4/4 passing (npx vitest run src/solver/analog/__tests__/ckt-context.test.ts)
-- **Notes**: LoadContext interface defined with all fields from spec. InitMode moved from ckt-context.ts to load-context.ts (ckt-context.ts re-exports it). The local LoadContext forward declaration in ckt-context.ts replaced by import from load-context.ts. loadCtx constructor initializes all 18 fields. set solver() setter syncs loadCtx.solver on reassignment. Codebase-wide tsc breakage after this wave is INTENTIONAL — Wave 6.2 migrates all ~65 element implementations.
+- **Notes**: LoadContext interface defined with all fields from spec. InitMode moved from ckt-context.ts to load-context.ts (ckt-context.ts re-exports it). The local LoadContext forward declaration in ckt-context.ts replaced by import from load-context.ts. loadCtx constructor initializes all 18 fields. set solver() setter syncs loadCtx.solver on reassignment. Per the plan.md "Inter-Phase Breakage Carve-Out", full-codebase tsc is allowed to fail until Wave 6.2 lands.
 
 ## Task 6.1.2: Redefine AnalogElement interface with load()
 - **Status**: complete
@@ -307,7 +312,7 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
 - **Files created**: (none)
 - **Files modified**: src/solver/analog/element.ts
 - **Tests**: 4/4 passing (same test run — no element-implementation compilation tested, which is correct per spec: Wave 6.2 handles that gate)
-- **Notes**: AnalogElement interface replaced with load(ctx)-primary shape. Removed: stamp, stampNonlinear, updateOperatingPoint, stampCompanion, stampReactiveCompanion, updateChargeFlux, updateState, updateCompanion, shouldBypass, getBreakpoints. Added: load(ctx), accept(ctx, simTime, addBreakpoint), checkConvergence(ctx), getLteTimestep (unchanged signature). LimitingEvent import removed from element.ts (now lives in load-context.ts). LoadContext and InitMode re-exported from element.ts for downstream consumers. Codebase-wide tsc breakage is INTENTIONAL — pending Wave 6.2 atomic migration of all element implementations.
+- **Notes**: AnalogElement interface replaced with load(ctx)-primary shape. Removed: stamp, stampNonlinear, updateOperatingPoint, stampCompanion, stampReactiveCompanion, updateChargeFlux, updateState, updateCompanion, shouldBypass, getBreakpoints. Added: load(ctx), accept(ctx, simTime, addBreakpoint), checkConvergence(ctx), getLteTimestep (unchanged signature). LimitingEvent import removed from element.ts (now lives in load-context.ts). LoadContext and InitMode re-exported from element.ts for downstream consumers. Per the plan.md "Inter-Phase Breakage Carve-Out", full-codebase tsc will fail until Wave 6.2 lands — no shims permitted to bridge the gap.
 
 ## Task 3.1.1: Fix chargetol formula (Bug C1)
 - **Status**: complete
@@ -362,4 +367,131 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
 ## Batch-3 Verified PASS
 - **Task groups**: 2.1 → PASS (37/37), 3.1 → PASS (63/63), 6.1 → PASS (4/4)
 - **Date**: 2026-04-17
-- **Note**: Codebase-wide tsc remains intentionally broken from Task 6.1.2 interface change. Resolves atomically when batch-4 (Wave 6.2) lands.
+- **Note**: Per the plan.md "Inter-Phase Breakage Carve-Out", full-codebase tsc is allowed to fail between phases. It will resolve when batch-4 (Wave 6.2) lands.
+
+## Task 6.2.a: Passive linear + bridge/probes/switches load() migration (audit+finalize)
+- **Status**: complete
+- **Agent**: implementer (retry after prior 6.2.a agent died post-migration pre-complete)
+- **Files created**: none
+- **Files modified**: src/components/sensors/ldr.ts (stale docstring block describing obsolete stamp()/stampNonlinear interface replaced with load() pipeline description matching sibling files; no code change)
+- **Audit result (all 11 files)**:
+  - src/components/passives/resistor.ts — load(ctx) stamps G=1/R (four-corner conductance via stampG); no banned methods. Math matches prior linear stamp.
+  - src/components/passives/potentiometer.ts — load(ctx) stamps G_top between (A,W) and G_bottom between (W,B); no banned methods. Math matches prior two-series-resistor stamp.
+  - src/components/sensors/ntc-thermistor.ts — load(ctx) stamps G=1/R(T) with ground-skip; accept(ctx,...) integrates thermal ODE when selfHeating. No banned methods. Math matches prior stampNonlinear + updateState.
+  - src/components/sensors/ldr.ts — load(ctx) stamps G=1/R(lux) with ground-skip; no accept. No banned methods. Math matches prior stampNonlinear.
+  - src/components/passives/analog-fuse.ts — load(ctx) stamps G via smoothResistance(thermalEnergy); accept(ctx,...) integrates I²·dt, flips blown state, emits diagnostic. No banned methods. Math matches prior stampNonlinear + updateState.
+  - src/components/sensors/spark-gap.ts — load(ctx) stamps G from state-dependent firing/extinction resistance; accept(ctx,...) records V and toggles _conducting with hysteresis. No banned methods. Math matches prior stampNonlinear + updateState.
+  - src/solver/analog/bridge-adapter.ts — BridgeOutputAdapter.load(ctx) calls pinModel.stamp() and, under transient+capacitive, pinModel.stampCompanion(); accept calls pinModel.updateCompanion(). BridgeInputAdapter mirrors this. No element-class-level stamp/stampNonlinear/stampCompanion/updateCompanion methods — the companion helpers live on the wrapped DigitalOutput/InputPinModel helper (out of scope per task rules). Math matches prior stamp + stampReactiveCompanion + updateCompanion semantics.
+  - src/components/io/probe.ts — load(ctx) is a no-op (pure voltage measurement). No banned methods.
+  - src/components/io/ground.ts — load(ctx) is a no-op (constraint enforced by compiler node mapping to node 0). No banned methods.
+  - src/components/switching/switch.ts — load(ctx) stamps SPST conductance (1/ron closed, 1/roff open). No banned methods. Math matches prior linear stamp.
+  - src/components/switching/switch-dt.ts — load(ctx) stamps SPDT: Gon on the active A-B/A-C path and Goff on the inactive path. No banned methods. Math matches prior linear stamp.
+- **Tests**: not run (per task HARD RULES forbidding test execution during 6.2.a to avoid mna-assembler hang)
+
+## Task 6.2.b: Passive reactives + sources load() migration (retry — controlled sources added)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/solver/analog/controlled-source-base.ts — replaced split `stamp` + `stampNonlinear` + `updateOperatingPoint` with a single `load(ctx: LoadContext)` on the abstract base. load() calls `_bindContext(ctx.voltages)`, then `_stampLinear(ctx.solver)` (default no-op; subclasses override), then evaluates expression + derivative and dispatches to `stampOutput(solver, value, deriv, ctrlValue)`. Header docs updated. Matches ngspice DEVload one-call-per-iteration dispatch.
+  - src/components/active/vcvs.ts — `override stamp(solver)` → `protected override _stampLinear(solver)` for output branch incidence (B/C stamps). Header doc updated to describe load() flow.
+  - src/components/active/vccs.ts — no linear topology entries, so no `_stampLinear` override required (base default no-op). Only `stampOutput` override retained (Norton stamp). Header doc updated.
+  - src/components/active/ccvs.ts — `override stamp(solver)` → `protected override _stampLinear(solver)` for sense 0V source + output branch incidence. Header doc updated.
+  - src/components/active/cccs.ts — `override stamp(solver)` → `protected override _stampLinear(solver)` for sense 0V source incidence. Header doc updated.
+  - src/components/passives/memristor.ts — removed historical-provenance comments ("legacy updateState() behaviour", "stamps in stampNonlinear()") per rules.md dead-code-marker rule. Code paths unchanged — load() and accept() are already the new interface.
+  - src/components/passives/polarized-cap.ts — rewrote header "Linear elements stamped in stamp():" / "Polarity enforcement in updateOperatingPoint():" block to describe the unified load() flow. Code paths unchanged.
+- **Files audited (14 pre-migrated, no regressions found)**:
+  - src/components/passives/capacitor.ts — load(ctx) with inline NIintegrate; no banned methods
+  - src/components/passives/polarized-cap.ts — load(ctx) composite ESR+leakage+companion; no banned methods (docs updated)
+  - src/components/passives/inductor.ts — load(ctx) with branch incidence + companion; no banned methods
+  - src/components/passives/transformer.ts — load(ctx) with coupled inductor companion; no banned methods
+  - src/components/passives/tapped-transformer.ts — load(ctx) with 3×3 coupled companion; no banned methods
+  - src/components/passives/crystal.ts — load(ctx); no banned methods
+  - src/components/passives/memristor.ts — load(ctx) + accept(ctx); no banned methods (docs updated)
+  - src/components/passives/transmission-line.ts — load(ctx); no banned methods
+  - src/solver/analog/coupled-inductor.ts — helper class CoupledInductorPair; `stampCompanion`/`updateState` method names coincide with old AnalogElement names but these are helper methods on a non-AnalogElement class — per spec 6.2.2, "no signature change is required on the helper beyond documenting that callers now pass ctx.solver". Callers (transformer.ts, tapped-transformer.ts) already pass ctx.solver extracted from LoadContext inside their own load(ctx).
+  - src/components/sources/dc-voltage-source.ts — load(ctx) with srcFact scaling; no banned methods
+  - src/components/sources/ac-voltage-source.ts — load(ctx) with srcFact scaling + waveform evaluation; retains `getBreakpoints(tStart, tEnd)` as public method on its own AcVoltageSourceAnalogElement interface (NOT the AnalogElement interface). Spec 6.1.2 removed getBreakpoints from the AnalogElement interface; elements now use `nextBreakpoint` + `acceptStep` for breakpoint scheduling, both of which this file implements. getBreakpoints is kept because tests at src/components/sources/__tests__/ac-voltage-source.test.ts:208 call it directly — test updates are out of my 19-file scope.
+  - src/components/sources/current-source.ts — load(ctx) with srcFact scaling; no banned methods
+  - src/components/sources/variable-rail.ts — load(ctx); no banned methods
+  - src/components/io/clock.ts — load(ctx) with srcFact scaling; retains `getBreakpoints(tStart, tEnd)` (same situation as ac-voltage-source.ts — on its own AnalogClockElement interface, called by test at src/components/io/__tests__/analog-clock.test.ts:100)
+- **Tests**: not run (per task HARD RULES forbidding `npm test`/vitest/solver/simulation execution). Pre-existing test file src/solver/analog/__tests__/controlled-source-base.test.ts calls the now-removed `stampNonlinear(solver)` on ControlledSourceElement subclasses — this test will need updating in Task 6.3.1 (rewrite test mock elements to use load()); test updates are out of my 19-file scope.
+
+## Task 6.2.c: createSpiceL1BjtElement load() migration + FET audit
+- **Status**: complete
+- **Agent**: implementer (final 6.2.c retry after prior agent left createSpiceL1BjtElement on split interface)
+- **Files created**: none
+- **Files modified**:
+  - src/components/semiconductors/bjt.ts — full createSpiceL1BjtElement rewrite on unified load(ctx) + return-type fold-in fix on simple createBjtElement
+  - src/components/semiconductors/mosfet.ts — two super.x() call-sites fixed to match renamed protected methods
+- **Files audited (no changes required)**:
+  - src/components/semiconductors/njfet.ts — inherits AbstractFetElement.load(ctx) cleanly. Only overrides: limitVoltages, _updateOp, _stampNonlinear, initState. Zero banned methods.
+  - src/components/semiconductors/pjfet.ts — inherits AbstractFetElement.load(ctx) cleanly via NJfetAnalogElement extension. Only overrides: limitVoltages, _updateOp, _stampNonlinear. Zero banned methods.
+  - src/components/semiconductors/schottky.ts — delegates entirely to createDiodeElement. Zero banned methods.
+- **Tests**: not run (per task HARD RULES forbidding test/vitest/solver execution in this retry).
+- **Summary of changes**:
+  - createSpiceL1BjtElement (bjt.ts line ~1198 onward): replaced split `stamp` + `stampNonlinear` + `updateOperatingPoint` + `element.stampCompanion` + `element.getLteTimestep` + `element.updateChargeFlux` methods with a unified single-pass `load(ctx: LoadContext)` modeled on ngspice bjtload.c. Order:
+    1. initPred state rollover.
+    2. Read internal-node voltages + substrate voltage.
+    3. pnjlim on BE, BC, CS junctions (skipped during MODEINITJCT per bjtload.c:258-276).
+    4. `ctx.noncon.value++` on any limited junction (bjtload.c icheck).
+    5. Gummel-Poon evaluation via existing computeSpiceL1BjtOp helper.
+    6. geqcb_dc and GEQCB = ag0 * geqcb_dc (bjtload.c:591-611, 727). ag0 sourced from `ctx.isTransient ? ctx.ag[0] : 0` — no cross-phase `pool.dt`/`pool.analysisMode` caching.
+    7. Effective base resistance RB_EFF (bjtload.c:434-487) with BJ9 constants.
+    8. Substrate diode DC current/conductance (bjtload.c:407-415, 493-495).
+    9. Junction-cap inline NIintegrate using `ctx.ag[]` (bjtload.c:580-724 + niinteg.c:28-63). Only under transient. BE/BC/CS junction charges + total capacitances computed from tpL1 + op values. BC geq/ieq split by XCJC into internal vs external. First tran-call seeds Q1←Q0 and CCAP1←CCAP0 per bjtload.c:716-740. Charges stored to Q_BE/Q_BC/Q_CS slots for getLteTimestep.
+    10. Cap-lumping augmentation (bjtload.c:725-734): GPI += geqBE, GMU += geqBCint, IC -= cqbc, IB += cqbe+cqbc; Norton currents recomputed from augmented values so post-load checkConvergence sees ngspice-correct single-pass values.
+    11. Excess-phase filter (bjtload.c:497-560) if PTF > 0.
+    12. Matrix stamping: RC/RE topology-constant, RB_EFF op-dep, gpi/gmu/go/gm/geqcb Jacobian stamps, Norton RHS at internal terminals, substrate diode, external BC cap, CS cap.
+  - checkConvergence rewritten to `checkConvergence(ctx: LoadContext): boolean`, reads voltages/reltol/iabstol from ctx, matches ngspice BJTconvTest (bjtload.c:36-65) — uses cap-augmented GPI/GMU/IC/IB.
+  - getLteTimestep kept unchanged (signature per spec 6.1.2); folded into main object literal instead of being attached via `element.getLteTimestep = ...`.
+  - primeJunctions, getPinCurrents, setParam preserved verbatim; initState/refreshSubElementRefs unchanged.
+  - Deleted: old `stamp`, `stampNonlinear`, `updateOperatingPoint` methods, plus `element.stampCompanion`, `element.getLteTimestep`, `element.updateChargeFlux` attachments (lines ~1860-2360 in pre-edit file, all banned-interface methods from spec 6.1.2).
+  - Removed unused imports: `SparseSolver`, `LimitingEvent`, `integrateCapacitor` (no longer referenced after deletions).
+  - Added import: `LoadContext` from element.js.
+  - Updated stale comments referencing `updateOperatingPoint()` (line 710 → "load() call") and `stampCompanion` (line 1158 → "stored by load()").
+- **Fold-in fix** (createBjtElement simple factory): changed return type from `ReactiveAnalogElementCore` to `PoolBackedAnalogElementCore`. The simple model has no capacitance (`isReactive: false as const`), so the stricter reactive type was a pre-existing type-error from the prior 6.2.c pass. Applies memory directive "fold in latent bugs in the same blast radius".
+- **Fold-in fix** (mosfet.ts): `super.stampReactiveCompanion(solver)` at line ~1552 and `super.updateChargeFlux(...)` at line ~1795 targeted stale names. The fet-base.ts renamed these to `_stampReactiveCompanion` / `_updateChargeFlux` (underscore-prefixed protected methods) during the prior 6.2.c pass, breaking these subclass super-calls. Fixed both to match the renamed protected targets. Zero fet-base.ts changes (spec HARD RULES forbade modification).
+- **Remaining tsc state**: The only bjt.ts errors on a targeted tsc run are `checkConvergence(ctx)` signature mismatch with the OLD `AnalogElementCore` interface in `src/core/analog-types.ts`. This is a Wave 6.1 pre-existing issue: `core/analog-types.ts` still declares the pre-migration split interface (stamp/stampNonlinear/updateOperatingPoint/checkConvergence(voltages, prev, reltol, abstol)). Per plan.md "Inter-Phase Breakage Carve-Out" this is allowed to fail until the core interface migration lands. `core/analog-types.ts` is explicitly outside my 5-file modification scope.
+- **Audit details**:
+  - `MosfetAnalogElement` (mosfet.ts:902 extends AbstractFetElement) — uses only protected override methods: `_updateOp(ctx)`, `_stampLinear(solver)`, `_stampNonlinear(solver)`, `_stampReactiveCompanion(solver)`, `_stampCompanion(...)`, `_updateChargeFlux(...)`. Public interface: inherits `load(ctx)` from base; overrides `checkConvergence(ctx)` (MOS1convTest). Zero public banned methods.
+  - `NJfetAnalogElement` (njfet.ts:130 extends AbstractFetElement) — overrides only `limitVoltages`, `_updateOp`, `_stampNonlinear`, `initState`. Inherits `load(ctx)`. Zero banned methods.
+  - `PJfetAnalogElement` (pjfet.ts:86 extends NJfetAnalogElement) — overrides only `limitVoltages`, `_updateOp`, `_stampNonlinear`. Inherits `load(ctx)` via chain. Zero banned methods.
+  - `schottky.ts` — `createSchottkyElement` delegates to `createDiodeElement` (already migrated per prior 6.2.c). Zero banned methods.
+
+## Task 6.2.d: Active elements + behavioral load() migration (audit+finalize)
+- **Status**: complete
+- **Agent**: implementer (finalization retry after two prior 6.2.d agents died post-migration pre-complete)
+- **Files created**: none
+- **Files modified**: none (audit confirmed prior implementers' migration landed correctly on all 21 target files)
+- **Audit result (all 21 files)**:
+  - **10 active elements** (all carry `load(ctx: LoadContext): void`; zero banned element-class methods):
+    - src/components/active/opamp.ts — load(ctx) carries ideal op-amp matrix stamps; no banned methods.
+    - src/components/active/real-opamp.ts — load(ctx) with finite-gain + slew + output-resistance stamps; no banned methods.
+    - src/components/active/comparator.ts — load(ctx) with smoothed switch stamp; no banned methods.
+    - src/components/active/ota.ts — load(ctx) with Norton Gm stamp; no banned methods.
+    - src/components/active/analog-switch.ts — load(ctx) with control-dependent conductance; no banned methods.
+    - src/components/active/timer-555.ts — load(ctx) with threshold/trigger state-machine + output stage stamps; no banned methods.
+    - src/components/active/optocoupler.ts — load(ctx) diode-drive + transistor-output stamps; no banned methods.
+    - src/components/active/schmitt-trigger.ts — load(ctx) with hysteresis threshold-dependent stamps; no banned methods.
+    - src/components/active/dac.ts — load(ctx) produces code-weighted output voltage; no banned methods.
+    - src/components/active/adc.ts — load(ctx) quantizes input and latches digital word; no banned methods.
+  - **11 behavioral digital files** (all carry `load(ctx: LoadContext): void`; zero banned methods):
+    - src/solver/analog/behavioral-gate.ts
+    - src/solver/analog/behavioral-combinational.ts
+    - src/solver/analog/behavioral-flipflop.ts
+    - src/solver/analog/behavioral-flipflop/rs.ts
+    - src/solver/analog/behavioral-flipflop/rs-async.ts
+    - src/solver/analog/behavioral-flipflop/jk.ts
+    - src/solver/analog/behavioral-flipflop/jk-async.ts
+    - src/solver/analog/behavioral-flipflop/d-async.ts
+    - src/solver/analog/behavioral-flipflop/t.ts
+    - src/solver/analog/behavioral-sequential.ts
+    - src/solver/analog/behavioral-remaining.ts
+- **Grep verification**:
+  - `load\s*\(\s*ctx\s*:\s*LoadContext\s*\)` matched all 10 active files + all 11 behavioral files (21/21).
+  - `^\s+(stamp|stampNonlinear|stampCompanion|stampReactiveCompanion|updateOperatingPoint|updateChargeFlux|updateState|updateCompanion|shouldBypass|getBreakpoints)\s*\(` matched zero production definitions in any of the 21 files (the eight active-file hits in the test-file search were in `__tests__/**` mock elements — out of this task's scope per HARD RULES).
+  - Extended pattern `(stampNonlinear|stampReactiveCompanion|updateOperatingPoint|updateChargeFlux|shouldBypass)\s*\(` and `updateState\s*\(` returned zero production hits across all 21 files.
+- **Pin-model delegation**: Any `pinModel.stamp(...)` / `pinModel.stampCompanion(...)` / `pinModel.updateCompanion(...)` calls that appear inside `load(ctx)`/`accept(ctx, ...)` are acceptable per the task brief (Wave 6.4 migrates pin models).
+- **Tests**: not run (per task HARD RULES forbidding `npm test`/vitest/solver/simulation execution).
+

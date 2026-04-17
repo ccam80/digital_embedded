@@ -39,10 +39,18 @@ const TRAP_LTE_FACTOR_1 = 1 / 12;
 
 /**
  * LTE error factor for Gear (BDF) methods, indexed by (order - 1).
- * gear[0] = 0.5 (BDF-1), gear[1] = 2/9 (BDF-2).
- * gear[2..5] = factors for GEAR orders 3-6 (geardefs.h).
+ * Values from ngspice cktterr.c:24-31 gearCoeff[] table (exact fractions
+ * of the truncated decimals ngspice ships; see
+ * spec/state-machines/ngspice-cktterr-vs-ckt-terr.md rows 43-48 for the
+ * per-element mapping).
+ *   [0] = 0.5           = 0.5          (order 1, BDF-1)
+ *   [1] = 2/9           ≈ .2222222222  (order 2, BDF-2)
+ *   [2] = 3/22          ≈ .1363636364  (order 3)
+ *   [3] = 12/125        = .096         (order 4)
+ *   [4] = 10/137        ≈ .07299270073 (order 5)
+ *   [5] = 20/343        ≈ .05830903790 (order 6)
  */
-export const GEAR_LTE_FACTORS = [0.5, 2 / 9, 3 / 22, 12 / 125, 5 / 72, 20 / 343];
+export const GEAR_LTE_FACTORS = [0.5, 2 / 9, 3 / 22, 12 / 125, 10 / 137, 20 / 343];
 
 // ---------------------------------------------------------------------------
 // LteParams -- tolerance parameters passed from TimestepController
@@ -115,10 +123,15 @@ export function cktTerr(
   //
   // ngspice cktterr.c:43-59
   //
-  // Timestep denominators:
-  //   h0 = dt (current step)
-  //   h1 = deltaOld[0] (step n-1), fallback to dt
-  //   h2 = deltaOld[1] (step n-2), fallback to h1
+  // Convention (matches ngspice CKTdeltaOld[] and engine timestep.ts):
+  //   deltaOld[0] = current dt (set by setDeltaOldCurrent before each call)
+  //   deltaOld[1] = h_{n-1} (previous accepted step)
+  //   deltaOld[2] = h_{n-2}
+  //
+  // Timestep denominators for divided differences:
+  //   h0 = dt = deltaOld[0] (current step)
+  //   h1 = deltaOld[1] (step n-1), fallback to dt
+  //   h2 = deltaOld[2] (step n-2), fallback to h1
   // ------------------------------------------------------------------
 
   let diff0 = q0, diff1 = q1, diff2 = q2, diff3 = q3;

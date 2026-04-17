@@ -34,9 +34,8 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
+import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
   computeJunctionCapacitance,
@@ -262,23 +261,8 @@ export function createTunnelDiodeElement(
       s3 = newS3;
     },
 
-    stamp(_solver: SparseSolver): void {
-      // No topology-constant entries.
-      // Capacitance companion model entries are stamped in stampReactiveCompanion().
-    },
-
-    stampNonlinear(solver: SparseSolver): void {
-      const geq = s0[base + SLOT_GEQ];
-      const ieq = s0[base + SLOT_IEQ];
-      stampG(solver, nodeAnode,   nodeAnode,   geq);
-      stampG(solver, nodeAnode,   nodeCathode, -geq);
-      stampG(solver, nodeCathode, nodeAnode,   -geq);
-      stampG(solver, nodeCathode, nodeCathode, geq);
-      stampRHS(solver, nodeAnode,   -ieq);
-      stampRHS(solver, nodeCathode, ieq);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): boolean {
+    load(ctx: LoadContext): void {
+      const voltages = ctx.voltages;
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;
@@ -300,12 +284,58 @@ export function createTunnelDiodeElement(
         vdNew = vdRaw;
       }
 
+      if (limited) ctx.noncon.value++;
+
       s0[base + SLOT_VD] = vdNew;
       recompute(vdNew);
-      return limited;
+
+      const geq = s0[base + SLOT_GEQ];
+      const ieq = s0[base + SLOT_IEQ];
+      const solver = ctx.solver;
+      stampG(solver, nodeAnode,   nodeAnode,   geq);
+      stampG(solver, nodeAnode,   nodeCathode, -geq);
+      stampG(solver, nodeCathode, nodeAnode,   -geq);
+      stampG(solver, nodeCathode, nodeCathode, geq);
+      stampRHS(solver, nodeAnode,   -ieq);
+      stampRHS(solver, nodeCathode, ieq);
+
+      // Reactive companion: junction capacitance + transit-time diffusion cap
+      if (hasCapacitance && ctx.isTransient) {
+        const dt = ctx.dt;
+        const order = ctx.order;
+        const method = ctx.method;
+        const deltaOld = ctx.deltaOld;
+
+        const Cj = computeJunctionCapacitance(vdNew, params.CJO, params.VJ, params.M, params.FC);
+        const { dIdV: gDiode, i: iNowDiode } = tunnelDiodeIV(vdNew, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
+        const Ct = params.TT * gDiode;
+        const Ctotal = Cj + Ct;
+
+        const q0 = computeJunctionCharge(vdNew, params.CJO, params.VJ, params.M, params.FC, params.TT, iNowDiode);
+        const q1 = s1[base + SLOT_Q];
+        const q2 = s2[base + SLOT_Q];
+        const ccapPrev = s1[base + SLOT_CCAP];
+        const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+        const { geq: capGeq, ceq: capIeq, ccap } = integrateCapacitor(Ctotal, vdNew, q0, q1, q2, dt, h1, order, method, ccapPrev);
+        s0[base + SLOT_CAP_GEQ] = capGeq;
+        s0[base + SLOT_CAP_IEQ] = capIeq;
+        s0[base + SLOT_V] = vdNew;
+        s0[base + SLOT_Q] = q0;
+        s0[base + SLOT_CCAP] = ccap;
+
+        if (capGeq !== 0 || capIeq !== 0) {
+          stampG(solver, nodeAnode,   nodeAnode,   capGeq);
+          stampG(solver, nodeAnode,   nodeCathode, -capGeq);
+          stampG(solver, nodeCathode, nodeAnode,   -capGeq);
+          stampG(solver, nodeCathode, nodeCathode, capGeq);
+          stampRHS(solver, nodeAnode,   -capIeq);
+          stampRHS(solver, nodeCathode, capIeq);
+        }
+      }
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+    checkConvergence(ctx: LoadContext): boolean {
+      const voltages = ctx.voltages;
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;
@@ -316,7 +346,7 @@ export function createTunnelDiodeElement(
       const id = s0[base + SLOT_ID];
       const gd = s0[base + SLOT_GEQ];
       const cdhat = id + gd * delvd;
-      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + abstol;
+      const tol = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + ctx.iabstol;
       return Math.abs(cdhat - id) <= tol;
     },
 
@@ -332,59 +362,8 @@ export function createTunnelDiodeElement(
     },
   };
 
-  // Attach stampCompanion and getLteTimestep only when junction capacitance is present
+  // Attach getLteTimestep only when junction capacitance is present
   if (hasCapacitance) {
-    (element as unknown as { stampCompanion: (dt: number, method: IntegrationMethod, _voltages: Float64Array, order: number, deltaOld: readonly number[]) => void }).stampCompanion = function (
-      dt: number,
-      method: IntegrationMethod,
-      _voltages: Float64Array,
-      order: number,
-      deltaOld: readonly number[],
-    ): void {
-      // Compute vd freshly from current node voltages. stampCompanion runs at
-      // step boundaries where NR has already converged, so NDR step-clamping
-      // (which is a mid-NR stabilizer) is not needed here — vdOld and vdRaw
-      // are identical at a converged step. Never read a cross-phase cached slot.
-      const vA_sc = nodeAnode   > 0 ? _voltages[nodeAnode   - 1] : 0;
-      const vC_sc = nodeCathode > 0 ? _voltages[nodeCathode - 1] : 0;
-      const vNow = vA_sc - vC_sc;
-      s0[base + SLOT_VD] = vNow;
-
-      // Depletion + transit-time capacitance at current operating point.
-      // For transit-time cap: use total dI/dV (all components) as gDiode.
-      const Cj = computeJunctionCapacitance(vNow, params.CJO, params.VJ, params.M, params.FC);
-      const { dIdV: gDiode, i: iNowDiode } = tunnelDiodeIV(vNow, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
-      const Ct = params.TT * gDiode;
-      const Ctotal = Cj + Ct;
-
-      const q0 = computeJunctionCharge(vNow, params.CJO, params.VJ, params.M, params.FC, params.TT, iNowDiode);
-      const q1 = s1[base + SLOT_Q];
-      const q2 = s2[base + SLOT_Q];
-      const ccapPrev = s1[base + SLOT_CCAP];
-      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const { geq, ceq, ccap } = integrateCapacitor(Ctotal, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
-      s0[base + SLOT_CAP_GEQ] = geq;
-      s0[base + SLOT_CAP_IEQ] = ceq;
-      s0[base + SLOT_V] = vNow;
-      s0[base + SLOT_Q] = q0;
-      s0[base + SLOT_CCAP] = ccap;
-    };
-
-    (element as unknown as { stampReactiveCompanion: (solver: SparseSolver) => void }).stampReactiveCompanion = function (
-      solver: SparseSolver,
-    ): void {
-      const capGeq = s0[base + SLOT_CAP_GEQ];
-      const capIeq = s0[base + SLOT_CAP_IEQ];
-      if (capGeq !== 0 || capIeq !== 0) {
-        stampG(solver, nodeAnode,   nodeAnode,   capGeq);
-        stampG(solver, nodeAnode,   nodeCathode, -capGeq);
-        stampG(solver, nodeCathode, nodeAnode,   -capGeq);
-        stampG(solver, nodeCathode, nodeCathode, capGeq);
-        stampRHS(solver, nodeAnode,   -capIeq);
-        stampRHS(solver, nodeCathode, capIeq);
-      }
-    };
-
     (element as unknown as { getLteTimestep: (dt: number, deltaOld: readonly number[], order: number, method: IntegrationMethod, lteParams: LteParams) => number }).getLteTimestep = function (
       dt: number,
       deltaOld: readonly number[],
@@ -399,19 +378,6 @@ export function createTunnelDiodeElement(
       const ccap0 = s0[base + SLOT_CCAP];
       const ccap1 = s1[base + SLOT_CCAP];
       return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, ccap0, ccap1, lteParams);
-    };
-
-    (element as unknown as { updateChargeFlux: (v: Float64Array, dt: number, method: string, order: number, deltaOld: readonly number[]) => void }).updateChargeFlux = function(_voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
-      // Compute vd freshly from the converged node voltages (single-pass,
-      // ngspice bjtload-style). NDR step-clamping is a mid-NR stabilizer;
-      // at step acceptance, vdRaw equals the converged value.
-      const vA_uc = nodeAnode   > 0 ? _voltages[nodeAnode   - 1] : 0;
-      const vC_uc = nodeCathode > 0 ? _voltages[nodeCathode - 1] : 0;
-      const vd = vA_uc - vC_uc;
-      s0[base + SLOT_VD] = vd;
-      const { i: iNowDiode } = tunnelDiodeIV(vd, params.IP, params.VP, params.IV, params.VV, params.IS, params.N);
-      s0[base + SLOT_Q] = computeJunctionCharge(vd, params.CJO, params.VJ, params.M, params.FC, params.TT, iNowDiode);
-      s0[base + SLOT_V] = vd;
     };
   }
 

@@ -39,7 +39,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { IntegrationMethod } from "../../solver/analog/element.js";
+import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
@@ -1216,7 +1216,13 @@ class MosfetAnalogElement extends AbstractFetElement {
     return { cgs: gsOverlap, cgd: gdOverlap };
   }
 
-  override updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
+  protected override _updateOp(ctx: LoadContext): void {
+    const voltages = ctx.voltages;
+    const limitingCollector = ctx.limitingCollector;
+    this._updateOpImpl(voltages, limitingCollector ?? null, ctx);
+  }
+
+  private _updateOpImpl(voltages: Readonly<Float64Array>, limitingCollector: LimitingEvent[] | null, ctx: LoadContext): void {
     if (this._pool.initMode === "initPred") {
       // mos1load.c:206-225: copy voltage-old references for fetlim/pnjlim limiting
       const base = this.stateBaseOffset;
@@ -1281,7 +1287,7 @@ class MosfetAnalogElement extends AbstractFetElement {
       s0[base + SLOT_CBD_I] = cbdI;
       s0[base + SLOT_CBS_I] = cbsI;
       s0[base + SLOT_VBD] = vbd;
-      return false;
+      return;
     }
 
     const nodeD = this.drainNode;
@@ -1434,10 +1440,10 @@ class MosfetAnalogElement extends AbstractFetElement {
     s0[base + SLOT_CBD_I] = cbdI;
     s0[base + SLOT_CBS_I] = cbsI;
     s0[base + SLOT_VBD] = vbd;
-    return this._pnjlimLimited;
+    if (this._pnjlimLimited) ctx.noncon.value++;
   }
 
-  override stampNonlinear(solver: SparseSolver): void {
+  protected override _stampNonlinear(solver: SparseSolver): void {
     const nodeG = this.gateNode;
     const effectiveD = this._swapped ? this.sourceNode : this.drainNode;
     const effectiveS = this._swapped ? this.drainNode : this.sourceNode;
@@ -1521,7 +1527,7 @@ class MosfetAnalogElement extends AbstractFetElement {
     stampRHS(solver, nodeS, -polarity * ceqbs);
   }
 
-  override stamp(solver: SparseSolver): void {
+  protected override _stampLinear(solver: SparseSolver): void {
     // Drain ohmic resistance RD between external drain pin and internal drain node
     if (this._p.RD > 0 && this.drainNode !== this._nodeDext) {
       const gRD = 1 / this._p.RD;
@@ -1541,9 +1547,9 @@ class MosfetAnalogElement extends AbstractFetElement {
     }
   }
 
-  override stampReactiveCompanion(solver: SparseSolver): void {
+  protected override _stampReactiveCompanion(solver: SparseSolver): void {
     // GS and GD gate overlap capacitances via base class
-    super.stampReactiveCompanion(solver);
+    super._stampReactiveCompanion(solver);
 
     const base = this.stateBaseOffset;
     const s0 = this._s0;
@@ -1601,9 +1607,9 @@ class MosfetAnalogElement extends AbstractFetElement {
     }
   }
 
-  override checkConvergence(voltages: Float64Array, prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+  override checkConvergence(ctx: LoadContext): boolean {
     if (this._p.OFF && this._pool.initMode === "initFix") return true;
-    return super.checkConvergence(voltages, prevVoltages, reltol, abstol);
+    return super.checkConvergence(ctx);
   }
 
   primeJunctions(): void {
@@ -1624,9 +1630,9 @@ class MosfetAnalogElement extends AbstractFetElement {
     }
   }
 
-  override stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
+  protected override _stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
     // Gate overlap capacitances (Cgs, Cgd) via base class
-    super.stampCompanion(dt, method, voltages, order, deltaOld);
+    super._stampCompanion(dt, method, voltages, order, deltaOld);
 
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -1784,9 +1790,9 @@ class MosfetAnalogElement extends AbstractFetElement {
     }
   }
 
-  override updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
+  protected override _updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
     // GS and GD charges via base class
-    super.updateChargeFlux(voltages, dt, method, order, deltaOld);
+    super._updateChargeFlux(voltages, dt, method, order, deltaOld);
 
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;

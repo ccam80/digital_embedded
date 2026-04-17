@@ -1,20 +1,19 @@
 /**
  * BehavioralDFlipflopElement — analog behavioral model for a D flip-flop.
  *
- * Edge detection happens in updateCompanion() (called once per accepted
- * timestep, not per NR iteration). This ensures Q only latches on a real
- * rising clock edge, never mid-NR due to Newton-Raphson oscillation.
+ * Edge detection happens in accept() (called once per accepted timestep, not
+ * per NR iteration). This ensures Q only latches on a real rising clock edge,
+ * never mid-NR due to Newton-Raphson oscillation.
  *
- * Stamp protocol:
- *   stamp()          — stamps all pin R_in and output R_out/V_out (linear)
- *   stampNonlinear() — re-stamps output pins based on _latchedQ
- *   stampCompanion() — stamps pin capacitance companion models
- *   updateCompanion()— edge detection + pin companion state update
- *   updateOperatingPoint() — caches latest NR voltages for stampNonlinear
+ * Unified interface:
+ *   load()   — stamps all pin loading and output Norton equivalents based on
+ *              the current latched Q state; also stamps pin-capacitance
+ *              companion models during transient.
+ *   accept() — edge detection + pin companion state update after each
+ *              accepted timestep.
  */
 
-import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElementCore, IntegrationMethod } from "./element.js";
+import type { AnalogElementCore, LoadContext } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
@@ -79,15 +78,6 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
    */
   private readonly _resetActiveLevel: 'high' | 'low';
 
-  /**
-   * Cached solver reference — set on first stamp() call so stampCompanion
-   * can reach the solver without receiving it as a parameter.
-   */
-  private _solver: SparseSolver | null = null;
-
-  /** Cached operating-point voltages from the last updateOperatingPoint call. */
-  private _cachedVoltages: Float64Array = new Float64Array(0);
-
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
@@ -127,66 +117,31 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
     (this as unknown as { _vIH: number })._vIH = vIH;
   }
 
-  /**
-   * Stamp linear contributions: input loading resistances.
-   *
-   * Output pins are stamped in stampNonlinear because their Norton current
-   * depends on the latched Q state. Since beginAssembly clears the matrix
-   * before each NR iteration, stamping the full output in stampNonlinear is
-   * correct and avoids double-counting.
-   */
-  stamp(solver: SparseSolver): void {
-    this._solver = solver;
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+
+    // Stamp input loading conductances
     this._clockPin.stamp(solver);
     this._dPin.stamp(solver);
     if (this._setPin !== null) this._setPin.stamp(solver);
     if (this._resetPin !== null) this._resetPin.stamp(solver);
-  }
 
-  /**
-   * Re-stamp output pins based on the current latched Q state.
-   *
-   * Called every NR iteration. Does NOT evaluate logic — that happens
-   * exclusively in updateCompanion() to prevent mid-NR latching.
-   */
-  stampNonlinear(solver: SparseSolver): void {
-    this._solver = solver;
+    // Stamp output Norton equivalents from the currently latched Q state.
+    // Logic evaluation happens only in accept() to prevent mid-NR latching.
     this._qPin.setLogicLevel(this._latchedQ);
     this._qBarPin.setLogicLevel(!this._latchedQ);
     this._qPin.stampOutput(solver);
     this._qBarPin.stampOutput(solver);
-  }
 
-  /**
-   * Cache NR solution voltages for stampNonlinear.
-   *
-   * Grows the cache array lazily to match the solution vector size.
-   */
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    if (this._cachedVoltages.length !== voltages.length) {
-      this._cachedVoltages = new Float64Array(voltages.length);
+    // Transient: stamp companion models for pin capacitances.
+    if (ctx.isTransient && ctx.dt > 0) {
+      this._clockPin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._dPin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._qPin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._qBarPin.stampCompanion(solver, ctx.dt, ctx.method);
+      if (this._setPin !== null) this._setPin.stampCompanion(solver, ctx.dt, ctx.method);
+      if (this._resetPin !== null) this._resetPin.stampCompanion(solver, ctx.dt, ctx.method);
     }
-    this._cachedVoltages.set(voltages);
-  }
-
-  /**
-   * Stamp companion models for all pin capacitances.
-   *
-   * Called once per timestep before the NR iterations begin.
-   */
-  stampCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    _voltages: Float64Array,
-  ): void {
-    const solver = this._solver;
-    if (solver === null) return;
-    this._clockPin.stampCompanion(solver, dt, method);
-    this._dPin.stampCompanion(solver, dt, method);
-    this._qPin.stampCompanion(solver, dt, method);
-    this._qBarPin.stampCompanion(solver, dt, method);
-    if (this._setPin !== null) this._setPin.stampCompanion(solver, dt, method);
-    if (this._resetPin !== null) this._resetPin.stampCompanion(solver, dt, method);
   }
 
   /**
@@ -201,20 +156,18 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
    *   5. Update _prevClockVoltage.
    *   6. Update all pin companion models.
    */
-  updateCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    voltages: Float64Array,
-  ): void {
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    const voltages = ctx.voltages;
+    const dt = ctx.dt;
+    const method = ctx.method;
+
     const clockNodeId = this._clockPin.nodeId;
     const dNodeId = this._dPin.nodeId;
     const currentClockV = readMnaVoltage(clockNodeId, voltages);
     const dVoltage = readMnaVoltage(dNodeId, voltages);
 
     // Rising edge detection. On the first call _prevClockVoltage is NaN
-    // (sentinel): skip edge detection and just seed from the current sample
-    // — edge detection requires two samples, and the DC steady-state value
-    // must not be interpreted as a transition from LOW.
+    // (sentinel): skip edge detection and just seed from the current sample.
     const risingEdge =
       !Number.isNaN(this._prevClockVoltage) &&
       this._prevClockVoltage < this._vIH &&
@@ -222,7 +175,6 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
 
     if (risingEdge) {
       const dLevel = this._dPin.readLogicLevel(dVoltage);
-      // If D is indeterminate, latch holds its current value
       if (dLevel !== undefined) {
         this._latchedQ = dLevel;
       }
@@ -231,7 +183,6 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
     // Asynchronous set/reset — override latched state
     if (this._setPin !== null) {
       const setV = readMnaVoltage(this._setPin.nodeId, voltages);
-      // Set is active-high
       if (setV > this._vIH) {
         this._latchedQ = true;
       }
@@ -252,25 +203,22 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
 
     this._prevClockVoltage = currentClockV;
 
-    // Update all pin companion models with accepted voltages
-    this._clockPin.updateCompanion(dt, method, currentClockV);
-    this._dPin.updateCompanion(dt, method, dVoltage);
+    // Update all pin companion models with accepted voltages (transient only).
+    if (dt > 0) {
+      this._clockPin.updateCompanion(dt, method, currentClockV);
+      this._dPin.updateCompanion(dt, method, dVoltage);
 
-    this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
-    this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
+      this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
+      this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
 
-    if (this._setPin !== null) {
-      this._setPin.updateCompanion(dt, method, readMnaVoltage(this._setPin.nodeId, voltages));
+      if (this._setPin !== null) {
+        this._setPin.updateCompanion(dt, method, readMnaVoltage(this._setPin.nodeId, voltages));
+      }
+
+      if (this._resetPin !== null) {
+        this._resetPin.updateCompanion(dt, method, readMnaVoltage(this._resetPin.nodeId, voltages));
+      }
     }
-
-    if (this._resetPin !== null) {
-      this._resetPin.updateCompanion(dt, method, readMnaVoltage(this._resetPin.nodeId, voltages));
-    }
-  }
-
-  /** No-op: threshold detection manages state in updateCompanion. */
-  updateState(_dt: number, _voltages: Float64Array): void {
-    // intentionally empty
   }
 
   /**

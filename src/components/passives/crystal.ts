@@ -44,13 +44,8 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
-import {
-  integrateCapacitor,
-  integrateInductor,
-} from "../../solver/analog/integration.js";
+import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { stampG } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import {
@@ -312,59 +307,169 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     this.C_0 = C0;
   }
 
-  stamp(solver: SparseSolver): void {
+  /**
+   * Unified load() — BVD crystal model.
+   *
+   * Stamps in one pass:
+   *   - R_s series conductance (nA ↔ n1, topology-constant).
+   *   - L_s branch incidence + NIintegrate companion (n1 ↔ n2).
+   *   - C_s series capacitor companion (n2 ↔ nB) via inline NIintegrate.
+   *   - C_0 shunt capacitor companion (nA ↔ nB) via inline NIintegrate.
+   * All three reactive components use ctx.ag[] coefficients directly.
+   */
+  load(ctx: LoadContext): void {
+    const { solver, voltages, initMode, isDcOp, isTransient, ag } = ctx;
     const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
     const n1 = this.pinNodeIds[2];
     const n2 = this.pinNodeIds[3];
     const b = this.branchIndex;
+    const base = this.base;
 
-    // R_s: conductance between n_A and n1 (topology-constant)
+    // R_s conductance (nA ↔ n1).
     stampG(solver, nA, nA, this.G_s);
     stampG(solver, nA, n1, -this.G_s);
     stampG(solver, n1, nA, -this.G_s);
     stampG(solver, n1, n1, this.G_s);
 
-    // L_s: B sub-matrix — branch current I_L flows into n1, out of n2 (KCL node rows)
+    // L_s branch incidence (B sub-matrix).
     if (n1 !== 0) solver.stamp(n1 - 1, b, 1);
     if (n2 !== 0) solver.stamp(n2 - 1, b, -1);
-
-    // L_s: C sub-matrix — voltage incidence (topology-constant ±1 entries)
+    // L_s KVL incidence (C sub-matrix).
     if (n1 !== 0) solver.stamp(b, n1 - 1, 1);
     if (n2 !== 0) solver.stamp(b, n2 - 1, -1);
-  }
 
-  stampReactiveCompanion(solver: SparseSolver): void {
-    const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
-    const n2 = this.pinNodeIds[3];
-    const b = this.branchIndex;
+    if (!isTransient && !isDcOp) return;
 
-    const geqL  = this.s0[this.base + SLOT_GEQ_L];
-    const ieqL  = this.s0[this.base + SLOT_IEQ_L];
-    const geqCs = this.s0[this.base + SLOT_GEQ_CS];
-    const ieqCs = this.s0[this.base + SLOT_IEQ_CS];
-    const geqC0 = this.s0[this.base + SLOT_GEQ_C0];
-    const ieqC0 = this.s0[this.base + SLOT_IEQ_C0];
+    const iNow = voltages[b];
+    const vA = nA > 0 ? voltages[nA - 1] : 0;
+    const vBv = nB > 0 ? voltages[nB - 1] : 0;
+    const vN2 = n2 > 0 ? voltages[n2 - 1] : 0;
+    const vCs = vN2 - vBv;
+    const vC0 = vA - vBv;
 
-    // L_s: branch diagonal -geqL and RHS ieqL
-    solver.stamp(b, b, -geqL);
-    solver.stampRHS(b, ieqL);
+    if (isTransient) {
+      // L_s flux update.
+      if (initMode === "initPred") {
+        this.s0[base + SLOT_PHI_L] = this.s1[base + SLOT_PHI_L];
+      } else {
+        this.s0[base + SLOT_PHI_L] = this.L_s * iNow;
+        if (initMode === "initTran") {
+          this.s1[base + SLOT_PHI_L] = this.s0[base + SLOT_PHI_L];
+        }
+      }
+      // C_s charge update.
+      if (initMode === "initPred") {
+        this.s0[base + SLOT_Q_CS] = this.s1[base + SLOT_Q_CS];
+      } else {
+        this.s0[base + SLOT_Q_CS] = this.C_s * vCs;
+        if (initMode === "initTran") {
+          this.s1[base + SLOT_Q_CS] = this.s0[base + SLOT_Q_CS];
+        }
+      }
+      // C_0 charge update.
+      if (initMode === "initPred") {
+        this.s0[base + SLOT_Q_C0] = this.s1[base + SLOT_Q_C0];
+      } else {
+        this.s0[base + SLOT_Q_C0] = this.C_0 * vC0;
+        if (initMode === "initTran") {
+          this.s1[base + SLOT_Q_C0] = this.s0[base + SLOT_Q_C0];
+        }
+      }
 
-    // C_s: companion model between n2 and n_B
-    stampG(solver, n2, n2, geqCs);
-    stampG(solver, n2, nB, -geqCs);
-    stampG(solver, nB, n2, -geqCs);
-    stampG(solver, nB, nB, geqCs);
-    stampRHS(solver, n2, -ieqCs);
-    stampRHS(solver, nB, ieqCs);
+      // NIintegrate for L_s flux.
+      const phiL_0 = this.s0[base + SLOT_PHI_L];
+      const phiL_1 = this.s1[base + SLOT_PHI_L];
+      let ccapL: number;
+      if (ctx.order >= 2 && ag.length > 2) {
+        ccapL = ag[0] * phiL_0 + ag[1] * phiL_1 + ag[2] * this.s2[base + SLOT_PHI_L];
+      } else {
+        ccapL = ag[0] * phiL_0 + ag[1] * phiL_1;
+      }
+      this.s0[base + SLOT_CCAP_L] = ccapL;
+      const geqL = ag[0] * this.L_s;
+      const ceqL = ccapL - ag[0] * phiL_0;
+      if (initMode === "initTran") {
+        this.s1[base + SLOT_CCAP_L] = ccapL;
+      }
 
-    // C_0: shunt capacitance between n_A and n_B
-    stampG(solver, nA, nA, geqC0);
-    stampG(solver, nA, nB, -geqC0);
-    stampG(solver, nB, nA, -geqC0);
-    stampG(solver, nB, nB, geqC0);
-    stampRHS(solver, nA, -ieqC0);
-    stampRHS(solver, nB, ieqC0);
+      // NIintegrate for C_s charge.
+      const qCs_0 = this.s0[base + SLOT_Q_CS];
+      const qCs_1 = this.s1[base + SLOT_Q_CS];
+      let ccapCs: number;
+      if (ctx.order >= 2 && ag.length > 2) {
+        ccapCs = ag[0] * qCs_0 + ag[1] * qCs_1 + ag[2] * this.s2[base + SLOT_Q_CS];
+      } else {
+        ccapCs = ag[0] * qCs_0 + ag[1] * qCs_1;
+      }
+      this.s0[base + SLOT_CCAP_CS] = ccapCs;
+      const geqCs = ag[0] * this.C_s;
+      const ceqCs = ccapCs - ag[0] * qCs_0;
+      if (initMode === "initTran") {
+        this.s1[base + SLOT_CCAP_CS] = ccapCs;
+      }
+
+      // NIintegrate for C_0 charge.
+      const qC0_0 = this.s0[base + SLOT_Q_C0];
+      const qC0_1 = this.s1[base + SLOT_Q_C0];
+      let ccapC0: number;
+      if (ctx.order >= 2 && ag.length > 2) {
+        ccapC0 = ag[0] * qC0_0 + ag[1] * qC0_1 + ag[2] * this.s2[base + SLOT_Q_C0];
+      } else {
+        ccapC0 = ag[0] * qC0_0 + ag[1] * qC0_1;
+      }
+      this.s0[base + SLOT_CCAP_C0] = ccapC0;
+      const geqC0 = ag[0] * this.C_0;
+      const ceqC0 = ccapC0 - ag[0] * qC0_0;
+      if (initMode === "initTran") {
+        this.s1[base + SLOT_CCAP_C0] = ccapC0;
+      }
+
+      // L_s companion stamp on branch row.
+      solver.stamp(b, b, -geqL);
+      solver.stampRHS(b, ceqL);
+
+      // C_s companion stamp (n2 ↔ nB).
+      stampG(solver, n2, n2, geqCs);
+      stampG(solver, n2, nB, -geqCs);
+      stampG(solver, nB, n2, -geqCs);
+      stampG(solver, nB, nB, geqCs);
+      if (n2 !== 0) solver.stampRHS(n2 - 1, -ceqCs);
+      if (nB !== 0) solver.stampRHS(nB - 1, ceqCs);
+
+      // C_0 companion stamp (nA ↔ nB).
+      stampG(solver, nA, nA, geqC0);
+      stampG(solver, nA, nB, -geqC0);
+      stampG(solver, nB, nA, -geqC0);
+      stampG(solver, nB, nB, geqC0);
+      if (nA !== 0) solver.stampRHS(nA - 1, -ceqC0);
+      if (nB !== 0) solver.stampRHS(nB - 1, ceqC0);
+
+      // Cache.
+      this.s0[base + SLOT_GEQ_L]  = geqL;
+      this.s0[base + SLOT_IEQ_L]  = ceqL;
+      this.s0[base + SLOT_I_L]    = iNow;
+      this.s0[base + SLOT_GEQ_CS] = geqCs;
+      this.s0[base + SLOT_IEQ_CS] = ceqCs;
+      this.s0[base + SLOT_V_CS]   = vCs;
+      this.s0[base + SLOT_GEQ_C0] = geqC0;
+      this.s0[base + SLOT_IEQ_C0] = ceqC0;
+      this.s0[base + SLOT_V_C0]   = vC0;
+    } else {
+      // DC-OP: just store, no reactive stamps.
+      this.s0[base + SLOT_PHI_L] = this.L_s * iNow;
+      this.s0[base + SLOT_Q_CS]  = this.C_s * vCs;
+      this.s0[base + SLOT_Q_C0]  = this.C_0 * vC0;
+      this.s0[base + SLOT_I_L]   = iNow;
+      this.s0[base + SLOT_V_CS]  = vCs;
+      this.s0[base + SLOT_V_C0]  = vC0;
+      this.s0[base + SLOT_GEQ_L]  = 0;
+      this.s0[base + SLOT_IEQ_L]  = 0;
+      this.s0[base + SLOT_GEQ_CS] = 0;
+      this.s0[base + SLOT_IEQ_CS] = 0;
+      this.s0[base + SLOT_GEQ_C0] = 0;
+      this.s0[base + SLOT_IEQ_C0] = 0;
+    }
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -387,107 +492,6 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     // Total current into pin A = motional arm current + shunt current
     const I = iMotional + iShunt;
     return [I, -I];
-  }
-
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
-    const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
-    const n1 = this.pinNodeIds[2];
-    const n2 = this.pinNodeIds[3];
-    const b = this.branchIndex;
-
-    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-
-    // L_s companion model — uses branch current row
-    const iNow = voltages[b];
-    const phi0 = this.L_s * iNow;
-    const phi1 = this.s1[this.base + SLOT_PHI_L];
-    const phi2 = this.s2[this.base + SLOT_PHI_L];
-    const ccapPrevL = this.s1[this.base + SLOT_CCAP_L];
-    const resL = integrateInductor(this.L_s, iNow, phi0, phi1, phi2, dt, h1, order, method, ccapPrevL);
-    this.s0[this.base + SLOT_GEQ_L]  = resL.geq;
-    this.s0[this.base + SLOT_IEQ_L]  = resL.ceq;
-    this.s0[this.base + SLOT_I_L]    = iNow;
-    this.s0[this.base + SLOT_PHI_L]  = phi0;
-    this.s0[this.base + SLOT_CCAP_L] = resL.ccap;
-
-    // C_s companion model — voltage across n2 and n_B
-    const vN2 = n2 > 0 ? voltages[n2 - 1] : 0;
-    const vB  = nB > 0 ? voltages[nB - 1] : 0;
-    const vCs_now = vN2 - vB;
-    const q0Cs = this.C_s * vCs_now;
-    const q1Cs = this.s1[this.base + SLOT_Q_CS];
-    const q2Cs = this.s2[this.base + SLOT_Q_CS];
-    const ccapPrevCs = this.s1[this.base + SLOT_CCAP_CS];
-    const resCs = integrateCapacitor(this.C_s, vCs_now, q0Cs, q1Cs, q2Cs, dt, h1, order, method, ccapPrevCs);
-    this.s0[this.base + SLOT_GEQ_CS]  = resCs.geq;
-    this.s0[this.base + SLOT_IEQ_CS]  = resCs.ceq;
-    this.s0[this.base + SLOT_V_CS]    = vCs_now;
-    this.s0[this.base + SLOT_Q_CS]    = q0Cs;
-    this.s0[this.base + SLOT_CCAP_CS] = resCs.ccap;
-
-    // C_0 companion model — voltage across n_A and n_B
-    const vA = nA > 0 ? voltages[nA - 1] : 0;
-    const vC0_now = vA - vB;
-    const q0C0 = this.C_0 * vC0_now;
-    const q1C0 = this.s1[this.base + SLOT_Q_C0];
-    const q2C0 = this.s2[this.base + SLOT_Q_C0];
-    const ccapPrevC0 = this.s1[this.base + SLOT_CCAP_C0];
-    const resC0 = integrateCapacitor(this.C_0, vC0_now, q0C0, q1C0, q2C0, dt, h1, order, method, ccapPrevC0);
-    this.s0[this.base + SLOT_GEQ_C0]  = resC0.geq;
-    this.s0[this.base + SLOT_IEQ_C0]  = resC0.ceq;
-    this.s0[this.base + SLOT_V_C0]    = vC0_now;
-    this.s0[this.base + SLOT_Q_C0]    = q0C0;
-    this.s0[this.base + SLOT_CCAP_C0] = resC0.ccap;
-  }
-
-  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
-    const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
-    const n2 = this.pinNodeIds[3];
-    const b = this.branchIndex;
-
-    const iNowL = voltages[b];
-    this.s0[this.base + SLOT_PHI_L] = this.L_s * iNowL;
-
-    const vN2 = n2 > 0 ? voltages[n2 - 1] : 0;
-    const vB = nB > 0 ? voltages[nB - 1] : 0;
-    const vCs_now = vN2 - vB;
-    this.s0[this.base + SLOT_Q_CS] = this.C_s * vCs_now;
-
-    const vA = nA > 0 ? voltages[nA - 1] : 0;
-    const vC0_now = vA - vB;
-    this.s0[this.base + SLOT_Q_C0] = this.C_0 * vC0_now;
-
-    // Recompute ccap for all 3 reactive junctions from converged charge/flux
-    // so the next step's trapezoidal recursion starts from correct companion current.
-    if (dt > 0) {
-      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-
-      // L_s flux
-      const phi0 = this.s0[this.base + SLOT_PHI_L];
-      const phi1 = this.s1[this.base + SLOT_PHI_L];
-      const phi2 = this.s2[this.base + SLOT_PHI_L];
-      const ccapPrevL = this.s1[this.base + SLOT_CCAP_L];
-      const resL = integrateInductor(this.L_s, iNowL, phi0, phi1, phi2, dt, h1, order, method, ccapPrevL);
-      this.s0[this.base + SLOT_CCAP_L] = resL.ccap;
-
-      // C_s charge
-      const q0Cs = this.s0[this.base + SLOT_Q_CS];
-      const q1Cs = this.s1[this.base + SLOT_Q_CS];
-      const q2Cs = this.s2[this.base + SLOT_Q_CS];
-      const ccapPrevCs = this.s1[this.base + SLOT_CCAP_CS];
-      const resCs = integrateCapacitor(this.C_s, vCs_now, q0Cs, q1Cs, q2Cs, dt, h1, order, method, ccapPrevCs);
-      this.s0[this.base + SLOT_CCAP_CS] = resCs.ccap;
-
-      // C_0 charge
-      const q0C0 = this.s0[this.base + SLOT_Q_C0];
-      const q1C0 = this.s1[this.base + SLOT_Q_C0];
-      const q2C0 = this.s2[this.base + SLOT_Q_C0];
-      const ccapPrevC0 = this.s1[this.base + SLOT_CCAP_C0];
-      const resC0 = integrateCapacitor(this.C_0, vC0_now, q0C0, q1C0, q2C0, dt, h1, order, method, ccapPrevC0);
-      this.s0[this.base + SLOT_CCAP_C0] = resC0.ccap;
-    }
   }
 
   getLteTimestep(

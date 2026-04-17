@@ -70,8 +70,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -174,19 +173,25 @@ function createOTAElement(
     isNonlinear: true,
     isReactive: false,
 
-    stamp(_solver: SparseSolver): void {
-      // No linear topology-constant entries for this nonlinear element.
-    },
-
-    stampNonlinear(solver: SparseSolver): void {
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
+      const voltages = ctx.voltages;
       const twoVt = 2 * p.vt;
+
+      // Read operating-point voltages
+      const vp = readNode(voltages, nVp);
+      const vm = readNode(voltages, nVm);
+      vDiff = vp - vm;
+      const vIabc = readNode(voltages, nIabc);
+      // Bias current must be non-negative (OTA requires positive bias current)
+      iBias = Math.max(0, vIabc);
+
       // Evaluate tanh-limited output current at current operating point.
       const x = vDiff / twoVt;
-      // tanh computed via standard formula; clamp argument to avoid overflow
       const xClamped = Math.max(-50, Math.min(50, x));
       const tanhX = Math.tanh(xClamped);
-
       const iOutNow = iBias * tanhX;
+      iOut = iOutNow;
 
       // Effective transconductance: dI_out/dV_diff = I_bias/(2*V_T) * sech²(x)
       // sech²(x) = 1 - tanh²(x)
@@ -198,8 +203,6 @@ function createOTAElement(
       const iNR = iOutNow - gmEff * vDiff;
 
       // Stamp VCCS: current gm_eff * V_diff injected into OUT+ from (V+, V-)
-      // G[OUT+, V+] -= gmEff   G[OUT+, V-] += gmEff
-      // G[OUT-, V+] += gmEff   G[OUT-, V-] -= gmEff
       if (nOutP !== 0 && nVp !== 0) solver.stamp(nOutP - 1, nVp - 1, -gmEff);
       if (nOutP !== 0 && nVm !== 0) solver.stamp(nOutP - 1, nVm - 1, gmEff);
       if (nOutN !== 0 && nVp !== 0) solver.stamp(nOutN - 1, nVp - 1, gmEff);
@@ -208,25 +211,6 @@ function createOTAElement(
       // RHS: Norton constant
       if (nOutP !== 0) solver.stampRHS(nOutP - 1, iNR);
       if (nOutN !== 0) solver.stampRHS(nOutN - 1, -iNR);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      const twoVt = 2 * p.vt;
-      const vp = readNode(voltages, nVp);
-      const vm = readNode(voltages, nVm);
-      vDiff = vp - vm;
-
-      // I_bias is the voltage at the Iabc node, interpreted as bias current
-      // (convention: a current source of value I_bias drives into Iabc with
-      // a 1 Ω shunt to ground, so V(Iabc) = I_bias numerically).
-      const vIabc = readNode(voltages, nIabc);
-      // Bias current must be non-negative (OTA requires positive bias current)
-      iBias = Math.max(0, vIabc);
-
-      // Cache output current for getPinCurrents
-      const x = vDiff / twoVt;
-      const xClamped = Math.max(-50, Math.min(50, x));
-      iOut = iBias * Math.tanh(xClamped);
     },
 
     /**

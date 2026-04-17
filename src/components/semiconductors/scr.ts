@@ -28,11 +28,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { VT } from "../../core/constants.js";
@@ -240,34 +238,8 @@ export function createScrElement(
       s0 = newS0;
     },
 
-    stamp(_solver: SparseSolver): void {
-      // No topology-constant linear contributions
-    },
-
-    stampNonlinear(solver: SparseSolver): void {
-      const geq      = s0[base + SLOT_GEQ];
-      const ieq      = s0[base + SLOT_IEQ];
-      const gGateGeq = s0[base + SLOT_G_GATE_GEQ];
-      const gGateIeq = s0[base + SLOT_G_GATE_IEQ];
-
-      // Anode-cathode path
-      stampG(solver, nodeA, nodeA, geq);
-      stampG(solver, nodeA, nodeK, -geq);
-      stampG(solver, nodeK, nodeA, -geq);
-      stampG(solver, nodeK, nodeK, geq);
-      stampRHS(solver, nodeA, -ieq);
-      stampRHS(solver, nodeK, ieq);
-
-      // Gate-cathode path (gate junction)
-      stampG(solver, nodeG, nodeG, gGateGeq);
-      stampG(solver, nodeG, nodeK, -gGateGeq);
-      stampG(solver, nodeK, nodeG, -gGateGeq);
-      stampG(solver, nodeK, nodeK, gGateGeq);
-      stampRHS(solver, nodeG, -gGateIeq);
-      stampRHS(solver, nodeK, gGateIeq);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
+    load(ctx: LoadContext): void {
+      const voltages = ctx.voltages;
       let vakRaw: number;
       let vgkRaw: number;
       if (primedVak !== null) {
@@ -305,8 +277,8 @@ export function createScrElement(
         vgkLimited = vgkResult.value;
         pnjlimLimited = vakResult.limited || vgkResult.limited;
 
-        if (limitingCollector) {
-          limitingCollector.push({
+        if (ctx.limitingCollector) {
+          ctx.limitingCollector.push({
             elementIndex: (this as any).elementIndex ?? -1,
             label: (this as any).label ?? "",
             junction: "AK",
@@ -315,7 +287,7 @@ export function createScrElement(
             vAfter: vakLimited,
             wasLimited: vakResult.limited,
           });
-          limitingCollector.push({
+          ctx.limitingCollector.push({
             elementIndex: (this as any).elementIndex ?? -1,
             label: (this as any).label ?? "",
             junction: "GK",
@@ -327,18 +299,42 @@ export function createScrElement(
         }
       }
 
+      if (pnjlimLimited) ctx.noncon.value++;
+
       s0[base + SLOT_VAK] = vakLimited;
       s0[base + SLOT_VGK] = vgkLimited;
 
       computeOperatingPoint(vakLimited, vgkLimited);
-      return pnjlimLimited;
+
+      const solver = ctx.solver;
+      const geq      = s0[base + SLOT_GEQ];
+      const ieq      = s0[base + SLOT_IEQ];
+      const gGateGeq = s0[base + SLOT_G_GATE_GEQ];
+      const gGateIeq = s0[base + SLOT_G_GATE_IEQ];
+
+      // Anode-cathode path
+      stampG(solver, nodeA, nodeA, geq);
+      stampG(solver, nodeA, nodeK, -geq);
+      stampG(solver, nodeK, nodeA, -geq);
+      stampG(solver, nodeK, nodeK, geq);
+      stampRHS(solver, nodeA, -ieq);
+      stampRHS(solver, nodeK, ieq);
+
+      // Gate-cathode path (gate junction)
+      stampG(solver, nodeG, nodeG, gGateGeq);
+      stampG(solver, nodeG, nodeK, -gGateGeq);
+      stampG(solver, nodeK, nodeG, -gGateGeq);
+      stampG(solver, nodeK, nodeK, gGateGeq);
+      stampRHS(solver, nodeG, -gGateIeq);
+      stampRHS(solver, nodeK, gGateIeq);
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
-      // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+    checkConvergence(ctx: LoadContext): boolean {
+      // ngspice icheck gate: if voltage was limited in load(),
       // declare non-convergence immediately (SCRload sets CKTnoncon++)
       if (pnjlimLimited) return false;
 
+      const voltages = ctx.voltages;
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
       const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
@@ -349,7 +345,7 @@ export function createScrElement(
       const iak = s0[base + SLOT_IAK];
       const gak = s0[base + SLOT_GEQ];
       const cakhat = iak + gak * delvak;
-      const tolAK = reltol * Math.max(Math.abs(cakhat), Math.abs(iak)) + abstol;
+      const tolAK = ctx.reltol * Math.max(Math.abs(cakhat), Math.abs(iak)) + ctx.iabstol;
 
       // ngspice DIOconvTest on J2 (gate-cathode)
       const vgkRaw = vG - vK;
@@ -357,7 +353,7 @@ export function createScrElement(
       const igk = s0[base + SLOT_IGK];
       const ggk = s0[base + SLOT_G_GATE_GEQ];
       const cgkhat = igk + ggk * delvgk;
-      const tolGK = reltol * Math.max(Math.abs(cgkhat), Math.abs(igk)) + abstol;
+      const tolGK = ctx.reltol * Math.max(Math.abs(cgkhat), Math.abs(igk)) + ctx.iabstol;
 
       return Math.abs(cakhat - iak) <= tolAK && Math.abs(cgkhat - igk) <= tolGK;
     },

@@ -24,7 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -330,9 +330,9 @@ function createSwitchAnalogElement(
     isNonlinear: false,
     isReactive: false,
 
-    stamp(solver: SparseSolver): void {
+    load(ctx: LoadContext): void {
       const G = effectivelyClosed ? 1 / ron : 1 / roff;
-      stampConductanceSpst(solver, nodeA, nodeB, G);
+      stampConductanceSpst(ctx.solver, nodeA, nodeB, G);
     },
 
     setClosed(c: boolean): void {

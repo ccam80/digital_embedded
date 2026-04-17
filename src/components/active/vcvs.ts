@@ -14,12 +14,13 @@
  *   The VCVS introduces one branch variable (the output current) via a
  *   dedicated branch row in the MNA matrix.
  *
- *   `stamp()` places the B/C incidence for the output port:
+ *   `_stampLinear()` places the B/C incidence for the output port:
  *     B[nOutP, k] += 1   C[k, nOutP] += 1
  *     B[nOutN, k] -= 1   C[k, nOutN] -= 1
  *
- *   `stampNonlinear()` (via base class) evaluates f(Vctrl) and f'(Vctrl),
- *   then `stampOutput()` stamps the Jacobian and NR-linearized RHS:
+ *   `load()` (via base class) binds the control voltage, calls `_stampLinear`,
+ *   evaluates f(Vctrl) and f'(Vctrl), then calls `stampOutput()` which stamps
+ *   the Jacobian and NR-linearized RHS:
  *     C[k, nCtrlP] -= f'(Vctrl)   (Jacobian)
  *     C[k, nCtrlN] += f'(Vctrl)   (Jacobian)
  *     RHS[k]        = f(Vctrl) - f'(Vctrl) * Vctrl
@@ -158,7 +159,7 @@ class VCVSAnalogElement extends ControlledSourceElement {
   }
 
   /** Stamp the linear B/C incidence for the output voltage source branch. */
-  override stamp(solver: SparseSolver): void {
+  protected override _stampLinear(solver: SparseSolver): void {
     const k = this._k;
     if (this._nOutP !== 0) {
       solver.stamp(this._nOutP - 1, k, 1);   // B[nOutP, k]

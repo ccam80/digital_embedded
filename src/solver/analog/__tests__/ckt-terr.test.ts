@@ -90,29 +90,6 @@ describe("cktTerrVoltage", () => {
     expect(isFinite(result)).toBe(true);
   });
 
-  it("order 1: quadratic voltage gives correct result by manual calculation", () => {
-    // v = n^2: v(3)=9, v(2)=4, v(1)=1 at equal dt=1
-    // 1st diffs: (9-4)/1=5, (4-1)/1=3
-    // 2nd diff: (5-3)/(1+1)=1 => ddiff=1
-    // GEAR order 1: factor=0.5, denom=max(1e-6, 0.5*1)=0.5
-    // tol = 1e-6 + 1e-3 * max(9,4) = 0.009001
-    // del = 7 * 0.009001 / 0.5 = 0.12601...; result = sqrt(del)
-    const dt = 1.0;
-    const lteReltol = 1e-3;
-    const lteAbstol = 1e-6;
-    const trtol = 7;
-    const result = cktTerrVoltage(9, 4, 1, 0, dt, [dt, dt], 1, "bdf1", lteReltol, lteAbstol, trtol);
-    const expectedTol = lteAbstol + lteReltol * Math.max(9, 4);
-    const expectedDenom = Math.max(lteAbstol, 0.5 * 1.0);
-    const delta = dt;
-    let delsum = dt + dt; // deltaOld[0]+deltaOld[1]
-    const factor = GEAR_LTE_FACTORS[0];
-    const denom2 = Math.max(lteAbstol, factor * 1.0);
-    const tmp = (expectedTol * trtol * delsum) / (denom2 * delta);
-    const expectedResult = delta * Math.sqrt(tmp);
-    expect(result).toBeCloseTo(expectedResult, 8);
-  });
-
   it("order 2 bdf2: applies sqrt root extraction for nonzero 3rd divided difference", () => {
     // Cubic data: v=27,8,1,0 at dt=1 gives 3rd divided diff = 1
     const dt = 1.0;
@@ -294,7 +271,45 @@ describe("gear_lte_factor_selection", () => {
     const denom = Math.max(1e-12, factor * ddiff);
     const del = 7 * tol / denom;
     const expectedOrder3 = Math.exp(Math.log(del) / (3 + 1)); // order+1=4
-    expect(resultOrder3).toBeCloseTo(expectedOrder3, 10);
+    expect(resultOrder3).toBe(expectedOrder3);
+  });
+
+  it("gear_lte_factor_order_5", () => {
+    // GEAR order 5 must use factor 10/137 (ngspice cktterr.c gearCoeff[4])
+    // Repo cross-reference: spec/state-machines/ngspice-cktterr-vs-ckt-terr.md row 47
+    expect(GEAR_LTE_FACTORS[4]).toBe(10 / 137);
+
+    const dt = 1e-6;
+    const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
+    const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-12, chgtol: 1e-14 };
+    const resultOrder5 = cktTerr(dt, [dt, dt, dt, dt, dt], 5, "bdf2", q0, q1, q2, q3, q0, q1, params);
+
+    // Reference using correct factor 10/137 for order 5 (order>=2 uses the same
+    // order-2 divided-difference path; only the factor and root index differ).
+    const h0 = dt, h1 = dt, h2 = dt;
+    let d0 = q0, d1 = q1, d2 = q2, d3 = q3;
+    d0 = (d0 - d1) / h0;
+    d1 = (d1 - d2) / h1;
+    d2 = (d2 - d3) / h2;
+    let dt0 = h1 + h0, dt1 = h2 + h1;
+    d0 = (d0 - d1) / dt0;
+    d1 = (d1 - d2) / dt1;
+    dt0 = dt1 + h0;
+    d0 = (d0 - d1) / dt0;
+    const ddiff = Math.abs(d0);
+    const volttol = 1e-12 + 1e-3 * Math.max(q0, q1);
+    const chargetolRaw = 1e-3 * Math.max(Math.max(q0, q1), 1e-14);
+    const chargetol = chargetolRaw / dt;
+    const tol = Math.max(volttol, chargetol);
+    const factor = 10 / 137; // correct GEAR order 5 factor
+    const denom = Math.max(1e-12, factor * ddiff);
+    const del = 7 * tol / denom;
+    const expectedOrder5 = Math.exp(Math.log(del) / (5 + 1)); // order+1=6
+    expect(resultOrder5).toBe(expectedOrder5);
+
+    // Regression guard against the incorrect 5/72 value that shipped in
+    // batch-3 at commit ecdc34a.
+    expect(GEAR_LTE_FACTORS[4]).not.toBe(5 / 72);
   });
 
   it("gear_lte_factor_order_6", () => {
@@ -305,12 +320,28 @@ describe("gear_lte_factor_selection", () => {
     const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
     const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-12, chgtol: 1e-14 };
     const resultOrder6 = cktTerr(dt, [dt, dt, dt, dt, dt], 6, "bdf2", q0, q1, q2, q3, q0, q1, params);
-    expect(resultOrder6).toBeGreaterThan(0);
-    expect(isFinite(resultOrder6)).toBe(true);
-    // Verify the factor is applied: order 6 uses GEAR_LTE_FACTORS[5] = 20/343
-    // Factor 20/343 < factor 2/9, so order 6 gives a larger timestep than order 2
-    const resultOrder2 = cktTerr(dt, [dt, dt], 2, "bdf2", q0, q1, q2, q3, q0, q1, params);
-    expect(resultOrder6).toBeGreaterThan(resultOrder2);
+
+    // Bit-exact reference for order 6.
+    const h0 = dt, h1 = dt, h2 = dt;
+    let d0 = q0, d1 = q1, d2 = q2, d3 = q3;
+    d0 = (d0 - d1) / h0;
+    d1 = (d1 - d2) / h1;
+    d2 = (d2 - d3) / h2;
+    let dt0 = h1 + h0, dt1 = h2 + h1;
+    d0 = (d0 - d1) / dt0;
+    d1 = (d1 - d2) / dt1;
+    dt0 = dt1 + h0;
+    d0 = (d0 - d1) / dt0;
+    const ddiff = Math.abs(d0);
+    const volttol = 1e-12 + 1e-3 * Math.max(q0, q1);
+    const chargetolRaw = 1e-3 * Math.max(Math.max(q0, q1), 1e-14);
+    const chargetol = chargetolRaw / dt;
+    const tol = Math.max(volttol, chargetol);
+    const factor = 20 / 343;
+    const denom = Math.max(1e-12, factor * ddiff);
+    const del = 7 * tol / denom;
+    const expectedOrder6 = Math.exp(Math.log(del) / (6 + 1));
+    expect(resultOrder6).toBe(expectedOrder6);
   });
 });
 

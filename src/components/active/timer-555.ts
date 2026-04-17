@@ -16,10 +16,10 @@
  *   - Q=0 (RESET): OUTPUT ≈ GND+0.1V (low),    DISCHARGE = rDischarge to GND
  *
  * MNA model:
- *   stamp()         — internal voltage divider resistors (topology-constant)
- *   stampNonlinear()— output and discharge Norton equivalents (state-dependent)
- *   updateOperatingPoint() — evaluate comparators, update flip-flop state
- *   updateState()   — re-evaluate at accepted timestep for state consistency
+ *   load()   — stamps internal voltage divider resistors, output Norton
+ *              equivalents, and discharge transistor; reads pin voltages.
+ *   accept() — runs the comparator evaluation / flip-flop advance once per
+ *              accepted timestep so state transitions never happen inside NR.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -35,7 +35,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { DigitalOutputPinModel } from "../../solver/analog/digital-pin-model.js";
@@ -226,14 +226,14 @@ export class Timer555Element extends AbstractCircuitElement {
 /**
  * Create the MNA analog element for a 555 timer.
  *
- * Internal voltage divider (stamped in stamp()):
+ * Internal voltage divider (stamped inside load()):
  *   VCC → CTRL: 5kΩ   (upper divider arm)
  *   CTRL → GND: 10kΩ  (two 5kΩ in series, combined; no tapped midpoint node needed)
  * Result: CTRL = VCC × 10/15 = 2/3 VCC when CTRL pin is floating.
  * External drive on CTRL overrides this.
  *
- * Output (stampNonlinear): Norton equivalent between OUT and GND.
- * Discharge (stampNonlinear): R_sat or R_hiZ between DIS and GND.
+ * Output: Norton equivalent between OUT and GND (stamped inside load()).
+ * Discharge: R_sat or R_hiZ between DIS and GND (stamped inside load()).
  */
 function createTimer555Element(
   pinNodes: ReadonlyMap<string, number>,
@@ -298,7 +298,7 @@ function createTimer555Element(
 
   function advanceFlipflop(voltages: Float64Array): void {
     // Evaluate comparators and advance flip-flop state.
-    // Called ONLY after an accepted timestep (in updateState), not during NR
+    // Called ONLY from accept() after an accepted timestep, not during NR
     // iteration. Holding flip-flop state constant within a timestep allows the
     // NR solver to converge; state transitions happen once per timestep.
     const vGnd  = readNode(voltages, nGnd);
@@ -335,13 +335,19 @@ function createTimer555Element(
     isNonlinear: true,
     isReactive: false,
 
-    stamp(solver: SparseSolver): void {
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
+      const voltages = ctx.voltages;
+
+      // Update output pin voltage levels from current rail voltages for the
+      // stamping pass. Flip-flop state is held constant within each NR solve
+      // — transitions only happen in accept() after an accepted timestep.
+      updateOutputPinLevels(voltages);
+
       // Internal voltage divider: VCC→CTRL (5kΩ), CTRL→GND (10kΩ)
       stampResistor(solver, nVcc, nCtrl, rDiv1);
       stampResistor(solver, nCtrl, nGnd, rDiv2);
-    },
 
-    stampNonlinear(solver: SparseSolver): void {
       // Output stage: conductance + current source driving OUT toward vOH or vOL
       _outputPin.setLogicLevel(_flipflopQ);
       _outputPin.stampOutput(solver);
@@ -354,18 +360,10 @@ function createTimer555Element(
       }
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      // Update output pin voltage levels for stampNonlinear but do NOT advance
-      // flip-flop. Keeping flip-flop state constant within each NR solve lets
-      // the solver converge to the linearized operating point. State transitions
-      // only occur in updateState() after each accepted timestep.
-      updateOutputPinLevels(voltages);
-    },
-
-    updateState(_dt: number, voltages: Float64Array): void {
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
       // Called once per accepted timestep: now safe to advance state.
-      updateOutputPinLevels(voltages);
-      advanceFlipflop(voltages);
+      updateOutputPinLevels(ctx.voltages);
+      advanceFlipflop(ctx.voltages);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -374,7 +372,7 @@ function createTimer555Element(
       //
       // Convention: positive = current flowing INTO the element at that pin.
       //
-      // Stamped constitutive equations (read from stamp() / stampNonlinear()):
+      // Stamped constitutive equations (read from load()):
       //   Voltage divider:  rDiv1 between VCC↔CTRL, rDiv2 between CTRL↔GND
       //   Output:           DigitalOutputPinModel stamps G_out on nOut diagonal,
       //                     vTarget*G_out on RHS at nOut (reference = MNA node 0)

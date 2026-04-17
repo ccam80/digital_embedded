@@ -10,21 +10,19 @@
  * Self-heating thermal model (when selfHeating=true):
  *   dT/dt = (P_dissipated - (T - T_ambient) / R_thermal) / C_thermal
  *   where P = V² / R(T)
- *   Integrated with forward Euler each accepted timestep via updateState().
+ *   Integrated with forward Euler each accepted timestep via accept().
  *
  * MNA topology:
  *   pinNodeIds[0] = n_pos
  *   pinNodeIds[1] = n_neg
  *   branchIndex    = -1
  *
- * Stamping:
- *   stamp()         — no-op (conductance is temperature-dependent)
- *   stampNonlinear  — stamps conductance 1/R(T) between terminals
- *   updateState     — integrates thermal ODE if selfHeating enabled
+ * Unified load() pipeline (matches ngspice DEVload):
+ *   load(ctx)  — stamps conductance 1/R(T) between terminals every NR iteration
+ *   accept(ctx, ...) — integrates thermal ODE after an accepted timestep when selfHeating
  */
 
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -188,11 +186,8 @@ export class NTCThermistorElement implements AnalogElementCore {
     return this._p.temperature;
   }
 
-  stamp(_solver: SparseSolver): void {
-    // All conductance is in stampNonlinear (resistance depends on temperature).
-  }
-
-  stampNonlinear(solver: SparseSolver): void {
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
 
@@ -220,9 +215,11 @@ export class NTCThermistorElement implements AnalogElementCore {
     return [I, -I];
   }
 
-  updateState(dt: number, voltages: Float64Array): void {
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     if (!this._selfHeating) return;
 
+    const dt = ctx.dt;
+    const voltages = ctx.voltages;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;

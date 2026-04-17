@@ -5,7 +5,7 @@
  * R_blown (open circuit) when the accumulated I²t energy exceeds the rating.
  *
  * Thermal model:
- *   _thermalEnergy accumulates I²·dt each accepted timestep via updateState().
+ *   _thermalEnergy accumulates I²·dt each accepted timestep via accept().
  *   When _thermalEnergy exceeds i2tRating the fuse is permanently blown.
  *
  * Smooth resistance transition:
@@ -29,17 +29,14 @@
  *   pinNodeIds[1] = n_neg  (negative terminal)
  *   branchIndex    = -1     (no branch current row)
  *
- * Stamping:
- *   stamp()         — no-op (all contributions are in stampNonlinear)
- *   stampNonlinear  — stamps conductance 1/R(_thermalEnergy)
- *   updateState     — integrates I²·dt using current terminal voltages
- *
- * Diagnostic:
- *   Emits 'fuse-blown' (info) on the timestep when _blown first becomes true.
+ * Unified load() pipeline (matches ngspice DEVload):
+ *   load(ctx)       — stamps conductance 1/R(_thermalEnergy) every NR iteration
+ *   accept(ctx,...) — integrates I²·dt using accepted-step terminal voltages and
+ *                     emits the 'fuse-blown' diagnostic (info) on the first step
+ *                     where _blown becomes true.
  */
 
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElement, AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { PropertyBag } from "../../core/properties.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -130,11 +127,8 @@ export class AnalogFuseElement implements AnalogElement {
     this._onStateChange = onStateChange ?? null;
   }
 
-  stamp(_solver: SparseSolver): void {
-    // All conductance contributions are in stampNonlinear (resistance is state-dependent).
-  }
-
-  stampNonlinear(solver: SparseSolver): void {
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
 
@@ -153,11 +147,9 @@ export class AnalogFuseElement implements AnalogElement {
     }
   }
 
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    void voltages;
-  }
-
-  updateState(dt: number, voltages: Float64Array): void {
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    const dt = ctx.dt;
+    const voltages = ctx.voltages;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;

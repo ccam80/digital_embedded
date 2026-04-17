@@ -21,11 +21,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { VT } from "../../core/constants.js";
 import { createDiodeElement, getDiodeInternalNodeCount, getDiodeInternalNodeLabels } from "./diode.js";
@@ -156,22 +154,8 @@ export function createZenerElement(
       s3 = newS3;
     },
 
-    stamp(_solver: SparseSolver): void {
-      // No linear topology-constant contributions.
-    },
-
-    stampNonlinear(solver: SparseSolver): void {
-      const geq = s0[base + SLOT_GEQ];
-      const ieq = s0[base + SLOT_IEQ];
-      stampG(solver, nodeAnode, nodeAnode, geq);
-      stampG(solver, nodeAnode, nodeCathode, -geq);
-      stampG(solver, nodeCathode, nodeAnode, -geq);
-      stampG(solver, nodeCathode, nodeCathode, geq);
-      stampRHS(solver, nodeAnode, -ieq);
-      stampRHS(solver, nodeCathode, ieq);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): void {
+    load(ctx: LoadContext): void {
+      const voltages = ctx.voltages;
       let vdRaw: number;
       if (primedVd !== null) {
         vdRaw = primedVd;
@@ -208,8 +192,10 @@ export function createZenerElement(
         pnjlimLimited = vdResult.limited;
       }
 
-      if (limitingCollector) {
-        limitingCollector.push({
+      if (pnjlimLimited) ctx.noncon.value++;
+
+      if (ctx.limitingCollector) {
+        ctx.limitingCollector.push({
           elementIndex: (this as any).elementIndex ?? -1,
           label: (this as any).label ?? "",
           junction: "AK",
@@ -222,30 +208,43 @@ export function createZenerElement(
 
       s0[base + SLOT_VD] = vdLimited;
 
+      let geq: number;
+      let ieq: number;
       if (vdLimited >= -params.BV) {
         // Forward region and normal reverse region: standard Shockley
         const expArg = Math.min(vdLimited / nVt, 700);
         const expVal = Math.exp(expArg);
         const id = params.IS * (expVal - 1);
+        geq = (params.IS * expVal) / nVt + GMIN;
+        ieq = id - geq * vdLimited;
         s0[base + SLOT_ID] = id;
-        s0[base + SLOT_GEQ] = (params.IS * expVal) / nVt + GMIN;
-        s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
       } else {
         // Reverse breakdown region: Id = -IS * exp(-(Vd + BV) / (NBV*Vt))
         const bdExpArg = Math.min(-(vdLimited + params.BV) / nbvVt, 700);
         const bdExpVal = Math.exp(bdExpArg);
         const id = -params.IS * bdExpVal;
+        geq = (params.IS * bdExpVal) / nbvVt + GMIN;
+        ieq = id - geq * vdLimited;
         s0[base + SLOT_ID] = id;
-        s0[base + SLOT_GEQ] = (params.IS * bdExpVal) / nbvVt + GMIN;
-        s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
       }
+      s0[base + SLOT_GEQ] = geq;
+      s0[base + SLOT_IEQ] = ieq;
+
+      const solver = ctx.solver;
+      stampG(solver, nodeAnode, nodeAnode, geq);
+      stampG(solver, nodeAnode, nodeCathode, -geq);
+      stampG(solver, nodeCathode, nodeAnode, -geq);
+      stampG(solver, nodeCathode, nodeCathode, geq);
+      stampRHS(solver, nodeAnode, -ieq);
+      stampRHS(solver, nodeCathode, ieq);
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
-      // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+    checkConvergence(ctx: LoadContext): boolean {
+      // ngspice icheck gate: if voltage was limited in load(),
       // declare non-convergence immediately (DIOload sets CKTnoncon++)
       if (pnjlimLimited) return false;
 
+      const voltages = ctx.voltages;
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
@@ -255,7 +254,7 @@ export function createZenerElement(
       const id = s0[base + SLOT_ID];
       const gd = s0[base + SLOT_GEQ];
       const cdhat = id + gd * delvd;
-      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + abstol;
+      const tol = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + ctx.iabstol;
       return Math.abs(cdhat - id) <= tol;
     },
 

@@ -24,7 +24,7 @@
  * Clock-edge detection:
  *   Rising edge: prev CLK voltage < vIH, current CLK voltage >= vIH.
  *   Comparison uses threshold vIH = 2.0V (standard CMOS 3.3V logic family).
- *   Edge detection happens in updateState() (once per accepted timestep,
+ *   Edge detection happens in accept() (once per accepted timestep,
  *   never mid-NR), guaranteeing output only latches on real clock edges.
  *
  * EOC:
@@ -46,8 +46,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { defineModelParams } from "../../core/model-params.js";
-import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
@@ -327,9 +326,6 @@ function createADCElement(
     if (n > 0) digitalPins[i].init(n, -1);
   }
 
-  // Solver cached from stamp() for use in stampCompanion()
-  let _solver: SparseSolver | null = null;
-
   // Clock edge detection state
   let prevClkVoltage = 0;
 
@@ -374,9 +370,8 @@ function createADCElement(
     isNonlinear: true,
     isReactive: true,
 
-    stamp(solver: SparseSolver): void {
-      // Cache solver for use in stampCompanion (interface does not pass it there)
-      _solver = solver;
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
       // Input loading — VIN and CLK pins
       if (nVin > 0) vinPin.stamp(solver);
       if (nClk > 0) clkPin.stamp(solver);
@@ -386,63 +381,21 @@ function createADCElement(
       for (let i = 0; i < bits; i++) {
         if (nDigital[i] > 0) digitalPins[i].stampOutput(solver);
       }
-    },
 
-    stampNonlinear(solver: SparseSolver): void {
-      // Re-stamp output pins with current logic levels (Norton currents)
-      if (nEoc > 0) eocPin.stampOutput(solver);
-      for (let i = 0; i < bits; i++) {
-        if (nDigital[i] > 0) digitalPins[i].stampOutput(solver);
+      // Transient: companion stamps for input/output capacitances.
+      if (ctx.isTransient && ctx.dt > 0) {
+        if (nVin > 0) vinPin.stampCompanion(solver, ctx.dt, ctx.method);
+        if (nClk > 0) clkPin.stampCompanion(solver, ctx.dt, ctx.method);
+        if (nEoc > 0) eocPin.stampCompanion(solver, ctx.dt, ctx.method);
+        for (let i = 0; i < bits; i++) {
+          if (nDigital[i] > 0) digitalPins[i].stampCompanion(solver, ctx.dt, ctx.method);
+        }
       }
     },
 
-    stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array): void {
-      if (_solver === null) return;
-      if (nVin > 0) vinPin.stampCompanion(_solver, dt, method);
-      if (nClk > 0) clkPin.stampCompanion(_solver, dt, method);
-      if (nEoc > 0) eocPin.stampCompanion(_solver, dt, method);
-      for (let i = 0; i < bits; i++) {
-        if (nDigital[i] > 0) digitalPins[i].stampCompanion(_solver, dt, method);
-      }
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      // Cache voltages — stampNonlinear reads output pin states which were
-      // set during updateCompanion (clock-edge detection). No re-evaluation
-      // of the ADC conversion here — that only happens on accepted timesteps.
-      void voltages;
-    },
-
-    getPinCurrents(voltages: Float64Array): number[] {
-      const rIn = p.rIn;
-      const rOut = p.rOut;
-
-      // VIN: DigitalInputPinModel — loading conductance 1/rIn to ground
-      const iVin = nVin > 0 ? readVoltage(voltages, nVin) / rIn : 0;
-
-      // CLK: DigitalInputPinModel — loading conductance 1/rIn to ground
-      const iClk = nClk > 0 ? readVoltage(voltages, nClk) / rIn : 0;
-
-      // VREF: passive — no conductance stamped, behavioral approximation → 0
-      // GND: passive — no conductance stamped, behavioral approximation → 0
-
-      // EOC: DigitalOutputPinModel — I = (V_eoc - V_target) / rOut
-      const vEoc = readVoltage(voltages, nEoc);
-      const iEoc = nEoc > 0 ? (vEoc - eocPin.currentVoltage) / rOut : 0;
-
-      // D0..D(N-1): DigitalOutputPinModel — I = (V_d - V_target) / rOut
-      const currents: number[] = [iVin, iClk, 0, 0, iEoc];
-      for (let i = 0; i < bits; i++) {
-        const n = nDigital[i];
-        const vD = readVoltage(voltages, n);
-        currents.push(n > 0 ? (vD - digitalPins[i].currentVoltage) / rOut : 0);
-      }
-
-      // Sum is nonzero — residual is implicit supply current (expected for behavioral model)
-      return currents;
-    },
-
-    updateState(dt: number, voltages: Float64Array): void {
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+      const voltages = ctx.voltages;
+      const dt = ctx.dt;
       const clkVoltage = readVoltage(voltages, nClk);
       const risingEdge = prevClkVoltage < p.vIH && clkVoltage >= p.vIH;
       prevClkVoltage = clkVoltage;
@@ -454,7 +407,6 @@ function createADCElement(
           eocActive = true;
           eocPin.setLogicLevel(true);
         } else {
-          // SAR: start conversion, N cycles to complete
           if (sarCyclesRemaining === 0) {
             sarCyclesRemaining = bits;
             eocActive = false;
@@ -472,13 +424,36 @@ function createADCElement(
       }
 
       // Update companion model state for accepted timestep
-      if (nVin > 0) vinPin.updateCompanion(dt, "trapezoidal", readVoltage(voltages, nVin));
-      if (nClk > 0) clkPin.updateCompanion(dt, "trapezoidal", clkVoltage);
-      if (nEoc > 0) eocPin.updateCompanion(dt, "trapezoidal", readVoltage(voltages, nEoc));
+      if (dt > 0) {
+        const method = ctx.method;
+        if (nVin > 0) vinPin.updateCompanion(dt, method, readVoltage(voltages, nVin));
+        if (nClk > 0) clkPin.updateCompanion(dt, method, clkVoltage);
+        if (nEoc > 0) eocPin.updateCompanion(dt, method, readVoltage(voltages, nEoc));
+        for (let i = 0; i < bits; i++) {
+          const n = nDigital[i];
+          if (n > 0) digitalPins[i].updateCompanion(dt, method, readVoltage(voltages, n));
+        }
+      }
+    },
+
+    getPinCurrents(voltages: Float64Array): number[] {
+      const rIn = p.rIn;
+      const rOut = p.rOut;
+
+      const iVin = nVin > 0 ? readVoltage(voltages, nVin) / rIn : 0;
+      const iClk = nClk > 0 ? readVoltage(voltages, nClk) / rIn : 0;
+
+      const vEoc = readVoltage(voltages, nEoc);
+      const iEoc = nEoc > 0 ? (vEoc - eocPin.currentVoltage) / rOut : 0;
+
+      const currents: number[] = [iVin, iClk, 0, 0, iEoc];
       for (let i = 0; i < bits; i++) {
         const n = nDigital[i];
-        if (n > 0) digitalPins[i].updateCompanion(dt, "trapezoidal", readVoltage(voltages, n));
+        const vD = readVoltage(voltages, n);
+        currents.push(n > 0 ? (vD - digitalPins[i].currentVoltage) / rOut : 0);
       }
+
+      return currents;
     },
 
     /** Read back the current latched output code (for testing). */

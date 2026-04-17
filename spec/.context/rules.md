@@ -9,25 +9,6 @@ These rules are absolute. No agent may override, soften, or interpret them flexi
 - No `pytest.approx()` with loose tolerances to make tests pass.
 - Test the specific: exact values, exact types, exact error messages where applicable.
 
-### Targeted Tests Only — NEVER the Full Suite
-
-Engine-internal phases (0 through 6) must be verified with **targeted vitest runs only**. Agents MUST NOT run:
-
-- `npm test` / `npm run test` / `npm run test:q` — runs the full suite including Playwright E2E.
-- `npx playwright test` or anything under `e2e/` — E2E tests may regress during engine refactors and won't recover until Phase 7 lands.
-- `npx vitest run` with no path argument — runs all vitest files across the repo.
-
-Instead, run **only the specific test file(s) you touched**:
-
-```bash
-npx vitest run src/solver/analog/__tests__/sparse-solver.test.ts
-npx vitest run src/solver/analog/__tests__/newton-raphson.test.ts src/solver/analog/__tests__/ckt-context.test.ts
-```
-
-Rationale: full-suite runs during Phases 0–6 hit E2E tests that are known to break during the refactor (numerical divergence, engine stagnation). They lock up the machine for ~5 minutes and produce noise that masks real regressions. Phase 7 is the single gate where full-suite / parity tests run. Pre-existing failures are already documented in `spec/test-baseline.md`.
-
-If you think you need broader coverage, first spawn a new implementer for the next task and let the phase boundary's wave-verifier batch-check. Do not second-guess this rule — it is here because a prior agent DID lock up the user's machine.
-
 ## Completeness
 - Never mark work as deferred, TODO, or "not implemented."
 - Never add `# TODO`, `# FIXME`, `# HACK` comments.

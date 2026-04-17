@@ -290,9 +290,8 @@ describe("CKTCircuitContext", () => {
     const validMethods = ["trapezoidal", "bdf1", "bdf2", "gear"];
     expect(validMethods).toContain(lc.method);
 
-    // order — positive integer
-    expect(typeof lc.order).toBe("number");
-    expect(lc.order).toBeGreaterThanOrEqual(1);
+    // order — default is 1 at construction
+    expect(lc.order).toBe(1);
 
     // deltaOld — length-7 array
     expect(Array.isArray(lc.deltaOld)).toBe(true);
@@ -307,27 +306,26 @@ describe("CKTCircuitContext", () => {
     expect(typeof lc.srcFact).toBe("number");
     expect(lc.srcFact).toBe(1);
 
-    // noncon — mutable ref object with numeric value
-    expect(typeof lc.noncon).toBe("object");
+    // noncon — mutable ref object, value starts at 0
     expect(lc.noncon).not.toBeNull();
-    expect(typeof lc.noncon.value).toBe("number");
+    expect(lc.noncon.value).toBe(0);
 
     // limitingCollector — null at construction
     expect(lc.limitingCollector).toBeNull();
 
-    // isDcOp / isTransient — boolean flags
-    expect(typeof lc.isDcOp).toBe("boolean");
-    expect(typeof lc.isTransient).toBe("boolean");
+    // isDcOp / isTransient — both false at construction (engine flips them)
+    expect(lc.isDcOp).toBe(false);
+    expect(lc.isTransient).toBe(false);
 
-    // xfact — numeric
-    expect(typeof lc.xfact).toBe("number");
+    // xfact — 0 until first step computes deltaOld[0]/deltaOld[1]
+    expect(lc.xfact).toBe(0);
 
     // gmin — positive number
     expect(typeof lc.gmin).toBe("number");
     expect(lc.gmin).toBeGreaterThan(0);
 
-    // uic — boolean
-    expect(typeof lc.uic).toBe("boolean");
+    // uic — false at construction (set by solveDcOperatingPoint when requested)
+    expect(lc.uic).toBe(false);
 
     // reltol — matches params
     expect(typeof lc.reltol).toBe("number");

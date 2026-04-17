@@ -329,7 +329,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
     // ---- STEP B: CKTload — unified device evaluation ----
     ctx.preIterationHook?.(iteration, prevVoltages);
-    assembler.stampAll(elements, matrixSize, prevVoltages, ctx.limitingCollector ?? null, iteration, voltages);
+    assembler.stampAll(elements, matrixSize, prevVoltages, ctx.limitingCollector ?? null, iteration);
 
     // ---- STEP C: Nodeset/IC enforcement (ngspice CKTnodeset/CKTic) ----
     if (ctx.nodesets.size || ctx.ics.size) {

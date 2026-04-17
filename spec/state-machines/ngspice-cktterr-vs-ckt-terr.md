@@ -35,7 +35,7 @@ Status legend:
 | 14 | (no counterpart) | `const TRAP_LTE_FACTOR_1 = 1 / 12;` (line 38) | DIFF (vs ngspice inline `.08333333333` - see factor table section) |
 | 15 | (no counterpart) | `const GEAR_LTE_FACTOR_0 = 0.5;` (line 45) | DIFF (TS hoists gear[0] to module constant) |
 | 16 | (no counterpart) | `const GEAR_LTE_FACTOR_1 = 2 / 9;` (line 46) | DIFF (vs ngspice inline `.2222222222` - truncated decimal) |
-| 17 | (no counterpart) | `const GEAR_LTE_FACTORS = [0.5, 2 / 9, 3 / 22, 12 / 125, 10 / 137, 20 / 343];` (line 47) | DIFF (TS uses exact fractions; ngspice uses truncated decimals - six vs six entries but numerically different) |
+| 17 | (no counterpart) | `const GEAR_LTE_FACTORS = [0.5, 2 / 9, 3 / 22, 12 / 125, 10 / 137, 20 / 343];` (line 47) | DIFF (TS uses exact fractions; ngspice uses truncated decimals — per-element precision differences listed at rows 43-48) |
 | 18 | (no counterpart) | `export interface LteParams { ... }` (lines 53-62) | DIFF (TS bundles trtol/reltol/abstol/chgtol into a struct; ngspice reads them as separate CKTcircuit fields) |
 
 ## 2. Function Signature and Parameter Declarations

@@ -31,11 +31,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { PoolBackedAnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { VT } from "../../core/constants.js";
@@ -270,35 +268,8 @@ export function createTriacElement(
       s3 = newS3;
     },
 
-    stamp(_solver: SparseSolver): void {
-      // No topology-constant contributions
-    },
-
-    stampNonlinear(solver: SparseSolver): void {
-      const geq      = s0[base + SLOT_GEQ];
-      const ieq      = s0[base + SLOT_IEQ];
-      const gGateGeq = s0[base + SLOT_G_GATE_GEQ];
-      const gGateIeq = s0[base + SLOT_G_GATE_IEQ];
-
-      // MT1-MT2 main path
-      stampG(solver, nodeMT2, nodeMT2, geq);
-      stampG(solver, nodeMT2, nodeMT1, -geq);
-      stampG(solver, nodeMT1, nodeMT2, -geq);
-      stampG(solver, nodeMT1, nodeMT1, geq);
-      // Norton current source: positive ieq means current from MT1 to MT2
-      stampRHS(solver, nodeMT2, -ieq);
-      stampRHS(solver, nodeMT1, ieq);
-
-      // Gate-MT1 path
-      stampG(solver, nodeG,   nodeG,   gGateGeq);
-      stampG(solver, nodeG,   nodeMT1, -gGateGeq);
-      stampG(solver, nodeMT1, nodeG,   -gGateGeq);
-      stampG(solver, nodeMT1, nodeMT1, gGateGeq);
-      stampRHS(solver, nodeG,   -gGateIeq);
-      stampRHS(solver, nodeMT1, gGateIeq);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
+    load(ctx: LoadContext): void {
+      const voltages = ctx.voltages;
       const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
       const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
       const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;
@@ -313,9 +284,10 @@ export function createTriacElement(
       const vg1Result = pnjlim(vg1Raw, s0[base + SLOT_VGK], nVt, vcritGate);
       const vg1Limited = vg1Result.value;
       pnjlimLimited = vmtResult.limited || vg1Result.limited;
+      if (pnjlimLimited) ctx.noncon.value++;
 
-      if (limitingCollector) {
-        limitingCollector.push({
+      if (ctx.limitingCollector) {
+        ctx.limitingCollector.push({
           elementIndex: (this as any).elementIndex ?? -1,
           label: (this as any).label ?? "",
           junction: "MT2-MT1",
@@ -324,7 +296,7 @@ export function createTriacElement(
           vAfter: vmtLimited,
           wasLimited: vmtResult.limited,
         });
-        limitingCollector.push({
+        ctx.limitingCollector.push({
           elementIndex: (this as any).elementIndex ?? -1,
           label: (this as any).label ?? "",
           junction: "G-MT1",
@@ -339,14 +311,36 @@ export function createTriacElement(
       s0[base + SLOT_VGK] = vg1Limited;
 
       computeOperatingPoint(vmtLimited, vg1Limited);
-      return pnjlimLimited;
+
+      const solver = ctx.solver;
+      const geq      = s0[base + SLOT_GEQ];
+      const ieq      = s0[base + SLOT_IEQ];
+      const gGateGeq = s0[base + SLOT_G_GATE_GEQ];
+      const gGateIeq = s0[base + SLOT_G_GATE_IEQ];
+
+      // MT1-MT2 main path
+      stampG(solver, nodeMT2, nodeMT2, geq);
+      stampG(solver, nodeMT2, nodeMT1, -geq);
+      stampG(solver, nodeMT1, nodeMT2, -geq);
+      stampG(solver, nodeMT1, nodeMT1, geq);
+      stampRHS(solver, nodeMT2, -ieq);
+      stampRHS(solver, nodeMT1, ieq);
+
+      // Gate-MT1 path
+      stampG(solver, nodeG,   nodeG,   gGateGeq);
+      stampG(solver, nodeG,   nodeMT1, -gGateGeq);
+      stampG(solver, nodeMT1, nodeG,   -gGateGeq);
+      stampG(solver, nodeMT1, nodeMT1, gGateGeq);
+      stampRHS(solver, nodeG,   -gGateIeq);
+      stampRHS(solver, nodeMT1, gGateIeq);
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
-      // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+    checkConvergence(ctx: LoadContext): boolean {
+      // ngspice icheck gate: if voltage was limited in load(),
       // declare non-convergence immediately (TRIACload sets CKTnoncon++)
       if (pnjlimLimited) return false;
 
+      const voltages = ctx.voltages;
       const v1 = nodeMT1 > 0 ? voltages[nodeMT1 - 1] : 0;
       const v2 = nodeMT2 > 0 ? voltages[nodeMT2 - 1] : 0;
       const vG = nodeG   > 0 ? voltages[nodeG   - 1] : 0;
@@ -357,7 +351,7 @@ export function createTriacElement(
       const imt = s0[base + SLOT_IAK];
       const gmt = s0[base + SLOT_GEQ];
       const cmthat = imt + gmt * delvmt;
-      const tolMT = reltol * Math.max(Math.abs(cmthat), Math.abs(imt)) + abstol;
+      const tolMT = ctx.reltol * Math.max(Math.abs(cmthat), Math.abs(imt)) + ctx.iabstol;
 
       // ngspice DIOconvTest on J2 (gate-MT1)
       const vg1Raw = vG - v1;
@@ -365,7 +359,7 @@ export function createTriacElement(
       const ig1 = s0[base + SLOT_IGK];
       const gg1 = s0[base + SLOT_G_GATE_GEQ];
       const cg1hat = ig1 + gg1 * delvg1;
-      const tolG1 = reltol * Math.max(Math.abs(cg1hat), Math.abs(ig1)) + abstol;
+      const tolG1 = ctx.reltol * Math.max(Math.abs(cg1hat), Math.abs(ig1)) + ctx.iabstol;
 
       return Math.abs(cmthat - imt) <= tolMT && Math.abs(cg1hat - ig1) <= tolG1;
     },

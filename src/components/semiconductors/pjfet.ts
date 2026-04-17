@@ -31,10 +31,10 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { NJfetAnalogElement } from "./njfet.js";
+import type { LoadContext } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { VT } from "../../core/constants.js";
 
@@ -112,7 +112,9 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
     this._vgs_junction = -1;
   }
 
-  override updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
+  protected override _updateOp(ctx: LoadContext): void {
+    const voltages = ctx.voltages;
+    const limitingCollector = ctx.limitingCollector;
     // jfetload.c: during MODEINITJCT, primeJunctions() has already set _vgs, _vds,
     // _vgs_junction directly. Skip MNA voltage reads and all voltage limiting.
     if (this._pool.initMode === "initJct") {
@@ -129,7 +131,7 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
       const igJunction = this._p.IS * (Math.exp(expArg) - 1);
       this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
       this._id_junction = igJunction;
-      return false;
+      return;
     }
 
     const nodeG = this.gateNode;
@@ -144,6 +146,7 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
     const vGraw = -1 * (vG - vS);  // Vsg
     const vDraw = -1 * (vD - vS);  // Vsd
 
+    this._pnjlimLimited = false;
     const limited = this.limitVoltages(this._vgs, this._vds, vGraw, vDraw);
     if (limitingCollector) {
       limitingCollector.push({
@@ -190,10 +193,10 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
     const igJunction = this._p.IS * (Math.exp(expArg) - 1);
     this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
     this._id_junction = igJunction;
-    return this._pnjlimLimited;
+    if (this._pnjlimLimited) ctx.noncon.value++;
   }
 
-  override stampNonlinear(solver: SparseSolver): void {
+  protected override _stampNonlinear(solver: SparseSolver): void {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;

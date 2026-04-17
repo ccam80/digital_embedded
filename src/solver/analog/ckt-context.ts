@@ -145,10 +145,7 @@ export class CKTCircuitContext {
     }
   }
 
-  /**
-   * MNA matrix assembler (hoisted to ctx in Phase 1, deleted in Phase 2 Wave 2.2
-   * when cktLoad replaces stampAll).
-   */
+  /** MNA matrix assembler bound to the current `solver`. */
   assembler: MNAAssembler = null!;
 
   // -------------------------------------------------------------------------
@@ -560,15 +557,9 @@ export class CKTCircuitContext {
     this.nonlinearElements = elements.filter(el => el.isNonlinear);
     this.reactiveElements = elements.filter(el => el.isReactive);
     this.poolBackedElements = elements.filter(el => isPoolBacked(el));
-    this.elementsWithConvergence = elements.filter(
-      el => typeof (el as { checkConvergence?: unknown }).checkConvergence === "function",
-    );
-    this.elementsWithLte = elements.filter(
-      el => typeof (el as { getLteTimestep?: unknown }).getLteTimestep === "function",
-    );
-    this.elementsWithAcceptStep = elements.filter(
-      el => typeof (el as { acceptStep?: unknown }).acceptStep === "function",
-    );
+    this.elementsWithConvergence = elements.filter(el => el.checkConvergence !== undefined);
+    this.elementsWithLte = elements.filter(el => el.getLteTimestep !== undefined);
+    this.elementsWithAcceptStep = elements.filter(el => el.acceptStep !== undefined);
 
     // Derive hadNodeset from nodesets size — populated later by engine
     this.hadNodeset = false;

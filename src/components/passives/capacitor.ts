@@ -21,10 +21,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
-import { integrateCapacitor } from "../../solver/analog/integration.js";
+import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -234,24 +231,96 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     }
   }
 
-  stamp(_solver: SparseSolver): void {
-    // No topology-constant entries for a capacitor.
-    // All companion model entries are stamped in stampReactiveCompanion().
-  }
-
-  stampReactiveCompanion(solver: SparseSolver): void {
+  /**
+   * Unified load() — ngspice capload.c CAPload.
+   *
+   * Reads terminal voltage, computes charge Q = C*V, NIintegrates inline using
+   * ctx.ag[], and stamps the companion model (geq conductance + ceq current
+   * source). Matches the Appendix D2 reference pattern.
+   */
+  load(ctx: LoadContext): void {
+    const { solver, voltages, initMode, isDcOp, isTransient, ag } = ctx;
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
-    const geq = this.s0[this.base + SLOT_GEQ];
-    const ieq = this.s0[this.base + SLOT_IEQ];
+    const C = this.C;
 
-    stampG(solver, n0, n0, geq);
-    stampG(solver, n0, n1, -geq);
-    stampG(solver, n1, n0, -geq);
-    stampG(solver, n1, n1, geq);
+    // Gate: capacitors only participate in tran/ac/tranop (capload.c:30).
+    if (!isTransient && !isDcOp) return;
 
-    stampRHS(solver, n0, -ieq);
-    stampRHS(solver, n1, ieq);
+    // Determine if using initial condition (capload.c:32-36).
+    const cond1 = (isDcOp && initMode === "initJct") ||
+                  (ctx.uic && initMode === "initTran" && !isNaN(this._IC));
+
+    // Read terminal voltage (capload.c:49-51).
+    let vcap: number;
+    if (cond1) {
+      vcap = this._IC;
+    } else {
+      const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
+      const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
+      vcap = v0 - v1;
+    }
+
+    if (isTransient) {
+      // #ifndef PREDICTOR (capload.c:53-65).
+      if (initMode === "initPred") {
+        // Copy state1 charge to state0 (capload.c:55-56).
+        this.s0[this.base + SLOT_Q] = this.s1[this.base + SLOT_Q];
+      } else {
+        // Compute charge Q = C * V (capload.c:58).
+        this.s0[this.base + SLOT_Q] = C * vcap;
+        if (initMode === "initTran") {
+          // Seed state1 from state0 (capload.c:60-62).
+          this.s1[this.base + SLOT_Q] = this.s0[this.base + SLOT_Q];
+        }
+      }
+
+      // NIintegrate inline using ctx.ag[] (capload.c:67-68, niinteg.c:28-63).
+      const q0 = this.s0[this.base + SLOT_Q];
+      const q1 = this.s1[this.base + SLOT_Q];
+      let ccap: number;
+      if (ctx.order >= 2 && ag.length > 2) {
+        // GEAR / BDF-2+: ccap = sum(ag[k] * q_k)
+        const q2 = this.s2[this.base + SLOT_Q];
+        ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
+        // Orders > 2 would read deeper history slots. Current pool depth is 4
+        // (s0..s3); higher orders fall back to three-term sum.
+      } else {
+        // BDF-1 / Trap order 1: ccap = ag[0]*q0 + ag[1]*q1
+        ccap = ag[0] * q0 + ag[1] * q1;
+      }
+      this.s0[this.base + SLOT_CCAP] = ccap;
+
+      // geq and ceq (niinteg.c:77-78).
+      const geq = ag[0] * C;
+      const ceq = ccap - ag[0] * q0;
+
+      // Seed state1 companion current on first tran step (capload.c:70-72).
+      if (initMode === "initTran") {
+        this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];
+      }
+
+      // Cache companion state for diagnostic readout / getPinCurrents.
+      this.s0[this.base + SLOT_GEQ] = geq;
+      this.s0[this.base + SLOT_IEQ] = ceq;
+      this.s0[this.base + SLOT_V] = vcap;
+
+      // Stamp companion model (capload.c:74-79).
+      if (n0 !== 0) solver.stamp(n0 - 1, n0 - 1, geq);
+      if (n1 !== 0) solver.stamp(n1 - 1, n1 - 1, geq);
+      if (n0 !== 0 && n1 !== 0) {
+        solver.stamp(n0 - 1, n1 - 1, -geq);
+        solver.stamp(n1 - 1, n0 - 1, -geq);
+      }
+      if (n0 !== 0) solver.stampRHS(n0 - 1, -ceq);
+      if (n1 !== 0) solver.stampRHS(n1 - 1, ceq);
+    } else {
+      // DC operating point: just store charge, no matrix stamp (capload.c:84).
+      this.s0[this.base + SLOT_Q] = C * vcap;
+      this.s0[this.base + SLOT_V] = vcap;
+      this.s0[this.base + SLOT_GEQ] = 0;
+      this.s0[this.base + SLOT_IEQ] = 0;
+    }
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -263,57 +332,6 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     const ieq = this.s0[this.base + SLOT_IEQ];
     const I = geq * (v0 - v1) + ieq;
     return [I, -I];
-  }
-
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
-    const n0 = this.pinNodeIds[0];
-    const n1 = this.pinNodeIds[1];
-    const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
-    const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
-    const vNow = v0 - v1;
-
-    // q0 is the charge at the current (pre-solve) voltage, used as the new-step charge.
-    // q1/q2 come from the post-solve charge written by updateChargeFlux in previous steps.
-    const isInitPred = this._pool && this._pool.initMode === "initPred";
-    const isInitTranUIC = this._pool && this._pool.initMode === "initTran" && this._pool.uic === true && !isNaN(this._IC);
-    const q0 = isInitPred ? this.s1[this.base + SLOT_Q] : isInitTranUIC ? this.C * this._IC : this.C * vNow;
-    const q1 = this.s1[this.base + SLOT_Q];
-    const q2 = this.s2[this.base + SLOT_Q];
-    const ccapPrev = this.s1[this.base + SLOT_CCAP];
-    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-    if (this._pool && this._pool.initMode === "initTran") {
-      this.s1[this.base + SLOT_Q] = q0;  // q0→q1 copy (capload.c:60-63)
-    }
-    const { geq, ceq, ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
-    this.s0[this.base + SLOT_GEQ]  = geq;
-    this.s0[this.base + SLOT_IEQ]  = ceq;
-    this.s0[this.base + SLOT_V]    = vNow;
-    this.s0[this.base + SLOT_CCAP] = ccap;
-    if (this._pool && this._pool.initMode === "initTran") {
-      this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];  // ccap0→ccap1 copy (capload.c:70-73)
-    }
-    // SLOT_Q is written by updateChargeFlux after the Newton-Raphson solve converges.
-  }
-
-  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
-    const n0 = this.pinNodeIds[0];
-    const n1 = this.pinNodeIds[1];
-    const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
-    const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
-    const vNow = v0 - v1;
-    this.s0[this.base + SLOT_Q] = this.C * vNow;
-
-    // Recompute ccap from converged charge so the next step's trapezoidal
-    // recursion starts from the correct companion current (fixes stale SLOT_CCAP).
-    if (dt > 0) {
-      const q0 = this.s0[this.base + SLOT_Q];
-      const q1 = this.s1[this.base + SLOT_Q];
-      const q2 = this.s2[this.base + SLOT_Q];
-      const ccapPrev = this.s1[this.base + SLOT_CCAP];
-      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const { ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
-      this.s0[this.base + SLOT_CCAP] = ccap;
-    }
   }
 
   getLteTimestep(

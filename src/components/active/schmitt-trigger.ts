@@ -33,8 +33,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { DigitalOutputPinModel, DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -130,9 +129,6 @@ function createSchmittTriggerElement(
   if (nOut > 0) outModel.init(nOut, -1);
   if (nIn  > 0) inModel.init(nIn, 0);
 
-  // Solver cached from stamp() for use in stampCompanion()
-  let _solver: SparseSolver | null = null;
-
   // Initial state: output low
   let _outputHigh = false;
   outModel.setLogicLevel(inverting ? _outputHigh : _outputHigh);
@@ -156,21 +152,9 @@ function createSchmittTriggerElement(
     isNonlinear: true,
     isReactive: true,
 
-    stamp(solver: SparseSolver): void {
-      // Cache solver for use in stampCompanion (interface does not pass it there)
-      _solver = solver;
-      // Linear loading: input resistance + output drive (Norton equivalent)
-      if (nIn > 0)  inModel.stamp(solver);
-      if (nOut > 0) outModel.stampOutput(solver);
-    },
-
-    stampNonlinear(solver: SparseSolver): void {
-      // Re-stamp the output Norton equivalent with the current target voltage.
-      // The output level was already updated in updateOperatingPoint.
-      if (nOut > 0) outModel.stampOutput(solver);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
+      const voltages = ctx.voltages;
       const vIn = readNode(voltages, nIn);
 
       // Apply hysteresis state machine
@@ -181,7 +165,28 @@ function createSchmittTriggerElement(
         _outputHigh = true;
         updateOutputLevel();
       }
-      // Otherwise hold state — hysteresis
+
+      // Linear loading: input resistance + output drive (Norton equivalent)
+      if (nIn > 0)  inModel.stamp(solver);
+      if (nOut > 0) outModel.stampOutput(solver);
+
+      // Transient: companion stamps for input/output capacitances.
+      if (ctx.isTransient && ctx.dt > 0) {
+        if (nOut > 0) outModel.stampCompanion(solver, ctx.dt, ctx.method);
+        if (nIn > 0)  inModel.stampCompanion(solver, ctx.dt, ctx.method);
+      }
+    },
+
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+      // Post-acceptance companion state update for the pin models.
+      if (ctx.dt <= 0) return;
+      const voltages = ctx.voltages;
+      if (nOut > 0) {
+        outModel.updateCompanion(ctx.dt, ctx.method, readNode(voltages, nOut));
+      }
+      if (nIn > 0) {
+        inModel.updateCompanion(ctx.dt, ctx.method, readNode(voltages, nIn));
+      }
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -190,28 +195,11 @@ function createSchmittTriggerElement(
       const iIn = nIn > 0 ? vIn / outputSpec.rIn : 0;
 
       // Output pin: Norton equivalent — I_out = (V_out - V_target) / rOut
-      // Positive = current flowing into element (element is sinking current)
       const vOut = readNode(voltages, nOut);
       const targetVoltage = outModel.currentVoltage;
       const iOut = nOut > 0 ? (vOut - targetVoltage) / outputSpec.rOut : 0;
 
-      // pinLayout order: in, out
-      // Sum is nonzero — difference is implicit supply current (expected for behavioral model)
       return [iIn, iOut];
-    },
-
-    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-      if (_solver === null) return;
-      if (nOut > 0) {
-        const vOut = readNode(voltages, nOut);
-        outModel.stampCompanion(_solver, dt, method);
-        outModel.updateCompanion(dt, method, vOut);
-      }
-      if (nIn > 0) {
-        const vIn = readNode(voltages, nIn);
-        inModel.stampCompanion(_solver, dt, method);
-        inModel.updateCompanion(dt, method, vIn);
-      }
     },
 
     setParam(key: string, value: number): void {

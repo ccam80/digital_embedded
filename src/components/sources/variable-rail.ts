@@ -37,8 +37,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -191,27 +190,28 @@ export function makeVariableRailElement(
       if (key in p) (p as Record<string, number>)[key] = value;
     },
 
-    setSourceScale(_factor: number): void {
-      // Source stepping not needed for variable rail (it's meant for interactive use).
-    },
-
     getPinCurrents(voltages: Float64Array): number[] {
       // Branch current = current delivered by the ideal voltage source (into pos terminal).
       return [voltages[branchIdx]];
     },
 
-    stamp(solver: SparseSolver): void {
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
       const k = branchIdx;
       const G = p.resistance > 0 ? 1 / p.resistance : 1e9;
 
-      // Ideal voltage source: nodePos → nodeInt (internal node before R_int)
+      // Ideal voltage source: nodePos → nodeInt (internal node before R_int).
+      // Variable rail is a user-facing interactive slider, not an ngspice
+      // independent source: ctx.srcFact is deliberately ignored so slider
+      // changes take effect immediately and are unaffected by DC-OP source
+      // stepping. See VARIABLE_RAIL_PROPERTY_DEFS for the slider definition.
       if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
       if (nodeInt !== 0) solver.stamp(nodeInt - 1, k, -1);
       if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
       if (nodeInt !== 0) solver.stamp(k, nodeInt - 1, -1);
       solver.stampRHS(k, p.voltage);
 
-      // Internal resistance: nodeInt → nodeNeg
+      // Internal resistance: nodeInt → nodeNeg.
       if (nodeInt !== 0) solver.stamp(nodeInt - 1, nodeInt - 1, G);
       if (nodeNeg !== 0) solver.stamp(nodeNeg - 1, nodeNeg - 1, G);
       if (nodeInt !== 0 && nodeNeg !== 0) {

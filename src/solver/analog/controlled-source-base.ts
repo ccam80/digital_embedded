@@ -6,21 +6,24 @@
  * (voltage or current) to an output quantity, with symbolic differentiation
  * for the Jacobian contribution in Newton-Raphson iteration.
  *
- * Subclasses implement `stampOutput(solver, value, derivative, ctrlValue)` to
- * stamp either a dependent voltage source (VCVS, CCVS) or a dependent current
- * source (VCCS, CCCS) at the output port.
+ * Subclasses implement:
+ *   - `_bindContext(voltages)` to populate ctx with the relevant control values
+ *     and set `_ctrlValue`.
+ *   - `_stampLinear(solver)` to stamp linear topology-constant entries (e.g.
+ *     voltage source branch incidence rows for VCVS/CCVS, sense 0V source for
+ *     CCVS/CCCS). Default no-op.
+ *   - `stampOutput(solver, value, derivative, ctrlValue)` to stamp either a
+ *     dependent voltage source (VCVS, CCVS) or a dependent current source
+ *     (VCCS, CCCS) at the output port.
  *
- * MNA stamping protocol:
- *   - `stamp(solver)`: stamps the linear topology-constant entries (e.g.
- *     voltage source branch incidence rows for VCVS/CCVS).
- *   - `stampNonlinear(solver)`: evaluates expression and derivative at the
- *     current operating point; calls `stampOutput` with the results.
- *   - `updateOperatingPoint(voltages)`: reads node voltages and branch currents
- *     from the current NR solution and updates the internal context state.
+ * MNA load protocol (matches ngspice DEVload dispatch):
+ *   `load(ctx)` reads voltages from ctx, binds the control quantity, stamps
+ *   the linear incidence, evaluates expression and derivative at the current
+ *   operating point, and dispatches to `stampOutput` with the results.
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElementCore } from "./element.js";
+import type { AnalogElementCore, LoadContext } from "./element.js";
 import type { ExprNode } from "./expression.js";
 import { compileExpression } from "./expression-evaluate.js";
 import type { ExpressionContext } from "./expression-evaluate.js";
@@ -31,7 +34,7 @@ import type { ExpressionContext } from "./expression-evaluate.js";
 
 /**
  * Mutable ExpressionContext whose V() and I() mappings are updated each NR
- * iteration via `updateOperatingPoint`.
+ * iteration via `_bindContext`.
  */
 export class MutableExpressionContext implements ExpressionContext {
   private readonly _voltageMap: Map<string, number> = new Map();
@@ -71,9 +74,11 @@ export class MutableExpressionContext implements ExpressionContext {
  *
  * Concrete subclasses supply:
  *   - `pinNodeIds` and `branchIndex`
- *   - `stamp(solver)` for linear topology entries (overrides no-op default)
  *   - `_bindContext(voltages)` to populate ctx with the relevant control values
- *   - `stampOutput(solver, value, derivative, ctrlValue)` for the output stamp
+ *     and set `_ctrlValue`.
+ *   - `_stampLinear(solver)` for linear topology-constant entries. Default
+ *     no-op; VCVS/CCVS/CCCS override to stamp branch incidence.
+ *   - `stampOutput(solver, value, derivative, ctrlValue)` for the output stamp.
  *
  * The `ctrlValue` parameter passed to `stampOutput` is the scalar control
  * quantity at the current operating point (V_ctrl for voltage-controlled,
@@ -95,12 +100,12 @@ export abstract class ControlledSourceElement implements AnalogElementCore {
   protected readonly _compiledExpr: (ctx: ExpressionContext) => number;
   protected readonly _compiledDeriv: (ctx: ExpressionContext) => number;
 
-  /** Live context updated by updateOperatingPoint before each stampNonlinear. */
+  /** Live context updated by `_bindContext` before each expression evaluation. */
   protected readonly _ctx: MutableExpressionContext = new MutableExpressionContext();
 
   /**
    * Scalar control quantity at the last operating point. Set by `_bindContext`
-   * in subclasses; read by `stampNonlinear` to pass to `stampOutput`.
+   * in subclasses; read by `load()` to pass to `stampOutput`.
    *
    * For VCVS/VCCS: `_ctrlValue = V_ctrl+ - V_ctrl-`
    * For CCVS/CCCS: `_ctrlValue = I_sense`
@@ -118,31 +123,31 @@ export abstract class ControlledSourceElement implements AnalogElementCore {
   }
 
   /**
-   * Stamp linear (topology-constant) entries.
-   * Non-abstract default: no-op. Subclasses that introduce branch rows
-   * (VCVS, CCVS) override this to stamp the voltage source incidence columns.
+   * Unified hot-path method called every NR iteration.
+   *
+   * Binds the control quantity from the current solution vector, stamps the
+   * linear topology incidence, evaluates the transfer function expression and
+   * its symbolic derivative at the current operating point, and dispatches to
+   * `stampOutput` which performs the Jacobian and NR-linearized RHS stamps.
+   *
+   * Matches ngspice DEVload one-call-per-iteration dispatch.
    */
-  stamp(_solver: SparseSolver): void {
-    // default: no linear entries
-  }
-
-  /**
-   * Evaluate expression and derivative at the current operating point;
-   * dispatch to `stampOutput`.
-   */
-  stampNonlinear(solver: SparseSolver): void {
+  load(ctx: LoadContext): void {
+    this._bindContext(ctx.voltages);
+    this._stampLinear(ctx.solver);
     const value = this._compiledExpr(this._ctx);
     const deriv = this._compiledDeriv(this._ctx);
-    this.stampOutput(solver, value, deriv, this._ctrlValue);
+    this.stampOutput(ctx.solver, value, deriv, this._ctrlValue);
   }
 
   /**
-   * Update context from the latest NR solution vector. Subclasses override
-   * `_bindContext` to extract the correct control variable (voltage or current)
-   * and set `_ctrlValue`.
+   * Stamp linear (topology-constant) entries.
+   * Default: no-op. Subclasses that introduce branch rows (VCVS, CCVS, CCCS)
+   * override this to stamp the voltage source / sense source incidence
+   * columns.
    */
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    this._bindContext(voltages);
+  protected _stampLinear(_solver: SparseSolver): void {
+    // default: no linear entries
   }
 
   /**

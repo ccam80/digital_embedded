@@ -27,8 +27,11 @@
  *     RHS[senseBranch] = 0  (0V)
  *
  *   Output port (dependent voltage source, nodes out+ / out-):
- *     stamp() places B/C incidence for out branch.
- *     stampOutput() fills the Jacobian and NR-linearized RHS:
+ *     `_stampLinear()` places B/C incidence for out branch (and the sense 0V
+ *     source incidence above).
+ *     `load()` (via base class) binds I_sense, calls `_stampLinear`, evaluates
+ *     f(I_sense) and f'(I_sense), then calls `stampOutput()` which fills the
+ *     Jacobian and NR-linearized RHS:
  *       C[outBranch, senseBranch] -= f'(I_sense)  (Jacobian: dV_out/dI_sense)
  *       RHS[outBranch] = f(I0) - f'(I0) * I0
  *
@@ -177,11 +180,11 @@ class CCVSAnalogElement extends ControlledSourceElement {
    *   B[nSenseN, senseBranch] -= 1   C[senseBranch, nSenseN] -= 1
    *   RHS[senseBranch] = 0
    *
-   * Output voltage source (incidence only; Jacobian in stampNonlinear):
+   * Output voltage source (incidence only; Jacobian stamped in stampOutput):
    *   B[nOutP, outBranch] += 1   C[outBranch, nOutP] += 1
    *   B[nOutN, outBranch] -= 1   C[outBranch, nOutN] -= 1
    */
-  override stamp(solver: SparseSolver): void {
+  protected override _stampLinear(solver: SparseSolver): void {
     const ks = this._senseBranch;
     const ko = this._outBranch;
 

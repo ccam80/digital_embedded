@@ -27,8 +27,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -153,11 +152,14 @@ export function createDiacElement(
     isNonlinear: true,
     isReactive: false,
 
-    stamp(_solver: SparseSolver): void {
-      // No topology-constant contributions
-    },
+    load(ctx: LoadContext): void {
+      const voltages = ctx.voltages;
+      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
+      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      _v = vA - vB;
+      recompute(_v);
 
-    stampNonlinear(solver: SparseSolver): void {
+      const solver = ctx.solver;
       stampG(solver, nodeA, nodeA, _geq);
       stampG(solver, nodeA, nodeB, -_geq);
       stampG(solver, nodeB, nodeA, -_geq);
@@ -166,21 +168,15 @@ export function createDiacElement(
       stampRHS(solver, nodeB, _ieq);
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
-      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
-      _v = vA - vB;
-      recompute(_v);
-    },
-
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+    checkConvergence(ctx: LoadContext): boolean {
+      const voltages = ctx.voltages;
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
       const vRaw = vA - vB;
 
       const delvd = vRaw - _v;
       const cdhat = _id + _geq * delvd;
-      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(_id)) + abstol;
+      const tol = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(_id)) + ctx.iabstol;
       return Math.abs(cdhat - _id) <= tol;
     },
 

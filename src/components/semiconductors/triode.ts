@@ -38,8 +38,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -190,30 +189,36 @@ export function createTriodeElement(
     isNonlinear: true,
     isReactive: false,
 
-    stamp(_solver: SparseSolver): void {
-      // No topology-constant linear contributions.
-    },
+    load(ctx: LoadContext): void {
+      const voltages = ctx.voltages;
+      const vP = nodeP > 0 ? voltages[nodeP - 1] : 0;
+      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
+      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
 
-    stampNonlinear(solver: SparseSolver): void {
+      const vgkNew = vG - vK;
+      const vpkNew = vP - vK;
+
+      // Voltage limiting: clamp V_GK step (prevents exponential overflow in Koren formula)
+      const dvgk = vgkNew - vgk;
+      const limitedDvgk = Math.max(-VGK_MAX_STEP, Math.min(VGK_MAX_STEP, dvgk));
+      const limited = limitedDvgk !== dvgk;
+      vgk = vgk + limitedDvgk;
+      vpk = vpkNew;
+      if (limited) ctx.noncon.value++;
+
+      op = computeTriodeOp(vgk, vpk, p.mu, p.kp, p.kvb, p.kg1, p.ex, p.rGI);
+
       const { ip, ig, gm, gp, ggi } = op;
       const vgkOp = op.vgk;
       const vpkOp = op.vpk;
 
       // Norton equivalents:
       //   I_P = ip + gm*(V_GK - vgkOp) + gp*(V_PK - vpkOp)
-      //       = ip - gm*vgkOp - gp*vpkOp + gm*V_GK + gp*V_PK
-      //
-      //   Norton current (independent term):
-      //     ipNorton = ip - gm*vgkOp - gp*vpkOp
-      //
-      //   At node P: +I_P flows in (conventional: I_P from K to P through tube)
-      //   At node K: -I_P flows out
-      //
-      //   Grid current I_G: ggi*(V_GK) = ggi*(V_G - V_K)
-      //   ipNorton includes contribution at P from grid (through gm).
-
+      //   Norton current (independent term): ipNorton = ip - gm*vgkOp - gp*vpkOp
       const ipNorton = ip - gm * vgkOp - gp * vpkOp;
       const igNorton = ig - ggi * vgkOp;
+
+      const solver = ctx.solver;
 
       // Plate conductance gp between P and K
       stampG(solver, nodeP, nodeP, gp);
@@ -222,7 +227,6 @@ export function createTriodeElement(
       stampG(solver, nodeK, nodeK, gp);
 
       // Transconductance gm: VCCS gm*(V_G - V_K) from K to P
-      // Adds gm to [P,G], -gm to [P,K], -gm to [K,G], +gm to [K,K]
       stampG(solver, nodeP, nodeG, gm);
       stampG(solver, nodeP, nodeK, -gm);
       stampG(solver, nodeK, nodeG, -gm);
@@ -235,30 +239,10 @@ export function createTriodeElement(
       stampG(solver, nodeK, nodeK, ggi);
 
       // Norton RHS: inject independent current terms
-      // Plate: current flows from K to P (positive ip into plate node)
       stampRHS(solver, nodeP, -ipNorton);
       stampRHS(solver, nodeK, ipNorton);
-
-      // Grid: current flows from K to G (positive ig into grid node)
       stampRHS(solver, nodeG, -igNorton);
       stampRHS(solver, nodeK, igNorton);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      const vP = nodeP > 0 ? voltages[nodeP - 1] : 0;
-      const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-      const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
-
-      const vgkNew = vG - vK;
-      const vpkNew = vP - vK;
-
-      // Voltage limiting: clamp V_GK step
-      const dvgk = vgkNew - vgk;
-      const limitedDvgk = Math.max(-VGK_MAX_STEP, Math.min(VGK_MAX_STEP, dvgk));
-      vgk = vgk + limitedDvgk;
-      vpk = vpkNew;
-
-      op = computeTriodeOp(vgk, vpk, p.mu, p.kp, p.kvb, p.kg1, p.ex, p.rGI);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -283,7 +267,8 @@ export function createTriodeElement(
       return [iPlate, iGrid, iCathode];
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+    checkConvergence(ctx: LoadContext): boolean {
+      const voltages = ctx.voltages;
       const vP = nodeP > 0 ? voltages[nodeP - 1] : 0;
       const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
       const vK = nodeK > 0 ? voltages[nodeK - 1] : 0;
@@ -300,8 +285,8 @@ export function createTriodeElement(
       const cphat = ip + gmOp * delvgk + gpOp * delvpk;
       const cghat = ig + ggiOp * delvgk;
 
-      const tolP = reltol * Math.max(Math.abs(cphat), Math.abs(ip)) + abstol;
-      const tolG = reltol * Math.max(Math.abs(cghat), Math.abs(ig)) + abstol;
+      const tolP = ctx.reltol * Math.max(Math.abs(cphat), Math.abs(ip)) + ctx.iabstol;
+      const tolG = ctx.reltol * Math.max(Math.abs(cghat), Math.abs(ig)) + ctx.iabstol;
 
       return Math.abs(cphat - ip) <= tolP && Math.abs(cghat - ig) <= tolG;
     },

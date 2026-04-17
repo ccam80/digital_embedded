@@ -1,3 +1,5 @@
+import type { PoolBackedAnalogElementCore } from "./element.js";
+
 export class StatePool {
   /** Ring buffer of state arrays. [0]=current, [1]=prev, [2]=prev2, [3]=prev3. */
   states: Float64Array[];
@@ -73,7 +75,7 @@ export class StatePool {
   get state7(): Float64Array { return this.states[7]; }
 
   /** Update all pool-backed elements' s0-s7 references after rotation. */
-  refreshElementRefs(elements: readonly { poolBacked?: true; s0?: Float64Array; s1?: Float64Array; s2?: Float64Array; s3?: Float64Array; s4?: Float64Array; s5?: Float64Array; s6?: Float64Array; s7?: Float64Array }[]): void {
+  refreshElementRefs(elements: readonly { poolBacked?: boolean }[]): void {
     const s0 = this.states[0];
     const s1 = this.states[1];
     const s2 = this.states[2];
@@ -83,19 +85,17 @@ export class StatePool {
     const s6 = this.states[6];
     const s7 = this.states[7];
     for (const el of elements) {
-      if (el.poolBacked) {
-        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s0 = s0;
-        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s1 = s1;
-        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s2 = s2;
-        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s3 = s3;
-        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s4 = s4;
-        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s5 = s5;
-        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s6 = s6;
-        (el as { s0: Float64Array; s1: Float64Array; s2: Float64Array; s3: Float64Array; s4: Float64Array; s5: Float64Array; s6: Float64Array; s7: Float64Array }).s7 = s7;
-        if (typeof (el as any).refreshSubElementRefs === 'function') {
-          (el as any).refreshSubElementRefs(s0, s1, s2, s3, s4, s5, s6, s7);
-        }
-      }
+      if (!el.poolBacked) continue;
+      const pel = el as PoolBackedAnalogElementCore;
+      pel.s0 = s0;
+      pel.s1 = s1;
+      pel.s2 = s2;
+      pel.s3 = s3;
+      pel.s4 = s4;
+      pel.s5 = s5;
+      pel.s6 = s6;
+      pel.s7 = s7;
+      pel.refreshSubElementRefs?.(s0, s1, s2, s3, s4, s5, s6, s7);
     }
   }
 

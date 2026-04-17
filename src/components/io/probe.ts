@@ -24,8 +24,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // ProbeMode
@@ -220,7 +219,8 @@ class AnalogProbeElement implements AnalogElementCore {
   readonly isNonlinear: boolean = false;
   readonly isReactive: boolean = false;
 
-  stamp(_solver: SparseSolver): void {
+  load(_ctx: LoadContext): void {
+    // Probe is a pure voltage measurement — no MNA contribution.
   }
 
   getVoltage(voltages: Float64Array): number {

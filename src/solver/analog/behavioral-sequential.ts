@@ -2,13 +2,12 @@
  * Behavioral analog models for edge-triggered sequential components:
  * N-bit counter and N-bit parallel-load register.
  *
- * Edge detection happens in updateCompanion() (once per accepted timestep),
- * never per NR iteration. Multi-bit outputs use one DigitalOutputPinModel
- * per bit, driven by extracting individual bits from the internal count/value.
+ * Edge detection happens in accept() (once per accepted timestep), never per
+ * NR iteration. Multi-bit outputs use one DigitalOutputPinModel per bit,
+ * driven by extracting individual bits from the internal count/value.
  */
 
-import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElementCore, IntegrationMethod } from "./element.js";
+import type { AnalogElementCore, LoadContext } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalInputPinModel,
@@ -65,9 +64,6 @@ export class BehavioralCounterElement implements AnalogElementCore {
   private _prevClockVoltage = 0;
   private readonly _vIH: number;
 
-  private _solver: SparseSolver | null = null;
-  private _cachedVoltages: Float64Array = new Float64Array(0);
-
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
@@ -98,19 +94,14 @@ export class BehavioralCounterElement implements AnalogElementCore {
     this._pinModelsByLabel = pinModelsByLabel;
   }
 
-  stamp(solver: SparseSolver): void {
-    this._solver = solver;
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+
     this._enPin.stamp(solver);
     this._clockPin.stamp(solver);
     this._clrPin.stamp(solver);
-  }
 
-  stampNonlinear(solver: SparseSolver): void {
-    this._solver = solver;
-    this._applyOutputLevels(solver);
-  }
-
-  private _applyOutputLevels(solver: SparseSolver): void {
+    // Stamp output Norton equivalents from current count
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const high = ((this._count >> bit) & 1) === 1;
       this._outBitPins[bit].setLogicLevel(high);
@@ -119,36 +110,28 @@ export class BehavioralCounterElement implements AnalogElementCore {
     const ovf = this._count === this._maxValue;
     this._ovfPin.setLogicLevel(ovf);
     this._ovfPin.stampOutput(solver);
-  }
 
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    if (this._cachedVoltages.length !== voltages.length) {
-      this._cachedVoltages = new Float64Array(voltages.length);
+    if (ctx.isTransient && ctx.dt > 0) {
+      this._enPin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._clockPin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._clrPin.stampCompanion(solver, ctx.dt, ctx.method);
+      for (const pin of this._outBitPins) {
+        pin.stampCompanion(solver, ctx.dt, ctx.method);
+      }
+      this._ovfPin.stampCompanion(solver, ctx.dt, ctx.method);
     }
-    this._cachedVoltages.set(voltages);
   }
 
-  stampCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    _voltages: Float64Array,
-  ): void {
-    const solver = this._solver;
-    if (solver === null) return;
-    this._enPin.stampCompanion(solver, dt, method);
-    this._clockPin.stampCompanion(solver, dt, method);
-    this._clrPin.stampCompanion(solver, dt, method);
-    for (const pin of this._outBitPins) {
-      pin.stampCompanion(solver, dt, method);
-    }
-    this._ovfPin.stampCompanion(solver, dt, method);
-  }
+  /**
+   * Rising-edge detection, count update, clear handling, and companion state
+   * update — called once per accepted timestep with the accepted solution
+   * voltages.
+   */
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    const voltages = ctx.voltages;
+    const dt = ctx.dt;
+    const method = ctx.method;
 
-  updateCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    voltages: Float64Array,
-  ): void {
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
     const risingEdge =
@@ -175,18 +158,16 @@ export class BehavioralCounterElement implements AnalogElementCore {
 
     this._prevClockVoltage = currentClockV;
 
-    this._enPin.updateCompanion(dt, method, readMnaVoltage(this._enPin.nodeId, voltages));
-    this._clockPin.updateCompanion(dt, method, currentClockV);
-    this._clrPin.updateCompanion(dt, method, readMnaVoltage(this._clrPin.nodeId, voltages));
+    if (dt > 0) {
+      this._enPin.updateCompanion(dt, method, readMnaVoltage(this._enPin.nodeId, voltages));
+      this._clockPin.updateCompanion(dt, method, currentClockV);
+      this._clrPin.updateCompanion(dt, method, readMnaVoltage(this._clrPin.nodeId, voltages));
 
-    for (const pin of this._outBitPins) {
-      pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
+      for (const pin of this._outBitPins) {
+        pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
+      }
+      this._ovfPin.updateCompanion(dt, method, readMnaVoltage(this._ovfPin.nodeId, voltages));
     }
-    this._ovfPin.updateCompanion(dt, method, readMnaVoltage(this._ovfPin.nodeId, voltages));
-  }
-
-  updateState(_dt: number, _voltages: Float64Array): void {
-    // intentionally empty
   }
 
   /**
@@ -256,9 +237,6 @@ export class BehavioralRegisterElement implements AnalogElementCore {
   private _prevClockVoltage = 0;
   private readonly _vIH: number;
 
-  private _solver: SparseSolver | null = null;
-  private _cachedVoltages: Float64Array = new Float64Array(0);
-
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
@@ -286,57 +264,44 @@ export class BehavioralRegisterElement implements AnalogElementCore {
     this._pinModelsByLabel = pinModelsByLabel;
   }
 
-  stamp(solver: SparseSolver): void {
-    this._solver = solver;
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+
     for (const pin of this._dataPins) {
       pin.stamp(solver);
     }
     this._clockPin.stamp(solver);
     this._enPin.stamp(solver);
-  }
 
-  stampNonlinear(solver: SparseSolver): void {
-    this._solver = solver;
-    this._applyOutputLevels(solver);
-  }
-
-  private _applyOutputLevels(solver: SparseSolver): void {
+    // Stamp output Norton equivalents from stored value
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const high = ((this._storedValue >> bit) & 1) === 1;
       this._outBitPins[bit].setLogicLevel(high);
       this._outBitPins[bit].stampOutput(solver);
     }
-  }
 
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    if (this._cachedVoltages.length !== voltages.length) {
-      this._cachedVoltages = new Float64Array(voltages.length);
-    }
-    this._cachedVoltages.set(voltages);
-  }
-
-  stampCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    _voltages: Float64Array,
-  ): void {
-    const solver = this._solver;
-    if (solver === null) return;
-    for (const pin of this._dataPins) {
-      pin.stampCompanion(solver, dt, method);
-    }
-    this._clockPin.stampCompanion(solver, dt, method);
-    this._enPin.stampCompanion(solver, dt, method);
-    for (const pin of this._outBitPins) {
-      pin.stampCompanion(solver, dt, method);
+    if (ctx.isTransient && ctx.dt > 0) {
+      for (const pin of this._dataPins) {
+        pin.stampCompanion(solver, ctx.dt, ctx.method);
+      }
+      this._clockPin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._enPin.stampCompanion(solver, ctx.dt, ctx.method);
+      for (const pin of this._outBitPins) {
+        pin.stampCompanion(solver, ctx.dt, ctx.method);
+      }
     }
   }
 
-  updateCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    voltages: Float64Array,
-  ): void {
+  /**
+   * Rising-edge detection, parallel-load latching on en=high, and companion
+   * state update — called once per accepted timestep with the accepted
+   * solution voltages.
+   */
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    const voltages = ctx.voltages;
+    const dt = ctx.dt;
+    const method = ctx.method;
+
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
     const risingEdge =
@@ -361,19 +326,17 @@ export class BehavioralRegisterElement implements AnalogElementCore {
 
     this._prevClockVoltage = currentClockV;
 
-    for (const pin of this._dataPins) {
-      pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
-    }
-    this._clockPin.updateCompanion(dt, method, currentClockV);
-    this._enPin.updateCompanion(dt, method, readMnaVoltage(this._enPin.nodeId, voltages));
+    if (dt > 0) {
+      for (const pin of this._dataPins) {
+        pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
+      }
+      this._clockPin.updateCompanion(dt, method, currentClockV);
+      this._enPin.updateCompanion(dt, method, readMnaVoltage(this._enPin.nodeId, voltages));
 
-    for (const pin of this._outBitPins) {
-      pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
+      for (const pin of this._outBitPins) {
+        pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
+      }
     }
-  }
-
-  updateState(_dt: number, _voltages: Float64Array): void {
-    // intentionally empty
   }
 
   get storedValue(): number {
@@ -516,9 +479,6 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
   private _prevClockVoltage = 0;
   private readonly _vIH: number;
 
-  private _solver: SparseSolver | null = null;
-  private _cachedVoltages: Float64Array = new Float64Array(0);
-
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
@@ -556,70 +516,59 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     this._pinModelsByLabel = pinModelsByLabel;
   }
 
-  stamp(solver: SparseSolver): void {
-    this._solver = solver;
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+    const voltages = ctx.voltages;
+
     this._enPin.stamp(solver);
     this._clockPin.stamp(solver);
     this._dirPin.stamp(solver);
     for (const pin of this._inBitPins) pin.stamp(solver);
     this._ldPin.stamp(solver);
     this._clrPin.stamp(solver);
-  }
 
-  stampNonlinear(solver: SparseSolver): void {
-    this._solver = solver;
-    this._applyOutputLevels(solver);
-  }
-
-  private _applyOutputLevels(solver: SparseSolver): void {
+    // Stamp output Norton equivalents from current count
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const high = ((this._count >> bit) & 1) === 1;
       this._outBitPins[bit].setLogicLevel(high);
       this._outBitPins[bit].stampOutput(solver);
     }
+    // ovf depends on dir and en levels at the current NR iterate
     const dirHigh = this._dirPin.readLogicLevel(
-      readMnaVoltage(this._dirPin.nodeId, this._cachedVoltages),
+      readMnaVoltage(this._dirPin.nodeId, voltages),
     );
     const countingDown = dirHigh === true;
     const atOverflow = countingDown
       ? this._count === 0
       : this._count === this._maxValue;
     const enHigh = this._enPin.readLogicLevel(
-      readMnaVoltage(this._enPin.nodeId, this._cachedVoltages),
+      readMnaVoltage(this._enPin.nodeId, voltages),
     );
     this._ovfPin.setLogicLevel(atOverflow && enHigh === true);
     this._ovfPin.stampOutput(solver);
-  }
 
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    if (this._cachedVoltages.length !== voltages.length) {
-      this._cachedVoltages = new Float64Array(voltages.length);
+    if (ctx.isTransient && ctx.dt > 0) {
+      this._enPin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._clockPin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._dirPin.stampCompanion(solver, ctx.dt, ctx.method);
+      for (const pin of this._inBitPins) pin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._ldPin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._clrPin.stampCompanion(solver, ctx.dt, ctx.method);
+      for (const pin of this._outBitPins) pin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._ovfPin.stampCompanion(solver, ctx.dt, ctx.method);
     }
-    this._cachedVoltages.set(voltages);
   }
 
-  stampCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    _voltages: Float64Array,
-  ): void {
-    const solver = this._solver;
-    if (solver === null) return;
-    this._enPin.stampCompanion(solver, dt, method);
-    this._clockPin.stampCompanion(solver, dt, method);
-    this._dirPin.stampCompanion(solver, dt, method);
-    for (const pin of this._inBitPins) pin.stampCompanion(solver, dt, method);
-    this._ldPin.stampCompanion(solver, dt, method);
-    this._clrPin.stampCompanion(solver, dt, method);
-    for (const pin of this._outBitPins) pin.stampCompanion(solver, dt, method);
-    this._ovfPin.stampCompanion(solver, dt, method);
-  }
+  /**
+   * Rising-edge detection, up/down count / load / clear priority resolution,
+   * and companion state update — called once per accepted timestep with the
+   * accepted solution voltages.
+   */
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    const voltages = ctx.voltages;
+    const dt = ctx.dt;
+    const method = ctx.method;
 
-  updateCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    voltages: Float64Array,
-  ): void {
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
     const risingEdge =
@@ -671,19 +620,21 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
 
     this._prevClockVoltage = currentClockV;
 
-    this._enPin.updateCompanion(dt, method, readMnaVoltage(this._enPin.nodeId, voltages));
-    this._clockPin.updateCompanion(dt, method, currentClockV);
-    this._dirPin.updateCompanion(dt, method, readMnaVoltage(this._dirPin.nodeId, voltages));
-    for (const pin of this._inBitPins) {
-      pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
-    }
-    this._ldPin.updateCompanion(dt, method, readMnaVoltage(this._ldPin.nodeId, voltages));
-    this._clrPin.updateCompanion(dt, method, readMnaVoltage(this._clrPin.nodeId, voltages));
+    if (dt > 0) {
+      this._enPin.updateCompanion(dt, method, readMnaVoltage(this._enPin.nodeId, voltages));
+      this._clockPin.updateCompanion(dt, method, currentClockV);
+      this._dirPin.updateCompanion(dt, method, readMnaVoltage(this._dirPin.nodeId, voltages));
+      for (const pin of this._inBitPins) {
+        pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
+      }
+      this._ldPin.updateCompanion(dt, method, readMnaVoltage(this._ldPin.nodeId, voltages));
+      this._clrPin.updateCompanion(dt, method, readMnaVoltage(this._clrPin.nodeId, voltages));
 
-    for (const pin of this._outBitPins) {
-      pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
+      for (const pin of this._outBitPins) {
+        pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
+      }
+      this._ovfPin.updateCompanion(dt, method, readMnaVoltage(this._ovfPin.nodeId, voltages));
     }
-    this._ovfPin.updateCompanion(dt, method, readMnaVoltage(this._ovfPin.nodeId, voltages));
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -704,10 +655,6 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     const vOvf = readMnaVoltage(this._ovfPin.nodeId, voltages);
     result.push((vOvf - this._ovfPin.currentVoltage) / this._ovfPin.rOut);
     return result;
-  }
-
-  updateState(_dt: number, _voltages: Float64Array): void {
-    // intentionally empty
   }
 
   get count(): number {

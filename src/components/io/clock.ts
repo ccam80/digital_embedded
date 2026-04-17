@@ -21,7 +21,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -239,48 +239,65 @@ export interface AnalogClockElement extends AnalogElementCore {
   registerRefreshCallback(cb: () => void): void;
 }
 
-function createAnalogClockElement(
+/**
+ * Create an analog clock element that stamps a square-wave voltage source
+ * via the unified load(ctx) interface.
+ *
+ * The clock's instantaneous value depends on the simulation time, which is
+ * supplied via the getTime closure captured at construction. The engine
+ * advances simulation time between accepted steps; load() reads it each
+ * NR iteration and stamps V = vdd on even half-periods, V = 0 on odd ones.
+ */
+export function makeAnalogClockElement(
   nodePos: number,
   nodeNeg: number,
   branchIdx: number,
   frequency: number,
-  _vdd: number,
-): AnalogClockElement {
-  void (1 / frequency); // period unused
+  vdd: number,
+  getTime: () => number,
+): AnalogClockElement & { stampAtTime(solver: SparseSolver, t: number): void } {
+  const halfPeriod = 1 / (2 * frequency);
   let refreshCallback: (() => void) | null = null;
 
-  const element: AnalogClockElement = {
+  const element: AnalogClockElement & { stampAtTime(solver: SparseSolver, t: number): void } = {
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
-    // Clock frequency is not currently hot-loadable via setParam; the refresh
-    // callback is wired up defensively so that if frequency hot-loading is added
-    // in future, the breakpoint queue is automatically refreshed.
+
     setParam(key: string, _value: number): void {
       if (key === "frequency" && refreshCallback !== null) {
         refreshCallback();
       }
     },
 
-    setSourceScale(_factor: number): void {
-      // Square wave, no source stepping needed.
-    },
-
-    stamp(solver: SparseSolver): void {
-      // Value is computed by the engine each timestep; we stamp the incidence only.
-      // The actual voltage value is handled via getBreakpoints + engine time tracking.
-      // For analog stamping we use the voltage source stamp (same as DC source).
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
       const k = branchIdx;
+
+      // Branch incidence (B and C sub-matrices).
       if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
       if (nodeNeg !== 0) solver.stamp(nodeNeg - 1, k, -1);
       if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
       if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
-      // RHS is set by the engine's time-domain loop; we leave it for the engine.
-      // Here we provide the value via stampWithTime below.
+
+      // Square-wave voltage value at current simulation time.
+      const t = getTime();
+      const halfPeriods = Math.floor(t / halfPeriod);
+      const v = halfPeriods % 2 === 0 ? vdd : 0;
+      solver.stampRHS(k, v * ctx.srcFact);
+    },
+
+    // stampAtTime retained for callers that drive the engine's time loop
+    // directly (ClockManager / waveform playback paths); stamps only the RHS
+    // value so incidence must be set via load().
+    stampAtTime(solver: SparseSolver, t: number): void {
+      const k = branchIdx;
+      const halfPeriods = Math.floor(t / halfPeriod);
+      const v = halfPeriods % 2 === 0 ? vdd : 0;
+      solver.stampRHS(k, v);
     },
 
     nextBreakpoint(afterTime: number): number | null {
-      const halfPeriod = 1 / (2 * frequency);
       const idx = Math.floor(afterTime / halfPeriod) + 1;
       const result = idx * halfPeriod;
       return result > afterTime ? result : (idx + 1) * halfPeriod;
@@ -306,50 +323,15 @@ function createAnalogClockElement(
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
-      const I = voltages[branchIdx];
-      return [-I];
-    },
-  };
-
-  return element;
-}
-
-/**
- * Create an analog clock element that stamps a square-wave voltage source.
- * Used by the engine's time-domain loop; the RHS value is set per timestep
- * via the returned `stampAtTime` method.
- */
-export function makeAnalogClockElement(
-  nodePos: number,
-  nodeNeg: number,
-  branchIdx: number,
-  frequency: number,
-  vdd: number,
-): AnalogClockElement & { stampAtTime(solver: SparseSolver, t: number): void } {
-  const halfPeriod = 1 / (2 * frequency);
-  const inner = createAnalogClockElement(nodePos, nodeNeg, branchIdx, frequency, vdd);
-
-  return {
-    ...inner,
-    stamp(solver: SparseSolver): void {
-      // Base stamp (incidence only) — engine calls stampAtTime with current time.
-      inner.stamp(solver);
-    },
-    stampAtTime(solver: SparseSolver, t: number): void {
-      const k = branchIdx;
-      const halfPeriods = Math.floor(t / halfPeriod);
-      const v = halfPeriods % 2 === 0 ? vdd : 0;
-      solver.stampRHS(k, v);
-    },
-
-    getPinCurrents(voltages: Float64Array): number[] {
-      // Pin layout: [out] � positive terminal; negative terminal is implicit ground.
+      // Pin layout: [out] - positive terminal; negative terminal is implicit ground.
       // Branch current I = voltages[branchIdx] flows from neg to pos through source.
       // Current INTO element at out = -I (conventional: exits at positive terminal).
       const I = voltages[branchIdx];
       return [-I];
     },
   };
+
+  return element;
 }
 
 // ---------------------------------------------------------------------------
@@ -380,13 +362,13 @@ export const ClockDefinition: ComponentDefinition = {
         _internalNodeIds: readonly number[],
         branchIdx: number,
         props: PropertyBag,
-        _getTime: () => number,
+        getTime: () => number,
       ): AnalogElementCore {
         const frequency = props.getOrDefault<number>("Frequency", 1);
         const vdd = props.getOrDefault<number>("vdd", 3.3);
         const nodePos = pinNodes.get("out")!;
         const nodeNeg = 0;
-        return makeAnalogClockElement(nodePos, nodeNeg, branchIdx, frequency, vdd);
+        return makeAnalogClockElement(nodePos, nodeNeg, branchIdx, frequency, vdd, getTime);
       },
       paramDefs: [],
       params: {},

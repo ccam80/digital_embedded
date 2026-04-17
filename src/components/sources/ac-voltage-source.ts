@@ -29,8 +29,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { parseExpression, evaluateExpression, ExprParseError } from "../../solver/analog/expression.js";
 import type { ExprNode } from "../../solver/analog/expression.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -506,8 +505,6 @@ function createAcVoltageSourceElement(
     fallTime,
   };
 
-  let scale = 1;
-
   // Parse expression once at creation for expression waveform mode.
   let parsedExpr: ExprNode | null = null;
   let parseError: string | null = null;
@@ -545,23 +542,20 @@ function createAcVoltageSourceElement(
       }
     },
 
-    setSourceScale(factor: number): void {
-      scale = factor;
-    },
-
-    stamp(solver: SparseSolver): void {
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
       const k = branchIdx;
       const t = getTime();
 
       let v: number;
       if (waveform === "expression") {
         if (element._parsedExpr !== null) {
-          v = evaluateExpression(element._parsedExpr, { t }) * scale;
+          v = evaluateExpression(element._parsedExpr, { t }) * ctx.srcFact;
         } else {
           v = 0;
         }
       } else {
-        v = computeWaveformValue(waveform, amplitude, frequency, phase, dcOffset, t, ext) * scale;
+        v = computeWaveformValue(waveform, amplitude, frequency, phase, dcOffset, t, ext) * ctx.srcFact;
       }
 
       // B sub-matrix: node rows, branch column k
@@ -572,7 +566,7 @@ function createAcVoltageSourceElement(
       if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
       if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
 
-      // RHS voltage constraint
+      // RHS voltage constraint (ctx.srcFact folded in above).
       solver.stampRHS(k, v);
     },
 

@@ -25,8 +25,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -160,7 +159,6 @@ export function makeDcVoltageSource(
   branchIdx: number,
   voltage: number,
 ): AnalogElementCore {
-  let scale = 1;
   const p: Record<string, number> = { voltage };
 
   return {
@@ -172,11 +170,8 @@ export function makeDcVoltageSource(
       if (key in p) (p as Record<string, number>)[key] = value;
     },
 
-    setSourceScale(factor: number): void {
-      scale = factor;
-    },
-
-    stamp(solver: SparseSolver): void {
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
       const k = branchIdx;
 
       // B sub-matrix: node rows, branch column k
@@ -187,8 +182,8 @@ export function makeDcVoltageSource(
       if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
       if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
 
-      // RHS voltage constraint (scaled for source stepping)
-      solver.stampRHS(k, p.voltage * scale);
+      // RHS voltage constraint scaled by ctx.srcFact (CKTsrcFact) for DC source stepping.
+      solver.stampRHS(k, p.voltage * ctx.srcFact);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {

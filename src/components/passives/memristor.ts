@@ -16,8 +16,9 @@
  *
  *   G(w) = w · (1/R_on − 1/R_off) + 1/R_off
  *
- * The memristor stamps its state-dependent conductance in stampNonlinear().
- * The engine calls updateState() each accepted timestep to integrate w.
+ * The memristor stamps its state-dependent conductance inside load() every
+ * NR iteration. The engine calls accept() once per accepted timestep to
+ * integrate w forward by Euler forward.
  *
  * MNA topology:
  *   pinNodeIds[0] = node_A  (positive terminal)
@@ -36,8 +37,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { stampG } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -123,11 +123,14 @@ export class MemristorElement implements AnalogElementCore {
     else if (key === "initialState") this._w = Math.max(0, Math.min(1, value));
   }
 
-  stamp(_solver: SparseSolver): void {
-    // No topology-constant linear contributions — all stamping is in stampNonlinear.
-  }
-
-  stampNonlinear(solver: SparseSolver): void {
+  /**
+   * Unified load() — stamps the state-dependent conductance every NR iteration.
+   *
+   * The memristor is nonlinear but not reactive: dw/dt integration happens in
+   * accept() once per accepted timestep, not in the NR inner loop.
+   */
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
     const G = this.conductance();
@@ -136,40 +139,21 @@ export class MemristorElement implements AnalogElementCore {
     stampG(solver, nA, nB, -G);
     stampG(solver, nB, nA, -G);
     stampG(solver, nB, nB, G);
-
-    // Norton current source: I_norton = I_op − G · V_op
-    // At linearisation point the stamp of G·V is already handled by the
-    // conductance matrix, so we only need to add the constant term.
-    // For a pure conductance (no previous operating-point offset), the RHS
-    // contribution is zero — the conductance self-consistently produces the
-    // right current from the solution voltages without an extra source term.
-    // (This matches the resistor pattern: pure G stamp, no RHS offset.)
-  }
-
-  updateOperatingPoint(_voltages: Readonly<Float64Array>): void {
-    // No voltage limiting needed; conductance is a smooth function of w.
+    // Pure conductance — no RHS offset needed (matches resistor Norton stamp).
   }
 
   /**
-   * Integrate state variable w using Euler forward step.
+   * Euler forward integration of the state variable w once per accepted timestep.
+   * The engine calls accept() exactly once per accepted step with the converged
+   * terminal voltages on ctx.voltages.
    *
-   * dw/dt = µ_v · R_on / D² · i(t) · f_p(w)
-   * f_p(w) = 1 − (2w − 1)^(2p)
-   *
-   * Current i = G(w) · V(t) flows through the element.
+   *   dw/dt = µ_v · R_on / D² · i(t) · f_p(w)
+   *   f_p(w) = 1 − (2w − 1)^(2p)
    */
-  getPinCurrents(voltages: Float64Array): number[] {
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
-    const vA = nA > 0 ? voltages[nA - 1] : 0;
-    const vB = nB > 0 ? voltages[nB - 1] : 0;
-    const I = this.conductance() * (vA - vB);
-    return [I, -I];
-  }
-
-  updateState(dt: number, voltages: Float64Array): void {
-    const nA = this.pinNodeIds[0];
-    const nB = this.pinNodeIds[1];
+    const voltages = ctx.voltages;
     const vA = nA > 0 ? voltages[nA - 1] : 0;
     const vB = nB > 0 ? voltages[nB - 1] : 0;
     const vAB = vA - vB;
@@ -180,7 +164,16 @@ export class MemristorElement implements AnalogElementCore {
     const fp = 1 - Math.pow(twoWMinus1, 2 * p);
 
     const dWdt = (this.mobility * this.rOn) / (this.deviceLength * this.deviceLength) * current * fp;
-    this._w = Math.max(0, Math.min(1, this._w + dWdt * dt));
+    this._w = Math.max(0, Math.min(1, this._w + dWdt * ctx.dt));
+  }
+
+  getPinCurrents(voltages: Float64Array): number[] {
+    const nA = this.pinNodeIds[0];
+    const nB = this.pinNodeIds[1];
+    const vA = nA > 0 ? voltages[nA - 1] : 0;
+    const vB = nB > 0 ? voltages[nB - 1] : 0;
+    const I = this.conductance() * (vA - vB);
+    return [I, -I];
   }
 }
 

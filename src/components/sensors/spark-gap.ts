@@ -26,14 +26,15 @@
  *   pinNodeIds[1] = n_neg
  *   branchIndex    = -1
  *
- * Stamping:
- *   stamp()        — no-op
- *   stampNonlinear — stamps linearized conductance at current operating point
- *   updateOperatingPoint — tracks terminal voltage for resistance computation
+ * Unified load() pipeline (matches ngspice DEVload):
+ *   load(ctx)       — stamps linearized conductance at the current operating point
+ *                     every NR iteration; resistance is computed from the hysteretic
+ *                     _conducting state and the last accepted-step terminal voltage
+ *   accept(ctx,...) — records the accepted-step terminal voltage and applies the
+ *                     discrete conducting/blocking state transition with hysteresis
  */
 
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -162,11 +163,8 @@ export class SparkGapElement implements AnalogElementCore {
     return this._conducting;
   }
 
-  stamp(_solver: SparseSolver): void {
-    // All contributions are in stampNonlinear.
-  }
-
-  stampNonlinear(solver: SparseSolver): void {
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
 
@@ -194,7 +192,8 @@ export class SparkGapElement implements AnalogElementCore {
     return [I, -I];
   }
 
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    const voltages = ctx.voltages;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
     const vPos = nPos > 0 ? voltages[nPos - 1] : 0;

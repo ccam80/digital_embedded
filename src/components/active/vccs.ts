@@ -12,9 +12,10 @@
  * `transconductance * V(ctrl)`.
  *
  * MNA formulation (Norton stamp — no branch variable):
- *   `stamp()`: no-op (no linear topology-constant entries).
- *   `stampNonlinear()` (via base class) evaluates f(Vctrl) and f'(Vctrl),
- *   then `stampOutput()` stamps the NR-linearized Norton equivalent:
+ *   No `_stampLinear` override (no linear topology-constant entries).
+ *   `load()` (via base class) binds the control voltage, evaluates f(Vctrl)
+ *   and f'(Vctrl), then calls `stampOutput()` which stamps the NR-linearized
+ *   Norton equivalent:
  *
  *   Norton current source (NR linearized around Vctrl0 = current op point):
  *     I_out(Vctrl) ≈ f(Vctrl0) + f'(Vctrl0) * (Vctrl - Vctrl0)

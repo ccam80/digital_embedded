@@ -4,16 +4,16 @@
  * BridgeOutputAdapter wraps a DigitalOutputPinModel for use at a cross-engine
  * boundary. It uses an ideal voltage source branch equation. The logic level
  * is set externally by the DefaultSimulationCoordinator after each digital
- * engine step. Re-stamping the branch equation after a level change is
- * sufficient — no NR iteration is required.
+ * engine step. Re-stamping the branch equation on the next NR iteration is
+ * sufficient — no NR convergence is required for a level change.
  *
  * BridgeInputAdapter wraps a DigitalInputPinModel for use at a cross-engine
  * boundary. It exposes threshold detection so the coordinator can convert
- * analog voltages to digital bits. When unloaded, stamp() is a no-op.
+ * analog voltages to digital bits. When unloaded, load() performs no matrix
+ * writes (the underlying pin model early-exits).
  */
 
-import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElement, IntegrationMethod } from "./element.js";
+import type { AnalogElement, LoadContext } from "./element.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
   DigitalOutputPinModel,
@@ -33,17 +33,14 @@ import {
  * level is set externally by the DefaultSimulationCoordinator.
  *
  * isNonlinear is false — the ideal source is linear; logic level changes are
- * handled by re-stamping the branch equation (coordinator calls stamp() after
- * updating the level), not via NR iteration.
+ * handled by re-stamping the branch equation on the next load() call, not via
+ * NR convergence.
  *
  * isReactive is a getter — true only when loaded and cOut > 0.
  */
 export class BridgeOutputAdapter implements AnalogElement {
   private readonly _pinModel: DigitalOutputPinModel;
   private readonly _loaded: boolean;
-
-  /** Cached solver reference for stampCompanion. */
-  private _solver: SparseSolver | null = null;
 
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
@@ -75,8 +72,8 @@ export class BridgeOutputAdapter implements AnalogElement {
   /**
    * True only when loaded and cOut > 0.
    *
-   * The timestep controller reads this flag to decide whether to call
-   * stampCompanion. When unloaded, stampCompanion is a no-op.
+   * The timestep controller reads this flag to decide whether to stamp the
+   * C_out companion model inside load() during transient solves.
    */
   get isReactive(): boolean {
     return this._loaded && this._pinModel.capacitance > 0;
@@ -104,49 +101,33 @@ export class BridgeOutputAdapter implements AnalogElement {
   }
 
   /**
-   * Stamp the ideal voltage source branch equation into the MNA matrix.
+   * Unified per-NR-iteration load. Stamps the ideal voltage source branch
+   * equation (vOH/vOL or Hi-Z) and, during transient solves, the C_out
+   * companion model. Matches ngspice DEVload: one call per element per NR
+   * iteration that reads state and writes conductance/RHS.
    *
-   * Caches the solver reference for stampCompanion.
+   * Logic level is owned by the coordinator (setLogicLevel / setHighZ) —
+   * load() does not read the MNA solution to drive a Norton/Thevenin choice;
+   * the branch equation enforces the coordinator-set target.
    */
-  stamp(solver: SparseSolver): void {
-    this._solver = solver;
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
     this._pinModel.stamp(solver);
+    if (ctx.isTransient && ctx.dt > 0 && this._loaded && this._pinModel.capacitance > 0) {
+      this._pinModel.stampCompanion(solver, ctx.dt, ctx.method);
+    }
   }
 
   /**
-   * Stamp the C_out companion model for this timestep.
+   * Post-accepted-step update for the C_out companion state.
    *
-   * Called once per timestep before the NR iterations begin. No-op when
-   * unloaded or cOut === 0.
+   * Only active for transient solves with a loaded, capacitive output pin.
    */
-  stampCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    _voltages: Float64Array,
-  ): void {
-    const solver = this._solver;
-    if (solver === null) return;
-    this._pinModel.stampCompanion(solver, dt, method);
-  }
-
-  /**
-   * Update C_out companion state after an accepted timestep.
-   */
-  updateCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    voltages: Float64Array,
-  ): void {
-    const v = readMnaVoltage(this._pinModel.nodeId, voltages);
-    this._pinModel.updateCompanion(dt, method, v);
-  }
-
-  /**
-   * No-op — bridge output operating point is set by the coordinator, not
-   * read from the MNA solution.
-   */
-  updateOperatingPoint(_voltages: Readonly<Float64Array>): void {
-    // Intentionally empty — logic level is owned by the coordinator.
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    if (!this._loaded || this._pinModel.capacitance <= 0) return;
+    if (!ctx.isTransient || ctx.dt <= 0) return;
+    const v = readMnaVoltage(this._pinModel.nodeId, ctx.voltages);
+    this._pinModel.updateCompanion(ctx.dt, ctx.method, v);
   }
 
   /**
@@ -190,9 +171,6 @@ export class BridgeInputAdapter implements AnalogElement {
   private readonly _pinModel: DigitalInputPinModel;
   private readonly _loaded: boolean;
 
-  /** Cached solver reference for stampCompanion. */
-  private _solver: SparseSolver | null = null;
-
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
   readonly internalNodeLabels: readonly string[];
@@ -221,46 +199,34 @@ export class BridgeInputAdapter implements AnalogElement {
     return this._loaded && this._pinModel.capacitance > 0;
   }
 
-  /**
-   * Stamp the input loading conductance 1/rIn into the MNA matrix.
-   *
-   * No-op when unloaded. Caches the solver reference for stampCompanion.
-   */
-  stamp(solver: SparseSolver): void {
-    this._solver = solver;
-    this._pinModel.stamp(solver);
-  }
-
   /** Hot-update a single electrical parameter on the underlying pin model. */
   setParam(key: string, value: number): void {
     this._pinModel.setParam(key, value);
   }
 
   /**
-   * Stamp the C_in companion model for this timestep.
-   *
-   * No-op when unloaded or cIn === 0.
+   * Unified per-NR-iteration load. Stamps the input loading conductance
+   * 1/rIn (no-op when unloaded) and, during transient solves, the C_in
+   * companion model. Matches ngspice DEVload.
    */
-  stampCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    _voltages: Float64Array,
-  ): void {
-    const solver = this._solver;
-    if (solver === null) return;
-    this._pinModel.stampCompanion(solver, dt, method);
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+    this._pinModel.stamp(solver);
+    if (ctx.isTransient && ctx.dt > 0 && this._loaded && this._pinModel.capacitance > 0) {
+      this._pinModel.stampCompanion(solver, ctx.dt, ctx.method);
+    }
   }
 
   /**
-   * Update C_in companion state after an accepted timestep.
+   * Post-accepted-step update for the C_in companion state.
+   *
+   * Only active for transient solves with a loaded, capacitive input pin.
    */
-  updateCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    voltages: Float64Array,
-  ): void {
-    const v = readMnaVoltage(this._pinModel.nodeId, voltages);
-    this._pinModel.updateCompanion(dt, method, v);
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    if (!this._loaded || this._pinModel.capacitance <= 0) return;
+    if (!ctx.isTransient || ctx.dt <= 0) return;
+    const v = readMnaVoltage(this._pinModel.nodeId, ctx.voltages);
+    this._pinModel.updateCompanion(ctx.dt, ctx.method, v);
   }
 
   /**

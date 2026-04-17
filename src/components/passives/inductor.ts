@@ -21,9 +21,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import { integrateInductor } from "../../solver/analog/integration.js";
+import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -251,84 +249,100 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     }
   }
 
-  stamp(solver: SparseSolver): void {
+  /**
+   * Unified load() — ngspice indload.c INDload.
+   *
+   * Stamps the branch-current incidence (B/C sub-matrices) always, reads the
+   * branch current, computes flux phi = L*I, NIintegrates inline using
+   * ctx.ag[], and stamps the companion (-geq on branch diagonal, ceq on RHS).
+   * Dual of the capacitor Appendix D2 pattern with charge→flux / C→L.
+   */
+  load(ctx: LoadContext): void {
+    const { solver, voltages, initMode, isDcOp, isTransient, ag } = ctx;
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const b = this.branchIndex;
+    const L = this.L;
 
-    // B sub-matrix: branch current incidence in node KCL equations.
-    // I_branch flows from n0 through the inductor to n1.
+    // Topology-constant branch incidence stamps (indload.c — matrix pointers).
+    // B sub-matrix: I_branch flows into n0 and out of n1.
     if (n0 !== 0) solver.stamp(n0 - 1, b, 1);
     if (n1 !== 0) solver.stamp(n1 - 1, b, -1);
-
-    // C sub-matrix: voltage incidence (topology-constant ±1 entries).
-    // Before first stampReactiveCompanion, geq=0 and ieq=0 → V_n0 - V_n1 = 0
-    // (short circuit — correct DC operating point for an inductor).
+    // C sub-matrix: KVL voltage incidence.
     if (n0 !== 0) solver.stamp(b, n0 - 1, 1);
     if (n1 !== 0) solver.stamp(b, n1 - 1, -1);
-  }
 
-  stampReactiveCompanion(solver: SparseSolver): void {
-    const b = this.branchIndex;
-    const geq = this.s0[this.base + SLOT_GEQ];
-    const ieq = this.s0[this.base + SLOT_IEQ];
+    // Gate: inductors only participate in tran/ac/tranop (indload.c gate).
+    if (!isTransient && !isDcOp) return;
 
-    // Branch diagonal: -geq (companion conductance term)
-    solver.stamp(b, b, -geq);
+    // Initial condition gate (dual of capload.c:32-36).
+    const cond1 = (isDcOp && initMode === "initJct") ||
+                  (ctx.uic && initMode === "initTran" && !isNaN(this._IC));
 
-    // RHS: branch equation source
-    solver.stampRHS(b, ieq);
+    let iNow: number;
+    if (cond1) {
+      iNow = this._IC;
+    } else {
+      iNow = voltages[b];
+    }
+
+    const n0v = n0 > 0 ? voltages[n0 - 1] : 0;
+    const n1v = n1 > 0 ? voltages[n1 - 1] : 0;
+
+    if (isTransient) {
+      // #ifndef PREDICTOR dual (indload.c flux storage).
+      if (initMode === "initPred") {
+        this.s0[this.base + SLOT_PHI] = this.s1[this.base + SLOT_PHI];
+      } else {
+        this.s0[this.base + SLOT_PHI] = L * iNow;
+        if (initMode === "initTran") {
+          this.s1[this.base + SLOT_PHI] = this.s0[this.base + SLOT_PHI];
+        }
+      }
+
+      // NIintegrate inline using ctx.ag[] (niinteg.c, indload.c NIintegrate call).
+      const phi0 = this.s0[this.base + SLOT_PHI];
+      const phi1 = this.s1[this.base + SLOT_PHI];
+      let ccap: number;
+      if (ctx.order >= 2 && ag.length > 2) {
+        const phi2 = this.s2[this.base + SLOT_PHI];
+        ccap = ag[0] * phi0 + ag[1] * phi1 + ag[2] * phi2;
+      } else {
+        ccap = ag[0] * phi0 + ag[1] * phi1;
+      }
+      this.s0[this.base + SLOT_CCAP] = ccap;
+
+      const geq = ag[0] * L;
+      const ceq = ccap - ag[0] * phi0;
+
+      if (initMode === "initTran") {
+        this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];
+      }
+
+      // Cache companion state for diagnostics.
+      this.s0[this.base + SLOT_GEQ]  = geq;
+      this.s0[this.base + SLOT_IEQ]  = ceq;
+      this.s0[this.base + SLOT_I]    = iNow;
+      this.s0[this.base + SLOT_VOLT] = n0v - n1v;
+
+      // Branch equation: V(n0) - V(n1) - geq * I = ceq
+      // Stamp -geq on branch diagonal and ceq on the branch RHS.
+      solver.stamp(b, b, -geq);
+      solver.stampRHS(b, ceq);
+    } else {
+      // DC operating point: short-circuit branch (V_n0 = V_n1).
+      // Branch incidence already stamped above; no geq/ceq stamp.
+      this.s0[this.base + SLOT_PHI]  = L * iNow;
+      this.s0[this.base + SLOT_I]    = iNow;
+      this.s0[this.base + SLOT_VOLT] = n0v - n1v;
+      this.s0[this.base + SLOT_GEQ] = 0;
+      this.s0[this.base + SLOT_IEQ] = 0;
+    }
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
     const I = voltages[this.branchIndex];
     return [I, -I];
-  }
-
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
-    const iNow = voltages[this.branchIndex];
-
-    const isInitPred = this._pool && this._pool.initMode === "initPred";
-    const isInitTranUIC = this._pool && this._pool.initMode === "initTran" && this._pool.uic === true && !isNaN(this._IC);
-    const phi0 = isInitPred ? this.s1[this.base + SLOT_PHI] : isInitTranUIC ? this.L * this._IC : this.L * iNow;
-    const phi1 = this.s1[this.base + SLOT_PHI];
-    const phi2 = this.s2[this.base + SLOT_PHI];
-    const ccapPrev = this.s1[this.base + SLOT_CCAP];
-    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-    if (this._pool && this._pool.initMode === "initTran") {
-      this.s1[this.base + SLOT_PHI] = phi0;  // flux0→flux1 copy (indload.c:99-102)
-    }
-    const { geq, ceq, ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, order, method, ccapPrev);
-    this.s0[this.base + SLOT_GEQ]  = geq;
-    this.s0[this.base + SLOT_IEQ]  = ceq;
-    this.s0[this.base + SLOT_I]    = iNow;
-    this.s0[this.base + SLOT_CCAP] = ccap;
-    if (this._pool && this._pool.initMode === "initTran") {
-      this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];  // ccap0→ccap1 copy (indload.c:114-117)
-    }
-    const n0 = this.pinNodeIds[0];
-    const n1 = this.pinNodeIds[1];
-    const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
-    const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
-    this.s0[this.base + SLOT_VOLT] = v0 - v1;
-    // SLOT_PHI is written by updateChargeFlux after the Newton-Raphson solve converges.
-  }
-
-  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
-    const iNow = voltages[this.branchIndex];
-    this.s0[this.base + SLOT_PHI] = this.L * iNow;
-
-    // Recompute ccap from converged flux so the next step's trapezoidal
-    // recursion starts from the correct companion current (fixes stale SLOT_CCAP).
-    if (dt > 0) {
-      const phi0 = this.s0[this.base + SLOT_PHI];
-      const phi1 = this.s1[this.base + SLOT_PHI];
-      const phi2 = this.s2[this.base + SLOT_PHI];
-      const ccapPrev = this.s1[this.base + SLOT_CCAP];
-      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const { ccap } = integrateInductor(this.L, iNow, phi0, phi1, phi2, dt, h1, order, method, ccapPrev);
-      this.s0[this.base + SLOT_CCAP] = ccap;
-    }
   }
 
   getLteTimestep(

@@ -23,13 +23,11 @@
  *   pinNodeIds[1] = n_neg
  *   branchIndex    = -1
  *
- * Stamping:
- *   stamp()        — no-op
- *   stampNonlinear — stamps conductance 1/R(lux)
+ * Unified load() pipeline (matches ngspice DEVload):
+ *   load(ctx) — stamps conductance 1/R(lux) between terminals every NR iteration
  */
 
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { PropertyBag, PropertyType } from "../../core/properties.js";
 import type { PropertyDefinition } from "../../core/properties.js";
 import {
@@ -120,11 +118,8 @@ export class LDRElement implements AnalogElementCore {
     if (key in this._p) this._p[key] = value;
   }
 
-  stamp(_solver: SparseSolver): void {
-    // All conductance contributions are in stampNonlinear.
-  }
-
-  stampNonlinear(solver: SparseSolver): void {
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
 
@@ -140,11 +135,6 @@ export class LDRElement implements AnalogElementCore {
     } else if (nNeg !== 0) {
       solver.stamp(nNeg - 1, nNeg - 1, G);
     }
-  }
-
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    // No internal voltage-dependent state; resistance depends only on lux.
-    void voltages;
   }
 
   getPinCurrents(voltages: Float64Array): number[] {

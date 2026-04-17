@@ -22,8 +22,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -164,8 +163,11 @@ export function makeCurrentSource(
   nodeNeg: number,
   current: number,
 ): AnalogElementCore {
-  let scale = 1;
   const p: Record<string, number> = { current };
+  // Captures the srcFact seen on the most recent load() call so that
+  // getPinCurrents can report consistent DC-OP source-stepped currents
+  // to diagnostic readouts between iterations.
+  let lastSrcFact = 1;
 
   return {
     branchIndex: -1,
@@ -176,23 +178,21 @@ export function makeCurrentSource(
       if (key in p) (p as Record<string, number>)[key] = value;
     },
 
-    setSourceScale(factor: number): void {
-      scale = factor;
-    },
-
-    stamp(solver: SparseSolver): void {
-      const I = p.current * scale;
+    load(ctx: LoadContext): void {
+      lastSrcFact = ctx.srcFact;
+      const I = p.current * ctx.srcFact;
+      const solver = ctx.solver;
       if (nodePos !== 0) solver.stampRHS(nodePos - 1, I);
       if (nodeNeg !== 0) solver.stampRHS(nodeNeg - 1, -I);
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {
-      // No branch row — current is defined by the stamp: I = current * scale.
+      // No branch row — current is defined by the stamp: I = current * srcFact.
       // Pin layout order: [neg, pos] — neg is index 0, pos is index 1.
       // Conventional current flows from neg through source to pos (arrow direction).
       // Current into neg = +I (current enters element at neg from the circuit).
       // Current into pos = -I (current exits element at pos into the circuit).
-      const I = p.current * scale;
+      const I = p.current * lastSrcFact;
       return [I, -I];
     },
   };

@@ -16,16 +16,13 @@
  *   pinNodeIds[1] = n_neg  (negative terminal / cathode)
  *   pinNodeIds[2] = n_cap  (internal node between ESR and capacitor body)
  *
- * Linear elements stamped in stamp():
+ * Elements stamped inside load() every NR iteration:
  *   - ESR conductance between n_pos and n_cap
  *   - Leakage conductance between n_cap and n_neg
- *   - Capacitor companion model (geq + ieq) between n_cap and n_neg
- *     (these coefficients change only at timestep boundaries, not every NR
- *     iteration — so they are safe to stamp in the linear pass)
- *
- * Polarity enforcement in updateOperatingPoint():
- *   - Called every NR iteration when isNonlinear === true
- *   - Emits a reverse-biased-cap diagnostic when V(pos) < V(neg) − reverseMax
+ *   - Capacitor companion model (geq + ieq) between n_cap and n_neg,
+ *     computed inline with ctx.ag[] (NIintegrate)
+ *   - Polarity check: emits a reverse-biased-cap diagnostic when
+ *     V(pos) < V(neg) − reverseMax
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -41,11 +38,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
-import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { stampG } from "../../solver/analog/stamp-helpers.js";
 import type { Diagnostic } from "../../compile/types.js";
-import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
 import {
   defineStateSchema,
@@ -289,54 +284,39 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     applyInitialValues(POLARIZED_CAP_SCHEMA, pool, this.base, {});
   }
 
-  stamp(solver: SparseSolver): void {
+  /**
+   * Unified load() — ESR + leakage stamps + capacitor companion + polarity check.
+   *
+   * Topology: pos ── ESR ── nCap ── (C || leakage) ── neg.
+   * Stamps in one pass:
+   *   - ESR conductance between nPos and nCap (topology-constant, stamped always).
+   *   - Leakage conductance between nCap and nNeg (topology-constant).
+   *   - Capacitor companion (geq, ceq) between nCap and nNeg using inline
+   *     NIintegrate with ctx.ag[].
+   *   - Polarity diagnostic when reverse-biased beyond reverseMax.
+   */
+  load(ctx: LoadContext): void {
+    const { solver, voltages, initMode, isDcOp, isTransient, ag } = ctx;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
     const nCap = this.pinNodeIds[2];
 
-    // ESR: conductance between n_pos and n_cap (topology-constant)
+    // ESR conductance (nPos ↔ nCap).
     stampG(solver, nPos, nPos, this.G_esr);
     stampG(solver, nPos, nCap, -this.G_esr);
     stampG(solver, nCap, nPos, -this.G_esr);
     stampG(solver, nCap, nCap, this.G_esr);
 
-    // Leakage: conductance between n_cap and n_neg (topology-constant)
+    // Leakage conductance (nCap ↔ nNeg).
     stampG(solver, nCap, nCap, this.G_leak);
     stampG(solver, nCap, nNeg, -this.G_leak);
     stampG(solver, nNeg, nCap, -this.G_leak);
     stampG(solver, nNeg, nNeg, this.G_leak);
-  }
 
-  stampReactiveCompanion(solver: SparseSolver): void {
-    const nNeg = this.pinNodeIds[1];
-    const nCap = this.pinNodeIds[2];
-    const geq = this.s0[this.base + SLOT_GEQ];
-    const ieq = this.s0[this.base + SLOT_IEQ];
-
-    // Capacitor companion model: conductance + history current between n_cap and n_neg
-    // RHS sign: -ieq at nCap, +ieq at nNeg (standard Norton convention: ieq = -geq*v(n))
-    stampG(solver, nCap, nCap, geq);
-    stampG(solver, nCap, nNeg, -geq);
-    stampG(solver, nNeg, nCap, -geq);
-    stampG(solver, nNeg, nNeg, geq);
-
-    stampRHS(solver, nCap, -ieq);
-    stampRHS(solver, nNeg, ieq);
-  }
-
-  stampNonlinear(_solver: SparseSolver): void {
-    // No additional nonlinear stamps required.
-    // Polarity violation detection occurs in updateOperatingPoint.
-  }
-
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    const nPos = this.pinNodeIds[0];
-    const nNeg = this.pinNodeIds[1];
-
+    // Polarity detection — check anode vs cathode voltage.
     const vAnode = nPos > 0 ? voltages[nPos - 1] : 0;
     const vCathode = nNeg > 0 ? voltages[nNeg - 1] : 0;
     const vDiff = vAnode - vCathode;
-
     if (vDiff < -this.reverseMax) {
       if (!this._reverseBiasDiagEmitted) {
         this._reverseBiasDiagEmitted = true;
@@ -359,6 +339,62 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     } else {
       this._reverseBiasDiagEmitted = false;
     }
+
+    // Capacitor body (between nCap and nNeg).
+    if (!isTransient && !isDcOp) return;
+    const C = this.C;
+
+    const vCapNode = nCap > 0 ? voltages[nCap - 1] : 0;
+    const vNegNode = nNeg > 0 ? voltages[nNeg - 1] : 0;
+    const vNow = vCapNode - vNegNode;
+
+    if (isTransient) {
+      // Charge update (capload.c pattern).
+      if (initMode === "initPred") {
+        this.s0[this.base + SLOT_Q] = this.s1[this.base + SLOT_Q];
+      } else {
+        this.s0[this.base + SLOT_Q] = C * vNow;
+        if (initMode === "initTran") {
+          this.s1[this.base + SLOT_Q] = this.s0[this.base + SLOT_Q];
+        }
+      }
+
+      const q0 = this.s0[this.base + SLOT_Q];
+      const q1 = this.s1[this.base + SLOT_Q];
+      let ccap: number;
+      if (ctx.order >= 2 && ag.length > 2) {
+        const q2 = this.s2[this.base + SLOT_Q];
+        ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
+      } else {
+        ccap = ag[0] * q0 + ag[1] * q1;
+      }
+      this.s0[this.base + SLOT_CCAP] = ccap;
+
+      const geq = ag[0] * C;
+      const ceq = ccap - ag[0] * q0;
+
+      if (initMode === "initTran") {
+        this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];
+      }
+
+      this.s0[this.base + SLOT_GEQ] = geq;
+      this.s0[this.base + SLOT_IEQ] = ceq;
+      this.s0[this.base + SLOT_V]   = vNow;
+
+      // Stamp companion between nCap and nNeg.
+      stampG(solver, nCap, nCap, geq);
+      stampG(solver, nCap, nNeg, -geq);
+      stampG(solver, nNeg, nCap, -geq);
+      stampG(solver, nNeg, nNeg, geq);
+      if (nCap !== 0) solver.stampRHS(nCap - 1, -ceq);
+      if (nNeg !== 0) solver.stampRHS(nNeg - 1, ceq);
+    } else {
+      // DC operating point.
+      this.s0[this.base + SLOT_Q] = C * vNow;
+      this.s0[this.base + SLOT_V] = vNow;
+      this.s0[this.base + SLOT_GEQ] = 0;
+      this.s0[this.base + SLOT_IEQ] = 0;
+    }
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -376,48 +412,6 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     this.G_esr = G_esr;
     this.G_leak = G_leak;
     this.reverseMax = reverseMax;
-  }
-
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
-    const nCap = this.pinNodeIds[2];
-    const nNeg = this.pinNodeIds[1];
-
-    const vCapNode = nCap > 0 ? voltages[nCap - 1] : 0;
-    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
-    const vNow = vCapNode - vNeg;
-
-    const q0 = this.C * vNow;
-    const q1 = this.s1[this.base + SLOT_Q];
-    const q2 = this.s2[this.base + SLOT_Q];
-    const ccapPrev = this.s1[this.base + SLOT_CCAP];
-    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-    const { geq, ceq, ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
-    this.s0[this.base + SLOT_GEQ]  = geq;
-    this.s0[this.base + SLOT_IEQ]  = ceq;
-    this.s0[this.base + SLOT_V]    = vNow;
-    this.s0[this.base + SLOT_CCAP] = ccap;
-    // SLOT_Q is written by updateChargeFlux after the Newton-Raphson solve converges.
-  }
-
-  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
-    const nCap = this.pinNodeIds[2];
-    const nNeg = this.pinNodeIds[1];
-    const vCapNode = nCap > 0 ? voltages[nCap - 1] : 0;
-    const vNeg = nNeg > 0 ? voltages[nNeg - 1] : 0;
-    const vNow = vCapNode - vNeg;
-    this.s0[this.base + SLOT_Q] = this.C * vNow;
-
-    // Recompute ccap from converged charge so the next step's trapezoidal
-    // recursion starts from the correct companion current (fixes stale SLOT_CCAP).
-    if (dt > 0) {
-      const q0 = this.s0[this.base + SLOT_Q];
-      const q1 = this.s1[this.base + SLOT_Q];
-      const q2 = this.s2[this.base + SLOT_Q];
-      const ccapPrev = this.s1[this.base + SLOT_CCAP];
-      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const { ccap } = integrateCapacitor(this.C, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
-      this.s0[this.base + SLOT_CCAP] = ccap;
-    }
   }
 
   getLteTimestep(

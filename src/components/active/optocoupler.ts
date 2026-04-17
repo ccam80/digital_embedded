@@ -86,8 +86,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -172,7 +171,7 @@ function createOptocouplerElement(
   const nEmitter   = pinNodes.get("emitter")!;
 
   // Operating-point state
-  let vd = 0;       // V_anode - V_cathode at last updateOperatingPoint
+  let vd = 0;       // V_anode - V_cathode at last load() call
   let gLed = G_OFF; // effective LED conductance
   let iNR = 0;      // Norton offset for LED stamp
 
@@ -185,11 +184,23 @@ function createOptocouplerElement(
     isNonlinear: true,
     isReactive: false,
 
-    stamp(_solver: SparseSolver): void {
-      // No linear topology-constant contributions.
-    },
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
+      const voltages = ctx.voltages;
 
-    stampNonlinear(solver: SparseSolver): void {
+      // Evaluate operating point from current NR-iterate voltages.
+      const vA = readNode(voltages, nAnode);
+      const vK = readNode(voltages, nCathode);
+      vd = vA - vK;
+      const gOn = 1 / p.rLed;
+      if (vd >= p.vForward) {
+        gLed = gOn;
+        iNR = gOn * p.vForward;
+      } else {
+        gLed = G_OFF;
+        iNR = 0;
+      }
+
       // --- Input LED stamp ---
       // Conductance stamp between anode and cathode
       if (nAnode !== 0) {
@@ -209,40 +220,20 @@ function createOptocouplerElement(
       if (nCathode !== 0) solver.stampRHS(nCathode - 1, iNR);
 
       // --- Output phototransistor stamp ---
-      // I_C = CTR * I_LED; I_LED = gLed * V_d - iNR
       const iLed0 = gLed * vd - iNR;
       const iC0 = p.ctr * iLed0;
       const gmCtr = p.ctr * gLed; // dI_C/dV_d
 
-      // NR constant term for output Norton source
       const iCnr = iC0 - gmCtr * vd;
 
-      // Cross-port Jacobian: controlled source dependence on input voltage
-      // G[nC, nA] -= gmCtr   G[nC, nK] += gmCtr
-      // G[nE, nA] += gmCtr   G[nE, nK] -= gmCtr
+      // Cross-port Jacobian
       if (nCollector !== 0 && nAnode !== 0) solver.stamp(nCollector - 1, nAnode - 1, -gmCtr);
       if (nCollector !== 0 && nCathode !== 0) solver.stamp(nCollector - 1, nCathode - 1, gmCtr);
       if (nEmitter !== 0 && nAnode !== 0) solver.stamp(nEmitter - 1, nAnode - 1, gmCtr);
       if (nEmitter !== 0 && nCathode !== 0) solver.stamp(nEmitter - 1, nCathode - 1, -gmCtr);
 
-      // RHS: Norton constant
       if (nCollector !== 0) solver.stampRHS(nCollector - 1, iCnr);
       if (nEmitter !== 0) solver.stampRHS(nEmitter - 1, -iCnr);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      const vA = readNode(voltages, nAnode);
-      const vK = readNode(voltages, nCathode);
-      vd = vA - vK;
-
-      const gOn = 1 / p.rLed;
-      if (vd >= p.vForward) {
-        gLed = gOn;
-        iNR = gOn * p.vForward;
-      } else {
-        gLed = G_OFF;
-        iNR = 0;
-      }
     },
 
     getPinCurrents(voltages: Float64Array): number[] {

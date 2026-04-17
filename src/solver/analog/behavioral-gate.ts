@@ -6,7 +6,7 @@
  * table function. A single class handles NOT, AND, NAND, OR, NOR, XOR and any
  * other combinational gate via parameterization.
  *
- * Threshold detection in stampNonlinear() makes the element nonlinear.
+ * Threshold detection inside load() makes the element nonlinear.
  * Pin capacitances require companion models, making it reactive.
  *
  * Indeterminate inputs (voltage between vIL and vIH) latch to the previous
@@ -14,8 +14,7 @@
  * threshold.
  */
 
-import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElementCore, IntegrationMethod } from "./element.js";
+import type { AnalogElementCore, LoadContext } from "./element.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -61,13 +60,11 @@ export type AnalogElementFactory = (
 /**
  * Analog behavioral model for a combinational digital gate.
  *
- * Stamp protocol:
- *   stamp()              — stamps input R_in and output R_out/V_out (linear)
- *   stampNonlinear()     — uses cached voltages from updateOperatingPoint to
- *                          evaluate the truth table and re-stamp the output
- *   stampCompanion()     — stamps pin capacitance companion models
- *   updateOperatingPoint() — caches latest solution voltages for stampNonlinear
- *   updateCompanion()    — updates pin companion state after accepted timestep
+ * Unified load() protocol (ngspice DEVload):
+ *   load()   — stamps input loading, evaluates the truth table from current
+ *              NR-iterate voltages, stamps the output Norton equivalent, and
+ *              (in transient) stamps pin-capacitance companion models.
+ *   accept() — updates pin companion state after an accepted timestep.
  */
 export class BehavioralGateElement implements AnalogElementCore {
   private readonly _inputs: DigitalInputPinModel[];
@@ -77,16 +74,6 @@ export class BehavioralGateElement implements AnalogElementCore {
 
   /** Latched logic levels per input — persist across timesteps. */
   private readonly _latchedLevels: boolean[];
-
-  /**
-   * Cached node voltages from the most recent updateOperatingPoint call.
-   * Used by stampNonlinear to evaluate the truth table without needing to
-   * read from the solver directly.
-   */
-  private _cachedVoltages: Float64Array = new Float64Array(0);
-
-  /** Cached solver reference — set on first stamp() call. */
-  private _solver: SparseSolver | null = null;
 
   pinNodeIds!: readonly number[];  // set by compiler via Object.assign after factory returns
   readonly branchIndex: number = -1;
@@ -107,44 +94,15 @@ export class BehavioralGateElement implements AnalogElementCore {
     this._pinModelsByLabel = pinModelsByLabel;
   }
 
-  /**
-   * Stamp linear contributions: input loading resistances only.
-   *
-   * The output Norton equivalent is fully stamped in stampNonlinear because
-   * both the conductance (1/rOut) and the current source (V_out/rOut) are
-   * topology-constant and logic-level-dependent respectively. Since
-   * beginAssembly clears the matrix before each NR iteration, it is correct
-   * and simpler to stamp the entire output in stampNonlinear.
-   *
-   * Caches the solver reference for use in stampCompanion().
-   */
-  stamp(solver: SparseSolver): void {
-    this._solver = solver;
-    for (const inp of this._inputs) {
-      inp.stamp(solver);
-    }
-  }
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+    const voltages = ctx.voltages;
 
-  /**
-   * Evaluate the truth table at the cached operating-point voltages and
-   * re-stamp the output Norton equivalent.
-   *
-   * For each input:
-   *   - Read the cached node voltage (set by updateOperatingPoint).
-   *   - Apply threshold detection via readLogicLevel().
-   *   - If indeterminate, keep the current latched level.
-   *   - If clearly HIGH or LOW, update the latch.
-   *
-   * Then call truthTable(latchedLevels) and update the output logic level.
-   * Re-stamp the output so the Norton current source reflects the new state.
-   */
-  stampNonlinear(solver: SparseSolver): void {
-    this._solver = solver;
-    const v = this._cachedVoltages;
-
+    // Evaluate each input's logic level from the current NR iterate, latching
+    // on indeterminate to prevent oscillation as inputs traverse the threshold.
     for (let i = 0; i < this._inputs.length; i++) {
       const nodeId = this._inputs[i].nodeId;
-      const voltage = readMnaVoltage(nodeId, v);
+      const voltage = readMnaVoltage(nodeId, voltages);
       const level = this._inputs[i].readLogicLevel(voltage);
       if (level !== undefined) {
         this._latchedLevels[i] = level;
@@ -153,38 +111,32 @@ export class BehavioralGateElement implements AnalogElementCore {
 
     const outputBit = this._truthTable(this._latchedLevels);
     this._output.setLogicLevel(outputBit);
-    this._output.stampOutput(solver);
-  }
 
-  /**
-   * Cache the current NR solution voltages for use in stampNonlinear.
-   *
-   * Called after each NR iteration. Grows the cache array lazily to match
-   * the solution vector size.
-   */
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    if (this._cachedVoltages.length !== voltages.length) {
-      this._cachedVoltages = new Float64Array(voltages.length);
-    }
-    this._cachedVoltages.set(voltages);
-  }
-
-  /**
-   * Stamp companion models for all pin capacitances.
-   *
-   * Called once per timestep before the NR iterations begin.
-   */
-  stampCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    _voltages: Float64Array,
-  ): void {
-    const solver = this._solver;
-    if (solver === null) return;
+    // Stamp input loading conductances (R_in).
     for (const inp of this._inputs) {
-      inp.stampCompanion(solver, dt, method);
+      inp.stamp(solver);
     }
-    this._output.stampCompanion(solver, dt, method);
+    // Stamp output Norton equivalent (G_out + Norton source).
+    this._output.stampOutput(solver);
+
+    // Transient: stamp companion models for pin capacitances.
+    if (ctx.isTransient && ctx.dt > 0) {
+      for (const inp of this._inputs) {
+        inp.stampCompanion(solver, ctx.dt, ctx.method);
+      }
+      this._output.stampCompanion(solver, ctx.dt, ctx.method);
+    }
+  }
+
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    if (ctx.dt <= 0) return;
+    const voltages = ctx.voltages;
+    for (const inp of this._inputs) {
+      const v = readMnaVoltage(inp.nodeId, voltages);
+      inp.updateCompanion(ctx.dt, ctx.method, v);
+    }
+    const vOut = readMnaVoltage(this._output.nodeId, voltages);
+    this._output.updateCompanion(ctx.dt, ctx.method, vOut);
   }
 
   /**
@@ -205,25 +157,6 @@ export class BehavioralGateElement implements AnalogElementCore {
     const vOut = readMnaVoltage(this._output.nodeId, voltages);
     result.push((vOut - this._output.currentVoltage) / this._output.rOut);
     return result;
-  }
-
-  /**
-   * Update companion model state after an accepted timestep.
-   *
-   * Calls updateCompanion() on all input and output pin models using the
-   * accepted node voltages. Node IDs are 0-based solver indices.
-   */
-  updateCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    voltages: Float64Array,
-  ): void {
-    for (const inp of this._inputs) {
-      const v = readMnaVoltage(inp.nodeId, voltages);
-      inp.updateCompanion(dt, method, v);
-    }
-    const vOut = readMnaVoltage(this._output.nodeId, voltages);
-    this._output.updateCompanion(dt, method, vOut);
   }
 
   setParam(key: string, value: number): void {

@@ -8,6 +8,43 @@
 4. **Only permitted additions over ngspice:** convergence logging, diagnostics emission, blame tracking.
 5. **Persistent linked-list sparse solver** matching ngspice `spMatrix`. No COO→CSC pipeline. No AMD ordering.
 
+## Inter-Phase Breakage Carve-Out (reviewers: read before filing findings)
+
+This is a far-reaching refactor. Between the start of Phase 0 and the end of
+Phase 7 the codebase will not be fully working. Specifically:
+
+- **`tsc --noEmit` may fail** at any commit between phases. Type-level
+  breakage that is the direct consequence of a landed interface change
+  (e.g. Wave 6.1 redefining `AnalogElement` before Wave 6.2 migrates the
+  implementations) is **expected** and **must not** be papered over with
+  optional chains, `as any` casts, runtime arity sniffs, conditional method
+  presence checks, or any other form of compatibility shim. If tsc breaks,
+  leave it broken — it is a correctness signal for the next phase, not a
+  regression to chase.
+- **Unit and E2E tests may fail** at any commit between phases. Phase 7 is
+  the verification gate; prior phases are not expected to leave the test
+  suite fully green. If tests pass uniformly between phases, it almost
+  certainly means a shim was added to bridge a gap — which is a violation,
+  not a success.
+- **No deliberately non-equivalent numerical tests.** Every numerical
+  assertion must be bit-exact against ngspice (or a pre-computed
+  bit-exact reference). Relaxed tolerances, `toBeCloseTo`, or
+  implementation-mirroring expected values are banned — they silently mask
+  divergence.
+- **No deliberate shims to keep phases connected.** If Wave 6.1 deletes
+  interface methods, callers of those methods break at tsc time and fail
+  at runtime. That is the intended state until the paired Wave lands.
+  Restoring the methods, adding `?.` guards, or writing runtime sniffs to
+  keep the engine limping is forbidden.
+
+Reviewers: do **not** file findings that a shim/sniff/cast should be added
+to keep cross-phase callers alive. Do file findings when a shim/sniff/cast
+exists. The tsc-broken baseline itself is not a finding once this carve-out
+is in place; the shims used to hide it are.
+
+End of Phase 7 is the only point where the entire codebase must
+simultaneously type-check clean and pass every test.
+
 ## Resolved Design Decisions
 
 | Decision | Resolution | Rationale |
@@ -30,19 +67,19 @@
 
 | Phase | Name | Spec File | Dependencies |
 |---|---|---|---|
-| **0** | Sparse Solver Rewrite | `spec/phase-0-sparse-solver-rewrite.md` | None |
+| **0** | Sparse Solver Rewrite (Waves 0.1–0.3 real; Wave 0.4 complex) | `spec/phase-0-sparse-solver-rewrite.md` | None |
 | **1** | Zero-Alloc Infrastructure | `spec/phase-1-zero-alloc-infrastructure.md` | Phase 0 |
 | **2** | NR Loop Alignment | `spec/phase-2-nr-loop-alignment.md` | Phase 1, Phase 6 (for cktLoad) |
 | **3** | Numerical Fixes | `spec/phase-3-numerical-fixes.md` | Phase 1 |
 | **4** | DC Operating Point Alignment | `spec/phase-4-dcop-alignment.md` | Phase 1, Phase 2 |
 | **5** | Transient Step Alignment | `spec/phase-5-transient-step-alignment.md` | Phase 1, Phase 4 |
-| **6** | Model Rewrites | `spec/phase-6-model-rewrites.md` | Phase 1 (for LoadContext) |
+| **6** | Model Rewrites (Waves 6.1–6.3 + Wave 6.4 digital pin models) | `spec/phase-6-model-rewrites.md` | Phase 1 (for LoadContext) |
 | **7** | Verification | `spec/phase-7-verification.md` | All previous phases |
 
 ## Dependency Graph
 
 ```
-Phase 0 (sparse solver rewrite — persistent linked lists, preorder, drop AMD)
+Phase 0 Waves 0.1–0.3 (real sparse solver — persistent linked lists, preorder, drop AMD)
   ↓
 Phase 1 (CKTCircuitContext god-object, zero-alloc buffers)
   ↓
@@ -56,7 +93,8 @@ Phase 1 (CKTCircuitContext god-object, zero-alloc buffers)
   │     ↓
   │   Phase 6 Wave 6.2 (rewrite all ~65 elements — atomic)
   │     ↓
-  │   Phase 6 Wave 6.3 (test infrastructure, delete dead code)
+  │   ├── Phase 6 Wave 6.3 (test infrastructure, delete dead code on real solver)
+  │   └── Phase 6 Wave 6.4 (digital pin models into cktLoad world)
   │
   ├── Phase 4 (DC-OP alignment — all 5 sub-algorithms)
   │     requires: Phase 2 Wave 2.1
@@ -64,24 +102,38 @@ Phase 1 (CKTCircuitContext god-object, zero-alloc buffers)
   └── Phase 5 (transient step alignment, timestep controller)
         requires: Phase 4
 
+Phase 0 Wave 0.4 (complex sparse solver parity — mirror of 0.1/0.2/0.3 on complex-sparse-solver.ts)
+  independent of 0.1/0.2/0.3; runs in parallel with Phase 6
+
 Phase 7 (verification — ngspice parity tests)
   requires: all above
 ```
 
-**Critical path:** 0 → 1 → 6.1 → 6.2 → 2.2 → 4 → 5 → 7
+**Critical path:** 0 (Waves 0.1–0.3) → 1 → 6.1 → 6.2 → 2.2 → 4 → 5 → 7
 
 **Parallelizable after Phase 1:**
 - Phase 3 (numerical fixes) can run in parallel with Phase 6
 - Phase 2 Wave 2.1 (pnjlim/fetlim) can run in parallel with Phase 6
 - Phase 4 can start as soon as Phase 2 Wave 2.1 completes
+- Phase 0 Wave 0.4 (complex solver parity) can run in parallel with Phase 6 — separate file, separate call sites
+- Phase 6 Wave 6.4 (digital pin models) can run in parallel with Wave 6.3 after Wave 6.2 lands
 
-**Wave 6.2 atomic-migration gate:** All ~65 elements must implement `load()` in the same merge — no shims, no coexistence period. Full-codebase `tsc --noEmit` must succeed before Wave 6.3 begins.
+**Wave 6.2 atomic-migration gate:** All ~65 elements must implement `load()` in the same merge — no shims, no coexistence period. Full-codebase `tsc --noEmit` must succeed before Waves 6.3 and 6.4 begin.
+
+**Wave 0.4 atomic-migration gate:** `ComplexSparseSolver.stamp(row, col, re, im)` deletion (Task 0.4.4) lands atomically with every `stampAc` implementation's migration to the handle-based API. Full-codebase `tsc --noEmit` must succeed after Wave 0.4 — independent of the Wave 6.3 gate on the real side.
+
+**Wave 6.4 atomic-migration gate:** The legacy pin-model methods (`stamp`, `stampOutput`, `stampCompanion`, `updateCompanion`) are deleted in Task 6.4.4 only after Tasks 6.4.1–6.4.3 have landed. Full-codebase `tsc --noEmit` must succeed after Wave 6.4.
 
 ## File Impact Summary
 
 | File | Change | Phase |
 |---|---|---|
-| `src/solver/analog/sparse-solver.ts` | **Major rewrite** — persistent linked lists, real preorder, drop AMD | 0 |
+| `src/solver/analog/sparse-solver.ts` | **Major rewrite** — persistent linked lists, real preorder, drop AMD | 0 (Waves 0.1–0.3) |
+| `src/solver/analog/complex-sparse-solver.ts` | **Major rewrite** — persistent complex linked lists, real preorder, drop AMD, handle-based stampComplexElement, forceReorder lifecycle | 0 (Wave 0.4) |
+| `src/solver/analog/ac-analysis.ts` | **Moderate** — single `forceReorder()` call on sweep entry; handle-cache invalidation contract | 0 (Wave 0.4) |
+| `src/solver/analog/digital-pin-model.ts` | **Major rewrite** — load(ctx)/accept(ctx, voltage) surface, role tag on DigitalOutputPinModel, loaded getter, handle caching, delete legacy stamp methods | 6 (Wave 6.4) |
+| `src/solver/analog/behavioral-*.ts` and `src/solver/analog/behavioral-flipflop/*.ts` | **Moderate** — read `_pinLoading` from PropertyBag; delegate element `load()`/`accept()` to pin-model `load()`/`accept()`; drop hardcoded `loaded=true` literals | 6 (Waves 6.2.6, 6.4.3) |
+| `src/solver/analog/compiler.ts` | **Moderate** — shared `resolvePinLoading` helper; write `_pinLoading: Record<string, boolean>` into PropertyBag for every behavioural element | 6 (Wave 6.4.1) |
 | `src/solver/analog/ckt-context.ts` | **New file** — CKTCircuitContext god-object | 1 |
 | `src/solver/analog/load-context.ts` | **New file** — LoadContext interface | 6 |
 | `src/solver/analog/ckt-load.ts` | **New file** — cktLoad function (replaces stampAll) | 2 |
@@ -98,7 +150,7 @@ Phase 7 (verification — ngspice parity tests)
 
 ## Verification Criteria
 
-After all phases complete, the following 8 circuits must produce IEEE-754 identical per-NR-iteration node voltages compared to ngspice:
+After all phases complete, the following 9 circuits must produce IEEE-754 identical per-NR-iteration / per-frequency node voltages compared to ngspice:
 
 1. Resistive divider (DC-OP — linear stamp, 1 iteration)
 2. Diode + resistor (DC-OP — pnjlim, mode transitions)
@@ -108,10 +160,12 @@ After all phases complete, the following 8 circuits must produce IEEE-754 identi
 6. RLC oscillator (Transient — inductor integration, ringing without method switch)
 7. Diode bridge rectifier (Transient — multiple junctions, breakpoints)
 8. MOSFET inverter (DC-OP + Transient — fetlim, FET equations)
+9. **RLC bandpass filter, 10 Hz → 1 MHz log sweep (AC — complex solver, preorder on VS branch row, handle-cache reuse across frequencies)**
 
 Pass criteria per circuit:
 - **DC-OP:** Every NR iteration's rhsOld[] matches exactly (IEEE-754 bit-identical, absDelta === 0). Mode transitions match. Iteration count matches.
 - **Transient:** Every accepted timestep's dt, order, method match. Per-step NR iteration count matches. Node voltages match exactly (absDelta === 0).
+- **AC:** Every swept frequency's solution matches ngspice `.AC` output with `absDelta === 0` on both real and imaginary parts of every node voltage. Single reorder across the sweep (`solver.lastFactorUsedReorder === true` only on the first frequency).
 - **Convergence flow:** noncon, diagGmin, srcFact match at every iteration/step.
 - **Device state:** state0[] (per DEVICE_MAPPINGS slots) matches exactly at every NR iteration.
 

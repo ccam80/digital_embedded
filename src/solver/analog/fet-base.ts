@@ -17,7 +17,7 @@
  */
 
 import type { AnalogElementCore, IntegrationMethod, StatePoolRef } from "../../core/analog-types.js";
-import type { SparseSolver } from "./sparse-solver.js";
+import type { LoadContext } from "./load-context.js";
 import { stampG, stampRHS } from "./stamp-helpers.js";
 import { integrateCapacitor } from "./integration.js";
 import { defineStateSchema, applyInitialValues } from "./state-schema.js";
@@ -251,22 +251,43 @@ export abstract class AbstractFetElement implements AnalogElementCore {
   }
 
   /**
+   * Unified load() method per the Wave 6.1 interface.
+   *
+   * Orders per Appendix D3 (semiconductor): read voltages, voltage limiting,
+   * evaluate device equations, stamp conductance and RHS, then reactive
+   * companion (inline NIintegrate) if transient.
+   */
+  load(ctx: LoadContext): void {
+    // 1-6: update internal linearization from current NR iterate
+    this._updateOp(ctx);
+
+    // 7: stamp topology-constant + nonlinear Norton equivalent
+    this._stampLinear(ctx.solver);
+    this._stampNonlinear(ctx.solver);
+
+    // 8: reactive companion integration + stamp (if reactive & transient)
+    if (this.isReactive && ctx.isTransient) {
+      this._stampCompanion(ctx.dt, ctx.method, ctx.voltages, ctx.order, ctx.deltaOld);
+      this._stampReactiveCompanion(ctx.solver);
+    }
+  }
+
+  /**
    * Stamp the linear part: topology-constant entries only.
    *
    * Base FET has no topology-constant entries. Subclasses may override.
-   * Capacitance companion model entries are stamped in stampReactiveCompanion().
    */
-  stamp(_solver: SparseSolver): void {
+  protected _stampLinear(_solver: LoadContext["solver"]): void {
     // Base FET has no topology-constant entries. Subclasses may override.
   }
 
   /**
    * Stamp GS and GD gate capacitance companion model entries.
    *
-   * Called every NR iteration after stampNonlinear. Subclasses with additional
+   * Called from load() after _stampCompanion. Subclasses with additional
    * junction capacitances (e.g. MOSFET GB, DB, SB) override this and call super.
    */
-  stampReactiveCompanion(solver: SparseSolver): void {
+  protected _stampReactiveCompanion(solver: LoadContext["solver"]): void {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -295,7 +316,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     }
   }
 
-  stampNonlinear(solver: SparseSolver): void {
+  protected _stampNonlinear(solver: LoadContext["solver"]): void {
     const nodeG = this.gateNode;
     const effectiveD = this._swapped ? this.sourceNode : this.drainNode;
     const effectiveS = this._swapped ? this.drainNode : this.sourceNode;
@@ -322,7 +343,8 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     stampRHS(solver, effectiveS, nortonId);
   }
 
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+  protected _updateOp(ctx: LoadContext): void {
+    const voltages = ctx.voltages;
     const nodeD = this.drainNode;
     const nodeG = this.gateNode;
     const nodeS = this.sourceNode;
@@ -336,10 +358,13 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     const vDraw = this.polaritySign * (vD - vS);
 
     // Device-specific voltage limiting
+    this._pnjlimLimited = false;
     const limited = this.limitVoltages(this._vgs, this._vds, vGraw, vDraw);
     this._vgs = limited.vgs;
     this._vds = limited.vds;
     this._swapped = limited.swapped ?? false;
+
+    if (this._pnjlimLimited) ctx.noncon.value++;
 
     // Recompute operating point at limited voltages
     this._ids = this.computeIds(this._vgs, this._vds);
@@ -378,11 +403,14 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     return result;
   }
 
-  checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
-    // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+  checkConvergence(ctx: LoadContext): boolean {
+    // ngspice icheck gate: if voltage was limited in load(),
     // declare non-convergence immediately (MOSload/JFETload sets CKTnoncon++)
     if (this._pnjlimLimited) return false;
 
+    const voltages = ctx.voltages;
+    const reltol = ctx.reltol;
+    const abstol = ctx.iabstol;
     const nodeD = this.drainNode;
     const nodeG = this.gateNode;
     const nodeS = this.sourceNode;
@@ -448,7 +476,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     return Math.abs(cdhat - cdFinal) <= tolD && Math.abs(cbhat - (cbsI + cbdI)) <= tolB;
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
+  protected _stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
     // Compute vgs/vgd freshly from current node voltages (ngspice mos1load.c
     // single-pass semantics). Voltage limiting is a mid-NR stabilizer applied
     // in updateOperatingPoint; at step boundaries / post-convergence,
@@ -522,7 +550,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     }
   }
 
-  updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
+  protected _updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;

@@ -25,7 +25,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -343,7 +343,8 @@ function createSwitchDTAnalogElement(
     isNonlinear: false,
     isReactive: false,
 
-    stamp(solver: SparseSolver): void {
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
       const Gon = 1 / ron;
       const Goff = 1 / roff;
       if (effectivelyClosed) {

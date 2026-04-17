@@ -173,7 +173,11 @@ export class CoupledInductorPair {
    *   branch2 row: KVL incidence for nodes2, cross term −g12 at (b2,b1),
    *                self term −g22 at (b2,b2), RHS hist2
    *
-   * @param solver   - MNA sparse solver
+   * Callers (Transformer / TappedTransformer) pass `ctx.solver` extracted from
+   * their LoadContext — the same `SparseSolver` instance they previously passed
+   * directly. No signature change is required at the helper level.
+   *
+   * @param solver   - MNA sparse solver (callers pass ctx.solver)
    * @param branch1  - Absolute solver row for inductor 1 branch current
    * @param branch2  - Absolute solver row for inductor 2 branch current
    * @param nodes1   - [n1+, n1−] node IDs (0 = ground) for inductor 1

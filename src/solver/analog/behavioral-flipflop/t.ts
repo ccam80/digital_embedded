@@ -2,8 +2,7 @@
  * Behavioral analog factory for edge-triggered T flip-flops.
  */
 
-import type { SparseSolver } from "../sparse-solver.js";
-import type { AnalogElementCore, IntegrationMethod } from "../element.js";
+import type { AnalogElementCore, LoadContext } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
@@ -22,6 +21,13 @@ import { FALLBACK_SPEC, getPinSpecs, makeInputPin, makeOutputPin } from "./share
  *
  * Without T enable input (withEnable=false):
  *   Toggle Q on every rising clock edge.
+ *
+ * Unified interface:
+ *   load()   — stamps input loading, output Norton equivalents from the
+ *              currently latched Q state, and pin-capacitance companions
+ *              during transient.
+ *   accept() — rising-edge detection and conditional toggle, plus pin
+ *              companion state update after each accepted timestep.
  */
 export class BehavioralTFlipflopElement implements AnalogElementCore {
   private readonly _tPin: DigitalInputPinModel | null;
@@ -32,9 +38,6 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
   private _latchedQ = false;
   private _prevClockVoltage = 0;
   private readonly _vIH: number;
-
-  private _solver: SparseSolver | null = null;
-  private _cachedVoltages: Float64Array = new Float64Array(0);
 
   private readonly _pinModelsByLabel: ReadonlyMap<string, DigitalInputPinModel | DigitalOutputPinModel>;
 
@@ -65,37 +68,34 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
     delegatePinSetParam(this._pinModelsByLabel, key, value);
   }
 
-  stamp(solver: SparseSolver): void {
-    this._solver = solver;
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
+
     if (this._tPin !== null) this._tPin.stamp(solver);
     this._clockPin.stamp(solver);
-  }
 
-  stampNonlinear(solver: SparseSolver): void {
-    this._solver = solver;
     this._qPin.setLogicLevel(this._latchedQ);
     this._qBarPin.setLogicLevel(!this._latchedQ);
     this._qPin.stampOutput(solver);
     this._qBarPin.stampOutput(solver);
-  }
 
-  updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-    if (this._cachedVoltages.length !== voltages.length) {
-      this._cachedVoltages = new Float64Array(voltages.length);
+    if (ctx.isTransient && ctx.dt > 0) {
+      if (this._tPin !== null) this._tPin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._clockPin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._qPin.stampCompanion(solver, ctx.dt, ctx.method);
+      this._qBarPin.stampCompanion(solver, ctx.dt, ctx.method);
     }
-    this._cachedVoltages.set(voltages);
   }
 
-  stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array): void {
-    const solver = this._solver;
-    if (solver === null) return;
-    if (this._tPin !== null) this._tPin.stampCompanion(solver, dt, method);
-    this._clockPin.stampCompanion(solver, dt, method);
-    this._qPin.stampCompanion(solver, dt, method);
-    this._qBarPin.stampCompanion(solver, dt, method);
-  }
+  /**
+   * Rising-edge detection, conditional toggle, and companion state update —
+   * called once per accepted timestep with the accepted solution voltages.
+   */
+  accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+    const voltages = ctx.voltages;
+    const dt = ctx.dt;
+    const method = ctx.method;
 
-  updateCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
     const risingEdge =
@@ -116,12 +116,14 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
 
     this._prevClockVoltage = currentClockV;
 
-    if (this._tPin !== null) {
-      this._tPin.updateCompanion(dt, method, readMnaVoltage(this._tPin.nodeId, voltages));
+    if (dt > 0) {
+      if (this._tPin !== null) {
+        this._tPin.updateCompanion(dt, method, readMnaVoltage(this._tPin.nodeId, voltages));
+      }
+      this._clockPin.updateCompanion(dt, method, currentClockV);
+      this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
+      this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
     }
-    this._clockPin.updateCompanion(dt, method, currentClockV);
-    this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
-    this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -136,10 +138,6 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
     result.push((vQ - this._qPin.currentVoltage) / this._qPin.rOut);
     result.push((vQBar - this._qBarPin.currentVoltage) / this._qBarPin.rOut);
     return result;
-  }
-
-  updateState(_dt: number, _voltages: Float64Array): void {
-    // intentionally empty
   }
 }
 

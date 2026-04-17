@@ -28,11 +28,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
@@ -468,33 +466,10 @@ export function createDiodeElement(
       s3 = newS3;
     },
 
-    stamp(solver: SparseSolver): void {
-      // Stamp series resistance RS between anode pin and internal junction node
-      if (params.RS > 0 && nodeJunction !== nodeAnode) {
-        const gRS = 1 / params.RS;
-        stampG(solver, nodeAnode, nodeAnode, gRS);
-        stampG(solver, nodeAnode, nodeJunction, -gRS);
-        stampG(solver, nodeJunction, nodeAnode, -gRS);
-        stampG(solver, nodeJunction, nodeJunction, gRS);
-      }
-      // Capacitance companion model entries are stamped in stampReactiveCompanion().
-    },
+    load(ctx: LoadContext): void {
+      const voltages = ctx.voltages;
 
-    stampNonlinear(solver: SparseSolver): void {
-      const geq = s0[base + SLOT_GEQ];
-      const ieq = s0[base + SLOT_IEQ];
-      // Stamp companion model: conductance geq in parallel, Norton offset ieq
-      // Junction is between nodeJunction and nodeCathode
-      stampG(solver, nodeJunction, nodeJunction, geq);
-      stampG(solver, nodeJunction, nodeCathode, -geq);
-      stampG(solver, nodeCathode, nodeJunction, -geq);
-      stampG(solver, nodeCathode, nodeCathode, geq);
-      // RHS: Norton current source
-      stampRHS(solver, nodeJunction, -ieq);
-      stampRHS(solver, nodeCathode, ieq);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): boolean {
+      // initPred path: adopt predictor values from previous accepted step
       if (pool.initMode === "initPred") {
         s0[base + SLOT_VD]  = s1[base + SLOT_VD];
         s0[base + SLOT_ID]  = s1[base + SLOT_ID];
@@ -528,33 +503,25 @@ export function createDiodeElement(
         vdtemp = reflResult.value;
         pnjlimLimited = reflResult.limited;
         vdLimited = -(vdtemp + tBV);
-        if (limitingCollector) {
-          limitingCollector.push({
-            elementIndex: (this as any).elementIndex ?? -1,
-            label: (this as any).label ?? "",
-            junction: "AK",
-            limitType: "pnjlim",
-            vBefore: vdRaw,
-            vAfter: vdLimited,
-            wasLimited: pnjlimLimited,
-          });
-        }
       } else {
         // Normal forward/reverse limiting: dioload.c:189-191
         const vdResult = pnjlim(vdRaw, vdOld, nVt, tVcrit);
         vdLimited = vdResult.value;
         pnjlimLimited = vdResult.limited;
-        if (limitingCollector) {
-          limitingCollector.push({
-            elementIndex: (this as any).elementIndex ?? -1,
-            label: (this as any).label ?? "",
-            junction: "AK",
-            limitType: "pnjlim",
-            vBefore: vdRaw,
-            vAfter: vdLimited,
-            wasLimited: pnjlimLimited,
-          });
-        }
+      }
+
+      if (pnjlimLimited) ctx.noncon.value++;
+
+      if (ctx.limitingCollector) {
+        ctx.limitingCollector.push({
+          elementIndex: (this as any).elementIndex ?? -1,
+          label: (this as any).label ?? "",
+          junction: "AK",
+          limitType: "pnjlim",
+          vBefore: vdRaw,
+          vAfter: vdLimited,
+          wasLimited: pnjlimLimited,
+        });
       }
 
       s0[base + SLOT_VD] = vdLimited;
@@ -580,17 +547,84 @@ export function createDiodeElement(
 
       s0[base + SLOT_ID] = id;
       s0[base + SLOT_GEQ] = gd;
-      s0[base + SLOT_IEQ] = id - gd * vdLimited;
-      return pnjlimLimited;
+      const ieq = id - gd * vdLimited;
+      s0[base + SLOT_IEQ] = ieq;
+
+      const solver = ctx.solver;
+
+      // Stamp series resistance RS between anode pin and internal junction node
+      if (params.RS > 0 && nodeJunction !== nodeAnode) {
+        const gRS = 1 / params.RS;
+        stampG(solver, nodeAnode, nodeAnode, gRS);
+        stampG(solver, nodeAnode, nodeJunction, -gRS);
+        stampG(solver, nodeJunction, nodeAnode, -gRS);
+        stampG(solver, nodeJunction, nodeJunction, gRS);
+      }
+
+      // Stamp nonlinear companion model: conductance gd in parallel, Norton offset ieq
+      // Junction is between nodeJunction and nodeCathode
+      stampG(solver, nodeJunction, nodeJunction, gd);
+      stampG(solver, nodeJunction, nodeCathode, -gd);
+      stampG(solver, nodeCathode, nodeJunction, -gd);
+      stampG(solver, nodeCathode, nodeCathode, gd);
+      stampRHS(solver, nodeJunction, -ieq);
+      stampRHS(solver, nodeCathode, ieq);
+
+      // Reactive companion: junction capacitance + transit-time diffusion cap
+      if (hasCapacitance && ctx.isTransient) {
+        const dt = ctx.dt;
+        const order = ctx.order;
+        const method = ctx.method;
+        const deltaOld = ctx.deltaOld;
+
+        // Depletion + transit-time capacitance at current operating point
+        const Cj = computeJunctionCapacitance(vdLimited, tCJO, tVJ, params.M, params.FC);
+        const Ct = params.TT * gd;  // dioload.c:338: diffcap = TT * gdb
+        const Ctotal = Cj + Ct;
+
+        const q0 = computeJunctionCharge(vdLimited, tCJO, tVJ, params.M, params.FC, params.TT, idRaw);
+        let q1 = s1[base + SLOT_Q];
+        const q2 = s2[base + SLOT_Q];
+        const ccapPrev = s1[base + SLOT_CCAP];
+        const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+
+        if (pool.initMode === "initTran") {
+          // dioload.c:391-393: MODEINITTRAN copies q0→q1 so first-step history matches
+          s1[base + SLOT_Q] = q0;
+          q1 = q0;
+        }
+
+        const { geq: capGeq, ceq: capIeq, ccap } = integrateCapacitor(Ctotal, vdLimited, q0, q1, q2, dt, h1, order, method, ccapPrev);
+        s0[base + SLOT_CAP_GEQ] = capGeq;
+        s0[base + SLOT_CAP_IEQ] = capIeq;
+        s0[base + SLOT_V] = vdLimited;
+        s0[base + SLOT_Q] = q0;
+        s0[base + SLOT_CCAP] = ccap;
+
+        if (pool.initMode === "initTran") {
+          // dioload.c:399-402: MODEINITTRAN copies ccap0→ccap1
+          s1[base + SLOT_CCAP] = ccap;
+        }
+
+        if (capGeq !== 0 || capIeq !== 0) {
+          stampG(solver, nodeJunction, nodeJunction, capGeq);
+          stampG(solver, nodeJunction, nodeCathode, -capGeq);
+          stampG(solver, nodeCathode, nodeJunction, -capGeq);
+          stampG(solver, nodeCathode, nodeCathode, capGeq);
+          stampRHS(solver, nodeJunction, -capIeq);
+          stampRHS(solver, nodeCathode, capIeq);
+        }
+      }
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+    checkConvergence(ctx: LoadContext): boolean {
       if (params.OFF && pool.initMode === "initFix") return true;
 
-      // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+      // ngspice icheck gate: if voltage was limited in load(),
       // declare non-convergence immediately (DIOload sets CKTnoncon++)
       if (pnjlimLimited) return false;
 
+      const voltages = ctx.voltages;
       const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
@@ -600,7 +634,7 @@ export function createDiodeElement(
       const id = s0[base + SLOT_ID];
       const gd = s0[base + SLOT_GEQ];
       const cdhat = id + gd * delvd;
-      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + abstol;
+      const tol = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + ctx.iabstol;
       return Math.abs(cdhat - id) <= tol;
     },
 
@@ -629,74 +663,8 @@ export function createDiodeElement(
     },
   };
 
-  // Attach stampCompanion only when junction capacitance is present
+  // Attach getLteTimestep only when junction capacitance is present
   if (hasCapacitance) {
-    (element as unknown as { stampCompanion: AnalogElementCore["stampCompanion"] }).stampCompanion = function (
-      dt: number,
-      method: IntegrationMethod,
-      _voltages: Float64Array,
-      order: number,
-      deltaOld: readonly number[],
-    ): void {
-      // Compute vd freshly from current node voltages and apply pnjlim
-      // (dioload.c:180-191) — single-pass semantics, never read a cross-phase
-      // cached slot.
-      const va_sc = nodeJunction > 0 ? _voltages[nodeJunction - 1] : 0;
-      const vc_sc = nodeCathode > 0 ? _voltages[nodeCathode - 1] : 0;
-      const vdRaw_sc = va_sc - vc_sc;
-      const vtebrk_sc = params.NBV * vt;
-      const vdOld_sc = s0[base + SLOT_VD];
-      let vNow: number;
-      if (tBV < Infinity && vdRaw_sc < Math.min(0, -tBV + 10 * vtebrk_sc)) {
-        const vdtemp_sc = -(vdRaw_sc + tBV);
-        const vdtempOld_sc = -(vdOld_sc + tBV);
-        const reflRes_sc = pnjlim(vdtemp_sc, vdtempOld_sc, vtebrk_sc, tVcrit);
-        vNow = -(reflRes_sc.value + tBV);
-      } else {
-        vNow = pnjlim(vdRaw_sc, vdOld_sc, nVt, tVcrit).value;
-      }
-      s0[base + SLOT_VD] = vNow;
-
-      // Depletion + transit-time capacitance at current operating point
-      const Cj = computeJunctionCapacitance(vNow, tCJO, tVJ, params.M, params.FC);
-      const { gd: gDiode, id: idRaw } = computeDiodeIV(vNow, tIS, nVt, tBV, params.NBV * vt);
-      const Ct = params.TT * gDiode;  // dioload.c:338: diffcap = TT * gdb
-      const Ctotal = Cj + Ct;
-
-      const q0 = computeJunctionCharge(vNow, tCJO, tVJ, params.M, params.FC, params.TT, idRaw);
-      const q1 = s1[base + SLOT_Q];
-      const q2 = s2[base + SLOT_Q];
-      const ccapPrev = s1[base + SLOT_CCAP];
-      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      if (pool.initMode === "initTran") {
-        s1[base + SLOT_Q] = q0;  // q0→q1 copy (dioload.c:391-393)
-      }
-      const { geq, ceq, ccap } = integrateCapacitor(Ctotal, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
-      s0[base + SLOT_CAP_GEQ] = geq;
-      s0[base + SLOT_CAP_IEQ] = ceq;
-      s0[base + SLOT_V] = vNow;
-      s0[base + SLOT_Q] = q0;
-      s0[base + SLOT_CCAP] = ccap;
-      if (pool.initMode === "initTran") {
-        s1[base + SLOT_CCAP] = s0[base + SLOT_CCAP];  // ccap0→ccap1 copy (dioload.c:399-402)
-      }
-    };
-
-    (element as unknown as { stampReactiveCompanion: AnalogElementCore["stampReactiveCompanion"] }).stampReactiveCompanion = function (
-      solver: SparseSolver,
-    ): void {
-      const capGeq = s0[base + SLOT_CAP_GEQ];
-      const capIeq = s0[base + SLOT_CAP_IEQ];
-      if (capGeq !== 0 || capIeq !== 0) {
-        stampG(solver, nodeJunction, nodeJunction, capGeq);
-        stampG(solver, nodeJunction, nodeCathode, -capGeq);
-        stampG(solver, nodeCathode, nodeJunction, -capGeq);
-        stampG(solver, nodeCathode, nodeCathode, capGeq);
-        stampRHS(solver, nodeJunction, -capIeq);
-        stampRHS(solver, nodeCathode, capIeq);
-      }
-    };
-
     (element as unknown as { getLteTimestep: (dt: number, deltaOld: readonly number[], order: number, method: IntegrationMethod, lteParams: LteParams) => number }).getLteTimestep = function (
       dt: number,
       deltaOld: readonly number[],
@@ -711,29 +679,6 @@ export function createDiodeElement(
       const ccap0 = s0[base + SLOT_CCAP];
       const ccap1 = s1[base + SLOT_CCAP];
       return cktTerr(dt, deltaOld, order, method, _q0, _q1, _q2, _q3, ccap0, ccap1, lteParams);
-    };
-
-    (element as unknown as { updateChargeFlux: (v: Float64Array, dt: number, method: string, order: number, deltaOld: readonly number[]) => void }).updateChargeFlux = function(_voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
-      // Compute vd freshly from current node voltages + pnjlim (dioload.c:180-191,
-      // 308-341). Single-pass semantics — never read a cross-phase cached slot.
-      const va_uc = nodeJunction > 0 ? _voltages[nodeJunction - 1] : 0;
-      const vc_uc = nodeCathode > 0 ? _voltages[nodeCathode - 1] : 0;
-      const vdRaw_uc = va_uc - vc_uc;
-      const vtebrkLim_uc = params.NBV * vt;
-      const vdOld_uc = s0[base + SLOT_VD];
-      let vd: number;
-      if (tBV < Infinity && vdRaw_uc < Math.min(0, -tBV + 10 * vtebrkLim_uc)) {
-        const vdtemp_uc = -(vdRaw_uc + tBV);
-        const vdtempOld_uc = -(vdOld_uc + tBV);
-        const reflRes_uc = pnjlim(vdtemp_uc, vdtempOld_uc, vtebrkLim_uc, tVcrit);
-        vd = -(reflRes_uc.value + tBV);
-      } else {
-        vd = pnjlim(vdRaw_uc, vdOld_uc, nVt, tVcrit).value;
-      }
-      s0[base + SLOT_VD] = vd;
-      const { id: idRaw } = computeDiodeIV(vd, tIS, nVt, tBV, params.NBV * vt);
-      s0[base + SLOT_Q] = computeJunctionCharge(vd, tCJO, tVJ, params.M, params.FC, params.TT, idRaw);
-      s0[base + SLOT_V] = vd;
     };
   }
 

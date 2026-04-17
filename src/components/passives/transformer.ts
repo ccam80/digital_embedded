@@ -27,8 +27,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { CoupledInductorPair } from "../../solver/analog/coupled-inductor.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -284,13 +283,28 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     applyInitialValues(TRANSFORMER_SCHEMA, { states: [this.s0, this.s1, this.s2, this.s3], state0: this.s0, state1: this.s1, state2: this.s2, state3: this.s3, totalSlots: this.s0.length, tranStep: 0 } as StatePoolRef, this._base, {});
   }
 
-  stamp(solver: SparseSolver): void {
+  /**
+   * Unified load() — two-winding coupled inductor transformer.
+   *
+   * Always stamps: winding resistances, branch B/C incidence.
+   * Reactive: inline NIintegrate on flux linkages φ1 = L1·I1 + M·I2,
+   *                                          φ2 = L2·I2 + M·I1.
+   * Under NIintegrate (ngspice niinteg.c), the branch equation is:
+   *   V_1 = dφ_1/dt ⇒ ag[0]·φ_1(n) + Σ_{j≥1} ag[j]·φ_1(n-j) = V_1(n)
+   * substituting φ_1(n) = L1·I1(n) + M·I2(n):
+   *   ag[0]·L1·I1 + ag[0]·M·I2 + hist_φ1 = V_1
+   *   ⇒ branch row: V(P1)−V(P2) − (ag[0]·L1)·I1 − (ag[0]·M)·I2 = hist_φ1
+   */
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
     const [p1, p2, s1, s2] = this.pinNodeIds;
     const b1 = this.branchIndex;
     const b2 = this._branch2;
+    const L1 = this._pair.l1;
+    const L2 = this._pair.l2;
+    const M = this._pair.m;
 
-    // Primary winding resistance: series resistance modelled as a conductance
-    // between P1 and P2 in the node block (Norton parallel equivalent).
+    // Winding resistances (topology-constant, always stamped).
     if (this._rPri > 0) {
       const gPri = 1 / this._rPri;
       if (p1 !== 0) solver.stamp(p1 - 1, p1 - 1, gPri);
@@ -300,8 +314,6 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
         solver.stamp(p2 - 1, p1 - 1, -gPri);
       }
     }
-
-    // Secondary winding resistance: series resistance in node block.
     if (this._rSec > 0) {
       const gSec = 1 / this._rSec;
       if (s1 !== 0) solver.stamp(s1 - 1, s1 - 1, gSec);
@@ -312,122 +324,96 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
       }
     }
 
-    // B sub-matrix: branch current incidence into KCL node equations.
-    // Branch current I1 (primary) flows into P1 and out of P2.
-    // Branch current I2 (secondary) flows into S1 and out of S2.
+    // B sub-matrix: branch current incidence in KCL node rows.
     if (p1 !== 0) solver.stamp(p1 - 1, b1, 1);
     if (p2 !== 0) solver.stamp(p2 - 1, b1, -1);
     if (s1 !== 0) solver.stamp(s1 - 1, b2, 1);
     if (s2 !== 0) solver.stamp(s2 - 1, b2, -1);
 
-    // C sub-matrix: voltage incidence (topology-constant ±1 entries).
+    // C sub-matrix: KVL voltage incidence (topology-constant ±1 entries).
     if (p1 !== 0) solver.stamp(b1, p1 - 1, 1);
     if (p2 !== 0) solver.stamp(b1, p2 - 1, -1);
     if (s1 !== 0) solver.stamp(b2, s1 - 1, 1);
     if (s2 !== 0) solver.stamp(b2, s2 - 1, -1);
-  }
 
-  stampReactiveCompanion(solver: SparseSolver): void {
-    const b1 = this.branchIndex;
-    const b2 = this._branch2;
-    const g11   = this.s0[this._base + SLOT_G11];
-    const g22   = this.s0[this._base + SLOT_G22];
-    const g12   = this.s0[this._base + SLOT_G12];
-    const hist1 = this.s0[this._base + SLOT_HIST1];
-    const hist2 = this.s0[this._base + SLOT_HIST2];
+    if (!ctx.isTransient && !ctx.isDcOp) return;
 
-    // Branch rows: companion + winding resistance on diagonal, mutual on off-diagonal.
-    // Winding resistances appear here combined with the companion conductance,
-    // providing the RL damping needed for DC steady-state convergence.
-    //
-    // Primary: -(g11 + R_pri)·I1 - g12·I2 = hist1
-    solver.stamp(b1, b1, -(g11 + this._rPri));
-    solver.stamp(b1, b2, -g12);
-    solver.stampRHS(b1, hist1);
-
-    // Secondary: -g12·I1 - (g22 + R_sec)·I2 = hist2
-    solver.stamp(b2, b1, -g12);
-    solver.stamp(b2, b2, -(g22 + this._rSec));
-    solver.stampRHS(b2, hist2);
-  }
-
-  stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-    const [p1, p2, s1, s2] = this.pinNodeIds;
-    const b1 = this.branchIndex;
-    const b2 = this._branch2;
-
-    const L1 = this._pair.l1;
-    const L2 = this._pair.l2;
-    const M = this._pair.m;
-
-    // Read the accepted solution from the previous timestep.
+    const voltages = ctx.voltages;
     const i1Now = voltages[b1];
     const i2Now = voltages[b2];
-    const vp1 = p1 > 0 ? voltages[p1 - 1] : 0;
-    const vp2 = p2 > 0 ? voltages[p2 - 1] : 0;
-    const vs1 = s1 > 0 ? voltages[s1 - 1] : 0;
-    const vs2 = s2 > 0 ? voltages[s2 - 1] : 0;
-    const v1Now = vp1 - vp2;
-    const v2Now = vs1 - vs2;
 
-    const s = this.s0;
-    const s1r = this.s1;
-    const base = this._base;
+    if (ctx.isTransient) {
+      const ag = ctx.ag;
+      const base = this._base;
 
-    switch (method) {
-      case "bdf1": {
-        const g11 = L1 / dt;
-        const g22 = L2 / dt;
-        const g12 = M / dt;
-        s[base + SLOT_G11]   = g11;
-        s[base + SLOT_G22]   = g22;
-        s[base + SLOT_G12]   = g12;
-        s[base + SLOT_HIST1] = -g11 * i1Now - g12 * i2Now;
-        s[base + SLOT_HIST2] = -g22 * i2Now - g12 * i1Now;
-        break;
+      // Compute current-step flux linkages from branch currents.
+      if (ctx.initMode === "initPred") {
+        this.s0[base + SLOT_PHI1] = this.s1[base + SLOT_PHI1];
+        this.s0[base + SLOT_PHI2] = this.s1[base + SLOT_PHI2];
+      } else {
+        this.s0[base + SLOT_PHI1] = L1 * i1Now + M * i2Now;
+        this.s0[base + SLOT_PHI2] = L2 * i2Now + M * i1Now;
+        if (ctx.initMode === "initTran") {
+          this.s1[base + SLOT_PHI1] = this.s0[base + SLOT_PHI1];
+          this.s1[base + SLOT_PHI2] = this.s0[base + SLOT_PHI2];
+        }
       }
-      case "trapezoidal": {
-        const g11 = (2 * L1) / dt;
-        const g22 = (2 * L2) / dt;
-        const g12 = (2 * M) / dt;
-        s[base + SLOT_G11]   = g11;
-        s[base + SLOT_G22]   = g22;
-        s[base + SLOT_G12]   = g12;
-        s[base + SLOT_HIST1] = -g11 * i1Now - g12 * i2Now - v1Now;
-        s[base + SLOT_HIST2] = -g22 * i2Now - g12 * i1Now - v2Now;
-        break;
+
+      const phi1_0 = this.s0[base + SLOT_PHI1];
+      const phi2_0 = this.s0[base + SLOT_PHI2];
+      const phi1_1 = this.s1[base + SLOT_PHI1];
+      const phi2_1 = this.s1[base + SLOT_PHI2];
+
+      let ccap1: number;
+      let ccap2: number;
+      if (ctx.order >= 2 && ag.length > 2) {
+        const phi1_2 = this.s2[base + SLOT_PHI1];
+        const phi2_2 = this.s2[base + SLOT_PHI2];
+        ccap1 = ag[0] * phi1_0 + ag[1] * phi1_1 + ag[2] * phi1_2;
+        ccap2 = ag[0] * phi2_0 + ag[1] * phi2_1 + ag[2] * phi2_2;
+      } else {
+        ccap1 = ag[0] * phi1_0 + ag[1] * phi1_1;
+        ccap2 = ag[0] * phi2_0 + ag[1] * phi2_1;
       }
-      case "bdf2": {
-        const g11 = (3 * L1) / (2 * dt);
-        const g22 = (3 * L2) / (2 * dt);
-        const g12 = (3 * M) / (2 * dt);
-        s[base + SLOT_G11] = g11;
-        s[base + SLOT_G22] = g22;
-        s[base + SLOT_G12] = g12;
-        // Read previous step's currents from s1 (rotated history)
-        const i1Hist = (4 / 3) * i1Now - (1 / 3) * s1r[base + SLOT_I1];
-        const i2Hist = (4 / 3) * i2Now - (1 / 3) * s1r[base + SLOT_I2];
-        s[base + SLOT_HIST1] = -g11 * i1Hist - g12 * i2Hist;
-        s[base + SLOT_HIST2] = -g22 * i2Hist - g12 * i1Hist;
-        break;
-      }
+
+      const g11 = ag[0] * L1;
+      const g22 = ag[0] * L2;
+      const g12 = ag[0] * M;
+      const hist1 = ccap1 - ag[0] * phi1_0;
+      const hist2 = ccap2 - ag[0] * phi2_0;
+
+      // Branch equations:
+      //   V(P1) − V(P2) − g11·I1 − g12·I2 = hist1
+      //   V(S1) − V(S2) − g12·I1 − g22·I2 = hist2
+      solver.stamp(b1, b1, -g11);
+      solver.stamp(b1, b2, -g12);
+      solver.stampRHS(b1, hist1);
+      solver.stamp(b2, b1, -g12);
+      solver.stamp(b2, b2, -g22);
+      solver.stampRHS(b2, hist2);
+
+      // Cache for diagnostics / LTE.
+      this.s0[base + SLOT_G11]   = g11;
+      this.s0[base + SLOT_G22]   = g22;
+      this.s0[base + SLOT_G12]   = g12;
+      this.s0[base + SLOT_HIST1] = hist1;
+      this.s0[base + SLOT_HIST2] = hist2;
+      this.s0[base + SLOT_I1]    = i1Now;
+      this.s0[base + SLOT_I2]    = i2Now;
+    } else {
+      // DC operating point: short-circuit branches.
+      // Branch incidence already stamped; currents determined by V(P1)=V(P2), V(S1)=V(S2).
+      const base = this._base;
+      this.s0[base + SLOT_PHI1] = L1 * i1Now + M * i2Now;
+      this.s0[base + SLOT_PHI2] = L2 * i2Now + M * i1Now;
+      this.s0[base + SLOT_I1]   = i1Now;
+      this.s0[base + SLOT_I2]   = i2Now;
+      this.s0[base + SLOT_G11]  = 0;
+      this.s0[base + SLOT_G22]  = 0;
+      this.s0[base + SLOT_G12]  = 0;
+      this.s0[base + SLOT_HIST1] = 0;
+      this.s0[base + SLOT_HIST2] = 0;
     }
-
-    // Write current step's values into s0 (no manual history shifting)
-    s[base + SLOT_I1]   = i1Now;
-    s[base + SLOT_I2]   = i2Now;
-  }
-
-  updateChargeFlux(voltages: Float64Array, _dt: number, _method: IntegrationMethod, _order: number, _deltaOld: readonly number[]): void {
-    const b1 = this.branchIndex;
-    const b2 = this._branch2;
-    const L1 = this._pair.l1;
-    const L2 = this._pair.l2;
-    const M = this._pair.m;
-    const i1Now = voltages[b1];
-    const i2Now = voltages[b2];
-    this.s0[this._base + SLOT_PHI1] = L1 * i1Now + M * i2Now;
-    this.s0[this._base + SLOT_PHI2] = L2 * i2Now + M * i1Now;
   }
 
   getLteTimestep(

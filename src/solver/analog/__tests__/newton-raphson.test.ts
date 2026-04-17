@@ -92,9 +92,10 @@ describe("NR", () => {
 
   it("pnjlim_passes_small_step", () => {
     // Small step within 2*Vt: 0.60V → 0.65V, Vt=0.026, vcrit=0.6
-    // |0.65 - 0.60| = 0.05, 2*vt = 0.052, so 0.05 <= 0.052 → no limiting
+    // |0.65 - 0.60| = 0.05, 2*vt = 0.052, so 0.05 <= 0.052 → no limiting.
+    // When limited===false, pnjlim returns vnew unchanged — bit-identical.
     const result = pnjlim(0.65, 0.60, 0.026, 0.6);
-    expect(result.value).toBeCloseTo(0.65, 10);
+    expect(result.value).toBe(0.65);
     expect(result.limited).toBe(false);
   });
 
@@ -110,10 +111,12 @@ describe("NR", () => {
     expect(result).toBeLessThanOrEqual(1.0 + 0.7 + 4); // capped at vto+4
     expect(result).toBeGreaterThan(1.0);
 
-    // Deep-on zone: large enough step triggers vtsthi clamp
-    // vtsthi = |2*(5.0-0.7)|+2 = 10.6, delv=15 > 10.6 → clamp to 5+10.6=15.6
+    // Deep-on zone: large enough step triggers vtsthi clamp.
+    // ngspice DEVfetlim formula: vtsthi = |2*(vold-vto)|+2 = |2*(5.0-0.7)|+2
+    //                            vnew = vold + vtsthi when delv > vtsthi
     const result3 = fetlim(20.0, 5.0, 0.7);
-    expect(result3).toBeCloseTo(5.0 + (Math.abs(2 * (5.0 - 0.7)) + 2), 10);
+    const vtsthi3 = Math.abs(2 * (5.0 - 0.7)) + 2;
+    expect(result3).toBe(5.0 + vtsthi3);
   });
 
   // ---------------------------------------------------------------------------
@@ -382,7 +385,6 @@ describe("NR", () => {
   // ---------------------------------------------------------------------------
 
   it("applyNodesetsAndICs_stamps_nodeset_in_initJct_mode", () => {
-    const G_NODESET = 1e10;
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map([[1, 2.5]]);
@@ -390,11 +392,10 @@ describe("NR", () => {
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initJct");
     expect(solver.elementCount).toBe(1);
     const rhs = solver.getRhsSnapshot();
-    expect(rhs[1]).toBeCloseTo(G_NODESET * 2.5, 0);
+    expect(rhs[1]).toBe(2.5e10); // 1e10 (G_NODESET) * 2.5 — exact in IEEE-754
   });
 
   it("applyNodesetsAndICs_stamps_nodeset_in_initFix_mode", () => {
-    const G_NODESET = 1e10;
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map([[2, 1.0]]);
@@ -402,7 +403,7 @@ describe("NR", () => {
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFix");
     expect(solver.elementCount).toBe(1);
     const rhs = solver.getRhsSnapshot();
-    expect(rhs[2]).toBeCloseTo(G_NODESET * 1.0, 0);
+    expect(rhs[2]).toBe(1e10); // 1e10 (G_NODESET) * 1.0 — exact
   });
 
   it("applyNodesetsAndICs_skips_nodesets_in_initFloat_mode", () => {
@@ -417,7 +418,6 @@ describe("NR", () => {
   });
 
   it("applyNodesetsAndICs_always_stamps_ics_regardless_of_mode", () => {
-    const G_NODESET = 1e10;
     const solver = new SparseSolver();
     solver.beginAssembly(3);
     const nodesets = new Map<number, number>();
@@ -425,7 +425,7 @@ describe("NR", () => {
     applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFloat");
     expect(solver.elementCount).toBe(1);
     const rhs = solver.getRhsSnapshot();
-    expect(rhs[1]).toBeCloseTo(G_NODESET * 1.5, 0);
+    expect(rhs[1]).toBe(1.5e10); // 1e10 (G_NODESET) * 1.5 — exact
   });
 
   it("applyNodesetsAndICs_scales_by_srcFact", () => {
@@ -437,8 +437,8 @@ describe("NR", () => {
     applyNodesetsAndICs(solver, nodesets, ics, 0.5, "initJct");
     expect(solver.elementCount).toBe(2);
     const rhs = solver.getRhsSnapshot();
-    expect(rhs[1]).toBeCloseTo(G_NODESET * 2.0 * 0.5, 0);
-    expect(rhs[2]).toBeCloseTo(G_NODESET * 1.0 * 0.5, 0);
+    expect(rhs[1]).toBe(1e10); // 1e10 (G_NODESET) * 2.0 * 0.5 — exact
+    expect(rhs[2]).toBe(5e9);  // 1e10 (G_NODESET) * 1.0 * 0.5 — exact
   });
 });
 
@@ -567,9 +567,13 @@ describe("ipass hadNodeset gate", () => {
     newtonRaphson(ctx);
 
     expect(ctx.nrResult.converged).toBe(true);
-    // With no nodesets, ipass gate never fires — convergence happens without extra iteration
-    // convergeIter - initFloatBeginIter should be minimal (0 or 1 extra NR steps, not an ipass-forced extra)
     expect(ctx.hadNodeset).toBe(false);
+    // With a primed diode junction and no nodesets, initFloat begins at a
+    // converged operating point: noncon===0 on the very first initFloat
+    // iteration, and without the ipass gate firing convergence must be
+    // observed on that same iteration.
+    expect(initFloatBeginIter).toBeGreaterThanOrEqual(0);
+    expect(convergeIter).toBe(initFloatBeginIter);
   });
 
   it("ipass_fires_with_nodesets", () => {

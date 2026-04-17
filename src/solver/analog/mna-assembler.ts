@@ -1,12 +1,13 @@
 /**
  * MNA matrix assembler.
  *
- * Orchestrates the stamp protocol used by the Newton-Raphson loop:
+ * `stampAll` performs three sub-passes per NR iteration:
+ *   1. `updateOperatingPoints` (nonlinear elements, iteration > 0 only)
+ *   2. per-element stamp loop (linear `stamp`, `stampNonlinear`, `stampReactiveCompanion`)
+ *   3. `solver.finalize()`
  *
- *   `stampAll` — called every NR iteration (unified CKTload equivalent).
- *                Clears the matrix, updates operating points, stamps all
- *                element contributions (linear + nonlinear + reactive companion)
- *                unconditionally, and finalizes the matrix for factorization.
+ * `checkAllConverged` / `checkAllConvergedDetailed` run element-level
+ * convergence checks after `solver.solve()`.
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
@@ -35,11 +36,9 @@ export class MNAAssembler {
   }
 
   /**
-   * Unified CKTload equivalent: clear the matrix, update operating points,
-   * stamp ALL element contributions unconditionally, and finalize.
-   *
-   * Called every NR iteration. Replaces the old separate linear/nonlinear
-   * stamp hoisting with a single unconditional pass matching ngspice CKTload.
+   * Clear the matrix, update operating points (iteration > 0), stamp every
+   * element's linear/nonlinear/reactive-companion contributions, and finalize
+   * the matrix for factorization.
    *
    * @param elements          - The full element list for this circuit.
    * @param matrixSize        - MNA matrix dimension (nodeCount + branchCount).
@@ -48,8 +47,6 @@ export class MNAAssembler {
    *   harness instrumentation. Null when harness capture is inactive.
    * @param iteration         - Current NR iteration (0-based). On iteration 0,
    *   updateOperatingPoint is skipped (no previous solution to linearize from).
-   * @param prevVoltages      - Solution vector from the previous NR iteration.
-   *   Used by shouldBypass() checks. When omitted, bypass is never triggered.
    */
   stampAll(
     elements: readonly AnalogElement[],
@@ -57,7 +54,6 @@ export class MNAAssembler {
     voltages: Float64Array,
     limitingCollector: LimitingEvent[] | null,
     iteration: number,
-    prevVoltages?: Float64Array,
   ): void {
     this._solver.beginAssembly(matrixSize);
 
@@ -66,9 +62,6 @@ export class MNAAssembler {
     }
 
     for (const el of elements) {
-      if (iteration > 0 && prevVoltages !== undefined && el.shouldBypass?.(voltages, prevVoltages)) {
-        continue;
-      }
       el.stamp(this._solver);
       if (el.isNonlinear && el.stampNonlinear) {
         el.stampNonlinear(this._solver);

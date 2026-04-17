@@ -43,8 +43,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -210,12 +209,6 @@ function createOpenCollectorComparatorElement(
   // Used to model response-time delay via a first-order filter.
   let _outputWeight = 0.0;
 
-  // Effective conductance stamped on the output node (updated each NR iter)
-  let _gEff = G_off;
-
-  // Solver reference cached during stamp() for use in stampCompanion()
-  let _solver: SparseSolver | null = null;
-
   function readNode(voltages: Float64Array, n: number): number {
     return n > 0 ? voltages[n - 1] : 0;
   }
@@ -230,85 +223,59 @@ function createOpenCollectorComparatorElement(
     isNonlinear: true,
     isReactive: false,
 
-    stamp(solver: SparseSolver): void {
-      // Cache solver for use in stampCompanion (interface does not pass it there)
-      _solver = solver;
-      // Linear part: stamp the effective conductance between out and ground.
-      // This is re-evaluated every NR iteration via stampNonlinear to track
-      // the current output state.
-      if (nOut > 0) {
-        solver.stamp(nOut - 1, nOut - 1, _gEff);
-      }
-    },
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
+      const voltages = ctx.voltages;
 
-    stampNonlinear(solver: SparseSolver): void {
-      // Re-stamp the output conductance at the current operating point.
-      const gNew = computeGeff();
-      if (nOut > 0) {
-        solver.stamp(nOut - 1, nOut - 1, gNew - _gEff);
-      }
-      _gEff = gNew;
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+      // Hysteresis state update from current NR-iterate voltages.
       const vInp = readNode(voltages, nInp);
       const vInn = readNode(voltages, nInn);
       const vDiff = vInp - vInn - p.vos;
-
-      // Hysteresis comparison with dead band
       const halfHyst = p.hysteresis / 2;
       if (_outputActive) {
-        // Currently active (sinking); stays active until V+ drops well below V-
         if (vDiff < -halfHyst) {
           _outputActive = false;
           _outputWeight = 0.0;
         }
       } else {
-        // Currently inactive; activates when V+ exceeds V-
         if (vDiff > halfHyst) {
           _outputActive = true;
           _outputWeight = 1.0;
         }
       }
+
+      // Stamp the effective conductance from out to ground.
+      if (nOut > 0) {
+        solver.stamp(nOut - 1, nOut - 1, computeGeff());
+      }
+    },
+
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+      // Update _outputWeight toward its target using a first-order Euler step.
+      // Models the propagation delay specified by responseTime. Called once
+      // per accepted timestep.
+      const dt = ctx.dt;
+      if (dt <= 0) return;
+      const target = _outputActive ? 1.0 : 0.0;
+      const tau = Math.max(p.responseTime, 1e-12);
+      const alpha = dt / (tau + dt);
+      _outputWeight = _outputWeight + alpha * (target - _outputWeight);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
       // Input pins: high-impedance load — implicit R_IN to ground
-      // Using a fixed 10 MΩ input impedance (matching behavioral digital model convention)
       const R_IN = 1e7;
       const vInp = readNode(voltages, nInp);
       const vInn = readNode(voltages, nInn);
       const iInp = nInp > 0 ? vInp / R_IN : 0;
       const iInn = nInn > 0 ? vInn / R_IN : 0;
 
-      // Output pin: conductance _gEff from out to ground + optional Norton source
-      // Open-collector: I_out = V_out * G_eff (no Norton source; current sinks to ground)
-      // Push-pull: I_out = (V_out - V_target) * G_eff
+      // Output pin: I_out = V_out * G_eff (current sinks to ground)
       const vOut = readNode(voltages, nOut);
-      let iOut = 0;
-      if (nOut > 0) {
-        iOut = vOut * _gEff;
-      }
+      const gEff = computeGeff();
+      const iOut = nOut > 0 ? vOut * gEff : 0;
 
-      // pinLayout order: in+, in-, out
-      // Sum is nonzero — residual is implicit supply current (expected for behavioral model)
       return [iInp, iInn, iOut];
-    },
-
-    stampCompanion(dt: number, _method: IntegrationMethod, _voltages: Float64Array): void {
-      // Update _outputWeight toward its target using first-order Euler step.
-      // This models the propagation delay specified by responseTime.
-      const target = _outputActive ? 1.0 : 0.0;
-      const tau = Math.max(p.responseTime, 1e-12);
-      const alpha = dt / (tau + dt); // first-order low-pass coefficient
-      _outputWeight = _outputWeight + alpha * (target - _outputWeight);
-
-      // Re-stamp the (now possibly updated) conductance using cached solver
-      const gNew = computeGeff();
-      if (nOut > 0 && _solver !== null) {
-        _solver.stamp(nOut - 1, nOut - 1, gNew - _gEff);
-      }
-      _gEff = gNew;
     },
 
     setParam(key: string, value: number): void {
@@ -343,8 +310,6 @@ function createPushPullComparatorElement(
 
   let _outputActive = false;
   let _outputWeight = 0.0;
-  let _gEff = G_off;
-  let _solver: SparseSolver | null = null;
 
   function readNode(voltages: Float64Array, n: number): number {
     return n > 0 ? voltages[n - 1] : 0;
@@ -360,34 +325,36 @@ function createPushPullComparatorElement(
     isNonlinear: true,
     isReactive: false,
 
-    stamp(solver: SparseSolver): void {
-      _solver = solver;
-      if (nOut > 0) solver.stamp(nOut - 1, nOut - 1, _gEff);
-    },
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
+      const voltages = ctx.voltages;
 
-    stampNonlinear(solver: SparseSolver): void {
-      const gNew = computeGeff();
-      if (nOut > 0) solver.stamp(nOut - 1, nOut - 1, gNew - _gEff);
-      _gEff = gNew;
-
-      // Norton current source drives output toward vOH or vOL
-      if (nOut > 0) {
-        const vTarget = _outputActive ? p.vOL : p.vOH;
-        solver.stampRHS(nOut - 1, vTarget * _gEff);
-      }
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
       const vInp = readNode(voltages, nInp);
       const vInn = readNode(voltages, nInn);
       const vDiff = vInp - vInn - p.vos;
-
       const halfHyst = p.hysteresis / 2;
       if (_outputActive) {
         if (vDiff < -halfHyst) { _outputActive = false; _outputWeight = 0.0; }
       } else {
         if (vDiff > halfHyst) { _outputActive = true; _outputWeight = 1.0; }
       }
+
+      const gEff = computeGeff();
+      if (nOut > 0) {
+        solver.stamp(nOut - 1, nOut - 1, gEff);
+        // Norton current source drives output toward vOH or vOL
+        const vTarget = _outputActive ? p.vOL : p.vOH;
+        solver.stampRHS(nOut - 1, vTarget * gEff);
+      }
+    },
+
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+      const dt = ctx.dt;
+      if (dt <= 0) return;
+      const target = _outputActive ? 1.0 : 0.0;
+      const tau = Math.max(p.responseTime, 1e-12);
+      const alpha = dt / (tau + dt);
+      _outputWeight = _outputWeight + alpha * (target - _outputWeight);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -398,23 +365,13 @@ function createPushPullComparatorElement(
       const iInn = nInn > 0 ? vInn / R_IN : 0;
 
       const vOut = readNode(voltages, nOut);
+      const gEff = computeGeff();
       let iOut = 0;
       if (nOut > 0) {
         const vTarget = _outputActive ? p.vOL : p.vOH;
-        iOut = (vOut - vTarget) * _gEff;
+        iOut = (vOut - vTarget) * gEff;
       }
       return [iInp, iInn, iOut];
-    },
-
-    stampCompanion(dt: number, _method: IntegrationMethod, _voltages: Float64Array): void {
-      const target = _outputActive ? 1.0 : 0.0;
-      const tau = Math.max(p.responseTime, 1e-12);
-      const alpha = dt / (tau + dt);
-      _outputWeight = _outputWeight + alpha * (target - _outputWeight);
-
-      const gNew = computeGeff();
-      if (nOut > 0 && _solver !== null) _solver.stamp(nOut - 1, nOut - 1, gNew - _gEff);
-      _gEff = gNew;
     },
 
     setParam(key: string, value: number): void {

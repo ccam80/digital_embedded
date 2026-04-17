@@ -21,8 +21,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElement, AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElement, AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -199,27 +198,28 @@ class AnalogPotentiometerElement implements AnalogElement {
     this.G_bottom = 1 / R_bottom;
   }
 
-  stamp(solver: SparseSolver): void {
+  load(ctx: LoadContext): void {
+    const solver = ctx.solver;
     const n_A = this.pinNodeIds[0]; // top
     const n_W = this.pinNodeIds[1]; // wiper
     const n_B = this.pinNodeIds[2]; // bottom
 
     // Stamp helper: 1-based node IDs, skip ground (node 0), -1 for solver index
-    const s = (r: number, c: number, v: number): void => {
+    const stamp = (r: number, c: number, v: number): void => {
       if (r !== 0 && c !== 0) solver.stamp(r - 1, c - 1, v);
     };
 
     // Top resistor (R_top) stamps: G_top at (A,A), (W,W), (A,W), (W,A)
-    s(n_A, n_A, this.G_top);
-    s(n_W, n_W, this.G_top);
-    s(n_A, n_W, -this.G_top);
-    s(n_W, n_A, -this.G_top);
+    stamp(n_A, n_A, this.G_top);
+    stamp(n_W, n_W, this.G_top);
+    stamp(n_A, n_W, -this.G_top);
+    stamp(n_W, n_A, -this.G_top);
 
     // Bottom resistor (R_bottom) stamps: G_bottom at (W,W), (B,B), (W,B), (B,W)
-    s(n_W, n_W, this.G_bottom);
-    s(n_B, n_B, this.G_bottom);
-    s(n_W, n_B, -this.G_bottom);
-    s(n_B, n_W, -this.G_bottom);
+    stamp(n_W, n_W, this.G_bottom);
+    stamp(n_B, n_B, this.G_bottom);
+    stamp(n_W, n_B, -this.G_bottom);
+    stamp(n_B, n_W, -this.G_bottom);
   }
 
   getPinCurrents(voltages: Float64Array): number[] {

@@ -25,8 +25,7 @@ import {
   type ComponentDefinition,
   type ComponentLayout,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
 // Pin layout
@@ -114,7 +113,7 @@ function createGroundAnalogElement(
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
-    stamp(_solver: SparseSolver): void {
+    load(_ctx: LoadContext): void {
       // Ground constraint is handled by the compiler's node mapping.
     },
 

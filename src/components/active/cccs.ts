@@ -176,7 +176,7 @@ class CCCSAnalogElement extends ControlledSourceElement {
    *   B[nSenseN, senseBranch] -= 1   C[senseBranch, nSenseN] -= 1
    *   RHS[senseBranch] = 0  (0V, not explicitly stamped — zeros from beginAssembly)
    */
-  override stamp(solver: SparseSolver): void {
+  protected override _stampLinear(solver: SparseSolver): void {
     const ks = this._senseBranch;
 
     if (this._nSenseP !== 0) {

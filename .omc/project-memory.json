@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1776330775625,
+  "lastScanned": 1776420037795,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -66,7 +66,6 @@
     "isMonorepo": false,
     "workspaces": [],
     "mainDirectories": [
-      "docs",
       "lib",
       "scripts",
       "spec",
@@ -83,7 +82,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1776330775591,
+      "lastAccessed": 1776420037731,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -95,7 +94,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 5,
-      "lastAccessed": 1776330775592,
+      "lastAccessed": 1776420037731,
       "keyFiles": [
         "simulator.html",
         "tutorial-editor.html",
@@ -104,29 +103,18 @@
         "tutorials.html"
       ]
     },
-    "docs": {
-      "path": "docs",
-      "purpose": "Documentation",
-      "fileCount": 3,
-      "lastAccessed": 1776330775592,
-      "keyFiles": [
-        "harness-redesign-spec.md",
-        "ngspice-state-machine-alignment-spec.md",
-        "timestep-alignment-spec.md"
-      ]
-    },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776330775608,
+      "lastAccessed": 1776420037732,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 16,
-      "lastAccessed": 1776330775608,
+      "lastAccessed": 1776420037762,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -139,28 +127,41 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1776330775609,
+      "lastAccessed": 1776420037763,
       "keyFiles": []
+    },
+    "local_working_projectsdigital_in_browser.claudeworktreesecdc34a-audit": {
+      "path": "local_working_projectsdigital_in_browser.claudeworktreesecdc34a-audit",
+      "purpose": null,
+      "fileCount": 27,
+      "lastAccessed": 1776420037763,
+      "keyFiles": [
+        "CLAUDE.md",
+        "e2e-results.json",
+        "eslint.config.js",
+        "local_working_projectsdigital_in_browserspecstate-machines_gen_integ.cjs",
+        "mcp-stderr.log"
+      ]
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776330775609,
+      "lastAccessed": 1776420037763,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776330775609,
+      "lastAccessed": 1776420037764,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 20,
-      "lastAccessed": 1776330775609,
+      "lastAccessed": 1776420037764,
       "keyFiles": [
         "circuit-mcp-server.ts",
         "cleanup-unused-imports.mjs",
@@ -172,21 +173,21 @@
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 7,
-      "lastAccessed": 1776330775609,
+      "fileCount": 15,
+      "lastAccessed": 1776420037764,
       "keyFiles": [
         "analog-snapshot-analysis.md",
-        "ngspice-alignment-implementation-spec.md",
-        "plan.md",
-        "progress.md",
-        "test-baseline.md"
+        "ngspice-alignment-master.md",
+        "phase-0-sparse-solver-rewrite.md",
+        "phase-1-zero-alloc-infrastructure.md",
+        "phase-2-nr-loop-alignment.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1776330775610,
+      "lastAccessed": 1776420037765,
       "keyFiles": [
         "main.ts"
       ]
@@ -195,7 +196,7 @@
       "path": "test-results",
       "purpose": null,
       "fileCount": 3,
-      "lastAccessed": 1776330775610,
+      "lastAccessed": 1776420037765,
       "keyFiles": [
         "playwright-failures.json",
         "test-failures.json"
@@ -205,7 +206,7 @@
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1776330775610,
+      "lastAccessed": 1776420037765,
       "keyFiles": [
         "index.json"
       ]
@@ -214,7 +215,7 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1776330775611,
+      "lastAccessed": 1776420037766,
       "keyFiles": [
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js",
@@ -225,7 +226,7 @@
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1776330775611,
+      "lastAccessed": 1776420037767,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -236,7 +237,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1776330775612,
+      "lastAccessed": 1776420037769,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -247,7 +248,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1776330775613,
+      "lastAccessed": 1776420037769,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -258,310 +259,310 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1776330775613,
+      "lastAccessed": 1776420037769,
       "keyFiles": []
     }
   },
   "hotPaths": [
     {
-      "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 70,
-      "lastAccessed": 1776406948856,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\sparse-solver.ts",
-      "accessCount": 49,
-      "lastAccessed": 1776404198474,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 43,
-      "lastAccessed": 1776406744945,
-      "type": "file"
-    },
-    {
-      "path": "",
-      "accessCount": 34,
-      "lastAccessed": 1776404710582,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\dc-operating-point.ts",
-      "accessCount": 27,
-      "lastAccessed": 1776406486415,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\integration.ts",
-      "accessCount": 25,
-      "lastAccessed": 1776406785800,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog",
-      "accessCount": 18,
-      "lastAccessed": 1776406147711,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\mna-assembler.ts",
-      "accessCount": 16,
-      "lastAccessed": 1776406469876,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 13,
-      "lastAccessed": 1776406725123,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\ckt-terr.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776406501754,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src",
-      "accessCount": 8,
-      "lastAccessed": 1776336134672,
-      "type": "directory"
-    },
-    {
-      "path": "spec\\state-machines\\impl-spec-ngspice-alignment.md",
-      "accessCount": 8,
-      "lastAccessed": 1776343264609,
+      "path": "spec\\progress.md",
+      "accessCount": 29,
+      "lastAccessed": 1776429070327,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 6,
-      "lastAccessed": 1776403013775,
+      "accessCount": 24,
+      "lastAccessed": 1776428623959,
+      "type": "directory"
+    },
+    {
+      "path": "src",
+      "accessCount": 24,
+      "lastAccessed": 1776429125318,
+      "type": "directory"
+    },
+    {
+      "path": "spec\\phase-6-model-rewrites.md",
+      "accessCount": 21,
+      "lastAccessed": 1776429070106,
       "type": "file"
     },
     {
-      "path": "src\\editor",
-      "accessCount": 5,
-      "lastAccessed": 1776337052725,
-      "type": "directory"
-    },
-    {
-      "path": "ref/ngspice/src/spicelib/analysis/dctran.c",
-      "accessCount": 4,
-      "lastAccessed": 1776333530460,
-      "type": "directory"
-    },
-    {
-      "path": "ref\\ngspice",
-      "accessCount": 4,
-      "lastAccessed": 1776400574772,
-      "type": "directory"
-    },
-    {
-      "path": "ref/ngspice/visualc/include/ngspice/config.h",
-      "accessCount": 3,
-      "lastAccessed": 1776333540436,
-      "type": "directory"
-    },
-    {
-      "path": "spec\\state-machines\\ngspice-integration-vs-integration.md",
-      "accessCount": 3,
-      "lastAccessed": 1776334206421,
+      "path": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+      "accessCount": 16,
+      "lastAccessed": 1776422400139,
       "type": "file"
     },
     {
-      "path": "src/solver",
-      "accessCount": 3,
-      "lastAccessed": 1776334241951,
-      "type": "directory"
-    },
-    {
-      "path": "ref/ngspice/src/maths/sparse",
-      "accessCount": 3,
-      "lastAccessed": 1776336938623,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776405818635,
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 15,
+      "lastAccessed": 1776428894749,
       "type": "file"
     },
     {
-      "path": "ref/ngspice",
-      "accessCount": 2,
-      "lastAccessed": 1776332589361,
+      "path": "src\\solver\\analog\\mna-assembler.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776426113763,
+      "type": "file"
+    },
+    {
+      "path": "spec\\plan.md",
+      "accessCount": 13,
+      "lastAccessed": 1776427251619,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\bridge-adapter.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776427317379,
+      "type": "file"
+    },
+    {
+      "path": "src\\core\\analog-types.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776428294369,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\load-context.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776428624746,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog",
+      "accessCount": 13,
+      "lastAccessed": 1776429139015,
       "type": "directory"
+    },
+    {
+      "path": "src\\components\\passives\\resistor.ts",
+      "accessCount": 11,
+      "lastAccessed": 1776427306900,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\integration.test.ts",
+      "accessCount": 10,
+      "lastAccessed": 1776422292949,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\lock-protocol.md",
+      "accessCount": 10,
+      "lastAccessed": 1776428895887,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\behavioral-gate.ts",
+      "accessCount": 10,
+      "lastAccessed": 1776429109765,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\ckt-context.ts",
+      "accessCount": 9,
+      "lastAccessed": 1776421111171,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\passives\\analog-fuse.ts",
+      "accessCount": 9,
+      "lastAccessed": 1776427405013,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\state-pool.ts",
+      "accessCount": 9,
+      "lastAccessed": 1776427704797,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\sensors\\ntc-thermistor.ts",
+      "accessCount": 8,
+      "lastAccessed": 1776427404315,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\switching\\switch.ts",
+      "accessCount": 8,
+      "lastAccessed": 1776427416973,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\sensors\\spark-gap.ts",
+      "accessCount": 8,
+      "lastAccessed": 1776427417495,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ckt-terr.test.ts",
+      "accessCount": 7,
+      "lastAccessed": 1776422314075,
+      "type": "file"
     },
     {
       "path": "spec\\state-machines\\ngspice-cktterr-vs-ckt-terr.md",
-      "accessCount": 2,
-      "lastAccessed": 1776334200392,
+      "accessCount": 7,
+      "lastAccessed": 1776422326588,
       "type": "file"
     },
     {
-      "path": "ref\\ngspice\\src\\spicelib\\analysis\\dctran.c",
-      "accessCount": 2,
-      "lastAccessed": 1776334239132,
+      "path": "src\\components\\sensors\\ldr.ts",
+      "accessCount": 7,
+      "lastAccessed": 1776425951732,
       "type": "file"
     },
     {
-      "path": "ref\\ngspice\\src\\maths\\sparse\\spsmp.c",
-      "accessCount": 2,
-      "lastAccessed": 1776336946954,
+      "path": "src\\components\\passives\\potentiometer.ts",
+      "accessCount": 7,
+      "lastAccessed": 1776427288013,
       "type": "file"
     },
     {
-      "path": "ref\\ngspice\\src\\maths\\sparse",
-      "accessCount": 2,
-      "lastAccessed": 1776336989584,
+      "path": "src\\components\\io\\probe.ts",
+      "accessCount": 6,
+      "lastAccessed": 1776425889412,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\io\\ground.ts",
+      "accessCount": 6,
+      "lastAccessed": 1776425890675,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\switching\\switch-dt.ts",
+      "accessCount": 6,
+      "lastAccessed": 1776425892998,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\ckt-terr.ts",
+      "accessCount": 5,
+      "lastAccessed": 1776421055161,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\__tests__\\ckt-context.test.ts",
+      "accessCount": 5,
+      "lastAccessed": 1776421397178,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\newton-raphson.ts",
+      "accessCount": 5,
+      "lastAccessed": 1776426112460,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\integration.ts",
+      "accessCount": 4,
+      "lastAccessed": 1776424975132,
+      "type": "file"
+    },
+    {
+      "path": "spec\\.context\\reviewer.md",
+      "accessCount": 3,
+      "lastAccessed": 1776420199427,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-2-nr-loop-alignment.md",
+      "accessCount": 3,
+      "lastAccessed": 1776421434420,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\digital-pin-model.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776424745052,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\sparse-solver.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776424816549,
       "type": "directory"
     },
     {
-      "path": "scripts",
+      "path": "spec\\phase-3-numerical-fixes.md",
       "accessCount": 2,
-      "lastAccessed": 1776336992147,
+      "lastAccessed": 1776420166859,
+      "type": "file"
+    },
+    {
+      "path": "spec\\reviews\\phase-2.md",
+      "accessCount": 2,
+      "lastAccessed": 1776420336840,
+      "type": "file"
+    },
+    {
+      "path": "spec\\reviews\\phase-3.md",
+      "accessCount": 2,
+      "lastAccessed": 1776420340944,
+      "type": "file"
+    },
+    {
+      "path": "spec\\reviews\\phase-6.md",
+      "accessCount": 2,
+      "lastAccessed": 1776420344872,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\compiler.ts",
+      "accessCount": 2,
+      "lastAccessed": 1776422466901,
       "type": "directory"
     },
     {
-      "path": "ref\\ngspice\\src\\maths\\sparse\\sputils.c",
+      "path": "spec\\phase-0-sparse-solver-rewrite.md",
       "accessCount": 2,
-      "lastAccessed": 1776396809366,
+      "lastAccessed": 1776424057239,
+      "type": "file"
+    },
+    {
+      "path": "spec",
+      "accessCount": 2,
+      "lastAccessed": 1776424740999,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\stamp-helpers.ts",
+      "accessCount": 2,
+      "lastAccessed": 1776424798597,
+      "type": "file"
+    },
+    {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 2,
+      "lastAccessed": 1776427598713,
+      "type": "file"
+    },
+    {
+      "path": "tmp-probe.mjs",
+      "accessCount": 1,
+      "lastAccessed": 1776421591133,
+      "type": "file"
+    },
+    {
+      "path": ".vitest-failures.json",
+      "accessCount": 1,
+      "lastAccessed": 1776421666518,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\complex-sparse-solver.ts",
       "accessCount": 1,
-      "lastAccessed": 1776330904644,
+      "lastAccessed": 1776422456497,
       "type": "file"
     },
     {
-      "path": "ref/ngspice/src/maths/sparse/spsmp.c",
+      "path": "src\\solver\\analog\\ac-analysis.ts",
       "accessCount": 1,
-      "lastAccessed": 1776332597187,
-      "type": "directory"
-    },
-    {
-      "path": "ref/ngspice/src/maths/sparse/spoutput.c",
-      "accessCount": 1,
-      "lastAccessed": 1776332614458,
-      "type": "directory"
-    },
-    {
-      "path": "ref/ngspice/src/maths/sparse/sputils.c",
-      "accessCount": 1,
-      "lastAccessed": 1776332623882,
-      "type": "directory"
-    },
-    {
-      "path": "ref/ngspice/src/maths/ni/nicomcof.c",
-      "accessCount": 1,
-      "lastAccessed": 1776333531470,
-      "type": "directory"
-    },
-    {
-      "path": "ref/ngspice/src/spicelib/analysis/ckttrunc.c",
-      "accessCount": 1,
-      "lastAccessed": 1776333541411,
-      "type": "directory"
-    },
-    {
-      "path": "spec\\state-machines\\cktop-vs-dc-operating-point.md",
-      "accessCount": 1,
-      "lastAccessed": 1776334180626,
+      "lastAccessed": 1776422476394,
       "type": "file"
-    },
-    {
-      "path": "spec\\state-machines\\dctran-vs-analog-engine-step.md",
-      "accessCount": 1,
-      "lastAccessed": 1776334181214,
-      "type": "file"
-    },
-    {
-      "path": "spec\\state-machines\\niiter-vs-newton-raphson.md",
-      "accessCount": 1,
-      "lastAccessed": 1776334181919,
-      "type": "file"
-    },
-    {
-      "path": "spec\\state-machines\\ngspice-timestep-vs-timestep.md",
-      "accessCount": 1,
-      "lastAccessed": 1776334182723,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\maths\\ni\\nipred.c",
-      "accessCount": 1,
-      "lastAccessed": 1776334237789,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\spicelib\\devices\\bjt\\bjtload.c",
-      "accessCount": 1,
-      "lastAccessed": 1776334238737,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\configure.ac",
-      "accessCount": 1,
-      "lastAccessed": 1776334241368,
-      "type": "file"
-    },
-    {
-      "path": "src/solver/analog/newton-raphson.ts",
-      "accessCount": 1,
-      "lastAccessed": 1776334253610,
-      "type": "directory"
-    },
-    {
-      "path": "src/solver/analog",
-      "accessCount": 1,
-      "lastAccessed": 1776334254598,
-      "type": "directory"
-    },
-    {
-      "path": "ref\\ngspice\\src\\maths\\ni\\niconv.c",
-      "accessCount": 1,
-      "lastAccessed": 1776336142595,
-      "type": "directory"
-    },
-    {
-      "path": "ref\\ngspice\\src\\spicelib\\devices\\dio\\dioload.c",
-      "accessCount": 1,
-      "lastAccessed": 1776336945879,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\spicelib\\devices\\cap\\capload.c",
-      "accessCount": 1,
-      "lastAccessed": 1776336947563,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\maths\\sparse\\spdefs.h",
-      "accessCount": 1,
-      "lastAccessed": 1776336947905,
-      "type": "file"
-    },
-    {
-      "path": "ref\\ngspice\\src\\spicelib\\devices\\res\\resload.c",
-      "accessCount": 1,
-      "lastAccessed": 1776336967999,
-      "type": "file"
-    },
-    {
-      "path": "src\\headless",
-      "accessCount": 1,
-      "lastAccessed": 1776336989402,
-      "type": "directory"
-    },
-    {
-      "path": "src\\io",
-      "accessCount": 1,
-      "lastAccessed": 1776336990842,
-      "type": "directory"
     }
   ],
   "userDirectives": []

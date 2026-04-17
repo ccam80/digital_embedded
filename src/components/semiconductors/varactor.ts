@@ -26,11 +26,9 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { ReactiveAnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { computeJunctionCapacitance, computeJunctionCharge } from "./diode.js";
 import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -157,37 +155,8 @@ export function createVaractorElement(
       s3 = newS3;
     },
 
-    stamp(_solver: SparseSolver): void {
-      // No topology-constant entries.
-      // Capacitance companion model entries are stamped in stampReactiveCompanion().
-    },
-
-    stampReactiveCompanion(solver: SparseSolver): void {
-      const capGeq = s0[base + SLOT_CAP_GEQ];
-      const capIeq = s0[base + SLOT_CAP_IEQ];
-      if (capGeq !== 0 || capIeq !== 0) {
-        stampG(solver, nodeAnode,   nodeAnode,   capGeq);
-        stampG(solver, nodeAnode,   nodeCathode, -capGeq);
-        stampG(solver, nodeCathode, nodeAnode,   -capGeq);
-        stampG(solver, nodeCathode, nodeCathode, capGeq);
-        stampRHS(solver, nodeAnode,   -capIeq);
-        stampRHS(solver, nodeCathode, capIeq);
-      }
-    },
-
-    stampNonlinear(solver: SparseSolver): void {
-      // Stamp Shockley diode Norton equivalent
-      const geq = s0[base + SLOT_GEQ];
-      const ieq = s0[base + SLOT_IEQ];
-      stampG(solver, nodeAnode,   nodeAnode,   geq);
-      stampG(solver, nodeAnode,   nodeCathode, -geq);
-      stampG(solver, nodeCathode, nodeAnode,   -geq);
-      stampG(solver, nodeCathode, nodeCathode, geq);
-      stampRHS(solver, nodeAnode,   -ieq);
-      stampRHS(solver, nodeCathode, ieq);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>, limitingCollector?: LimitingEvent[] | null): void {
+    load(ctx: LoadContext): void {
+      const voltages = ctx.voltages;
       let vdRaw: number;
       if (primedVd !== null) {
         vdRaw = primedVd;
@@ -211,8 +180,10 @@ export function createVaractorElement(
         pnjlimLimited = vdResult.limited;
       }
 
-      if (limitingCollector) {
-        limitingCollector.push({
+      if (pnjlimLimited) ctx.noncon.value++;
+
+      if (ctx.limitingCollector) {
+        ctx.limitingCollector.push({
           elementIndex: (this as any).elementIndex ?? -1,
           label: (this as any).label ?? "",
           junction: "AK",
@@ -229,39 +200,51 @@ export function createVaractorElement(
       const expArg = Math.min(vdLimited / nVt, 700);
       const expVal = Math.exp(expArg);
       const id = p.iS * (expVal - 1);
+      const gd = (p.iS * expVal) / nVt + GMIN;
+      const ieq = id - gd * vdLimited;
       s0[base + SLOT_ID] = id;
-      s0[base + SLOT_GEQ] = (p.iS * expVal) / nVt + GMIN;
-      s0[base + SLOT_IEQ] = id - s0[base + SLOT_GEQ] * vdLimited;
-    },
+      s0[base + SLOT_GEQ] = gd;
+      s0[base + SLOT_IEQ] = ieq;
 
-    stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
-      // Compute vd freshly from current node voltages + pnjlim — single-pass
-      // semantics, never read a cross-phase cached slot.
-      const vA_sc = nodeAnode   > 0 ? _voltages[nodeAnode   - 1] : 0;
-      const vC_sc = nodeCathode > 0 ? _voltages[nodeCathode - 1] : 0;
-      const vdRaw_sc = vA_sc - vC_sc;
-      const vNow = pnjlim(vdRaw_sc, s0[base + SLOT_VD], nVt, vcrit).value;
-      s0[base + SLOT_VD] = vNow;
+      const solver = ctx.solver;
+      stampG(solver, nodeAnode,   nodeAnode,   gd);
+      stampG(solver, nodeAnode,   nodeCathode, -gd);
+      stampG(solver, nodeCathode, nodeAnode,   -gd);
+      stampG(solver, nodeCathode, nodeCathode, gd);
+      stampRHS(solver, nodeAnode,   -ieq);
+      stampRHS(solver, nodeCathode, ieq);
 
-      const Cj = computeJunctionCapacitance(vNow, p.cjo, p.vj, p.m, p.fc);
+      // Reactive companion: varactor's PRIMARY purpose — voltage-controlled capacitance
+      if (ctx.isTransient) {
+        const dt = ctx.dt;
+        const order = ctx.order;
+        const method = ctx.method;
+        const deltaOld = ctx.deltaOld;
 
-      const expArg = Math.min(vNow / nVt, 700);
-      const gd = (p.iS * Math.exp(expArg)) / nVt + GMIN;
-      const Ctotal = Cj + p.tt * gd;
+        const Cj = computeJunctionCapacitance(vdLimited, p.cjo, p.vj, p.m, p.fc);
+        const Ctotal = Cj + p.tt * gd;
 
+        const q0 = computeJunctionCharge(vdLimited, p.cjo, p.vj, p.m, p.fc, p.tt, id);
+        const q1 = s1[base + SLOT_Q];
+        const q2 = s2[base + SLOT_Q];
+        const ccapPrev = s1[base + SLOT_CCAP];
+        const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+        const { geq: capGeq, ceq: capIeq, ccap } = integrateCapacitor(Ctotal, vdLimited, q0, q1, q2, dt, h1, order, method, ccapPrev);
+        s0[base + SLOT_CAP_GEQ] = capGeq;
+        s0[base + SLOT_CAP_IEQ] = capIeq;
+        s0[base + SLOT_V] = vdLimited;
+        s0[base + SLOT_Q] = q0;
+        s0[base + SLOT_CCAP] = ccap;
 
-      const id = s0[base + SLOT_ID];
-      const q0 = computeJunctionCharge(vNow, p.cjo, p.vj, p.m, p.fc, p.tt, id);
-      const q1 = s1[base + SLOT_Q];
-      const q2 = s2[base + SLOT_Q];
-      const ccapPrev = s1[base + SLOT_CCAP];
-      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-      const { geq, ceq, ccap } = integrateCapacitor(Ctotal, vNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
-      s0[base + SLOT_CAP_GEQ] = geq;
-      s0[base + SLOT_CAP_IEQ] = ceq;
-      s0[base + SLOT_V] = vNow;
-      s0[base + SLOT_Q] = q0;
-      s0[base + SLOT_CCAP] = ccap;
+        if (capGeq !== 0 || capIeq !== 0) {
+          stampG(solver, nodeAnode,   nodeAnode,   capGeq);
+          stampG(solver, nodeAnode,   nodeCathode, -capGeq);
+          stampG(solver, nodeCathode, nodeAnode,   -capGeq);
+          stampG(solver, nodeCathode, nodeCathode, capGeq);
+          stampRHS(solver, nodeAnode,   -capIeq);
+          stampRHS(solver, nodeCathode, capIeq);
+        }
+      }
     },
 
     getLteTimestep(
@@ -280,11 +263,12 @@ export function createVaractorElement(
       return cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
-      // ngspice icheck gate: if voltage was limited in updateOperatingPoint,
+    checkConvergence(ctx: LoadContext): boolean {
+      // ngspice icheck gate: if voltage was limited in load(),
       // declare non-convergence immediately (DIOload sets CKTnoncon++)
       if (pnjlimLimited) return false;
 
+      const voltages = ctx.voltages;
       const vA = nodeAnode   > 0 ? voltages[nodeAnode   - 1] : 0;
       const vC = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = vA - vC;
@@ -294,7 +278,7 @@ export function createVaractorElement(
       const id = s0[base + SLOT_ID];
       const gd = s0[base + SLOT_GEQ];
       const cdhat = id + gd * delvd;
-      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + abstol;
+      const tol = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(id)) + ctx.iabstol;
       return Math.abs(cdhat - id) <= tol;
     },
 
@@ -324,12 +308,6 @@ export function createVaractorElement(
       }
     },
 
-    updateChargeFlux(_voltages: Float64Array, _dt: number, _method: string, _order: number, _deltaOld: readonly number[]): void {
-      const vNow = s0[base + SLOT_VD];
-      const id = s0[base + SLOT_ID];
-      s0[base + SLOT_Q] = computeJunctionCharge(vNow, p.cjo, p.vj, p.m, p.fc, p.tt, id);
-      s0[base + SLOT_V] = vNow;
-    },
   };
 }
 

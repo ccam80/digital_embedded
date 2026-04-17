@@ -29,8 +29,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { defineModelParams } from "../../core/model-params.js";
 
 // ---------------------------------------------------------------------------
@@ -178,7 +177,7 @@ function createOpAmpElement(
   const nInp = pinNodes.get("in+")!; // non-inverting input node (1-based, 0=ground)
   const nInn = pinNodes.get("in-")!; // inverting input node
   const nOut = pinNodes.get("out")!; // output node
-  // Operating-point state updated by updateOperatingPoint
+  // Operating-point state updated at the top of each load() call.
   let vInp = 0;
   let vInn = 0;
   let vVccP = 15;  // default rail +15V
@@ -203,48 +202,19 @@ function createOpAmpElement(
       scale = factor;
     },
 
-    stamp(solver: SparseSolver): void {
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
+      const voltages = ctx.voltages;
       const G_out = 1 / Math.max(p.rOut, 1e-9);
-      // G_out: output resistance between nOut and ground (always present).
-      if (nOut > 0) {
-        solver.stamp(nOut - 1, nOut - 1, G_out);
-      }
 
-      // Linear VCVS stamp in unsaturated region.
-      // Implements: (V_out - gain*(V_inp - V_inn)) / R_out = 0
-      // which rearranges to: G_out*V_out - gain*G_out*V_inp + gain*G_out*V_inn = 0
-      // MNA row for out: G[out,out] += G_out (above), G[out,in+] -= gain*G_out,
-      //                                                G[out,in-] += gain*G_out
-      if (!saturated) {
-        const effectiveGain = p.gain * scale;
-        if (nOut > 0 && nInp > 0) {
-          solver.stamp(nOut - 1, nInp - 1, -effectiveGain * G_out);
-        }
-        if (nOut > 0 && nInn > 0) {
-          solver.stamp(nOut - 1, nInn - 1, effectiveGain * G_out);
-        }
-      }
-    },
-
-    stampNonlinear(solver: SparseSolver): void {
-      const G_out = 1 / Math.max(p.rOut, 1e-9);
-      // Saturation: inject Norton current to clamp output to rail voltage.
-      // In linear region: no nonlinear contribution (all handled in stamp()).
-      if (saturated && nOut > 0) {
-        solver.stampRHS(nOut - 1, vOutTarget * G_out);
-      }
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+      // Read operating-point voltages and determine saturation state.
       vInp = readNode(voltages, nInp);
       vInn = readNode(voltages, nInn);
-
       // Saturation is determined by the current output voltage, not the ideal
       // open-loop voltage. This prevents oscillation: the linear stamp is used
       // whenever the output is within the supply rails, letting NR find the
       // virtual-ground solution (V_inn ≈ 0) without toggling the Jacobian.
       const vOut = readNode(voltages, nOut);
-
       if (vOut >= vVccP) {
         saturated = true;
         vOutTarget = vVccP;
@@ -254,6 +224,29 @@ function createOpAmpElement(
       } else {
         saturated = false;
         vOutTarget = vOut;
+      }
+
+      // G_out: output resistance between nOut and ground (always present).
+      if (nOut > 0) {
+        solver.stamp(nOut - 1, nOut - 1, G_out);
+      }
+
+      if (!saturated) {
+        // Linear VCVS stamp in unsaturated region.
+        // Implements: (V_out - gain*(V_inp - V_inn)) / R_out = 0
+        // which rearranges to: G_out*V_out - gain*G_out*V_inp + gain*G_out*V_inn = 0
+        // MNA row for out: G[out,out] += G_out (above), G[out,in+] -= gain*G_out,
+        //                                                G[out,in-] += gain*G_out
+        const effectiveGain = p.gain * scale;
+        if (nOut > 0 && nInp > 0) {
+          solver.stamp(nOut - 1, nInp - 1, -effectiveGain * G_out);
+        }
+        if (nOut > 0 && nInn > 0) {
+          solver.stamp(nOut - 1, nInn - 1, effectiveGain * G_out);
+        }
+      } else if (nOut > 0) {
+        // Saturation: inject Norton current to clamp output to rail voltage.
+        solver.stampRHS(nOut - 1, vOutTarget * G_out);
       }
     },
 

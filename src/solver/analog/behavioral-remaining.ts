@@ -17,7 +17,7 @@
  */
 
 import type { SparseSolver } from "./sparse-solver.js";
-import type { AnalogElementCore, IntegrationMethod } from "./element.js";
+import type { AnalogElementCore, LoadContext } from "./element.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -111,10 +111,8 @@ export function createDriverAnalogElement(
   outputPin.init(nodeOut, -1);
   outputPin.setHighZ(true); // default Hi-Z until sel is known
 
-  let cachedVoltages = new Float64Array(0);
   let latchedIn = false;
   let latchedSel = false;
-  let solver: SparseSolver | null = null;
 
   const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
     ["in", inputPin],
@@ -127,15 +125,13 @@ export function createDriverAnalogElement(
     isNonlinear: true,
     isReactive: true,
 
-    stamp(s: SparseSolver): void {
-      solver = s;
+    load(ctx: LoadContext): void {
+      const s = ctx.solver;
+      const v = ctx.voltages;
+
       inputPin.stamp(s);
       selPin.stamp(s);
-    },
 
-    stampNonlinear(s: SparseSolver): void {
-      solver = s;
-      const v = cachedVoltages;
       const vIn = readMnaVoltage(nodeIn, v);
       const vSel = readMnaVoltage(nodeSel, v);
 
@@ -148,20 +144,20 @@ export function createDriverAnalogElement(
       outputPin.setHighZ(!latchedSel);
       outputPin.setLogicLevel(latchedIn);
       outputPin.stampOutput(s);
-    },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      if (cachedVoltages.length !== voltages.length) {
-        cachedVoltages = new Float64Array(voltages.length);
+      if (ctx.isTransient && ctx.dt > 0) {
+        inputPin.stampCompanion(s, ctx.dt, ctx.method);
+        selPin.stampCompanion(s, ctx.dt, ctx.method);
+        outputPin.stampCompanion(s, ctx.dt, ctx.method);
       }
-      cachedVoltages.set(voltages);
     },
 
-    stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array): void {
-      if (solver === null) return;
-      inputPin.stampCompanion(solver, dt, method);
-      selPin.stampCompanion(solver, dt, method);
-      outputPin.stampCompanion(solver, dt, method);
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+      if (ctx.dt <= 0) return;
+      const v = ctx.voltages;
+      inputPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(nodeIn, v));
+      selPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(nodeSel, v));
+      outputPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(nodeOut, v));
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -217,10 +213,8 @@ export function createDriverInvAnalogElement(
   outputPin.init(nodeOut, -1);
   outputPin.setHighZ(false); // active-low: sel=0 → driven
 
-  let cachedVoltages = new Float64Array(0);
   let latchedIn = false;
   let latchedSel = false;
-  let solver: SparseSolver | null = null;
 
   const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
     ["in", inputPin],
@@ -233,15 +227,13 @@ export function createDriverInvAnalogElement(
     isNonlinear: true,
     isReactive: true,
 
-    stamp(s: SparseSolver): void {
-      solver = s;
+    load(ctx: LoadContext): void {
+      const s = ctx.solver;
+      const v = ctx.voltages;
+
       inputPin.stamp(s);
       selPin.stamp(s);
-    },
 
-    stampNonlinear(s: SparseSolver): void {
-      solver = s;
-      const v = cachedVoltages;
       const vIn = readMnaVoltage(nodeIn, v);
       const vSel = readMnaVoltage(nodeSel, v);
 
@@ -255,20 +247,20 @@ export function createDriverInvAnalogElement(
       outputPin.setHighZ(latchedSel);
       outputPin.setLogicLevel(latchedIn);
       outputPin.stampOutput(s);
-    },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      if (cachedVoltages.length !== voltages.length) {
-        cachedVoltages = new Float64Array(voltages.length);
+      if (ctx.isTransient && ctx.dt > 0) {
+        inputPin.stampCompanion(s, ctx.dt, ctx.method);
+        selPin.stampCompanion(s, ctx.dt, ctx.method);
+        outputPin.stampCompanion(s, ctx.dt, ctx.method);
       }
-      cachedVoltages.set(voltages);
     },
 
-    stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array): void {
-      if (solver === null) return;
-      inputPin.stampCompanion(solver, dt, method);
-      selPin.stampCompanion(solver, dt, method);
-      outputPin.stampCompanion(solver, dt, method);
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+      if (ctx.dt <= 0) return;
+      const v = ctx.voltages;
+      inputPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(nodeIn, v));
+      selPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(nodeSel, v));
+      outputPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(nodeOut, v));
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -345,22 +337,17 @@ export function createSplitterAnalogElement(
     outputPins.push(pin);
   }
 
-  let cachedVoltages = new Float64Array(0);
-  let solver: SparseSolver | null = null;
-
   return {
     branchIndex: -1,
     isNonlinear: true,
     isReactive: true,
 
-    stamp(s: SparseSolver): void {
-      solver = s;
-      for (const p of inputPins) p.stamp(s);
-    },
+    load(ctx: LoadContext): void {
+      const s = ctx.solver;
+      const v = ctx.voltages;
 
-    stampNonlinear(s: SparseSolver): void {
-      solver = s;
-      const v = cachedVoltages;
+      for (const p of inputPins) p.stamp(s);
+
       for (let i = 0; i < numIn; i++) {
         const nodeId = inputPins[i].nodeId;
         const voltage = readMnaVoltage(nodeId, v);
@@ -371,19 +358,22 @@ export function createSplitterAnalogElement(
         outputPins[i].setLogicLevel(latchedLevels[i] ?? false);
         outputPins[i].stampOutput(s);
       }
-    },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      if (cachedVoltages.length !== voltages.length) {
-        cachedVoltages = new Float64Array(voltages.length);
+      if (ctx.isTransient && ctx.dt > 0) {
+        for (const p of inputPins) p.stampCompanion(s, ctx.dt, ctx.method);
+        for (const p of outputPins) p.stampCompanion(s, ctx.dt, ctx.method);
       }
-      cachedVoltages.set(voltages);
     },
 
-    stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array): void {
-      if (solver === null) return;
-      for (const p of inputPins) p.stampCompanion(solver, dt, method);
-      for (const p of outputPins) p.stampCompanion(solver, dt, method);
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+      if (ctx.dt <= 0) return;
+      const v = ctx.voltages;
+      for (const p of inputPins) {
+        p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, v));
+      }
+      for (const p of outputPins) {
+        p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, v));
+      }
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -423,6 +413,10 @@ const LED_ROFF = 1e7;
 const LED_GMIN = 1e-12;
 
 type SegmentDiodeElement = AnalogElementCore & {
+  /** Unified load entry point — stamps linearized diode equations. */
+  load(ctx: LoadContext): void;
+  /** NR-iteration convergence test. */
+  checkConvergence(ctx: LoadContext): boolean;
   /** Current flowing into the anode pin at the accepted operating point. */
   anodeCurrent(voltages: Float64Array): number;
 };
@@ -441,17 +435,9 @@ function createSegmentDiodeElement(
     isNonlinear: true,
     isReactive: false,
 
-    stamp(_s: SparseSolver): void {
-      // No linear topology contributions for nonlinear diode
-    },
-
-    stampNonlinear(s: SparseSolver): void {
-      stampG(s, nodeAnode, nodeCathode, geq);
-      stampRHS(s, nodeAnode, -ieq);
-      if (nodeCathode > 0) stampRHS(s, nodeCathode, ieq);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
+    load(ctx: LoadContext): void {
+      const s = ctx.solver;
+      const voltages = ctx.voltages;
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vd = va - vc;
@@ -464,16 +450,21 @@ function createSegmentDiodeElement(
       }
       _vdStored = vd;
       _idStored = geq * vd + ieq;
+
+      stampG(s, nodeAnode, nodeCathode, geq);
+      stampRHS(s, nodeAnode, -ieq);
+      if (nodeCathode > 0) stampRHS(s, nodeCathode, ieq);
     },
 
-    checkConvergence(voltages: Float64Array, _prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
+    checkConvergence(ctx: LoadContext): boolean {
+      const voltages = ctx.voltages;
       const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
 
       const delvd = vdRaw - _vdStored;
       const cdhat = _idStored + geq * delvd;
-      const tol = reltol * Math.max(Math.abs(cdhat), Math.abs(_idStored)) + abstol;
+      const tol = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(_idStored)) + ctx.iabstol;
       return Math.abs(cdhat - _idStored) <= tol;
     },
 
@@ -514,20 +505,12 @@ export function createSevenSegAnalogElement(
     isNonlinear: true,
     isReactive: false,
 
-    stamp(s: SparseSolver): void {
-      for (const d of segDiodes) d.stamp(s);
+    load(ctx: LoadContext): void {
+      for (const d of segDiodes) d.load(ctx);
     },
 
-    stampNonlinear(s: SparseSolver): void {
-      for (const d of segDiodes) d.stampNonlinear!(s);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      for (const d of segDiodes) d.updateOperatingPoint!(voltages);
-    },
-
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
-      return segDiodes.every((d) => d.checkConvergence!(voltages, prevVoltages, reltol, abstol));
+    checkConvergence(ctx: LoadContext): boolean {
+      return segDiodes.every((d) => d.checkConvergence(ctx));
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -597,9 +580,6 @@ export function createRelayAnalogElement(
   // Contact state
   let contactClosed = normallyClosed;
 
-  // Stored solver reference for stampCompanion (set during stamp/stampNonlinear)
-  let cachedSolver: SparseSolver | null = null;
-
   // Current contact conductance
   function contactG(): number {
     return contactClosed ? 1 / RELAY_R_ON : 1 / RELAY_R_OFF;
@@ -612,54 +592,44 @@ export function createRelayAnalogElement(
     isNonlinear: true,
     isReactive: true,
 
-    stamp(s: SparseSolver): void {
-      cachedSolver = s;
+    load(ctx: LoadContext): void {
+      const s = ctx.solver;
+      const voltages = ctx.voltages;
+
       // Coil DC resistance stamps between coil1 and coil2
       stampG(s, nodeCoil1, nodeCoil2, 1 / rCoil);
-      // Contact variable resistance (linear stamp uses current contact state)
+      // Contact variable resistance (current contact state)
       stampG(s, nodeContactA, nodeContactB, contactG());
-    },
 
-    stampNonlinear(s: SparseSolver): void {
-      cachedSolver = s;
-      // Re-stamp contact conductance (may have changed in updateState)
-      stampG(s, nodeContactA, nodeContactB, contactG());
-    },
-
-    updateOperatingPoint(_voltages: Readonly<Float64Array>): void {
-      // No nonlinear operating-point update needed for coil resistance
-    },
-
-    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-      if (L <= 0 || dt <= 0 || cachedSolver === null) return;
-      const s = cachedSolver;
-      // Companion model: G_eq = dt/(2L) for trapezoidal, dt/L for BDF-1
-      const factor = method === "bdf1" ? 1 : (method === "bdf2" ? 2 / 3 : 0.5);
-      geqL = (dt * factor) / L;
-      // History current from previous timestep
-      const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
-      const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
-      const vL = vCoil1 - vCoil2;
-      if (method === "trapezoidal") {
-        ieqL = iL + geqL * vL;
-      } else {
-        ieqL = iL;
+      if (ctx.isTransient && ctx.dt > 0 && L > 0) {
+        // Inductor companion model: G_eq = dt/(2L) for trapezoidal,
+        // dt/L for BDF-1, 2/3 * dt/L for BDF-2
+        const factor = ctx.method === "bdf1" ? 1 : (ctx.method === "bdf2" ? 2 / 3 : 0.5);
+        geqL = (ctx.dt * factor) / L;
+        const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
+        const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
+        const vL = vCoil1 - vCoil2;
+        if (ctx.method === "trapezoidal") {
+          ieqL = iL + geqL * vL;
+        } else {
+          ieqL = iL;
+        }
+        // Stamp inductor companion: parallel conductance + current source
+        stampG(s, nodeCoil1, nodeCoil2, geqL);
+        stampRHS(s, nodeCoil1, ieqL);
+        if (nodeCoil2 > 0) stampRHS(s, nodeCoil2, -ieqL);
       }
-      // Stamp inductor companion: parallel conductance + current source between coil nodes
-      stampG(s, nodeCoil1, nodeCoil2, geqL);
-      // History current source: into node coil1, out of node coil2
-      stampRHS(s, nodeCoil1, ieqL);
-      if (nodeCoil2 > 0) stampRHS(s, nodeCoil2, -ieqL);
     },
 
-    updateState(dt: number, voltages: Float64Array): void {
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+      const voltages = ctx.voltages;
       // Update inductor current from accepted solution
-      if (L > 0 && dt > 0) {
+      if (L > 0 && ctx.dt > 0) {
         const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
         const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
         const vL = vCoil1 - vCoil2;
         const factor = 0.5; // trapezoidal default
-        iL = ieqL + geqL * vL + factor * (dt / L) * vL;
+        iL = ieqL + geqL * vL + factor * (ctx.dt / L) * vL;
       }
       // Update contact state based on coil current magnitude
       const coilCurrentMag = Math.abs(iL);
@@ -724,9 +694,6 @@ export function createRelayDTAnalogElement(
   // Initial state: de-energised → A-C connected (rest), A-B open (throw)
   let energised = false;
 
-  // Stored solver reference for stampCompanion (set during stamp/stampNonlinear)
-  let cachedSolverDT: SparseSolver | null = null;
-
   function gThrow(): number { return energised ? 1 / RELAY_R_ON : 1 / RELAY_R_OFF; }
   function gRest(): number { return energised ? 1 / RELAY_R_OFF : 1 / RELAY_R_ON; }
 
@@ -735,41 +702,34 @@ export function createRelayDTAnalogElement(
     isNonlinear: true,
     isReactive: true,
 
-    stamp(s: SparseSolver): void {
-      cachedSolverDT = s;
+    load(ctx: LoadContext): void {
+      const s = ctx.solver;
+      const voltages = ctx.voltages;
+
       stampG(s, nodeCoil1, nodeCoil2, 1 / rCoil);
       stampG(s, nodeCommon, nodeThrow, gThrow());
       stampG(s, nodeCommon, nodeRest, gRest());
-    },
 
-    stampNonlinear(s: SparseSolver): void {
-      cachedSolverDT = s;
-      stampG(s, nodeCommon, nodeThrow, gThrow());
-      stampG(s, nodeCommon, nodeRest, gRest());
-    },
-
-    updateOperatingPoint(_voltages: Readonly<Float64Array>): void {},
-
-    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-      if (L <= 0 || dt <= 0 || cachedSolverDT === null) return;
-      const s = cachedSolverDT;
-      const factor = method === "bdf1" ? 1 : (method === "bdf2" ? 2 / 3 : 0.5);
-      geqL = (dt * factor) / L;
-      const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
-      const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
-      const vL = vCoil1 - vCoil2;
-      ieqL = method === "trapezoidal" ? iL + geqL * vL : iL;
-      stampG(s, nodeCoil1, nodeCoil2, geqL);
-      stampRHS(s, nodeCoil1, ieqL);
-      if (nodeCoil2 > 0) stampRHS(s, nodeCoil2, -ieqL);
-    },
-
-    updateState(dt: number, voltages: Float64Array): void {
-      if (L > 0 && dt > 0) {
+      if (ctx.isTransient && ctx.dt > 0 && L > 0) {
+        const factor = ctx.method === "bdf1" ? 1 : (ctx.method === "bdf2" ? 2 / 3 : 0.5);
+        geqL = (ctx.dt * factor) / L;
         const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
         const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
         const vL = vCoil1 - vCoil2;
-        iL = ieqL + geqL * vL + 0.5 * (dt / L) * vL;
+        ieqL = ctx.method === "trapezoidal" ? iL + geqL * vL : iL;
+        stampG(s, nodeCoil1, nodeCoil2, geqL);
+        stampRHS(s, nodeCoil1, ieqL);
+        if (nodeCoil2 > 0) stampRHS(s, nodeCoil2, -ieqL);
+      }
+    },
+
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+      const voltages = ctx.voltages;
+      if (L > 0 && ctx.dt > 0) {
+        const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;
+        const vCoil2 = nodeCoil2 > 0 ? voltages[nodeCoil2 - 1] : 0;
+        const vL = vCoil1 - vCoil2;
+        iL = ieqL + geqL * vL + 0.5 * (ctx.dt / L) * vL;
       }
       energised = Math.abs(iL) > iPull;
     },
@@ -829,22 +789,13 @@ export function createButtonLEDAnalogElement(
     isNonlinear: true,
     isReactive: false,
 
-    stamp(s: SparseSolver): void {
-      outputPin.stampOutput(s);
-      ledDiode.stamp(s);
+    load(ctx: LoadContext): void {
+      outputPin.stampOutput(ctx.solver);
+      ledDiode.load(ctx);
     },
 
-    stampNonlinear(s: SparseSolver): void {
-      outputPin.stampOutput(s);
-      ledDiode.stampNonlinear!(s);
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      ledDiode.updateOperatingPoint!(voltages);
-    },
-
-    checkConvergence(voltages: Float64Array, prevVoltages: Float64Array, reltol: number, abstol: number): boolean {
-      return ledDiode.checkConvergence!(voltages, prevVoltages, reltol, abstol);
+    checkConvergence(ctx: LoadContext): boolean {
+      return ledDiode.checkConvergence(ctx);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -855,7 +806,7 @@ export function createButtonLEDAnalogElement(
       const iOut = outputPin.isHiZ
         ? vOut / outputPin.rHiZ
         : (vOut - outputPin.currentVoltage) / outputPin.rOut;
-      const iLed = (ledDiode as SegmentDiodeElement).anodeCurrent(voltages);
+      const iLed = ledDiode.anodeCurrent(voltages);
       return [iOut, iLed];
     },
 

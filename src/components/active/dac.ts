@@ -35,8 +35,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import { DigitalInputPinModel } from "../../solver/analog/digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -286,10 +285,7 @@ function createDACElement(
     inputModels.push(model);
   }
 
-  // Solver cached from stamp() for use in stampCompanion()
-  let _solver: SparseSolver | null = null;
-
-  // Current output voltage (updated by updateOperatingPoint)
+  // Current output voltage (updated each load() pass)
   let _vOut = 0;
 
   function readNode(voltages: Float64Array, n: number): number {
@@ -311,11 +307,8 @@ function createDACElement(
     }
 
     if (bipolar) {
-      // Bipolar: symmetric, range [-vRef, +vRef]
-      // V_out = vRef · (2·code/2^N - 1)
       return vRefNow * (2 * code / maxCode - 1);
     } else {
-      // Unipolar: range [0, vRef · (2^N-1)/2^N]
       return vRefNow * code / maxCode;
     }
   }
@@ -325,12 +318,17 @@ function createDACElement(
     isNonlinear: true,
     isReactive: true,
 
-    stamp(solver: SparseSolver): void {
-      // Cache solver for use in stampCompanion (interface does not pass it there)
-      _solver = solver;
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
+      const voltages = ctx.voltages;
+
+      _vOut = computeOutputVoltage(voltages);
+
       // Stamp G_out from OUT to GND (Norton output resistance)
       if (nOut > 0) {
         solver.stamp(nOut - 1, nOut - 1, G_out);
+        // Norton current source: I = V_out · G_out injected at OUT node
+        solver.stampRHS(nOut - 1, _vOut * G_out);
       }
       // Stamp input loading for each digital input pin
       for (let i = 0; i < bits; i++) {
@@ -339,56 +337,45 @@ function createDACElement(
           inputModels[i].stamp(solver);
         }
       }
-    },
 
-    stampNonlinear(solver: SparseSolver): void {
-      // Norton current source: I = V_out · G_out injected at OUT node
-      if (nOut > 0) {
-        solver.stampRHS(nOut - 1, _vOut * G_out);
+      // Transient: companion stamps for input capacitances.
+      if (ctx.isTransient && ctx.dt > 0) {
+        for (let i = 0; i < bits; i++) {
+          if (nDigitalBits[i] > 0) {
+            inputModels[i].stampCompanion(solver, ctx.dt, ctx.method);
+          }
+        }
       }
     },
 
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      _vOut = computeOutputVoltage(voltages);
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+      if (ctx.dt <= 0) return;
+      const voltages = ctx.voltages;
+      for (let i = 0; i < bits; i++) {
+        const nD = nDigitalBits[i];
+        if (nD > 0) {
+          inputModels[i].updateCompanion(ctx.dt, ctx.method, readNode(voltages, nD));
+        }
+      }
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
       const currents: number[] = [];
 
-      // D0..D(N-1): DigitalInputPinModel — loading conductance 1/rIn to ground
-      // I = V_pin / rIn  (positive = into element)
       const rIn = p.rIn;
       for (let i = 0; i < bits; i++) {
         const v = readNode(voltages, nDigitalBits[i]);
         currents.push(nDigitalBits[i] > 0 ? v / rIn : 0);
       }
 
-      // VREF: passive — no conductance stamped, behavioral approximation → 0
-      currents.push(0);
+      currents.push(0); // VREF
 
-      // OUT: Norton equivalent — I = (V_out_node - V_target) / rOut
-      // Positive = current flowing into element (element sinking)
       const vOut = readNode(voltages, nOut);
       currents.push(nOut > 0 ? (vOut - _vOut) * G_out : 0);
 
-      // GND: passive — no conductance stamped, behavioral approximation → 0
-      currents.push(0);
+      currents.push(0); // GND
 
-      // Sum is nonzero — residual is implicit supply current (expected for behavioral model)
       return currents;
-    },
-
-    stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array): void {
-      if (_solver === null) return;
-      // Stamp C_in companion model for each digital input
-      for (let i = 0; i < bits; i++) {
-        const nD = nDigitalBits[i];
-        if (nD > 0) {
-          const vD = readNode(voltages, nD);
-          inputModels[i].stampCompanion(_solver, dt, method);
-          inputModels[i].updateCompanion(dt, method, vD);
-        }
-      }
     },
 
     setParam(key: string, value: number): void {

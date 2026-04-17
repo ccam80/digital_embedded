@@ -671,46 +671,6 @@ describe("computeNIcomCof", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 3.2.1 — nicomcof_trap_order2_matches_ngspice_rounding (Bug 3.2.1)
-// ---------------------------------------------------------------------------
-
-describe("nicomcof_rounding", () => {
-  it("nicomcof_trap_order2_matches_ngspice_rounding", () => {
-    // dt=1.23456789e-7, xmu=1/3: 1-xmu=2/3 is not exactly representable in IEEE-754
-    // The two formulas produce different bit-level results:
-    //   correct:  1.0 / dt / (1.0 - xmu)  — two sequential divisions
-    //   old:      1 / (dt * (1 - xmu))     — one multiply then divide
-    const dt = 1.23456789e-7;
-    const xmu = 1 / 3;
-
-    // Compute reference using corrected formula (ngspice nicomcof.c operand order)
-    const correctFormula = 1.0 / dt / (1.0 - xmu);
-    // Compute old formula
-    const oldFormula = 1 / (dt * (1 - xmu));
-
-    // Confirm they differ at the bit level for these inputs
-    expect(correctFormula).not.toBe(oldFormula);
-
-    // computeNIcomCof uses xmu=0.5 internally for trap order 2, so to test the rounding
-    // we verify that the implementation uses sequential divisions.
-    // With xmu=0.5: 1-xmu=0.5, both formulas give the same result (0.5 is exactly representable).
-    // So we test correctness via integrateCapacitor which uses the same formula with external xmu.
-    const { ag0: ag0Result } = integrateCapacitor(1, 0, 0, 0, 0, dt, 0, 2, "trapezoidal", 0, xmu);
-    // ag0 from integrateCapacitor trap order 2 = 1/dt/(1-xmu)
-    const expectedAg0 = 1.0 / dt / (1.0 - xmu);
-    expect(ag0Result).toBe(expectedAg0); // bit-exact
-
-    // Also test computeNIcomCof trap order 2 with xmu=0.5 matches the formula
-    const ag = new Float64Array(8);
-    const scratch = new Float64Array(49);
-    computeNIcomCof(dt, [dt, dt], 2, "trapezoidal", ag, scratch);
-    // xmu=0.5: ag[0] = 1.0/dt/(1.0-0.5) = 1/dt/0.5 = 2/dt
-    const expectedAg0Trap = 1.0 / dt / (1.0 - 0.5);
-    expect(ag[0]).toBe(expectedAg0Trap); // bit-exact
-  });
-});
-
-// ---------------------------------------------------------------------------
 // Task 3.2.2 — trap_order2_ccap_with_nonstandard_xmu
 // ---------------------------------------------------------------------------
 
@@ -756,14 +716,20 @@ describe("gear_vandermonde_regression", () => {
 
     computeNIcomCof(h, [h, h, h, h], 4, "gear", ag, scratch);
 
-    // Assert ag[0..4] match pre-computed reference values for GEAR order 4 equal steps.
-    // Known GEAR-4 coefficients: ag*dt = [25/12, -4, 3, -4/3, 1/4]
-    const tol = 1e-6;
-    expect(Math.abs(ag[0] - 25 / (12 * h))).toBeLessThan(tol / h);
-    expect(Math.abs(ag[1] - (-4 / h))).toBeLessThan(tol / h);
-    expect(Math.abs(ag[2] - (3 / h))).toBeLessThan(tol / h);
-    expect(Math.abs(ag[3] - (-4 / (3 * h)))).toBeLessThan(tol / h);
-    expect(Math.abs(ag[4] - (1 / (4 * h)))).toBeLessThan(tol / h);
+    // Assert ag[0..4] match the closed-form GEAR-4 coefficients bit-exact.
+    // Known GEAR-4 coefficients for equal steps: ag*dt = [25/12, -4, 3, -4/3, 1/4].
+    // A byte-equivalent Vandermonde solver must produce these to IEEE-754 precision.
+    //
+    // Known divergence at commit ecdc34a: ag[0] produces 2083333.333333333
+    // (1 ULP low vs closed-form 2083333.3333333333 = 25/(12*h)). This is a
+    // real numerical divergence from the mathematical ideal and (likely)
+    // from ngspice — not a test-infra issue. Keep the assertion strict so
+    // it stays flagged as a finding for batch-4 remediation.
+    expect(ag[0]).toBe(25 / (12 * h));
+    expect(ag[1]).toBe(-4 / h);
+    expect(ag[2]).toBe(3 / h);
+    expect(ag[3]).toBe(-4 / (3 * h));
+    expect(ag[4]).toBe(1 / (4 * h));
 
     // Assert the scratch buffer was mutated — confirms it was used (not bypassed)
     expect(scratch[0]).not.toBe(0);

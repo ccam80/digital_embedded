@@ -60,7 +60,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import type { AnalogElementCore, IntegrationMethod } from "../../solver/analog/element.js";
+import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -290,8 +290,8 @@ export class RealOpAmpElement extends AbstractCircuitElement {
  * MNA formulation — Norton/VCVS hybrid with proper Jacobian:
  *
  * Input stage:
- *   - R_in conductance between in+ and in- (always linear, stamped in stamp())
- *   - Bias current sources I_bias stamped in stampNonlinear()
+ *   - R_in conductance between in+ and in-
+ *   - Bias current sources I_bias stamped at the input nodes
  *
  * Gain stage (DC: same as ideal op-amp VCVS; transient: companion integrator):
  *
@@ -301,9 +301,9 @@ export class RealOpAmpElement extends AbstractCircuitElement {
  *
  *   The NR linearization at operating point (Vinp0, Vinn0, Vout0):
  *     MNA row for out:
- *       G[out,out] += G_out                   (stamped in stamp())
- *       G[out,in+] -= A_eff * G_out           (Jacobian: stampNonlinear)
- *       G[out,in-] += A_eff * G_out           (Jacobian: stampNonlinear)
+ *       G[out,out] += G_out
+ *       G[out,in+] -= A_eff * G_out           (Jacobian: output depends on in+)
+ *       G[out,in-] += A_eff * G_out           (Jacobian: output depends on in-)
  *       RHS[out]   += G_out * (V_int - A_eff * (Vinp0 - Vinn0))
  *
  *   This is the standard NR linearization: f(x) = f(x0) + f'(x0)*(x-x0).
@@ -320,7 +320,7 @@ export class RealOpAmpElement extends AbstractCircuitElement {
  * Current limiting:
  *   When |I_out| > I_max: inject a constant current ±I_max instead.
  *
- * Transient (stampCompanion active):
+ * Transient:
  *   A_eff is reduced by the companion integrator's bandwidth-limiting factor.
  *   The effective gain at frequency ω is A_OL / (1 + jω*τ), implemented as
  *   a first-order BDF-1 update of V_int each timestep with slew-rate clamping.
@@ -363,7 +363,7 @@ export function createRealOpAmpElement(
   const nVccN = pinNodes.get("Vcc-")!; // negative supply
 
   // Internal gain-stage state — not an MNA node.
-  // Updated each NR iteration in updateOperatingPoint.
+  // Updated each NR iteration inside load().
   let vInt = 0;
 
   // Operating point voltages
@@ -424,104 +424,27 @@ export function createRealOpAmpElement(
       scale = factor;
     },
 
-    stamp(solver: SparseSolver): void {
-      const G_in  = 1 / Math.max(p.rIn,  1e-9);
-      const G_out = 1 / Math.max(p.rOut, 1e-9);
-      // Input resistance between in+ and in- (always present)
-      stampCond(solver, nInp, nInn, G_in);
-
-      // Output conductance G_out (always present for NR stability)
-      if (nOut > 0) {
-        solver.stamp(nOut - 1, nOut - 1, G_out);
-      }
-    },
-
-    stampCompanion(
-      dt: number,
-      _method: IntegrationMethod,
-      voltages: Float64Array,
-    ): void {
-      // Record the previous accepted-timestep vInt and output voltage, and set
-      // up the companion conductance geq_int = tau/dt for the gain-stage integrator.
-      vIntPrev = vInt;
-      _vOutPrev = readNode(voltages, nOut);
-      const tau = Math.max(p.aol, 1) / (2 * Math.PI * Math.max(p.gbw, 1));
-      geq_int  = tau / dt;
-    },
-
-    stampNonlinear(solver: SparseSolver): void {
-      const G_out = 1 / Math.max(p.rOut, 1e-9);
-      // 1. Input bias currents
-      const iBiasScaled = Math.abs(p.iBias) * scale;
-      if (nInp > 0) solver.stampRHS(nInp - 1, -iBiasScaled);
-      if (nInn > 0) solver.stampRHS(nInn - 1, -iBiasScaled);
-
-      if (nOut <= 0) return;
-
-      // 2. Gain-stage output
-      //
-      // DC/small-signal unsaturated case:
-      //   V_out ≈ A_eff * (V_diff + V_os)
-      //   Linearizing around (vInp, vInn):
-      //     f(V_diff) = A_eff * V_diff + A_eff * V_os
-      //     f'(V_diff) = A_eff
-      //   NR MNA (Norton form):
-      //     G[out, in+] -= A_eff * G_out    (Jacobian: output depends on in+)
-      //     G[out, in-] += A_eff * G_out    (Jacobian: output depends on in-)
-      //     RHS[out]    += G_out * A_eff * V_os   (constant bias offset)
-      //
-      //   This is identical to the ideal op-amp stamp. The V_os offset shifts
-      //   the virtual-ground equilibrium by V_os.
-      //
-      // Saturated case: same as ideal op-amp — drive output to clamp level.
-      //
-      // Slewing case (transient only): output tracks vInt directly.
-
-      if (outputSaturated) {
-        // Output clamped to rail — no input coupling
-        solver.stampRHS(nOut - 1, outputClampLevel * G_out);
-
-      } else if (currentLimited) {
-        // Output current limited — inject ±I_max as a Norton current source.
-        // G_out is already stamped by stamp(); RHS carries only the current source.
-        solver.stampRHS(nOut - 1, iOutLimited);
-
-      } else if (slewLimited) {
-        // Slewing: output tracks vInt directly with no Jacobian coupling to inputs.
-        // The output is driven toward vInt by the Norton current source.
-        solver.stampRHS(nOut - 1, vInt * G_out);
-
-      } else {
-        // Normal operation: bandwidth-limited VCVS with BDF-1 history current.
-        //
-        // The gain-stage BDF-1 companion gives:
-        //   vInt = aEff * vDiff + ieq/G_out
-        // where:
-        //   aEff = p.aol / (1 + geq_int)   (bandwidth-limited gain)
-        //   ieq  = (geq_int / (1 + geq_int)) * vIntPrev * G_out  (history current)
-        //
-        // In DC mode geq_int = 0, so aEff = p.aol and ieq = 0 (pure VCVS).
-        // In transient mode the history current carries forward the previous
-        // accepted vIntPrev, making the NR equation linear and convergent in
-        // one iteration regardless of the initial iterate.
-        const aEffScaled = aEff * scale;
-        const ieq = geq_int > 0
-          ? (geq_int / (1 + geq_int)) * vIntPrev * G_out
-          : 0;
-        if (nInp > 0) solver.stamp(nOut - 1, nInp - 1, -aEffScaled * G_out);
-        if (nInn > 0) solver.stamp(nOut - 1, nInn - 1,  aEffScaled * G_out);
-        // History current + V_os offset
-        solver.stampRHS(nOut - 1, ieq + aEffScaled * G_out * p.vos * scale);
-      }
-    },
-
-    updateOperatingPoint(voltages: Readonly<Float64Array>): void {
-      const G_out  = 1 / Math.max(p.rOut,  1e-9);
+    load(ctx: LoadContext): void {
+      const solver = ctx.solver;
+      const voltages = ctx.voltages;
+      const G_in   = 1 / Math.max(p.rIn,  1e-9);
+      const G_out  = 1 / Math.max(p.rOut, 1e-9);
       const iMax   = Math.max(p.iMax,   1e-12);
       const vSatPos = Math.max(p.vSatPos, 0);
       const vSatNeg = Math.max(p.vSatNeg, 0);
       const aol    = Math.max(p.aol, 1);
 
+      // Update companion coefficient at the start of each NR iteration.
+      // During transient NR: geq_int = tau/dt. During DC: geq_int = 0 (no
+      // history term, pure VCVS).
+      if (ctx.isTransient && ctx.dt > 0) {
+        const tau = aol / (2 * Math.PI * Math.max(p.gbw, 1));
+        geq_int = tau / ctx.dt;
+      } else {
+        geq_int = 0;
+      }
+
+      // Evaluate operating point from current NR-iterate voltages.
       vInp  = readNode(voltages, nInp);
       vInn  = readNode(voltages, nInn);
       vVccP = readNode(voltages, nVccP);
@@ -531,17 +454,11 @@ export function createRealOpAmpElement(
       const vDiff = vInp - vInn;
       const vOsScaled = p.vos * scale;
 
-      // Supply rail limits
       const vRailPos = vVccP - vSatPos;
       const vRailNeg = vVccN + vSatNeg;
 
       if (geq_int > 0) {
         // Transient: re-evaluate slew state from current NR-iterate voltages.
-        // With the BDF-1 history current in stampNonlinear, normal-mode NR is
-        // linear and converges in one iteration regardless of the starting point,
-        // so re-evaluating slewLimited/aEff on every call is safe — there is no
-        // oscillation risk as long as the stamp and the operating-point update
-        // agree on the slew state.
         const g = geq_int;
         const tau = aol / (2 * Math.PI * Math.max(p.gbw, 1));
         const dt = tau / g;
@@ -553,19 +470,15 @@ export function createRealOpAmpElement(
         vInt = vIntPrev + clampedDelta;
         aEff = slewLimited ? 0 : aol / (1 + g);
 
-        // Rail clamp on freshly computed vInt
         if (vVccP > vVccN) {
           vInt = Math.max(vRailNeg, Math.min(vRailPos, vInt));
         } else {
           vInt = Math.max(-1000, Math.min(1000, vInt));
         }
       } else {
-        // DC: V_int tracks A_OL*(V_diff + V_os) directly
         vInt = aol * (vDiff + vOsScaled);
         aEff = aol;
         slewLimited = false;
-
-        // Rail clamp
         if (vVccP > vVccN) {
           vInt = Math.max(vRailNeg, Math.min(vRailPos, vInt));
         } else {
@@ -573,7 +486,6 @@ export function createRealOpAmpElement(
         }
       }
 
-      // Determine output saturation from output node voltage
       if (vVccP > vVccN && vOut >= vRailPos) {
         outputSaturated  = true;
         outputClampLevel = vRailPos;
@@ -585,13 +497,6 @@ export function createRealOpAmpElement(
         outputClampLevel = 0;
       }
 
-      // Output current limiting: only meaningful when the output is saturated.
-      // In linear (non-saturated) operation the closed-loop feedback sets V_out,
-      // so the Norton current (vInt - vOut)*G_out is not the actual load current.
-      // Applying current limiting in the linear region causes NR oscillation
-      // because vInt is the huge unclamped open-loop voltage during iteration.
-      // When saturated, vInt is rail-clamped and (vInt - vOut)*G_out correctly
-      // represents the drive current into the load.
       if (outputSaturated) {
         const iOutNow = (outputClampLevel - vOut) * G_out;
         if (Math.abs(iOutNow) > iMax) {
@@ -605,6 +510,46 @@ export function createRealOpAmpElement(
         currentLimited = false;
         iOutLimited    = 0;
       }
+
+      // Linear topology stamps:
+      // Input resistance between in+ and in-
+      stampCond(solver, nInp, nInn, G_in);
+      // Output conductance G_out (always present for NR stability)
+      if (nOut > 0) {
+        solver.stamp(nOut - 1, nOut - 1, G_out);
+      }
+
+      // Input bias currents
+      const iBiasScaled = Math.abs(p.iBias) * scale;
+      if (nInp > 0) solver.stampRHS(nInp - 1, -iBiasScaled);
+      if (nInn > 0) solver.stampRHS(nInn - 1, -iBiasScaled);
+
+      if (nOut <= 0) return;
+
+      // Gain-stage output
+      if (outputSaturated) {
+        solver.stampRHS(nOut - 1, outputClampLevel * G_out);
+      } else if (currentLimited) {
+        solver.stampRHS(nOut - 1, iOutLimited);
+      } else if (slewLimited) {
+        solver.stampRHS(nOut - 1, vInt * G_out);
+      } else {
+        // Normal operation: bandwidth-limited VCVS with BDF-1 history current.
+        const aEffScaled = aEff * scale;
+        const ieq = geq_int > 0
+          ? (geq_int / (1 + geq_int)) * vIntPrev * G_out
+          : 0;
+        if (nInp > 0) solver.stamp(nOut - 1, nInp - 1, -aEffScaled * G_out);
+        if (nInn > 0) solver.stamp(nOut - 1, nInn - 1,  aEffScaled * G_out);
+        solver.stampRHS(nOut - 1, ieq + aEffScaled * G_out * p.vos * scale);
+      }
+    },
+
+    accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
+      // Record the accepted-timestep vInt and output voltage so the next
+      // step's BDF-1 history term uses the converged state.
+      vIntPrev = vInt;
+      _vOutPrev = readNode(ctx.voltages, nOut);
     },
 
     getPinCurrents(_voltages: Float64Array): number[] {
