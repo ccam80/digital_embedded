@@ -10,12 +10,8 @@
 import { describe, it, expect } from "vitest";
 import { ZenerDiodeDefinition, createZenerElement } from "../zener.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -361,16 +357,10 @@ describe("Integration", () => {
     const { element: zenerStated } = withState(zenerCore);
     const z = withNodeIds(zenerStated, [0, 1]);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [vs, r, z],
       matrixSize,
       nodeCount: 2,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);

@@ -411,7 +411,8 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     let elemConverged = false;
     let largestChangeNode = 0;
     let largestChangeMag = 0;
-    let convergenceFailedElements: string[] = [];
+    const convergenceFailedElements = ctx.convergenceFailures;
+    convergenceFailedElements.length = 0;
 
     if (assembler.noncon === 0 && iteration > 0) {
       globalConverged = true;
@@ -431,14 +432,20 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       if (ctx.detailedConvergence) {
         const detailed = assembler.checkAllConvergedDetailed(elements, voltages, prevVoltages, reltol, iabstol);
         elemConverged = detailed.allConverged;
-        convergenceFailedElements = detailed.failedIndices.map(i => elements[i].label ?? `element_${i}`);
+        convergenceFailedElements.length = 0;
+        for (const i of detailed.failedIndices) {
+          convergenceFailedElements.push(elements[i].label ?? `element_${i}`);
+        }
       } else {
         elemConverged = assembler.checkAllConverged(elements, voltages, prevVoltages, reltol, iabstol);
       }
     } else if (assembler.noncon > 0 && iteration > 0 && ctx.detailedConvergence) {
       const detailed = assembler.checkAllConvergedDetailed(elements, voltages, prevVoltages, reltol, iabstol);
       elemConverged = false;
-      convergenceFailedElements = detailed.failedIndices.map(i => elements[i].label ?? `element_${i}`);
+      convergenceFailedElements.length = 0;
+      for (const i of detailed.failedIndices) {
+        convergenceFailedElements.push(elements[i].label ?? `element_${i}`);
+      }
     }
 
     // ---- STEP I: Newton damping (ngspice niiter.c:204-229) ----

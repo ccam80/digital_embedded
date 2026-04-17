@@ -17,12 +17,8 @@ import {
   SwitchSPDTDefinition,
 } from "../analog-switch.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
@@ -203,7 +199,7 @@ describe("SPST", () => {
       isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
-      stamp(solver: SparseSolver): void {
+      stamp(solver: SparseSolverType): void {
         solver.stamp(nOut - 1, nOut - 1, 1 / 1000);
       },
     };
@@ -211,15 +207,10 @@ describe("SPST", () => {
     const vsCtrl = makeDcVoltageSource(nCtrl, 0, brCtrl, 3.3);
     const vsIn   = makeDcVoltageSource(nIn,   0, brIn,   1.0);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [sw, rLoad, vsCtrl as unknown as AnalogElement, vsIn as unknown as AnalogElement],
       matrixSize,
       nodeCount: 3,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);
@@ -246,7 +237,7 @@ describe("SPST", () => {
       isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
-      stamp(solver: SparseSolver): void {
+      stamp(solver: SparseSolverType): void {
         solver.stamp(nOut - 1, nOut - 1, 1 / 1000);
       },
     };
@@ -254,15 +245,10 @@ describe("SPST", () => {
     const vsCtrl = makeDcVoltageSource(nCtrl, 0, brCtrl, 1.65); // exactly at threshold
     const vsIn   = makeDcVoltageSource(nIn,   0, brIn,   1.0);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [sw, rLoad, vsCtrl as unknown as AnalogElement, vsIn as unknown as AnalogElement],
       matrixSize,
       nodeCount: 3,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);

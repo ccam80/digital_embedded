@@ -20,11 +20,9 @@ import {
   CRYSTAL_ATTRIBUTE_MAPPINGS,
 } from "../crystal.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
+import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
+import { runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 
@@ -259,16 +257,10 @@ describe("Crystal", () => {
         },
       };
 
-      const solver = new SparseSolver();
-      const diagnostics = new DiagnosticCollector();
-
-      const result = solveDcOperatingPoint({
-        solver,
+      const result = runDcOp({
         elements: [vs, crystal, gminShunts],
         matrixSize: 5,
         nodeCount: 3,
-        params: DEFAULT_SIMULATION_PARAMS,
-        diagnostics,
       });
 
       expect(result.converged).toBe(true);

@@ -206,6 +206,8 @@ export class MNAEngine implements AnalogEngine {
     );
     // Wire ctx's solver to the same SparseSolver instance used by the engine.
     this._ctx.solver = this._solver;
+    // Bind pre-iteration hook once so step() never allocates a new closure.
+    this._ctx.preIterationHook = this._companionPreIterationHook.bind(this);
     // Wire diagnostics
     this._ctx.diagnostics = this._diagnostics;
 
@@ -355,7 +357,7 @@ export class MNAEngine implements AnalogEngine {
     // Elements read/write states[0] during NR; states[1] holds the last accepted state.
     if (statePool) {
       statePool.rotateStateVectors();
-      statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
+      statePool.refreshElementRefs(this._ctx!.poolBackedElements as unknown as PoolBackedAnalogElement[]);
     }
 
     // Phase tracking for stepPhaseHook: first attempt is tranInit on step 0, tranNR thereafter.
@@ -444,14 +446,6 @@ export class MNAEngine implements AnalogEngine {
       ctx.dcopModeLadder = null;
       ctx.exactMaxIterations = false;
       ctx.onIteration0Complete = null;
-      ctx.preIterationHook = (_iteration, iterVoltages) => {
-        const currentMethod = this._timestep.currentMethod;
-        for (const el of elements) {
-          if (el.isReactive && el.isNonlinear && el.stampCompanion) {
-            el.stampCompanion(dt, currentMethod, iterVoltages, this._timestep.currentOrder, this._timestep.deltaOld);
-          }
-        }
-      };
       newtonRaphson(ctx);
       const nrResult = ctx.nrResult;
 
@@ -661,9 +655,10 @@ export class MNAEngine implements AnalogEngine {
     }
 
     // Schedule next waveform breakpoints after acceptance
+    const addBP = this._ctx!.addBreakpointBound;
     for (const el of elements) {
       if (el.acceptStep) {
-        el.acceptStep(this._simTime, (t) => this._timestep.addBreakpoint(t));
+        el.acceptStep(this._simTime, addBP);
       }
     }
 
@@ -1101,6 +1096,22 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
 
   /**
+   * Pre-iteration hook for transient NR: re-stamps reactive nonlinear companion
+   * models at the current iteration voltages. Bound once at init() and stored
+   * on ctx.preIterationHook to avoid creating a new closure per step.
+   */
+  private _companionPreIterationHook(_iteration: number, iterVoltages: Float64Array): void {
+    const currentMethod = this._timestep.currentMethod;
+    const dt = this._timestep.currentDt;
+    const elements = this._compiled!.elements;
+    for (const el of elements) {
+      if (el.isReactive && el.isNonlinear && el.stampCompanion) {
+        el.stampCompanion(dt, currentMethod, iterVoltages, this._timestep.currentOrder, this._timestep.deltaOld);
+      }
+    }
+  }
+
+  /**
    * Post-convergence seeding sequence shared by dcOperatingPoint() and
    * _transientDcop().
    *
@@ -1140,7 +1151,7 @@ export class MNAEngine implements AnalogEngine {
       cac.statePool.ag[0] = 0;
       cac.statePool.ag[1] = 0;
       cac.statePool.seedHistory();
-      cac.statePool.refreshElementRefs(elements.filter(isPoolBacked) as unknown as PoolBackedAnalogElement[]);
+      cac.statePool.refreshElementRefs(this._ctx!.poolBackedElements as unknown as PoolBackedAnalogElement[]);
       this._firsttime = true;
     }
 

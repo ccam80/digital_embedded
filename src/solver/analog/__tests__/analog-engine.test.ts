@@ -790,3 +790,36 @@ describe("runner_integration", () => {
     expect(vMid).toBeCloseTo(2.5, 2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 1.2.2 — no_closures_in_step
+// ---------------------------------------------------------------------------
+
+describe("no_closures_in_step", () => {
+  it("no_closures_in_step", () => {
+    // Build an RC circuit (has reactive nonlinear-ish cap) so preIterationHook
+    // and addBreakpointBound are exercised every step.
+    const circuit = makeRCCircuit();
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    engine.dcOperatingPoint();
+    engine.start();
+
+    // Capture bound references from ctx after init — these must never change.
+    const ctx = (engine as unknown as { _ctx: { preIterationHook: unknown; addBreakpointBound: unknown; convergenceFailures: string[] } })._ctx;
+    const hookRef = ctx.preIterationHook;
+    const bpRef = ctx.addBreakpointBound;
+    const failuresArr = ctx.convergenceFailures;
+
+    // Run 10 transient steps.
+    for (let i = 0; i < 10; i++) {
+      engine.step();
+    }
+
+    // Function references must be identical — no new closures created per step.
+    expect(ctx.preIterationHook).toBe(hookRef);
+    expect(ctx.addBreakpointBound).toBe(bpRef);
+    // convergenceFailures array identity must be stable — reset in-place, not reallocated.
+    expect(ctx.convergenceFailures).toBe(failuresArr);
+  });
+});

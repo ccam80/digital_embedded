@@ -18,9 +18,7 @@ import {
 } from "../analog-fuse.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
+import { runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { Diagnostic } from "../../../compile/types.js";
@@ -279,16 +277,10 @@ describe("AnalogFuseElement", () => {
       const fuse = new AnalogFuseElement([1, 0], rCold, 1e9, 100.0);
       const vs = makeDcVoltageSource(1, 0, 1, 1.0) as unknown as AnalogElement;
 
-      const solver = new SparseSolver();
-      const diagnostics = new DiagnosticCollector();
-
-      const result = solveDcOperatingPoint({
-        solver,
+      const result = runDcOp({
         elements: [vs, fuse],
         matrixSize: 2,
         nodeCount: 1,
-        params: DEFAULT_SIMULATION_PARAMS,
-        diagnostics,
       });
 
       expect(result.converged).toBe(true);
@@ -329,16 +321,10 @@ describe("AnalogFuseElement", () => {
         },
       };
 
-      const solver = new SparseSolver();
-      const diagnostics = new DiagnosticCollector();
-
-      const result = solveDcOperatingPoint({
-        solver,
+      const result = runDcOp({
         elements: [vs, fuse, loadResistor],
         matrixSize: 3,
         nodeCount: 2,
-        params: DEFAULT_SIMULATION_PARAMS,
-        diagnostics,
       });
 
       expect(result.converged).toBe(true);

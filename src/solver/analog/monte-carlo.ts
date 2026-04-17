@@ -17,8 +17,7 @@ import { EngineState } from "../../core/engine-interface.js";
 import type { ConcreteCompiledAnalogCircuit } from "./compiled-analog-circuit.js";
 import { MNAEngine } from "./analog-engine.js";
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
-import { SparseSolver } from "./sparse-solver.js";
-import { DiagnosticCollector } from "./diagnostics.js";
+import { CKTCircuitContext } from "./ckt-context.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
@@ -322,17 +321,9 @@ function runDcSync(compiled: ConcreteCompiledAnalogCircuit): {
   converged: boolean;
   nodeVoltages: Float64Array;
 } {
-  const solver = new SparseSolver();
-  const diagnostics = new DiagnosticCollector();
-  const result = solveDcOperatingPoint({
-    solver,
-    elements: compiled.elements,
-    matrixSize: compiled.matrixSize,
-    nodeCount: compiled.nodeCount,
-    params: DEFAULT_SIMULATION_PARAMS,
-    diagnostics,
-  });
-  return { converged: result.converged, nodeVoltages: result.nodeVoltages };
+  const ctx = new CKTCircuitContext(compiled, DEFAULT_SIMULATION_PARAMS, () => {});
+  solveDcOperatingPoint(ctx);
+  return { converged: ctx.dcopResult.converged, nodeVoltages: ctx.dcopResult.nodeVoltages };
 }
 
 // ---------------------------------------------------------------------------

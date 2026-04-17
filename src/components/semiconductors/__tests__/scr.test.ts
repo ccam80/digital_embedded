@@ -16,12 +16,8 @@ import { describe, it, expect } from "vitest";
 import { createScrElement, ScrDefinition, SCR_PARAM_DEFAULTS } from "../scr.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
@@ -147,16 +143,10 @@ describe("SCR", () => {
     const vs = withNodeIds(makeDcVoltageSource(2, 0, 2, 50), [2, 0]);
     const rLoad = makeResistorElement(2, 1, 10000); // 10kΩ
 
-    const solver = new SparseSolver();
-    const diag = new DiagnosticCollector();
-
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [vs, rLoad, scr],
       matrixSize,
       nodeCount: 2,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics: diag,
     });
 
     expect(result.converged).toBe(true);

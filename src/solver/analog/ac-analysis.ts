@@ -25,11 +25,11 @@
 import { ComplexSparseSolver } from "./complex-sparse-solver.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
-import { SparseSolver } from "./sparse-solver.js";
+import { CKTCircuitContext } from "./ckt-context.js";
 import type { AnalogElement } from "./element.js";
 import type { SimulationParams } from "../../core/analog-engine-interface.js";
 import type { Diagnostic } from "../../compile/types.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../core/analog-engine-interface.js";
+import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------
 // AcParams, AcResult — canonical home is core/analog-types.ts; re-exported here
@@ -82,16 +82,9 @@ export class AcAnalysis {
     const { compiled, diagnostics } = this._setupAnalysis();
 
     // Step 1: Solve DC operating point
-    const dcSolver = new SparseSolver();
-    const dcDiagnostics = new DiagnosticCollector();
-    const dcResult = solveDcOperatingPoint({
-      solver: dcSolver,
-      elements: compiled.elements,
-      matrixSize: compiled.matrixSize,
-      nodeCount: compiled.nodeCount,
-      params: this._params,
-      diagnostics: dcDiagnostics,
-    });
+    const dcCtx = new CKTCircuitContext(compiled, resolveSimulationParams(this._params), () => {});
+    solveDcOperatingPoint(dcCtx);
+    const dcResult = dcCtx.dcopResult;
 
     // After DC OP, nonlinear elements have their small-signal parameters set.
     // We don't need the DC voltages explicitly — they're baked into element state.

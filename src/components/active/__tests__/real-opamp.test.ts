@@ -13,11 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { RealOpAmpDefinition, createRealOpAmpElement, REAL_OPAMP_MODELS } from "../real-opamp.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
@@ -149,16 +145,7 @@ function makeOpAmp(
  * Solve DC operating point for given elements.
  */
 function solveDC(elements: AnalogElement[], matrixSize: number, nodeCount: number) {
-  const solver  = new SparseSolver();
-  const diags   = new DiagnosticCollector();
-  return solveDcOperatingPoint({
-    solver,
-    elements,
-    matrixSize,
-    nodeCount,
-    params: DEFAULT_SIMULATION_PARAMS,
-    diagnostics: diags,
-  });
+  return runDcOp({ elements, matrixSize, nodeCount });
 }
 
 // ---------------------------------------------------------------------------
@@ -187,16 +174,7 @@ function runTransient(
     }
 
     // NR solve for this timestep
-    const stepSolver  = new SparseSolver();
-    const stepDiags   = new DiagnosticCollector();
-    const result = solveDcOperatingPoint({
-      solver: stepSolver,
-      elements,
-      matrixSize,
-      nodeCount,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics: stepDiags,
-    });
+    const result = runDcOp({ elements, matrixSize, nodeCount });
 
     voltages.set(result.nodeVoltages);
     vOut[i] = voltages[outputNode - 1];

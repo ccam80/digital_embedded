@@ -264,46 +264,58 @@
   },
   "hotPaths": [
     {
+      "path": "src\\solver\\analog\\analog-engine.ts",
+      "accessCount": 59,
+      "lastAccessed": 1776406160719,
+      "type": "directory"
+    },
+    {
       "path": "src\\solver\\analog\\sparse-solver.ts",
-      "accessCount": 34,
-      "lastAccessed": 1776402064572,
+      "accessCount": 49,
+      "lastAccessed": 1776404198474,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 21,
-      "lastAccessed": 1776402002159,
+      "accessCount": 37,
+      "lastAccessed": 1776406011504,
       "type": "file"
     },
     {
       "path": "",
-      "accessCount": 16,
-      "lastAccessed": 1776371694322,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog",
-      "accessCount": 15,
-      "lastAccessed": 1776401615134,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\mna-assembler.ts",
-      "accessCount": 13,
-      "lastAccessed": 1776401152922,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\analog-engine.ts",
-      "accessCount": 11,
-      "lastAccessed": 1776371699984,
+      "accessCount": 34,
+      "lastAccessed": 1776404710582,
       "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\dc-operating-point.ts",
-      "accessCount": 10,
-      "lastAccessed": 1776371705460,
+      "accessCount": 23,
+      "lastAccessed": 1776405617334,
       "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\integration.ts",
+      "accessCount": 18,
+      "lastAccessed": 1776405927736,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog",
+      "accessCount": 18,
+      "lastAccessed": 1776406147711,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\mna-assembler.ts",
+      "accessCount": 15,
+      "lastAccessed": 1776404104642,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 9,
+      "lastAccessed": 1776406151754,
+      "type": "directory"
     },
     {
       "path": "ref\\ngspice\\src",
@@ -318,9 +330,15 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\integration.ts",
-      "accessCount": 7,
-      "lastAccessed": 1776371704803,
+      "path": "src\\solver\\analog\\element.ts",
+      "accessCount": 6,
+      "lastAccessed": 1776403013775,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\ckt-terr.ts",
+      "accessCount": 6,
+      "lastAccessed": 1776406124869,
       "type": "file"
     },
     {
@@ -330,27 +348,9 @@
       "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 5,
-      "lastAccessed": 1776371726310,
-      "type": "file"
-    },
-    {
       "path": "ref/ngspice/src/spicelib/analysis/dctran.c",
       "accessCount": 4,
       "lastAccessed": 1776333530460,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\ckt-terr.ts",
-      "accessCount": 4,
-      "lastAccessed": 1776371651712,
-      "type": "file"
-    },
-    {
-      "path": "src",
-      "accessCount": 4,
-      "lastAccessed": 1776400496038,
       "type": "directory"
     },
     {
@@ -382,6 +382,12 @@
       "accessCount": 3,
       "lastAccessed": 1776336938623,
       "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776405818635,
+      "type": "file"
     },
     {
       "path": "ref/ngspice",
@@ -418,12 +424,6 @@
       "accessCount": 2,
       "lastAccessed": 1776336992147,
       "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\compiled-analog-circuit.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776337045863,
-      "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\sparse\\sputils.c",

@@ -23,11 +23,9 @@ import {
 } from "../../../components/semiconductors/bjt.js";
 import { createDiodeElement, DIODE_PARAM_DEFAULTS, DIODE_SCHEMA } from "../../../components/semiconductors/diode.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../sparse-solver.js";
-import { DiagnosticCollector } from "../diagnostics.js";
+import type { SparseSolver } from "../sparse-solver.js";
 import { solveDcOperatingPoint, type DcOpNRPhase, type DcOpNRAttemptOutcome } from "../dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
-import { withNodeIds } from "./test-helpers.js";
+import { withNodeIds, makeSimpleCtx } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
@@ -310,8 +308,6 @@ describe("dcopInitJct", () => {
     it("emits dcopInitJct phase marker before dcopInitFloat", () => {
       // Simple resistor divider — no nonlinear elements.
       // Phase marker must still be emitted (even though no priming happens).
-      const solver = new SparseSolver();
-      const diagnostics = new DiagnosticCollector();
       const matrixSize = 3;
       const branchRow = 2;
 
@@ -360,16 +356,11 @@ describe("dcopInitJct", () => {
       const phases: DcOpNRPhase[] = [];
       const outcomes: DcOpNRAttemptOutcome[] = [];
 
-      const result = solveDcOperatingPoint({
-        solver,
-        elements,
-        matrixSize,
-        params: DEFAULT_SIMULATION_PARAMS,
-        diagnostics,
-        nodeCount: 2,
-        onPhaseBegin: (phase) => phases.push(phase),
-        onPhaseEnd: (outcome) => outcomes.push(outcome),
-      });
+      const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount: 2 });
+      ctx._onPhaseBegin = (phase) => phases.push(phase as DcOpNRPhase);
+      ctx._onPhaseEnd = (outcome) => outcomes.push(outcome as DcOpNRAttemptOutcome);
+      solveDcOperatingPoint(ctx);
+      const result = ctx.dcopResult;
 
       expect(result.converged).toBe(true);
       // dcopInitJct must appear before dcopInitFloat

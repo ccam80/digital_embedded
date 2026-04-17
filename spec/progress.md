@@ -197,3 +197,56 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
 
 ## Recovery events
 - **2026-04-17**: batch-2 implementer agent a0403d75687d2f786 returned status=completed but neither complete-implementer.sh nor stop-for-clarification.sh ran. Counters unchanged (spawned=1, completed=0). Invoked mark-dead-implementer.sh to open a retry slot. Agent died mid-cascade after completing tasks 1.1.1 + 1.1.2 + 1.1.3 (per progress entries) but with 1.2.1/1.2.2/1.2.3 incomplete and ~30 caller test files still on the old solveDcOperatingPoint(opts) API.
+
+## Task part-a-cascade: Migrate all callers from solveDcOperatingPoint(opts) to solveDcOperatingPoint(ctx)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/components/passives/__tests__/crystal.test.ts
+  - src/components/passives/__tests__/polarized-cap.test.ts
+  - src/components/passives/__tests__/analog-fuse.test.ts
+  - src/components/io/__tests__/led.test.ts
+  - src/components/semiconductors/__tests__/bjt.test.ts
+  - src/components/semiconductors/__tests__/diode.test.ts
+  - src/components/semiconductors/__tests__/jfet.test.ts
+  - src/components/semiconductors/__tests__/mosfet.test.ts
+  - src/components/semiconductors/__tests__/scr.test.ts
+  - src/components/semiconductors/__tests__/zener.test.ts
+  - src/components/active/__tests__/analog-switch.test.ts
+  - src/components/active/__tests__/dac.test.ts
+  - src/components/active/__tests__/opamp.test.ts
+  - src/components/active/__tests__/real-opamp.test.ts
+  - src/components/active/__tests__/timer-555.test.ts
+  - src/solver/analog/__tests__/dcop-init-jct.test.ts
+  - src/solver/analog/__tests__/fet-base.test.ts
+  - src/solver/analog/ac-analysis.ts
+  - src/solver/analog/monte-carlo.ts
+  - src/solver/analog/parameter-sweep.ts
+- **Tests**: All targeted tests passing (163 across semiconductor/active files, 42 across dc-op/dcop-init-jct/fet-base)
+
+## Task 1.2.1: Convert integration functions to zero-alloc
+- **Status**: complete (pre-existing)
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none
+- **Tests**: 36/36 passing (integration.test.ts) — solveGearVandermonde already takes scratch buffer, computeIntegrationCoefficients already absent
+
+## Task 1.2.2: Eliminate per-step closures and filter calls
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/solver/analog/ckt-context.ts (added convergenceFailures: string[] field)
+  - src/solver/analog/newton-raphson.ts (use ctx.convergenceFailures instead of per-iteration allocation)
+  - src/solver/analog/analog-engine.ts (replace filter(isPoolBacked) with ctx.poolBackedElements; replace per-step preIterationHook closure with bound method; replace per-element addBreakpoint closure with ctx.addBreakpointBound)
+  - src/solver/analog/__tests__/analog-engine.test.ts (added no_closures_in_step test)
+- **Tests**: 24/24 passing in analog-engine.test.ts (2 pre-existing failures excluded)
+
+## Task 1.2.3: Eliminate LTE-path allocations
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/solver/analog/__tests__/ckt-terr.test.ts (added zero_allocations_in_lte_path test)
+- **Tests**: 20/20 passing in ckt-terr.test.ts — cktTerr/cktTerrVoltage already fully scalar; lteScratch already on CKTCircuitContext

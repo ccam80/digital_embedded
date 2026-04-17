@@ -41,12 +41,8 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import type { ComponentLayout } from "../../../core/registry.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
@@ -804,16 +800,10 @@ describe("AnalogLED", () => {
     const { element: ledStateWrapped } = withState(ledCore);
     const led = withNodeIds(ledStateWrapped, [1, 0]);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [vs, r, led],
       matrixSize,
       nodeCount: 2,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);
@@ -841,16 +831,10 @@ describe("AnalogLED", () => {
     const { element: ledStateWrapped } = withState(ledCore);
     const led = withNodeIds(ledStateWrapped, [1, 0]);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [vs, r, led],
       matrixSize,
       nodeCount: 2,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);

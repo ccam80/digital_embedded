@@ -392,6 +392,13 @@ export class CKTCircuitContext {
    */
   preIterationHook: ((iteration: number, iterVoltages: Float64Array) => void) | null;
 
+  /**
+   * Pre-allocated array for convergence-failed element labels.
+   * Reset to length 0 at the start of each NR iteration check instead of
+   * allocating a new string[] per iteration.
+   */
+  convergenceFailures: string[];
+
   // -------------------------------------------------------------------------
   // NR call-specific parameters (set by caller before each newtonRaphson call)
   // -------------------------------------------------------------------------
@@ -559,6 +566,7 @@ export class CKTCircuitContext {
     // Bound closures
     this.addBreakpointBound = addBreakpoint;
     this.preIterationHook = null;
+    this.convergenceFailures = [];
 
     // NR call-specific parameters (set by caller before each newtonRaphson call)
     this.dcopModeLadder = null;

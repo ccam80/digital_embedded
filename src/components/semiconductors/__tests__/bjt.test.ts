@@ -24,12 +24,8 @@ import {
   BJT_SPICE_L1_NPN_DEFAULTS,
 } from "../bjt.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -662,16 +658,10 @@ describe("Integration", () => {
     const bjtProps = makeBjtProps({ IS: 1e-14 });
     const bjt = withNodeIds(withState(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 0]]), -1, bjtProps)).element, [2, 1, 0]);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [vcc, vbb, rc, rb, bjt],
       matrixSize,
       nodeCount: 4,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);
@@ -711,16 +701,10 @@ describe("Integration", () => {
     const bjtProps = makeBjtProps();
     const bjt = withNodeIds(withState(createBjtElement(1, new Map([["B", 0], ["C", 1], ["E", 0]]), -1, bjtProps)).element, [0, 1, 0]);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [vcc, rc, bjt],
       matrixSize,
       nodeCount: 2,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);
@@ -752,19 +736,17 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const bjtProps = makeBjtProps({ IS: 1e-14 });
     const bjt = withNodeIds(withState(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 0]]), -1, bjtProps)).element, [2, 1, 0]);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
     const elements = [vcc, vbb, rc, rb, bjt];
 
     // Before: BF=100
-    const before = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 4, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const before = runDcOp({ elements, matrixSize, nodeCount: 4 });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[0], 6.928910e-01, "V(collector) before");
     expectSpiceRef(before.nodeVoltages[1], 6.928910e-01, "V(base) before");
 
     // setParam and re-solve
     bjt.setParam("BF", 50);
-    const after = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 4, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const after = runDcOp({ elements, matrixSize, nodeCount: 4 });
     expect(after.converged).toBe(true);
     expectSpiceRef(after.nodeVoltages[0], 2.837533e+00, "V(collector) after BF=50");
     expectSpiceRef(after.nodeVoltages[1], 6.750668e-01, "V(base) after BF=50");
@@ -787,19 +769,17 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const bjtProps = makeBjtProps({ IS: 1e-14 });
     const bjt = withNodeIds(withState(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 0]]), -1, bjtProps)).element, [2, 1, 0]);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
     const elements = [vcc, vbb, rc, rb, bjt];
 
     // Before: IS=1e-14
-    const before = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 4, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const before = runDcOp({ elements, matrixSize, nodeCount: 4 });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[0], 6.928910e-01, "V(collector) before");
     expectSpiceRef(before.nodeVoltages[1], 6.928910e-01, "V(base) before");
 
     // setParam and re-solve
     bjt.setParam("IS", 1e-12);
-    const after = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 4, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const after = runDcOp({ elements, matrixSize, nodeCount: 4 });
     expect(after.converged).toBe(true);
     expectSpiceRef(after.nodeVoltages[0], 5.744795e-01, "V(collector) after IS=1e-12");
     expectSpiceRef(after.nodeVoltages[1], 5.744795e-01, "V(base) after IS=1e-12");
@@ -886,15 +866,10 @@ describe("SPICE L1 model", () => {
       [2, 1, 0],
     );
 
-    const solver1 = new SparseSolver();
-    const diag1 = new DiagnosticCollector();
-    const result1 = solveDcOperatingPoint({
-      solver: solver1,
+    const result1 = runDcOp({
       elements: [vcc1, vbb1, rc1, rb1, simpleBjt],
       matrixSize,
       nodeCount: 4,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics: diag1,
     });
     expect(result1.converged).toBe(true);
 
@@ -909,15 +884,10 @@ describe("SPICE L1 model", () => {
       [2, 1, 0],
     );
 
-    const solver2 = new SparseSolver();
-    const diag2 = new DiagnosticCollector();
-    const result2 = solveDcOperatingPoint({
-      solver: solver2,
+    const result2 = runDcOp({
       elements: [vcc2, vbb2, rc2, rb2, spiceBjt],
       matrixSize,
       nodeCount: 4,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics: diag2,
     });
     expect(result2.converged).toBe(true);
 

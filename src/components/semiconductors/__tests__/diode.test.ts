@@ -12,12 +12,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { DiodeDefinition, createDiodeElement, computeJunctionCapacitance, DIODE_PARAM_DEFAULTS } from "../diode.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -383,16 +379,10 @@ describe("Integration", () => {
     const { element: dCore } = withState(createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps));
     const d = withNodeIds(dCore, [1, 0]);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [vs, r, d],
       matrixSize,
       nodeCount: 2,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);
@@ -426,19 +416,17 @@ describe("setParam mutates params object (not captured locals)", () => {
     const { element: dCore1 } = withState(createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps));
     const d = withNodeIds(dCore1, [1, 0]);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
     const elements = [vs, r, d];
 
     // Before: default IS=1e-14
-    const before = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 2, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const before = runDcOp({ elements, matrixSize, nodeCount: 2 });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[0], 6.928910e-01, "V(diode) before");
     expectSpiceRef((before.nodeVoltages[1] - before.nodeVoltages[0]) / 1000, 4.307675e-03, "I(diode) before");
 
     // setParam and re-solve
     d.setParam("IS", 1e-11);
-    const after = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 2, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const after = runDcOp({ elements, matrixSize, nodeCount: 2 });
     expect(after.converged).toBe(true);
     expectSpiceRef(after.nodeVoltages[0], 5.152668e-01, "V(diode) after IS=1e-11");
     expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 4.485160e-03, "I(diode) after IS=1e-11");
@@ -453,19 +441,17 @@ describe("setParam mutates params object (not captured locals)", () => {
     const { element: dCore2 } = withState(createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, diodeProps));
     const d = withNodeIds(dCore2, [1, 0]);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
     const elements = [vs, r, d];
 
     // Before: default N=1
-    const before = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 2, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const before = runDcOp({ elements, matrixSize, nodeCount: 2 });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[0], 6.928910e-01, "V(diode) before");
     expectSpiceRef((before.nodeVoltages[1] - before.nodeVoltages[0]) / 1000, 4.307675e-03, "I(diode) before");
 
     // setParam and re-solve
     d.setParam("N", 2);
-    const after = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 2, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const after = runDcOp({ elements, matrixSize, nodeCount: 2 });
     expect(after.converged).toBe(true);
     expectSpiceRef(after.nodeVoltages[0], 1.376835e+00, "V(diode) after N=2");
     expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 3.623504e-03, "I(diode) after N=2");

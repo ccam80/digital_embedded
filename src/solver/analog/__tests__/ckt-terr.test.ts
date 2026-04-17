@@ -157,3 +157,56 @@ describe("cktTerrVoltage", () => {
     expect(isFinite(result)).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 1.2.3 — zero_allocations_in_lte_path
+// ---------------------------------------------------------------------------
+
+describe("zero_allocations_in_lte_path", () => {
+  it("zero_allocations_in_lte_path", () => {
+    const RealF64 = Float64Array;
+    const RealArray = Array;
+    let f64Count = 0;
+    let arrayCount = 0;
+
+    (globalThis as unknown as Record<string, unknown>)["Float64Array"] = new Proxy(RealF64, {
+      construct(target, args) {
+        f64Count++;
+        return new target(...(args as ConstructorParameters<typeof Float64Array>));
+      },
+    });
+    (globalThis as unknown as Record<string, unknown>)["Array"] = new Proxy(RealArray, {
+      construct(target, args) {
+        arrayCount++;
+        return new target(...(args as ConstructorParameters<typeof Array>));
+      },
+    });
+
+    const dt = 1e-9;
+    const deltaOld = new RealF64([dt, dt, dt]);
+    const params: LteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
+
+    // Warm up — first call may trigger internal initialisation not counted.
+    cktTerr(dt, deltaOld, 1, "bdf1", 1e-12, 0.9e-12, 0.8e-12, 0, 1e-12, 0.9e-12, params);
+    cktTerrVoltage(5.0, 4.9, 4.8, 4.7, dt, deltaOld, 1, "bdf1", 1e-3, 1e-6, 7);
+
+    // Reset counters after warmup.
+    f64Count = 0;
+    arrayCount = 0;
+
+    // Run 100 LTE evaluations across orders 1 and 2, charge-based and voltage-based.
+    for (let i = 0; i < 50; i++) {
+      const q = 1e-12 * (1 + i * 0.01);
+      cktTerr(dt, deltaOld, 1, "bdf1", q, q * 0.99, q * 0.98, 0, q, q * 0.99, params);
+      cktTerr(dt, deltaOld, 2, "bdf2", q, q * 0.99, q * 0.98, q * 0.97, q, q * 0.99, params);
+      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, deltaOld, 1, "bdf1", 1e-3, 1e-6, 7);
+      cktTerrVoltage(5 + i * 0.001, 4.9, 4.8, 4.7, dt, deltaOld, 2, "bdf2", 1e-3, 1e-6, 7);
+    }
+
+    (globalThis as unknown as Record<string, unknown>)["Float64Array"] = RealF64;
+    (globalThis as unknown as Record<string, unknown>)["Array"] = RealArray;
+
+    expect(f64Count).toBe(0);
+    expect(arrayCount).toBe(0);
+  });
+});

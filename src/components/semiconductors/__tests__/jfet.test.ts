@@ -26,12 +26,8 @@ import {
 } from "../pjfet.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -363,8 +359,6 @@ describe("NR", () => {
     // node1=drain, node2=Vdd(10V), node3=gate(0V)
     // branches: row3=Vdd source, row4=Vgate source
     const matrixSize = 5;
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
 
     // createNJfetElement pin order: [G, S, D]
     const propsObj = createTestPropertyBag();
@@ -374,13 +368,11 @@ describe("NR", () => {
     const vdd = makeDcVoltageSource(2, 0, 3, 10.0) as unknown as AnalogElement; // Vdd=10V
     const vgate = makeDcVoltageSource(3, 0, 4, 0.0) as unknown as AnalogElement; // Vg=0V
 
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [vdd, vgate, rd, jfet],
       matrixSize,
       nodeCount: 3,
-      params: { ...DEFAULT_SIMULATION_PARAMS, maxIterations: 10 },
-      diagnostics,
+      params: { maxIterations: 10 },
     });
 
     expect(result.converged).toBe(true);

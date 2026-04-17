@@ -26,11 +26,7 @@
 import { describe, it, expect } from "vitest";
 import { DACDefinition, DAC_DEFAULTS } from "../dac.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
+import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
@@ -124,15 +120,10 @@ function solveDac(
   const vRefBranchRow = nNodes + BITS;
   elements.push(makeDcVoltageSource(nVRefNode, 0, vRefBranchRow, vRef) as unknown as AnalogElement);
 
-  const solver = new SparseSolver();
-  const diagnostics = new DiagnosticCollector();
-  const result = solveDcOperatingPoint({
-    solver,
+  const result = runDcOp({
     elements,
     matrixSize,
     nodeCount: nNodes,
-    params: DEFAULT_SIMULATION_PARAMS,
-    diagnostics,
   });
 
   return {

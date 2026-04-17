@@ -41,10 +41,6 @@ import { Timer555Definition } from "../timer-555.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
@@ -206,6 +202,7 @@ import {
   makeVoltageSource,
   withNodeIds,
   allocateStatePool,
+  runDcOp,
 } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
@@ -248,15 +245,10 @@ describe("Timer555", () => {
 
     const vsVcc = makeVoltageSource(nVcc, nGnd, brVcc, VCC);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [timer, vsVcc],
       matrixSize,
       nodeCount: 3,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);

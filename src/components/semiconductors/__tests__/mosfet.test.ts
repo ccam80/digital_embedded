@@ -25,12 +25,8 @@ import {
   MOSFET_NMOS_DEFAULTS,
 } from "../mosfet.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -600,16 +596,10 @@ describe("Integration", () => {
     const propsObj = makeParamBag(nmosParams);
     const nmos = withState(withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]));
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [vdd, vgate, rd, nmos],
       matrixSize,
       nodeCount: 3,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);
@@ -647,18 +637,16 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const propsObj = makeParamBag(nmosParams);
     const nmos = withState(withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]));
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
     const elements = [vdd, vgate, rd, nmos];
 
     // Before: VTO=0.7
-    const before = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 3, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const before = runDcOp({ elements, matrixSize, nodeCount: 3 });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[0], 1.840508e+00, "V(drain) before");
 
     // setParam and re-solve
     nmos.setParam("VTO", 2.5);
-    const after = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 3, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const after = runDcOp({ elements, matrixSize, nodeCount: 3 });
     expect(after.converged).toBe(true);
     expectSpiceRef(after.nodeVoltages[0], 4.835494e+00, "V(drain) after VTO=2.5");
     expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 1.645065e-04, "Id after VTO=2.5");
@@ -673,18 +661,16 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
     const propsObj = makeParamBag(nmosParams);
     const nmos = withState(withNodeIds(createMosfetElement(1, new Map([["G", 3], ["S", 0], ["D", 1]]), [], -1, propsObj), [3, 0, 1]));
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
     const elements = [vdd, vgate, rd, nmos];
 
     // Before: KP=120µ
-    const before = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 3, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const before = runDcOp({ elements, matrixSize, nodeCount: 3 });
     expect(before.converged).toBe(true);
     expectSpiceRef(before.nodeVoltages[0], 1.840508e+00, "V(drain) before");
 
     // setParam and re-solve
     nmos.setParam("KP", 240e-6);
-    const after = solveDcOperatingPoint({ solver, elements, matrixSize, nodeCount: 3, params: DEFAULT_SIMULATION_PARAMS, diagnostics });
+    const after = runDcOp({ elements, matrixSize, nodeCount: 3 });
     expect(after.converged).toBe(true);
     expectSpiceRef(after.nodeVoltages[0], 9.071396e-01, "V(drain) after KP=240µ");
     expectSpiceRef((after.nodeVoltages[1] - after.nodeVoltages[0]) / 1000, 4.092860e-03, "Id after KP=240µ");

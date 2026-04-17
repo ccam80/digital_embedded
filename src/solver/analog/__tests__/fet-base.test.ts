@@ -22,12 +22,8 @@ import {
   SLOT_V_GD,
 } from "../fet-base.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../sparse-solver.js";
-import { DiagnosticCollector } from "../diagnostics.js";
-import { solveDcOperatingPoint } from "../dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../../components/sources/dc-voltage-source.js";
-import { withNodeIds } from "./test-helpers.js";
+import { withNodeIds, runDcOp } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../sparse-solver.js";
 import type { AnalogElement } from "../element.js";
@@ -138,8 +134,6 @@ describe("Refactor", () => {
     // MNA: node1=drain, node2=Vdd(5V), node3=gate(3V), branch3=Vdd, branch4=Vgate
     // Same layout as mosfet.test.ts integration test
     const matrixSize = 5;
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
 
     const propsObj = makeParamBag(NMOS_10U_1U);
     const nmosElement = withState(withNodeIds(createMosfetElement(
@@ -156,12 +150,9 @@ describe("Refactor", () => {
 
     const elements: AnalogElement[] = [vddSource, vgateSource, rdElement, nmosElement];
 
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements,
       matrixSize,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
       nodeCount: 3,
     });
 
@@ -189,8 +180,6 @@ describe("Refactor", () => {
     // PMOS: S=Vss, G=Vg, D through Rd to ground
     // MNA: node1=drain, node2=Vss(5V), node3=gate(2V)
     const matrixSize = 5;
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
 
     const propsObj = makeParamBag(PMOS_DEFAULTS);
     const pmosElement = withState(withNodeIds(createMosfetElement(
@@ -207,12 +196,9 @@ describe("Refactor", () => {
 
     const elements: AnalogElement[] = [vssSource, vgateSource, rdElement, pmosElement];
 
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements,
       matrixSize,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
       nodeCount: 3,
     });
 

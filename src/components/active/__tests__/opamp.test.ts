@@ -16,12 +16,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { OpAmpDefinition } from "../opamp.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
@@ -223,7 +219,7 @@ describe("OpAmp", () => {
       branchIndex: -1, isNonlinear: false, isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
-      stamp(solver: SparseSolver): void {
+      stamp(solver: SparseSolverType): void {
         solver.stamp(nOut - 1, nOut - 1, G_load);
       },
     };
@@ -233,15 +229,10 @@ describe("OpAmp", () => {
     const vccPSource = makeDcVoltageSource(nVccP, 0, brVccP, 15);
     const vccNSource = makeDcVoltageSource(nVccN, 0, brVccN, -15);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [opampEl, rLoadEl, vinSource as unknown as AnalogElement, vinnSource as unknown as AnalogElement, vccPSource as unknown as AnalogElement, vccNSource as unknown as AnalogElement],
       matrixSize,
       nodeCount: 5,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);
@@ -264,7 +255,7 @@ describe("Integration", () => {
       branchIndex: -1, isNonlinear: false, isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
-      stamp(solver: SparseSolver): void {
+      stamp(solver: SparseSolverType): void {
         if (nodeA > 0) solver.stamp(nodeA - 1, nodeA - 1, G);
         if (nodeB > 0) solver.stamp(nodeB - 1, nodeB - 1, G);
         if (nodeA > 0 && nodeB > 0) {
@@ -305,15 +296,10 @@ describe("Integration", () => {
     const vsVccP = makeDcVoltageSource(nVccP, 0, brVccP, 15);
     const vsVccN = makeDcVoltageSource(nVccN, 0, brVccN, -15);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [opampEl, rin, rf, vsVin as unknown as AnalogElement, vsInp as unknown as AnalogElement, vsVccP as unknown as AnalogElement, vsVccN as unknown as AnalogElement],
       matrixSize,
       nodeCount: 6,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);
@@ -343,15 +329,10 @@ describe("Integration", () => {
     const vsVccP = makeDcVoltageSource(nVccP, 0, brVccP, 15);
     const vsVccN = makeDcVoltageSource(nVccN, 0, brVccN, -15);
 
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
-    const result = solveDcOperatingPoint({
-      solver,
+    const result = runDcOp({
       elements: [opampEl, vsVin as unknown as AnalogElement, vsVccP as unknown as AnalogElement, vsVccN as unknown as AnalogElement],
       matrixSize,
       nodeCount: 4,
-      params: DEFAULT_SIMULATION_PARAMS,
-      diagnostics,
     });
 
     expect(result.converged).toBe(true);

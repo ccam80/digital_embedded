@@ -18,9 +18,7 @@ import {
 } from "../polarized-cap.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { solveDcOperatingPoint } from "../../../solver/analog/dc-operating-point.js";
-import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
+import { runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
@@ -126,16 +124,10 @@ describe("PolarizedCap", () => {
       const vs = makeDcVoltageSource(1, 0, 2, V) as unknown as AnalogElement;
       const cap = makeCapElement({ capacitance: C, esr, rLeak });
 
-      const solver = new SparseSolver();
-      const diagnostics = new DiagnosticCollector();
-
-      const result = solveDcOperatingPoint({
-        solver,
+      const result = runDcOp({
         elements: [vs, cap],
         matrixSize: 3,
         nodeCount: 2,
-        params: DEFAULT_SIMULATION_PARAMS,
-        diagnostics,
       });
 
       expect(result.converged).toBe(true);
@@ -175,16 +167,10 @@ describe("PolarizedCap", () => {
       const initVoltages = new Float64Array([0, 0]);
       cap.stampCompanion(dt, "bdf1", initVoltages, 1, [dt]);
 
-      const solver = new SparseSolver();
-      const diagnostics = new DiagnosticCollector();
-
-      const result = solveDcOperatingPoint({
-        solver,
+      const result = runDcOp({
         elements: [vs, cap],
         matrixSize: 3,
         nodeCount: 2,
-        params: DEFAULT_SIMULATION_PARAMS,
-        diagnostics,
       });
 
       expect(result.converged).toBe(true);
