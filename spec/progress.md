@@ -260,3 +260,11 @@ Batch-1 implementation and prior remediation passes all verifications. Code matc
   - src/solver/analog/analog-engine.ts (line 425-426: changed output buffer from `statePool.ag` to `this._ctx!.ag` and added `this._ctx!.gearMatScratch` as scratch argument)
   - src/solver/analog/__tests__/integration.test.ts (all `computeNIcomCof` call sites updated to pass required scratch buffer)
 - **Tests**: integration.test.ts 36/36 passing; ckt-context.test.ts 3/3 passing; analog-engine.test.ts 58 passed / 2 pre-existing baseline failures (transient_rc_decay, predictor_off_rc_regression)
+
+
+---
+## Phase 1 Complete
+- **Batches**: 1 (batch-2)
+- **Task groups verified**: 1.1 → PASSED (after 1 fail/fix cycle)
+- **Final tests**: ckt-context 3/3, newton-raphson 30/30, dc-operating-point 21/21, integration 36/36, analog-engine 58/60 (2 pre-existing baseline failures), ckt-terr 20/20
+- **Date**: 2026-04-17
