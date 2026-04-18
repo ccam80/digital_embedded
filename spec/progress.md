@@ -658,3 +658,17 @@ Raw grep across all surviving C3b test files (38 files; `coupled-inductor.test.t
 - **Files modified**: src/solver/analog/__tests__/ngspice-parity/rlc-oscillator.test.ts
 - **Tests**: 1 skipped/1 total (DLL absent — describeIfDll guard; correct local state per assignment)
 - **Change**: Replaced `acceptedAttempt.phase === "tranNR"` check with `ourStep.integrationCoefficients.ours.method === "trapezoidal"` assertion on every accepted step, matching spec Task 7.3.2 acceptance criterion exactly.
+
+---
+## batch-parallel-waves Complete (2026-04-19)
+- **Batches**: Phase 0.4 + Phase 4 + Phase 5 + Phase 7.1 (all in one parallel batch)
+- **All verified**: yes (4/4 task_groups PASSED on first verification pass)
+
+## batch-phase7-parity Complete (2026-04-19)
+- **Batches**: Phase 7.2 + 7.3 + 7.4 parity tests (8 circuits + audit)
+- **All verified**: yes (2/4 PASSED first pass, 2/4 PASSED after fix round)
+- **Fix round**: 7.2b (opamp-inverting) added missing NR iteration count assertion; 7.3a (rlc-oscillator) replaced phase check with integrationCoefficients method check
+- **Parity tests**: all 8 fixtures + test files created; tests SKIP locally via describeIfDll (ngspice DLL not present in this env); will run bit-exact when DLL is supplied.
+
+## ngspice-alignment Implementation Complete
+All phases (0 through 7) landed. See commit log for delivery timeline.
