@@ -265,8 +265,8 @@
   "hotPaths": [
     {
       "path": "src",
-      "accessCount": 29,
-      "lastAccessed": 1776514874659,
+      "accessCount": 30,
+      "lastAccessed": 1776515158028,
       "type": "directory"
     },
     {
@@ -318,6 +318,12 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\analog-types.ts",
+      "accessCount": 9,
+      "lastAccessed": 1776515227265,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\passives\\capacitor.ts",
       "accessCount": 8,
       "lastAccessed": 1776510032817,
@@ -342,6 +348,12 @@
       "type": "directory"
     },
     {
+      "path": "src\\solver\\analog\\newton-raphson.ts",
+      "accessCount": 8,
+      "lastAccessed": 1776515140788,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\semiconductors\\varactor.ts",
       "accessCount": 7,
       "lastAccessed": 1776510034781,
@@ -360,16 +372,10 @@
       "type": "file"
     },
     {
-      "path": "src\\core\\analog-types.ts",
-      "accessCount": 7,
-      "lastAccessed": 1776513135163,
+      "path": "spec\\phase-catchup.md",
+      "accessCount": 6,
+      "lastAccessed": 1776515130677,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 7,
-      "lastAccessed": 1776513157170,
-      "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors",
@@ -381,12 +387,6 @@
       "path": "src\\solver\\analog\\ni-integrate.ts",
       "accessCount": 5,
       "lastAccessed": 1776512347741,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-catchup.md",
-      "accessCount": 5,
-      "lastAccessed": 1776512796422,
       "type": "file"
     },
     {
@@ -427,8 +427,8 @@
     },
     {
       "path": ".tsc-check.txt",
-      "accessCount": 2,
-      "lastAccessed": 1776510694406,
+      "accessCount": 3,
+      "lastAccessed": 1776515235496,
       "type": "file"
     },
     {
