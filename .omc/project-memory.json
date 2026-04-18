@@ -266,8 +266,8 @@
   "hotPaths": [
     {
       "path": "spec\\progress.md",
-      "accessCount": 62,
-      "lastAccessed": 1776471609799,
+      "accessCount": 63,
+      "lastAccessed": 1776471661459,
       "type": "file"
     },
     {
@@ -301,9 +301,15 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\analog-types.ts",
+      "accessCount": 32,
+      "lastAccessed": 1776472192474,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\element.ts",
-      "accessCount": 29,
-      "lastAccessed": 1776471102445,
+      "accessCount": 30,
+      "lastAccessed": 1776471669389,
       "type": "directory"
     },
     {
@@ -320,14 +326,8 @@
     },
     {
       "path": "spec\\.context\\rules.md",
-      "accessCount": 25,
-      "lastAccessed": 1776471082406,
-      "type": "file"
-    },
-    {
-      "path": "src\\core\\analog-types.ts",
-      "accessCount": 25,
-      "lastAccessed": 1776471547365,
+      "accessCount": 26,
+      "lastAccessed": 1776471654707,
       "type": "file"
     },
     {
@@ -391,6 +391,12 @@
       "type": "file"
     },
     {
+      "path": "spec\\test-baseline.md",
+      "accessCount": 12,
+      "lastAccessed": 1776471662099,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\passives\\resistor.ts",
       "accessCount": 11,
       "lastAccessed": 1776427306900,
@@ -407,12 +413,6 @@
       "accessCount": 11,
       "lastAccessed": 1776466308753,
       "type": "directory"
-    },
-    {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 11,
-      "lastAccessed": 1776471086729,
-      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\state-pool.ts",

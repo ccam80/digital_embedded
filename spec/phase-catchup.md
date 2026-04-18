@@ -64,7 +64,7 @@ The following items land in `spec/plan.md` as part of this phase (not as individ
 
 - **Acceptance criteria**:
   - `AnalogElementCore` method surface bit-identical to `AnalogElement` method surface (ignoring `pinNodeIds` / `allNodeIds` which Core excludes by design).
-  - Grep `stamp\s*\(|stampNonlinear\s*\(|updateOperatingPoint\s*\(|stampCompanion\s*\(|stampReactiveCompanion\s*\(|updateChargeFlux\s*\(|updateState\s*\(|updateCompanion\s*\(|shouldBypass\s*\(|getBreakpoints\s*\(` in `src/core/analog-types.ts` returns zero matches.
+  - Inside the `AnalogElementCore` interface body (from `interface AnalogElementCore {` to its closing `}`), grep `stamp\s*\(|stampNonlinear\s*\(|updateOperatingPoint\s*\(|stampCompanion\s*\(|stampReactiveCompanion\s*\(|updateChargeFlux\s*\(|updateState\s*\(|updateCompanion\s*\(|shouldBypass\s*\(|getBreakpoints\s*\(` returns **zero matches**. Matches on sibling interfaces elsewhere in the file (`SparseSolverStamp.stamp(row,col,value)` — owned by Wave C5.1; `ComplexSparseSolver.stamp(row,col,re,im)` — owned by Phase 0 Wave 0.4 Task 0.4.4) are **out of scope for C1.1** and must be left untouched.
   - Full-codebase `tsc --noEmit` **succeeds for all production element files**. Test files are expected to remain red until C3.
 
 - **Tests-red protocol**: if any production element file fails `tsc` after this task, that element was left on the split interface by Wave 6.2 and must be finished in this task. Do not revert C1; fix the element.

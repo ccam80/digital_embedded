@@ -11,15 +11,15 @@
           "C1.1"
         ]
       ],
-      "spawned": 1,
-      "completed": 1,
+      "spawned": 2,
+      "completed": 2,
       "verifications_passed": 0,
-      "verifications_failed": 0,
+      "verifications_failed": 1,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "C1": "pending"
+        "C1": "failed"
       }
     },
     {
@@ -298,5 +298,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-18T00:19:47.862Z"
+  "last_updated": "2026-04-18T00:31:40.544Z"
 }
