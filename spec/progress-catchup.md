@@ -634,3 +634,52 @@ User: "c4.6 - most definitely option C, it's critical that we match ngspice's so
   - Rewrote all 7 el.load(ctx) call sites using makeSimpleCtx wrapping the capture solver
   - Rewrote all assertions from mock.calls to read from stamps array with same strictness
   - SPST tests use nodeCount=2/matrixSize=2; SPDT tests use nodeCount=3/matrixSize=3
+
+## Task C4.semi_sources (retry-round): buckbjt-convergence spec rewrite + variable-rail mock completion
+- **Status**: complete (with 1 red-detecting-real-divergence finding surfaced per tests-red protocol)
+- **Agent**: implementer
+- **Files created**:
+  - `src/solver/analog/__tests__/buckbjt-stagnation-regression.test.ts` — hosts the 5 pre-existing stagnation tests relocated out of `buckbjt-convergence.test.ts` so that file can become a pure per-NR-iteration ngspice parity test per C4.3 spec
+- **Files modified**:
+  - `src/solver/analog/__tests__/buckbjt-convergence.test.ts` — replaced the file contents entirely. Old content was a transient-stagnation regression test (`getDcOpResult`, `converged === true`, 50/2000/600µs step loops) which does not match the C4.3 spec. Rewritten as `buckbjt_load_dcop_parity` — a `ComparisonSession`-based per-NR-iteration parity test comparing `rhsOld[]`, `noncon`, `diagGmin` (via attempt `phaseParameter` on `dcopGminDynamic`/`dcopGminSpice3` phases), and `srcFact` (via attempt `phaseParameter` on `dcopSrcSweep`) against ngspice. Bit-exact: `absDelta === 0` on every rhsOld entry and `toBe` on every phaseParameter. Gated on presence of the instrumented `spice.dll`.
+  - `src/components/sources/__tests__/variable-rail.test.ts` — completed `makeCaptureSolver()` mock. Previously implemented only `stamp` + `stampRHS`; production `variable-rail.ts:208-219` calls `solver.allocElement(row, col)` + `solver.stampElement(handle, value)` + `solver.stampRHS(row, value)`. All three `variable_rail_load_srcfact_parity` tests now pass — srcFact=0.5/0/1 each bit-exact delivers the nominal voltage at the branch row (variable-rail by design ignores `ctx.srcFact` so its slider changes take effect immediately). Mirror of `dc-voltage-source.test.ts::makeMockSolver()` pattern, which was already complete.
+- **Tests**:
+  - `variable-rail.test.ts`: 3/3 new srcFact parity tests pass (srcfact_05_rhs_ignores_srcfact_bit_exact, srcfact_0_still_delivers_full_voltage, srcfact_1_delivers_full_voltage). The 3 pre-existing `VariableRail` suite failures (`dc_output_matches_voltage`, `voltage_change_updates_output`, `internal_resistance_limits_current`) remain red — they throw `element.load is not a function` from the file-local `makeResistorElement()` (lines 26-46) which still exposes a `stamp(solver)` method instead of `load(ctx)`. These are identical in kind to the pre-existing `stampCompanion/updateOperatingPoint is not a function` failures already documented for other C5.* batches; they live on the element fixture inside the test file, not in the `makeCaptureSolver` mock I fixed. Out-of-scope for C4.semi_sources retry; flag for a later test-helper migration batch.
+  - `buckbjt-stagnation-regression.test.ts`: 3/5 passing. The 2 failing tests (`survives 2000 transient steps without ERROR state`, `survives 600µs of sim time (matches UI run duration)`) are the pre-existing transient stagnation the user described as the real defect that started this journey — "Engine stagnation: simTime stuck at 0.000049999999999315275s". Phase 4 (DC-OP alignment) and Phase 5 (transient step alignment) are both still pending; nothing in C4.semi_sources is expected to move the needle on transient stagnation.
+  - `buckbjt-convergence.test.ts`: 1/1 test red — spec-exact bit-exact assertion against ngspice detects a real DC-OP divergence at step 0 iter 0. Documented below under tests-red protocol.
+
+### tests-red protocol finding — `buckbjt_load_dcop_parity` (user adjudication required)
+
+Per Wave C4 tests-red protocol ("If any parity test reveals divergence, surface via CLARIFICATION NEEDED per tests-red protocol. Do NOT relax to `toBeCloseTo`."), the buckbjt DC-OP per-NR-iteration parity test surfaces a real numerical divergence at the very first iteration of the boot step. This is exactly the kind of finding the test is designed to catch; the test did not need to traverse any gmin-stepping or source-stepping phase parameters to fail — the ordinary `dcopDirect` RHS vector diverges from ngspice immediately.
+
+- **Test**: `src/solver/analog/__tests__/buckbjt-convergence.test.ts > buckbjt DC-OP per-NR-iteration parity (C4.3) > buckbjt_load_dcop_parity: rhsOld + noncon + diagGmin + srcFact bit-exact vs ngspice`
+- **Spec assertion**: bit-exact match on `rhsOld[label]` (== `preSolveRhs` in our capture types == ngspice `rhsOld[]`) for every NR iteration of the accepted attempt of every step.
+- **First divergent entry**:
+  - Step: 0 (the DC-OP boot step)
+  - Iteration: 0 (first NR pass in the `dcopDirect` attempt)
+  - Label: `V1:branch` — the RHS entry for the branch row of the NPN-side DC voltage source `V1`.
+  - Measured: ours = `0.00925906587084539`
+  - ngspice:   `0.009268473398412237`
+  - absDelta:  `9.407527566847318e-6`
+  - This is a real algorithmic delta of roughly `9.4e-6 A` in the branch-current RHS, ~10⁻³ relative — not a last-bit ULP drift.
+- **Root cause** (hypothesised, for user diagnosis):
+  The divergence is on a branch row, not a node row. Branch rows on iteration 0 receive contributions from (a) `*CKTrhs += VSRCdcValue * CKTsrcFact` from the DC voltage source and (b) whatever nonlinear element companion currents land on the same row via the incidence stamps. At srcFact=1 (the default first iteration of `dcopDirect` — no source stepping has been entered yet) the source contribution is identical between engines; therefore the delta must come from the nonlinear semiconductor initial-guess + companion path. Candidates to investigate:
+  1. `dcop-init-jct.ts` junction priming — the initial `V_BE = 0.7` / `V_GS` seeding, any off-by-one in how ngspice MODEINITJCT bootstraps the first iteration.
+  2. BJT `load()` companion stamp at the priming point — `IS`, `VT`, `BF`, `VAF` ramp-ins, whether we match ngspice `BJTload` for the Gummel-Poon initial evaluation on a non-zero junction seed.
+  3. Tunnel-diode DC seed (the fixture uses one on the NMOS source net — see `fixtures/buckbjt.dts`).
+- **Context**: the user explicitly said the spec'd test is expected to be red at this point of the catchup. Phase 4 (DC-OP alignment) has not yet run; the test landing red is the test doing its job. Per the Wave C4 tests-red protocol + the `capacitor_trap_order2_xmu_nonstandard_ccap_parity` (Option C) precedent at progress-catchup.md:462-485, the test stays tight — no `toBeCloseTo`, no tolerances, no `?.` guards. The measured values are here for the user's adjudication.
+- **Adjudication paths (user decides)**:
+  1. **Option A — defer to Phase 4**: ship the red test as-is, mark it as a live Phase 4 acceptance gate (test must be green before Phase 4 is declared complete). No immediate code change.
+  2. **Option B — expand the instrumentation**: extend the test to also dump the NR residual, the `dcopInitJct` seed values, and the BJT / tunnel-diode state slots at step 0 iter 0 to pin down which device is responsible before Phase 4 begins. Still red.
+  3. **Option C — run the ngspice-harness investigation workflow now** (per CLAUDE.md "ngspice Comparison Harness — First Tool for Numerical Issues"): dispatch an investigator to compare BJTload / BJTconvTest / DIOload one function at a time against our BJT/tunnel-diode load paths and identify the source of the 9.4e-6 A delta on V1's branch row. Fix in the current wave.
+- **Deliberate scope note**: the spec also requires `diagGmin` + `srcFact` bit-exact. Those assertions never execute because step 0's ordinary `dcopDirect` attempt has no gmin/srcFact phaseParameter, and the earlier `.toBe(0)` on rhsOld absDelta fails first. Once the rhsOld delta is resolved (or converted into a tolerance-bounded gate per user decision), the gmin/srcFact assertions will execute against any gmin-stepping / source-sweep attempts the engine enters — which on this circuit is more likely on later DC-OP stress scenarios.
+- **Precedent**: matches the Option C adjudication shape used for `capacitor_trap_order2_xmu_nonstandard_ccap_parity` at progress-catchup.md:462-485.
+
+### Relocated-but-unchanged stagnation tests
+
+The 5 tests previously in `buckbjt-convergence.test.ts` are now in `buckbjt-stagnation-regression.test.ts` verbatim — filename and `describe` label changed, test bodies unchanged. Split is per-spec ("MUST NOT remain mixed into the ngspice-parity file"). Baseline for the relocated file:
+- `compiles without throwing` — pass.
+- `DC operating point converges` — pass.
+- `transient stepping does not error after 50 steps` — pass.
+- `survives 2000 transient steps without ERROR state` — pre-existing fail (stagnation at simTime=0.00005s). Matches Phase 0 baseline pattern ("Engine Stagnation: simTime stuck").
+- `survives 600µs of sim time (matches UI run duration)` — pre-existing fail, same stagnation at the same simTime.

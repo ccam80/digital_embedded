@@ -29,6 +29,7 @@ import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement } from "..
 import { isPoolBacked } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import { pnjlim, newtonRaphson } from "../newton-raphson.js";
+import { niIntegrate } from "../ni-integrate.js";
 import { StatePool } from "../state-pool.js";
 import type { StatePoolRef } from "../../../core/analog-types.js";
 import { AnalogCapacitorElement } from "../../../components/passives/capacitor.js";
@@ -426,10 +427,13 @@ export function makeCapacitor(
   // Companion model state — updated each NR iteration inside load().
   let geq = 0;
   let ceq = 0;
-  // Charge history: q0 = current step, q1 = previous step, q2 = two steps back.
+  // Charge history: q0 = current step, q1 = previous step, q2 = two steps back, q3 = three steps back.
   let q0 = 0;
   let q1 = 0;
   let q2 = 0;
+  let q3 = 0;
+  // Companion current history for TRAP order 2 recursion (niinteg.c:32).
+  let ccapPrev = 0;
   let firstTranStep = true;
 
   return {
@@ -460,10 +464,18 @@ export function makeCapacitor(
           }
         }
 
-        // NIintegrate inline using ctx.ag[] (matches capload.c pattern).
-        const ccap = ag[0] * q0 + ag[1] * q1 + (ag.length > 2 ? ag[2] * q2 : 0);
-        geq = ag[0] * capacitance;
-        ceq = ccap - ag[0] * q0;
+        // NIintegrate via shared helper (niinteg.c:17-80).
+        const result = niIntegrate(
+          ctx.method,
+          ctx.order,
+          capacitance,
+          ag,
+          q0, q1,
+          [q2, q3, 0, 0, 0],
+          ccapPrev,
+        );
+        geq = result.geq;
+        ceq = result.ceq;
 
         if (!firstTranStep) {
           G(solver, nodeA, nodeA, geq);
@@ -478,12 +490,15 @@ export function makeCapacitor(
     },
 
     accept(ctx: LoadContext): void {
-      // Advance history: q1 becomes q2, current q0 becomes q1 for next step.
+      // Advance history: q2 becomes q3, q1 becomes q2, current q0 becomes q1.
+      // Also roll ccap into ccapPrev so TRAP order 2 recursion (niinteg.c:32) works.
       const { voltages } = ctx;
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      q3 = q2;
       q2 = q1;
       q1 = capacitance * (vA - vB);
+      ccapPrev = ceq + geq * (vA - vB); // ccap = ceq + ag[0]*q0 = ceq + geq*v
       firstTranStep = false;
     },
 

@@ -23,6 +23,7 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
+import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import {
@@ -282,25 +283,22 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
         }
       }
 
-      // NIintegrate inline using ctx.ag[] (capload.c:67-68, niinteg.c:28-63).
+      // NIintegrate via shared helper (capload.c:67-68, niinteg.c:17-80).
       const q0 = this.s0[this.base + SLOT_Q];
       const q1 = this.s1[this.base + SLOT_Q];
-      let ccap: number;
-      if (ctx.order >= 2 && ag.length > 2) {
-        // GEAR / BDF-2+: ccap = sum(ag[k] * q_k)
-        const q2 = this.s2[this.base + SLOT_Q];
-        ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
-        // Orders > 2 would read deeper history slots. Current pool depth is 4
-        // (s0..s3); higher orders fall back to three-term sum.
-      } else {
-        // BDF-1 / Trap order 1: ccap = ag[0]*q0 + ag[1]*q1
-        ccap = ag[0] * q0 + ag[1] * q1;
-      }
+      const q2 = this.s2[this.base + SLOT_Q];
+      const q3 = this.s3[this.base + SLOT_Q];
+      const ccapPrev = this.s1[this.base + SLOT_CCAP];
+      const { ccap, ceq, geq } = niIntegrate(
+        ctx.method,
+        ctx.order,
+        C,
+        ag,
+        q0, q1,
+        [q2, q3, 0, 0, 0],
+        ccapPrev,
+      );
       this.s0[this.base + SLOT_CCAP] = ccap;
-
-      // geq and ceq (niinteg.c:77-78).
-      const geq = ag[0] * C;
-      const ceq = ccap - ag[0] * q0;
 
       // Seed state1 companion current on first tran step (capload.c:70-72).
       if (initMode === "initTran") {

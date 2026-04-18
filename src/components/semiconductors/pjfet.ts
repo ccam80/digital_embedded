@@ -201,8 +201,8 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
 
-    const gmS = this._gm * this._sourceScale;
-    const gdsS = this._gds * this._sourceScale;
+    const gmS = this._gm;
+    const gdsS = this._gds;
 
     // For P-JFET: current flows from S to D (opposite to N-JFET)
     // Norton: I_SD = ids, with polarity = -1 meaning current into S, out of D
@@ -225,13 +225,13 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
 
     // Norton current: polarity -1 means positive ids flows from S to D
     // KCL at S: +norton, at D: -norton
-    const nortonId = (this._ids - this._gm * this._vgs - this._gds * this._vds) * this._sourceScale;
+    const nortonId = (this._ids - this._gm * this._vgs - this._gds * this._vds);
     stampRHS(solver, nodeS, -nortonId);
     stampRHS(solver, nodeD, nortonId);
 
     // Gate junction diode (between G and S, raw Vgs orientation)
-    const gd = this._gd_junction * this._sourceScale;
-    const nortonIg = (this._id_junction - this._gd_junction * this._vgs_junction) * this._sourceScale;
+    const gd = this._gd_junction;
+    const nortonIg = (this._id_junction - this._gd_junction * this._vgs_junction);
 
     stampG(solver, nodeG, nodeG, gd);
     stampG(solver, nodeG, nodeS, -gd);

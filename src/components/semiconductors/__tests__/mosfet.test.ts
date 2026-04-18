@@ -365,26 +365,40 @@ describe("NMOS", () => {
     expect(nonzeroStamps.length).toBeGreaterThan(0);
   });
 
-  it("setSourceScale_zero_disables_current", () => {
-    // srcFact=0 should zero all RHS contributions from load()
-    const element = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+  it("srcFact_zero_does_not_scale_mosfet_stamps", () => {
+    // ngspice parity: MOSFETs (mos1load.c) do not reference CKTsrcFact.
+    // Device conductance and Norton RHS must be identical at srcFact=0 and srcFact=1.
+    // Source-stepping scales only Vsrc/Isrc (vsrcload.c, isrcload.c) and nodeset/IC targets (cktload.c).
+    const baseline = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
+    const zeroed = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
 
     const voltages = new Float64Array(3);
     voltages[0] = 5;
     voltages[1] = 3;
     voltages[2] = 0;
-    const ctx = makeDcOpCtx(voltages, 3);
-    ctx.srcFact = 0;
-    element.load(ctx);
-    const entries = ctx.solver.getCSCNonZeros();
-    const rhs = ctx.solver.getRhsSnapshot();
 
-    for (let i = 0; i < rhs.length; i++) {
-      expect(Math.abs(rhs[i])).toBeCloseTo(0, 11);
+    const ctxBaseline = makeDcOpCtx(voltages, 3);
+    ctxBaseline.srcFact = 1;
+    baseline.load(ctxBaseline);
+
+    const ctxZero = makeDcOpCtx(voltages, 3);
+    ctxZero.srcFact = 0;
+    zeroed.load(ctxZero);
+
+    const baselineEntries = ctxBaseline.solver.getCSCNonZeros();
+    const zeroEntries     = ctxZero.solver.getCSCNonZeros();
+    const baselineRhs     = ctxBaseline.solver.getRhsSnapshot();
+    const zeroRhs         = ctxZero.solver.getRhsSnapshot();
+
+    expect(zeroEntries.length).toBe(baselineEntries.length);
+    for (let i = 0; i < baselineEntries.length; i++) {
+      expect(zeroEntries[i].row).toBe(baselineEntries[i].row);
+      expect(zeroEntries[i].col).toBe(baselineEntries[i].col);
+      expect(zeroEntries[i].value).toBeCloseTo(baselineEntries[i].value, 14);
     }
-
-    for (const e of entries) {
-      expect(Math.abs(e.value)).toBeCloseTo(0, 11);
+    expect(zeroRhs.length).toBe(baselineRhs.length);
+    for (let i = 0; i < baselineRhs.length; i++) {
+      expect(zeroRhs[i]).toBeCloseTo(baselineRhs[i], 14);
     }
   });
 
@@ -442,8 +456,9 @@ describe("NMOS", () => {
     expect(converged).toBe(true);
   });
 
-  it("setSourceScale_one_is_default", () => {
-    // Without setting ctx.srcFact, behaviour should match explicit srcFact=1.
+  it("srcFact_default_equals_one", () => {
+    // ngspice parity: CKTsrcFact defaults to 1 (cktinit.c:75). Omitting ctx.srcFact
+    // must produce identical stamps and RHS to explicit srcFact=1.
     const elementDefault = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
     const elementScaled = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
 

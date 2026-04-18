@@ -167,12 +167,21 @@ describe("VariableRail", () => {
 // ===========================================================================
 
 describe("variable_rail_load_srcfact_parity", () => {
+  // variable-rail.ts load() invokes solver.allocElement(row, col),
+  // solver.stampElement(handle, value), and solver.stampRHS(row, value).
+  // The capture solver implements the same three-method surface the production
+  // sibling sources (dc-voltage-source.test.ts et al) use, so it covers every
+  // method variable-rail.ts touches.
   function makeCaptureSolver() {
     const stamps: Array<{ row: number; col: number; value: number }> = [];
     const rhs: Array<{ row: number; value: number }> = [];
     return {
-      stamp: vi.fn((row: number, col: number, value: number) => {
-        stamps.push({ row, col, value });
+      allocElement: vi.fn((row: number, col: number) => {
+        stamps.push({ row, col, value: 0 });
+        return stamps.length - 1;
+      }),
+      stampElement: vi.fn((h: number, v: number) => {
+        stamps[h].value += v;
       }),
       stampRHS: vi.fn((row: number, value: number) => {
         rhs.push({ row, value });

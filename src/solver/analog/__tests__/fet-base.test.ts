@@ -554,7 +554,7 @@ describe("integration", () => {
     expect(source.match(/integrateInductor/g)).toBeNull();
   });
 
-  it("trap_order2_xmu_nonstandard_no_helper", () => {
+  it("trap_order2_matches_niinteg_recursion", () => {
     // Build an NMOS with non-zero CGSO so cgs = CGSO * W * M > 0.
     const CGSO = 100e-12;  // F/m — overlap cap per unit width
     const W    = 10e-6;     // m
@@ -595,11 +595,12 @@ describe("integration", () => {
     const vgsNow  = 3.0;
     const prevVgs = 2.5;
     const prevQgs = 5e-16;  // prev step charge
+    const ccapPrev = 1.25e-7;  // non-zero so TRAP order 2 recursion (niinteg.c:32) is exercised
 
     // Write s1 (prev step) values:
     pool.state1[SLOT_V_GS] = prevVgs;   // prevVgs read in _stampCompanion
     pool.state1[SLOT_Q_GS] = prevQgs;   // q1 read as this.s1[base + SLOT_Q_GS]
-    pool.state1[SLOT_CCAP_GS] = 0;      // ccapPrev — not used by inline formula
+    pool.state1[SLOT_CCAP_GS] = ccapPrev; // ccapPrev — RECURSIVE in TRAP order 2 per niinteg.c:32
 
     // Trap order 2 integration coefficients with xmu = 0.3
     const xmu = 0.3;
@@ -657,9 +658,9 @@ describe("integration", () => {
     const q0 = pool.state0[SLOT_Q_GS];
     const q1 = prevQgs;  // s1[SLOT_Q_GS] — unchanged by load()
 
-    // Expected ccap from inline NIintegrate (niinteg.c:28-63, order=2 path):
-    // ccap = ag[0]*q0 + ag[1]*q1
-    const expectedCcap = ag0 * q0 + ag1 * q1;
+    // Expected ccap from NIintegrate TRAP order=2 (niinteg.c:32-34 — RECURSIVE):
+    // ccap = -ccapPrev * ag[1] + ag[0] * (q0 - q1)
+    const expectedCcap = -ccapPrev * ag1 + ag0 * (q0 - q1);
 
     // Bit-exact: the implementation performs this exact floating-point computation
     expect(pool.state0[SLOT_CCAP_GS]).toBe(expectedCcap);

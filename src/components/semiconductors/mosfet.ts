@@ -51,10 +51,6 @@ import {
   AbstractFetElement,
   SLOT_VGS,
   SLOT_VDS,
-  SLOT_GM,
-  SLOT_GDS,
-  SLOT_IDS,
-  SLOT_SWAPPED,
   SLOT_VSB,
   SLOT_GMBS,
   SLOT_GBD,
@@ -1449,9 +1445,9 @@ class MosfetAnalogElement extends AbstractFetElement {
     const effectiveS = this._swapped ? this.drainNode : this.sourceNode;
     const nodeB = this._nodeB;
 
-    const gmS = this._gm * this._sourceScale;
-    const gdsS = this._gds * this._sourceScale;
-    const gmbsS = this._gmbs * this._sourceScale;
+    const gmS = this._gm;
+    const gdsS = this._gds;
+    const gmbsS = this._gmbs;
 
     // Transconductance gm (Vgs): current from S to D
     stampG(solver, effectiveD, nodeG, gmS);
@@ -1489,7 +1485,6 @@ class MosfetAnalogElement extends AbstractFetElement {
       const vbd = vbsOp - this._vds;
       nortonId = -polarity * (this._ids - this._gds * (-this._vds) - this._gm * vgd - this._gmbs * vbd);
     }
-    nortonId *= this._sourceScale;
 
     stampRHS(solver, effectiveD, -nortonId);
     stampRHS(solver, effectiveS, nortonId);

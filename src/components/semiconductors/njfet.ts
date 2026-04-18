@@ -352,8 +352,8 @@ export class NJfetAnalogElement extends AbstractFetElement {
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
 
-    const gmS = this._gm * this._sourceScale;
-    const gdsS = this._gds * this._sourceScale;
+    const gmS = this._gm;
+    const gdsS = this._gds;
 
     // Transconductance gm
     stampG(solver, nodeD, nodeG, gmS);
@@ -368,13 +368,13 @@ export class NJfetAnalogElement extends AbstractFetElement {
     stampG(solver, nodeS, nodeS, gdsS);
 
     // Norton current (channel)
-    const nortonId = (this._ids - this._gm * this._vgs - this._gds * this._vds) * this._sourceScale;
+    const nortonId = (this._ids - this._gm * this._vgs - this._gds * this._vds);
     stampRHS(solver, nodeD, -nortonId);
     stampRHS(solver, nodeS, nortonId);
 
     // Gate junction diode Norton equivalent (between G and S)
-    const gd = this._gd_junction * this._sourceScale;
-    const nortonIg = (this._id_junction - this._gd_junction * this._vgs_junction) * this._sourceScale;
+    const gd = this._gd_junction;
+    const nortonIg = (this._id_junction - this._gd_junction * this._vgs_junction);
 
     stampG(solver, nodeG, nodeG, gd);
     stampG(solver, nodeG, nodeS, -gd);

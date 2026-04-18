@@ -23,6 +23,7 @@ import { defineStateSchema, applyInitialValues } from "./state-schema.js";
 import type { StateSchema } from "./state-schema.js";
 import { cktTerr } from "./ckt-terr.js";
 import type { LteParams } from "./ckt-terr.js";
+import { niIntegrate } from "./ni-integrate.js";
 
 // ---------------------------------------------------------------------------
 // FetCapacitances interface
@@ -186,9 +187,6 @@ export abstract class AbstractFetElement implements AnalogElementCore {
   s3!: Float64Array;
   protected _pool!: StatePoolRef;
 
-  // Source-stepping scale factor — not stored in pool (not state)
-  protected _sourceScale: number = 1.0;
-
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, sets CKTnoncon++)
   protected _pnjlimLimited: boolean = false;
 
@@ -243,10 +241,6 @@ export abstract class AbstractFetElement implements AnalogElementCore {
    */
   protected _initReactive(hasCaps: boolean): void {
     (this as unknown as { isReactive: boolean }).isReactive = hasCaps;
-  }
-
-  setSourceScale(factor: number): void {
-    this._sourceScale = factor;
   }
 
   /**
@@ -320,8 +314,8 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     const effectiveD = this._swapped ? this.sourceNode : this.drainNode;
     const effectiveS = this._swapped ? this.drainNode : this.sourceNode;
 
-    const gmS = this._gm * this._sourceScale;
-    const gdsS = this._gds * this._sourceScale;
+    const gmS = this._gm;
+    const gdsS = this._gds;
 
     // Transconductance gm (Vgs): current flows from effectiveS to effectiveD
     stampG(solver, effectiveD, nodeG, gmS);
@@ -337,7 +331,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
 
     // Norton current sources (KCL at drain and source)
     // Positive Id flows from D to S in N-channel
-    const nortonId = this.polaritySign * (this._ids - this._gm * this._vgs - this._gds * this._vds) * this._sourceScale;
+    const nortonId = this.polaritySign * (this._ids - this._gm * this._vgs - this._gds * this._vds);
     stampRHS(solver, effectiveD, -nortonId);
     stampRHS(solver, effectiveS, nortonId);
   }
@@ -383,9 +377,9 @@ export abstract class AbstractFetElement implements AnalogElementCore {
    * pinNodeIds order: [gate, drain, source, ...extraNodes]
    */
   getPinCurrents(_voltages: Float64Array): number[] {
-    // Drain-source current with polarity and source-stepping scale.
+    // Drain-source current with polarity.
     // Positive _ids = current flows D→S for N-channel (polaritySign = +1).
-    const ids = this.polaritySign * this._ids * this._sourceScale;
+    const ids = this.polaritySign * this._ids;
 
     // When _swapped, the internal "drain" and "source" roles are reversed
     // relative to the physical pins.
@@ -475,7 +469,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     return Math.abs(cdhat - cdFinal) <= tolD && Math.abs(cbhat - (cbsI + cbdI)) <= tolB;
   }
 
-  protected _stampCompanion(_dt: number, _method: IntegrationMethod, _voltages: Float64Array, order: number, _deltaOld: readonly number[], ag: Float64Array): void {
+  protected _stampCompanion(_dt: number, method: IntegrationMethod, _voltages: Float64Array, order: number, _deltaOld: readonly number[], ag: Float64Array): void {
     // Compute vgs/vgd freshly from current node voltages (ngspice mos1load.c
     // single-pass semantics). Voltage limiting is a mid-NR stabilizer applied
     // in updateOperatingPoint; at step boundaries / post-convergence,
@@ -505,15 +499,18 @@ export abstract class AbstractFetElement implements AnalogElementCore {
       const prevQgs = this.s1[base + SLOT_Q_GS];
       const q0 = isFirstCall ? caps.cgs * vgsNow : caps.cgs * (vgsNow - prevVgs) + prevQgs;
       const q1 = this.s1[base + SLOT_Q_GS];
-      let ccap: number;
-      if (order >= 2 && ag.length > 2) {
-        const q2 = this.s2[base + SLOT_Q_GS];
-        ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
-      } else {
-        ccap = ag[0] * q0 + ag[1] * q1;
-      }
-      const geq = ag[0] * caps.cgs;
-      const ceq = ccap - ag[0] * q0;
+      const q2 = this.s2[base + SLOT_Q_GS];
+      const q3 = this.s3[base + SLOT_Q_GS];
+      const ccapPrev = this.s1[base + SLOT_CCAP_GS];
+      const { ccap, ceq, geq } = niIntegrate(
+        method,
+        order,
+        caps.cgs,
+        ag,
+        q0, q1,
+        [q2, q3, 0, 0, 0],
+        ccapPrev,
+      );
       this._s0[base + SLOT_CAP_GEQ_GS] = geq;
       this._s0[base + SLOT_CAP_IEQ_GS] = ceq;
       this._s0[base + SLOT_CCAP_GS] = ccap;
@@ -530,15 +527,18 @@ export abstract class AbstractFetElement implements AnalogElementCore {
       const prevQgd = this.s1[base + SLOT_Q_GD];
       const q0 = isFirstCall ? caps.cgd * vgdNow : caps.cgd * (vgdNow - prevVgd) + prevQgd;
       const q1 = this.s1[base + SLOT_Q_GD];
-      let ccap: number;
-      if (order >= 2 && ag.length > 2) {
-        const q2 = this.s2[base + SLOT_Q_GD];
-        ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
-      } else {
-        ccap = ag[0] * q0 + ag[1] * q1;
-      }
-      const geq = ag[0] * caps.cgd;
-      const ceq = ccap - ag[0] * q0;
+      const q2 = this.s2[base + SLOT_Q_GD];
+      const q3 = this.s3[base + SLOT_Q_GD];
+      const ccapPrev = this.s1[base + SLOT_CCAP_GD];
+      const { ccap, ceq, geq } = niIntegrate(
+        method,
+        order,
+        caps.cgd,
+        ag,
+        q0, q1,
+        [q2, q3, 0, 0, 0],
+        ccapPrev,
+      );
       this._s0[base + SLOT_CAP_GEQ_GD] = geq;
       this._s0[base + SLOT_CAP_IEQ_GD] = ceq;
       this._s0[base + SLOT_CCAP_GD] = ccap;
@@ -560,7 +560,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     }
   }
 
-  protected _updateChargeFlux(voltages: Float64Array, dt: number, _method: IntegrationMethod, order: number, _deltaOld: readonly number[], ag: Float64Array): void {
+  protected _updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, _deltaOld: readonly number[], ag: Float64Array): void {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -600,26 +600,36 @@ export abstract class AbstractFetElement implements AnalogElementCore {
       if (caps.cgs > 0) {
         const q0gs = this._s0[base + SLOT_Q_GS];
         const q1gs = this.s1[base + SLOT_Q_GS];
-        let ccapGs: number;
-        if (order >= 2 && ag.length > 2) {
-          const q2gs = this.s2[base + SLOT_Q_GS];
-          ccapGs = ag[0] * q0gs + ag[1] * q1gs + ag[2] * q2gs;
-        } else {
-          ccapGs = ag[0] * q0gs + ag[1] * q1gs;
-        }
+        const q2gs = this.s2[base + SLOT_Q_GS];
+        const q3gs = this.s3[base + SLOT_Q_GS];
+        const ccapPrevGs = this.s1[base + SLOT_CCAP_GS];
+        const { ccap: ccapGs } = niIntegrate(
+          method,
+          order,
+          caps.cgs,
+          ag,
+          q0gs, q1gs,
+          [q2gs, q3gs, 0, 0, 0],
+          ccapPrevGs,
+        );
         this._s0[base + SLOT_CCAP_GS] = ccapGs;
       }
 
       if (caps.cgd > 0) {
         const q0gd = this._s0[base + SLOT_Q_GD];
         const q1gd = this.s1[base + SLOT_Q_GD];
-        let ccapGd: number;
-        if (order >= 2 && ag.length > 2) {
-          const q2gd = this.s2[base + SLOT_Q_GD];
-          ccapGd = ag[0] * q0gd + ag[1] * q1gd + ag[2] * q2gd;
-        } else {
-          ccapGd = ag[0] * q0gd + ag[1] * q1gd;
-        }
+        const q2gd = this.s2[base + SLOT_Q_GD];
+        const q3gd = this.s3[base + SLOT_Q_GD];
+        const ccapPrevGd = this.s1[base + SLOT_CCAP_GD];
+        const { ccap: ccapGd } = niIntegrate(
+          method,
+          order,
+          caps.cgd,
+          ag,
+          q0gd, q1gd,
+          [q2gd, q3gd, 0, 0, 0],
+          ccapPrevGd,
+        );
         this._s0[base + SLOT_CCAP_GD] = ccapGd;
       }
     }

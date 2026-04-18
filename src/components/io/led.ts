@@ -29,6 +29,7 @@ import {
   computeJunctionCharge,
 } from "../semiconductors/diode.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
+import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -302,14 +303,19 @@ function createLedAnalogElement(
         const q0 = computeJunctionCharge(vdLimited, params.CJO, params.VJ, params.M, params.FC, params.TT, idRaw);
         const q1 = s1[base + SLOT_Q];
         const q2 = s2[base + SLOT_Q];
-        // Inline NIintegrate (niinteg.c:28-63). Mapping: ag[]=ctx.ag, q0/q1/q2=charges.
-        // geq = ag[0] * Ctotal
-        // ccap = ag[0]*q0 + ag[1]*q1 + ag[2]*q2 (order terms)
-        // ceq  = ccap - geq * vdLimited
+        const q3 = s3[base + SLOT_Q];
+        // NIintegrate via shared helper (niinteg.c:17-80).
         const ag = ctx.ag;
-        let ccap = ag[0] * q0 + ag[1] * q1;
-        if (order >= 2 && method !== "trapezoidal") ccap += ag[2] * q2;
-        const capGeq = ag[0] * Ctotal;
+        const ccapPrev = s1[base + SLOT_CCAP];
+        const { ccap, geq: capGeq } = niIntegrate(
+          method,
+          order,
+          Ctotal,
+          ag,
+          q0, q1,
+          [q2, q3, 0, 0, 0],
+          ccapPrev,
+        );
         const capIeq = ccap - capGeq * vdLimited;
         s0[base + SLOT_CAP_GEQ] = capGeq;
         s0[base + SLOT_CAP_IEQ] = capIeq;

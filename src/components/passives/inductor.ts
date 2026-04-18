@@ -23,6 +23,7 @@ import {
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
+import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
@@ -300,20 +301,22 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
         }
       }
 
-      // NIintegrate inline using ctx.ag[] (niinteg.c, indload.c NIintegrate call).
+      // NIintegrate via shared helper (niinteg.c:17-80, indload.c NIintegrate call).
       const phi0 = this.s0[this.base + SLOT_PHI];
       const phi1 = this.s1[this.base + SLOT_PHI];
-      let ccap: number;
-      if (ctx.order >= 2 && ag.length > 2) {
-        const phi2 = this.s2[this.base + SLOT_PHI];
-        ccap = ag[0] * phi0 + ag[1] * phi1 + ag[2] * phi2;
-      } else {
-        ccap = ag[0] * phi0 + ag[1] * phi1;
-      }
+      const phi2 = this.s2[this.base + SLOT_PHI];
+      const phi3 = this.s3[this.base + SLOT_PHI];
+      const ccapPrev = this.s1[this.base + SLOT_CCAP];
+      const { ccap, ceq, geq } = niIntegrate(
+        ctx.method,
+        ctx.order,
+        L,
+        ag,
+        phi0, phi1,
+        [phi2, phi3, 0, 0, 0],
+        ccapPrev,
+      );
       this.s0[this.base + SLOT_CCAP] = ccap;
-
-      const geq = ag[0] * L;
-      const ceq = ccap - ag[0] * phi0;
 
       if (initMode === "initTran") {
         this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];

@@ -34,6 +34,7 @@ import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams, deviceParams } from "../../core/model-params.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
+import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { computeJunctionCapacitance, computeJunctionCharge } from "./diode.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import type { PoolBackedAnalogElementCore, ReactiveAnalogElementCore } from "../../solver/analog/element.js";
@@ -1742,15 +1743,18 @@ export function createSpiceL1BjtElement(
           if (CtotalBE > 0) {
             const q0 = s0[base + L1_SLOT_Q_BE];
             const q1 = s1[base + L1_SLOT_Q_BE];
-            let ccap: number;
-            if (ctx.order >= 2 && ag.length > 2) {
-              const q2 = s2[base + L1_SLOT_Q_BE];
-              ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
-            } else {
-              ccap = ag[0] * q0 + ag[1] * q1;
-            }
-            const geq = ag[0] * CtotalBE;
-            const ceq = ccap - ag[0] * q0;
+            const q2 = s2[base + L1_SLOT_Q_BE];
+            const q3 = s3[base + L1_SLOT_Q_BE];
+            const ccapPrev = s1[base + L1_SLOT_CCAP_BE];
+            const { ccap, ceq, geq } = niIntegrate(
+              ctx.method,
+              ctx.order,
+              CtotalBE,
+              ag,
+              q0, q1,
+              [q2, q3, 0, 0, 0],
+              ccapPrev,
+            );
             s0[base + L1_SLOT_CAP_GEQ_BE] = geq;
             s0[base + L1_SLOT_CAP_IEQ_BE] = ceq;
             s0[base + L1_SLOT_CCAP_BE] = ccap;
@@ -1765,15 +1769,18 @@ export function createSpiceL1BjtElement(
           if (CtotalBC > 0) {
             const q0 = s0[base + L1_SLOT_Q_BC];
             const q1 = s1[base + L1_SLOT_Q_BC];
-            let ccap: number;
-            if (ctx.order >= 2 && ag.length > 2) {
-              const q2 = s2[base + L1_SLOT_Q_BC];
-              ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
-            } else {
-              ccap = ag[0] * q0 + ag[1] * q1;
-            }
-            const geq = ag[0] * CtotalBC;
-            const ceq = ccap - ag[0] * q0;
+            const q2 = s2[base + L1_SLOT_Q_BC];
+            const q3 = s3[base + L1_SLOT_Q_BC];
+            const ccapPrev = s1[base + L1_SLOT_CCAP_BC];
+            const { ccap, ceq, geq } = niIntegrate(
+              ctx.method,
+              ctx.order,
+              CtotalBC,
+              ag,
+              q0, q1,
+              [q2, q3, 0, 0, 0],
+              ccapPrev,
+            );
             s0[base + L1_SLOT_CCAP_BC] = ccap;
             if (isFirstTranCall) s1[base + L1_SLOT_CCAP_BC] = ccap;
             s0[base + L1_SLOT_CAP_GEQ_BC_INT] = xcjc * geq;
@@ -1792,15 +1799,18 @@ export function createSpiceL1BjtElement(
           if (CtotalCS > 0) {
             const q0 = s0[base + L1_SLOT_Q_CS];
             const q1 = s1[base + L1_SLOT_Q_CS];
-            let ccap: number;
-            if (ctx.order >= 2 && ag.length > 2) {
-              const q2 = s2[base + L1_SLOT_Q_CS];
-              ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
-            } else {
-              ccap = ag[0] * q0 + ag[1] * q1;
-            }
-            const geq = ag[0] * CtotalCS;
-            const ceq = ccap - ag[0] * q0;
+            const q2 = s2[base + L1_SLOT_Q_CS];
+            const q3 = s3[base + L1_SLOT_Q_CS];
+            const ccapPrev = s1[base + L1_SLOT_CCAP_CS];
+            const { ccap, ceq, geq } = niIntegrate(
+              ctx.method,
+              ctx.order,
+              CtotalCS,
+              ag,
+              q0, q1,
+              [q2, q3, 0, 0, 0],
+              ccapPrev,
+            );
             s0[base + L1_SLOT_CAP_GEQ_CS] = geq;
             s0[base + L1_SLOT_CAP_IEQ_CS] = ceq;
             s0[base + L1_SLOT_CCAP_CS] = ccap;

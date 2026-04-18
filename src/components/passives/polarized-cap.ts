@@ -49,6 +49,7 @@ import {
 } from "../../solver/analog/state-schema.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
+import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -361,17 +362,19 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
 
       const q0 = this.s0[this.base + SLOT_Q];
       const q1 = this.s1[this.base + SLOT_Q];
-      let ccap: number;
-      if (ctx.order >= 2 && ag.length > 2) {
-        const q2 = this.s2[this.base + SLOT_Q];
-        ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
-      } else {
-        ccap = ag[0] * q0 + ag[1] * q1;
-      }
+      const q2 = this.s2[this.base + SLOT_Q];
+      const q3 = this.s3[this.base + SLOT_Q];
+      const ccapPrev = this.s1[this.base + SLOT_CCAP];
+      const { ccap, ceq, geq } = niIntegrate(
+        ctx.method,
+        ctx.order,
+        C,
+        ag,
+        q0, q1,
+        [q2, q3, 0, 0, 0],
+        ccapPrev,
+      );
       this.s0[this.base + SLOT_CCAP] = ccap;
-
-      const geq = ag[0] * C;
-      const ceq = ccap - ag[0] * q0;
 
       if (initMode === "initTran") {
         this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];

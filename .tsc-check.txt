@@ -1,0 +1,400 @@
+src/compile/__tests__/compile-integration.test.ts(105,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/compile/__tests__/compile-integration.test.ts(118,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/compile/__tests__/compile-integration.test.ts(131,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/compile/__tests__/compile.test.ts(176,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/compile/__tests__/coordinator.test.ts(127,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/compile/__tests__/pin-loading-menu.test.ts(59,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/components/active/__tests__/real-opamp.test.ts(174,7): error TS2339: Property 'dt' does not exist on type 'CKTCircuitContext'.
+src/components/active/__tests__/real-opamp.test.ts(180,39): error TS2551: Property 'nodeVoltages' does not exist on type 'NRResult'. Did you mean 'voltages'?
+src/components/active/__tests__/real-opamp.test.ts(186,21): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/io/__tests__/analog-clock.test.ts(57,17): error TS2554: Expected 6 arguments, but got 5.
+src/components/io/__tests__/analog-clock.test.ts(81,17): error TS2554: Expected 6 arguments, but got 5.
+src/components/io/__tests__/analog-clock.test.ts(101,17): error TS2554: Expected 6 arguments, but got 5.
+src/components/io/__tests__/analog-clock.test.ts(123,17): error TS2554: Expected 6 arguments, but got 5.
+src/components/io/__tests__/analog-clock.test.ts(164,17): error TS2554: Expected 6 arguments, but got 5.
+src/components/io/__tests__/led.test.ts(742,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/components/io/__tests__/led.test.ts(889,10): error TS2339: Property 'initState' does not exist on type 'AnalogElementCore'.
+src/components/io/led.ts(225,9): error TS2739: Type '{ branchIndex: number; isNonlinear: true; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<"Q" | "GEQ" | "IEQ" | "V" | "CCAP" | "VD" | "ID" | "CAP_GEQ" | "CAP_IEQ">; ... 10 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'PoolBackedAnalogElementCore': s4, s5, s6, s7
+src/components/passives/__tests__/capacitor.test.ts(23,1): error TS6133: 'makeSimpleCtx' is declared but its value is never read.
+src/components/passives/__tests__/capacitor.test.ts(24,31): error TS2300: Duplicate identifier 'SparseSolverType'.
+src/components/passives/__tests__/capacitor.test.ts(25,15): error TS2300: Duplicate identifier 'LoadContext'.
+src/components/passives/__tests__/capacitor.test.ts(401,9): error TS6133: 'SLOT_Q' is declared but its value is never read.
+src/components/passives/__tests__/capacitor.test.ts(570,15): error TS2300: Duplicate identifier 'LoadContext'.
+src/components/passives/__tests__/capacitor.test.ts(571,31): error TS2300: Duplicate identifier 'SparseSolverType'.
+src/components/passives/__tests__/polarized-cap.test.ts(21,19): error TS6133: 'makeSimpleCtx' is declared but its value is never read.
+src/components/passives/__tests__/potentiometer.test.ts(238,24): error TS2339: Property 'pinNodeIds' does not exist on type 'AnalogElementCore'.
+src/components/passives/__tests__/potentiometer.test.ts(239,24): error TS2339: Property 'allNodeIds' does not exist on type 'AnalogElementCore'.
+src/components/passives/__tests__/resistor.test.ts(8,19): error TS2300: Duplicate identifier 'makeSimpleCtx'.
+src/components/passives/__tests__/resistor.test.ts(211,3): error TS2300: Duplicate identifier 'makeSimpleCtx'.
+src/components/passives/capacitor.ts(158,14): error TS2420: Class 'AnalogCapacitorElement' incorrectly implements interface 'ReactiveAnalogElementCore'.
+  Type 'AnalogCapacitorElement' is missing the following properties from type 'ReactiveAnalogElementCore': s4, s5, s6, s7
+src/components/passives/crystal.ts(242,14): error TS2420: Class 'AnalogCrystalElement' incorrectly implements interface 'ReactiveAnalogElement'.
+  Type 'AnalogCrystalElement' is not assignable to type 'ReactiveAnalogElementCore'.
+    Type 'AnalogCrystalElement' is missing the following properties from type 'ReactiveAnalogElementCore': s4, s5, s6, s7
+src/components/passives/inductor.ts(175,14): error TS2420: Class 'AnalogInductorElement' incorrectly implements interface 'ReactiveAnalogElementCore'.
+  Type 'AnalogInductorElement' is missing the following properties from type 'ReactiveAnalogElementCore': s4, s5, s6, s7
+src/components/passives/polarized-cap.ts(228,14): error TS2420: Class 'AnalogPolarizedCapElement' incorrectly implements interface 'ReactiveAnalogElement'.
+  Type 'AnalogPolarizedCapElement' is not assignable to type 'ReactiveAnalogElementCore'.
+    Type 'AnalogPolarizedCapElement' is missing the following properties from type 'ReactiveAnalogElementCore': s4, s5, s6, s7
+src/components/passives/tapped-transformer.ts(243,14): error TS2420: Class 'AnalogTappedTransformerElement' incorrectly implements interface 'ReactiveAnalogElement'.
+  Type 'AnalogTappedTransformerElement' is not assignable to type 'ReactiveAnalogElementCore'.
+    Type 'AnalogTappedTransformerElement' is missing the following properties from type 'ReactiveAnalogElementCore': s4, s5, s6, s7
+src/components/passives/transformer.ts(222,14): error TS2420: Class 'AnalogTransformerElement' incorrectly implements interface 'ReactiveAnalogElement'.
+  Type 'AnalogTransformerElement' is not assignable to type 'ReactiveAnalogElementCore'.
+    Type 'AnalogTransformerElement' is missing the following properties from type 'ReactiveAnalogElementCore': s4, s5, s6, s7
+src/components/passives/transformer.ts(283,44): error TS2352: Conversion of type '{ states: Float64Array<ArrayBufferLike>[]; state0: Float64Array<ArrayBufferLike>; state1: Float64Array<ArrayBufferLike>; state2: Float64Array<...>; state3: Float64Array<...>; totalSlots: number; tranStep: number; }' to type 'StatePoolRef' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ states: Float64Array<ArrayBufferLike>[]; state0: Float64Array<ArrayBufferLike>; state1: Float64Array<ArrayBufferLike>; state2: Float64Array<...>; state3: Float64Array<...>; totalSlots: number; tranStep: number; }' is missing the following properties from type 'StatePoolRef': state4, state5, state6, state7
+src/components/passives/transmission-line.ts(326,7): error TS2420: Class 'SegmentInductorElement' incorrectly implements interface 'ReactiveAnalogElement'.
+  Type 'SegmentInductorElement' is not assignable to type 'ReactiveAnalogElementCore'.
+    Type 'SegmentInductorElement' is missing the following properties from type 'ReactiveAnalogElementCore': s4, s5, s6, s7
+src/components/passives/transmission-line.ts(432,7): error TS2420: Class 'SegmentCapacitorElement' incorrectly implements interface 'ReactiveAnalogElement'.
+  Type 'SegmentCapacitorElement' is not assignable to type 'ReactiveAnalogElementCore'.
+    Type 'SegmentCapacitorElement' is missing the following properties from type 'ReactiveAnalogElementCore': s4, s5, s6, s7
+src/components/passives/transmission-line.ts(534,7): error TS2420: Class 'CombinedRLElement' incorrectly implements interface 'ReactiveAnalogElement'.
+  Type 'CombinedRLElement' is not assignable to type 'ReactiveAnalogElementCore'.
+    Type 'CombinedRLElement' is missing the following properties from type 'ReactiveAnalogElementCore': s4, s5, s6, s7
+src/components/semiconductors/__tests__/bjt.test.ts(1174,37): error TS2339: Property 'stateSize' does not exist on type 'AnalogElementCore & { label?: string; elementIndex?: number; }'.
+src/components/semiconductors/__tests__/bjt.test.ts(1175,10): error TS2339: Property 'stateBaseOffset' does not exist on type 'AnalogElementCore & { label?: string; elementIndex?: number; }'.
+src/components/semiconductors/__tests__/bjt.test.ts(1176,10): error TS2339: Property 'initState' does not exist on type 'AnalogElementCore & { label?: string; elementIndex?: number; }'.
+src/components/semiconductors/__tests__/bjt.test.ts(1227,37): error TS2339: Property 'stateSize' does not exist on type 'AnalogElementCore & { primeJunctions: () => void; }'.
+src/components/semiconductors/__tests__/bjt.test.ts(1228,10): error TS2339: Property 'stateBaseOffset' does not exist on type 'AnalogElementCore & { primeJunctions: () => void; }'.
+src/components/semiconductors/__tests__/bjt.test.ts(1229,10): error TS2339: Property 'initState' does not exist on type 'AnalogElementCore & { primeJunctions: () => void; }'.
+src/components/semiconductors/__tests__/bjt.test.ts(1291,37): error TS2339: Property 'stateSize' does not exist on type 'AnalogElementCore & { label?: string; elementIndex?: number; }'.
+src/components/semiconductors/__tests__/bjt.test.ts(1292,10): error TS2339: Property 'stateBaseOffset' does not exist on type 'AnalogElementCore & { label?: string; elementIndex?: number; }'.
+src/components/semiconductors/__tests__/bjt.test.ts(1293,10): error TS2339: Property 'initState' does not exist on type 'AnalogElementCore & { label?: string; elementIndex?: number; }'.
+src/components/semiconductors/__tests__/diode-state-pool.test.ts(36,16): error TS2352: Conversion of type '{ branchIndex: number; isNonlinear: boolean; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<string>; stateBaseOffset: number; initState(poolRef: StatePoolRef): void; ... 5 more ...; setParam(key: string, value: number): void; }' to type 'ReactiveAnalogElement' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ branchIndex: number; isNonlinear: boolean; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<string>; stateBaseOffset: number; initState(poolRef: StatePoolRef): void; ... 5 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'ReactiveAnalogElementCore': s0, s1, s2, s3, and 4 more.
+src/components/semiconductors/__tests__/diode-state-pool.test.ts(209,21): error TS2352: Conversion of type '{ branchIndex: number; isNonlinear: boolean; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<string>; stateBaseOffset: number; initState(poolRef: StatePoolRef): void; ... 5 more ...; setParam(key: string, value: number): void; }' to type 'ReactiveAnalogElement' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ branchIndex: number; isNonlinear: boolean; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<string>; stateBaseOffset: number; initState(poolRef: StatePoolRef): void; ... 5 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'ReactiveAnalogElementCore': s0, s1, s2, s3, and 4 more.
+src/components/semiconductors/__tests__/diode-state-pool.test.ts(233,21): error TS2352: Conversion of type '{ branchIndex: number; isNonlinear: boolean; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<string>; stateBaseOffset: number; initState(poolRef: StatePoolRef): void; ... 5 more ...; setParam(key: string, value: number): void; }' to type 'ReactiveAnalogElement' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ branchIndex: number; isNonlinear: boolean; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<string>; stateBaseOffset: number; initState(poolRef: StatePoolRef): void; ... 5 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'ReactiveAnalogElementCore': s0, s1, s2, s3, and 4 more.
+src/components/semiconductors/__tests__/diode-state-pool.test.ts(246,21): error TS2352: Conversion of type '{ branchIndex: number; isNonlinear: boolean; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<string>; stateBaseOffset: number; initState(poolRef: StatePoolRef): void; ... 5 more ...; setParam(key: string, value: number): void; }' to type 'ReactiveAnalogElement' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ branchIndex: number; isNonlinear: boolean; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<string>; stateBaseOffset: number; initState(poolRef: StatePoolRef): void; ... 5 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'ReactiveAnalogElementCore': s0, s1, s2, s3, and 4 more.
+src/components/semiconductors/__tests__/diode-state-pool.test.ts(258,18): error TS2352: Conversion of type '{ branchIndex: number; isNonlinear: boolean; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<string>; stateBaseOffset: number; initState(poolRef: StatePoolRef): void; ... 5 more ...; setParam(key: string, value: number): void; }' to type 'ReactiveAnalogElement' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ branchIndex: number; isNonlinear: boolean; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<string>; stateBaseOffset: number; initState(poolRef: StatePoolRef): void; ... 5 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'ReactiveAnalogElementCore': s0, s1, s2, s3, and 4 more.
+src/components/semiconductors/__tests__/diode-state-pool.test.ts(283,21): error TS2352: Conversion of type '{ branchIndex: number; isNonlinear: boolean; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<string>; stateBaseOffset: number; initState(poolRef: StatePoolRef): void; ... 5 more ...; setParam(key: string, value: number): void; }' to type 'ReactiveAnalogElement' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ branchIndex: number; isNonlinear: boolean; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<string>; stateBaseOffset: number; initState(poolRef: StatePoolRef): void; ... 5 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'ReactiveAnalogElementCore': s0, s1, s2, s3, and 4 more.
+src/components/semiconductors/__tests__/diode.test.ts(18,10): error TS2300: Duplicate identifier 'SparseSolver'.
+src/components/semiconductors/__tests__/diode.test.ts(565,6): error TS2352: Conversion of type 'AnalogElementCore' to type '{ elementIndex: number; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'elementIndex' is missing in type 'AnalogElementCore' but required in type '{ elementIndex: number; }'.
+src/components/semiconductors/__tests__/diode.test.ts(567,6): error TS2352: Conversion of type 'AnalogElementCore' to type '{ stateBaseOffset: number; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'stateBaseOffset' is missing in type 'AnalogElementCore' but required in type '{ stateBaseOffset: number; }'.
+src/components/semiconductors/__tests__/diode.test.ts(744,6): error TS2352: Conversion of type 'AnalogElementCore' to type '{ stateBaseOffset: number; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'stateBaseOffset' is missing in type 'AnalogElementCore' but required in type '{ stateBaseOffset: number; }'.
+src/components/semiconductors/__tests__/diode.test.ts(822,6): error TS2352: Conversion of type 'AnalogElementCore' to type '{ stateBaseOffset: number; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'stateBaseOffset' is missing in type 'AnalogElementCore' but required in type '{ stateBaseOffset: number; }'.
+src/components/semiconductors/__tests__/diode.test.ts(1026,10): error TS2300: Duplicate identifier 'SparseSolver'.
+src/components/semiconductors/__tests__/mosfet.test.ts(1098,11): error TS6133: 'capbd' is declared but its value is never read.
+src/components/semiconductors/__tests__/mosfet.test.ts(1099,11): error TS6133: 'qbd' is declared but its value is never read.
+src/components/semiconductors/__tests__/mosfet.test.ts(1306,11): error TS6133: 'NGSPICE_ceqbd' is declared but its value is never read.
+src/components/semiconductors/__tests__/scr.test.ts(456,6): error TS2352: Conversion of type 'AnalogElementCore' to type '{ elementIndex: number; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'elementIndex' is missing in type 'AnalogElementCore' but required in type '{ elementIndex: number; }'.
+src/components/semiconductors/__tests__/scr.test.ts(458,6): error TS2352: Conversion of type 'AnalogElementCore' to type '{ stateBaseOffset: number; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Property 'stateBaseOffset' is missing in type 'AnalogElementCore' but required in type '{ stateBaseOffset: number; }'.
+src/components/semiconductors/__tests__/triode.test.ts(19,1): error TS6133: 'AnalogElement' is declared but its value is never read.
+src/components/semiconductors/__tests__/tunnel-diode.test.ts(17,3): error TS6133: 'TUNNEL_DIODE_PARAM_DEFAULTS' is declared but its value is never read.
+src/components/semiconductors/__tests__/tunnel-diode.test.ts(23,1): error TS6133: 'newtonRaphson' is declared but its value is never read.
+src/components/semiconductors/__tests__/tunnel-diode.test.ts(29,1): error TS6133: 'SparseSolverType' is declared but its value is never read.
+src/components/semiconductors/__tests__/zener.test.ts(17,1): error TS6133: 'SparseSolverType' is declared but its value is never read.
+src/components/semiconductors/bjt.ts(716,3): error TS2739: Type '{ branchIndex: number; isNonlinear: true; isReactive: false; poolBacked: true; stateSchema: StateSchema<string>; stateSize: number; stateBaseOffset: number; s0: Float64Array<ArrayBuffer>; ... 9 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'PoolBackedAnalogElementCore': s4, s5, s6, s7
+src/components/semiconductors/bjt.ts(1366,9): error TS2739: Type '{ branchIndex: number; isNonlinear: true; isReactive: true; poolBacked: true; stateSchema: StateSchema<string>; stateSize: number; stateBaseOffset: number; s0: Float64Array<ArrayBuffer>; ... 10 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'ReactiveAnalogElementCore': s4, s5, s6, s7
+src/components/semiconductors/scr.ts(221,10): error TS2352: Conversion of type '{ branchIndex: number; isNonlinear: true; isReactive: false; poolBacked: true; stateSize: number; stateSchema: StateSchema<"GEQ" | "IEQ" | "VAK" | "VGK" | "G_GATE_GEQ" | "G_GATE_IEQ" | "LATCHED" | "IAK" | "IGK">; ... 9 more ...; readonly _latchedState: boolean; }' to type 'PoolBackedAnalogElementCore & { _latchedState: boolean; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ branchIndex: number; isNonlinear: true; isReactive: false; poolBacked: true; stateSize: number; stateSchema: StateSchema<"GEQ" | "IEQ" | "VAK" | "VGK" | "G_GATE_GEQ" | "G_GATE_IEQ" | "LATCHED" | "IAK" | "IGK">; ... 9 more ...; readonly _latchedState: boolean; }' is missing the following properties from type 'PoolBackedAnalogElementCore': s0, s1, s2, s3, and 4 more.
+src/components/semiconductors/triac.ts(241,3): error TS2739: Type '{ branchIndex: number; isNonlinear: true; isReactive: false; poolBacked: true; stateSize: number; stateSchema: StateSchema<"GEQ" | "IEQ" | "VAK" | "VGK" | "G_GATE_GEQ" | "G_GATE_IEQ" | "LATCHED" | "IAK" | "IGK">; ... 10 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'PoolBackedAnalogElementCore': s4, s5, s6, s7
+src/components/semiconductors/tunnel-diode.ts(230,9): error TS2739: Type '{ branchIndex: number; isNonlinear: true; isReactive: boolean; poolBacked: true; stateSize: number; stateSchema: StateSchema<"Q" | "GEQ" | "IEQ" | "V" | "CCAP" | "VD" | "ID" | "CAP_GEQ" | "CAP_IEQ">; ... 10 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'PoolBackedAnalogElementCore': s4, s5, s6, s7
+src/components/semiconductors/varactor.ts(127,3): error TS2739: Type '{ branchIndex: number; isNonlinear: true; isReactive: true; poolBacked: true; stateSize: number; stateSchema: StateSchema<"Q" | "GEQ" | "IEQ" | "V" | "CCAP" | "VD" | "ID" | "CAP_GEQ" | "CAP_IEQ">; ... 12 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'ReactiveAnalogElementCore': s4, s5, s6, s7
+src/components/semiconductors/zener.ts(126,3): error TS2739: Type '{ branchIndex: number; isNonlinear: true; isReactive: false; poolBacked: true; stateSize: number; stateSchema: StateSchema<"GEQ" | "IEQ" | "VD" | "ID">; stateBaseOffset: number; ... 10 more ...; setParam(key: string, value: number): void; }' is missing the following properties from type 'PoolBackedAnalogElementCore': s4, s5, s6, s7
+src/components/sensors/__tests__/ldr.test.ts(167,16): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/sensors/__tests__/ldr.test.ts(187,16): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/sensors/__tests__/ldr.test.ts(208,16): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/sensors/__tests__/ntc-thermistor.test.ts(287,16): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/sensors/__tests__/spark-gap.test.ts(296,16): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/sensors/__tests__/spark-gap.test.ts(318,16): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/sensors/__tests__/spark-gap.test.ts(330,16): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/sources/__tests__/ac-voltage-source.test.ts(61,42): error TS6133: 'time' is declared but its value is never read.
+src/components/sources/__tests__/variable-rail.test.ts(37,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/components/sources/__tests__/variable-rail.test.ts(37,19): error TS2552: Cannot find name 'SparseSolver'. Did you mean 'SparseSolverType'?
+src/components/sources/ac-voltage-source.ts(623,5): error TS2353: Object literal may only specify known properties, and 'acceptStep' does not exist in type 'AcVoltageSourceAnalogElement'.
+src/components/switching/__tests__/switches.test.ts(801,13): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/switching/__tests__/switches.test.ts(821,13): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/switching/__tests__/switches.test.ts(841,13): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/switching/__tests__/switches.test.ts(847,13): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/switching/__tests__/switches.test.ts(873,13): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/switching/__tests__/switches.test.ts(899,13): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/components/switching/__tests__/switches.test.ts(925,13): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/core/__tests__/analog-engine-interface.test.ts(94,7): error TS2739: Type '{ states: Float64Array<ArrayBuffer>[]; state0: Float64Array<ArrayBuffer>; state1: Float64Array<ArrayBuffer>; state2: Float64Array<...>; state3: Float64Array<...>; totalSlots: number; tranStep: number; }' is missing the following properties from type 'StatePoolRef': state4, state5, state6, state7
+src/core/__tests__/analog-types-setparam.test.ts(6,5): error TS2578: Unused '@ts-expect-error' directive.
+src/core/__tests__/analog-types-setparam.test.ts(11,7): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElementCore'. Did you mean to write 'stampAc'?
+src/core/__tests__/analog-types-setparam.test.ts(24,7): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElementCore'. Did you mean to write 'stampAc'?
+src/headless/__tests__/rc-rl-diagnostic.test.ts(7,14): error TS7006: Parameter 'n' implicitly has an 'any' type.
+src/solver/__tests__/coordinator-capability.test.ts(46,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/solver/__tests__/coordinator-speed-control.test.ts(57,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/solver/analog/__tests__/analog-engine.test.ts(529,22): error TS2339: Property 'push' does not exist on type 'readonly AnalogElement[]'.
+src/solver/analog/__tests__/analog-engine.test.ts(545,9): error TS6133: 'hitEdge' is declared but its value is never read.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(17,32): error TS6133: 'vi' is declared but its value is never read.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(71,24): error TS2345: Argument of type '{ diagnostics: DiagnosticCollector; maxIterations: number; reltol: number; abstol: number; iabstol: number; solver: SparseSolver; elements: AnalogElement[]; matrixSize: number; }' is not assignable to parameter of type 'CKTCircuitContext'.
+  Type '{ diagnostics: DiagnosticCollector; maxIterations: number; reltol: number; abstol: number; iabstol: number; solver: SparseSolver; elements: AnalogElement[]; matrixSize: number; }' is missing the following properties from type 'CKTCircuitContext': _solver, rhsOld, rhs, rhsSpare, and 53 more.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(136,19): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(138,19): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(146,19): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(147,19): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(158,21): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(159,21): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(225,19): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(227,19): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(228,19): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(229,19): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(230,19): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(238,19): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(240,21): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(249,21): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(251,29): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(318,19): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(319,19): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(320,19): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(321,19): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(322,19): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(330,21): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-combinational.test.ts(332,29): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(135,24): error TS2345: Argument of type '{ diagnostics: DiagnosticCollector; maxIterations: number; reltol: number; abstol: number; iabstol: number; solver: SparseSolver; elements: AnalogElement[]; matrixSize: number; }' is not assignable to parameter of type 'CKTCircuitContext'.
+  Type '{ diagnostics: DiagnosticCollector; maxIterations: number; reltol: number; abstol: number; iabstol: number; solver: SparseSolver; elements: AnalogElement[]; matrixSize: number; }' is missing the following properties from type 'CKTCircuitContext': _solver, rhsOld, rhs, rhsSpare, and 53 more.
+src/solver/analog/__tests__/behavioral-gate.test.ts(186,19): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(189,25): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(201,19): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(202,25): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(223,23): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(224,23): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(235,22): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(236,28): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(262,21): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(263,27): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(293,21): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(294,27): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(316,19): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(317,19): error TS2339: Property 'iterations' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(330,19): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(332,25): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(388,34): error TS2345: Argument of type '{ diagnostics: DiagnosticCollector; maxIterations: number; reltol: number; abstol: number; iabstol: number; solver: SparseSolver; elements: AnalogElement[]; matrixSize: number; }' is not assignable to parameter of type 'CKTCircuitContext'.
+  Type '{ diagnostics: DiagnosticCollector; maxIterations: number; reltol: number; abstol: number; iabstol: number; solver: SparseSolver; elements: AnalogElement[]; matrixSize: number; }' is missing the following properties from type 'CKTCircuitContext': _solver, rhsOld, rhs, rhsSpare, and 53 more.
+src/solver/analog/__tests__/behavioral-gate.test.ts(396,19): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(398,27): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(465,19): error TS2339: Property 'converged' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-gate.test.ts(467,19): error TS2339: Property 'voltages' does not exist on type 'void'.
+src/solver/analog/__tests__/behavioral-integration.test.ts(33,1): error TS6133: 'SparseSolver' is declared but its value is never read.
+src/solver/analog/__tests__/behavioral-remaining.test.ts(23,32): error TS6133: 'vi' is declared but its value is never read.
+src/solver/analog/__tests__/behavioral-remaining.test.ts(25,1): error TS6133: 'DiagnosticCollector' is declared but its value is never read.
+src/solver/analog/__tests__/behavioral-remaining.test.ts(403,7): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+src/solver/analog/__tests__/behavioral-sequential.test.ts(13,32): error TS6133: 'vi' is declared but its value is never read.
+src/solver/analog/__tests__/ckt-terr.test.ts(354,17): error TS2345: Argument of type 'Float64Array<ArrayBuffer>' is not assignable to parameter of type 'readonly number[]'.
+  Type 'Float64Array<ArrayBuffer>' is missing the following properties from type 'readonly number[]': concat, flatMap, flat, [Symbol.unscopables]
+src/solver/analog/__tests__/ckt-terr.test.ts(355,44): error TS2345: Argument of type 'Float64Array<ArrayBuffer>' is not assignable to parameter of type 'readonly number[]'.
+  Type 'Float64Array<ArrayBuffer>' is missing the following properties from type 'readonly number[]': concat, flatMap, flat, [Symbol.unscopables]
+src/solver/analog/__tests__/ckt-terr.test.ts(364,19): error TS2345: Argument of type 'Float64Array<ArrayBuffer>' is not assignable to parameter of type 'readonly number[]'.
+  Type 'Float64Array<ArrayBuffer>' is missing the following properties from type 'readonly number[]': concat, flatMap, flat, [Symbol.unscopables]
+src/solver/analog/__tests__/ckt-terr.test.ts(365,19): error TS2345: Argument of type 'Float64Array<ArrayBuffer>' is not assignable to parameter of type 'readonly number[]'.
+  Type 'Float64Array<ArrayBuffer>' is missing the following properties from type 'readonly number[]': concat, flatMap, flat, [Symbol.unscopables]
+src/solver/analog/__tests__/ckt-terr.test.ts(366,56): error TS2345: Argument of type 'Float64Array<ArrayBuffer>' is not assignable to parameter of type 'readonly number[]'.
+  Type 'Float64Array<ArrayBuffer>' is missing the following properties from type 'readonly number[]': concat, flatMap, flat, [Symbol.unscopables]
+src/solver/analog/__tests__/ckt-terr.test.ts(367,56): error TS2345: Argument of type 'Float64Array<ArrayBuffer>' is not assignable to parameter of type 'readonly number[]'.
+  Type 'Float64Array<ArrayBuffer>' is missing the following properties from type 'readonly number[]': concat, flatMap, flat, [Symbol.unscopables]
+src/solver/analog/__tests__/compile-analog-partition.test.ts(88,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/solver/analog/__tests__/compiler.test.ts(101,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/solver/analog/__tests__/compiler.test.ts(114,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/solver/analog/__tests__/compiler.test.ts(127,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/solver/analog/__tests__/controlled-source-base.test.ts(85,14): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/solver/analog/__tests__/controlled-source-base.test.ts(97,14): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/solver/analog/__tests__/controlled-source-base.test.ts(109,14): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/solver/analog/__tests__/controlled-source-base.test.ts(121,14): error TS2345: Argument of type 'CKTCircuitContext' is not assignable to parameter of type 'LoadContext'.
+  Type 'CKTCircuitContext' is missing the following properties from type 'LoadContext': voltages, iteration, dt, method, and 4 more.
+src/solver/analog/__tests__/dc-operating-point.test.ts(71,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/solver/analog/__tests__/digital-pin-loading.test.ts(72,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/solver/analog/__tests__/digital-pin-loading.test.ts(104,61): error TS2741: Property 'load' is missing in type '{ pinNodeIds: never[]; allNodeIds: never[]; branchIndex: number; isNonlinear: false; isReactive: false; stamp(): void; setParam(_k: string, _v: number): void; getPinCurrents(_v: Float64Array<ArrayBufferLike>): number[]; }' but required in type 'AnalogElementCore'.
+src/solver/analog/__tests__/digital-pin-model.test.ts(24,32): error TS6133: 'vi' is declared but its value is never read.
+src/solver/analog/__tests__/digital-pin-model.test.ts(36,11): error TS6196: 'StampRecord' is declared but never used.
+src/solver/analog/__tests__/digital-pin-model.test.ts(155,27): error TS2322: Type 'MockSolver' is not assignable to type 'SparseSolver & MockSolver'.
+  Type 'MockSolver' is missing the following properties from type 'SparseSolver': _elRow, _elCol, _elVal, _elFlags, and 92 more.
+src/solver/analog/__tests__/digital-pin-model.test.ts(176,27): error TS2322: Type 'MockSolver' is not assignable to type 'SparseSolver & MockSolver'.
+  Type 'MockSolver' is missing the following properties from type 'SparseSolver': _elRow, _elCol, _elVal, _elFlags, and 92 more.
+src/solver/analog/__tests__/digital-pin-model.test.ts(196,27): error TS2322: Type 'MockSolver' is not assignable to type 'SparseSolver & MockSolver'.
+  Type 'MockSolver' is missing the following properties from type 'SparseSolver': _elRow, _elCol, _elVal, _elFlags, and 92 more.
+src/solver/analog/__tests__/digital-pin-model.test.ts(215,27): error TS2322: Type 'MockSolver' is not assignable to type 'SparseSolver & MockSolver'.
+  Type 'MockSolver' is missing the following properties from type 'SparseSolver': _elRow, _elCol, _elVal, _elFlags, and 92 more.
+src/solver/analog/__tests__/digital-pin-model.test.ts(235,11): error TS6133: 'prevVoltage' is declared but its value is never read.
+src/solver/analog/__tests__/digital-pin-model.test.ts(238,27): error TS2322: Type 'MockSolver' is not assignable to type 'SparseSolver & MockSolver'.
+  Type 'MockSolver' is missing the following properties from type 'SparseSolver': _elRow, _elCol, _elVal, _elFlags, and 92 more.
+src/solver/analog/__tests__/digital-pin-model.test.ts(258,27): error TS2322: Type 'MockSolver' is not assignable to type 'SparseSolver & MockSolver'.
+  Type 'MockSolver' is missing the following properties from type 'SparseSolver': _elRow, _elCol, _elVal, _elFlags, and 92 more.
+src/solver/analog/__tests__/digital-pin-model.test.ts(306,27): error TS2322: Type 'MockSolver' is not assignable to type 'SparseSolver & MockSolver'.
+  Type 'MockSolver' is missing the following properties from type 'SparseSolver': _elRow, _elCol, _elVal, _elFlags, and 92 more.
+src/solver/analog/__tests__/digital-pin-model.test.ts(333,27): error TS2322: Type 'MockSolver' is not assignable to type 'SparseSolver & MockSolver'.
+  Type 'MockSolver' is missing the following properties from type 'SparseSolver': _elRow, _elCol, _elVal, _elFlags, and 92 more.
+src/solver/analog/__tests__/digital-pin-model.test.ts(346,27): error TS2322: Type 'MockSolver' is not assignable to type 'SparseSolver & MockSolver'.
+  Type 'MockSolver' is missing the following properties from type 'SparseSolver': _elRow, _elCol, _elVal, _elFlags, and 92 more.
+src/solver/analog/__tests__/digital-pin-model.test.ts(379,27): error TS2322: Type 'MockSolver' is not assignable to type 'SparseSolver & MockSolver'.
+  Type 'MockSolver' is missing the following properties from type 'SparseSolver': _elRow, _elCol, _elVal, _elFlags, and 92 more.
+src/solver/analog/__tests__/element-interface.test.ts(65,5): error TS2578: Unused '@ts-expect-error' directive.
+src/solver/analog/__tests__/element-interface.test.ts(70,7): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElementCore'. Did you mean to write 'stampAc'?
+src/solver/analog/__tests__/element-interface.test.ts(76,5): error TS2578: Unused '@ts-expect-error' directive.
+src/solver/analog/__tests__/element-interface.test.ts(81,7): error TS2561: Object literal may only specify known properties, but 'stampNonlinear' does not exist in type 'AnalogElementCore'. Did you mean to write 'isNonlinear'?
+src/solver/analog/__tests__/element-interface.test.ts(87,5): error TS2578: Unused '@ts-expect-error' directive.
+src/solver/analog/__tests__/element-interface.test.ts(92,7): error TS2353: Object literal may only specify known properties, and 'updateOperatingPoint' does not exist in type 'AnalogElementCore'.
+src/solver/analog/__tests__/element-interface.test.ts(125,5): error TS2578: Unused '@ts-expect-error' directive.
+src/solver/analog/__tests__/element-interface.test.ts(130,7): error TS2322: Type '(_voltages: Float64Array<ArrayBufferLike>, _prevVoltages: Float64Array<ArrayBufferLike>, _reltol: number, _abstol: number) => boolean' is not assignable to type '(ctx: LoadContext) => boolean'.
+  Target signature provides too few arguments. Expected 4 or more, but got 1.
+src/solver/analog/__tests__/fet-base.test.ts(30,46): error TS6133: 'makeSimpleCtx' is declared but its value is never read.
+src/solver/analog/__tests__/fet-base.test.ts(303,36): error TS2339: Property 'stamp' does not exist on type 'SparseSolver'.
+src/solver/analog/__tests__/fet-base.test.ts(381,36): error TS2339: Property 'stamp' does not exist on type 'SparseSolver'.
+src/solver/analog/__tests__/harness/buckbjt-smoke.test.ts(108,13): error TS6133: 'inductorNodes' is declared but its value is never read.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(66,34): error TS2345: Argument of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/analog-engine").ConcreteCompiledAnalogCircuit' is not assignable to parameter of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/compiled-analog-circuit").ConcreteCompiledAnalogCircuit'.
+  Type 'ConcreteCompiledAnalogCircuit' is missing the following properties from type 'ConcreteCompiledAnalogCircuit': labelPinNodes, wireToNodeId, models, elementToCircuitElement, and 8 more.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(107,22): error TS6133: 'pool' is declared but its value is never read.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(117,22): error TS6133: 'pool' is declared but its value is never read.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(154,5): error TS2322: Type 'undefined' is not assignable to type '((iteration: number, voltages: Float64Array<ArrayBufferLike>, prevVoltages: Float64Array<ArrayBufferLike>, noncon: number, globalConverged: boolean, elemConverged: boolean, limitingEvents: LimitingEvent[], convergenceFailedElements: string[]) => void) | null'.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(184,5): error TS2322: Type 'undefined' is not assignable to type '((iteration: number, voltages: Float64Array<ArrayBufferLike>, prevVoltages: Float64Array<ArrayBufferLike>, noncon: number, globalConverged: boolean, elemConverged: boolean, limitingEvents: LimitingEvent[], convergenceFailedElements: string[]) => void) | null'.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(185,81): error TS2345: Argument of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/analog-engine").ConcreteCompiledAnalogCircuit' is not assignable to parameter of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/compiled-analog-circuit").ConcreteCompiledAnalogCircuit'.
+  Type 'ConcreteCompiledAnalogCircuit' is missing the following properties from type 'ConcreteCompiledAnalogCircuit': labelPinNodes, wireToNodeId, models, elementToCircuitElement, and 8 more.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(216,5): error TS2322: Type 'undefined' is not assignable to type '((iteration: number, voltages: Float64Array<ArrayBufferLike>, prevVoltages: Float64Array<ArrayBufferLike>, noncon: number, globalConverged: boolean, elemConverged: boolean, limitingEvents: LimitingEvent[], convergenceFailedElements: string[]) => void) | null'.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(217,81): error TS2345: Argument of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/analog-engine").ConcreteCompiledAnalogCircuit' is not assignable to parameter of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/compiled-analog-circuit").ConcreteCompiledAnalogCircuit'.
+  Type 'ConcreteCompiledAnalogCircuit' is missing the following properties from type 'ConcreteCompiledAnalogCircuit': labelPinNodes, wireToNodeId, models, elementToCircuitElement, and 8 more.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(236,5): error TS2322: Type 'undefined' is not assignable to type '((iteration: number, voltages: Float64Array<ArrayBufferLike>, prevVoltages: Float64Array<ArrayBufferLike>, noncon: number, globalConverged: boolean, elemConverged: boolean, limitingEvents: LimitingEvent[], convergenceFailedElements: string[]) => void) | null'.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(237,81): error TS2345: Argument of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/analog-engine").ConcreteCompiledAnalogCircuit' is not assignable to parameter of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/compiled-analog-circuit").ConcreteCompiledAnalogCircuit'.
+  Type 'ConcreteCompiledAnalogCircuit' is missing the following properties from type 'ConcreteCompiledAnalogCircuit': labelPinNodes, wireToNodeId, models, elementToCircuitElement, and 8 more.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(255,5): error TS2322: Type 'undefined' is not assignable to type '((iteration: number, voltages: Float64Array<ArrayBufferLike>, prevVoltages: Float64Array<ArrayBufferLike>, noncon: number, globalConverged: boolean, elemConverged: boolean, limitingEvents: LimitingEvent[], convergenceFailedElements: string[]) => void) | null'.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(256,81): error TS2345: Argument of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/analog-engine").ConcreteCompiledAnalogCircuit' is not assignable to parameter of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/compiled-analog-circuit").ConcreteCompiledAnalogCircuit'.
+  Type 'ConcreteCompiledAnalogCircuit' is missing the following properties from type 'ConcreteCompiledAnalogCircuit': labelPinNodes, wireToNodeId, models, elementToCircuitElement, and 8 more.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(278,5): error TS2322: Type 'undefined' is not assignable to type '((iteration: number, voltages: Float64Array<ArrayBufferLike>, prevVoltages: Float64Array<ArrayBufferLike>, noncon: number, globalConverged: boolean, elemConverged: boolean, limitingEvents: LimitingEvent[], convergenceFailedElements: string[]) => void) | null'.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(279,81): error TS2345: Argument of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/analog-engine").ConcreteCompiledAnalogCircuit' is not assignable to parameter of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/compiled-analog-circuit").ConcreteCompiledAnalogCircuit'.
+  Type 'ConcreteCompiledAnalogCircuit' is missing the following properties from type 'ConcreteCompiledAnalogCircuit': labelPinNodes, wireToNodeId, models, elementToCircuitElement, and 8 more.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(298,5): error TS2322: Type 'undefined' is not assignable to type '((iteration: number, voltages: Float64Array<ArrayBufferLike>, prevVoltages: Float64Array<ArrayBufferLike>, noncon: number, globalConverged: boolean, elemConverged: boolean, limitingEvents: LimitingEvent[], convergenceFailedElements: string[]) => void) | null'.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(299,81): error TS2345: Argument of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/analog-engine").ConcreteCompiledAnalogCircuit' is not assignable to parameter of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/compiled-analog-circuit").ConcreteCompiledAnalogCircuit'.
+  Type 'ConcreteCompiledAnalogCircuit' is missing the following properties from type 'ConcreteCompiledAnalogCircuit': labelPinNodes, wireToNodeId, models, elementToCircuitElement, and 8 more.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(373,5): error TS2322: Type 'undefined' is not assignable to type '((iteration: number, voltages: Float64Array<ArrayBufferLike>, prevVoltages: Float64Array<ArrayBufferLike>, noncon: number, globalConverged: boolean, elemConverged: boolean, limitingEvents: LimitingEvent[], convergenceFailedElements: string[]) => void) | null'.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(398,5): error TS2322: Type 'undefined' is not assignable to type '((iteration: number, voltages: Float64Array<ArrayBufferLike>, prevVoltages: Float64Array<ArrayBufferLike>, noncon: number, globalConverged: boolean, elemConverged: boolean, limitingEvents: LimitingEvent[], convergenceFailedElements: string[]) => void) | null'.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(451,5): error TS2322: Type 'undefined' is not assignable to type '((iteration: number, voltages: Float64Array<ArrayBufferLike>, prevVoltages: Float64Array<ArrayBufferLike>, noncon: number, globalConverged: boolean, elemConverged: boolean, limitingEvents: LimitingEvent[], convergenceFailedElements: string[]) => void) | null'.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(452,81): error TS2345: Argument of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/analog-engine").ConcreteCompiledAnalogCircuit' is not assignable to parameter of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/compiled-analog-circuit").ConcreteCompiledAnalogCircuit'.
+  Type 'ConcreteCompiledAnalogCircuit' is missing the following properties from type 'ConcreteCompiledAnalogCircuit': labelPinNodes, wireToNodeId, models, elementToCircuitElement, and 8 more.
+src/solver/analog/__tests__/harness/harness-integration.test.ts(493,5): error TS2741: Property 'totalIterationCount' is missing in type '{ stepStartTime: number; stepEndTime: number; attempts: NRAttempt[]; acceptedAttemptIndex: number; accepted: true; dt: number; iterations: IterationSnapshot[]; converged: true; iterationCount: number; integrationCoefficients: IntegrationCoefficients; analysisPhase: "tranFloat"; }' but required in type 'StepSnapshot'.
+src/solver/analog/__tests__/harness/netlist-generator.test.ts(17,15): error TS2459: Module '"../../../../core/element.js"' declares 'RenderContext' locally, but it is not exported.
+src/solver/analog/__tests__/harness/ngspice-bridge.ts(149,11): error TS6133: '_koffi' is declared but its value is never read.
+src/solver/analog/__tests__/harness/ngspice-bridge.ts(334,48): error TS18046: 'p' is of type 'unknown'.
+src/solver/analog/__tests__/harness/ngspice-bridge.ts(334,52): error TS2571: Object is of type 'unknown'.
+src/solver/analog/__tests__/harness/ngspice-bridge.ts(334,78): error TS18046: 'p' is of type 'unknown'.
+src/solver/analog/__tests__/harness/ngspice-bridge.ts(335,50): error TS2538: Type 'unknown' cannot be used as an index type.
+src/solver/analog/__tests__/harness/ngspice-bridge.ts(335,80): error TS2538: Type 'unknown' cannot be used as an index type.
+src/solver/analog/__tests__/harness/ngspice-bridge.ts(548,73): error TS6133: 'isLastInStep' is declared but its value is never read.
+src/solver/analog/__tests__/harness/ngspice-bridge.ts(691,17): error TS6133: 'outerEv' is declared but its value is never read.
+src/solver/analog/__tests__/harness/query-methods.test.ts(246,48): error TS2345: Argument of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/analog-engine").ConcreteCompiledAnalogCircuit' is not assignable to parameter of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/compiled-analog-circuit").ConcreteCompiledAnalogCircuit'.
+  Type 'ConcreteCompiledAnalogCircuit' is missing the following properties from type 'ConcreteCompiledAnalogCircuit': labelPinNodes, wireToNodeId, models, elementToCircuitElement, and 8 more.
+src/solver/analog/__tests__/harness/query-methods.test.ts(247,34): error TS2345: Argument of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/analog-engine").ConcreteCompiledAnalogCircuit' is not assignable to parameter of type 'import("C:/local_working_projects/digital_in_browser/src/solver/analog/compiled-analog-circuit").ConcreteCompiledAnalogCircuit'.
+  Type 'ConcreteCompiledAnalogCircuit' is missing the following properties from type 'ConcreteCompiledAnalogCircuit': labelPinNodes, wireToNodeId, models, elementToCircuitElement, and 8 more.
+src/solver/analog/__tests__/harness/query-methods.test.ts(803,18): error TS6133: 'createAsymmetricSession' is declared but its value is never read.
+src/solver/analog/__tests__/harness/stream-verification.test.ts(14,3): error TS6196: 'DivergenceCategory' is declared but never used.
+src/solver/analog/__tests__/harness/test-npn-harness.test.ts(75,11): error TS2353: Object literal may only specify known properties, and 'side' does not exist in type 'AttemptQuery'.
+src/solver/analog/__tests__/newton-raphson.test.ts(6,32): error TS6133: 'beforeEach' is declared but its value is never read.
+src/solver/analog/__tests__/newton-raphson.test.ts(6,44): error TS6133: 'afterEach' is declared but its value is never read.
+src/solver/analog/__tests__/newton-raphson.test.ts(12,1): error TS6133: 'StatePool' is declared but its value is never read.
+src/solver/analog/__tests__/ngspice-bridge-smoke.test.ts(5,24): error TS6133: 'expect' is declared but its value is never read.
+src/solver/analog/__tests__/spice-import-dialog.test.ts(300,9): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/solver/analog/__tests__/test-helpers.test.ts(9,13): error TS2352: Conversion of type 'AnalogElement' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'AnalogElement'.
+src/solver/analog/__tests__/test-helpers.test.ts(10,13): error TS2352: Conversion of type 'AnalogElement' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'AnalogElement'.
+src/solver/analog/__tests__/test-helpers.test.ts(11,13): error TS2352: Conversion of type 'AnalogElement' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'AnalogElement'.
+src/solver/analog/__tests__/test-helpers.test.ts(18,13): error TS2352: Conversion of type 'AnalogElement' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'AnalogElement'.
+src/solver/analog/__tests__/test-helpers.test.ts(19,13): error TS2352: Conversion of type 'AnalogElement' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'AnalogElement'.
+src/solver/analog/__tests__/test-helpers.test.ts(20,13): error TS2352: Conversion of type 'AnalogElement' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'AnalogElement'.
+src/solver/analog/__tests__/test-helpers.test.ts(27,13): error TS2352: Conversion of type 'AnalogElement' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'AnalogElement'.
+src/solver/analog/__tests__/test-helpers.test.ts(28,13): error TS2352: Conversion of type 'AnalogElement' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'AnalogElement'.
+src/solver/analog/__tests__/test-helpers.test.ts(29,13): error TS2352: Conversion of type 'AnalogElement' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'AnalogElement'.
+src/solver/analog/__tests__/test-helpers.test.ts(36,13): error TS2352: Conversion of type 'ReactiveAnalogElement' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'ReactiveAnalogElement'.
+src/solver/analog/__tests__/test-helpers.test.ts(37,13): error TS2352: Conversion of type 'ReactiveAnalogElement' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'ReactiveAnalogElement'.
+src/solver/analog/__tests__/test-helpers.test.ts(38,13): error TS2352: Conversion of type 'ReactiveAnalogElement' to type 'Record<string, unknown>' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Index signature for type 'string' is missing in type 'ReactiveAnalogElement'.
+src/solver/analog/__tests__/test-helpers.ts(318,3): error TS2322: Type '{ pinNodeIds: number[]; allNodeIds: number[]; branchIndex: number; isNonlinear: true; isReactive: true; poolBacked: true; stateSize: number; stateBaseOffset: number; stateSchema: StateSchema<string>; ... 8 more ...; getPinCurrents(voltages: Float64Array<...>): number[]; }' is not assignable to type 'ReactiveAnalogElement'.
+  Type '{ pinNodeIds: number[]; allNodeIds: number[]; branchIndex: number; isNonlinear: true; isReactive: true; poolBacked: true; stateSize: number; stateBaseOffset: number; stateSchema: StateSchema<string>; ... 8 more ...; getPinCurrents(voltages: Float64Array<...>): number[]; }' is missing the following properties from type 'ReactiveAnalogElementCore': s4, s5, s6, s7
+src/solver/analog/__tests__/timestep.test.ts(56,5): error TS2561: Object literal may only specify known properties, but 'stamp' does not exist in type 'AnalogElement'. Did you mean to write 'stampAc'?
+src/solver/analog/__tests__/timestep.test.ts(81,41): error TS2379: Argument of type 'SimulationParams' is not assignable to parameter of type 'ResolvedSimulationParams' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'SimulationParams' is not assignable to type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+    Property 'maxTimeStep' is optional in type 'SimulationParams' but required in type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+src/solver/analog/__tests__/timestep.test.ts(97,41): error TS2379: Argument of type 'SimulationParams' is not assignable to parameter of type 'ResolvedSimulationParams' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'SimulationParams' is not assignable to type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+    Property 'maxTimeStep' is optional in type 'SimulationParams' but required in type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+src/solver/analog/__tests__/timestep.test.ts(122,41): error TS2379: Argument of type 'SimulationParams' is not assignable to parameter of type 'ResolvedSimulationParams' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'SimulationParams' is not assignable to type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+    Property 'maxTimeStep' is optional in type 'SimulationParams' but required in type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+src/solver/analog/__tests__/timestep.test.ts(130,47): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number | bigint'.
+  Type 'undefined' is not assignable to type 'number | bigint'.
+src/solver/analog/__tests__/timestep.test.ts(136,44): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type 'number | bigint'.
+  Type 'undefined' is not assignable to type 'number | bigint'.
+src/solver/analog/__tests__/timestep.test.ts(143,41): error TS2379: Argument of type 'SimulationParams' is not assignable to parameter of type 'ResolvedSimulationParams' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'SimulationParams' is not assignable to type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+    Property 'maxTimeStep' is optional in type 'SimulationParams' but required in type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+src/solver/analog/__tests__/timestep.test.ts(164,41): error TS2379: Argument of type 'SimulationParams' is not assignable to parameter of type 'ResolvedSimulationParams' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'SimulationParams' is not assignable to type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+    Property 'maxTimeStep' is optional in type 'SimulationParams' but required in type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+src/solver/analog/__tests__/timestep.test.ts(335,41): error TS2379: Argument of type 'SimulationParams' is not assignable to parameter of type 'ResolvedSimulationParams' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'SimulationParams' is not assignable to type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+    Property 'maxTimeStep' is optional in type 'SimulationParams' but required in type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+src/solver/analog/__tests__/timestep.test.ts(346,42): error TS2379: Argument of type 'SimulationParams' is not assignable to parameter of type 'ResolvedSimulationParams' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'SimulationParams' is not assignable to type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+    Property 'maxTimeStep' is optional in type 'SimulationParams' but required in type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+src/solver/analog/__tests__/timestep.test.ts(379,41): error TS2379: Argument of type 'SimulationParams' is not assignable to parameter of type 'ResolvedSimulationParams' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Type 'SimulationParams' is not assignable to type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+    Property 'maxTimeStep' is optional in type 'SimulationParams' but required in type 'Required<Pick<SimulationParams, "maxTimeStep" | "minTimeStep" | "firstStep">>'.
+src/solver/analog/analog-engine.ts(142,13): error TS6133: 'matrixSize' is declared but its value is never read.
+src/solver/analog/analog-engine.ts(257,23): error TS6133: 'matrixSize' is declared but its value is never read.
+src/solver/analog/analog-engine.ts(343,11): error TS6133: 'wasFirsttime' is declared but its value is never read.
+src/solver/analog/analog-engine.ts(448,13): error TS2412: Type '{ iteration: number; maxDelta: number; maxDeltaNode: number; noncon: number; converged: boolean; }[] | undefined' is not assignable to type '{ iteration: number; maxDelta: number; maxDeltaNode: number; noncon: number; converged: boolean; }[]' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the type of the target.
+  Type 'undefined' is not assignable to type '{ iteration: number; maxDelta: number; maxDeltaNode: number; noncon: number; converged: boolean; }[]'.
+src/solver/analog/analog-engine.ts(740,22): error TS2375: Type '{ dt: number; method: "bdf1"; iterations: number; converged: boolean; blameElement: number; blameNode: number; trigger: "initial"; iterationDetails: { iteration: number; maxDelta: number; maxDeltaNode: number; noncon: number; converged: boolean; }[] | undefined; }' is not assignable to type 'NRAttemptRecord' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'iterationDetails' are incompatible.
+    Type '{ iteration: number; maxDelta: number; maxDeltaNode: number; noncon: number; converged: boolean; }[] | undefined' is not assignable to type '{ iteration: number; maxDelta: number; maxDeltaNode: number; noncon: number; converged: boolean; }[]'.
+      Type 'undefined' is not assignable to type '{ iteration: number; maxDelta: number; maxDeltaNode: number; noncon: number; converged: boolean; }[]'.
+src/solver/analog/ckt-terr.ts(37,7): error TS6133: 'TRAP_LTE_FACTOR_0' is declared but its value is never read.
+src/solver/analog/ckt-terr.ts(38,7): error TS6133: 'TRAP_LTE_FACTOR_1' is declared but its value is never read.
+src/solver/analog/compiled-analog-circuit.ts(169,5): error TS2412: Type 'Map<number, number> | undefined' is not assignable to type 'Map<number, number>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the type of the target.
+  Type 'undefined' is not assignable to type 'Map<number, number>'.
+src/solver/analog/compiled-analog-circuit.ts(170,5): error TS2412: Type 'Map<number, number> | undefined' is not assignable to type 'Map<number, number>' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the type of the target.
+  Type 'undefined' is not assignable to type 'Map<number, number>'.
+src/solver/analog/compiler.ts(70,11): error TS2375: Type '{ factory: AnalogFactory; branchCount: number | ((props: PropertyBag) => number) | undefined; }' is not assignable to type 'MnaModel' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Types of property 'branchCount' are incompatible.
+    Type 'number | ((props: PropertyBag) => number) | undefined' is not assignable to type 'number | ((props: PropertyBag) => number)'.
+      Type 'undefined' is not assignable to type 'number | ((props: PropertyBag) => number)'.
+src/solver/digital/__tests__/flatten-pipeline-reorder.test.ts(45,76): error TS2741: Property 'load' is missing in type '{ branchIndex: -1; isNonlinear: boolean; isReactive: boolean; stamp: () => void; getPinCurrents: () => number[]; setParam: (_k: string, _v: number) => void; }' but required in type 'AnalogElementCore'.
+src/solver/digital/__tests__/flatten-pipeline-reorder.test.ts(58,76): error TS2741: Property 'load' is missing in type '{ branchIndex: -1; isNonlinear: boolean; isReactive: boolean; stamp: () => void; getPinCurrents: () => number[]; setParam: (_k: string, _v: number) => void; }' but required in type 'AnalogElementCore'.
+src/test-fixtures/model-fixtures.ts(15,6): error TS2741: Property 'load' is missing in type '{ branchIndex: number; stamp: () => void; isNonlinear: false; isReactive: false; getPinCurrents: () => never[]; setParam: (_key: string, _value: number) => void; }' but required in type 'AnalogElementCore'.
+src/test-fixtures/registry-builders.ts(102,5): error TS2634: 'string' index signatures are incompatible.
+  Type '{ kind: "inline"; factory: () => { branchIndex: -1; isNonlinear: boolean; isReactive: boolean; stamp: () => void; getPinCurrents: () => number[]; setParam: (_key: string, _value: number) => void; }; paramDefs: never[]; params: {}; }' is not assignable to type 'ModelEntry'.
+    The types returned by 'factory(...)' are incompatible between these types.
+      Property 'load' is missing in type '{ branchIndex: -1; isNonlinear: boolean; isReactive: boolean; stamp: () => void; getPinCurrents: () => number[]; setParam: (_key: string, _value: number) => void; }' but required in type 'AnalogElementCore'.
+src/test-fixtures/registry-builders.ts(129,5): error TS2634: 'string' index signatures are incompatible.
+  Type '{ kind: "inline"; factory: () => { branchIndex: -1; isNonlinear: boolean; isReactive: boolean; stamp: () => void; getPinCurrents: () => number[]; setParam: (_key: string, _value: number) => void; }; paramDefs: never[]; params: {}; }' is not assignable to type 'ModelEntry'.
+    The types returned by 'factory(...)' are incompatible between these types.
+      Property 'load' is missing in type '{ branchIndex: -1; isNonlinear: boolean; isReactive: boolean; stamp: () => void; getPinCurrents: () => number[]; setParam: (_key: string, _value: number) => void; }' but required in type 'AnalogElementCore'.

@@ -52,6 +52,7 @@ import {
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { stampG } from "../../solver/analog/stamp-helpers.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
+import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -385,15 +386,18 @@ class SegmentInductorElement implements ReactiveAnalogElement {
       }
       const phi0 = this.s0[this.base + SLOT_L_PHI];
       const phi1 = this.s1[this.base + SLOT_L_PHI];
-      let ccap: number;
-      if (ctx.order >= 2 && ag.length > 2) {
-        const phi2 = this.s2[this.base + SLOT_L_PHI];
-        ccap = ag[0] * phi0 + ag[1] * phi1 + ag[2] * phi2;
-      } else {
-        ccap = ag[0] * phi0 + ag[1] * phi1;
-      }
-      const geq = ag[0] * L;
-      const ceq = ccap - ag[0] * phi0;
+      const phi2 = this.s2[this.base + SLOT_L_PHI];
+      const phi3 = this.s3[this.base + SLOT_L_PHI];
+      const ccapPrev = this.s1[this.base + SLOT_L_CCAP];
+      const { ccap, ceq, geq } = niIntegrate(
+        ctx.method,
+        ctx.order,
+        L,
+        ag,
+        phi0, phi1,
+        [phi2, phi3, 0, 0, 0],
+        ccapPrev,
+      );
       if (ctx.initMode === "initTran") {
         this.s1[this.base + SLOT_L_CCAP] = ccap;
       }
@@ -478,15 +482,18 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
       }
       const q0 = this.s0[this.base + SLOT_C_Q];
       const q1 = this.s1[this.base + SLOT_C_Q];
-      let ccap: number;
-      if (ctx.order >= 2 && ag.length > 2) {
-        const q2 = this.s2[this.base + SLOT_C_Q];
-        ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
-      } else {
-        ccap = ag[0] * q0 + ag[1] * q1;
-      }
-      const geq = ag[0] * C;
-      const ceq = ccap - ag[0] * q0;
+      const q2 = this.s2[this.base + SLOT_C_Q];
+      const q3 = this.s3[this.base + SLOT_C_Q];
+      const ccapPrev = this.s1[this.base + SLOT_C_CCAP];
+      const { ccap, ceq, geq } = niIntegrate(
+        ctx.method,
+        ctx.order,
+        C,
+        ag,
+        q0, q1,
+        [q2, q3, 0, 0, 0],
+        ccapPrev,
+      );
       if (ctx.initMode === "initTran") {
         this.s1[this.base + SLOT_C_CCAP] = ccap;
       }
@@ -590,15 +597,18 @@ class CombinedRLElement implements ReactiveAnalogElement {
       }
       const phi0 = this.s0[this.base + SLOT_RL_PHI];
       const phi1 = this.s1[this.base + SLOT_RL_PHI];
-      let ccap: number;
-      if (ctx.order >= 2 && ag.length > 2) {
-        const phi2 = this.s2[this.base + SLOT_RL_PHI];
-        ccap = ag[0] * phi0 + ag[1] * phi1 + ag[2] * phi2;
-      } else {
-        ccap = ag[0] * phi0 + ag[1] * phi1;
-      }
-      const geq = ag[0] * L;
-      const ceq = ccap - ag[0] * phi0;
+      const phi2 = this.s2[this.base + SLOT_RL_PHI];
+      const phi3 = this.s3[this.base + SLOT_RL_PHI];
+      const ccapPrev = this.s1[this.base + SLOT_RL_CCAP];
+      const { ccap, ceq, geq } = niIntegrate(
+        ctx.method,
+        ctx.order,
+        L,
+        ag,
+        phi0, phi1,
+        [phi2, phi3, 0, 0, 0],
+        ccapPrev,
+      );
       if (ctx.initMode === "initTran") {
         this.s1[this.base + SLOT_RL_CCAP] = ccap;
       }

@@ -423,3 +423,16 @@ Raw grep across all surviving C3b test files (38 files; `coupled-inductor.test.t
   - transformer.test.ts: 3 pre-existing failures (power_conservation, dc_blocks, load writes G11/G22/G12 slots) — from prior batch
   - tapped-transformer.test.ts: 1 pre-existing failure (full_wave_rectifier Singular at step 5) — from prior batch
   - transmission-line.test.ts: full suite hangs (>60s timeout) due to pre-existing slow/hanging MNAEngine tests from prior batch; new parity test passes in 1.1s when run in isolation
+
+## Task C4.semi_sources retry: buckbjt-convergence spec rewrite + variable-rail mock completion
+- **Status**: complete (with 1 red-detecting-real-divergence finding surfaced per tests-red protocol — see progress-catchup.md)
+- **Agent**: implementer
+- **Files created**:
+  - `src/solver/analog/__tests__/buckbjt-stagnation-regression.test.ts` — hosts the 5 pre-existing stagnation tests relocated out of `buckbjt-convergence.test.ts` so that file can become a pure C4.3 ngspice parity test.
+- **Files modified**:
+  - `src/solver/analog/__tests__/buckbjt-convergence.test.ts` — replaced entirely. Now a `ComparisonSession`-based per-NR-iteration DC-OP parity test asserting bit-exact match on `rhsOld[]` / `noncon` / `diagGmin` / `srcFact` vs ngspice per Wave C4.3 spec.
+  - `src/components/sources/__tests__/variable-rail.test.ts` — completed `makeCaptureSolver()` with the `allocElement` + `stampElement` + `stampRHS` surface the production `variable-rail.ts` load() calls. Mirror of the pattern already used in `dc-voltage-source.test.ts`.
+- **Tests**:
+  - `variable-rail.test.ts`: 3 new srcFact parity tests pass; 3 pre-existing VariableRail suite failures unchanged (local `makeResistorElement` exposes `stamp` not `load` — out-of-scope for this retry).
+  - `buckbjt-stagnation-regression.test.ts`: 3/5 pass; 2 fail due to pre-existing transient simTime stagnation at t=0.00005s.
+  - `buckbjt-convergence.test.ts`: 1/1 red by design — spec-exact assertion detects real ngspice divergence at step 0 iter 0 (V1:branch rhsOld delta = 9.4e-6 A, ~10⁻³ relative). Full measured-vs-expected values and investigation paths documented in `spec/progress-catchup.md` under the C4.semi_sources retry entry (tests-red protocol, user adjudication required).
