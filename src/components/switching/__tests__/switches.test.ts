@@ -733,6 +733,7 @@ import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import {
   makeResistor,
   makeVoltageSource,
+  makeSimpleCtx,
 } from "../../../solver/analog/__tests__/test-helpers.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/analog-engine.js";
@@ -748,22 +749,22 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 
-function makeMockSolver() {
-  const stamps: Array<{ row: number; col: number; value: number }> = [];
-  const rhs: Record<number, number> = {};
-
+function makeCaptureSolver() {
+  const stamps: Array<[number, number, number]> = [];
+  const rhs: Array<[number, number]> = [];
   const solver = {
-    stamp: vi.fn((row: number, col: number, value: number) => {
-      stamps.push({ row, col, value });
+    allocElement: vi.fn((row: number, col: number) => {
+      stamps.push([row, col, 0]);
+      return stamps.length - 1;
     }),
-    stampRHS: vi.fn((row: number, value: number) => {
-      rhs[row] = (rhs[row] ?? 0) + value;
+    stampElement: vi.fn((h: number, v: number) => {
+      stamps[h][2] += v;
     }),
-    _stamps: stamps,
-    _rhs: rhs,
+    stampRHS: vi.fn((row: number, v: number) => {
+      rhs.push([row, v]);
+    }),
   };
-
-  return solver;
+  return { solver, stamps, rhs };
 }
 
 function makeSpstProps(overrides: {
@@ -795,14 +796,15 @@ describe("AnalogSwitch", () => {
       props,
       () => 0,
     ) as SpstAnalogElement;
-    const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    const { solver, stamps } = makeCaptureSolver();
+    const ctx = makeSimpleCtx({ solver: solver as unknown as SparseSolver, elements: [], nodeCount: 2, matrixSize: 2 });
+    el.load(ctx);
 
     // G = 1/Ron = 1.0; should stamp conductance entries
     const expectedG = 1.0;
-    const gCalls = solver.stamp.mock.calls.map(([, , v]) => v as number);
-    expect(gCalls.some((v) => Math.abs(v - expectedG) < 1e-10)).toBe(true);
-    expect(gCalls.some((v) => Math.abs(v + expectedG) < 1e-10)).toBe(true);
+    const gVals = stamps.map(([, , v]) => v);
+    expect(gVals.some((v) => Math.abs(v - expectedG) < 1e-10)).toBe(true);
+    expect(gVals.some((v) => Math.abs(v + expectedG) < 1e-10)).toBe(true);
   });
 
   it("open_stamps_roff", () => {
@@ -814,13 +816,14 @@ describe("AnalogSwitch", () => {
       props,
       () => 0,
     ) as SpstAnalogElement;
-    const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    const { solver, stamps } = makeCaptureSolver();
+    const ctx = makeSimpleCtx({ solver: solver as unknown as SparseSolver, elements: [], nodeCount: 2, matrixSize: 2 });
+    el.load(ctx);
 
     // G = 1/Roff = 1e-9
     const expectedG = 1e-9;
-    const gCalls = solver.stamp.mock.calls.map(([, , v]) => v as number);
-    expect(gCalls.some((v) => Math.abs(v - expectedG) < 1e-18)).toBe(true);
+    const gVals = stamps.map(([, , v]) => v);
+    expect(gVals.some((v) => Math.abs(v - expectedG) < 1e-18)).toBe(true);
   });
 
   it("toggle_changes_conductance", () => {
@@ -833,14 +836,16 @@ describe("AnalogSwitch", () => {
       () => 0,
     ) as SpstAnalogElement;
 
-    const solver1 = makeMockSolver();
-    el.stamp(solver1 as unknown as SparseSolver);
-    const gClosed = solver1.stamp.mock.calls.map(([, , v]) => v as number).find((v) => v > 0)!;
+    const { solver: solver1, stamps: stamps1 } = makeCaptureSolver();
+    const ctx1 = makeSimpleCtx({ solver: solver1 as unknown as SparseSolver, elements: [], nodeCount: 2, matrixSize: 2 });
+    el.load(ctx1);
+    const gClosed = stamps1.map(([, , v]) => v).find((v) => v > 0)!;
 
     el.setClosed(false);
-    const solver2 = makeMockSolver();
-    el.stamp(solver2 as unknown as SparseSolver);
-    const gOpen = solver2.stamp.mock.calls.map(([, , v]) => v as number).find((v) => v > 0)!;
+    const { solver: solver2, stamps: stamps2 } = makeCaptureSolver();
+    const ctx2 = makeSimpleCtx({ solver: solver2 as unknown as SparseSolver, elements: [], nodeCount: 2, matrixSize: 2 });
+    el.load(ctx2);
+    const gOpen = stamps2.map(([, , v]) => v).find((v) => v > 0)!;
 
     // Closed G = 1/Ron = 1.0; Open G = 1/Roff = 1e-9
     expect(gClosed).toBeGreaterThan(gOpen);
@@ -863,12 +868,13 @@ describe("AnalogSwitch", () => {
       () => 0,
     ) as SpstAnalogElement;
 
-    const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    const { solver, stamps } = makeCaptureSolver();
+    const ctx = makeSimpleCtx({ solver: solver as unknown as SparseSolver, elements: [], nodeCount: 2, matrixSize: 2 });
+    el.load(ctx);
 
     // NC + closed=false → effectively closed → stamps Ron
-    const gCalls = solver.stamp.mock.calls.map(([, , v]) => v as number);
-    expect(gCalls.some((v) => Math.abs(v - 1.0) < 1e-10)).toBe(true);
+    const gVals = stamps.map(([, , v]) => v);
+    expect(gVals.some((v) => Math.abs(v - 1.0) < 1e-10)).toBe(true);
   });
 });
 
@@ -888,11 +894,11 @@ describe("AnalogSPDT", () => {
       () => 0,
     ) as SpdtAnalogElement;
 
-    const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    const { solver, stamps } = makeCaptureSolver();
+    const ctx = makeSimpleCtx({ solver: solver as unknown as SparseSolver, elements: [], nodeCount: 3, matrixSize: 3 });
+    el.load(ctx);
 
-    const calls = solver.stamp.mock.calls as Array<[number, number, number]>;
-    const positiveValues = calls.filter(([, , v]) => v > 0).map(([, , v]) => v);
+    const positiveValues = stamps.filter(([, , v]) => v > 0).map(([, , v]) => v);
     const smallG = positiveValues.filter((v) => v < 1e-6);
     const largeG = positiveValues.filter((v) => v > 0.5);
     expect(smallG.length).toBeGreaterThan(0);
@@ -914,11 +920,11 @@ describe("AnalogSPDT", () => {
       () => 0,
     ) as SpdtAnalogElement;
 
-    const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    const { solver, stamps } = makeCaptureSolver();
+    const ctx = makeSimpleCtx({ solver: solver as unknown as SparseSolver, elements: [], nodeCount: 3, matrixSize: 3 });
+    el.load(ctx);
 
-    const calls = solver.stamp.mock.calls as Array<[number, number, number]>;
-    const positiveValues = calls.filter(([, , v]) => v > 0).map(([, , v]) => v);
+    const positiveValues = stamps.filter(([, , v]) => v > 0).map(([, , v]) => v);
     const smallG = positiveValues.filter((v) => v < 1e-6);
     const largeG = positiveValues.filter((v) => v > 0.5);
     expect(smallG.length).toBeGreaterThan(0);

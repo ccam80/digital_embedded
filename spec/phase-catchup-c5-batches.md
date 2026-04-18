@@ -10,9 +10,9 @@ All remaining `.stamp(` callers live in test files. These are the files each bat
 
 ## Non-Negotiable Rules For Every C5.x Implementer
 
-1. **Only touch the files listed in your batch.** Do not open or edit any other file.
+1. **Only touch the test files listed in your batch.** Do not open or edit any other **test** file. *Production files are handled by the coordinator as part of the master C5.1 scope (see `phase-catchup.md` line 370 — the original spec requires "All element files under `src/components/**` and `src/solver/analog/**` that stamp matrix entries" to be migrated). Production migrations therefore appear in the same commit as test migrations; the verifier must treat production-file edits in the C5 commit as in-scope per master spec, not as a sub-batch violation.*
 2. **No TypeScript chasing.** If your edit triggers a `tsc` error outside the migration pattern (bad cast, missing field, unrelated type drift), leave it. The coordinator will reassess `tsc` state after all 5 batches land.
-3. **No test-chasing.** If a migrated test fails at runtime, record the failure in your final report and move on. Do NOT weaken the assertion, add `?.` guards, cast with `as any`, or delete the test.
+3. **No test-chasing. Tests going red after your migration is the EXPECTED outcome.** If a migrated test fails at runtime, record the failure with measured-vs-expected numbers in your final report and move on. Do NOT weaken the assertion, do NOT loosen `toBeCloseTo` precision, do NOT replace `toBe` with `toBeCloseTo`, do NOT add `?.` guards, do NOT cast with `as any`, do NOT delete the test. The wave-verifier will flag any precision loosening as a FAIL.
 4. **No drive-by refactors.** Do not rename variables, extract helpers, reorder imports, or "clean up" unrelated code.
 5. **No new helpers unless strictly required.** If every call in a file can be rewritten inline with `allocElement`+`stampElement` or `load(ctx)`, do it inline.
 6. **Do not run `tsc --noEmit`.** Do not run the full test suite. Run at most `npx vitest run <the_files_in_your_batch>` once at the end to record pass/fail counts.

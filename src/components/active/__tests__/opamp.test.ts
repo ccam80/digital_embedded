@@ -125,10 +125,10 @@ describe("OpAmp", () => {
     expect(sumAt(2, 2)).toBeCloseTo(G_out, 10);
 
     // VCVS: G[out, in+] -= gain*G_out → stamp(2, 0, -gain*G_out)
-    expect(sumAt(2, 0)).toBeCloseTo(-1e6 * G_out, 2);
+    expect(sumAt(2, 0)).toBeCloseTo(-1e6 * G_out, 10);
 
     // VCVS: G[out, in-] += gain*G_out → stamp(2, 1, +gain*G_out)
-    expect(sumAt(2, 1)).toBeCloseTo(1e6 * G_out, 2);
+    expect(sumAt(2, 1)).toBeCloseTo(1e6 * G_out, 10);
 
     // stampNonlinear in linear region: no RHS contribution
     const nlSolver = makeMockSolver();

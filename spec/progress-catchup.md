@@ -588,3 +588,45 @@ Per Wave C4 tests-red protocol ("If any parity test reveals last-bit divergence,
 - **Migration pattern used**:
   - Bridge adapter files (4 files): MockSolver gained allocElement/stampElement (Pattern D capture); adapter.stamp(solver) → adapter.load(makeCtx(solver)); handles NOT cleared on reset() to preserve handle cache across re-stamp calls
   - diode.test.ts (3 sites): element.stamp(solver2) → element.load(capCtx) with inline capture solver; core.stamp(solver) → core.load(makeCtxForSolver(solver)) with inline capture solver
+
+## Task C5.a (fix): debug console.log removed
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/components/passives/__tests__/resistor.test.ts
+- **Tests**: N/A (debug line removal)
+
+## Task C5.b (respawn): stale comment cleanup
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: `src/components/passives/__tests__/transformer.test.ts`
+- **Verification**: Zero `.stamp\s*\(` matches across all 5 C5.b test files (transformer, tapped-transformer, transmission-line, probe, ground)
+- **Change**: Rewrote lines 12-13 of transformer.test.ts from `"Simulation strategy: manual transient loop using SparseSolver + element.stamp() + element.stampCompanion(), following the pattern in integration.test.ts."` to `"Simulation strategy: manual transient loop driving each element through load(ctx) / accept(ctx, simTime, addBreakpoint), following the pattern in integration.test.ts."` to remove reference to deleted `.stamp()` API.
+
+## Task C5.d (fix): opamp.test.ts assertion strengthening
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/components/active/__tests__/opamp.test.ts
+- **Change**: Lines 128 and 131 — precision restored from 2 → 10
+  - `expect(sumAt(2, 0)).toBeCloseTo(-1e6 * G_out, 2)` → `toBeCloseTo(-1e6 * G_out, 10)`
+  - `expect(sumAt(2, 1)).toBeCloseTo(1e6 * G_out, 2)` → `toBeCloseTo(1e6 * G_out, 10)`
+- **Vitest result**: 4 passed / 3 failed (7 total)
+- **Pre-existing failures** (all 3 failures are pre-existing, unrelated to precision change):
+  - `linear_region` — `TypeError: opamp.updateOperatingPoint is not a function` at line 116, crashes before reaching lines 128/131
+  - `positive_saturation` — same error at line 152
+  - `negative_saturation` — same error at line 188
+  - These failures appear before the precision-changed assertions execute; confirmed pre-existing per test-baseline.md known-broken list.
+- **Note**: Line 125 (`toBeCloseTo(G_out, 10)`) was already at precision=10 — left unchanged per spec.
+
+## Task C5.c (respawn): switches.test.ts migration
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/components/switching/__tests__/switches.test.ts
+- **Pre-migration match count**: 7 (el.stamp call sites)
+- **Post-migration match count**: 0
+- **Tests**: 89/89 passing
+- **Changes**:
+  - Added makeSimpleCtx to import from test-helpers
+  - Replaced makeMockSolver() with makeCaptureSolver() exposing allocElement/stampElement/stampRHS and a stamps: Array<[row, col, value]> capture array
+  - Rewrote all 7 el.load(ctx) call sites using makeSimpleCtx wrapping the capture solver
+  - Rewrote all assertions from mock.calls to read from stamps array with same strictness
+  - SPST tests use nodeCount=2/matrixSize=2; SPDT tests use nodeCount=3/matrixSize=3

@@ -320,9 +320,6 @@ describe("resistor_load_interface", () => {
       matrixSize: 2,
       nodeCount: 2,
     });
-    console.log("DEBUG ctx.solver:", ctx.solver?.constructor?.name, typeof ctx.solver?.stamp);
-    console.log("DEBUG ctx.loadCtx.solver:", ctx.loadCtx?.solver?.constructor?.name, typeof ctx.loadCtx?.solver?.stamp);
-    console.log("DEBUG same ref?", ctx.loadCtx.solver === ctx.solver);
     ctx.solver.beginAssembly(2);
     element.load(ctx.loadCtx);
     ctx.solver.finalize();

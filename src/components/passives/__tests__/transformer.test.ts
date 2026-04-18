@@ -9,8 +9,9 @@
  *   - DC blocking (inductors block DC in steady state)
  *   - Winding resistance drops voltage
  *
- * Simulation strategy: manual transient loop using SparseSolver + element.stamp()
- * + element.stampCompanion(), following the pattern in integration.test.ts.
+ * Simulation strategy: manual transient loop driving each element through
+ * load(ctx) / accept(ctx, simTime, addBreakpoint), following the pattern
+ * in integration.test.ts.
  *
  * Circuit topology for AC tests:
  *   Node 1: primary+ (Vac source positive)

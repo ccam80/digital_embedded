@@ -152,22 +152,22 @@
           "C5.e"
         ]
       ],
-      "spawned": 9,
-      "completed": 3,
-      "verifications_passed": 0,
-      "verifications_failed": 0,
+      "spawned": 13,
+      "completed": 7,
+      "verifications_passed": 5,
+      "verifications_failed": 3,
       "stops_for_clarification": 0,
       "dead_implementers": 5,
-      "dead_verifiers": 0,
+      "dead_verifiers": 1,
       "group_status": {
         "C4.passive_reactive": "pending",
         "C4.semi_sources": "pending",
         "C4.active_rounding": "pending",
-        "C5.a": "pending",
-        "C5.b": "pending",
-        "C5.c": "pending",
-        "C5.d": "pending",
-        "C5.e": "pending"
+        "C5.a": "passed",
+        "C5.b": "passed",
+        "C5.c": "passed",
+        "C5.d": "passed",
+        "C5.e": "passed"
       }
     },
     {
@@ -318,5 +318,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-18T04:07:05.353Z"
+  "last_updated": "2026-04-18T04:27:55.465Z"
 }
