@@ -11,7 +11,7 @@
  *   - Integration: common-source NMOS DC operating point vs SPICE reference
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   NmosfetDefinition,
   PmosfetDefinition,
@@ -28,11 +28,12 @@ import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import {
   SLOT_Q_DB,
@@ -83,14 +84,33 @@ const NMOS_DEFAULTS = {
 };
 
 // ---------------------------------------------------------------------------
-// Mock SparseSolver
+// DC-OP LoadContext helper — fresh SparseSolver sized for matrixSize rows.
 // ---------------------------------------------------------------------------
 
-function makeMockSolver() {
+function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
+  const solver = new SparseSolver();
+  solver.beginAssembly(matrixSize);
   return {
-    stamp: vi.fn(),
-    stampRHS: vi.fn(),
-  } as unknown as SparseSolverType;
+    solver,
+    voltages,
+    iteration: 1,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
 }
 
 
@@ -127,7 +147,7 @@ function makeNmosAtVgs_Vds(
 
   // Iterate to converge voltage limiting
   for (let i = 0; i < 50; i++) {
-    element.updateOperatingPoint!(voltages);
+    elementWithPins.load(makeDcOpCtx(voltages, 3));
     voltages[0] = vds;
     voltages[1] = vgs;
     voltages[2] = 0;
@@ -149,7 +169,8 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
-    stamp(solver: SparseSolverType): void {
+    load(ctx: LoadContext): void {
+      const { solver } = ctx;
       if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
       if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
       if (nodeA !== 0 && nodeB !== 0) {
@@ -168,16 +189,19 @@ describe("NMOS", () => {
   it("cutoff_region", () => {
     // Vgs = 0V < VTO = 0.7V → device off, Id ≈ 0
     const element = makeNmosAtVgs_Vds(0, 5, NMOS_DEFAULTS);
-    const solver = makeMockSolver();
 
-    element.stampNonlinear!(solver);
-
-    const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
+    const voltages = new Float64Array(3);
+    voltages[0] = 5;
+    voltages[1] = 0;
+    voltages[2] = 0;
+    const ctx = makeDcOpCtx(voltages, 3);
+    element.load(ctx);
+    const rhs = ctx.solver.getRhsSnapshot();
 
     // The Norton current at drain/source should be ≈ 0 (only GMIN leakage)
     // All RHS stamps will be present but very small
-    for (const call of rhsCalls) {
-      expect(Math.abs(call[1] as number)).toBeLessThan(1e-10);
+    for (let i = 0; i < rhs.length; i++) {
+      expect(Math.abs(rhs[i])).toBeLessThan(1e-10);
     }
   });
 
@@ -323,36 +347,44 @@ describe("NMOS", () => {
   });
 
   it("stamp_nonlinear_has_conductance_entries", () => {
-    // Vgs=3V, Vds=5V (saturation): stampNonlinear should stamp nonzero conductances
+    // Vgs=3V, Vds=5V (saturation): load should stamp nonzero conductances
     const element = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
-    const solver = makeMockSolver();
 
-    element.stampNonlinear!(solver);
+    const voltages = new Float64Array(3);
+    voltages[0] = 5;
+    voltages[1] = 3;
+    voltages[2] = 0;
+    const ctx = makeDcOpCtx(voltages, 3);
+    element.load(ctx);
+    const entries = ctx.solver.getCSCNonZeros();
 
-    const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
-    expect(stampCalls.length).toBeGreaterThan(0);
+    expect(entries.length).toBeGreaterThan(0);
 
     // At least one conductance stamp should be significantly nonzero
-    const nonzeroStamps = stampCalls.filter((call) => Math.abs(call[2] as number) > 1e-15);
+    const nonzeroStamps = entries.filter((e) => Math.abs(e.value) > 1e-15);
     expect(nonzeroStamps.length).toBeGreaterThan(0);
   });
 
   it("setSourceScale_zero_disables_current", () => {
-    // setSourceScale(0) should zero all RHS contributions from stampNonlinear
+    // srcFact=0 should zero all RHS contributions from load()
     const element = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
-    element.setSourceScale!(0);
-    const solver = makeMockSolver();
 
-    element.stampNonlinear!(solver);
+    const voltages = new Float64Array(3);
+    voltages[0] = 5;
+    voltages[1] = 3;
+    voltages[2] = 0;
+    const ctx = makeDcOpCtx(voltages, 3);
+    ctx.srcFact = 0;
+    element.load(ctx);
+    const entries = ctx.solver.getCSCNonZeros();
+    const rhs = ctx.solver.getRhsSnapshot();
 
-    const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
-    for (const call of rhsCalls) {
-      expect(Math.abs(call[1] as number)).toBeCloseTo(0, 11);
+    for (let i = 0; i < rhs.length; i++) {
+      expect(Math.abs(rhs[i])).toBeCloseTo(0, 11);
     }
 
-    const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
-    for (const call of stampCalls) {
-      expect(Math.abs(call[2] as number)).toBeCloseTo(0, 11);
+    for (const e of entries) {
+      expect(Math.abs(e.value)).toBeCloseTo(0, 11);
     }
   });
 
@@ -365,7 +397,7 @@ describe("NMOS", () => {
     // NOT subtract the capacitor companion current (cqbd).
     //
     // We drive the NMOS to a known saturation operating point, then call
-    // checkConvergence twice with identical voltages. Because pnjlimLimited=false
+    // checkConvergence with identical voltages. Because pnjlimLimited=false
     // and the voltages haven't changed, convergence should be declared.
     //
     // The key assertion is that convergence IS reached (not perpetually rejected
@@ -381,7 +413,6 @@ describe("NMOS", () => {
 
     // Set up state pool so analysisMode="tran" (transient)
     // The pool is accessed via the element's internal reference (_pool).
-    // We access the pool through withState's return, which is the element itself.
     const pool = (core as unknown as { _pool: { analysisMode: string; initMode: string } })._pool;
     pool.analysisMode = "tran";
     pool.initMode = "transient";
@@ -393,15 +424,17 @@ describe("NMOS", () => {
     voltages[2] = 0;   // V(node3=S)
 
     for (let i = 0; i < 50; i++) {
-      (element as unknown as { updateOperatingPoint: (v: Float64Array) => boolean }).updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages, 3));
       voltages[0] = 5;
       voltages[1] = 3;
       voltages[2] = 0;
     }
 
-    // checkConvergence with identical current and previous voltages (no change)
-    const prevVoltages = new Float64Array(voltages);
-    const converged = (element as unknown as { checkConvergence: (v: Float64Array, pv: Float64Array, rt: number, ab: number) => boolean }).checkConvergence!(voltages, prevVoltages, 1e-3, 1e-12);
+    // checkConvergence with identical current (no change). The new-shape
+    // signature is checkConvergence(ctx: LoadContext) — build a ctx whose
+    // voltages match the element's last converged operating point.
+    const ctx = makeDcOpCtx(voltages, 3);
+    const converged = element.checkConvergence!(ctx);
 
     // With no voltage change and a converged operating point, checkConvergence
     // must return true. If cqbd were incorrectly subtracted, the cd formula
@@ -410,29 +443,37 @@ describe("NMOS", () => {
   });
 
   it("setSourceScale_one_is_default", () => {
-    // Without calling setSourceScale, behavior should match explicit setSourceScale(1)
+    // Without setting ctx.srcFact, behaviour should match explicit srcFact=1.
     const elementDefault = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
     const elementScaled = makeNmosAtVgs_Vds(3, 5, NMOS_DEFAULTS);
-    elementScaled.setSourceScale!(1);
 
-    const solverDefault = makeMockSolver();
-    const solverScaled = makeMockSolver();
+    const voltages = new Float64Array(3);
+    voltages[0] = 5;
+    voltages[1] = 3;
+    voltages[2] = 0;
 
-    elementDefault.stampNonlinear!(solverDefault);
-    elementScaled.stampNonlinear!(solverScaled);
+    const ctxDefault = makeDcOpCtx(voltages, 3);
+    elementDefault.load(ctxDefault);
 
-    const defaultStamp = (solverDefault.stamp as ReturnType<typeof vi.fn>).mock.calls;
-    const scaledStamp = (solverScaled.stamp as ReturnType<typeof vi.fn>).mock.calls;
-    const defaultRhs = (solverDefault.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
-    const scaledRhs = (solverScaled.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
+    const ctxScaled = makeDcOpCtx(voltages, 3);
+    ctxScaled.srcFact = 1;
+    elementScaled.load(ctxScaled);
 
-    expect(defaultStamp.length).toBe(scaledStamp.length);
-    for (let i = 0; i < defaultStamp.length; i++) {
-      expect(defaultStamp[i][2]).toBeCloseTo(scaledStamp[i][2] as number, 15);
+    const defaultEntries = ctxDefault.solver.getCSCNonZeros();
+    const scaledEntries = ctxScaled.solver.getCSCNonZeros();
+    const defaultRhs = ctxDefault.solver.getRhsSnapshot();
+    const scaledRhs = ctxScaled.solver.getRhsSnapshot();
+
+    expect(defaultEntries.length).toBe(scaledEntries.length);
+    // Order of entries is deterministic given identical stamp sequences.
+    for (let i = 0; i < defaultEntries.length; i++) {
+      expect(defaultEntries[i].row).toBe(scaledEntries[i].row);
+      expect(defaultEntries[i].col).toBe(scaledEntries[i].col);
+      expect(defaultEntries[i].value).toBeCloseTo(scaledEntries[i].value, 15);
     }
     expect(defaultRhs.length).toBe(scaledRhs.length);
     for (let i = 0; i < defaultRhs.length; i++) {
-      expect(defaultRhs[i][1]).toBeCloseTo(scaledRhs[i][1] as number, 15);
+      expect(defaultRhs[i]).toBeCloseTo(scaledRhs[i], 15);
     }
   });
 });
@@ -468,7 +509,9 @@ describe("PMOS", () => {
     // In MNA: nodeS at high voltage (5V), nodeD at 0V, nodeG at 2V (so Vgs = 2-5 = -3V)
     // createMosfetElement pin order: [G, S, D]
     const propsObj = makeParamBag(PMOS_DEFAULTS);
-    const element = withState(createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj));
+    const core = withState(createMosfetElement(-1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj));
+    // pinLayout order [G, D, S, B]; B=S for 3-terminal → [2, 1, 3, 3]
+    const element = withNodeIds(core, [2, 1, 3, 3]) as unknown as AnalogElement;
 
     // vS=5V (node3), vG=2V (node2), vD=0V (node1)
     // Vgs = 2-5 = -3V, Vds = 0-5 = -5V
@@ -478,35 +521,33 @@ describe("PMOS", () => {
     voltages[2] = 5;  // V(S)=5
 
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages, 3));
       voltages[0] = 0;
       voltages[1] = 2;
       voltages[2] = 5;
     }
 
-    const solver = makeMockSolver();
-    element.stampNonlinear!(solver);
+    const ctx = makeDcOpCtx(voltages, 3);
+    element.load(ctx);
+    const rhs = ctx.solver.getRhsSnapshot();
 
     // PMOS in saturation: Id should flow from S to D (conventional positive Isd)
     // Norton current at drain node should be positive (current entering drain = Isd)
-    const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
-
-    // Find drain node (node index 0 in solver = node 1)
-    const drainRhs = rhsCalls.find((c) => c[0] === 0);
-    const sourceRhs = rhsCalls.find((c) => c[0] === 2);
+    // nodes: drain=node1→row 0, gate=node2→row 1, source=node3→row 2
+    const drainRhs = rhs[0];
+    const sourceRhs = rhs[2];
 
     // At least one RHS entry should be nonzero (device is conducting)
-    const maxRhs = Math.max(...rhsCalls.map((c) => Math.abs(c[1] as number)));
+    let maxRhs = 0;
+    for (let i = 0; i < rhs.length; i++) {
+      const abs = Math.abs(rhs[i]);
+      if (abs > maxRhs) maxRhs = abs;
+    }
     expect(maxRhs).toBeGreaterThan(1e-10);
 
-    // PMOS conducts: there should be nonzero RHS entries with correct signs
-    // The PMOS carries current from S to D: drain node gets current in, source loses current
-    // This is opposite to NMOS which drains current from D to S
-    expect(drainRhs).toBeDefined();
-    if (drainRhs && sourceRhs) {
-      // For PMOS: current flows into drain, out of source (opposite sign to NMOS)
-      expect(Math.sign(drainRhs[1] as number)).toBe(-Math.sign(sourceRhs[1] as number));
-    }
+    // PMOS conducts: drain and source RHS entries should have opposite signs.
+    // For PMOS: current flows into drain, out of source (opposite sign to NMOS).
+    expect(Math.sign(drainRhs)).toBe(-Math.sign(sourceRhs));
   });
 
   it("pmos_definition_has_correct_device_type", () => {
@@ -691,7 +732,7 @@ describe("setParam shifts DC OP to match SPICE reference", () => {
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
 
 describe("MOSFET LimitingEvent instrumentation", () => {
-  function makeNmosWithState(): ReactiveAnalogElement & { label: string; elementIndex: number } {
+  function makeNmosWithState(): AnalogElement {
     const propsObj = new PropertyBag();
     propsObj.replaceModelParams({ ...MOSFET_NMOS_DEFAULTS, VTO: 1.0, KP: 2e-5, GAMMA: 0, PHI: 0.6, LAMBDA: 0, W: 1e-6, L: 1e-6 });
     // Gate=1, Drain=2, Source=3; bulk tied to source internally by factory
@@ -700,18 +741,28 @@ describe("MOSFET LimitingEvent instrumentation", () => {
     const re = withState(core) as any;
     re.label = "M1";
     re.elementIndex = 6;
-    return re;
+    // pinLayout [G, D, S, B]; 3-terminal → B=S → [1, 2, 3, 3]
+    const element = withNodeIds(re, [1, 2, 3, 3]) as unknown as AnalogElement;
+    return element;
+  }
+
+  function makeCtxWithCollector(
+    voltages: Float64Array,
+    collector: LimitingEvent[] | null,
+  ): LoadContext {
+    const ctx = makeDcOpCtx(voltages, 10);
+    return { ...ctx, limitingCollector: collector };
   }
 
   it("pushes GS (fetlim) event to limitingCollector", () => {
-    const el = makeNmosWithState() as any;
+    const el = makeNmosWithState();
     const voltages = new Float64Array(10);
     voltages[0] = 5.0; // G = node 1
     voltages[1] = 3.0; // D = node 2
     voltages[2] = 0.0; // S = node 3
 
     const collector: LimitingEvent[] = [];
-    el.updateOperatingPoint(voltages, collector);
+    el.load(makeCtxWithCollector(voltages, collector));
 
     const gsEv = collector.find((e: LimitingEvent) => e.junction === "GS");
     expect(gsEv).toBeDefined();
@@ -724,14 +775,14 @@ describe("MOSFET LimitingEvent instrumentation", () => {
   });
 
   it("pushes DS (limvds) event to limitingCollector", () => {
-    const el = makeNmosWithState() as any;
+    const el = makeNmosWithState();
     const voltages = new Float64Array(10);
     voltages[0] = 5.0;
     voltages[1] = 3.0;
     voltages[2] = 0.0;
 
     const collector: LimitingEvent[] = [];
-    el.updateOperatingPoint(voltages, collector);
+    el.load(makeCtxWithCollector(voltages, collector));
 
     const dsEv = collector.find((e: LimitingEvent) => e.junction === "DS");
     expect(dsEv).toBeDefined();
@@ -742,14 +793,14 @@ describe("MOSFET LimitingEvent instrumentation", () => {
   });
 
   it("pushes BS or BD (pnjlim) bulk junction event", () => {
-    const el = makeNmosWithState() as any;
+    const el = makeNmosWithState();
     const voltages = new Float64Array(10);
     voltages[0] = 5.0;
     voltages[1] = 3.0;
     voltages[2] = 0.0;
 
     const collector: LimitingEvent[] = [];
-    el.updateOperatingPoint(voltages, collector);
+    el.load(makeCtxWithCollector(voltages, collector));
 
     const bulkEv = collector.find((e: LimitingEvent) => e.junction === "BS" || e.junction === "BD");
     expect(bulkEv).toBeDefined();
@@ -759,12 +810,11 @@ describe("MOSFET LimitingEvent instrumentation", () => {
   });
 
   it("does not throw when limitingCollector is null", () => {
-    const el = makeNmosWithState() as any;
+    const el = makeNmosWithState();
     const voltages = new Float64Array(10);
     voltages[0] = 5.0;
     voltages[1] = 3.0;
-    expect(() => el.updateOperatingPoint(voltages, null)).not.toThrow();
-    expect(() => el.updateOperatingPoint(voltages, undefined)).not.toThrow();
+    expect(() => el.load(makeCtxWithCollector(voltages, null))).not.toThrow();
   });
 });
 
@@ -944,7 +994,7 @@ describe("MOSFET primeJunctions", () => {
   it("primeJunctions_with_OFF_sets_all_voltages_to_zero", () => {
     const { element, pool } = makeNmosElement({ OFF: 1 });
     element.primeJunctions();
-    // primeJunctions writes directly to s0 slots; check before calling updateOperatingPoint
+    // primeJunctions writes directly to s0 slots; check before calling load()
     const vgs = pool.states[0][SLOT_VGS];
     const vds = pool.states[0][SLOT_VDS];
     const vbsOld = pool.states[0][SLOT_VBS_OLD];
@@ -959,8 +1009,9 @@ describe("MOSFET primeJunctions", () => {
     const { element, pool } = makeNmosElement({ OFF: 1 });
     pool.initMode = "initFix";
     const voltages = new Float64Array(4);
-    const prevVoltages = new Float64Array(4);
-    const result = element.checkConvergence(voltages, prevVoltages, 1e-3, 1e-6);
+    const ctx = makeDcOpCtx(voltages, 4);
+    ctx.initMode = "initFix";
+    const result = element.checkConvergence(ctx);
     expect(result).toBe(true);
   });
 });
@@ -1040,23 +1091,17 @@ describe("integration", () => {
     pool.state1[SLOT_Q_DB] = q1_db;
 
     // Build minimal LoadContext: voltages[0]=vD=vds, voltages[1]=vG=vgs, voltages[2]=vS=0
-    const stamps: Array<[number, number, number]> = [];
-    const rhs: Array<[number, number]> = [];
-    const mockSolver = {
-      stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
-      stampRHS: (r: number, v: number) => rhs.push([r, v]),
-      beginAssembly: () => {},
-      endAssembly: () => {},
-    } as any;
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
 
     pool.ag.set(ag);
-    const ctx = {
-      solver: mockSolver,
+    const ctx: LoadContext = {
+      solver,
       voltages: new Float64Array([vds, vgs, 0]),
       iteration: 0,
-      initMode: "transient" as const,
+      initMode: "transient",
       dt,
-      method: "trapezoidal" as const,
+      method: "trapezoidal",
       order: 2,
       deltaOld: [dt, dt, dt, dt, dt, dt, dt],
       ag,
@@ -1108,5 +1153,172 @@ describe("integration", () => {
     ) as string;
     expect(src).not.toMatch(/integrateCapacitor/);
     expect(src).not.toMatch(/integrateInductor/);
+  });
+});
+
+// ===========================================================================
+// mosfet_spicel1_load_dcop_parity
+//
+// Canonical saturation-region NMOS (SPICE-L1):
+//   Vgs=2V, Vds=3V, Vt=VTO=1V, KP=100µA/V², W=L=1µm, GAMMA=0, LAMBDA=0.
+//   TNOM=300.15K (=REFTEMP) → temperature correction factor = 1 (identity).
+//
+// mos1load.c variable mapping:
+//   vgs      = 2V,  vds = 3V
+//   tKP      = KP = 100e-6  (ratio=REFTEMP/TNOM=1, ratio4=1, _tTransconductance=KP/1)
+//   tPhi     = PHI = 0.6
+//   tVto     = VTO = 1  (no temperature shift at TNOM=REFTEMP)
+//   GAMMA=0  → body effect sarg=sqrt(PHI), vth=VTO (no Vsb body term since Vsb=0)
+//   vgst     = vgs - vth = 1V
+//   vdsat    = 1V (= vgst in saturation)
+//   vds=3 >= vgst=1 → SATURATION
+//   Beta     = tKP * W/L = 100e-6
+//   ids      = Beta * vgst² * 0.5 = 5e-5 A
+//   gm       = Beta * vgst + GMIN = 1e-4 + GMIN
+//   gds      = Beta * LAMBDA * vgst² * 0.5 + GMIN = GMIN  (LAMBDA=0)
+//   gmbs     = 0  (GAMMA=0)
+//
+// Bulk junctions (B=S=0=ground, IS=1e-14):
+//   vbs=0, vbd=-3V (<= -3*VT → gbd=GMIN, cbdI=GMIN*(-3)-IS)
+//   gbs = IS/VT + GMIN, cbsI = 0  (vbs=0 → evbs=1, cbsI=IS*(1-1)=0)
+//   ceqbd = cbdI - gbd*vbd = (-3*GMIN-IS) - GMIN*(-3) = -IS
+//   ceqbs = 0 - gbs*0 = 0
+//
+// MNA node layout: D=1 (row/col 0), G=2 (row/col 1), S=0 (ground), B=0 (ground).
+// Stamps survive only where both row and col are non-zero.
+//
+// Matrix entries:
+//   (D,D) = gds + gbd = GMIN + GMIN = 2*GMIN
+//   (D,G) = gm = KP + GMIN
+//   RHS[D] = -(ids-gm*vgs-gds*vds) + IS  (channel Norton + bulk drain Norton)
+// ===========================================================================
+
+describe("mosfet_spicel1_load_dcop_parity", () => {
+  it("saturation_nmos_dcop_stamp_bit_exact_vs_ngspice_mos1load_formula", () => {
+    const VGS    = 2;
+    const VDS    = 3;
+    const VTO    = 1;
+    const KP     = 100e-6;
+    const W      = 1e-6;
+    const L      = 1e-6;
+    const PHI    = 0.6;
+    const GAMMA  = 0;
+    const LAMBDA = 0;
+    const IS_JCT = 1e-14;
+    const GMIN   = 1e-12;
+
+    // TNOM = 300.15 K (= REFTEMP) so all temperature correction factors = 1.
+    const TNOM   = 300.15;
+
+    // Build NMOS element: polarity=1, G=2, S=0 (ground), D=1, B=0 (tied to source).
+    // All caps zero, RD=RS=0 (no internal nodes).
+    const propsObj = makeParamBag({
+      VTO, KP, LAMBDA, W, L, PHI, GAMMA,
+      CBD: 0, CBS: 0, CGDO: 0, CGSO: 0, CGBO: 0,
+      RD: 0, RS: 0, IS: IS_JCT, PB: 0.8,
+      CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
+      AD: 0, AS: 0, PD: 0, PS: 0,
+      TOX: 0, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600,
+      KF: 0, AF: 1, FC: 0.5, M: 1, OFF: 0,
+      TNOM,
+    });
+
+    // polarity=1 (NMOS), D=1, G=2, S=0, B tied to S → factory uses B=S=0
+    const core = createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj);
+    const pool = new StatePool(core.stateSize);
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Seed SLOT_VGS (0) and SLOT_VDS (1) so fetlim/limitVoltages passes through unchanged.
+    pool.state0[0] = VGS;  // SLOT_VGS
+    pool.state0[1] = VDS;  // SLOT_VDS
+    // Seed SLOT_VON (28) to VTO so fetlim uses the correct threshold.
+    pool.state0[28] = VTO; // SLOT_VON
+    // Seed SLOT_VBS_OLD (29) = 0 so pnjlim on vbs=0 passes through.
+    pool.state0[29] = 0;   // SLOT_VBS_OLD
+    // SLOT_VBD_OLD (30) = 0 (default from initState, consistent with reverse-bias start).
+    pool.state0[30] = 0;   // SLOT_VBD_OLD
+
+    // MNA voltages: V(D=1)=VDS, V(G=2)=VGS (S=0=ground, B=0=ground).
+    const voltages = new Float64Array([VDS, VGS]);
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+
+    const ctx: LoadContext = {
+      solver,
+      voltages,
+      iteration: 1,
+      initMode: "initFloat",
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: GMIN,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    // withNodeIds: pinLayout [G, D, S, B] → nodeIds [2, 1, 0, 0]
+    const el = withNodeIds(core as unknown as AnalogElementCore, [2, 1, 0, 0]);
+    el.load(ctx);
+
+    // ---------------------------------------------------------------------------
+    // NGSPICE_REF: mos1load.c saturation-region formulas
+    // ---------------------------------------------------------------------------
+    // At TNOM=REFTEMP: tKP=KP, tPhi=PHI, tVto=VTO, tempFactor=1.
+    const NGSPICE_tKP    = KP;                              // temperature-corrected KP
+    const NGSPICE_vth    = VTO;                             // no body effect (GAMMA=0, vsb=0)
+    const NGSPICE_vgst   = VGS - NGSPICE_vth;              // = 1
+    const NGSPICE_Beta   = NGSPICE_tKP * W / L;            // = 100e-6
+    // Saturation: vds=3 >= vgst=1
+    const NGSPICE_IDS    = NGSPICE_Beta * NGSPICE_vgst * NGSPICE_vgst * 0.5
+                          * (1 + LAMBDA * VDS);             // = 5e-5
+    const NGSPICE_GM     = NGSPICE_Beta * (1 + LAMBDA * VDS) * NGSPICE_vgst + GMIN; // = 1e-4 + GMIN
+    const NGSPICE_GDS    = NGSPICE_Beta * LAMBDA * NGSPICE_vgst * NGSPICE_vgst * 0.5 + GMIN; // = GMIN
+    const NGSPICE_GMBS   = 0;                              // GAMMA=0 → no body effect
+    // Bulk drain junction: vbd = vbs - vds = 0 - 3 = -3V (< -3*VT → reverse saturation)
+    const NGSPICE_vbd    = 0 - VDS;                        // = -3
+    const NGSPICE_GBD    = GMIN;                           // gbd = GMIN when vbd <= -3*VT
+    const NGSPICE_cbdI   = GMIN * NGSPICE_vbd - IS_JCT;   // cbdI = GMIN*(-3) - IS
+    const NGSPICE_ceqbd  = NGSPICE_cbdI - NGSPICE_GBD * NGSPICE_vbd; // = -IS
+    // Norton: ids - gm*vgs - gds*vds - gmbs*vbs (vbs=0)
+    const NGSPICE_nortonId = NGSPICE_IDS
+      - NGSPICE_GM  * VGS
+      - NGSPICE_GDS * VDS
+      - NGSPICE_GMBS * 0;
+
+    // ---------------------------------------------------------------------------
+    // Read assembled matrix entries.
+    // D=1→row/col 0, G=2→row/col 1, S=0→ground (skipped), B=0→ground (skipped).
+    // ---------------------------------------------------------------------------
+    const entries = solver.getCSCNonZeros();
+    const sumAt = (row: number, col: number): number =>
+      entries
+        .filter((e) => e.row === row && e.col === col)
+        .reduce((acc, e) => acc + e.value, 0);
+
+    // (D, D): gds from channel + gbd from drain-bulk junction
+    expect(sumAt(0, 0)).toBe(NGSPICE_GDS + NGSPICE_GBD);
+
+    // (D, G): gm from transconductance stamp
+    expect(sumAt(0, 1)).toBe(NGSPICE_GM);
+
+    // (G, *): no G-row stamps (gate has no conductance to itself)
+    expect(sumAt(1, 0)).toBe(0);
+    expect(sumAt(1, 1)).toBe(0);
+
+    // RHS[D]: channel Norton + bulk drain Norton (-polarity * ceqbd = IS)
+    const rhs = solver.getRhsSnapshot();
+    expect(rhs[0]).toBe(-NGSPICE_nortonId + IS_JCT);
+    // RHS[G]: no stamps on gate row
+    expect(rhs[1]).toBe(0);
   });
 });

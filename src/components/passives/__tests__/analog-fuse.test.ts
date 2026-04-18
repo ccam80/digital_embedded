@@ -18,9 +18,10 @@ import {
 } from "../analog-fuse.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
+import { runDcOp, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import type { AnalogFactory } from "../../../core/registry.js";
@@ -49,6 +50,39 @@ function makeFuseElement(opts: {
   );
 }
 
+/**
+ * Drive one load()+accept() iteration on a fuse. The fuse load() stamps a
+ * conductance into the solver (used by NR); accept() integrates I²·dt and
+ * updates blown state.
+ */
+function driveFuseStep(fuse: AnalogFuseElement, dt: number, voltages: Float64Array): void {
+  const solver = new SparseSolver();
+  solver.beginAssembly(Math.max(voltages.length, 1));
+  const ctx: LoadContext = {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "transient",
+    dt,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: true,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+  fuse.load(ctx);
+  fuse.accept(ctx, 0, () => {});
+}
+
 // ---------------------------------------------------------------------------
 // Fuse tests
 // ---------------------------------------------------------------------------
@@ -65,8 +99,7 @@ describe("AnalogFuseElement", () => {
 
       const dt = 0.1;
       for (let i = 0; i < 10; i++) {
-        fuse.updateOperatingPoint(voltages);
-        fuse.updateState(dt, voltages);
+        driveFuseStep(fuse, dt, voltages);
       }
 
       expect(fuse.blown).toBe(false);
@@ -93,8 +126,7 @@ describe("AnalogFuseElement", () => {
       let blowStep = -1;
       for (let i = 0; i < maxSteps; i++) {
         if (!fuse.blown) {
-          fuse.updateOperatingPoint(voltages);
-          fuse.updateState(dt, voltages);
+          driveFuseStep(fuse, dt, voltages);
           if (fuse.blown) {
             blowStep = i;
           }
@@ -122,8 +154,7 @@ describe("AnalogFuseElement", () => {
 
       const dt = 0.001;
       for (let i = 0; i < 100; i++) {
-        fuse.updateOperatingPoint(voltages);
-        fuse.updateState(dt, voltages);
+        driveFuseStep(fuse, dt, voltages);
       }
 
       expect(fuse.blown).toBe(true);
@@ -148,8 +179,7 @@ describe("AnalogFuseElement", () => {
         const v = current * rCold;
         const vArr = new Float64Array(1);
         vArr[0] = v;
-        testFuse.updateOperatingPoint(vArr);
-        testFuse.updateState(dt, vArr);
+        driveFuseStep(testFuse, dt, vArr);
         resistances.push(testFuse.currentResistance);
       }
 
@@ -184,8 +214,7 @@ describe("AnalogFuseElement", () => {
 
       const dt = 0.01;
       for (let i = 0; i < 50; i++) {
-        fuse.updateOperatingPoint(voltages);
-        fuse.updateState(dt, voltages);
+        driveFuseStep(fuse, dt, voltages);
       }
 
       expect(fuse.blown).toBe(true);
@@ -209,8 +238,7 @@ describe("AnalogFuseElement", () => {
 
       const dt = 0.01;
       for (let i = 0; i < 100; i++) {
-        fuse.updateOperatingPoint(voltages);
-        fuse.updateState(dt, voltages);
+        driveFuseStep(fuse, dt, voltages);
       }
 
       expect(fuse.blown).toBe(true);
@@ -225,8 +253,7 @@ describe("AnalogFuseElement", () => {
 
       const voltages = new Float64Array(1);
       voltages[0] = 1.0; // 100A through 0.01Ω
-      fuse.updateOperatingPoint(voltages);
-      fuse.updateState(0.0001, voltages);
+      driveFuseStep(fuse, 0.0001, voltages);
 
       expect(fuse.thermalRatio).toBeGreaterThan(0);
       expect(fuse.thermalRatio).toBeLessThanOrEqual(1);
@@ -245,8 +272,7 @@ describe("AnalogFuseElement", () => {
       const voltages = new Float64Array(1);
       voltages[0] = 1.0; // high current
 
-      fuse.updateOperatingPoint(voltages);
-      fuse.updateState(0.01, voltages);
+      driveFuseStep(fuse, 0.01, voltages);
 
       expect(calls.length).toBe(1);
       expect(calls[0].ratio).toBeGreaterThan(0);
@@ -263,8 +289,7 @@ describe("AnalogFuseElement", () => {
       const voltages = new Float64Array(1);
       voltages[0] = 1.0;
 
-      el.updateOperatingPoint(voltages);
-      el.updateState(0.1, voltages);
+      driveFuseStep(el, 0.1, voltages);
 
       expect(props.get("_thermalRatio")).toBeGreaterThan(0);
       expect(props.get("blown")).toBe(true);
@@ -293,8 +318,7 @@ describe("AnalogFuseElement", () => {
 
       const voltages = new Float64Array(1);
       voltages[0] = 1000 * 0.01;
-      fuse.updateOperatingPoint(voltages);
-      fuse.updateState(1.0, voltages);
+      driveFuseStep(fuse, 1.0, voltages);
       expect(fuse.blown).toBe(true);
       expect(fuse.currentResistance).toBeGreaterThan(1e8);
     });
@@ -308,7 +332,7 @@ describe("AnalogFuseElement", () => {
       const vs = makeDcVoltageSource(1, 0, 2, 1.0) as unknown as AnalogElement;
 
       const G_load = 1 / rLoad;
-      const loadResistor = {
+      const loadResistor: AnalogElement = {
         pinNodeIds: [2, 0] as readonly number[],
         allNodeIds: [2, 0] as readonly number[],
         branchIndex: -1,
@@ -316,8 +340,8 @@ describe("AnalogFuseElement", () => {
         isReactive: false,
         setParam(_key: string, _value: number): void {},
         getPinCurrents(_v: Float64Array): number[] { return []; },
-        stamp(solver: SparseSolver): void {
-          solver.stampElement(solver.allocElement(1, 1), G_load);
+        load(ctx: LoadContext): void {
+          ctx.solver.stampElement(ctx.solver.allocElement(1, 1), G_load);
         },
       };
 
@@ -330,6 +354,54 @@ describe("AnalogFuseElement", () => {
       expect(result.converged).toBe(true);
       const sourceCurrent = Math.abs(result.nodeVoltages[2]);
       expect(sourceCurrent).toBeCloseTo(0.1, 2);
+    });
+  });
+
+  describe("fuse_load_dcop_parity", () => {
+    // fuse_load_dcop_parity — C4.1 / Task 6.2.1
+    //
+    // Fuse in un-blown state (thermalEnergy=0). rCold=0.01, rBlown=1e9, i2tRating=1e-4.
+    // smoothResistance(0, 1e-4, 0.01, 1e9):
+    //   width = 0.05 * 1e-4 = 5e-6
+    //   x = (0 - 1e-4) / 5e-6 = -20
+    //   blend = 0.5 * (1 + tanh(-20)) ≈ 0 (tanh(-20) ≈ -1 to 53-bit precision)
+    //   R ≈ 0.01 + (1e9 - 0.01) * blend ≈ 0.01
+    // G = 1 / max(R, 1e-12) = 1 / R_from_smooth_formula (bit-exact).
+    //
+    // NGSPICE reference: ngspice resload.c stamps G=1/R using a single division.
+    // The test inlines the same smoothResistance computation as AnalogFuseElement.load().
+    // Nodes: pos=1 → idx 0, neg=0 (ground). matrixSize=1, nodeCount=1.
+    it("un-blown fuse stamps G=1/smoothResistance(0) bit-exact", () => {
+      // Inline closed-form — same IEEE-754 operations as AnalogFuseElement.load()
+      // with smoothResistance(thermalEnergy=0, i2tRating=1e-4, rCold=0.01, rBlown=1e9):
+      const rCold = 0.01;
+      const rBlown = 1e9;
+      const i2tRating = 1e-4;
+      const thermalEnergy = 0;
+      const width = 0.05 * i2tRating;
+      const x = (thermalEnergy - i2tRating) / Math.max(width, 1e-30);
+      const blend = 0.5 * (1 + Math.tanh(x));
+      const R_REF = rCold + (rBlown - rCold) * blend;
+      const MIN_RESISTANCE = 1e-12;
+      const NGSPICE_G_REF = 1 / Math.max(R_REF, MIN_RESISTANCE);
+
+      // Construct fuse with pinNodeIds=[1, 0] (pos=1 above ground).
+      const fuse = new AnalogFuseElement([1, 0], rCold, rBlown, i2tRating);
+
+      const stampCtx = makeSimpleCtx({
+        elements: [fuse as unknown as AnalogElement],
+        matrixSize: 1,
+        nodeCount: 1,
+      });
+      stampCtx.solver.beginAssembly(1);
+      fuse.load(stampCtx.loadCtx as unknown as LoadContext);
+      stampCtx.solver.finalize();
+      const stamps = stampCtx.solver.getCSCNonZeros();
+
+      // Only the pos diagonal is stamped (neg=0 is ground, suppressed).
+      const e00 = stamps.find((e) => e.row === 0 && e.col === 0);
+      expect(e00).toBeDefined();
+      expect(e00!.value).toBe(NGSPICE_G_REF);
     });
   });
 

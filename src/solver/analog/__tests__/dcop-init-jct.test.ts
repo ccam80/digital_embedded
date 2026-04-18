@@ -132,7 +132,7 @@ const T = 300.15;
 const VT_ROOM = T * K / Q; // thermal voltage at 300.15 K ≈ 0.02585 V
 
 // ---------------------------------------------------------------------------
-// tVcrit formula (mirrors computeBjtTempParams and diode updateOperatingPoint)
+// tVcrit formula (matching computeBjtTempParams and diode primeJunctions)
 // ---------------------------------------------------------------------------
 
 function computeTVcrit(vt: number, IS: number, AREA: number = 1): number {

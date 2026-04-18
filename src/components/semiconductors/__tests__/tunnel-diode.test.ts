@@ -22,7 +22,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { newtonRaphson } from "../../../solver/analog/newton-raphson.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
-import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runNR } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
@@ -73,8 +73,43 @@ function makeTunnelDiode(overrides: Partial<typeof TD_MODEL_PARAMS> = {}): Analo
 }
 
 /**
+ * Build a bare LoadContext for a single-element unit test. The caller owns
+ * the solver, the state pool, and the voltages buffer.
+ */
+function buildUnitCtx(
+  solver: SparseSolver,
+  voltages: Float64Array,
+  overrides: Partial<import("../../../solver/analog/load-context.js").LoadContext> = {},
+): import("../../../solver/analog/load-context.js").LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+    ...overrides,
+  };
+}
+
+/**
  * Drive element to operating point and return Norton equivalent {geq, ieq}.
- * nodeAnode=1 (index 0), nodeCathode=2 (index 1)
+ * nodeAnode=1 (index 0), nodeCathode=2 (index 1). Runs load(ctx) repeatedly
+ * until SLOT_VD / state are converged, then re-stamps into a fresh real
+ * SparseSolver to read the diagonal conductance and RHS entry.
  */
 function driveAndGetNorton(
   element: AnalogElement,
@@ -85,27 +120,27 @@ function driveAndGetNorton(
   voltages[0] = vd;
   voltages[1] = 0;
   for (let i = 0; i < iterations; i++) {
-    element.updateOperatingPoint!(voltages);
-    voltages[0] = vd;
-    voltages[1] = 0;
+    const iterSolver = new SparseSolver();
+    iterSolver.beginAssembly(2);
+    const iterCtx = buildUnitCtx(iterSolver, voltages);
+    element.load(iterCtx);
   }
 
-  const calls: Array<[number, number, number]> = [];
-  const rhs: Array<[number, number]> = [];
-  const solver = {
-    stamp: (r: number, c: number, v: number) => calls.push([r, c, v]),
-    stampRHS: (r: number, v: number) => rhs.push([r, v]),
-  } as unknown as SparseSolverType;
+  // Re-stamp into a fresh solver for the final Norton read.
+  const solver = new SparseSolver();
+  solver.beginAssembly(2);
+  const ctx = buildUnitCtx(solver, voltages);
+  element.load(ctx);
 
-  element.stampNonlinear!(solver);
+  const entries = solver.getCSCNonZeros();
+  const geq = entries
+    .filter((e) => e.row === 0 && e.col === 0)
+    .reduce((acc, e) => acc + e.value, 0);
+  const rhsVec = solver.getRhsSnapshot();
+  // Element writes -ieq at anode row; Norton ieq = -rhs[anode].
+  const ieq = -rhsVec[0];
 
-  const geqEntry = calls.find((c) => c[0] === 0 && c[1] === 0);
-  const ieqEntry = rhs.find((r) => r[0] === 0);
-
-  return {
-    geq: geqEntry?.[2] ?? 0,
-    ieq: ieqEntry ? -ieqEntry[1] : 0, // stampRHS stamps -ieq
-  };
+  return { geq, ieq };
 }
 
 /** Compute effective current at voltage V from Norton equivalent. */
@@ -254,8 +289,6 @@ describe("TunnelDiode", () => {
     //
     // Circuit: VS(node1=0.29V) + resistor(100Ω, node1→node2) + tunnel_diode(A=node2, K=gnd)
     // matrixSize = 3 (node1, node2, VS branch)
-    //
-    // Count NR iterations manually by tracking updateOperatingPoint calls.
 
     const vTarget = (TD_DEFAULTS.vp + TD_DEFAULTS.vv) / 2; // ~0.29V
 
@@ -268,7 +301,7 @@ describe("TunnelDiode", () => {
     const { element: statedCore } = withState(core);
     const td = withNodeIds(statedCore, [2, 0]);
 
-    // Resistor element
+    // Resistor element (load-style)
     const G = 1 / 100;
     const resistor: AnalogElement = {
       pinNodeIds: [1, 2],
@@ -278,11 +311,12 @@ describe("TunnelDiode", () => {
       isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_v: Float64Array): number[] { return []; },
-      stamp(solver: SparseSolverType): void {
-        solver.stampElement(solver.allocElement(0, 0), G); // node1 diagonal
-        solver.stampElement(solver.allocElement(1, 1), G); // node2 diagonal
-        solver.stampElement(solver.allocElement(0, 1), -G);
-        solver.stampElement(solver.allocElement(1, 0), -G);
+      load(ctx): void {
+        const s = ctx.solver;
+        s.stampElement(s.allocElement(0, 0), G);
+        s.stampElement(s.allocElement(1, 1), G);
+        s.stampElement(s.allocElement(0, 1), -G);
+        s.stampElement(s.allocElement(1, 0), -G);
       },
     };
 
@@ -295,26 +329,27 @@ describe("TunnelDiode", () => {
       isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_v: Float64Array): number[] { return []; },
-      stamp(solver: SparseSolverType): void {
+      load(ctx): void {
+        const s = ctx.solver;
         // KCL: add/subtract branch current from node1
-        solver.stampElement(solver.allocElement(0, 2), 1);  // node1 row, branch col
-        solver.stampElement(solver.allocElement(2, 0), 1);  // branch row, node1 col
+        s.stampElement(s.allocElement(0, 2), 1);  // node1 row, branch col
+        s.stampElement(s.allocElement(2, 0), 1);  // branch row, node1 col
         // Branch equation: V(node1) = vTarget
-        solver.stampRHS(2, vTarget);
+        s.stampRHS(2, vTarget);
       },
     };
 
     const solver = new SparseSolver();
     const diagnostics = new DiagnosticCollector();
 
-    const result = newtonRaphson({
+    const result = runNR({
       solver,
       elements: [vsource, resistor, td],
       matrixSize: 3,
+      nodeCount: 2,
+      branchCount: 1,
       maxIterations: 15,
-      reltol: 1e-3,
-      abstol: 1e-6,
-      iabstol: 1e-12,
+      params: { reltol: 1e-3, voltTol: 1e-6, abstol: 1e-12 },
       diagnostics,
     });
 
@@ -384,21 +419,17 @@ describe("integration", () => {
     const q1_val = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevId);
     pool.state1[7] = q1_val;
 
-    const stamps: Array<[number, number, number]> = [];
-    const rhs: Array<[number, number]> = [];
-    const mockSolver = {
-      stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
-      stampRHS: (r: number, v: number) => rhs.push([r, v]),
-    } as any;
-
+    // Real SparseSolver — anode=node 1 mapped to row 0, cathode=ground.
+    const solver = new SparseSolver();
+    solver.beginAssembly(1);
     pool.ag.set(ag);
-    const ctx = {
-      solver: mockSolver,
+    const ctx: import("../../../solver/analog/load-context.js").LoadContext = {
+      solver,
       voltages: new Float64Array([vd, 0]),
       iteration: 0,
-      initMode: "transient" as const,
+      initMode: "transient",
       dt,
-      method: "trapezoidal" as const,
+      method: "trapezoidal",
       order: 2,
       deltaOld: [dt, dt, dt, dt, dt, dt, dt],
       ag,
@@ -432,7 +463,10 @@ describe("integration", () => {
 
     // Verify the element stamped the correct total capGeq at diagonal (0,0)
     const { dIdV: geqFull } = tunnelDiodeIV(vd, IP, VP, IV, VV, IS, N);
-    const total00 = stamps.filter(([r, c]) => r === 0 && c === 0).reduce((sum, s) => sum + s[2], 0);
+    const entries = solver.getCSCNonZeros();
+    const total00 = entries
+      .filter((e) => e.row === 0 && e.col === 0)
+      .reduce((sum, e) => sum + e.value, 0);
     expect(total00).toBe(geqFull + capGeq_expected);
   });
 

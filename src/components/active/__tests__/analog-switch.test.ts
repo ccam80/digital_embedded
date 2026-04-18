@@ -11,7 +11,7 @@
  *   SPST::nr_converges_during_transition — at threshold, NR converges ≤ 10 iterations
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   SwitchSPSTDefinition,
   SwitchSPDTDefinition,
@@ -31,17 +31,9 @@ function getFactory(entry: ModelEntry): AnalogFactory {
   return entry.factory;
 }
 
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function makeMockSolver() {
-  return {
-    stamp: vi.fn(),
-    stampRHS: vi.fn(),
-  } as unknown as SparseSolverType;
-}
 
 const SWITCH_MODEL_PARAM_KEYS = new Set(["rOn", "rOff", "threshold", "transitionSharpness"]);
 
@@ -113,15 +105,13 @@ describe("SPST", () => {
     const sw = makeSPST(1, 2, 3, { rOn: 10, rOff: 1e9, threshold: 1.65, transitionSharpness: 20 });
     const voltages = makeVoltages(3, { 1: 3.3 });
 
-    sw.updateOperatingPoint!(voltages);
-    const solver = makeMockSolver();
-    sw.stampNonlinear!(solver);
+    const { solver, stamps } = makeSwitchCaptureSolver();
+    sw.load(makeSwitchParityCtx(voltages, solver));
 
-    const calls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls as number[][];
     // Diagonal entry for nIn node: stamp(nIn-1, nIn-1, G) = stamp(1, 1, G)
-    const diagEntry = calls.find((c) => c[0] === 1 && c[1] === 1);
+    const diagEntry = stamps.find((s) => s.row === 1 && s.col === 1);
     expect(diagEntry).toBeDefined();
-    const g = diagEntry![2];
+    const g = diagEntry!.value;
     const r = 1 / g;
     // R should be within 1% of R_on = 10 Ω
     expect(r).toBeCloseTo(10, 0);
@@ -133,14 +123,12 @@ describe("SPST", () => {
     const sw = makeSPST(1, 2, 3, { rOn: 10, rOff: 1e9, threshold: 1.65, transitionSharpness: 20 });
     const voltages = makeVoltages(3, { 1: 0 });
 
-    sw.updateOperatingPoint!(voltages);
-    const solver = makeMockSolver();
-    sw.stampNonlinear!(solver);
+    const { solver, stamps } = makeSwitchCaptureSolver();
+    sw.load(makeSwitchParityCtx(voltages, solver));
 
-    const calls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls as number[][];
-    const diagEntry = calls.find((c) => c[0] === 1 && c[1] === 1);
+    const diagEntry = stamps.find((s) => s.row === 1 && s.col === 1);
     expect(diagEntry).toBeDefined();
-    const g = diagEntry![2];
+    const g = diagEntry!.value;
     const r = 1 / g;
     // R should be within 1% of R_off = 1e9 Ω
     expect(r).toBeCloseTo(1e9, -3);
@@ -157,12 +145,10 @@ describe("SPST", () => {
     for (let i = 0; i <= steps; i++) {
       const vCtrl = (3.3 * i) / steps;
       const voltages = makeVoltages(3, { 1: vCtrl });
-      sw.updateOperatingPoint!(voltages);
-      const solver = makeMockSolver();
-      sw.stampNonlinear!(solver);
-      const calls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls as number[][];
-      const diagEntry = calls.find((c) => c[0] === 1 && c[1] === 1);
-      const g = diagEntry ? diagEntry[2] : 0;
+      const { solver, stamps } = makeSwitchCaptureSolver();
+      sw.load(makeSwitchParityCtx(voltages, solver));
+      const diagEntry = stamps.find((s) => s.row === 1 && s.col === 1);
+      const g = diagEntry ? diagEntry.value : 0;
       resistances.push(g > 0 ? 1 / g : 1e18);
     }
 
@@ -277,42 +263,38 @@ describe("SPDT", () => {
 
     // High control: NO closed, NC open
     const voltagesHigh = makeVoltages(4, { 1: 3.3 });
-    swHigh.updateOperatingPoint!(voltagesHigh);
-    const solverHigh = makeMockSolver();
-    swHigh.stampNonlinear!(solverHigh);
-    const callsHigh = (solverHigh.stamp as ReturnType<typeof vi.fn>).mock.calls as number[][];
+    const { solver: solverHigh, stamps: stampsHigh } = makeSwitchCaptureSolver();
+    swHigh.load(makeSwitchParityCtx(voltagesHigh, solverHigh));
 
     // COM(2)-NO(3) diagonal: stamp(1, 1, G_NO) — nCom-1=1
-    const diagComHigh = callsHigh.find((c) => c[0] === 1 && c[1] === 1);
+    const diagComHigh = stampsHigh.find((s) => s.row === 1 && s.col === 1);
     expect(diagComHigh).toBeDefined();
     // Total conductance on COM diagonal = G_NO + G_NC; NO dominates when ctrl is high
     // We check that total conductance ≈ G_NO (G_NC is tiny)
     // Instead, check off-diagonal COM-NO entry for conductance
-    const offComNoHigh = callsHigh.find((c) => c[0] === 1 && c[1] === 2);
+    const offComNoHigh = stampsHigh.find((s) => s.row === 1 && s.col === 2);
     expect(offComNoHigh).toBeDefined();
-    const gNO_high = -offComNoHigh![2];
+    const gNO_high = -offComNoHigh!.value;
     expect(1 / gNO_high).toBeCloseTo(rOn, 0); // NO resistance ≈ R_on
 
-    const offComNcHigh = callsHigh.find((c) => c[0] === 1 && c[1] === 3);
+    const offComNcHigh = stampsHigh.find((s) => s.row === 1 && s.col === 3);
     expect(offComNcHigh).toBeDefined();
-    const gNC_high = -offComNcHigh![2];
+    const gNC_high = -offComNcHigh!.value;
     expect(1 / gNC_high).toBeCloseTo(rOff, -3); // NC resistance ≈ R_off
 
     // Low control: NO open, NC closed
     const voltagesLow = makeVoltages(4, { 1: 0 });
-    swLow.updateOperatingPoint!(voltagesLow);
-    const solverLow = makeMockSolver();
-    swLow.stampNonlinear!(solverLow);
-    const callsLow = (solverLow.stamp as ReturnType<typeof vi.fn>).mock.calls as number[][];
+    const { solver: solverLow, stamps: stampsLow } = makeSwitchCaptureSolver();
+    swLow.load(makeSwitchParityCtx(voltagesLow, solverLow));
 
-    const offComNoLow = callsLow.find((c) => c[0] === 1 && c[1] === 2);
+    const offComNoLow = stampsLow.find((s) => s.row === 1 && s.col === 2);
     expect(offComNoLow).toBeDefined();
-    const gNO_low = -offComNoLow![2];
+    const gNO_low = -offComNoLow!.value;
     expect(1 / gNO_low).toBeCloseTo(rOff, -3); // NO resistance ≈ R_off
 
-    const offComNcLow = callsLow.find((c) => c[0] === 1 && c[1] === 3);
+    const offComNcLow = stampsLow.find((s) => s.row === 1 && s.col === 3);
     expect(offComNcLow).toBeDefined();
-    const gNC_low = -offComNcLow![2];
+    const gNC_low = -offComNcLow!.value;
     expect(1 / gNC_low).toBeCloseTo(rOn, 0); // NC resistance ≈ R_on
   });
 
@@ -326,22 +308,20 @@ describe("SPDT", () => {
     const sw = makeSPDT(1, 2, 3, 4, { rOn, rOff, threshold: vTh, transitionSharpness: 20 });
 
     const voltages = makeVoltages(4, { 1: vTh });
-    sw.updateOperatingPoint!(voltages);
-    const solver = makeMockSolver();
-    sw.stampNonlinear!(solver);
-    const calls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls as number[][];
+    const { solver, stamps } = makeSwitchCaptureSolver();
+    sw.load(makeSwitchParityCtx(voltages, solver));
 
     // At threshold: tanh(0) = 0, so both paths get R = R_off - (R_off-R_on)*0.5 = midpoint
     const midR = rOff - (rOff - rOn) * 0.5;
 
-    const offComNo = calls.find((c) => c[0] === 1 && c[1] === 2);
+    const offComNo = stamps.find((s) => s.row === 1 && s.col === 2);
     expect(offComNo).toBeDefined();
-    const rNO = -1 / offComNo![2];
+    const rNO = -1 / offComNo!.value;
     expect(rNO).toBeCloseTo(midR, -3);
 
-    const offComNc = calls.find((c) => c[0] === 1 && c[1] === 3);
+    const offComNc = stamps.find((s) => s.row === 1 && s.col === 3);
     expect(offComNc).toBeDefined();
-    const rNC = -1 / offComNc![2];
+    const rNC = -1 / offComNc!.value;
     expect(rNC).toBeCloseTo(midR, -3);
 
     // Both paths at mid-R → neither is fully on (R_on=10) simultaneously

@@ -22,6 +22,76 @@ import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { LoadContext, InitMode } from "../../../solver/analog/load-context.js";
+
+// ---------------------------------------------------------------------------
+// companionLoadCtx — build a transient LoadContext matching the ag[] that
+// computeNIcomCof would emit for (dt, method, order), then call element.load(ctx).
+// Replaces the deleted stampCompanion(dt, method, voltages, order, deltaOld).
+// ---------------------------------------------------------------------------
+
+function companionAg(dt: number, method: string, order: number): Float64Array {
+  const ag = new Float64Array(8);
+  if (method === "trapezoidal") {
+    if (order === 1) {
+      ag[0] = 1 / dt;
+      ag[1] = -1 / dt;
+    } else {
+      const xmu = 0.5;
+      ag[0] = 1.0 / dt / (1.0 - xmu);
+      ag[1] = xmu / (1 - xmu);
+    }
+  } else if (method === "bdf2") {
+    // Equal-step case (deltaOld[1] = dt): ag[0] = 3/(2*dt), ag[1] = -2/dt, ag[2] = 1/(2*dt)
+    const r2 = 2;
+    const u22 = r2 * (r2 - 1);
+    const rhs2 = 1 / dt;
+    const ag2 = rhs2 / u22;
+    ag[1] = (-1 / dt - r2 * ag2);
+    ag[0] = -(ag[1] + ag2);
+    ag[2] = ag2;
+  } else {
+    // BDF-1
+    ag[0] = 1 / dt;
+    ag[1] = -1 / dt;
+  }
+  return ag;
+}
+
+function makeCompanionCtx(opts: {
+  solver: SparseSolverType;
+  voltages: Float64Array;
+  dt: number;
+  method: string;
+  order: number;
+  initMode?: InitMode;
+  uic?: boolean;
+}): LoadContext {
+  return {
+    solver: opts.solver,
+    voltages: opts.voltages,
+    iteration: 0,
+    // Default to initFloat so q1 stays at pool default (0) on first call —
+    // matches the pre-migration stampCompanion(dt, method, voltages, ...) behaviour
+    // where the seed logic was invoked by the engine, not the unit-test driver.
+    initMode: opts.initMode ?? "initFloat",
+    dt: opts.dt,
+    method: (opts.method === "bdf1" ? "trapezoidal" : opts.method) as LoadContext["method"],
+    order: opts.order,
+    deltaOld: [opts.dt, opts.dt, opts.dt, opts.dt, opts.dt, opts.dt, opts.dt],
+    ag: companionAg(opts.dt, opts.method, opts.order),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: true,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: opts.uic ?? false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -91,12 +161,11 @@ describe("Capacitor", () => {
 
       // voltages[0] = V(node1) = 5V, voltages[1] = V(node2) = 0V
       const voltages = new Float64Array([5, 0]);
-      analogElement.stampCompanion!(1e-6, "trapezoidal", voltages, 2, [1e-6, 1e-6]);
 
-      // For trapezoidal: geq = 2C/h = 2 * 1e-6 / 1e-6 = 2.0
+      // For trapezoidal order 2: geq = 2C/h = 2 * 1e-6 / 1e-6 = 2.0
       const { solver, stamps } = makeCaptureSolver();
-      const ctx = makeSimpleCtx({ elements: [analogElement], matrixSize: 2, nodeCount: 2, solver });
-      analogElement.load(ctx.loadCtx);
+      const ctx = makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "trapezoidal", order: 2 });
+      analogElement.load(ctx);
 
       const geqStamps = stamps.filter((s) => s[2] > 0);
       expect(geqStamps.length).toBe(2); // diagonal entries
@@ -112,12 +181,11 @@ describe("Capacitor", () => {
       const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
       const voltages = new Float64Array([5, 0]);
-      analogElement.stampCompanion!(1e-6, "bdf1", voltages, 1, [1e-6]);
 
       // For BDF-1: geq = C/h = 1e-6 / 1e-6 = 1.0
       const { solver, stamps } = makeCaptureSolver();
-      const ctx = makeSimpleCtx({ elements: [analogElement], matrixSize: 2, nodeCount: 2, solver });
-      analogElement.load(ctx.loadCtx);
+      const ctx = makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "bdf1", order: 1 });
+      analogElement.load(ctx);
 
       const geqStamps = stamps.filter((s) => s[2] > 0);
       expect(geqStamps[0][2]).toBeCloseTo(1.0, 5);
@@ -132,12 +200,11 @@ describe("Capacitor", () => {
       const analogElement = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
       const voltages = new Float64Array([5, 0]);
-      analogElement.stampCompanion!(1e-6, "bdf2", voltages, 2, [1e-6, 1e-6]);
 
       // For BDF-2: geq = 3C/(2h) = 3 * 1e-6 / (2 * 1e-6) = 1.5
       const { solver, stamps } = makeCaptureSolver();
-      const ctx = makeSimpleCtx({ elements: [analogElement], matrixSize: 2, nodeCount: 2, solver });
-      analogElement.load(ctx.loadCtx);
+      const ctx = makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "bdf2", order: 2 });
+      analogElement.load(ctx);
 
       const geqStamps = stamps.filter((s) => s[2] > 0);
       expect(geqStamps[0][2]).toBeCloseTo(1.5, 5);
@@ -221,7 +288,8 @@ describe("Capacitor", () => {
       const { element, pool } = withState(core);
 
       const voltages = new Float64Array([5, 0]);
-      element.stampCompanion!(1e-6, "bdf1", voltages, 1, [1e-6]);
+      const { solver } = makeCaptureSolver();
+      element.load(makeCompanionCtx({ solver, voltages, dt: 1e-6, method: "bdf1", order: 1 }));
 
       // slot 0 = GEQ = C/h = 1e-6 / 1e-6 = 1.0
       expect(pool.state0[0]).toBeCloseTo(1.0, 5);
@@ -241,11 +309,17 @@ describe("Capacitor", () => {
       const { element, pool } = withState(core);
 
       // First call: voltage = 3V
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]), 1, [1e-6]);
+      {
+        const { solver } = makeCaptureSolver();
+        element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
+      }
       expect(pool.state0[2]).toBeCloseTo(3.0, 5);
 
       // Second call: voltage = 7V — V_PREV should now be 7V after the call
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]), 1, [1e-6]);
+      {
+        const { solver } = makeCaptureSolver();
+        element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
+      }
       expect(pool.state0[2]).toBeCloseTo(7.0, 5);
     });
 
@@ -258,10 +332,11 @@ describe("Capacitor", () => {
       Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
       const { element, pool } = withState(core);
 
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([5, 0]), 1, [1e-6]);
+      const { solver } = makeCaptureSolver();
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
       pool.rotateStateVectors();
       pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]), 1, [1e-6]);
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
 
       const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
       const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "bdf1", lteParams);
@@ -279,11 +354,12 @@ describe("Capacitor", () => {
       const { element, pool } = withState(core);
 
       // First call: v1 = 3V — rotate pool so v=3 lands in s1
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]), 1, [1e-6]);
+      const { solver } = makeCaptureSolver();
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
       pool.rotateStateVectors();
       pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       // Second call: v2 = 7V
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]), 1, [1e-6]);
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
 
       const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
       const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "bdf1", lteParams);
@@ -302,11 +378,12 @@ describe("Capacitor", () => {
       const { element, pool } = withState(core);
 
       // First call: v1 = 5V (non-zero) — rotate so v=5 lands in s1
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([5, 0]), 1, [1e-6]);
+      const { solver } = makeCaptureSolver();
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
       pool.rotateStateVectors();
       pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       // Second call: v2 = 0V (zero crossing)
-      element.stampCompanion!(1e-6, "bdf1", new Float64Array([0, 0]), 1, [1e-6]);
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([0, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
 
       const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
       const result = element.getLteTimestep!(1e-6, [1e-6, 1e-6], 1, "bdf1", lteParams);
@@ -334,14 +411,18 @@ describe("Capacitor initPred", () => {
     const { element, pool } = withState(core);
 
     // First step: v=3V, accepted — charge C*3 lands in s1 after rotateStateVectors
-    element.stampCompanion!(1e-6, "bdf1", new Float64Array([3, 0]), 1, [1e-6]);
+    const { solver } = makeCaptureSolver();
+    element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
     pool.rotateStateVectors();
     pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
 
     // Second step: initPred mode, v=7V (different voltage)
     // q0 should use s1[SLOT_Q] = C*3 = 3µC, NOT C*7 = 7µC
     pool.initMode = "initPred";
-    element.stampCompanion!(1e-6, "bdf1", new Float64Array([7, 0]), 1, [1e-6]);
+    element.load(makeCompanionCtx({
+      solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1,
+      initMode: "initPred",
+    }));
 
     // GEQ = C/dt regardless of q0
     const geq = pool.states[0][0]; // SLOT_GEQ
@@ -377,7 +458,13 @@ describe("Capacitor initPred", () => {
     pool.initMode = "initTran";
     (pool as any).uic = true;
     // Node voltage is 2V (different from IC=5V)
-    element.stampCompanion!(1e-6, "bdf1", new Float64Array([2, 0]), 1, [1e-6]);
+    {
+      const { solver } = makeCaptureSolver();
+      element.load(makeCompanionCtx({
+        solver, voltages: new Float64Array([2, 0]), dt: 1e-6, method: "bdf1", order: 1,
+        initMode: "initTran", uic: true,
+      }));
+    }
 
     // GEQ = C/dt = 1e-6/1e-6 = 1
     const geq = pool.states[0][0];
@@ -563,5 +650,195 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
 
     const actualCcap = (re as unknown as { s0: Float64Array }).s0[base + SLOT_CCAP_CAP];
     expect(actualCcap).toBe(expectedCcap);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C4.2 — Capacitor transient parity (10-step RC circuit)
+// ---------------------------------------------------------------------------
+//
+// Circuit: V_src=1V (node 1 → gnd) — R=1000Ω (node 1 → node 2) — C=1µF (node 2 → gnd)
+// Integration: BDF-1 / trapezoidal order=1, fixed dt=1e-6 s, 10 steps.
+//
+// ngspice reference (capload.c:58, niinteg.c:28-63, BDF-1 case):
+//   q0   = C * vcap                              (capload.c:58)
+//   ccap = ag[0]*q0 + ag[1]*q1                  (niinteg.c BDF-1: ag[0]=1/dt, ag[1]=-1/dt)
+//   geq  = ag[0] * C                             (niinteg.c:77)
+//   ceq  = ccap - ag[0]*q0 = ag[1]*q1 = -(C/dt)*v_prev   (niinteg.c:78)
+//
+// Reference values computed from the exact same floating-point operations:
+//   v2[k] = (geq*v2[k-1] + G_R*Vsrc) / (G_R + geq)
+//
+// ngspice source → our variable mapping:
+//   capload.c:CAPload::cstate0[CAPqcap]   → s0[SLOT_Q]
+//   niinteg.c:NIintegrate::ccap           → s0[SLOT_CCAP]
+//   niinteg.c:NIintegrate::ag[0]          → ctx.ag[0] = 1/dt
+//   niinteg.c:NIintegrate::ag[1]          → ctx.ag[1] = -1/dt
+//   capload.c:CAPload::geq                → s0[SLOT_GEQ]
+//   capload.c:CAPload::ceq                → s0[SLOT_IEQ]
+
+// ---------------------------------------------------------------------------
+// C4.2 — Capacitor transient parity (10-step RC circuit)
+// ---------------------------------------------------------------------------
+//
+// Circuit: V_src=1V (node 1 → gnd) — R=1000Ω (node 1 → node 2) — C=1µF (node 2 → gnd)
+// Integration: BDF-1 / trapezoidal order=1, fixed dt=1e-6 s, 10 steps.
+//
+// ngspice reference (capload.c:58, niinteg.c:28-63, BDF-1 case):
+//   q0   = C * vcap                             (capload.c:58)
+//   ccap = ag[0]*q0 + ag[1]*q1                 (niinteg.c BDF-1: ag[0]=1/dt, ag[1]=-1/dt)
+//   geq  = ag[0] * C                            (niinteg.c:77)
+//   ceq  = ccap - ag[0]*q0 = ag[1]*q1          (niinteg.c:78 → -(C/dt)*v_prev)
+//
+// Stamp convention (capload.c:74-79):
+//   G[n+,n+] += geq, G[n-,n-] += geq, G[n+,n-] -= geq, G[n-,n+] -= geq
+//   RHS[n+]  -= ceq, RHS[n-]  += ceq
+//
+// Node voltage update formula (KCL at node 2, v1=Vsrc fixed):
+//   G_R*(Vsrc - v2) - ceq = geq*v2
+//   v2_new = (G_R*Vsrc - ceq) / (G_R + geq)
+//   ceq    = ag[1]*C*v2_prev  (BDF-1)
+//
+// ngspice source → our variable mapping:
+//   capload.c:CAPload::cstate0[CAPqcap]  → s0[SLOT_Q]   = C*vcap
+//   niinteg.c:NIintegrate::ccap          → s0[SLOT_CCAP] = ag[0]*q0+ag[1]*q1
+//   niinteg.c:NIintegrate::ag[0]         → ctx.ag[0]     = 1/dt
+//   niinteg.c:NIintegrate::ag[1]         → ctx.ag[1]     = -1/dt
+//   capload.c:CAPload::geq               → s0[SLOT_GEQ]  = ag[0]*C
+//   capload.c:CAPload::ceq               → s0[SLOT_IEQ]  = ag[1]*q_prev
+
+describe("capacitor_load_transient_parity (C4.2)", () => {
+  it("capacitor_load_transient_parity", () => {
+    const C_val  = 1e-6;   // 1 µF
+    const R_val  = 1000;   // 1 kΩ
+    const Vsrc   = 1.0;    // step voltage (V)
+    const dt     = 1e-6;   // timestep (s)
+    const order  = 1;
+    const method = "trapezoidal" as const;
+
+    // ngspice niinteg.c BDF-1 coefficients: ag[0]=1/dt, ag[1]=-1/dt
+    const ag0 = 1 / dt;
+    const ag1 = -1 / dt;
+    // geq = ag[0]*C  (niinteg.c:77) — bit-exact reference constant
+    const geq = ag0 * C_val;
+    const G_R = 1 / R_val;
+
+    // Element setup: cap between node 2 (pos) and gnd (0), pinNodeIds=[2,0]
+    const props = new PropertyBag();
+    props.setModelParam("capacitance", C_val);
+    const element = makeCapacitorElement(new Map([["pos", 2], ["neg", 0]]), props);
+
+    const ag = new Float64Array(8);
+    ag[0] = ag0;
+    ag[1] = ag1;
+
+    // Reusable capture solver — handles are allocated once and reused across steps,
+    // matching the element's internal _handlesInit caching pattern.
+    const handles: { row: number; col: number }[] = [];
+    const handleIndex = new Map<string, number>();
+    const matValues: number[] = [];
+    const rhsEntries: [number, number][] = [];
+
+    const solver = {
+      allocElement: (row: number, col: number): number => {
+        const key = `${row},${col}`;
+        let h = handleIndex.get(key);
+        if (h === undefined) {
+          h = handles.length;
+          handles.push({ row, col });
+          handleIndex.set(key, h);
+          matValues.push(0);
+        }
+        return h;
+      },
+      stampElement: (h: number, v: number): void => { matValues[h] += v; },
+      stampRHS: (row: number, v: number): void => { rhsEntries.push([row, v]); },
+    } as unknown as SparseSolverType;
+
+    // Compute bit-exact reference sequence using the same BDF-1 arithmetic.
+    // v2[k] = (G_R*Vsrc - ceq[k]) / (G_R + geq), where ceq[k] = ag[1]*C*v2[k-1]
+    const refV2: number[] = [];
+    let v2_ref = 0;
+    for (let k = 0; k < 10; k++) {
+      const ceq_k = ag1 * C_val * v2_ref;          // ag[1]*q_prev = -(C/dt)*v_prev
+      v2_ref = (G_R * Vsrc - ceq_k) / (G_R + geq);
+      refV2.push(v2_ref);
+    }
+
+    const poolEl = element as unknown as {
+      s0: Float64Array; s1: Float64Array; stateBaseOffset: number;
+    };
+
+    // 10-step transient loop
+    let v2 = 0;  // accepted node-2 voltage from previous step
+    for (let step = 0; step < 10; step++) {
+      matValues.fill(0);
+      rhsEntries.length = 0;
+
+      const ctx: LoadContext = {
+        solver,
+        voltages: new Float64Array([Vsrc, v2, 0]),
+        iteration: 0,
+        initMode: step === 0 ? "initTran" : "transient",
+        dt,
+        method,
+        order,
+        deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+        ag,
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        isDcOp: false,
+        isTransient: true,
+        xfact: 1,
+        gmin: 1e-12,
+        uic: false,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+      };
+
+      element.load(ctx);
+
+      // Assert per-step integration constants (spec: assert dt, order, method)
+      expect(ctx.dt).toBe(dt);
+      expect(ctx.order).toBe(order);
+      expect(ctx.method).toBe(method);
+
+      // Rotate state: s1 ← s0 (simulates pool.rotateStateVectors for single element)
+      poolEl.s1.set(poolEl.s0);
+
+      // Advance to next accepted voltage (reference value for next step input)
+      v2 = refV2[step];
+    }
+
+    // After 10 accepted steps: assert companion state from the last load() call.
+    // State tracking:
+    //   step k feeds voltages[1] = refV2[k-1] (the accepted voltage from step k-1).
+    //   load() computes q0 = C*refV2[k-1], stores in s0[SLOT_Q].
+    //   Then we rotate: s1 ← s0.  So at step k, s1[SLOT_Q] = C*refV2[k-2].
+    //   ceq = ag[1]*q1 = ag[1]*C*refV2[k-2].
+    //   Exception: step 0 uses initTran which seeds s1 from s0 inside load() itself,
+    //   and step 1 feeds v2=refV2[0] with s1[SLOT_Q] = C*0 (initial seed).
+    //
+    // At step 9 (the 10th step, 0-indexed): voltages[1] = refV2[8].
+    // s1[SLOT_Q] was set from the step-8 rotation: s1[SLOT_Q] = C*refV2[7].
+    // ceq_step9 = ag[1]*C*refV2[7].
+    const SLOT_GEQ_F = 0;  // SLOT_GEQ = 0 in CAPACITOR_SCHEMA
+    const SLOT_IEQ_F = 1;  // SLOT_IEQ = 1 in CAPACITOR_SCHEMA
+    const base = poolEl.stateBaseOffset;
+
+    // geq = ag[0]*C — bit-exact (niinteg.c:77)
+    expect(poolEl.s0[base + SLOT_GEQ_F]).toBe(geq);
+
+    // ceq at step 9 (last, 0-indexed) = ag[1]*C * refV2[7]
+    // (s1[SLOT_Q] contains C*refV2[7] after the step-8 rotation)
+    const ceq_last = ag1 * C_val * refV2[7];
+    expect(poolEl.s0[base + SLOT_IEQ_F]).toBe(ceq_last);
+
+    // Post-step node 2 voltage (v2 after step 9): refV2[9] bit-exact reference.
+    // The element was fed voltages[1]=refV2[8] at step 9.
+    // v_cap stored in s0[SLOT_V] = refV2[8] (the input vcap for step 9).
+    const SLOT_V_F = 2;  // SLOT_V = 2 in CAPACITOR_SCHEMA
+    expect(poolEl.s0[base + SLOT_V_F]).toBe(refV2[8]);
   });
 });

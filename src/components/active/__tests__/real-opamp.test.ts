@@ -13,7 +13,8 @@
 import { describe, it, expect } from "vitest";
 import { RealOpAmpDefinition, createRealOpAmpElement, REAL_OPAMP_MODELS } from "../real-opamp.js";
 import { PropertyBag } from "../../../core/properties.js";
-import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { newtonRaphson } from "../../../solver/analog/newton-raphson.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 
 // ---------------------------------------------------------------------------
@@ -152,7 +153,8 @@ function solveDC(elements: AnalogElement[], matrixSize: number, nodeCount: numbe
 
 // ---------------------------------------------------------------------------
 // Run transient simulation starting from zero initial conditions.
-// Each step: call stampCompanion on reactive elements, then solve.
+// Each step: build a transient ctx with BDF-1 coefficients, run NR, then
+// invoke accept(ctx) on reactive elements to advance their companion state.
 // Returns the output voltage time series at the given output node (1-based).
 // The first value in the array is the output after step 1 (not DC).
 // ---------------------------------------------------------------------------
@@ -164,22 +166,26 @@ function runTransient(
   dt: number,
   outputNode: number,
 ): Float64Array {
-  const voltages = new Float64Array(matrixSize);
   const vOut = new Float64Array(nSteps);
+  const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount });
+  // Configure the ctx for transient stepping: BDF-1 trapezoidal, dt, ag coefficients.
+  ctx.isDcOp = false;
+  ctx.isTransient = true;
+  ctx.dt = dt;
+  ctx.ag[0] = 1 / dt;
+  ctx.ag[1] = -1 / dt;
 
   for (let i = 0; i < nSteps; i++) {
-    // Stamp companion models for reactive elements using previous voltages
+    newtonRaphson(ctx);
+    const nodeVoltages = ctx.nrResult.nodeVoltages;
+    vOut[i] = nodeVoltages[outputNode - 1];
+    // Advance reactive element companion state for next step.
+    const simTime = (i + 1) * dt;
     for (const el of elements) {
-      if (el.isReactive && el.stampCompanion) {
-        el.stampCompanion(dt, "bdf1", voltages);
+      if (el.isReactive) {
+        el.accept?.(ctx, simTime, () => {});
       }
     }
-
-    // NR solve for this timestep
-    const result = runDcOp({ elements, matrixSize, nodeCount });
-
-    voltages.set(result.nodeVoltages);
-    vOut[i] = voltages[outputNode - 1];
   }
 
   return vOut;
@@ -504,8 +510,8 @@ describe("CurrentLimit", () => {
 
     const vOut = result.nodeVoltages[nOut - 1];
     // With high open-loop gain and feedback, the output drives through R_out.
-    // The RealOpAmp model clamps output current to ±I_max in its stampNonlinear
-    // method when saturated. With 10Ω load and V_in=10V, verify output is within rails.
+    // The RealOpAmp model clamps output current to ±I_max inside load(ctx)
+    // when saturated. With 10Ω load and V_in=10V, verify output is within rails.
     const vRailPos = 15 - 1.5; // V_supply - V_sat
     expect(Math.abs(vOut)).toBeLessThanOrEqual(vRailPos + 0.1);
   });

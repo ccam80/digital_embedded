@@ -9,15 +9,14 @@
  *   Hysteresis::noisy_sine_clean_square            — noisy sine produces exactly 10 transitions in 5ms
  *   Transfer::plot_matches_hysteresis_loop         — sweep up then down shows rectangular hysteresis loop
  *
- * Testing approach: since the Schmitt trigger's output is determined by
- * updateOperatingPoint() reading the current input voltage, and the input
- * is driven by an ideal voltage source, we drive updateOperatingPoint()
- * directly with a synthetic voltage vector and observe the output by reading
- * the stamp calls to a mock solver. This avoids full transient MNA overhead
- * while exercising the exact production code path.
+ * Testing approach: the Schmitt trigger's output is determined by load() reading
+ * the current input voltage from ctx.voltages. We drive load(ctx) directly with
+ * a synthetic voltage vector and observe the output by capturing the RHS stamps
+ * emitted into a recording solver. This avoids full transient MNA overhead while
+ * exercising the exact production code path.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   SchmittInvertingDefinition,
   SchmittNonInvertingDefinition,
@@ -25,6 +24,7 @@ import {
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -40,11 +40,60 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeMockSolver() {
-  return {
-    stamp: vi.fn(),
-    stampRHS: vi.fn(),
+/**
+ * Recording solver that implements the public allocElement / stampElement /
+ * stampRHS surface that AnalogElement.load() calls. Accumulates RHS entries
+ * per row so tests can read the total Norton-equivalent stamp.
+ */
+interface RecordingSolverResult {
+  solver: SparseSolverType;
+  rhs: Map<number, number>;
+}
+function makeRecordingSolver(): RecordingSolverResult {
+  const rhs = new Map<number, number>();
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (_handle: number, _value: number): void => {},
+    stampRHS: (row: number, value: number): void => {
+      rhs.set(row, (rhs.get(row) ?? 0) + value);
+    },
   } as unknown as SparseSolverType;
+  return { solver, rhs };
+}
+
+function makeSchmittLoadCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
 }
 
 const MODEL_PARAM_KEYS = new Set(["vTH", "vTL", "vOH", "vOL", "rOut"]);
@@ -99,30 +148,32 @@ function makeSchmittNonInverting(
   ) as unknown as AnalogElement;
 }
 
-function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float64Array {
-  const v = new Float64Array(size);
-  for (const [node, voltage] of Object.entries(nodeVoltages)) {
-    const n = parseInt(node);
-    if (n > 0 && n <= size) v[n - 1] = voltage;
-  }
-  return v;
-}
-
 /**
- * Read the current target output voltage from the Schmitt trigger by observing
- * the RHS stamp placed by stampNonlinear (Norton current = V_target / R_out).
+ * Drive an input voltage into the Schmitt trigger via load(ctx) and read back
+ * the target output voltage implied by the Norton RHS stamp on nOut.
  *
- * The Norton equivalent stamps: RHS[nOut-1] += V_target * G_out
- * So V_target = RHS_value / G_out.
+ * load() stamps RHS[nOut-1] += V_target * G_out, so V_target = RHS / G_out.
+ *
+ * Also updates the trigger's internal hysteresis state machine (_outputHigh),
+ * which load() runs on every iteration using ctx.voltages as the input.
  */
-function readOutputVoltage(element: AnalogElement, nOut: number, rOut: number): number {
-  const solver = makeMockSolver();
-  element.stampNonlinear!(solver);
-  const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls as number[][];
-  const outRhs = rhsCalls.find((c) => c[0] === nOut - 1);
-  if (!outRhs) return 0;
+function driveAndReadOutput(
+  element: AnalogElement,
+  vIn: number,
+  nIn: number,
+  nOut: number,
+  rOut: number,
+): number {
+  const size = Math.max(nIn, nOut);
+  const voltages = new Float64Array(size);
+  if (nIn > 0) voltages[nIn - 1] = vIn;
+  const { solver, rhs } = makeRecordingSolver();
+  const ctx = makeSchmittLoadCtx(voltages, solver);
+  element.load(ctx);
+  const outRhs = rhs.get(nOut - 1);
+  if (outRhs === undefined) return 0;
   const gOut = 1 / rOut;
-  return outRhs[1] / gOut;
+  return outRhs / gOut;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,20 +189,14 @@ describe("Inverting", () => {
     const st = makeSchmittInverting(nIn, nOut, { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut });
 
     // Initial state: output HIGH (inverting, input starts low → _outputHigh=false → drive HIGH)
-    const vInit = makeVoltages(2, { 1: 0.0 });
-    st.updateOperatingPoint!(vInit);
-    const vOutInit = readOutputVoltage(st, nOut, rOut);
+    const vOutInit = driveAndReadOutput(st, 0.0, nIn, nOut, rOut);
     expect(vOutInit).toBeCloseTo(3.3, 1); // initial: output HIGH
 
     // Drive input just below threshold — no switch
-    const vBelowTH = makeVoltages(2, { 1: 1.9 });
-    st.updateOperatingPoint!(vBelowTH);
-    expect(readOutputVoltage(st, nOut, rOut)).toBeCloseTo(3.3, 1);
+    expect(driveAndReadOutput(st, 1.9, nIn, nOut, rOut)).toBeCloseTo(3.3, 1);
 
     // Drive input above threshold → output switches LOW
-    const vAboveTH = makeVoltages(2, { 1: 2.1 });
-    st.updateOperatingPoint!(vAboveTH);
-    expect(readOutputVoltage(st, nOut, rOut)).toBeCloseTo(0.0, 1);
+    expect(driveAndReadOutput(st, 2.1, nIn, nOut, rOut)).toBeCloseTo(0.0, 1);
   });
 
   it("switches_high_on_falling_threshold", () => {
@@ -162,19 +207,13 @@ describe("Inverting", () => {
     const st = makeSchmittInverting(nIn, nOut, { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut });
 
     // Force output to LOW by driving input above V_TH
-    const vHigh = makeVoltages(2, { 1: 2.5 });
-    st.updateOperatingPoint!(vHigh);
-    expect(readOutputVoltage(st, nOut, rOut)).toBeCloseTo(0.0, 1); // output LOW
+    expect(driveAndReadOutput(st, 2.5, nIn, nOut, rOut)).toBeCloseTo(0.0, 1); // output LOW
 
     // Drive input just above V_TL — no switch yet
-    const vAboveTL = makeVoltages(2, { 1: 1.1 });
-    st.updateOperatingPoint!(vAboveTL);
-    expect(readOutputVoltage(st, nOut, rOut)).toBeCloseTo(0.0, 1); // still LOW
+    expect(driveAndReadOutput(st, 1.1, nIn, nOut, rOut)).toBeCloseTo(0.0, 1); // still LOW
 
     // Drive input below V_TL → output switches HIGH
-    const vBelowTL = makeVoltages(2, { 1: 0.9 });
-    st.updateOperatingPoint!(vBelowTL);
-    expect(readOutputVoltage(st, nOut, rOut)).toBeCloseTo(3.3, 1);
+    expect(driveAndReadOutput(st, 0.9, nIn, nOut, rOut)).toBeCloseTo(3.3, 1);
   });
 
   it("hysteresis_prevents_oscillation", () => {
@@ -186,15 +225,13 @@ describe("Inverting", () => {
     const st = makeSchmittInverting(nIn, nOut, { vTH, vTL, vOH: 3.3, vOL: 0.0, rOut });
 
     // Start with input low → output HIGH
-    st.updateOperatingPoint!(makeVoltages(2, { 1: 0.0 }));
-    const initialOut = readOutputVoltage(st, nOut, rOut);
+    const initialOut = driveAndReadOutput(st, 0.0, nIn, nOut, rOut);
     expect(initialOut).toBeCloseTo(3.3, 1);
 
     // Oscillate input within hysteresis band (V_TL + ε to V_TH - ε)
     const inBandValues = [1.2, 1.5, 1.8, 1.6, 1.3, 1.7, 1.4, 1.9, 1.1, 1.8];
     for (const v of inBandValues) {
-      st.updateOperatingPoint!(makeVoltages(2, { 1: v }));
-      const out = readOutputVoltage(st, nOut, rOut);
+      const out = driveAndReadOutput(st, v, nIn, nOut, rOut);
       // Output must not change — still HIGH
       expect(out).toBeCloseTo(3.3, 1);
     }
@@ -213,16 +250,13 @@ describe("NonInverting", () => {
     const st = makeSchmittNonInverting(nIn, nOut, { vTH: 2.0, vTL: 1.0, vOH: 3.3, vOL: 0.0, rOut });
 
     // Initial: output LOW (starts low)
-    st.updateOperatingPoint!(makeVoltages(2, { 1: 0.5 }));
-    expect(readOutputVoltage(st, nOut, rOut)).toBeCloseTo(0.0, 1);
+    expect(driveAndReadOutput(st, 0.5, nIn, nOut, rOut)).toBeCloseTo(0.0, 1);
 
     // Drive input above V_TH → output HIGH
-    st.updateOperatingPoint!(makeVoltages(2, { 1: 2.5 }));
-    expect(readOutputVoltage(st, nOut, rOut)).toBeCloseTo(3.3, 1);
+    expect(driveAndReadOutput(st, 2.5, nIn, nOut, rOut)).toBeCloseTo(3.3, 1);
 
     // Drive input back below V_TL → output LOW
-    st.updateOperatingPoint!(makeVoltages(2, { 1: 0.5 }));
-    expect(readOutputVoltage(st, nOut, rOut)).toBeCloseTo(0.0, 1);
+    expect(driveAndReadOutput(st, 0.5, nIn, nOut, rOut)).toBeCloseTo(0.0, 1);
   });
 });
 
@@ -267,11 +301,9 @@ describe("Hysteresis", () => {
     }
 
     let transitions = 0;
-    let prevOut = readOutputVoltage(st, nOut, rOut);
     // Initialise with first sample
     const firstV = offset + amplitude * Math.sin(0) + noiseSd * gaussianNoise();
-    st.updateOperatingPoint!(makeVoltages(2, { 1: firstV }));
-    prevOut = readOutputVoltage(st, nOut, rOut);
+    let prevOut = driveAndReadOutput(st, firstV, nIn, nOut, rOut);
 
     for (let i = 1; i <= numSamples; i++) {
       const t = (i / numSamples) * totalTime;
@@ -279,8 +311,7 @@ describe("Hysteresis", () => {
       const noise = noiseSd * gaussianNoise();
       const vIn = vSine + noise;
 
-      st.updateOperatingPoint!(makeVoltages(2, { 1: vIn }));
-      const vOut = readOutputVoltage(st, nOut, rOut);
+      const vOut = driveAndReadOutput(st, vIn, nIn, nOut, rOut);
 
       if (Math.abs(vOut - prevOut) > 0.5) {
         transitions++;
@@ -312,14 +343,13 @@ describe("Transfer", () => {
     });
 
     // Start at 0V: output LOW
-    st.updateOperatingPoint!(makeVoltages(2, { 1: 0.0 }));
+    driveAndReadOutput(st, 0.0, nIn, nOut, rOut);
 
     // Rising sweep: 0 → 3.3V in 0.1V steps
     let risingTransitionAt: number | null = null;
     for (let i = 0; i <= 33; i++) {
       const vIn = (i / 33) * 3.3;
-      st.updateOperatingPoint!(makeVoltages(2, { 1: vIn }));
-      const vOut = readOutputVoltage(st, nOut, rOut);
+      const vOut = driveAndReadOutput(st, vIn, nIn, nOut, rOut);
       if (risingTransitionAt === null && vOut > 1.65) {
         // Output switched HIGH — record the input voltage
         risingTransitionAt = vIn;
@@ -335,8 +365,7 @@ describe("Transfer", () => {
     let fallingTransitionAt: number | null = null;
     for (let i = 33; i >= 0; i--) {
       const vIn = (i / 33) * 3.3;
-      st.updateOperatingPoint!(makeVoltages(2, { 1: vIn }));
-      const vOut = readOutputVoltage(st, nOut, rOut);
+      const vOut = driveAndReadOutput(st, vIn, nIn, nOut, rOut);
       if (fallingTransitionAt === null && vOut < 1.65) {
         fallingTransitionAt = vIn;
       }
@@ -367,8 +396,6 @@ describe("Transfer", () => {
 //              → stamps 1/rOut on nOut diag + vOL·(1/rOut) on nOut RHS
 //     (outputSpec.rOut = max(p.rOut, 1e-9); p.rOut defaults to 50)
 //   Input is below vTH and output starts low → no state change → stays low.
-
-import type { LoadContext } from "../../../solver/analog/load-context.js";
 
 interface SchmittCaptureStamp { row: number; col: number; value: number; }
 function makeSchmittCaptureSolver(): {

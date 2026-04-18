@@ -480,6 +480,10 @@ Per Wave C4 tests-red protocol ("If any parity test reveals last-bit divergence,
   3. **Option C — investigate ngspice source more carefully**: determine which form ngspice actually uses at runtime (the two files implement different APIs — `capload.c` is the capacitor device's direct load, `niinteg.c` is a shared integration helper; the correct answer depends on which path the production solver invokes). This requires reading the ngspice source rather than the spec excerpt.
 - Red test stays tight per protocol. No assertion softening, no `toBeCloseTo` relaxation. User adjudicates.
 
+### User decision (2026-04-18): Option C
+
+User: "c4.6 - most definitely option C, it's critical that we match ngspice's solver completely." Investigator agent dispatched to read ngspice source (capload.c, niinteg.c, and the capacitor device's CKTload call-path — including `cktload.c` where devices are invoked) to determine which formula ngspice actually invokes at runtime. Implementation of the correct form (and any propagation to `fet-base.ts` / `mosfet.ts` / `diode.ts` / `varactor.ts` / `tunnel-diode.ts` / `led.ts`) will follow the investigator's finding.
+
 ## Task C5.d: Batch C5.d — active component test migration (5 files)
 - **Status**: complete
 - **Agent**: implementer

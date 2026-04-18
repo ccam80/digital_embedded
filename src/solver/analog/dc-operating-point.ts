@@ -470,8 +470,7 @@ function dynamicGmin(
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
 ): StepResult {
-  const { elements, statePool, params } = ctx;
-  const matrixSize = ctx.matrixSize;
+  const { statePool, params } = ctx;
 
   // Use ctx.dcopVoltages as the working buffer
   const voltages = ctx.dcopVoltages;

@@ -12,7 +12,7 @@
  *   - Integration: common-emitter amplifier DC operating point
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   createBjtElement,
   createSpiceL1BjtElement,
@@ -28,7 +28,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
@@ -78,14 +78,33 @@ function makeSpiceL1Props(modelParams?: Record<string, number>): PropertyBag {
 }
 
 // ---------------------------------------------------------------------------
-// Mock SparseSolver
+// DC-OP LoadContext helper — fresh SparseSolver sized for matrixSize rows.
 // ---------------------------------------------------------------------------
 
-function makeMockSolver() {
+function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
+  const solver = new SparseSolver();
+  solver.beginAssembly(matrixSize);
   return {
-    stamp: vi.fn(),
-    stampRHS: vi.fn(),
-  } as unknown as SparseSolverType;
+    solver,
+    voltages,
+    iteration: 1,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +134,7 @@ function makeBjtAtOp(
     voltages[0] = vC;
     voltages[1] = vB;
     voltages[2] = vE;
-    element.updateOperatingPoint!(voltages);
+    element.load(makeDcOpCtx(voltages, 3));
     voltages[0] = vC;
     voltages[1] = vB;
     voltages[2] = vE;
@@ -138,7 +157,8 @@ function makeResistor(nodeA: number, nodeB: number, R: number): AnalogElement {
     isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
-    stamp(solver: SparseSolverType): void {
+    load(ctx: LoadContext): void {
+      const { solver } = ctx;
       if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
       if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
       if (nodeA !== 0 && nodeB !== 0) {
@@ -234,17 +254,23 @@ describe("NPN", () => {
     expect(exp.ic / exp.ib).toBeGreaterThan(95);
     expect(exp.ic / exp.ib).toBeLessThan(105);
 
-    // Verify stamp produces conductance entries
-    const solver = makeMockSolver();
-    element.stampNonlinear!(solver);
-
-    const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
-    const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
+    // Verify load produces conductance entries by stamping into a real solver.
+    const voltages = new Float64Array([vbe - vbc, vbe, 0]);
+    const ctx = makeDcOpCtx(voltages, 3);
+    element.load(ctx);
+    const entries = ctx.solver.getCSCNonZeros();
+    const rhs = ctx.solver.getRhsSnapshot();
 
     // Conductance stamps: gpi(B-E), gmu(B-C), go(C-E), gm VCCS (C-B, C-E, E-B, E-E terms)
-    // Total of 16 conductance entries (4 per conductance × 4 conductances)
-    expect(stampCalls.length).toBe(16);
-    expect(rhsCalls.length).toBe(3); // C, B, E Norton currents
+    // Total of 16 conductance entries (4 per conductance × 4 conductances).
+    // Fresh solver starts empty — entries are unique (row, col) positions.
+    expect(entries.length).toBe(16);
+    // RHS Norton currents stamped into C, B, E rows (3 rows).
+    let nonzeroRhsRows = 0;
+    for (let i = 0; i < rhs.length; i++) {
+      if (rhs[i] !== 0) nonzeroRhsRows++;
+    }
+    expect(nonzeroRhsRows).toBe(3);
 
     // gm, go, gpi, gmu: exact values computed from Gummel-Poon at this operating point
     expect(exp.gm).toBeCloseTo(0.08505970252905432, 10);
@@ -293,6 +319,7 @@ describe("NPN", () => {
     // Start at a moderate Vbe operating point
     const propsObj = makeBjtProps();
     const { element, pool } = withState(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj));
+    const withPins = withNodeIds(element, [2, 1, 3]);
 
     const voltages = new Float64Array(3);
     // Set initial operating point: Vbe ≈ 0.3V (B=0.3, E=0, C=5)
@@ -301,7 +328,7 @@ describe("NPN", () => {
     voltages[2] = 0;  // Ve
 
     for (let i = 0; i < 20; i++) {
-      element.updateOperatingPoint!(voltages);
+      withPins.load(makeDcOpCtx(voltages, 3));
       voltages[0] = 5;
       voltages[1] = 0.3;
       voltages[2] = 0;
@@ -312,7 +339,7 @@ describe("NPN", () => {
     voltages[1] = 5.0; // large Vbe step
     voltages[2] = 0;
     const voltagesSnapshot = Float64Array.from(voltages);
-    element.updateOperatingPoint!(voltages);
+    withPins.load(makeDcOpCtx(voltages, 3));
 
     // voltages array must be unchanged — no write-back
     expect(voltages[0]).toBe(voltagesSnapshot[0]);
@@ -337,10 +364,8 @@ describe("NPN", () => {
     voltages[1] = 0.7; // Vb
     voltages[2] = 0;   // Ve
 
-    const prevVoltages = new Float64Array(3);
-    prevVoltages.set(voltages);
-
-    const converged = element.checkConvergence!(voltages, prevVoltages, 1e-3, 1e-12);
+    const ctx = makeDcOpCtx(voltages, 3);
+    const converged = element.checkConvergence!(ctx);
     expect(converged).toBe(true);
   });
 
@@ -355,10 +380,8 @@ describe("NPN", () => {
     voltages[1] = 0.0;
     voltages[2] = 0;
 
-    const prevVoltages = new Float64Array(3);
-    prevVoltages.set(voltages);
-
-    const converged = element.checkConvergence!(voltages, prevVoltages, 1e-3, 1e-12);
+    const ctx = makeDcOpCtx(voltages, 3);
+    const converged = element.checkConvergence!(ctx);
     expect(converged).toBe(false);
   });
 
@@ -400,24 +423,32 @@ describe("PNP", () => {
     const npnEl = makeBjtAtOp(1, vbe_pnp, vbc_pnp);
     const pnpEl = makeBjtAtOp(-1, vbe_pnp, vbc_pnp);
 
-    // Both should produce the same magnitude of Norton currents but in opposite polarity
-    const solverNpn = makeMockSolver();
-    const solverPnp = makeMockSolver();
-    npnEl.stampNonlinear!(solverNpn);
-    pnpEl.stampNonlinear!(solverPnp);
+    // Both should produce the same magnitude of Norton currents but in opposite polarity.
+    // For NPN: Ve=0, Vb=+0.794, Vc=Vb+4.3=5.094.
+    // For PNP: signs flip relative to polarity=-1 so we use the same raw voltages.
+    const vbeRaw = vbe_pnp;
+    const vcRaw = vbe_pnp - vbc_pnp;
+    const npnVoltages = new Float64Array([vcRaw, vbeRaw, 0]);
+    const pnpVoltages = new Float64Array([-vcRaw, -vbeRaw, 0]);
 
-    const rhsNpn = (solverNpn.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
-    const rhsPnp = (solverPnp.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
+    const ctxNpn = makeDcOpCtx(npnVoltages, 3);
+    npnEl.load(ctxNpn);
+    const ctxPnp = makeDcOpCtx(pnpVoltages, 3);
+    pnpEl.load(ctxPnp);
 
-    // Both have 3 RHS stamps
-    expect(rhsNpn).toHaveLength(3);
-    expect(rhsPnp).toHaveLength(3);
+    const rhsNpn = ctxNpn.solver.getRhsSnapshot();
+    const rhsPnp = ctxPnp.solver.getRhsSnapshot();
 
-    // Collector (node 1 → row 0) RHS for NPN and PNP should be negated
-    const npnCollRhs = rhsNpn.find((c) => c[0] === 0)!;
-    const pnpCollRhs = rhsPnp.find((c) => c[0] === 0)!;
-    // PNP collector RHS should be negated relative to NPN
-    expect(pnpCollRhs[1]).toBeCloseTo(-(npnCollRhs[1] as number), 10);
+    // Both must stamp 3 nonzero RHS rows (C, B, E).
+    let nonzeroNpn = 0;
+    let nonzeroPnp = 0;
+    for (let i = 0; i < rhsNpn.length; i++) if (rhsNpn[i] !== 0) nonzeroNpn++;
+    for (let i = 0; i < rhsPnp.length; i++) if (rhsPnp[i] !== 0) nonzeroPnp++;
+    expect(nonzeroNpn).toBe(3);
+    expect(nonzeroPnp).toBe(3);
+
+    // Collector is at node 1 → row 0. PNP collector RHS is negated relative to NPN.
+    expect(rhsPnp[0]).toBeCloseTo(-rhsNpn[0], 10);
   });
 
   it("pnp_active_region_currents_positive", () => {
@@ -555,10 +586,12 @@ describe("ModelParams", () => {
   it("setModelParam_BF_200_recompile_produces_different_results", () => {
     const props100 = makeBjtProps();
     const { element: el100 } = withState(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, props100));
+    const el100Pinned = withNodeIds(el100, [2, 1, 3]);
 
     const props200 = makeBjtProps({ BF: 200 });
     expect(props200.getModelParam<number>("BF")).toBe(200);
     const { element: el200 } = withState(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, props200));
+    const el200Pinned = withNodeIds(el200, [2, 1, 3]);
 
     const voltages100 = new Float64Array(3);
     const voltages200 = new Float64Array(3);
@@ -566,14 +599,14 @@ describe("ModelParams", () => {
     voltages200[0] = 5; voltages200[1] = 0.7; voltages200[2] = 0;
 
     for (let i = 0; i < 50; i++) {
-      el100.updateOperatingPoint!(voltages100);
+      el100Pinned.load(makeDcOpCtx(voltages100, 3));
       voltages100[0] = 5; voltages100[1] = 0.7; voltages100[2] = 0;
-      el200.updateOperatingPoint!(voltages200);
+      el200Pinned.load(makeDcOpCtx(voltages200, 3));
       voltages200[0] = 5; voltages200[1] = 0.7; voltages200[2] = 0;
     }
 
-    const currents100 = el100.getPinCurrents!(voltages100);
-    const currents200 = el200.getPinCurrents!(voltages200);
+    const currents100 = el100Pinned.getPinCurrents!(voltages100);
+    const currents200 = el200Pinned.getPinCurrents!(voltages200);
 
     // With higher BF, base current should be smaller for same collector current
     const ib100 = Math.abs(currents100[0]);
@@ -924,27 +957,29 @@ describe("StatePool — BJT simple write-back elimination", () => {
     expect(core.stateBaseOffset).toBe(0);
   });
 
-  it("updateOperatingPoint_does_not_modify_voltages_array", () => {
+  it("load_does_not_modify_voltages_array", () => {
     const propsObj = makeBjtProps();
     const { element } = withState(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj));
+    const withPins = withNodeIds(element, [2, 1, 3]);
 
     const voltages = new Float64Array([5.0, 0.7, 0.0]); // Vc, Vb, Ve
     const snapshot = Float64Array.from(voltages);
 
-    element.updateOperatingPoint!(voltages);
+    withPins.load(makeDcOpCtx(voltages, 3));
 
     expect(voltages[0]).toBe(snapshot[0]);
     expect(voltages[1]).toBe(snapshot[1]);
     expect(voltages[2]).toBe(snapshot[2]);
   });
 
-  it("updateOperatingPoint_stores_limited_vbe_vbc_in_pool", () => {
+  it("load_stores_limited_vbe_vbc_in_pool", () => {
     const propsObj = makeBjtProps();
     const { element, pool } = withState(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj));
+    const withPins = withNodeIds(element, [2, 1, 3]);
 
     const voltages = new Float64Array([5.0, 0.7, 0.0]); // Vc=5, Vb=0.7, Ve=0
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      withPins.load(makeDcOpCtx(voltages, 3));
       voltages[0] = 5.0;
       voltages[1] = 0.7;
       voltages[2] = 0.0;
@@ -962,30 +997,31 @@ describe("StatePool — BJT simple write-back elimination", () => {
     expect(vbcInPool).toBeCloseTo(-4.3, 3);
   });
 
-  it("stampNonlinear_reads_conductances_from_pool", () => {
+  it("load_reads_conductances_from_pool", () => {
     const propsObj = makeBjtProps();
     const { element } = withState(createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj));
+    const withPins = withNodeIds(element, [2, 1, 3]);
 
     const voltages = new Float64Array([5.0, 0.7, 0.0]);
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      withPins.load(makeDcOpCtx(voltages, 3));
       voltages[0] = 5.0; voltages[1] = 0.7; voltages[2] = 0.0;
     }
 
-    const solver = {
-      stamp: vi.fn(),
-      stampRHS: vi.fn(),
-    } as unknown as SparseSolverType;
+    const ctx = makeDcOpCtx(voltages, 3);
+    withPins.load(ctx);
+    const entries = ctx.solver.getCSCNonZeros();
+    const rhs = ctx.solver.getRhsSnapshot();
 
-    element.stampNonlinear!(solver);
+    // 4 conductances × 4 stamps each = 16 total (row, col) entries
+    expect(entries.length).toBe(16);
 
-    const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
-    const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
-
-    // 4 conductances × 4 stamps each = 16 total stamp calls
-    expect(stampCalls.length).toBe(16);
-    // 3 RHS stamps (C, B, E)
-    expect(rhsCalls.length).toBe(3);
+    // 3 nonzero RHS rows (C, B, E)
+    let nonzeroRhsRows = 0;
+    for (let i = 0; i < rhs.length; i++) {
+      if (rhs[i] !== 0) nonzeroRhsRows++;
+    }
+    expect(nonzeroRhsRows).toBe(3);
   });
 });
 
@@ -996,27 +1032,29 @@ describe("StatePool — BJT SPICE L1 write-back elimination", () => {
     expect(core.stateBaseOffset).toBe(-1);
   });
 
-  it("updateOperatingPoint_does_not_modify_voltages_array", () => {
+  it("load_does_not_modify_voltages_array", () => {
     const propsObj = makeSpiceL1Props();
     const { element } = withState(createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, propsObj));
+    const withPins = withNodeIds(element, [2, 1, 3]);
 
     const voltages = new Float64Array([5.0, 0.7, 0.0]); // Vc, Vb, Ve
     const snapshot = Float64Array.from(voltages);
 
-    element.updateOperatingPoint!(voltages);
+    withPins.load(makeDcOpCtx(voltages, 3));
 
     expect(voltages[0]).toBe(snapshot[0]);
     expect(voltages[1]).toBe(snapshot[1]);
     expect(voltages[2]).toBe(snapshot[2]);
   });
 
-  it("updateOperatingPoint_stores_limited_vbe_vbc_in_pool", () => {
+  it("load_stores_limited_vbe_vbc_in_pool", () => {
     const propsObj = makeSpiceL1Props();
     const { element, pool } = withState(createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, propsObj));
+    const withPins = withNodeIds(element, [2, 1, 3]);
 
     const voltages = new Float64Array([5.0, 0.7, 0.0]);
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      withPins.load(makeDcOpCtx(voltages, 3));
       voltages[0] = 5.0;
       voltages[1] = 0.7;
       voltages[2] = 0.0;
@@ -1034,9 +1072,10 @@ describe("StatePool — BJT SPICE L1 write-back elimination", () => {
   it("rbEff_stored_in_pool_slot_10", () => {
     const propsObj = makeSpiceL1Props({ RB: 10, IRB: 0, RBM: 0 });
     const { element, pool } = withState(createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, propsObj));
+    const withPins = withNodeIds(element, [2, 1, 3]);
 
     const voltages = new Float64Array([5.0, 0.7, 0.0]);
-    element.updateOperatingPoint!(voltages);
+    withPins.load(makeDcOpCtx(voltages, 3));
 
     // With IRB=0 and RBM=0, rbEff = RB = 10
     expect(pool.state0[10]).toBe(10); // L1_SLOT_RB_EFF = 10
@@ -1127,26 +1166,31 @@ describe("stateSchema — BJT SPICE L1", () => {
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
 
 describe("BJT simple LimitingEvent instrumentation", () => {
-  function makeNpnWithState(): any {
+  function makeNpnWithState(): AnalogElement {
     const props = makeBjtProps();
-    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, props) as any;
+    const core = createBjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), -1, props) as AnalogElementCore & { label?: string; elementIndex?: number };
     core.label = "Q1";
     core.elementIndex = 5;
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
-    return core;
+    return withNodeIds(core, [1, 2, 3]);
+  }
+
+  function makeCtxWithCollector(voltages: Float64Array, collector: LimitingEvent[] | null): LoadContext {
+    const ctx = makeDcOpCtx(voltages, 10);
+    return { ...ctx, limitingCollector: collector };
   }
 
   it("pushes BE and BC pnjlim events when limitingCollector provided", () => {
-    const core = makeNpnWithState();
+    const element = makeNpnWithState();
     const voltages = new Float64Array(10);
     voltages[0] = 5.0; // B = node 1
     voltages[1] = 3.0; // C = node 2
     voltages[2] = 0.0; // E = node 3
 
     const collector: LimitingEvent[] = [];
-    core.updateOperatingPoint(voltages, collector);
+    element.load(makeCtxWithCollector(voltages, collector));
 
     expect(collector.length).toBeGreaterThanOrEqual(2);
     const beEv = collector.find((e: LimitingEvent) => e.junction === "BE");
@@ -1164,12 +1208,11 @@ describe("BJT simple LimitingEvent instrumentation", () => {
     }
   });
 
-  it("does not throw when limitingCollector is null or undefined", () => {
-    const core = makeNpnWithState();
+  it("does not throw when limitingCollector is null", () => {
+    const element = makeNpnWithState();
     const voltages = new Float64Array(10);
     voltages[0] = 5.0;
-    expect(() => core.updateOperatingPoint(voltages, null)).not.toThrow();
-    expect(() => core.updateOperatingPoint(voltages, undefined)).not.toThrow();
+    expect(() => element.load(makeCtxWithCollector(voltages, null))).not.toThrow();
   });
 });
 
@@ -1180,15 +1223,16 @@ describe("BJT simple LimitingEvent instrumentation", () => {
 describe("BJT OFF parameter", () => {
   it("primeJunctions_with_OFF_seeds_zero_vbe_vbc", () => {
     const propsObj = makeBjtProps({ OFF: 1 });
-    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj) as any;
+    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj) as AnalogElementCore & { primeJunctions: () => void };
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
     // Call primeJunctions to arm the cold-start seed
     core.primeJunctions();
-    // Consume it via updateOperatingPoint with zero node voltages
+    // Consume it via load() with zero node voltages.
+    const element = withNodeIds(core, [2, 1, 3]);
     const voltages = new Float64Array(3);
-    core.updateOperatingPoint(voltages, null);
+    element.load(makeDcOpCtx(voltages, 3));
     // VBE and VBC should be 0 (limited from the 0 seed)
     // slot 0 = SLOT_VBE, slot 1 = SLOT_VBC
     expect(pool.states[0][0]).toBeCloseTo(0, 6); // SLOT_VBE
@@ -1197,30 +1241,41 @@ describe("BJT OFF parameter", () => {
 
   it("checkConvergence_returns_true_during_initFix_when_OFF", () => {
     const propsObj = makeBjtProps({ OFF: 1 });
-    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj) as any;
+    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
     pool.initMode = "initFix";
+    const element = withNodeIds(core, [2, 1, 3]);
     const voltages = new Float64Array(3);
-    const prevVoltages = new Float64Array(3);
-    const result = core.checkConvergence(voltages, prevVoltages, 1e-3, 1e-6);
+    const ctx = makeDcOpCtx(voltages, 3);
+    ctx.initMode = "initFix";
+    const result = element.checkConvergence!(ctx);
     expect(result).toBe(true);
   });
 
   it("checkConvergence_does_not_always_return_true_when_OFF_in_transient_mode", () => {
     // OFF only suppresses noncon during initFix, not during transient NR
     const propsObj = makeBjtProps({ OFF: 1 });
-    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj) as any;
+    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
     pool.initMode = "transient";
-    // Update to set stored VBE/VBC
+    const element = withNodeIds(core, [2, 1, 3]);
+    // Update to set stored VBE/VBC via a transient load pass.
     const voltages = new Float64Array(3);
-    core.updateOperatingPoint(voltages, null);
+    const loadCtx = makeDcOpCtx(voltages, 3);
+    loadCtx.initMode = "transient";
+    loadCtx.isDcOp = false;
+    loadCtx.isTransient = true;
+    element.load(loadCtx);
     // checkConvergence should not blindly return true in transient mode
-    const result = core.checkConvergence(voltages, new Float64Array(3), 1e-3, 1e-6);
+    const ctx = makeDcOpCtx(voltages, 3);
+    ctx.initMode = "transient";
+    ctx.isDcOp = false;
+    ctx.isTransient = true;
+    const result = element.checkConvergence!(ctx);
     // Converged (all zeros → no icheck limitation) — result may be true or false
     // but the key is it doesn't throw
     expect(typeof result).toBe("boolean");
@@ -1228,26 +1283,52 @@ describe("BJT OFF parameter", () => {
 });
 
 describe("BJT L1 LimitingEvent instrumentation", () => {
-  function makeL1NpnWithState(): any {
+  function makeL1NpnWithState(): AnalogElement {
     const props = makeSpiceL1Props();
-    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, props) as any;
+    const core = createSpiceL1BjtElement(1, new Map([["B", 1], ["C", 2], ["E", 3]]), [], -1, props) as AnalogElementCore & { label?: string; elementIndex?: number };
     core.label = "Q1";
     core.elementIndex = 5;
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
-    return core;
+    return withNodeIds(core, [1, 2, 3]);
+  }
+
+  function makeCtxWithCollector(voltages: Float64Array, collector: LimitingEvent[] | null): LoadContext {
+    const solver = new SparseSolver();
+    solver.beginAssembly(10);
+    return {
+      solver,
+      voltages,
+      iteration: 1,
+      initMode: "initFloat",
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: collector,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
   }
 
   it("pushes BE and BC pnjlim events", () => {
-    const core = makeL1NpnWithState();
+    const element = makeL1NpnWithState();
     const voltages = new Float64Array(10);
     voltages[0] = 5.0; // B = node 1
     voltages[1] = 3.0; // C = node 2
     voltages[2] = 0.0; // E = node 3
 
     const collector: LimitingEvent[] = [];
-    core.updateOperatingPoint(voltages, collector);
+    element.load(makeCtxWithCollector(voltages, collector));
 
     expect(collector.length).toBeGreaterThanOrEqual(2);
     const beEv = collector.find((e: LimitingEvent) => e.junction === "BE");
@@ -1344,12 +1425,8 @@ describe("bjt_spicel1_load_dcop_parity", () => {
     // Vbe = Vb - Ve, Vbc = Vb - Vc. Pick Ve=0, Vb=0.7 → Vbe=0.7. Vc = Vb - Vbc = 0.7 - (-4.3) = 5.0.
     const voltages = new Float64Array([5.0, 0.7, 0.0]);
 
-    const stamps: Array<[number, number, number]> = [];
-    const rhs: Array<[number, number]> = [];
-    const solver = {
-      stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
-      stampRHS: (r: number, v: number) => rhs.push([r, v]),
-    };
+    const solver = new SparseSolver();
+    solver.beginAssembly(3);
 
     // Seed pool slots so pnjlim produces pass-through (vd_old == vd_raw → no limit).
     // BJT L1 state layout: SLOT_VBE=0, SLOT_VBC=1.

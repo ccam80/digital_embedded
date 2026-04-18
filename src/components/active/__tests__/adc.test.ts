@@ -6,9 +6,10 @@
  *   code = clamp(floor(V_in / V_ref × 2^N), 0, 2^N - 1)   (unipolar mode)
  *
  * Testing approach: construct the ADC AnalogElement directly via analogFactory,
- * then drive its state via updateState() calls with synthetic Float64Array
- * voltage vectors. The element exposes `latchedCode` and `eocActive` as
- * observable properties for inspection without running the full MNA solver.
+ * then drive its state via accept(ctx, simTime, addBreakpoint) calls with
+ * synthetic Float64Array voltage vectors. The element exposes `latchedCode`
+ * and `eocActive` as observable properties for inspection without running the
+ * full MNA solver.
  *
  * Node assignment (8-bit, unipolar):
  *   nodeIds[0] = VIN   → node 1  (voltages[0])
@@ -28,6 +29,8 @@ import { describe, it, expect } from "vitest";
 import { ADCDefinition, ADC_DEFAULTS } from "../adc.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -115,11 +118,32 @@ function makeAdc(
 // ---------------------------------------------------------------------------
 
 /**
+ * Build a transient LoadContext bound to the supplied voltage vector and dt.
+ *
+ * accept(ctx, simTime, addBreakpoint) reads ctx.voltages and ctx.dt to detect
+ * clock edges and to step the internal companion-model state of the pin models.
+ */
+function makeAcceptCtx(voltages: Float64Array, dt: number): LoadContext {
+  const ctx = makeSimpleCtx({
+    elements: [],
+    matrixSize: voltages.length,
+    nodeCount: voltages.length,
+    branchCount: 0,
+  }) as unknown as LoadContext;
+  // Mutate fields that makeSimpleCtx's default values leave at DC-OP settings.
+  (ctx as { voltages: Float64Array }).voltages = voltages;
+  (ctx as { dt: number }).dt = dt;
+  (ctx as { isDcOp: boolean }).isDcOp = false;
+  (ctx as { isTransient: boolean }).isTransient = true;
+  return ctx;
+}
+
+/**
  * Apply a rising clock edge to the ADC with the given V_in.
  *
  * Steps:
- *   1. Drive CLK LOW with the target V_in set — updateState() sees prev=LOW.
- *   2. Drive CLK HIGH — updateState() detects the rising edge and converts.
+ *   1. Drive CLK LOW with the target V_in set — accept() sees prev=LOW.
+ *   2. Drive CLK HIGH — accept() detects the rising edge and converts.
  */
 function applyClockEdge(
   adc: ADCElementExt,
@@ -133,11 +157,11 @@ function applyClockEdge(
 
   // Step 1: CLK low — initialise prevClkVoltage to LOW
   const vLow = makeVoltages({ [N_VIN]: vIn, [N_CLK]: vIL, [N_VREF]: vRef });
-  adc.updateState!(dt, vLow);
+  adc.accept!(makeAcceptCtx(vLow, dt), 0, () => {});
 
   // Step 2: CLK high — rising edge detected, conversion fires
   const vHigh = makeVoltages({ [N_VIN]: vIn, [N_CLK]: vIH, [N_VREF]: vRef });
-  adc.updateState!(dt, vHigh);
+  adc.accept!(makeAcceptCtx(vHigh, dt), dt, () => {});
 }
 
 // ---------------------------------------------------------------------------
@@ -227,11 +251,11 @@ describe("ADC", () => {
 
     // Step 1: CLK low
     const vLow = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 0.0, [N_VREF]: V_REF });
-    adc.updateState!(dt, vLow);
+    adc.accept!(makeAcceptCtx(vLow, dt), 0, () => {});
 
     // Step 2: CLK to 1.5V — still below vIH=2.0V
     const vMid = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 1.5, [N_VREF]: V_REF });
-    adc.updateState!(dt, vMid);
+    adc.accept!(makeAcceptCtx(vMid, dt), dt, () => {});
 
     expect(adc.latchedCode).toBe(0);  // no conversion fired
     expect(adc.eocActive).toBe(false);
@@ -243,17 +267,17 @@ describe("ADC", () => {
     const dt = 1e-6;
 
     const vLow = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 0.0, [N_VREF]: V_REF });
-    adc.updateState!(dt, vLow);
+    adc.accept!(makeAcceptCtx(vLow, dt), 0, () => {});
 
     const vHigh = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 3.3, [N_VREF]: V_REF });
-    adc.updateState!(dt, vHigh);
+    adc.accept!(makeAcceptCtx(vHigh, dt), dt, () => {});
 
     expect(adc.latchedCode).toBe(0);  // 3.3V < 4.0V → no edge
     expect(adc.eocActive).toBe(false);
 
     // Now drive above 4.0V — should trigger
     const vHigher = makeVoltages({ [N_VIN]: V_REF / 2, [N_CLK]: 4.5, [N_VREF]: V_REF });
-    adc.updateState!(dt, vHigher);
+    adc.accept!(makeAcceptCtx(vHigher, dt), 2 * dt, () => {});
 
     expect(adc.latchedCode).toBe(128);
     expect(adc.eocActive).toBe(true);
@@ -273,7 +297,6 @@ describe("ADC", () => {
 //   outputSpec.rOut = p.rOut → EOC and D0..D(N-1) diagonal stamps = 1/rOut,
 //                              RHS = vOL·(1/rOut) (all initially low → stays at vOL)
 
-import type { LoadContext } from "../../../solver/analog/load-context.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 interface AdcCaptureStamp { row: number; col: number; value: number; }

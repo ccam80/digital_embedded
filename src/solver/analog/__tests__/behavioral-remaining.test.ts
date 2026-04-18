@@ -124,7 +124,7 @@ describe("Driver", () => {
    * matrixSize = 5 (3 node rows 0..2 + 2 branch rows 3,4)
    *
    * The driver latches sel=HIGH on the second NR iteration when
-   * updateOperatingPoint has stored VDD at solver row 1 (nodeSel=1).
+   * VDD is present at solver row 1 (nodeSel=1).
    * NR converges to vOut ≈ vOH * LOAD_R / (rOut + LOAD_R) ≈ 3.284V.
    */
   it("tri_state_high", () => {
@@ -318,24 +318,9 @@ describe("Relay", () => {
    *   nodeContactA=3, nodeContactB=4 (contact terminals)
    *
    * The relay's contact state is driven by the inductor current iL, which is
-   * updated in updateState() after each transient timestep. The companion model
-   * (stampCompanion) must be called before assembly each step to stamp the
-   * inductor's equivalent conductance and history current source.
-   *
-   * Transient flow (matching integration.test.ts RL circuit pattern):
-   *   For each timestep:
-   *     1. relay.stampCompanion(dt, method, voltages) — update geqL/ieqL coefficients
-   *     2. solver.beginAssembly(matrixSize)
-   *     3. stamp all elements (stamp() only — NOT stampCompanion again)
-   *     4. solver.finalize() → factor() → solve()
-   *     5. relay.updateState(dt, voltages) — advance iL and update contactClosed
-   *
-   * Note: For the relay, stampCompanion() both updates internal state (geqL/ieqL)
-   * AND stamps into the solver. We call it before beginAssembly so its coefficients
-   * are ready for the stamp() call which also stamps the companion contributions.
-   * Actually, looking at relay.stampCompanion: it calls stampG and stampRHS on
-   * the solver passed to it. Since beginAssembly clears the matrix, we call
-   * stampCompanion AFTER beginAssembly so it stamps into the fresh matrix.
+   * advanced in relay.accept() after each transient timestep. Each step calls
+   * relay.load(ctx) to stamp the inductor companion model, then relay.accept()
+   * to advance iL and update contactClosed.
    *
    * Circuit:
    *   VS_coil: 10V at node 1 (branch row 4) — coil input

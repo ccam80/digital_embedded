@@ -13,7 +13,7 @@
  * Integration tests verify full DC operating point solutions.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { OpAmpDefinition } from "../opamp.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
@@ -28,18 +28,6 @@ import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
-}
-
-
-// ---------------------------------------------------------------------------
-// Mock SparseSolver
-// ---------------------------------------------------------------------------
-
-function makeMockSolver() {
-  return {
-    stamp: vi.fn(),
-    stampRHS: vi.fn(),
-  } as unknown as SparseSolverType;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +86,7 @@ function makeSolutionVector(
 
 describe("OpAmp", () => {
   it("linear_region", () => {
-    // In linear region: stamp() places VCVS entries, stampNonlinear() is a no-op.
+    // In linear region: load() places VCVS entries and no RHS.
     // G[out,out] += G_out
     // G[out,in+] -= gain*G_out
     // G[out,in-] += gain*G_out
@@ -113,9 +101,8 @@ describe("OpAmp", () => {
       4: 15,     // Vcc+
       5: -15,    // Vcc-
     });
-    opamp.updateOperatingPoint!(voltages);
 
-    const { solver, stamps } = makeCaptureSolver();
+    const { solver, stamps, rhs } = makeCaptureSolver();
     opamp.load(makeOpAmpParityCtx(voltages, solver));
 
     const sumAt = (row: number, col: number): number =>
@@ -130,14 +117,13 @@ describe("OpAmp", () => {
     // VCVS: G[out, in-] += gain*G_out → stamp(2, 1, +gain*G_out)
     expect(sumAt(2, 1)).toBeCloseTo(1e6 * G_out, 10);
 
-    // stampNonlinear in linear region: no RHS contribution
-    const nlSolver = makeMockSolver();
-    opamp.stampNonlinear!(nlSolver);
-    expect((nlSolver.stampRHS as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
+    // Linear region: no RHS contribution at the output node
+    const rhsAtOut = rhs.filter((r) => r.row === 2);
+    expect(rhsAtOut).toHaveLength(0);
   });
 
   it("positive_saturation", () => {
-    // When Vout >= Vcc+: saturated, stamp omits VCVS, stampNonlinear drives to rail.
+    // When Vout >= Vcc+: saturated, load() omits VCVS and drives a Norton current to the rail.
     const opamp = makeOpAmp({ gain: 1e6, rOut: 75 });
     const G_out = 1 / 75;
 
@@ -149,10 +135,8 @@ describe("OpAmp", () => {
       4: 15,     // Vcc+
       5: -15,    // Vcc-
     });
-    opamp.updateOperatingPoint!(voltages);
 
-    // stamp(): G_out on diagonal only, no VCVS entries
-    const { solver: stampSolver, stamps: stampCapture } = makeCaptureSolver();
+    const { solver: stampSolver, stamps: stampCapture, rhs } = makeCaptureSolver();
     opamp.load(makeOpAmpParityCtx(voltages, stampSolver));
     const sumAt2 = (row: number, col: number): number =>
       stampCapture.filter((s) => s.row === row && s.col === col).reduce((a, s) => a + s.value, 0);
@@ -163,17 +147,14 @@ describe("OpAmp", () => {
     );
     expect(hasVcvsEntry).toBe(false);
 
-    // stampNonlinear(): Norton current to clamp output to Vcc+=15V
-    const nlSolver = makeMockSolver();
-    opamp.stampNonlinear!(nlSolver);
-    const rhsCalls = (nlSolver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
-    const rhsAtOut = rhsCalls.find((c: number[]) => c[0] === 2);
+    // Norton current to clamp output to Vcc+=15V
+    const rhsAtOut = rhs.find((r) => r.row === 2);
     expect(rhsAtOut).toBeDefined();
-    expect(rhsAtOut![1]).toBeCloseTo(15 * G_out, 6);
+    expect(rhsAtOut!.value).toBeCloseTo(15 * G_out, 6);
   });
 
   it("negative_saturation", () => {
-    // When Vout <= Vcc-: saturated, stampNonlinear drives output to Vcc-.
+    // When Vout <= Vcc-: saturated, load() drives output to Vcc- via a Norton current.
     const opamp = makeOpAmp({ gain: 1e6, rOut: 75 });
     const G_out = 1 / 75;
 
@@ -185,14 +166,12 @@ describe("OpAmp", () => {
       4: 15,     // Vcc+
       5: -15,    // Vcc-
     });
-    opamp.updateOperatingPoint!(voltages);
 
-    const nlSolver = makeMockSolver();
-    opamp.stampNonlinear!(nlSolver);
-    const rhsCalls = (nlSolver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
-    const rhsAtOut = rhsCalls.find((c: number[]) => c[0] === 2);
+    const { solver, rhs } = makeCaptureSolver();
+    opamp.load(makeOpAmpParityCtx(voltages, solver));
+    const rhsAtOut = rhs.find((r) => r.row === 2);
     expect(rhsAtOut).toBeDefined();
-    expect(rhsAtOut![1]).toBeCloseTo(-15 * G_out, 6);
+    expect(rhsAtOut!.value).toBeCloseTo(-15 * G_out, 6);
   });
 
   it("output_impedance", () => {

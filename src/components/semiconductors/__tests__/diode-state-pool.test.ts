@@ -2,7 +2,7 @@
  * Verification tests for the diode state pool migration.
  *
  * Asserts:
- *   - updateOperatingPoint does NOT modify the voltages array
+ *   - load(ctx) does NOT modify the voltages array
  *   - pool.state0[base + SLOT_VD] contains the limited voltage after the call
  */
 
@@ -10,8 +10,11 @@ import { describe, it, expect } from "vitest";
 import { createDiodeElement, DIODE_PARAM_DEFAULTS } from "../diode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { VT } from "../../../core/constants.js";
-import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
+import type { AnalogElement, ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 
 const SLOT_VD = 0;
 const SLOT_GEQ = 1;
@@ -26,26 +29,81 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
 
 /**
  * Create a diode element with state pool initialized.
- * Returns the element and pool so tests can inspect state0.
+ * Returns the element (with pinNodeIds set) and pool so tests can inspect state0.
  */
 function makeDiodeWithPool(params: Record<string, number> = {}) {
   const props = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, ...params });
-  const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
-  const stateSize = element.stateSize;
+  const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
+  const stateSize = core.stateSize;
   const pool = new StatePool(stateSize);
-  element.stateBaseOffset = 0;
-  element.initState(pool);
+  core.stateBaseOffset = 0;
+  core.initState(pool);
+  const element = withNodeIds(core, [1, 2]) as unknown as AnalogElement & ReactiveAnalogElement;
   return { element, pool };
 }
 
+/** Build a DC-OP LoadContext with a fresh SparseSolver sized for the diode (matrixSize=2). */
+function makeDcOpCtx(voltages: Float64Array): LoadContext {
+  const solver = new SparseSolver();
+  solver.beginAssembly(2);
+  return {
+    solver,
+    voltages,
+    iteration: 1,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+/** Build a transient LoadContext with the provided ag[] coefficients. */
+function makeTranCtx(voltages: Float64Array, dt: number, ag: Float64Array): LoadContext {
+  const solver = new SparseSolver();
+  solver.beginAssembly(2);
+  return {
+    solver,
+    voltages,
+    iteration: 1,
+    initMode: "transient",
+    dt,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+    ag,
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: true,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
 describe("diode state pool migration", () => {
-  it("updateOperatingPoint does not modify the voltages array", () => {
+  it("load does not modify the voltages array", () => {
     const { element } = makeDiodeWithPool();
 
     const voltages = new Float64Array([0.7, 0.0]);
     const snapshot = new Float64Array(voltages);
 
-    element.updateOperatingPoint!(voltages);
+    element.load(makeDcOpCtx(voltages));
 
     expect(voltages[0]).toBe(snapshot[0]);
     expect(voltages[1]).toBe(snapshot[1]);
@@ -57,7 +115,7 @@ describe("diode state pool migration", () => {
     // Converge to 0.3V operating point first
     const voltages = new Float64Array([0.3, 0.0]);
     for (let i = 0; i < 20; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages));
       voltages[0] = 0.3;
       voltages[1] = 0.0;
     }
@@ -65,18 +123,18 @@ describe("diode state pool migration", () => {
     // Now apply a large step that pnjlim will compress
     voltages[0] = 5.0;
     voltages[1] = 0.0;
-    element.updateOperatingPoint!(voltages);
+    element.load(makeDcOpCtx(voltages));
 
     // Voltages must be unchanged
     expect(voltages[0]).toBe(5.0);
     expect(voltages[1]).toBe(0.0);
   });
 
-  it("pool state0[SLOT_VD] contains limited voltage after updateOperatingPoint", () => {
+  it("pool state0[SLOT_VD] contains limited voltage after load", () => {
     const { element, pool } = makeDiodeWithPool();
 
     const voltages = new Float64Array([0.7, 0.0]);
-    element.updateOperatingPoint!(voltages);
+    element.load(makeDcOpCtx(voltages));
 
     // SLOT_VD = 0: should hold the pnjlim-limited junction voltage
     const vdInPool = pool.state0[SLOT_VD];
@@ -90,7 +148,7 @@ describe("diode state pool migration", () => {
 
     const voltages = new Float64Array([0.65, 0.0]);
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages));
       voltages[0] = 0.65;
       voltages[1] = 0.0;
     }
@@ -105,14 +163,14 @@ describe("diode state pool migration", () => {
     // Converge to 0.3V
     const voltages = new Float64Array([0.3, 0.0]);
     for (let i = 0; i < 20; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages));
       voltages[0] = 0.3;
     }
 
     // Large step to 5V — pnjlim compresses
     voltages[0] = 5.0;
     voltages[1] = 0.0;
-    element.updateOperatingPoint!(voltages);
+    element.load(makeDcOpCtx(voltages));
 
     const limitedVd = pool.state0[SLOT_VD];
     // Must be less than 5V (pnjlim compressed) and positive (forward bias)
@@ -124,7 +182,7 @@ describe("diode state pool migration", () => {
     const { element, pool } = makeDiodeWithPool();
 
     const voltages = new Float64Array([0.7, 0.0]);
-    element.updateOperatingPoint!(voltages);
+    element.load(makeDcOpCtx(voltages));
 
     expect(pool.state0[SLOT_GEQ]).toBeGreaterThan(0);
   });
@@ -137,7 +195,7 @@ describe("diode state pool migration", () => {
     // Converge to 0.65V
     const voltages = new Float64Array([0.65, 0.0]);
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages));
       voltages[0] = 0.65;
     }
 
@@ -164,13 +222,13 @@ describe("diode state pool migration", () => {
     const voltages = new Float64Array([-5.0, 0.0]);
     const snapshot = new Float64Array(voltages);
 
-    element.updateOperatingPoint!(voltages);
+    element.load(makeDcOpCtx(voltages));
 
     expect(voltages[0]).toBe(snapshot[0]);
     expect(voltages[1]).toBe(snapshot[1]);
   });
 
-  it("capacitance slots initialized to zero before stampCompanion", () => {
+  it("capacitance slots initialized to zero before load", () => {
     const props = makeParamBag({ CJO: 10e-12, TT: 0 });
     const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
     const pool = new StatePool(element.stateSize);
@@ -195,18 +253,27 @@ describe("diode state pool migration", () => {
     expect(pool.state0[7]).toBe(0); // SLOT_Q
   });
 
-  it("SLOT_V is written to vNow after first stampCompanion call", () => {
+  it("SLOT_V is written to vNow after first transient load call", () => {
     const props = makeParamBag({ CJO: 10e-12, TT: 0 });
-    const element = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
-    const pool = new StatePool(element.stateSize);
-    element.stateBaseOffset = 0;
-    element.initState(pool);
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as ReactiveAnalogElement;
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    const element = withNodeIds(core, [1, 2]) as unknown as AnalogElement & ReactiveAnalogElement;
 
     const voltages = new Float64Array([-1.0, 0.0]);
-    element.updateOperatingPoint!(voltages);
-    element.stampCompanion!(1e-6, "trapezoidal", voltages, 1, [1e-6]);
+    // First call: DC-OP load so the junction state reflects the applied voltage.
+    element.load(makeDcOpCtx(voltages));
 
-    // After first stampCompanion, SLOT_V should hold the current junction voltage
+    // Second call: transient load exercises the capacitor companion path and writes SLOT_V.
+    const dt = 1e-6;
+    const ag = new Float64Array(8);
+    ag[0] = 1 / dt;
+    ag[1] = -1 / dt;
+    pool.ag.set(ag);
+    element.load(makeTranCtx(voltages, dt, ag));
+
+    // After first transient load, SLOT_V should hold the current junction voltage
     // vNow = voltages[0] - voltages[1] = -1.0
     expect(pool.state0[6]).toBeCloseTo(-1.0, 10); // SLOT_V
   });
@@ -226,7 +293,7 @@ describe("diode state pool migration", () => {
 
     const voltages = new Float64Array([0.65, 0.0]);
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages));
       voltages[0] = 0.65;
     }
 

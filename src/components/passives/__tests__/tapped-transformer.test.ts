@@ -42,20 +42,30 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 }
 
 // ---------------------------------------------------------------------------
-// makeTransientCtx — minimal LoadContext for manual transient loops
+// makeTransientCtx — minimal LoadContext for manual transient loops.
+//
+// Seeds ctx.ag[] with the integration coefficients that computeNIcomCof would
+// produce for (dt, "trapezoidal", order=1), which matches the pre-migration
+// stampCompanion(dt, "trapezoidal", voltages) defaults.
 // ---------------------------------------------------------------------------
 
-function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array): LoadContext {
+function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: number = 1e-6): LoadContext {
+  const ag = new Float64Array(8);
+  // Trapezoidal order 1: ag[0] = 1/dt, ag[1] = -1/dt.
+  if (dt > 0) {
+    ag[0] = 1 / dt;
+    ag[1] = -1 / dt;
+  }
   return {
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     voltages,
     iteration: 0,
     initMode: "initFloat",
-    dt: 0,
+    dt,
     method: "trapezoidal",
     order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(8),
+    deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+    ag,
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
@@ -160,12 +170,10 @@ describe("TappedTransformer", () => {
       const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
       const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
-      tx.stampCompanion(dt, "trapezoidal", voltages);
       solver.beginAssembly(matrixSize);
-      const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages);
+      const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, dt);
       vsrc.load(ctx);
       tx.load(ctx);
-      tx.stampReactiveCompanion!(solver);
       rLoad.load(ctx);
       rCtGnd.load(ctx);
       rS2Gnd.load(ctx);
@@ -250,12 +258,10 @@ describe("TappedTransformer", () => {
       const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
       const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
-      tx.stampCompanion(dt, "trapezoidal", voltages);
       solver.beginAssembly(matrixSize);
-      const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages);
+      const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, dt);
       vsrc.load(ctx);
       tx.load(ctx);
-      tx.stampReactiveCompanion!(solver);
       rLoad1.load(ctx);
       rLoad2.load(ctx);
       rGnd.load(ctx);
@@ -325,7 +331,7 @@ describe("TappedTransformer", () => {
     // Diodes: D1 anode=S1(2), cathode=out(5); D2 anode=S2(4), cathode=out(5)
     const d1 = makeDiode(2, 5, 1e-14, 1.0);
     const d2 = makeDiode(4, 5, 1e-14, 1.0);
-    allocateStatePool([tx as unknown as AnalogElementCore, d1, d2]);
+    const pool = allocateStatePool([tx as unknown as AnalogElementCore, d1, d2]);
 
     // Filter cap 1000µF + load
     const cFilter = makeCapacitor(5, 0, 1000e-6);
@@ -339,39 +345,52 @@ describe("TappedTransformer", () => {
       const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
       const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
 
-      tx.stampCompanion(dt, "trapezoidal", voltages);
-      cFilter.stampCompanion?.(dt, "trapezoidal", voltages);
-
-      // NR loop for diodes (up to 50 iterations per timestep)
+      // NR loop for diodes (up to 50 iterations per timestep). On the first
+      // NR iteration of the very first step, use initMode="initTran" so
+      // reactive elements seed state1 history from state0. After convergence
+      // we call element.accept(ctx,...) to advance history (q1 ← current q).
+      let lastCtx: LoadContext | null = null;
       for (let nr = 0; nr < 50; nr++) {
-        d1.updateOperatingPoint?.(voltages);
-        d2.updateOperatingPoint?.(voltages);
-
         solver.beginAssembly(matrixSize);
-        const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages);
+        const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, dt);
+        if (i === 0 && nr === 0) ctx.initMode = "initTran";
         vsrc.load(ctx);
         tx.load(ctx);
-        tx.stampReactiveCompanion!(solver);
         rCtGnd.load(ctx);
         cFilter.load(ctx);
         rLoadEl.load(ctx);
         d1.load(ctx);
         d2.load(ctx);
-        d1.stampNonlinear?.(solver);
-        d2.stampNonlinear?.(solver);
         solver.finalize();
 
         const result = solver.factor();
         if (!result.success) throw new Error(`Singular at step ${i} NR ${nr}`);
 
-        const prevVoltages = new Float64Array(voltages);
         solver.solve(voltages);
 
-        // Check convergence
-        const d1conv = d1.checkConvergence?.(voltages, prevVoltages, 1e-3, 1e-6) ?? true;
-        const d2conv = d2.checkConvergence?.(voltages, prevVoltages, 1e-3, 1e-6) ?? true;
+        // Check convergence — elements checkConvergence takes a LoadContext in the
+        // migrated API; diode test-helper uses checkConvergence(ctx).
+        const d1conv = d1.checkConvergence?.(ctx) ?? true;
+        const d2conv = d2.checkConvergence?.(ctx) ?? true;
+        lastCtx = ctx;
         if (d1conv && d2conv) break;
       }
+
+      // Advance reactive element history after the step converges.
+      if (lastCtx) {
+        lastCtx.voltages = voltages;
+        cFilter.accept?.(lastCtx, i * dt, () => {});
+        d1.accept?.(lastCtx, i * dt, () => {});
+        d2.accept?.(lastCtx, i * dt, () => {});
+      }
+      // Rotate pool-backed state history so the tapped transformer's s1 holds
+      // the just-accepted step (ngspice dctran.c post-accept rotation).
+      pool.rotateStateVectors();
+      pool.refreshElementRefs([
+        tx as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore,
+        d1 as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore,
+        d2 as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore,
+      ]);
     }
 
     // Measure final DC output at node 5 (index 4)
@@ -491,5 +510,166 @@ describe("TappedTransformerDefinition", () => {
     const L2 = Lp * (N / 2) * (N / 2);
     const expectedM23 = k * Math.sqrt(L2 * L2); // = k * L2
     expect(el.mutualInductanceSecSec).toBeCloseTo(expectedM23, 10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C4.2 — Transient parity test
+//
+// Circuit: Three-winding tapped transformer, all voltages/currents zero.
+// pinNodeIds=[P1=1, P2=0, S1=2, CT=3, S2=4], branch1=5, branch2=6, branch3=7.
+// N=2 total turns ratio: each half has N/2=1 turns → L2=L3=L1*(N/2)².
+//
+// All voltages zero → i1=i2=i3=0 → all flux linkages = 0 → hist1=hist2=hist3=0.
+//
+// BDF-1 / trapezoidal (order=1): ag[0]=1/dt, ag[1]=-1/dt.
+//   g11 = ag[0]*L1           (niinteg.c:77 for primary winding)
+//   g22 = ag[0]*L2           (niinteg.c:77 for secondary half-1)
+//   g33 = ag[0]*L3           (niinteg.c:77 for secondary half-2)
+//   g12 = ag[0]*M12          (niinteg.c:77 for primary–sec-half-1 mutual)
+//   g13 = ag[0]*M13          (niinteg.c:77 for primary–sec-half-2 mutual)
+//   g23 = ag[0]*M23          (niinteg.c:77 for sec-half-1 to sec-half-2 mutual)
+//   hist1=hist2=hist3=0      (all flux linkages zero)
+//
+// ngspice source → our variable mapping:
+//   indload.c:INDload::cstate0[INDflux] → s0[SLOT_PHI{1,2,3}] = flux linkage
+//   indload.c:INDload::geq (winding k)  → s0[SLOT_G{11,22,33}] = ag[0]*L_k
+//   indload.c:INDload::geq (mutual jk)  → s0[SLOT_G{12,13,23}] = ag[0]*M_jk
+//   indload.c:INDload::ceq              → s0[SLOT_HIST{1,2,3}] = 0
+// ---------------------------------------------------------------------------
+
+describe("tapped_transformer_load_transient_parity (C4.2)", () => {
+  it("tapped_transformer_load_transient_parity", () => {
+    const L1  = 100e-3;  // 100 mH primary inductance
+    const N   = 2.0;     // total secondary-to-primary turns ratio
+    const k   = 0.99;    // coupling coefficient
+    const dt  = 1e-6;    // timestep (s)
+    const order  = 1;
+    const method = "trapezoidal" as const;
+
+    // Derived inductances (matches AnalogTappedTransformerElement constructor)
+    const halfRatio = N / 2;
+    const L2 = L1 * halfRatio * halfRatio;
+    const L3 = L1 * halfRatio * halfRatio;
+    const M12 = k * Math.sqrt(L1 * L2);
+    const M13 = k * Math.sqrt(L1 * L3);
+    const M23 = k * Math.sqrt(L2 * L3);
+
+    // BDF-1 coefficients: ag[0]=1/dt, ag[1]=-1/dt
+    const ag0 = 1 / dt;
+    const ag1 = -1 / dt;
+
+    // Bit-exact companion conductances (niinteg.c:77)
+    const g11 = ag0 * L1;
+    const g22 = ag0 * L2;
+    const g33 = ag0 * L3;
+    const g12 = ag0 * M12;
+    const g13 = ag0 * M13;
+    const g23 = ag0 * M23;
+
+    // Build element: pinNodeIds=[P1=1, P2=0, S1=2, CT=3, S2=4], branch1=5
+    const el = new AnalogTappedTransformerElement([1, 0, 2, 3, 4], 5, L1, N, k, 0, 0);
+
+    // Allocate state pool via test helper (mirrors compiler allocation)
+    allocateStatePool([el]);
+
+    const poolEl = el as unknown as {
+      s0: Float64Array; s1: Float64Array; stateBaseOffset: number;
+    };
+
+    // Handle-based capture solver (persistent handles across steps)
+    const handles: { row: number; col: number }[] = [];
+    const handleIndex = new Map<string, number>();
+    const matValues: number[] = [];
+
+    const solver = {
+      allocElement: (row: number, col: number): number => {
+        const key = `${row},${col}`;
+        let h = handleIndex.get(key);
+        if (h === undefined) {
+          h = handles.length;
+          handles.push({ row, col });
+          handleIndex.set(key, h);
+          matValues.push(0);
+        }
+        return h;
+      },
+      stampElement: (h: number, v: number): void => { matValues[h] += v; },
+      stampRHS: (_row: number, _v: number): void => {},
+    } as unknown as SparseSolverType;
+
+    const ag = new Float64Array(8);
+    ag[0] = ag0;
+    ag[1] = ag1;
+
+    // voltages layout: [V(node1),...,V(node4), I_b5, I_b6, I_b7]
+    // All zero → i1=i2=i3=0 → all phi=0.
+    const voltages = new Float64Array(8);
+
+    // 10-step transient loop
+    for (let step = 0; step < 10; step++) {
+      matValues.fill(0);
+
+      const ctx: LoadContext = {
+        solver,
+        voltages,
+        iteration: 0,
+        initMode: step === 0 ? "initTran" : "transient",
+        dt,
+        method,
+        order,
+        deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+        ag,
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        isDcOp: false,
+        isTransient: true,
+        xfact: 1,
+        gmin: 1e-12,
+        uic: false,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+      };
+
+      el.load(ctx);
+
+      // Assert per-step integration constants (spec: assert dt, order, method)
+      expect(ctx.dt).toBe(dt);
+      expect(ctx.order).toBe(order);
+      expect(ctx.method).toBe(method);
+
+      // Rotate state: s1 ← s0
+      poolEl.s1.set(poolEl.s0);
+    }
+
+    // After 10 steps: assert companion state from last load().
+    // TAPPED_TRANSFORMER_SCHEMA slot indices:
+    //   G11=0, G22=1, G33=2, G12=3, G13=4, G23=5,
+    //   HIST1=6, HIST2=7, HIST3=8, I1=9, I2=10, I3=11, PHI1=12, PHI2=13, PHI3=14
+    const base = poolEl.stateBaseOffset;
+
+    // Companion conductances — bit-exact (niinteg.c:77)
+    expect(poolEl.s0[base + 0]).toBe(g11);
+    expect(poolEl.s0[base + 1]).toBe(g22);
+    expect(poolEl.s0[base + 2]).toBe(g33);
+    expect(poolEl.s0[base + 3]).toBe(g12);
+    expect(poolEl.s0[base + 4]).toBe(g13);
+    expect(poolEl.s0[base + 5]).toBe(g23);
+
+    // History terms = 0 (all voltages zero → all flux = 0)
+    expect(poolEl.s0[base + 6]).toBe(0);
+    expect(poolEl.s0[base + 7]).toBe(0);
+    expect(poolEl.s0[base + 8]).toBe(0);
+
+    // Branch currents = 0 (voltages array all zero)
+    expect(poolEl.s0[base + 9]).toBe(0);
+    expect(poolEl.s0[base + 10]).toBe(0);
+    expect(poolEl.s0[base + 11]).toBe(0);
+
+    // Flux linkages = 0 (all currents zero)
+    expect(poolEl.s0[base + 12]).toBe(0);
+    expect(poolEl.s0[base + 13]).toBe(0);
+    expect(poolEl.s0[base + 14]).toBe(0);
   });
 });

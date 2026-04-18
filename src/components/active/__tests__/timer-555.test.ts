@@ -12,11 +12,11 @@
  *   Timer555::internal_divider_voltages       — CTRL floating → threshold ≈ 2/3 VCC ±1%
  *
  * Testing approach:
- *   For operating-point tests: drive updateState() directly with synthetic
- *   voltage vectors and observe stampNonlinear() output.
- *   Note: updateOperatingPoint() only updates cached voltage levels; the
- *   flip-flop state advances only in updateState() (called once per accepted
- *   timestep). Unit tests use updateState() to trigger state transitions.
+ *   For operating-point tests: drive load(ctx) and accept(ctx) in sequence
+ *   with synthetic voltage vectors. load(ctx) stamps the MNA matrix from the
+ *   current flip-flop state; accept(ctx) advances the flip-flop based on the
+ *   latched comparator inputs. Unit tests invoke accept() once per change to
+ *   force a state transition, then load() to observe the resulting stamps.
  *
  *   For transient tests (astable, monostable): use MNAEngine with a hand-built circuit
  *   (ConcreteCompiledAnalogCircuit) containing the 555 element, timing capacitor,
@@ -45,7 +45,6 @@ import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import { vi } from "vitest";
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 
 // ---------------------------------------------------------------------------
@@ -116,34 +115,29 @@ function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float
   return v;
 }
 
-function makeMockSolver() {
-  return {
-    stamp: vi.fn(),
-    stampRHS: vi.fn(),
-  } as unknown as SparseSolverType;
-}
-
 /**
- * Read the Norton output voltage for a node relative to a reference by inspecting
- * stampNonlinear stamp calls.
+ * Apply the given voltage vector to the 555 timer element: advance the flip-flop
+ * via accept(ctx), then stamp via load(ctx), and return the Norton target voltage
+ * at the output pin.
  *
- * The Norton equivalent stamps G on diagonal and G off-diagonal, then
- * RHS[nPos-1] += vTarget*G and RHS[nNeg-1] -= vTarget*G.
- * We read the RHS entry at nOut-1 and divide by G = 1/rOut.
+ * The 555 output pin stamps G = 1/rOut on the output diagonal and a Norton
+ * current = v_target * G into the RHS at the output row. We read that RHS
+ * entry and divide by G to recover v_target.
  */
 function readNortonTargetVoltage(
   element: AnalogElement,
   nOut: number,
   rOut: number,
+  voltages: Float64Array,
 ): number {
-  const solver = makeMockSolver();
-  element.stampNonlinear!(solver);
-  const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls as [number, number][];
-  // Find the RHS entry at nOut-1 that is positive (Norton current into nOut)
-  const outRhs = rhsCalls.find((c) => c[0] === nOut - 1 && c[1] > 0);
-  if (!outRhs) return 0;
+  const { solver, rhs } = makeTimer555CaptureSolver();
+  const ctx = makeTimer555ParityCtx(voltages, solver, 1e-6);
+  element.accept?.(ctx, 0, () => {});
+  element.load(ctx);
+  const outRhs = rhs.get(nOut - 1);
+  if (outRhs === undefined) return 0;
   const G = 1 / rOut;
-  return outRhs[1] / G;
+  return outRhs / G;
 }
 
 // ---------------------------------------------------------------------------
@@ -293,10 +287,9 @@ describe("Reset", () => {
       [nCtrl]: VCC * (2/3),   // internal divider default
       [nRst]:  VCC,           // RST = VCC (inactive)
     });
-    timer.updateState!(0, vSet);
 
     // Output should now be HIGH (SET state)
-    const vOutHigh = readNortonTargetVoltage(timer, nOut, rOut);
+    const vOutHigh = readNortonTargetVoltage(timer, nOut, rOut, vSet);
     expect(vOutHigh).toBeGreaterThan(VCC * 0.5); // confirms SET state
 
     // Now apply RST low (< 0.7V above GND = 0)
@@ -307,10 +300,9 @@ describe("Reset", () => {
       [nCtrl]: VCC * (2/3),
       [nRst]:  0.2,           // RST < 0.7V → active
     });
-    timer.updateState!(0, vRstLow);
 
     // Output must be LOW
-    const vOutLow = readNortonTargetVoltage(timer, nOut, rOut);
+    const vOutLow = readNortonTargetVoltage(timer, nOut, rOut, vRstLow);
     expect(vOutLow).toBeLessThan(1.0); // VOL ≈ GND + 0.1V = 0.1V
   });
 });
@@ -341,8 +333,7 @@ describe("Control", () => {
       [nCtrl]: vCtrlExt,
       [nRst]:  VCC,
     });
-    timer.updateState!(0, vReset);
-    const vOutReset = readNortonTargetVoltage(timer, nOut, rOut);
+    const vOutReset = readNortonTargetVoltage(timer, nOut, rOut, vReset);
     expect(vOutReset).toBeLessThan(1.0); // output LOW (RESET)
 
     // Test 2: TRIG=0.9V < CTRL/2=1V → comparator 2 fires → SET (Q=1)
@@ -353,8 +344,7 @@ describe("Control", () => {
       [nCtrl]: vCtrlExt,
       [nRst]:  VCC,
     });
-    timer.updateState!(0, vSet);
-    const vOutSet = readNortonTargetVoltage(timer, nOut, rOut);
+    const vOutSet = readNortonTargetVoltage(timer, nOut, rOut, vSet);
     // V_OH = VCC - vDrop = 5 - 1.5 = 3.5V
     expect(vOutSet).toBeGreaterThan(2.5); // output HIGH (SET), threshold relative to GND=0
   });
@@ -398,20 +388,22 @@ describe("Discharge", () => {
       [nCtrl]: VCC * (2/3),
       [nRst]:  VCC,
     });
-    timer.updateState!(0, vReset);
 
-    // Inspect stampNonlinear: DIS should be connected to GND via R_sat
-    const solver = makeMockSolver();
-    timer.stampNonlinear!(solver);
-    const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls as [number, number, number][];
+    // Advance flip-flop via accept(ctx), then stamp via load(ctx). Inspect the
+    // captured stamps: DIS should be connected to GND via R_sat.
+    const { solver, stamps } = makeTimer555CaptureSolver();
+    const ctx = makeTimer555ParityCtx(vReset, solver, 1e-6);
+    timer.accept?.(ctx, 0, () => {});
+    timer.load(ctx);
 
     // DIS node (nDis-1=5) should have a diagonal stamp consistent with G=1/R_sat
     const G_sat = 1 / rSat;
-    const disDiagonal = stampCalls.find((c) => c[0] === nDis - 1 && c[1] === nDis - 1);
-    expect(disDiagonal).toBeDefined();
+    const disDiagonalTotal = stamps
+      .filter((s) => s.row === nDis - 1 && s.col === nDis - 1)
+      .reduce((sum, s) => sum + s.value, 0);
     // The stamp includes contributions from all resistors touching DIS.
     // At minimum, G_sat should be present in the DIS diagonal.
-    expect(disDiagonal![2]).toBeGreaterThanOrEqual(G_sat * 0.99);
+    expect(disDiagonalTotal).toBeGreaterThanOrEqual(G_sat * 0.99);
   });
 });
 

@@ -14,6 +14,9 @@ import { MemristorElement, MemristorDefinition, createMemristorElement, MEMRISTO
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 
 // ---------------------------------------------------------------------------
 // Test defaults matching MemristorDefinition
@@ -44,6 +47,35 @@ function makeMemristor(overrides: Partial<{
   );
   Object.assign(el, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
   return el;
+}
+
+/**
+ * Integrate the memristor state variable w forward by one accepted step.
+ * Memristor.accept() reads ctx.dt and ctx.voltages to compute dw/dt.
+ */
+function acceptStep(mem: MemristorElement, dt: number, voltages: Float64Array): void {
+  const ctx: LoadContext = {
+    solver: new SparseSolver(),
+    voltages,
+    iteration: 0,
+    initMode: "transient",
+    dt,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: true,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+  mem.accept(ctx, 0, () => {});
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +121,7 @@ describe("Memristor", () => {
 
       const dt = 1e-6; // 1 µs steps
       for (let i = 0; i < 100; i++) {
-        mem.updateState(dt, voltages);
+        acceptStep(mem, dt, voltages);
       }
 
       expect(mem.w).toBeGreaterThan(wBefore);
@@ -105,7 +137,7 @@ describe("Memristor", () => {
 
       const dt = 1e-6;
       for (let i = 0; i < 100; i++) {
-        mem.updateState(dt, voltages);
+        acceptStep(mem, dt, voltages);
       }
 
       expect(mem.resistance()).toBeLessThan(rBefore);
@@ -123,7 +155,7 @@ describe("Memristor", () => {
 
       const dt = 1e-6;
       for (let i = 0; i < 100; i++) {
-        mem.updateState(dt, voltages);
+        acceptStep(mem, dt, voltages);
       }
 
       expect(mem.w).toBeLessThan(wBefore);
@@ -139,7 +171,7 @@ describe("Memristor", () => {
 
       const dt = 1e-6;
       for (let i = 0; i < 100; i++) {
-        mem.updateState(dt, voltages);
+        acceptStep(mem, dt, voltages);
       }
 
       expect(mem.resistance()).toBeGreaterThan(rBefore);
@@ -179,7 +211,7 @@ describe("Memristor", () => {
           }
         }
 
-        mem.updateState(dt, voltages);
+        acceptStep(mem, dt, voltages);
       }
 
       // Both crossing points should have measurable conductance (loop passes through origin)
@@ -206,7 +238,7 @@ describe("Memristor", () => {
 
       const dt = 1e-6;
       for (let i = 0; i < 10000; i++) {
-        mem.updateState(dt, voltages);
+        acceptStep(mem, dt, voltages);
       }
 
       expect(mem.w).toBeLessThanOrEqual(1.0);
@@ -220,7 +252,7 @@ describe("Memristor", () => {
 
       const dt = 1e-6;
       for (let i = 0; i < 10000; i++) {
-        mem.updateState(dt, voltages);
+        acceptStep(mem, dt, voltages);
       }
 
       expect(mem.w).toBeGreaterThanOrEqual(0.0);
@@ -235,7 +267,7 @@ describe("Memristor", () => {
 
       const dt = 1e-6;
       for (let i = 0; i < 1000; i++) {
-        mem.updateState(dt, voltages);
+        acceptStep(mem, dt, voltages);
       }
 
       // w should remain at 0 (window function clamps dynamics at boundaries)
@@ -252,34 +284,56 @@ describe("Memristor", () => {
 
       const dt = 1e-6;
       for (let i = 0; i < 1000; i++) {
-        mem.updateState(dt, voltages);
+        acceptStep(mem, dt, voltages);
       }
 
       expect(mem.w).toBeCloseTo(1.0, 5);
     });
   });
 
-  describe("stampNonlinear", () => {
+  describe("load", () => {
     it("stamps conductance between nodes A and B", () => {
       const mem = makeMemristor();
-      const stamps: Array<[number, number, number]> = [];
-      const rhsStamps: Array<[number, number]> = [];
 
-      const mockSolver = {
-        stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
-        stampRHS: (r: number, v: number) => rhsStamps.push([r, v]),
-      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
-
-      mem.stampNonlinear(mockSolver);
+      const solver = new SparseSolver();
+      solver.beginAssembly(2);
+      const ctx: LoadContext = {
+        solver,
+        voltages: new Float64Array(2),
+        iteration: 0,
+        initMode: "initFloat",
+        dt: 0,
+        method: "trapezoidal",
+        order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(8),
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        isDcOp: true,
+        isTransient: false,
+        xfact: 1,
+        gmin: 1e-12,
+        uic: false,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+      };
+      (mem as unknown as AnalogElement).load(ctx);
 
       const G = mem.conductance();
 
-      // Expect 4 conductance stamps: [0,0,G], [0,1,-G], [1,0,-G], [1,1,G]
+      // Expect 4 conductance stamps: (0,0,G), (0,1,-G), (1,0,-G), (1,1,G)
       // (node 1 → index 0, node 2 → index 1)
-      expect(stamps).toContainEqual([0, 0, G]);
-      expect(stamps).toContainEqual([0, 1, -G]);
-      expect(stamps).toContainEqual([1, 0, -G]);
-      expect(stamps).toContainEqual([1, 1, G]);
+      const entries = solver.getCSCNonZeros();
+      const sumAt = (row: number, col: number) =>
+        entries
+          .filter((e) => e.row === row && e.col === col)
+          .reduce((acc, e) => acc + e.value, 0);
+
+      expect(sumAt(0, 0)).toBe(G);
+      expect(sumAt(0, 1)).toBe(-G);
+      expect(sumAt(1, 0)).toBe(-G);
+      expect(sumAt(1, 1)).toBe(G);
     });
   });
 
@@ -313,5 +367,121 @@ describe("Memristor", () => {
     it("branchCount is false", () => {
       expect((MemristorDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBeFalsy();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C4.2 — Transient parity test
+//
+// Circuit: Memristor with pinNodeIds=[A=1, B=0(gnd)].
+// All voltages zero throughout → vAB=0 → current=0 → dw/dt=0 → w=w0 constant.
+//
+// The memristor is nonlinear but NOT reactive (isReactive=false, no state pool).
+// load() stamps a pure conductance G(w) = w*(1/R_on - 1/R_off) + 1/R_off.
+// accept() integrates w forward via Euler: w_new = w + dWdt*dt.
+// With zero voltage, current=0 → dWdt=0 → w is constant every step.
+//
+// At each accepted step, load() stamps:
+//   G_stamp = w_0 * (1/R_on − 1/R_off) + 1/R_off   (bit-exact reference constant)
+// and accept() leaves w unchanged.
+//
+// ngspice source → our variable mapping:
+//   memristor conductance G(w)  → this.conductance() = w*(1/R_on−1/R_off)+1/R_off
+//   Joglekar dw/dt formula      → accept(): dWdt = (μ*R_on/D²)*i*fp
+//   Euler integration w_new     → this._w = clamp(w + dWdt*dt, 0, 1)
+// ---------------------------------------------------------------------------
+
+describe("memristor_load_transient_parity (C4.2)", () => {
+  it("memristor_load_transient_parity", () => {
+    const rOn         = 100;     // Ω
+    const rOff        = 16000;   // Ω
+    const w0          = 0.5;     // initial state
+    const mobility    = 1e-14;   // m²/(V·s)
+    const deviceLen   = 10e-9;   // m
+    const windowOrder = 1;
+    const dt          = 1e-6;    // timestep (s)
+    const order       = 1;
+    const method      = "trapezoidal" as const;
+
+    // Bit-exact reference conductance at w=w0 (constant — zero voltage keeps w=w0)
+    //   G(w) = w*(1/R_on − 1/R_off) + 1/R_off
+    const G_ref = w0 * (1 / rOn - 1 / rOff) + 1 / rOff;
+
+    // Build element: pinNodeIds=[A=1, B=0(gnd)]
+    const mem = new MemristorElement(rOn, rOff, w0, mobility, deviceLen, windowOrder);
+    Object.assign(mem, { pinNodeIds: [1, 0], allNodeIds: [1, 0] });
+
+    // Handle-based capture solver (persistent handles across steps)
+    const handles: { row: number; col: number }[] = [];
+    const handleIndex = new Map<string, number>();
+    const matValues: number[] = [];
+
+    const solver = {
+      allocElement: (row: number, col: number): number => {
+        const key = `${row},${col}`;
+        let h = handleIndex.get(key);
+        if (h === undefined) {
+          h = handles.length;
+          handles.push({ row, col });
+          handleIndex.set(key, h);
+          matValues.push(0);
+        }
+        return h;
+      },
+      stampElement: (h: number, v: number): void => { matValues[h] += v; },
+      stampRHS: (_row: number, _v: number): void => {},
+    } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
+
+    const ag = new Float64Array(8);
+    ag[0] = 1 / dt;
+    ag[1] = -1 / dt;
+
+    // All voltages zero → vAB=0 → current=0 → dw/dt=0 → w stays at w0.
+    const voltages = new Float64Array(2);
+
+    // 10-step transient loop
+    for (let step = 0; step < 10; step++) {
+      matValues.fill(0);
+
+      const ctx: LoadContext = {
+        solver,
+        voltages,
+        iteration: 0,
+        initMode: step === 0 ? "initTran" : "transient",
+        dt,
+        method,
+        order,
+        deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+        ag,
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        isDcOp: false,
+        isTransient: true,
+        xfact: 1,
+        gmin: 1e-12,
+        uic: false,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+      };
+
+      mem.load(ctx);
+
+      // Assert per-step integration constants (spec: assert dt, order, method)
+      expect(ctx.dt).toBe(dt);
+      expect(ctx.order).toBe(order);
+      expect(ctx.method).toBe(method);
+
+      // Assert stamped conductance is bit-exact G(w0) (zero voltage → w constant)
+      // stampG stamps G on [nA-1,nA-1] — matValues[0] after fill(0) is G_ref.
+      const h00 = handleIndex.get("0,0")!;
+      expect(matValues[h00]).toBe(G_ref);
+
+      // Call accept() with zero voltages → dWdt=0 → w unchanged
+      mem.accept(ctx, step * dt, () => {});
+
+      // w must remain w0 bit-exactly (zero current means no state evolution)
+      expect(mem.w).toBe(w0);
+    }
   });
 });

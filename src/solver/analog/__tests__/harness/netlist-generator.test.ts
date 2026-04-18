@@ -16,7 +16,7 @@ import { PropertyBag } from "../../../../core/properties.js";
 import { AbstractCircuitElement } from "../../../../core/element.js";
 import type { RenderContext } from "../../../../core/element.js";
 import type { Pin } from "../../../../core/pin.js";
-import type { AnalogElement } from "../../element.js";
+import type { AnalogElement, LoadContext } from "../../element.js";
 import type { StatePool } from "../../state-pool.js";
 
 describe("BJT_MAPPING companion current slots", () => {
@@ -75,8 +75,7 @@ class TestCircuitElement extends AbstractCircuitElement {
 function makeAnalogEl(pinNodeIds: number[]): AnalogElement {
   return {
     pinNodeIds, allNodeIds: pinNodeIds, branchIndex: -1,
-    stamp: () => {}, stampNonlinear: () => {},
-    updateOperatingPoint: () => {}, isLinear: true, isReactive: false,
+    load: (_ctx: LoadContext) => void 0, isNonlinear: false, isReactive: false,
     label: "test", stateSchema: { slots: [] }, stateBaseOffset: 0,
     stateSize: 0, initState: () => {}, getPinCurrents: () => [],
     setParam: () => {}, isPoolBacked: false,

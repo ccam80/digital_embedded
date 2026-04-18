@@ -111,6 +111,68 @@
       }
     },
     {
+      "id": "batch-C3b",
+      "phase": "phase_catchup Wave C3b: Extended test-side migration (39 test files + production-side cleanup — see spec/phase-catchup-c3b.md)",
+      "task_groups": [
+        "C3b.1",
+        "C3b.2",
+        "C3b.3",
+        "C3b.4",
+        "C3b.5",
+        "C3b.6",
+        "C3b.7",
+        "C3b.8",
+        "C3b.prod"
+      ],
+      "tasks": [
+        [
+          "C3b.1"
+        ],
+        [
+          "C3b.2"
+        ],
+        [
+          "C3b.3"
+        ],
+        [
+          "C3b.4"
+        ],
+        [
+          "C3b.5"
+        ],
+        [
+          "C3b.6"
+        ],
+        [
+          "C3b.7"
+        ],
+        [
+          "C3b.8"
+        ],
+        [
+          "C3b.prod"
+        ]
+      ],
+      "spawned": 15,
+      "completed": 7,
+      "verifications_passed": 9,
+      "verifications_failed": 0,
+      "stops_for_clarification": 2,
+      "dead_implementers": 7,
+      "dead_verifiers": 0,
+      "group_status": {
+        "C3b.1": "passed",
+        "C3b.2": "passed",
+        "C3b.3": "passed",
+        "C3b.4": "passed",
+        "C3b.5": "passed",
+        "C3b.6": "passed",
+        "C3b.7": "passed",
+        "C3b.8": "passed",
+        "C3b.prod": "passed"
+      }
+    },
+    {
       "id": "batch-4",
       "phase": "phase_catchup Waves C4 + C5 (parity tests + SparseSolver.stamp deletion — C5 split into 5 sub-batches of 5 files each per spec/phase-catchup-c5-batches.md)",
       "task_groups": [
@@ -152,12 +214,12 @@
           "C5.e"
         ]
       ],
-      "spawned": 13,
-      "completed": 7,
+      "spawned": 16,
+      "completed": 10,
       "verifications_passed": 5,
       "verifications_failed": 3,
       "stops_for_clarification": 0,
-      "dead_implementers": 5,
+      "dead_implementers": 6,
       "dead_verifiers": 1,
       "group_status": {
         "C4.passive_reactive": "pending",
@@ -318,5 +380,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-18T04:27:55.465Z"
+  "last_updated": "2026-04-18T09:48:39.236Z"
 }

@@ -9,17 +9,20 @@
  *   - Integration: diode + resistor DC operating point vs SPICE reference
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { DiodeDefinition, createDiodeElement, computeJunctionCapacitance, DIODE_PARAM_DEFAULTS } from "../diode.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
-import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, runDcOp, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
 
 // ---------------------------------------------------------------------------
 // Helper: allocate a StatePool for a single element and call initState
@@ -64,14 +67,90 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
 }
 
 // ---------------------------------------------------------------------------
-// Mock SparseSolver
+// Real-solver helpers
 // ---------------------------------------------------------------------------
 
-function makeMockSolver() {
+/**
+ * Drive an element to steady operating point by iterating load(ctx) with a
+ * fresh SparseSolver each iteration. Each call reads ctx.voltages and
+ * re-writes SLOT_VD via pnjlim.
+ */
+/**
+ * Build a bare LoadContext for a single-element unit test. Caller owns the
+ * solver, the state pool, and the voltages buffer — makeSimpleCtx would
+ * re-run allocateStatePool and wipe already-seeded pool state.
+ */
+function buildUnitCtx(
+  solver: SparseSolver,
+  voltages: Float64Array,
+  overrides: Partial<LoadContext> = {},
+): LoadContext {
   return {
-    stamp: vi.fn(),
-    stampRHS: vi.fn(),
-  } as unknown as SparseSolverType;
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+    ...overrides,
+  };
+}
+
+/**
+ * Drive an element to steady operating point by iterating load(ctx) with a
+ * fresh SparseSolver each iteration. Pool state persists across iterations
+ * because the element and its pool are kept in the outer scope.
+ */
+function driveToOp(
+  element: AnalogElement,
+  voltages: Float64Array,
+  iterations: number,
+  opts: { matrixSize?: number; limitingCollector?: LimitingEvent[] | null; iteration?: number } = {},
+): void {
+  const matrixSize = opts.matrixSize ?? Math.max(voltages.length, element.pinNodeIds.length, 1);
+  for (let i = 0; i < iterations; i++) {
+    const solver = new SparseSolver();
+    solver.beginAssembly(matrixSize);
+    const ctx = buildUnitCtx(solver, voltages, {
+      limitingCollector: opts.limitingCollector ?? null,
+      iteration: opts.iteration ?? 0,
+    });
+    element.load(ctx);
+  }
+}
+
+/** Load element into a fresh real SparseSolver and return the (row,col,value) entries. */
+function stampAndCaptureEntries(
+  element: AnalogElement,
+  voltages: Float64Array,
+  matrixSize: number,
+): { stamps: Array<[number, number, number]>; rhs: Array<[number, number]>; solver: SparseSolver } {
+  const solver = new SparseSolver();
+  solver.beginAssembly(matrixSize);
+  const ctx = buildUnitCtx(solver, voltages);
+  element.load(ctx);
+
+  const entries = solver.getCSCNonZeros();
+  const stamps: Array<[number, number, number]> = entries.map((e) => [e.row, e.col, e.value]);
+  const rhsVec = solver.getRhsSnapshot();
+  const rhs: Array<[number, number]> = [];
+  for (let i = 0; i < rhsVec.length; i++) {
+    if (rhsVec[i] !== 0) rhs.push([i, rhsVec[i]]);
+  }
+  return { stamps, rhs, solver };
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +159,8 @@ function makeMockSolver() {
 
 /**
  * Create a diode element and drive it to a specific operating point by
- * calling updateOperatingPoint with a voltages array set to the desired Vd.
+ * calling load(ctx) repeatedly against a fresh solver each iteration to
+ * settle SLOT_VD through pnjlim.
  *
  * nodeAnode=1, nodeCathode=2, so solver indices are 0 and 1.
  * Vd = voltages[0] - voltages[1]
@@ -94,16 +174,12 @@ function makeDiodeAtVd(
   const { element: statedCore } = withState(core);
   const element = withNodeIds(statedCore, [1, 2]);
 
-  // Drive the element to the operating point by calling updateOperatingPoint
-  // multiple times to converge the pnjlim limiting
+  // Drive the element to the operating point by calling load(ctx) multiple
+  // times to converge pnjlim limiting.
   const voltages = new Float64Array(2);
-  // Set target voltage on anode
   voltages[0] = vd;
   voltages[1] = 0;
-  for (let i = 0; i < 50; i++) {
-    element.updateOperatingPoint!(voltages);
-    voltages[0] = vd;
-  }
+  driveToOp(element, voltages, 50, { matrixSize: 2 });
   return element;
 }
 
@@ -118,12 +194,8 @@ describe("Diode", () => {
     const nVt = N * VT;
 
     const element = makeDiodeAtVd(0.7, { IS, N });
-    const solver = makeMockSolver();
-
-    element.stampNonlinear!(solver);
-
-    const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
-    const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
+    const voltages = new Float64Array([0.7, 0]);
+    const { stamps: stampCalls, rhs: rhsCalls } = stampAndCaptureEntries(element, voltages, 2);
 
     // At Vd = 0.7V, geq = IS * exp(Vd/nVt) / nVt + GMIN
     const expVal = Math.exp(0.7 / nVt);
@@ -149,11 +221,8 @@ describe("Diode", () => {
     const N = 1;
 
     const element = makeDiodeAtVd(-5, { IS, N });
-    const solver = makeMockSolver();
-
-    element.stampNonlinear!(solver);
-
-    const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
+    const voltages = new Float64Array([-5, 0]);
+    const { stamps: stampCalls } = stampAndCaptureEntries(element, voltages, 2);
 
     // At Vd = -5V, geq ≈ GMIN (exp(-5/0.026) ≈ 0)
     // All 4 conductance stamps should be very small (≈ GMIN)
@@ -170,22 +239,28 @@ describe("Diode", () => {
 
     // Start at vd = 0.3V
     const propsObj = makeParamBag({ IS, N, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
-    const { element, pool } = withState(createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj));
+    const { element: stated, pool } = withState(createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj));
+    const element = withNodeIds(stated, [1, 2]);
 
     const voltages = new Float64Array(2);
     voltages[0] = 0.3;
     voltages[1] = 0;
 
     // Drive to 0.3V operating point
-    for (let i = 0; i < 20; i++) {
-      element.updateOperatingPoint!(voltages);
-      voltages[0] = 0.3;
-    }
+    driveToOp(element, voltages, 20, { matrixSize: 2 });
 
     // Now simulate a large NR step to 5.0V
     voltages[0] = 5.0;
     voltages[1] = 0;
-    element.updateOperatingPoint!(voltages);
+    const jumpSolver = new SparseSolver();
+    const jumpCtx = makeSimpleCtx({
+      solver: jumpSolver,
+      elements: [element],
+      matrixSize: 2,
+      nodeCount: 2,
+    });
+    jumpCtx.loadCtx.voltages = voltages;
+    element.load(jumpCtx.loadCtx);
 
     // Voltages array must be unchanged — no write-back
     expect(voltages[0]).toBe(5.0);
@@ -205,39 +280,25 @@ describe("Diode", () => {
     const FC = 0.5;
 
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, CJO, VJ, M, TT: 0, FC });
-    const { element } = withState(createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj));
+    const { element: stated } = withState(createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj));
+    const element = withNodeIds(stated, [1, 2]);
 
     // isReactive should be true when CJO > 0
     expect(element.isReactive).toBe(true);
 
-    // Call stampCompanion at Vd = -2V
+    // load() at Vd = -2V in transient mode stamps reactive companion inline.
     const voltages = new Float64Array(2);
     voltages[0] = -2; // anode at -2V
     voltages[1] = 0;  // cathode at 0V
 
-    // updateOperatingPoint first to set state
-    element.updateOperatingPoint!(voltages);
-
-    // Now call stampCompanion
-    expect(element.stampCompanion).toBeDefined();
-
-    element.stampCompanion!(1e-6, "trapezoidal", voltages, 1, [1e-6]);
-
-    // Now load should include capacitor contributions
-    const capStamps: [number, number, number][] = [];
-    const capHandles: [number, number][] = [];
-    const capSolver = {
-      allocElement: (row: number, col: number) => { capHandles.push([row, col]); return capHandles.length - 1; },
-      stampElement: (h: number, v: number) => { const [r, c] = capHandles[h]; capStamps.push([r, c, v]); },
-      stampRHS: (_row: number, _v: number) => {},
-    } as unknown as SparseSolverType;
-    const capCtx = {
+    const capSolver = new SparseSolver();
+    const capCtx: LoadContext = {
       solver: capSolver,
       voltages,
       iteration: 0,
-      initMode: "initFloat" as const,
+      initMode: "initFloat",
       dt: 1e-6,
-      method: "trapezoidal" as const,
+      method: "trapezoidal",
       order: 1,
       deltaOld: [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6],
       ag: new Float64Array(8),
@@ -252,6 +313,7 @@ describe("Diode", () => {
       reltol: 1e-3,
       iabstol: 1e-12,
     };
+    capSolver.beginAssembly(2);
     element.load(capCtx);
 
     // Verify Cj computation: CJO / (1 - Vd/VJ)^M at Vd = -2V
@@ -261,6 +323,7 @@ describe("Diode", () => {
     expect(expectedCj).toBeCloseTo(CJO / Math.pow(1 - (-2) / VJ, M), 14);
 
     // After load(), conductance entries must have been placed
+    const capStamps = capSolver.getCSCNonZeros();
     expect(capStamps.length).toBeGreaterThan(0);
   });
 
@@ -301,20 +364,23 @@ describe("Diode", () => {
     // primeJunctions sets primedVd=0 (OFF path)
     el.primeJunctions!();
 
-    // Consume the primed voltage by calling updateOperatingPoint.
+    // Consume the primed voltage by calling load(ctx).
     // Voltages array values don't matter — primedVd overrides them.
     const voltages = new Float64Array(2);
     voltages[0] = 5; // would give Vd=5V without OFF, but primed=0 overrides
     voltages[1] = 0;
-    el.updateOperatingPoint!(voltages);
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    el.load(buildUnitCtx(solver, voltages));
 
-    // After primeJunctions + updateOperatingPoint, SLOT_VD (index 0) must be 0.
+    // After primeJunctions + load, SLOT_VD (index 0) must be 0.
     expect(pool.state0[0]).toBeCloseTo(0, 10);
 
     // checkConvergence with initFix mode must return true (OFF suppresses noncon).
     pool.initMode = "initFix";
-    const prevVoltages = new Float64Array(2);
-    const converged = el.checkConvergence!(voltages, prevVoltages, 1e-3, 1e-12);
+    const convSolver = new SparseSolver();
+    convSolver.beginAssembly(2);
+    const converged = el.checkConvergence!(buildUnitCtx(convSolver, voltages, { initMode: "initFix" }));
     expect(converged).toBe(true);
   });
 
@@ -335,11 +401,13 @@ describe("Diode", () => {
     // primeJunctions sets primedVd=IC=0.5 (UIC path)
     el.primeJunctions!();
 
-    // Consume the primed voltage.
+    // Consume the primed voltage via load(ctx).
     const voltages = new Float64Array(2);
     voltages[0] = 0;
     voltages[1] = 0;
-    el.updateOperatingPoint!(voltages);
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    el.load(buildUnitCtx(solver, voltages));
 
     // SLOT_VD (index 0) must be 0.5V (pnjlim does not limit 0.5V from 0V
     // because 0.5 < vcrit ≈ 0.725V, so no clamping occurs).
@@ -361,7 +429,8 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
-    stamp(solver: SparseSolverType): void {
+    load(ctx): void {
+      const solver = ctx.solver;
       if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
       if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
       if (nodeA !== 0 && nodeB !== 0) {
@@ -487,28 +556,32 @@ describe("setParam mutates params object (not captured locals)", () => {
 // LimitingEvent instrumentation tests
 // ---------------------------------------------------------------------------
 
-import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
-
 describe("Diode LimitingEvent instrumentation", () => {
-  function makeDiodeWithState(modelParams: Record<string, number> = {}) {
+  function makeDiodeWithState(modelParams: Record<string, number> = {}): AnalogElement {
     const props = makeParamBag({ IS: 1e-14, N: 1, ...modelParams });
     const pinNodes = new Map([["A", 1], ["K", 2]]);
-    const core = createDiodeElement(pinNodes, [], -1, props) as any;
-    core.label = "D1";
-    core.elementIndex = 3;
-    const pool = new StatePool(core.stateSize);
-    core.stateBaseOffset = 0;
-    core.initState(pool);
-    return core;
+    const core = createDiodeElement(pinNodes, [], -1, props) as AnalogElementCore;
+    (core as { label: string }).label = "D1";
+    (core as { elementIndex: number }).elementIndex = 3;
+    const pool = new StatePool((core as unknown as { stateSize: number }).stateSize);
+    (core as { stateBaseOffset: number }).stateBaseOffset = 0;
+    (core as unknown as ReactiveAnalogElement).initState(pool);
+    return withNodeIds(core, [1, 2]);
+  }
+
+  function loadOnce(element: AnalogElement, voltages: Float64Array, collector: LimitingEvent[] | null, iteration = 1): void {
+    const solver = new SparseSolver();
+    solver.beginAssembly(Math.max(voltages.length, element.pinNodeIds.length));
+    element.load(buildUnitCtx(solver, voltages, { limitingCollector: collector, iteration }));
   }
 
   it("pushes AK pnjlim event when limitingCollector provided", () => {
-    const core = makeDiodeWithState();
+    const element = makeDiodeWithState();
     const voltages = new Float64Array(10);
     voltages[0] = 5.0; // node 1 = anode
 
     const collector: LimitingEvent[] = [];
-    core.updateOperatingPoint(voltages, collector);
+    loadOnce(element, voltages, collector);
 
     expect(collector.length).toBeGreaterThanOrEqual(1);
     const ev = collector[0];
@@ -522,25 +595,24 @@ describe("Diode LimitingEvent instrumentation", () => {
     expect(ev.wasLimited).toBe(ev.vAfter !== ev.vBefore);
   });
 
-  it("does not throw when limitingCollector is null or undefined", () => {
-    const core = makeDiodeWithState();
+  it("does not throw when limitingCollector is null", () => {
+    const element = makeDiodeWithState();
     const voltages = new Float64Array(10);
     voltages[0] = 5.0;
-    expect(() => core.updateOperatingPoint(voltages, null)).not.toThrow();
-    expect(() => core.updateOperatingPoint(voltages, undefined)).not.toThrow();
+    expect(() => loadOnce(element, voltages, null)).not.toThrow();
   });
 
   it("wasLimited=true when large forward step forces pnjlim to clamp", () => {
-    const core = makeDiodeWithState({ IS: 1e-14, N: 1 });
+    const element = makeDiodeWithState({ IS: 1e-14, N: 1 });
     // First call to establish vdOld near 0
     const voltages = new Float64Array(10);
     voltages[0] = 0.0;
-    core.updateOperatingPoint(voltages, null);
+    loadOnce(element, voltages, null);
 
     // Now a large jump: should be limited
     voltages[0] = 10.0;
     const collector: LimitingEvent[] = [];
-    core.updateOperatingPoint(voltages, collector);
+    loadOnce(element, voltages, collector);
 
     const ev = collector[0];
     expect(ev.wasLimited).toBe(true);
@@ -548,16 +620,16 @@ describe("Diode LimitingEvent instrumentation", () => {
   });
 
   it("wasLimited=false for small voltage steps near operating point", () => {
-    const core = makeDiodeWithState({ IS: 1e-14, N: 1 });
+    const element = makeDiodeWithState({ IS: 1e-14, N: 1 });
     const voltages = new Float64Array(10);
     voltages[0] = 0.6;
     // Warm up to vdOld ≈ 0.6
-    core.updateOperatingPoint(voltages, null);
+    loadOnce(element, voltages, null);
 
     // Tiny step — should not be limited
     voltages[0] = 0.601;
     const collector: LimitingEvent[] = [];
-    core.updateOperatingPoint(voltages, collector);
+    loadOnce(element, voltages, collector);
 
     const ev = collector[0];
     expect(ev.wasLimited).toBe(false);
@@ -665,34 +737,21 @@ describe("IBV knee iteration (Change 32)", () => {
 // ---------------------------------------------------------------------------
 
 describe("IKF/IKR high-injection correction (Change 33)", () => {
-  function diodeGd(vd: number, overrides: Record<string, number> = {}): number {
+  function diodeSlot(vd: number, slot: number, overrides: Record<string, number> = {}): number {
     const props = makeParamBag({ IS: 1e-14, N: 1, ...overrides });
-    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as any;
-    const pool = new StatePool(core.stateSize);
-    core.stateBaseOffset = 0;
-    core.initState(pool);
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as AnalogElementCore;
+    const pool = new StatePool((core as unknown as { stateSize: number }).stateSize);
+    (core as { stateBaseOffset: number }).stateBaseOffset = 0;
+    (core as unknown as ReactiveAnalogElement).initState(pool);
+    const element = withNodeIds(core, [1, 2]);
     const voltages = new Float64Array(10);
     voltages[0] = vd;
-    for (let i = 0; i < 50; i++) {
-      core.updateOperatingPoint(voltages);
-      voltages[0] = vd;
-    }
-    return pool.state0[1]; // SLOT_GEQ
+    driveToOp(element, voltages, 50, { matrixSize: 10 });
+    return pool.state0[slot];
   }
 
-  function diodeId(vd: number, overrides: Record<string, number> = {}): number {
-    const props = makeParamBag({ IS: 1e-14, N: 1, ...overrides });
-    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as any;
-    const pool = new StatePool(core.stateSize);
-    core.stateBaseOffset = 0;
-    core.initState(pool);
-    const voltages = new Float64Array(10);
-    voltages[0] = vd;
-    for (let i = 0; i < 50; i++) {
-      core.updateOperatingPoint(voltages);
-      voltages[0] = vd;
-    }
-    return pool.state0[3]; // SLOT_ID
+  function diodeGd(vd: number, overrides: Record<string, number> = {}): number {
+    return diodeSlot(vd, 1, overrides); // SLOT_GEQ
   }
 
   it("IKF=Infinity leaves gd equal to IKF=Infinity case", () => {
@@ -758,16 +817,14 @@ describe("IKF/IKR high-injection correction (Change 33)", () => {
 describe("AREA scaling (Change 34)", () => {
   function diodeOP(vd: number, overrides: Record<string, number> = {}): { id: number; gd: number } {
     const props = makeParamBag({ IS: 1e-14, N: 1, RS: 0, CJO: 0, ...overrides });
-    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as any;
-    const pool = new StatePool(core.stateSize);
-    core.stateBaseOffset = 0;
-    core.initState(pool);
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as AnalogElementCore;
+    const pool = new StatePool((core as unknown as { stateSize: number }).stateSize);
+    (core as { stateBaseOffset: number }).stateBaseOffset = 0;
+    (core as unknown as ReactiveAnalogElement).initState(pool);
+    const element = withNodeIds(core, [1, 2]);
     const voltages = new Float64Array(10);
     voltages[0] = vd;
-    for (let i = 0; i < 50; i++) {
-      core.updateOperatingPoint(voltages);
-      voltages[0] = vd;
-    }
+    driveToOp(element, voltages, 50, { matrixSize: 10 });
     return { id: pool.state0[3], gd: pool.state0[1] }; // SLOT_ID, SLOT_GEQ
   }
 
@@ -890,40 +947,23 @@ describe("integration", () => {
     const q1_val = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevId);
     pool.state1[7] = q1_val; // SLOT_Q = 7
 
-    // Build minimal LoadContext for transient step
-    const stamps: Array<[number, number, number]> = [];
-    const rhs: Array<[number, number]> = [];
-    const mockSolver = {
-      stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
-      stampRHS: (r: number, v: number) => rhs.push([r, v]),
-      beginAssembly: () => {},
-      endAssembly: () => {},
-    } as any;
+    // Real SparseSolver — anode=node 1 mapped to row 0, cathode=ground.
+    const solver = new SparseSolver();
+    solver.beginAssembly(1);
 
     pool.ag.set(ag);
-    const ctx = {
-      solver: mockSolver,
-      voltages: new Float64Array([vd, 0]),
-      iteration: 0,
-      initMode: "transient" as const,
+    const ctx = buildUnitCtx(solver, new Float64Array([vd, 0]), {
+      initMode: "transient",
       dt,
-      method: "trapezoidal" as const,
+      method: "trapezoidal",
       order: 2,
       deltaOld: [dt, dt, dt, dt, dt, dt, dt],
       ag,
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
       isDcOp: false,
       isTransient: true,
-      xfact: 1,
-      gmin: 1e-12,
-      uic: false,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-    };
+    });
 
-    core.load(ctx);
+    (core as AnalogElementCore as unknown as { load(c: LoadContext): void }).load(ctx);
 
     // Compute expected values using the same formula
     const idRaw = IS * (Math.exp(vd / (N * VT)) - 1);
@@ -936,13 +976,11 @@ describe("integration", () => {
     const capGeq_expected = ag[0] * Ctotal;
     const capIeq_expected = ccap_expected - capGeq_expected * vd;
 
-    // Find the capacitance stamp at (nodeAnode-1, nodeAnode-1) = (0,0)
-    const capStamp = stamps.find(([r, c]) => r === 0 && c === 0);
-    expect(capStamp).not.toBeUndefined();
-    // The stamp at (0,0) includes both the diode geq and capGeq. Extract capGeq.
-    // capGeq and diode geq are stamped separately — capGeq entry appears after diode stamps.
-    // We verify by checking that the total (0,0) stamp includes capGeq_expected contribution.
-    const total00 = stamps.filter(([r, c]) => r === 0 && c === 0).reduce((sum, s) => sum + s[2], 0);
+    // The stamp at (0,0) is the sum of diode geq and capGeq contributions.
+    const entries = solver.getCSCNonZeros();
+    const total00 = entries
+      .filter((e) => e.row === 0 && e.col === 0)
+      .reduce((sum, e) => sum + e.value, 0);
     const gd_at_vd = IS * Math.exp(vd / (N * VT)) / (N * VT) + 1e-12;
     expect(total00).toBe(gd_at_vd + capGeq_expected);
 

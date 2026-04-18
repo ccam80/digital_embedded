@@ -8,13 +8,13 @@
  *   Comparator::zero_crossing_detector       — V-=0V; V+ sweeps through 0; clean transition
  *   Comparator::response_time                — step input; transition completes within responseTime
  *
- * Testing approach: drive updateOperatingPoint() with synthetic voltage vectors
- * and inspect stampNonlinear() calls to observe the output state. For the
- * response_time test, drive stampCompanion() in a time-stepped loop and verify
- * the output weight converges within the specified time constant.
+ * Testing approach: drive load(ctx) with synthetic voltage vectors and
+ * inspect captured stamp entries to observe the output state. For the
+ * response_time test, drive load(ctx) + accept(ctx) in a time-stepped loop
+ * and verify the output weight converges within the specified time constant.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { VoltageComparatorDefinition } from "../comparator.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -29,17 +29,9 @@ function getFactory(entry: ModelEntry): AnalogFactory {
   return entry.factory;
 }
 
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function makeMockSolver() {
-  return {
-    stamp: vi.fn(),
-    stampRHS: vi.fn(),
-  } as unknown as SparseSolverType;
-}
 
 const COMPARATOR_MODEL_PARAM_KEYS = new Set(["hysteresis", "vos", "rSat", "responseTime"]);
 
@@ -85,14 +77,17 @@ function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float
 }
 
 /**
- * Get the total conductance after calling load(ctx) (includes incremental updates).
- * Calls load() first to get the baseline, then stampNonlinear() to get the delta.
+ * Stamp the element once via load(ctx) at the given voltages and return the
+ * total conductance on the output node's diagonal.
  */
-function readTotalOutputConductance(element: AnalogElement, nOut: number): number {
+function readTotalOutputConductance(
+  element: AnalogElement,
+  nOut: number,
+  voltages: Float64Array,
+): number {
   const { solver, stamps } = makeComparatorCaptureSolver();
-  const ctx = makeComparatorParityCtx(new Float64Array(3), solver);
+  const ctx = makeComparatorParityCtx(voltages, solver);
   element.load(ctx);
-  element.stampNonlinear!(solver);
   return stamps
     .filter((s) => s.row === nOut - 1 && s.col === nOut - 1)
     .reduce((sum, s) => sum + s.value, 0);
@@ -112,11 +107,10 @@ describe("Comparator", () => {
 
     // Set V+ = 2V, V- = 1V → output should activate
     const voltages = makeVoltages(3, { 1: 2.0, 2: 1.0, 3: 0.0 });
-    cmp.updateOperatingPoint!(voltages);
 
     // The active (sinking) state stamps G_sat on output node diagonal
     const G_sat = 1 / rSat;
-    const g = readTotalOutputConductance(cmp, nOut);
+    const g = readTotalOutputConductance(cmp, nOut, voltages);
     expect(g).toBeCloseTo(G_sat, 6);
   });
 
@@ -130,11 +124,10 @@ describe("Comparator", () => {
 
     // Set V+ = 1V, V- = 2V → output should be inactive (high-impedance)
     const voltages = makeVoltages(3, { 1: 1.0, 2: 2.0, 3: 0.0 });
-    cmp.updateOperatingPoint!(voltages);
 
     // Inactive state: G_off = 1/R_OFF
     const G_off = 1 / R_OFF;
-    const g = readTotalOutputConductance(cmp, nOut);
+    const g = readTotalOutputConductance(cmp, nOut, voltages);
     expect(g).toBeCloseTo(G_off, 15);
   });
 
@@ -149,25 +142,25 @@ describe("Comparator", () => {
     // Start with output inactive (V+ < V-)
     const vRef = 1.0; // reference on V-
     const vStart = makeVoltages(3, { 1: vRef - 0.006, 2: vRef, 3: 0.0 });
-    cmp.updateOperatingPoint!(vStart);
 
     const R_OFF = 1e9;
     const G_off = 1 / R_OFF;
 
     // Verify initial state is inactive
-    const gBefore = readTotalOutputConductance(cmp, nOut);
+    const gBefore = readTotalOutputConductance(cmp, nOut, vStart);
     expect(gBefore).toBeCloseTo(G_off, 12);
 
     // Oscillate ±5mV around threshold (just inside hysteresis band)
     // The half-band is 5mV; voltages of ±4mV are within the dead band.
     const perturbations = [-0.004, +0.004, -0.004, +0.004, -0.004, +0.004];
+    let vLast = vStart;
     for (const delta of perturbations) {
-      const v = makeVoltages(3, { 1: vRef + delta, 2: vRef, 3: 0.0 });
-      cmp.updateOperatingPoint!(v);
+      vLast = makeVoltages(3, { 1: vRef + delta, 2: vRef, 3: 0.0 });
+      readTotalOutputConductance(cmp, nOut, vLast);
     }
 
     // Output must still be inactive after all the perturbations
-    const gAfter = readTotalOutputConductance(cmp, nOut);
+    const gAfter = readTotalOutputConductance(cmp, nOut, vLast);
     expect(gAfter).toBeCloseTo(G_off, 12);
   });
 
@@ -183,16 +176,16 @@ describe("Comparator", () => {
     const G_sat = 1 / rSat;
 
     // V+ = -1V → output inactive
-    cmp.updateOperatingPoint!(makeVoltages(3, { 1: -1.0, 2: 0.0, 3: 0.0 }));
-    expect(readTotalOutputConductance(cmp, nOut)).toBeCloseTo(G_off, 12);
+    expect(readTotalOutputConductance(cmp, nOut, makeVoltages(3, { 1: -1.0, 2: 0.0, 3: 0.0 })))
+      .toBeCloseTo(G_off, 12);
 
     // V+ = +0.1V → output active (V+ > V- + vos ≈ 0.001)
-    cmp.updateOperatingPoint!(makeVoltages(3, { 1: 0.1, 2: 0.0, 3: 0.0 }));
-    expect(readTotalOutputConductance(cmp, nOut)).toBeCloseTo(G_sat, 6);
+    expect(readTotalOutputConductance(cmp, nOut, makeVoltages(3, { 1: 0.1, 2: 0.0, 3: 0.0 })))
+      .toBeCloseTo(G_sat, 6);
 
     // V+ = -0.1V → output inactive again
-    cmp.updateOperatingPoint!(makeVoltages(3, { 1: -0.1, 2: 0.0, 3: 0.0 }));
-    expect(readTotalOutputConductance(cmp, nOut)).toBeCloseTo(G_off, 12);
+    expect(readTotalOutputConductance(cmp, nOut, makeVoltages(3, { 1: -0.1, 2: 0.0, 3: 0.0 })))
+      .toBeCloseTo(G_off, 12);
   });
 
   it("response_time", () => {
@@ -200,29 +193,33 @@ describe("Comparator", () => {
     // responseTime = 1µs. After 5 time constants (5µs) the output weight
     // should have settled to > 99% of its final value (fully active).
     //
-    // The stampCompanion method advances _outputWeight toward the target
-    // using a first-order filter: alpha = dt/(tau+dt).
-    // After N steps of dt each, the weight should be ≥ 0.99.
+    // accept(ctx) advances _outputWeight toward the target using a first-order
+    // filter: alpha = dt/(tau+dt). After N accepted timesteps of dt each, the
+    // weight should be ≥ 0.99.
     const nInp = 1, nInn = 2, nOut = 3;
     const responseTime = 1e-6; // 1 µs
     const rSat = 50;
     const cmp = makeComparator(nInp, nInn, nOut, { responseTime, rSat, hysteresis: 0, vos: 0 });
 
-    // Step: V+ = 3V, V- = 1V → activates immediately in updateOperatingPoint
-    cmp.updateOperatingPoint!(makeVoltages(3, { 1: 3.0, 2: 1.0, 3: 0.0 }));
+    // Step: V+ = 3V, V- = 1V → activates immediately on first load()
+    const voltages = makeVoltages(3, { 1: 3.0, 2: 1.0, 3: 0.0 });
 
-    // Step through time: 10 steps of 0.5µs each = 5µs total
+    // Advance via accept() for 10 steps of 0.5µs each = 5µs total.
+    // load(ctx) each iteration to update _outputActive, then accept(ctx) to
+    // advance the first-order filter state by dt.
     const dt = 0.5e-6;
     const steps = 10;
-    const voltages = makeVoltages(3, { 1: 3.0, 2: 1.0, 3: 0.0 });
     for (let i = 0; i < steps; i++) {
-      cmp.stampCompanion!(dt, "bdf1", voltages);
+      const { solver } = makeComparatorCaptureSolver();
+      const ctx = makeComparatorTransientCtx(voltages, solver, dt);
+      cmp.load(ctx);
+      cmp.accept?.(ctx, i * dt, () => {});
     }
 
     // After 5τ the weight should be > 99% active → conductance near G_sat
     const G_sat = 1 / rSat;
     const G_off = 1 / 1e9;
-    const gFinal = readTotalOutputConductance(cmp, nOut);
+    const gFinal = readTotalOutputConductance(cmp, nOut, voltages);
 
     // gFinal should be within 1% of G_sat
     expect(gFinal).toBeGreaterThan(G_sat * 0.99);
@@ -299,6 +296,34 @@ function makeComparatorParityCtx(voltages: Float64Array, solver: SparseSolverTyp
     limitingCollector: null,
     isDcOp: true,
     isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+function makeComparatorTransientCtx(
+  voltages: Float64Array,
+  solver: SparseSolverType,
+  dt: number,
+): LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "transient",
+    dt,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: true,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

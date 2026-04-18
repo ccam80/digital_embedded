@@ -20,6 +20,77 @@ import {
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
+import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+
+// ---------------------------------------------------------------------------
+// Capture solver — records stamp tuples via the real allocElement/stampElement
+// API so tests can read back what load() wrote.
+// ---------------------------------------------------------------------------
+
+interface CaptureStamp { row: number; col: number; value: number; }
+interface CaptureRhs { row: number; value: number; }
+
+function makeCaptureSolver(): {
+  solver: SparseSolverType;
+  stamps: CaptureStamp[];
+  rhs: CaptureRhs[];
+} {
+  const stamps: CaptureStamp[] = [];
+  const rhs: CaptureRhs[] = [];
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stampRHS: (row: number, value: number) => {
+      rhs.push({ row, value });
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps, rhs };
+}
+
+// ---------------------------------------------------------------------------
+// Build a minimal LoadContext for accept() calls. NTCThermistor.accept reads
+// ctx.dt and ctx.voltages; no solver stamps occur inside accept.
+// ---------------------------------------------------------------------------
+
+function makeAcceptCtx(voltages: Float64Array, dt: number): import("../../../solver/analog/load-context.js").LoadContext {
+  return {
+    solver: undefined as unknown as SparseSolverType,
+    voltages,
+    iteration: 0,
+    initMode: "transient",
+    dt,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+    ag: new Float64Array(7),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: true,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -113,14 +184,15 @@ describe("NTC", () => {
       });
 
       const initialTemp = ntc.temperature;
-      const voltages = new Float64Array(3);
+      const voltages = new Float64Array(2);
       voltages[0] = 1.0; // node 1 at 1V
       voltages[1] = 0.0; // node 2 at 0V
 
       // Run many timesteps to accumulate heating
       const dt = 1e-4;
+      const ctx = makeAcceptCtx(voltages, dt);
       for (let i = 0; i < 5000; i++) {
-        ntc.updateState(dt, voltages);
+        ntc.accept(ctx, 0, () => {});
       }
 
       expect(ntc.temperature).toBeGreaterThan(initialTemp);
@@ -145,15 +217,16 @@ describe("NTC", () => {
       });
 
       const voltage = 1.0; // V across the thermistor
-      const voltages = new Float64Array(3);
+      const voltages = new Float64Array(2);
       voltages[0] = voltage;
       voltages[1] = 0.0;
 
       // Run to steady state: time constant = R_thermal * C_thermal = 100 * 0.001 = 0.1s
       // Run for 10× time constant = 1s with dt=1ms
       const dt = 1e-3;
+      const ctx = makeAcceptCtx(voltages, dt);
       for (let i = 0; i < 2000; i++) {
-        ntc.updateState(dt, voltages);
+        ntc.accept(ctx, 0, () => {});
       }
 
       // At equilibrium: P = V²/R(T_eq), T_eq = T_ambient + P · R_thermal
@@ -200,22 +273,25 @@ describe("NTC", () => {
     });
   });
 
-  describe("stampNonlinear", () => {
+  describe("load", () => {
     it("stamps conductance between nodes", () => {
       const ntc = makeNTC({ r0: 10000, temperature: 298.15 });
-      const stamps: Array<[number, number, number]> = [];
-      const mockSolver = {
-        stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
-        stampRHS: () => {},
-      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
+      const { solver, stamps } = makeCaptureSolver();
+      const ctx = makeSimpleCtx({
+        solver,
+        elements: [ntc as unknown as AnalogElement],
+        matrixSize: 2,
+        nodeCount: 2,
+      });
 
-      ntc.stampNonlinear(mockSolver);
+      ntc.load(ctx);
 
       const G = 1 / ntc.resistance();
-      expect(stamps).toContainEqual([0, 0, G]);
-      expect(stamps).toContainEqual([0, 1, -G]);
-      expect(stamps).toContainEqual([1, 0, -G]);
-      expect(stamps).toContainEqual([1, 1, G]);
+      const tuples = stamps.map((s) => [s.row, s.col, s.value] as [number, number, number]);
+      expect(tuples).toContainEqual([0, 0, G]);
+      expect(tuples).toContainEqual([0, 1, -G]);
+      expect(tuples).toContainEqual([1, 0, -G]);
+      expect(tuples).toContainEqual([1, 1, G]);
     });
   });
 
@@ -245,5 +321,67 @@ describe("NTC", () => {
     it("branchCount is false", () => {
       expect((NTCThermistorDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBeFalsy();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ntc_load_dcop_parity — C4.1 / Task 6.2.1
+//
+// NTC at 25°C nominal (T = T₀ = 298.15 K), self-heating OFF.
+// Default params: r0=10000, beta=3950, t0=298.15, temperature=298.15.
+// At T = T₀: R = r0 · exp(beta · (1/T - 1/T₀)) = 10000 · exp(0) = 10000 Ω.
+// G = 1 / R = 1 / 10000.
+//
+// NGSPICE reference: ngspice resload.c stamps G=1/R. For a linear resistor at
+// T=T₀ the B-parameter exponent is zero, so G = 1/r0 exactly.
+// Nodes: pos=1 → idx 0, neg=2 → idx 1. matrixSize=2, nodeCount=2.
+// ---------------------------------------------------------------------------
+
+describe("ntc_load_dcop_parity", () => {
+  it("NTC at 25°C (T=T₀) G=1/r0=1/10000 bit-exact", () => {
+    const props = new PropertyBag();
+    props.replaceModelParams(NTC_DEFAULTS);
+    // Ensure temperature equals t0 so exponent is zero
+    props.setModelParam("temperature", NTC_DEFAULTS.t0);
+
+    const core = createNTCThermistorElement(
+      new Map([["pos", 1], ["neg", 2]]),
+      [],
+      -1,
+      props,
+      () => 0,
+    );
+    const analogElement = Object.assign(core, {
+      pinNodeIds: [1, 2] as readonly number[],
+      allNodeIds: [1, 2] as readonly number[],
+    }) as unknown as AnalogElement;
+
+    const stampCtx = makeSimpleCtx({
+      elements: [analogElement],
+      matrixSize: 2,
+      nodeCount: 2,
+    });
+    stampCtx.solver.beginAssembly(2);
+    analogElement.load(stampCtx.loadCtx);
+    stampCtx.solver.finalize();
+    const stamps = stampCtx.solver.getCSCNonZeros();
+
+    // NGSPICE ref: G = 1/r0 when T == T₀ (exponent = 0, exp(0) = 1).
+    // Single IEEE-754 division: 1 / 10000.
+    const NGSPICE_G_REF = 1 / NTC_DEFAULTS.r0;
+
+    const e00 = stamps.find((e) => e.row === 0 && e.col === 0);
+    expect(e00).toBeDefined();
+    expect(e00!.value).toBe(NGSPICE_G_REF);
+
+    const e11 = stamps.find((e) => e.row === 1 && e.col === 1);
+    expect(e11).toBeDefined();
+    expect(e11!.value).toBe(NGSPICE_G_REF);
+
+    const e01 = stamps.find((e) => e.row === 0 && e.col === 1);
+    expect(e01!.value).toBe(-NGSPICE_G_REF);
+
+    const e10 = stamps.find((e) => e.row === 1 && e.col === 0);
+    expect(e10!.value).toBe(-NGSPICE_G_REF);
   });
 });

@@ -15,6 +15,49 @@ import { LDRElement, LDRDefinition, createLDRElement, LDR_DEFAULTS } from "../ld
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
+import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+
+// ---------------------------------------------------------------------------
+// Capture solver — records stamp tuples via the real allocElement/stampElement
+// API so tests can read back what load() wrote. Used where tests assert on
+// the exact matrix entries produced by a single load(ctx) call.
+// ---------------------------------------------------------------------------
+
+interface CaptureStamp { row: number; col: number; value: number; }
+interface CaptureRhs { row: number; value: number; }
+
+function makeCaptureSolver(): {
+  solver: SparseSolverType;
+  stamps: CaptureStamp[];
+  rhs: CaptureRhs[];
+} {
+  const stamps: CaptureStamp[] = [];
+  const rhs: CaptureRhs[] = [];
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stampRHS: (row: number, value: number) => {
+      rhs.push({ row, value });
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps, rhs };
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -114,52 +157,59 @@ describe("LDR", () => {
       const R = ldr.resistance();
       const expectedG = 1 / R;
 
-      const stamps: Array<[number, number, number]> = [];
-      const mockSolver = {
-        stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
-        stampRHS: () => {},
-      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
-
-      ldr.stampNonlinear(mockSolver);
+      const { solver, stamps } = makeCaptureSolver();
+      const ctx = makeSimpleCtx({
+        solver,
+        elements: [ldr as unknown as AnalogElement],
+        matrixSize: 2,
+        nodeCount: 2,
+      });
+      ldr.load(ctx);
 
       // Check that diagonal conductance matches expected
-      const diagStamp = stamps.find(([r, c]) => r === 0 && c === 0);
+      const diagStamp = stamps.find((s) => s.row === 0 && s.col === 0);
       expect(diagStamp).toBeDefined();
-      expect(diagStamp![2]).toBeCloseTo(expectedG, 10);
+      expect(diagStamp!.value).toBeCloseTo(expectedG, 10);
     });
   });
 
-  describe("stampNonlinear", () => {
+  describe("load", () => {
     it("stamps conductance between the two nodes", () => {
       const ldr = makeLDR({ rDark: 1e6, luxRef: 1000, gamma: 0.7, lux: 1000 });
-      const stamps: Array<[number, number, number]> = [];
-      const mockSolver = {
-        stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
-        stampRHS: () => {},
-      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
+      const { solver, stamps } = makeCaptureSolver();
+      const ctx = makeSimpleCtx({
+        solver,
+        elements: [ldr as unknown as AnalogElement],
+        matrixSize: 2,
+        nodeCount: 2,
+      });
 
-      ldr.stampNonlinear(mockSolver);
+      ldr.load(ctx);
 
       const G = 1 / ldr.resistance();
-      expect(stamps).toContainEqual([0, 0, G]);
-      expect(stamps).toContainEqual([0, 1, -G]);
-      expect(stamps).toContainEqual([1, 0, -G]);
-      expect(stamps).toContainEqual([1, 1, G]);
+      const tuples = stamps.map((s) => [s.row, s.col, s.value] as [number, number, number]);
+      expect(tuples).toContainEqual([0, 0, G]);
+      expect(tuples).toContainEqual([0, 1, -G]);
+      expect(tuples).toContainEqual([1, 0, -G]);
+      expect(tuples).toContainEqual([1, 1, G]);
     });
 
     it("lux=0 stamps dark conductance", () => {
       const rDark = 1e6;
       const ldr = makeLDR({ rDark, lux: 0 });
-      const stamps: Array<[number, number, number]> = [];
-      const mockSolver = {
-        stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
-        stampRHS: () => {},
-      } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
+      const { solver, stamps } = makeCaptureSolver();
+      const ctx = makeSimpleCtx({
+        solver,
+        elements: [ldr as unknown as AnalogElement],
+        matrixSize: 2,
+        nodeCount: 2,
+      });
 
-      ldr.stampNonlinear(mockSolver);
+      ldr.load(ctx);
 
       const G = 1 / rDark;
-      expect(stamps).toContainEqual([0, 0, G]);
+      const tuples = stamps.map((s) => [s.row, s.col, s.value] as [number, number, number]);
+      expect(tuples).toContainEqual([0, 0, G]);
     });
   });
 
@@ -190,5 +240,72 @@ describe("LDR", () => {
     it("branchCount is false", () => {
       expect((LDRDefinition.modelRegistry?.behavioral as {kind:"inline";factory:AnalogFactory;branchCount?:number}|undefined)?.branchCount).toBeFalsy();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ldr_load_dcop_parity — C4.1 / Task 6.2.1
+//
+// LDR at 1000 lux. Default params: rDark=1e6, luxRef=100, gamma=0.7, lux=1000.
+// R(1000lux) = rDark * (lux / luxRef)^(-gamma) = 1e6 * (1000/100)^(-0.7)
+//            = 1e6 * 10^(-0.7)
+// G = 1 / R(1000lux).
+//
+// NGSPICE reference: ngspice resload.c stamps G=1/R using a single division.
+// This test constructs the element via its factory with lux=1000 and asserts
+// the diagonal stamp equals the closed-form G bit-exact.
+// Nodes: pos=1 → idx 0, neg=2 → idx 1. matrixSize=2, nodeCount=2.
+// ---------------------------------------------------------------------------
+
+describe("ldr_load_dcop_parity", () => {
+  it("LDR at 1000lux G=1/(rDark*(lux/luxRef)^(-gamma)) bit-exact", () => {
+    const props = new PropertyBag();
+    props.replaceModelParams(LDR_DEFAULTS);
+    props.setModelParam("lux", 1000);
+
+    const core = createLDRElement(
+      new Map([["pos", 1], ["neg", 2]]),
+      [],
+      -1,
+      props,
+      () => 0,
+    );
+    const analogElement = Object.assign(core, {
+      pinNodeIds: [1, 2] as readonly number[],
+      allNodeIds: [1, 2] as readonly number[],
+    }) as unknown as AnalogElement;
+
+    const stampCtx = makeSimpleCtx({
+      elements: [analogElement],
+      matrixSize: 2,
+      nodeCount: 2,
+    });
+    stampCtx.solver.beginAssembly(2);
+    analogElement.load(stampCtx.loadCtx);
+    stampCtx.solver.finalize();
+    const stamps = stampCtx.solver.getCSCNonZeros();
+
+    // NGSPICE ref: G = 1/R where R = rDark * (lux/luxRef)^(-gamma).
+    // Inline closed-form — same IEEE-754 operations as LDRElement.resistance():
+    const rDark = LDR_DEFAULTS.rDark;
+    const luxRef = LDR_DEFAULTS.luxRef;
+    const gamma = LDR_DEFAULTS.gamma;
+    const lux = 1000;
+    const R_REF = rDark * Math.pow(lux / luxRef, -gamma);
+    const NGSPICE_G_REF = 1 / R_REF;
+
+    const e00 = stamps.find((e) => e.row === 0 && e.col === 0);
+    expect(e00).toBeDefined();
+    expect(e00!.value).toBe(NGSPICE_G_REF);
+
+    const e11 = stamps.find((e) => e.row === 1 && e.col === 1);
+    expect(e11).toBeDefined();
+    expect(e11!.value).toBe(NGSPICE_G_REF);
+
+    const e01 = stamps.find((e) => e.row === 0 && e.col === 1);
+    expect(e01!.value).toBe(-NGSPICE_G_REF);
+
+    const e10 = stamps.find((e) => e.row === 1 && e.col === 0);
+    expect(e10!.value).toBe(-NGSPICE_G_REF);
   });
 });

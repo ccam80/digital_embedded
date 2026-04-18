@@ -11,7 +11,7 @@
  *   - Component registration
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   NJfetDefinition,
   createNJfetElement,
@@ -20,6 +20,7 @@ import {
   SLOT_GD_JUNCTION,
   SLOT_ID_JUNCTION,
 } from "../njfet.js";
+import { VT } from "../../../core/constants.js";
 import {
   PJfetDefinition,
   createPJfetElement,
@@ -29,11 +30,12 @@ import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js"
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 
 // ---------------------------------------------------------------------------
 // withState — allocate a StatePool and call initState on the element
@@ -86,14 +88,33 @@ const PJFET_PARAMS = {
 };
 
 // ---------------------------------------------------------------------------
-// Mock SparseSolver
+// DC-OP LoadContext helper — fresh SparseSolver sized for matrixSize rows.
 // ---------------------------------------------------------------------------
 
-function makeMockSolver() {
+function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
+  const solver = new SparseSolver();
+  solver.beginAssembly(matrixSize);
   return {
-    stamp: vi.fn(),
-    stampRHS: vi.fn(),
-  } as unknown as SparseSolverType;
+    solver,
+    voltages,
+    iteration: 1,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +131,8 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
-    stamp(solver: SparseSolverType): void {
+    load(ctx: LoadContext): void {
+      const { solver } = ctx;
       if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
       if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
       if (nodeA !== 0 && nodeB !== 0) {
@@ -132,23 +154,24 @@ describe("NJFET", () => {
     // G=voltage[0]=-3V, D=voltage[1]=5V
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
-    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj));
+    const core = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj));
+    const element = withNodeIds(core, [1, 2, 0]); // [G, D, S]
 
     const voltages = new Float64Array(2);
     voltages[0] = -3; // V(G) = -3V → Vgs = -3V
     voltages[1] = 5;  // V(D) = 5V → Vds = 5V
 
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages, 2));
     }
 
-    const solver = makeMockSolver();
-    element.stampNonlinear!(solver);
+    const ctx = makeDcOpCtx(voltages, 2);
+    element.load(ctx);
+    const rhs = ctx.solver.getRhsSnapshot();
 
     // In cutoff: Norton current ≈ 0 (only GMIN leakage)
-    const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
-    for (const call of rhsCalls) {
-      expect(Math.abs(call[1] as number)).toBeLessThan(1e-9);
+    for (let i = 0; i < rhs.length; i++) {
+      expect(Math.abs(rhs[i])).toBeLessThan(1e-9);
     }
   });
 
@@ -161,26 +184,30 @@ describe("NJFET", () => {
     const params = { ...NJFET_PARAMS, LAMBDA: 0 };
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(params);
-    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj)) as unknown as NJfetAnalogElement;
+    const core = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj)) as unknown as NJfetAnalogElement;
+    const element = withNodeIds(core, [1, 2, 0]);
 
     const voltages = new Float64Array(2);
     voltages[0] = 0; // V(G) = 0V → Vgs = 0
     voltages[1] = 5; // V(D) = 5V → Vds = 5
 
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages, 2));
     }
 
     // Expected: Ids = beta/2 * (Vgs - Vp)^2 = 1e-4/2 * (0-(-2))^2 = 0.2mA
     const expectedIds = (params.BETA / 2) * Math.pow(0 - params.VTO, 2);
     expect(expectedIds).toBeCloseTo(0.2e-3, 8);
 
-    const solver = makeMockSolver();
-    element.stampNonlinear!(solver);
+    const ctx = makeDcOpCtx(voltages, 2);
+    element.load(ctx);
+    const rhs = ctx.solver.getRhsSnapshot();
 
     // Norton current at D should reflect Ids
-    const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
-    const hasSignificantCurrent = rhsCalls.some((c) => Math.abs(c[1] as number) > 1e-5);
+    let hasSignificantCurrent = false;
+    for (let i = 0; i < rhs.length; i++) {
+      if (Math.abs(rhs[i]) > 1e-5) { hasSignificantCurrent = true; break; }
+    }
     expect(hasSignificantCurrent).toBe(true);
   });
 
@@ -191,25 +218,29 @@ describe("NJFET", () => {
     const params = { ...NJFET_PARAMS, LAMBDA: 0 };
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(params);
-    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj)) as unknown as NJfetAnalogElement;
+    const core = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj)) as unknown as NJfetAnalogElement;
+    const element = withNodeIds(core, [1, 2, 0]);
 
     const voltages = new Float64Array(2);
     voltages[0] = 0;   // Vgs = 0
     voltages[1] = 0.5; // Vds = 0.5
 
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages, 2));
     }
 
     const expectedIds = params.BETA * (2 * 0.5 - 0.5 * 0.5 / 2);
     expect(expectedIds).toBeCloseTo(0.0875e-3, 10);
 
-    const solver = makeMockSolver();
-    element.stampNonlinear!(solver);
+    const ctx = makeDcOpCtx(voltages, 2);
+    element.load(ctx);
+    const rhs = ctx.solver.getRhsSnapshot();
 
     // Non-zero Norton current expected
-    const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
-    const hasLinearCurrent = rhsCalls.some((c) => Math.abs(c[1] as number) > 1e-6);
+    let hasLinearCurrent = false;
+    for (let i = 0; i < rhs.length; i++) {
+      if (Math.abs(rhs[i]) > 1e-6) { hasLinearCurrent = true; break; }
+    }
     expect(hasLinearCurrent).toBe(true);
   });
 
@@ -261,22 +292,27 @@ describe("NJFET", () => {
     // Create element with forward-biased gate
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
-    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj));
+    const core = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj));
+    const element = withNodeIds(core, [1, 2, 0]);
 
     const voltages = new Float64Array(2);
     voltages[0] = 0.7; // V(G) = 0.7V → Vgs = 0.7V
     voltages[1] = 0;   // V(D) = 0 → Vds = 0
 
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages, 2));
     }
 
-    const solver = makeMockSolver();
-    element.stampNonlinear!(solver);
+    const ctx = makeDcOpCtx(voltages, 2);
+    element.load(ctx);
+    const rhs = ctx.solver.getRhsSnapshot();
 
     // With forward bias, gate junction contributes current
-    const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
-    const maxRhs = Math.max(...rhsCalls.map((c) => Math.abs(c[1] as number)));
+    let maxRhs = 0;
+    for (let i = 0; i < rhs.length; i++) {
+      const abs = Math.abs(rhs[i]);
+      if (abs > maxRhs) maxRhs = abs;
+    }
     expect(maxRhs).toBeGreaterThan(1e-9); // measurable junction current
   });
 
@@ -319,7 +355,8 @@ describe("PJFET", () => {
     // Vsd = 5 - 0 = 5V → saturation (Vsd > Vsg - Vp = 3 - 2 = 1V)
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(PJFET_PARAMS);
-    const element = withState(createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj));
+    const core = withState(createPJfetElement(new Map([["G", 1], ["D", 2], ["S", 3]]), [], -1, propsObj));
+    const element = withNodeIds(core, [1, 2, 3]); // [G, D, S]
 
     // node1=G=2V, node2=D=0V, node3=S=5V
     const voltages = new Float64Array(3);
@@ -328,20 +365,24 @@ describe("PJFET", () => {
     voltages[2] = 5; // V(S) = 5V
 
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages, 3));
     }
 
-    const solver = makeMockSolver();
-    element.stampNonlinear!(solver);
+    const ctx = makeDcOpCtx(voltages, 3);
+    element.load(ctx);
+    const entries = ctx.solver.getCSCNonZeros();
+    const rhs = ctx.solver.getRhsSnapshot();
 
     // Device should be conducting: non-zero stamps expected
-    const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
-    const nonzeroStamps = stampCalls.filter((c) => Math.abs(c[2] as number) > 1e-15);
+    const nonzeroStamps = entries.filter((e) => Math.abs(e.value) > 1e-15);
     expect(nonzeroStamps.length).toBeGreaterThan(0);
 
     // RHS entries should be nonzero
-    const rhsCalls = (solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls;
-    const maxRhs = Math.max(...rhsCalls.map((c) => Math.abs(c[1] as number)));
+    let maxRhs = 0;
+    for (let i = 0; i < rhs.length; i++) {
+      const abs = Math.abs(rhs[i]);
+      if (abs > maxRhs) maxRhs = abs;
+    }
     expect(maxRhs).toBeGreaterThan(1e-10);
   });
 });
@@ -447,10 +488,11 @@ describe("JFET state-pool extension schema", () => {
     expect(pool.state0[SLOT_ID_JUNCTION]).toBe(0);
   });
 
-  it("junction_slots_are_written_by_updateOperatingPoint", () => {
+  it("junction_slots_are_written_by_load", () => {
     const propsObj = createTestPropertyBag();
     propsObj.replaceModelParams(NJFET_PARAMS);
-    const element = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj));
+    const core = withState(createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj));
+    const element = withNodeIds(core, [1, 2, 0]);
 
     // Forward-bias gate junction: V(G)=0.7V, V(S)=0V
     const voltages = new Float64Array(2);
@@ -458,7 +500,7 @@ describe("JFET state-pool extension schema", () => {
     voltages[1] = 0;
 
     for (let i = 0; i < 20; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(makeDcOpCtx(voltages, 2));
     }
 
     // After forward-bias iterations, GD_JUNCTION should be > GMIN (junction active)
@@ -496,5 +538,137 @@ describe("JFET state-pool extension schema", () => {
     // SLOT_V_GS and SLOT_V_GD are zero-initialised (first-call detection via s1[Q_GS]===0)
     expect(pool.state0[10]).toBe(0); // SLOT_V_GS = 10
     expect(pool.state0[11]).toBe(0); // SLOT_V_GD = 11
+  });
+});
+
+// ===========================================================================
+// jfet_load_dcop_parity
+//
+// Canonical common-source NJFET bias: Vgs=-1V, Vds=5V.
+// Standard SPICE-L1 Shichman-Hodges parameters: VTO=-2, BETA=1e-4, LAMBDA=0,
+// IS=1e-14, N=1, GMIN=1e-12.
+//
+// jfet1load.c variable mapping:
+//   vgs          → Vgs = -1V  (gate-source voltage)
+//   vds          → Vds =  5V  (drain-source voltage)
+//   vgst         → vgs - VTO = -1 - (-2) = 1V  (effective gate overdrive)
+//   beta         → BETA = 1e-4
+//   lambda       → LAMBDA = 0
+//   Saturation (vds=5 >= vgst=1):
+//     ids        = beta/2 * vgst² * (1 + lambda*vds) = 5e-5 A
+//     gm         = beta * vgst * (1 + lambda*vds) + GMIN = 1e-4 + GMIN
+//     gds        = beta/2 * vgst² * lambda + GMIN = GMIN
+//   Gate junction (vgs_junction=-1, reverse biased):
+//     vt_n       = VT * N
+//     expArg     = min(-1/vt_n, 80)  (large negative → exp ≈ 0)
+//     gd_jct     = IS/vt_n * exp(expArg) + GMIN ≈ GMIN
+//     id_jct     = IS*(exp(expArg)-1) ≈ -IS
+//     nortonIg   = id_jct - gd_jct * vgs_junction ≈ -IS + GMIN
+//   Norton (channel): nortonId = ids - gm*vgs - gds*vds
+//     = 5e-5 - (1e-4+GMIN)*(-1) - GMIN*5
+//     = 5e-5 + 1e-4 + GMIN - 5*GMIN
+//     = 1.5e-4 - 4*GMIN
+//
+// MNA node layout: G=1 (row/col 0), D=2 (row/col 1), S=0 (ground, skipped).
+// ===========================================================================
+
+describe("jfet_load_dcop_parity", () => {
+  it("saturation_bias_dcop_stamp_bit_exact_vs_ngspice_jfet1load_formula", () => {
+    const VGS = -1;
+    const VDS = 5;
+    const VTO = -2;
+    const BETA = 1e-4;
+    const LAMBDA = 0;
+    const IS = 1e-14;
+    const N = 1;
+    const GMIN = 1e-12;
+
+    // Build element: G=1, D=2, S=0 (source to ground), no caps.
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams({
+      VTO, BETA, LAMBDA, IS, N,
+      CGS: 0, CGD: 0, PB: 1.0, FC: 0.5,
+      RD: 0, RS: 0, KF: 0, AF: 1, TNOM: 27,
+    });
+    const core = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Seed SLOT_VGS (0) so channel limitVoltages passes through (vgsOld == vgsNew).
+    pool.state0[0] = VGS;
+    // Seed SLOT_VGS_JUNCTION (45) so gate-junction pnjlim passes through.
+    pool.state0[SLOT_VGS_JUNCTION] = VGS;
+
+    // MNA voltages: V(G=1)=VGS, V(D=2)=VDS (S=0 is ground).
+    const voltages = new Float64Array([VGS, VDS]);
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+
+    const ctx: LoadContext = {
+      solver,
+      voltages,
+      iteration: 1,
+      initMode: "initFloat",
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: GMIN,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    const el = withNodeIds(core as unknown as AnalogElementCore, [1, 2, 0]);
+    el.load(ctx);
+
+    // ---------------------------------------------------------------------------
+    // NGSPICE_REF: jfet1load.c saturation-region formulas
+    // ---------------------------------------------------------------------------
+    const NGSPICE_vgst = VGS - VTO;                              // = 1
+    // Saturation: vds=5 >= vgst=1
+    const NGSPICE_IDS = (BETA / 2) * NGSPICE_vgst * NGSPICE_vgst * (1 + LAMBDA * VDS);
+    const NGSPICE_GM  = BETA * NGSPICE_vgst * (1 + LAMBDA * VDS) + GMIN;
+    const NGSPICE_GDS = (BETA / 2) * NGSPICE_vgst * NGSPICE_vgst * LAMBDA + GMIN;
+    // Gate junction (reverse biased Vgs=-1V)
+    const NGSPICE_vt_n   = VT * N;
+    const NGSPICE_expArg = Math.min(VGS / NGSPICE_vt_n, 80);    // ≈ -38.7
+    const NGSPICE_GD_JCT = (IS / NGSPICE_vt_n) * Math.exp(NGSPICE_expArg) + GMIN;
+    const NGSPICE_ID_JCT = IS * (Math.exp(NGSPICE_expArg) - 1);
+    // Norton equivalents
+    const NGSPICE_nortonId  = NGSPICE_IDS - NGSPICE_GM * VGS - NGSPICE_GDS * VDS;
+    const NGSPICE_nortonIg  = NGSPICE_ID_JCT - NGSPICE_GD_JCT * VGS;
+
+    // ---------------------------------------------------------------------------
+    // Read assembled matrix entries by (row, col).
+    // G=1→row/col 0, D=2→row/col 1, S=0→ground (no stamps).
+    // ---------------------------------------------------------------------------
+    const entries = solver.getCSCNonZeros();
+    const sumAt = (row: number, col: number): number =>
+      entries
+        .filter((e) => e.row === row && e.col === col)
+        .reduce((acc, e) => acc + e.value, 0);
+
+    // G row (row=0): gate-junction self-conductance gd_jct at (G,G)
+    expect(sumAt(0, 0)).toBe(NGSPICE_GD_JCT);
+
+    // D row (row=1): gm from (D,G) and gds from (D,D)
+    expect(sumAt(1, 0)).toBe(NGSPICE_GM);
+    expect(sumAt(1, 1)).toBe(NGSPICE_GDS);
+
+    // RHS
+    const rhs = solver.getRhsSnapshot();
+    // G node RHS = -nortonIg
+    expect(rhs[0]).toBe(-NGSPICE_nortonIg);
+    // D node RHS = -nortonId
+    expect(rhs[1]).toBe(-NGSPICE_nortonId);
   });
 });

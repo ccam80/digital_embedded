@@ -202,3 +202,87 @@ describe("Potentiometer", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// potentiometer_load_dcop_parity — C4.1 / Task 6.2.1
+//
+// Pot at wiper=0.5, 10kΩ total. Each half is 5kΩ → G = 1/5000.
+// Nodes: A=1, B=2, W=3.  matrixSize=3 (no branch rows needed).
+//
+// NGSPICE reference: ngspice resload.c stamps G=1/R at (pos,pos), (neg,neg),
+// and -G at (pos,neg), (neg,pos) for each resistor sub-element.
+// Potentiometer = two series resistors sharing wiper node W.
+//   Top resistor (A↔W):  G_top = 1/R_top = 1/(10000*0.5) = 1/5000
+//   Bottom resistor (W↔B): G_bottom = 1/R_bottom = 1/(10000*0.5) = 1/5000
+// The factory calls new AnalogPotentiometerElement([A, B, W], R, position)
+// where the second arg is the wiper (middle) node.
+// Node indices in solver (0-based): A=0, B=1, W=2.
+// ---------------------------------------------------------------------------
+
+describe("potentiometer_load_dcop_parity", () => {
+  it("wiper=0.5 10kΩ pot G_top=G_bottom=1/5000 bit-exact", () => {
+    const props = new PropertyBag();
+    props.setModelParam("resistance", 10000);
+    props.setModelParam("position", 0.5);
+
+    const core = getFactory(PotentiometerDefinition.modelRegistry!.behavioral!)(
+      new Map([["A", 1], ["B", 2], ["W", 3]]),
+      [],
+      -1,
+      props,
+      () => 0,
+    );
+    // Factory constructs AnalogPotentiometerElement([A_node, B_node, W_node], R, pos)
+    // = ([1, 2, 3], 10000, 0.5) → pinNodeIds[0]=A=1, pinNodeIds[1]=B=2, pinNodeIds[2]=W=3
+    const analogElement = Object.assign(core, {
+      pinNodeIds: core.pinNodeIds ?? [1, 2, 3] as readonly number[],
+      allNodeIds: core.allNodeIds ?? [1, 2, 3] as readonly number[],
+    }) as unknown as AnalogElement;
+
+    const stampCtx = makeSimpleCtx({
+      elements: [analogElement],
+      matrixSize: 3,
+      nodeCount: 3,
+    });
+    stampCtx.solver.beginAssembly(3);
+    analogElement.load(stampCtx.loadCtx);
+    stampCtx.solver.finalize();
+    const stamps = stampCtx.solver.getCSCNonZeros();
+
+    // NGSPICE ref: G = 1/R = 1 / (R_total * position) = 1 / (10000 * 0.5)
+    // This is a single IEEE-754 division: 1 / 5000.
+    const NGSPICE_G_REF = 1 / 5000;
+
+    // Solver uses 0-based indices. Node mapping: A=1→idx0, B=2→idx1, W=3→idx2.
+    // Factory: new AnalogPotentiometerElement([A=1, B=2, W=3], 10000, 0.5).
+    // load() uses: n_A=pinNodeIds[0]=1, n_W(code label)=pinNodeIds[1]=2, n_B(code label)=pinNodeIds[2]=3.
+    // Top resistor stamps between A(idx0) and pinNodeIds[1]=B(idx1).
+    // Bottom resistor stamps between pinNodeIds[1]=B(idx1) and pinNodeIds[2]=W(idx2).
+    // So: diag[0]=G_top, diag[1]=G_top+G_bottom, diag[2]=G_bottom.
+
+    const eAA = stamps.find((e) => e.row === 0 && e.col === 0);
+    expect(eAA).toBeDefined();
+    expect(eAA!.value).toBe(NGSPICE_G_REF);
+
+    // B is the middle node — receives G_top from the A–B segment and G_bottom from the B–W segment.
+    const eBB = stamps.find((e) => e.row === 1 && e.col === 1);
+    expect(eBB).toBeDefined();
+    expect(eBB!.value).toBe(NGSPICE_G_REF + NGSPICE_G_REF);
+
+    const eWW = stamps.find((e) => e.row === 2 && e.col === 2);
+    expect(eWW).toBeDefined();
+    expect(eWW!.value).toBe(NGSPICE_G_REF);
+
+    // Off-diagonal entries -G_top (A↔B cross terms, solver indices 0↔1)
+    const eAB = stamps.find((e) => e.row === 0 && e.col === 1);
+    expect(eAB!.value).toBe(-NGSPICE_G_REF);
+    const eBA = stamps.find((e) => e.row === 1 && e.col === 0);
+    expect(eBA!.value).toBe(-NGSPICE_G_REF);
+
+    // Off-diagonal entries -G_bottom (B↔W cross terms, solver indices 1↔2)
+    const eBW = stamps.find((e) => e.row === 1 && e.col === 2);
+    expect(eBW!.value).toBe(-NGSPICE_G_REF);
+    const eWB = stamps.find((e) => e.row === 2 && e.col === 1);
+    expect(eWB!.value).toBe(-NGSPICE_G_REF);
+  });
+});

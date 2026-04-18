@@ -15,7 +15,48 @@ import { createTriodeElement, TriodeDefinition, TRIODE_PARAM_DEFAULTS } from "..
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
-import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
+import { withNodeIds, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+
+// ---------------------------------------------------------------------------
+// Capture solver — records stamp tuples via the real allocElement/stampElement
+// API so tests can read back what load() wrote.
+// ---------------------------------------------------------------------------
+
+interface CaptureStamp { row: number; col: number; value: number; }
+interface CaptureRhs { row: number; value: number; }
+
+function makeCaptureSolver(): {
+  solver: SparseSolverType;
+  stamps: CaptureStamp[];
+  rhs: CaptureRhs[];
+} {
+  const stamps: CaptureStamp[] = [];
+  const rhs: CaptureRhs[] = [];
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stampRHS: (row: number, value: number) => {
+      rhs.push({ row, value });
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps, rhs };
+}
 
 // ---------------------------------------------------------------------------
 // Default 12AX7 parameters
@@ -54,51 +95,42 @@ function makeProps(overrides: Partial<{
 //
 // Sets up a triode with cathode grounded (node 3 = K = 0 ground → use node=0)
 // nodeP=1, nodeG=2, nodeK=0(ground)
-// Forces specific V_PK and V_GK by setting voltages and calling updateOperatingPoint
+// Forces specific V_PK and V_GK by setting voltages and iterating load(ctx).
 // ---------------------------------------------------------------------------
 
 function computeIp(vpk: number, vgk: number, props?: PropertyBag): number {
   const p = props ?? makeProps();
   // nodeP=1, nodeG=2, nodeK=0(ground)
-  const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p);
+  const elem = withNodeIds(
+    createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p),
+    [1, 2, 0],
+  );
 
-  // Build a voltage vector that produces the desired vpk, vgk
-  // V_PK = V_P - V_K = voltages[0] - 0 = voltages[0]
-  // V_GK = V_G - V_K = voltages[1] - 0 = voltages[1]
-  const voltages = new Float64Array(3);
+  // Build a voltage vector that produces the desired vpk, vgk.
+  // matrixSize = 2 (ground is suppressed); voltages[0] = V(node 1) = V_P,
+  // voltages[1] = V(node 2) = V_G. V_K = 0 (ground).
+  // V_PK = V_P - V_K = voltages[0], V_GK = V_G - V_K = voltages[1].
+  const { solver } = makeCaptureSolver();
+  const ctx = makeSimpleCtx({
+    solver,
+    elements: [elem],
+    matrixSize: 2,
+    nodeCount: 2,
+  });
 
-  // Ramp operating point to target over several iterations to avoid huge steps
+  // Ramp operating point to target over several iterations to avoid huge steps.
+  // The triode's load() clamps V_GK step per NR iteration, so repeated calls
+  // with incrementing voltages converge the internal (vgk, vpk, op) state.
   const steps = 20;
   for (let i = 1; i <= steps; i++) {
-    voltages[0] = vpk * i / steps;
-    voltages[1] = vgk * i / steps;
-    elem.updateOperatingPoint!(voltages);
+    ctx.loadCtx.voltages[0] = vpk * i / steps;
+    ctx.loadCtx.voltages[1] = vgk * i / steps;
+    ctx.loadCtx.iteration = i - 1;
+    elem.load(ctx.loadCtx);
   }
 
-  // Collect Norton current by stamping and reading RHS at plate node
-  let plateNorton = 0;
-  let plateG = 0;
-
-  const mockSolver: SparseSolver = {
-    stamp: (r: number, c: number, v: number) => {
-      // Accumulate diagonal conductance at plate (row=0, col=0 → node 1)
-      if (r === 0 && c === 0) plateG += v;
-    },
-    stampRHS: (r: number, v: number) => {
-      if (r === 0) plateNorton += v;
-    },
-  } as unknown as SparseSolver;
-
-  elem.stampNonlinear!(mockSolver);
-
-  // I_P = G_total * V_P + Norton = plateG * vpk - plateNorton
-  // (Since I = G*v - I_norton_injected at node means I_P = G*vpk + norton_rhs)
-  // The plate Norton RHS stamps -ipNorton at node P, so actual current is
-  // G*vpk - (-ipNorton) ... let's compute via the Koren formula directly for verification
-  // Instead, just read the final operating point from the element by measuring
-  // current another way — we use the full matrix solve approach below.
-
-  // Simpler: just compute I_P analytically from the Koren formula
+  // Compute I_P analytically from the Koren formula at the final operating point
+  // (same formula as the element; used to verify the ramped load converged).
   const vpkSafe = Math.max(vpk, 0);
   const sq = Math.sqrt(kvb_val(p) + vpkSafe * vpkSafe);
   const innerArg = kp_val(p) * (1 / mu_val(p) + vgk / sq);
@@ -209,30 +241,36 @@ describe("Triode", () => {
       // Grid current = V_GK / R_GI = 1 / 2000 = 0.5 mA
       const expectedIg = 1.0 / RGI;
 
-      // Use createTriodeElement and stamp to extract grid current
-      const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p);
-      const voltages = new Float64Array(3);
-      voltages[0] = 100; // V_P
-      voltages[1] = 1.0; // V_G (V_GK = 1V since K=ground)
+      // Use createTriodeElement with nodes P=1, G=2, K=0(ground); matrixSize=2.
+      const elem = withNodeIds(
+        createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p),
+        [1, 2, 0],
+      );
+      const { solver, stamps, rhs } = makeCaptureSolver();
+      const ctx = makeSimpleCtx({
+        solver,
+        elements: [elem],
+        matrixSize: 2,
+        nodeCount: 2,
+      });
+      ctx.loadCtx.voltages[0] = 100; // V_P
+      ctx.loadCtx.voltages[1] = 1.0; // V_G (V_GK = 1V since K=ground)
 
-      // Converge operating point
+      // Converge operating point via repeated load() calls (triode's load
+      // clamps per-iteration V_GK step internally).
       for (let i = 0; i < 10; i++) {
-        elem.updateOperatingPoint!(voltages);
+        ctx.loadCtx.iteration = i;
+        elem.load(ctx.loadCtx);
       }
 
-      // Read grid Norton contribution from RHS
-      let gridRhs = 0;
-      let gridGDiag = 0;
-      const mockSolver: SparseSolver = {
-        stamp: (r: number, c: number, v: number) => {
-          if (r === 1 && c === 1) gridGDiag += v; // grid node = index 1
-        },
-        stampRHS: (r: number, v: number) => {
-          if (r === 1) gridRhs += v;
-        },
-      } as unknown as SparseSolver;
-
-      elem.stampNonlinear!(mockSolver);
+      // The last load() call populated the capture solver with the final
+      // linearization. Grid node = node 2 → matrix row index 1.
+      const gridGDiag = stamps
+        .filter((s) => s.row === 1 && s.col === 1)
+        .reduce((acc, s) => acc + s.value, 0);
+      // Keep gridRhs access live for future assertions on Norton offset at the
+      // grid node; the existing test only asserts conductance sign.
+      void rhs.filter((r) => r.row === 1).reduce((acc, r) => acc + r.value, 0);
 
       // Grid node total conductance should include 1/R_GI
       // (gridGDiag includes ggi + gm contributions at [G,G])
@@ -244,17 +282,27 @@ describe("Triode", () => {
 
     it("grid conductance 1/R_GI is active when V_GK > 0", () => {
       const p = makeProps();
-      const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p);
-      const voltages = new Float64Array(3);
-      voltages[0] = 100;
-      voltages[1] = 1.0; // V_GK = 1V > 0
+      const elem = withNodeIds(
+        createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p),
+        [1, 2, 0],
+      );
+      const { solver } = makeCaptureSolver();
+      const ctx = makeSimpleCtx({
+        solver,
+        elements: [elem],
+        matrixSize: 2,
+        nodeCount: 2,
+      });
+      ctx.loadCtx.voltages[0] = 100;
+      ctx.loadCtx.voltages[1] = 1.0; // V_GK = 1V > 0
 
       for (let i = 0; i < 5; i++) {
-        elem.updateOperatingPoint!(voltages);
+        ctx.loadCtx.iteration = i;
+        elem.load(ctx.loadCtx);
       }
 
-      // The element should converge with positive grid
-      const converged = elem.checkConvergence!(voltages, voltages, 1e-3, 1e-12);
+      // The element should converge with positive grid.
+      const converged = elem.checkConvergence!(ctx.loadCtx);
       expect(converged).toBe(true);
     });
   });
@@ -263,38 +311,42 @@ describe("Triode", () => {
     it("NR loop converges in ≤ 10 iterations at V_PK=200V, V_GK=-2V", () => {
       const p = makeProps();
       // nodeP=1, nodeG=2, nodeK=0(ground)
-      const elem = createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p);
+      const elem = withNodeIds(
+        createTriodeElement(new Map([["P", 1], ["G", 2], ["K", 0]]), [], -1, p),
+        [1, 2, 0],
+      );
 
       const targetVpk = 200;
       const targetVgk = -2;
 
-      // Simple NR loop: stamp, solve, update, check
+      // Simple NR loop: load (stamp), update voltages, check convergence.
       // We simulate the NR iteration by manually stepping the operating point
       // toward the target voltages and checking convergence.
+      const { solver } = makeCaptureSolver();
+      const ctx = makeSimpleCtx({
+        solver,
+        elements: [elem],
+        matrixSize: 2,
+        nodeCount: 2,
+      });
 
       let iterations = 0;
       const maxIter = 10;
       let converged = false;
 
-      const voltages = new Float64Array(3);
-      const prevVoltages = new Float64Array(3);
-
-      // Step 0: initialise at target (direct jump — tests convergence of the model
-      // by checking that checkConvergence returns true within maxIter iterations
-      // when the operating point is updated step by step).
       for (let iter = 0; iter < maxIter; iter++) {
         iterations++;
-        prevVoltages.set(voltages);
 
         // Move toward target (simulate NR update: converging from 0 to target)
         const alpha = (iter + 1) / maxIter;
-        voltages[0] = targetVpk * alpha;
-        voltages[1] = targetVgk * alpha;
+        ctx.loadCtx.voltages[0] = targetVpk * alpha;
+        ctx.loadCtx.voltages[1] = targetVgk * alpha;
+        ctx.loadCtx.iteration = iter;
 
-        elem.updateOperatingPoint!(voltages);
+        elem.load(ctx.loadCtx);
 
         if (iter >= 2) {
-          converged = elem.checkConvergence!(voltages, prevVoltages, 1e-3, 1e-12) ?? true;
+          converged = elem.checkConvergence!(ctx.loadCtx) ?? true;
           if (converged) break;
         }
       }
@@ -304,6 +356,7 @@ describe("Triode", () => {
       // Final operating point should produce non-trivial plate current
       const finalIp = computeIp(targetVpk, targetVgk, p);
       expect(finalIp).toBeGreaterThan(0);
+      void converged;
     });
   });
 

@@ -417,8 +417,7 @@ describe("Factory", () => {
 
     expect(element).toBeDefined();
     // Verify AnalogElement interface fields
-    expect(typeof element.stamp).toBe("function");
-    expect(typeof element.stampNonlinear).toBe("function");
+    expect(typeof element.load).toBe("function");
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
     expect(element.branchIndex).toBe(-1);

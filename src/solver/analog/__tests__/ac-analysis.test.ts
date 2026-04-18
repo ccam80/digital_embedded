@@ -19,9 +19,8 @@
 import { describe, it, expect } from "vitest";
 import { AcAnalysis, buildFrequencyArray } from "../ac-analysis.js";
 import type { AcCompiledCircuit } from "../ac-analysis.js";
-import type { AnalogElement } from "../element.js";
+import type { AnalogElement, LoadContext } from "../element.js";
 import type { ComplexSparseSolver } from "../element.js";
-import type { SparseSolver } from "../sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Inline test element helpers
@@ -48,9 +47,7 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
-    stamp(_solver: SparseSolver): void {
-      // Real-domain stamp (not used in AC path)
-    },
+    load(_ctx: LoadContext): void {},
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
     stampAc(solver: ComplexSparseSolver, _omega: number): void {
@@ -77,7 +74,7 @@ function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): Ana
     branchIndex: -1,
     isNonlinear: false,
     isReactive: true,
-    stamp(_solver: SparseSolver): void {},
+    load(_ctx: LoadContext): void {},
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
     stampAc(solver: ComplexSparseSolver, omega: number): void {
@@ -105,7 +102,7 @@ function makeAcInductor(nodeA: number, nodeB: number, inductance: number): Analo
     branchIndex: -1,
     isNonlinear: false,
     isReactive: true,
-    stamp(_solver: SparseSolver): void {},
+    load(_ctx: LoadContext): void {},
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
     stampAc(solver: ComplexSparseSolver, omega: number): void {

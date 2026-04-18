@@ -28,6 +28,8 @@ import { makeVoltageSource, makeResistor } from "../../../solver/analog/__tests_
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { makeDiagnostic } from "../../../solver/analog/diagnostics.js";
+import { computeNIcomCof } from "../../../solver/analog/integration.js";
+import type { IntegrationMethod } from "../../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -81,17 +83,33 @@ function makeStubSolver(): { solver: SparseSolverType; stamps: StampCall[]; rhsS
   return { solver, stamps, rhsStamps };
 }
 
-function makeStubCtx(solver: SparseSolverType): LoadContext {
+function makeStubCtx(
+  solver: SparseSolverType,
+  opts: {
+    voltages?: Float64Array;
+    dt?: number;
+    method?: IntegrationMethod;
+    order?: number;
+    initMode?: LoadContext["initMode"];
+  } = {},
+): LoadContext {
+  const dt = opts.dt ?? 1e-9;
+  const method: IntegrationMethod = opts.method ?? "bdf1";
+  const order = opts.order ?? 1;
+  const deltaOld = [dt, dt, dt, dt, dt, dt, dt];
+  const ag = new Float64Array(8);
+  const scratch = new Float64Array(64);
+  if (dt > 0) computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
   return {
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
-    voltages: new Float64Array(200),
+    voltages: opts.voltages ?? new Float64Array(200),
     iteration: 0,
-    initMode: "initFloat",
-    dt: 0,
-    method: "trapezoidal",
-    order: 1,
-    deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(8),
+    initMode: opts.initMode ?? "initTran",
+    dt,
+    method,
+    order,
+    deltaOld,
+    ag,
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
@@ -188,18 +206,14 @@ describe("TLine", () => {
 
       const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
 
-      // Pool setup required before stampCompanion (pool-backed architecture)
+      // Pool setup required before load (pool-backed architecture)
       { const re = el as import("../../../solver/analog/element.js").ReactiveAnalogElement;
         const pool = new StatePool(Math.max(re.stateSize, 1));
         re.stateBaseOffset = 0; re.initState(pool); }
 
-      // Set up companion model (dt=1ns, BDF-1) before stamping so inductors are active
       const voltages = new Float64Array(6 + N);
-      el.stampCompanion!(1e-9, "bdf1", voltages, 1, [1e-9]);
-
       const { solver, stamps } = makeStubSolver();
-      el.load(makeStubCtx(solver));
-      el.stampReactiveCompanion?.(solver);
+      el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "bdf1", order: 1, initMode: "initTran" }));
 
       // For a lossless line all resistive stamps (R_seg) should be zero conductance
       // or equivalent to MIN_CONDUCTANCE (1e-12 S). The inductors will also stamp
@@ -207,7 +221,7 @@ describe("TLine", () => {
       // Key assertion: no negative off-diagonal entries from resistors should be
       // present with magnitude > 1e-6 (which would indicate a real resistive stamp).
       // Filter for off-diagonal stamps that could be from resistors (not inductors).
-      // Since after stampCompanion the inductor geq = L/dt which is large, we can
+      // Since after load the inductor geq = L/dt which is large, we can
       // check that no large conductance values appear that are inconsistent with
       // pure inductive behavior.
 
@@ -242,7 +256,7 @@ describe("TLine", () => {
       expect(cSeg).toBeCloseTo(20e-12, 18);
 
       // Verify these match what the element stamps by checking geq of the first
-      // inductor segment after stampCompanion with BDF-1 (geq = L/dt)
+      // inductor segment after load with BDF-1 (geq = L/dt)
       const props = new PropertyBag();
       props.setModelParam("impedance", Z0);
       props.setModelParam("delay", delay);
@@ -259,18 +273,15 @@ describe("TLine", () => {
         new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0,
       );
 
-      // Pool setup required before stampCompanion (pool-backed architecture)
+      // Pool setup required before load (pool-backed architecture)
       { const re = el as import("../../../solver/analog/element.js").ReactiveAnalogElement;
         const pool = new StatePool(Math.max(re.stateSize, 1));
         re.stateBaseOffset = 0; re.initState(pool); }
 
       const dt = 1e-9;
       const voltages = new Float64Array(nodeCount + N);
-      el.stampCompanion!(dt, "bdf1", voltages, 1, [dt]);
-
       const { solver, stamps } = makeStubSolver();
-      el.load(makeStubCtx(solver));
-      el.stampReactiveCompanion?.(solver);
+      el.load(makeStubCtx(solver, { voltages, dt, method: "bdf1", order: 1, initMode: "initTran" }));
 
       // BDF-1 geq = L/dt. For each segment's inductor (SegmentInductorElement):
       // geq = lSeg / dt = 50e-9 / 1e-9 = 50
@@ -811,21 +822,18 @@ describe("TransmissionLine", () => {
       const firstBranch = nodeCount;
       const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), firstBranch, props, () => 0);
 
-      // Pool setup required before stampCompanion (pool-backed architecture)
+      // Pool setup required before load (pool-backed architecture)
       { const re = el as import("../../../solver/analog/element.js").ReactiveAnalogElement;
         const pool = new StatePool(Math.max(re.stateSize, 1));
         re.stateBaseOffset = 0; re.initState(pool); }
 
       const voltages = new Float64Array(nodeCount + 3);
-      el.stampCompanion!(1e-9, "bdf1", voltages, 1, [1e-9]);
-
       const { solver, stamps } = makeStubSolver();
-      el.load(makeStubCtx(solver));
-      el.stampReactiveCompanion?.(solver);
+      el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "bdf1", order: 1, initMode: "initTran" }));
       expect(stamps.length).toBeGreaterThan(0);
     });
 
-    it("stampCompanion is defined", () => {
+    it("load is defined", () => {
       const props = new PropertyBag();
       props.setModelParam("segments", 3);
       props.setModelParam("impedance", 50);
@@ -834,7 +842,7 @@ describe("TransmissionLine", () => {
       props.setModelParam("length", 1.0);
       const nodeIds = buildNodeIds(1, 2, 3, 3);
       const el = getFactory(TransmissionLineDefinition.modelRegistry!.behavioral!)(new Map([["P1b", nodeIds[0]], ["P2b", nodeIds[1]], ["P1a", 0], ["P2a", 0]]), nodeIds.slice(2), 6, props, () => 0);
-      expect(el.stampCompanion).toBeDefined();
+      expect(el.load).toBeDefined();
     });
   });
 
@@ -876,16 +884,17 @@ describe("TransmissionLine", () => {
       expect((el as any).poolBacked).toBe(true);
     });
 
-    it("sub-elements are pool-bound immediately after construction — stampCompanion works without initState", () => {
+    it("sub-elements are pool-bound immediately after construction — load works after initState", () => {
       // Sub-elements now require initState to be called (pool-backed architecture).
-      // Set up pool before calling stampCompanion.
+      // Set up pool before calling load.
       const N = 3;
       const el = makeEl(N);
       const pool = new StatePool(Math.max((el as any).stateSize, 1));
       (el as any).stateBaseOffset = 0;
       el.initState!(pool);
       const voltages = new Float64Array(2 + 2 * (N - 1) + N);
-      expect(() => el.stampCompanion!(1e-9, "bdf1", voltages, 1, [1e-9])).not.toThrow();
+      const { solver } = makeStubSolver();
+      expect(() => el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "bdf1", order: 1, initMode: "initTran" }))).not.toThrow();
     });
 
     it("SegmentInductorElement sub-elements declare stateSchema with 5 slots", () => {
@@ -945,5 +954,174 @@ describe("TransmissionLine", () => {
       const uniqueOffsets = new Set(offsets);
       expect(uniqueOffsets.size).toBe(offsets.length);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C4.2 — Transient parity test
+//
+// Circuit: Lossless transmission line, N=2 segments, all voltages/currents zero.
+//
+// For N=2 segments (lossless, rSeg=gSeg=0):
+//   Segment 0: SegmentResistor(Port1→rlMid0) + SegmentInductor(rlMid0→junction0, b=bFirst+0)
+//              + SegmentCapacitor(junction0)
+//   Segment 1: CombinedRL(junction0→Port2, b=bFirst+1)
+//
+// Per-segment L and C (niinteg.c:77 applied to each reactive sub-element):
+//   lSeg = z0 * delay / N
+//   cSeg = delay / (z0 * N)
+//
+// BDF-1 (order=1): ag[0]=1/dt, ag[1]=-1/dt.
+//   geq_L0 = ag[0]*lSeg   (SegmentInductorElement GEQ slot = 0)
+//   geq_RL = ag[0]*lSeg   (CombinedRLElement GEQ slot = 0, same lSeg for last seg)
+//   geq_C0 = ag[0]*cSeg   (SegmentCapacitorElement GEQ slot = 0)
+//
+// All voltages/branch currents zero → all phi=0, q=0 → ceq=0 every step.
+// The geq values are the only state-dependent quantities; they are constant.
+//
+// ngspice source → our variable mapping:
+//   indload.c:INDload::geq (segment inductor) → s0[SLOT_GEQ=0] = ag[0]*lSeg
+//   capload.c:CAPload::geq (segment cap)      → s0[SLOT_GEQ=0] = ag[0]*cSeg
+//   indload.c:INDload::ceq (all zero)         → s0[SLOT_IEQ=1] = 0
+//   capload.c:CAPload::ceq (all zero)         → s0[SLOT_IEQ=1] = 0
+// ---------------------------------------------------------------------------
+
+describe("transmission_line_load_transient_parity (C4.2)", () => {
+  it("transmission_line_load_transient_parity", () => {
+    const z0    = 50;     // Ω characteristic impedance
+    const delay = 1e-9;   // 1 ns one-way delay
+    const N     = 2;      // 2 segments (minimal for clear topology)
+    const dt    = 1e-10;  // timestep (s) — < delay/N for reasonable sim
+    const order   = 1;
+    const method  = "trapezoidal" as const;
+
+    // Per-segment L and C (transmission-line.ts constructor formula)
+    const lSeg = (z0 * delay) / N;
+    const cSeg = delay / (z0 * N);
+
+    // BDF-1 coefficients: ag[0]=1/dt, ag[1]=-1/dt
+    const ag0 = 1 / dt;
+    const ag1 = -1 / dt;
+
+    // Bit-exact companion conductances (niinteg.c:77):
+    const geq_L = ag0 * lSeg;  // both SegmentInductor and CombinedRL use same lSeg
+    const geq_C = ag0 * cSeg;  // SegmentCapacitor companion conductance
+
+    // Node layout for N=2:
+    //   Port1=1, Port2=2, rlMid0=3, junction0=4
+    //   nodeCount = 2 + 2*(N-1) = 4
+    // Branch layout:
+    //   firstBranch = nodeCount = 4
+    //   b0=4 (SegmentInductor), b1=5 (CombinedRL)
+    const nodeIds = buildNodeIds(1, 2, 3, N);
+    const firstBranch = 2 + 2 * (N - 1); // = 4
+
+    const el = new TransmissionLineElement(nodeIds, firstBranch, z0, delay, 0, 1.0, N);
+
+    // Allocate state pool directly (mirrors buildTLineCircuit logic)
+    let offset = 0;
+    (el as any).stateBaseOffset = offset;
+    offset += el.stateSize;
+    const statePool = new StatePool(Math.max(offset, 1));
+    (el as any).initState(statePool);
+
+    // Handle-based capture solver (persistent handles across steps)
+    const handles: { row: number; col: number }[] = [];
+    const handleIndex = new Map<string, number>();
+    const matValues: number[] = [];
+
+    const solver = {
+      allocElement: (row: number, col: number): number => {
+        const key = `${row},${col}`;
+        let h = handleIndex.get(key);
+        if (h === undefined) {
+          h = handles.length;
+          handles.push({ row, col });
+          handleIndex.set(key, h);
+          matValues.push(0);
+        }
+        return h;
+      },
+      stampElement: (h: number, v: number): void => { matValues[h] += v; },
+      stampRHS: (_row: number, _v: number): void => {},
+    } as unknown as SparseSolverType;
+
+    const ag = new Float64Array(8);
+    ag[0] = ag0;
+    ag[1] = ag1;
+
+    // voltages: [V(node1), V(node2), V(node3), V(node4), I_b4, I_b5]
+    // All zero → all flux=0, q=0 → geq constant, ceq=0 every step.
+    const voltages = new Float64Array(6);
+
+    // Expose sub-element state arrays via the composite element
+    const subEls = (el as any)._subElements as any[];
+    // N=2: subEls = [SegRes(1→3), SegInd(3→4,b4), SegCap(4), CombRL(4→2,b5)]
+    // reactive sub-elements: SegInd (index 1), SegCap (index 2), CombRL (index 3)
+    const segInd = subEls[1];  // SegmentInductorElement
+    const segCap = subEls[2];  // SegmentCapacitorElement
+    const combRL = subEls[3];  // CombinedRLElement
+
+    // 10-step transient loop
+    for (let step = 0; step < 10; step++) {
+      matValues.fill(0);
+
+      const ctx: LoadContext = {
+        solver,
+        voltages,
+        iteration: 0,
+        initMode: step === 0 ? "initTran" : "transient",
+        dt,
+        method,
+        order,
+        deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+        ag,
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        isDcOp: false,
+        isTransient: true,
+        xfact: 1,
+        gmin: 1e-12,
+        uic: false,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+      };
+
+      el.load(ctx);
+
+      // Assert per-step integration constants (spec: assert dt, order, method)
+      expect(ctx.dt).toBe(dt);
+      expect(ctx.order).toBe(order);
+      expect(ctx.method).toBe(method);
+
+      // Rotate state arrays for all reactive sub-elements (mirrors engine rotate)
+      for (const sub of subEls) {
+        if (sub.s0 && sub.s1) {
+          sub.s1.set(sub.s0);
+        }
+      }
+    }
+
+    // After 10 steps: assert companion geq values stored in state slots (bit-exact).
+    // SLOT_GEQ=0, SLOT_IEQ=1 for all three reactive schemas.
+    const baseInd = segInd.stateBaseOffset;
+    const baseCap = segCap.stateBaseOffset;
+    const baseCRL = combRL.stateBaseOffset;
+
+    // SegmentInductor: geq = ag[0]*lSeg (niinteg.c:77)
+    expect(segInd.s0[baseInd + 0]).toBe(geq_L);
+    // ceq = 0 (zero flux all steps)
+    expect(segInd.s0[baseInd + 1]).toBe(0);
+
+    // SegmentCapacitor: geq = ag[0]*cSeg (niinteg.c:77)
+    expect(segCap.s0[baseCap + 0]).toBe(geq_C);
+    // ceq = 0 (zero charge all steps)
+    expect(segCap.s0[baseCap + 1]).toBe(0);
+
+    // CombinedRL (last segment): geq = ag[0]*lSeg (niinteg.c:77)
+    expect(combRL.s0[baseCRL + 0]).toBe(geq_L);
+    // ceq = 0 (zero flux all steps)
+    expect(combRL.s0[baseCRL + 1]).toBe(0);
   });
 });

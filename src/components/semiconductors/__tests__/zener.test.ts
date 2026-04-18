@@ -13,11 +13,14 @@ import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
 
 // ---------------------------------------------------------------------------
 // Helper: allocate a StatePool for a single element and call initState
@@ -62,6 +65,74 @@ function makeParamBag(params: Record<string, number>): PropertyBag {
   return bag;
 }
 
+/**
+ * Build a bare LoadContext for a single-element unit test. The caller owns
+ * the solver, the state pool, and the voltages buffer.
+ */
+function buildUnitCtx(
+  solver: SparseSolver,
+  voltages: Float64Array,
+  overrides: Partial<LoadContext> = {},
+): LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+    ...overrides,
+  };
+}
+
+/**
+ * Drive a Zener element to a steady operating point by iterating load() with a
+ * fresh SparseSolver each iteration. Matches the ngspice DIOload iteration
+ * protocol: load() reads voltages and updates SLOT_VD via pnjlim.
+ */
+function driveToOp(
+  element: AnalogElement,
+  voltages: Float64Array,
+  iterations: number,
+  opts: { limitingCollector?: LimitingEvent[] | null } = {},
+): void {
+  const collector = opts.limitingCollector ?? null;
+  const matrixSize = Math.max(voltages.length, element.pinNodeIds.length, 1);
+  for (let i = 0; i < iterations; i++) {
+    const solver = new SparseSolver();
+    solver.beginAssembly(matrixSize);
+    const ctx = buildUnitCtx(solver, voltages, { limitingCollector: collector });
+    element.load(ctx);
+  }
+}
+
+/**
+ * Re-stamp an element into a fresh real SparseSolver and return (row, col) → sum accessor.
+ * Returns a function sumAt(row, col) that sums all CSC entries at that position.
+ */
+function stampAndGetSumAt(element: AnalogElement, matrixSize: number, voltages: Float64Array): (row: number, col: number) => number {
+  const solver = new SparseSolver();
+  solver.beginAssembly(matrixSize);
+  const ctx = buildUnitCtx(solver, voltages);
+  element.load(ctx);
+  const entries = solver.getCSCNonZeros();
+  return (row: number, col: number) =>
+    entries.filter((e) => e.row === row && e.col === col).reduce((acc, e) => acc + e.value, 0);
+}
+
 function makeZenerAtVd(
   vd: number,
   modelOverrides?: Record<string, number>,
@@ -77,14 +148,11 @@ function makeZenerAtVd(
   const { element: statedCore } = withState(core);
   const element = withNodeIds(statedCore, [1, 2]);
 
-  // Drive to operating point
+  // Drive to operating point via load(ctx) iteration
   const voltages = new Float64Array(2);
   voltages[0] = vd;
   voltages[1] = 0;
-  for (let i = 0; i < 50; i++) {
-    element.updateOperatingPoint!(voltages);
-    voltages[0] = vd;
-  }
+  driveToOp(element, voltages, 50);
   return element;
 }
 
@@ -98,7 +166,8 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
-    stamp(solver: SparseSolverType): void {
+    load(ctx): void {
+      const solver = ctx.solver;
       if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
       if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
       if (nodeA !== 0 && nodeB !== 0) {
@@ -137,6 +206,7 @@ describe("Zener", () => {
     const propsObj = makeParamBag({ IS, N, BV, IBV });
     const core = createZenerElement(new Map([["A", 1], ["K", 0]]), [], -1, propsObj);
     const { element: el } = withState(core);
+    const element = withNodeIds(el, [1, 0]);
 
     // Verify the element is nonlinear
     expect(el.isNonlinear).toBe(true);
@@ -144,10 +214,7 @@ describe("Zener", () => {
     // Drive to breakdown voltage to verify it converges
     const voltages = new Float64Array(1);
     voltages[0] = -5.5;
-    for (let i = 0; i < 50; i++) {
-      el.updateOperatingPoint!(voltages);
-      voltages[0] = -5.5;
-    }
+    driveToOp(element, voltages, 50);
     // After convergence, anode voltage should still be at -5.5V
     // (pnjlim does not limit reverse bias steps)
     expect(voltages[0]).toBeCloseTo(-5.5, 1);
@@ -168,17 +235,21 @@ describe("Zener", () => {
     expect(id).toBeGreaterThan(1e-6); // should be mA range
   });
 
-  it("updateOperatingPoint_does_not_write_voltages", () => {
-    // Verify that updateOperatingPoint reads from voltages but does NOT write back
-    // This is critical for the state pool migration: voltages[] stays read-only
+  it("load_does_not_write_voltages", () => {
+    // Verify that load() reads from voltages but does NOT write back.
+    // This is critical for the state pool migration: voltages[] stays read-only.
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, BV: 5.1, IBV: 1e-3 });
     const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
     const { element } = withState(core);
+    const el = withNodeIds(element, [1, 2]);
 
     const voltages = new Float64Array([0.7, 0.0]);
     const voltagesBefore = new Float64Array(voltages);
 
-    element.updateOperatingPoint!(voltages);
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const ctx = buildUnitCtx(solver, voltages);
+    el.load(ctx);
 
     // Voltages should be completely unchanged
     expect(voltages[0]).toBe(voltagesBefore[0]);
@@ -219,26 +290,19 @@ describe("Zener", () => {
     const propsObj = makeParamBag({ IS, N, BV, IBV });
     const core = createZenerElement(new Map([["A", 0], ["K", 1]]), [], -1, propsObj);
     const { element: el } = withState(core);
+    const element = withNodeIds(el, [0, 1]);
 
-    // Drive to exactly -BV: Vd = 0 - BV = -BV
+    // Drive to exactly -BV: Vd = 0 - BV = -BV (cathode at BV, anode at ground)
     const voltages = new Float64Array(1);
-    voltages[0] = BV; // cathode at BV, anode at 0 → Vd = -BV
-    for (let i = 0; i < 100; i++) {
-      el.updateOperatingPoint!(voltages);
-    }
+    voltages[0] = BV;
+    driveToOp(element, voltages, 100);
 
-    // Stamp to read conductance from state via Norton equivalent
-    const calls: Array<[number, number, number]> = [];
-    const rhsCalls: Array<[number, number]> = [];
-    const solver = {
-      stamp: (r: number, c: number, v: number) => calls.push([r, c, v]),
-      stampRHS: (r: number, v: number) => rhsCalls.push([r, v]),
-    } as unknown as SparseSolverType;
-    el.stampNonlinear!(solver);
+    // Stamp into a real SparseSolver and read (0,0) diagonal for geq.
+    const sumAt = stampAndGetSumAt(element, 1, voltages);
 
     // geq at breakdown vd = -BV: IS * exp(0) / (NBV*Vt) + GMIN = IS/(N*VT) + GMIN
     // With IS=1e-14, N=1, VT=0.02585: geq ≈ 3.87e-13 + 1e-12 ≈ 1.39e-12
-    const geqActual = calls.find(c => c[0] === 0 && c[1] === 0)?.[2] ?? NaN;
+    const geqActual = sumAt(0, 0);
     const geqFromIS = IS / (N * VT) + 1e-12;
     const geqFromIBV = IBV / (N * VT) + 1e-12;
 
@@ -258,26 +322,25 @@ describe("Zener", () => {
     // Without NBV (defaults to N)
     const propsNoNBV = makeParamBag({ IS, N, BV });
     const coreNoNBV = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsNoNBV);
-    const { element: elNoNBV } = withState(coreNoNBV);
+    const { element: elNoNBVStated } = withState(coreNoNBV);
+    const elNoNBV = withNodeIds(elNoNBVStated, [1, 2]);
 
     // With explicit NBV=1 (same as default)
     const propsWithNBV1 = makeParamBag({ IS, N, BV, NBV: 1 });
     const coreWithNBV1 = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsWithNBV1);
-    const { element: elWithNBV1 } = withState(coreWithNBV1);
+    const { element: elWithNBV1Stated } = withState(coreWithNBV1);
+    const elWithNBV1 = withNodeIds(elWithNBV1Stated, [1, 2]);
 
     // Both elements at vd=0.65V forward bias should produce identical geq
     const voltages = new Float64Array(2);
     voltages[0] = 0.65;
     voltages[1] = 0;
-    for (let i = 0; i < 50; i++) {
-      elNoNBV.updateOperatingPoint!(voltages);
-      elWithNBV1.updateOperatingPoint!(voltages);
-    }
+    driveToOp(elNoNBV, voltages, 50);
+    driveToOp(elWithNBV1, voltages, 50);
 
-    const getGeq = (el: any): number => {
-      const calls: Array<[number, number, number]> = [];
-      el.stampNonlinear!({ stamp: (r: number, c: number, v: number) => calls.push([r, c, v]), stampRHS: () => {} });
-      return calls.find((c: [number, number, number]) => c[0] === 0 && c[1] === 0)?.[2] ?? NaN;
+    const getGeq = (el: AnalogElement): number => {
+      const sumAt = stampAndGetSumAt(el, 2, voltages);
+      return sumAt(0, 0);
     };
 
     const geqNoNBV = getGeq(elNoNBV);
@@ -302,21 +365,28 @@ describe("Zener", () => {
     const propsObj = makeParamBag({ IS, N, BV });
     const core = createZenerElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
     const { element: el } = withState(core);
+    const element = withNodeIds(el, [1, 2]);
 
-    // Start at vd=0
+    // Start at vd=0 (warm up SLOT_VD in pool)
     const voltages = new Float64Array(2);
     voltages[0] = 0;
     voltages[1] = 0;
-    el.updateOperatingPoint!(voltages);
+    driveToOp(element, voltages, 1);
 
     // Suddenly jump to deep breakdown: vd = -20V
     voltages[0] = -20;
     voltages[1] = 0;
-    const limitingEvents: any[] = [];
-    el.updateOperatingPoint!(voltages, limitingEvents);
+    const limitingEvents: LimitingEvent[] = [];
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const jumpCtx = buildUnitCtx(solver, voltages, {
+      limitingCollector: limitingEvents,
+      iteration: 1,
+    });
+    element.load(jumpCtx);
 
     // pnjlim should have limited this large step
-    const wasLimited = limitingEvents.some(e => e.wasLimited);
+    const wasLimited = limitingEvents.some((e) => e.wasLimited);
     expect(wasLimited).toBe(true);
   });
 });

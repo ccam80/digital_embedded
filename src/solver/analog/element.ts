@@ -18,7 +18,7 @@ export type {
   StatePoolRef,
 } from "../../core/analog-types.js";
 
-import type { AnalogElementCore, ComplexSparseSolver, IntegrationMethod, SparseSolverStamp, StatePoolRef } from "../../core/analog-types.js";
+import type { AnalogElementCore, ComplexSparseSolver, IntegrationMethod, StatePoolRef } from "../../core/analog-types.js";
 import type { StateSchema } from "./state-schema.js";
 export type { LoadContext, InitMode } from "./load-context.js";
 import type { LoadContext } from "./load-context.js";

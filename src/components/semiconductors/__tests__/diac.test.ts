@@ -15,8 +15,47 @@ import { PropertyBag as _PropertyBag } from "../../../core/properties.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
-import { withNodeIds, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
+import { withNodeIds, allocateStatePool, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+
+// ---------------------------------------------------------------------------
+// Capture solver — records stamp tuples via the real allocElement/stampElement
+// API so tests can read back what load() wrote.
+// ---------------------------------------------------------------------------
+
+interface CaptureStamp { row: number; col: number; value: number; }
+interface CaptureRhs { row: number; value: number; }
+
+function makeCaptureSolver(): {
+  solver: SparseSolverType;
+  stamps: CaptureStamp[];
+  rhs: CaptureRhs[];
+} {
+  const stamps: CaptureStamp[] = [];
+  const rhs: CaptureRhs[] = [];
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stampRHS: (row: number, value: number) => {
+      rhs.push({ row, value });
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps, rhs };
+}
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -48,7 +87,11 @@ function makeDiac(overrides: Partial<typeof DIAC_DEFAULTS> = {}): AnalogElement 
 }
 
 /**
- * Drive diac to a steady operating point by calling updateOperatingPoint repeatedly.
+ * Drive diac to a steady operating point by calling load() repeatedly with
+ * a ctx whose voltages are pinned to (vA, vB). Each load() iteration reads
+ * the current voltages, recomputes the linearization, and stamps; after
+ * enough iterations the internal linearization is steady.
+ *
  * nodeA=1 (index 0), nodeB=2 (index 1)
  */
 function driveToOp(element: AnalogElement, vA: number, vB: number, iterations = 50): Float64Array {
@@ -56,7 +99,17 @@ function driveToOp(element: AnalogElement, vA: number, vB: number, iterations = 
   voltages[0] = vA;
   voltages[1] = vB;
   for (let i = 0; i < iterations; i++) {
-    element.updateOperatingPoint!(voltages);
+    const { solver } = makeCaptureSolver();
+    const ctx = makeSimpleCtx({
+      solver,
+      elements: [element],
+      matrixSize: 2,
+      nodeCount: 2,
+    });
+    // ctx.voltages is the rhsOld buffer; overwrite it so the diac sees (vA, vB).
+    ctx.loadCtx.voltages[0] = vA;
+    ctx.loadCtx.voltages[1] = vB;
+    element.load(ctx.loadCtx);
     voltages[0] = vA;
     voltages[1] = vB;
   }
@@ -71,23 +124,25 @@ function driveToOp(element: AnalogElement, vA: number, vB: number, iterations = 
 function getCurrentAtV(element: AnalogElement, v: number): number {
   driveToOp(element, v, 0, 50);
 
-  const calls: Array<[number, number, number]> = [];
-  const rhs: Array<[number, number]> = [];
-  const solver = {
-    stamp: (r: number, c: number, val: number) => calls.push([r, c, val]),
-    stampRHS: (r: number, val: number) => rhs.push([r, val]),
-  } as unknown as SparseSolverType;
-
-  element.stampNonlinear!(solver);
+  const { solver, stamps, rhs } = makeCaptureSolver();
+  const ctx = makeSimpleCtx({
+    solver,
+    elements: [element],
+    matrixSize: 2,
+    nodeCount: 2,
+  });
+  ctx.loadCtx.voltages[0] = v;
+  ctx.loadCtx.voltages[1] = 0;
+  element.load(ctx.loadCtx);
 
   // geq is the (0,0) diagonal entry, ieq = RHS[0] (negated)
-  const geqEntry = calls.find((c) => c[0] === 0 && c[1] === 0);
-  const ieqEntry = rhs.find((r) => r[0] === 0);
+  const geqEntry = stamps.find((s) => s.row === 0 && s.col === 0);
+  const ieqEntry = rhs.find((r) => r.row === 0);
 
   if (!geqEntry || !ieqEntry) return 0;
 
-  const geq = geqEntry[2];
-  const ieq = -ieqEntry[1]; // stampRHS stamps -ieq at row 0
+  const geq = geqEntry.value;
+  const ieq = -ieqEntry.value; // stampRHS stamps -ieq at row 0
   return geq * v + ieq;
 }
 
@@ -176,28 +231,35 @@ describe("Diac", () => {
 
     // Step 2: with that gate current level (simulated by 0.65V gate bias which
     // corresponds to a forward-biased gate junction), triac should trigger.
-    const voltages = new Float64Array(3);
-    voltages[0] = 0;   // MT1
-    voltages[1] = 100; // MT2 (100V positive)
-    voltages[2] = 0.65; // Gate (forward-biased, simulating diac delivery)
-
+    // The triac element has three pins MT1=1, MT2=2, G=3; matrixSize=3.
+    // Share the StatePool and solver across iterations so the triac's latch
+    // state persists (pool-backed state0 slots, local closure state in load()).
+    const triacEl = withNodeIds(triac, [1, 2, 3]);
+    const { solver: drivingSolver } = makeCaptureSolver();
+    const drivingCtx = makeSimpleCtx({
+      solver: drivingSolver,
+      elements: [triacEl],
+      matrixSize: 3,
+      nodeCount: 3,
+    });
     for (let i = 0; i < 200; i++) {
-      triac.updateOperatingPoint!(voltages);
-      voltages[0] = 0;
-      voltages[1] = 100;
-      voltages[2] = 0.65;
+      drivingCtx.loadCtx.voltages[0] = 0;    // MT1
+      drivingCtx.loadCtx.voltages[1] = 100;  // MT2 (100V positive)
+      drivingCtx.loadCtx.voltages[2] = 0.65; // Gate (forward-biased, simulating diac delivery)
+      drivingCtx.loadCtx.iteration = i;
+      triacEl.load(drivingCtx.loadCtx);
     }
 
-    // Verify triac is now conducting (high conductance)
-    const calls: Array<[number, number, number]> = [];
-    const solver = {
-      stamp: (r: number, c: number, v: number) => calls.push([r, c, v]),
-      stampRHS: (_r: number, _v: number) => {},
-    } as unknown as SparseSolverType;
-    triac.stampNonlinear!(solver);
+    // Verify triac is now conducting (high conductance) via a fresh capture.
+    const { solver: readoutSolver, stamps } = makeCaptureSolver();
+    drivingCtx.loadCtx.solver = readoutSolver;
+    drivingCtx.loadCtx.voltages[0] = 0;
+    drivingCtx.loadCtx.voltages[1] = 100;
+    drivingCtx.loadCtx.voltages[2] = 0.65;
+    triacEl.load(drivingCtx.loadCtx);
 
-    const diagMT = calls.filter((c) => c[0] === c[1] && c[0] < 2);
-    const maxG = Math.max(...diagMT.map((c) => Math.abs(c[2])));
+    const diagMT = stamps.filter((s) => s.row === s.col && s.row < 2);
+    const maxG = Math.max(...diagMT.map((s) => Math.abs(s.value)));
     expect(maxG).toBeGreaterThan(1.0); // triac in on-state — diac triggered it
   });
 

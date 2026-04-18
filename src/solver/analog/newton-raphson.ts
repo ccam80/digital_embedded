@@ -466,10 +466,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
           ctx.noncon = 1;
         } else {
           if (ladder) {
-            const phaseLabel =
-              curInitMode === "initJct" ? "dcopInitJct" as const :
-              curInitMode === "initFix" ? "dcopInitFix" as const : "dcopInitFloat" as const;
-            ladder.onModeEnd(phaseLabel, iteration, true);
+            ladder.onModeEnd("dcopInitFloat", iteration, true);
           }
           ctx.nrResult.converged = true;
           ctx.nrResult.iterations = iteration + 1;
