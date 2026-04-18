@@ -60,5 +60,23 @@ describeIfDll("opamp-inverting DC-OP parity", () => {
     assertModeTransitionMatch(ours, ngspice);
     // Verifies srcFact sequence bit-exact across all source-stepping sub-solves
     assertConvergenceFlowMatch(ours, ngspice);
+
+    // NR iteration count must match between engines
+    const ourTotalIters = ours.steps.reduce(
+      (sum, step) =>
+        sum +
+        step.attempts.reduce((s, a) => s + a.iterations.length, 0),
+      0,
+    );
+    const ngTotalIters = ngspice.steps.reduce(
+      (sum, step) =>
+        sum +
+        step.attempts.reduce((s, a) => s + a.iterations.length, 0),
+      0,
+    );
+    expect(
+      ourTotalIters,
+      `NR iteration count mismatch: ours=${ourTotalIters} ngspice=${ngTotalIters}`,
+    ).toBe(ngTotalIters);
   }, 60_000);
 });

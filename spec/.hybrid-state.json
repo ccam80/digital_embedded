@@ -340,20 +340,20 @@
           "7.4.1"
         ]
       ],
-      "spawned": 4,
-      "completed": 4,
-      "verifications_passed": 0,
-      "verifications_failed": 0,
+      "spawned": 6,
+      "completed": 6,
+      "verifications_passed": 2,
+      "verifications_failed": 2,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "7.2a": "pending",
-        "7.2b": "pending",
-        "7.3a": "pending",
-        "7.3b": "pending"
+        "7.2a": "passed",
+        "7.2b": "failed",
+        "7.3a": "failed",
+        "7.3b": "passed"
       }
     }
   ],
-  "last_updated": "2026-04-18T13:37:01.309Z"
+  "last_updated": "2026-04-18T13:43:47.019Z"
 }

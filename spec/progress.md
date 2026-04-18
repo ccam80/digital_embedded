@@ -643,3 +643,18 @@ Raw grep across all surviving C3b test files (38 files; `coupled-inductor.test.t
 - **Files modified**: none
 - **Tests**: 0/0 (audit-only, no tests)
 - **Audit result**: All 8 parity test files contain assertModeTransitionMatch at end-of-test site (see completion report)
+
+## Task 7.2b-retry: Fix opamp-inverting.test.ts — add NR iteration count equality assertion
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/__tests__/ngspice-parity/opamp-inverting.test.ts
+- **Tests**: 1/1 passing (1 skipped — DLL absent, correct local state per spec)
+
+## Task 7.3.2-fix: Fix rlc-oscillator.test.ts — replace phase check with currentMethod === "trapezoidal"
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: src/solver/analog/__tests__/ngspice-parity/rlc-oscillator.test.ts
+- **Tests**: 1 skipped/1 total (DLL absent — describeIfDll guard; correct local state per assignment)
+- **Change**: Replaced `acceptedAttempt.phase === "tranNR"` check with `ourStep.integrationCoefficients.ours.method === "trapezoidal"` assertion on every accepted step, matching spec Task 7.3.2 acceptance criterion exactly.

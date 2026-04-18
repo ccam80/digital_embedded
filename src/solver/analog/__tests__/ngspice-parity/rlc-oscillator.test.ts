@@ -51,16 +51,13 @@ describeIfDll("RLC oscillator transient parity — Task 7.3.2", () => {
       const ourStep = ourSteps[si]!;
       const ngStep = ngSteps[si]!;
 
-      // Assert trapezoidal method at every accepted step.
-      const acceptedAttemptIdx = ourStep.acceptedAttemptIndex;
-      if (acceptedAttemptIdx >= 0) {
-        const acceptedAttempt = ourStep.attempts[acceptedAttemptIdx];
-        if (acceptedAttempt) {
-          expect(
-            acceptedAttempt.phase,
-            `step=${si}: expected tranNR phase (trapezoidal), got ${acceptedAttempt.phase}`,
-          ).toBe("tranNR");
-        }
+      // Assert trapezoidal integration method at every accepted step (no method switching).
+      if (ourStep.accepted) {
+        const method = ourStep.integrationCoefficients.ours.method;
+        expect(
+          method,
+          `step=${si}: expected currentMethod === "trapezoidal", got "${method}"`,
+        ).toBe("trapezoidal");
       }
 
       for (const ourAttempt of ourStep.attempts) {
