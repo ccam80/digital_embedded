@@ -9,6 +9,8 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createMosfetElement, MOSFET_NMOS_DEFAULTS, MOSFET_PMOS_DEFAULTS } from "../../../components/semiconductors/mosfet.js";
 import {
   AbstractFetElement,
@@ -20,6 +22,8 @@ import {
   SLOT_SWAPPED,
   SLOT_V_GS,
   SLOT_V_GD,
+  SLOT_Q_GS,
+  SLOT_CCAP_GS,
 } from "../fet-base.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../../components/sources/dc-voltage-source.js";
@@ -29,6 +33,7 @@ import type { SparseSolver as SparseSolverType } from "../sparse-solver.js";
 import type { AnalogElement } from "../element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../element.js";
+import type { LoadContext } from "../load-context.js";
 
 // ---------------------------------------------------------------------------
 // Default model parameters (same as mosfet.test.ts for exact comparison)
@@ -500,5 +505,132 @@ describe("StatePool migration", () => {
     // After rollback, state0 should be restored to checkpoint values
     expect(vgsAfterRollback).not.toBe(vgsAfterMutation);
     expect(vgsAfterRollback).toBe(cp[SLOT_VGS]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// integration — NIintegrate inline migration tests
+// ---------------------------------------------------------------------------
+
+describe("integration", () => {
+  it("no_integrateCapacitor_import", () => {
+    const fetBasePath = fileURLToPath(new URL("../fet-base.ts", import.meta.url));
+    const source = readFileSync(fetBasePath, "utf-8");
+    expect(source.match(/integrateCapacitor/g)).toBeNull();
+    expect(source.match(/integrateInductor/g)).toBeNull();
+  });
+
+  it("trap_order2_xmu_nonstandard_no_helper", () => {
+    // Build an NMOS with CGSO=1e-12 so cgs = CGSO * W * M > 0.
+    // W=1e-6, M=1 → cgs = 1e-18 F (tiny but non-zero; what matters is the formula).
+    // Use larger CGSO so cgs is non-trivial.
+    const CGSO = 100e-12;  // F/m — overlap cap per unit width
+    const W    = 10e-6;     // m
+    // cgs from computeCapacitances = CGSO * W * M = 100e-12 * 10e-6 = 1e-15 F
+    const cgs  = CGSO * W * 1;  // = 1e-15
+
+    const propsObj = new PropertyBag();
+    propsObj.replaceModelParams({
+      ...MOSFET_NMOS_DEFAULTS,
+      VTO: 0.7,
+      KP: 120e-6,
+      LAMBDA: 0.02,
+      PHI: 0.6,
+      GAMMA: 0.37,
+      CBD: 0,
+      CBS: 0,
+      CGDO: 0,
+      CGSO,
+      W,
+      L: 1e-6,
+    });
+
+    // G=node1, S=node2, D=node3 (bulk defaults to source for 3-terminal)
+    const element = createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj) as AnalogElementCore & { stateBaseOffset: number; stateSize: number; initState(p: StatePool): void; isReactive: boolean };
+    element.stateBaseOffset = 0;
+    const pool = new StatePool(element.stateSize);
+    element.initState(pool);
+
+    // Set up state: second transient step so isFirstCall === false (tranStep=1).
+    pool.tranStep = 1;
+
+    // Manually seed q0 and q1 (prev-step charge) in pool slots.
+    // q0 (current step charge) goes into s0[SLOT_Q_GS] — set it here directly since
+    // _stampCompanion computes q0 from voltages+prevVgs+prevQgs; we instead drive
+    // the element via load() and then read back the committed ccap.
+    //
+    // Strategy: set voltages so vgsNow = 3.0, prevVgs = 2.5 (in s1), prevQgs = known.
+    // Then q0 = cgs*(vgsNow - prevVgs) + prevQgs.
+    const vgsNow  = 3.0;
+    const prevVgs = 2.5;
+    const prevQgs = 5e-16;  // prev step charge
+
+    // Write s1 (prev step) values:
+    pool.state1[SLOT_V_GS] = prevVgs;   // prevVgs read in _stampCompanion
+    pool.state1[SLOT_Q_GS] = prevQgs;   // q1 read as this.s1[base + SLOT_Q_GS]
+    pool.state1[SLOT_CCAP_GS] = 0;      // ccapPrev — not used by inline formula
+
+    // Trap order 2 integration coefficients with xmu = 0.3
+    const xmu = 0.3;
+    const dt   = 1e-9;
+    // ag[0] = 1/(dt*(1-xmu))  — from computeNIcomCof trap order 2
+    const ag0 = 1.0 / dt / (1.0 - xmu);
+    // ag[1] = xmu/(1-xmu)
+    const ag1 = xmu / (1.0 - xmu);
+    pool.ag[0] = ag0;
+    pool.ag[1] = ag1;
+
+    // Build a minimal LoadContext for the transient load() call.
+    // The mock solver captures stamps but we only care about pool state after load().
+    const mockSolver: SparseSolverType = {
+      stamp: vi.fn(),
+      stampRHS: vi.fn(),
+      allocElement: vi.fn().mockReturnValue(0),
+      stampElement: vi.fn(),
+    } as unknown as SparseSolverType;
+
+    // Node voltages: G=node1 → v[0]=vgsNow+vS, S=node2 → v[1]=vS, D=node3 → v[2]=5V
+    // With S=node2, vS=v[1]; G=node1, vG=v[0]; polaritySign=+1
+    // vgsNow = vG - vS = v[0] - v[1]
+    // Set v[1]=0 (source at ground), v[0]=vgsNow=3.0, v[2]=5.0
+    const voltages = new Float64Array([vgsNow, 0, 5.0]);
+
+    const ctx: LoadContext = {
+      solver: mockSolver,
+      voltages,
+      iteration: 0,
+      initMode: "transient",
+      dt,
+      method: "trapezoidal",
+      order: 2,
+      deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+      ag: pool.ag,
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: false,
+      isTransient: true,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    // Assign pinNodeIds so load() can read nodes
+    (element as unknown as { pinNodeIds: readonly number[] }).pinNodeIds = [1, 2, 3];
+
+    element.load!(ctx as LoadContext);
+
+    // After load(), s0[SLOT_Q_GS] holds q0 = cgs*(vgsNow - prevVgs) + prevQgs
+    const q0 = pool.state0[SLOT_Q_GS];
+    const q1 = prevQgs;  // s1[SLOT_Q_GS] — unchanged by load()
+
+    // Expected ccap from inline NIintegrate (niinteg.c:28-63, order=2 path):
+    // ccap = ag[0]*q0 + ag[1]*q1
+    const expectedCcap = ag0 * q0 + ag1 * q1;
+
+    // Bit-exact: the implementation performs this exact floating-point computation
+    expect(pool.state0[SLOT_CCAP_GS]).toBe(expectedCcap);
   });
 });

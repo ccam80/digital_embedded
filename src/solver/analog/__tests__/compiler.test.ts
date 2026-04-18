@@ -526,3 +526,194 @@ describe("AnalogCompiler", () => {
     expect(compiled.elementCount).toBe(compiled.elements.length);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 6.4.1 — _pinLoading threading tests
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a registry with a behavioural 2-input NAND gate whose factory
+ * captures the props argument so tests can inspect _pinLoading.
+ *
+ * defaultModel="behavioral" ensures the element compiles into the analog
+ * partition so the factory receives _pinLoading from the compiler.
+ */
+function buildPinLoadingTestRegistry(
+  onFactory?: (props: PropertyBag, pinNodes: ReadonlyMap<string, number>) => void,
+): ComponentRegistry {
+  const registry = new ComponentRegistry();
+
+  registry.register({
+    ...makeBaseDef("Ground"),
+    defaultModel: "behavioral",
+    models: {},
+    modelRegistry: { behavioral: { kind: "inline" as const, factory: () => { throw new Error("not used"); }, paramDefs: [], params: {} } },
+  });
+
+  // Minimal analog-only resistor to force a non-empty analog partition
+  registry.register({
+    ...makeBaseDef("AnalogR"),
+    pinLayout: [
+      { label: "A", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" as const },
+      { label: "B", direction: PinDirection.BIDIRECTIONAL, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" as const },
+    ],
+    defaultModel: "behavioral",
+    models: {},
+    modelRegistry: {
+      behavioral: { kind: "inline" as const, factory: (pinNodes) => {
+        const [n0, n1] = [...pinNodes.values()];
+        return makeTestResistorElement(n0 ?? 0, n1 ?? 0);
+      }, paramDefs: [], params: {} },
+    },
+  });
+
+  // NAND gate: 2 inputs + 1 output; digital + behavioral models.
+  // defaultModel="behavioral" ensures it compiles into the analog partition
+  // so the behavioral factory receives _pinLoading from the compiler.
+  registry.register({
+    ...makeBaseDef("Nand"),
+    pinLayout: [
+      { label: "In_1", direction: PinDirection.INPUT,  defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" as const },
+      { label: "In_2", direction: PinDirection.INPUT,  defaultBitWidth: 1, position: { x: 0, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" as const },
+      { label: "out",  direction: PinDirection.OUTPUT, defaultBitWidth: 1, position: { x: 2, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" as const },
+    ],
+    defaultModel: "behavioral",
+    models: { digital: { executeFn: noopExecuteFn as unknown as import("../../../core/registry.js").ExecuteFunction } },
+    modelRegistry: {
+      behavioral: { kind: "inline" as const, factory: (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
+        onFactory?.(props, pinNodes);
+        const [n0, , n2] = [...pinNodes.values()];
+        return makeTestResistorElement(n0 ?? 1, n2 ?? 3);
+      }, paramDefs: [], params: {} },
+    },
+  });
+
+  return registry;
+}
+
+/**
+ * Build a circuit with: Ground (0,0), AnalogR (20,0)→(22,0), Nand at (10,0)
+ * with pins In_1=(10,1), In_2=(10,2), out=(12,1).
+ */
+function buildPinLoadingCircuit(
+  metadata: Partial<import("../../../core/circuit.js").CircuitMetadata> = {},
+  registry?: ComponentRegistry,
+): { circuit: Circuit; registry: ComponentRegistry } {
+  const reg = registry ?? buildPinLoadingTestRegistry();
+  const circuit = new Circuit(metadata);
+
+  const gnd = makeElement("Ground", "gnd1", [{ x: 0, y: 0 }], new Map(), reg);
+  const resistor = makeElement("AnalogR", "r1", [{ x: 20, y: 0 }, { x: 22, y: 0 }], new Map(), reg);
+  const nand = makeElement(
+    "Nand", "nand1",
+    [{ x: 10, y: 1, label: "In_1" }, { x: 10, y: 2, label: "In_2" }, { x: 12, y: 1, label: "out" }],
+    new Map(),
+    reg,
+  );
+
+  circuit.addElement(gnd);
+  circuit.addElement(resistor);
+  circuit.addElement(nand);
+
+  circuit.addWire(new Wire({ x: 0, y: 0 }, { x: 20, y: 0 }));
+  circuit.addWire(new Wire({ x: 22, y: 0 }, { x: 23, y: 0 }));
+  circuit.addWire(new Wire({ x: 10, y: 1 }, { x: 11, y: 1 }));
+  circuit.addWire(new Wire({ x: 10, y: 2 }, { x: 11, y: 2 }));
+  circuit.addWire(new Wire({ x: 12, y: 1 }, { x: 13, y: 1 }));
+
+  return { circuit, registry: reg };
+}
+
+describe("Task 6.4.1 — _pinLoading threaded to behavioural factory", () => {
+  it("pin_loading_threaded_for_behavioural_gate_all_mode", () => {
+    let capturedPinLoading: Record<string, boolean> | undefined;
+
+    const registry = buildPinLoadingTestRegistry((props) => {
+      if (props.has("_pinLoading")) {
+        capturedPinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
+      }
+    });
+
+    const { circuit } = buildPinLoadingCircuit({ digitalPinLoading: "all" }, registry);
+    compileUnified(circuit, registry);
+
+    expect(capturedPinLoading).toBeDefined();
+    expect(capturedPinLoading!["In_1"]).toBe(true);
+    expect(capturedPinLoading!["In_2"]).toBe(true);
+    expect(capturedPinLoading!["out"]).toBe(true);
+  });
+
+  it("pin_loading_threaded_for_behavioural_gate_none_mode", () => {
+    let capturedPinLoading: Record<string, boolean> | undefined;
+
+    const registry = buildPinLoadingTestRegistry((props) => {
+      if (props.has("_pinLoading")) {
+        capturedPinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
+      }
+    });
+
+    const { circuit } = buildPinLoadingCircuit({ digitalPinLoading: "none" }, registry);
+    compileUnified(circuit, registry);
+
+    expect(capturedPinLoading).toBeDefined();
+    expect(capturedPinLoading!["In_1"]).toBe(false);
+    expect(capturedPinLoading!["In_2"]).toBe(false);
+    expect(capturedPinLoading!["out"]).toBe(false);
+  });
+
+  it("pin_loading_respects_per_net_override", () => {
+    // Compile with "all" mode plus a per-net override forcing the In_1 pin
+    // to "ideal" (loaded=false). The override anchor uses the instanceId+pinLabel
+    // form so the compiler resolves it to the actual MNA node before compilation.
+    let capturedPinLoading: Record<string, boolean> | undefined;
+
+    const registry = buildPinLoadingTestRegistry((props) => {
+      if (props.has("_pinLoading")) {
+        capturedPinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
+      }
+    });
+
+    const { circuit } = buildPinLoadingCircuit({
+      digitalPinLoading: "all",
+      digitalPinLoadingOverrides: [{
+        anchor: { type: "pin", instanceId: "nand1", pinLabel: "In_1" },
+        loading: "ideal",
+      }],
+    }, registry);
+    compileUnified(circuit, registry);
+
+    // In_1 overridden to ideal → false; In_2 and out follow "all" → true
+    expect(capturedPinLoading).toBeDefined();
+    expect(capturedPinLoading!["In_1"]).toBe(false);
+    expect(capturedPinLoading!["In_2"]).toBe(true);
+    expect(capturedPinLoading!["out"]).toBe(true);
+  });
+
+  it("pin_loading_helper_shared_with_bridge_adapter", () => {
+    // Verify the bridge-adapter and behavioural-factory code paths invoke the
+    // same shared resolvePinLoading helper by confirming they track the same
+    // circuit-level mode:
+    //  "all"  → gate _pinLoading["out"] = true
+    //  "none" → gate _pinLoading["out"] = false
+    let capturedPinLoading: Record<string, boolean> | undefined;
+
+    const registry = buildPinLoadingTestRegistry((props) => {
+      if (props.has("_pinLoading")) {
+        capturedPinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
+      }
+    });
+    const { circuit } = buildPinLoadingCircuit({ digitalPinLoading: "all" }, registry);
+    compileUnified(circuit, registry);
+    expect(capturedPinLoading).toBeDefined();
+    expect(capturedPinLoading!["out"]).toBe(true);
+
+    const registry2 = buildPinLoadingTestRegistry((props) => {
+      if (props.has("_pinLoading")) {
+        capturedPinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
+      }
+    });
+    const { circuit: circuit2 } = buildPinLoadingCircuit({ digitalPinLoading: "none" }, registry2);
+    compileUnified(circuit2, registry2);
+    expect(capturedPinLoading!["out"]).toBe(false);
+  });
+});

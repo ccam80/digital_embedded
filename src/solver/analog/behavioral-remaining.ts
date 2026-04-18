@@ -53,6 +53,12 @@ function getPinSpec(
   return pinSpecs?.[label] ?? CMOS_3V3_FALLBACK;
 }
 
+function getPinLoadingFlag(props: PropertyBag, label: string, defaultValue: boolean): boolean {
+  if (!props.has("_pinLoading")) return defaultValue;
+  const pinLoading = props.get("_pinLoading") as unknown as Record<string, boolean>;
+  return pinLoading[label] ?? defaultValue;
+}
+
 // ---------------------------------------------------------------------------
 // Helper: stamp a conductance between two MNA nodes (ground = node 0 not stamped)
 // ---------------------------------------------------------------------------
@@ -101,13 +107,13 @@ export function createDriverAnalogElement(
   const selSpec = getPinSpec(props, "sel");
   const outSpec = getPinSpec(props, "out");
 
-  const inputPin = new DigitalInputPinModel(inSpec, true);
+  const inputPin = new DigitalInputPinModel(inSpec, getPinLoadingFlag(props, "in", true));
   inputPin.init(nodeIn, 0);
 
-  const selPin = new DigitalInputPinModel(selSpec, true);
+  const selPin = new DigitalInputPinModel(selSpec, getPinLoadingFlag(props, "sel", true));
   selPin.init(nodeSel, 0);
 
-  const outputPin = new DigitalOutputPinModel(outSpec);
+  const outputPin = new DigitalOutputPinModel(outSpec, getPinLoadingFlag(props, "out", false), "direct");
   outputPin.init(nodeOut, -1);
   outputPin.setHighZ(true); // default Hi-Z until sel is known
 
@@ -126,11 +132,10 @@ export function createDriverAnalogElement(
     isReactive: true,
 
     load(ctx: LoadContext): void {
-      const s = ctx.solver;
       const v = ctx.voltages;
 
-      inputPin.stamp(s);
-      selPin.stamp(s);
+      inputPin.load(ctx);
+      selPin.load(ctx);
 
       const vIn = readMnaVoltage(nodeIn, v);
       const vSel = readMnaVoltage(nodeSel, v);
@@ -143,21 +148,14 @@ export function createDriverAnalogElement(
 
       outputPin.setHighZ(!latchedSel);
       outputPin.setLogicLevel(latchedIn);
-      outputPin.stampOutput(s);
-
-      if (ctx.isTransient && ctx.dt > 0) {
-        inputPin.stampCompanion(s, ctx.dt, ctx.method);
-        selPin.stampCompanion(s, ctx.dt, ctx.method);
-        outputPin.stampCompanion(s, ctx.dt, ctx.method);
-      }
+      outputPin.load(ctx);
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      if (ctx.dt <= 0) return;
       const v = ctx.voltages;
-      inputPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(nodeIn, v));
-      selPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(nodeSel, v));
-      outputPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(nodeOut, v));
+      inputPin.accept(ctx, readMnaVoltage(nodeIn, v));
+      selPin.accept(ctx, readMnaVoltage(nodeSel, v));
+      outputPin.accept(ctx, readMnaVoltage(nodeOut, v));
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -203,13 +201,13 @@ export function createDriverInvAnalogElement(
   const selSpec = getPinSpec(props, "sel");
   const outSpec = getPinSpec(props, "out");
 
-  const inputPin = new DigitalInputPinModel(inSpec, true);
+  const inputPin = new DigitalInputPinModel(inSpec, getPinLoadingFlag(props, "in", true));
   inputPin.init(nodeIn, 0);
 
-  const selPin = new DigitalInputPinModel(selSpec, true);
+  const selPin = new DigitalInputPinModel(selSpec, getPinLoadingFlag(props, "sel", true));
   selPin.init(nodeSel, 0);
 
-  const outputPin = new DigitalOutputPinModel(outSpec);
+  const outputPin = new DigitalOutputPinModel(outSpec, getPinLoadingFlag(props, "out", false), "direct");
   outputPin.init(nodeOut, -1);
   outputPin.setHighZ(false); // active-low: sel=0 → driven
 
@@ -228,11 +226,10 @@ export function createDriverInvAnalogElement(
     isReactive: true,
 
     load(ctx: LoadContext): void {
-      const s = ctx.solver;
       const v = ctx.voltages;
 
-      inputPin.stamp(s);
-      selPin.stamp(s);
+      inputPin.load(ctx);
+      selPin.load(ctx);
 
       const vIn = readMnaVoltage(nodeIn, v);
       const vSel = readMnaVoltage(nodeSel, v);
@@ -246,21 +243,14 @@ export function createDriverInvAnalogElement(
       // Active-low: hiZ when sel is HIGH
       outputPin.setHighZ(latchedSel);
       outputPin.setLogicLevel(latchedIn);
-      outputPin.stampOutput(s);
-
-      if (ctx.isTransient && ctx.dt > 0) {
-        inputPin.stampCompanion(s, ctx.dt, ctx.method);
-        selPin.stampCompanion(s, ctx.dt, ctx.method);
-        outputPin.stampCompanion(s, ctx.dt, ctx.method);
-      }
+      outputPin.load(ctx);
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      if (ctx.dt <= 0) return;
       const v = ctx.voltages;
-      inputPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(nodeIn, v));
-      selPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(nodeSel, v));
-      outputPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(nodeOut, v));
+      inputPin.accept(ctx, readMnaVoltage(nodeIn, v));
+      selPin.accept(ctx, readMnaVoltage(nodeSel, v));
+      outputPin.accept(ctx, readMnaVoltage(nodeOut, v));
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -321,7 +311,7 @@ export function createSplitterAnalogElement(
   for (let i = 0; i < numIn; i++) {
     const label = allLabels[i] ?? `in${i}`;
     const spec = getPinSpec(props, label);
-    const pin = new DigitalInputPinModel(spec, true);
+    const pin = new DigitalInputPinModel(spec, getPinLoadingFlag(props, label, true));
     pin.init(allNodeIds[i] ?? 0, 0);
     inputPins.push(pin);
   }
@@ -331,7 +321,7 @@ export function createSplitterAnalogElement(
   for (let i = 0; i < numOut; i++) {
     const label = allLabels[numIn + i] ?? `out${i}`;
     const spec = getPinSpec(props, label);
-    const pin = new DigitalOutputPinModel(spec);
+    const pin = new DigitalOutputPinModel(spec, getPinLoadingFlag(props, label, false), "direct");
     pin.init(allNodeIds[numIn + i] ?? 0, -1);
     pin.setLogicLevel(false);
     outputPins.push(pin);
@@ -343,10 +333,9 @@ export function createSplitterAnalogElement(
     isReactive: true,
 
     load(ctx: LoadContext): void {
-      const s = ctx.solver;
       const v = ctx.voltages;
 
-      for (const p of inputPins) p.stamp(s);
+      for (const p of inputPins) p.load(ctx);
 
       for (let i = 0; i < numIn; i++) {
         const nodeId = inputPins[i].nodeId;
@@ -356,23 +345,17 @@ export function createSplitterAnalogElement(
       }
       for (let i = 0; i < numOut; i++) {
         outputPins[i].setLogicLevel(latchedLevels[i] ?? false);
-        outputPins[i].stampOutput(s);
-      }
-
-      if (ctx.isTransient && ctx.dt > 0) {
-        for (const p of inputPins) p.stampCompanion(s, ctx.dt, ctx.method);
-        for (const p of outputPins) p.stampCompanion(s, ctx.dt, ctx.method);
+        outputPins[i].load(ctx);
       }
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      if (ctx.dt <= 0) return;
       const v = ctx.voltages;
       for (const p of inputPins) {
-        p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, v));
+        p.accept(ctx, readMnaVoltage(p.nodeId, v));
       }
       for (const p of outputPins) {
-        p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, v));
+        p.accept(ctx, readMnaVoltage(p.nodeId, v));
       }
     },
 
@@ -774,7 +757,7 @@ export function createButtonLEDAnalogElement(
   const nodeLedIn = pinNodes.get("in")!; // LED anode
 
   const outSpec = getPinSpec(props, "out");
-  const outputPin = new DigitalOutputPinModel(outSpec);
+  const outputPin = new DigitalOutputPinModel(outSpec, getPinLoadingFlag(props, "out", false), "direct");
   outputPin.init(nodeOut, -1);
   outputPin.setLogicLevel(false); // default low
 
@@ -790,7 +773,7 @@ export function createButtonLEDAnalogElement(
     isReactive: false,
 
     load(ctx: LoadContext): void {
-      outputPin.stampOutput(ctx.solver);
+      outputPin.load(ctx);
       ledDiode.load(ctx);
     },
 
@@ -813,4 +796,3 @@ export function createButtonLEDAnalogElement(
     setParam(key: string, value: number) { delegatePinSetParam(pinModelsByLabel, key, value); },
   };
 }
-

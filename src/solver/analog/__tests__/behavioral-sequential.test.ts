@@ -10,7 +10,7 @@
  *   - CounterPresetDefinition has analogFactory registered
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   BehavioralCounterElement,
   BehavioralRegisterElement,
@@ -27,6 +27,8 @@ import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+import { PropertyBag } from "../../../core/properties.js";
+import type { LoadContext } from "../load-context.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
@@ -446,5 +448,76 @@ describe("Registration", () => {
     expect(el2.isReactive).toBe(true);
     expect(el2.branchIndex).toBe(-1);
     expect(el2.pinNodeIds.length).toBe(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 6.4.3 — sequential_pin_loading_propagates
+// ---------------------------------------------------------------------------
+
+describe("Task 6.4.3 — sequential pin loading propagates", () => {
+  it("sequential_pin_loading_propagates", () => {
+    // 4-bit counter: en=node 1, C=node 2, clr=node 3, out=node 4, ovf=node 5.
+    // Set _pinLoading so "en" is loaded=true but "C" and "clr" are loaded=false.
+    // Verify via allocElement spy:
+    //   en (MNA node 1 → nodeIdx 0) → allocElement called at (0,0)
+    //   C  (MNA node 2 → nodeIdx 1) → NO call at (1,1)
+    const pinLoading: Record<string, boolean> = {
+      "en": true,
+      "C": false,
+      "clr": false,
+      "out": false,
+      "ovf": false,
+    };
+    const props = new PropertyBag();
+    props.set("bitWidth", 4 as unknown as import("../../../core/properties.js").PropertyValue);
+    props.set("_pinLoading", pinLoading as unknown as import("../../../core/properties.js").PropertyValue);
+
+    const factory = getFactory(CounterDefinition.modelRegistry!.behavioral!);
+    const element = factory(
+      new Map([["en", 1], ["C", 2], ["clr", 3], ["out", 4], ["ovf", 5]]),
+      [], -1, props, () => 0,
+    );
+    Object.assign(element, { pinNodeIds: [1, 2, 3, 4, 5], allNodeIds: [1, 2, 3, 4, 5] });
+
+    const allocCalls: Array<[number, number]> = [];
+    const solver = {
+      allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
+      stampElement(_h: number, _v: number) {},
+      stampRHS(_i: number, _v: number) {},
+    };
+
+    const ag = new Float64Array(7);
+    const ctx: LoadContext = {
+      solver: solver as any,
+      voltages: new Float64Array(16),
+      iteration: 0,
+      initMode: "transient" as const,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [],
+      ag,
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: false,
+      isTransient: false,
+      xfact: 0,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    element.load(ctx);
+
+    // en (nodeIdx=0) should have a diagonal stamp (loaded=true)
+    const enDiag = allocCalls.some(([r, c]) => r === 0 && c === 0);
+    // C (nodeIdx=1) should NOT have a diagonal stamp (loaded=false → no-op)
+    const clockDiag = allocCalls.some(([r, c]) => r === 1 && c === 1);
+
+    expect(enDiag).toBe(true);
+    expect(clockDiag).toBe(false);
   });
 });

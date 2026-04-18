@@ -20,7 +20,7 @@
  *   matrixSize = number of circuit nodes + number of VS branch variables
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson } from "../newton-raphson.js";
@@ -56,6 +56,7 @@ import { ButtonLEDDefinition } from "../../../components/io/button-led.js";
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
+import type { LoadContext } from "../load-context.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
@@ -446,5 +447,72 @@ describe("Registration", () => {
         `${def.name} should have an analog model`,
       ).toBe(true);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 6.4.3 — remaining_pin_loading_propagates
+// ---------------------------------------------------------------------------
+
+describe("Task 6.4.3 — remaining pin loading propagates", () => {
+  it("remaining_pin_loading_propagates", () => {
+    // Driver element: pins "in"=node 1, "sel"=node 2, "out"=node 3.
+    // Set _pinLoading: "in"=true, "sel"=false.
+    // Verify via allocElement spy:
+    //   in  (MNA node 1 → nodeIdx 0) → allocElement called at (0,0)
+    //   sel (MNA node 2 → nodeIdx 1) → NO call at (1,1)
+    const pinLoading: Record<string, boolean> = {
+      "in": true,
+      "sel": false,
+      "out": false,
+    };
+    const props = new PropertyBag();
+    props.set("_pinLoading", pinLoading as unknown as import("../../../core/properties.js").PropertyValue);
+
+    const element = createDriverAnalogElement(
+      new Map([["in", 1], ["sel", 2], ["out", 3]]),
+      [], -1, props,
+    );
+    Object.assign(element, { pinNodeIds: [1, 2, 3], allNodeIds: [1, 2, 3] });
+
+    const allocCalls: Array<[number, number]> = [];
+    const solver = {
+      allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
+      stampElement(_h: number, _v: number) {},
+      stampRHS(_i: number, _v: number) {},
+    };
+
+    const ag = new Float64Array(7);
+    const ctx: LoadContext = {
+      solver: solver as any,
+      voltages: new Float64Array(16),
+      iteration: 0,
+      initMode: "transient" as const,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [],
+      ag,
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: false,
+      isTransient: false,
+      xfact: 0,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    element.load(ctx);
+
+    // in (nodeIdx=0) should produce an allocElement call at (0,0) since loaded=true
+    const inDiag = allocCalls.some(([r, c]) => r === 0 && c === 0);
+    // sel (nodeIdx=1) should NOT produce any allocElement call (loaded=false → no-op)
+    const selDiag = allocCalls.some(([r, c]) => r === 1 && c === 1);
+
+    expect(inDiag).toBe(true);
+    expect(selDiag).toBe(false);
   });
 });

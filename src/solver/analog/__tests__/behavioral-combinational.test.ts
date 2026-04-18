@@ -14,7 +14,7 @@
  * compared to vIH / vIL thresholds.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson } from "../newton-raphson.js";
@@ -35,6 +35,7 @@ import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../element.js";
+import type { LoadContext } from "../load-context.js";
 import { MuxDefinition } from "../../../components/wiring/mux.js";
 import { DemuxDefinition } from "../../../components/wiring/demux.js";
 import { DecoderDefinition } from "../../../components/wiring/decoder.js";
@@ -393,5 +394,72 @@ describe("Registration", () => {
     );
     expect(element.isNonlinear).toBe(true);
     expect(element.isReactive).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 6.4.3 — combinational_pin_loading_propagates
+// ---------------------------------------------------------------------------
+
+describe("Task 6.4.3 — combinational pin loading propagates", () => {
+  it("combinational_pin_loading_propagates", () => {
+    // 2:1 mux (selectorBits=1): sel=1, in_0=2, in_1=3, out=4.
+    // Set _pinLoading so that "sel" is loaded=true and "in_0" is loaded=false.
+    // Verify via allocElement spy: sel (MNA node 1 → nodeIdx 0) should produce
+    // an allocElement call at (0,0); in_0 (MNA node 2 → nodeIdx 1) should not.
+    const pinLoading: Record<string, boolean> = {
+      "sel": true,
+      "in_0": false,
+      "in_1": false,
+      "out": false,
+    };
+    const props = new PropertyBag([]);
+    props.set("_pinLoading", pinLoading as unknown as import("../../../core/properties.js").PropertyValue);
+
+    const factory = makeBehavioralMuxAnalogFactory(1);
+    const element = withNodeIds(
+      factory(new Map([["sel", 1], ["in_0", 2], ["in_1", 3], ["out", 4]]), [], -1, props, () => 0),
+      [1, 2, 3, 4],
+    );
+
+    const allocCalls: Array<[number, number]> = [];
+    const solver = {
+      allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
+      stampElement(_h: number, _v: number) {},
+      stampRHS(_i: number, _v: number) {},
+    };
+
+    const ag = new Float64Array(7);
+    const ctx: LoadContext = {
+      solver: solver as any,
+      voltages: new Float64Array(16),
+      iteration: 0,
+      initMode: "transient" as const,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [],
+      ag,
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: false,
+      isTransient: false,
+      xfact: 0,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    element.load(ctx);
+
+    // sel (nodeIdx=0) should appear in allocCalls (loaded=true → stamps 1/rIn)
+    const selDiag = allocCalls.some(([r, c]) => r === 0 && c === 0);
+    // in_0 (nodeIdx=1) should NOT appear (loaded=false → no-op)
+    const in0Diag = allocCalls.some(([r, c]) => r === 1 && c === 1);
+
+    expect(selDiag).toBe(true);
+    expect(in0Diag).toBe(false);
   });
 });

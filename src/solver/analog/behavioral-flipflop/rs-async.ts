@@ -8,7 +8,7 @@ import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin
 import type { AnalogElementFactory } from "../behavioral-gate.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { makeDiagnostic } from "../diagnostics.js";
-import { FALLBACK_SPEC, getPinSpecs, makeInputPin, makeOutputPin } from "./shared.js";
+import { FALLBACK_SPEC, getPinSpecs, getPinLoading, makeInputPin, makeOutputPin } from "./shared.js";
 
 // ---------------------------------------------------------------------------
 // BehavioralRSAsyncLatchElement (level-sensitive SR latch, no clock)
@@ -22,9 +22,8 @@ import { FALLBACK_SPEC, getPinSpecs, makeInputPin, makeOutputPin } from "./share
  * S=1, R=1 → forbidden: hold previous, emit diagnostic
  *
  * Unified interface:
- *   load()   — stamps input loading, output Norton equivalents from the
- *              currently latched Q state, and pin-capacitance companions
- *              during transient.
+ *   load()   — delegates input/output pin stamping to pin models from the
+ *              currently latched Q state.
  *   accept() — level-sensitive latching, diagnostic emission, and pin
  *              companion state update after each accepted timestep.
  */
@@ -71,22 +70,14 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
-
-    this._sPin.stamp(solver);
-    this._rPin.stamp(solver);
+    // Delegate input stamping to pin models
+    this._sPin.load(ctx);
+    this._rPin.load(ctx);
 
     this._qPin.setLogicLevel(this._latchedQ);
     this._qBarPin.setLogicLevel(!this._latchedQ);
-    this._qPin.stampOutput(solver);
-    this._qBarPin.stampOutput(solver);
-
-    if (ctx.isTransient && ctx.dt > 0) {
-      this._sPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._rPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._qPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._qBarPin.stampCompanion(solver, ctx.dt, ctx.method);
-    }
+    this._qPin.load(ctx);
+    this._qBarPin.load(ctx);
   }
 
   /**
@@ -95,8 +86,6 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.voltages;
-    const dt = ctx.dt;
-    const method = ctx.method;
 
     const sV = readMnaVoltage(this._sPin.nodeId, voltages);
     const rV = readMnaVoltage(this._rPin.nodeId, voltages);
@@ -126,12 +115,11 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
       }
     }
 
-    if (dt > 0) {
-      this._sPin.updateCompanion(dt, method, sV);
-      this._rPin.updateCompanion(dt, method, rV);
-      this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
-      this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
-    }
+    // Delegate companion updates to pin models.
+    this._sPin.accept(ctx, sV);
+    this._rPin.accept(ctx, rV);
+    this._qPin.accept(ctx, readMnaVoltage(this._qPin.nodeId, voltages));
+    this._qBarPin.accept(ctx, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -162,15 +150,17 @@ export class BehavioralRSAsyncLatchElement implements AnalogElementCore {
 export function makeRSAsyncLatchAnalogFactory(): AnalogElementFactory {
   return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
+    const pinLoading = getPinLoading(props);
+
     const sSpec = pinSpecs?.["S"] ?? FALLBACK_SPEC;
     const rSpec = pinSpecs?.["R"] ?? FALLBACK_SPEC;
     const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
     const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-    const sPin = makeInputPin(sSpec, pinNodes.get("S") ?? 0);
-    const rPin = makeInputPin(rSpec, pinNodes.get("R") ?? 0);
-    const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
-    const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
+    const sPin = makeInputPin(sSpec, pinNodes.get("S") ?? 0, pinLoading["S"] ?? true);
+    const rPin = makeInputPin(rSpec, pinNodes.get("R") ?? 0, pinLoading["R"] ?? true);
+    const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0, pinLoading["Q"] ?? false);
+    const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0, pinLoading["~Q"] ?? false);
 
     const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
       ["S", sPin],

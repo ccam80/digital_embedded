@@ -13,13 +13,13 @@
       ],
       "spawned": 2,
       "completed": 2,
-      "verifications_passed": 0,
+      "verifications_passed": 1,
       "verifications_failed": 1,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "C1": "failed"
+        "C1": "passed"
       }
     },
     {
@@ -45,8 +45,8 @@
           "C2.4"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 4,
+      "completed": 4,
       "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
@@ -298,5 +298,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-18T00:31:40.544Z"
+  "last_updated": "2026-04-18T01:30:31.797Z"
 }

@@ -1073,7 +1073,7 @@ export class MNAEngine implements AnalogEngine {
    */
   private _seedFromDcop(
     result: DcOpResult,
-    _elements: readonly AnalogElement[],
+    elements: readonly AnalogElement[],
     cac: CompiledWithBridges,
   ): void {
     this._voltages.set(result.nodeVoltages);
@@ -1089,6 +1089,19 @@ export class MNAEngine implements AnalogEngine {
       cac.statePool.seedHistory();
       cac.statePool.refreshElementRefs(this._ctx!.poolBackedElements as unknown as PoolBackedAnalogElement[]);
       this._firsttime = true;
+    }
+
+    // Seed reactive element history (e.g. _prevClockVoltage) from the DC-OP
+    // solution so the first transient step can correctly detect signal edges.
+    // Matches ngspice DEVaccept post-CKTop call: elements are notified of the
+    // accepted DC operating point before any transient NR iteration begins.
+    const addBP = this._ctx!.addBreakpointBound;
+    this._ctx!.loadCtx.voltages = this._voltages;
+    this._ctx!.loadCtx.dt = 0;
+    for (const el of elements) {
+      if (el.accept) {
+        el.accept(this._ctx!.loadCtx, 0, addBP);
+      }
     }
   }
 

@@ -6,11 +6,10 @@
  * never mid-NR due to Newton-Raphson oscillation.
  *
  * Unified interface:
- *   load()   — stamps all pin loading and output Norton equivalents based on
- *              the current latched Q state; also stamps pin-capacitance
- *              companion models during transient.
+ *   load()   — delegates pin stamping to pin models and evaluates truth table
+ *              from latched Q state.
  *   accept() — edge detection + pin companion state update after each
- *              accepted timestep.
+ *              accepted timestep, delegates to pin model accept().
  */
 
 import type { AnalogElementCore, LoadContext } from "./element.js";
@@ -118,30 +117,18 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
-
-    // Stamp input loading conductances
-    this._clockPin.stamp(solver);
-    this._dPin.stamp(solver);
-    if (this._setPin !== null) this._setPin.stamp(solver);
-    if (this._resetPin !== null) this._resetPin.stamp(solver);
+    // Delegate stamping to pin models
+    this._clockPin.load(ctx);
+    this._dPin.load(ctx);
+    if (this._setPin !== null) this._setPin.load(ctx);
+    if (this._resetPin !== null) this._resetPin.load(ctx);
 
     // Stamp output Norton equivalents from the currently latched Q state.
     // Logic evaluation happens only in accept() to prevent mid-NR latching.
     this._qPin.setLogicLevel(this._latchedQ);
     this._qBarPin.setLogicLevel(!this._latchedQ);
-    this._qPin.stampOutput(solver);
-    this._qBarPin.stampOutput(solver);
-
-    // Transient: stamp companion models for pin capacitances.
-    if (ctx.isTransient && ctx.dt > 0) {
-      this._clockPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._dPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._qPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._qBarPin.stampCompanion(solver, ctx.dt, ctx.method);
-      if (this._setPin !== null) this._setPin.stampCompanion(solver, ctx.dt, ctx.method);
-      if (this._resetPin !== null) this._resetPin.stampCompanion(solver, ctx.dt, ctx.method);
-    }
+    this._qPin.load(ctx);
+    this._qBarPin.load(ctx);
   }
 
   /**
@@ -154,12 +141,10 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
    *   3. On rising edge: sample D, update _latchedQ.
    *   4. Handle async set/reset (override clock-triggered state).
    *   5. Update _prevClockVoltage.
-   *   6. Update all pin companion models.
+   *   6. Delegate companion updates to pin models.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.voltages;
-    const dt = ctx.dt;
-    const method = ctx.method;
 
     const clockNodeId = this._clockPin.nodeId;
     const dNodeId = this._dPin.nodeId;
@@ -203,21 +188,17 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
 
     this._prevClockVoltage = currentClockV;
 
-    // Update all pin companion models with accepted voltages (transient only).
-    if (dt > 0) {
-      this._clockPin.updateCompanion(dt, method, currentClockV);
-      this._dPin.updateCompanion(dt, method, dVoltage);
+    // Delegate companion updates to pin models with accepted voltages.
+    this._clockPin.accept(ctx, currentClockV);
+    this._dPin.accept(ctx, dVoltage);
+    this._qPin.accept(ctx, readMnaVoltage(this._qPin.nodeId, voltages));
+    this._qBarPin.accept(ctx, readMnaVoltage(this._qBarPin.nodeId, voltages));
 
-      this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
-      this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
-
-      if (this._setPin !== null) {
-        this._setPin.updateCompanion(dt, method, readMnaVoltage(this._setPin.nodeId, voltages));
-      }
-
-      if (this._resetPin !== null) {
-        this._resetPin.updateCompanion(dt, method, readMnaVoltage(this._resetPin.nodeId, voltages));
-      }
+    if (this._setPin !== null) {
+      this._setPin.accept(ctx, readMnaVoltage(this._setPin.nodeId, voltages));
+    }
+    if (this._resetPin !== null) {
+      this._resetPin.accept(ctx, readMnaVoltage(this._resetPin.nodeId, voltages));
     }
   }
 
@@ -300,21 +281,25 @@ export function makeDFlipflopAnalogFactory(): AnalogElementFactory {
       ? (props.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>)
       : undefined;
 
+    const pinLoading = props.has("_pinLoading")
+      ? (props.get("_pinLoading") as unknown as Record<string, boolean>)
+      : {} as Record<string, boolean>;
+
     const dSpec = pinSpecs?.["D"] ?? FALLBACK_SPEC;
     const cSpec = pinSpecs?.["C"] ?? FALLBACK_SPEC;
     const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
     const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-    const dPin = new DigitalInputPinModel(dSpec, true);
+    const dPin = new DigitalInputPinModel(dSpec, pinLoading["D"] ?? true);
     dPin.init(pinNodes.get("D") ?? 0, 0);
 
-    const clockPin = new DigitalInputPinModel(cSpec, true);
+    const clockPin = new DigitalInputPinModel(cSpec, pinLoading["C"] ?? true);
     clockPin.init(pinNodes.get("C") ?? 0, 0);
 
-    const qPin = new DigitalOutputPinModel(qSpec);
+    const qPin = new DigitalOutputPinModel(qSpec, pinLoading["Q"] ?? false, "direct");
     qPin.init(pinNodes.get("Q") ?? 0, -1);
 
-    const qBarPin = new DigitalOutputPinModel(qBarSpec);
+    const qBarPin = new DigitalOutputPinModel(qBarSpec, pinLoading["~Q"] ?? false, "direct");
     qBarPin.init(pinNodes.get("~Q") ?? 0, -1);
 
     const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([

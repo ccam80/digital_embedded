@@ -83,6 +83,34 @@ function modelEntryToMnaModel(entry: ModelEntry): MnaModel | null {
   return null;
 }
 
+/**
+ * Resolve the loaded flag for a single pin at a given MNA node.
+ *
+ * Used by both the bridge-adapter code path and the behavioural-factory code
+ * path so that both resolve pin loading through the same logic.
+ *
+ * @param nodeId          - MNA node ID for the pin (from groupToNodeId).
+ * @param mode            - Circuit-level digitalPinLoading setting.
+ * @param nodeIdToOverride - Per-net loading overrides (nodeId → "loaded"|"ideal").
+ * @param isCrossDomain   - True when the pin is at a cross-domain boundary
+ *                          (bridge adapter); false for purely behavioural pins.
+ */
+function resolvePinLoading(
+  nodeId: number,
+  mode: "cross-domain" | "all" | "none",
+  nodeIdToOverride: ReadonlyMap<number, "loaded" | "ideal">,
+  isCrossDomain: boolean,
+): boolean {
+  const override = nodeIdToOverride.get(nodeId);
+  if (override !== undefined) {
+    return override === "loaded";
+  }
+  if (mode === "none") return false;
+  if (mode === "all") return true;
+  // "cross-domain": only load pins that are at a cross-domain boundary
+  return isCrossDomain;
+}
+
 function resolveComponentRoute(
   def: ComponentDefinition,
   pc: PartitionedComponent,
@@ -1195,6 +1223,22 @@ export function compileAnalogPartition(
         );
       }
       props.set("_pinElectrical", pinElectricalMap as unknown as import("../../core/properties.js").PropertyValue);
+
+      // Build per-pin loading map and inject into PropertyBag so that
+      // behavioural factories can read it during pin-model construction.
+      const pinLoadingMap: Record<string, boolean> = {};
+      for (const pinLabel of pinLabelsForElec) {
+        const nodeId = pinNodes.get(pinLabel);
+        if (nodeId !== undefined) {
+          pinLoadingMap[pinLabel] = resolvePinLoading(
+            nodeId,
+            digitalPinLoading,
+            nodeIdToLoadingOverride,
+            false,
+          );
+        }
+      }
+      props.set("_pinLoading", pinLoadingMap as unknown as import("../../core/properties.js").PropertyValue);
     }
 
     // Populate model params.
@@ -1278,12 +1322,13 @@ export function compileAnalogPartition(
     const nodeId = groupToNodeId.get(boundaryGroupId);
     if (nodeId === undefined) continue;
 
-    // Determine loaded flag: use per-net override if present, else circuit-level mode.
-    // "none" mode → unloaded (ideal); "cross-domain" or "all" → loaded.
-    const override = descriptor.boundaryGroup.loadingMode;
-    const loaded = override !== undefined
-      ? override === "loaded"
-      : digitalPinLoading !== "none";
+    // Determine loaded flag using the shared resolvePinLoading helper.
+    const loaded = resolvePinLoading(
+      nodeId,
+      digitalPinLoading,
+      nodeIdToLoadingOverride,
+      true,
+    );
 
     const spec = resolvePinElectrical(circuitFamily, descriptor.electricalSpec);
     const adapters: Array<BridgeOutputAdapter | BridgeInputAdapter> = [];

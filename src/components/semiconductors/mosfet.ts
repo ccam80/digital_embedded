@@ -45,7 +45,7 @@ import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
 import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
 import { VT } from "../../core/constants.js";
-import { integrateCapacitor } from "../../solver/analog/integration.js";
+import { computeNIcomCof } from "../../solver/analog/integration.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import {
   AbstractFetElement,
@@ -1630,9 +1630,9 @@ class MosfetAnalogElement extends AbstractFetElement {
     }
   }
 
-  protected override _stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
+  protected override _stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[], ag: Float64Array): void {
     // Gate overlap capacitances (Cgs, Cgd) via base class
-    super._stampCompanion(dt, method, voltages, order, deltaOld);
+    super._stampCompanion(dt, method, voltages, order, deltaOld, ag);
 
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -1660,8 +1660,6 @@ class MosfetAnalogElement extends AbstractFetElement {
     const pb = this._tBulkPot;
     const mj = this._p.MJ;
     const mjsw = this._p.MJSW;
-
-    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
 
     // Junction-cap formulas follow ngspice mos1load.c exactly, which uses
     // vbd = V_bulk - V_drain and vbs = V_bulk - V_source as the controlling
@@ -1695,11 +1693,10 @@ class MosfetAnalogElement extends AbstractFetElement {
       s0[base + SLOT_Q_DB] = qbd;
       const q1_db = s1[base + SLOT_Q_DB];
       const q2_db = this.s2[base + SLOT_Q_DB];
-      const ccapPrev_db = s1[base + SLOT_CCAP_DB];
-      const resDB = integrateCapacitor(capbd, vbd, qbd, q1_db, q2_db, dt, h1, order, method, ccapPrev_db);
-      s0[base + SLOT_CAP_GEQ_DB] = resDB.geq;
-      s0[base + SLOT_CAP_IEQ_DB] = resDB.ceq;
-      s0[base + SLOT_CCAP_DB] = resDB.ccap;
+      const ccap_db = order >= 2 ? ag[0] * qbd + ag[1] * q1_db + ag[2] * q2_db : ag[0] * qbd + ag[1] * q1_db;
+      s0[base + SLOT_CAP_GEQ_DB] = ag[0] * capbd;
+      s0[base + SLOT_CAP_IEQ_DB] = ccap_db - ag[0] * qbd;
+      s0[base + SLOT_CCAP_DB] = ccap_db;
     } else {
       s0[base + SLOT_CAP_GEQ_DB] = 0;
       s0[base + SLOT_CAP_IEQ_DB] = 0;
@@ -1727,11 +1724,10 @@ class MosfetAnalogElement extends AbstractFetElement {
       s0[base + SLOT_Q_SB] = qbs;
       const q1_sb = s1[base + SLOT_Q_SB];
       const q2_sb = this.s2[base + SLOT_Q_SB];
-      const ccapPrev_sb = s1[base + SLOT_CCAP_SB];
-      const resSB = integrateCapacitor(capbs, vbs, qbs, q1_sb, q2_sb, dt, h1, order, method, ccapPrev_sb);
-      s0[base + SLOT_CAP_GEQ_SB] = resSB.geq;
-      s0[base + SLOT_CAP_IEQ_SB] = resSB.ceq;
-      s0[base + SLOT_CCAP_SB] = resSB.ccap;
+      const ccap_sb = order >= 2 ? ag[0] * qbs + ag[1] * q1_sb + ag[2] * q2_sb : ag[0] * qbs + ag[1] * q1_sb;
+      s0[base + SLOT_CAP_GEQ_SB] = ag[0] * capbs;
+      s0[base + SLOT_CAP_IEQ_SB] = ccap_sb - ag[0] * qbs;
+      s0[base + SLOT_CCAP_SB] = ccap_sb;
     } else {
       s0[base + SLOT_CAP_GEQ_SB] = 0;
       s0[base + SLOT_CAP_IEQ_SB] = 0;
@@ -1768,11 +1764,10 @@ class MosfetAnalogElement extends AbstractFetElement {
       const qgb = totalGb * vgb;
       const q1_gb = s1[base + SLOT_Q_GB];
       const q2_gb = this.s2[base + SLOT_Q_GB];
-      const ccapPrev_gb = s1[base + SLOT_CCAP_GB];
-      const resGB = integrateCapacitor(totalGb, vgb, qgb, q1_gb, q2_gb, dt, h1, order, method, ccapPrev_gb);
-      s0[base + SLOT_CAP_GEQ_GB] = resGB.geq;
-      s0[base + SLOT_CAP_IEQ_GB] = resGB.ceq;
-      s0[base + SLOT_CCAP_GB] = resGB.ccap;
+      const ccap_gb = order >= 2 ? ag[0] * qgb + ag[1] * q1_gb + ag[2] * q2_gb : ag[0] * qgb + ag[1] * q1_gb;
+      s0[base + SLOT_CAP_GEQ_GB] = ag[0] * totalGb;
+      s0[base + SLOT_CAP_IEQ_GB] = ccap_gb - ag[0] * qgb;
+      s0[base + SLOT_CCAP_GB] = ccap_gb;
       s0[base + SLOT_Q_GB] = qgb;
     } else {
       s0[base + SLOT_CAP_GEQ_GB] = 0;
@@ -1790,9 +1785,9 @@ class MosfetAnalogElement extends AbstractFetElement {
     }
   }
 
-  protected override _updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
+  protected override _updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[], ag: Float64Array): void {
     // GS and GD charges via base class
-    super._updateChargeFlux(voltages, dt, method, order, deltaOld);
+    super._updateChargeFlux(voltages, dt, method, order, deltaOld, ag);
 
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -1852,7 +1847,10 @@ class MosfetAnalogElement extends AbstractFetElement {
     // companion current (fixes stale CCAP slots). Uses ngspice vbd/vbs
     // convention to match stampCompanion above.
     if (dt > 0) {
-      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
+      const agLocal = new Float64Array(7);
+      const agScratch = new Float64Array(49);
+      computeNIcomCof(dt, deltaOld, order, method, agLocal, agScratch);
+
       const vbd = -vdb;
       const vbs = -vsbCap;
 
@@ -1863,25 +1861,22 @@ class MosfetAnalogElement extends AbstractFetElement {
         const pb = this._tBulkPot;
         const mj = this._p.MJ;
         const mjsw = this._p.MJSW;
-        let capbd: number;
         let qbd: number;
         if (vbd < this._tDepCap) {
           const argD = 1 - vbd / pb;
           const sargD = Math.exp(-mj * Math.log(argD));
           const sargswD = Math.exp(-mjsw * Math.log(argD));
-          capbd = czbd * sargD + czbdsw * sargswD;
           qbd = pb * (czbd * (1 - argD * sargD) / (1 - mj)
             + czbdsw * (1 - argD * sargswD) / (1 - mjsw));
         } else {
-          capbd = this._f2d + vbd * this._f3d;
           qbd = this._f4d + vbd * (this._f2d + vbd * this._f3d / 2);
         }
         s0[base + SLOT_Q_DB] = qbd;
         const q1_db = s1[base + SLOT_Q_DB];
         const q2_db = this.s2[base + SLOT_Q_DB];
-        const ccapPrev_db = s1[base + SLOT_CCAP_DB];
-        const resDB = integrateCapacitor(capbd, vbd, qbd, q1_db, q2_db, dt, h1, order, method, ccapPrev_db);
-        s0[base + SLOT_CCAP_DB] = resDB.ccap;
+        s0[base + SLOT_CCAP_DB] = order >= 2
+          ? agLocal[0] * qbd + agLocal[1] * q1_db + agLocal[2] * q2_db
+          : agLocal[0] * qbd + agLocal[1] * q1_db;
       }
 
       // Source-bulk charge recomputation
@@ -1891,25 +1886,22 @@ class MosfetAnalogElement extends AbstractFetElement {
         const pb = this._tBulkPot;
         const mj = this._p.MJ;
         const mjsw = this._p.MJSW;
-        let capbs: number;
         let qbs: number;
         if (vbs < this._tDepCap) {
           const argS = 1 - vbs / pb;
           const sargS = Math.exp(-mj * Math.log(argS));
           const sargswS = Math.exp(-mjsw * Math.log(argS));
-          capbs = czbs * sargS + czbssw * sargswS;
           qbs = pb * (czbs * (1 - argS * sargS) / (1 - mj)
             + czbssw * (1 - argS * sargswS) / (1 - mjsw));
         } else {
-          capbs = this._f2s + vbs * this._f3s;
           qbs = this._f4s + vbs * (this._f2s + vbs * this._f3s / 2);
         }
         s0[base + SLOT_Q_SB] = qbs;
         const q1_sb = s1[base + SLOT_Q_SB];
         const q2_sb = this.s2[base + SLOT_Q_SB];
-        const ccapPrev_sb = s1[base + SLOT_CCAP_SB];
-        const resSB = integrateCapacitor(capbs, vbs, qbs, q1_sb, q2_sb, dt, h1, order, method, ccapPrev_sb);
-        s0[base + SLOT_CCAP_SB] = resSB.ccap;
+        s0[base + SLOT_CCAP_SB] = order >= 2
+          ? agLocal[0] * qbs + agLocal[1] * q1_sb + agLocal[2] * q2_sb
+          : agLocal[0] * qbs + agLocal[1] * q1_sb;
       }
 
       // Gate-bulk ccap recomputation
@@ -1917,14 +1909,14 @@ class MosfetAnalogElement extends AbstractFetElement {
       if (q0_gb !== 0 || s1[base + SLOT_Q_GB] !== 0) {
         const q1_gb = s1[base + SLOT_Q_GB];
         const q2_gb = this.s2[base + SLOT_Q_GB];
-        const ccapPrev_gb = s1[base + SLOT_CCAP_GB];
         const meyerGbNow = s0[base + SLOT_MEYER_GB];
         const meyerGbPrev = s1[base + SLOT_MEYER_GB];
         const isFirstCallU2 = this._pool.initMode === "initTran";
         const totalGbRecalc = (isFirstCallU2 ? 2 * meyerGbNow : meyerGbNow + meyerGbPrev) + gbOverlap;
         if (totalGbRecalc > 0) {
-          const resGB = integrateCapacitor(totalGbRecalc, vgb, q0_gb, q1_gb, q2_gb, dt, h1, order, method, ccapPrev_gb);
-          s0[base + SLOT_CCAP_GB] = resGB.ccap;
+          s0[base + SLOT_CCAP_GB] = order >= 2
+            ? agLocal[0] * q0_gb + agLocal[1] * q1_gb + agLocal[2] * q2_gb
+            : agLocal[0] * q0_gb + agLocal[1] * q1_gb;
         }
       }
     }

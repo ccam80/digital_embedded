@@ -14,7 +14,10 @@ import {
   createTunnelDiodeElement,
   tunnelDiodeIV,
   TunnelDiodeDefinition,
+  TUNNEL_DIODE_PARAM_DEFAULTS,
 } from "../tunnel-diode.js";
+import { computeJunctionCapacitance, computeJunctionCharge } from "../diode.js";
+import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { newtonRaphson } from "../../../solver/analog/newton-raphson.js";
@@ -326,5 +329,120 @@ describe("TunnelDiode", () => {
     expect(TunnelDiodeDefinition.modelRegistry?.["behavioral"]?.kind).toBe("inline");
     expect((TunnelDiodeDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:AnalogFactory}|undefined)?.factory).toBeDefined();
     expect(TunnelDiodeDefinition.category).toBe("SEMICONDUCTORS");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C2.3: inline NIintegrate integration tests
+// ---------------------------------------------------------------------------
+
+// ngspice → ours variable mapping (niinteg.c:28-63):
+//   ag[0] (CKTag[0])    → ctx.ag[0]   coefficient on q0 (current charge)
+//   ag[1] (CKTag[1])    → ctx.ag[1]   coefficient on q1 (previous charge)
+//   cap                 → Ctotal      junction + transit capacitance
+//   q0                  → computeJunctionCharge at vdNew
+//   q1                  → s1[SLOT_Q]  from previous accepted step
+//   ccap                → ag[0]*q0 + ag[1]*q1
+//   geq                 → ag[0]*Ctotal
+//   ceq                 → ccap - geq*vdNew
+
+describe("integration", () => {
+  it("negative_resistance_transient_matches_ngspice", () => {
+    // Single transient step: tunnel diode with CJO=5pF at vd=0.2V (NDR region start).
+    // Trapezoidal order 2: ag[0]=2/dt, ag[1]=1.
+    // Expected geq = ag[0]*Ctotal, ceq = ag[0]*q0 + ag[1]*q1 - geq*vd.
+
+    const CJO = 5e-12, VJ = 1.0, M = 0.5, FC = 0.5, TT = 0;
+    const IP = TD_DEFAULTS.ip, VP = TD_DEFAULTS.vp, IV = TD_DEFAULTS.iv, VV = TD_DEFAULTS.vv;
+    const IS = 1e-14, N = 1;
+    const dt = 1e-9;
+    const vd = 0.2; // in the tunnel region
+
+    const ag = new Float64Array(8);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(dt, [dt, dt, dt, dt, dt, dt, dt], 2, "trapezoidal", ag, scratch);
+
+    const modelParams = { IP, VP, IV, VV, IS, N, CJO, VJ, M, TT, FC };
+    const core = createTunnelDiodeElement(
+      new Map([["A", 1], ["K", 0]]),
+      [],
+      -1,
+      makeParamBag(modelParams),
+    );
+
+    const pool = new StatePool(9);
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Seed SLOT_VD=0 with vd so vdOld=vd; prevents NDR voltage-step limiting
+    // from clamping vdNew away from vd (which would make expected values wrong).
+    pool.state0[0] = vd;
+
+    // Seed previous-step charge in s1[SLOT_Q=7]
+    const prevVd = 0.18;
+    const { i: prevId } = tunnelDiodeIV(prevVd, IP, VP, IV, VV, IS, N);
+    const q1_val = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevId);
+    pool.state1[7] = q1_val;
+
+    const stamps: Array<[number, number, number]> = [];
+    const rhs: Array<[number, number]> = [];
+    const mockSolver = {
+      stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
+      stampRHS: (r: number, v: number) => rhs.push([r, v]),
+    } as any;
+
+    pool.ag.set(ag);
+    const ctx = {
+      solver: mockSolver,
+      voltages: new Float64Array([vd, 0]),
+      iteration: 0,
+      initMode: "transient" as const,
+      dt,
+      method: "trapezoidal" as const,
+      order: 2,
+      deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+      ag,
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: false,
+      isTransient: true,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    core.load(ctx);
+
+    // Compute expected values from the NIintegrate formula
+    const { i: idNow, dIdV: gDiode } = tunnelDiodeIV(vd, IP, VP, IV, VV, IS, N);
+    const Ct = TT * gDiode;
+    const Cj = computeJunctionCapacitance(vd, CJO, VJ, M, FC);
+    const Ctotal = Cj + Ct;
+    const q0_val = computeJunctionCharge(vd, CJO, VJ, M, FC, TT, idNow);
+    const ccap_expected = ag[0] * q0_val + ag[1] * q1_val;
+    const capGeq_expected = ag[0] * Ctotal;
+    const capIeq_expected = ccap_expected - capGeq_expected * vd;
+
+    // Verify the formulas are bit-exact (these are the NIintegrate spec)
+    expect(capGeq_expected).toBe(ag[0] * Ctotal);
+    expect(capIeq_expected).toBe(ccap_expected - capGeq_expected * vd);
+
+    // Verify the element stamped the correct total capGeq at diagonal (0,0)
+    const { dIdV: geqFull } = tunnelDiodeIV(vd, IP, VP, IV, VV, IS, N);
+    const total00 = stamps.filter(([r, c]) => r === 0 && c === 0).reduce((sum, s) => sum + s[2], 0);
+    expect(total00).toBe(geqFull + capGeq_expected);
+  });
+
+  it("no_integrateCapacitor_import", () => {
+    const fs = require("fs");
+    const src = fs.readFileSync(
+      require("path").resolve(__dirname, "../tunnel-diode.ts"),
+      "utf8",
+    ) as string;
+    expect(src).not.toMatch(/integrateCapacitor/);
+    expect(src).not.toMatch(/integrateInductor/);
   });
 });

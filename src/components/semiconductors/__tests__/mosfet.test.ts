@@ -33,6 +33,13 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+import { computeNIcomCof } from "../../../solver/analog/integration.js";
+import {
+  SLOT_Q_DB,
+  SLOT_CCAP_DB,
+  SLOT_CAP_GEQ_DB,
+  SLOT_CAP_IEQ_DB,
+} from "../../../solver/analog/fet-base.js";
 
 // ---------------------------------------------------------------------------
 // withState — allocate a StatePool and call initState on the element
@@ -955,5 +962,151 @@ describe("MOSFET primeJunctions", () => {
     const prevVoltages = new Float64Array(4);
     const result = element.checkConvergence(voltages, prevVoltages, 1e-3, 1e-6);
     expect(result).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Integration tests — inline NIintegrate migration (C2.2)
+//
+// ngspice NIintegrate mapping (niinteg.c:28-63):
+//   CKTag[0] → ag[0]    coefficient on q0 (current charge)
+//   CKTag[1] → ag[1]    coefficient on q1 (previous charge)
+//   CKTag[2] → ag[2]    coefficient on q2 (2 steps back, order>=2)
+//   geq      = ag[0] * cap
+//   ccap     = ag[0]*q0 + ag[1]*q1 (+ ag[2]*q2 for order>=2)
+//   ceq      = ccap - ag[0]*q0
+// ---------------------------------------------------------------------------
+
+describe("integration", () => {
+  it("cgs_cgd_transient_matches_ngspice_mos1", () => {
+    // Single transient step: NMOS with CBD=10pF at Vds=0.5V, Vgs=2V.
+    // Bulk = Source = 0V (3-terminal device, nodeB = nodeS).
+    // vbd = vBulk - vDrain = 0 - 0.5 = -0.5V (reverse bias).
+    // Trapezoidal order 2: ag[0]=2/dt, ag[1]=1 (xmu=0.5).
+    // Expected: geq_db = ag[0]*czbd_eff, ccap_db = ag[0]*q0 + ag[1]*q1,
+    //           ceq_db = ccap_db - ag[0]*q0.
+
+    const CBD = 10e-12;
+    const PB = 0.7;  // bulk junction potential (MJ default = 0.5)
+    const MJ = 0.5;
+
+    const dt = 1e-9;
+    const vds = 0.5;
+    const vgs = 2.0;
+
+    // ag[] for trapezoidal order 2
+    const ag = new Float64Array(7);
+    const agScratch = new Float64Array(49);
+    computeNIcomCof(dt, [dt, dt, dt, dt, dt, dt, dt], 2, "trapezoidal", ag, agScratch);
+
+    // Build NMOS with CBD > 0, no CJ (so czbd = _tCbd ≈ CBD at room temp)
+    // Nodes: D=1, G=2, S=3, B=S=3
+    const bag = makeParamBag({
+      ...NMOS_DEFAULTS,
+      CBD,
+      CBS: CBD,
+      PB,
+      MJ,
+      MJSW: 0.33,
+    });
+    const core = createMosfetElement(
+      1,
+      new Map([["G", 2], ["S", 3], ["D", 1]]),
+      [],
+      -1,
+      bag,
+    ) as any;
+
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    Object.assign(core, { pinNodeIds: [2, 1, 3, 3], allNodeIds: [2, 1, 3, 3] });
+
+    // Compute expected czbd at room temperature (capfact ≈ 1 at TNOM=300.15K=REFTEMP)
+    // vbd = -vds = -0.5V (reverse bias, below tDepCap which requires argD > 0)
+    const vbd = -vds;   // = -0.5V (ngspice convention: vBulk - vDrain)
+    const argD = 1 - vbd / PB;  // = 1 + 0.5/0.7 > 1 → depletion formula
+    const sargD = Math.exp(-MJ * Math.log(argD));
+    // czbd ≈ CBD (at room temp, capfact = 1)
+    const czbd = CBD;
+    const capbd = czbd * sargD;
+    const qbd = PB * czbd * (1 - argD * sargD) / (1 - MJ);
+
+    // Seed previous-step charge in s1 (simulates one accepted prior step)
+    const prevVbd = -0.4;
+    const prevArgD = 1 - prevVbd / PB;
+    const prevSargD = Math.exp(-MJ * Math.log(prevArgD));
+    const q1_db = PB * czbd * (1 - prevArgD * prevSargD) / (1 - MJ);
+    pool.state1[SLOT_Q_DB] = q1_db;
+
+    // Build minimal LoadContext: voltages[0]=vD=vds, voltages[1]=vG=vgs, voltages[2]=vS=0
+    const stamps: Array<[number, number, number]> = [];
+    const rhs: Array<[number, number]> = [];
+    const mockSolver = {
+      stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
+      stampRHS: (r: number, v: number) => rhs.push([r, v]),
+      beginAssembly: () => {},
+      endAssembly: () => {},
+    } as any;
+
+    pool.ag.set(ag);
+    const ctx = {
+      solver: mockSolver,
+      voltages: new Float64Array([vds, vgs, 0]),
+      iteration: 0,
+      initMode: "transient" as const,
+      dt,
+      method: "trapezoidal" as const,
+      order: 2,
+      deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+      ag,
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: false,
+      isTransient: true,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    pool.initMode = "transient";
+    core.load(ctx);
+
+    // The _stampCompanion path writes directly to s0 slots
+    const s0 = pool.state0;
+
+    // Read what the element stored
+    const q0_db = s0[SLOT_Q_DB];
+    const q2_db = pool.state2[SLOT_Q_DB];
+    const stored_geq = s0[SLOT_CAP_GEQ_DB];
+    const stored_ceq = s0[SLOT_CAP_IEQ_DB];
+    const stored_ccap = s0[SLOT_CCAP_DB];
+
+    // Derive capbd from stored geq: capbd = geq / ag[0]
+    const capbd_from_element = stored_geq / ag[0];
+
+    // Verify NIintegrate identity: geq = ag[0] * capbd (bit-exact)
+    expect(stored_geq).toBe(ag[0] * capbd_from_element);
+
+    // Verify ccap = ag[0]*q0 + ag[1]*q1 + ag[2]*q2 (bit-exact)
+    const ccap_expected = ag[0] * q0_db + ag[1] * q1_db + ag[2] * q2_db;
+    expect(stored_ccap).toBe(ccap_expected);
+
+    // Verify ceq = ccap - ag[0]*q0 (bit-exact)
+    const ceq_expected = ccap_expected - ag[0] * q0_db;
+    expect(stored_ceq).toBe(ceq_expected);
+  });
+
+  it("no_integrateCapacitor_import", () => {
+    const fs = require("fs");
+    const src = fs.readFileSync(
+      require("path").resolve(__dirname, "../mosfet.ts"),
+      "utf8",
+    ) as string;
+    expect(src).not.toMatch(/integrateCapacitor/);
+    expect(src).not.toMatch(/integrateInductor/);
   });
 });

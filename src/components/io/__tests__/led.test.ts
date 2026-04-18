@@ -12,6 +12,12 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  computeJunctionCapacitance,
+  computeJunctionCharge,
+} from "../../semiconductors/diode.js";
+import { computeNIcomCof } from "../../../solver/analog/integration.js";
+import { VT as LED_VT } from "../../../core/constants.js";
+import {
   LedElement,
   executeLed,
   LedDefinition,
@@ -842,5 +848,116 @@ describe("AnalogLED", () => {
     const vf = result.nodeVoltages[0];
     expect(vf).toBeGreaterThan(3.05);
     expect(vf).toBeLessThan(3.35);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C2.3: inline NIintegrate integration tests
+// ---------------------------------------------------------------------------
+
+// ngspice → ours variable mapping (niinteg.c:28-63):
+//   ag[0] (CKTag[0])    → ctx.ag[0]   coefficient on q0 (current charge)
+//   ag[1] (CKTag[1])    → ctx.ag[1]   coefficient on q1 (previous charge)
+//   cap                 → Ctotal      junction + transit-time cap
+//   q0                  → computeJunctionCharge at vdLimited
+//   q1                  → s1[SLOT_Q]  from previous accepted step
+//   ccap                → ag[0]*q0 + ag[1]*q1
+//   geq                 → ag[0]*Ctotal
+//   ceq                 → ccap - geq*vdLimited
+
+describe("integration", () => {
+  it("junction_cap_transient_matches_ngspice", () => {
+    // Single transient step: red LED with CJO=10pF at Vd=1.8V (near forward drop).
+    // Trapezoidal order 2: ag[0]=2/dt, ag[1]=1.
+    // Expected geq = ag[0]*Ctotal, ceq = ag[0]*q0 + ag[1]*q1 - geq*vd.
+
+    const IS = 3.17e-19, N = 1.8, CJO = 10e-12, VJ = 1.0, M = 0.5, FC = 0.5, TT = 0;
+    const dt = 1e-9;
+    const vd = 1.8;
+
+    const ag = new Float64Array(8);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(dt, [dt, dt, dt, dt, dt, dt, dt], 2, "trapezoidal", ag, scratch);
+
+    const props = new PropertyBag();
+    props.set("color", "red");
+    props.replaceModelParams({ IS, N, CJO, VJ, M, TT, FC });
+    const core = getFactory(LedDefinition.modelRegistry!.red!)!(new Map([["in", 1]]), [], -1, props, () => 0);
+
+    const pool = new StatePool(9);
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Seed SLOT_VD=0 with vd so pnjlim sees vdOld=vd and returns vdLimited=vd unchanged.
+    pool.state0[0] = vd;
+
+    // Seed previous-step charge in s1[SLOT_Q=7]
+    const nVt = N * LED_VT;
+    const prevVd = 1.75;
+    const prevIdRaw = IS * (Math.exp(prevVd / nVt) - 1);
+    const q1_val = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevIdRaw);
+    pool.state1[7] = q1_val;
+
+    const stamps: Array<[number, number, number]> = [];
+    const rhs: Array<[number, number]> = [];
+    const mockSolver = {
+      stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
+      stampRHS: (r: number, v: number) => rhs.push([r, v]),
+    } as any;
+
+    pool.ag.set(ag);
+    const ctx = {
+      solver: mockSolver,
+      voltages: new Float64Array([vd]),
+      iteration: 0,
+      initMode: "transient" as const,
+      dt,
+      method: "trapezoidal" as const,
+      order: 2,
+      deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+      ag,
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: false,
+      isTransient: true,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    core.load(ctx);
+
+    // Compute expected values from the NIintegrate formula
+    const idRaw = IS * (Math.exp(vd / nVt) - 1);
+    const gdRaw = IS * Math.exp(vd / nVt) / nVt;
+    const Cj = computeJunctionCapacitance(vd, CJO, VJ, M, FC);
+    const Ct = TT * gdRaw;
+    const Ctotal = Cj + Ct;
+    const q0_val = computeJunctionCharge(vd, CJO, VJ, M, FC, TT, idRaw);
+    const ccap_expected = ag[0] * q0_val + ag[1] * q1_val;
+    const capGeq_expected = ag[0] * Ctotal;
+    const capIeq_expected = ccap_expected - capGeq_expected * vd;
+
+    // Verify the formulas are bit-exact (these are the NIintegrate spec)
+    expect(capGeq_expected).toBe(ag[0] * Ctotal);
+    expect(capIeq_expected).toBe(ccap_expected - capGeq_expected * vd);
+
+    // Verify the element stamped the correct total at diagonal (0,0)
+    const total00 = stamps.filter(([r, c]) => r === 0 && c === 0).reduce((sum, s) => sum + s[2], 0);
+    const gd_junction = gdRaw + 1e-12; // LED_GMIN added in load()
+    expect(total00).toBe(gd_junction + capGeq_expected);
+  });
+
+  it("no_integrateCapacitor_import", () => {
+    const fs = require("fs");
+    const src = fs.readFileSync(
+      require("path").resolve(__dirname, "../led.ts"),
+      "utf8",
+    ) as string;
+    expect(src).not.toMatch(/integrateCapacitor/);
+    expect(src).not.toMatch(/integrateInductor/);
   });
 });

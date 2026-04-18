@@ -86,7 +86,6 @@ export class BehavioralMuxElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
     const voltages = ctx.voltages;
 
     // Decode selector bits into an integer
@@ -103,10 +102,10 @@ export class BehavioralMuxElement implements AnalogElementCore {
 
     const selectedGroup = this._dataPins[sel] ?? this._dataPins[0];
 
-    // Stamp input loading conductances for all input pins
-    for (const p of this._selPins) p.stamp(solver);
+    // Delegate stamping to pin models for all input pins
+    for (const p of this._selPins) p.load(ctx);
     for (const group of this._dataPins) {
-      for (const p of group) p.stamp(solver);
+      for (const p of group) p.load(ctx);
     }
 
     // Route selected data to outputs and stamp output Norton equivalents
@@ -117,16 +116,7 @@ export class BehavioralMuxElement implements AnalogElementCore {
       const level = inputPin.readLogicLevel(inputVoltage);
       const outLevel = level ?? false;
       this._outPins[bit].setLogicLevel(outLevel);
-      this._outPins[bit].stampOutput(solver);
-    }
-
-    // Transient: stamp companion models for pin capacitances
-    if (ctx.isTransient && ctx.dt > 0) {
-      for (const p of this._selPins) p.stampCompanion(solver, ctx.dt, ctx.method);
-      for (const group of this._dataPins) {
-        for (const p of group) p.stampCompanion(solver, ctx.dt, ctx.method);
-      }
-      for (const p of this._outPins) p.stampCompanion(solver, ctx.dt, ctx.method);
+      this._outPins[bit].load(ctx);
     }
   }
 
@@ -134,15 +124,15 @@ export class BehavioralMuxElement implements AnalogElementCore {
     if (ctx.dt <= 0) return;
     const voltages = ctx.voltages;
     for (const p of this._selPins) {
-      p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
+      p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
     }
     for (const group of this._dataPins) {
       for (const p of group) {
-        p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
+        p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
       }
     }
     for (const p of this._outPins) {
-      p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
+      p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
     }
   }
 
@@ -221,7 +211,6 @@ export class BehavioralDemuxElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
     const voltages = ctx.voltages;
 
     // Decode selector
@@ -241,21 +230,14 @@ export class BehavioralDemuxElement implements AnalogElementCore {
     const inVoltage = readMnaVoltage(inNodeId, voltages);
     const inLevel = this._inPin.readLogicLevel(inVoltage) ?? false;
 
-    // Stamp input loading
-    for (const p of this._selPins) p.stamp(solver);
-    this._inPin.stamp(solver);
+    // Delegate stamping to pin models for inputs
+    for (const p of this._selPins) p.load(ctx);
+    this._inPin.load(ctx);
 
     // Route: selected output gets input level, all others get LOW
     for (let i = 0; i < this._outputCount; i++) {
       this._outPins[i].setLogicLevel(i === sel ? inLevel : false);
-      this._outPins[i].stampOutput(solver);
-    }
-
-    // Transient: stamp companion models
-    if (ctx.isTransient && ctx.dt > 0) {
-      for (const p of this._selPins) p.stampCompanion(solver, ctx.dt, ctx.method);
-      this._inPin.stampCompanion(solver, ctx.dt, ctx.method);
-      for (const p of this._outPins) p.stampCompanion(solver, ctx.dt, ctx.method);
+      this._outPins[i].load(ctx);
     }
   }
 
@@ -263,11 +245,11 @@ export class BehavioralDemuxElement implements AnalogElementCore {
     if (ctx.dt <= 0) return;
     const voltages = ctx.voltages;
     for (const p of this._selPins) {
-      p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
+      p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
     }
-    this._inPin.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(this._inPin.nodeId, voltages));
+    this._inPin.accept(ctx, readMnaVoltage(this._inPin.nodeId, voltages));
     for (const p of this._outPins) {
-      p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
+      p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
     }
   }
 
@@ -338,7 +320,6 @@ export class BehavioralDecoderElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
     const voltages = ctx.voltages;
 
     // Decode selector
@@ -353,19 +334,13 @@ export class BehavioralDecoderElement implements AnalogElementCore {
       }
     }
 
-    // Stamp selector-pin loading
-    for (const p of this._selPins) p.stamp(solver);
+    // Delegate stamping for selector-pin loading
+    for (const p of this._selPins) p.load(ctx);
 
     // One-hot output: only the selected index is HIGH
     for (let i = 0; i < this._outputCount; i++) {
       this._outPins[i].setLogicLevel(i === sel);
-      this._outPins[i].stampOutput(solver);
-    }
-
-    // Transient: stamp companion models
-    if (ctx.isTransient && ctx.dt > 0) {
-      for (const p of this._selPins) p.stampCompanion(solver, ctx.dt, ctx.method);
-      for (const p of this._outPins) p.stampCompanion(solver, ctx.dt, ctx.method);
+      this._outPins[i].load(ctx);
     }
   }
 
@@ -373,10 +348,10 @@ export class BehavioralDecoderElement implements AnalogElementCore {
     if (ctx.dt <= 0) return;
     const voltages = ctx.voltages;
     for (const p of this._selPins) {
-      p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
+      p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
     }
     for (const p of this._outPins) {
-      p.updateCompanion(ctx.dt, ctx.method, readMnaVoltage(p.nodeId, voltages));
+      p.accept(ctx, readMnaVoltage(p.nodeId, voltages));
     }
   }
 
@@ -423,6 +398,13 @@ function resolveSpec(
   return pinSpecs?.[pinLabel] ?? FALLBACK_SPEC;
 }
 
+function resolveLoaded(props: PropertyBag, pinLabel: string, defaultLoaded: boolean): boolean {
+  const pinLoading = props.has("_pinLoading")
+    ? (props.get("_pinLoading") as unknown as Record<string, boolean>)
+    : undefined;
+  return pinLoading !== undefined ? (pinLoading[pinLabel] ?? defaultLoaded) : defaultLoaded;
+}
+
 // ---------------------------------------------------------------------------
 // makeBehavioralMuxAnalogFactory
 // ---------------------------------------------------------------------------
@@ -445,9 +427,10 @@ export function makeBehavioralMuxAnalogFactory(selectorBits: number): AnalogElem
     // All selector bit pins share the single "sel" bus node
     const selNodeId = pinNodes.get("sel") ?? 0;
     const selSpec = resolveSpec(props, "sel");
+    const selLoaded = resolveLoaded(props, "sel", true);
     const selPins: DigitalInputPinModel[] = [];
     for (let b = 0; b < selectorBits; b++) {
-      const pin = new DigitalInputPinModel(selSpec, true);
+      const pin = new DigitalInputPinModel(selSpec, selLoaded);
       pin.init(selNodeId, 0);
       selPins.push(pin);
     }
@@ -455,11 +438,13 @@ export function makeBehavioralMuxAnalogFactory(selectorBits: number): AnalogElem
     // Each data input group shares its own "in_i" bus node
     const dataPins: DigitalInputPinModel[][] = [];
     for (let i = 0; i < inputCount; i++) {
-      const inNodeId = pinNodes.get(`in_${i}`) ?? 0;
-      const spec = resolveSpec(props, `in_${i}`);
+      const inLabel = `in_${i}`;
+      const inNodeId = pinNodes.get(inLabel) ?? 0;
+      const spec = resolveSpec(props, inLabel);
+      const loaded = resolveLoaded(props, inLabel, true);
       const group: DigitalInputPinModel[] = [];
       for (let bit = 0; bit < bitWidth; bit++) {
-        const pin = new DigitalInputPinModel(spec, true);
+        const pin = new DigitalInputPinModel(spec, loaded);
         pin.init(inNodeId, 0);
         group.push(pin);
       }
@@ -469,9 +454,10 @@ export function makeBehavioralMuxAnalogFactory(selectorBits: number): AnalogElem
     // All output bit pins share the single "out" bus node
     const outNodeId = pinNodes.get("out") ?? 0;
     const outSpec = resolveSpec(props, "out");
+    const outLoaded = resolveLoaded(props, "out", false);
     const outPins: DigitalOutputPinModel[] = [];
     for (let bit = 0; bit < bitWidth; bit++) {
-      const pin = new DigitalOutputPinModel(outSpec);
+      const pin = new DigitalOutputPinModel(outSpec, outLoaded, "direct");
       pin.init(outNodeId, -1);
       outPins.push(pin);
     }
@@ -508,9 +494,10 @@ export function makeBehavioralDemuxAnalogFactory(selectorBits: number): AnalogEl
     // All selector bit pins share the single "sel" bus node
     const selNodeId = pinNodes.get("sel") ?? 0;
     const selSpec = resolveSpec(props, "sel");
+    const selLoaded = resolveLoaded(props, "sel", true);
     const selPins: DigitalInputPinModel[] = [];
     for (let b = 0; b < selectorBits; b++) {
-      const pin = new DigitalInputPinModel(selSpec, true);
+      const pin = new DigitalInputPinModel(selSpec, selLoaded);
       pin.init(selNodeId, 0);
       selPins.push(pin);
     }
@@ -518,15 +505,18 @@ export function makeBehavioralDemuxAnalogFactory(selectorBits: number): AnalogEl
     // Each output pin has its own "out_i" node (1-bit pins)
     const outPins: DigitalOutputPinModel[] = [];
     for (let i = 0; i < outputCount; i++) {
-      const spec = resolveSpec(props, `out_${i}`);
-      const pin = new DigitalOutputPinModel(spec);
-      pin.init(pinNodes.get(`out_${i}`) ?? 0, -1);
+      const outLabel = `out_${i}`;
+      const spec = resolveSpec(props, outLabel);
+      const loaded = resolveLoaded(props, outLabel, false);
+      const pin = new DigitalOutputPinModel(spec, loaded, "direct");
+      pin.init(pinNodes.get(outLabel) ?? 0, -1);
       outPins.push(pin);
     }
 
     // Input pin
     const inSpec = resolveSpec(props, "in");
-    const inPin = new DigitalInputPinModel(inSpec, true);
+    const inLoaded = resolveLoaded(props, "in", true);
+    const inPin = new DigitalInputPinModel(inSpec, inLoaded);
     inPin.init(pinNodes.get("in") ?? 0, 0);
 
     const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>();
@@ -561,9 +551,10 @@ export function makeBehavioralDecoderAnalogFactory(selectorBits: number): Analog
     // All selector bit pins share the single "sel" bus node
     const selNodeId = pinNodes.get("sel") ?? 0;
     const selSpec = resolveSpec(props, "sel");
+    const selLoaded = resolveLoaded(props, "sel", true);
     const selPins: DigitalInputPinModel[] = [];
     for (let b = 0; b < selectorBits; b++) {
-      const pin = new DigitalInputPinModel(selSpec, true);
+      const pin = new DigitalInputPinModel(selSpec, selLoaded);
       pin.init(selNodeId, 0);
       selPins.push(pin);
     }
@@ -571,9 +562,11 @@ export function makeBehavioralDecoderAnalogFactory(selectorBits: number): Analog
     // Each output pin has its own "out_i" node (1-bit pins)
     const outPins: DigitalOutputPinModel[] = [];
     for (let i = 0; i < outputCount; i++) {
-      const spec = resolveSpec(props, `out_${i}`);
-      const pin = new DigitalOutputPinModel(spec);
-      pin.init(pinNodes.get(`out_${i}`) ?? 0, -1);
+      const outLabel = `out_${i}`;
+      const spec = resolveSpec(props, outLabel);
+      const loaded = resolveLoaded(props, outLabel, false);
+      const pin = new DigitalOutputPinModel(spec, loaded, "direct");
+      pin.init(pinNodes.get(outLabel) ?? 0, -1);
       outPins.push(pin);
     }
 

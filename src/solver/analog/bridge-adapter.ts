@@ -28,9 +28,9 @@ import {
 /**
  * Analog MNA element for a digital engine output pin at an engine boundary.
  *
- * Stamps an ideal voltage source branch equation using DigitalOutputPinModel.
- * The branch variable at branchIndex carries the source current. The logic
- * level is set externally by the DefaultSimulationCoordinator.
+ * Stamps an ideal voltage source branch equation using DigitalOutputPinModel
+ * with role="branch". The branch variable at branchIndex carries the source
+ * current. The logic level is set externally by the DefaultSimulationCoordinator.
  *
  * isNonlinear is false — the ideal source is linear; logic level changes are
  * handled by re-stamping the branch equation on the next load() call, not via
@@ -40,7 +40,6 @@ import {
  */
 export class BridgeOutputAdapter implements AnalogElement {
   private readonly _pinModel: DigitalOutputPinModel;
-  private readonly _loaded: boolean;
 
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
@@ -50,20 +49,17 @@ export class BridgeOutputAdapter implements AnalogElement {
   label?: string;
 
   /**
-   * @param pinModel  - Initialised DigitalOutputPinModel for this bridge pin.
-   *                    The caller must have already called pinModel.init() with
-   *                    the correct MNA node ID and branch index.
+   * @param pinModel  - Initialised DigitalOutputPinModel for this bridge pin
+   *                    with role="branch". The caller must have already called
+   *                    pinModel.init() with the correct MNA node ID and branch index.
    * @param branchIdx - Absolute branch row/col in the augmented MNA matrix.
-   * @param loaded    - Whether output loading (rOut, cOut) is stamped.
    */
   constructor(
     pinModel: DigitalOutputPinModel,
     branchIdx: number,
-    loaded: boolean,
   ) {
     this._pinModel = pinModel;
     this.branchIndex = branchIdx;
-    this._loaded = loaded;
     this.pinNodeIds = [pinModel.nodeId];
     this.allNodeIds = [pinModel.nodeId];
     this.internalNodeLabels = [];
@@ -76,7 +72,7 @@ export class BridgeOutputAdapter implements AnalogElement {
    * C_out companion model inside load() during transient solves.
    */
   get isReactive(): boolean {
-    return this._loaded && this._pinModel.capacitance > 0;
+    return this._pinModel.loaded && this._pinModel.capacitance > 0;
   }
 
   /**
@@ -111,11 +107,7 @@ export class BridgeOutputAdapter implements AnalogElement {
    * the branch equation enforces the coordinator-set target.
    */
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
-    this._pinModel.stamp(solver);
-    if (ctx.isTransient && ctx.dt > 0 && this._loaded && this._pinModel.capacitance > 0) {
-      this._pinModel.stampCompanion(solver, ctx.dt, ctx.method);
-    }
+    this._pinModel.load(ctx);
   }
 
   /**
@@ -124,10 +116,10 @@ export class BridgeOutputAdapter implements AnalogElement {
    * Only active for transient solves with a loaded, capacitive output pin.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    if (!this._loaded || this._pinModel.capacitance <= 0) return;
+    if (!this._pinModel.loaded || this._pinModel.capacitance <= 0) return;
     if (!ctx.isTransient || ctx.dt <= 0) return;
     const v = readMnaVoltage(this._pinModel.nodeId, ctx.voltages);
-    this._pinModel.updateCompanion(ctx.dt, ctx.method, v);
+    this._pinModel.accept(ctx, v);
   }
 
   /**
@@ -169,7 +161,6 @@ export class BridgeOutputAdapter implements AnalogElement {
  */
 export class BridgeInputAdapter implements AnalogElement {
   private readonly _pinModel: DigitalInputPinModel;
-  private readonly _loaded: boolean;
 
   readonly pinNodeIds: readonly number[];
   readonly allNodeIds: readonly number[];
@@ -182,11 +173,9 @@ export class BridgeInputAdapter implements AnalogElement {
    * @param pinModel - Initialised DigitalInputPinModel for this bridge pin.
    *                   The caller must have already called pinModel.init() with
    *                   the correct MNA node ID.
-   * @param loaded   - Whether input loading (rIn, cIn) is stamped.
    */
-  constructor(pinModel: DigitalInputPinModel, loaded: boolean) {
+  constructor(pinModel: DigitalInputPinModel) {
     this._pinModel = pinModel;
-    this._loaded = loaded;
     this.pinNodeIds = [pinModel.nodeId];
     this.allNodeIds = [pinModel.nodeId];
     this.internalNodeLabels = [];
@@ -196,7 +185,7 @@ export class BridgeInputAdapter implements AnalogElement {
    * True only when loaded and cIn > 0.
    */
   get isReactive(): boolean {
-    return this._loaded && this._pinModel.capacitance > 0;
+    return this._pinModel.loaded && this._pinModel.capacitance > 0;
   }
 
   /** Hot-update a single electrical parameter on the underlying pin model. */
@@ -210,11 +199,7 @@ export class BridgeInputAdapter implements AnalogElement {
    * companion model. Matches ngspice DEVload.
    */
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
-    this._pinModel.stamp(solver);
-    if (ctx.isTransient && ctx.dt > 0 && this._loaded && this._pinModel.capacitance > 0) {
-      this._pinModel.stampCompanion(solver, ctx.dt, ctx.method);
-    }
+    this._pinModel.load(ctx);
   }
 
   /**
@@ -223,10 +208,10 @@ export class BridgeInputAdapter implements AnalogElement {
    * Only active for transient solves with a loaded, capacitive input pin.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-    if (!this._loaded || this._pinModel.capacitance <= 0) return;
+    if (!this._pinModel.loaded || this._pinModel.capacitance <= 0) return;
     if (!ctx.isTransient || ctx.dt <= 0) return;
     const v = readMnaVoltage(this._pinModel.nodeId, ctx.voltages);
-    this._pinModel.updateCompanion(ctx.dt, ctx.method, v);
+    this._pinModel.accept(ctx, v);
   }
 
   /**
@@ -249,7 +234,7 @@ export class BridgeInputAdapter implements AnalogElement {
    * When unloaded, no conductance is stamped, so current contribution is 0.
    */
   getPinCurrents(voltages: Float64Array): number[] {
-    if (!this._loaded) return [0];
+    if (!this._pinModel.loaded) return [0];
     const nodeId = this._pinModel.nodeId;
     const vNode = nodeId > 0 ? voltages[nodeId - 1] : 0;
     const i = vNode / this._pinModel.rIn;
@@ -274,6 +259,8 @@ export class BridgeInputAdapter implements AnalogElement {
 /**
  * Build a BridgeOutputAdapter from a ResolvedPinElectrical spec, a
  * pre-assigned MNA node ID, a branch variable index, and a loaded flag.
+ *
+ * The output pin uses role="branch" (ideal voltage source).
  */
 export function makeBridgeOutputAdapter(
   spec: ResolvedPinElectrical,
@@ -281,9 +268,9 @@ export function makeBridgeOutputAdapter(
   branchIdx: number,
   loaded: boolean,
 ): BridgeOutputAdapter {
-  const model = new DigitalOutputPinModel(spec, loaded);
+  const model = new DigitalOutputPinModel(spec, loaded, "branch");
   model.init(nodeId, branchIdx);
-  return new BridgeOutputAdapter(model, branchIdx, loaded);
+  return new BridgeOutputAdapter(model, branchIdx);
 }
 
 /**
@@ -297,5 +284,5 @@ export function makeBridgeInputAdapter(
 ): BridgeInputAdapter {
   const model = new DigitalInputPinModel(spec, loaded);
   model.init(nodeId, 0);
-  return new BridgeInputAdapter(model, loaded);
+  return new BridgeInputAdapter(model);
 }

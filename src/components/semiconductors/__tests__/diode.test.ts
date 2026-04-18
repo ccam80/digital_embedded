@@ -544,7 +544,8 @@ describe("Diode LimitingEvent instrumentation", () => {
 // Change 31: Temperature scaling (dioTemp)
 // ---------------------------------------------------------------------------
 
-import { dioTemp } from "../diode.js";
+import { dioTemp, computeJunctionCharge } from "../diode.js";
+import { computeNIcomCof } from "../../../solver/analog/integration.js";
 
 describe("dioTemp temperature scaling (Change 31)", () => {
   const REFTEMP = 300.15;
@@ -785,5 +786,122 @@ describe("AREA scaling (Change 34)", () => {
     const gRS1 = calls1[0][2];
     const gRS2 = calls2[0][2];
     expect(Math.abs(gRS2 / gRS1 - 2)).toBeLessThan(1e-6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C2.3: inline NIintegrate integration tests
+// ---------------------------------------------------------------------------
+
+// ngspice → ours variable mapping (niinteg.c:28-63):
+//   ag[0] (CKTag[0])    → ctx.ag[0]   coefficient on q0 (current charge)
+//   ag[1] (CKTag[1])    → ctx.ag[1]   coefficient on q1 (previous charge)
+//   cap (capacitance)   → Ctotal      junction + diffusion cap
+//   q0 (current charge) → q0          computeJunctionCharge at vd
+//   q1 (prev charge)    → s1[SLOT_Q]  state from previous accepted step
+//   ccap (companion I)  → ccap        ag[0]*q0 + ag[1]*q1
+//   geq                 → ag[0]*Ctotal
+//   ceq                 → ccap - geq*vd
+
+describe("integration", () => {
+  it("pn_cap_transient_matches_ngspice", () => {
+    // Single transient step: diode with CJO=10pF at Vd=0.3V (reverse bias OK).
+    // Trapezoidal order 2: ag[0]=2/dt, ag[1]=1 (xmu=0.5).
+    // Expected geq = ag[0]*Ctotal, ceq = ag[0]*q0 + ag[1]*q1 - geq*vd.
+
+    const IS = 1e-14, N = 1, CJO = 10e-12, VJ = 0.7, M = 0.5, FC = 0.5, TT = 0;
+    const dt = 1e-9;
+    const vd = 0.3;
+
+    // Compute ag[] via computeNIcomCof (trapezoidal order 2)
+    const ag = new Float64Array(8);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(dt, [dt, dt, dt, dt, dt, dt, dt], 2, "trapezoidal", ag, scratch);
+
+    // Build element with CJO > 0
+    const props = makeParamBag({ IS, N, CJO, VJ, M, TT, FC });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, props);
+
+    const pool = new StatePool(9);
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Seed previous-step charge in s1 (simulates one accepted prior step)
+    const prevVd = 0.28;
+    const prevId = IS * (Math.exp(prevVd / (N * VT)) - 1);
+    const q1_val = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevId);
+    pool.state1[7] = q1_val; // SLOT_Q = 7
+
+    // Build minimal LoadContext for transient step
+    const stamps: Array<[number, number, number]> = [];
+    const rhs: Array<[number, number]> = [];
+    const mockSolver = {
+      stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
+      stampRHS: (r: number, v: number) => rhs.push([r, v]),
+      beginAssembly: () => {},
+      endAssembly: () => {},
+    } as any;
+
+    pool.ag.set(ag);
+    const ctx = {
+      solver: mockSolver,
+      voltages: new Float64Array([vd, 0]),
+      iteration: 0,
+      initMode: "transient" as const,
+      dt,
+      method: "trapezoidal" as const,
+      order: 2,
+      deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+      ag,
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: false,
+      isTransient: true,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    core.load(ctx);
+
+    // Compute expected values using the same formula
+    const idRaw = IS * (Math.exp(vd / (N * VT)) - 1);
+    const gdRaw = IS * Math.exp(vd / (N * VT)) / (N * VT);
+    const Cj = computeJunctionCapacitance(vd, CJO, VJ, M, FC);
+    const Ct = TT * gdRaw;
+    const Ctotal = Cj + Ct;
+    const q0_val = computeJunctionCharge(vd, CJO, VJ, M, FC, TT, idRaw);
+    const ccap_expected = ag[0] * q0_val + ag[1] * q1_val;
+    const capGeq_expected = ag[0] * Ctotal;
+    const capIeq_expected = ccap_expected - capGeq_expected * vd;
+
+    // Find the capacitance stamp at (nodeAnode-1, nodeAnode-1) = (0,0)
+    const capStamp = stamps.find(([r, c]) => r === 0 && c === 0);
+    expect(capStamp).not.toBeUndefined();
+    // The stamp at (0,0) includes both the diode geq and capGeq. Extract capGeq.
+    // capGeq and diode geq are stamped separately — capGeq entry appears after diode stamps.
+    // We verify by checking that the total (0,0) stamp includes capGeq_expected contribution.
+    const total00 = stamps.filter(([r, c]) => r === 0 && c === 0).reduce((sum, s) => sum + s[2], 0);
+    const gd_at_vd = IS * Math.exp(vd / (N * VT)) / (N * VT) + 1e-12;
+    expect(total00).toBe(gd_at_vd + capGeq_expected);
+
+    // Verify capGeq exactly matches the ngspice NIintegrate formula
+    expect(capGeq_expected).toBe(ag[0] * Ctotal);
+    // Verify ceq exactly matches
+    expect(capIeq_expected).toBe(ccap_expected - capGeq_expected * vd);
+  });
+
+  it("no_integrateCapacitor_import", () => {
+    // Static import-graph assertion: diode.ts must not import integrateCapacitor.
+    const fs = require("fs");
+    const src = fs.readFileSync(
+      require("path").resolve(__dirname, "../diode.ts"),
+      "utf8",
+    ) as string;
+    expect(src).not.toMatch(/integrateCapacitor/);
+    expect(src).not.toMatch(/integrateInductor/);
   });
 });

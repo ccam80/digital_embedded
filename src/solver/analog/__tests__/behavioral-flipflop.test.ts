@@ -11,12 +11,13 @@
  *   - DDefinition has analogFactory registered
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { BehavioralDFlipflopElement } from "../behavioral-flipflop.js";
 import { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import { SparseSolver } from "../sparse-solver.js";
 import { DDefinition } from "../../../components/flipflops/d.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
+import type { LoadContext } from "../load-context.js";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -310,6 +311,83 @@ describe("DFF", () => {
 // ---------------------------------------------------------------------------
 // Registration test
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Task 6.4.3 — flipflop_load_delegates_to_pin_models
+// ---------------------------------------------------------------------------
+
+function makeMinimalFlipflopCtx(voltages?: Float64Array): LoadContext {
+  const ag = new Float64Array(7);
+  return {
+    solver: {
+      allocElement: (_r: number, _c: number) => 0,
+      stampElement: (_h: number, _v: number) => {},
+      stampRHS: (_i: number, _v: number) => {},
+    } as any,
+    voltages: voltages ?? new Float64Array(16),
+    iteration: 0,
+    initMode: "transient" as const,
+    dt: 0,
+    method: "trapezoidal" as const,
+    order: 1,
+    deltaOld: [],
+    ag,
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: false,
+    xfact: 0,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("Task 6.4.3 — flipflop load delegates to pin models", () => {
+  it("flipflop_load_delegates_to_pin_models", () => {
+    // Build a D flip-flop element and spy on each pin model's load() method.
+    // Assert each spy is called exactly once with the same LoadContext reference.
+    const clockPin = new DigitalInputPinModel(CMOS33, true);
+    clockPin.init(1, 0);
+    const dPin = new DigitalInputPinModel(CMOS33, true);
+    dPin.init(2, 0);
+    const qPin = new DigitalOutputPinModel(CMOS33, false, "direct");
+    qPin.init(3, -1);
+    const qBarPin = new DigitalOutputPinModel(CMOS33, false, "direct");
+    qBarPin.init(4, -1);
+
+    const element = new BehavioralDFlipflopElement(
+      clockPin,
+      dPin,
+      qPin,
+      qBarPin,
+      null,
+      null,
+      "low",
+    );
+    element._setThresholds(CMOS33.vIH, CMOS33.vIL);
+    Object.assign(element, { pinNodeIds: [1, 2, 3, 4], allNodeIds: [1, 2, 3, 4] });
+
+    const clockLoadSpy = vi.spyOn(clockPin, "load");
+    const dLoadSpy = vi.spyOn(dPin, "load");
+    const qLoadSpy = vi.spyOn(qPin, "load");
+    const qBarLoadSpy = vi.spyOn(qBarPin, "load");
+
+    const ctx = makeMinimalFlipflopCtx();
+    element.load(ctx);
+
+    expect(clockLoadSpy).toHaveBeenCalledOnce();
+    expect(clockLoadSpy).toHaveBeenCalledWith(ctx);
+    expect(dLoadSpy).toHaveBeenCalledOnce();
+    expect(dLoadSpy).toHaveBeenCalledWith(ctx);
+    expect(qLoadSpy).toHaveBeenCalledOnce();
+    expect(qLoadSpy).toHaveBeenCalledWith(ctx);
+    expect(qBarLoadSpy).toHaveBeenCalledOnce();
+    expect(qBarLoadSpy).toHaveBeenCalledWith(ctx);
+  });
+});
 
 describe("Registration", () => {
   it("d_flipflop_has_analog_model", () => {

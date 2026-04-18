@@ -21,7 +21,7 @@
  * solver uses 0-based indexing so voltages[nodeId - 1] gives node voltage.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson } from "../newton-raphson.js";
@@ -42,6 +42,7 @@ import {
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../element.js";
+import type { LoadContext } from "../load-context.js";
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -502,5 +503,263 @@ describe("Factory", () => {
     );
     expect(element.isNonlinear).toBe(true);
     expect(element.pinNodeIds.length).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 6.4.3 — _pinLoading propagation and delegation tests
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a minimal LoadContext for delegation spy tests.
+ * dt=0 → accept() is a no-op (reactive companion skipped); enough for delegation tests.
+ */
+function makeMinimalCtx(voltages?: Float64Array): LoadContext {
+  const ag = new Float64Array(7);
+  return {
+    solver: {
+      allocElement: (_r: number, _c: number) => 0,
+      stampElement: (_h: number, _v: number) => {},
+      stampRHS: (_i: number, _v: number) => {},
+    } as any,
+    voltages: voltages ?? new Float64Array(16),
+    iteration: 0,
+    initMode: "transient" as const,
+    dt: 0,
+    method: "trapezoidal" as const,
+    order: 1,
+    deltaOld: [],
+    ag,
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: false,
+    xfact: 0,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("Task 6.4.3 — _pinLoading propagation and delegation", () => {
+  it("pin_loading_propagates_to_pin_models_all_mode", () => {
+    // Factory invoked with _pinLoading: all true → pin.loaded flags should all be true.
+    const pinLoading = { "In_1": true, "In_2": true, "out": true };
+    const props = new PropertyBag();
+    props.set("_pinLoading", pinLoading as unknown as import("../../../core/properties.js").PropertyValue);
+
+    const factory = makeNandAnalogFactory(2);
+    const element = factory(
+      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
+      [], -1, props, () => 0,
+    ) as BehavioralGateElement;
+
+    // Access internal pins via the pinModelsByLabel map is not exposed; instead
+    // verify via the loaded getter that should be visible on the returned gate's
+    // pin models. We access via the getPinCurrents side-effect path: loaded
+    // pins stamp conductance, ideal pins stamp nothing. Use the spec's
+    // "loaded getter" accessor pattern documented in 6.4.2.
+    //
+    // Direct approach: reconstruct via factory with known pinLoading and check
+    // that load(ctx) causes stamps (loaded=true stamps 1/rIn).
+    const solver = {
+      stampCalls: 0,
+      allocElement(_r: number, _c: number) { return 0; },
+      stampElement(_h: number, _v: number) { this.stampCalls++; },
+      stampRHS(_i: number, _v: number) {},
+    };
+    const ctx = makeMinimalCtx();
+    (ctx as any).solver = solver;
+
+    withNodeIds(element, [1, 2, 3]);
+    element.load(ctx);
+
+    // When all inputs are loaded (rIn stamps), each input contributes at least
+    // one stamp per load() call. Two loaded inputs → at least 2 matrix stamps.
+    expect(solver.stampCalls).toBeGreaterThan(0);
+  });
+
+  it("pin_loading_propagates_to_pin_models_none_mode", () => {
+    // Factory invoked with _pinLoading: all false → inputs are ideal (no rIn stamp).
+    // Output still stamps its Norton equivalent even when loaded=false (the loaded
+    // flag gates only the companion capacitor stamp, not the basic drive stamp).
+    // This test verifies that input pins with loaded=false do NOT allocate matrix
+    // positions (they are no-ops in load()).
+    const pinLoading = { "In_1": false, "In_2": false, "out": false };
+    const props = new PropertyBag();
+    props.set("_pinLoading", pinLoading as unknown as import("../../../core/properties.js").PropertyValue);
+
+    const factory = makeNandAnalogFactory(2);
+    const element = factory(
+      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
+      [], -1, props, () => 0,
+    ) as BehavioralGateElement;
+
+    const allocCalls: Array<[number, number]> = [];
+    const solver = {
+      allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
+      stampElement(_h: number, _v: number) {},
+      stampRHS(_i: number, _v: number) {},
+    };
+    const ctx = makeMinimalCtx();
+    (ctx as any).solver = solver;
+
+    withNodeIds(element, [1, 2, 3]);
+    element.load(ctx);
+
+    // DigitalInputPinModel with loaded=false is a pure no-op in load():
+    // no allocElement calls for nodeIds 1 (idx=0) or 2 (idx=1).
+    const hasIn1Diag = allocCalls.some(([r, c]) => r === 0 && c === 0);
+    const hasIn2Diag = allocCalls.some(([r, c]) => r === 1 && c === 1);
+    expect(hasIn1Diag).toBe(false);
+    expect(hasIn2Diag).toBe(false);
+  });
+
+  it("pin_loading_respects_per_net_override_on_gate_input", () => {
+    // In_1 loaded=false (overridden to ideal), In_2 loaded=true (default "all")
+    const pinLoading = { "In_1": false, "In_2": true, "out": true };
+    const props = new PropertyBag();
+    props.set("_pinLoading", pinLoading as unknown as import("../../../core/properties.js").PropertyValue);
+
+    const factory = makeAndAnalogFactory(2);
+    const element = factory(
+      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
+      [], -1, props, () => 0,
+    ) as BehavioralGateElement;
+
+    // Count allocElement calls: a loaded input calls allocElement once for the
+    // node diagonal, an ideal input calls allocElement zero times.
+    const allocCalls: Array<[number, number]> = [];
+    const solver = {
+      allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
+      stampElement(_h: number, _v: number) {},
+      stampRHS(_i: number, _v: number) {},
+    };
+    const ctx = makeMinimalCtx();
+    (ctx as any).solver = solver;
+
+    withNodeIds(element, [1, 2, 3]);
+    element.load(ctx);
+
+    // MNA node IDs are 1-based; allocElement receives 0-based nodeIdx = nodeId-1.
+    // In_1 = MNA node 1 → nodeIdx 0. In_2 = MNA node 2 → nodeIdx 1.
+    // In_1 (nodeIdx=0) diagonal should NOT appear (loaded=false → no-op in load()).
+    // In_2 (nodeIdx=1) diagonal SHOULD appear (loaded=true → stamps 1/rIn).
+    const node1Diag = allocCalls.some(([r, c]) => r === 0 && c === 0);
+    const node2Diag = allocCalls.some(([r, c]) => r === 1 && c === 1);
+    expect(node1Diag).toBe(false);
+    expect(node2Diag).toBe(true);
+  });
+
+  it("gate_load_delegates_to_pin_models", () => {
+    // Monkey-patch each pin model's load() with a spy; assert each is called
+    // exactly once with the same LoadContext reference.
+    const inA = new DigitalInputPinModel(CMOS_3V3, true);
+    inA.init(1, -1);
+    const inB = new DigitalInputPinModel(CMOS_3V3, true);
+    inB.init(2, -1);
+    const out = new DigitalOutputPinModel(CMOS_3V3, false, "direct");
+    out.init(3, -1);
+
+    const gate = new BehavioralGateElement(
+      [inA, inB],
+      out,
+      (inputs) => !(inputs[0] && inputs[1]),
+      new Map(),
+    );
+    withNodeIds(gate, [1, 2, 3]);
+
+    const inALoadSpy = vi.spyOn(inA, "load");
+    const inBLoadSpy = vi.spyOn(inB, "load");
+    const outLoadSpy = vi.spyOn(out, "load");
+
+    const ctx = makeMinimalCtx();
+    gate.load(ctx);
+
+    expect(inALoadSpy).toHaveBeenCalledOnce();
+    expect(inALoadSpy).toHaveBeenCalledWith(ctx);
+    expect(inBLoadSpy).toHaveBeenCalledOnce();
+    expect(inBLoadSpy).toHaveBeenCalledWith(ctx);
+    expect(outLoadSpy).toHaveBeenCalledOnce();
+    expect(outLoadSpy).toHaveBeenCalledWith(ctx);
+  });
+
+  it("gate_accept_delegates_to_pin_models", () => {
+    // Monkey-patch each pin model's accept() with a spy; assert each is called
+    // with the voltage from ctx.voltages at that pin's node index.
+    const inA = new DigitalInputPinModel(CMOS_3V3, true);
+    inA.init(1, -1); // MNA node 1 → solver index 0 (0-based)
+    const inB = new DigitalInputPinModel(CMOS_3V3, true);
+    inB.init(2, -1); // MNA node 2 → solver index 1
+    const out = new DigitalOutputPinModel(CMOS_3V3, false, "direct");
+    out.init(3, -1); // MNA node 3 → solver index 2
+
+    const gate = new BehavioralGateElement(
+      [inA, inB],
+      out,
+      (inputs) => inputs[0] || inputs[1],
+      new Map(),
+    );
+    withNodeIds(gate, [1, 2, 3]);
+
+    const inAAcceptSpy = vi.spyOn(inA, "accept");
+    const inBAcceptSpy = vi.spyOn(inB, "accept");
+    const outAcceptSpy = vi.spyOn(out, "accept");
+
+    // Set specific voltages at each node
+    const voltages = new Float64Array(16);
+    voltages[0] = 3.3; // node 1 (MNA) → index 0
+    voltages[1] = 0.0; // node 2 (MNA) → index 1
+    voltages[2] = 3.3; // node 3 (MNA) → index 2
+
+    // dt must be > 0 to trigger accept delegation (gate.accept returns early if dt<=0)
+    const ctx = { ...makeMinimalCtx(voltages), dt: 1e-9 };
+
+    gate.accept(ctx, 0, () => {});
+
+    // Each pin's accept should be called with the voltage at its node
+    expect(inAAcceptSpy).toHaveBeenCalledWith(ctx, voltages[0]);
+    expect(inBAcceptSpy).toHaveBeenCalledWith(ctx, voltages[1]);
+    expect(outAcceptSpy).toHaveBeenCalledWith(ctx, voltages[2]);
+  });
+
+  it("gate_output_uses_direct_role", () => {
+    // Gate output pins always use role="direct" (conductance+Norton source form),
+    // never role="branch". Verify by observing that load() does NOT stamp any
+    // branch-equation row (no allocation at row >= nodeCount).
+    const pinLoading = { "In_1": false, "In_2": false, "out": true };
+    const props = new PropertyBag();
+    props.set("_pinLoading", pinLoading as unknown as import("../../../core/properties.js").PropertyValue);
+
+    const factory = makeOrAnalogFactory(2);
+    const element = factory(
+      new Map([["In_1", 1], ["In_2", 2], ["out", 3]]),
+      [], -1, props, () => 0,
+    );
+    withNodeIds(element, [1, 2, 3]);
+
+    const allocCalls: Array<[number, number]> = [];
+    const solver = {
+      allocElement(r: number, c: number) { allocCalls.push([r, c]); return allocCalls.length - 1; },
+      stampElement(_h: number, _v: number) {},
+      stampRHS(_i: number, _v: number) {},
+    };
+    const ctx = makeMinimalCtx();
+    (ctx as any).solver = solver;
+
+    element.load(ctx);
+
+    // direct role stamps only on node diagonal (nodeIdx, nodeIdx) where
+    // nodeIdx = nodeId - 1 (0-based). No branch rows are allocated.
+    // Branch rows for a 3-node circuit would be at row >= 3 (absolute row).
+    const hasBranchRowStamp = allocCalls.some(([r]) => r >= 3);
+    expect(hasBranchRowStamp).toBe(false);
+
+    // Output MNA node 3 → nodeIdx 2. The output diagonal (2,2) IS stamped
+    // (loaded=true, direct role → stamps 1/rOut on node diagonal).
+    const hasOutputDiag = allocCalls.some(([r, c]) => r === 2 && c === 2);
+    expect(hasOutputDiag).toBe(true);
   });
 });

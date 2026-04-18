@@ -61,10 +61,10 @@ export type AnalogElementFactory = (
  * Analog behavioral model for a combinational digital gate.
  *
  * Unified load() protocol (ngspice DEVload):
- *   load()   — stamps input loading, evaluates the truth table from current
- *              NR-iterate voltages, stamps the output Norton equivalent, and
- *              (in transient) stamps pin-capacitance companion models.
- *   accept() — updates pin companion state after an accepted timestep.
+ *   load()   — delegates input/output pin stamping to pin models, evaluates
+ *              the truth table from current NR-iterate voltages.
+ *   accept() — delegates companion state update to pin models after each
+ *              accepted timestep.
  */
 export class BehavioralGateElement implements AnalogElementCore {
   private readonly _inputs: DigitalInputPinModel[];
@@ -95,7 +95,6 @@ export class BehavioralGateElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
     const voltages = ctx.voltages;
 
     // Evaluate each input's logic level from the current NR iterate, latching
@@ -112,20 +111,11 @@ export class BehavioralGateElement implements AnalogElementCore {
     const outputBit = this._truthTable(this._latchedLevels);
     this._output.setLogicLevel(outputBit);
 
-    // Stamp input loading conductances (R_in).
+    // Delegate stamping to pin models.
     for (const inp of this._inputs) {
-      inp.stamp(solver);
+      inp.load(ctx);
     }
-    // Stamp output Norton equivalent (G_out + Norton source).
-    this._output.stampOutput(solver);
-
-    // Transient: stamp companion models for pin capacitances.
-    if (ctx.isTransient && ctx.dt > 0) {
-      for (const inp of this._inputs) {
-        inp.stampCompanion(solver, ctx.dt, ctx.method);
-      }
-      this._output.stampCompanion(solver, ctx.dt, ctx.method);
-    }
+    this._output.load(ctx);
   }
 
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
@@ -133,10 +123,10 @@ export class BehavioralGateElement implements AnalogElementCore {
     const voltages = ctx.voltages;
     for (const inp of this._inputs) {
       const v = readMnaVoltage(inp.nodeId, voltages);
-      inp.updateCompanion(ctx.dt, ctx.method, v);
+      inp.accept(ctx, v);
     }
     const vOut = readMnaVoltage(this._output.nodeId, voltages);
-    this._output.updateCompanion(ctx.dt, ctx.method, vOut);
+    this._output.accept(ctx, vOut);
   }
 
   /**
@@ -234,6 +224,10 @@ function buildGateElement(
     ? (props.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>)
     : undefined;
 
+  const pinLoading = props.has("_pinLoading")
+    ? (props.get("_pinLoading") as unknown as Record<string, boolean>)
+    : {} as Record<string, boolean>;
+
   const fallback: ResolvedPinElectrical = {
     rOut: 50,
     cOut: 5e-12,
@@ -252,14 +246,16 @@ function buildGateElement(
   for (let i = 0; i < inputCount; i++) {
     const label = `In_${i + 1}`;
     const spec = pinSpecs?.[label] ?? fallback;
-    const pin = new DigitalInputPinModel(spec, true);
+    const loaded = pinLoading[label] ?? true;
+    const pin = new DigitalInputPinModel(spec, loaded);
     pin.init(pinNodes.get(label) ?? 0, 0);
     inputPins.push(pin);
     pinModelsByLabel.set(label, pin);
   }
 
   const outSpec = pinSpecs?.["out"] ?? fallback;
-  const outputPin = new DigitalOutputPinModel(outSpec);
+  const outLoaded = pinLoading["out"] ?? false;
+  const outputPin = new DigitalOutputPinModel(outSpec, outLoaded, "direct");
   outputPin.init(pinNodes.get("out") ?? 0, -1);
   pinModelsByLabel.set("out", outputPin);
 

@@ -19,7 +19,6 @@
 import type { AnalogElementCore, IntegrationMethod, StatePoolRef } from "../../core/analog-types.js";
 import type { LoadContext } from "./load-context.js";
 import { stampG, stampRHS } from "./stamp-helpers.js";
-import { integrateCapacitor } from "./integration.js";
 import { defineStateSchema, applyInitialValues } from "./state-schema.js";
 import type { StateSchema } from "./state-schema.js";
 import { cktTerr } from "./ckt-terr.js";
@@ -267,7 +266,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
 
     // 8: reactive companion integration + stamp (if reactive & transient)
     if (this.isReactive && ctx.isTransient) {
-      this._stampCompanion(ctx.dt, ctx.method, ctx.voltages, ctx.order, ctx.deltaOld);
+      this._stampCompanion(ctx.dt, ctx.method, ctx.voltages, ctx.order, ctx.deltaOld, ctx.ag);
       this._stampReactiveCompanion(ctx.solver);
     }
   }
@@ -476,7 +475,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     return Math.abs(cdhat - cdFinal) <= tolD && Math.abs(cbhat - (cbsI + cbdI)) <= tolB;
   }
 
-  protected _stampCompanion(dt: number, method: IntegrationMethod, _voltages: Float64Array, order: number, deltaOld: readonly number[]): void {
+  protected _stampCompanion(_dt: number, _method: IntegrationMethod, _voltages: Float64Array, order: number, _deltaOld: readonly number[], ag: Float64Array): void {
     // Compute vgs/vgd freshly from current node voltages (ngspice mos1load.c
     // single-pass semantics). Voltage limiting is a mid-NR stabilizer applied
     // in updateOperatingPoint; at step boundaries / post-convergence,
@@ -499,7 +498,6 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     this._s0[base + SLOT_V_GD] = vgdNow;
 
     const caps = this.computeCapacitances(vgsNow, vdsNow);
-    const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
 
     if (caps.cgs > 0) {
       // Meyer incremental charge: Q = cgs*(vgs - prevVgs) + prevQ
@@ -507,12 +505,18 @@ export abstract class AbstractFetElement implements AnalogElementCore {
       const prevQgs = this.s1[base + SLOT_Q_GS];
       const q0 = isFirstCall ? caps.cgs * vgsNow : caps.cgs * (vgsNow - prevVgs) + prevQgs;
       const q1 = this.s1[base + SLOT_Q_GS];
-      const q2 = this.s2[base + SLOT_Q_GS];
-      const ccapPrev = this.s1[base + SLOT_CCAP_GS];
-      const res = integrateCapacitor(caps.cgs, vgsNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
-      this._s0[base + SLOT_CAP_GEQ_GS] = res.geq;
-      this._s0[base + SLOT_CAP_IEQ_GS] = res.ceq;
-      this._s0[base + SLOT_CCAP_GS] = res.ccap;
+      let ccap: number;
+      if (order >= 2 && ag.length > 2) {
+        const q2 = this.s2[base + SLOT_Q_GS];
+        ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
+      } else {
+        ccap = ag[0] * q0 + ag[1] * q1;
+      }
+      const geq = ag[0] * caps.cgs;
+      const ceq = ccap - ag[0] * q0;
+      this._s0[base + SLOT_CAP_GEQ_GS] = geq;
+      this._s0[base + SLOT_CAP_IEQ_GS] = ceq;
+      this._s0[base + SLOT_CCAP_GS] = ccap;
       this._s0[base + SLOT_Q_GS] = q0;
     } else {
       this._s0[base + SLOT_CAP_GEQ_GS] = 0;
@@ -526,12 +530,18 @@ export abstract class AbstractFetElement implements AnalogElementCore {
       const prevQgd = this.s1[base + SLOT_Q_GD];
       const q0 = isFirstCall ? caps.cgd * vgdNow : caps.cgd * (vgdNow - prevVgd) + prevQgd;
       const q1 = this.s1[base + SLOT_Q_GD];
-      const q2 = this.s2[base + SLOT_Q_GD];
-      const ccapPrev = this.s1[base + SLOT_CCAP_GD];
-      const res = integrateCapacitor(caps.cgd, vgdNow, q0, q1, q2, dt, h1, order, method, ccapPrev);
-      this._s0[base + SLOT_CAP_GEQ_GD] = res.geq;
-      this._s0[base + SLOT_CAP_IEQ_GD] = res.ceq;
-      this._s0[base + SLOT_CCAP_GD] = res.ccap;
+      let ccap: number;
+      if (order >= 2 && ag.length > 2) {
+        const q2 = this.s2[base + SLOT_Q_GD];
+        ccap = ag[0] * q0 + ag[1] * q1 + ag[2] * q2;
+      } else {
+        ccap = ag[0] * q0 + ag[1] * q1;
+      }
+      const geq = ag[0] * caps.cgd;
+      const ceq = ccap - ag[0] * q0;
+      this._s0[base + SLOT_CAP_GEQ_GD] = geq;
+      this._s0[base + SLOT_CAP_IEQ_GD] = ceq;
+      this._s0[base + SLOT_CCAP_GD] = ccap;
       this._s0[base + SLOT_Q_GD] = q0;
     } else {
       this._s0[base + SLOT_CAP_GEQ_GD] = 0;
@@ -550,7 +560,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     }
   }
 
-  protected _updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[]): void {
+  protected _updateChargeFlux(voltages: Float64Array, dt: number, _method: IntegrationMethod, order: number, _deltaOld: readonly number[], ag: Float64Array): void {
     const nodeG = this.gateNode;
     const nodeD = this.drainNode;
     const nodeS = this.sourceNode;
@@ -587,24 +597,30 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     // Recompute ccap from converged charges so the next step's trapezoidal
     // recursion starts from the correct companion current (fixes stale CCAP_GS/GD).
     if (dt > 0) {
-      const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-
       if (caps.cgs > 0) {
         const q0gs = this._s0[base + SLOT_Q_GS];
         const q1gs = this.s1[base + SLOT_Q_GS];
-        const q2gs = this.s2[base + SLOT_Q_GS];
-        const ccapPrevGs = this.s1[base + SLOT_CCAP_GS];
-        const resGs = integrateCapacitor(caps.cgs, vgsNow, q0gs, q1gs, q2gs, dt, h1, order, method, ccapPrevGs);
-        this._s0[base + SLOT_CCAP_GS] = resGs.ccap;
+        let ccapGs: number;
+        if (order >= 2 && ag.length > 2) {
+          const q2gs = this.s2[base + SLOT_Q_GS];
+          ccapGs = ag[0] * q0gs + ag[1] * q1gs + ag[2] * q2gs;
+        } else {
+          ccapGs = ag[0] * q0gs + ag[1] * q1gs;
+        }
+        this._s0[base + SLOT_CCAP_GS] = ccapGs;
       }
 
       if (caps.cgd > 0) {
         const q0gd = this._s0[base + SLOT_Q_GD];
         const q1gd = this.s1[base + SLOT_Q_GD];
-        const q2gd = this.s2[base + SLOT_Q_GD];
-        const ccapPrevGd = this.s1[base + SLOT_CCAP_GD];
-        const resGd = integrateCapacitor(caps.cgd, vgdNow, q0gd, q1gd, q2gd, dt, h1, order, method, ccapPrevGd);
-        this._s0[base + SLOT_CCAP_GD] = resGd.ccap;
+        let ccapGd: number;
+        if (order >= 2 && ag.length > 2) {
+          const q2gd = this.s2[base + SLOT_Q_GD];
+          ccapGd = ag[0] * q0gd + ag[1] * q1gd + ag[2] * q2gd;
+        } else {
+          ccapGd = ag[0] * q0gd + ag[1] * q1gd;
+        }
+        this._s0[base + SLOT_CCAP_GD] = ccapGd;
       }
     }
   }

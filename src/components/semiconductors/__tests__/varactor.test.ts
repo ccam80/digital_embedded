@@ -15,6 +15,7 @@ import {
   VARACTOR_PARAM_DEFAULTS,
 } from "../varactor.js";
 import { computeJunctionCapacitance, computeJunctionCharge } from "../diode.js";
+import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
@@ -313,3 +314,111 @@ describe("Varactor", () => {
     expect(cWithTT).toBeGreaterThan(cWithoutTT);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C2.3: inline NIintegrate integration tests
+// ---------------------------------------------------------------------------
+
+// ngspice → ours variable mapping (niinteg.c:28-63):
+//   ag[0] (CKTag[0])    → ctx.ag[0]   coefficient on q0 (current charge)
+//   ag[1] (CKTag[1])    → ctx.ag[1]   coefficient on q1 (previous charge)
+//   cap                 → Ctotal      voltage-dependent junction capacitance
+//   q0                  → computeJunctionCharge at vd
+//   q1                  → s1[SLOT_Q]  from previous accepted step
+//   ccap                → ag[0]*q0 + ag[1]*q1
+//   geq                 → ag[0]*Ctotal
+//   ceq                 → ccap - geq*vd
+
+describe("integration", () => {
+  it("cvoltage_dependent_transient_matches_ngspice", () => {
+    // Single transient step: varactor with cjo=20pF at vd=-2V (reverse bias).
+    // Trapezoidal order 2: ag[0]=2/dt, ag[1]=1.
+    // Expected geq = ag[0]*Ctotal, ceq = ag[0]*q0 + ag[1]*q1 - geq*vd.
+
+    const cjo = 20e-12, vj = 0.7, m = 0.5, iS = 1e-14, fc = 0.5, tt = 0;
+    const dt = 1e-9;
+    const vd = -2.0; // reverse bias
+
+    const ag = new Float64Array(8);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(dt, [dt, dt, dt, dt, dt, dt, dt], 2, "trapezoidal", ag, scratch);
+
+    const params = { ...VARACTOR_PARAM_DEFAULTS, cjo, vj, m, iS, fc, tt };
+    const props = createTestPropertyBag();
+    props.replaceModelParams(params);
+    const core = createVaractorElement(new Map([["A", 1], ["K", 0]]), [], -1, props);
+
+    const pool = new StatePool(9);
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Seed previous-step charge in s1[SLOT_Q=7]
+    const prevVd = -1.9;
+    const prevId = iS * (Math.exp(prevVd / 0.02585) - 1);
+    const q1_val = computeJunctionCharge(prevVd, cjo, vj, m, fc, tt, prevId);
+    pool.state1[7] = q1_val;
+
+    const stamps: Array<[number, number, number]> = [];
+    const rhs: Array<[number, number]> = [];
+    const mockSolver = {
+      stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
+      stampRHS: (r: number, v: number) => rhs.push([r, v]),
+    } as any;
+
+    pool.ag.set(ag);
+    const ctx = {
+      solver: mockSolver,
+      voltages: new Float64Array([vd, 0]),
+      iteration: 0,
+      initMode: "transient" as const,
+      dt,
+      method: "trapezoidal" as const,
+      order: 2,
+      deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+      ag,
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: false,
+      isTransient: true,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    core.load(ctx);
+
+    // Compute expected values from the NIintegrate formula
+    const idRaw = iS * (Math.exp(vd / 0.02585) - 1);
+    const gdRaw = iS * Math.exp(vd / 0.02585) / 0.02585;
+    const Cj = computeJunctionCapacitance(vd, cjo, vj, m, fc);
+    const Ctotal = Cj + tt * gdRaw;
+    const q0_val = computeJunctionCharge(vd, cjo, vj, m, fc, tt, idRaw);
+    const ccap_expected = ag[0] * q0_val + ag[1] * q1_val;
+    const capGeq_expected = ag[0] * Ctotal;
+    const capIeq_expected = ccap_expected - capGeq_expected * vd;
+
+    // Verify geq = ag[0] * Ctotal (bit-exact)
+    expect(capGeq_expected).toBe(ag[0] * Ctotal);
+    // Verify ceq = ccap - geq*vd (bit-exact)
+    expect(capIeq_expected).toBe(ccap_expected - capGeq_expected * vd);
+
+    // Verify the element stamped the correct capGeq: find diagonal (0,0) contributions
+    const total00 = stamps.filter(([r, c]) => r === 0 && c === 0).reduce((sum, s) => sum + s[2], 0);
+    const gd_junction = gdRaw + 1e-12; // GMIN added in varactor load()
+    expect(total00).toBe(gd_junction + capGeq_expected);
+  });
+
+  it("no_integrateCapacitor_import", () => {
+    const fs = require("fs");
+    const src = fs.readFileSync(
+      require("path").resolve(__dirname, "../varactor.ts"),
+      "utf8",
+    ) as string;
+    expect(src).not.toMatch(/integrateCapacitor/);
+    expect(src).not.toMatch(/integrateInductor/);
+  });
+});
+

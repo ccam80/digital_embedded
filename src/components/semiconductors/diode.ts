@@ -31,7 +31,6 @@ import {
 import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
-import { integrateCapacitor } from "../../solver/analog/integration.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -594,7 +593,15 @@ export function createDiodeElement(
           q1 = q0;
         }
 
-        const { geq: capGeq, ceq: capIeq, ccap } = integrateCapacitor(Ctotal, vdLimited, q0, q1, q2, dt, h1, order, method, ccapPrev);
+        // Inline NIintegrate (niinteg.c:28-63). Mapping: ag[]=ctx.ag, q0/q1=charges, ccapPrev=ccap at prev step.
+        // geq = ag[0] * Ctotal  (ngspice: cap * ag[0])
+        // ccap = ag[0]*q0 + ag[1]*q1 + ag[2]*q2 + ... (order terms)
+        // ceq  = ccap - geq * vdLimited
+        const ag = ctx.ag;
+        let ccap = ag[0] * q0 + ag[1] * q1;
+        if (order >= 2 && method !== "trapezoidal") ccap += ag[2] * q2;
+        const capGeq = ag[0] * Ctotal;
+        const capIeq = ccap - capGeq * vdLimited;
         s0[base + SLOT_CAP_GEQ] = capGeq;
         s0[base + SLOT_CAP_IEQ] = capIeq;
         s0[base + SLOT_V] = vdLimited;

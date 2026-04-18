@@ -6,7 +6,7 @@ import type { AnalogElementCore, LoadContext } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
-import { FALLBACK_SPEC, getPinSpecs, makeInputPin, makeOutputPin } from "./shared.js";
+import { FALLBACK_SPEC, getPinSpecs, getPinLoading, makeInputPin, makeOutputPin } from "./shared.js";
 
 // ---------------------------------------------------------------------------
 // BehavioralJKAsyncFlipflopElement
@@ -20,9 +20,8 @@ import { FALLBACK_SPEC, getPinSpecs, makeInputPin, makeOutputPin } from "./share
  * Async Clr (active-high) overrides clock, forces Q=0.
  *
  * Unified interface:
- *   load()   — stamps input loading, output Norton equivalents from the
- *              currently latched Q state, and pin-capacitance companions
- *              during transient.
+ *   load()   — delegates input/output pin stamping to pin models from the
+ *              currently latched Q state.
  *   accept() — rising-edge detection, JK latching/toggling, async Set/Clr
  *              overrides, and pin companion state update after each accepted
  *              timestep.
@@ -76,28 +75,17 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
-
-    this._setPin.stamp(solver);
-    this._jPin.stamp(solver);
-    this._clockPin.stamp(solver);
-    this._kPin.stamp(solver);
-    this._clrPin.stamp(solver);
+    // Delegate input stamping to pin models
+    this._setPin.load(ctx);
+    this._jPin.load(ctx);
+    this._clockPin.load(ctx);
+    this._kPin.load(ctx);
+    this._clrPin.load(ctx);
 
     this._qPin.setLogicLevel(this._latchedQ);
     this._qBarPin.setLogicLevel(!this._latchedQ);
-    this._qPin.stampOutput(solver);
-    this._qBarPin.stampOutput(solver);
-
-    if (ctx.isTransient && ctx.dt > 0) {
-      this._setPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._jPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._clockPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._kPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._clrPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._qPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._qBarPin.stampCompanion(solver, ctx.dt, ctx.method);
-    }
+    this._qPin.load(ctx);
+    this._qBarPin.load(ctx);
   }
 
   /**
@@ -107,8 +95,6 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElementCore {
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.voltages;
-    const dt = ctx.dt;
-    const method = ctx.method;
 
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
@@ -145,15 +131,14 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElementCore {
 
     this._prevClockVoltage = currentClockV;
 
-    if (dt > 0) {
-      this._setPin.updateCompanion(dt, method, setV);
-      this._jPin.updateCompanion(dt, method, readMnaVoltage(this._jPin.nodeId, voltages));
-      this._clockPin.updateCompanion(dt, method, currentClockV);
-      this._kPin.updateCompanion(dt, method, readMnaVoltage(this._kPin.nodeId, voltages));
-      this._clrPin.updateCompanion(dt, method, clrV);
-      this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
-      this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
-    }
+    // Delegate companion updates to pin models.
+    this._setPin.accept(ctx, setV);
+    this._jPin.accept(ctx, readMnaVoltage(this._jPin.nodeId, voltages));
+    this._clockPin.accept(ctx, currentClockV);
+    this._kPin.accept(ctx, readMnaVoltage(this._kPin.nodeId, voltages));
+    this._clrPin.accept(ctx, clrV);
+    this._qPin.accept(ctx, readMnaVoltage(this._qPin.nodeId, voltages));
+    this._qBarPin.accept(ctx, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -191,6 +176,8 @@ export class BehavioralJKAsyncFlipflopElement implements AnalogElementCore {
 export function makeJKAsyncFlipflopAnalogFactory(): AnalogElementFactory {
   return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
+    const pinLoading = getPinLoading(props);
+
     const setSpec = pinSpecs?.["Set"] ?? FALLBACK_SPEC;
     const jSpec = pinSpecs?.["J"] ?? FALLBACK_SPEC;
     const cSpec = pinSpecs?.["C"] ?? FALLBACK_SPEC;
@@ -199,13 +186,13 @@ export function makeJKAsyncFlipflopAnalogFactory(): AnalogElementFactory {
     const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
     const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-    const setPin = makeInputPin(setSpec, pinNodes.get("Set") ?? 0);
-    const jPin = makeInputPin(jSpec, pinNodes.get("J") ?? 0);
-    const clockPin = makeInputPin(cSpec, pinNodes.get("C") ?? 0);
-    const kPin = makeInputPin(kSpec, pinNodes.get("K") ?? 0);
-    const clrPin = makeInputPin(clrSpec, pinNodes.get("Clr") ?? 0);
-    const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
-    const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
+    const setPin = makeInputPin(setSpec, pinNodes.get("Set") ?? 0, pinLoading["Set"] ?? true);
+    const jPin = makeInputPin(jSpec, pinNodes.get("J") ?? 0, pinLoading["J"] ?? true);
+    const clockPin = makeInputPin(cSpec, pinNodes.get("C") ?? 0, pinLoading["C"] ?? true);
+    const kPin = makeInputPin(kSpec, pinNodes.get("K") ?? 0, pinLoading["K"] ?? true);
+    const clrPin = makeInputPin(clrSpec, pinNodes.get("Clr") ?? 0, pinLoading["Clr"] ?? true);
+    const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0, pinLoading["Q"] ?? false);
+    const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0, pinLoading["~Q"] ?? false);
 
     const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
       ["Set", setPin],

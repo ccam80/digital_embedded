@@ -6,7 +6,7 @@ import type { AnalogElementCore, LoadContext } from "../element.js";
 import { readMnaVoltage, delegatePinSetParam } from "../digital-pin-model.js";
 import type { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
 import type { AnalogElementFactory } from "../behavioral-gate.js";
-import { FALLBACK_SPEC, getPinSpecs, makeInputPin, makeOutputPin } from "./shared.js";
+import { FALLBACK_SPEC, getPinSpecs, getPinLoading, makeInputPin, makeOutputPin } from "./shared.js";
 
 // ---------------------------------------------------------------------------
 // BehavioralTFlipflopElement
@@ -23,9 +23,8 @@ import { FALLBACK_SPEC, getPinSpecs, makeInputPin, makeOutputPin } from "./share
  *   Toggle Q on every rising clock edge.
  *
  * Unified interface:
- *   load()   — stamps input loading, output Norton equivalents from the
- *              currently latched Q state, and pin-capacitance companions
- *              during transient.
+ *   load()   — delegates input/output pin stamping to pin models from the
+ *              currently latched Q state.
  *   accept() — rising-edge detection and conditional toggle, plus pin
  *              companion state update after each accepted timestep.
  */
@@ -69,22 +68,14 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
-
-    if (this._tPin !== null) this._tPin.stamp(solver);
-    this._clockPin.stamp(solver);
+    // Delegate input stamping to pin models
+    if (this._tPin !== null) this._tPin.load(ctx);
+    this._clockPin.load(ctx);
 
     this._qPin.setLogicLevel(this._latchedQ);
     this._qBarPin.setLogicLevel(!this._latchedQ);
-    this._qPin.stampOutput(solver);
-    this._qBarPin.stampOutput(solver);
-
-    if (ctx.isTransient && ctx.dt > 0) {
-      if (this._tPin !== null) this._tPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._clockPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._qPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._qBarPin.stampCompanion(solver, ctx.dt, ctx.method);
-    }
+    this._qPin.load(ctx);
+    this._qBarPin.load(ctx);
   }
 
   /**
@@ -93,8 +84,6 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.voltages;
-    const dt = ctx.dt;
-    const method = ctx.method;
 
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
@@ -116,14 +105,13 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
 
     this._prevClockVoltage = currentClockV;
 
-    if (dt > 0) {
-      if (this._tPin !== null) {
-        this._tPin.updateCompanion(dt, method, readMnaVoltage(this._tPin.nodeId, voltages));
-      }
-      this._clockPin.updateCompanion(dt, method, currentClockV);
-      this._qPin.updateCompanion(dt, method, readMnaVoltage(this._qPin.nodeId, voltages));
-      this._qBarPin.updateCompanion(dt, method, readMnaVoltage(this._qBarPin.nodeId, voltages));
+    // Delegate companion updates to pin models.
+    if (this._tPin !== null) {
+      this._tPin.accept(ctx, readMnaVoltage(this._tPin.nodeId, voltages));
     }
+    this._clockPin.accept(ctx, currentClockV);
+    this._qPin.accept(ctx, readMnaVoltage(this._qPin.nodeId, voltages));
+    this._qBarPin.accept(ctx, readMnaVoltage(this._qBarPin.nodeId, voltages));
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -157,6 +145,7 @@ export class BehavioralTFlipflopElement implements AnalogElementCore {
 export function makeTFlipflopAnalogFactory(): AnalogElementFactory {
   return (pinNodes, _internalNodeIds, _branchIdx, props, _getTime) => {
     const pinSpecs = getPinSpecs(props);
+    const pinLoading = getPinLoading(props);
     const withEnable = props.has("withEnable")
       ? (props.get("withEnable") as boolean)
       : true;
@@ -167,10 +156,10 @@ export function makeTFlipflopAnalogFactory(): AnalogElementFactory {
       const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
       const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-      const tPin = makeInputPin(tSpec, pinNodes.get("T") ?? 0);
-      const clockPin = makeInputPin(cSpec, pinNodes.get("C") ?? 0);
-      const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
-      const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
+      const tPin = makeInputPin(tSpec, pinNodes.get("T") ?? 0, pinLoading["T"] ?? true);
+      const clockPin = makeInputPin(cSpec, pinNodes.get("C") ?? 0, pinLoading["C"] ?? true);
+      const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0, pinLoading["Q"] ?? false);
+      const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0, pinLoading["~Q"] ?? false);
 
       const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
         ["T", tPin],
@@ -188,9 +177,9 @@ export function makeTFlipflopAnalogFactory(): AnalogElementFactory {
       const qSpec = pinSpecs?.["Q"] ?? FALLBACK_SPEC;
       const qBarSpec = pinSpecs?.["~Q"] ?? FALLBACK_SPEC;
 
-      const clockPin = makeInputPin(cSpec, pinNodes.get("C") ?? 0);
-      const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0);
-      const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0);
+      const clockPin = makeInputPin(cSpec, pinNodes.get("C") ?? 0, pinLoading["C"] ?? true);
+      const qPin = makeOutputPin(qSpec, pinNodes.get("Q") ?? 0, pinLoading["Q"] ?? false);
+      const qBarPin = makeOutputPin(qBarSpec, pinNodes.get("~Q") ?? 0, pinLoading["~Q"] ?? false);
 
       const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
         ["C", clockPin],

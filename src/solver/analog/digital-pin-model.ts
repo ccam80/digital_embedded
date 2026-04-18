@@ -1,12 +1,9 @@
 /**
  * DigitalPinModel — MNA stamp helpers for digital pins.
  *
- * DigitalOutputPinModel stamps an ideal voltage source branch equation:
- *   - Drive mode: branch equation enforces V_node = V_target.
- *     If loaded, also stamps 1/rOut on the node diagonal.
- *   - Hi-Z mode: branch equation enforces I = 0.
- *     If loaded, stamps 1/rHiZ on the node diagonal.
- *   - Companion model for C_out only when loaded and cOut > 0.
+ * DigitalOutputPinModel stamps an ideal voltage source branch equation ("branch" role)
+ * or a conductance+current-source ("direct" role) based on the role assigned at
+ * construction. Loading (rOut, cOut) is stamped only when the loaded flag is true.
  *
  * DigitalInputPinModel is sense-only by default:
  *   - When loaded, stamps 1/rIn on the node diagonal.
@@ -14,12 +11,8 @@
  *   - Threshold detection always available regardless of loaded flag.
  */
 
-import type { SparseSolver } from "./sparse-solver.js";
-import type { IntegrationMethod } from "./element.js";
+import type { LoadContext } from "./load-context.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
-import {
-  integrateCapacitor,
-} from "./integration.js";
 
 /**
  * Read voltage for an MNA node from the solver solution vector.
@@ -35,16 +28,18 @@ export function readMnaVoltage(nodeId: number, voltages: Float64Array): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Stamps the analog equivalent of one digital output pin into the MNA matrix
- * using an ideal voltage source branch equation.
+ * Stamps the analog equivalent of one digital output pin into the MNA matrix.
  *
- * The branch variable at branchIdx represents the current injected by the
- * ideal source. The branch equation selects between drive and Hi-Z modes.
+ * role "branch": ideal voltage-source branch equation (for bridge adapters).
+ * role "direct": conductance+current-source (for behavioural elements).
+ *
  * Loading (rOut, cOut) is stamped only when the loaded flag is true.
+ * Companion integration is inline via ctx.ag[] — no external helper calls.
  */
 export class DigitalOutputPinModel {
   private _spec: ResolvedPinElectrical;
-  private _loaded: boolean;
+  private readonly _loaded: boolean;
+  private readonly _role: "branch" | "direct";
 
   /** Node this pin drives. Set by init(). */
   private _nodeId = -1;
@@ -61,20 +56,32 @@ export class DigitalOutputPinModel {
   private _prevVoltage = 0;
   private _prevCurrent = 0;
 
-  constructor(spec: ResolvedPinElectrical, loaded = false) {
+  /** Cached matrix handles — allocated on first load(), keyed by role. */
+  private _handlesInit = false;
+  // branch role handles
+  private _hBranchNode = -1;   // (branchIdx, nodeIdx)
+  private _hBranchBranch = -1; // (branchIdx, branchIdx)
+  private _hNodeBranch = -1;   // (nodeIdx, branchIdx)
+  // direct and shared
+  private _hNodeDiag = -1;     // (nodeIdx, nodeIdx)
+
+  constructor(spec: ResolvedPinElectrical, loaded = false, role: "branch" | "direct" = "direct") {
     this._spec = { ...spec };
     this._loaded = loaded;
+    this._role = role;
   }
 
   /**
    * Assign the node this pin drives and the branch variable index.
    *
    * branchIdx is the absolute row/col in the augmented MNA matrix
-   * (= totalNodeCount + assignedBranchOffset).
+   * (= totalNodeCount + assignedBranchOffset). Pass -1 for direct-role pins
+   * (no branch variable needed).
    */
   init(nodeId: number, branchIdx: number): void {
     this._nodeId = nodeId;
     this._branchIdx = branchIdx;
+    this._handlesInit = false;
   }
 
   /** Set the output logic level. High → vOH, low → vOL. */
@@ -94,114 +101,108 @@ export class DigitalOutputPinModel {
     }
   }
 
+  /** Read-only introspection accessor. */
+  get loaded(): boolean { return this._loaded; }
+
   /**
-   * Stamp the ideal voltage source branch equation into the MNA matrix.
+   * Unified per-NR-iteration load. Dispatches on role:
    *
-   * Drive mode:
-   *   stamp(branchIdx, nodeIdx, 1)   — branch eq: V_node coefficient
-   *   stamp(branchIdx, branchIdx, 0) — sparsity pre-allocation
-   *   stamp(nodeIdx, branchIdx, 1)   — KCL: branch current into node
-   *   stampRHS(branchIdx, V_target)  — branch eq RHS
-   *   If loaded: stamp(nodeIdx, nodeIdx, 1/rOut)
+   * "branch": stamps ideal voltage-source branch equation.
+   *   Drive mode:  branch eq enforces V_node = V_target.
+   *   Hi-Z mode:   branch eq enforces I = 0.
+   *   If loaded:   1/rOut (drive) or 1/rHiZ (Hi-Z) on node diagonal.
    *
-   * Hi-Z mode:
-   *   stamp(branchIdx, branchIdx, 1) — branch eq: I = 0
-   *   stamp(branchIdx, nodeIdx, 0)   — sparsity pre-allocation
-   *   stamp(nodeIdx, branchIdx, 1)   — KCL: branch current (= 0)
-   *   stampRHS(branchIdx, 0)         — branch eq RHS
-   *   If loaded: stamp(nodeIdx, nodeIdx, 1/rHiZ)
+   * "direct": stamps conductance+current-source (Norton equivalent).
+   *   Drive mode:  1/rOut diagonal + V_target/rOut RHS.
+   *   Hi-Z mode:   1/rHiZ diagonal only.
+   *   (loaded flag governs whether these stamps happen at all for "direct".)
    *
-   * When branchIdx < 0 (not assigned), this method is a no-op.
+   * When loaded and cOut > 0 and ctx.isTransient: inline companion stamp
+   * using ctx.ag[] — no external integrateCapacitor helper.
    */
-  stamp(solver: SparseSolver): void {
+  load(ctx: LoadContext): void {
     const node = this._nodeId;
     if (node <= 0) return;
-    const bIdx = this._branchIdx;
-    if (bIdx < 0) return;
     const nodeIdx = node - 1;
+    const solver = ctx.solver;
 
-    if (this._hiZ) {
-      solver.stamp(bIdx, bIdx, 1);
-      solver.stamp(bIdx, nodeIdx, 0);
-      solver.stamp(nodeIdx, bIdx, 1);
-      solver.stampRHS(bIdx, 0);
-      if (this._loaded) {
-        solver.stamp(nodeIdx, nodeIdx, 1 / this._spec.rHiZ);
+    if (this._role === "branch") {
+      const bIdx = this._branchIdx;
+      if (bIdx < 0) return;
+
+      if (!this._handlesInit) {
+        this._hBranchNode = solver.allocElement(bIdx, nodeIdx);
+        this._hBranchBranch = solver.allocElement(bIdx, bIdx);
+        this._hNodeBranch = solver.allocElement(nodeIdx, bIdx);
+        if (this._loaded) {
+          this._hNodeDiag = solver.allocElement(nodeIdx, nodeIdx);
+        }
+        this._handlesInit = true;
+      }
+
+      if (this._hiZ) {
+        solver.stampElement(this._hBranchBranch, 1);
+        solver.stampElement(this._hBranchNode, 0);
+        solver.stampElement(this._hNodeBranch, 1);
+        solver.stampRHS(bIdx, 0);
+        if (this._loaded) {
+          solver.stampElement(this._hNodeDiag, 1 / this._spec.rHiZ);
+        }
+      } else {
+        solver.stampElement(this._hBranchNode, 1);
+        solver.stampElement(this._hBranchBranch, 0);
+        solver.stampElement(this._hNodeBranch, 1);
+        solver.stampRHS(bIdx, this._high ? this._spec.vOH : this._spec.vOL);
+        if (this._loaded) {
+          solver.stampElement(this._hNodeDiag, 1 / this._spec.rOut);
+        }
       }
     } else {
-      solver.stamp(bIdx, nodeIdx, 1);
-      solver.stamp(bIdx, bIdx, 0);
-      solver.stamp(nodeIdx, bIdx, 1);
-      solver.stampRHS(bIdx, this._high ? this._spec.vOH : this._spec.vOL);
-      if (this._loaded) {
-        solver.stamp(nodeIdx, nodeIdx, 1 / this._spec.rOut);
+      // "direct" role — conductance+current-source Norton equivalent
+      if (!this._handlesInit) {
+        this._hNodeDiag = solver.allocElement(nodeIdx, nodeIdx);
+        this._handlesInit = true;
       }
+
+      if (this._hiZ) {
+        solver.stampElement(this._hNodeDiag, 1 / this._spec.rHiZ);
+      } else {
+        const gOut = 1 / this._spec.rOut;
+        solver.stampElement(this._hNodeDiag, gOut);
+        solver.stampRHS(nodeIdx, (this._high ? this._spec.vOH : this._spec.vOL) * gOut);
+      }
+    }
+
+    // Inline companion stamp for C_out (transient, loaded, cOut > 0)
+    if (this._loaded && this._spec.cOut > 0 && ctx.isTransient && ctx.dt > 0) {
+      const C = this._spec.cOut;
+      const ag0 = ctx.ag[0];
+      const ag1 = ctx.ag[1] ?? 0;
+      const q0 = C * this._prevVoltage;
+      const q1 = C * this._prevVoltage;
+      const geq = ag0 * C;
+      const ccap = ag0 * (q0 - q1) + ag1 * this._prevCurrent;
+      const ceq = ccap - geq * this._prevVoltage;
+      solver.stampElement(this._hNodeDiag, geq);
+      solver.stampRHS(nodeIdx, -ceq);
     }
   }
 
   /**
-   * Stamp a conductance + current source for the output into the MNA matrix.
-   *
-   * Drive mode: stamps 1/rOut on diagonal + V_target/rOut current source on RHS.
-   * Hi-Z mode: stamps 1/rHiZ on diagonal only.
-   *
-   * Used by behavioral elements (gates, flipflops, sequential) which model
-   * the output as a conductance+current-source in the nonlinear NR loop. These
-   * elements do not use a branch variable, so the branch-equation stamp() is not
-   * applicable to them.
+   * Post-accepted-timestep companion state update.
+   * Updates _prevVoltage and _prevCurrent from the accepted solution.
    */
-  stampOutput(solver: SparseSolver): void {
-    const node = this._nodeId;
-    if (node <= 0) return;
-    const nodeIdx = node - 1;
-    if (this._hiZ) {
-      solver.stamp(nodeIdx, nodeIdx, 1 / this._spec.rHiZ);
-    } else {
-      const gOut = 1 / this._spec.rOut;
-      solver.stamp(nodeIdx, nodeIdx, gOut);
-      solver.stampRHS(nodeIdx, (this._high ? this._spec.vOH : this._spec.vOL) * gOut);
-    }
-  }
-
-  /**
-   * Stamp the companion model for C_out.
-   *
-   * Only active when loaded and cOut > 0.
-   */
-  stampCompanion(
-    solver: SparseSolver,
-    dt: number,
-    method: IntegrationMethod,
-  ): void {
-    if (!this._loaded) return;
-    const node = this._nodeId;
-    if (node <= 0) return;
-    const C = this._spec.cOut;
-    if (C <= 0) return;
-    const idx = node - 1;
-    const vNow = this._prevVoltage;
-    const q0 = C * vNow;
-    const q1 = C * vNow; // no previous charge history — treat as BDF-1
-    const { geq, ceq } = integrateCapacitor(C, vNow, q0, q1, 0, dt, 0, 0, 1, method, 0);
-    solver.stamp(idx, idx, geq);
-    solver.stampRHS(idx, -ceq);
-  }
-
-  /**
-   * Update C_out companion state for the newly accepted timestep voltage.
-   */
-  updateCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    voltage: number,
-  ): void {
+  accept(ctx: LoadContext, voltage: number): void {
     if (!this._loaded) return;
     const C = this._spec.cOut;
     if (C <= 0) return;
+    const ag0 = ctx.ag[0] ?? 0;
+    const ag1 = ctx.ag[1] ?? 0;
     const q0 = C * voltage;
     const q1 = C * this._prevVoltage;
-    const { geq, ceq } = integrateCapacitor(C, voltage, q0, q1, 0, dt, 0, 0, 1, method, 0);
-    const iNow = geq * voltage - ceq; // ceq = ccap - geq*vNow => geq*v - ceq = ccap
+    const geq = ag0 * C;
+    const ccap = ag0 * (q0 - q1) + ag1 * this._prevCurrent;
+    const iNow = geq * voltage - (ccap - geq * voltage);
     this._prevCurrent = iNow;
     this._prevVoltage = voltage;
   }
@@ -240,6 +241,11 @@ export class DigitalOutputPinModel {
   get rHiZ(): number {
     return this._spec.rHiZ;
   }
+
+  /** Role assigned at construction ("branch" or "direct"). */
+  get role(): "branch" | "direct" {
+    return this._role;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -254,13 +260,17 @@ export class DigitalOutputPinModel {
  */
 export class DigitalInputPinModel {
   private _spec: ResolvedPinElectrical;
-  private _loaded: boolean;
+  private readonly _loaded: boolean;
 
   /** Node this pin reads. Set by init(). */
   private _nodeId = -1;
 
   private _prevVoltage = 0;
   private _prevCurrent = 0;
+
+  /** Cached matrix handle for node diagonal. */
+  private _hNodeDiag = -1;
+  private _handlesInit = false;
 
   constructor(spec: ResolvedPinElectrical, loaded: boolean) {
     this._spec = { ...spec };
@@ -272,6 +282,7 @@ export class DigitalInputPinModel {
    */
   init(nodeId: number, _groundNode: number): void {
     this._nodeId = nodeId;
+    this._handlesInit = false;
   }
 
   /** Hot-update a single electrical parameter on this pin model. */
@@ -281,57 +292,60 @@ export class DigitalInputPinModel {
     }
   }
 
+  /** Read-only introspection accessor. */
+  get loaded(): boolean { return this._loaded; }
+
   /**
-   * Stamp the input loading conductance 1/rIn from node to ground.
+   * Unified per-NR-iteration load.
    *
-   * No-op when not loaded.
+   * No-op when !_loaded. When loaded, stamps 1/rIn on the node diagonal.
+   * When loaded and cIn > 0 and ctx.isTransient: inline companion stamp
+   * using ctx.ag[] — no external integrateCapacitor helper.
    */
-  stamp(solver: SparseSolver): void {
+  load(ctx: LoadContext): void {
     if (!this._loaded) return;
     const node = this._nodeId;
     if (node <= 0) return;
-    solver.stamp(node - 1, node - 1, 1 / this._spec.rIn);
+    const nodeIdx = node - 1;
+    const solver = ctx.solver;
+
+    if (!this._handlesInit) {
+      this._hNodeDiag = solver.allocElement(nodeIdx, nodeIdx);
+      this._handlesInit = true;
+    }
+
+    solver.stampElement(this._hNodeDiag, 1 / this._spec.rIn);
+
+    // Inline companion stamp for C_in (transient, cIn > 0)
+    if (this._spec.cIn > 0 && ctx.isTransient && ctx.dt > 0) {
+      const C = this._spec.cIn;
+      const ag0 = ctx.ag[0];
+      const ag1 = ctx.ag[1] ?? 0;
+      const q0 = C * this._prevVoltage;
+      const q1 = C * this._prevVoltage;
+      const geq = ag0 * C;
+      const ccap = ag0 * (q0 - q1) + ag1 * this._prevCurrent;
+      const ceq = ccap - geq * this._prevVoltage;
+      solver.stampElement(this._hNodeDiag, geq);
+      solver.stampRHS(nodeIdx, -ceq);
+    }
   }
 
   /**
-   * Stamp the companion model for C_in.
-   *
-   * No-op when not loaded or cIn === 0.
+   * Post-accepted-timestep companion state update.
+   * Updates _prevVoltage and _prevCurrent from the accepted solution.
    */
-  stampCompanion(
-    solver: SparseSolver,
-    dt: number,
-    method: IntegrationMethod,
-  ): void {
-    if (!this._loaded) return;
-    const node = this._nodeId;
-    if (node <= 0) return;
-    const C = this._spec.cIn;
-    if (C <= 0) return;
-    const idx = node - 1;
-    const vNow = this._prevVoltage;
-    const q0 = C * vNow;
-    const q1 = C * vNow;
-    const { geq, ceq } = integrateCapacitor(C, vNow, q0, q1, 0, dt, 0, 0, 1, method, 0);
-    solver.stamp(idx, idx, geq);
-    solver.stampRHS(idx, -ceq);
-  }
-
-  /**
-   * Update C_in companion state for the newly accepted timestep voltage.
-   */
-  updateCompanion(
-    dt: number,
-    method: IntegrationMethod,
-    voltage: number,
-  ): void {
+  accept(ctx: LoadContext, voltage: number): void {
     if (!this._loaded) return;
     const C = this._spec.cIn;
     if (C <= 0) return;
+    const ag0 = ctx.ag[0] ?? 0;
+    const ag1 = ctx.ag[1] ?? 0;
     const q0 = C * voltage;
     const q1 = C * this._prevVoltage;
-    const { geq, ceq } = integrateCapacitor(C, voltage, q0, q1, 0, dt, 0, 0, 1, method, 0);
-    const iNow = geq * voltage - ceq;
+    const geq = ag0 * C;
+    const ccap = ag0 * (q0 - q1) + ag1 * this._prevCurrent;
+    const iNow = geq * voltage - (ccap - geq * voltage);
     this._prevCurrent = iNow;
     this._prevVoltage = voltage;
   }

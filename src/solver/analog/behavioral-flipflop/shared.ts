@@ -35,14 +35,20 @@ export function getPinSpecs(props: PropertyBag): Record<string, ResolvedPinElect
     : undefined;
 }
 
-export function makeInputPin(spec: ResolvedPinElectrical, nodeId: number): DigitalInputPinModel {
-  const pin = new DigitalInputPinModel(spec, true);
+export function getPinLoading(props: PropertyBag): Record<string, boolean> {
+  return props.has("_pinLoading")
+    ? (props.get("_pinLoading") as unknown as Record<string, boolean>)
+    : {};
+}
+
+export function makeInputPin(spec: ResolvedPinElectrical, nodeId: number, loaded = true): DigitalInputPinModel {
+  const pin = new DigitalInputPinModel(spec, loaded);
   pin.init(nodeId, 0);
   return pin;
 }
 
-export function makeOutputPin(spec: ResolvedPinElectrical, nodeId: number): DigitalOutputPinModel {
-  const pin = new DigitalOutputPinModel(spec);
+export function makeOutputPin(spec: ResolvedPinElectrical, nodeId: number, loaded = false): DigitalOutputPinModel {
+  const pin = new DigitalOutputPinModel(spec, loaded, "direct");
   pin.init(nodeId, -1);
   return pin;
 }

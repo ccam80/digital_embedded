@@ -95,31 +95,19 @@ export class BehavioralCounterElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
-
-    this._enPin.stamp(solver);
-    this._clockPin.stamp(solver);
-    this._clrPin.stamp(solver);
+    this._enPin.load(ctx);
+    this._clockPin.load(ctx);
+    this._clrPin.load(ctx);
 
     // Stamp output Norton equivalents from current count
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const high = ((this._count >> bit) & 1) === 1;
       this._outBitPins[bit].setLogicLevel(high);
-      this._outBitPins[bit].stampOutput(solver);
+      this._outBitPins[bit].load(ctx);
     }
     const ovf = this._count === this._maxValue;
     this._ovfPin.setLogicLevel(ovf);
-    this._ovfPin.stampOutput(solver);
-
-    if (ctx.isTransient && ctx.dt > 0) {
-      this._enPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._clockPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._clrPin.stampCompanion(solver, ctx.dt, ctx.method);
-      for (const pin of this._outBitPins) {
-        pin.stampCompanion(solver, ctx.dt, ctx.method);
-      }
-      this._ovfPin.stampCompanion(solver, ctx.dt, ctx.method);
-    }
+    this._ovfPin.load(ctx);
   }
 
   /**
@@ -129,8 +117,6 @@ export class BehavioralCounterElement implements AnalogElementCore {
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.voltages;
-    const dt = ctx.dt;
-    const method = ctx.method;
 
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
@@ -158,16 +144,15 @@ export class BehavioralCounterElement implements AnalogElementCore {
 
     this._prevClockVoltage = currentClockV;
 
-    if (dt > 0) {
-      this._enPin.updateCompanion(dt, method, readMnaVoltage(this._enPin.nodeId, voltages));
-      this._clockPin.updateCompanion(dt, method, currentClockV);
-      this._clrPin.updateCompanion(dt, method, readMnaVoltage(this._clrPin.nodeId, voltages));
+    // Delegate companion updates to pin models.
+    this._enPin.accept(ctx, readMnaVoltage(this._enPin.nodeId, voltages));
+    this._clockPin.accept(ctx, currentClockV);
+    this._clrPin.accept(ctx, readMnaVoltage(this._clrPin.nodeId, voltages));
 
-      for (const pin of this._outBitPins) {
-        pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
-      }
-      this._ovfPin.updateCompanion(dt, method, readMnaVoltage(this._ovfPin.nodeId, voltages));
+    for (const pin of this._outBitPins) {
+      pin.accept(ctx, readMnaVoltage(pin.nodeId, voltages));
     }
+    this._ovfPin.accept(ctx, readMnaVoltage(this._ovfPin.nodeId, voltages));
   }
 
   /**
@@ -265,30 +250,17 @@ export class BehavioralRegisterElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
-
     for (const pin of this._dataPins) {
-      pin.stamp(solver);
+      pin.load(ctx);
     }
-    this._clockPin.stamp(solver);
-    this._enPin.stamp(solver);
+    this._clockPin.load(ctx);
+    this._enPin.load(ctx);
 
     // Stamp output Norton equivalents from stored value
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const high = ((this._storedValue >> bit) & 1) === 1;
       this._outBitPins[bit].setLogicLevel(high);
-      this._outBitPins[bit].stampOutput(solver);
-    }
-
-    if (ctx.isTransient && ctx.dt > 0) {
-      for (const pin of this._dataPins) {
-        pin.stampCompanion(solver, ctx.dt, ctx.method);
-      }
-      this._clockPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._enPin.stampCompanion(solver, ctx.dt, ctx.method);
-      for (const pin of this._outBitPins) {
-        pin.stampCompanion(solver, ctx.dt, ctx.method);
-      }
+      this._outBitPins[bit].load(ctx);
     }
   }
 
@@ -299,8 +271,6 @@ export class BehavioralRegisterElement implements AnalogElementCore {
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.voltages;
-    const dt = ctx.dt;
-    const method = ctx.method;
 
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
@@ -326,16 +296,15 @@ export class BehavioralRegisterElement implements AnalogElementCore {
 
     this._prevClockVoltage = currentClockV;
 
-    if (dt > 0) {
-      for (const pin of this._dataPins) {
-        pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
-      }
-      this._clockPin.updateCompanion(dt, method, currentClockV);
-      this._enPin.updateCompanion(dt, method, readMnaVoltage(this._enPin.nodeId, voltages));
+    // Delegate companion updates to pin models.
+    for (const pin of this._dataPins) {
+      pin.accept(ctx, readMnaVoltage(pin.nodeId, voltages));
+    }
+    this._clockPin.accept(ctx, currentClockV);
+    this._enPin.accept(ctx, readMnaVoltage(this._enPin.nodeId, voltages));
 
-      for (const pin of this._outBitPins) {
-        pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
-      }
+    for (const pin of this._outBitPins) {
+      pin.accept(ctx, readMnaVoltage(pin.nodeId, voltages));
     }
   }
 
@@ -394,6 +363,10 @@ export function makeBehavioralCounterAnalogFactory(): AnalogElementFactory {
       ? (props.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>)
       : undefined;
 
+    const pinLoading = props.has("_pinLoading")
+      ? (props.get("_pinLoading") as unknown as Record<string, boolean>)
+      : {} as Record<string, boolean>;
+
     const bitWidth = (props.has("bitWidth") ? props.get("bitWidth") as number : undefined) ?? 4;
 
     const enSpec = pinSpecs?.["en"] ?? FALLBACK_SPEC;
@@ -402,23 +375,23 @@ export function makeBehavioralCounterAnalogFactory(): AnalogElementFactory {
     const outSpec = pinSpecs?.["out"] ?? FALLBACK_SPEC;
     const ovfSpec = pinSpecs?.["ovf"] ?? FALLBACK_SPEC;
 
-    const enPin = new DigitalInputPinModel(enSpec, true);
+    const enPin = new DigitalInputPinModel(enSpec, pinLoading["en"] ?? true);
     enPin.init(pinNodes.get("en") ?? 0, 0);
 
-    const clockPin = new DigitalInputPinModel(cSpec, true);
+    const clockPin = new DigitalInputPinModel(cSpec, pinLoading["C"] ?? true);
     clockPin.init(pinNodes.get("C") ?? 0, 0);
 
-    const clrPin = new DigitalInputPinModel(clrSpec, true);
+    const clrPin = new DigitalInputPinModel(clrSpec, pinLoading["clr"] ?? true);
     clrPin.init(pinNodes.get("clr") ?? 0, 0);
 
     const outBitPins: DigitalOutputPinModel[] = [];
     for (let bit = 0; bit < bitWidth; bit++) {
-      const pin = new DigitalOutputPinModel(outSpec);
+      const pin = new DigitalOutputPinModel(outSpec, pinLoading["out"] ?? false, "direct");
       pin.init(pinNodes.get("out") ?? 0, -1);
       outBitPins.push(pin);
     }
 
-    const ovfPin = new DigitalOutputPinModel(ovfSpec);
+    const ovfPin = new DigitalOutputPinModel(ovfSpec, pinLoading["ovf"] ?? false, "direct");
     ovfPin.init(pinNodes.get("ovf") ?? 0, -1);
 
     const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
@@ -517,21 +490,20 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
   }
 
   load(ctx: LoadContext): void {
-    const solver = ctx.solver;
     const voltages = ctx.voltages;
 
-    this._enPin.stamp(solver);
-    this._clockPin.stamp(solver);
-    this._dirPin.stamp(solver);
-    for (const pin of this._inBitPins) pin.stamp(solver);
-    this._ldPin.stamp(solver);
-    this._clrPin.stamp(solver);
+    this._enPin.load(ctx);
+    this._clockPin.load(ctx);
+    this._dirPin.load(ctx);
+    for (const pin of this._inBitPins) pin.load(ctx);
+    this._ldPin.load(ctx);
+    this._clrPin.load(ctx);
 
     // Stamp output Norton equivalents from current count
     for (let bit = 0; bit < this._bitWidth; bit++) {
       const high = ((this._count >> bit) & 1) === 1;
       this._outBitPins[bit].setLogicLevel(high);
-      this._outBitPins[bit].stampOutput(solver);
+      this._outBitPins[bit].load(ctx);
     }
     // ovf depends on dir and en levels at the current NR iterate
     const dirHigh = this._dirPin.readLogicLevel(
@@ -545,18 +517,7 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
       readMnaVoltage(this._enPin.nodeId, voltages),
     );
     this._ovfPin.setLogicLevel(atOverflow && enHigh === true);
-    this._ovfPin.stampOutput(solver);
-
-    if (ctx.isTransient && ctx.dt > 0) {
-      this._enPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._clockPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._dirPin.stampCompanion(solver, ctx.dt, ctx.method);
-      for (const pin of this._inBitPins) pin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._ldPin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._clrPin.stampCompanion(solver, ctx.dt, ctx.method);
-      for (const pin of this._outBitPins) pin.stampCompanion(solver, ctx.dt, ctx.method);
-      this._ovfPin.stampCompanion(solver, ctx.dt, ctx.method);
-    }
+    this._ovfPin.load(ctx);
   }
 
   /**
@@ -566,8 +527,6 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     const voltages = ctx.voltages;
-    const dt = ctx.dt;
-    const method = ctx.method;
 
     const currentClockV = readMnaVoltage(this._clockPin.nodeId, voltages);
 
@@ -620,21 +579,20 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
 
     this._prevClockVoltage = currentClockV;
 
-    if (dt > 0) {
-      this._enPin.updateCompanion(dt, method, readMnaVoltage(this._enPin.nodeId, voltages));
-      this._clockPin.updateCompanion(dt, method, currentClockV);
-      this._dirPin.updateCompanion(dt, method, readMnaVoltage(this._dirPin.nodeId, voltages));
-      for (const pin of this._inBitPins) {
-        pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
-      }
-      this._ldPin.updateCompanion(dt, method, readMnaVoltage(this._ldPin.nodeId, voltages));
-      this._clrPin.updateCompanion(dt, method, readMnaVoltage(this._clrPin.nodeId, voltages));
-
-      for (const pin of this._outBitPins) {
-        pin.updateCompanion(dt, method, readMnaVoltage(pin.nodeId, voltages));
-      }
-      this._ovfPin.updateCompanion(dt, method, readMnaVoltage(this._ovfPin.nodeId, voltages));
+    // Delegate companion updates to pin models.
+    this._enPin.accept(ctx, readMnaVoltage(this._enPin.nodeId, voltages));
+    this._clockPin.accept(ctx, currentClockV);
+    this._dirPin.accept(ctx, readMnaVoltage(this._dirPin.nodeId, voltages));
+    for (const pin of this._inBitPins) {
+      pin.accept(ctx, readMnaVoltage(pin.nodeId, voltages));
     }
+    this._ldPin.accept(ctx, readMnaVoltage(this._ldPin.nodeId, voltages));
+    this._clrPin.accept(ctx, readMnaVoltage(this._clrPin.nodeId, voltages));
+
+    for (const pin of this._outBitPins) {
+      pin.accept(ctx, readMnaVoltage(pin.nodeId, voltages));
+    }
+    this._ovfPin.accept(ctx, readMnaVoltage(this._ovfPin.nodeId, voltages));
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -686,6 +644,10 @@ export function makeBehavioralCounterPresetAnalogFactory(): AnalogElementFactory
       ? (props.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>)
       : undefined;
 
+    const pinLoading = props.has("_pinLoading")
+      ? (props.get("_pinLoading") as unknown as Record<string, boolean>)
+      : {} as Record<string, boolean>;
+
     const bitWidth = (props.has("bitWidth") ? props.get("bitWidth") as number : undefined) ?? 4;
     let maxValue = (props.has("maxValue") ? props.get("maxValue") as number : undefined) ?? 0;
     const mask = bitWidth >= 32 ? 0xFFFFFFFF : (1 << bitWidth) - 1;
@@ -701,40 +663,40 @@ export function makeBehavioralCounterPresetAnalogFactory(): AnalogElementFactory
     const outSpec = pinSpecs?.["out"] ?? FALLBACK_SPEC;
     const ovfSpec = pinSpecs?.["ovf"] ?? FALLBACK_SPEC;
 
-    const enPin = new DigitalInputPinModel(enSpec, true);
+    const enPin = new DigitalInputPinModel(enSpec, pinLoading["en"] ?? true);
     enPin.init(pinNodes.get("en") ?? 0, 0);
 
-    const clockPin = new DigitalInputPinModel(cSpec, true);
+    const clockPin = new DigitalInputPinModel(cSpec, pinLoading["C"] ?? true);
     clockPin.init(pinNodes.get("C") ?? 0, 0);
 
-    const dirPin = new DigitalInputPinModel(dirSpec, true);
+    const dirPin = new DigitalInputPinModel(dirSpec, pinLoading["dir"] ?? true);
     dirPin.init(pinNodes.get("dir") ?? 0, 0);
 
     // All in-bit pins share the single "in" bus node
     const inBitPins: DigitalInputPinModel[] = [];
     const inNodeId = pinNodes.get("in") ?? 0;
     for (let bit = 0; bit < bitWidth; bit++) {
-      const pin = new DigitalInputPinModel(inSpec, true);
+      const pin = new DigitalInputPinModel(inSpec, pinLoading["in"] ?? true);
       pin.init(inNodeId, 0);
       inBitPins.push(pin);
     }
 
-    const ldPin = new DigitalInputPinModel(ldSpec, true);
+    const ldPin = new DigitalInputPinModel(ldSpec, pinLoading["ld"] ?? true);
     ldPin.init(pinNodes.get("ld") ?? 0, 0);
 
-    const clrPin = new DigitalInputPinModel(clrSpec, true);
+    const clrPin = new DigitalInputPinModel(clrSpec, pinLoading["clr"] ?? true);
     clrPin.init(pinNodes.get("clr") ?? 0, 0);
 
     // All out-bit pins share the single "out" bus node
     const outBitPins: DigitalOutputPinModel[] = [];
     const outNodeId = pinNodes.get("out") ?? 0;
     for (let bit = 0; bit < bitWidth; bit++) {
-      const pin = new DigitalOutputPinModel(outSpec);
+      const pin = new DigitalOutputPinModel(outSpec, pinLoading["out"] ?? false, "direct");
       pin.init(outNodeId, -1);
       outBitPins.push(pin);
     }
 
-    const ovfPin = new DigitalOutputPinModel(ovfSpec);
+    const ovfPin = new DigitalOutputPinModel(ovfSpec, pinLoading["ovf"] ?? false, "direct");
     ovfPin.init(pinNodes.get("ovf") ?? 0, -1);
 
     const pinModelsByLabel = new Map<string, DigitalInputPinModel | DigitalOutputPinModel>([
@@ -786,6 +748,10 @@ export function makeBehavioralRegisterAnalogFactory(): AnalogElementFactory {
       ? (props.get("_pinElectrical") as unknown as Record<string, ResolvedPinElectrical>)
       : undefined;
 
+    const pinLoading = props.has("_pinLoading")
+      ? (props.get("_pinLoading") as unknown as Record<string, boolean>)
+      : {} as Record<string, boolean>;
+
     const bitWidth = (props.has("bitWidth") ? props.get("bitWidth") as number : undefined) ?? 8;
 
     const dSpec = pinSpecs?.["D"] ?? FALLBACK_SPEC;
@@ -797,22 +763,22 @@ export function makeBehavioralRegisterAnalogFactory(): AnalogElementFactory {
     const dataPins: DigitalInputPinModel[] = [];
     const dNodeId = pinNodes.get("D") ?? 0;
     for (let bit = 0; bit < bitWidth; bit++) {
-      const pin = new DigitalInputPinModel(dSpec, true);
+      const pin = new DigitalInputPinModel(dSpec, pinLoading["D"] ?? true);
       pin.init(dNodeId, 0);
       dataPins.push(pin);
     }
 
-    const clockPin = new DigitalInputPinModel(cSpec, true);
+    const clockPin = new DigitalInputPinModel(cSpec, pinLoading["C"] ?? true);
     clockPin.init(pinNodes.get("C") ?? 0, 0);
 
-    const enPin = new DigitalInputPinModel(enSpec, true);
+    const enPin = new DigitalInputPinModel(enSpec, pinLoading["en"] ?? true);
     enPin.init(pinNodes.get("en") ?? 0, 0);
 
     // All output-bit pins share the single "Q" bus node
     const outBitPins: DigitalOutputPinModel[] = [];
     const qNodeId = pinNodes.get("Q") ?? 0;
     for (let bit = 0; bit < bitWidth; bit++) {
-      const pin = new DigitalOutputPinModel(qSpec);
+      const pin = new DigitalOutputPinModel(qSpec, pinLoading["Q"] ?? false, "direct");
       pin.init(qNodeId, -1);
       outBitPins.push(pin);
     }
