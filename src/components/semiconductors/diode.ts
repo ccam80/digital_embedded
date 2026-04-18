@@ -571,10 +571,8 @@ export function createDiodeElement(
 
       // Reactive companion: junction capacitance + transit-time diffusion cap
       if (hasCapacitance && ctx.isTransient) {
-        const dt = ctx.dt;
         const order = ctx.order;
         const method = ctx.method;
-        const deltaOld = ctx.deltaOld;
 
         // Depletion + transit-time capacitance at current operating point
         const Cj = computeJunctionCapacitance(vdLimited, tCJO, tVJ, params.M, params.FC);
@@ -584,8 +582,6 @@ export function createDiodeElement(
         const q0 = computeJunctionCharge(vdLimited, tCJO, tVJ, params.M, params.FC, params.TT, idRaw);
         let q1 = s1[base + SLOT_Q];
         const q2 = s2[base + SLOT_Q];
-        const ccapPrev = s1[base + SLOT_CCAP];
-        const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
 
         if (pool.initMode === "initTran") {
           // dioload.c:391-393: MODEINITTRAN copies q0→q1 so first-step history matches

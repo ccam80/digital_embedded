@@ -332,18 +332,8 @@ function createDACElement(
       }
       // Stamp input loading for each digital input pin
       for (let i = 0; i < bits; i++) {
-        const nD = nDigitalBits[i];
-        if (nD > 0) {
-          inputModels[i].stamp(solver);
-        }
-      }
-
-      // Transient: companion stamps for input capacitances.
-      if (ctx.isTransient && ctx.dt > 0) {
-        for (let i = 0; i < bits; i++) {
-          if (nDigitalBits[i] > 0) {
-            inputModels[i].stampCompanion(solver, ctx.dt, ctx.method);
-          }
+        if (nDigitalBits[i] > 0) {
+          inputModels[i].load(ctx);
         }
       }
     },
@@ -354,7 +344,7 @@ function createDACElement(
       for (let i = 0; i < bits; i++) {
         const nD = nDigitalBits[i];
         if (nD > 0) {
-          inputModels[i].updateCompanion(ctx.dt, ctx.method, readNode(voltages, nD));
+          inputModels[i].accept(ctx, readNode(voltages, nD));
         }
       }
     },

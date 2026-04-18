@@ -371,25 +371,14 @@ function createADCElement(
     isReactive: true,
 
     load(ctx: LoadContext): void {
-      const solver = ctx.solver;
       // Input loading — VIN and CLK pins
-      if (nVin > 0) vinPin.stamp(solver);
-      if (nClk > 0) clkPin.stamp(solver);
+      if (nVin > 0) vinPin.load(ctx);
+      if (nClk > 0) clkPin.load(ctx);
 
       // Output Norton equivalents — EOC and data bits
-      if (nEoc > 0) eocPin.stampOutput(solver);
+      if (nEoc > 0) eocPin.load(ctx);
       for (let i = 0; i < bits; i++) {
-        if (nDigital[i] > 0) digitalPins[i].stampOutput(solver);
-      }
-
-      // Transient: companion stamps for input/output capacitances.
-      if (ctx.isTransient && ctx.dt > 0) {
-        if (nVin > 0) vinPin.stampCompanion(solver, ctx.dt, ctx.method);
-        if (nClk > 0) clkPin.stampCompanion(solver, ctx.dt, ctx.method);
-        if (nEoc > 0) eocPin.stampCompanion(solver, ctx.dt, ctx.method);
-        for (let i = 0; i < bits; i++) {
-          if (nDigital[i] > 0) digitalPins[i].stampCompanion(solver, ctx.dt, ctx.method);
-        }
+        if (nDigital[i] > 0) digitalPins[i].load(ctx);
       }
     },
 
@@ -425,13 +414,12 @@ function createADCElement(
 
       // Update companion model state for accepted timestep
       if (dt > 0) {
-        const method = ctx.method;
-        if (nVin > 0) vinPin.updateCompanion(dt, method, readVoltage(voltages, nVin));
-        if (nClk > 0) clkPin.updateCompanion(dt, method, clkVoltage);
-        if (nEoc > 0) eocPin.updateCompanion(dt, method, readVoltage(voltages, nEoc));
+        if (nVin > 0) vinPin.accept(ctx, readVoltage(voltages, nVin));
+        if (nClk > 0) clkPin.accept(ctx, clkVoltage);
+        if (nEoc > 0) eocPin.accept(ctx, readVoltage(voltages, nEoc));
         for (let i = 0; i < bits; i++) {
           const n = nDigital[i];
-          if (n > 0) digitalPins[i].updateCompanion(dt, method, readVoltage(voltages, n));
+          if (n > 0) digitalPins[i].accept(ctx, readVoltage(voltages, n));
         }
       }
     },

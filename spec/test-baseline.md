@@ -26,6 +26,18 @@ Known root causes (all remediated by phase_catchup):
 - Hanging tests are expected until Wave C2 lands (module-load crashes resolved).
 - Wave C2.4 is an atomic-migration gate — `tsc --noEmit` is expected to succeed only after the full Wave 6.4 body lands.
 
+## CRITICAL TEST INVOCATION RULE (for implementers AND verifiers)
+
+**Do NOT use `npm test` or `npm run test:q`** — those commands are hanging the whole machine during phase_catchup because some test files still fail at module-load and the npm wrapper gets stuck. Use `vitest` directly with a file-path scope instead.
+
+- ✅ `npx vitest run path/to/file.test.ts --reporter=verbose` — targeted, fast, non-hanging
+- ✅ `npx vitest run --reporter=default path/to/file.test.ts` — targeted with default reporter
+- ❌ `npm test -- ...` — hangs
+- ❌ `npm run test:q` — hangs
+- ❌ `npm test` — hangs
+
+Always target a specific file (or directory) you just edited. Never attempt a full run until the catchup phase completes.
+
 ---
 
 ## Historical baseline (Phase 0, captured 2026-04-15T21:58:00Z)

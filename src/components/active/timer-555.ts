@@ -350,7 +350,7 @@ function createTimer555Element(
 
       // Output stage: conductance + current source driving OUT toward vOH or vOL
       _outputPin.setLogicLevel(_flipflopQ);
-      _outputPin.stampOutput(solver);
+      _outputPin.load(ctx);
 
       // Discharge transistor: R_sat to GND when Q=0, Hi-Z when Q=1
       if (_flipflopQ) {

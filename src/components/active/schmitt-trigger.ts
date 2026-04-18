@@ -153,7 +153,6 @@ function createSchmittTriggerElement(
     isReactive: true,
 
     load(ctx: LoadContext): void {
-      const solver = ctx.solver;
       const voltages = ctx.voltages;
       const vIn = readNode(voltages, nIn);
 
@@ -167,25 +166,18 @@ function createSchmittTriggerElement(
       }
 
       // Linear loading: input resistance + output drive (Norton equivalent)
-      if (nIn > 0)  inModel.stamp(solver);
-      if (nOut > 0) outModel.stampOutput(solver);
-
-      // Transient: companion stamps for input/output capacitances.
-      if (ctx.isTransient && ctx.dt > 0) {
-        if (nOut > 0) outModel.stampCompanion(solver, ctx.dt, ctx.method);
-        if (nIn > 0)  inModel.stampCompanion(solver, ctx.dt, ctx.method);
-      }
+      if (nIn > 0)  inModel.load(ctx);
+      if (nOut > 0) outModel.load(ctx);
     },
 
     accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
-      // Post-acceptance companion state update for the pin models.
       if (ctx.dt <= 0) return;
       const voltages = ctx.voltages;
       if (nOut > 0) {
-        outModel.updateCompanion(ctx.dt, ctx.method, readNode(voltages, nOut));
+        outModel.accept(ctx, readNode(voltages, nOut));
       }
       if (nIn > 0) {
-        inModel.updateCompanion(ctx.dt, ctx.method, readNode(voltages, nIn));
+        inModel.accept(ctx, readNode(voltages, nIn));
       }
     },
 

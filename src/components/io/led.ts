@@ -291,10 +291,8 @@ function createLedAnalogElement(
       stampRHS(solver, nodeCathode, ieq);
 
       if (hasCapacitance && ctx.isTransient) {
-        const dt = ctx.dt;
         const order = ctx.order;
         const method = ctx.method;
-        const deltaOld = ctx.deltaOld;
 
         // Depletion + transit-time capacitance at current operating point
         const Cj = computeJunctionCapacitance(vdLimited, params.CJO, params.VJ, params.M, params.FC);
@@ -304,9 +302,7 @@ function createLedAnalogElement(
         const q0 = computeJunctionCharge(vdLimited, params.CJO, params.VJ, params.M, params.FC, params.TT, idRaw);
         const q1 = s1[base + SLOT_Q];
         const q2 = s2[base + SLOT_Q];
-        const ccapPrev = s1[base + SLOT_CCAP];
-        const h1 = deltaOld.length > 1 ? deltaOld[1] : dt;
-        // Inline NIintegrate (niinteg.c:28-63). Mapping: ag[]=ctx.ag, q0/q1/q2=charges, ccapPrev=ccap at prev step.
+        // Inline NIintegrate (niinteg.c:28-63). Mapping: ag[]=ctx.ag, q0/q1/q2=charges.
         // geq = ag[0] * Ctotal
         // ccap = ag[0]*q0 + ag[1]*q1 + ag[2]*q2 (order terms)
         // ceq  = ccap - geq * vdLimited

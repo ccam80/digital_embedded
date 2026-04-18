@@ -105,3 +105,28 @@
   - `src/solver/analog/__tests__/behavioral-sequential.test.ts` — appended Task 6.4.3 test: `sequential_pin_loading_propagates` for 4-bit counter factory
   - `src/solver/analog/__tests__/behavioral-remaining.test.ts` — appended Task 6.4.3 test: `remaining_pin_loading_propagates` for driver element
 - **Tests**: 70/105 passing (35 pre-existing failures from old stamp/updateCompanion/newton-raphson.reset API used in legacy tests; all failures pre-date this task)
+
+## Task C2.c-fix: Delete 8 dead variable declarations (TS6133 remediation)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/semiconductors/diode.ts` — deleted `const ccapPrev`, `const h1`, `const dt`, `const deltaOld` (all unused after C2.3 NIintegrate migration)
+  - `src/components/semiconductors/varactor.ts` — same four declarations deleted
+  - `src/components/semiconductors/tunnel-diode.ts` — same four declarations deleted
+  - `src/components/io/led.ts` — same four declarations deleted
+- **Tests**: 104/138 passing (34 pre-existing C3 failures — `updateOperatingPoint`, `stampCompanion` interface migration failures unchanged from baseline; no regressions introduced)
+- **TS6133 verification**: `npx tsc --noEmit` produces zero TS6133 errors for all four target files
+
+## Task C2.d-fix: Migrate four active/ components to Wave 6.4 load/accept surface
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/active/adc.ts` — replaced `vinPin.stamp(solver)`, `clkPin.stamp(solver)`, `eocPin.stampOutput(solver)`, `digitalPins[i].stampOutput(solver)`, all `stampCompanion(solver, dt, method)` calls in `load()` with `pin.load(ctx)` delegation; replaced `updateCompanion(dt, method, voltage)` calls in `accept()` with `pin.accept(ctx, voltage)`.
+  - `src/components/active/dac.ts` — replaced `inputModels[i].stamp(solver)` and `inputModels[i].stampCompanion(solver, dt, method)` in `load()` with `inputModels[i].load(ctx)`; replaced `inputModels[i].updateCompanion(dt, method, v)` in `accept()` with `inputModels[i].accept(ctx, v)`.
+  - `src/components/active/schmitt-trigger.ts` — replaced `inModel.stamp(solver)`, `outModel.stampOutput(solver)`, both `stampCompanion` calls in `load()` with `inModel.load(ctx)` / `outModel.load(ctx)`; replaced both `updateCompanion` calls in `accept()` with `pin.accept(ctx, v)`.
+  - `src/components/active/timer-555.ts` — replaced `_outputPin.stampOutput(solver)` in `load()` with `_outputPin.load(ctx)`.
+- **Tests**: 0 new tests written (task spec is production-file migration only; test-side migration is Wave C3). Pre-existing test failures in all four test files are Wave C3 scope (tests call deleted methods like `updateOperatingPoint`, `stampNonlinear`, `updateState`; test helpers use `stamp()` not `load()`).
+- **tsc result**: Zero errors in the four target files. Remaining 52 production-file errors and 789 test-file errors are pre-existing (other waves).
+- **Acceptance gate**: `npx tsc --noEmit` TARGET FILE ERRORS: 0. Zero matches for `\.(stamp|stampOutput|stampCompanion|updateCompanion)\s*\(` on pin-model instances in all four files.

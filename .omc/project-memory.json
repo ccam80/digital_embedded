@@ -266,14 +266,14 @@
   "hotPaths": [
     {
       "path": "spec\\progress.md",
-      "accessCount": 66,
-      "lastAccessed": 1776475693495,
+      "accessCount": 67,
+      "lastAccessed": 1776476967731,
       "type": "file"
     },
     {
       "path": "src",
-      "accessCount": 56,
-      "lastAccessed": 1776474916710,
+      "accessCount": 57,
+      "lastAccessed": 1776477452589,
       "type": "directory"
     },
     {
@@ -284,8 +284,8 @@
     },
     {
       "path": "spec\\phase-6-model-rewrites.md",
-      "accessCount": 39,
-      "lastAccessed": 1776474757244,
+      "accessCount": 42,
+      "lastAccessed": 1776476974497,
       "type": "file"
     },
     {
@@ -307,22 +307,28 @@
       "type": "file"
     },
     {
+      "path": "spec\\.context\\rules.md",
+      "accessCount": 36,
+      "lastAccessed": 1776477427898,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\element.ts",
       "accessCount": 34,
       "lastAccessed": 1776472807131,
       "type": "directory"
     },
     {
-      "path": "spec\\.context\\rules.md",
-      "accessCount": 31,
-      "lastAccessed": 1776472764919,
-      "type": "file"
+      "path": "src\\solver\\analog",
+      "accessCount": 32,
+      "lastAccessed": 1776475972647,
+      "type": "directory"
     },
     {
-      "path": "src\\solver\\analog",
-      "accessCount": 30,
-      "lastAccessed": 1776473849973,
-      "type": "directory"
+      "path": "spec\\test-baseline.md",
+      "accessCount": 29,
+      "lastAccessed": 1776477432423,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
@@ -337,15 +343,27 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\digital-pin-model.ts",
+      "accessCount": 26,
+      "lastAccessed": 1776477451569,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\load-context.ts",
       "accessCount": 25,
       "lastAccessed": 1776474248800,
       "type": "file"
     },
     {
-      "path": "spec\\test-baseline.md",
-      "accessCount": 22,
-      "lastAccessed": 1776475300521,
+      "path": "src\\solver\\analog\\compiler.ts",
+      "accessCount": 25,
+      "lastAccessed": 1776477207113,
+      "type": "directory"
+    },
+    {
+      "path": "src\\solver\\analog\\bridge-adapter.ts",
+      "accessCount": 20,
+      "lastAccessed": 1776476326796,
       "type": "file"
     },
     {
@@ -356,32 +374,20 @@
     },
     {
       "path": "spec\\.context\\lock-protocol.md",
-      "accessCount": 18,
-      "lastAccessed": 1776472769296,
+      "accessCount": 19,
+      "lastAccessed": 1776477428173,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\compiler.ts",
-      "accessCount": 18,
-      "lastAccessed": 1776475002456,
+      "path": "src\\solver\\analog\\behavioral-gate.ts",
+      "accessCount": 17,
+      "lastAccessed": 1776477451389,
       "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\bridge-adapter.ts",
-      "accessCount": 16,
-      "lastAccessed": 1776472991254,
-      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\sparse-solver.ts",
       "accessCount": 16,
       "lastAccessed": 1776474254237,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\behavioral-gate.ts",
-      "accessCount": 16,
-      "lastAccessed": 1776474799471,
       "type": "directory"
     },
     {
@@ -412,12 +418,6 @@
       "path": "src\\solver\\analog\\__tests__\\ckt-context.test.ts",
       "accessCount": 12,
       "lastAccessed": 1776466271972,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\digital-pin-model.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776475371109,
       "type": "file"
     },
     {
