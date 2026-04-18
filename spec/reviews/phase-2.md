@@ -1,265 +1,177 @@
-# Review Report: Phase 2 Wave 2.1 — NIiter Structural Alignment
+# Review Report: Phase 2 - NR Loop Alignment
 
-**Date**: 2026-04-17
-**Reviewer**: claude-orchestrator:reviewer (claude-sonnet-4-6)
-**Scope**: Tasks 2.1.1, 2.1.2, 2.1.3 (Wave 2.1 only; Wave 2.2 is not yet implemented and is out of scope)
-
----
+Scope: Wave 2.1 (Tasks 2.1.1, 2.1.2, 2.1.3) + Wave 2.2 (Tasks 2.2.1, 2.2.2, 2.2.3) + batch-5-fix remediation (af407a3b)
+Reviewed: 2026-04-18
+Reviewer: claude-orchestrator:reviewer (ab3a8e9e345af2e9c)
 
 ## Summary
 
 | Item | Count |
 |------|-------|
-| Tasks reviewed | 3 |
-| Violations — critical | 3 |
-| Violations — major | 1 |
-| Violations — minor | 1 |
-| Gaps | 1 |
+| Tasks reviewed | 6 |
+| Violations critical | 0 |
+| Violations major | 3 |
+| Violations minor | 3 |
+| Gaps | 2 |
 | Weak tests | 3 |
 | Legacy references | 2 |
 
-**Verdict**: has-violations
-
----
-
+Verdict: has-violations
 ## Violations
 
-### V-01 — Critical: `shouldBypass` optional-chain call is a dead-code compatibility shim
+### V-01 Major: Historical-provenance comment in newton-raphson.ts JSDoc
 
-**File**: `src/solver/analog/mna-assembler.ts:69`
-**Rule**: Code Hygiene — "No fallbacks. No backwards compatibility shims." / "All replaced or edited code is removed entirely."
-**Severity**: critical
+File: src/solver/analog/newton-raphson.ts
+Line: 50
+Rule: rules.md historical-provenance comment ban
 
-Task 6.1.2 (also in this same batch, already completed and verified) deleted `shouldBypass` from the `AnalogElement` interface entirely. The current `element.ts` confirms `shouldBypass` is absent from the interface. Despite this deletion, `mna-assembler.ts` line 69 still calls `el.shouldBypass?.(voltages, prevVoltages)` via an optional chain:
+The JSDoc for applyNodesetsAndICs reads: on specific nodes. Called after CKTload (stampAll) during each NR iteration.
 
-```typescript
-if (iteration > 0 && prevVoltages !== undefined && el.shouldBypass?.(voltages, prevVoltages)) {
-  continue;
-}
-```
+The phrase CKTload (stampAll) is a historical-provenance reference. stampAll is the deleted MNAAssembler method. The parenthetical (stampAll) is a dead-name reference to a deleted API decorating retained code.
 
-The `?.` operator is a backwards-compatibility shim that silently no-ops when the method no longer exists. The code decorating this call (the bypass `continue` branch) is dead code — `shouldBypass` can never return a truthy value through any currently-compiled element, because the method has been removed from the interface. The comment in the `stampAll` JSDoc at line 52 ("Used by `shouldBypass()` checks. When omitted, bypass is never triggered.") reinforces that the agent knowingly left this dead branch rather than deleting it. The `prevVoltages` parameter only exists in the public API of `stampAll` because of this dead path.
+Severity: major
 
-**Evidence**:
-```typescript
-// mna-assembler.ts:52 (JSDoc for prevVoltages parameter)
- *   Used by shouldBypass() checks. When omitted, bypass is never triggered.
+### V-02 Major: Stale comment in ckt-load.ts file-header JSDoc references deleted MNAAssembler.stampAll
 
-// mna-assembler.ts:69 (dead optional-chain call)
-      if (iteration > 0 && prevVoltages !== undefined && el.shouldBypass?.(voltages, prevVoltages)) {
-        continue;
-      }
-```
+File: src/solver/analog/ckt-load.ts
+Line: 2
+Rule: rules.md historical-provenance comment ban
 
----
+The file-level JSDoc reads: cktLoad - single-pass device load replacing MNAAssembler.stampAll().
 
-### V-02 — Critical: Historical-provenance comment in `mna-assembler.ts:41` is a dead-code marker
+Replacing MNAAssembler.stampAll() is a historical-provenance statement. MNAAssembler has been deleted. The comment describes what this code replaced, which is exactly what the rule bans.
 
-**File**: `src/solver/analog/mna-assembler.ts:41`
-**Rule**: Code Hygiene — "Historical-provenance comments are dead-code markers." / "No `# previously this was...` comments."
-**Severity**: critical
+Severity: major
 
-The JSDoc for `stampAll` contains the comment:
+### V-03 Major: cktLoad does not apply srcFact scaling to nodeset stamp RHS values
 
-```
-   * Called every NR iteration. Replaces the old separate linear/nonlinear
-   * stamp hoisting with a single unconditional pass matching ngspice CKTload.
-```
+File: src/solver/analog/ckt-load.ts
+Lines: 54-58
+Rule: CLAUDE.md SPICE-Correct Implementations Only; spec task 2.2.1 acceptance criteria
 
-The phrase "Replaces the old separate linear/nonlinear stamp hoisting" is a historical-provenance comment describing what this code replaced. Per the rules, this is not just a comment problem — it is a dead-code marker. The comment exists because the multi-pass/hoisting code that `stampAll` replaced was not fully deleted; instead `stampAll` itself is still a 3-pass method (calling `updateOperatingPoints`, then a `stamp` loop, then `stampNonlinear`, then `stampReactiveCompanion` conditionally). The Wave 2.2 intent (true single-pass cktLoad) has not landed, yet Wave 2.1 implementers modified this file (adding the `shouldBypass` call) and left this provenance comment in place. The comment is proof the agent knew the implementation was not a true single-pass replacement.
+The nodeset stamping in cktLoad applies (1e10 * value) to the RHS, but does not scale by ctx.srcFact. Compare with applyNodesetsAndICs in newton-raphson.ts which takes a srcFact parameter and applies (G_NODESET * value * srcFact):
 
-**Evidence**:
-```typescript
-// mna-assembler.ts:38-42
-  /**
-   * Unified CKTload equivalent: clear the matrix, update operating points,
-   * stamp ALL element contributions unconditionally, and finalize.
-   *
-   * Called every NR iteration. Replaces the old separate linear/nonlinear
-   * stamp hoisting with a single unconditional pass matching ngspice CKTload.
-```
+- applyNodesetsAndICs (newton-raphson.ts line 72): solver.stampRHS(nodeId, G_NODESET * value * srcFact);
+- cktLoad (ckt-load.ts line 57): ctx.solver.stampRHS(node, 1e10 * value);  // missing * ctx.srcFact
 
----
+ngspice cktload.c applies CKTsrcFact scaling to nodeset voltages during source-stepping convergence aids. Without srcFact scaling, the nodeset stamps will enforce the full target voltage even when the circuit is mid-way through source stepping, diverging from ngspice behavior.
 
-### V-03 — Critical: Historical-provenance comment in `ckt-context.ts:149` describes future deletion
+Note: Appendix B in plan.md also omits srcFact in the pseudocode (which itself may be a spec error), but applyNodesetsAndICs (the function this code replaces) does apply srcFact. The discrepancy between the function that was replaced (which applied srcFact correctly) and the new cktLoad (which does not) is a regression.
 
-**File**: `src/solver/analog/ckt-context.ts:149`
-**Rule**: Code Hygiene — "Historical-provenance comments are dead-code markers." / "Comments never describe what was changed, what was removed, or historical behaviour."
-**Severity**: critical
+Severity: major
 
-The JSDoc for the `assembler` field reads:
+### V-04 Minor: TODO comments in harness test helper file
 
-```typescript
-  /**
-   * MNA matrix assembler (hoisted to ctx in Phase 1, deleted in Phase 2 Wave 2.2
-   * when cktLoad replaces stampAll).
-   */
-  assembler: MNAAssembler = null!;
-```
+File: src/solver/analog/__tests__/harness/netlist-generator.ts
+Lines: 269, 281, 298
+Rule: rules.md ban on TODO/FIXME/HACK comments
 
-This comment is a forward-deletion annotation — it explicitly says this field "will be deleted in Phase 2 Wave 2.2." This is a deferral comment in disguise: it justifies retaining dead-weight infrastructure by pointing at a future wave. Per the rules, such comments are banned because they mark transitional code that was left in place rather than completing the work. The comment also describes how the field was introduced ("hoisted to ctx in Phase 1"), which is a historical-provenance statement.
+Three TODO comments exist in the ngspice harness test helper:
+- Line 269: TODO: this is an approximation - triangle wave has no exact SPICE transient primitive.
+- Line 281: TODO: this is an approximation - sawtooth has no exact SPICE transient primitive.
+- Line 298: TODO: sweep/am/fm/noise/expression waveforms are not representable in SPICE
 
-**Evidence**:
-```typescript
-// ckt-context.ts:148-151
-  /**
-   * MNA matrix assembler (hoisted to ctx in Phase 1, deleted in Phase 2 Wave 2.2
-   * when cktLoad replaces stampAll).
-   */
-  assembler: MNAAssembler = null!;
-```
+The rules.md prohibition on TODO comments applies universally. These were not introduced by Phase 2 tasks, but they exist in files that are in scope as part of the Phase 2 test surface.
 
-Note: The `assembler` field itself is required for Wave 2.1 (the NR loop still uses `assembler.stampAll`, `assembler.noncon`, and `assembler.checkAllConverged`). The violation here is the provenance/deferral comment, not the field's existence. The comment must be replaced with a mechanical description of what the field is, with no mention of what phase introduced it or what phase will delete it.
+Severity: minor
 
----
+### V-05 Minor: applyNodesetsAndICs is dead code retained without a production caller
 
-### V-04 — Major: `mna-assembler.ts` header claims "Unified CKTload equivalent" — the method is a 3-pass walk
+File: src/solver/analog/newton-raphson.ts
+Lines: 45-79
+Rule: rules.md - All replaced or edited code is removed entirely. Scorched earth.
 
-**File**: `src/solver/analog/mna-assembler.ts:6-10` (file header) and `mna-assembler.ts:38` (method JSDoc)
-**Rule**: Code Hygiene — "Comments exist ONLY to explain complicated code to future developers. They never describe what was changed, what was removed, or historical behaviour." / CLAUDE.md "No Pragmatic Patches"
-**Severity**: major
+The applyNodesetsAndICs exported function is no longer called by any production code. The NR loop calls cktLoad, which internally applies nodesets (ckt-load.ts lines 54-58). Searches confirm applyNodesetsAndICs is referenced only in its own definition and in newton-raphson.test.ts test imports.
 
-The file-level JSDoc (lines 6-10) and the `stampAll` method JSDoc (line 38) both claim `stampAll` is a "unified CKTload equivalent" — but the implementation is a 3-pass walk:
-1. `updateOperatingPoints` loop (nonlinear elements only)
-2. Element stamp loop (calling `el.stamp`, `el.stampNonlinear`, `el.stampReactiveCompanion` separately)
-3. `solver.finalize()`
+This is retained dead code kept solely so the associated tests continue to pass - a classic retain dead code to avoid deleting tests pattern. The function, its export, and the five associated tests should all be removed.
 
-The real single-pass `cktLoad` (Wave 2.2) has not landed. The comment is a lie about the current implementation state. While Wave 2.2 work is legitimately deferred per the scope boundary note, the comment fraudulently describes the current code as already being what Wave 2.2 is supposed to deliver.
+Severity: minor (overlaps with G-02)
 
-**Evidence**:
-```typescript
-// mna-assembler.ts:6-10 (file header)
- * Orchestrates the stamp protocol used by the Newton-Raphson loop:
- *
- *   `stampAll` — called every NR iteration (unified CKTload equivalent).
- *                Clears the matrix, updates operating points, stamps all
- *                element contributions (linear + nonlinear + reactive companion)
- *                unconditionally, and finalizes the matrix for factorization.
+### V-06 Minor: Weak assertion pattern in noncon test
 
-// mna-assembler.ts:38 (method JSDoc first line)
-   * Unified CKTload equivalent: clear the matrix, update operating points,
-```
+File: src/solver/analog/__tests__/ckt-load.test.ts
+Line: 154
+Rule: rules.md Test the specific: exact values, exact types, exact error messages where applicable.
 
-The actual implementation (lines 62-82) performs three separate passes over different element subsets, which does not match ngspice CKTload.
+The noncon_incremented_by_device_limiting test only asserts ctx.noncon > 0:
 
----
+    expect(ctx.noncon).toBeGreaterThan(0);
 
-### V-05 — Minor: `pnjlim_passes_small_step` uses `toBeCloseTo(0.65, 10)` instead of exact `toBe`
+This is a trivially weak assertion. For a known diode circuit with a 5V forced anode voltage (far above vcrit), the pnjlim call should produce a specific noncon increment. The assertion does not verify any specific count or that limiting actually occurred - it only checks the counter is non-zero, which would also pass if noncon were erroneously set to 1e6.
 
-**File**: `src/solver/analog/__tests__/newton-raphson.test.ts:97`
-**Rule**: Testing — "Test the specific: exact values, exact types, exact error messages where applicable." / "No `pytest.approx()` with loose tolerances to make tests pass."
-**Severity**: minor
-
-The pre-existing `pnjlim_passes_small_step` test (not one of the 4 spec-required new tests) uses `toBeCloseTo(0.65, 10)` rather than exact `toBe(0.65)`. When `limited === false`, `pnjlim` returns `vnew` unchanged — the returned value is IEEE-754 identical to the input `0.65`. There is no floating-point arithmetic involved in the no-limiting path; `toBeCloseTo` with precision 10 is unnecessarily tolerant for an identity return. The 4 new spec-required tests correctly use `toBe` for exact assertions. This test was not added in Wave 2.1 but it is in the same file that Wave 2.1 modified, making it in-scope for this review.
-
-**Evidence**:
-```typescript
-// newton-raphson.test.ts:96-98
-    const result = pnjlim(0.65, 0.60, 0.026, 0.6);
-    expect(result.value).toBeCloseTo(0.65, 10);
-    expect(result.limited).toBe(false);
-```
-
----
+Severity: minor (weak test)
 
 ## Gaps
 
-### G-01: `ipass_skipped_without_nodesets` does not assert the convergence iteration count — the no-ipass claim is unverified
+### G-01: cktLoad does not stamp ICs (initial conditions)
 
-**Spec requirement** (Task 2.1.3): "Assert that after initFix→initFloat transition, convergence returns immediately on noncon===0 (no extra ipass iteration)."
+Spec requirement: Task 2.2.1 states Applies nodesets/ICs after device loads (only in DC mode during initJct/initFix). The spec description explicitly lists ICs alongside nodesets.
 
-**What was found** (`src/solver/analog/__tests__/newton-raphson.test.ts:567-572`):
+What was found: cktLoad (ckt-load.ts lines 54-58) only iterates ctx.nodesets. There is no loop over ctx.ics. The old applyNodesetsAndICs function in newton-raphson.ts applied both nodesets and ICs (with ICs stamped unconditionally for all modes). The new cktLoad silently drops IC application.
 
-The test records `initFloatBeginIter` and `convergeIter` but never asserts a relationship between them. The test only asserts `ctx.hadNodeset === false` and `ctx.nrResult.converged === true`. It does not assert that `convergeIter === initFloatBeginIter` (or any quantitative claim that convergence was immediate), which is the spec's stated requirement. The test therefore passes vacuously — the ipass gate might be firing and still pass, because the assertion is absent.
+File: src/solver/analog/ckt-load.ts
 
-**Evidence**:
-```typescript
-// newton-raphson.test.ts:565-573
-    newtonRaphson(ctx);
+Note: Appendix B in plan.md also omits ICs from the pseudocode. This may be a spec ambiguity. Since the existing applyNodesetsAndICs function (which cktLoad was designed to replace) applied ICs, and the task spec text explicitly mentions nodesets/ICs, this is reported as a gap. If plan.md Appendix B intentionally excludes ICs, the task text contradicts the pseudocode and the user must adjudicate.
 
-    expect(ctx.nrResult.converged).toBe(true);
-    // With no nodesets, ipass gate never fires — convergence happens without extra iteration
-    // convergeIter - initFloatBeginIter should be minimal (0 or 1 extra NR steps, not an ipass-forced extra)
-    expect(ctx.hadNodeset).toBe(false);
-    // NOTE: convergeIter and initFloatBeginIter are tracked but never compared
-```
+### G-02: applyNodesetsAndICs function retained without a caller - dead code
 
-The comment says "should be minimal" but there is no `expect(convergeIter)` assertion anywhere in this test. `convergeIter` and `initFloatBeginIter` are assigned in the ladder callbacks and never read by any assertion.
+Spec requirement: Task 2.2.1 acceptance criteria - Nodesets/ICs applied inside cktLoad, not as a separate step. Task 2.2.2 and rules.md - All replaced or edited code is removed entirely.
 
-**File**: `src/solver/analog/__tests__/newton-raphson.test.ts` (ipass_skipped_without_nodesets test body)
+What was found: applyNodesetsAndICs remains exported from newton-raphson.ts and has five dedicated tests in newton-raphson.test.ts. No production call site invokes it anymore. The function is retained solely to keep its tests passing.
 
----
+Per rules.md Scorched earth: the function, its export, and the five associated tests should all be removed. The nodeset behavior is now tested via the nodesets_applied_after_device_loads test in ckt-load.test.ts.
+
+File: src/solver/analog/newton-raphson.ts lines 61-79; src/solver/analog/__tests__/newton-raphson.test.ts lines 384-443
 
 ## Weak Tests
 
-### W-01: `fetlim_clamps_above_threshold` — second assertion uses `toBeCloseTo` for an exact arithmetic result
+### WT-01: single_pass_stamps_all_contributions - trivially weak assertions
 
-**Test path**: `src/solver/analog/__tests__/newton-raphson.test.ts::NR::fetlim_clamps_above_threshold` (line 116)
-**Problem**: `expect(result3).toBeCloseTo(5.0 + (Math.abs(2 * (5.0 - 0.7)) + 2), 10)` computes the expected value in floating-point (identical operations to the implementation) and uses `toBeCloseTo` with precision 10. This is an implementation-mirroring assertion — the expected value is computed using the same formula as the code under test. When implementation and expected share the same arithmetic path, `toBeCloseTo` cannot catch an off-by-one or wrong operator in either. The test should use a pre-computed literal value.
-**Evidence**:
-```typescript
-    const result3 = fetlim(20.0, 5.0, 0.7);
-    expect(result3).toBeCloseTo(5.0 + (Math.abs(2 * (5.0 - 0.7)) + 2), 10);
-```
+Test path: src/solver/analog/__tests__/ckt-load.test.ts::CKTload::single_pass_stamps_all_contributions
 
----
+Problem: The test asserts only Number.isFinite(solution[0]) and Number.isFinite(solution[1]). This checks that values are numbers (not NaN/Infinity), but does not verify any specific voltage. A circuit with Vs=5V, R=1kOhm, and a diode has a well-defined operating point. The test should assert concrete voltage values (node 1 ~5V, node 2 ~0.6-0.75V). As written, the test would pass even if the solver returned numerically wrong but finite values.
 
-### W-02: `ipass_skipped_without_nodesets` — key assertion is entirely absent (see also G-01)
+Spec requirement: Task 2.2.1 - Assert the solver matrix contains all stamps (linear + nonlinear + reactive companion) from a single pass. Asserting isFinite on solution elements does not verify the matrix contains all stamps.
 
-**Test path**: `src/solver/analog/__tests__/newton-raphson.test.ts::ipass hadNodeset gate::ipass_skipped_without_nodesets`
-**Problem**: The test declares and populates `initFloatBeginIter` and `convergeIter` variables inside the ladder callbacks but never asserts their values. The spec requires asserting that convergence is immediate (no extra ipass iteration). The comment in the test acknowledges the intent but the `expect()` call is missing entirely. This is a trivially-passing test that verifies nothing about the behaviour it claims to cover.
-**Evidence**:
-```typescript
-    let initFloatBeginIter = -1;
-    let convergeIter = -1;
-    // ... ladder callbacks set these ...
-    newtonRaphson(ctx);
-    expect(ctx.nrResult.converged).toBe(true);
-    expect(ctx.hadNodeset).toBe(false);
-    // convergeIter and initFloatBeginIter are NEVER read by any expect()
-```
+### WT-02: writes_into_ctx_nrResult - trivially-true type/length checks
 
----
+Test path: src/solver/analog/__tests__/newton-raphson.test.ts::NR::writes_into_ctx_nrResult
 
-### W-03: `applyNodesetsAndICs_stamps_nodeset_in_initJct_mode` — RHS assertion uses `toBeCloseTo` with precision 0
+Problem: The test includes expect(ctx.nrResult.voltages).toBeInstanceOf(Float64Array) - a trivially-true type check. The voltages field is typed Float64Array and guaranteed by construction, so this assertion adds no signal. The .length === 3 check is also guaranteed by construction (matrixSize=3). These weak assertions surround the meaningful toBeCloseTo(2.5, 4) but dilute the test intent.
 
-**Test path**: `src/solver/analog/__tests__/newton-raphson.test.ts::NR::applyNodesetsAndICs_stamps_nodeset_in_initJct_mode` (lines 392-393)
-**Problem**: `expect(rhs[1]).toBeCloseTo(G_NODESET * 2.5, 0)` uses precision 0, meaning the assertion tolerates values within ±0.5 of `2.5e10`. This is 5 orders of magnitude looser than what `toBeCloseTo` at precision 10 would give, and vastly looser than a direct `toBe` assertion on an exact integer multiplication. The value `1e10 * 2.5 = 2.5e10` is exactly representable in IEEE-754 double. The same loose-precision pattern appears in all four `applyNodesetsAndICs_*` tests (lines 393, 405, 428, 440-441). These were not added in Wave 2.1 but are in the Wave 2.1-modified test file.
-**Evidence**:
-```typescript
-    expect(rhs[1]).toBeCloseTo(G_NODESET * 2.5, 0);  // precision=0: ±5e9 tolerance
-```
+### WT-03: noncon_incremented_by_device_limiting - toBeGreaterThan(0) without specific value
 
----
+Test path: src/solver/analog/__tests__/ckt-load.test.ts::CKTload::noncon_incremented_by_device_limiting
+
+Problem: expect(ctx.noncon).toBeGreaterThan(0) does not verify a specific count. The diode with anode forced to 5V should produce a deterministic noncon increment. The assertion does not verify the actual limiting behavior (the pnjlim call returning limited=true), only that the counter is non-zero.
+
+Evidence: expect(ctx.noncon).toBeGreaterThan(0);
 
 ## Legacy References
 
-### L-01: `mna-assembler.ts:41` — "Replaces the old separate linear/nonlinear stamp hoisting"
+### LR-01: MNAAssembler referenced in sparse-solver.ts JSDoc
 
-**File**: `src/solver/analog/mna-assembler.ts:41`
-**Stale reference**: `"Called every NR iteration. Replaces the old separate linear/nonlinear stamp hoisting with a single unconditional pass matching ngspice CKTload."`
+File: src/solver/analog/sparse-solver.ts
+Line: 225
+Evidence: Called at compile time by every caller (element factories, MNAAssembler).
 
-This is a historical description of what the method replaced. The old multi-pass hoisting code no longer exists in this file, but the comment describes the past state of the codebase. This is the definition of a banned historical-provenance comment.
+MNAAssembler has been deleted. This JSDoc for allocElement refers to a deleted class as a caller. It is a stale historical reference that should name the actual callers post-deletion (element load() implementations, cktLoad via element.load).
 
----
+### LR-02: MNAAssembler.stampAll() referenced in ckt-load.ts file header JSDoc
 
-### L-02: `ckt-context.ts:149` — "hoisted to ctx in Phase 1, deleted in Phase 2 Wave 2.2"
+File: src/solver/analog/ckt-load.ts
+Line: 2
+Evidence: cktLoad - single-pass device load replacing MNAAssembler.stampAll().
 
-**File**: `src/solver/analog/ckt-context.ts:149`
-**Stale reference**: `"MNA matrix assembler (hoisted to ctx in Phase 1, deleted in Phase 2 Wave 2.2 when cktLoad replaces stampAll)."`
+Already cited in V-02 as a violation. Also recorded here as a legacy reference: MNAAssembler.stampAll() is the deleted API name.
 
-This comment describes the field's history (Phase 1 introduction) and announces its future deletion (Phase 2 Wave 2.2). Both clauses are banned: the first is a historical-provenance statement; the second is a deferral annotation.
+## Additional Observations (informational, not violations)
 
----
+- Task 2.1.1 pnjlim: Implementation matches ngspice DEVpnjlim devsup.c:50-58 exactly. Variable-mapping table present in JSDoc. All four spec-required tests present. Shared result object _pnjlimResult pattern is sound for single-threaded JS.
+- Task 2.1.2 fetlim: vtstlo = vtsthi / 2 + 2 at newton-raphson.ts line 173 is correct. Both spec-required tests present with correct expected values.
+- Task 2.1.3 hadNodeset gate: condition (ctx.isDcOp AND ctx.hadNodeset AND ipass > 0) at newton-raphson.ts line 504 matches the spec. updateHadNodeset() correctly derives from nodesets.size > 0. Both spec-required tests present.
+- Task 2.2.2 MNAAssembler deletion: mna-assembler.ts deleted. mna-assembler.test.ts deleted. No import of MNAAssembler in newton-raphson.ts. CKTCircuitContext.assembler field absent. Inline convergence loop via ctx.elementsWithConvergence confirmed in newton-raphson.ts lines 417-446.
+- Task 2.2.3 E_SINGULAR recovery: e_singular_recovery_via_cktLoad test correctly uses proxy solver, asserts converged === true, factorCallCount >= 2, lastFactorUsedReorder === true, iterations === 3. Control flow verified.
+- batch-5-fix xfact formula: ctx.loadCtx.xfact = ctx.deltaOld[0] / ctx.deltaOld[1] at analog-engine.ts line 418 - no guard, matches spec. Test uses toBe exact equality.
+- mna-end-to-end.test.ts: This file exists and was not listed in progress.md for any Phase 2 task. It appears outside tracked scope and exercises the full compiler-engine pipeline including MOSFET tests.
 
-## Notes on Wave 2.1 Tasks — Positive Findings
-
-The three core algorithmic changes (pnjlim rewrite, fetlim formula fix, hadNodeset gate) are correctly implemented:
-
-- **Task 2.1.1 (pnjlim)**: The implementation in `newton-raphson.ts:126-146` is a direct port of ngspice `DEVpnjlim` (devsup.c:50-58). The variable-mapping table is present as a comment (lines 118-125). The forward-bias branch, arg-le-zero branch, cold-junction branch, and no-limiting path all match the ngspice C code. The 4 spec-required tests (`pnjlim_matches_ngspice_forward_bias`, `pnjlim_matches_ngspice_arg_le_zero_branch`, `pnjlim_matches_ngspice_cold_junction_branch`, `pnjlim_no_limiting_when_below_vcrit`) all use exact `toBe` assertions with pre-computed IEEE-754 reference values.
-
-- **Task 2.1.2 (fetlim)**: The formula `const vtstlo = vtsthi / 2 + 2` at line 172 matches ngspice `DEVfetlim` exactly. The 2 spec-required tests are present and test the correct values.
-
-- **Task 2.1.3 (hadNodeset gate)**: The gate `if (ctx.isDcOp && ctx.hadNodeset && ipass > 0)` at `newton-raphson.ts:501` matches ngspice niiter.c:1050-1052. `hadNodeset` is correctly derived from `nodesets.size > 0` via `updateHadNodeset()` in `ckt-context.ts:581-583`. `ipass_fires_with_nodesets` test asserts `convergeIter >= initFloatBeginIter + 1` which is a meaningful quantitative assertion.
-
-The `shouldBypass` issue (V-01) is confirmed: `shouldBypass` does not appear anywhere in the current `element.ts` interface (grep returned no matches), confirming the optional-chain call in `mna-assembler.ts:69` is dead code left from before Task 6.1.2 deleted the method.

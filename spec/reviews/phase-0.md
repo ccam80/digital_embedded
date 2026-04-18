@@ -1,16 +1,26 @@
 # Review Report: Phase 0 — Sparse Solver Rewrite
 
+**Scope**: Tasks 0.1.1, 0.1.2, 0.1.3, 0.2.1, 0.3.1, 0.3.2, phase0-v03-v04-swapcols remediation, Task 0.1-fix  
+**Date**: 2026-04-18  
+**Files reviewed**:
+- `src/solver/analog/sparse-solver.ts`
+- `src/solver/analog/newton-raphson.ts`
+- `src/solver/analog/__tests__/sparse-solver.test.ts`
+- `src/solver/analog/__tests__/newton-raphson.test.ts`
+
+---
+
 ## Summary
 
-| Item | Count |
-|------|-------|
-| Tasks reviewed | 7 (0.1.1, 0.1.2, 0.1.3, 0.2.1, 0.3.1, 0.3.2, batch-1 fix) |
-| Violations — critical | 1 |
-| Violations — major | 2 |
-| Violations — minor | 1 |
-| Gaps | 1 |
+| Category | Count |
+|---|---|
+| Tasks reviewed | 8 |
+| Violations — critical | 2 |
+| Violations — major | 1 |
+| Violations — minor | 2 |
+| Gaps | 2 |
 | Weak tests | 2 |
-| Legacy references | 0 |
+| Legacy references | 3 |
 
 **Verdict: has-violations**
 
@@ -18,102 +28,79 @@
 
 ## Violations
 
-### V-01 [CRITICAL] — `_buildCSCFromLinked()` does not implement the specified algorithm
+### V-01 [critical] — Test file calls deleted interface methods `el.stamp()` and `el.stampNonlinear()` on AnalogElement instances
 
-**File:** `src/solver/analog/sparse-solver.ts`, lines 1162–1173
+**File:** `src/solver/analog/__tests__/sparse-solver.test.ts`, lines 456, 461, 481, 482
 
-**Rule violated:** Spec adherence — Task 0.1.3 specifies that `_buildCSCFromLinked()` walks the pool once, reads `_elVal` into the CSC arrays using stored indices, "producing cache-optimal CSC L/U for forward/backward substitution." The spec states: "After `factorWithReorder()` completes, `_buildCSCFromLinked()` walks the pool once, reading `_elVal` into the CSC arrays using the stored indices."
-
-**Evidence:**
-```typescript
-private _buildCSCFromLinked(): void {
-  const n = this._n;
-  const lnz = this._lColPtr[n];
-  const unz = this._uColPtr[n];
-  // Walk all elements and verify their CSC index mappings are in bounds
-  for (let e = 0; e < this._elCount; e++) {
-    const li = this._lValueIndex[e];
-    if (li >= 0 && li >= lnz) this._lValueIndex[e] = -1;
-    const ui = this._uValueIndex[e];
-    if (ui >= 0 && ui >= unz) this._uValueIndex[e] = -1;
-  }
-}
-```
-
-**What the spec requires:** The method must snapshot element values from the linked structure into the CSC arrays: `_lVals[elem.lValueIndex] = elem._elVal` for each element with a valid `lValueIndex`. The implementation instead performs only an integrity check — it clamps out-of-bounds index pointers to -1 but never writes any values into `_lVals` or `_uVals`. The actual value population is done inside `_numericLUMarkowitz()` itself (lines 1019–1047), which writes directly to `_lVals`/`_uVals` during the scatter loop. So `_buildCSCFromLinked()` as named is misleading: it is described in comments as a "verify CSC L/U index mappings" helper, not a "build CSC from linked" helper.
-
-**Impact:** The spec's acceptance criterion for Task 0.1.3 is "CSC is rebuilt only on reorder events, not every NR iteration." The values are populated inline in `_numericLUMarkowitz`, so the CSC data is correct. However, the described architecture — a post-factor snapshot pass using `lValueIndex`/`uValueIndex` — is not implemented. The method named `_buildCSCFromLinked` performs bounds clamping instead of value population. This is a deviation from the specified algorithm: the spec says this method exists to populate CSC L/U via `_lValueIndex`/`_uValueIndex`, but it does not do that. The named concept exists (as an integrity check), but not the specified implementation. The test `csc_solve_matches_linked_factor` verifies that some elements have valid `lValueIndex`/`uValueIndex` entries, which is true, but the test does not verify that `_buildCSCFromLinked()` performs the snapshot (it cannot — the method is private and the values are already in CSC before it runs). Severity: **critical** because the implementation of a spec-named method deviates from the spec description in a way that could create divergent behavior in future modifications and because the spec's acceptance criterion for Task 0.1.3 depends on this design being correct.
-
----
-
-### V-02 [MAJOR] — `_numericLUReusePivots()` contains a linked-list walk in the hot path
-
-**File:** `src/solver/analog/sparse-solver.ts`, lines 1091–1103
-
-**Rule violated:** Task 0.1.3 acceptance criterion: "`factorNumerical()` touches zero linked-list operations — values are scattered from linked elements into existing CSC positions."
+**Rule violated:** rules.md — "All replaced or edited code is removed entirely. Scorched earth." Task 6.1.2 deleted `stamp` and `stampNonlinear` from the `AnalogElement` interface. `sparse-solver.test.ts` is listed as a modified file across multiple Phase 0 tasks in `spec/progress.md`. The test `mna_50node_realistic_circuit_performance` still calls these deleted methods on element instances.
 
 **Evidence:**
 ```typescript
-for (let k = 0; k < n; k++) {
-  // Scatter A-matrix entries for column k into dense workspace
-  let xNzCount = 0;
-  let ae = this._colHead[k];
-  while (ae >= 0) {                          // ← linked-list walk
-    if (!(this._elFlags[ae] & FLAG_FILL_IN)) {
-      const row = this._elRow[ae];
-      if (x[row] === 0) xNzIdx[xNzCount++] = row;
-      x[row] += this._elVal[ae];
-    }
-    ae = this._elNextInCol[ae];              // ← chain traversal
-  }
-  // ... and then _reach(k) which also walks L's column chain
-  const reachTop = this._reach(k);
+// sparse-solver.test.ts line 456
+el.stamp(rawSolver);
+// line 461
+el.stampNonlinear(rawSolver);
+// line 481
+el.stamp(rawSolver);
+// line 482
+el.stampNonlinear(rawSolver);
 ```
 
-**What the spec requires:** The spec says `_numericLUReusePivots()` must scatter values "via O(1) index lookup (`_lVals[elem.lValueIndex] = elem.value`)… No linked-structure rebuild, no pivot search." Instead, the implementation walks the linked-list column chain for every column k, and calls `_reach(k)` which also performs a DFS over L's column structure. These are not O(1) operations — they are O(nnz) linked-list traversals. The U and L value scatter at lines 1128–1137 does use O(1) CSC index iteration (iterating over `_uColPtr`/`_lColPtr` ranges), so those loops are correct. But the initial scatter of A-values into the dense workspace via `_colHead` chain walk, and the `_reach()` call, are linked-list operations in the hot path. The spec's acceptance criterion "zero linked-list operations" is not satisfied.
+Both `stamp` and `stampNonlinear` were removed from the `AnalogElement` interface in Task 6.1.2. These calls will fail at runtime (TypeScript type error) and demonstrate that the test file was not updated to reflect the `load(ctx)` migration.
 
-**Severity: major** — directly violates a named acceptance criterion.
+**Severity: critical**
 
 ---
 
-### V-03 [MAJOR] — Historical-provenance comment in `_swapColumns` documents internal architecture deviation from ngspice
+### V-02 [critical] — `newton-raphson.ts` JSDoc contains the banned word "fallback"
 
-**File:** `src/solver/analog/sparse-solver.ts`, lines 477–482
+**File:** `src/solver/analog/newton-raphson.ts`, line 262
+
+**Rule violated:** rules.md: "Any comment containing words like… 'fallback'… is almost never just a comment problem. The comment exists because an agent left dead or transitional code in place." Per reviewer instructions, "fallback" in a comment is a dead-code marker. The code decorated by this comment must be examined.
+
+**Evidence:**
+```typescript
+ * (DC operating point solver) decides the appropriate fallback strategy.
+```
+
+The JSDoc at line 262 uses the banned word "fallback" to describe the DC operating point solver's behavior. Per rules, this comment's use of "fallback" must be treated as a dead-code marker: the code it decorates must be examined for transitional or dead logic.
+
+**Severity: critical**
+
+---
+
+### V-03 [major] — `_resetForAssembly` diagonal-clear condition uses wrong column coordinate after preorder swaps
+
+**File:** `src/solver/analog/sparse-solver.ts`, line 685
+
+**Rule violated:** Spec acceptance criterion (Task 0.2.1): "After `SMPpreOrder`, diagonal elements resolve correctly." The diagonal-clear logic at line 685 reads `if (r === col && ...)` where `col` is the internal column loop variable and `r` is the element's row. After `_swapColumns`, `_preorderColPerm[col] != col` for swapped columns, so an element on the logical diagonal (row == original column) will not be recognized as diagonal when `col` != `r`. This leaves stale `_diag` entries for swapped columns.
+
+**Evidence:**
+```typescript
+// line 685
+if (r === col && this._diag[col] === e) {
+```
+
+After preorder, internal column `col` maps to original column `_preorderColPerm[col]`. An element is on the logical diagonal when `r === _preorderColPerm[col]`, not when `r === col`. The condition silently fails for any fill-in or A-element placed on the preorder-swapped diagonal.
+
+**Severity: major**
+
+---
+
+### V-04 [minor] — Dead-explanation comment in `_resetForAssembly`
+
+**File:** `src/solver/analog/sparse-solver.ts`, lines 692–698
 
 **Rule violated:** rules.md: "No `# previously this was...` comments. Comments exist ONLY to explain complicated code to future developers. They never describe what was changed, what was removed, or historical behaviour."
 
 **Evidence:**
 ```typescript
-/**
- * Swap columns col1 and col2 in the persistent linked structure.
- * Unlike ngspice SwapCols (sputils.c:283-301), we MUST also update per-element
- * _elCol fields. ngspice skips this because preorder runs before row-linking
- * and uses IntToExtColMap to translate column indices in factor/solve. Our
- * architecture has no IntToExtColMap: rows are linked at allocation time, and
- * _elCol[e] is read by _removeFromCol (to find _colHead) and by
- * _updateMarkowitzNumbers (to count column contributions). Both must see the
- * current (post-swap) column assignment or they corrupt the factorization.
- */
+// Nothing to do — handle table entries for A-elements remain correct
+// after clear. The handle (pool index) is still valid; only _elVal
+// will be re-stamped before the next factorization.
 ```
 
-**Analysis:** This comment begins "Unlike ngspice SwapCols... ngspice skips this because... Our architecture has no IntToExtColMap... rows are linked at allocation time." This is a historical-provenance comment: it describes the historical ngspice behavior and how the implementation "replaced" or "diverged from" that behavior and why. The rules require that comments "never describe what was changed, what was removed, or historical behaviour." The reference to "ngspice skips this because preorder runs before row-linking" and "Our architecture has no IntToExtColMap" are historical/comparative. A compliant comment would only explain the mechanics of the current code. Per the rules, this does not indicate dead code, but it is a banned comment form.
-
-**Severity: major** — violates the explicit historical-provenance comment ban in rules.md.
-
----
-
-### V-04 [MINOR] — `allocElement` fallback comment uses the banned word "fallback"
-
-**File:** `src/solver/analog/sparse-solver.ts`, line 199
-
-**Rule violated:** rules.md: banned-phrase comments. While the reviewer instructions note that "fallback" in a comment is a dead-code marker, in this instance the comment describes a legitimate code path (O(column chain length) for very large matrices), not dead/transitional code. However the word "fallback" is itself in the banned list per the rules.
-
-**Evidence:**
-```
- * O(column chain length) fallback for very large matrices.
-```
-
-The code it annotates (lines 209–233) is the real walk-the-chain path used when `n > _handleTableN`, which is a genuine live code path. The comment is not a dead-code marker. This is a minor violation of the word-level ban on "fallback" in comments.
+This comment describes why code was intentionally omitted — a justification comment explaining a design decision in terms of what "remains correct" from a prior state. This is a historical-provenance/dead-explanation form that the rules prohibit. Comments must explain complicated code, not explain why code was not written.
 
 **Severity: minor**
 
@@ -121,88 +108,83 @@ The code it annotates (lines 209–233) is the real walk-the-chain path used whe
 
 ## Gaps
 
-### G-01 — Task 0.1.3 acceptance criterion: `factorNumerical()` touches zero linked-list operations
+### G-01 — `complex-sparse-solver.ts` retains COO arrays and AMD artifacts (Wave 0.4 explicitly out of scope)
+
+**Spec requirement:** Phase 0 overall goal: delete COO arrays and AMD artifacts from all sparse solver implementations.
+
+**What was found:** `src/solver/analog/complex-sparse-solver.ts` retains `_perm`, `_permInv`, `_topologyDirty`, `_computeAMD()`, `_buildEtree()`, `_symbolicLU()`, and COO triplet arrays. Wave 0.4 is designated to fix this and is explicitly out of scope for this review per the assignment. Recorded as a gap for completeness.
+
+**File:** `src/solver/analog/complex-sparse-solver.ts`
+
+---
+
+### G-02 — `_reach(k)` DFS in `_numericLUReusePivots` — borderline on "zero linked-list operations" criterion
 
 **Spec requirement (Task 0.1.3):** "`factorNumerical()` touches zero linked-list operations — values are scattered from linked elements into existing CSC positions."
 
-**What was found:** `_numericLUReusePivots()` (called by `factorNumerical()`) contains a linked-list chain walk of the column structure (`_colHead`/`_elNextInCol`) on every column k of the NR hot path, plus a call to `_reach(k)` which performs a DFS through L's CSC column structure. These are not O(1) lookups. The spec's "zero linked-list operations" criterion is not satisfied.
+**What was found:** `_numericLUReusePivots()` uses `_aMatrixColStart`/`_aMatrixHandlesByCol` flat arrays for A-matrix scatter (correct, O(1) per element). However, it calls `_reach(k)` which performs a DFS over L's CSC column structure (`_lColPtr`/`_lRowIdx`). The `_reach()` DFS is over CSC arrays (not the persistent linked list), so this is not strictly a linked-list walk, but it is a non-trivial traversal. Whether this satisfies "zero linked-list operations" depends on interpretation. Recorded as a gap pending clarification.
 
-**File:** `src/solver/analog/sparse-solver.ts` lines 1091–1137
-
-**Note:** This gap overlaps with V-02. Both the violation (hot-path linked-list walk) and the gap (acceptance criterion unmet) are reported separately per instructions.
+**File:** `src/solver/analog/sparse-solver.ts`, `_numericLUReusePivots()`
 
 ---
 
 ## Weak Tests
 
-### WT-01 — `csc_solve_matches_linked_factor`: does not verify that `_buildCSCFromLinked()` performs the population step
+### WT-01 — `mna_50node_realistic_circuit_performance`: calls deleted API methods and contains dead `performance.now()` calls
 
-**Test path:** `src/solver/analog/__tests__/sparse-solver.test.ts::SparseSolver CSC from linked structure::csc_solve_matches_linked_factor`
+**Test path:** `src/solver/analog/__tests__/sparse-solver.test.ts::SparseSolver performance::mna_50node_realistic_circuit_performance`
 
-**Issue:** The test verifies solve correctness and checks that `lValueIndex`/`uValueIndex` have some entries >= 0. It does not verify that `_buildCSCFromLinked()` actually copies element values into `_lVals`/`_uVals`. The test asserts:
+**Issues:**
+1. Calls `el.stamp(rawSolver)` and `el.stampNonlinear(rawSolver)` — both deleted from `AnalogElement` in Task 6.1.2. These calls are dead and will fail at runtime.
+2. Lines 464, 466, 468, 470, 486, 488, 490, 492: multiple `performance.now()` calls whose return values are assigned to local variables that are never read. These are dead measurement code with discarded results — they produce no assertions and contribute no information.
+
+**Evidence:**
 ```typescript
-let hasLIndex = false;
-let hasUIndex = false;
-for (let e = 0; e < elCount; e++) {
-  if (lValueIndex[e] >= 0) hasLIndex = true;
-  if (uValueIndex[e] >= 0) hasUIndex = true;
-}
-expect(hasLIndex).toBe(true);
-expect(hasUIndex).toBe(true);
+// line 456
+el.stamp(rawSolver);
+// line 464
+const t0 = performance.now();  // t0 never used in any assertion
 ```
-This only checks that some indices are non-negative. It does not verify the actual CSC value arrays (`_lVals`, `_uVals`) match the linked-structure element values — which is the entire point of the spec's `_buildCSCFromLinked()` contract. The acceptance criterion "CSC is rebuilt only on reorder events" cannot be verified from this test either. A test that actually reads back `_lVals[lValueIndex[e]]` and compares it to `_elVal[e]` would be needed.
+
+**Severity: test calls deleted interface methods (overlaps V-01) plus dead measurement code with zero assertions.**
 
 ---
 
-### WT-02 — `numeric_refactor_reuses_csc_pattern`: `lastFactorUsedReorder` check is on the method called, not on whether the CSC sparsity pattern was actually reused
+### WT-02 — `preorder_fixes_zero_diagonal_from_voltage_source`: does not assert that a swap actually occurred
 
-**Test path:** `src/solver/analog/__tests__/sparse-solver.test.ts::SparseSolver CSC from linked structure::numeric_refactor_reuses_csc_pattern`
+**Test path:** `src/solver/analog/__tests__/sparse-solver.test.ts::SparseSolver preorder::preorder_fixes_zero_diagonal_from_voltage_source`
 
-**Issue:** The test verifies `solver.lastFactorUsedReorder === false` after `factorNumerical()`. This is an implementation-detail assertion (which dispatch path was taken), not a behavioral assertion about the CSC sparsity pattern being reused. The spec's acceptance criterion is "CSC is rebuilt only on reorder events, not every NR iteration." The test does not assert that the CSC sparsity structure (`_lColPtr`, `_lRowIdx`, `_uColPtr`, `_uRowIdx`) is identical before and after the numerical factorization — which would be the correct behavioral assertion. The correctness assertion (`x[0] ≈ 1.0`, `x[1] ≈ 1.0`) does test desired behavior, so the test is not entirely implementation-detail focused, but the pattern-reuse criterion is untested.
+**Issue:** The test only verifies that factorization succeeds and that `Ax=b` holds after `preorder()` is called. It does not assert that any column swap actually took place (`_preorderColPerm[i] !== i` for some `i`), nor that `_diag` was correctly populated after the swap. A trivially-correct solver with no preorder logic at all could pass this test as long as the circuit is solvable by some other means. The behavioral assertion (swap occurred, diagonal was fixed) is absent.
+
+**Evidence:**
+```typescript
+// The test only checks:
+expect(() => solver.factorWithReorder()).not.toThrow();
+// and solution correctness — not that preorder actually swapped anything
+```
 
 ---
 
 ## Legacy References
 
-None found in `src/solver/analog/sparse-solver.ts` or `src/solver/analog/newton-raphson.ts`.
+### L-01 — `complex-sparse-solver.ts` retains AMD symbols and COO arrays
+
+**File:** `src/solver/analog/complex-sparse-solver.ts`
+
+Retains: `_perm`, `_permInv`, `_topologyDirty`, `_computeAMD`, `_buildEtree`, `_symbolicLU`, and COO triplet field declarations. These are the exact artifacts Phase 0 was designed to delete. Wave 0.4 is assigned to remove them; this is a legacy reference that will persist until that wave lands.
 
 ---
 
-## Additional Notes
+### L-02 — `spec/progress.md` line 67: stale `stampAll` reference
 
-The following items from the coordinator's concern list were explicitly verified clean:
+**File:** `spec/progress.md`, line 67
 
-1. **Handle-based stamp API O(1) in hot path:** `stampElement(handle, value)` is `_elVal[handle] += value` — unconditionally O(1). Confirmed clean.
-
-2. **`stamp(row, col, value)` retained without banned-phrase comments:** The method at lines 249–252 is a thin wrapper with no deferral comments, no "pending Phase 6", no "TODO". The JSDoc says "Convenience method: find-or-create element at (row, col) and accumulate value." Clean.
-
-3. **All COO fields deleted:** No `_cooRows`, `_cooCols`, `_cooVals`, `_cooCount`, `_cooToCsc`, `_prevCooCount`, `_bldColCount`, `_bldColPos`, `_bldBucketRows`, `_bldBucketCooIdx` found in sparse-solver.ts. Confirmed clean.
-
-4. **AMD artifacts deleted:** No `_computeAMD`, `_buildEtree`, `_perm`, `_permInv`, `_symbolicLU` found. Confirmed clean.
-
-5. **`_lValueIndex`/`_uValueIndex` exist:** Both declared at lines 62–67 and used. Confirmed.
-
-6. **`preorder()` implements SMPpreOrder:** Implements twin-pair detection with monotonic `startAt` cursor, `_countTwins`, `_swapColumns` helpers. Confirmed.
-
-7. **`forceReorder()` at the three ngspice-matching points:**
-   - initJct→initFix: line 549 in newton-raphson.ts — confirmed.
-   - initTran when `iteration <= 0` (0-based = iterno <= 1 in 1-based): line 565-566 — confirmed.
-   - E_SINGULAR recovery: line 384 followed by `continue` at line 385 — confirmed.
-
-8. **E_SINGULAR recovery uses `forceReorder() + continue`:** Lines 381–385 check `!solver.lastFactorUsedReorder`, call `solver.forceReorder()`, then `continue`. The `continue` returns to the top of the `for` loop, re-executing Step A (clear noncon) and Step B (stampAll). Confirmed correct.
-
-9. **`_topologyDirty` / `_prevCooCount` deleted:** Neither found. Confirmed clean.
-
-10. **All spec-required test names present:** All 15 Phase 0 spec-required test names found in the test files. Confirmed.
+`stampAll` was deleted in Phase 2.2. The progress entry at line 67 still references it as a method expected to be called in the NR loop, which is now incorrect. This is a stale API reference in the progress document.
 
 ---
 
-## Appendix: `_buildCSCFromLinked` — Spec vs Implementation
+### L-03 — `spec/progress.md` lines 84–89: stale CLARIFICATION NEEDED block
 
-The spec (Task 0.1.3) says:
+**File:** `spec/progress.md`, lines 84–89
 
-> "After `factorWithReorder()` completes, `_buildCSCFromLinked()` walks the pool once, reading `_elVal` into the CSC arrays using the stored indices — producing cache-optimal CSC L/U for forward/backward substitution."
-
-The implementation's `_buildCSCFromLinked()` does not walk the pool to read `_elVal` into CSC arrays. Instead, the L/U values are written inline during `_numericLUMarkowitz()` at lines 1019–1047 as each L/U entry is created. `_buildCSCFromLinked()` is then called as a post-pass that clamps out-of-range indices. The comment at line 1160 says "Verify CSC L/U index mappings are consistent after factorWithReorder."
-
-The factual situation: the CSC values are correct (populated inline), but the architecture described in the spec (post-factor snapshot pass) is not what was built. The method name `_buildCSCFromLinked` no longer accurately describes what the method does. This matters for Task 0.1.3's acceptance criterion around `_numericLUReusePivots` using O(1) scatter — the spec's design was: "After `factorWithReorder()` completes, `_buildCSCFromLinked()` walks the pool once" to set up `_lValueIndex`/`_uValueIndex` mappings for subsequent `_numericLUReusePivots` calls. In the implementation, these mappings are set during `_numericLUMarkowitz` itself, so the hot-path path (`_numericLUReusePivots`) still has to scatter A-values via a chain walk before accessing CSC positions, making the hot-path chain-walk (V-02) unavoidable with the current design.
+The CLARIFICATION NEEDED block at lines 84–89 describes unresolved questions about Phase 2 and Phase 6 integration. Both phases have since landed (Phase 2.2 and Phase 6.1.2 are marked complete in progress.md). The block is stale — the questions it raises are no longer open.

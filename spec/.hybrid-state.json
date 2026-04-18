@@ -2,163 +2,178 @@
   "batches": [
     {
       "id": "batch-1",
-      "phase": "Phase 0: Sparse Solver Rewrite",
+      "phase": "phase_catchup Wave C1: AnalogElementCore interface migration",
       "task_groups": [
-        "0.1"
+        "C1"
       ],
       "tasks": [
         [
-          "0.1.1",
-          "0.1.2",
-          "0.1.3",
-          "0.2.1",
-          "0.3.1",
-          "0.3.2"
+          "C1.1"
         ]
       ],
-      "spawned": 5,
-      "completed": 2,
-      "verifications_passed": 1,
-      "verifications_failed": 1,
-      "stops_for_clarification": 1,
-      "dead_implementers": 2,
-      "dead_verifiers": 0,
-      "group_status": {
-        "0.1": "passed"
-      }
-    },
-    {
-      "id": "batch-2",
-      "phase": "Phase 1: CKTCircuitContext + Zero-Alloc",
-      "task_groups": [
-        "1.1"
-      ],
-      "tasks": [
-        [
-          "1.1.1",
-          "1.1.2",
-          "1.1.3",
-          "1.2.1",
-          "1.2.2",
-          "1.2.3"
-        ]
-      ],
-      "spawned": 3,
-      "completed": 2,
-      "verifications_passed": 1,
-      "verifications_failed": 1,
-      "stops_for_clarification": 0,
-      "dead_implementers": 1,
-      "dead_verifiers": 0,
-      "group_status": {
-        "1.1": "passed"
-      }
-    },
-    {
-      "id": "batch-3",
-      "phase": "Phase 2.1 + Phase 3 + Phase 6.1 (parallel)",
-      "task_groups": [
-        "2.1",
-        "3.1",
-        "6.1"
-      ],
-      "tasks": [
-        [
-          "2.1.1",
-          "2.1.2",
-          "2.1.3"
-        ],
-        [
-          "3.1.1",
-          "3.1.2",
-          "3.1.3",
-          "3.2.1",
-          "3.2.2",
-          "3.2.3"
-        ],
-        [
-          "6.1.1",
-          "6.1.2"
-        ]
-      ],
-      "spawned": 3,
-      "completed": 3,
-      "verifications_passed": 3,
+      "spawned": 1,
+      "completed": 1,
+      "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "2.1": "passed",
-        "3.1": "passed",
-        "6.1": "passed"
+        "C1": "pending"
+      }
+    },
+    {
+      "id": "batch-2",
+      "phase": "phase_catchup Wave C2: Production integrate-helper migration + Wave 6.4 pull-forward",
+      "task_groups": [
+        "C2.a",
+        "C2.b",
+        "C2.c",
+        "C2.d"
+      ],
+      "tasks": [
+        [
+          "C2.1"
+        ],
+        [
+          "C2.2"
+        ],
+        [
+          "C2.3"
+        ],
+        [
+          "C2.4"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "C2.a": "pending",
+        "C2.b": "pending",
+        "C2.c": "pending",
+        "C2.d": "pending"
+      }
+    },
+    {
+      "id": "batch-3",
+      "phase": "phase_catchup Waves C3 + C6 + C7 + C8 (parallel after C2)",
+      "task_groups": [
+        "C3",
+        "C6a",
+        "C6b_C7",
+        "C8"
+      ],
+      "tasks": [
+        [
+          "C3.1",
+          "C3.2",
+          "C3.3",
+          "C3.4",
+          "C3.5",
+          "C3.6"
+        ],
+        [
+          "C6.1",
+          "C6.2",
+          "C6.3",
+          "C6.4",
+          "C6.5"
+        ],
+        [
+          "C6.6",
+          "C7.1",
+          "C7.2"
+        ],
+        [
+          "C8.1",
+          "C8.2",
+          "C8.3",
+          "C8.4"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "C3": "pending",
+        "C6a": "pending",
+        "C6b_C7": "pending",
+        "C8": "pending"
       }
     },
     {
       "id": "batch-4",
-      "phase": "Phase 6.2: Element Rewrites (atomic, non-overlapping files)",
+      "phase": "phase_catchup Waves C4 + C5 (parity tests + SparseSolver.stamp deletion)",
       "task_groups": [
-        "6.2.a",
-        "6.2.b",
-        "6.2.c",
-        "6.2.d"
+        "C4.passive_reactive",
+        "C4.semi_sources",
+        "C4.active_rounding",
+        "C5"
       ],
       "tasks": [
         [
-          "6.2.1",
-          "6.2.7"
+          "C4.1",
+          "C4.2"
         ],
         [
-          "6.2.2",
-          "6.2.4"
+          "C4.3",
+          "C4.4"
         ],
         [
-          "6.2.3"
+          "C4.5",
+          "C4.6"
         ],
         [
-          "6.2.5",
-          "6.2.6"
+          "C5.1"
         ]
       ],
-      "spawned": 11,
-      "completed": 4,
-      "verifications_passed": 4,
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
-      "dead_implementers": 7,
+      "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "6.2.a": "passed",
-        "6.2.b": "passed",
-        "6.2.c": "passed",
-        "6.2.d": "passed"
+        "C4.passive_reactive": "pending",
+        "C4.semi_sources": "pending",
+        "C4.active_rounding": "pending",
+        "C5": "pending"
       }
     },
     {
       "id": "batch-5",
-      "phase": "Phase 2.2 + Phase 6.3: cktLoad + delete loops (atomic)",
+      "phase": "phase_catchup Wave C9: Mechanical cleanup (last wave)",
       "task_groups": [
-        "2.2_6.3"
+        "C9"
       ],
       "tasks": [
         [
-          "2.2.1",
-          "2.2.2",
-          "2.2.3",
-          "6.3.1",
-          "6.3.2",
-          "6.3.3"
+          "C9.1",
+          "C9.2",
+          "C9.3",
+          "C9.4",
+          "C9.5"
         ]
       ],
-      "spawned": 4,
-      "completed": 2,
+      "spawned": 0,
+      "completed": 0,
       "verifications_passed": 0,
-      "verifications_failed": 1,
+      "verifications_failed": 0,
       "stops_for_clarification": 0,
-      "dead_implementers": 2,
+      "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "2.2_6.3": "failed"
+        "C9": "pending"
       }
     },
     {
@@ -283,5 +298,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-17T13:36:04.999Z"
+  "last_updated": "2026-04-18T00:19:47.862Z"
 }

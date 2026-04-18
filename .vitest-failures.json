@@ -1,23 +1,10 @@
 {
   "summary": {
-    "passed": 32,
-    "failed": 1,
+    "passed": 3,
+    "failed": 0,
     "skipped": 0,
-    "totalFiles": 3,
-    "durationSeconds": 1.1
+    "totalFiles": 1,
+    "durationSeconds": 0.8
   },
-  "failures": [
-    {
-      "message": "expected 2083333.333333333 to be 2083333.3333333333 // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\integration.test.ts",
-          "test": "gear_vandermonde_flat_scratch_regression",
-          "line": 321,
-          "column": 19
-        }
-      ]
-    }
-  ]
+  "failures": []
 }

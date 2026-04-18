@@ -1,16 +1,42 @@
 # Test Baseline
 
-- **Timestamp**: 2026-04-15T21:58:00Z
-- **Phase**: Phase 0 (baseline capture)
+- **Timestamp**: 2026-04-18T00:00:00Z
+- **Phase**: phase_catchup (about to start Wave C1)
+- **Command**: npm run test:q
+- **Result**: BROKEN — suite hangs indefinitely; cannot run to completion.
+
+## Current pre-catchup state (AUTHORITATIVE for phase_catchup)
+
+The test suite does **not** run to completion in this phase. Implementers must not attempt a full suite run. Use targeted tests only (`npm test -- <path-pattern>`) scoped to the files modified in the current task.
+
+Known root causes (all remediated by phase_catchup):
+
+1. **Seven production modules import the deleted `integrateCapacitor` / `integrateInductor` symbols** — `fet-base.ts`, `mosfet.ts`, `diode.ts`, `varactor.ts`, `tunnel-diode.ts`, `led.ts`, `digital-pin-model.ts`. Any runtime test touching these modules fails at module-load. Fixed by Wave C2.
+2. **`src/core/analog-types.ts::AnalogElementCore` still carries pre-migration split method set**; its sibling `AnalogElement` was migrated. tsc breakage + mock confusion. Fixed by Wave C1.
+3. **Test files still driving elements through deleted methods** across `controlled-source-base.test.ts`, `behavioral-*.test.ts`, `fet-base.test.ts`, `dcop-init-jct.test.ts`, `varactor.test.ts`, `sparse-solver.test.ts`, `test-helpers.ts` mock factory. Fixed by Wave C3.
+4. **`cktLoad` drops `srcFact` scaling on nodesets, never stamps ICs**, vs ngspice `cktload.c:96-136`. Fixed by Wave C7.
+5. **Dead code paths** — `applyNodesetsAndICs` helper, `rawMaxIter` tautological ternary, `SparseSolver.stamp(row,col,value)` wrapper, five obsolete tests. Fixed by Waves C5, C6.6, C7.2.
+6. **Missing spec-required parity tests** — every per-element parity test from Phase 6 Tasks 6.2.1–6.2.5, plus `buckbjt-convergence.test.ts` (Task 6.2.3), plus Phase 3 rounding differential tests. Fixed by Wave C4.
+7. **Weak assertions and `toBeCloseTo`** across `integration.test.ts`, `ckt-terr.test.ts`. Fixed by Wave C8.
+
+## Pre-catchup rule for implementers
+
+- **Do not** interpret a test failure you see during phase_catchup as caused by your own changes without verifying it against the Phase 0 historical baseline below and against this known-broken list.
+- When a spec-exact test detects real ngspice divergence, **surface the divergence** to the user — do not soften the assertion, do not relax `toBe` to `toBeCloseTo`, do not add `?.` guards, do not cast with `as any`.
+- Hanging tests are expected until Wave C2 lands (module-load crashes resolved).
+- Wave C2.4 is an atomic-migration gate — `tsc --noEmit` is expected to succeed only after the full Wave 6.4 body lands.
+
+---
+
+## Historical baseline (Phase 0, captured 2026-04-15T21:58:00Z)
+
+Kept for reference only. Most of these failing tests will be retargeted or replaced by phase_catchup; do not use this list to triage failures during phase_catchup.
+
 - **Command**: npm run test:q
 - **Result**: 8333/8368 passing, 35 failing, 0 errors
+- **Duration**: 17.9 seconds across 365 files
 
-## Summary
-
-Total tests: 8368 across 365 files
-Duration: 17.9 seconds
-
-## Failing Tests (pre-existing)
+### Phase 0 failing tests
 
 | Test File | Test Name | Error Type | Summary |
 |-----------|-----------|-----------|---------|
@@ -22,47 +48,4 @@ Duration: 17.9 seconds
 | src/headless/__tests__/rlc-lte-path.test.ts | reltol configurability: tight reltol produces different result and more steps | Engine Stagnation | simTime stuck at 0.0000348s |
 | src/headless/__tests__/rlc-lte-path.test.ts | RC capacitor zero-crossings at f=20Hz (f<<fc): 2±1 crossings and peak≥0.95 | Assertion | expected 99 to be ≤ 3 |
 | src/headless/__tests__/rlc-lte-path.test.ts | RL resistor zero-crossings at f=200Hz (f<<fc): ≥6 crossings over 4 periods | Engine Stagnation | simTime stuck at 0.0093s |
-| src/io/dts-schema.ts | circuit.metadata.models entry survives serialize -> deserialize | Schema Validation | modelParamDeltas.params["ICVBE"] must be number or string (6 tests) |
-| src/io/dts-schema.ts | deserialized circuit with metadata.models compiles cleanly | Schema Validation | modelParamDeltas.params["ICVBE"] must be number or string |
-| src/io/dts-schema.ts | deserialized circuit produces same DC result as pre-serialization | Schema Validation | modelParamDeltas.params["ICVBE"] must be number or string |
-| src/io/dts-schema.ts | serialize → deserialize preserves SPICE model name and params | Schema Validation | modelParamDeltas.params["ICVBE"] must be number or string |
-| src/io/dts-schema.ts | overrides survive serialize -> deserialize -> recompile | Schema Validation | modelParamDeltas.params["ICVBE"] must be number or string |
-| src/io/dts-schema.ts | deserialized circuit with overrides produces same DC result as pre-serialization | Schema Validation | modelParamDeltas.params["ICVBE"] must be number or string |
-| src/components/active/__tests__/timer-555.test.ts | oscillates_at_correct_frequency | Assertion | expected 0 to be ≥ 8 |
-| src/components/active/__tests__/timer-555.test.ts | duty_cycle | Assertion | expected 1 to be < 0.05 |
-| src/components/active/__tests__/timer-555.test.ts | pulse_width | Assertion | expected 0.9998 to be < 0.1 (2 tests) |
-| src/components/active/__tests__/timer-555.test.ts | retrigger_ignored_during_pulse | Assertion | expected 0.9998 to be < 0.1 |
-| src/components/sources/__tests__/ac-voltage-source.test.ts | rc_lowpass | Assertion | expected Infinity to be < 0.864 |
-| src/solver/analog/__tests__/analog-engine.test.ts | transient_rc_decay | Assertion | expected -1.44e+18 to be > 4.5 (3 tests) |
-| src/solver/analog/__tests__/analog-engine.test.ts | predictor_off_rc_regression | Assertion | expected -1.44e+18 to be > 4.5 |
-| src/solver/analog/__tests__/convergence-regression.test.ts | RC circuit runs transient steps stably with capacitor near Vs | Assertion | expected -1.44e+18 to be > 4.5 |
-| src/solver/analog/__tests__/buckbjt-convergence.test.ts | DC operating point converges | Assertion | expected false to be true (Object.is equality) |
-| src/solver/analog/__tests__/buckbjt-mcp-surface.test.ts | DC op result after compile has converged === true and all finite node voltages | Assertion | expected false to be true (Object.is equality) |
-| src/solver/coordinator.ts | transient stepping does not error after 50 steps | Engine Stagnation | simTime stuck at 1.25e-10s |
-| src/solver/analog/__tests__/buckbjt-convergence.test.ts | survives 2000 transient steps without ERROR state | Engine Error | ERROR state at step 2, simTime=1.25e-10 |
-| src/solver/analog/__tests__/buckbjt-convergence.test.ts | survives 600µs of sim time (matches UI run duration) | Engine Error | ERROR state at step 2, simTime=1.25e-10 |
-| src/solver/analog/__tests__/mna-end-to-end.test.ts | rc_steady_state_no_drift | Assertion | expected 2.86e+46 to be < 0.1 |
-| src/solver/analog/__tests__/mna-end-to-end.test.ts | rc_steady_state_current_zero | Assertion | expected 2.98e+42 to be < 0.01 |
-| src/solver/analog/__tests__/mna-end-to-end.test.ts | rl_dc_steady_state_tight_tolerance | Assertion | expected 0.691 to be < 0.1 |
-| src/solver/analog/__tests__/rc-ac-transient.test.ts | steady-state amplitude matches analytical \|H(f)\| | Assertion | expected Infinity to be < 4.445 |
-| src/solver/analog/__tests__/rc-ac-transient.test.ts | output amplitude is attenuated relative to input | Assertion | expected Infinity to be < 4.999 |
-| src/solver/analog/__tests__/rc-ac-transient.test.ts | output phase lags input | Assertion | expected true to be false (Object.is equality) |
-| src/solver/analog/__tests__/rc-ac-transient.test.ts | higher frequency produces greater attenuation | Assertion | expected 1.99e+161 to be < 2.116 |
-| src/solver/analog/__tests__/rc-ac-transient.test.ts | full pipeline: compile → DC OP → transient → analytical match | Assertion | expected 4.9999 to be < 4.657 |
-
-## Failure Categories
-
-| Category | Count | Details |
-|----------|-------|---------|
-| Numerical/Convergence Issues | 8 | Infinity values, extreme values (e+30, e+42, e+46, e+161) suggesting NaN propagation or solver instability |
-| Engine Stagnation | 4 | Timestep unable to advance; check convergence log (see CLAUDE.md) |
-| Engine Error | 2 | ERROR state during transient simulation |
-| Schema Validation | 6 | modelParamDeltas serialization format issue with ICVBE parameter |
-| Oscillator/Timing | 5 | 555 timer and AC source behavioral assertions failing |
-| RLC/Dynamics | 6 | Step response, zero-crossing, and AC frequency response failures |
-| DC Convergence | 2 | BJT buck converter DC operating point not converging |
-| Wire Current Analysis | 2 | KCL and current equality checks |
-
-## Structured Failure Data
-
-Complete structured failure data available in `.vitest-failures.json` with file paths, line numbers, and error messages.
+| src/io/dts-schema.ts | circuit.metadata.models entry survives serialize -> deserialize | Schema Validation | modelParamDeltas.params["ICVBE"] must be number or string (multiple) |

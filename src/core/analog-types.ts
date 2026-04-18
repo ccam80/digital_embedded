@@ -121,53 +121,33 @@ export interface AnalogElementCore {
   readonly branchIndex: number;
 
   /**
-   * Stamp linear (topology-dependent, operating-point-independent)
-   * contributions into the MNA matrix.
+   * Primary hot-path method. Called every NR iteration.
+   *
+   * Reads terminal voltages from ctx.voltages, evaluates device equations,
+   * and stamps conductance and RHS contributions into ctx.solver. For reactive
+   * elements, also integrates charge/flux inline using ctx.ag[]. Matches
+   * ngspice DEVload.
    */
-  stamp(solver: SparseSolverStamp): void;
+  load(ctx: import("../solver/analog/load-context.js").LoadContext): void;
 
   /**
-   * Stamp linearized nonlinear contributions at the current operating point.
+   * Post-acceptance work: update companion state and schedule next breakpoint.
+   *
+   * Called once per accepted timestep — never on a rejected LTE retry and
+   * never inside the NR convergence loop. Absorbs the former updateCompanion
+   * and updateState responsibilities. ctx provides dt, method, and voltages
+   * needed for companion/state updates.
    */
-  stampNonlinear?(solver: SparseSolverStamp): void;
-
-  /**
-   * Update internal linearization state from the latest NR solution vector.
-   */
-  updateOperatingPoint?(voltages: Readonly<Float64Array>): boolean | void;
-
-  /**
-   * Recompute companion model coefficients and stamp them into the solver.
-   */
-  stampCompanion?(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void;
-
-  /**
-   * Stamp previously-computed companion model entries (geq/ieq) into the
-   * MNA matrix. Called every NR iteration. Companion entries are separated
-   * from stamp() so the linear base contains only topology-constant
-   * contributions.
-   */
-  stampReactiveCompanion?(solver: SparseSolverStamp): void;
-
-  /**
-   * Rewrite the _NOW charge/flux slot(s) using converged NR voltages, and
-   * recompute ccap from the converged charge so the next step's trapezoidal
-   * recursion starts from the correct companion current.
-   * Called after NR convergence but before LTE evaluation so that
-   * getLteTimestep sees accurate charge/flux values.
-   * Implementations must write ONLY the _NOW slot — never shift history.
-   */
-  updateChargeFlux?(voltages: Float64Array, dt: number, method: import("../solver/analog/element.js").IntegrationMethod, order: number, deltaOld: readonly number[]): void;
-
-  /**
-   * Update non-MNA internal state variables after an accepted timestep.
-   */
-  updateState?(dt: number, voltages: Float64Array): void;
+  accept?(ctx: import("../solver/analog/load-context.js").LoadContext, simTime: number, addBreakpoint: (t: number) => void): void;
 
   /**
    * Element-specific convergence check beyond the global node-voltage criterion.
+   *
+   * Called after every NR iteration. Return true if this element considers
+   * the current solution converged; false to signal that iteration must
+   * continue. Tolerances reltol and iabstol are available on ctx.
    */
-  checkConvergence?(voltages: Float64Array, prevVoltages: Float64Array, reltol: number, abstol: number): boolean;
+  checkConvergence?(ctx: import("../solver/analog/load-context.js").LoadContext): boolean;
 
   /**
    * CKTterr-based LTE timestep proposal. Returns the maximum allowable
@@ -181,7 +161,7 @@ export interface AnalogElementCore {
     dt: number,
     deltaOld: readonly number[],
     order: number,
-    method: import("../solver/analog/element.js").IntegrationMethod,
+    method: IntegrationMethod,
     lteParams: import("../solver/analog/ckt-terr.js").LteParams,
   ): number;
 
@@ -203,17 +183,27 @@ export interface AnalogElementCore {
   stampAc?(solver: ComplexSparseSolver, omega: number): void;
 
   /**
-   * True if this element implements stampNonlinear.
+   * True if this element performs nonlinear stamping inside load().
+   *
+   * The engine reads this flag to decide whether to call load() for
+   * nonlinear elements during NR iteration or only once per timestep.
    */
   readonly isNonlinear: boolean;
 
   /**
-   * True if this element implements stampCompanion.
+   * True if this element integrates reactive state (charge/flux) inside load().
+   *
+   * The timestep controller reads this flag to decide whether to call
+   * getLteTimestep() for reactive element handling.
    */
   readonly isReactive: boolean;
 
   /**
    * Compute per-pin currents for this element.
+   *
+   * Returns an array of currents in pinLayout order (same as pinNodeIds),
+   * one per visible pin. Positive means current flowing into the element.
+   * The array must satisfy KCL: the sum of all entries is zero.
    */
   getPinCurrents(voltages: Float64Array): number[];
 
@@ -221,26 +211,13 @@ export interface AnalogElementCore {
    * Arm a one-shot per-device junction seed for cold-start NR convergence.
    * Called once by the dcopInitJct phase before the main NR runs. The device
    * stores tVcrit-derived junction voltages in internal state; the next call
-   * to updateOperatingPoint consumes and clears that state, overriding the
-   * values it would otherwise compute from the shared voltages array.
+   * to load() consumes and clears that state.
    *
    * Matches ngspice MODEINITJCT (bjtload.c:265-274): a per-device
    * linearization-point override, NOT a write into the shared MNA vector.
    * Optional; linear elements do not implement this.
    */
   primeJunctions?(): void;
-
-  /**
-   * Device bypass optimization (ngspice bypass check).
-   * When this method returns true AND the NR iteration is > 0, the element's
-   * stamp/stampNonlinear/stampReactiveCompanion calls are skipped — the
-   * contributions from iteration 0 remain in the matrix.
-   *
-   * Implementations compare current and previous node voltages to decide
-   * whether the device operating point has changed enough to warrant
-   * re-stamping. Elements that do not implement this method are always stamped.
-   */
-  shouldBypass?(voltages: Float64Array, prevVoltages: Float64Array): boolean;
 
   /**
    * Optional display label for diagnostic attribution.
