@@ -278,7 +278,7 @@ describe("Zener", () => {
   });
 
   it("change42_breakdown_amplitude_uses_IS_not_IBV", () => {
-    // Change 42: breakdown Id = -IS * exp(-(Vd+BV)/(NBV*Vt)), not -IBV * exp(...)
+    // breakdown Id = -IS * exp(-(Vd+BV)/(NBV*Vt)), not -IBV * exp(...)
     // At Vd = -BV: Id = -IS * exp(0) = -IS
     // With IS=1e-14 and IBV=1e-3, the currents differ by ~11 orders of magnitude.
     // Drive element to exactly -BV and check that ID in state is -IS (not -IBV).
@@ -311,7 +311,7 @@ describe("Zener", () => {
   });
 
   it("change42_nbv_parameter_defaults_to_N", () => {
-    // Change 42: NBV parameter added; when not given, defaults to N.
+    // NBV parameter added; when not given, defaults to N.
     // Verify that passing NBV=NaN (omitted) results in NBV being treated as N=1,
     // meaning the element accepts the parameter and works correctly in forward bias.
     // This is a structural check: NBV is accepted as a parameter and does not crash.
@@ -353,7 +353,7 @@ describe("Zener", () => {
   });
 
   it("change42_breakdown_pnjlim_limits_in_reflected_domain", () => {
-    // Change 42: breakdown pnjlim applies in the reflected domain.
+    // breakdown pnjlim applies in the reflected domain.
     // When starting far from breakdown and stepping to deep breakdown,
     // pnjlim must limit the step (preventing exponential runaway).
     // Test: starting at vd=0 (forward), then suddenly jumping to vd=-20V (deep breakdown)

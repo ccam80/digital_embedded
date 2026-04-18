@@ -153,6 +153,11 @@ export class AcAnalysis {
     // Step 5: Frequency sweep
     const complexSolver = new ComplexSparseSolver();
 
+    // Handle cache for the AC voltage-source branch-row stamps.
+    // Allocated once on frequency 0, reused across the sweep.
+    let acBranchHandleA = -1;
+    let acBranchHandleB = -1;
+
     for (let fi = 0; fi < numFreq; fi++) {
       const f = frequencies[fi];
       const omega = 2 * Math.PI * f;
@@ -173,12 +178,17 @@ export class AcAnalysis {
       //   C[branchRow, sourceNodeIdx] += 1   (C sub-matrix: branch row, node col)
       //   RHS[branchRow] = 1 + 0j            (voltage constraint: V_src = 1V AC)
       if (sourceNodeIdx >= 0) {
-        complexSolver.stamp(sourceNodeIdx, branchRow, 1.0, 0.0);
-        complexSolver.stamp(branchRow, sourceNodeIdx, 1.0, 0.0);
+        if (fi === 0) {
+          acBranchHandleA = complexSolver.allocComplexElement(sourceNodeIdx, branchRow);
+          acBranchHandleB = complexSolver.allocComplexElement(branchRow, sourceNodeIdx);
+        }
+        complexSolver.stampComplexElement(acBranchHandleA, 1.0, 0.0);
+        complexSolver.stampComplexElement(acBranchHandleB, 1.0, 0.0);
       }
       complexSolver.stampRHS(branchRow, 1.0, 0.0);
 
       complexSolver.finalize();
+      if (fi === 0) complexSolver.forceReorder();
       const ok = complexSolver.factor();
 
       if (ok) {

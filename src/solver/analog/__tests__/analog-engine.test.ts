@@ -888,6 +888,120 @@ describe("xfact_computed_from_deltaOld", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Task 5.1.1 — method_stable_across_ringing
+// ---------------------------------------------------------------------------
+
+describe("method_stable_across_ringing", () => {
+  it("method_stable_across_ringing", () => {
+    // Create an RLC oscillator that would have triggered BDF-2 switching under
+    // the old code. Assert method remains trapezoidal throughout.
+    //
+    // We run an RC circuit (reactive element) through many steps and verify
+    // currentMethod never becomes "bdf2" (which the old checkMethodSwitch would
+    // have set on detecting alternating terminal voltages).
+    const circuit = makeRCCircuit();
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    engine.dcOperatingPoint();
+
+    // Run 50 transient steps.
+    for (let i = 0; i < 50; i++) {
+      engine.step();
+      expect(engine.getState()).not.toBe(EngineState.ERROR);
+    }
+
+    // Access internal timestep controller.
+    const ts = (engine as unknown as { _timestep: { currentMethod: string } })._timestep;
+    // Method must remain trapezoidal — no BDF-2 switching.
+    expect(ts.currentMethod).not.toBe("bdf2");
+    // Method is either trapezoidal (initial) or bdf1 (post-breakpoint reset only).
+    expect(["trapezoidal", "bdf1"]).toContain(ts.currentMethod);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.1.2 — first_step_uses_trapezoidal
+// ---------------------------------------------------------------------------
+
+describe("first_step_uses_trapezoidal", () => {
+  it("first_step_uses_trapezoidal", () => {
+    // Run one transient step. Assert integration coefficients match trapezoidal.
+    // For trapezoidal order 2: ag[0] = 2/dt, ag[1] = -2/dt (ngspice NIcomCof trap).
+    // For BDF-1: ag[0] = 1/dt, ag[1] = -1/dt.
+    // We verify the method is trapezoidal before and after the first step.
+    const circuit = makeRCCircuit();
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    engine.dcOperatingPoint();
+
+    // Check method before first step.
+    const ts = (engine as unknown as { _timestep: { currentMethod: string; currentOrder: number } })._timestep;
+    expect(ts.currentMethod).toBe("trapezoidal");
+    expect(ts.currentOrder).toBe(2);
+
+    // Run one step.
+    engine.step();
+    expect(engine.getState()).not.toBe(EngineState.ERROR);
+
+    // After first step, the engine ran with trapezoidal.
+    // The method may have been reset to bdf1 by a breakpoint if one was at t=0,
+    // but initially it was trapezoidal.
+    // Check that the integration coefficients written to ctx.ag match trapezoidal:
+    // ag[0] = 2/dt for trapezoidal (order 2).
+    const ctx = (engine as unknown as { _ctx: { ag: number[]; loadCtx: { dt: number } } })._ctx;
+    const dt = engine.lastDt;
+    // Trapezoidal: ag[0] = 2/dt, ag[1] = -2/dt (NIcomCof trap formula).
+    // We check the ratio: ag[0] * dt should be 2 for trapezoidal, 1 for bdf1.
+    // After the step, ag[] holds the coefficients from the accepted step.
+    if (dt > 0) {
+      const ag0 = ctx.ag[0];
+      // ag[0] * dt should be 2 for trapezoidal or 1 for bdf1.
+      // Since we start trapezoidal, expect 2.
+      expect(ag0 * dt).toBeCloseTo(2, 6);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5.3.1 — predictor_gate_off_by_default
+// ---------------------------------------------------------------------------
+
+describe("predictor_gate_off_by_default", () => {
+  it("predictor_gate_off_by_default", () => {
+    // Audit: the predictor code path in step() is gated by
+    // `this._stepCount > 0 && (this._params.predictor ?? false)`.
+    // When predictor is explicitly set to false, predictVoltages is never called.
+    // This is an audit test — verify that the gate works by running with
+    // predictor: false and confirming no error/corruption occurs (predictor
+    // is bypassed, not invoked).
+    const circuit = makeRCCircuit();
+    const engine = new MNAEngine();
+    engine.init(circuit);
+    engine.configure({ predictor: false });
+    engine.dcOperatingPoint();
+
+    // Run 10 steps with predictor explicitly disabled.
+    for (let i = 0; i < 10; i++) {
+      engine.step();
+      expect(engine.getState()).not.toBe(EngineState.ERROR);
+    }
+
+    // Verify predictor is false in resolved params.
+    const params = (engine as unknown as { _params: { predictor?: boolean } })._params;
+    expect(params.predictor ?? false).toBe(false);
+
+    // Engine ran 10 steps successfully without calling predictVoltages.
+    // No code path invokes computeAgp or predictVoltages when predictor is false.
+    expect(engine.simTime).toBeGreaterThan(0);
+
+    // Verify no parallel voltage buffer exists (confirming correct architecture).
+    const e = engine as unknown as Record<string, unknown>;
+    expect(e._voltages).toBeUndefined();
+    expect(e._prevVoltages).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Task 1.2.2 — no_closures_in_step
 // ---------------------------------------------------------------------------
 

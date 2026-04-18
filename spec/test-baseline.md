@@ -1,63 +1,42 @@
 # Test Baseline
 
-- **Timestamp**: 2026-04-18T00:00:00Z
-- **Phase**: phase_catchup (about to start Wave C1)
-- **Command**: npm run test:q
-- **Result**: BROKEN — suite hangs indefinitely; cannot run to completion.
+- **Timestamp**: 2026-04-19T00:00:00Z (coordinator-authored)
+- **Phase**: Pre-parallel-waves (Phase 0.4 + Phase 4 + Phase 5 + Phase 7.1 about to start in one parallel batch)
+- **Command**: n/a — full suite **hangs indefinitely** in this job.
+- **Result**: **RED across the suite.** Tests are expected to remain red until late Phase 7.
 
-## Current pre-catchup state (AUTHORITATIVE for phase_catchup)
+## Critical facts for implementers and verifiers
 
-The test suite does **not** run to completion in this phase. Implementers must not attempt a full suite run. Use targeted tests only (`npm test -- <path-pattern>`) scoped to the files modified in the current task.
+**The full test suite is red and will stay red until late Phase 7.** This is the intended mid-refactor state per `spec/plan.md` "Inter-Phase Breakage Carve-Out". Do NOT treat red as failure caused by your changes unless you can positively show a regression in tests **you** explicitly touched.
 
-Known root causes (all remediated by phase_catchup):
+## CRITICAL TEST INVOCATION RULE (for ALL implementers AND verifiers)
 
-1. **Seven production modules import the deleted `integrateCapacitor` / `integrateInductor` symbols** — `fet-base.ts`, `mosfet.ts`, `diode.ts`, `varactor.ts`, `tunnel-diode.ts`, `led.ts`, `digital-pin-model.ts`. Any runtime test touching these modules fails at module-load. Fixed by Wave C2.
-2. **`src/core/analog-types.ts::AnalogElementCore` still carries pre-migration split method set**; its sibling `AnalogElement` was migrated. tsc breakage + mock confusion. Fixed by Wave C1.
-3. **Test files still driving elements through deleted methods** across `controlled-source-base.test.ts`, `behavioral-*.test.ts`, `fet-base.test.ts`, `dcop-init-jct.test.ts`, `varactor.test.ts`, `sparse-solver.test.ts`, `test-helpers.ts` mock factory. Fixed by Wave C3.
-4. **`cktLoad` drops `srcFact` scaling on nodesets, never stamps ICs**, vs ngspice `cktload.c:96-136`. Fixed by Wave C7.
-5. **Dead code paths** — `applyNodesetsAndICs` helper, `rawMaxIter` tautological ternary, `SparseSolver.stamp(row,col,value)` wrapper, five obsolete tests. Fixed by Waves C5, C6.6, C7.2.
-6. **Missing spec-required parity tests** — every per-element parity test from Phase 6 Tasks 6.2.1–6.2.5, plus `buckbjt-convergence.test.ts` (Task 6.2.3), plus Phase 3 rounding differential tests. Fixed by Wave C4.
-7. **Weak assertions and `toBeCloseTo`** across `integration.test.ts`, `ckt-terr.test.ts`. Fixed by Wave C8.
+**NEVER run `npm test`, `npm run test:q`, or any full-suite invocation.** The suite hangs indefinitely and will stall the whole job.
 
-## Pre-catchup rule for implementers
+- ❌ `npm test`
+- ❌ `npm run test:q`
+- ❌ `npx vitest run` (with no path argument — targets everything)
+- ✅ `npx vitest run <specific file path>` — e.g. `npx vitest run src/solver/analog/__tests__/dc-operating-point.test.ts`
+- ✅ `npx vitest run <specific directory>` — e.g. `npx vitest run src/solver/analog/__tests__/`  *(only a small targeted subfolder — never the whole project)*
 
-- **Do not** interpret a test failure you see during phase_catchup as caused by your own changes without verifying it against the Phase 0 historical baseline below and against this known-broken list.
-- When a spec-exact test detects real ngspice divergence, **surface the divergence** to the user — do not soften the assertion, do not relax `toBe` to `toBeCloseTo`, do not add `?.` guards, do not cast with `as any`.
-- Hanging tests are expected until Wave C2 lands (module-load crashes resolved).
-- Wave C2.4 is an atomic-migration gate — `tsc --noEmit` is expected to succeed only after the full Wave 6.4 body lands.
+Always target the specific file(s) you just edited. Add `--reporter=default --no-coverage` if output is too verbose.
 
-## CRITICAL TEST INVOCATION RULE (for implementers AND verifiers)
+If a targeted file appears to hang (>60s), kill it — the hang probably comes from cross-file module-load breakage from an in-flight sibling phase. Report that fact and move on; do not try to diagnose the other phase's breakage.
 
-**Do NOT use `npm test` or `npm run test:q`** — those commands are hanging the whole machine during phase_catchup because some test files still fail at module-load and the npm wrapper gets stuck. Use `vitest` directly with a file-path scope instead.
+## Guidance for Phase 4 / Phase 5 / Phase 0.4 / Phase 7.1 implementers
 
-- ✅ `npx vitest run path/to/file.test.ts --reporter=verbose` — targeted, fast, non-hanging
-- ✅ `npx vitest run --reporter=default path/to/file.test.ts` — targeted with default reporter
-- ❌ `npm test -- ...` — hangs
-- ❌ `npm run test:q` — hangs
-- ❌ `npm test` — hangs
+- Run ONLY the tests you added or the tests for the file(s) you edited.
+- If a test you did NOT touch fails, it is pre-existing red and NOT your concern.
+- Do not soften, skip, or relax any `.toBe(...)` / `.toBeCloseTo(...)` assertion values or tolerances to make other reds go green — surface divergence rather than hiding it.
+- A spec-exact numerical test that detects real ngspice divergence is a **signal**, not a bug — surface it, don't rewrite it.
 
-Always target a specific file (or directory) you just edited. Never attempt a full run until the catchup phase completes.
+## Known-red regions (pre-existing, not caused by current batch)
 
----
+Do not investigate failures in the following regions unless they are in files you explicitly modified:
 
-## Historical baseline (Phase 0, captured 2026-04-15T21:58:00Z)
+- `src/editor/__tests__/wire-current-resolver.test.ts` — 2 pre-existing KCL/assertion failures
+- `src/headless/__tests__/rlc-lte-path.test.ts` — multiple engine-stagnation / large-value-ratio failures
+- `src/io/dts-schema.ts` schema validation failures
+- All mid-phase cross-boundary `tsc --noEmit` errors per the "Inter-Phase Breakage Carve-Out" in `spec/plan.md`.
 
-Kept for reference only. Most of these failing tests will be retargeted or replaced by phase_catchup; do not use this list to triage failures during phase_catchup.
-
-- **Command**: npm run test:q
-- **Result**: 8333/8368 passing, 35 failing, 0 errors
-- **Duration**: 17.9 seconds across 365 files
-
-### Phase 0 failing tests
-
-| Test File | Test Name | Error Type | Summary |
-|-----------|-----------|-----------|---------|
-| src/editor/__tests__/wire-current-resolver.test.ts | cross-component current equality through real compiled lrctest.dig | Assertion | expected 0.0108 to be greater than 0.045 |
-| src/editor/__tests__/wire-current-resolver.test.ts | component-as-node KCL: wire at pin A ≈ wire at pin B ≈ body current | Assertion | expected 272.02 to be less than 0.01 |
-| src/headless/__tests__/rlc-lte-path.test.ts | RC step response: exponential charging matches V(1-e^-t/τ) | Assertion | expected 6.2e+30 to be ≤ 3.22 |
-| src/headless/__tests__/rlc-lte-path.test.ts | RL step response: V_R matches 1-e^-t/τ (R=10, L=1mH, τ=100µs) | Assertion | expected 2.2e+6 to be ≤ 0.64 |
-| src/headless/__tests__/rlc-lte-path.test.ts | series RLC ring-down: oscillatory with strictly decreasing envelope | Engine Stagnation | simTime stuck at 0.001217s |
-| src/headless/__tests__/rlc-lte-path.test.ts | reltol configurability: tight reltol produces different result and more steps | Engine Stagnation | simTime stuck at 0.0000348s |
-| src/headless/__tests__/rlc-lte-path.test.ts | RC capacitor zero-crossings at f=20Hz (f<<fc): 2±1 crossings and peak≥0.95 | Assertion | expected 99 to be ≤ 3 |
-| src/headless/__tests__/rlc-lte-path.test.ts | RL resistor zero-crossings at f=200Hz (f<<fc): ≥6 crossings over 4 periods | Engine Stagnation | simTime stuck at 0.0093s |
-| src/io/dts-schema.ts | circuit.metadata.models entry survives serialize -> deserialize | Schema Validation | modelParamDeltas.params["ICVBE"] must be number or string (multiple) |
+Any test specifically named in Phase 4 / Phase 5 / Phase 0.4 / Phase 7.1 task bodies is YOUR responsibility to deliver green (or surface as red-detecting-real-ngspice-divergence with full diff). All other reds are not your concern.

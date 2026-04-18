@@ -152,6 +152,7 @@ function runNR(
   ctx.diagonalGmin = diagonalGmin;
   ctx.dcopModeLadder = ladder;
   ctx.exactMaxIterations = exactMaxIterations ?? false;
+  ctx.noncon = 1;
   newtonRaphson(ctx);
   return {
     converged: ctx.nrResult.converged,
@@ -201,8 +202,12 @@ function cktop(
 /**
  * Finalize the DC operating point after convergence.
  *
- * Sets initMode to "initSmsig", performs one final load pass with
- * exactMaxIterations=1, then resets initMode to "transient".
+ * Sets initMode to "initSmsig" and performs one final load pass with
+ * exactMaxIterations=1. The mode is left as-is after the pass; the caller
+ * (dctran.c equivalent) sets MODEINITTRAN before the first transient step.
+ *
+ * ngspice reference: cktop.c post-convergence — sets MODEINITSMSIG, runs
+ * CKTload, does NOT reset mode afterward.
  */
 function dcopFinalize(
   ctx: CKTCircuitContext,
@@ -216,9 +221,6 @@ function dcopFinalize(
   ctx.postIterationHook = null;
   runNR(ctx, 1, voltages, ctx.diagonalGmin, null, true);
   ctx.postIterationHook = savedHook;
-  if (pool) {
-    pool.initMode = "transient";
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -510,7 +512,7 @@ function dynamicGmin(
       const iterHi = ((3 * params.dcTrcvMaxIter / 4) | 0);
 
       if (result.iterations <= iterLo) {
-        factor = Math.min(factor * Math.sqrt(factor), 10);
+        factor = Math.min(factor * Math.sqrt(factor), params.gminFactor ?? 10);
       } else if (result.iterations > iterHi) {
         factor = Math.sqrt(factor);
       }
@@ -534,9 +536,9 @@ function dynamicGmin(
     }
   }
 
-  // Final clean solve with gshunt diagonal
+  // Final clean solve with gshunt diagonal (ngspice cktop.c:253 uses CKTdcMaxIter = maxIterations)
   onPhaseBegin?.("dcopGminDynamic", 0);
-  const cleanResult = runNR(ctx, params.dcTrcvMaxIter, voltages, params.gshunt ?? 0, null);
+  const cleanResult = runNR(ctx, params.maxIterations, voltages, params.gshunt ?? 0, null);
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
 
@@ -574,7 +576,8 @@ function spice3Gmin(
 
   const numGminSteps = params.numGminSteps ?? 10;
   const gminFactor = params.gminFactor ?? 10;
-  let diagGmin = params.gmin;
+  const gs = params.gshunt ?? 0;
+  let diagGmin = gs === 0 ? params.gmin : gs;
   for (let k = 0; k < numGminSteps; k++) {
     diagGmin *= gminFactor;
   }
@@ -652,18 +655,7 @@ function spice3Src(
   }
 
   scaleAllSources(elements, 1);
-
-  // Final clean solve
-  onPhaseBegin?.("dcopSrcSweep", 1);
-  const cleanResult = runNR(ctx, params.dcTrcvMaxIter, voltages, params.gshunt ?? 0, null);
-  totalIter += cleanResult.iterations;
-  onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
-
-  if (cleanResult.converged) {
-    voltages.set(cleanResult.voltages);
-    return { converged: true, iterations: totalIter, voltages };
-  }
-  return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
+  return { converged: true, iterations: totalIter, voltages };
 }
 
 // ---------------------------------------------------------------------------
@@ -747,7 +739,7 @@ function gillespieSrc(
   while (raise >= 1e-7 && convFact < 1) {
     scaleAllSources(elements, srcFact);
     onPhaseBegin?.("dcopSrcSweep", srcFact);
-    const stepResult = runNR(ctx, params.dcTrcvMaxIter, voltages, 0, null);
+    const stepResult = runNR(ctx, params.dcTrcvMaxIter, voltages, params.gshunt ?? 0, null);
     totalIter += stepResult.iterations;
 
     if (stepResult.converged) {

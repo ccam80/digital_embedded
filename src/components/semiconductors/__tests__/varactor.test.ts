@@ -281,7 +281,7 @@ describe("Varactor", () => {
   });
 
   it("change35_uses_computeJunctionCharge_for_q0", () => {
-    // Change 35: charge stored in Q slot should equal computeJunctionCharge,
+    // charge stored in Q slot should equal computeJunctionCharge,
     // not Cj * vNow. Verify by checking that at forward bias (vd=0.4V) the
     // charge values match computeJunctionCharge output (which differs from
     // CJO * vd at forward bias because of the linearized region formula).
@@ -338,7 +338,7 @@ describe("Varactor", () => {
   });
 
   it("change36_uses_computeJunctionCapacitance_with_fc_linearization", () => {
-    // Change 36: capacitance must follow computeJunctionCapacitance (with FC linearization)
+    // capacitance must follow computeJunctionCapacitance (with FC linearization)
     // not the old simple formula CJO/(1+V_R/VJ)^M.
     // Above FC*VJ, the linearized formula produces a different value than the
     // direct depletion formula.
@@ -368,7 +368,7 @@ describe("Varactor", () => {
   });
 
   it("change37_tt_adds_diffusion_capacitance", () => {
-    // Change 37: Ctotal = Cj + TT * gd
+    // Ctotal = Cj + TT * gd
     // With TT > 0, the effective capacitance seen at forward bias is larger than Cj alone.
     // At forward bias (vd=0.6V) and TT=10ns, TT*gd adds a diffusion component.
     const CJO = 20e-12;

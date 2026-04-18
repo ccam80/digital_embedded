@@ -1217,7 +1217,7 @@ describe("BJT simple LimitingEvent instrumentation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// OFF device test — Change 22: OFF parameter zeros junctions and suppresses noncon
+// OFF device test
 // ---------------------------------------------------------------------------
 
 describe("BJT OFF parameter", () => {

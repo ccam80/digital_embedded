@@ -635,6 +635,20 @@ export class NgspiceBridge {
         }
       }
 
+      // Populate lteDt on the last iteration of the accepted attempt from
+      // RawNgspiceOuterEvent.nextDelta (the LTE-proposed next timestep).
+      const outerEv = outerByTime.get(step.stepStartTime);
+      if (
+        outerEv !== undefined &&
+        typeof outerEv.nextDelta === "number" &&
+        isFinite(outerEv.nextDelta) &&
+        outerEv.nextDelta > 0 &&
+        acceptedAttempt.iterations.length > 0
+      ) {
+        const lastIter = acceptedAttempt.iterations[acceptedAttempt.iterations.length - 1]!;
+        lastIter.lteDt = outerEv.nextDelta;
+      }
+
       steps.push({
         stepStartTime: step.stepStartTime,
         stepEndTime,

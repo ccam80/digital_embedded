@@ -177,6 +177,13 @@ export interface IterationSnapshot {
   limitingEvents: LimitingEvent[];
   convergenceFailedElements: string[];
   ngspiceConvergenceFailedDevices: string[];
+  /**
+   * LTE-proposed next timestep (seconds) as computed after this iteration's
+   * accepted step. Populated on the final accepted iteration of each step
+   * from our TimestepController (our engine) or from RawNgspiceOuterEvent.nextDelta
+   * (ngspice side). Undefined for non-accepted or DC-OP iterations.
+   */
+  lteDt?: number;
 }
 
 /** Device state for one element at one iteration. */

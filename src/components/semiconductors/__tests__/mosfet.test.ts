@@ -403,7 +403,7 @@ describe("NMOS", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Wave 6: checkConvergence without cqbd (Change 17)
+  // checkConvergence without cqbd
   // -------------------------------------------------------------------------
 
   it("checkConvergence_without_cqbd_uses_mode_ids_minus_cbdI", () => {
@@ -834,10 +834,10 @@ describe("MOSFET LimitingEvent instrumentation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 16: PMOS temperature scaling — type multiplier on tVbi/tVto
+// PMOS temperature scaling — type multiplier on tVbi/tVto
 // ---------------------------------------------------------------------------
 
-describe("PMOS temperature scaling (Change 16)", () => {
+describe("PMOS temperature scaling", () => {
   it("pmos_tVto_differs_from_nmos_tVto_at_elevated_tnom", () => {
     // NMOS and PMOS with same magnitude VTO=0.7 and elevated TNOM=350K
     // The type multiplier (-1 for PMOS) must flip the GAMMA and delta-phi terms.
@@ -895,10 +895,10 @@ describe("PMOS temperature scaling (Change 16)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 18: gm and gds return 0 in cutoff (not GMIN)
+// gm and gds return 0 in cutoff (not GMIN)
 // ---------------------------------------------------------------------------
 
-describe("Cutoff gm/gds return 0 (Change 18)", () => {
+describe("Cutoff gm/gds return 0", () => {
   it("gm_is_zero_in_cutoff", () => {
     // Vgs=0 < VTO=0.7: device is in cutoff
     const gm = computeGm(0, 5, 0, { ...NMOS_DEFAULTS });
@@ -925,10 +925,10 @@ describe("Cutoff gm/gds return 0 (Change 18)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 27: M multiplicity parameter scales current and capacitances
+// M multiplicity parameter scales current and capacitances
 // ---------------------------------------------------------------------------
 
-describe("MOSFET M multiplicity (Change 27)", () => {
+describe("MOSFET M multiplicity", () => {
   it("m2_doubles_drain_current_in_saturation", () => {
     // Two parallel MOSFETs = one MOSFET with M=2: drain current doubles
     const idM1 = computeIds(2, 5, 0, { ...NMOS_DEFAULTS }).ids;
@@ -966,7 +966,7 @@ describe("MOSFET M multiplicity (Change 27)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// primeJunctions — Change 21: MOSFET MODEINITJCT non-zero startup voltages
+// primeJunctions — MOSFET MODEINITJCT non-zero startup voltages
 // ---------------------------------------------------------------------------
 
 describe("MOSFET primeJunctions", () => {

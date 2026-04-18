@@ -120,7 +120,7 @@ Phase 7 (verification — ngspice parity tests)
 
 **Wave 6.2 atomic-migration gate:** All ~65 elements must implement `load()` in the same merge — no shims, no coexistence period. Full-codebase `tsc --noEmit` must succeed before Waves 6.3 and 6.4 begin.
 
-**Wave 0.4 atomic-migration gate:** `ComplexSparseSolver.stamp(row, col, re, im)` deletion (Task 0.4.4) lands atomically with every `stampAc` implementation's migration to the handle-based API. Full-codebase `tsc --noEmit` must succeed after Wave 0.4 — independent of the Wave 6.3 gate on the real side.
+**Wave 0.4 scope note:** `ComplexSparseSolver.stamp(row, col, re, im)` deletion (Task 0.4.4) lands with migration of the single remaining caller inside `ac-analysis.ts`. No files under `src/components/**` are touched — per-element `stampAc` implementations do not currently exist and are out of scope for Wave 0.4. They will be defined and implemented in a later phase whose spec captures the per-element small-signal AC stamps against ngspice references. Full-codebase `tsc --noEmit` must succeed after Wave 0.4 lands.
 
 **Wave 6.4 atomic-migration gate:** The legacy pin-model methods (`stamp`, `stampOutput`, `stampCompanion`, `updateCompanion`) are deleted in Task 6.4.4 only after Tasks 6.4.1–6.4.3 have landed. Full-codebase `tsc --noEmit` must succeed after Wave 6.4.
 

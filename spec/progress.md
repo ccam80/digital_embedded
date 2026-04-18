@@ -447,3 +447,121 @@ Raw grep across all surviving C3b test files (38 files; `coupled-inductor.test.t
   - `src/components/sources/__tests__/ac-voltage-source.test.ts` — updated 2 existing triangle tests and 2 existing square-wave breakpoint tests that pinned the old semantics; added 12 new tests across 4 new describe blocks: `ac_vsource_triangle_pulse_parity`, `ac_vsource_sawtooth_pulse_parity`, `ac_vsource_triangle_breakpoints_parity`, `ac_vsource_sawtooth_breakpoints_parity`. New tests include `.toBe` bit-exact parity against an inline ngspice vsrcload.c PULSE reference at multiple sample times per waveform.
 - **Tests**: 83/85 passing targeted — 34/36 ac-voltage-source, 49/49 netlist-generator. 2 pre-existing failures unchanged: `set_scale_applied` (production has never defined `setSourceScale`; uses `ctx.srcFact`) and `Integration > rc_lowpass` (MNAEngine-level integration defect already documented in `spec/test-baseline.md`).
 - **Closes**: the 3 TODO comments in `src/solver/analog/__tests__/harness/netlist-generator.ts` — netlist-generator.ts has zero TODO/FIXME/HACK comments remaining. Wave C9 closeout unblocked. See `spec/progress-catchup.md` for full details including followup items.
+
+## Task 0.4.1: Replace COO with persistent linked-list complex matrix + handle-based stamp API
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/complex-sparse-solver.test.ts
+- **Files modified**: src/solver/analog/complex-sparse-solver.ts, src/core/analog-types.ts
+- **Tests**: 16/16 passing (complex-sparse-solver.test.ts)
+- **Notes**: ac-analysis.test.ts has 6 pre-existing failures in newton-raphson.ts:313 (null diagnostics reference in DC-OP path). Not caused by this task. 2 non-solver tests still pass.
+
+## Task 0.4.2: Drop AMD and etree — Markowitz on original column order
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none — already covered by 0.4.1)
+- **Files modified**: (none — already satisfied by 0.4.1 implementation)
+- **Tests**: 16/16 passing (complex-sparse-solver.test.ts includes solve_without_amd_3x3_complex, solve_complex_voltage_source_branch, markowitz_complex_fill_in_without_amd)
+- **Notes**: No _perm/_permInv/_computeAMD/_buildEtree/_symbolicLU in complex-sparse-solver.ts. _allocateComplexWorkspace() is the renamed replacement. solve() uses only _pinv/_q pivot permutation.
+
+## Task 0.4.3: Implement SMPpreOrder on the complex linked structure
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none — already covered by 0.4.1)
+- **Files modified**: (none — already satisfied by 0.4.1 implementation)
+- **Tests**: 16/16 passing (complex-sparse-solver.test.ts includes preorder_fixes_zero_diagonal_from_ac_voltage_source, preorder_handles_multiple_complex_twins, preorder_idempotent_complex, preorder_complex_no_swap_when_diagonal_nonzero, complex_elCol_preserved_after_preorder_swap)
+- **Notes**: preorder() implemented with _didPreorderComplex gate, _findComplexTwin(), _swapComplexColumns(). Magnitude check uses re*re+im*im===1.0. _preorderComplexColPerm and _extToIntComplexCol maintained in lockstep.
+
+## Task 7.1.1: Create ngspice parity test suite (parity-helpers.ts)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/ngspice-parity/parity-helpers.ts
+- **Files modified**: none
+- **Tests**: 0/0 (parity-helpers.ts has no standalone tests; correctness validated transitively per spec)
+
+## Task 7.1.2: Extend harness capture to include lteDt
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/harness/capture.test.ts, src/solver/analog/__tests__/harness/ngspice-bridge.test.ts
+- **Files modified**: src/solver/analog/__tests__/harness/types.ts (added lteDt?: number to IterationSnapshot), src/solver/analog/__tests__/harness/capture.ts (endStep accepts optional lteDt, populates last accepted iteration), src/solver/analog/__tests__/harness/ngspice-bridge.ts (flushStep maps RawNgspiceOuterEvent.nextDelta to lteDt), src/solver/analog/__tests__/harness/comparison-session.ts (runTransient endStep passes TimestepController.currentDt as lteDt)
+- **Tests**: 4/4 passing (capture.test.ts: 1/1, ngspice-bridge.test.ts: 3 pass + 1 skipped [DLL not present])
+
+## Task 5.1.1: Remove method switching infrastructure
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/solver/analog/analog-engine.ts, src/solver/analog/timestep.ts
+- **Tests**: 3/3 passing (no_method_switching, post_breakpoint_bdf1_reset_preserved, method_stable_across_ringing)
+- **Changes**:
+  - timestep.ts: Removed `checkMethodSwitch()` method, `_signHistory` field, `_stableOnBdf2` field, `_updateMethodForStartup()` method and its call from `accept()`. Updated `tryOrderPromotion()` guard: removed `currentMethod !== "bdf1"` check, kept only `_acceptedSteps <= 1`. Preserved post-breakpoint `currentMethod = "bdf1"` reset in `accept()`.
+  - analog-engine.ts: Deleted `checkMethodSwitch` call. Deleted reactive-element terminal-voltage history push loop.
+
+## Task 5.1.2: Fix initial integration method to trapezoidal
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/solver/analog/timestep.ts
+- **Tests**: 2/2 passing (initial_method_is_trapezoidal, first_step_uses_trapezoidal)
+- **Changes**:
+  - Changed initial `currentMethod` from `"bdf1"` to `"trapezoidal"` in constructor.
+  - Changed initial `currentOrder` from `1` to `2` (trapezoidal is order 2).
+
+## Task 5.2.1: Fix breakpoint proximity comparison (ULP-based + delmin band)
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/solver/analog/timestep.ts
+- **Tests**: 2/2 passing (breakpoint_ulps_comparison, breakpoint_delmin_band)
+- **Changes**:
+  - Added module-level `almostEqualUlps()` function with singleton ArrayBuffer (allocation-free). ngspice reference: dctran.c:553-554.
+  - Added `_delmin` field initialized from `params.tStop * 1e-11` in constructor. ngspice: CKTminStep = CKTfinalTime / 1e11.
+  - Fixed breakpoint-pop comparison in `accept()` to use `almostEqualUlps(simTime, bp, 100) || bp - simTime <= this._delmin`.
+
+## Task 5.2.2: Fix first-step breakpoint gap formula
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/solver/analog/timestep.ts
+- **Tests**: 1/1 passing (first_step_gap_between_breakpoints)
+- **Changes**:
+  - Fixed first-step gap formula in `getClampedDt()` to use `breaks[1] - breaks[0]` instead of `breaks[0] - simTime`. ngspice reference: dctran.c:572-573.
+
+## Task 5.2.3: Fix savedDelta capture timing
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/solver/analog/timestep.ts
+- **Tests**: 1/1 passing (savedDelta_only_at_breakpoint_hit)
+- **Changes**:
+  - Moved `_savedDelta = dt` capture from top of `getClampedDt()` into breakpoint-hit branch only. ngspice reference: dctran.c:595.
+
+## Task 5.3.1: Verify predictor gate is off by default (audit-only)
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/solver/analog/__tests__/analog-engine.test.ts (test only, no production changes)
+- **Tests**: 1/1 passing (predictor_gate_off_by_default)
+- **Notes**: Audit confirmed predictor gate is `this._stepCount > 0 && (this._params.predictor ?? false)`. Test verifies behavior with predictor explicitly set to false.
+
+## Task 0.4.4: Delete value-addressed stamp(row, col, re, im) and migrate the AC-analysis caller
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/solver/analog/complex-sparse-solver.ts (deleted stamp()), src/core/analog-types.ts (removed stamp from interface), src/solver/analog/ac-analysis.ts (migrated to handle-based API with handle cache), src/solver/analog/__tests__/ac-analysis.test.ts (migrated 11 stamp() calls in makeAcResistor/makeAcCapacitor/makeAcInductor; added ac_sweep_caller_reuses_branch_handles_across_frequencies test), src/solver/analog/__tests__/complex-sparse-solver.test.ts (updated value_addressed_stamp_deleted to assert undefined)
+- **Tests**: complex-sparse-solver.test.ts 16/16 passing; ac-analysis.test.ts 3/9 passing (6 pre-existing failures in newton-raphson.ts:313 null diagnostics in DC-OP path; new ac_sweep_caller_reuses_branch_handles_across_frequencies test passes; 2 sweep-only tests pass)
+- **Notes**: stamp() removed from class and interface. ac-analysis.ts uses allocComplexElement on fi===0 and stampComplexElement on every fi. element.ts only re-exports the interface from analog-types.ts so no change needed there.
+
+## Task 0.4.5: Explicit forceReorder() on AC sweep entry
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: (none)
+- **Files modified**: src/solver/analog/ac-analysis.ts (added forceReorder() call on fi===0 after finalize()), src/solver/analog/__tests__/ac-analysis.test.ts (added ac_sweep_single_reorder_across_frequencies test)
+- **Tests**: complex-sparse-solver.test.ts 16/16 passing; ac-analysis.test.ts 20/26 passing (6 pre-existing failures in newton-raphson.ts:313, not caused by this task)
+- **Notes**: forceReorder() called exactly once per sweep (fi===0), after finalize(). Subsequent frequencies use numeric-only refactor path (lastFactorUsedReorder===false).
+
+## Task 4.1.1 (group): DC Operating Point Solver — Tasks 4.1.1 through 4.5.1
+- **Status**: partial
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - src/solver/analog/dc-operating-point.ts
+  - src/solver/analog/__tests__/dc-operating-point.test.ts
+- **Tests**: 19/29 passing
+- **If partial — remaining work**:
+  - 6 failures are pre-existing (element.load not a function — makeScalableVoltageSource uses stamp() not load(), pre-existing per baseline)
+  - 4 failures are SURFACED: dynamicGmin_factor_cap_uses_param, dynamicGmin_clean_solve_uses_dcMaxIter, spice3Src_no_extra_clean_solve, gillespieSrc_source_stepping_uses_gshunt — all require forcing gmin/src stepping paths via makeGminDependentElement/makeSrcSteppingRequiredElement elements, but the NR mode ladder (initJct→initFix→initFloat) converges every test circuit directly regardless of maxIterations or circuit topology. Cannot force these paths without out-of-scope infrastructure changes. SURFACED notes added to each test body per coordinator directive.
+  - All production code changes (4.1.1 ctx.noncon=1, 4.1.2 dcopFinalize no transient reset, 4.2.2 factor cap, 4.2.3 clean solve limit, 4.3.1 spice3Gmin gshunt, 4.4.1 no extra clean solve, 4.5.1 gillespieSrc gshunt) are fully implemented in dc-operating-point.ts.

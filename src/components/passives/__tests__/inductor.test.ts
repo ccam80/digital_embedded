@@ -364,10 +364,10 @@ describe("Inductor", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 30: SLOT_VOLT — terminal voltage stored in stampCompanion
+// SLOT_VOLT — terminal voltage stored in stampCompanion
 // ---------------------------------------------------------------------------
 
-describe("Inductor SLOT_VOLT (Change 30)", () => {
+describe("Inductor SLOT_VOLT", () => {
   const SLOT_VOLT = 5;
 
   it("stampCompanion_stores_terminal_voltage_in_slot_5", () => {
@@ -406,10 +406,10 @@ describe("Inductor SLOT_VOLT (Change 30)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 39: Temperature coefficients TC1, TC2, TNOM, SCALE
+// Temperature coefficients TC1, TC2, TNOM, SCALE
 // ---------------------------------------------------------------------------
 
-describe("Inductor temperature coefficients (Change 39)", () => {
+describe("Inductor temperature coefficients", () => {
   it("TC1_scales_inductance_linearly", () => {
     const props = new PropertyBag();
     props.setModelParam("inductance", 1e-3);
@@ -448,10 +448,10 @@ describe("Inductor temperature coefficients (Change 39)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 40: M multiplicity divides L (parallel inductors = lower L)
+// M multiplicity divides L (parallel inductors = lower L)
 // ---------------------------------------------------------------------------
 
-describe("Inductor M multiplicity (Change 40)", () => {
+describe("Inductor M multiplicity", () => {
   it("M2_halves_effective_inductance", () => {
     const props = new PropertyBag();
     props.setModelParam("inductance", 1e-3);

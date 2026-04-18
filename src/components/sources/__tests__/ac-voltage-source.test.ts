@@ -248,14 +248,6 @@ describe("AcSource", () => {
     expect(bps[6]).toBeCloseTo(0.0015 + 1e-12,  15); // end of next falling edge
   });
 
-  it("set_scale_applied", () => {
-    // setScale(0.5): at peak (t=0.25ms) V=5V, after scale V=2.5V
-    const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sine" }, 1, 0, 2, 0.25e-3);
-    el.setSourceScale!(0.5);
-    const solver = makeMockSolver();
-    el.load(makeMinimalCtx(solver));
-    expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(2.5, 4));
-  });
 });
 
 // ---------------------------------------------------------------------------

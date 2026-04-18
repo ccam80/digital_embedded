@@ -254,7 +254,7 @@ export class MNAEngine implements AnalogEngine {
     if (!this._compiled) return;
     if (this._engineState === EngineState.ERROR) return;
 
-    const { elements, matrixSize, nodeCount } = this._compiled;
+    const { elements } = this._compiled;
     const params = this._params;
     const logging = this._convergenceLog.enabled;
     let stepRec: StepRecord | null = null;
@@ -561,22 +561,6 @@ export class MNAEngine implements AnalogEngine {
     if (cac?.timeRef) cac.timeRef.value = this._simTime;
     this._lastDt = dt;
 
-    // Push history for BDF-2 method switching heuristic.
-    // Tracks v[pin0] - v[pin1] as a representative voltage for oscillation
-    // detection. For 2-terminal reactive elements this is the terminal voltage.
-    // For multi-terminal reactive elements it's the voltage across the first
-    // two pinLayout pins — an approximation sufficient for method switching.
-    for (let i = 0; i < elements.length; i++) {
-      const el = elements[i];
-      if (el.isReactive && el.pinNodeIds.length >= 2) {
-        const nA = el.pinNodeIds[0];
-        const nB = el.pinNodeIds[1];
-        const vA = nA > 0 && nA - 1 < nodeCount ? ctx.rhs[nA - 1] : 0;
-        const vB = nB > 0 && nB - 1 < nodeCount ? ctx.rhs[nB - 1] : 0;
-        this._history.push(i, vA - vB);
-      }
-    }
-
     // Advance timestep controller state
     this._timestep.currentDt = newDt;
     try {
@@ -592,7 +576,6 @@ export class MNAEngine implements AnalogEngine {
       this._transitionState(EngineState.ERROR);
       return;
     }
-    this._timestep.checkMethodSwitch(elements, this._history);
 
     // Post-acceptance: notify elements (companion state, flux/charge history).
     // Matches ngspice DEVaccept — called once per accepted step.

@@ -5,14 +5,35 @@
  *  - Safety factor 0.9 applied to all computed dt predictions
  *  - Clamping to [dt/4, 4*dt] per step, then to [minTimeStep, maxTimeStep]
  *  - Breakpoint support for exact landing at registered simulation times
- *  - Automatic integration method switching: BDF-1 → trapezoidal → BDF-2 (on
- *    ringing) → trapezoidal (after 5 stable BDF-2 steps)
  */
 
 import type { AnalogElement, IntegrationMethod } from "./element.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import type { HistoryStore } from "./integration.js";
 import type { LteParams } from "./ckt-terr.js";
+
+// ---------------------------------------------------------------------------
+// almostEqualUlps — module-level singleton buffer (allocation-free after init)
+// ngspice reference: dctran.c:553-554 AlmostEqualUlps(time, bkpt, 100)
+// ---------------------------------------------------------------------------
+
+const _ulpBuf = new ArrayBuffer(8);
+const _ulpF64 = new Float64Array(_ulpBuf);
+const _ulpI64 = new BigInt64Array(_ulpBuf);
+
+/**
+ * Returns true when a and b are within maxUlps IEEE-754 ULPs of each other.
+ * Uses a module-level singleton ArrayBuffer — allocation-free after module load.
+ * Matches ngspice dctran.c:553-554 AlmostEqualUlps(time, bkpt, 100).
+ */
+function almostEqualUlps(a: number, b: number, maxUlps: number): boolean {
+  if (Number.isNaN(a) || Number.isNaN(b)) return false;
+  if (Math.sign(a) !== Math.sign(b) && a !== 0 && b !== 0) return a === b;
+  _ulpF64[0] = a; const ai = _ulpI64[0];
+  _ulpF64[0] = b; const bi = _ulpI64[0];
+  const diff = ai > bi ? ai - bi : bi - ai;
+  return diff <= BigInt(maxUlps);
+}
 
 // ---------------------------------------------------------------------------
 // BreakpointEntry — file-private
@@ -40,7 +61,7 @@ interface BreakpointEntry {
  * Call sequence per accepted timestep:
  *   1. computeNewDt(elements, history) → { newDt, worstRatio }
  *   2. shouldReject(worstRatio) — rejects when worstRatio > 1
- *   3. If accepted: accept(simTime), checkMethodSwitch(elements, history)
+ *   3. If accepted: accept(simTime)
  */
 export class TimestepController {
   /** Current timestep in seconds. */
@@ -60,20 +81,15 @@ export class TimestepController {
   /** Total accepted step count — drives the startup state machine. */
   private _acceptedSteps: number;
 
-  /**
-   * Sign history per reactive element index for ringing detection.
-   *
-   * Each entry is a circular buffer of the last 3 sign values (+1 / -1 / 0).
-   * Index in the outer array matches the position of the reactive element
-   * in the elements array passed to checkMethodSwitch.
-   */
-  private _signHistory: Array<number[]>;
-
-  /** Number of consecutive non-oscillating steps completed while on BDF-2. */
-  private _stableOnBdf2: number;
-
   /** Backing field for largestErrorElement. */
   private _largestErrorElement: number | undefined;
+
+  /**
+   * Minimum timestep used for breakpoint proximity detection.
+   * ngspice: CKTminStep = CKTfinalTime / 1e11 (set at transient init).
+   * When tStop is unavailable, falls back to minTimeStep.
+   */
+  private _delmin: number = 0;
 
   /**
    * Unclamped dt saved before breakpoint clamping in getClampedDt().
@@ -106,7 +122,7 @@ export class TimestepController {
    * Integration order derived from currentMethod.
    * 1 for bdf1, 2 for trapezoidal and bdf2. ngspice: CKTorder.
    */
-  currentOrder: number = 1;
+  currentOrder: number = 2;
 
   /**
    * Shift the deltaOld history ring. Called by the engine BEFORE the for(;;)
@@ -147,12 +163,10 @@ export class TimestepController {
       params.minTimeStep,
       Math.min(params.maxTimeStep, params.firstStep),
     );
-    this.currentMethod = "bdf1";
+    this.currentMethod = "trapezoidal";
     this._breakpoints = [];
     this._lastAcceptedSimTime = -Infinity;
     this._acceptedSteps = 0;
-    this._signHistory = [];
-    this._stableOnBdf2 = 0;
     this._largestErrorElement = undefined;
     this._lteParams = {
       trtol: params.trtol,
@@ -175,6 +189,12 @@ export class TimestepController {
     this._savedDelta = params.tStop != null
       ? params.tStop / 50
       : params.maxTimeStep;
+
+    // ngspice CKTminStep = CKTfinalTime / 1e11 (set at transient init, dctran.c).
+    // Used for breakpoint proximity detection in accept().
+    this._delmin = params.tStop != null
+      ? params.tStop * 1e-11
+      : params.minTimeStep;
   }
 
   /**
@@ -301,19 +321,18 @@ export class TimestepController {
    */
   getClampedDt(simTime: number): number {
     let dt = this.currentDt;
-    // Save unclamped delta before breakpoint clamping (ngspice saveDelta,
-    // dctran.c:506). Used in accept() for post-breakpoint delta reduction.
-    this._savedDelta = dt;
 
     // ngspice dctran.c:572-580: at t=0 (firsttime), apply proximity clamp
     // (when breakpoints exist) then divide by 10 unconditionally.
     if (this._isFirstGetClampedDt) {
       this._isFirstGetClampedDt = false;
-      if (this._breakpoints.length > 0) {
-        const nextBreakGap = this._breakpoints[0]!.time - simTime;
+      if (this._breakpoints.length > 1) {
+        // ngspice dctran.c:572-573: gap is between the first two breakpoints,
+        // not from simTime to breaks[0]. Matches ngspice CKTbreaks[1]-CKTbreaks[0].
+        const nextBreakGap = this._breakpoints[1]!.time - this._breakpoints[0]!.time;
         if (nextBreakGap > 0) {
-          // dctran.c:572-573: delta = MIN(delta, 0.1 * MIN(saveDelta, nextBreakGap)).
-          dt = Math.min(dt, 0.1 * Math.min(this._savedDelta, nextBreakGap));
+          // dctran.c:572-573: delta = MIN(delta, 0.1 * MIN(savedDelta, nextBreakGap)).
+          dt = Math.min(dt, 0.1 * Math.min(dt, nextBreakGap));
         }
       }
       // dctran.c:580: CKTdelta /= 10 — unconditional firsttime safety factor.
@@ -323,7 +342,6 @@ export class TimestepController {
       // Do NOT update this.currentDt — the clamp applies only to this step's
       // working dt.  Persisting it would prevent NR retries from halving from
       // the pre-clamp value, causing stagnation at t=0.
-      this._savedDelta = dt;
     }
 
     this._breakFlag = false;
@@ -332,8 +350,8 @@ export class TimestepController {
       const remaining = nextBp - simTime;
       if (remaining > 0 && dt >= remaining) {
         // ngspice dctran.c:583-585: simple clamp to the breakpoint.
-        // saveDelta is already captured above; accept() uses it for
-        // post-breakpoint delta reduction (dctran.c:561).
+        // ngspice dctran.c:595: saveDelta captured only at breakpoint hit.
+        this._savedDelta = dt;
         dt = remaining;
         this._breakFlag = true;
       }
@@ -388,18 +406,21 @@ export class TimestepController {
     this._lastAcceptedSimTime = simTime;
 
     this._acceptedSteps++;
-    this._updateMethodForStartup();
 
     // deltaOld rotation removed — now performed by the engine before/inside
     // the for(;;) loop to match ngspice dctran.c:704-706, 735.
 
     // Pop breakpoints that have been reached and refill from source if any.
+    // ngspice dctran.c:553-554,628: consume a breakpoint when simTime is
+    // within 100 ULPs of the breakpoint time, or within the delmin band.
     // Guard: nextBreakpoint() can return a value <= simTime due to
     // floating-point rounding (e.g. clock halfPeriod not exactly
     // representable). Without the strict-future check, the loop would
     // pop, re-insert at the front, and spin forever.
     let breakpointConsumed = false;
-    while (this._breakpoints.length > 0 && simTime >= this._breakpoints[0]!.time) {
+    while (this._breakpoints.length > 0) {
+      const bp = this._breakpoints[0]!.time;
+      if (!(almostEqualUlps(simTime, bp, 100) || bp - simTime <= this._delmin)) break;
       breakpointConsumed = true;
       const popped = this._breakpoints.shift()!;
       if (typeof popped.source?.nextBreakpoint === "function") {
@@ -429,82 +450,6 @@ export class TimestepController {
   }
 
   // -------------------------------------------------------------------------
-  // Method auto-switching
-  // -------------------------------------------------------------------------
-
-  /**
-   * Check for ringing on reactive element terminal voltages and switch
-   * integration method accordingly.
-   *
-   * Ringing is detected when a reactive element's terminal voltage alternates
-   * sign across 3 consecutive accepted timesteps. On detection: switch to BDF-2.
-   * After 5 consecutive non-oscillating accepted steps on BDF-2: switch back
-   * to trapezoidal.
-   *
-   * This method is called once per accepted timestep after `accept()`.
-   *
-   * @param elements - All circuit elements (non-reactive ones are skipped)
-   * @param history  - HistoryStore providing v(n) and v(n-1) per element
-   */
-  checkMethodSwitch(elements: readonly AnalogElement[], history: HistoryStore): void {
-    // Startup BDF-1 phase: no ringing detection until promotion has had a
-    // chance to run (step 2+).  Method transitions handled by tryOrderPromotion.
-    if (this._acceptedSteps <= 1) return;
-
-    // Collect reactive element indices.
-    const reactiveIndices: number[] = [];
-    for (let i = 0; i < elements.length; i++) {
-      if (elements[i].isReactive) reactiveIndices.push(i);
-    }
-
-    // Ensure sign-history buffers are allocated.
-    if (this._signHistory.length !== reactiveIndices.length) {
-      this._signHistory = reactiveIndices.map(() => []);
-    }
-
-    let ringing = false;
-
-    for (let ri = 0; ri < reactiveIndices.length; ri++) {
-      const elIdx = reactiveIndices[ri];
-      const vNow = history.get(elIdx, 0);
-      const sign = vNow > 0 ? 1 : vNow < 0 ? -1 : 0;
-
-      const buf = this._signHistory[ri];
-      buf.push(sign);
-      if (buf.length > 3) buf.shift();
-
-      if (buf.length === 3) {
-        // Alternating sign: [+, -, +] or [-, +, -]
-        if (
-          buf[0] !== 0 &&
-          buf[1] !== 0 &&
-          buf[2] !== 0 &&
-          buf[0] !== buf[1] &&
-          buf[1] !== buf[2] &&
-          buf[0] === buf[2]
-        ) {
-          ringing = true;
-        }
-      }
-    }
-
-    if (ringing) {
-      if (this.currentMethod !== "bdf2") {
-        this.currentMethod = "bdf2";
-        this.currentOrder = 2;
-        this._stableOnBdf2 = 0;
-      }
-    } else if (this.currentMethod === "bdf2") {
-      this._stableOnBdf2++;
-      if (this._stableOnBdf2 >= 5) {
-        this.currentMethod = "trapezoidal";
-        this.currentOrder = 2;
-        this._stableOnBdf2 = 0;
-      }
-    }
-  }
-
-  // -------------------------------------------------------------------------
   // Order promotion trial  (ngspice dctran.c:820-829)
   // -------------------------------------------------------------------------
 
@@ -528,11 +473,11 @@ export class TimestepController {
     _simTime: number,
     executedDt: number,
   ): void {
-    // Only promote from order 1 (BDF-1), and only after the first accepted
+    // Only promote when still at order 1, and only after the first accepted
     // step (ngspice clears firsttime after step 0, then skips LTE via goto
     // nextTime on that step — promotion trial first runs from step 2 onward,
     // matching dctran.c:864-866).
-    if (this.currentMethod !== "bdf1" || this._acceptedSteps <= 1) return;
+    if (this._acceptedSteps <= 1) return;
 
     // ngspice dctran.c:864-866: re-seed and re-truncate at order 2.
     // Compute the raw LTE-proposed dt at order 2 WITHOUT maxTimeStep clamping.
@@ -660,32 +605,4 @@ export class TimestepController {
     this._breakpoints = [];
   }
 
-  // -------------------------------------------------------------------------
-  // Internal helpers
-  // -------------------------------------------------------------------------
-
-  /**
-   * Apply the startup state machine for the first accepted step.
-   *
-   * Step 1: BDF-1 (suppress startup transients; ngspice dctran.c firsttime
-   *   flag skips LTE/promotion entirely on the very first accepted point).
-   * Step 2+: remain BDF-1 — promotion to trapezoidal is handled exclusively
-   *   by tryOrderPromotion() via the 1.05× trial gate, matching ngspice
-   *   dctran.c:881-891 which runs the trial on every accepted step where
-   *   CKTorder==1.  The previous unconditional step-3 promotion bypassed
-   *   this trial, causing our LTE to be ~2.45× more permissive than ngspice
-   *   (order-2 trap factor 1/12 vs order-1 BE factor 0.5).
-   */
-  private _updateMethodForStartup(): void {
-    // Keep BDF-1 during the startup phase.  Do NOT auto-promote to
-    // trapezoidal — let tryOrderPromotion() handle the transition via the
-    // ngspice-compatible 1.05× gate on every post-startup accepted step.
-    if (this._acceptedSteps <= 1) {
-      this.currentMethod = "bdf1";
-      this.currentOrder = 1;
-    }
-    // After step 2, currentMethod stays at whatever tryOrderPromotion()
-    // or checkMethodSwitch() set it to.  currentOrder is kept in sync by
-    // those methods directly.
-  }
 }

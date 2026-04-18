@@ -1,18 +1,73 @@
 {
   "summary": {
     "vitest": {
-      "passed": 1,
-      "failed": 0,
-      "skipped": 33,
-      "totalFiles": 1,
-      "durationSeconds": 1.1
+      "passed": 62,
+      "failed": 8,
+      "skipped": 0,
+      "totalFiles": 3,
+      "durationSeconds": 0.7
     },
     "playwright": null,
-    "totalFailed": 0,
-    "totalPassed": 1
+    "totalFailed": 8,
+    "totalPassed": 62
   },
   "failures": {
-    "vitest": [],
+    "vitest": [
+      {
+        "message": "solver.allocElement is not a function",
+        "count": 8,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\stamp-helpers.ts",
+            "test": "capacitance_decreases_with_reverse_bias",
+            "line": 17,
+            "column": 32
+          },
+          {
+            "file": "src\\solver\\analog\\stamp-helpers.ts",
+            "test": "cjo_at_zero_bias",
+            "line": 17,
+            "column": 32
+          },
+          {
+            "file": "src\\solver\\analog\\stamp-helpers.ts",
+            "test": "cv_formula_correct",
+            "line": 17,
+            "column": 32
+          },
+          {
+            "file": "src\\solver\\analog\\stamp-helpers.ts",
+            "test": "vco_circuit",
+            "line": 17,
+            "column": 32
+          },
+          {
+            "file": "src\\solver\\analog\\stamp-helpers.ts",
+            "test": "change35_uses_computeJunctionCharge_for_q0",
+            "line": 17,
+            "column": 32
+          },
+          {
+            "file": "src\\solver\\analog\\stamp-helpers.ts",
+            "test": "change36_uses_computeJunctionCapacitance_with_fc_linearization",
+            "line": 17,
+            "column": 32
+          },
+          {
+            "file": "src\\solver\\analog\\stamp-helpers.ts",
+            "test": "change37_tt_adds_diffusion_capacitance",
+            "line": 17,
+            "column": 32
+          },
+          {
+            "file": "src\\solver\\analog\\stamp-helpers.ts",
+            "test": "cvoltage_dependent_transient_matches_ngspice",
+            "line": 17,
+            "column": 32
+          }
+        ]
+      }
+    ],
     "playwright": []
   }
 }

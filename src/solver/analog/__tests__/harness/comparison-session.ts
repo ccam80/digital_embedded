@@ -650,11 +650,14 @@ export class ComparisonSession {
 
       const nowTime = this._engine.simTime ?? 0;
       if (nowTime > prevSimTime) {
+        const lteDtValue = (this._engine as any)._timestep?.currentDt as number | undefined;
         sc.endStep({
           stepEndTime: nowTime,
           integrationCoefficients: this._captureIntegCoeff(),
           analysisPhase: this._curAnalysisPhase(),
           acceptedAttemptIndex: -1,
+          lteDt: typeof lteDtValue === "number" && isFinite(lteDtValue) && lteDtValue > 0
+            ? lteDtValue : undefined,
         });
         prevSimTime = nowTime;
       }

@@ -16,11 +16,12 @@
  * The -3dB point is at f_c = 1/(2π·R·C).
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { AcAnalysis, buildFrequencyArray } from "../ac-analysis.js";
 import type { AcCompiledCircuit } from "../ac-analysis.js";
 import type { AnalogElement, LoadContext } from "../element.js";
 import type { ComplexSparseSolver } from "../element.js";
+import * as ComplexSolverModule from "../complex-sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Inline test element helpers
@@ -35,10 +36,13 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
   const G = 1 / resistance;
 
   function stampMatrix(
-    solver: { stamp(r: number, c: number, re: number, im: number): void },
+    solver: { allocComplexElement(r: number, c: number): number; stampComplexElement(h: number, re: number, im: number): void },
     ra: number, ca: number, re: number, im: number
   ): void {
-    if (ra >= 0 && ca >= 0) solver.stamp(ra, ca, re, im);
+    if (ra >= 0 && ca >= 0) {
+      const h = solver.allocComplexElement(ra, ca);
+      solver.stampComplexElement(h, re, im);
+    }
   }
 
   return {
@@ -55,8 +59,10 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
       const b = nodeB > 0 ? nodeB - 1 : -1;
       stampMatrix(solver, a, a, G, 0);
       if (a >= 0 && b >= 0) {
-        solver.stamp(a, b, -G, 0);
-        solver.stamp(b, a, -G, 0);
+        const hab = solver.allocComplexElement(a, b);
+        solver.stampComplexElement(hab, -G, 0);
+        const hba = solver.allocComplexElement(b, a);
+        solver.stampComplexElement(hba, -G, 0);
       }
       stampMatrix(solver, b, b, G, 0);
     },
@@ -81,12 +87,12 @@ function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): Ana
       const jOmegaC = omega * capacitance; // imaginary part of admittance
       const a = nodeA > 0 ? nodeA - 1 : -1;
       const b = nodeB > 0 ? nodeB - 1 : -1;
-      if (a >= 0) solver.stamp(a, a, 0, jOmegaC);
+      if (a >= 0) { const h = solver.allocComplexElement(a, a); solver.stampComplexElement(h, 0, jOmegaC); }
       if (a >= 0 && b >= 0) {
-        solver.stamp(a, b, 0, -jOmegaC);
-        solver.stamp(b, a, 0, -jOmegaC);
+        const hab = solver.allocComplexElement(a, b); solver.stampComplexElement(hab, 0, -jOmegaC);
+        const hba = solver.allocComplexElement(b, a); solver.stampComplexElement(hba, 0, -jOmegaC);
       }
-      if (b >= 0) solver.stamp(b, b, 0, jOmegaC);
+      if (b >= 0) { const h = solver.allocComplexElement(b, b); solver.stampComplexElement(h, 0, jOmegaC); }
     },
   };
 }
@@ -110,12 +116,12 @@ function makeAcInductor(nodeA: number, nodeB: number, inductance: number): Analo
       const admIm = -1 / (omega * inductance);
       const a = nodeA > 0 ? nodeA - 1 : -1;
       const b = nodeB > 0 ? nodeB - 1 : -1;
-      if (a >= 0) solver.stamp(a, a, 0, admIm);
+      if (a >= 0) { const h = solver.allocComplexElement(a, a); solver.stampComplexElement(h, 0, admIm); }
       if (a >= 0 && b >= 0) {
-        solver.stamp(a, b, 0, -admIm);
-        solver.stamp(b, a, 0, -admIm);
+        const hab = solver.allocComplexElement(a, b); solver.stampComplexElement(hab, 0, -admIm);
+        const hba = solver.allocComplexElement(b, a); solver.stampComplexElement(hba, 0, -admIm);
       }
-      if (b >= 0) solver.stamp(b, b, 0, admIm);
+      if (b >= 0) { const h = solver.allocComplexElement(b, b); solver.stampComplexElement(h, 0, admIm); }
     },
   };
 }
@@ -470,6 +476,117 @@ describe("AC", () => {
     const expected3dbGain = expectedDcGainDb - 3.01;
     expect(mag[poleIdx]).toBeGreaterThan(expected3dbGain - 2);
     expect(mag[poleIdx]).toBeLessThan(expected3dbGain + 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 0.4.4 tests
+// ---------------------------------------------------------------------------
+
+describe("AC — Task 0.4.4", () => {
+  it("ac_sweep_caller_reuses_branch_handles_across_frequencies", () => {
+    // Verify the handle-caching contract in ac-analysis.ts directly by simulating
+    // the frequency-sweep loop logic: allocComplexElement called on fi===0 only,
+    // stampComplexElement called on every fi.
+    // Uses a direct ComplexSparseSolver instance (no DC-OP path).
+    const { ComplexSparseSolver: CSS } = ComplexSolverModule;
+
+    const N_ac = 2; // 1 node + 1 branch row
+    const sourceNodeIdx = 0;
+    const branchRow = 1;
+    const numFreq = 3;
+
+    const complexSolver = new CSS();
+
+    // Spy on allocComplexElement to count calls
+    const allocSpy = vi.spyOn(complexSolver, "allocComplexElement");
+
+    let acBranchHandleA = -1;
+    let acBranchHandleB = -1;
+
+    for (let fi = 0; fi < numFreq; fi++) {
+      complexSolver.beginAssembly(N_ac);
+
+      // Simulate element stamps — no-op here (minimal fixture)
+
+      // Production caller handle-caching logic (mirrors ac-analysis.ts)
+      if (fi === 0) {
+        acBranchHandleA = complexSolver.allocComplexElement(sourceNodeIdx, branchRow);
+        acBranchHandleB = complexSolver.allocComplexElement(branchRow, sourceNodeIdx);
+      }
+      complexSolver.stampComplexElement(acBranchHandleA, 1.0, 0.0);
+      complexSolver.stampComplexElement(acBranchHandleB, 1.0, 0.0);
+      complexSolver.stampRHS(branchRow, 1.0, 0.0);
+
+      complexSolver.finalize();
+      if (fi === 0) complexSolver.forceReorder();
+      complexSolver.factor();
+      const xRe = new Float64Array(N_ac);
+      const xIm = new Float64Array(N_ac);
+      complexSolver.solve(xRe, xIm);
+    }
+
+    // allocComplexElement must be called exactly twice (both on fi===0)
+    expect(allocSpy.mock.calls.length).toBe(2);
+
+    // Both allocations happen with the branch row positions
+    expect(allocSpy.mock.calls[0]).toEqual([sourceNodeIdx, branchRow]);
+    expect(allocSpy.mock.calls[1]).toEqual([branchRow, sourceNodeIdx]);
+
+    // Handles are stable: same handle returned if called again
+    expect(acBranchHandleA).toBe(complexSolver.allocComplexElement(sourceNodeIdx, branchRow));
+    expect(acBranchHandleB).toBe(complexSolver.allocComplexElement(branchRow, sourceNodeIdx));
+
+    allocSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 0.4.5 tests
+// ---------------------------------------------------------------------------
+
+describe("AC — Task 0.4.5", () => {
+  it("ac_sweep_single_reorder_across_frequencies", () => {
+    // 5-point AC sweep: forceReorder() called once before fi===0 factor.
+    // lastFactorUsedReorder === true on frequency 0, false on frequencies 1-4.
+    const { ComplexSparseSolver: CSS } = ComplexSolverModule;
+
+    const N_ac = 2; // 1 node + 1 branch row
+    const sourceNodeIdx = 0;
+    const branchRow = 1;
+    const numFreq = 5;
+
+    const complexSolver = new CSS();
+    let acBranchHandleA = -1;
+    let acBranchHandleB = -1;
+
+    const reorderFlags: boolean[] = [];
+
+    for (let fi = 0; fi < numFreq; fi++) {
+      complexSolver.beginAssembly(N_ac);
+
+      if (fi === 0) {
+        acBranchHandleA = complexSolver.allocComplexElement(sourceNodeIdx, branchRow);
+        acBranchHandleB = complexSolver.allocComplexElement(branchRow, sourceNodeIdx);
+      }
+      complexSolver.stampComplexElement(acBranchHandleA, 1.0, 0.0);
+      complexSolver.stampComplexElement(acBranchHandleB, 1.0, 0.0);
+      complexSolver.stampRHS(branchRow, 1.0, 0.0);
+      complexSolver.finalize();
+      if (fi === 0) complexSolver.forceReorder();
+      complexSolver.factor();
+      reorderFlags.push(complexSolver.lastFactorUsedReorder);
+      const xRe = new Float64Array(N_ac);
+      const xIm = new Float64Array(N_ac);
+      complexSolver.solve(xRe, xIm);
+    }
+
+    // Frequency 0 (fi===0): full reorder used
+    expect(reorderFlags[0]).toBe(true);
+    // Frequencies 1-4: numeric-only path
+    for (let fi = 1; fi < numFreq; fi++) {
+      expect(reorderFlags[fi]).toBe(false);
+    }
   });
 });
 

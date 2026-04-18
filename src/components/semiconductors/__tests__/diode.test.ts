@@ -638,13 +638,13 @@ describe("Diode LimitingEvent instrumentation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 31: Temperature scaling (dioTemp)
+// Temperature scaling (dioTemp)
 // ---------------------------------------------------------------------------
 
 import { dioTemp, computeJunctionCharge } from "../diode.js";
 import { computeNIcomCof } from "../../../solver/analog/integration.js";
 
-describe("dioTemp temperature scaling (Change 31)", () => {
+describe("dioTemp temperature scaling", () => {
   const REFTEMP = 300.15;
   const CONSTboltz = 1.3806226e-23;
   const CHARGE = 1.6021918e-19;
@@ -714,10 +714,10 @@ describe("dioTemp temperature scaling (Change 31)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 32: IBV knee iteration
+// IBV knee iteration
 // ---------------------------------------------------------------------------
 
-describe("IBV knee iteration (Change 32)", () => {
+describe("IBV knee iteration", () => {
   it("tBV satisfies knee equation: tIS*(exp((BV-tBV)/(NBV*vt))-1) ≈ IBV", () => {
     const BV = 5.0;
     const IBV = 1e-3;
@@ -733,10 +733,10 @@ describe("IBV knee iteration (Change 32)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 33: IKF/IKR high-injection correction
+// IKF/IKR high-injection correction
 // ---------------------------------------------------------------------------
 
-describe("IKF/IKR high-injection correction (Change 33)", () => {
+describe("IKF/IKR high-injection correction", () => {
   function diodeSlot(vd: number, slot: number, overrides: Record<string, number> = {}): number {
     const props = makeParamBag({ IS: 1e-14, N: 1, ...overrides });
     const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as AnalogElementCore;
@@ -811,10 +811,10 @@ describe("IKF/IKR high-injection correction (Change 33)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 34: Area scaling
+// Area scaling
 // ---------------------------------------------------------------------------
 
-describe("AREA scaling (Change 34)", () => {
+describe("AREA scaling", () => {
   function diodeOP(vd: number, overrides: Record<string, number> = {}): { id: number; gd: number } {
     const props = makeParamBag({ IS: 1e-14, N: 1, RS: 0, CJO: 0, ...overrides });
     const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props) as AnalogElementCore;

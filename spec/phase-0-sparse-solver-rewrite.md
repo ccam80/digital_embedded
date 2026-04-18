@@ -174,7 +174,7 @@ Port Waves 0.1–0.3 onto `ComplexSparseSolver` so AC analysis operates on the s
 - Real `SMPpreOrder` operating on the complex linked-list structure to fix zero-diagonal columns from voltage-source / inductor branch rows. Magnitude test uses `re*re + im*im === 1.0` to match ngspice's `|value| === 1.0` check.
 - Explicit `forceReorder()` lifecycle — called once by `AcAnalysis.run()` before the first frequency's factor; subsequent frequencies use the numeric-only refactor path.
 
-**Hot-path symmetry:** `element.stampAc(solver, omega)` runs once per element per frequency point. Elements cache complex handles on the first frequency's call to `allocComplexElement` and reuse them for every subsequent frequency, analogous to how `load()` callers cache real handles across NR iterations. Per-frequency stamps are strict O(1) `stampComplexElement(handle, re, im)` with no pattern rebuild.
+**Hot-path symmetry:** Inside `AcAnalysis.run()`, the frequency-sweep loop is the per-frequency assembly site. Its own stamp calls (the AC voltage-source branch row, lines 176–177 of `ac-analysis.ts`) cache complex handles on the first frequency and reuse them across the sweep — strict O(1) `stampComplexElement(handle, re, im)` with no pattern rebuild. Per-element `stampAc(solver, omega)` implementations do not yet exist in `src/components/**`; when they are added in a later phase they will be expected to follow the same handle-caching pattern, but Wave 0.4 scope is strictly the solver API and the `ac-analysis.ts` caller — no element files are touched by this wave.
 
 **Bit-exactness target:** Per-frequency node voltages match ngspice `.AC` output with `absDelta === 0` on both real and imaginary parts — same IEEE-754 bar applied to DC/transient in Phase 7.
 
@@ -250,35 +250,34 @@ Port Waves 0.1–0.3 onto `ComplexSparseSolver` so AC analysis operates on the s
   - Magnitude check uses exact `re*re + im*im === 1.0`.
   - Called once per solver lifetime; gated by `_didPreorderComplex` flag.
 
-### Task 0.4.4: Delete value-addressed `stamp(row, col, re, im)` and migrate all stampAc implementations
+### Task 0.4.4: Delete value-addressed `stamp(row, col, re, im)` and migrate the AC-analysis caller
 
-- **Description**: Atomic deletion gate for Wave 0.4. Every `stampAc(solver, omega)` implementation in the codebase migrates to cache complex handles on its first call and use `stampComplexElement(handle, re, im)` thereafter. Mirror of Phase 6 Wave 6.3 Task 6.3.4 for the real side.
+- **Scope (important)**: This task's blast radius is **three files** — `complex-sparse-solver.ts` (API deletion), `ac-analysis.ts` (single production caller), and `ac-analysis.test.ts` (three inline element test fixtures that call the deleted method). **No `src/components/**` files are touched.** An audit of `src/components/**/*.ts` at spec time shows zero elements currently implement `stampAc`; the only non-interface production call site for `ComplexSparseSolver.stamp(row, col, re, im)` is the AC voltage-source branch stamp inside `ac-analysis.ts`. The 11 additional call sites in `ac-analysis.test.ts` live inside the three inline test-fixture factories (`makeAcResistor`, `makeAcCapacitor`, `makeAcInductor`) and exist solely to exercise AC assembly on simple passive topologies. Per-element `stampAc` implementations for real components are out of scope for Wave 0.4 entirely and will be added in a later phase whose spec will define the per-element AC small-signal stamps against ngspice references (gm/gπ/gds for BJT, gm/gds/Cgs/Cgd/Cbd/Cbs for MOSFET, jωC for capacitors, 1/(jωL) for inductors, etc.). Wave 0.4's deliverable is strictly the solver-side persistent-linked-list infrastructure plus the two callers that exist today.
 
-  Handle-caching pattern: on the first frequency, the element calls `solver.allocComplexElement(row, col)` once per stamp location and stores the result in a dedicated `_acHandles: Int32Array` field (or similar) allocated at first call. Subsequent frequencies call `stampComplexElement(handle, re, im)` directly.
+- **Description**: Delete the value-addressed `stamp(row, col, re, im)` method from `ComplexSparseSolver` and from its interface in `analog-types.ts`. Migrate the two caller lines inside `ac-analysis.ts` to the handle-based API: on the first frequency of each sweep, call `allocComplexElement(row, col)` for each of the AC voltage-source branch-row stamp positions and cache the returned handles in local `let` variables scoped to the sweep; on every frequency (including the first) call `stampComplexElement(handle, 1.0, 0.0)` to emit the stamp.
 
-  Because AC is driven by `AcAnalysis.run()` rather than an NR loop, the handle cache is invalidated on `solver.invalidateTopology()` calls — same contract as the real-side cache.
+  Because `AcAnalysis.run()` constructs a fresh `ComplexSparseSolver` per invocation (line 154 of `ac-analysis.ts`) and the handle cache lives in `run()`-local variables, there is no cross-invocation cache invalidation question — each sweep starts with its own solver and its own handles.
+
+  ngspice reference: spbuild.c `spGetElement` (real and complex variants return a cached pointer used by `*ElementPtr += value`).
 
 - **Files to modify**:
-  - `src/solver/analog/complex-sparse-solver.ts` — Delete the `stamp(row: number, col: number, re: number, im: number): void` method.
+  - `src/solver/analog/complex-sparse-solver.ts` — Delete the `stamp(row: number, col: number, re: number, im: number): void` method entirely.
   - `src/core/analog-types.ts` — Remove `stamp(row, col, re, im)` from the `ComplexSparseSolver` interface. `stampRHS(row, re, im)` is retained unchanged.
-  - Every element implementing `stampAc` — migrate to the handle-based API. Non-exhaustive list (the atomic gate is that full-codebase `tsc --noEmit` must succeed after Wave 0.4 lands):
-    - `src/components/passives/resistor.ts`, `capacitor.ts`, `polarized-cap.ts`, `inductor.ts`, `transformer.ts`, `tapped-transformer.ts`
-    - `src/components/semiconductors/diode.ts`, `bjt.ts`, `mosfet.ts`, `njfet.ts`, `pjfet.ts`, `zener.ts`, `tunnel-diode.ts`, `varactor.ts`, `triode.ts`
-    - `src/components/active/opamp.ts`, `real-opamp.ts`, `comparator.ts`, `ota.ts`, `vcvs.ts`, `vccs.ts`, `ccvs.ts`, `cccs.ts`
-    - `src/components/sources/dc-voltage-source.ts`, `ac-voltage-source.ts`, `current-source.ts`, `variable-rail.ts`
-    - `src/solver/analog/digital-pin-model.ts` — any `stampAc` path, if exposed, migrates to the handle-based API alongside Phase 6 Wave 6.4's load() rewrite.
-    - Any additional file that grep for `stampAc` surfaces across `src/`.
+  - `src/solver/analog/element.ts` — If the `ComplexSparseSolver` interface exposed there still declares the deleted method, remove it so the two interface declarations stay in lockstep.
+  - `src/solver/analog/ac-analysis.ts` — Inside `run()`, replace the two `complexSolver.stamp(...)` calls at lines 176–177 with handle-based stamps. Concretely: before the frequency loop (after line 154 constructs the solver), declare `let acBranchHandleA = -1; let acBranchHandleB = -1;`. Inside the loop, after `beginAssembly(N_ac)`, when `sourceNodeIdx >= 0`, allocate the handles on the first frequency (`if (fi === 0) { acBranchHandleA = complexSolver.allocComplexElement(sourceNodeIdx, branchRow); acBranchHandleB = complexSolver.allocComplexElement(branchRow, sourceNodeIdx); }`) and always stamp via `complexSolver.stampComplexElement(acBranchHandleA, 1.0, 0.0); complexSolver.stampComplexElement(acBranchHandleB, 1.0, 0.0);`. `complexSolver.stampRHS(branchRow, 1.0, 0.0)` at line 179 is retained unchanged.
+  - `src/solver/analog/__tests__/ac-analysis.test.ts` — Migrate the 11 `solver.stamp(row, col, re, im)` call sites inside `makeAcResistor` (lines 41, 58, 59, 61), `makeAcCapacitor` (84, 86, 87, 89), and `makeAcInductor` (113, 115, 116, 118). Use the **lazy-alloc** pattern: each stamp becomes a two-line sequence `const h = solver.allocComplexElement(row, col); solver.stampComplexElement(h, re, im);`. This is not handle-caching — it relies on `allocComplexElement` being idempotent per (row, col) per Task 0.4.1's contract — but that is acceptable for test fixtures whose purpose is exercising AC assembly correctness, not hot-path allocation cost. The inline `stampMatrix` helper in `makeAcResistor` (lines 37–42) must be updated to take the solver via `{ allocComplexElement(r, c): number; stampComplexElement(h, re, im): void }` instead of the old `{ stamp(r, c, re, im): void }`. Update the `ComplexSparseSolver` import if the compiler requires it. No assertion in the test body is changed.
 
 - **Tests**:
-  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::value_addressed_stamp_deleted` — `(new ComplexSparseSolver() as any).stamp === undefined`.
-  - `src/solver/analog/__tests__/ac-analysis.test.ts::ac_sweep_reuses_handles_across_frequencies` — a 3-point sweep with a single resistor element; spy on `solver.allocComplexElement` and assert it is called exactly twice (once per stamp location on the first frequency) and zero times on subsequent frequencies.
+  - `src/solver/analog/__tests__/complex-sparse-solver.test.ts::value_addressed_stamp_deleted` — Assert `(new ComplexSparseSolver() as any).stamp === undefined`.
+  - `src/solver/analog/__tests__/ac-analysis.test.ts::ac_sweep_caller_reuses_branch_handles_across_frequencies` — 3-point AC sweep on a minimal fixture whose elements do not stamp anything (e.g., a `stampAc` that returns immediately). Spy on `solver.allocComplexElement` on the exact solver instance used by `AcAnalysis.run()`. Assert it is invoked exactly twice across the whole sweep — both on frequency 0 (the AC voltage-source branch-row handles) — and zero times on frequencies 1 and 2. This isolates the production caller's handle caching from fixture-side lazy-alloc calls.
   - Existing `src/solver/analog/__tests__/ac-analysis.test.ts` assertions continue to pass bit-exact.
 
 - **Acceptance criteria**:
-  - `ComplexSparseSolver.stamp(row, col, re, im)` does not exist.
-  - Zero grep hits for `.stamp(` on a `ComplexSparseSolver` instance anywhere in `src/` or test fixtures.
-  - Every `stampAc` implementation caches complex handles on first call.
-  - Full-codebase `tsc --noEmit` succeeds after this task lands — Wave 0.4 is the atomic gate for complex-side migration, independent of Phase 6's atomic gate for real-side.
+  - `ComplexSparseSolver.stamp(row, col, re, im)` does not exist on the class or in any interface.
+  - Grep for `\.stamp\s*\(` on a `ComplexSparseSolver` variable anywhere in `src/` returns zero hits outside the test that asserts its absence.
+  - `ac-analysis.ts` emits the AC branch-row stamps via cached handles, allocating each handle exactly once per sweep.
+  - Full-codebase `tsc --noEmit` succeeds after this task lands.
+  - No files under `src/components/**` are modified by this task.
 
 ### Task 0.4.5: Explicit forceReorder() on AC sweep entry
 

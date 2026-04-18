@@ -51,8 +51,9 @@ export interface SparseSolverStamp {
  * Used only in the stampAc optional method signature.
  */
 export interface ComplexSparseSolver {
-  stamp(row: number, col: number, re: number, im: number): void;
   stampRHS(row: number, re: number, im: number): void;
+  allocComplexElement(row: number, col: number): number;
+  stampComplexElement(handle: number, re: number, im: number): void;
 }
 
 // ---------------------------------------------------------------------------

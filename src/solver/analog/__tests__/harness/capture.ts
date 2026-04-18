@@ -448,6 +448,8 @@ export function createStepCaptureHook(
       integrationCoefficients: IntegrationCoefficients;
       analysisPhase: "dcop" | "tranInit" | "tranFloat";
       acceptedAttemptIndex: number;
+      /** LTE-proposed next timestep from TimestepController.computeNewDt(). */
+      lteDt?: number;
     }): void {
       if (pendingAttempts.length === 0) {
         // Nothing to emit — no attempts were recorded
@@ -465,6 +467,13 @@ export function createStepCaptureHook(
       let analysisPhase = params.analysisPhase;
       if (acceptedAttempt.phase === "tranInit") {
         analysisPhase = "tranInit";
+      }
+
+      // Populate lteDt on the last iteration of the accepted attempt so
+      // assertIterationMatch can compare it bit-exact across both engines.
+      if (params.lteDt !== undefined && acceptedAttempt.iterations.length > 0) {
+        const lastIter = acceptedAttempt.iterations[acceptedAttempt.iterations.length - 1]!;
+        lastIter.lteDt = params.lteDt;
       }
 
       steps.push({

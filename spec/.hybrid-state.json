@@ -259,12 +259,22 @@
       }
     },
     {
-      "id": "batch-6",
-      "phase": "Phase 4: DC-OP Alignment",
+      "id": "batch-parallel-waves",
+      "phase": "Parallel waves: Phase 0.4 (complex solver) + Phase 4 (DC-OP) + Phase 5 (transient) + Phase 7.1 (parity infrastructure) — all touch disjoint files, safe to run concurrently",
       "task_groups": [
-        "4.1"
+        "0.4",
+        "4.1",
+        "5.1",
+        "7.1"
       ],
       "tasks": [
+        [
+          "0.4.1",
+          "0.4.2",
+          "0.4.3",
+          "0.4.4",
+          "0.4.5"
+        ],
         [
           "4.1.1",
           "4.1.2",
@@ -274,26 +284,7 @@
           "4.3.1",
           "4.4.1",
           "4.5.1"
-        ]
-      ],
-      "spawned": 0,
-      "completed": 0,
-      "verifications_passed": 0,
-      "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 0,
-      "dead_verifiers": 0,
-      "group_status": {
-        "4.1": "pending"
-      }
-    },
-    {
-      "id": "batch-7",
-      "phase": "Phase 5: Transient Step Alignment",
-      "task_groups": [
-        "5.1"
-      ],
-      "tasks": [
+        ],
         [
           "5.1.1",
           "5.1.2",
@@ -301,45 +292,29 @@
           "5.2.2",
           "5.2.3",
           "5.3.1"
-        ]
-      ],
-      "spawned": 0,
-      "completed": 0,
-      "verifications_passed": 0,
-      "verifications_failed": 0,
-      "stops_for_clarification": 0,
-      "dead_implementers": 0,
-      "dead_verifiers": 0,
-      "group_status": {
-        "5.1": "pending"
-      }
-    },
-    {
-      "id": "batch-8",
-      "phase": "Phase 7.1: Parity Test Infrastructure",
-      "task_groups": [
-        "7.1"
-      ],
-      "tasks": [
+        ],
         [
           "7.1.1",
           "7.1.2"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 4,
+      "completed": 4,
       "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
+        "0.4": "pending",
+        "4.1": "pending",
+        "5.1": "pending",
         "7.1": "pending"
       }
     },
     {
-      "id": "batch-9",
-      "phase": "Phase 7.2-7.4: Parity Tests (parallel)",
+      "id": "batch-phase7-parity",
+      "phase": "Phase 7.2-7.4: Parity Tests (parallel) — depends on all prior phases",
       "task_groups": [
         "7.2a",
         "7.2b",
@@ -380,5 +355,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-18T12:29:05.278Z"
+  "last_updated": "2026-04-18T13:14:09.884Z"
 }

@@ -393,7 +393,7 @@ describe("Capacitor", () => {
 });
 
 // ---------------------------------------------------------------------------
-// initPred charge test — Change 20: q0 from s1 on initPred step
+// initPred charge test — q0 from s1 on initPred step
 // ---------------------------------------------------------------------------
 
 describe("Capacitor initPred", () => {
@@ -479,10 +479,10 @@ describe("Capacitor initPred", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 39: Temperature coefficients TC1, TC2, TNOM, SCALE
+// Temperature coefficients TC1, TC2, TNOM, SCALE
 // ---------------------------------------------------------------------------
 
-describe("Capacitor temperature coefficients (Change 39)", () => {
+describe("Capacitor temperature coefficients", () => {
   it("TC1_zero_TNOM_room_temp_gives_nominal_capacitance", () => {
     // dT=0 → factor=1, C_eff = C_nom * SCALE * M = C_nom
     const props = new PropertyBag();
@@ -520,10 +520,10 @@ describe("Capacitor temperature coefficients (Change 39)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Change 40: M multiplicity multiplies C (parallel capacitors = higher C)
+// M multiplicity multiplies C (parallel capacitors = higher C)
 // ---------------------------------------------------------------------------
 
-describe("Capacitor M multiplicity (Change 40)", () => {
+describe("Capacitor M multiplicity", () => {
   it("M2_doubles_effective_capacitance", () => {
     const props = new PropertyBag();
     props.setModelParam("capacitance", 1e-6);
