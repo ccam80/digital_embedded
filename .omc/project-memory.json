@@ -276,6 +276,18 @@
       "type": "directory"
     },
     {
+      "path": "src\\solver\\analog\\dc-operating-point.ts",
+      "accessCount": 21,
+      "lastAccessed": 1776518455317,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 20,
+      "lastAccessed": 1776518280794,
+      "type": "directory"
+    },
+    {
       "path": "src\\solver\\analog\\fet-base.ts",
       "accessCount": 18,
       "lastAccessed": 1776510022453,
@@ -294,16 +306,16 @@
       "type": "file"
     },
     {
-      "path": "",
-      "accessCount": 14,
-      "lastAccessed": 1776516855135,
-      "type": "directory"
-    },
-    {
       "path": "src\\solver\\analog\\newton-raphson.ts",
       "accessCount": 13,
       "lastAccessed": 1776517124605,
       "type": "directory"
+    },
+    {
+      "path": "src\\core\\analog-types.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776518428398,
+      "type": "file"
     },
     {
       "path": "src\\components\\passives\\transmission-line.ts",
@@ -312,21 +324,9 @@
       "type": "directory"
     },
     {
-      "path": "src\\core\\analog-types.ts",
-      "accessCount": 12,
-      "lastAccessed": 1776516970193,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
       "accessCount": 12,
       "lastAccessed": 1776517065254,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\dc-operating-point.ts",
-      "accessCount": 11,
-      "lastAccessed": 1776516565468,
       "type": "file"
     },
     {

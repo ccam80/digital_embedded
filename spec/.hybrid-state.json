@@ -300,16 +300,16 @@
       ],
       "spawned": 4,
       "completed": 4,
-      "verifications_passed": 0,
+      "verifications_passed": 4,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "0.4": "pending",
-        "4.1": "pending",
-        "5.1": "pending",
-        "7.1": "pending"
+        "0.4": "passed",
+        "4.1": "passed",
+        "5.1": "passed",
+        "7.1": "passed"
       }
     },
     {
@@ -355,5 +355,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-18T13:14:09.884Z"
+  "last_updated": "2026-04-18T13:22:06.391Z"
 }
