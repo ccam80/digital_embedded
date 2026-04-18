@@ -21,6 +21,7 @@ import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 
 // ---------------------------------------------------------------------------
@@ -52,52 +53,111 @@ const VARACTOR_DEFAULTS = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeVaractor(overrides: Partial<typeof VARACTOR_DEFAULTS> = {}): AnalogElementCore {
+// State pool slot index for the reactive-companion conductance (see
+// VARACTOR_STATE_SCHEMA in ../varactor.ts). Kept in sync manually with the
+// schema: positions 0=VD, 1=GEQ, 2=IEQ, 3=ID, 4=CAP_GEQ, 5=CAP_IEQ, ...
+const SLOT_CAP_GEQ = 4;
+
+interface MadeVaractor {
+  element: AnalogElementCore;
+  pool: StatePool;
+}
+
+function makeVaractor(overrides: Partial<typeof VARACTOR_DEFAULTS> = {}): MadeVaractor {
   const params = { ...VARACTOR_PARAM_DEFAULTS, ...VARACTOR_DEFAULTS, ...overrides };
   const props = createTestPropertyBag();
   props.replaceModelParams(params);
   // nodeAnode=1, nodeCathode=2
   const core = createVaractorElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
-  const { element: statedCore } = withState(core);
-  return withNodeIds(statedCore, [1, 2]);
+  const { element: statedCore, pool } = withState(core);
+  const element = withNodeIds(statedCore, [1, 2]);
+  return { element, pool };
 }
 
 /**
- * Drive varactor to operating point and call stampCompanion to set capacitance.
- * Returns the _capGeq (capacitance companion conductance) by observing stamp() output.
+ * Build a minimal LoadContext for driving an element directly via load(ctx).
  */
-function getCapacitanceAtBias(element: AnalogElementCore, vd: number, dt = 1e-6): number {
-  // Drive to operating point (vAnode = vd, vCathode = 0)
+function makeLoadCtx(
+  voltages: Float64Array,
+  solver: SparseSolverType,
+  overrides: Partial<LoadContext> = {},
+): LoadContext {
+  const dt = overrides.dt ?? 0;
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "transient",
+    dt,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+    ag: overrides.ag ?? new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+    ...overrides,
+  };
+}
+
+/**
+ * Drive varactor to operating point and capture the effective capacitance at the
+ * specified bias via the load(ctx) interface. Reads the reactive-companion
+ * conductance directly from the state pool after a transient load() and
+ * converts it back to capacitance via C = capGeq * dt / 2 (trapezoidal order-2
+ * inverse, since capGeq = (2/dt) * Ctotal for that integration rule).
+ */
+function getCapacitanceAtBias(
+  element: AnalogElementCore,
+  pool: StatePool,
+  vd: number,
+  dt = 1e-6,
+): number {
+  // Drive to operating point (vAnode = vd, vCathode = 0) using load(ctx) in DC-OP.
   const voltages = new Float64Array(2);
   voltages[0] = vd;
   voltages[1] = 0;
+  const nullSolver = {
+    stamp: () => {},
+    stampRHS: () => {},
+  } as unknown as SparseSolverType;
+  const dcCtx = makeLoadCtx(voltages, nullSolver, { isDcOp: true });
   for (let i = 0; i < 50; i++) {
-    element.updateOperatingPoint!(voltages);
+    element.load(dcCtx);
     voltages[0] = vd;
     voltages[1] = 0;
   }
 
-  // Call stampCompanion to compute capacitance at this bias
-  // order=2 so trapezoidal uses ag0=2/dt; recovery below is geq*dt/2 = C
-  element.stampCompanion!(dt, "trapezoidal", voltages, 2, [dt, dt]);
+  // Now compute the companion capacitance with trapezoidal order-2 at this bias.
+  // ag[0] = 2/dt for trapezoidal order 2; ag[1] = 1 per computeNIcomCof. We feed
+  // ag explicitly so we don't need to invoke the integration scratch buffer.
+  const ag = new Float64Array(8);
+  ag[0] = 2 / dt;
+  ag[1] = 1;
 
-  // Read the companion conductance from stamp() output
-  // capGeq is stamped as (nodeAnode-1, nodeAnode-1) = (0, 0) diagonal entry
-  const calls: Array<[number, number, number]> = [];
-  const solver = {
-    stamp: (r: number, c: number, v: number) => calls.push([r, c, v]),
-    stampRHS: (_r: number, _v: number) => {},
-  } as unknown as SparseSolverType;
+  const tranCtx = makeLoadCtx(voltages, nullSolver, {
+    isTransient: true,
+    dt,
+    method: "trapezoidal",
+    order: 2,
+    ag,
+  });
+  element.load(tranCtx);
 
-  element.stamp(solver);
-  element.stampReactiveCompanion?.(solver);
-
-  // The diagonal (0,0) entry = capGeq for trapezoidal = 2*C/dt
-  const diag = calls.find((c) => c[0] === 0 && c[1] === 0);
-  if (!diag) return 0;
+  // Read the reactive-companion conductance from the pool directly. This is
+  // the pure capGeq = (2/dt) * Ctotal — independent of the diode conductance
+  // gd which load() also stamps onto the matrix diagonal.
+  const capGeq = pool.state0[SLOT_CAP_GEQ];
 
   // capGeq = 2*C/dt (trapezoidal) → C = capGeq * dt / 2
-  return diag[2] * dt / 2;
+  return capGeq * dt / 2;
 }
 
 // ---------------------------------------------------------------------------
@@ -110,21 +170,21 @@ describe("Varactor", () => {
     // V_d (anode - cathode) = -V_R
     // Expected: C decreases monotonically as V_R increases
 
-    const varactor = makeVaractor();
+    const { element: varactor, pool } = makeVaractor();
     const dt = 1e-6;
 
     // V_R = 0: vd = 0 (anode = cathode = 0)
-    const c0 = getCapacitanceAtBias(varactor, 0, dt);
+    const c0 = getCapacitanceAtBias(varactor, pool, 0, dt);
 
     // For remaining bias points, create fresh elements to avoid history state
     const v1 = makeVaractor();
-    const c1 = getCapacitanceAtBias(v1, -1, dt); // V_R = 1V → vd = -1
+    const c1 = getCapacitanceAtBias(v1.element, v1.pool, -1, dt); // V_R = 1V → vd = -1
 
     const v2 = makeVaractor();
-    const c2 = getCapacitanceAtBias(v2, -5, dt); // V_R = 5V
+    const c2 = getCapacitanceAtBias(v2.element, v2.pool, -5, dt); // V_R = 5V
 
     const v3 = makeVaractor();
-    const c3 = getCapacitanceAtBias(v3, -10, dt); // V_R = 10V
+    const c3 = getCapacitanceAtBias(v3.element, v3.pool, -10, dt); // V_R = 10V
 
     // C should decrease monotonically with increasing reverse bias
     expect(c0).toBeGreaterThan(c1);
@@ -135,8 +195,8 @@ describe("Varactor", () => {
   it("cjo_at_zero_bias", () => {
     // At V_R = 0 (vd = 0): C_j = CJO / (1 + 0/VJ)^M = CJO
     const CJO = 20e-12;
-    const varactor = makeVaractor({ cjo: CJO });
-    const c = getCapacitanceAtBias(varactor, 0, 1e-6);
+    const { element: varactor, pool } = makeVaractor({ cjo: CJO });
+    const c = getCapacitanceAtBias(varactor, pool, 0, 1e-6);
 
     // Should equal CJO within numerical precision
     expect(c).toBeCloseTo(CJO, 12); // within 1 fF
@@ -160,8 +220,8 @@ describe("Varactor", () => {
     expect(expected).toBeCloseTo(expectedDirect, 14);
 
     // From element at V_d = -2V (reverse bias)
-    const varactor = makeVaractor({ cjo: CJO, vj: VJ, m: M });
-    const cMeasured = getCapacitanceAtBias(varactor, vd, 1e-6);
+    const { element: varactor, pool } = makeVaractor({ cjo: CJO, vj: VJ, m: M });
+    const cMeasured = getCapacitanceAtBias(varactor, pool, vd, 1e-6);
 
     // Should match computeJunctionCapacitance within 1%
     const ratio = cMeasured / expected;
@@ -196,10 +256,10 @@ describe("Varactor", () => {
 
     // Also verify from element: capacitances at two bias points differ significantly
     const v0 = makeVaractor({ cjo: CJO, vj: VJ, m: M });
-    const cFrom0 = getCapacitanceAtBias(v0, 0, 1e-9); // V_R=0
+    const cFrom0 = getCapacitanceAtBias(v0.element, v0.pool, 0, 1e-9); // V_R=0
 
     const v5 = makeVaractor({ cjo: CJO, vj: VJ, m: M });
-    const cFrom5 = getCapacitanceAtBias(v5, -5, 1e-9); // V_R=5V
+    const cFrom5 = getCapacitanceAtBias(v5.element, v5.pool, -5, 1e-9); // V_R=5V
 
     expect(cFrom0).toBeGreaterThan(cFrom5); // C decreases with reverse bias
     expect(cFrom0 / cFrom5).toBeGreaterThan(1.5); // significant tuning range
@@ -214,10 +274,10 @@ describe("Varactor", () => {
   });
 
   it("isNonlinear_and_isReactive", () => {
-    const v = makeVaractor();
+    const { element: v } = makeVaractor();
     expect(v.isNonlinear).toBe(true);
     expect(v.isReactive).toBe(true);
-    expect(v.stampCompanion).toBeDefined();
+    expect(typeof v.load).toBe('function');
   });
 
   it("change35_uses_computeJunctionCharge_for_q0", () => {
@@ -233,25 +293,43 @@ describe("Varactor", () => {
     const IS = 1e-14;
     const vd = 0.4; // forward bias above FC*VJ = 0.35
 
-    const varactor = makeVaractor({ cjo: CJO, vj: VJ, m: M, iS: IS });
+    const { element: varactor } = makeVaractor({ cjo: CJO, vj: VJ, m: M, iS: IS });
     const dt = 1e-6;
 
+    // Drive to operating point via load(ctx) in DC-OP mode.
     const voltages = new Float64Array(2);
     voltages[0] = vd;
     voltages[1] = 0;
+    const nullSolver = {
+      stamp: () => {},
+      stampRHS: () => {},
+    } as unknown as SparseSolverType;
+    const dcCtx = makeLoadCtx(voltages, nullSolver, { isDcOp: true });
     for (let i = 0; i < 50; i++) {
-      (varactor as any).updateOperatingPoint!(voltages);
+      varactor.load(dcCtx);
     }
     const idNow = Math.exp(vd / (IS > 0 ? 0.02585 : 1)) * IS - IS;
     const expectedQ = computeJunctionCharge(vd, CJO, VJ, M, FC, TT, idNow);
 
-    // Call stampCompanion to update Q slot
-    (varactor as any).stampCompanion!(dt, "trapezoidal", voltages, 2, [dt, dt]);
+    // Run load(ctx) in transient mode to exercise the reactive-companion path
+    // that writes the Q slot.
+    const ag = new Float64Array(8);
+    ag[0] = 2 / dt;
+    ag[1] = 1;
+    const tranCtx = makeLoadCtx(voltages, nullSolver, {
+      isTransient: true,
+      dt,
+      method: "trapezoidal",
+      order: 2,
+      ag,
+    });
+    varactor.load(tranCtx);
 
-    // The charge stored by stampCompanion is committed to state via integrateCapacitor.
-    // However the key assertion is that the formulas align: computeJunctionCharge
-    // at vd=0.4V must not equal CJO * vd (simple product), meaning the function
-    // genuinely computes the ngspice piecewise integral.
+    // The charge stored by load() (transient path) is committed to state via
+    // the inline NIintegrate expansion. The key assertion is that the formulas
+    // align: computeJunctionCharge at vd=0.4V must not equal CJO * vd (simple
+    // product), meaning the function genuinely computes the ngspice piecewise
+    // integral.
     const simpleProduct = CJO * vd;
     expect(expectedQ).not.toBeCloseTo(simpleProduct, 12);
     // Also verify computeJunctionCharge at zero is zero
@@ -280,9 +358,9 @@ describe("Varactor", () => {
 
     // Verify the element-level capacitance at this vd comes from computeJunctionCapacitance:
     // C from element ≈ computeJunctionCapacitance(vd, CJO, VJ, M, FC) via trapezoidal inversion
-    const varactor = makeVaractor({ cjo: CJO, vj: VJ, m: M });
+    const { element: varactor, pool } = makeVaractor({ cjo: CJO, vj: VJ, m: M });
     const dt = 1e-6;
-    const cMeasured = getCapacitanceAtBias(varactor, vdLinear, dt);
+    const cMeasured = getCapacitanceAtBias(varactor, pool, vdLinear, dt);
     // Should be close to cLinearized (within trapezoidal integration approximation)
     const ratio = cMeasured / cLinearized;
     expect(ratio).toBeGreaterThan(0.98);
@@ -304,11 +382,11 @@ describe("Varactor", () => {
 
     // Without TT
     const v0 = makeVaractor({ cjo: CJO, vj: VJ, m: M, iS: IS });
-    const cWithoutTT = getCapacitanceAtBias(v0, vdFwd, dt);
+    const cWithoutTT = getCapacitanceAtBias(v0.element, v0.pool, vdFwd, dt);
 
     // With TT = 10ns
     const v1 = makeVaractor({ cjo: CJO, vj: VJ, m: M, iS: IS, tt: TT });
-    const cWithTT = getCapacitanceAtBias(v1, vdFwd, dt);
+    const cWithTT = getCapacitanceAtBias(v1.element, v1.pool, vdFwd, dt);
 
     // TT*gd adds to capacitance; at forward bias gd is significant so cWithTT > cWithoutTT
     expect(cWithTT).toBeGreaterThan(cWithoutTT);
@@ -349,7 +427,7 @@ describe("integration", () => {
     const core = createVaractorElement(new Map([["A", 1], ["K", 0]]), [], -1, props);
 
     const pool = new StatePool(9);
-    (core as any).stateBaseOffset = 0;
+    (core as { stateBaseOffset: number }).stateBaseOffset = 0;
     core.initState(pool);
 
     // Seed previous-step charge in s1[SLOT_Q=7]
@@ -363,7 +441,7 @@ describe("integration", () => {
     const mockSolver = {
       stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
       stampRHS: (r: number, v: number) => rhs.push([r, v]),
-    } as any;
+    } as unknown as SparseSolverType;
 
     pool.ag.set(ag);
     const ctx = {

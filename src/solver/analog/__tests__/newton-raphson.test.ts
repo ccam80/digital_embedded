@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
-import { newtonRaphson, pnjlim, fetlim, applyNodesetsAndICs } from "../newton-raphson.js";
+import { newtonRaphson, pnjlim, fetlim } from "../newton-raphson.js";
 import { CKTCircuitContext } from "../ckt-context.js";
 import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
@@ -45,7 +45,7 @@ function makeDiodeCtx(sourceVoltage: number): CKTCircuitContext {
     statePool: pool,
   };
 
-  const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+  const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
   ctx.diagnostics = new DiagnosticCollector();
   return ctx;
 }
@@ -70,7 +70,7 @@ function makeResistorDividerCtx(voltage: number): CKTCircuitContext {
     statePool: null,
   };
 
-  const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+  const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
   ctx.diagnostics = new DiagnosticCollector();
   return ctx;
 }
@@ -380,66 +380,6 @@ describe("NR", () => {
     expect(ctx.nrResult.converged === true && ctx.nrResult.iterations === 0).toBe(false);
   });
 
-  // ---------------------------------------------------------------------------
-  // Wave 7.2: applyNodesetsAndICs — 1e10 conductance enforcement
-  // ---------------------------------------------------------------------------
-
-  it("applyNodesetsAndICs_stamps_nodeset_in_initJct_mode", () => {
-    const solver = new SparseSolver();
-    solver.beginAssembly(3);
-    const nodesets = new Map([[1, 2.5]]);
-    const ics = new Map<number, number>();
-    applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initJct");
-    expect(solver.elementCount).toBe(1);
-    const rhs = solver.getRhsSnapshot();
-    expect(rhs[1]).toBe(2.5e10); // 1e10 (G_NODESET) * 2.5 — exact in IEEE-754
-  });
-
-  it("applyNodesetsAndICs_stamps_nodeset_in_initFix_mode", () => {
-    const solver = new SparseSolver();
-    solver.beginAssembly(3);
-    const nodesets = new Map([[2, 1.0]]);
-    const ics = new Map<number, number>();
-    applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFix");
-    expect(solver.elementCount).toBe(1);
-    const rhs = solver.getRhsSnapshot();
-    expect(rhs[2]).toBe(1e10); // 1e10 (G_NODESET) * 1.0 — exact
-  });
-
-  it("applyNodesetsAndICs_skips_nodesets_in_initFloat_mode", () => {
-    const solver = new SparseSolver();
-    solver.beginAssembly(3);
-    const nodesets = new Map([[1, 2.5]]);
-    const ics = new Map<number, number>();
-    applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFloat");
-    expect(solver.elementCount).toBe(0);
-    const rhs = solver.getRhsSnapshot();
-    expect(rhs[1]).toBe(0);
-  });
-
-  it("applyNodesetsAndICs_always_stamps_ics_regardless_of_mode", () => {
-    const solver = new SparseSolver();
-    solver.beginAssembly(3);
-    const nodesets = new Map<number, number>();
-    const ics = new Map([[1, 1.5]]);
-    applyNodesetsAndICs(solver, nodesets, ics, 1.0, "initFloat");
-    expect(solver.elementCount).toBe(1);
-    const rhs = solver.getRhsSnapshot();
-    expect(rhs[1]).toBe(1.5e10); // 1e10 (G_NODESET) * 1.5 — exact
-  });
-
-  it("applyNodesetsAndICs_scales_by_srcFact", () => {
-    const G_NODESET = 1e10;
-    const solver = new SparseSolver();
-    solver.beginAssembly(3);
-    const nodesets = new Map([[1, 2.0]]);
-    const ics = new Map([[2, 1.0]]);
-    applyNodesetsAndICs(solver, nodesets, ics, 0.5, "initJct");
-    expect(solver.elementCount).toBe(2);
-    const rhs = solver.getRhsSnapshot();
-    expect(rhs[1]).toBe(1e10); // 1e10 (G_NODESET) * 2.0 * 0.5 — exact
-    expect(rhs[2]).toBe(5e9);  // 1e10 (G_NODESET) * 1.0 * 0.5 — exact
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -543,7 +483,7 @@ describe("ipass hadNodeset gate", () => {
     const pool = allocateStatePool(elements);
 
     const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
-    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = new DiagnosticCollector();
     ctx.isDcOp = true;
     // No nodesets added — hadNodeset stays false
@@ -587,7 +527,7 @@ describe("ipass hadNodeset gate", () => {
     const pool = allocateStatePool(elements);
 
     const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
-    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = new DiagnosticCollector();
     ctx.isDcOp = true;
 
@@ -669,7 +609,7 @@ describe("NR singular retry", () => {
     const pool = allocateStatePool(elements);
 
     const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
-    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = diagnostics;
     ctx.solver = proxySolver;
 
@@ -709,7 +649,7 @@ describe("NR singular retry", () => {
     const pool = allocateStatePool(elements);
 
     const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
-    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = diagnostics;
     ctx.solver = proxySolver;
 
@@ -736,7 +676,7 @@ describe("NR NISHOULDREORDER lifecycle", () => {
     const pool = allocateStatePool(elements);
 
     const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
-    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = new DiagnosticCollector();
 
     let forceReorderCalled = false;
@@ -781,7 +721,7 @@ describe("NR NISHOULDREORDER lifecycle", () => {
     const pool = allocateStatePool(elements);
 
     const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
-    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = new DiagnosticCollector();
     ctx.statePool!.initMode = "initTran";
 
@@ -832,7 +772,7 @@ describe("NR E_SINGULAR recovery via continue", () => {
     const pool = allocateStatePool(elements);
 
     const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
-    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = diagnostics;
 
     const realSolver = ctx.solver;
@@ -895,7 +835,7 @@ describe("NR E_SINGULAR recovery via continue", () => {
     const pool = allocateStatePool(elements);
 
     const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
-    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint);
+    const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = diagnostics;
 
     const realSolver = ctx.solver;

@@ -8,6 +8,9 @@
  */
 
 import { describe, it, expect } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   HistoryStore,
   computeNIcomCof,
@@ -30,6 +33,62 @@ describe("deleted_integrate_functions", () => {
   it("integrateInductor_does_not_exist", () => {
     expect((integrationModule as Record<string, unknown>)["integrateInductor"]).toBeUndefined();
   });
+
+  // Static import-graph assertion (Task C8.3): no production file imports the
+  // deleted symbols. The runtime `toBeUndefined` checks above catch the case
+  // where someone re-exports `integrateCapacitor` from `integration.ts`; this
+  // check catches the case where a production file imports the symbol from a
+  // different module (regression class Phase 6 V-02).
+  const HERE = path.dirname(fileURLToPath(import.meta.url));
+  const SRC_ROOT = path.resolve(HERE, "..", "..", "..");
+
+  function collectProductionTsFiles(dir: string, acc: string[]): void {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === "__tests__" || entry.name === "node_modules") continue;
+        collectProductionTsFiles(full, acc);
+      } else if (entry.isFile()) {
+        if (!entry.name.endsWith(".ts")) continue;
+        if (entry.name.endsWith(".test.ts")) continue;
+        if (entry.name.endsWith(".lint.ts")) continue;
+        if (entry.name.endsWith(".d.ts")) continue;
+        acc.push(full);
+      }
+    }
+  }
+
+  function findOffendingImports(symbol: "integrateCapacitor" | "integrateInductor"): string[] {
+    const files: string[] = [];
+    collectProductionTsFiles(SRC_ROOT, files);
+    // Match any TypeScript import statement (single-line or multi-line) whose
+    // specifier list contains the banned symbol as an identifier. Anchors on
+    // the `import` keyword at the start of a line and captures everything up
+    // to the closing quote of the module source, so multi-line `import {\n  x\n}
+    // from "..."` forms are covered.
+    const importRegex = new RegExp(
+      String.raw`(^|\n)\s*import\b[^;]*\b` + symbol + String.raw`\b[^;]*from\s*["'][^"']+["']`,
+      "m",
+    );
+    const offenders: string[] = [];
+    for (const file of files) {
+      const text = fs.readFileSync(file, "utf8");
+      if (importRegex.test(text)) {
+        offenders.push(path.relative(SRC_ROOT, file));
+      }
+    }
+    return offenders;
+  }
+
+  it("no_production_file_imports_integrateCapacitor", () => {
+    const offenders = findOffendingImports("integrateCapacitor");
+    expect(offenders).toEqual([]);
+  });
+
+  it("no_production_file_imports_integrateInductor", () => {
+    const offenders = findOffendingImports("integrateInductor");
+    expect(offenders).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -43,8 +102,8 @@ describe("HistoryStore", () => {
     store.push(idx, 10.0); // v(n) = 10
     store.push(idx, 20.0); // v(n) = 20, v(n-1) = 10
 
-    expect(store.get(idx, 0)).toBeCloseTo(20.0, 10);
-    expect(store.get(idx, 1)).toBeCloseTo(10.0, 10);
+    expect(store.get(idx, 0)).toBe(20.0);
+    expect(store.get(idx, 1)).toBe(10.0);
   });
 
   it("reset_zeros_all", () => {
@@ -68,10 +127,10 @@ describe("HistoryStore", () => {
     store.push(0, 150.0);
     store.push(1, 250.0);
 
-    expect(store.get(0, 0)).toBeCloseTo(150.0, 10);
-    expect(store.get(0, 1)).toBeCloseTo(100.0, 10);
-    expect(store.get(1, 0)).toBeCloseTo(250.0, 10);
-    expect(store.get(1, 1)).toBeCloseTo(200.0, 10);
+    expect(store.get(0, 0)).toBe(150.0);
+    expect(store.get(0, 1)).toBe(100.0);
+    expect(store.get(1, 0)).toBe(250.0);
+    expect(store.get(1, 1)).toBe(200.0);
   });
 
   it("initial_values_are_zero", () => {
@@ -88,8 +147,8 @@ describe("HistoryStore", () => {
     store.push(0, 2.0);
     store.push(0, 3.0); // v(n)=3, v(n-1)=2 (v(n-2)=1 is gone)
 
-    expect(store.get(0, 0)).toBeCloseTo(3.0, 10);
-    expect(store.get(0, 1)).toBeCloseTo(2.0, 10);
+    expect(store.get(0, 0)).toBe(3.0);
+    expect(store.get(0, 1)).toBe(2.0);
   });
 });
 
@@ -110,9 +169,9 @@ describe("gear_vandermonde_zero_alloc", () => {
     // GEAR order 2 equal steps: ag*dt = [1.5, -2, 0.5]
     scratch.fill(0);
     computeNIcomCof(h, [h, h], 2, "gear", ag, scratch);
-    expect(ag[0]).toBeCloseTo(3 / (2 * h), 8);
-    expect(ag[1]).toBeCloseTo(-2 / h, 8);
-    expect(ag[2]).toBeCloseTo(1 / (2 * h), 8);
+    expect(ag[0]).toBe(3 / (2 * h));
+    expect(ag[1]).toBe(-2 / h);
+    expect(ag[2]).toBe(1 / (2 * h));
     // Scratch buffer was mutated (non-zero entries exist after the solve)
     const scratchWasMutated = scratch.some(v => v !== 0);
     expect(scratchWasMutated).toBe(true);
@@ -120,29 +179,29 @@ describe("gear_vandermonde_zero_alloc", () => {
     // GEAR order 3 equal steps: ag*dt = [11/6, -3, 3/2, -1/3]
     ag.fill(0); scratch.fill(0);
     computeNIcomCof(h, [h, h, h], 3, "gear", ag, scratch);
-    expect(ag[0]).toBeCloseTo(11 / (6 * h), 6);
-    expect(ag[1]).toBeCloseTo(-3 / h, 6);
-    expect(ag[2]).toBeCloseTo(3 / (2 * h), 6);
-    expect(ag[3]).toBeCloseTo(-1 / (3 * h), 6);
+    expect(ag[0]).toBe(11 / (6 * h));
+    expect(ag[1]).toBe(-3 / h);
+    expect(ag[2]).toBe(3 / (2 * h));
+    expect(ag[3]).toBe(-1 / (3 * h));
 
     // GEAR order 4 equal steps: ag*dt = [25/12, -4, 3, -4/3, 1/4]
     ag.fill(0); scratch.fill(0);
     computeNIcomCof(h, [h, h, h, h], 4, "gear", ag, scratch);
-    expect(ag[0]).toBeCloseTo(25 / (12 * h), 6);
-    expect(ag[1]).toBeCloseTo(-4 / h, 6);
-    expect(ag[4]).toBeCloseTo(1 / (4 * h), 6);
+    expect(ag[0]).toBe(25 / (12 * h));
+    expect(ag[1]).toBe(-4 / h);
+    expect(ag[4]).toBe(1 / (4 * h));
 
     // GEAR order 5 equal steps
     ag.fill(0); scratch.fill(0);
     computeNIcomCof(h, [h, h, h, h, h], 5, "gear", ag, scratch);
-    expect(ag[0]).toBeCloseTo(137 / (60 * h), 5);
-    expect(ag[5]).toBeCloseTo(-1 / (5 * h), 5);
+    expect(ag[0]).toBe(137 / (60 * h));
+    expect(ag[5]).toBe(-1 / (5 * h));
 
     // GEAR order 6 equal steps
     ag.fill(0); scratch.fill(0);
     computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", ag, scratch);
-    expect(ag[0]).toBeCloseTo(49 / (20 * h), 5);
-    expect(ag[6]).toBeCloseTo(1 / (6 * h), 5);
+    expect(ag[0]).toBe(49 / (20 * h));
+    expect(ag[6]).toBe(1 / (6 * h));
   });
 
   it("computeIntegrationCoefficients_deleted", () => {
@@ -171,23 +230,23 @@ describe("computeNIcomCof", () => {
   it("BDF-1 order 1: ag[0]=1/dt, ag[1]=-1/dt", () => {
     const ag = new Float64Array(8);
     computeNIcomCof(h, [h, h], 1, "bdf1", ag, scratch);
-    expect(ag[0]).toBeCloseTo(1 / h, 10);
-    expect(ag[1]).toBeCloseTo(-1 / h, 10);
+    expect(ag[0]).toBe(1 / h);
+    expect(ag[1]).toBe(-1 / h);
   });
 
   it("trapezoidal order 1: ag[0]=1/dt, ag[1]=-1/dt", () => {
     const ag = new Float64Array(8);
     computeNIcomCof(h, [h, h], 1, "trapezoidal", ag, scratch);
-    expect(ag[0]).toBeCloseTo(1 / h, 10);
-    expect(ag[1]).toBeCloseTo(-1 / h, 10);
+    expect(ag[0]).toBe(1 / h);
+    expect(ag[1]).toBe(-1 / h);
   });
 
   it("trapezoidal order 2: ag[0]=2/dt, ag[1]=1 (xmu=0.5)", () => {
     const ag = new Float64Array(8);
     computeNIcomCof(h, [h, h], 2, "trapezoidal", ag, scratch);
     // xmu=0.5: ag[0] = 1/dt/(1-0.5) = 2/dt; ag[1] = 0.5/(1-0.5) = 1
-    expect(ag[0]).toBeCloseTo(2 / h, 10);
-    expect(ag[1]).toBeCloseTo(1, 10);
+    expect(ag[0]).toBe(2 / h);
+    expect(ag[1]).toBe(1);
   });
 
   it("BDF-2 equal steps: ag[0]=3/(2h), ag[1]=-2/h, ag[2]=1/(2h)", () => {
@@ -196,9 +255,9 @@ describe("computeNIcomCof", () => {
     // With h1=h: r1=1, r2=2, u22=2*(2-1)=2, rhs2=1/h
     // ag2 = (1/h)/2 = 1/(2h), ag1 = (-1/h - 2/(2h))/1 = -2/h
     // ag0 = -(ag1+ag2) = 2/h - 1/(2h) = 3/(2h)
-    expect(ag[0]).toBeCloseTo(3 / (2 * h), 10);
-    expect(ag[1]).toBeCloseTo(-2 / h, 10);
-    expect(ag[2]).toBeCloseTo(1 / (2 * h), 10);
+    expect(ag[0]).toBe(3 / (2 * h));
+    expect(ag[1]).toBe(-2 / h);
+    expect(ag[2]).toBe(1 / (2 * h));
   });
 
   it("BDF-2 degenerate (h1=0): falls back to BE coefficients", () => {
@@ -207,9 +266,9 @@ describe("computeNIcomCof", () => {
     const ag = new Float64Array(8);
     computeNIcomCof(h, [h, 0], 2, "bdf2", ag, scratch);
     // h1=0 → safeH1=dt=h → same as equal steps
-    expect(ag[0]).toBeCloseTo(3 / (2 * h), 10);
-    expect(ag[1]).toBeCloseTo(-2 / h, 10);
-    expect(ag[2]).toBeCloseTo(1 / (2 * h), 10);
+    expect(ag[0]).toBe(3 / (2 * h));
+    expect(ag[1]).toBe(-2 / h);
+    expect(ag[2]).toBe(1 / (2 * h));
   });
 
   it("GEAR order 2 equal steps matches BDF-2: ag[0]=3/(2h), ag[1]=-2/h, ag[2]=1/(2h)", () => {
@@ -218,9 +277,9 @@ describe("computeNIcomCof", () => {
     const ag = new Float64Array(8);
     const scratch = new Float64Array(49);
     computeNIcomCof(h, [h, h], 2, "gear", ag, scratch);
-    expect(ag[0]).toBeCloseTo(3 / (2 * h), 8);
-    expect(ag[1]).toBeCloseTo(-2 / h, 8);
-    expect(ag[2]).toBeCloseTo(1 / (2 * h), 8);
+    expect(ag[0]).toBe(3 / (2 * h));
+    expect(ag[1]).toBe(-2 / h);
+    expect(ag[2]).toBe(1 / (2 * h));
   });
 
   it("GEAR order 3 equal steps: ag*dt = [11/6, -3, 3/2, -1/3]", () => {
@@ -230,10 +289,10 @@ describe("computeNIcomCof", () => {
     const ag = new Float64Array(8);
     const scratch = new Float64Array(49);
     computeNIcomCof(h, [h, h, h], 3, "gear", ag, scratch);
-    expect(ag[0]).toBeCloseTo(11 / (6 * h), 6);
-    expect(ag[1]).toBeCloseTo(-3 / h, 6);
-    expect(ag[2]).toBeCloseTo(3 / (2 * h), 6);
-    expect(ag[3]).toBeCloseTo(-1 / (3 * h), 6);
+    expect(ag[0]).toBe(11 / (6 * h));
+    expect(ag[1]).toBe(-3 / h);
+    expect(ag[2]).toBe(3 / (2 * h));
+    expect(ag[3]).toBe(-1 / (3 * h));
   });
 
   it("GEAR order 4 equal steps: ag*dt = [25/12, -4, 3, -4/3, 1/4]", () => {
@@ -242,11 +301,11 @@ describe("computeNIcomCof", () => {
     const ag = new Float64Array(8);
     const scratch = new Float64Array(49);
     computeNIcomCof(h, [h, h, h, h], 4, "gear", ag, scratch);
-    expect(ag[0]).toBeCloseTo(25 / (12 * h), 6);
-    expect(ag[1]).toBeCloseTo(-4 / h, 6);
-    expect(ag[2]).toBeCloseTo(3 / h, 6);
-    expect(ag[3]).toBeCloseTo(-4 / (3 * h), 6);
-    expect(ag[4]).toBeCloseTo(1 / (4 * h), 6);
+    expect(ag[0]).toBe(25 / (12 * h));
+    expect(ag[1]).toBe(-4 / h);
+    expect(ag[2]).toBe(3 / h);
+    expect(ag[3]).toBe(-4 / (3 * h));
+    expect(ag[4]).toBe(1 / (4 * h));
   });
 
   it("GEAR order 5 equal steps: ag*dt = [137/60, -5, 5, -10/3, 5/4, -1/5]", () => {
@@ -254,12 +313,12 @@ describe("computeNIcomCof", () => {
     const ag = new Float64Array(8);
     const scratch = new Float64Array(49);
     computeNIcomCof(h, [h, h, h, h, h], 5, "gear", ag, scratch);
-    expect(ag[0]).toBeCloseTo(137 / (60 * h), 5);
-    expect(ag[1]).toBeCloseTo(-5 / h, 5);
-    expect(ag[2]).toBeCloseTo(5 / h, 5);
-    expect(ag[3]).toBeCloseTo(-10 / (3 * h), 5);
-    expect(ag[4]).toBeCloseTo(5 / (4 * h), 5);
-    expect(ag[5]).toBeCloseTo(-1 / (5 * h), 5);
+    expect(ag[0]).toBe(137 / (60 * h));
+    expect(ag[1]).toBe(-5 / h);
+    expect(ag[2]).toBe(5 / h);
+    expect(ag[3]).toBe(-10 / (3 * h));
+    expect(ag[4]).toBe(5 / (4 * h));
+    expect(ag[5]).toBe(-1 / (5 * h));
   });
 
   it("GEAR order 6 equal steps: ag*dt = [49/20, -6, 15/2, -20/3, 15/4, -6/5, 1/6]", () => {
@@ -267,13 +326,13 @@ describe("computeNIcomCof", () => {
     const ag = new Float64Array(8);
     const scratch = new Float64Array(49);
     computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", ag, scratch);
-    expect(ag[0]).toBeCloseTo(49 / (20 * h), 5);
-    expect(ag[1]).toBeCloseTo(-6 / h, 5);
-    expect(ag[2]).toBeCloseTo(15 / (2 * h), 5);
-    expect(ag[3]).toBeCloseTo(-20 / (3 * h), 5);
-    expect(ag[4]).toBeCloseTo(15 / (4 * h), 5);
-    expect(ag[5]).toBeCloseTo(-6 / (5 * h), 5);
-    expect(ag[6]).toBeCloseTo(1 / (6 * h), 5);
+    expect(ag[0]).toBe(49 / (20 * h));
+    expect(ag[1]).toBe(-6 / h);
+    expect(ag[2]).toBe(15 / (2 * h));
+    expect(ag[3]).toBe(-20 / (3 * h));
+    expect(ag[4]).toBe(15 / (4 * h));
+    expect(ag[5]).toBe(-6 / (5 * h));
+    expect(ag[6]).toBe(1 / (6 * h));
   });
 
   it("GEAR coefficients sum to zero (interpolation constraint)", () => {

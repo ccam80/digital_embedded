@@ -24,7 +24,7 @@ import { describe, it, expect, vi } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson } from "../newton-raphson.js";
-import { makeVoltageSource, makeResistor, withNodeIds } from "./test-helpers.js";
+import { makeVoltageSource, makeResistor, withNodeIds, makeSimpleCtx } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
 import {
   createDriverAnalogElement,
@@ -95,9 +95,10 @@ function solve(
   elements: AnalogElement[],
   matrixSize: number,
 ) {
-  const solver = new SparseSolver();
-  const diagnostics = new DiagnosticCollector();
-  return newtonRaphson({ solver, elements, matrixSize, ...NR_OPTS, diagnostics });
+  const nodeCount = matrixSize;
+  const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, params: NR_OPTS });
+  newtonRaphson(ctx);
+  return ctx.nrResult;
 }
 
 // ---------------------------------------------------------------------------
@@ -370,40 +371,66 @@ describe("Relay", () => {
     const matrixSize = 7;
 
     const solver = new SparseSolver();
-    let voltages = new Float64Array(matrixSize);
+    let currentVoltages = new Float64Array(matrixSize);
 
     // tau = L/R = 1e-3/10 = 100µs; run 10 steps of 100µs = 1 tau
     // After 1 tau: iL = (V/R)*(1-exp(-1)) ≈ (10/10)*0.632 = 0.632A >> 20mA
     const dt = 100e-6;
     const steps = 10;
 
+    const ag = new Float64Array(7);
+
+    function makeTransientCtx(v: Float64Array): import("../load-context.js").LoadContext {
+      return {
+        solver: solver as any,
+        voltages: v,
+        iteration: 0,
+        initMode: "transient" as const,
+        dt,
+        method: "trapezoidal" as const,
+        order: 1,
+        deltaOld: [],
+        ag,
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        isDcOp: false,
+        isTransient: true,
+        xfact: 0,
+        gmin: 1e-12,
+        uic: false,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+      };
+    }
+
     for (let step = 0; step < steps; step++) {
+      const ctx = makeTransientCtx(currentVoltages);
       solver.beginAssembly(matrixSize);
-      // Stamp all elements
-      for (const el of allElements) el.stamp(solver);
-      // Stamp relay companion model (adds inductor equivalent conductance + history current)
-      relay.stampCompanion!(dt, "trapezoidal", voltages);
+      for (const el of allElements) el.load(ctx);
       solver.finalize();
       const factored = solver.factor();
       expect(factored.success).toBe(true);
-      solver.solve(voltages);
+      const newVoltages = new Float64Array(matrixSize);
+      solver.solve(newVoltages);
+      currentVoltages = newVoltages;
       // Advance relay state: updates iL and contactClosed
-      relay.updateState!(dt, voltages);
+      relay.accept(makeTransientCtx(currentVoltages), 0, () => {});
     }
 
     // After 10 × 100µs, coil current >> 20mA → contact should be closed.
     // Verify by solving again with the updated contact state.
+    const finalCtx = makeTransientCtx(currentVoltages);
     solver.beginAssembly(matrixSize);
-    for (const el of allElements) el.stamp(solver);
-    relay.stampCompanion!(dt, "trapezoidal", voltages);
+    for (const el of allElements) el.load(finalCtx);
     solver.finalize();
     solver.factor();
-    solver.solve(voltages);
+    solver.solve(currentVoltages);
 
     // Contact A = circuit node 3 → voltages[2] (1-based index 3, solver row 2)
-    const vContactA = voltages[2];
+    const vContactA = currentVoltages[2];
     // Contact B = circuit node 4 → voltages[3]
-    const vContactB = voltages[3];
+    const vContactB = currentVoltages[3];
 
     expect(vContactA).toBeCloseTo(1.0, 2);
     // When closed (R_on=0.01Ω), drop across contact is negligible → vContactB ≈ 1V

@@ -1,5 +1,5 @@
 /**
- * cktLoad — single-pass device load replacing MNAAssembler.stampAll().
+ * cktLoad — single-pass device load.
  *
  * Matches ngspice cktload.c:29-158. One call to element.load() per device
  * per NR iteration. No separate updateOperatingPoint, stampNonlinear, or
@@ -7,6 +7,15 @@
  */
 
 import type { CKTCircuitContext } from "./ckt-context.js";
+
+/**
+ * Large conductance used to enforce nodeset and IC node voltages.
+ * Matches ngspice cktload.c:96-136: 1e10 siemens pin to a voltage source.
+ *
+ * Variable mapping (ngspice → ours):
+ *   cktload.c:113 (1e10 conductance) → CKTNS_PIN
+ */
+const CKTNS_PIN = 1e10;
 
 /**
  * Single-pass device load function.
@@ -50,11 +59,24 @@ export function cktLoad(ctx: CKTCircuitContext, iteration: number): void {
   ctx.noncon = ctx.loadCtx.noncon.value;
 
   // Step 4: apply nodesets/ICs inside cktLoad (ngspice cktload.c:96-136)
-  // Only in DC mode during initJct or initFix
+  // Only in DC mode during initJct or initFix.
+  // Both nodesets and ICs receive srcFact scaling on the RHS target voltage,
+  // matching ngspice CKTnodeset/CKTic enforcement.
+  //
+  // Variable mapping (ngspice cktload.c → ours):
+  //   ckt->CKTnodeset       → ctx.nodesets
+  //   ckt->CKTnodeValues    → ctx.ics
+  //   1e10 (conductance)    → CKTNS_PIN
+  //   *ckt->CKTrhs += ...   → ctx.solver.stampRHS(node, val)
+  //   CKTsrcFact            → ctx.srcFact
   if (ctx.isDcOp && (ctx.initMode === "initJct" || ctx.initMode === "initFix")) {
     for (const [node, value] of ctx.nodesets) {
-      ctx.solver.stamp(node, node, 1e10);
-      ctx.solver.stampRHS(node, 1e10 * value);
+      ctx.solver.stamp(node, node, CKTNS_PIN);
+      ctx.solver.stampRHS(node, CKTNS_PIN * value * ctx.srcFact);
+    }
+    for (const [node, value] of ctx.ics) {
+      ctx.solver.stamp(node, node, CKTNS_PIN);
+      ctx.solver.stampRHS(node, CKTNS_PIN * value * ctx.srcFact);
     }
   }
 

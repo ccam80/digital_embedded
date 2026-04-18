@@ -27,8 +27,27 @@ describe("cktTerr", () => {
     const dt = 1e-9;
     const q0 = 1e-12, q1 = 0.9e-12, q2 = 0.8e-12;
     const result = cktTerr(dt, [dt, dt], 1, "bdf1", q0, q1, q2, 0, q0, q1, defaultParams);
-    expect(result).toBeGreaterThan(0);
-    expect(isFinite(result)).toBe(true);
+
+    // NGSPICE_REF: ngspice cktterr.c CKTterr, order=1 GEAR (BDF-1) path.
+    // Divided difference (2nd) -> tolerance -> del = trtol*tol/max(abstol, factor*ddiff)
+    // -> GEAR order 1 takes sqrt(del).
+    const h0 = dt, h1 = dt;
+    let d0 = q0, d1 = q1, d2 = q2;
+    d0 = (d0 - d1) / h0;
+    d1 = (d1 - d2) / h1;
+    const dt0 = h1 + h0;
+    d0 = (d0 - d1) / dt0;
+    const ddiff = Math.abs(d0);
+    const volttol = defaultParams.abstol + defaultParams.reltol * Math.max(Math.abs(q0), Math.abs(q1));
+    const chargetolRaw = defaultParams.reltol * Math.max(Math.max(Math.abs(q0), Math.abs(q1)), defaultParams.chgtol);
+    const chargetol = chargetolRaw / dt;
+    const tol = Math.max(volttol, chargetol);
+    const factor = 0.5; // GEAR_LTE_FACTORS[0]
+    const denom = Math.max(defaultParams.abstol, factor * ddiff);
+    const del = defaultParams.trtol * tol / denom;
+    const NGSPICE_REF = Math.sqrt(del);
+
+    expect(result).toBe(NGSPICE_REF);
   });
 
   it("order 2 bdf2: returns sqrt-scaled timestep", () => {
@@ -36,8 +55,30 @@ describe("cktTerr", () => {
     const dt = 1e-9;
     const q0 = 27e-12, q1 = 8e-12, q2 = 1e-12, q3 = 0;
     const r2 = cktTerr(dt, [dt, dt], 2, "bdf2", q0, q1, q2, q3, q0, q1, defaultParams);
-    expect(r2).toBeGreaterThan(0);
-    expect(isFinite(r2)).toBe(true);
+
+    // NGSPICE_REF: ngspice cktterr.c CKTterr, order=2 GEAR (BDF-2) path.
+    // 3rd divided difference -> tol -> del -> root via exp(log(del)/(order+1)).
+    const h0 = dt, h1 = dt, h2 = dt;
+    let d0 = q0, d1 = q1, d2 = q2, d3 = q3;
+    d0 = (d0 - d1) / h0;
+    d1 = (d1 - d2) / h1;
+    d2 = (d2 - d3) / h2;
+    let dt0 = h1 + h0, dt1 = h2 + h1;
+    d0 = (d0 - d1) / dt0;
+    d1 = (d1 - d2) / dt1;
+    dt0 = dt1 + h0;
+    d0 = (d0 - d1) / dt0;
+    const ddiff = Math.abs(d0);
+    const volttol = defaultParams.abstol + defaultParams.reltol * Math.max(Math.abs(q0), Math.abs(q1));
+    const chargetolRaw = defaultParams.reltol * Math.max(Math.max(Math.abs(q0), Math.abs(q1)), defaultParams.chgtol);
+    const chargetol = chargetolRaw / dt;
+    const tol = Math.max(volttol, chargetol);
+    const factor = 2 / 9; // GEAR_LTE_FACTORS[1]
+    const denom = Math.max(defaultParams.abstol, factor * ddiff);
+    const del = defaultParams.trtol * tol / denom;
+    const NGSPICE_REF = Math.exp(Math.log(del) / (2 + 1));
+
+    expect(r2).toBe(NGSPICE_REF);
   });
 
   it("constant charge history produces finite timestep (not Infinity) — abstol-gated", () => {
@@ -45,8 +86,19 @@ describe("cktTerr", () => {
     const dt = 1e-9;
     const q = 1e-12;
     const result = cktTerr(dt, [dt, dt], 1, "bdf1", q, q, q, q, q, q, defaultParams);
-    expect(result).toBeGreaterThan(0);
-    expect(isFinite(result)).toBe(true);
+
+    // NGSPICE_REF: ngspice cktterr.c CKTterr, order=1 GEAR, ddiff=0 case.
+    // Constant Q -> 2nd divided difference = 0 -> denom clamps to abstol ->
+    // del = trtol*tol/abstol -> sqrt(del) for GEAR order 1.
+    const volttol = defaultParams.abstol + defaultParams.reltol * Math.max(Math.abs(q), Math.abs(q));
+    const chargetolRaw = defaultParams.reltol * Math.max(Math.max(Math.abs(q), Math.abs(q)), defaultParams.chgtol);
+    const chargetol = chargetolRaw / dt;
+    const tol = Math.max(volttol, chargetol);
+    const denom = defaultParams.abstol; // max(abstol, 0.5 * 0) = abstol
+    const del = defaultParams.trtol * tol / denom;
+    const NGSPICE_REF = Math.sqrt(del);
+
+    expect(result).toBe(NGSPICE_REF);
   });
 
   it("bdf2 order 2 returns positive finite timestep for cubic charge data", () => {
@@ -56,10 +108,38 @@ describe("cktTerr", () => {
     const q0 = 27.0, q1 = 8.0, q2 = 1.0, q3 = 0.0;
     const rTrap = cktTerr(dt, [dt, dt], 2, "trapezoidal", q0, q1, q2, q3, q0, q1, defaultParams);
     const rBdf2 = cktTerr(dt, [dt, dt], 2, "bdf2", q0, q1, q2, q3, q0, q1, defaultParams);
-    expect(rTrap).toBeGreaterThan(0);
-    expect(isFinite(rTrap)).toBe(true);
-    expect(rBdf2).toBeGreaterThan(0);
-    expect(isFinite(rBdf2)).toBe(true);
+
+    // Shared divided-difference bookkeeping (ngspice cktterr.c:43-59 order=2).
+    const h0 = dt, h1 = dt, h2 = dt;
+    let d0 = q0, d1 = q1, d2 = q2, d3 = q3;
+    d0 = (d0 - d1) / h0;
+    d1 = (d1 - d2) / h1;
+    d2 = (d2 - d3) / h2;
+    let dt0 = h1 + h0, dt1 = h2 + h1;
+    d0 = (d0 - d1) / dt0;
+    d1 = (d1 - d2) / dt1;
+    dt0 = dt1 + h0;
+    const diffSigned = (d0 - d1) / dt0; // signed 3rd divided difference (TRAP order-2 uses signed form)
+    const ddiff = Math.abs(diffSigned);
+    const volttol = defaultParams.abstol + defaultParams.reltol * Math.max(Math.abs(q0), Math.abs(q1));
+    const chargetolRaw = defaultParams.reltol * Math.max(Math.max(Math.abs(q0), Math.abs(q1)), defaultParams.chgtol);
+    const chargetol = chargetolRaw / dt;
+    const tol = Math.max(volttol, chargetol);
+
+    // NGSPICE_REF_TRAP: ngspice cktterr.c TRAP order 2:
+    //   del = |deltaOld[0] * trtol * tol * 3 * (deltaOld[0]+deltaOld[1]) / diff|
+    const d0old = dt, d1old = dt;
+    const NGSPICE_REF_TRAP = Math.abs(d0old * defaultParams.trtol * tol * 3 * (d0old + d1old) / diffSigned);
+
+    // NGSPICE_REF_BDF2: ngspice cktterr.c GEAR order 2:
+    //   del = trtol*tol/max(abstol, factor*ddiff); result = exp(log(del)/(order+1))
+    const factor = 2 / 9; // GEAR_LTE_FACTORS[1]
+    const denom = Math.max(defaultParams.abstol, factor * ddiff);
+    const del = defaultParams.trtol * tol / denom;
+    const NGSPICE_REF_BDF2 = Math.exp(Math.log(del) / (2 + 1));
+
+    expect(rTrap).toBe(NGSPICE_REF_TRAP);
+    expect(rBdf2).toBe(NGSPICE_REF_BDF2);
   });
 });
 
@@ -77,25 +157,79 @@ describe("cktTerrVoltage", () => {
     // GEAR: denom = max(lteAbstol, 0) = lteAbstol > 0, del > 0, sqrt > 0
     const v = 5.0;
     const dt = 1e-9;
-    const result = cktTerrVoltage(v, v, v, v, dt, [dt, dt], 1, "bdf1", 1e-3, 1e-6, 7);
-    expect(result).toBeGreaterThan(0);
-    expect(isFinite(result)).toBe(true);
+    const lteReltol = 1e-3, lteAbstol = 1e-6, trtol = 7;
+    const result = cktTerrVoltage(v, v, v, v, dt, [dt, dt], 1, "bdf1", lteReltol, lteAbstol, trtol);
+
+    // NGSPICE_REF: ngspice ckttrunc.c NEWTRUNC GEAR order 1, ddiff=0 case.
+    //   tol = lteAbstol + lteReltol * max(|vNow|,|v1|)
+    //   delsum = deltaOld[0] + deltaOld[1]  (i from 0 to order inclusive, deltaOld.length=2)
+    //   denom = max(lteAbstol, factor*ddiff) = lteAbstol (since ddiff=0)
+    //   tmp   = (tol*trtol*delsum) / (denom*delta)
+    //   result = delta * sqrt(tmp)
+    const tol = lteAbstol + lteReltol * Math.max(Math.abs(v), Math.abs(v));
+    const delsum = dt + dt; // deltaOld=[dt,dt], order=1 -> sum i=0..1
+    const denom = lteAbstol;
+    const tmp = (tol * trtol * delsum) / (denom * dt);
+    const NGSPICE_REF = dt * Math.sqrt(tmp);
+
+    expect(result).toBe(NGSPICE_REF);
   });
 
   it("order 1 bdf1: linear voltage gives finite (lteAbstol-gated) result", () => {
     // Linear ramp: 2nd divided diff = 0 for order=1; GEAR returns sqrt(del) where del>0
     const dt = 1e-9;
-    const result = cktTerrVoltage(4.0, 3.0, 2.0, 1.0, dt, [dt, dt], 1, "bdf1", 1e-3, 1e-6, 7);
-    expect(result).toBeGreaterThan(0);
-    expect(isFinite(result)).toBe(true);
+    const vNow = 4.0, v1 = 3.0, v2 = 2.0, v3 = 1.0;
+    const lteReltol = 1e-3, lteAbstol = 1e-6, trtol = 7;
+    const result = cktTerrVoltage(vNow, v1, v2, v3, dt, [dt, dt], 1, "bdf1", lteReltol, lteAbstol, trtol);
+
+    // NGSPICE_REF: ngspice ckttrunc.c NEWTRUNC GEAR order 1.
+    // For a strictly linear ramp, the 2nd divided difference is 0; denom clamps to lteAbstol.
+    const h0 = dt, h1 = dt;
+    let d0 = vNow, d1 = v1, d2 = v2;
+    d0 = (d0 - d1) / h0;
+    d1 = (d1 - d2) / h1;
+    const dt0 = h1 + h0;
+    d0 = (d0 - d1) / dt0;
+    const ddiff = Math.abs(d0);
+    const tol = lteAbstol + lteReltol * Math.max(Math.abs(vNow), Math.abs(v1));
+    const factor = 0.5; // GEAR_LTE_FACTORS[0]
+    const denom = Math.max(lteAbstol, factor * ddiff);
+    const delsum = dt + dt; // deltaOld=[dt,dt], order=1 -> sum i=0..1
+    const tmp = (tol * trtol * delsum) / (denom * dt);
+    const NGSPICE_REF = dt * Math.sqrt(tmp);
+
+    expect(result).toBe(NGSPICE_REF);
   });
 
   it("order 2 bdf2: applies sqrt root extraction for nonzero 3rd divided difference", () => {
     // Cubic data: v=27,8,1,0 at dt=1 gives 3rd divided diff = 1
     const dt = 1.0;
-    const r2 = cktTerrVoltage(27, 8, 1, 0, dt, [dt, dt], 2, "bdf2", 1e-3, 1e-6, 7);
-    expect(r2).toBeGreaterThan(0);
-    expect(isFinite(r2)).toBe(true);
+    const vNow = 27, v1 = 8, v2 = 1, v3 = 0;
+    const lteReltol = 1e-3, lteAbstol = 1e-6, trtol = 7;
+    const r2 = cktTerrVoltage(vNow, v1, v2, v3, dt, [dt, dt], 2, "bdf2", lteReltol, lteAbstol, trtol);
+
+    // NGSPICE_REF: ngspice ckttrunc.c NEWTRUNC GEAR order 2.
+    //   result = delta * exp(log(tmp) / (order+1))
+    const h0 = dt, h1 = dt, h2 = dt;
+    let d0 = vNow, d1 = v1, d2 = v2, d3 = v3;
+    d0 = (d0 - d1) / h0;
+    d1 = (d1 - d2) / h1;
+    d2 = (d2 - d3) / h2;
+    let dt0 = h1 + h0, dt1 = h2 + h1;
+    d0 = (d0 - d1) / dt0;
+    d1 = (d1 - d2) / dt1;
+    dt0 = dt1 + h0;
+    d0 = (d0 - d1) / dt0;
+    const ddiff = Math.abs(d0);
+    const tol = lteAbstol + lteReltol * Math.max(Math.abs(vNow), Math.abs(v1));
+    const factor = 2 / 9; // GEAR_LTE_FACTORS[1]
+    const denom = Math.max(lteAbstol, factor * ddiff);
+    // deltaOld=[dt,dt], order=2 -> sum i=0..2 but deltaOld.length=2 so only i=0,1
+    const delsum = dt + dt;
+    const tmp = (tol * trtol * delsum) / (denom * dt);
+    const NGSPICE_REF = dt * Math.exp(Math.log(tmp) / (2 + 1));
+
+    expect(r2).toBe(NGSPICE_REF);
   });
 
   it("larger lteReltol gives more permissive (larger) timestep proposal", () => {
@@ -124,19 +258,67 @@ describe("cktTerrVoltage", () => {
     // Both must return a positive finite timestep for nonlinear input data.
     const dt = 1.0;
     const v0 = 27.0, v1 = 8.0, v2 = 1.0, v3 = 0.0;
-    const rTrap = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 2, "trapezoidal", 1e-3, 1e-6, 7);
-    const rBdf2 = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 2, "bdf2", 1e-3, 1e-6, 7);
-    expect(rTrap).toBeGreaterThan(0);
-    expect(isFinite(rTrap)).toBe(true);
-    expect(rBdf2).toBeGreaterThan(0);
-    expect(isFinite(rBdf2)).toBe(true);
+    const lteReltol = 1e-3, lteAbstol = 1e-6, trtol = 7;
+    const rTrap = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 2, "trapezoidal", lteReltol, lteAbstol, trtol);
+    const rBdf2 = cktTerrVoltage(v0, v1, v2, v3, dt, [dt, dt], 2, "bdf2", lteReltol, lteAbstol, trtol);
+
+    // Shared divided-difference (ngspice ckttrunc.c NEWTRUNC, order=2).
+    const h0 = dt, h1 = dt, h2 = dt;
+    let d0 = v0, d1 = v1, d2 = v2, d3 = v3;
+    d0 = (d0 - d1) / h0;
+    d1 = (d1 - d2) / h1;
+    d2 = (d2 - d3) / h2;
+    let dt0 = h1 + h0, dt1 = h2 + h1;
+    d0 = (d0 - d1) / dt0;
+    d1 = (d1 - d2) / dt1;
+    dt0 = dt1 + h0;
+    const diffSigned = (d0 - d1) / dt0; // signed 3rd divided difference
+    const ddiff = Math.abs(diffSigned);
+    const tol = lteAbstol + lteReltol * Math.max(Math.abs(v0), Math.abs(v1));
+
+    // NGSPICE_REF_TRAP: ngspice ckttrunc.c NEWTRUNC TRAP order 2:
+    //   del = |deltaOld[0] * trtol * tol * 3 * (deltaOld[0]+deltaOld[1]) / diff|
+    const d0old = dt, d1old = dt;
+    const NGSPICE_REF_TRAP = Math.abs(d0old * trtol * tol * 3 * (d0old + d1old) / diffSigned);
+
+    // NGSPICE_REF_BDF2: ngspice ckttrunc.c NEWTRUNC GEAR order 2.
+    const factor = 2 / 9; // GEAR_LTE_FACTORS[1]
+    const denom = Math.max(lteAbstol, factor * ddiff);
+    const delsum = dt + dt; // deltaOld=[dt,dt], order=2 but deltaOld.length=2
+    const tmp = (tol * trtol * delsum) / (denom * dt);
+    const NGSPICE_REF_BDF2 = dt * Math.exp(Math.log(tmp) / (2 + 1));
+
+    expect(rTrap).toBe(NGSPICE_REF_TRAP);
+    expect(rBdf2).toBe(NGSPICE_REF_BDF2);
   });
 
   it("order 2 linear data gives finite timestep (lteAbstol-gated)", () => {
     const dt = 1.0;
-    const result = cktTerrVoltage(4, 3, 2, 1, dt, [dt, dt], 2, "bdf2", 1e-3, 1e-6, 7);
-    expect(result).toBeGreaterThan(0);
-    expect(isFinite(result)).toBe(true);
+    const vNow = 4, v1 = 3, v2 = 2, v3 = 1;
+    const lteReltol = 1e-3, lteAbstol = 1e-6, trtol = 7;
+    const result = cktTerrVoltage(vNow, v1, v2, v3, dt, [dt, dt], 2, "bdf2", lteReltol, lteAbstol, trtol);
+
+    // NGSPICE_REF: ngspice ckttrunc.c NEWTRUNC GEAR order 2.
+    // Linear ramp -> 3rd divided difference = 0 -> denom clamps to lteAbstol.
+    const h0 = dt, h1 = dt, h2 = dt;
+    let d0 = vNow, d1 = v1, d2 = v2, d3 = v3;
+    d0 = (d0 - d1) / h0;
+    d1 = (d1 - d2) / h1;
+    d2 = (d2 - d3) / h2;
+    let dt0 = h1 + h0, dt1 = h2 + h1;
+    d0 = (d0 - d1) / dt0;
+    d1 = (d1 - d2) / dt1;
+    dt0 = dt1 + h0;
+    d0 = (d0 - d1) / dt0;
+    const ddiff = Math.abs(d0);
+    const tol = lteAbstol + lteReltol * Math.max(Math.abs(vNow), Math.abs(v1));
+    const factor = 2 / 9; // GEAR_LTE_FACTORS[1]
+    const denom = Math.max(lteAbstol, factor * ddiff);
+    const delsum = dt + dt; // deltaOld=[dt,dt], order=2 but length=2
+    const tmp = (tol * trtol * delsum) / (denom * dt);
+    const NGSPICE_REF = dt * Math.exp(Math.log(tmp) / (2 + 1));
+
+    expect(result).toBe(NGSPICE_REF);
   });
 });
 

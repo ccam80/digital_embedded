@@ -449,16 +449,35 @@ describe("SparseSolver real MNA circuit", () => {
     expect(transientSteps).toBe(100);
 
     // --- Isolated solver timing (apples-to-apples with performance_50_node) ---
-    // Stamp the same circuit's linear elements into a raw SparseSolver
+    // Stamp all elements into a raw SparseSolver via the load(ctx) interface.
     const rawSolver = new SparseSolver();
+    const rawVoltages = new Float64Array(matrixSize);
+    const rawAg = new Float64Array(8);
+    const rawCtx: import("../load-context.js").LoadContext = {
+      solver: rawSolver,
+      voltages: rawVoltages,
+      iteration: 0,
+      initMode: "initFloat",
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: rawAg,
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
     rawSolver.beginAssembly(matrixSize);
     for (const el of elements) {
-      if (!el.isNonlinear) el.stamp(rawSolver);
-    }
-    // Also stamp diodes at their initial operating point (geq=GMIN, ieq=0)
-    // so the matrix has the same sparsity pattern as a real NR iteration
-    for (const el of elements) {
-      if (el.isNonlinear && el.stampNonlinear) el.stampNonlinear(rawSolver);
+      el.load(rawCtx);
     }
 
     performance.now();
@@ -478,8 +497,7 @@ describe("SparseSolver real MNA circuit", () => {
     // Warm run: re-stamp and re-factor (simulates NR iteration 2+)
     rawSolver.beginAssembly(matrixSize);
     for (const el of elements) {
-      if (!el.isNonlinear) el.stamp(rawSolver);
-      if (el.isNonlinear && el.stampNonlinear) el.stampNonlinear(rawSolver);
+      el.load(rawCtx);
     }
     rawSolver.finalize(); // topology unchanged — skips symbolic
 

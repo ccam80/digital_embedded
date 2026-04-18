@@ -481,52 +481,81 @@ describe("Integration", () => {
       return v;
     }
 
-    // Solver used solely to flush stampNonlinear state (qPin.currentVoltage
-    // reflects _targetVoltage, which stampNonlinear updates via setLogicLevel).
-    const dffSolver = new SparseSolver();
+    // Null solver for ctx: load() only updates pin state, no real stamping needed.
+    const nullSolver = {
+      allocElement: (_r: number, _c: number) => 0,
+      stampElement: (_h: number, _v: number) => {},
+      stampRHS: (_i: number, _v: number) => {},
+      stamp: (_r: number, _c: number, _v: number) => {},
+    } as any;
+    const ctxAg = new Float64Array(7);
 
-    // Flush helper: call stamp + stampNonlinear so pin currentVoltage is current.
-    // matrixSize=4 covers solver nodes 0-3 (clock, unused, Q, ~Q).
-    function flushQ(): void {
-      dffSolver.beginAssembly(4);
-      element.stamp(dffSolver);
-      element.stampNonlinear(dffSolver);
+    function makeCtxWith(
+      v: Float64Array,
+      ctxDt = dt,
+      method: import("../../../core/analog-types.js").IntegrationMethod = "trapezoidal",
+    ): import("../load-context.js").LoadContext {
+      return {
+        solver: nullSolver,
+        voltages: v,
+        iteration: 0,
+        initMode: "transient" as const,
+        dt: ctxDt,
+        method,
+        order: 1,
+        deltaOld: [],
+        ag: ctxAg,
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        isDcOp: false,
+        isTransient: ctxDt > 0,
+        xfact: 0,
+        gmin: 1e-12,
+        uic: false,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+      };
+    }
+
+    function flushQ(v: Float64Array = new Float64Array(4)): void {
+      element.load(makeCtxWith(v, 0));
     }
 
     // Track Q state through 4 rising edges
     const qStates: boolean[] = [];
 
     // Edge 1: clock LOW → HIGH; D = ~Q = vOH (true) → latch Q=true
-    element.updateCompanion(dt, "trapezoidal", makeVoltages(0.0, CMOS_3V3.vOL, CMOS_3V3.vOH));
-    element.updateCompanion(dt, "trapezoidal", makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH));
-    flushQ();
+    element.accept(makeCtxWith(makeVoltages(0.0, CMOS_3V3.vOL, CMOS_3V3.vOH)), 0, () => {});
+    element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH)), 0, () => {});
+    flushQ(makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH));
     qStates.push(qPin.currentVoltage > CMOS_3V3.vIH);
 
     // Clock stays HIGH for one step (no edge)
-    element.updateCompanion(dt, "trapezoidal", makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL));
+    element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL)), 0, () => {});
 
     // Edge 2: clock HIGH → LOW → HIGH; D = ~Q = vOL (false) → latch Q=false
-    element.updateCompanion(dt, "trapezoidal", makeVoltages(0.0, CMOS_3V3.vOH, CMOS_3V3.vOL));
-    element.updateCompanion(dt, "trapezoidal", makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL));
-    flushQ();
+    element.accept(makeCtxWith(makeVoltages(0.0, CMOS_3V3.vOH, CMOS_3V3.vOL)), 0, () => {});
+    element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL)), 0, () => {});
+    flushQ(makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL));
     qStates.push(qPin.currentVoltage > CMOS_3V3.vIH);
 
     // Clock stays HIGH for one step
-    element.updateCompanion(dt, "trapezoidal", makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH));
+    element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH)), 0, () => {});
 
     // Edge 3: clock HIGH → LOW → HIGH; D = ~Q = vOH (true) → latch Q=true
-    element.updateCompanion(dt, "trapezoidal", makeVoltages(0.0, CMOS_3V3.vOL, CMOS_3V3.vOH));
-    element.updateCompanion(dt, "trapezoidal", makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH));
-    flushQ();
+    element.accept(makeCtxWith(makeVoltages(0.0, CMOS_3V3.vOL, CMOS_3V3.vOH)), 0, () => {});
+    element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH)), 0, () => {});
+    flushQ(makeVoltages(3.3, CMOS_3V3.vOL, CMOS_3V3.vOH));
     qStates.push(qPin.currentVoltage > CMOS_3V3.vIH);
 
     // Clock stays HIGH for one step
-    element.updateCompanion(dt, "trapezoidal", makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL));
+    element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL)), 0, () => {});
 
     // Edge 4: clock HIGH → LOW → HIGH; D = ~Q = vOL (false) → latch Q=false
-    element.updateCompanion(dt, "trapezoidal", makeVoltages(0.0, CMOS_3V3.vOH, CMOS_3V3.vOL));
-    element.updateCompanion(dt, "trapezoidal", makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL));
-    flushQ();
+    element.accept(makeCtxWith(makeVoltages(0.0, CMOS_3V3.vOH, CMOS_3V3.vOL)), 0, () => {});
+    element.accept(makeCtxWith(makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL)), 0, () => {});
+    flushQ(makeVoltages(3.3, CMOS_3V3.vOH, CMOS_3V3.vOL));
     qStates.push(qPin.currentVoltage > CMOS_3V3.vIH);
 
     // Q should toggle once per rising edge: true, false, true, false

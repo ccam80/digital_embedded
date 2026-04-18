@@ -156,6 +156,70 @@ describe('CKTload', () => {
 });
 
 // ---------------------------------------------------------------------------
+// nodesets — C7.1 srcFact scaling
+// ---------------------------------------------------------------------------
+
+describe('nodesets', () => {
+  it('srcFact_scales_nodeset_rhs', () => {
+    // ngspice cktload.c:96-136: nodeset RHS = CKTNS_PIN * value * srcFact
+    // CKTNS_PIN = 1e10, value = 2.5, srcFact = 0.5 → expected = 1e10 * 2.5 * 0.5
+    const nodeCount = 1;
+    const matrixSize = nodeCount;
+    const R = makeResistor(1, 0, 1000);
+    const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
+    ctx.isDcOp = true;
+    ctx.isTransient = false;
+    ctx.initMode = 'initJct';
+    ctx.srcFact = 0.5;
+    ctx.nodesets.set(0, 2.5);
+    cktLoad(ctx, 0);
+    const rhs = ctx.solver.getRhsSnapshot();
+    expect(rhs[0]).toBe(1e10 * 2.5 * 0.5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ics — C7.1 IC stamping in initJct / outside init modes
+// ---------------------------------------------------------------------------
+
+describe('ics', () => {
+  it('ic_stamped_in_initJct', () => {
+    // ngspice cktload.c:96-136: IC RHS = CKTNS_PIN * value * srcFact
+    // CKTNS_PIN = 1e10, value = 1.2, srcFact = 1.0 → expected = 1e10 * 1.2
+    const nodeCount = 1;
+    const matrixSize = nodeCount;
+    const R = makeResistor(1, 0, 1000);
+    const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
+    ctx.isDcOp = true;
+    ctx.isTransient = false;
+    ctx.initMode = 'initJct';
+    ctx.srcFact = 1.0;
+    ctx.ics.set(0, 1.2);
+    cktLoad(ctx, 0);
+    const rhs = ctx.solver.getRhsSnapshot();
+    expect(rhs[0]).toBe(1e10 * 1.2);
+  });
+
+  it('ic_not_stamped_outside_init_modes', () => {
+    // With initMode = "floating" (not initJct or initFix), IC must NOT stamp RHS
+    const nodeCount = 1;
+    const matrixSize = nodeCount;
+    const R = makeResistor(1, 0, 1000);
+    const ctx = makeSimpleCtx({ elements: [R], matrixSize, nodeCount, branchCount: 0 });
+    ctx.isDcOp = true;
+    ctx.isTransient = false;
+    ctx.initMode = 'floating' as never;
+    ctx.srcFact = 1.0;
+    ctx.ics.set(0, 3.3);
+    cktLoad(ctx, 0);
+    const rhs = ctx.solver.getRhsSnapshot();
+    // RHS[0] should only reflect the resistor stamp (which is 0 for a linear resistor
+    // with no current source — resistor stamps G into the matrix, 0 into RHS)
+    expect(rhs[0]).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // E_SINGULAR recovery test — Task 2.2.3
 // ---------------------------------------------------------------------------
 

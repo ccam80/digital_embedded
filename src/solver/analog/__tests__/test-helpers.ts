@@ -24,7 +24,7 @@
  * not a free variable in the MNA system).
  */
 
-import type { SparseSolver } from "../sparse-solver.js";
+import { SparseSolver } from "../sparse-solver.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement } from "../element.js";
 import { isPoolBacked } from "../element.js";
 import type { LoadContext } from "../load-context.js";
@@ -741,11 +741,7 @@ export function allocateStatePool(
 }
 
 // ---------------------------------------------------------------------------
-// makeSimpleCtx / runDcOp / runNR — migration helpers for component tests
-//
-// Component tests that previously called solveDcOperatingPoint({solver, ...})
-// with the old DcOpOptions API should call runDcOp() instead.
-// Tests that previously called newtonRaphson({...}) should call runNR() instead.
+// makeSimpleCtx / runDcOp / runNR — minimal ctx wrappers for component tests
 // ---------------------------------------------------------------------------
 
 export interface SimpleCtxOptions {
@@ -764,6 +760,7 @@ export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
   const statePool = opts.statePool ?? allocateStatePool(opts.elements);
   const params: ResolvedSimulationParams = { ...DEFAULT_SIMULATION_PARAMS, ...opts.params };
   const diagnostics = opts.diagnostics ?? new DiagnosticCollector();
+  const solver = opts.solver ?? new SparseSolver();
   const ctx = new CKTCircuitContext(
     {
       nodeCount: opts.nodeCount,
@@ -774,10 +771,8 @@ export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
     },
     params,
     () => {},
+    solver,
   );
-  if (opts.solver) {
-    ctx.solver = opts.solver;
-  }
   ctx.diagnostics = diagnostics;
   return ctx;
 }
@@ -806,6 +801,7 @@ export function runNR(opts: SimpleNROptions): NRResult {
   const statePool = opts.statePool ?? allocateStatePool(opts.elements);
   const params: ResolvedSimulationParams = { ...DEFAULT_SIMULATION_PARAMS, ...opts.params };
   const diagnostics = opts.diagnostics ?? new DiagnosticCollector();
+  const solver = opts.solver ?? new SparseSolver();
   const ctx = new CKTCircuitContext(
     {
       nodeCount: opts.nodeCount,
@@ -816,10 +812,8 @@ export function runNR(opts: SimpleNROptions): NRResult {
     },
     params,
     () => {},
+    solver,
   );
-  if (opts.solver) {
-    ctx.solver = opts.solver;
-  }
   ctx.diagnostics = diagnostics;
   if (opts.maxIterations !== undefined) {
     ctx.maxIterations = opts.maxIterations;

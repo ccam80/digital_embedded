@@ -16,6 +16,7 @@ import type { StatePool } from "./state-pool.js";
 import type { DiagnosticCollector } from "./diagnostics.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import type { LimitingEvent } from "./newton-raphson.js";
+import { NodeVoltageHistory } from "./integration.js";
 export type { InitMode, LoadContext } from "./load-context.js";
 import type { InitMode, LoadContext } from "./load-context.js";
 
@@ -92,7 +93,7 @@ export class DcOpResult {
     this.converged = false;
     this.method = "direct";
     this.iterations = 0;
-    this.diagnostics = [];
+    this.diagnostics.length = 0;
   }
 }
 
@@ -177,13 +178,15 @@ export class CKTCircuitContext {
   dcopOldState0: Float64Array;
 
   // -------------------------------------------------------------------------
-  // Integration coefficients (ngspice CKTag[], CKTagp[])
+  // Integration coefficients (ngspice CKTag[], CKTagp[], CKTsols[])
   // -------------------------------------------------------------------------
 
   /** Integration coefficients computed by computeNIcomCof (CKTag[]). Length 7. */
   ag: Float64Array;
   /** Predictor coefficients (CKTagp[]). Length 7. */
   agp: Float64Array;
+  /** Per-node voltage history for NIpred predictor (CKTsols[]). */
+  nodeVoltageHistory: NodeVoltageHistory;
   /**
    * Previous timestep history for Vandermonde solve (ngspice deltaOld[]).
    * Pre-allocated length 7, matching computeNIcomCof/solveGearVandermonde signature.
@@ -424,6 +427,19 @@ export class CKTCircuitContext {
    */
   lteScratch: Float64Array;
 
+  /**
+   * Reusable scratch array returned by `cktncDump`. Stable identity across
+   * calls — consumers must not retain references beyond the current call.
+   * Populated by pushing pre-mutated pool entries from `_ncDumpPool`.
+   */
+  ncDumpScratch: { node: number; delta: number; tol: number }[];
+  /**
+   * Pool of pre-allocated mutable entry objects consumed by `cktncDump`.
+   * Length = matrixSize. `cktncDump` mutates fields in place and pushes the
+   * entry onto `ncDumpScratch`, so the failure path allocates nothing.
+   */
+  _ncDumpPool: { node: number; delta: number; tol: number }[];
+
   // -------------------------------------------------------------------------
   // Constructor
   // -------------------------------------------------------------------------
@@ -434,11 +450,15 @@ export class CKTCircuitContext {
    * @param circuit  - The compiled analog circuit supplying element list and matrix size.
    * @param params   - Resolved simulation parameters supplying tolerances.
    * @param addBreakpoint - The timestep controller's addBreakpoint method, bound once here.
+   * @param solver   - Shared sparse solver instance. The context and the owning
+   *                   engine use the same instance; it is never re-allocated
+   *                   post-construction.
    */
   constructor(
     circuit: CKTCircuitInput,
     params: ResolvedSimulationParams,
     addBreakpoint: (t: number) => void,
+    solver: SparseSolver,
   ) {
     const { nodeCount, matrixSize, elements } = circuit;
     const statePoolSize = circuit.statePool?.totalSlots ?? 1;
@@ -448,8 +468,8 @@ export class CKTCircuitContext {
     this.elements = elements;
     this.statePool = circuit.statePool ?? null;
 
-    // Matrix / solver
-    this.solver = new SparseSolver();
+    // Matrix / solver — shared instance owned by the engine
+    this.solver = solver;
 
     // Node voltage buffers
     this.rhsOld = new Float64Array(matrixSize);
@@ -470,6 +490,8 @@ export class CKTCircuitContext {
     this.ag = new Float64Array(7);
     this.agp = new Float64Array(7);
     this.deltaOld = new Array(7).fill(0);
+    this.nodeVoltageHistory = new NodeVoltageHistory();
+    this.nodeVoltageHistory.initNodeVoltages(matrixSize);
 
     // Gear scratch (7×7 flat)
     this.gearMatScratch = new Float64Array(49);
@@ -546,6 +568,14 @@ export class CKTCircuitContext {
 
     // LTE scratch
     this.lteScratch = new Float64Array(Math.max(matrixSize * 4, 64));
+
+    // Per-node non-convergence diagnostic scratch — pre-allocated entries so
+    // `cktncDump` never allocates on the failure path.
+    this.ncDumpScratch = [];
+    this._ncDumpPool = new Array(matrixSize);
+    for (let i = 0; i < matrixSize; i++) {
+      this._ncDumpPool[i] = { node: 0, delta: 0, tol: 0 };
+    }
 
     // Pre-computed element lists
     this.nonlinearElements = elements.filter(el => el.isNonlinear);

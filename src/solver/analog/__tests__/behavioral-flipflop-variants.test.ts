@@ -22,7 +22,6 @@ import {
   DigitalInputPinModel,
   DigitalOutputPinModel,
 } from "../digital-pin-model.js";
-import { SparseSolver } from "../sparse-solver.js";
 import { JKDefinition } from "../../../components/flipflops/jk.js";
 import { RSDefinition } from "../../../components/flipflops/rs.js";
 import { TDefinition } from "../../../components/flipflops/t.js";
@@ -30,6 +29,7 @@ import { JKAsyncDefinition } from "../../../components/flipflops/jk-async.js";
 import { RSAsyncDefinition } from "../../../components/flipflops/rs-async.js";
 import { DAsyncDefinition } from "../../../components/flipflops/d-async.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
+import type { LoadContext } from "../load-context.js";
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -67,8 +67,37 @@ function makeOutputPin(nodeId: number): DigitalOutputPinModel {
   return pin;
 }
 
-function makeSolver(_size: number): SparseSolver {
-  return new SparseSolver();
+function makeCtx(v: Float64Array = new Float64Array(8)): LoadContext {
+  return {
+    solver: {
+      allocElement: (_r: number, _c: number) => 0,
+      stampElement: (_h: number, _v: number) => {},
+      stampRHS: (_i: number, _v: number) => {},
+      stamp: (_r: number, _c: number, _v: number) => {},
+    } as any,
+    voltages: v,
+    iteration: 0,
+    initMode: "transient" as const,
+    dt: 0,
+    method: "bdf1" as const,
+    order: 1,
+    deltaOld: [],
+    ag: new Float64Array(7),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: false,
+    xfact: 0,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+function makeAcceptCtx(v: Float64Array): LoadContext {
+  return { ...makeCtx(v), dt: 1e-9, isTransient: true };
 }
 
 /**
@@ -183,50 +212,38 @@ describe("JK", () => {
   it("toggle_when_both_high", () => {
     // J=1, K=1 on rising clock edge → Q toggles
     const { element, qPin, qBarPin } = buildJK();
-    const solver = makeSolver(5);
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx());
 
     // Initial Q=false (vOL)
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
     expect(qBarPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
 
     // First rising edge: J=1, K=1 → Q toggles from false to true
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_HIGH, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_LOW, V_HIGH, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW)), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
 
     // Second rising edge: J=1, K=1 → Q toggles back to false
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_HIGH, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_LOW, V_HIGH, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW)), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
   });
 
   it("set_when_j_high", () => {
     // J=1, K=0, rising clock → Q=1
     const { element, qPin } = buildJK();
-    const solver = makeSolver(5);
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx());
 
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_LOW, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_LOW, V_LOW, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW)), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
   });
 
@@ -234,28 +251,21 @@ describe("JK", () => {
     // First set Q=1 via J=1, K=0 edge
     // Then J=0, K=1 on next rising edge → Q=0
     const { element, qPin } = buildJK();
-    const solver = makeSolver(5);
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx());
 
     // Set Q=1
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_LOW, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_LOW, V_LOW, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW)), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
 
     // Reset Q=0: J=0, K=1
-    element.updateCompanion(1e-9, 'bdf1', v6(V_LOW, V_LOW, V_HIGH, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v6(V_LOW, V_HIGH, V_HIGH, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v6(V_LOW, V_LOW, V_HIGH, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v6(V_LOW, V_HIGH, V_HIGH, V_LOW, V_LOW)), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(v6(V_LOW, V_HIGH, V_HIGH, V_LOW, V_LOW)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
   });
 });
@@ -268,28 +278,21 @@ describe("RS", () => {
   it("set_and_reset", () => {
     // S=1, R=0 on rising edge → Q=1; then S=0, R=1 → Q=0
     const { element, qPin } = buildRS();
-    const solver = makeSolver(5);
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx());
 
     // Set: S=1, R=0
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_LOW, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_LOW, V_LOW, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW)), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
 
     // Reset: S=0, R=1
-    element.updateCompanion(1e-9, 'bdf1', v6(V_LOW, V_LOW, V_HIGH, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v6(V_LOW, V_HIGH, V_HIGH, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v6(V_LOW, V_LOW, V_HIGH, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v6(V_LOW, V_HIGH, V_HIGH, V_LOW, V_LOW)), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(v6(V_LOW, V_HIGH, V_HIGH, V_LOW, V_LOW)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
   });
 
@@ -297,29 +300,22 @@ describe("RS", () => {
     // First set Q=1, then apply S=1, R=1 on rising edge
     // Q must remain 1 (hold previous value)
     const { element, qPin } = buildRS();
-    const solver = makeSolver(5);
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx());
 
     // Set Q=1
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_LOW, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_LOW, V_LOW, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW)), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(v6(V_HIGH, V_HIGH, V_LOW, V_LOW, V_LOW)));
     const qBefore = qPin.currentVoltage;
     expect(qBefore).toBeCloseTo(CMOS33.vOH, 5);
 
     // S=1, R=1 on rising edge → forbidden: Q must hold
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_HIGH, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_LOW, V_HIGH, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW)), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW)));
     expect(qPin.currentVoltage).toBeCloseTo(qBefore, 5);
   });
 });
@@ -332,40 +328,31 @@ describe("T", () => {
   it("toggles_on_t_high", () => {
     // T=1 on each rising clock edge → Q toggles each time
     const { element, qPin } = buildT();
-    const solver = makeSolver(4);
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx());
 
     // Initial Q=false
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
 
     // 1st edge: T=1 → Q toggles to true
-    element.updateCompanion(1e-9, 'bdf1', v5(V_HIGH, V_LOW, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v5(V_HIGH, V_HIGH, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v5(V_HIGH, V_LOW, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v5(V_HIGH, V_HIGH, V_LOW, V_LOW)), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(v5(V_HIGH, V_HIGH, V_LOW, V_LOW)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
 
     // 2nd edge: T=1 → Q toggles back to false
-    element.updateCompanion(1e-9, 'bdf1', v5(V_HIGH, V_LOW, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v5(V_HIGH, V_HIGH, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v5(V_HIGH, V_LOW, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v5(V_HIGH, V_HIGH, V_LOW, V_LOW)), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(v5(V_HIGH, V_HIGH, V_LOW, V_LOW)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
 
     // 3rd edge: T=1 → Q toggles to true again
-    element.updateCompanion(1e-9, 'bdf1', v5(V_HIGH, V_LOW, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v5(V_HIGH, V_HIGH, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v5(V_HIGH, V_LOW, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v5(V_HIGH, V_HIGH, V_LOW, V_LOW)), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(v5(V_HIGH, V_HIGH, V_LOW, V_LOW)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
   });
 });
@@ -397,15 +384,12 @@ describe("RS_FF", () => {
     //   code: 'rs-flipflop-both-set'
     //   severity: 'warning'
     const { element } = buildRS();
-    const solver = makeSolver(5);
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx());
 
     // Apply S=1, R=1 on rising clock edge
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_LOW, V_HIGH, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW));
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_LOW, V_HIGH, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(v6(V_HIGH, V_HIGH, V_HIGH, V_LOW, V_LOW)), 0, () => {});
 
     const diagnostics = element.getDiagnostics();
     expect(diagnostics.length).toBeGreaterThanOrEqual(1);

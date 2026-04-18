@@ -23,6 +23,7 @@
  */
 
 import { ComplexSparseSolver } from "./complex-sparse-solver.js";
+import { SparseSolver } from "./sparse-solver.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import { CKTCircuitContext } from "./ckt-context.js";
@@ -82,7 +83,7 @@ export class AcAnalysis {
     const { compiled, diagnostics } = this._setupAnalysis();
 
     // Step 1: Solve DC operating point
-    const dcCtx = new CKTCircuitContext(compiled, resolveSimulationParams(this._params), () => {});
+    const dcCtx = new CKTCircuitContext(compiled, resolveSimulationParams(this._params), () => {}, new SparseSolver());
     solveDcOperatingPoint(dcCtx);
     const dcResult = dcCtx.dcopResult;
 

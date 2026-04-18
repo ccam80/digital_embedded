@@ -205,6 +205,7 @@ class CKTCircuitContext {
   // Integration
   ag: Float64Array;              // length 7
   agp: Float64Array;              // length 7
+  nodeVoltageHistory: NodeVoltageHistory;  // CKTsols[0..7][] — per-node voltage history used by NIpred predictor
   deltaOld: number[];             // pre-allocated length 7 (matches computeNIcomCof/solveGearVandermonde `readonly number[]` parameter)
 
   // Gear scratch
@@ -302,11 +303,23 @@ function cktLoad(ctx: CKTCircuitContext, iteration: number): void {
   ctx.noncon = ctx.loadCtx.noncon.value;
 
   // Step 4: apply nodesets/ICs inside cktLoad (ngspice cktload.c:96-136)
-  // Only in DC mode during initJct or initFix
+  // Only in DC mode during initJct or initFix.
+  // Both nodesets and ICs receive srcFact scaling on the RHS target voltage.
+  // CKTNS_PIN = 1e10 matches ngspice cktload.c:113.
+  //
+  // Variable mapping (ngspice → ours):
+  //   ckt->CKTnodeset    → ctx.nodesets
+  //   ckt->CKTnodeValues → ctx.ics
+  //   1e10               → CKTNS_PIN
+  //   CKTsrcFact         → ctx.srcFact
   if (ctx.isDcOp && (ctx.initMode === "initJct" || ctx.initMode === "initFix")) {
     for (const [node, value] of ctx.nodesets) {
-      ctx.solver.stamp(node, node, 1e10);          // high conductance pin
-      ctx.solver.addToRhs(node, 1e10 * value);
+      ctx.solver.stamp(node, node, CKTNS_PIN);
+      ctx.solver.stampRHS(node, CKTNS_PIN * value * ctx.srcFact);
+    }
+    for (const [node, value] of ctx.ics) {
+      ctx.solver.stamp(node, node, CKTNS_PIN);
+      ctx.solver.stampRHS(node, CKTNS_PIN * value * ctx.srcFact);
     }
   }
 

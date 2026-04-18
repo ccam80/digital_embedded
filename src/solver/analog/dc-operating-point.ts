@@ -227,8 +227,15 @@ function dcopFinalize(
 
 /**
  * Compute per-node non-convergence diagnostics when the DC-OP fails.
+ *
+ * Zero-allocation: writes results into the caller-supplied `scratch` array,
+ * drawing mutable entry objects from `pool`. The returned array is the
+ * same reference as `scratch`, so its identity is stable across calls.
+ * `pool` must contain at least `matrixSize` pre-allocated entries.
  */
 export function cktncDump(
+  scratch: Array<{ node: number; delta: number; tol: number }>,
+  pool: Array<{ node: number; delta: number; tol: number }>,
   voltages: Float64Array,
   prevVoltages: Float64Array,
   reltol: number,
@@ -237,17 +244,21 @@ export function cktncDump(
   nodeCount: number,
   matrixSize: number,
 ): Array<{ node: number; delta: number; tol: number }> {
-  const nonConverged: Array<{ node: number; delta: number; tol: number }> = [];
+  scratch.length = 0;
   for (let i = 0; i < matrixSize; i++) {
     const delta = Math.abs(voltages[i] - prevVoltages[i]);
     const tol =
       reltol * Math.max(Math.abs(voltages[i]), Math.abs(prevVoltages[i])) +
       (i < nodeCount ? voltTol : abstol);
     if (delta > tol) {
-      nonConverged.push({ node: i, delta, tol });
+      const entry = pool[scratch.length];
+      entry.node = i;
+      entry.delta = delta;
+      entry.tol = tol;
+      scratch.push(entry);
     }
   }
-  return nonConverged;
+  return scratch;
 }
 
 // ---------------------------------------------------------------------------
@@ -410,6 +421,8 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   // Level 5 — Failure with blame attribution (cktop.c:546+)
   // -------------------------------------------------------------------------
   const ncNodes = cktncDump(
+    ctx.ncDumpScratch,
+    ctx._ncDumpPool,
     srcResult.voltages,
     directResult.voltages,
     params.reltol,
@@ -436,7 +449,7 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   );
 
   ctx.dcopResult.converged = false;
-  ctx.dcopResult.method = "direct";
+  ctx.dcopResult.method = numSrcSteps <= 1 ? "gillespie-src" : "spice3-src";
   ctx.dcopResult.iterations = totalIterations;
   ctx.dcopResult.nodeVoltages.fill(0);
   ctx.dcopResult.diagnostics = diagnostics.getDiagnostics();

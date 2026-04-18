@@ -6,7 +6,6 @@
  * element-specific convergence checking, and blame tracking.
  */
 
-import type { SparseSolver } from "./sparse-solver.js";
 import type { DiagnosticCollector } from "./diagnostics.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import type { CKTCircuitContext } from "./ckt-context.js";
@@ -39,43 +38,6 @@ export interface LimitingEvent {
   vAfter: number;
   /** Whether limiting was actually applied (vAfter differs from vBefore). */
   wasLimited: boolean;
-}
-
-// ---------------------------------------------------------------------------
-// applyNodesetsAndICs
-// ---------------------------------------------------------------------------
-
-/**
- * Stamps 1e10 conductance to enforce nodeset and initial-condition constraints
- * on specific nodes. Called after CKTload (stampAll) during each NR iteration.
- *
- * Matches ngspice CKTnodeset/CKTic enforcement: large conductance to a known
- * voltage forces the node to that value during the early initJct/initFix phases.
- *
- * @param solver    - The sparse solver to stamp into.
- * @param nodesets  - Map of nodeId → target voltage for nodeset constraints.
- * @param ics       - Map of nodeId → target voltage for initial-condition constraints.
- * @param srcFact   - Source stepping scale factor (0..1). Applied to target voltages.
- * @param initMode  - Current NR init mode. Nodesets only stamp in initJct or initFix.
- */
-export function applyNodesetsAndICs(
-  solver: SparseSolver,
-  nodesets: Map<number, number>,
-  ics: Map<number, number>,
-  srcFact: number,
-  initMode: string,
-): void {
-  const G_NODESET = 1e10;
-  if (initMode === "initJct" || initMode === "initFix") {
-    for (const [nodeId, value] of nodesets) {
-      solver.stamp(nodeId, nodeId, G_NODESET);
-      solver.stampRHS(nodeId, G_NODESET * value * srcFact);
-    }
-  }
-  for (const [nodeId, value] of ics) {
-    solver.stamp(nodeId, nodeId, G_NODESET);
-    solver.stampRHS(nodeId, G_NODESET * value * srcFact);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -273,9 +235,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
   // ngspice niiter.c:37-38 — unconditional floor: if (maxIter < 100) maxIter = 100;
   // Bypassed when exactMaxIterations is set (INITJCT/INITFIX need exactly 1 iteration).
-  const rawMaxIter = ctx.exactMaxIterations
-    ? (ctx.maxIterations)
-    : ctx.maxIterations;
+  const rawMaxIter = ctx.maxIterations;
   const maxIterations = ctx.exactMaxIterations ? rawMaxIter : Math.max(rawMaxIter, 100);
 
   ctx.nrResult.reset();

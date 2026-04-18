@@ -4,9 +4,9 @@
  * (predictVoltages) exactly.
  *
  * Variable mapping table (ngspice -> ours):
- *   CKTsols[0..7][]            -> NodeVoltageHistory._buf
- *   CKTagp[0..6]               -> _agp: Float64Array(7)
- *   CKTpred[] / CKTrhs[]       -> _voltages (written in-place)
+ *   CKTsols[0..7][]            -> ctx.nodeVoltageHistory (NodeVoltageHistory)
+ *   CKTagp[0..6]               -> ctx.agp: Float64Array(7)
+ *   CKTpred[] / CKTrhs[]       -> ctx.rhs (written in-place)
  *   NIpred()                   -> predictVoltages()
  *   NIcomCof #ifdef PREDICTOR  -> computeAgp()
  *   CKTdeltaOld[]              -> timestep.deltaOld
@@ -129,7 +129,7 @@ function _computeAgpGear(
 
 /**
  * Predict node voltages for the current timestep using the Adams-Gear predictor.
- * Writes predicted values directly into out (== _voltages in the engine).
+ * Writes predicted values directly into out (== ctx.rhs in the engine).
  *
  * Returns true when prediction written (sufficient history exists).
  * Returns false when fewer than (order+1) accepted steps available -
@@ -154,7 +154,7 @@ function _computeAgpGear(
  * @param order     - Integration order (1 or 2 for our engine)
  * @param method    - Integration method
  * @param agp       - Predictor coefficients computed by computeAgp()
- * @param out       - Output: predicted voltages written here (== _voltages)
+ * @param out       - Output: predicted voltages written here (== ctx.rhs)
  * @returns true if prediction written; false if insufficient history
  */
 export function predictVoltages(

@@ -20,7 +20,7 @@ import { AcAnalysis } from "./ac-analysis.js";
 import type { AcParams, AcResult } from "./ac-analysis.js";
 import { SparseSolver } from "./sparse-solver.js";
 import { TimestepController } from "./timestep.js";
-import { HistoryStore, NodeVoltageHistory, computeNIcomCof } from "./integration.js";
+import { HistoryStore, computeNIcomCof } from "./integration.js";
 import { computeAgp, predictVoltages } from "./ni-pred.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { ConvergenceLog } from "./convergence-log.js";
@@ -87,17 +87,8 @@ export class MNAEngine implements AnalogEngine {
   private _convergenceLog: ConvergenceLog = new ConvergenceLog(128);
 
   // -------------------------------------------------------------------------
-  // State vectors (allocated in init, sized to matrixSize)
+  // NIpred predictor state lives on _ctx (agp, nodeVoltageHistory)
   // -------------------------------------------------------------------------
-  private _voltages: Float64Array = new Float64Array(0);
-  private _prevVoltages: Float64Array = new Float64Array(0);
-
-
-  // -------------------------------------------------------------------------
-  // NIpred predictor state (ngspice: CKTagp[], CKTsols[])
-  // -------------------------------------------------------------------------
-  private _agp: Float64Array = new Float64Array(7);
-  private _nodeVoltageHistory: NodeVoltageHistory = new NodeVoltageHistory();
 
   // -------------------------------------------------------------------------
   // CKTCircuitContext — pre-allocated god-object for NR/DC-OP hot paths
@@ -150,14 +141,9 @@ export class MNAEngine implements AnalogEngine {
 
     const { matrixSize, elements } = compiled;
 
-    this._voltages = new Float64Array(matrixSize);
-    this._prevVoltages = new Float64Array(matrixSize);
-
     this._solver = new SparseSolver();
     this._timestep = new TimestepController(this._params);
     this._history = new HistoryStore(elements.length);
-    this._nodeVoltageHistory = new NodeVoltageHistory();
-    this._nodeVoltageHistory.initNodeVoltages(matrixSize);
     this._diagnostics = new DiagnosticCollector();
     this._convergenceLog.clear();
 
@@ -203,9 +189,8 @@ export class MNAEngine implements AnalogEngine {
       },
       this._params,
       (t) => this._timestep.addBreakpoint(t),
+      this._solver,
     );
-    // Wire ctx's solver to the same SparseSolver instance used by the engine.
-    this._ctx.solver = this._solver;
     // Wire diagnostics
     this._ctx.diagnostics = this._diagnostics;
 
@@ -215,8 +200,10 @@ export class MNAEngine implements AnalogEngine {
 
   /** Reset voltages, history, and simulation time to initial state. */
   reset(): void {
-    this._voltages.fill(0);
-    this._prevVoltages.fill(0);
+    if (this._ctx) {
+      this._ctx.rhs.fill(0);
+      this._ctx.rhsOld.fill(0);
+    }
     this._history.reset();
     this._simTime = 0;
     const cac = this._compiled as CompiledWithBridges | undefined;
@@ -245,8 +232,7 @@ export class MNAEngine implements AnalogEngine {
   /** Release all resources. Engine must not be used after dispose(). */
   dispose(): void {
     this._compiled = null;
-    this._voltages = new Float64Array(0);
-    this._prevVoltages = new Float64Array(0);
+    this._ctx = null;
     this._history = new HistoryStore(0);
     this._diagnostics.clear();
     this._changeListeners = [];
@@ -309,7 +295,8 @@ export class MNAEngine implements AnalogEngine {
       }
     }
 
-    this._prevVoltages.set(this._voltages);
+    const ctx = this._ctx!;
+    ctx.rhsOld.set(ctx.rhs);
     const statePool = (this._compiled as CompiledWithBridges).statePool ?? null;
 
     let dt = this._timestep.getClampedDt(this._simTime);
@@ -371,16 +358,16 @@ export class MNAEngine implements AnalogEngine {
       // NIpred: compute agp[] then predict voltages as NR initial guess.
       // Fires on every retry iteration (dt changes on NR-failure/LTE-rejection).
       // Matches ngspice dctran.c:734 NIcomCof + dctran.c:750 NIpred.
-      // Gated on _stepCount > 0: on step 0, _voltages already holds the
+      // Gated on _stepCount > 0: on step 0, ctx.rhs already holds the
       // converged DC-OP solution (written at seedHistory). ngspice does not run
       // MODEINITPRED under MODEINITTRAN, so the DC-OP result in CKTrhsOld is
       // used directly as the NR initial guess.
       if (this._stepCount > 0 && (this._params.predictor ?? false)) {
         computeAgp(this._timestep.currentMethod, this._timestep.currentOrder,
-          dt, this._timestep.deltaOld, this._agp);
-        predictVoltages(this._nodeVoltageHistory, this._timestep.deltaOld,
+          dt, this._timestep.deltaOld, ctx.agp);
+        predictVoltages(ctx.nodeVoltageHistory, this._timestep.deltaOld,
           this._timestep.currentOrder, this._timestep.currentMethod,
-          this._agp, this._voltages);
+          ctx.agp, ctx.rhs);
       }
 
       // --- Phase hook: begin attempt ---
@@ -412,14 +399,13 @@ export class MNAEngine implements AnalogEngine {
       }
 
       // --- NR solve (ngspice dctran.c:770 NIiter) ---
-      const ctx = this._ctx!;
       // xfact = deltaOld[0] / deltaOld[1] for predictor extrapolation in element load().
       // Written here so all elements read the correct value during this NR call.
       ctx.loadCtx.xfact = ctx.deltaOld[0] / ctx.deltaOld[1];
       // dt for reactive elements to use in load() (CKTdelta).
       ctx.loadCtx.dt = dt;
       ctx.maxIterations = params.transientMaxIterations;
-      ctx.initialGuess = this._voltages;
+      ctx.initialGuess = ctx.rhs;
       ctx.enableBlameTracking = logging;
       ctx.postIterationHook = this.postIterationHook;
       ctx.detailedConvergence = this.detailedConvergence;
@@ -468,7 +454,7 @@ export class MNAEngine implements AnalogEngine {
         // --- NR FAILED (ngspice dctran.c:793-810) ---
         this.stepPhaseHook?.onAttemptEnd("nrFailedRetry", false);
         this._simTime -= dt;                              // ngspice dctran.c:796
-        this._voltages.set(this._prevVoltages);
+        ctx.rhs.set(ctx.rhsOld);
         dt = dt / 8;                                    // ngspice dctran.c:802
         this._timestep.currentDt = dt;
         this._timestep.currentOrder = 1;                // ngspice dctran.c:810 — order, NOT method
@@ -479,7 +465,6 @@ export class MNAEngine implements AnalogEngine {
       } else {
         // --- NR CONVERGED — evaluate LTE (ngspice dctran.c:830+) ---
         this._timestep.currentDt = dt;
-        this._voltages.set(nrResult.voltages);
 
         // ngspice dctran.c:849-866: firsttime && converged -> skip LTE, accept immediately
         if (this._firsttime) {
@@ -519,7 +504,7 @@ export class MNAEngine implements AnalogEngine {
         this._simTime -= dt;                            // ngspice dctran.c:920
         if (logging) stepRec!.lteRejected = true;
 
-        this._voltages.set(this._prevVoltages);
+        ctx.rhs.set(ctx.rhsOld);
         dt = newDt;                                     // ngspice dctran.c:926
         this._timestep.currentDt = dt;
         // fall through to delmin check below
@@ -564,7 +549,7 @@ export class MNAEngine implements AnalogEngine {
     // NIpred: push fully-accepted solution into history for next step predictor.
     // Only fires after both NR convergence AND LTE acceptance — never on rejected attempts.
     // ngspice: CKTsols rotation in dctran.c acceptance block.
-    this._nodeVoltageHistory.rotateNodeVoltages(this._voltages);
+    ctx.nodeVoltageHistory.rotateNodeVoltages(ctx.rhs);
 
     if (logging) {
       stepRec!.acceptedDt = dt;
@@ -586,8 +571,8 @@ export class MNAEngine implements AnalogEngine {
       if (el.isReactive && el.pinNodeIds.length >= 2) {
         const nA = el.pinNodeIds[0];
         const nB = el.pinNodeIds[1];
-        const vA = nA > 0 && nA - 1 < nodeCount ? this._voltages[nA - 1] : 0;
-        const vB = nB > 0 && nB - 1 < nodeCount ? this._voltages[nB - 1] : 0;
+        const vA = nA > 0 && nA - 1 < nodeCount ? ctx.rhs[nA - 1] : 0;
+        const vB = nB > 0 && nB - 1 < nodeCount ? ctx.rhs[nB - 1] : 0;
         this._history.push(i, vA - vB);
       }
     }
@@ -613,12 +598,12 @@ export class MNAEngine implements AnalogEngine {
     // Matches ngspice DEVaccept — called once per accepted step.
     // Point loadCtx.voltages at the accepted solution, and set dt to the
     // accepted timestep, before calling accept().
-    const addBP = this._ctx!.addBreakpointBound;
-    this._ctx!.loadCtx.voltages = this._voltages;
-    this._ctx!.loadCtx.dt = this._lastDt;
+    const addBP = ctx.addBreakpointBound;
+    ctx.loadCtx.voltages = ctx.rhs;
+    ctx.loadCtx.dt = this._lastDt;
     for (const el of elements) {
       if (el.accept) {
-        el.accept(this._ctx!.loadCtx, this._simTime, addBP);
+        el.accept(ctx.loadCtx, this._simTime, addBP);
       }
     }
 
@@ -698,7 +683,7 @@ export class MNAEngine implements AnalogEngine {
    * Find the DC operating point of the circuit.
    *
    * Delegates to the three-level fallback solver. Stores the resulting node
-   * voltages in `_voltages` so subsequent `step()` calls start from the
+   * voltages in `ctx.rhs` so subsequent `step()` calls start from the
    * correct operating point.
    */
   dcOperatingPoint(): DcOpResult {
@@ -891,18 +876,18 @@ export class MNAEngine implements AnalogEngine {
    * voltages stored at solver indices 0..nodeCount-1.
    */
   getNodeVoltage(nodeId: number): number {
-    if (nodeId <= 0) return 0;
+    if (nodeId <= 0 || !this._ctx) return 0;
     const idx = nodeId - 1;
-    if (idx >= this._voltages.length) return 0;
-    return this._voltages[idx];
+    if (idx >= this._ctx.rhs.length) return 0;
+    return this._ctx.rhs[idx];
   }
 
   setNodeVoltage(nodeId: number, voltage: number): void {
-    if (nodeId <= 0) return;
+    if (nodeId <= 0 || !this._ctx) return;
     const idx = nodeId - 1;
-    if (idx >= this._voltages.length) return;
-    this._voltages[idx] = voltage;
-    this._prevVoltages[idx] = voltage;
+    if (idx >= this._ctx.rhs.length) return;
+    this._ctx.rhs[idx] = voltage;
+    this._ctx.rhsOld[idx] = voltage;
   }
 
   /**
@@ -912,10 +897,10 @@ export class MNAEngine implements AnalogEngine {
    * `branchId` is 0-based within the branch block.
    */
   getBranchCurrent(branchId: number): number {
-    if (!this._compiled) return 0;
+    if (!this._compiled || !this._ctx) return 0;
     const offset = this._compiled.nodeCount + branchId;
-    if (offset < 0 || offset >= this._voltages.length) return 0;
-    return this._voltages[offset];
+    if (offset < 0 || offset >= this._ctx.rhs.length) return 0;
+    return this._ctx.rhs[offset];
   }
 
   /**
@@ -926,8 +911,8 @@ export class MNAEngine implements AnalogEngine {
    */
   getElementCurrent(elementId: number): number {
     const el = this._compiled?.elements[elementId];
-    if (!el) return 0;
-    return el.getPinCurrents(this._voltages)[0];
+    if (!el || !this._ctx) return 0;
+    return el.getPinCurrents(this._ctx.rhs)[0];
   }
 
   /**
@@ -935,8 +920,8 @@ export class MNAEngine implements AnalogEngine {
    */
   getElementPinCurrents(elementId: number): number[] {
     const el = this._compiled?.elements[elementId];
-    if (!el) return [];
-    return el.getPinCurrents(this._voltages);
+    if (!el || !this._ctx) return [];
+    return el.getPinCurrents(this._ctx.rhs);
   }
 
   /**
@@ -946,8 +931,8 @@ export class MNAEngine implements AnalogEngine {
    */
   getElementPower(elementId: number): number {
     const el = this._compiled?.elements[elementId];
-    if (!el) return 0;
-    const currents = el.getPinCurrents(this._voltages);
+    if (!el || !this._ctx) return 0;
+    const currents = el.getPinCurrents(this._ctx.rhs);
     let power = 0;
     for (let i = 0; i < currents.length && i < el.pinNodeIds.length; i++) {
       power += this.getNodeVoltage(el.pinNodeIds[i]) * currents[i];
@@ -1076,7 +1061,8 @@ export class MNAEngine implements AnalogEngine {
     elements: readonly AnalogElement[],
     cac: CompiledWithBridges,
   ): void {
-    this._voltages.set(result.nodeVoltages);
+    const ctx = this._ctx!;
+    ctx.rhs.set(result.nodeVoltages);
 
     if (cac.statePool) {
       // ngspice dctran.c:346-350: set analysis mode, zero CKTag[], then copy state.
@@ -1087,7 +1073,7 @@ export class MNAEngine implements AnalogEngine {
       cac.statePool.ag[0] = 0;
       cac.statePool.ag[1] = 0;
       cac.statePool.seedHistory();
-      cac.statePool.refreshElementRefs(this._ctx!.poolBackedElements as unknown as PoolBackedAnalogElement[]);
+      cac.statePool.refreshElementRefs(ctx.poolBackedElements as unknown as PoolBackedAnalogElement[]);
       this._firsttime = true;
     }
 
@@ -1095,12 +1081,12 @@ export class MNAEngine implements AnalogEngine {
     // solution so the first transient step can correctly detect signal edges.
     // Matches ngspice DEVaccept post-CKTop call: elements are notified of the
     // accepted DC operating point before any transient NR iteration begins.
-    const addBP = this._ctx!.addBreakpointBound;
-    this._ctx!.loadCtx.voltages = this._voltages;
-    this._ctx!.loadCtx.dt = 0;
+    const addBP = ctx.addBreakpointBound;
+    ctx.loadCtx.voltages = ctx.rhs;
+    ctx.loadCtx.dt = 0;
     for (const el of elements) {
       if (el.accept) {
-        el.accept(this._ctx!.loadCtx, 0, addBP);
+        el.accept(ctx.loadCtx, 0, addBP);
       }
     }
   }

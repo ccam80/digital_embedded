@@ -17,18 +17,50 @@ import {
   makeBehavioralCounterAnalogFactory,
 } from "../behavioral-sequential.js";
 import { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
-import { SparseSolver } from "../sparse-solver.js";
 import { CounterDefinition } from "../../../components/memory/counter.js";
 import { CounterPresetDefinition } from "../../../components/memory/counter-preset.js";
 import { RegisterDefinition } from "../../../components/memory/register.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
+import type { LoadContext } from "../load-context.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
 // ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { LoadContext } from "../load-context.js";
+
+function makeCtx(v: Float64Array = new Float64Array(16)): LoadContext {
+  return {
+    solver: {
+      allocElement: (_r: number, _c: number) => 0,
+      stampElement: (_h: number, _v: number) => {},
+      stampRHS: (_i: number, _v: number) => {},
+      stamp: (_r: number, _c: number, _v: number) => {},
+    } as any,
+    voltages: v,
+    iteration: 0,
+    initMode: "transient" as const,
+    dt: 0,
+    method: "trapezoidal" as const,
+    order: 1,
+    deltaOld: [],
+    ag: new Float64Array(7),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: false,
+    xfact: 0,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+function makeAcceptCtx(v: Float64Array, dt = 1e-9): LoadContext {
+  return { ...makeCtx(v), dt, isTransient: true };
+}
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
@@ -70,7 +102,6 @@ const V_LOW = 0.0;
  */
 function buildCounter(bitWidth = 4): {
   element: BehavioralCounterElement;
-  solver: SparseSolver;
   makeVoltages: (en: number, clock: number, clr: number) => Float64Array;
 } {
   const enPin = new DigitalInputPinModel(CMOS33, true);
@@ -102,13 +133,9 @@ function buildCounter(bitWidth = 4): {
     new Map(),
   );
 
-  // Max MNA node = 4 + bitWidth (ovf pin). Solver size = max node ID.
-  const solverSize = 4 + bitWidth; // nodes 1=en, 2=clock, 3=clr, 4..3+bitWidth=bits, 4+bitWidth=ovf
-  const solver = new SparseSolver();
+  const solverSize = 4 + bitWidth;
 
   const makeVoltages = (en: number, clock: number, clr: number): Float64Array => {
-    // MNA node IDs are 1-based; readMnaVoltage(nodeId, v) reads v[nodeId-1]
-    // en=node1→v[0], clock=node2→v[1], clr=node3→v[2]
     const v = new Float64Array(solverSize);
     v[0] = en;
     v[1] = clock;
@@ -116,7 +143,7 @@ function buildCounter(bitWidth = 4): {
     return v;
   };
 
-  return { element, solver, makeVoltages };
+  return { element, makeVoltages };
 }
 
 /**
@@ -131,7 +158,6 @@ function buildCounter(bitWidth = 4): {
  */
 function buildRegister(bitWidth = 8): {
   element: BehavioralRegisterElement;
-  solver: SparseSolver;
   makeVoltages: (data: number, en: number, clock: number) => Float64Array;
   outBitPins: DigitalOutputPinModel[];
 } {
@@ -166,15 +192,9 @@ function buildRegister(bitWidth = 8): {
     new Map(),
   );
 
-  // Max MNA node = 1 + bitWidth + 2 + bitWidth - 1 = 2*bitWidth + 2 (last Q bit)
   const solverSize = 2 * bitWidth + 2;
-  const solver = new SparseSolver();
 
   const makeVoltages = (data: number, en: number, clock: number): Float64Array => {
-    // MNA node IDs are 1-based; readMnaVoltage(nodeId, v) reads v[nodeId-1]
-    // D bits: nodes 1..bitWidth → v[0..bitWidth-1]
-    // clock: node 1+bitWidth → v[bitWidth]
-    // en: node 2+bitWidth → v[bitWidth+1]
     const v = new Float64Array(solverSize);
     for (let bit = 0; bit < bitWidth; bit++) {
       v[bit] = ((data >> bit) & 1) ? V_HIGH : V_LOW;
@@ -184,7 +204,7 @@ function buildRegister(bitWidth = 8): {
     return v;
   };
 
-  return { element, solver, makeVoltages, outBitPins };
+  return { element, makeVoltages, outBitPins };
 }
 
 /**
@@ -197,8 +217,8 @@ function applyRisingEdge(
   en: number,
   clr: number,
 ): void {
-  element.updateCompanion(1e-9, 'bdf1', makeVoltages(en, V_LOW, clr));
-  element.updateCompanion(1e-9, 'bdf1', makeVoltages(en, V_HIGH, clr));
+  element.accept(makeAcceptCtx(makeVoltages(en, V_LOW, clr)), 0, () => {});
+  element.accept(makeAcceptCtx(makeVoltages(en, V_HIGH, clr)), 0, () => {});
 }
 
 // ---------------------------------------------------------------------------
@@ -207,11 +227,9 @@ function applyRisingEdge(
 
 describe("Counter", () => {
   it("counts_on_clock_edges", () => {
-    const { element, solver, makeVoltages } = buildCounter(4);
+    const { element, makeVoltages } = buildCounter(4);
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx());
 
     // Apply 5 rising clock edges with en=1, clr=0
     for (let i = 0; i < 5; i++) {
@@ -221,13 +239,8 @@ describe("Counter", () => {
     // Count should be 5 = 0b0101
     expect(element.count).toBe(5);
 
-    // Verify via stampNonlinear output levels
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(makeVoltages(V_HIGH, V_LOW, V_LOW)));
 
-    // Check output reflects binary 5 (0b0101)
-    // We verify via the factory-built element, checking that the count is correct
     expect(element.count).toBe(5);
   });
 
@@ -247,7 +260,7 @@ describe("Counter", () => {
 
   it("output_voltages_match_logic", () => {
     // Build a counter via the factory to verify output pin voltage levels
-    const nodeCount = 10; // ground + en + clk + clr + 4 bits + ovf + extra
+    const nodeCount = 10;
     const props = {
       has: (k: string) => k === "bitWidth",
       get: (k: string) => k === "bitWidth" ? 4 : undefined,
@@ -261,13 +274,9 @@ describe("Counter", () => {
       [], -1, props, () => 0,
     ) as BehavioralCounterElement;
 
-    const solver = new SparseSolver();
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx());
 
     // Apply 5 clock edges: count = 5 = 0b0101
-    // MNA node IDs 1-based: en=node1→v[0], clock=node2→v[1], clr=node3→v[2]
     const makeV = (en: number, clock: number, clr: number): Float64Array => {
       const v = new Float64Array(nodeCount);
       v[0] = en; v[1] = clock; v[2] = clr;
@@ -275,33 +284,19 @@ describe("Counter", () => {
     };
 
     for (let i = 0; i < 5; i++) {
-      element.updateCompanion(1e-9, 'bdf1', makeV(V_HIGH, V_LOW, V_LOW));
-      element.updateCompanion(1e-9, 'bdf1', makeV(V_HIGH, V_HIGH, V_LOW));
+      element.accept(makeAcceptCtx(makeV(V_HIGH, V_LOW, V_LOW)), 0, () => {});
+      element.accept(makeAcceptCtx(makeV(V_HIGH, V_HIGH, V_LOW)), 0, () => {});
     }
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(makeV(V_HIGH, V_LOW, V_LOW)));
 
     // count=5 = 0b0101: bit0=1, bit1=0, bit2=1, bit3=0
-    // Each output should be exactly V_OH or V_OL — no intermediate voltages
-    // We verify via the count value which drives the pin levels
     expect(element.count).toBe(5);
 
-    // Verify output voltages: each bit must be exactly V_OH or V_OL
-    // We verify this by checking the count bits match what we expect
     const expectedBits = [1, 0, 1, 0]; // count=5=0b0101
     for (let bit = 0; bit < 4; bit++) {
-      const expectedHigh = expectedBits[bit] === 1;
-      // The output pin drives either vOH or vOL — no intermediate voltage
-      // We test this by applying the count and reading back expected levels
       const countBit = (element.count >> bit) & 1;
       expect(countBit).toBe(expectedBits[bit]);
-      if (expectedHigh) {
-        expect(countBit).toBe(1);
-      } else {
-        expect(countBit).toBe(0);
-      }
     }
   });
 });
@@ -312,25 +307,21 @@ describe("Counter", () => {
 
 describe("Register", () => {
   it("latches_all_bits", () => {
-    const { element, solver, makeVoltages, outBitPins } = buildRegister(8);
+    const { element, makeVoltages, outBitPins } = buildRegister(8);
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx());
 
     // Initial state: all outputs LOW (storedValue=0)
     expect(element.storedValue).toBe(0);
 
     // Set data to 0xA5 = 0b10100101, en=1, clock low→high (rising edge)
-    element.updateCompanion(1e-9, 'bdf1', makeVoltages(0xA5, V_HIGH, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', makeVoltages(0xA5, V_HIGH, V_HIGH));
+    element.accept(makeAcceptCtx(makeVoltages(0xA5, V_HIGH, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(makeVoltages(0xA5, V_HIGH, V_HIGH)), 0, () => {});
 
     // Stored value should now be 0xA5
     expect(element.storedValue).toBe(0xA5);
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(makeVoltages(0xA5, V_HIGH, V_HIGH)));
 
     // Verify output pin voltage levels match 0xA5 = 0b10100101
     const expected = [1, 0, 1, 0, 0, 1, 0, 1]; // bits 0..7 of 0xA5
@@ -348,8 +339,8 @@ describe("Register", () => {
     const { element, makeVoltages } = buildRegister(8);
 
     // Clock edge with en=0 — should not latch
-    element.updateCompanion(1e-9, 'bdf1', makeVoltages(0xFF, V_LOW, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', makeVoltages(0xFF, V_LOW, V_HIGH));
+    element.accept(makeAcceptCtx(makeVoltages(0xFF, V_LOW, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(makeVoltages(0xFF, V_LOW, V_HIGH)), 0, () => {});
 
     expect(element.storedValue).toBe(0);
   });
@@ -358,13 +349,13 @@ describe("Register", () => {
     const { element, makeVoltages } = buildRegister(8);
 
     // Latch 0x55
-    element.updateCompanion(1e-9, 'bdf1', makeVoltages(0x55, V_HIGH, V_LOW));
-    element.updateCompanion(1e-9, 'bdf1', makeVoltages(0x55, V_HIGH, V_HIGH));
+    element.accept(makeAcceptCtx(makeVoltages(0x55, V_HIGH, V_LOW)), 0, () => {});
+    element.accept(makeAcceptCtx(makeVoltages(0x55, V_HIGH, V_HIGH)), 0, () => {});
     expect(element.storedValue).toBe(0x55);
 
     // Many timesteps with data=0, clock idle — value must hold
     for (let i = 0; i < 10; i++) {
-      element.updateCompanion(1e-9, 'bdf1', makeVoltages(0x00, V_HIGH, V_HIGH));
+      element.accept(makeAcceptCtx(makeVoltages(0x00, V_HIGH, V_HIGH)), 0, () => {});
     }
     expect(element.storedValue).toBe(0x55);
   });

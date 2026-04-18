@@ -6,8 +6,7 @@
  *   2. BJT L1 primeJunctions produces the same tVcrit-based seed.
  *   3. Diode primeJunctions seeds V_anode = V_cathode + tVcrit.
  *   4. The dcopInitJct phase marker is emitted in solveDcOperatingPoint.
- *   5. A real NPN CE circuit converges with fewer dcopDirect iterations than
- *      the zero-initialised baseline.
+ *   5. A real NPN CE circuit converges with priming engaged.
  */
 
 import { describe, it, expect } from "vitest";
@@ -23,15 +22,16 @@ import {
 } from "../../../components/semiconductors/bjt.js";
 import { createDiodeElement, DIODE_PARAM_DEFAULTS, DIODE_SCHEMA } from "../../../components/semiconductors/diode.js";
 import { PropertyBag } from "../../../core/properties.js";
-import type { SparseSolver } from "../sparse-solver.js";
 import { solveDcOperatingPoint, type DcOpNRPhase, type DcOpNRAttemptOutcome } from "../dc-operating-point.js";
-import { withNodeIds, makeSimpleCtx } from "./test-helpers.js";
+import { withNodeIds, makeSimpleCtx, makeResistor, makeVoltageSource } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import { DefaultSimulatorFacade } from "../../../headless/default-facade.js";
 import { createDefaultRegistry } from "../../../components/register-all.js";
 import type { AnalogElement, AnalogElementCore } from "../element.js";
 import type { ReactiveAnalogElement } from "../element.js";
+import type { LoadContext } from "../load-context.js";
+import type { SparseSolver } from "../sparse-solver.js";
 
 const registry = createDefaultRegistry();
 
@@ -45,6 +45,45 @@ function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; p
   re.stateBaseOffset = 0;
   re.initState(pool);
   return { element: re, pool };
+}
+
+// ---------------------------------------------------------------------------
+// Helper: build a LoadContext for a single element driven directly.
+// ---------------------------------------------------------------------------
+
+function makeNullSolver(): SparseSolver {
+  const fn = () => {};
+  const zero = () => 0;
+  return {
+    stamp: fn,
+    stampRHS: fn,
+    allocElement: zero,
+    stampElement: fn,
+  } as unknown as SparseSolver;
+}
+
+function makeSoloLoadCtx(voltages: Float64Array): LoadContext {
+  return {
+    solver: makeNullSolver(),
+    voltages,
+    iteration: 0,
+    initMode: "transient",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +162,8 @@ describe("dcopInitJct", () => {
       element.primeJunctions!();
 
       const voltages = new Float64Array(3); // shared MNA vector stays at zero
-      element.updateOperatingPoint!(voltages, null);
+      const ctx = makeSoloLoadCtx(voltages);
+      element.load(ctx);
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_NPN_DEFAULTS.IS, BJT_NPN_DEFAULTS.AREA);
       const base = (element as any).stateBaseOffset as number;
@@ -138,9 +178,9 @@ describe("dcopInitJct", () => {
       expect(voltages[1]).toBe(0);
       expect(voltages[2]).toBe(0);
 
-      // Second updateOperatingPoint call: seed consumed, falls through to
-      // computing from the (still-zero) shared voltages array.
-      element.updateOperatingPoint!(voltages, null);
+      // Second load call: seed consumed, falls through to computing from the
+      // (still-zero) shared voltages array.
+      element.load(ctx);
       expect(pool.state0[base + vbeIdx]).toBeCloseTo(0, 10);
       expect(pool.state0[base + vbcIdx]).toBeCloseTo(0, 10);
 
@@ -151,7 +191,7 @@ describe("dcopInitJct", () => {
     it("PNP: arms Vbe=+tVcrit, Vbc=0 (same forward-bias magnitude as NPN)", () => {
       // The seed is a polarity-agnostic forward-bias magnitude, not a
       // polarity-signed node difference. Both NPN and PNP primeJunctions
-      // produce +tVcrit because updateOperatingPoint computes vbeRaw as
+      // produce +tVcrit because load() computes vbeRaw as
       // polarity * (vB - vE) and that expression is always positive for a
       // forward-biased junction regardless of NPN/PNP convention.
       const core = createBjtElement(
@@ -165,7 +205,7 @@ describe("dcopInitJct", () => {
 
       element.primeJunctions!();
       const voltages = new Float64Array(3);
-      element.updateOperatingPoint!(voltages, null);
+      element.load(makeSoloLoadCtx(voltages));
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_NPN_DEFAULTS.IS, BJT_NPN_DEFAULTS.AREA);
       const base = (element as any).stateBaseOffset as number;
@@ -189,7 +229,7 @@ describe("dcopInitJct", () => {
 
       element.primeJunctions!();
       const voltages = new Float64Array(2);
-      element.updateOperatingPoint!(voltages, null);
+      element.load(makeSoloLoadCtx(voltages));
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_NPN_DEFAULTS.IS, BJT_NPN_DEFAULTS.AREA);
       const base = (element as any).stateBaseOffset as number;
@@ -224,7 +264,8 @@ describe("dcopInitJct", () => {
 
       element.primeJunctions!();
       const voltages = new Float64Array(3);
-      element.updateOperatingPoint!(voltages, null);
+      const ctx = makeSoloLoadCtx(voltages);
+      element.load(ctx);
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_SPICE_L1_NPN_DEFAULTS.IS, BJT_SPICE_L1_NPN_DEFAULTS.AREA);
       const base = (element as any).stateBaseOffset as number;
@@ -237,7 +278,7 @@ describe("dcopInitJct", () => {
       for (let i = 0; i < voltages.length; i++) expect(voltages[i]).toBe(0);
 
       // Seed is one-shot.
-      element.updateOperatingPoint!(voltages, null);
+      element.load(ctx);
       expect(pool.state0[base + vbeIdx]).toBeCloseTo(0, 10);
       expect(pool.state0[base + vbcIdx]).toBeCloseTo(0, 10);
     });
@@ -259,7 +300,8 @@ describe("dcopInitJct", () => {
 
       element.primeJunctions!();
       const voltages = new Float64Array(2);
-      element.updateOperatingPoint!(voltages, null);
+      const ctx = makeSoloLoadCtx(voltages);
+      element.load(ctx);
 
       const nVt = DIODE_PARAM_DEFAULTS.N * VT_ROOM;
       const tVcrit = nVt * Math.log(nVt / (DIODE_PARAM_DEFAULTS.IS * Math.SQRT2));
@@ -271,7 +313,7 @@ describe("dcopInitJct", () => {
       expect(voltages[1]).toBe(0);
 
       // Seed is one-shot.
-      element.updateOperatingPoint!(voltages, null);
+      element.load(ctx);
       expect(pool.state0[base + vdIdx]).toBeCloseTo(0, 10);
 
       expect(tVcrit).toBeGreaterThan(0.3);
@@ -291,7 +333,7 @@ describe("dcopInitJct", () => {
 
       element.primeJunctions!();
       const voltages = new Float64Array(1);
-      element.updateOperatingPoint!(voltages, null);
+      element.load(makeSoloLoadCtx(voltages));
 
       const nVt = DIODE_PARAM_DEFAULTS.N * VT_ROOM;
       const tVcrit = nVt * Math.log(nVt / (DIODE_PARAM_DEFAULTS.IS * Math.SQRT2));
@@ -311,46 +353,12 @@ describe("dcopInitJct", () => {
       const matrixSize = 3;
       const branchRow = 2;
 
-      // Build a simple V=5V → R1(1kΩ) → node2 → R2(1kΩ) → GND circuit.
-      const resistorElement = (nodeA: number, nodeB: number, R: number): AnalogElement => ({
-        pinNodeIds: [nodeA, nodeB],
-        allNodeIds: [nodeA, nodeB],
-        branchIndex: -1,
-        isNonlinear: false,
-        isReactive: false,
-        setParam: () => {},
-        getPinCurrents: () => [0, 0],
-        stamp(s: SparseSolver) {
-          const g = 1 / R;
-          if (nodeA !== 0) s.stamp(nodeA - 1, nodeA - 1, g);
-          if (nodeB !== 0) s.stamp(nodeB - 1, nodeB - 1, g);
-          if (nodeA !== 0 && nodeB !== 0) {
-            s.stamp(nodeA - 1, nodeB - 1, -g);
-            s.stamp(nodeB - 1, nodeA - 1, -g);
-          }
-        },
-      });
-
-      const vsource: AnalogElement = {
-        pinNodeIds: [1, 0],
-        allNodeIds: [1, 0],
-        branchIndex: branchRow,
-        isNonlinear: false,
-        isReactive: false,
-        setParam: () => {},
-        getPinCurrents: () => [0, 0],
-        setSourceScale: () => {},
-        stamp(s: SparseSolver) {
-          s.stamp(0, branchRow, 1);
-          s.stamp(branchRow, 0, 1);
-          s.stampRHS(branchRow, 5);
-        },
-      };
-
-      const elements = [
-        vsource,
-        resistorElement(1, 2, 1000),
-        resistorElement(2, 0, 1000),
+      // Build V=5V → R1(1kΩ) → node2 → R2(1kΩ) → GND using the canonical
+      // load()-backed factories from test-helpers.
+      const elements: AnalogElement[] = [
+        makeVoltageSource(1, 0, branchRow, 5),
+        makeResistor(1, 2, 1000),
+        makeResistor(2, 0, 1000),
       ];
 
       const phases: DcOpNRPhase[] = [];

@@ -4,7 +4,7 @@
  * Verifies:
  *   - nmos_dc_unchanged: NMOS DC operating point identical after refactor
  *   - pmos_dc_unchanged: PMOS DC operating point identical after refactor
- *   - nmos_transient_unchanged: NMOS transient waveform unchanged
+ *   - nmos_transient_unchanged: load() runs the reactive companion path
  *   - stamp_pattern_correct: gm and gds conductance entries at correct positions
  */
 
@@ -27,7 +27,7 @@ import {
 } from "../fet-base.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../../components/sources/dc-voltage-source.js";
-import { withNodeIds, runDcOp } from "./test-helpers.js";
+import { withNodeIds, runDcOp, makeResistor, makeSimpleCtx } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../sparse-solver.js";
 import type { AnalogElement } from "../element.js";
@@ -94,38 +94,48 @@ function withState(element: AnalogElementCore): ReactiveAnalogElement {
 }
 
 // ---------------------------------------------------------------------------
-// Mock SparseSolver
+// Spy solver — records every row/col/value argument triple passed to the
+// solver so tests can assert the conductance stamp pattern.
 // ---------------------------------------------------------------------------
 
-function makeMockSolver() {
+function makeSpySolver() {
   return {
     stamp: vi.fn(),
     stampRHS: vi.fn(),
+    allocElement: vi.fn().mockReturnValue(0),
+    stampElement: vi.fn(),
   } as unknown as SparseSolverType;
 }
 
 // ---------------------------------------------------------------------------
-// Helper: inline resistor element for integration tests
+// Build a minimal LoadContext for direct element.load(ctx) calls. The ctx
+// carries a spy solver and default DC-OP flags; callers override fields they
+// need (voltages, isTransient, ag, dt, etc.) before calling load().
 // ---------------------------------------------------------------------------
 
-function makeResistorElement(nodeA: number, nodeB: number, resistance: number): AnalogElement {
-  const G = 1 / resistance;
+function makeDirectLoadCtx(voltages: Float64Array, overrides: Partial<LoadContext> = {}): LoadContext {
+  const dt = overrides.dt ?? 0;
   return {
-    pinNodeIds: [nodeA, nodeB],
-    allNodeIds: [nodeA, nodeB],
-    branchIndex: -1,
-    isNonlinear: false,
-    isReactive: false,
-    stamp(solver: SparseSolverType): void {
-      if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
-      if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
-      if (nodeA !== 0 && nodeB !== 0) {
-        solver.stamp(nodeA - 1, nodeB - 1, -G);
-        solver.stamp(nodeB - 1, nodeA - 1, -G);
-      }
-    },
-    setParam(_key: string, _value: number): void {},
-    getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
+    solver: makeSpySolver(),
+    voltages,
+    iteration: 0,
+    initMode: "transient",
+    dt,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+    ag: overrides.ag ?? new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+    ...overrides,
   };
 }
 
@@ -151,7 +161,7 @@ describe("Refactor", () => {
 
     const vddSource = withNodeIds(makeDcVoltageSource(2, 0, 3, 5.0), [2, 0]);
     const vgateSource = withNodeIds(makeDcVoltageSource(3, 0, 4, 3.0), [3, 0]);
-    const rdElement = makeResistorElement(2, 1, 1000);     // Rd between Vdd and drain
+    const rdElement = makeResistor(2, 1, 1000);     // Rd between Vdd and drain
 
     const elements: AnalogElement[] = [vddSource, vgateSource, rdElement, nmosElement];
 
@@ -195,7 +205,7 @@ describe("Refactor", () => {
       propsObj,
     ), [3, 1, 2])); // pinLayout order: [G, D, S] for PMOS
 
-    const rdElement = makeResistorElement(1, 0, 1000); // Rd from drain to GND
+    const rdElement = makeResistor(1, 0, 1000); // Rd from drain to GND
     const vssSource = withNodeIds(makeDcVoltageSource(2, 0, 3, 5.0), [2, 0]);
     const vgateSource = withNodeIds(makeDcVoltageSource(3, 0, 4, 2.0), [3, 0]);
 
@@ -223,47 +233,59 @@ describe("Refactor", () => {
 
   it("nmos_transient_unchanged", () => {
     // Verify NMOS with capacitances produces reactive behavior in transient:
-    // After adding Cgd capacitance, the element should have isReactive=true
-    // and its stampCompanion should update companion model state.
+    // After adding Cbd junction capacitance, the element is marked isReactive
+    // and load() runs the reactive companion stamp path in transient mode.
     const propsWithCap = { ...NMOS_DEFAULTS, CBD: 1e-12 };
     const propsObj = makeParamBag(propsWithCap);
-    const element = withState(createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj));
+    // pinLayout order for NMOS factory: [G, S, D, B]; map pinNodeIds to match.
+    const element = withState(withNodeIds(
+      createMosfetElement(1, new Map([["G", 1], ["S", 2], ["D", 3]]), [], -1, propsObj),
+      [1, 2, 3],
+    ));
 
     expect(element.isReactive).toBe(true);
-    expect(element.stampCompanion).toBeDefined();
+    expect(typeof element.load).toBe("function");
 
-    // Set up an operating point
+    // Set up an operating point. voltages array is indexed by (nodeId - 1).
     const voltages = new Float64Array(3);
-    voltages[0] = 5; // V(D) = 5V
-    voltages[1] = 3; // V(G) = 3V
-    voltages[2] = 0; // V(S) = 0
+    voltages[0] = 3; // V(node1=G) = 3V
+    voltages[1] = 0; // V(node2=S) = 0V
+    voltages[2] = 5; // V(node3=D) = 5V
 
+    const dcCtx = makeDirectLoadCtx(voltages, { isDcOp: true });
     for (let i = 0; i < 10; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(dcCtx);
     }
 
-    // stampCompanion should run without throwing
+    // Transient load() must run the reactive companion path without throwing.
     const dt = 1e-9;
-    expect(() => element.stampCompanion!(dt, "bdf1", voltages, 1, [dt])).not.toThrow();
+    const ag = new Float64Array(8);
+    ag[0] = 1 / dt;  // bdf1 order-1 coefficient
+    ag[1] = -1 / dt;
+    const tranCtx = makeDirectLoadCtx(voltages, {
+      isTransient: true,
+      dt,
+      method: "bdf1",
+      order: 1,
+      ag,
+    });
+    expect(() => element.load(tranCtx)).not.toThrow();
 
-    // After stampCompanion, stamp should produce nonzero entries for capacitance
-    const solver = makeMockSolver();
-    element.stamp(solver);
-
-    // The junction capacitance companion entries may be zero for first call
-    // (vdbPrev === vdb on first call), but stamp should not throw
-    expect(() => element.stamp(solver)).not.toThrow();
+    // A second load() call must also succeed — companion state is now populated
+    // and the nonlinear+reactive stamps re-run cleanly each NR iteration.
+    expect(() => element.load(tranCtx)).not.toThrow();
   });
 
   it("stamp_pattern_correct", () => {
     // Drive NMOS to saturation (Vgs=3V, Vds=5V)
-    // nodeD=1, nodeG=2, nodeS=3 (source=ground would be node 0, but let's use node 3 for clarity)
-    // Actually to match matrix addressing: use nodeS=0 (ground) so source row is skipped
-
-    // Use nodeG=2, nodeS=0 (ground source), nodeD=1 for cleaner test
+    // Use nodeG=2, nodeS=0 (ground source), nodeD=1 for cleaner test.
     // createMosfetElement expects [G, S, D]
     const propsObj = makeParamBag(NMOS_DEFAULTS);
-    const element = withState(createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj));
+    // pinLayout order for NMOS factory: [G, S, D, B]; bulk defaults to source.
+    const element = withState(withNodeIds(
+      createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj),
+      [2, 0, 1],
+    ));
 
     // Drive to saturation: Vgs=3V (G=3V, S=0V), Vds=5V (D=5V, S=0V)
     // matrixSize=2, voltages: index0=V(node1)=Vds=5V, index1=V(node2=G)=3V
@@ -271,16 +293,14 @@ describe("Refactor", () => {
     voltages[0] = 5; // V(node1=D) = 5V
     voltages[1] = 3; // V(node2=G) = 3V
 
+    const ctx = makeDirectLoadCtx(voltages, { isDcOp: true });
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(ctx);
       voltages[0] = 5;
       voltages[1] = 3;
     }
 
-    const solver = makeMockSolver();
-    element.stampNonlinear!(solver);
-
-    const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
+    const stampCalls = (ctx.solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
 
     // Expect conductance entries at D-G (gm), D-D (gds), S-G (-gm), S-D (-gds)
     // nodeD=1 → matrix index 0; nodeG=2 → matrix index 1; nodeS=0 → skipped
@@ -291,21 +311,18 @@ describe("Refactor", () => {
     const nonzeroStamps = stampCalls.filter((call) => Math.abs(call[2] as number) > 1e-15);
     expect(nonzeroStamps.length).toBeGreaterThan(0);
 
-    // Find D-G entry (gm): row=D-1=0, col=G-1=1
-    const dgEntry = stampCalls.find((c) => c[0] === 0 && c[1] === 1);
-    expect(dgEntry).toBeDefined();
-    if (dgEntry) {
-      // gm should be positive in saturation
-      expect(dgEntry[2] as number).toBeGreaterThan(0);
-    }
+    // Find D-G entry (gm): row=D-1=0, col=G-1=1. The load() path may write the
+    // same (row,col) more than once — sum the values to get the net stamp.
+    const dgContribs = stampCalls.filter((c) => c[0] === 0 && c[1] === 1);
+    expect(dgContribs.length).toBeGreaterThan(0);
+    const dgTotal = dgContribs.reduce((acc, c) => acc + (c[2] as number), 0);
+    expect(dgTotal).toBeGreaterThan(0);
 
-    // Find D-D entry (gds): row=D-1=0, col=D-1=0
-    const ddEntry = stampCalls.find((c) => c[0] === 0 && c[1] === 0);
-    expect(ddEntry).toBeDefined();
-    if (ddEntry) {
-      // gds should be positive in saturation
-      expect(ddEntry[2] as number).toBeGreaterThan(0);
-    }
+    // Find D-D entry (gds): row=D-1=0, col=D-1=0.
+    const ddContribs = stampCalls.filter((c) => c[0] === 0 && c[1] === 0);
+    expect(ddContribs.length).toBeGreaterThan(0);
+    const ddTotal = ddContribs.reduce((acc, c) => acc + (c[2] as number), 0);
+    expect(ddTotal).toBeGreaterThan(0);
   });
 });
 
@@ -342,35 +359,39 @@ describe("AbstractFetElement", () => {
     // nodeG=1, nodeS=3, nodeD=2; createMosfetElement expects [G, S, D]
     // matrix indices: G-1=0, S-1=2, D-1=1
     const propsObj = makeParamBag(NMOS_DEFAULTS);
-    const element = withState(createMosfetElement(1, new Map([["G", 1], ["S", 3], ["D", 2]]), [], -1, propsObj));
+    // pinLayout order for NMOS factory: [G, S, D, B]; bulk defaults to source.
+    const element = withState(withNodeIds(
+      createMosfetElement(1, new Map([["G", 1], ["S", 3], ["D", 2]]), [], -1, propsObj),
+      [1, 3, 2],
+    ));
 
     const voltages = new Float64Array(3);
     voltages[0] = 3; // V(node1=G) = 3V
     voltages[1] = 5; // V(node2=D) = 5V
     voltages[2] = 0; // V(node3=S) = 0
 
+    const ctx = makeDirectLoadCtx(voltages, { isDcOp: true });
     for (let i = 0; i < 50; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(ctx);
       voltages[0] = 3;
       voltages[1] = 5;
       voltages[2] = 0;
     }
 
-    const solver = makeMockSolver();
-    element.stampNonlinear!(solver);
-
-    const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
+    const stampCalls = (ctx.solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
 
     // D=node2 → row/col index 1; G=node1 → row/col index 0; S=node3 → row/col index 2
-    // gm appears at [D,G] = [1,0] and [-gm at S,G = 2,0]
-    const dgEntry = stampCalls.find((c) => c[0] === 1 && c[1] === 0);
-    expect(dgEntry).toBeDefined();
-    expect(dgEntry![2] as number).toBeGreaterThan(0); // gm > 0
+    // gm appears at [D,G] = [1,0] and [-gm at S,G = 2,0]. Sum duplicate stamps.
+    const dgContribs = stampCalls.filter((c) => c[0] === 1 && c[1] === 0);
+    expect(dgContribs.length).toBeGreaterThan(0);
+    const dgTotal = dgContribs.reduce((acc, c) => acc + (c[2] as number), 0);
+    expect(dgTotal).toBeGreaterThan(0); // gm > 0
 
     // gds appears at [D,D] = [1,1]
-    const ddEntry = stampCalls.find((c) => c[0] === 1 && c[1] === 1);
-    expect(ddEntry).toBeDefined();
-    expect(ddEntry![2] as number).toBeGreaterThan(0); // gds > 0
+    const ddContribs = stampCalls.filter((c) => c[0] === 1 && c[1] === 1);
+    expect(ddContribs.length).toBeGreaterThan(0);
+    const ddTotal = ddContribs.reduce((acc, c) => acc + (c[2] as number), 0);
+    expect(ddTotal).toBeGreaterThan(0); // gds > 0
   });
 });
 
@@ -407,20 +428,22 @@ describe("StatePool migration", () => {
     expect(pool.state0[SLOT_V_GD]).toBe(0);
   });
 
-  it("updateOperatingPoint_writes_state_to_pool", () => {
+  it("load_writes_state_to_pool", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
-    const element = createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj);
+    const core = createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj);
+    const element = withNodeIds(core, [2, 0, 1]) as ReactiveAnalogElement;
     element.stateBaseOffset = 0;
     const pool = new StatePool(element.stateSize);
-    element.initState!(pool);
+    element.initState(pool);
 
     // Drive to saturation: Vgs=3, Vds=5
     const voltages = new Float64Array(2);
     voltages[0] = 5; // V(node1=D) = 5V
     voltages[1] = 3; // V(node2=G) = 3V
 
+    const ctx = makeDirectLoadCtx(voltages, { isDcOp: true });
     for (let i = 0; i < 20; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(ctx);
       voltages[0] = 5;
       voltages[1] = 3;
     }
@@ -432,15 +455,19 @@ describe("StatePool migration", () => {
     expect(pool.state0[SLOT_GDS]).toBeGreaterThan(1e-12);
   });
 
-  it("voltages_unchanged_after_updateOperatingPoint", () => {
+  it("voltages_unchanged_after_load", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
-    const element = withState(createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj));
+    const element = withState(withNodeIds(
+      createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj),
+      [2, 0, 1],
+    ));
 
     const voltages = new Float64Array([5.0, 3.0]);
     const snapshot = new Float64Array(voltages);
 
+    const ctx = makeDirectLoadCtx(voltages, { isDcOp: true });
     for (let i = 0; i < 10; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(ctx);
     }
 
     // voltages array must be unchanged — no write-back
@@ -450,18 +477,20 @@ describe("StatePool migration", () => {
 
   it("swapped_flag_stored_as_float_in_pool", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
-    const element = createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj);
+    const core = createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj);
+    const element = withNodeIds(core, [2, 0, 1]) as ReactiveAnalogElement;
     element.stateBaseOffset = 0;
     const pool = new StatePool(element.stateSize);
-    element.initState!(pool);
+    element.initState(pool);
 
     // Drive with reversed Vds (Vgs=3, Vds<0 → swap condition)
     const voltages = new Float64Array(2);
     voltages[0] = 0; // V(D) = 0V (less than source)
     voltages[1] = 3; // V(G) = 3V
 
+    const ctx = makeDirectLoadCtx(voltages, { isDcOp: true });
     for (let i = 0; i < 5; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(ctx);
     }
 
     // SLOT_SWAPPED must be 0.0 or 1.0, never another value
@@ -471,16 +500,20 @@ describe("StatePool migration", () => {
 
   it("pool_state_survives_rollback", () => {
     const propsObj = makeParamBag(NMOS_DEFAULTS);
-    const element = withState(createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj));
+    const element = withState(withNodeIds(
+      createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj),
+      [2, 0, 1],
+    ));
 
     const pool = new StatePool(element.stateSize);
     element.stateBaseOffset = 0;
-    element.initState!(pool);
+    element.initState(pool);
 
     // Drive to a known operating point
     const voltages = new Float64Array([5.0, 3.0]);
+    const ctx = makeDirectLoadCtx(voltages, { isDcOp: true });
     for (let i = 0; i < 10; i++) {
-      element.updateOperatingPoint!(voltages);
+      element.load(ctx);
       voltages[0] = 5.0;
       voltages[1] = 3.0;
     }
@@ -489,8 +522,9 @@ describe("StatePool migration", () => {
 
     // Mutate state with different voltages
     const voltages2 = new Float64Array([1.0, 0.5]);
+    const ctx2 = makeDirectLoadCtx(voltages2, { isDcOp: true });
     for (let i = 0; i < 5; i++) {
-      element.updateOperatingPoint!(voltages2);
+      element.load(ctx2);
       voltages2[0] = 1.0;
       voltages2[1] = 0.5;
     }
@@ -521,13 +555,10 @@ describe("integration", () => {
   });
 
   it("trap_order2_xmu_nonstandard_no_helper", () => {
-    // Build an NMOS with CGSO=1e-12 so cgs = CGSO * W * M > 0.
-    // W=1e-6, M=1 → cgs = 1e-18 F (tiny but non-zero; what matters is the formula).
-    // Use larger CGSO so cgs is non-trivial.
+    // Build an NMOS with non-zero CGSO so cgs = CGSO * W * M > 0.
     const CGSO = 100e-12;  // F/m — overlap cap per unit width
     const W    = 10e-6;     // m
     // cgs from computeCapacitances = CGSO * W * M = 100e-12 * 10e-6 = 1e-15 F
-    const cgs  = CGSO * W * 1;  // = 1e-15
 
     const propsObj = new PropertyBag();
     propsObj.replaceModelParams({

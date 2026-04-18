@@ -14,10 +14,19 @@
 import { describe, it, expect, vi } from "vitest";
 import { BehavioralDFlipflopElement } from "../behavioral-flipflop.js";
 import { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-model.js";
-import { SparseSolver } from "../sparse-solver.js";
 import { DDefinition } from "../../../components/flipflops/d.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { LoadContext } from "../load-context.js";
+import type { IntegrationMethod } from "../../../core/analog-types.js";
+
+function makeNullSolver() {
+  return {
+    allocElement: (_r: number, _c: number) => 0,
+    stampElement: (_h: number, _v: number) => {},
+    stampRHS: (_i: number, _v: number) => {},
+    stamp: (_r: number, _c: number, _v: number) => {},
+  } as any;
+}
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -96,11 +105,35 @@ function voltages(clock: number, d: number, q = 0, qBar = 0, reset = 0): Float64
 }
 
 /**
- * Create a SparseSolver large enough for the test nodes.
- * We use 5 solver rows (MNA nodes 1-5 → solver indices 0-4).
+ * Build a minimal LoadContext for driving element.load() and element.accept().
  */
-function makeSolver(): SparseSolver {
-  return new SparseSolver();
+function makeCtx(
+  v: Float64Array = new Float64Array(8),
+  dt = 0,
+  method: IntegrationMethod = "trapezoidal",
+): LoadContext {
+  const ag = new Float64Array(7);
+  return {
+    solver: makeNullSolver(),
+    voltages: v,
+    iteration: 0,
+    initMode: "transient" as const,
+    dt,
+    method,
+    order: 1,
+    deltaOld: [],
+    ag,
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: dt > 0,
+    xfact: 0,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -110,30 +143,25 @@ function makeSolver(): SparseSolver {
 describe("DFF", () => {
   it("latches_d_on_rising_edge", () => {
     // D=high, clock transitions from 0V to 3.3V (rising edge)
-    // After updateCompanion with rising edge, Q should be latched HIGH.
+    // After accept with rising edge, Q should be latched HIGH.
     const { element, qPin } = buildDff();
-    const solver = makeSolver();
 
-    // Initial stamp so solver ref is set
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    // Initial load so pin state is initialised.
+    element.load(makeCtx());
 
     // Previous clock low, current clock high with D=high
     const prevVoltages = voltages(0.0, 3.3);  // clock low, D high
     const currVoltages = voltages(3.3, 3.3);  // clock high (rising edge), D high
 
-    // Simulate: first accepted timestep at clock=low
-    element.updateCompanion(1e-9, 'bdf1', prevVoltages);
+    // First accepted timestep at clock=low
+    element.accept(makeCtx(prevVoltages, 1e-9, 'bdf1'), 0, () => {});
 
     // Second timestep: clock rises → should latch D=high
-    element.updateCompanion(1e-9, 'bdf1', currVoltages);
+    element.accept(makeCtx(currVoltages, 1e-9, 'bdf1'), 0, () => {});
 
-    // After rising edge with D=3.3V (> vIH=2.0), Q should be latched HIGH
-    // Verify by checking that stampNonlinear stamps vOH on Q node
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    // After rising edge with D=3.3V (> vIH=2.0), Q should be latched HIGH.
+    // Refresh pin state via load().
+    element.load(makeCtx(currVoltages));
 
     // qPin.currentVoltage should now be vOH
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
@@ -143,22 +171,18 @@ describe("DFF", () => {
     // First latch Q=high via rising edge, then apply falling edge with D=low
     // Q should remain HIGH
     const { element, qPin } = buildDff();
-    const solver = makeSolver();
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    // Initial load so pin state is initialised.
+    element.load(makeCtx());
 
     // Rising edge with D=high → latch Q=true
-    element.updateCompanion(1e-9, 'bdf1', voltages(0.0, 3.3));
-    element.updateCompanion(1e-9, 'bdf1', voltages(3.3, 3.3));
+    element.accept(makeCtx(voltages(0.0, 3.3), 1e-9, 'bdf1'), 0, () => {});
+    element.accept(makeCtx(voltages(3.3, 3.3), 1e-9, 'bdf1'), 0, () => {});
 
     // Falling edge with D=low — Q must NOT change
-    element.updateCompanion(1e-9, 'bdf1', voltages(0.0, 0.0));
+    element.accept(makeCtx(voltages(0.0, 0.0), 1e-9, 'bdf1'), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(voltages(0.0, 0.0)));
 
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
   });
@@ -166,23 +190,18 @@ describe("DFF", () => {
   it("q_bar_is_complement", () => {
     // When Q=high, ~Q must be vOL; when Q=low, ~Q must be vOH
     const { element, qPin, qBarPin } = buildDff();
-    const solver = makeSolver();
 
     // Initial state: Q=false (default)
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx());
 
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
     expect(qBarPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
 
     // Rising edge with D=high → Q=true
-    element.updateCompanion(1e-9, 'bdf1', voltages(0.0, 3.3));
-    element.updateCompanion(1e-9, 'bdf1', voltages(3.3, 3.3));
+    element.accept(makeCtx(voltages(0.0, 3.3), 1e-9, 'bdf1'), 0, () => {});
+    element.accept(makeCtx(voltages(3.3, 3.3), 1e-9, 'bdf1'), 0, () => {});
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(voltages(3.3, 3.3)));
 
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
     expect(qBarPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
@@ -190,39 +209,31 @@ describe("DFF", () => {
 
   it("does_not_latch_during_nr_iteration", () => {
     // Within a single timestep, NR runs multiple iterations.
-    // stampNonlinear must NOT change _latchedQ — only updateCompanion does.
-    // We verify this by calling stampNonlinear multiple times with varying
-    // voltages via updateOperatingPoint, and confirming Q stays fixed.
+    // load() must NOT change _latchedQ — only accept() does.
+    // We verify this by calling load() multiple times with clock=high, D=high
+    // but without calling accept(), and confirming Q stays fixed.
     const { element, qPin } = buildDff();
-    const solver = makeSolver();
 
     // Latch Q=false initially (default)
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx());
 
     const initialQ = qPin.currentVoltage;
     expect(initialQ).toBeCloseTo(CMOS33.vOL, 5);
 
-    // Simulate NR iterations: update operating point with clock=high, D=high
-    // but do NOT call updateCompanion (which would detect the edge)
+    // Simulate NR iterations: call load() with clock=high, D=high
+    // but do NOT call accept() (which would detect the edge)
     // Q should remain unchanged through all NR iterations
     for (let iter = 0; iter < 10; iter++) {
-      element.updateOperatingPoint(voltages(3.3, 3.3));
-      solver.beginAssembly(32);
-      element.stamp(solver);
-      element.stampNonlinear(solver);
+      element.load(makeCtx(voltages(3.3, 3.3)));
       // Q must still be LOW — no edge detection happened
       expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
     }
 
-    // Now accept the timestep via updateCompanion — Q should latch D=high
-    element.updateCompanion(1e-9, 'bdf1', voltages(0.0, 3.3));  // prev: clock low
-    element.updateCompanion(1e-9, 'bdf1', voltages(3.3, 3.3));  // curr: rising edge
+    // Now accept the timestep via accept() — Q should latch D=high
+    element.accept(makeCtx(voltages(0.0, 3.3), 1e-9, 'bdf1'), 0, () => {});  // prev: clock low
+    element.accept(makeCtx(voltages(3.3, 3.3), 1e-9, 'bdf1'), 0, () => {});  // curr: rising edge
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(voltages(3.3, 3.3)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
   });
 
@@ -230,23 +241,18 @@ describe("DFF", () => {
     // Reset pin driven such that reset is active (active-low: reset < vIL)
     // Q should be forced LOW regardless of clock/D state
     const { element, qPin } = buildDff(true);
-    const solver = makeSolver();
 
     // First latch Q=high via rising edge
-    element.updateCompanion(1e-9, 'bdf1', voltages(0.0, 3.3, 0, 0, 3.3)); // clock low
-    element.updateCompanion(1e-9, 'bdf1', voltages(3.3, 3.3, 3.3, 0, 3.3)); // rising edge, reset HIGH (inactive for active-low)
+    element.accept(makeCtx(voltages(0.0, 3.3, 0, 0, 3.3), 1e-9, 'bdf1'), 0, () => {}); // clock low
+    element.accept(makeCtx(voltages(3.3, 3.3, 3.3, 0, 3.3), 1e-9, 'bdf1'), 0, () => {}); // rising edge, reset HIGH (inactive)
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(voltages(3.3, 3.3, 3.3, 0, 3.3)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5); // Q=high
 
     // Now apply reset (active-low: reset voltage < vIL=0.8 → force Q=false)
-    element.updateCompanion(1e-9, 'bdf1', voltages(3.3, 3.3, 3.3, 0, 0.0)); // reset = 0V < vIL
+    element.accept(makeCtx(voltages(3.3, 3.3, 3.3, 0, 0.0), 1e-9, 'bdf1'), 0, () => {}); // reset = 0V < vIL
 
-    solver.beginAssembly(32);
-    element.stamp(solver);
-    element.stampNonlinear(solver);
+    element.load(makeCtx(voltages(3.3, 3.3, 3.3, 0, 0.0)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOL, 5); // Q forced low
   });
 
@@ -298,12 +304,9 @@ describe("DFF", () => {
 
     // Confirm the element has Q latched at vOH (not VOL)
     const { element: el, qPin } = buildDff();
-    const solver = makeSolver();
-    el.updateCompanion(dt, 'trapezoidal', voltages(0.0, 3.3));
-    el.updateCompanion(dt, 'trapezoidal', voltages(3.3, 3.3));
-    solver.beginAssembly(32);
-    el.stamp(solver);
-    el.stampNonlinear(solver);
+    el.accept(makeCtx(voltages(0.0, 3.3), dt, 'trapezoidal'), 0, () => {});
+    el.accept(makeCtx(voltages(3.3, 3.3), dt, 'trapezoidal'), 0, () => {});
+    el.load(makeCtx(voltages(3.3, 3.3)));
     expect(qPin.currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
   });
 });

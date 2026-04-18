@@ -12,6 +12,7 @@ import { describe, it, expect } from "vitest";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { solveDcOperatingPoint, cktncDump } from "../dc-operating-point.js";
 import { CKTCircuitContext } from "../ckt-context.js";
+import { SparseSolver } from "../sparse-solver.js";
 import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
 import type { AnalogElement } from "../element.js";
 import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../../core/analog-engine-interface.js";
@@ -42,7 +43,7 @@ function makeCtx(
     statePool: pool,
   };
   const resolved = resolveSimulationParams(params);
-  const ctx = new CKTCircuitContext(circuit, resolved, noopBreakpoint);
+  const ctx = new CKTCircuitContext(circuit, resolved, noopBreakpoint, new SparseSolver());
   ctx.diagnostics = new DiagnosticCollector();
   return ctx;
 }
@@ -308,7 +309,10 @@ describe("DcOP", () => {
   it("failure_cktncDump_uses_actual_voltages", () => {
     const voltages = new Float64Array([5.0, 0.7, -0.0025]);
     const prevVoltages = new Float64Array([4.0, 0.65, -0.002]);
-    const result = cktncDump(voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 2, 3);
+    const scratch: Array<{ node: number; delta: number; tol: number }> = [];
+    const pool: Array<{ node: number; delta: number; tol: number }> =
+      Array.from({ length: 3 }, () => ({ node: 0, delta: 0, tol: 0 }));
+    const result = cktncDump(scratch, pool, voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 2, 3);
     expect(result.length).toBeGreaterThan(0);
     expect(result.some(n => n.node === 0)).toBe(true);
     expect(result.some(n => n.node === 1)).toBe(true);
@@ -424,14 +428,20 @@ describe("DcOP", () => {
 
   it("cktncDump_returns_empty_when_all_converged", () => {
     const v = new Float64Array([1.0, 2.5, 0.0]);
-    const result = cktncDump(v, v, 1e-3, 1e-6, 1e-12, 2, 3);
+    const scratch: Array<{ node: number; delta: number; tol: number }> = [];
+    const pool: Array<{ node: number; delta: number; tol: number }> =
+      Array.from({ length: 3 }, () => ({ node: 0, delta: 0, tol: 0 }));
+    const result = cktncDump(scratch, pool, v, v, 1e-3, 1e-6, 1e-12, 2, 3);
     expect(result).toHaveLength(0);
   });
 
   it("cktncDump_identifies_non_converged_nodes", () => {
     const voltages = new Float64Array([5.0, 1.0]);
     const prevVoltages = new Float64Array([4.5, 1.0]);
-    const result = cktncDump(voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 2, 2);
+    const scratch: Array<{ node: number; delta: number; tol: number }> = [];
+    const pool: Array<{ node: number; delta: number; tol: number }> =
+      Array.from({ length: 2 }, () => ({ node: 0, delta: 0, tol: 0 }));
+    const result = cktncDump(scratch, pool, voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 2, 2);
     expect(result).toHaveLength(1);
     expect(result[0].node).toBe(0);
     expect(result[0].delta).toBeCloseTo(0.5, 10);
@@ -444,8 +454,61 @@ describe("DcOP", () => {
     // Branch row (i=1): tol = 1e-3 * max(0,0) + abstol = 1e-12 → 1e-7 > 1e-12 → non-converged
     const voltages = new Float64Array([1e-7, 1e-7]);
     const prevVoltages = new Float64Array([0, 0]);
-    const result = cktncDump(voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 1, 2);
+    const scratch: Array<{ node: number; delta: number; tol: number }> = [];
+    const pool: Array<{ node: number; delta: number; tol: number }> =
+      Array.from({ length: 2 }, () => ({ node: 0, delta: 0, tol: 0 }));
+    const result = cktncDump(scratch, pool, voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 1, 2);
     expect(result).toHaveLength(1);
     expect(result[0].node).toBe(1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Task C6.3 — cktncDump zero-allocation on failure path
+  // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // Task C6.5 — dcopResult.method reflects last strategy on failure
+  // ---------------------------------------------------------------------------
+
+  it("method_reflects_last_strategy", () => {
+    // Spec: construct a circuit that fails all three strategies and assert
+    // that `dcopResult.method` reflects the last-attempted strategy, not
+    // the default "direct". With `numSrcSteps <= 1` the last strategy is
+    // Gillespie source stepping, so method must be "gillespie-src".
+    //
+    // Topology: two voltage sources in parallel (node1 <-> gnd) declaring
+    // conflicting voltages (5V and 6V). Both branches constrain the same
+    // node difference, producing a singular MNA matrix. Direct NR, gmin
+    // stepping, and source stepping all fail against this degeneracy.
+    const elements = [
+      makeVoltageSource(1, 0, 1, 5),
+      makeVoltageSource(1, 0, 2, 6),
+    ];
+    const ctx = makeCtx(elements, 1, 2, { ...DEFAULT_PARAMS, gmin: 0 });
+
+    solveDcOperatingPoint(ctx);
+
+    expect(ctx.dcopResult.converged).toBe(false);
+    expect(ctx.dcopResult.method).toBe("gillespie-src");
+    expect(ctx.dcopResult.method).not.toBe("direct");
+  });
+
+  it("cktncDump_zero_alloc_on_failure_path", () => {
+    // Spec: call `cktncDump` twice against the same ctx scratch+pool and
+    // assert the returned array identity is the same (`.toBe`). This guards
+    // the zero-allocation contract: no new array or entry-object literals
+    // are allocated per call.
+    const voltages = new Float64Array([5.0, 0.7, -0.0025]);
+    const prevVoltages = new Float64Array([4.0, 0.65, -0.002]);
+    const scratch: Array<{ node: number; delta: number; tol: number }> = [];
+    const pool: Array<{ node: number; delta: number; tol: number }> =
+      Array.from({ length: 3 }, () => ({ node: 0, delta: 0, tol: 0 }));
+
+    const first = cktncDump(scratch, pool, voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 2, 3);
+    const second = cktncDump(scratch, pool, voltages, prevVoltages, 1e-3, 1e-6, 1e-12, 2, 3);
+
+    expect(first).toBe(scratch);
+    expect(second).toBe(scratch);
+    expect(first).toBe(second);
   });
 });

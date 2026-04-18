@@ -13,6 +13,7 @@ import {
   buildControlledSourceContext,
 } from "../controlled-source-base.js";
 import type { SparseSolver } from "../sparse-solver.js";
+import { makeSimpleCtx } from "./test-helpers.js";
 
 // ---------------------------------------------------------------------------
 // Concrete test subclass
@@ -22,7 +23,7 @@ import type { SparseSolver } from "../sparse-solver.js";
  * Minimal concrete subclass of ControlledSourceElement for testing.
  *
  * Records the most recent `stampOutput` call arguments so tests can verify
- * what was passed from `stampNonlinear`.
+ * what was passed from the load() dispatch.
  */
 class TestControlledSource extends ControlledSourceElement {
   readonly pinNodeIds: readonly number[] = [1, 0];
@@ -69,12 +70,6 @@ function makeSource(
   return new TestControlledSource(expr, deriv, variable, controlType);
 }
 
-/**
- * Null SparseSolver — stampOutput in tests doesn't use the solver.
- * We cast null to SparseSolver since the test subclass ignores the solver arg.
- */
-const nullSolver = null as unknown as SparseSolver;
-
 // ---------------------------------------------------------------------------
 // Tests: Base
 // ---------------------------------------------------------------------------
@@ -86,7 +81,8 @@ describe("Base", () => {
     // Set V(ctrl) = 1.5 in the context
     src.mutableCtx.setNodeVoltage("ctrl", 1.5);
 
-    src.stampNonlinear(nullSolver);
+    const ctx = makeSimpleCtx({ elements: [src], matrixSize: 1, nodeCount: 1 });
+    src.load(ctx);
 
     expect(src.lastValue).toBeCloseTo(3.0, 10);
   });
@@ -97,7 +93,8 @@ describe("Base", () => {
 
     src.mutableCtx.setNodeVoltage("ctrl", 1.5);
 
-    src.stampNonlinear(nullSolver);
+    const ctx = makeSimpleCtx({ elements: [src], matrixSize: 1, nodeCount: 1 });
+    src.load(ctx);
 
     expect(src.lastDerivative).toBeCloseTo(2.0, 10);
   });
@@ -108,7 +105,8 @@ describe("Base", () => {
 
     src.mutableCtx.setNodeVoltage("ctrl", 3.0);
 
-    src.stampNonlinear(nullSolver);
+    const ctx = makeSimpleCtx({ elements: [src], matrixSize: 1, nodeCount: 1 });
+    src.load(ctx);
 
     expect(src.lastValue).toBeCloseTo(0.09, 10);
   });
@@ -119,7 +117,8 @@ describe("Base", () => {
 
     src.mutableCtx.setNodeVoltage("ctrl", 3.0);
 
-    src.stampNonlinear(nullSolver);
+    const ctx = makeSimpleCtx({ elements: [src], matrixSize: 1, nodeCount: 1 });
+    src.load(ctx);
 
     expect(src.lastDerivative).toBeCloseTo(0.06, 10);
   });

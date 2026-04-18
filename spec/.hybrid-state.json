@@ -47,7 +47,7 @@
       ],
       "spawned": 6,
       "completed": 6,
-      "verifications_passed": 2,
+      "verifications_passed": 4,
       "verifications_failed": 2,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
@@ -55,8 +55,8 @@
       "group_status": {
         "C2.a": "passed",
         "C2.b": "passed",
-        "C2.c": "failed",
-        "C2.d": "failed"
+        "C2.c": "passed",
+        "C2.d": "passed"
       }
     },
     {
@@ -96,18 +96,18 @@
           "C8.4"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
-      "verifications_passed": 0,
-      "verifications_failed": 0,
+      "spawned": 13,
+      "completed": 5,
+      "verifications_passed": 4,
+      "verifications_failed": 1,
       "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "dead_implementers": 8,
       "dead_verifiers": 0,
       "group_status": {
-        "C3": "pending",
-        "C6a": "pending",
-        "C6b_C7": "pending",
-        "C8": "pending"
+        "C3": "passed",
+        "C6a": "passed",
+        "C6b_C7": "passed",
+        "C8": "passed"
       }
     },
     {
@@ -298,5 +298,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-18T02:04:24.237Z"
+  "last_updated": "2026-04-18T03:08:55.220Z"
 }

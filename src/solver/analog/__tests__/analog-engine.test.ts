@@ -171,9 +171,10 @@ describe("MNAEngine", () => {
     const circuit = makeResistorDividerCircuit();
     engine.init(circuit);
 
-    // Access private field through any-cast for testing
-    const e = engine as unknown as { _voltages: Float64Array };
-    expect(e._voltages.length).toBe(3);
+    // Voltage storage lives on ctx.rhs — a single buffer, no parallel field.
+    const e = engine as unknown as { _ctx: { rhs: Float64Array } };
+    expect(e._ctx.rhs).toBeInstanceOf(Float64Array);
+    expect(e._ctx.rhs.length).toBe(3);
   });
 
   // -------------------------------------------------------------------------
@@ -821,6 +822,36 @@ describe("rc_transient_without_separate_loops", () => {
     expect(v2).toBeGreaterThan(4.9);
     expect(v2).toBeLessThanOrEqual(5.01);
     expect(engine.simTime).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task C6.1 — buffer_consolidation: no parallel voltage buffer
+// ---------------------------------------------------------------------------
+
+describe("buffer_consolidation", () => {
+  it("no_parallel_voltage_buffer", () => {
+    // After Wave C6.1, AnalogEngine no longer maintains the parallel
+    // `_voltages`, `_prevVoltages`, `_agp`, or `_nodeVoltageHistory` fields.
+    // All voltage state lives on `_ctx` — CKTCircuitContext is the single
+    // source of truth.
+    const circuit = makeResistorDividerCircuit();
+    const engine = new MNAEngine();
+    engine.init(circuit);
+
+    const e = engine as unknown as Record<string, unknown>;
+
+    // The four deleted parallel buffers must not exist as own-properties on the
+    // engine instance.
+    expect(e._voltages).toBeUndefined();
+    expect(e._prevVoltages).toBeUndefined();
+    expect(e._agp).toBeUndefined();
+    expect(e._nodeVoltageHistory).toBeUndefined();
+
+    // Voltage storage is on _ctx.rhs, a Float64Array sized to matrixSize.
+    const ctx = e._ctx as { rhs: Float64Array };
+    expect(ctx.rhs).toBeInstanceOf(Float64Array);
+    expect(ctx.rhs.length).toBe(circuit.matrixSize);
   });
 });
 

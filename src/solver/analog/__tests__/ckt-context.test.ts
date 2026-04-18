@@ -13,6 +13,7 @@ import { CKTCircuitContext, NRResult, DcOpResult } from "../ckt-context.js";
 import { makeResistor, makeDiode, makeCapacitor, allocateStatePool } from "./test-helpers.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 import { isPoolBacked } from "../element.js";
+import { SparseSolver } from "../sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Test circuit factories
@@ -74,7 +75,7 @@ const noopBreakpoint = (_t: number): void => {};
 describe("CKTCircuitContext", () => {
   it("allocates_all_buffers_at_init", () => {
     const circuit = makeTestCircuit(9, 1);
-    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint);
+    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
 
     const sz = circuit.matrixSize; // 10
     const stateSlots = circuit.statePool!.totalSlots;
@@ -156,7 +157,7 @@ describe("CKTCircuitContext", () => {
 
   it("zero_allocations_on_reuse", () => {
     const circuit = makeTestCircuit(4, 0);
-    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint);
+    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
 
     // Monkey-patch Float64Array to count constructor calls
     const RealF64 = Float64Array;
@@ -200,7 +201,7 @@ describe("CKTCircuitContext", () => {
 
   it("precomputed_lists_match_element_flags", () => {
     const circuit = makeListTestCircuit();
-    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint);
+    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
 
     // nonlinearElements: exactly elements with isNonlinear === true
     const expectedNonlinear = circuit.elements.filter(el => el.isNonlinear);
@@ -257,7 +258,7 @@ describe("CKTCircuitContext", () => {
 
   it("loadCtx_fields_populated", () => {
     const circuit = makeTestCircuit(9, 1);
-    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint);
+    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
 
     const lc = ctx.loadCtx;
 
@@ -328,5 +329,52 @@ describe("CKTCircuitContext", () => {
     // iabstol — matches params abstol
     expect(typeof lc.iabstol).toBe("number");
     expect(lc.iabstol).toBe(defaultParams.abstol);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task C6.2 — DcOpResult.reset() must not reallocate diagnostics
+// ---------------------------------------------------------------------------
+
+describe("DcOpResult", () => {
+  it("reset_preserves_array_identity", () => {
+    // After C6.2, DcOpResult.reset() clears diagnostics in place
+    // via `this.diagnostics.length = 0` rather than allocating a fresh array.
+    const circuit = makeTestCircuit(4, 0);
+    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, new SparseSolver());
+
+    const arr = ctx.dcopResult.diagnostics;
+    arr.push({
+      code: "dc-op-converged",
+      severity: "info",
+      message: "sentinel entry",
+    });
+    expect(arr.length).toBe(1);
+
+    ctx.dcopResult.reset();
+
+    // Same array instance, cleared in place.
+    expect(ctx.dcopResult.diagnostics).toBe(arr);
+    expect(ctx.dcopResult.diagnostics.length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task C6.4 — solver must be passed in and not re-allocated
+// ---------------------------------------------------------------------------
+
+describe("solver", () => {
+  it("single_allocation", () => {
+    // C6.4: construct a ctx with an explicit solver instance; assert
+    // ctx.solver === passedSolver with .toBe identity. This guards against
+    // the double-allocation bug where CKTCircuitContext used to create its
+    // own SparseSolver internally and required callers to overwrite it.
+    const circuit = makeTestCircuit(4, 0);
+    const passedSolver = new SparseSolver();
+    const ctx = new CKTCircuitContext(circuit, defaultParams, noopBreakpoint, passedSolver);
+
+    expect(ctx.solver).toBe(passedSolver);
+    // loadCtx.solver must also point at the same instance.
+    expect(ctx.loadCtx.solver).toBe(passedSolver);
   });
 });
