@@ -247,12 +247,12 @@
           "C9.5"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 2,
+      "completed": 1,
       "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "dead_implementers": 1,
       "dead_verifiers": 0,
       "group_status": {
         "C9": "pending"
@@ -380,5 +380,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-18T11:45:39.334Z"
+  "last_updated": "2026-04-18T12:23:16.805Z"
 }

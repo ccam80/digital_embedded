@@ -130,8 +130,8 @@ export function cktTerr(
   //
   // Timestep denominators for divided differences:
   //   h0 = dt = deltaOld[0] (current step)
-  //   h1 = deltaOld[1] (step n-1), fallback to dt
-  //   h2 = deltaOld[2] (step n-2), fallback to h1
+  //   h1 = deltaOld[1] (step n-1), defaults to dt when absent
+  //   h2 = deltaOld[2] (step n-2), defaults to h1 when absent
   // ------------------------------------------------------------------
 
   let diff0 = q0, diff1 = q1, diff2 = q2, diff3 = q3;

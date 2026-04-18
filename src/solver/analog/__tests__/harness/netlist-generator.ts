@@ -195,20 +195,35 @@ export function generateSpiceNetlist(
  * so that ngspice drives the same time-varying waveform as our engine during
  * .tran analysis. The SPICE transient spec syntax is identical for V and I sources.
  *
- * Supported waveforms:
+ * Supported waveforms (all exact — no approximations):
  *   sine     → SIN(VO VA FREQ TD THETA PHASE_DEG)
  *   square   → PULSE(V1 V2 TD TR TF PW PER)
- *   triangle → PULSE approximation (TR=TF=PW=period/3, see note below)
- *   sawtooth → PULSE approximation (TR≈period, TF≈0, PW≈0, see note below)
- *   sweep/am/fm/noise/expression → not representable in SPICE transient primitives;
- *              falls back to DC <dcOffset> with a warning comment.
- *   unknown  → DC <dcOffset> fallback.
+ *   triangle → PULSE(V1 V2 TD halfPeriod halfPeriod 0 PER)
+ *   sawtooth → PULSE(V1 V2 TD (period-fallTime) fallTime 0 PER)
+ *
+ * Rejected waveforms (throw): sweep, am, fm, noise, expression — none of these
+ * are representable as a SPICE transient primitive. A .tran parity comparison
+ * against ngspice is not valid for these; callers must author a custom SPICE
+ * deck (e.g. PWL) if they need a ngspice counterpart.
  *
  * Square-wave note:
  *   Our engine uses ngspice PULSE semantics exactly: at t=0 (phase=0) value is V1 (LOW),
  *   the rising edge spans [0, TR], HIGH plateau is [TR, TR+PW], falling edge is
  *   [TR+PW, TR+PW+TF], then LOW until the next period. The PULSE(V1 V2 TD TR TF PW PER)
  *   emission is therefore exact — no approximation or sub-riseTime discrepancy.
+ *
+ * Triangle-wave note:
+ *   After the -π/2 phase alignment in computeWaveformValue, at t=0 (phase=0) our
+ *   triangle sits at V1 = dc - amp and rises linearly to V2 over the first half
+ *   period, then falls linearly back to V1 over the second half. SPICE PULSE with
+ *   TR=TF=halfPeriod and PW=0 reproduces this exactly (the rising edge is the
+ *   rise half-period, the falling edge is the fall half-period, zero plateau).
+ *   Non-zero phase is encoded via TD just like the square case.
+ *
+ * Sawtooth note:
+ *   Our engine rises linearly from V1 to V2 over (period - fallTime) and falls
+ *   linearly from V2 back to V1 over fallTime. SPICE PULSE with TR=(period-fallTime),
+ *   TF=fallTime, PW=0 reproduces this exactly. Non-zero phase is encoded via TD.
  */
 function buildAcSourceSpec(
   waveform: string,
@@ -247,8 +262,8 @@ function buildAcSourceSpec(
       //   TF  = fallTime
       //   PW  = period/2 - TR  (HIGH plateau, same as engine)
       //   PER = period
-      const riseTime = getPropNumber(props, "riseTime", 1e-9);
-      const fallTime = getPropNumber(props, "fallTime", 1e-9);
+      const riseTime = getPropNumber(props, "riseTime", 1e-12);
+      const fallTime = getPropNumber(props, "fallTime", 1e-12);
       const halfPeriod = period / 2;
       const phaseShift = freq > 0 ? phase / (2 * Math.PI * freq) : 0;
       // Rising edge starts at t = -phaseShift in the engine's unwrapped clock.
@@ -261,29 +276,37 @@ function buildAcSourceSpec(
     }
 
     case "triangle": {
-      // Our engine: dc + amp * (2/π) * arcsin(sin(2π*freq*t + phase))
-      // This produces a triangle wave swinging ±amp around dc, with period=1/freq.
-      // There is no exact SPICE primitive for this. We approximate with PULSE
-      // using TR=TF=PW=period/3 which gives a triangular shape when PW≈0 is wrong,
-      // so TR=TF=period/2, PW=0 gives a true triangle (rise half-period, fall half-period).
-      // TODO: this is an approximation — triangle wave has no exact SPICE transient primitive.
-      // The PULSE with TR=TF=halfPeriod, PW=0, TD=0 approximates our triangle for phase=0.
+      // PULSE-aligned triangle (see ac-voltage-source.ts computeWaveformValue):
+      // rises V1 → V2 over halfPeriod, then falls V2 → V1 over halfPeriod.
+      // At t=0 (phase=0) the wave sits at V1 rising. Non-zero phase shifts the
+      // waveform left in time by phase/(2π*freq); encode that as a positive TD
+      // wrapped into [0, period) just like the square case.
       const halfP = period / 2;
+      const phaseShift = freq > 0 ? phase / (2 * Math.PI * freq) : 0;
+      const td = ((-phaseShift % period) + period) % period;
       const v1 = dc - amp;
       const v2 = dc + amp;
-      return `PULSE(${v1} ${v2} 0 ${halfP} ${halfP} 0 ${period})`;
+      return `PULSE(${v1} ${v2} ${td} ${halfP} ${halfP} 0 ${period})`;
     }
 
     case "sawtooth": {
-      // Our engine: dc + amp * 2 * (freq*t + phase/(2π) - floor(freq*t + phase/(2π) + 0.5))
-      // This is a sawtooth swinging [dc-amp, dc+amp] with sharp fall at each period edge.
-      // PULSE approximation: very fast fall (TF→0), full-period rise, PW→0.
-      // TODO: this is an approximation — sawtooth has no exact SPICE transient primitive.
-      // Using a small TF (1ps) to approximate the instantaneous fall edge.
-      const tf = 1e-12; // 1 ps fall — negligible compared to any real sim period
+      // PULSE-aligned sawtooth (see ac-voltage-source.ts computeWaveformValue):
+      // rises V1 → V2 over (period - fallTime), then falls V2 → V1 over fallTime.
+      // At t=0 (phase=0) the wave sits at V1 rising. Default fallTime = 1 ps so
+      // the sharp fall is below typical transient timesteps while remaining
+      // losslessly encodable in PULSE.
+      const fallTime = getPropNumber(props, "fallTime", 1e-12);
+      if (fallTime >= period) {
+        throw new Error(
+          `sawtooth fallTime (${fallTime}s) must be strictly less than period (${period}s)`,
+        );
+      }
+      const riseSpan = period - fallTime;
+      const phaseShift = freq > 0 ? phase / (2 * Math.PI * freq) : 0;
+      const td = ((-phaseShift % period) + period) % period;
       const v1 = dc - amp;
       const v2 = dc + amp;
-      return `PULSE(${v1} ${v2} 0 ${period} ${tf} 0 ${period})`;
+      return `PULSE(${v1} ${v2} ${td} ${riseSpan} ${fallTime} 0 ${period})`;
     }
 
     case "sweep":
@@ -291,19 +314,14 @@ function buildAcSourceSpec(
     case "fm":
     case "noise":
     case "expression":
-      // These waveforms cannot be represented as SPICE transient primitives.
-      // Fall back to a flat DC source at dcOffset. The harness comparison will
-      // be meaningless for these waveforms — the caller should not use the harness
-      // for sweep/AM/FM/noise/expression sources without a custom SPICE deck.
-      // TODO: sweep/am/fm/noise/expression waveforms are not representable in SPICE
-      //       PULSE/SIN primitives. A .tran comparison against ngspice is not valid
-      //       for these waveforms. A PWL (piecewise-linear) approximation could be
-      //       generated for sweep, but that would require knowledge of the sim duration.
-      return `DC ${dc}`;
+      throw new Error(
+        `SPICE transient parity is not valid for waveform "${waveform}". ` +
+        `Sweep/AM/FM/noise/expression sources have no exact SPICE transient primitive — ` +
+        `author a custom SPICE deck (e.g. PWL) if you need a ngspice counterpart.`,
+      );
 
     default:
-      // Unrecognized waveform — fall back to flat DC.
-      return `DC ${dc}`;
+      throw new Error(`Unrecognized AC source waveform: "${waveform}"`);
   }
 }
 

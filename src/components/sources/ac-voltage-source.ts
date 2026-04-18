@@ -62,7 +62,14 @@ export interface ExtendedWaveformParams {
   modulationIndex?: number;
   /** Rise time for square wave transitions (seconds). Default 0 = instantaneous. */
   riseTime?: number;
-  /** Fall time for square wave transitions (seconds). Default 0 = instantaneous. */
+  /**
+   * Fall time (seconds). Used by:
+   *   - square wave: duration of the trapezoidal falling edge (V2 → V1).
+   *   - sawtooth: duration of the sharp fall from V2 back to V1 at the period
+   *     boundary. Default 1 ps so that SPICE PULSE can encode it exactly while
+   *     remaining below typical transient timesteps. Must be strictly less
+   *     than one period.
+   */
   fallTime?: number;
 }
 
@@ -127,12 +134,50 @@ export function computeWaveformValue(
       }
     }
 
-    case "triangle":
-      return dcOffset + amplitude * (2 / Math.PI) * Math.asin(Math.sin(arg));
+    case "triangle": {
+      // SPICE PULSE triangle semantics: at t=0, phase=0 the wave sits at
+      // V1 = dcOffset - amplitude and rises linearly to V2 = dcOffset + amplitude
+      // at t = period/2, then falls linearly back to V1 at t = period. The
+      // piecewise-linear form is bit-exact against a SPICE PULSE(V1 V2 TD halfP
+      // halfP 0 period) emission — indispensable for .tran parity against
+      // ngspice (computing via asin(sin(...)) instead drifts by ~1 ulp per
+      // sample due to the irrational-π rounding chain).
+      if (frequency <= 0) return dcOffset - amplitude;
+      const period = 1 / frequency;
+      const halfPeriod = period / 2;
+      const phaseShift = phase / (2 * Math.PI * frequency);
+      const tShifted = t - phaseShift;
+      const tMod = ((tShifted % period) + period) % period;
+      const V1 = dcOffset - amplitude;
+      const V2 = dcOffset + amplitude;
+      if (tMod < halfPeriod) {
+        return V1 + (V2 - V1) * tMod / halfPeriod;
+      }
+      return V2 - (V2 - V1) * (tMod - halfPeriod) / halfPeriod;
+    }
 
     case "sawtooth": {
-      const normalized = frequency * t + phase / (2 * Math.PI);
-      return dcOffset + amplitude * 2 * (normalized - Math.floor(normalized + 0.5));
+      // SPICE PULSE sawtooth semantics: linear rise from V1 to V2 over
+      // (period - fallTime), then linear fall from V2 back to V1 over
+      // fallTime. At t=0, phase=0 the wave is at V1 rising.
+      if (frequency <= 0) return dcOffset - amplitude;
+      const period = 1 / frequency;
+      const fallTime = ext?.fallTime ?? 1e-12;
+      if (fallTime >= period) {
+        throw new Error(
+          `sawtooth fallTime (${fallTime}s) must be strictly less than period (${period}s)`,
+        );
+      }
+      const riseSpan = period - fallTime;
+      const phaseShift = phase / (2 * Math.PI * frequency);
+      const tShifted = t - phaseShift;
+      const tMod = ((tShifted % period) + period) % period;
+      const V1 = dcOffset - amplitude;
+      const V2 = dcOffset + amplitude;
+      if (tMod < riseSpan) {
+        return V1 + (V2 - V1) * tMod / riseSpan;
+      }
+      return V2 - (V2 - V1) * (tMod - riseSpan) / fallTime;
     }
 
     case "sweep": {
@@ -239,8 +284,8 @@ export const { paramDefs: AC_VOLTAGE_SOURCE_PARAM_DEFS, defaults: AC_VOLTAGE_SOU
   secondary: {
     phase:    { default: 0,    unit: "rad", description: "Phase offset in radians" },
     dcOffset: { default: 0,    unit: "V",   description: "DC offset added to waveform" },
-    riseTime: { default: 1e-9, unit: "s",   description: "Rise time for square wave transitions" },
-    fallTime: { default: 1e-9, unit: "s",   description: "Fall time for square wave transitions" },
+    riseTime: { default: 1e-12, unit: "s",   description: "Rise time for square wave transitions" },
+    fallTime: { default: 1e-12, unit: "s",   description: "Fall time for square/sawtooth wave transitions" },
   },
 });
 
@@ -482,8 +527,8 @@ function createAcVoltageSourceElement(
     frequency: props.getModelParam<number>("frequency"),
     phase:     props.getModelParam<number>("phase"),
     dcOffset:  props.getModelParam<number>("dcOffset"),
-    riseTime:  props.hasModelParam("riseTime") ? props.getModelParam<number>("riseTime") : 1e-9,
-    fallTime:  props.hasModelParam("fallTime") ? props.getModelParam<number>("fallTime") : 1e-9,
+    riseTime:  props.hasModelParam("riseTime") ? props.getModelParam<number>("riseTime") : 1e-12,
+    fallTime:  props.hasModelParam("fallTime") ? props.getModelParam<number>("fallTime") : 1e-12,
   };
   let amplitude = p.amplitude;
   let frequency = p.frequency;
@@ -536,7 +581,14 @@ function createAcVoltageSourceElement(
         fallTime = p.fallTime;
         ext.riseTime = riseTime;
         ext.fallTime = fallTime;
-        if ((key === "frequency" || key === "phase") && refreshCallback !== null) {
+        // Any param that can shift breakpoint timing must invalidate the
+        // outstanding breakpoint cached in the timestep controller.
+        const shiftsBreakpoints =
+          key === "frequency" ||
+          key === "phase" ||
+          key === "riseTime" ||
+          key === "fallTime";
+        if (shiftsBreakpoints && refreshCallback !== null) {
           refreshCallback();
         }
       }
@@ -581,15 +633,33 @@ function createAcVoltageSourceElement(
     },
 
     nextBreakpoint(afterTime: number): number | null {
-      if (waveform === "square") {
+      if (waveform === "square" || waveform === "triangle" || waveform === "sawtooth") {
+        if (frequency <= 0) return null;
         const period = 1 / frequency;
         const halfPeriod = period / 2;
         const phaseShift = phase / (2 * Math.PI * frequency);
 
-        // Under ngspice PULSE semantics, the breakpoints within period n
-        // (starting at n*period - phaseShift) are at offsets:
-        //   0, riseTime, halfPeriod, halfPeriod + fallTime
-        const offsets = [0, riseTime, halfPeriod, halfPeriod + fallTime];
+        // Per-period offsets of points where the waveform has a first-derivative
+        // discontinuity (square: edge endpoints; triangle: valley + peak;
+        // sawtooth: start of sharp fall + start of next rise).
+        let offsets: number[];
+        switch (waveform) {
+          case "square":
+            // ngspice PULSE: rising-edge start/end and falling-edge start/end.
+            offsets = [0, riseTime, halfPeriod, halfPeriod + fallTime];
+            break;
+          case "triangle":
+            // PULSE-aligned triangle (Fix 1): valley at tMod=0, peak at tMod=halfPeriod.
+            offsets = [0, halfPeriod];
+            break;
+          case "sawtooth": {
+            // PULSE-aligned sawtooth (Fix 2): start of fall at tMod=riseSpan,
+            // end of fall / start of next rise at tMod=period (≡ 0 of next cycle).
+            const riseSpan = period - fallTime;
+            offsets = [riseSpan, period];
+            break;
+          }
+        }
 
         // Start searching from the period that could contain afterTime.
         const nMin = Math.floor((afterTime + phaseShift) / period) - 1;

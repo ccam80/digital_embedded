@@ -221,7 +221,7 @@ export function limvds(vnew: number, vold: number): number {
  *   J. INITF dispatcher (mode transitions)
  *
  * Non-convergence is written into ctx.nrResult, never thrown. The caller
- * (DC operating point solver) decides the appropriate fallback strategy.
+ * (DC operating point solver) decides the appropriate next strategy.
  *
  * @param ctx - Circuit context holding all solver state, buffers, and options
  */

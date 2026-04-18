@@ -102,7 +102,7 @@ describe("cktTerr", () => {
   });
 
   it("bdf2 order 2 returns positive finite timestep for cubic charge data", () => {
-    // After formula fix (Phase 3): TRAP order 2 and BDF2 order 2 use different formula families.
+    // TRAP order 2 and BDF2 order 2 use different formula families.
     // Both must return a positive finite timestep for nonlinear input data.
     const dt = 1.0;
     const q0 = 27.0, q1 = 8.0, q2 = 1.0, q3 = 0.0;
@@ -254,7 +254,7 @@ describe("cktTerrVoltage", () => {
   });
 
   it("trapezoidal order 2 and bdf2 order 2 both return positive finite timestep for cubic data", () => {
-    // After Phase 3 formula fixes, TRAP order 2 and BDF2 order 2 use different formula families.
+    // TRAP order 2 and BDF2 order 2 use different formula families.
     // Both must return a positive finite timestep for nonlinear input data.
     const dt = 1.0;
     const v0 = 27.0, v1 = 8.0, v2 = 1.0, v3 = 0.0;
@@ -489,8 +489,7 @@ describe("gear_lte_factor_selection", () => {
     const expectedOrder5 = Math.exp(Math.log(del) / (5 + 1)); // order+1=6
     expect(resultOrder5).toBe(expectedOrder5);
 
-    // Regression guard against the incorrect 5/72 value that shipped in
-    // batch-3 at commit ecdc34a.
+    // Regression guard against the incorrect 5/72 value.
     expect(GEAR_LTE_FACTORS[4]).not.toBe(5 / 72);
   });
 

@@ -436,3 +436,14 @@ Raw grep across all surviving C3b test files (38 files; `coupled-inductor.test.t
   - `variable-rail.test.ts`: 3 new srcFact parity tests pass; 3 pre-existing VariableRail suite failures unchanged (local `makeResistorElement` exposes `stamp` not `load` — out-of-scope for this retry).
   - `buckbjt-stagnation-regression.test.ts`: 3/5 pass; 2 fail due to pre-existing transient simTime stagnation at t=0.00005s.
   - `buckbjt-convergence.test.ts`: 1/1 red by design — spec-exact assertion detects real ngspice divergence at step 0 iter 0 (V1:branch rhsOld delta = 9.4e-6 A, ~10⁻³ relative). Full measured-vs-expected values and investigation paths documented in `spec/progress-catchup.md` under the C4.semi_sources retry entry (tests-red protocol, user adjudication required).
+
+## Task AC-source-fixes (ad-hoc under Wave C9 closeout)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/components/sources/ac-voltage-source.ts` — triangle rewritten as piecewise-linear PULSE-aligned form (V1 at t=0 rising, V2 at t=halfPeriod); sawtooth rewritten as rise-over-(period-fallTime) + fall-over-fallTime; `nextBreakpoint` extended to cover triangle and sawtooth; `setParam` refresh callback widened to include riseTime/fallTime; `AC_VOLTAGE_SOURCE_DEFAULTS.{riseTime,fallTime}` reduced from 1e-9 to 1e-12 so SPICE PULSE can encode them losslessly.
+  - `src/solver/analog/__tests__/harness/netlist-generator.ts` — `buildAcSourceSpec` now emits exact PULSE encodings for triangle and sawtooth with phase-TD encoding; sweep/am/fm/noise/expression/default now `throw`; all 3 prior TODO comments deleted. Fallback defaults for square riseTime/fallTime updated from 1e-9 to 1e-12 to match production.
+  - `src/components/sources/__tests__/ac-voltage-source.test.ts` — updated 2 existing triangle tests and 2 existing square-wave breakpoint tests that pinned the old semantics; added 12 new tests across 4 new describe blocks: `ac_vsource_triangle_pulse_parity`, `ac_vsource_sawtooth_pulse_parity`, `ac_vsource_triangle_breakpoints_parity`, `ac_vsource_sawtooth_breakpoints_parity`. New tests include `.toBe` bit-exact parity against an inline ngspice vsrcload.c PULSE reference at multiple sample times per waveform.
+- **Tests**: 83/85 passing targeted — 34/36 ac-voltage-source, 49/49 netlist-generator. 2 pre-existing failures unchanged: `set_scale_applied` (production has never defined `setSourceScale`; uses `ctx.srcFact`) and `Integration > rc_lowpass` (MNAEngine-level integration defect already documented in `spec/test-baseline.md`).
+- **Closes**: the 3 TODO comments in `src/solver/analog/__tests__/harness/netlist-generator.ts` — netlist-generator.ts has zero TODO/FIXME/HACK comments remaining. Wave C9 closeout unblocked. See `spec/progress-catchup.md` for full details including followup items.

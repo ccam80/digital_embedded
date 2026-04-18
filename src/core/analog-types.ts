@@ -138,9 +138,8 @@ export interface AnalogElementCore {
    * Post-acceptance work: update companion state and schedule next breakpoint.
    *
    * Called once per accepted timestep — never on a rejected LTE retry and
-   * never inside the NR convergence loop. Absorbs the former updateCompanion
-   * and updateState responsibilities. ctx provides dt, method, and voltages
-   * needed for companion/state updates.
+   * never inside the NR convergence loop. ctx provides dt, method, and
+   * voltages needed for companion/state updates.
    */
   accept?(ctx: import("../solver/analog/load-context.js").LoadContext, simTime: number, addBreakpoint: (t: number) => void): void;
 

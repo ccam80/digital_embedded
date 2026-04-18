@@ -260,8 +260,8 @@ describe("computeNIcomCof", () => {
     expect(ag[2]).toBe(1 / (2 * h));
   });
 
-  it("BDF-2 degenerate (h1=0): falls back to BE coefficients", () => {
-    // deltaOld[1]=0 triggers safeH1=dt fallback, which gives equal-steps BDF-2, not BE.
+  it("BDF-2 degenerate (h1=0): safeH1=dt yields equal-steps BDF-2 coefficients", () => {
+    // When deltaOld[1]=0, safeH1 defaults to dt, which gives equal-steps BDF-2, not BE.
     // Spec: h1 = deltaOld[1] > 0 ? deltaOld[1] : dt — so h1=dt → equal steps BDF-2.
     const ag = new Float64Array(8);
     computeNIcomCof(h, [h, 0], 2, "bdf2", ag, scratch);
@@ -371,12 +371,6 @@ describe("gear_vandermonde_regression", () => {
     // Assert ag[0..4] match the closed-form GEAR-4 coefficients bit-exact.
     // Known GEAR-4 coefficients for equal steps: ag*dt = [25/12, -4, 3, -4/3, 1/4].
     // A byte-equivalent Vandermonde solver must produce these to IEEE-754 precision.
-    //
-    // Known divergence at commit ecdc34a: ag[0] produces 2083333.333333333
-    // (1 ULP low vs closed-form 2083333.3333333333 = 25/(12*h)). This is a
-    // real numerical divergence from the mathematical ideal and (likely)
-    // from ngspice — not a test-infra issue. Keep the assertion strict so
-    // it stays flagged as a finding for batch-4 remediation.
     expect(ag[0]).toBe(25 / (12 * h));
     expect(ag[1]).toBe(-4 / h);
     expect(ag[2]).toBe(3 / h);
@@ -389,15 +383,15 @@ describe("gear_vandermonde_regression", () => {
 });
 
 // ---------------------------------------------------------------------------
-// C4.6 — Phase 3 G-01: ngspice trapezoidal order-2 rounding regression guard
+// ngspice trapezoidal order-2 rounding regression guard
 // ---------------------------------------------------------------------------
 //
-// Guard against the Phase 3 Task 3.2.1 rounding-order regression. The ngspice
-// trapezoidal order-2 formula is `ag[0] = 1.0 / dt / (1.0 - xmu)` (two
-// sequential divisions), matching nicomcof.c operand order. The pre-fix
-// formula `1 / (dt * (1 - xmu))` performs a multiplication then a single
-// division — IEEE-754 gives different last-bit values for non-trivial xmu,
-// so regressing to the pre-fix form would be silently wrong.
+// Guard against the rounding-order regression. The ngspice trapezoidal
+// order-2 formula is `ag[0] = 1.0 / dt / (1.0 - xmu)` (two sequential
+// divisions), matching nicomcof.c operand order. The alternative formula
+// `1 / (dt * (1 - xmu))` performs a multiplication then a single division —
+// IEEE-754 gives different last-bit values for non-trivial xmu, so using
+// that form would be silently wrong.
 //
 // The current implementation hardcodes xmu=0.5, so we exercise computeNIcomCof
 // with that value and confirm the result matches `1.0 / dt / (1.0 - 0.5)`. We
@@ -411,7 +405,7 @@ describe("nicomcof rounding regression (C4.6)", () => {
     const dt = 1.23456789e-7;
     const xmu = 1 / 3;
 
-    // Post-Task-3.2.1 formula (ngspice operand order): 1.0 / dt / (1 - xmu)
+    // ngspice operand order: 1.0 / dt / (1 - xmu)
     const postFix = 1.0 / dt / (1.0 - xmu);
     // Pre-fix formula (multiplication then division)
     const preFix  = 1 / (dt * (1 - xmu));

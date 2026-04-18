@@ -265,8 +265,8 @@
   "hotPaths": [
     {
       "path": "src",
-      "accessCount": 19,
-      "lastAccessed": 1776511067121,
+      "accessCount": 29,
+      "lastAccessed": 1776514874659,
       "type": "directory"
     },
     {
@@ -306,15 +306,15 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776510033929,
+      "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
+      "accessCount": 10,
+      "lastAccessed": 1776512832278,
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
+      "path": "src\\components\\semiconductors\\diode.ts",
       "accessCount": 9,
-      "lastAccessed": 1776512400901,
+      "lastAccessed": 1776510033929,
       "type": "file"
     },
     {
@@ -360,6 +360,18 @@
       "type": "file"
     },
     {
+      "path": "src\\core\\analog-types.ts",
+      "accessCount": 7,
+      "lastAccessed": 1776513135163,
+      "type": "file"
+    },
+    {
+      "path": "src\\solver\\analog\\newton-raphson.ts",
+      "accessCount": 7,
+      "lastAccessed": 1776513157170,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\semiconductors",
       "accessCount": 5,
       "lastAccessed": 1776510058787,
@@ -369,6 +381,12 @@
       "path": "src\\solver\\analog\\ni-integrate.ts",
       "accessCount": 5,
       "lastAccessed": 1776512347741,
+      "type": "file"
+    },
+    {
+      "path": "spec\\phase-catchup.md",
+      "accessCount": 5,
+      "lastAccessed": 1776512796422,
       "type": "file"
     },
     {
@@ -382,12 +400,6 @@
       "accessCount": 4,
       "lastAccessed": 1776511015182,
       "type": "directory"
-    },
-    {
-      "path": "spec\\phase-catchup.md",
-      "accessCount": 4,
-      "lastAccessed": 1776512239587,
-      "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\ni\\niinteg.c",
@@ -408,10 +420,10 @@
       "type": "directory"
     },
     {
-      "path": "src\\core\\analog-types.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776509843103,
-      "type": "file"
+      "path": "src\\solver\\analog\\ckt-load.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776512903084,
+      "type": "directory"
     },
     {
       "path": ".tsc-check.txt",
@@ -496,18 +508,6 @@
       "accessCount": 1,
       "lastAccessed": 1776508316069,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\ckt-load.ts",
-      "accessCount": 1,
-      "lastAccessed": 1776508317200,
-      "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 1,
-      "lastAccessed": 1776508331359,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\dc-operating-point.ts",

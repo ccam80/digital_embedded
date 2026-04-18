@@ -683,3 +683,192 @@ The 5 tests previously in `buckbjt-convergence.test.ts` are now in `buckbjt-stag
 - `transient stepping does not error after 50 steps` — pass.
 - `survives 2000 transient steps without ERROR state` — pre-existing fail (stagnation at simTime=0.00005s). Matches Phase 0 baseline pattern ("Engine Stagnation: simTime stuck").
 - `survives 600µs of sim time (matches UI run duration)` — pre-existing fail, same stagnation at the same simTime.
+
+## Task C9.1: Phase 0 — banned word removal in newton-raphson.ts
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**: src/solver/analog/newton-raphson.ts
+- **Change**: JSDoc at the newtonRaphson function (line 224) rewrote "decides the appropriate fallback strategy" to "decides the appropriate next strategy". Decorated code (export function newtonRaphson(ctx)) is live; per rules.md and C9 spec, comment-only fix applied.
+- **Acceptance**: case-insensitive search for the banned word in src/solver/analog/newton-raphson.ts returns 0 matches.
+- **Tests**: not run (comment-only change; no behaviour impact).
+
+## Task C9.2: Phase 1 — historical-provenance block removal
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**:
+  - src/solver/analog/__tests__/ckt-load.test.ts — file header docstring line 5 rewrote "migrated end-to-end solve tests from mna-assembler.test.ts" to "end-to-end solve tests"; describe-block section header "Stamping tests — migrated from mna-assembler.test.ts" rewrote to "Stamping tests".
+  - src/solver/analog/__tests__/test-helpers.ts — verified no surviving migration-narrative fragment in lines 735-763 (allocateStatePool JSDoc); C3.1 already cleaned the range.
+  - src/solver/analog/__tests__/newton-raphson.test.ts — test nonlinear_circuit_forced_noncon_on_iteration_0 inline comment at line 296-298 rewrote "Change 6 ensures assembler.noncon is forced to 1" to "noncon is forced to 1 after iteration 0 for nonlinear circuits".
+  - src/solver/analog/analog-engine.ts — JSDoc on stepPhaseHook at line 1022-1023 rewrote "onPhaseBegin/onPhaseEnd on DcOpOptions" to "onPhaseBegin/onPhaseEnd" (DcOpOptions is the deleted interface; surrounding prose still describes the live wiring).
+- **Acceptance**: banned-pattern search across the four files returns 0 matches.
+- **Tests**: not run (comment-only changes; no behaviour impact).
+- **Note**: Spec line numbers drifted from actual file state — the DcOpOptions comment in analog-engine.ts was at line 1023, not 1038 as spec'd. Intent preserved.
+
+## Task C9.3: Phase 2 — historical-provenance comments
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**:
+  - src/solver/analog/sparse-solver.ts — allocElement JSDoc at line 225 rewrote "Called at compile time by every caller (element factories, MNAAssembler)." to "Called at compile time by every caller (element factories, cktLoad)." MNAAssembler is the deleted interface; cktLoad is the live compile-time caller.
+  - src/solver/analog/__tests__/newton-raphson.test.ts — E_SINGULAR recovery test inline comment rewrote "re-execute CKTload (stampAll)" to "re-execute cktLoad" (stampAll is the deleted method name).
+- **Files verified clean (no-op)**:
+  - src/solver/analog/newton-raphson.ts — spec targeted line 50 for a (stampAll) parenthetical; pattern search confirms 0 matches; likely cleaned by an earlier wave.
+  - src/solver/analog/ckt-load.ts — spec targeted line 2 for "replacing MNAAssembler.stampAll()"; pattern search confirms 0 matches; likely cleaned by an earlier wave.
+- **Acceptance**: banned-pattern search across the three files returns 0 matches.
+- **Tests**: not run (comment-only changes).
+
+## Task C9.4: Phase 3 — historical-provenance + deferred-narrative comments
+- **Status**: complete
+- **Agent**: implementer
+- **Files modified**:
+  - src/solver/analog/ckt-terr.ts — lines 133-134 rewrote "fallback to dt" / "fallback to h1" to "defaults to dt when absent" / "defaults to h1 when absent". Decorated code (the h1/h2 safe-default expressions) is live; comment-only fix.
+  - src/solver/analog/__tests__/ckt-terr.test.ts — line 105: "After formula fix (Phase 3): TRAP order 2..." to "TRAP order 2 and BDF2 order 2 use different formula families..."; line 257: "After Phase 3 formula fixes, TRAP order 2..." to "TRAP order 2 and BDF2 order 2 use different formula families..."; lines 492-493: "Regression guard against the incorrect 5/72 value that shipped in batch-3 at commit ecdc34a." to "Regression guard against the incorrect 5/72 value." Tests themselves are live.
+  - src/solver/analog/__tests__/integration.test.ts — lines 375-379: removed the 5-line "Known divergence at commit ecdc34a... batch-4 remediation" comment block; tight .toBe(25 / (12 * h)) assertion retained per spec. Line 264: test name rewrote "falls back to BE coefficients" to "safeH1=dt yields equal-steps BDF-2 coefficients" (original was misleading — the inline comment clarified h1=dt gives BDF-2, not BE); inline comment updated correspondingly. Lines 386-394: "Phase 3 G-01" and "Phase 3 Task 3.2.1" narrative block rewrote to neutral "rounding-order regression" prose (decorated describe block for nicomcof rounding regression C4.6 is live). Line 408: "Post-Task-3.2.1 formula (ngspice operand order)" to "ngspice operand order".
+- **Acceptance**: banned-pattern search across the three files returns 0 matches.
+- **Tests**: not run (comment-only changes and test-name rewrites; assertions unchanged).
+
+## Task C9.5: Phase 6 — narrative and TODO comments — RESOLVED
+- **Status**: complete — analog-types.ts JSDoc cleanup landed earlier; the 3
+  netlist-generator.ts TODOs are resolved by `Task AC-source-fixes` (see entry
+  below). All banned-pattern searches in the target files now return 0 matches.
+- **Agent**: implementer (two waves — analog-types cleanup first, TODO resolution under the ad-hoc AC-source-fixes task)
+- **Files modified (analog-types portion)**:
+  - src/core/analog-types.ts — accept?() method JSDoc (lines 137-145) rewrote "Absorbs the former updateCompanion and updateState responsibilities. ctx provides..." to "ctx provides..." Removed the historical-provenance fragment naming the deleted updateCompanion / updateState methods. Decorated accept?() method is live; comment-only fix.
+- **Files modified (TODO-resolution portion — delegated to Task AC-source-fixes)**:
+  - src/solver/analog/__tests__/harness/netlist-generator.ts — 3 TODO comments at lines 269, 281, 298 deleted and the decorated code rewritten so the SPICE PULSE encoding is exact for triangle and sawtooth, and sweep/am/fm/noise/expression throw with a clear message instead of silently falling back to `DC`. See Task AC-source-fixes for full details.
+- **Files verified clean (no-op)**:
+  - src/solver/analog/__tests__/behavioral-remaining.test.ts lines 319-336 — verified legitimate Relay circuit documentation (1-based node IDs, coil/contact mapping, time constant). NOT a "pre-migration transient-flow narrative block". Progress-catchup record shows C3b.7 already cleaned historical-provenance comments in this file. No edit required.
+  - src/solver/analog/__tests__/test-helpers.ts 744-748 — verified no surviving migration-narrative fragment; C3.1 cleaned the range.
+- **Acceptance**: banned-pattern search across src/core/analog-types.ts and src/solver/analog/__tests__/harness/netlist-generator.ts returns 0 matches. Zero `TODO:` / `FIXME:` / `HACK:` comments remain in netlist-generator.ts.
+
+## Task AC-source-fixes (ad-hoc under Wave C9 closeout)
+- **Status**: complete
+- **Agent**: implementer
+- **Background**: Unscheduled but required task — the 3 TODOs in
+  netlist-generator.ts (269/281/298) flagged genuine engine defects: the
+  triangle waveform had a 90° phase offset from SPICE PULSE semantics
+  (started at the midpoint rising instead of V1 rising); the sawtooth fall
+  edge was placed at period/2 contradicting the file's own doc comment and
+  contradicting the conventional ramp-up shape; the sawtooth fall time was
+  hardcoded to zero; and `nextBreakpoint` only handled `square`/`noise`,
+  leaving triangle's first-derivative discontinuities and sawtooth's sharp
+  fall edge invisible to the timestep controller.
+- **Files modified**:
+  - `src/components/sources/ac-voltage-source.ts` —
+    - `ExtendedWaveformParams.fallTime` JSDoc updated to describe both square
+      and sawtooth usage and the 1 ps default.
+    - `computeWaveformValue` triangle case rewritten as a piecewise-linear
+      PULSE-aligned form: at t=0 (phase=0) returns V1 rising, reaches V2 at
+      t=period/2, returns to V1 at t=period. Chose piecewise-linear over the
+      spec's suggested `Math.asin(Math.sin(arg - π/2))` because the latter
+      cannot produce bit-exact parity against a SPICE PULSE reference — the
+      `asin(sin())` chain drifts by ~1 ulp at most non-trivial sample times
+      due to the irrational-π rounding composition. Piecewise-linear gives
+      `.toBe`-clean parity without relaxing any tolerances (see CLAUDE.md
+      "No pragmatic patches" / "SPICE-Correct Implementations Only").
+    - `computeWaveformValue` sawtooth case rewritten: linear rise V1→V2 over
+      `period - fallTime`, linear fall V2→V1 over `fallTime`. At t=0
+      (phase=0) returns V1 rising. Guards against `fallTime >= period` by
+      throwing.
+    - `nextBreakpoint` extended to handle `triangle` and `sawtooth` using the
+      existing square-case search scaffolding, with waveform-specific
+      offsets: `[0, halfPeriod]` for triangle; `[riseSpan, period]` for
+      sawtooth.
+    - `setParam` refresh-callback trigger widened from `{frequency, phase}`
+      to also cover `{riseTime, fallTime}` — these reshape breakpoint
+      timing too.
+    - `AC_VOLTAGE_SOURCE_DEFAULTS.{riseTime, fallTime}` changed from `1e-9`
+      to `1e-12` (1 ps). Chosen so SPICE PULSE can encode them exactly while
+      remaining below typical transient timesteps, consistent for both
+      square and sawtooth defaults. Fallback constants in
+      `createAcVoltageSourceElement` updated to match.
+  - `src/solver/analog/__tests__/harness/netlist-generator.ts` —
+    - `buildAcSourceSpec` JSDoc rewritten to describe all four supported
+      waveforms as exact (no approximations) and to state that
+      sweep/am/fm/noise/expression now throw.
+    - Triangle case emits `PULSE(V1 V2 TD halfPeriod halfPeriod 0 period)`
+      with TD computed from the phase in the same wrap-to-period-start
+      manner as the square case.
+    - Sawtooth case emits `PULSE(V1 V2 TD (period - fallTime) fallTime 0
+      period)` with the same phase-TD encoding.
+    - `sweep`/`am`/`fm`/`noise`/`expression` and `default` branches now
+      `throw new Error(...)` with a clear message explaining SPICE parity
+      is not valid for those waveforms and pointing callers at custom
+      PWL-style decks.
+    - Square-wave fallback defaults in `getPropNumber(props, "riseTime",
+      1e-9)` / `"fallTime"` 1e-9 updated to `1e-12` to match the new
+      production defaults.
+    - All 3 TODO comments deleted. Replacement JSDoc documents the exact
+      encoding for each supported waveform.
+  - `src/components/sources/__tests__/ac-voltage-source.test.ts` —
+    - Updated the two existing triangle tests that pinned the OLD
+      midpoint-rising semantics: `triangle at 1/8 period is V1 plus quarter
+      swing (PULSE-aligned rising)` and `triangle_linearity`. Both now
+      assert the correct PULSE-aligned value (`-2.5V` at t=period/8 with
+      amp=5, dc=0), not the old `+2.5V`. This is NOT test-chasing: the old
+      tests documented a bug that this task fixes; per CLAUDE.md's
+      "ngspice-correct implementations only" rule, production is the
+      source of truth.
+    - Updated the 2 existing square-wave breakpoint tests that pinned the
+      old `1e-9` default to use the new `1e-12` default.
+    - Added `pulseReference()` helper that inlines the ngspice vsrcload.c
+      PULSE evaluation formula — used by the new parity tests so they
+      don't depend on any helper the production shares.
+    - Added new describe blocks:
+      - `ac_vsource_triangle_pulse_parity` — 3 new tests:
+        `triangle_phase_zero_starts_at_V1_rising`,
+        `triangle_matches_pulse_encoding_bit_exact` (13 sample times,
+        `.toBe` bit-exact),
+        `triangle_nonzero_dc_offset_shifts_V1_and_V2`.
+      - `ac_vsource_sawtooth_pulse_parity` — 5 new tests:
+        `sawtooth_phase_zero_starts_at_V1_rising`,
+        `sawtooth_fall_time_shapes_fall_edge`,
+        `sawtooth_matches_pulse_encoding_bit_exact_default_fallTime`
+        (11 sample times),
+        `sawtooth_matches_pulse_encoding_bit_exact_custom_fallTime`
+        (8 sample times, fallTime = period/10),
+        `sawtooth_fallTime_gte_period_throws`.
+      - `ac_vsource_triangle_breakpoints_parity` — 2 new tests:
+        `triangle_breakpoints_at_peak_and_valley_bit_exact`,
+        `triangle_nextBreakpoint_monotone_across_cycles`.
+      - `ac_vsource_sawtooth_breakpoints_parity` — 2 new tests:
+        `sawtooth_breakpoints_at_riseSpan_and_period_bit_exact`,
+        `sawtooth_nextBreakpoint_monotone_across_cycles`.
+- **Tests**:
+  - Targeted run:
+    `npx vitest run src/components/sources/__tests__/ac-voltage-source.test.ts src/solver/analog/__tests__/harness/netlist-generator.test.ts`
+    → 83/85 passing. All 49 netlist-generator tests pass. 34/36 ac-voltage-source tests pass.
+  - 2 PRE-EXISTING failures unchanged (NOT regressions caused by this task):
+    1. `AcSource > set_scale_applied` — calls `el.setSourceScale!(0.5)` on
+       the AC voltage source element, but ac-voltage-source.ts has never
+       defined `setSourceScale`; it uses `ctx.srcFact` instead. The test's
+       `!` non-null assertion crashes at runtime. Pre-existing test bug
+       unrelated to this task.
+    2. `Integration > rc_lowpass` — transient integration test expecting
+       ~0.786V peak at the capacitor through an RC low-pass, but the
+       engine produces the full 5V amplitude (no attenuation). Same class
+       of defect as the `RC step response: exponential charging` failure
+       already documented in `spec/test-baseline.md` Phase 0 failure list
+       (expected 6.2e+30 to be ≤ 3.22) — MNAEngine-level integration
+       issue unrelated to the AC source.
+- **netlist-generator.ts TODOs**: all 3 deleted (lines 269, 281, 298 in the
+  prior file state). Replacement JSDoc documents the encoding as exact.
+  `grep -n 'TODO' src/solver/analog/__tests__/harness/netlist-generator.ts`
+  returns 0 matches.
+- **SPICE PULSE encoding exactness confirmed** — the four supported
+  waveforms (sine, square, triangle, sawtooth) all emit exact SPICE
+  transient specs. Rejected waveforms (sweep/am/fm/noise/expression)
+  throw with a clear message.
+- **Followups** (NOT addressed in this task):
+  - Expression-waveform breakpoint support: if the expression contains an
+    `abs()`, `sign()`, `step()`, or similar known-discontinuous function,
+    `nextBreakpoint` still returns `null`. Solving this requires symbolic
+    analysis of the expression tree and is left as a followup. Current
+    behaviour preserved for `expression`, `sweep`, `am`, `fm` in
+    `nextBreakpoint`.
+  - MCP and E2E surface-level tests for waveform shape: CLAUDE.md's
+    Three-Surface Testing Rule would normally require headless + MCP + E2E
+    coverage. No existing MCP or E2E tests exercised specific waveform
+    shapes before this task, and adding fresh surfaces would widen the
+    blast radius beyond the ad-hoc scope. Logging here so the user can
+    decide whether to mandate new surface-level tests as a separate
+    task.

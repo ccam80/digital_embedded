@@ -2,7 +2,7 @@
  * Tests for cktLoad — single-pass device load function.
  *
  * Test groups:
- *   Stamping        — migrated end-to-end solve tests from mna-assembler.test.ts
+ *   Stamping        — end-to-end solve tests
  *   CKTload         — cktLoad-specific behaviour (single pass, nodesets, noncon)
  *   E_SINGULAR      — Phase 0 E_SINGULAR recovery via cktLoad re-run
  */
@@ -21,7 +21,7 @@ import { newtonRaphson } from '../newton-raphson.js';
 import { SparseSolver } from '../sparse-solver.js';
 
 // ---------------------------------------------------------------------------
-// Stamping tests — migrated from mna-assembler.test.ts
+// Stamping tests
 // ---------------------------------------------------------------------------
 
 describe('Stamping', () => {

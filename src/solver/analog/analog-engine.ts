@@ -1019,9 +1019,9 @@ export class MNAEngine implements AnalogEngine {
    * Called before each NR attempt (onAttemptBegin) and after each attempt
    * (onAttemptEnd) inside the transient retry loop.
    *
-   * Also wired into dcOperatingPoint() via onPhaseBegin/onPhaseEnd on
-   * DcOpOptions, so boot-step DCOP sub-solves are captured into the same
-   * session as the first transient solve.
+   * Also wired into dcOperatingPoint() via onPhaseBegin/onPhaseEnd, so
+   * boot-step DCOP sub-solves are captured into the same session as the
+   * first transient solve.
    */
   stepPhaseHook: {
     onAttemptBegin(phase: DcOpNRPhase | "tranInit" | "tranNR" | "tranNrRetry" | "tranLteRetry", dt: number): void;

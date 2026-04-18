@@ -222,7 +222,7 @@ export class SparseSolver {
    * Allocate or find the element at (row, col) in the persistent linked structure.
    * Returns a stable handle (pool index) for use with stampElement().
    *
-   * Called at compile time by every caller (element factories, MNAAssembler).
+   * Called at compile time by every caller (element factories, cktLoad).
    * ngspice: spGetElement (spbuild.c) — returns a pointer used by *ElementPtr += value.
    *
    * O(1) via handle table when n <= handle table size.

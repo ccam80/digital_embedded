@@ -294,7 +294,7 @@ describe("NR", () => {
 
   it("nonlinear_circuit_forced_noncon_on_iteration_0", () => {
     // Even when NR would otherwise converge in iteration 0 (hypothetically),
-    // Change 6 ensures assembler.noncon is forced to 1 after iteration 0,
+    // noncon is forced to 1 after iteration 0 for nonlinear circuits,
     // preventing early return. Verify by checking iteration count >= 2.
     const ctx = makeDiodeCtx(5.0);
 
@@ -757,7 +757,7 @@ describe("NR NISHOULDREORDER lifecycle", () => {
 describe("NR E_SINGULAR recovery via continue", () => {
   it("e_singular_recovers_via_continue", () => {
     // The E_SINGULAR recovery path must: call forceReorder(), then continue to
-    // the top of the NR loop to re-execute CKTload (stampAll) before re-factoring.
+    // the top of the NR loop to re-execute cktLoad before re-factoring.
     const diagnostics = new DiagnosticCollector();
 
     let forceReorderCalledAfterFailure = false;
