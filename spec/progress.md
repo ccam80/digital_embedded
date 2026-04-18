@@ -565,3 +565,81 @@ Raw grep across all surviving C3b test files (38 files; `coupled-inductor.test.t
   - 6 failures are pre-existing (element.load not a function — makeScalableVoltageSource uses stamp() not load(), pre-existing per baseline)
   - 4 failures are SURFACED: dynamicGmin_factor_cap_uses_param, dynamicGmin_clean_solve_uses_dcMaxIter, spice3Src_no_extra_clean_solve, gillespieSrc_source_stepping_uses_gshunt — all require forcing gmin/src stepping paths via makeGminDependentElement/makeSrcSteppingRequiredElement elements, but the NR mode ladder (initJct→initFix→initFloat) converges every test circuit directly regardless of maxIterations or circuit topology. Cannot force these paths without out-of-scope infrastructure changes. SURFACED notes added to each test body per coordinator directive.
   - All production code changes (4.1.1 ctx.noncon=1, 4.1.2 dcopFinalize no transient reset, 4.2.2 factor cap, 4.2.3 clean solve limit, 4.3.1 spice3Gmin gshunt, 4.4.1 no extra clean solve, 4.5.1 gillespieSrc gshunt) are fully implemented in dc-operating-point.ts.
+
+## Task 7.2.1: Resistive divider DC-OP parity
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/ngspice-parity/fixtures/resistive-divider.dts, src/solver/analog/__tests__/ngspice-parity/resistive-divider.test.ts
+- **Files modified**: none
+- **Tests**: 1/1 passing (skipped — DLL absent, expected local state per spec)
+
+## Task 7.2.2: Diode + resistor DC-OP parity
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: src/solver/analog/__tests__/ngspice-parity/fixtures/diode-resistor.dts, src/solver/analog/__tests__/ngspice-parity/diode-resistor.test.ts
+- **Files modified**: none
+- **Tests**: 1/1 passing (skipped — DLL absent, expected local state per spec)
+
+## Task 7.3.1: RC transient parity — pulse, NIintegrate capacitor, LTE, order promotion
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/solver/analog/__tests__/ngspice-parity/fixtures/rc-transient.dts`
+  - `src/solver/analog/__tests__/ngspice-parity/rc-transient.test.ts`
+- **Files modified**: none
+- **Tests**: 1/1 passing (skipped via describeIfDll — DLL not present in CI; correct behavior)
+- **Notes**: RC circuit uses AcVoltageSource square waveform (amplitude=0.5, dcOffset=0.5, freq=500Hz, riseTime=1ns, fallTime=1ns) which maps to SPICE PULSE(0 1 0 1e-9 1e-9 ~1ms 2ms). Test calls assertIterationMatch per step/iter, assertModeTransitionMatch and assertConvergenceFlowMatch at end.
+
+## Task 7.3.2: RLC oscillator transient parity — inductor integration, ringing
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/solver/analog/__tests__/ngspice-parity/fixtures/rlc-oscillator.dts`
+  - `src/solver/analog/__tests__/ngspice-parity/rlc-oscillator.test.ts`
+- **Files modified**: none
+- **Tests**: 1/1 passing (skipped via describeIfDll — DLL not present in CI; correct behavior)
+- **Notes**: RLC circuit uses AcVoltageSource sine at 1592Hz, R1=10Ω, L1=10mH, C1=1µF. Test calls assertIterationMatch per step/iter, assertModeTransitionMatch, assertConvergenceFlowMatch, plus oscillation sanity check (peak > 0.5V over steps 0..200) and trapezoidal method assertion per accepted step.
+
+## Task 7.2.3: BJT common-emitter DC-OP parity — multi-junction limiting, gmin stepping
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/solver/analog/__tests__/ngspice-parity/fixtures/bjt-common-emitter.dts`
+  - `src/solver/analog/__tests__/ngspice-parity/bjt-common-emitter.test.ts`
+- **Files modified**: none
+- **Tests**: 1/1 skipped (DLL not present — describeIfDll correctly gates; compiles and skips cleanly)
+
+## Task 7.2.4: Op-amp inverting amplifier DC-OP parity — source stepping
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/solver/analog/__tests__/ngspice-parity/fixtures/opamp-inverting.dts`
+  - `src/solver/analog/__tests__/ngspice-parity/opamp-inverting.test.ts`
+- **Files modified**: none
+- **Tests**: 1/1 skipped (DLL not present — describeIfDll correctly gates; compiles and skips cleanly)
+
+## Task 7.3.3: Diode bridge rectifier transient parity
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: 
+  - `src/solver/analog/__tests__/ngspice-parity/fixtures/diode-bridge.dts`
+  - `src/solver/analog/__tests__/ngspice-parity/diode-bridge.test.ts`
+- **Files modified**: none
+- **Tests**: 1/1 passing (skipped — DLL not present; describeIfDll guards skip correctly)
+
+## Task 7.3.4: MOSFET inverter DC-OP + transient parity
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**:
+  - `src/solver/analog/__tests__/ngspice-parity/fixtures/mosfet-inverter.dts`
+  - `src/solver/analog/__tests__/ngspice-parity/mosfet-inverter.test.ts`
+- **Files modified**: none
+- **Tests**: 2/2 passing (skipped — DLL not present; describeIfDll guards skip correctly)
+
+## Task 7.4.1: Audit — mode-transition coverage across Waves 7.2–7.3
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: none
+- **Tests**: 0/0 (audit-only, no tests)
+- **Audit result**: All 8 parity test files contain assertModeTransitionMatch at end-of-test site (see completion report)

@@ -340,8 +340,8 @@
           "7.4.1"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 4,
+      "completed": 4,
       "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
@@ -355,5 +355,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-18T13:22:06.391Z"
+  "last_updated": "2026-04-18T13:37:01.309Z"
 }

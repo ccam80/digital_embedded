@@ -1,0 +1,82 @@
+{
+  "circuit": {
+    "description": "Diode + resistor DC-OP: V1=1V, R1=1k (in->anode), D1 (Is=1e-14,N=1) from anode to gnd",
+    "elements": [
+      {
+        "id": "22222222-0000-0000-0000-000000000001",
+        "position": { "x": 0, "y": 0 },
+        "properties": {
+          "_modelParams": { "voltage": 1 },
+          "label": "V1",
+          "voltage": 1
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "22222222-0000-0000-0000-000000000002",
+        "position": { "x": 4, "y": 0 },
+        "properties": {
+          "_modelParams": { "resistance": 1000 },
+          "label": "R1",
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "22222222-0000-0000-0000-000000000003",
+        "position": { "x": 8, "y": 0 },
+        "properties": {
+          "_modelParams": {
+            "AF": 1,
+            "BV": "_inf",
+            "CJO": 0,
+            "EG": 1.11,
+            "FC": 0.5,
+            "IBV": 0.001,
+            "IS": 1e-14,
+            "KF": 0,
+            "M": 0.5,
+            "N": 1,
+            "NBV": null,
+            "RS": 0,
+            "TT": 0,
+            "VJ": 1,
+            "XTI": 3
+          },
+          "label": "D1"
+        },
+        "rotation": 0,
+        "type": "Diode"
+      },
+      {
+        "id": "22222222-0000-0000-0000-000000000004",
+        "position": { "x": 12, "y": 0 },
+        "properties": {
+          "label": "gnd1"
+        },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "22222222-0000-0000-0000-000000000005",
+        "position": { "x": 0, "y": 2 },
+        "properties": {
+          "label": "gnd2"
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "diode-resistor",
+    "wires": [
+      {
+        "points": [
+          { "x": 0, "y": 0 },
+          { "x": 0, "y": 2 }
+        ]
+      }
+    ]
+  }
+}

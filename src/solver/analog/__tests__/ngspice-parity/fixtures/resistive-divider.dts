@@ -1,0 +1,67 @@
+{
+  "circuit": {
+    "description": "Resistive voltage divider: V1=5V, R1=1k (in->mid), R2=1k (mid->gnd)",
+    "elements": [
+      {
+        "id": "11111111-0000-0000-0000-000000000001",
+        "position": { "x": 0, "y": 0 },
+        "properties": {
+          "_modelParams": { "voltage": 5 },
+          "label": "V1",
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "11111111-0000-0000-0000-000000000002",
+        "position": { "x": 4, "y": 0 },
+        "properties": {
+          "_modelParams": { "resistance": 1000 },
+          "label": "R1",
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "11111111-0000-0000-0000-000000000003",
+        "position": { "x": 8, "y": 0 },
+        "properties": {
+          "_modelParams": { "resistance": 1000 },
+          "label": "R2",
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "11111111-0000-0000-0000-000000000004",
+        "position": { "x": 12, "y": 0 },
+        "properties": {
+          "label": "gnd1"
+        },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "11111111-0000-0000-0000-000000000005",
+        "position": { "x": 0, "y": 2 },
+        "properties": {
+          "label": "gnd2"
+        },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "resistive-divider",
+    "wires": [
+      {
+        "points": [
+          { "x": 0, "y": 0 },
+          { "x": 0, "y": 2 }
+        ]
+      }
+    ]
+  }
+}

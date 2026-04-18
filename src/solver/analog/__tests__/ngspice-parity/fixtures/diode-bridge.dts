@@ -1,0 +1,267 @@
+{
+  "circuit": {
+    "description": "Full-wave diode bridge rectifier: V1=1V@60Hz, 4 diodes (Is=1e-14,N=1), R_load=1k, C_filter=100uF",
+    "elements": [
+      {
+        "id": "v1",
+        "position": { "x": 0, "y": 0 },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 1,
+            "dcOffset": 0,
+            "fallTime": 1e-9,
+            "frequency": 60,
+            "phase": 0,
+            "riseTime": 1e-9
+          },
+          "label": "V1",
+          "amplitude": 1,
+          "dcOffset": 0,
+          "frequency": 60,
+          "waveform": "sine"
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "tun-acp-v1pos",
+        "position": { "x": 5, "y": 0 },
+        "properties": { "NetName": "AC_P" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "tun-acn-v1neg",
+        "position": { "x": -1, "y": 0 },
+        "properties": { "NetName": "AC_N" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "d1",
+        "position": { "x": 0, "y": 6 },
+        "properties": {
+          "_modelParams": {
+            "IS": 1e-14,
+            "N": 1,
+            "BV": "_inf",
+            "IBV": 1e-3,
+            "RS": 0,
+            "CJO": 0,
+            "VJ": 1,
+            "M": 0.5,
+            "EG": 1.11,
+            "XTI": 3,
+            "KF": 0,
+            "AF": 1,
+            "FC": 0.5,
+            "TT": 0
+          },
+          "label": "D1"
+        },
+        "rotation": 0,
+        "type": "Diode"
+      },
+      {
+        "id": "tun-acp-d1a",
+        "position": { "x": -1, "y": 6 },
+        "properties": { "NetName": "AC_P" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "tun-voutp-d1k",
+        "position": { "x": 5, "y": 6 },
+        "properties": { "NetName": "VOUT_P" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "d2",
+        "position": { "x": 0, "y": 10 },
+        "properties": {
+          "_modelParams": {
+            "IS": 1e-14,
+            "N": 1,
+            "BV": "_inf",
+            "IBV": 1e-3,
+            "RS": 0,
+            "CJO": 0,
+            "VJ": 1,
+            "M": 0.5,
+            "EG": 1.11,
+            "XTI": 3,
+            "KF": 0,
+            "AF": 1,
+            "FC": 0.5,
+            "TT": 0
+          },
+          "label": "D2"
+        },
+        "rotation": 0,
+        "type": "Diode"
+      },
+      {
+        "id": "tun-acn-d2a",
+        "position": { "x": -1, "y": 10 },
+        "properties": { "NetName": "AC_N" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "tun-voutp-d2k",
+        "position": { "x": 5, "y": 10 },
+        "properties": { "NetName": "VOUT_P" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "d3",
+        "position": { "x": 0, "y": 14 },
+        "properties": {
+          "_modelParams": {
+            "IS": 1e-14,
+            "N": 1,
+            "BV": "_inf",
+            "IBV": 1e-3,
+            "RS": 0,
+            "CJO": 0,
+            "VJ": 1,
+            "M": 0.5,
+            "EG": 1.11,
+            "XTI": 3,
+            "KF": 0,
+            "AF": 1,
+            "FC": 0.5,
+            "TT": 0
+          },
+          "label": "D3"
+        },
+        "rotation": 0,
+        "type": "Diode"
+      },
+      {
+        "id": "tun-acp-d3k",
+        "position": { "x": 5, "y": 14 },
+        "properties": { "NetName": "AC_P" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "gnd-d3a",
+        "position": { "x": -1, "y": 14 },
+        "properties": { "label": "GND3" },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "d4",
+        "position": { "x": 0, "y": 18 },
+        "properties": {
+          "_modelParams": {
+            "IS": 1e-14,
+            "N": 1,
+            "BV": "_inf",
+            "IBV": 1e-3,
+            "RS": 0,
+            "CJO": 0,
+            "VJ": 1,
+            "M": 0.5,
+            "EG": 1.11,
+            "XTI": 3,
+            "KF": 0,
+            "AF": 1,
+            "FC": 0.5,
+            "TT": 0
+          },
+          "label": "D4"
+        },
+        "rotation": 0,
+        "type": "Diode"
+      },
+      {
+        "id": "tun-acn-d4k",
+        "position": { "x": 5, "y": 18 },
+        "properties": { "NetName": "AC_N" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "gnd-d4a",
+        "position": { "x": -1, "y": 18 },
+        "properties": { "label": "GND4" },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "r-load",
+        "position": { "x": 10, "y": 6 },
+        "properties": {
+          "_modelParams": { "resistance": 1000 },
+          "label": "R_load",
+          "resistance": 1000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "tun-voutp-rloada",
+        "position": { "x": 9, "y": 6 },
+        "properties": { "NetName": "VOUT_P" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "gnd-rload",
+        "position": { "x": 15, "y": 6 },
+        "properties": { "label": "GND_R" },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "c-filter",
+        "position": { "x": 10, "y": 10 },
+        "properties": {
+          "_modelParams": { "capacitance": 100e-6 },
+          "label": "C_filter",
+          "capacitance": 100e-6
+        },
+        "rotation": 0,
+        "type": "Capacitor"
+      },
+      {
+        "id": "tun-voutp-cfiltera",
+        "position": { "x": 9, "y": 10 },
+        "properties": { "NetName": "VOUT_P" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "gnd-cfilter",
+        "position": { "x": 15, "y": 10 },
+        "properties": { "label": "GND_C" },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "Diode Bridge Rectifier",
+    "wires": [
+      { "points": [{ "x": 4, "y": 0 }, { "x": 5, "y": 0 }] },
+      { "points": [{ "x": 0, "y": 0 }, { "x": -1, "y": 0 }] },
+      { "points": [{ "x": 0, "y": 6 }, { "x": -1, "y": 6 }] },
+      { "points": [{ "x": 4, "y": 6 }, { "x": 5, "y": 6 }] },
+      { "points": [{ "x": 0, "y": 10 }, { "x": -1, "y": 10 }] },
+      { "points": [{ "x": 4, "y": 10 }, { "x": 5, "y": 10 }] },
+      { "points": [{ "x": 0, "y": 14 }, { "x": -1, "y": 14 }] },
+      { "points": [{ "x": 4, "y": 14 }, { "x": 5, "y": 14 }] },
+      { "points": [{ "x": 0, "y": 18 }, { "x": -1, "y": 18 }] },
+      { "points": [{ "x": 4, "y": 18 }, { "x": 5, "y": 18 }] },
+      { "points": [{ "x": 10, "y": 6 }, { "x": 9, "y": 6 }] },
+      { "points": [{ "x": 14, "y": 6 }, { "x": 15, "y": 6 }] },
+      { "points": [{ "x": 10, "y": 10 }, { "x": 9, "y": 10 }] },
+      { "points": [{ "x": 14, "y": 10 }, { "x": 15, "y": 10 }] }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}

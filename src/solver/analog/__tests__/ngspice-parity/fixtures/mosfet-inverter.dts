@@ -1,0 +1,170 @@
+{
+  "circuit": {
+    "description": "NMOS inverter: V_DD=5V, R_D=10k, NMOS(Vto=1V,Kp=50e-6,W=10u,L=1u,Lambda=0.02), V_IN pulse 0/5V 10kHz",
+    "elements": [
+      {
+        "id": "vdd",
+        "position": { "x": 0, "y": 0 },
+        "properties": {
+          "_modelParams": { "voltage": 5 },
+          "label": "V_DD",
+          "voltage": 5
+        },
+        "rotation": 0,
+        "type": "DcVoltageSource"
+      },
+      {
+        "id": "tun-vdd-pos",
+        "position": { "x": 5, "y": 0 },
+        "properties": { "NetName": "VDD" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "gnd-vdd",
+        "position": { "x": -1, "y": 0 },
+        "properties": { "label": "GND_VDD" },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "rd",
+        "position": { "x": 0, "y": 6 },
+        "properties": {
+          "_modelParams": { "resistance": 10000 },
+          "label": "R_D",
+          "resistance": 10000
+        },
+        "rotation": 0,
+        "type": "Resistor"
+      },
+      {
+        "id": "tun-vdd-rda",
+        "position": { "x": -1, "y": 6 },
+        "properties": { "NetName": "VDD" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "tun-vout-rdb",
+        "position": { "x": 5, "y": 6 },
+        "properties": { "NetName": "VOUT" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "m1",
+        "position": { "x": 0, "y": 10 },
+        "properties": {
+          "_modelParams": {
+            "VTO": 1,
+            "KP": 50e-6,
+            "W": 10e-6,
+            "L": 1e-6,
+            "LAMBDA": 0.02,
+            "GAMMA": 0,
+            "PHI": 0.6,
+            "RD": 0,
+            "RS": 0,
+            "CBD": 0,
+            "CBS": 0,
+            "IS": 1e-14,
+            "PB": 0.8,
+            "CGSO": 0,
+            "CGDO": 0,
+            "CGBO": 0,
+            "TOX": 1e-7,
+            "NSUB": 0,
+            "NSS": 0,
+            "TPG": 1,
+            "LD": 0,
+            "UO": 600,
+            "FC": 0.5,
+            "NSUB": 0,
+            "CJ": 0,
+            "CJSW": 0,
+            "MJ": 0.5,
+            "MJSW": 0.33,
+            "JS": 0,
+            "RSH": 0,
+            "AF": 1,
+            "KF": 0
+          },
+          "label": "M1"
+        },
+        "rotation": 0,
+        "type": "NMOS"
+      },
+      {
+        "id": "tun-vin-m1g",
+        "position": { "x": -1, "y": 10 },
+        "properties": { "NetName": "VIN" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "tun-vout-m1d",
+        "position": { "x": 5, "y": 9 },
+        "properties": { "NetName": "VOUT" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "gnd-m1s",
+        "position": { "x": 5, "y": 11 },
+        "properties": { "label": "GND_M1S" },
+        "rotation": 0,
+        "type": "Ground"
+      },
+      {
+        "id": "vin",
+        "position": { "x": 0, "y": 16 },
+        "properties": {
+          "_modelParams": {
+            "amplitude": 2.5,
+            "dcOffset": 2.5,
+            "fallTime": 1e-9,
+            "frequency": 10000,
+            "phase": 0,
+            "riseTime": 1e-9
+          },
+          "label": "V_IN",
+          "amplitude": 2.5,
+          "dcOffset": 2.5,
+          "frequency": 10000,
+          "waveform": "square"
+        },
+        "rotation": 0,
+        "type": "AcVoltageSource"
+      },
+      {
+        "id": "tun-vin-vinpos",
+        "position": { "x": 5, "y": 16 },
+        "properties": { "NetName": "VIN" },
+        "rotation": 0,
+        "type": "Tunnel"
+      },
+      {
+        "id": "gnd-vin",
+        "position": { "x": -1, "y": 16 },
+        "properties": { "label": "GND_VIN" },
+        "rotation": 0,
+        "type": "Ground"
+      }
+    ],
+    "name": "MOSFET Inverter",
+    "wires": [
+      { "points": [{ "x": 4, "y": 0 }, { "x": 5, "y": 0 }] },
+      { "points": [{ "x": 0, "y": 0 }, { "x": -1, "y": 0 }] },
+      { "points": [{ "x": 0, "y": 6 }, { "x": -1, "y": 6 }] },
+      { "points": [{ "x": 4, "y": 6 }, { "x": 5, "y": 6 }] },
+      { "points": [{ "x": 0, "y": 10 }, { "x": -1, "y": 10 }] },
+      { "points": [{ "x": 4, "y": 9 }, { "x": 5, "y": 9 }] },
+      { "points": [{ "x": 4, "y": 11 }, { "x": 5, "y": 11 }] },
+      { "points": [{ "x": 4, "y": 16 }, { "x": 5, "y": 16 }] },
+      { "points": [{ "x": 0, "y": 16 }, { "x": -1, "y": 16 }] }
+    ]
+  },
+  "format": "dts",
+  "version": 1
+}
