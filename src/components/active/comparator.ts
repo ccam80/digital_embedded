@@ -246,7 +246,7 @@ function createOpenCollectorComparatorElement(
 
       // Stamp the effective conductance from out to ground.
       if (nOut > 0) {
-        solver.stamp(nOut - 1, nOut - 1, computeGeff());
+        solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), computeGeff());
       }
     },
 
@@ -341,7 +341,7 @@ function createPushPullComparatorElement(
 
       const gEff = computeGeff();
       if (nOut > 0) {
-        solver.stamp(nOut - 1, nOut - 1, gEff);
+        solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), gEff);
         // Norton current source drives output toward vOH or vOL
         const vTarget = _outputActive ? p.vOL : p.vOH;
         solver.stampRHS(nOut - 1, vTarget * gEff);

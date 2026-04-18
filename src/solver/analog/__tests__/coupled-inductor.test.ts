@@ -33,8 +33,22 @@ interface RHSCall {
 function makeStubSolver(): { solver: SparseSolver; stamps: StampCall[]; rhs: RHSCall[] } {
   const stamps: StampCall[] = [];
   const rhs: RHSCall[] = [];
+  // Handle table: handle -> {row, col} so stampElement knows where the value lands.
+  const handleIndex: Array<{ row: number; col: number }> = [];
   const stub: SparseSolverStamp = {
-    stamp: (row, col, value) => { stamps.push({ row, col, value }); },
+    allocElement: (row, col) => {
+      // Find-or-create semantics matching SparseSolver.allocElement.
+      for (let i = 0; i < handleIndex.length; i++) {
+        const h = handleIndex[i];
+        if (h.row === row && h.col === col) return i;
+      }
+      handleIndex.push({ row, col });
+      return handleIndex.length - 1;
+    },
+    stampElement: (handle, value) => {
+      const { row, col } = handleIndex[handle];
+      stamps.push({ row, col, value });
+    },
     stampRHS: (row, value) => { rhs.push({ row, value }); },
   };
   const solver = stub as unknown as SparseSolver;

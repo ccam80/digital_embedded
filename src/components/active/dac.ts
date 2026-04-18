@@ -326,7 +326,7 @@ function createDACElement(
 
       // Stamp G_out from OUT to GND (Norton output resistance)
       if (nOut > 0) {
-        solver.stamp(nOut - 1, nOut - 1, G_out);
+        solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), G_out);
         // Norton current source: I = V_out · G_out injected at OUT node
         solver.stampRHS(nOut - 1, _vOut * G_out);
       }

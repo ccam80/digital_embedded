@@ -150,11 +150,11 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolverType): void {
-      if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
-      if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
+      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
+      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
       if (nodeA !== 0 && nodeB !== 0) {
-        solver.stamp(nodeA - 1, nodeB - 1, -G);
-        solver.stamp(nodeB - 1, nodeA - 1, -G);
+        solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -G);
+        solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -G);
       }
     },
   };

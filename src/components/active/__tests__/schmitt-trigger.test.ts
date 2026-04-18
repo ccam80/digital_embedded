@@ -351,3 +351,118 @@ describe("Transfer", () => {
     expect(risingTransitionAt!).toBeGreaterThan(fallingTransitionAt!);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C4.5 parity test — schmitt_load_dcop_parity
+// ---------------------------------------------------------------------------
+//
+// Drives the non-inverting Schmitt trigger via load(ctx) at a DC-OP operating
+// point (V_in below V_TL, initial output low) and asserts the stamped
+// conductance and RHS entries are bit-exact.
+//
+// Reference formulas (from schmitt-trigger.ts + digital-pin-model.ts):
+//   inModel  = DigitalInputPinModel(inputSpec, true) → stamps 1/rIn on nIn diag
+//              (inputSpec.rIn = 1e7)
+//   outModel = DigitalOutputPinModel(outputSpec) with role="direct", not hiZ
+//              → stamps 1/rOut on nOut diag + vOL·(1/rOut) on nOut RHS
+//     (outputSpec.rOut = max(p.rOut, 1e-9); p.rOut defaults to 50)
+//   Input is below vTH and output starts low → no state change → stays low.
+
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+
+interface SchmittCaptureStamp { row: number; col: number; value: number; }
+function makeSchmittCaptureSolver(): {
+  solver: SparseSolverType;
+  stamps: SchmittCaptureStamp[];
+  rhs: Map<number, number>;
+} {
+  const stamps: SchmittCaptureStamp[] = [];
+  const rhs = new Map<number, number>();
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stamp: (row: number, col: number, value: number) => {
+      stamps.push({ row, col, value });
+    },
+    stampRHS: (row: number, value: number) => {
+      rhs.set(row, (rhs.get(row) ?? 0) + value);
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps, rhs };
+}
+
+function makeSchmittParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("SchmittTrigger parity (C4.5)", () => {
+  it("schmitt_load_dcop_parity", () => {
+    const nIn = 1, nOut = 2;
+    const vTH = 2.0, vTL = 1.0, vOH = 3.3, vOL = 0.0, rOut = 50;
+    const schmitt = makeSchmittNonInverting(nIn, nOut, { vTH, vTL, vOH, vOL, rOut });
+
+    // V_in = 0.5V: below V_TL, below V_TH. Initial _outputHigh=false, stays low.
+    const voltages = new Float64Array(2);
+    voltages[nIn - 1] = 0.5;
+    voltages[nOut - 1] = 0.1;
+
+    const { solver, stamps, rhs } = makeSchmittCaptureSolver();
+    const ctx = makeSchmittParityCtx(voltages, solver);
+    schmitt.load(ctx);
+
+    // Closed-form reference:
+    const NGSPICE_RIN  = 1e7;                  // inputSpec.rIn (hardcoded in buildInputSpec)
+    const NGSPICE_GIN  = 1 / NGSPICE_RIN;
+    const NGSPICE_ROUT = Math.max(rOut, 1e-9); // outputSpec.rOut
+    const NGSPICE_GOUT = 1 / NGSPICE_ROUT;
+    // output low: target voltage = vOL, RHS = vOL * G_out (zero when vOL=0)
+    const NGSPICE_RHS_OUT = vOL * NGSPICE_GOUT;
+
+    const sumAt = (row: number, col: number): number =>
+      stamps.filter((s) => s.row === row && s.col === col)
+            .reduce((a, s) => a + s.value, 0);
+
+    // Input resistance on nIn diagonal
+    expect(sumAt(nIn - 1, nIn - 1)).toBe(NGSPICE_GIN);
+
+    // Output resistance on nOut diagonal
+    expect(sumAt(nOut - 1, nOut - 1)).toBe(NGSPICE_GOUT);
+
+    // Output Norton RHS: vOL * G_out
+    expect(rhs.get(nOut - 1) ?? 0).toBe(NGSPICE_RHS_OUT);
+  });
+});

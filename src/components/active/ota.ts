@@ -203,10 +203,10 @@ function createOTAElement(
       const iNR = iOutNow - gmEff * vDiff;
 
       // Stamp VCCS: current gm_eff * V_diff injected into OUT+ from (V+, V-)
-      if (nOutP !== 0 && nVp !== 0) solver.stamp(nOutP - 1, nVp - 1, -gmEff);
-      if (nOutP !== 0 && nVm !== 0) solver.stamp(nOutP - 1, nVm - 1, gmEff);
-      if (nOutN !== 0 && nVp !== 0) solver.stamp(nOutN - 1, nVp - 1, gmEff);
-      if (nOutN !== 0 && nVm !== 0) solver.stamp(nOutN - 1, nVm - 1, -gmEff);
+      if (nOutP !== 0 && nVp !== 0) solver.stampElement(solver.allocElement(nOutP - 1, nVp - 1), -gmEff);
+      if (nOutP !== 0 && nVm !== 0) solver.stampElement(solver.allocElement(nOutP - 1, nVm - 1), gmEff);
+      if (nOutN !== 0 && nVp !== 0) solver.stampElement(solver.allocElement(nOutN - 1, nVp - 1), gmEff);
+      if (nOutN !== 0 && nVm !== 0) solver.stampElement(solver.allocElement(nOutN - 1, nVm - 1), -gmEff);
 
       // RHS: Norton constant
       if (nOutP !== 0) solver.stampRHS(nOutP - 1, iNR);

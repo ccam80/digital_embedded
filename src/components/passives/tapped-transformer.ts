@@ -339,45 +339,45 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     // Winding resistances.
     if (this._rPri > 0) {
       const gPri = 1 / this._rPri;
-      if (p1 !== 0) solver.stamp(p1 - 1, p1 - 1, gPri);
-      if (p2 !== 0) solver.stamp(p2 - 1, p2 - 1, gPri);
+      if (p1 !== 0) solver.stampElement(solver.allocElement(p1 - 1, p1 - 1), gPri);
+      if (p2 !== 0) solver.stampElement(solver.allocElement(p2 - 1, p2 - 1), gPri);
       if (p1 !== 0 && p2 !== 0) {
-        solver.stamp(p1 - 1, p2 - 1, -gPri);
-        solver.stamp(p2 - 1, p1 - 1, -gPri);
+        solver.stampElement(solver.allocElement(p1 - 1, p2 - 1), -gPri);
+        solver.stampElement(solver.allocElement(p2 - 1, p1 - 1), -gPri);
       }
     }
     if (this._rSec > 0) {
       const gSec = 1 / this._rSec;
       // Sec half-1 (S1 ↔ CT)
-      if (s1 !== 0) solver.stamp(s1 - 1, s1 - 1, gSec);
-      if (ct !== 0) solver.stamp(ct - 1, ct - 1, gSec);
+      if (s1 !== 0) solver.stampElement(solver.allocElement(s1 - 1, s1 - 1), gSec);
+      if (ct !== 0) solver.stampElement(solver.allocElement(ct - 1, ct - 1), gSec);
       if (s1 !== 0 && ct !== 0) {
-        solver.stamp(s1 - 1, ct - 1, -gSec);
-        solver.stamp(ct - 1, s1 - 1, -gSec);
+        solver.stampElement(solver.allocElement(s1 - 1, ct - 1), -gSec);
+        solver.stampElement(solver.allocElement(ct - 1, s1 - 1), -gSec);
       }
       // Sec half-2 (CT ↔ S2)
-      if (ct !== 0) solver.stamp(ct - 1, ct - 1, gSec);
-      if (s2 !== 0) solver.stamp(s2 - 1, s2 - 1, gSec);
+      if (ct !== 0) solver.stampElement(solver.allocElement(ct - 1, ct - 1), gSec);
+      if (s2 !== 0) solver.stampElement(solver.allocElement(s2 - 1, s2 - 1), gSec);
       if (ct !== 0 && s2 !== 0) {
-        solver.stamp(ct - 1, s2 - 1, -gSec);
-        solver.stamp(s2 - 1, ct - 1, -gSec);
+        solver.stampElement(solver.allocElement(ct - 1, s2 - 1), -gSec);
+        solver.stampElement(solver.allocElement(s2 - 1, ct - 1), -gSec);
       }
     }
 
     // Branch incidence (B and C sub-matrices, topology-constant).
-    if (p1 !== 0) solver.stamp(p1 - 1, b1, 1);
-    if (p2 !== 0) solver.stamp(p2 - 1, b1, -1);
-    if (s1 !== 0) solver.stamp(s1 - 1, b2, 1);
-    if (ct !== 0) solver.stamp(ct - 1, b2, -1);
-    if (ct !== 0) solver.stamp(ct - 1, b3, 1);
-    if (s2 !== 0) solver.stamp(s2 - 1, b3, -1);
+    if (p1 !== 0) solver.stampElement(solver.allocElement(p1 - 1, b1), 1);
+    if (p2 !== 0) solver.stampElement(solver.allocElement(p2 - 1, b1), -1);
+    if (s1 !== 0) solver.stampElement(solver.allocElement(s1 - 1, b2), 1);
+    if (ct !== 0) solver.stampElement(solver.allocElement(ct - 1, b2), -1);
+    if (ct !== 0) solver.stampElement(solver.allocElement(ct - 1, b3), 1);
+    if (s2 !== 0) solver.stampElement(solver.allocElement(s2 - 1, b3), -1);
 
-    if (p1 !== 0) solver.stamp(b1, p1 - 1, 1);
-    if (p2 !== 0) solver.stamp(b1, p2 - 1, -1);
-    if (s1 !== 0) solver.stamp(b2, s1 - 1, 1);
-    if (ct !== 0) solver.stamp(b2, ct - 1, -1);
-    if (ct !== 0) solver.stamp(b3, ct - 1, 1);
-    if (s2 !== 0) solver.stamp(b3, s2 - 1, -1);
+    if (p1 !== 0) solver.stampElement(solver.allocElement(b1, p1 - 1), 1);
+    if (p2 !== 0) solver.stampElement(solver.allocElement(b1, p2 - 1), -1);
+    if (s1 !== 0) solver.stampElement(solver.allocElement(b2, s1 - 1), 1);
+    if (ct !== 0) solver.stampElement(solver.allocElement(b2, ct - 1), -1);
+    if (ct !== 0) solver.stampElement(solver.allocElement(b3, ct - 1), 1);
+    if (s2 !== 0) solver.stampElement(solver.allocElement(b3, s2 - 1), -1);
 
     if (!ctx.isTransient && !ctx.isDcOp) return;
 
@@ -438,17 +438,17 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
       const hist2 = ccap2 - ag[0] * phi2_0;
       const hist3 = ccap3 - ag[0] * phi3_0;
 
-      solver.stamp(b1, b1, -g11);
-      solver.stamp(b1, b2, -g12);
-      solver.stamp(b1, b3, -g13);
+      solver.stampElement(solver.allocElement(b1, b1), -g11);
+      solver.stampElement(solver.allocElement(b1, b2), -g12);
+      solver.stampElement(solver.allocElement(b1, b3), -g13);
       solver.stampRHS(b1, hist1);
-      solver.stamp(b2, b1, -g12);
-      solver.stamp(b2, b2, -g22);
-      solver.stamp(b2, b3, -g23);
+      solver.stampElement(solver.allocElement(b2, b1), -g12);
+      solver.stampElement(solver.allocElement(b2, b2), -g22);
+      solver.stampElement(solver.allocElement(b2, b3), -g23);
       solver.stampRHS(b2, hist2);
-      solver.stamp(b3, b1, -g13);
-      solver.stamp(b3, b2, -g23);
-      solver.stamp(b3, b3, -g33);
+      solver.stampElement(solver.allocElement(b3, b1), -g13);
+      solver.stampElement(solver.allocElement(b3, b2), -g23);
+      solver.stampElement(solver.allocElement(b3, b3), -g33);
       solver.stampRHS(b3, hist3);
 
       sRef[base + SLOT_G11] = g11;

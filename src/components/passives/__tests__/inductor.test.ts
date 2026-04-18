@@ -11,17 +11,18 @@
  *   - RL step response integration test
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   InductorDefinition,
   INDUCTOR_ATTRIBUTE_MAPPINGS,
 } from "../inductor.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
-import type { SparseSolverStamp } from "../../../core/analog-types.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -49,30 +50,21 @@ function withState(core: AnalogElementCore): { element: ReactiveAnalogElement; p
 // Helpers
 // ---------------------------------------------------------------------------
 
-interface StampCall {
-  row: number;
-  col: number;
-  value: number;
-}
-
-interface RHSCall {
-  row: number;
-  value: number;
-}
-
-function makeStubSolver(): { solver: SparseSolverStamp; stamps: StampCall[]; rhsStamps: RHSCall[] } {
-  const stamps: StampCall[] = [];
-  const rhsStamps: RHSCall[] = [];
-
-  const solver: SparseSolverStamp = {
-    stamp: (row: number, col: number, value: number) => {
-      stamps.push({ row, col, value });
-    },
-    stampRHS: (row: number, value: number) => {
-      rhsStamps.push({ row, value });
-    },
-  };
-
+function makeCaptureSolver(): { solver: SparseSolverType; stamps: [number, number, number][]; rhsStamps: [number, number][] } {
+  const stamps: [number, number, number][] = [];
+  const rhsStamps: [number, number][] = [];
+  const solver = {
+    allocElement: vi.fn((row: number, col: number) => {
+      stamps.push([row, col, 0]);
+      return stamps.length - 1;
+    }),
+    stampElement: vi.fn((h: number, v: number) => {
+      stamps[h][2] += v;
+    }),
+    stampRHS: vi.fn((row: number, v: number) => {
+      rhsStamps.push([row, v]);
+    }),
+  } as unknown as SparseSolverType;
   return { solver, stamps, rhsStamps };
 }
 
@@ -98,24 +90,25 @@ describe("Inductor", () => {
       // Node 1 → solver idx 0, Node 2 → solver idx 1, branch → solver row 2
       const analogElement = makeInductorElement(new Map([["A", 1], ["B", 2]]), 2, props);
 
-      const { solver, stamps } = makeStubSolver();
-      analogElement.stamp(solver);
+      const { solver, stamps } = makeCaptureSolver();
+      const ctx = makeSimpleCtx({ elements: [analogElement], matrixSize: 3, nodeCount: 2, branchCount: 1, solver });
+      analogElement.load(ctx.loadCtx);
 
       // Should have: 2 B-matrix incidence + 2 C/D-matrix branch (topology only) = 4
       // B-matrix (node rows): (0,2)=+1, (1,2)=-1
       // C/D-matrix (branch row): (2,0)=+1, (2,1)=-1
-      // Note: (2,2)=-geq is now stamped by stampReactiveCompanion
+      // Note: (2,2)=-geq is stamped only during transient (DC: short-circuit, no companion term)
       expect(stamps.length).toBe(4);
 
       // B sub-matrix: branch current incidence in node KCL rows
-      const nodeEntries = stamps.filter((s) => s.row < 2);
-      expect(nodeEntries.some((s) => s.row === 0 && s.col === 2 && s.value === 1)).toBe(true);
-      expect(nodeEntries.some((s) => s.row === 1 && s.col === 2 && s.value === -1)).toBe(true);
+      const nodeEntries = stamps.filter((s) => s[0] < 2);
+      expect(nodeEntries.some((s) => s[0] === 0 && s[1] === 2 && s[2] === 1)).toBe(true);
+      expect(nodeEntries.some((s) => s[0] === 1 && s[1] === 2 && s[2] === -1)).toBe(true);
 
       // C sub-matrix: branch equation entries
-      const branchEntries = stamps.filter((s) => s.row === 2);
-      expect(branchEntries.some((s) => s.col === 0 && s.value === 1)).toBe(true);
-      expect(branchEntries.some((s) => s.col === 1 && s.value === -1)).toBe(true);
+      const branchEntries = stamps.filter((s) => s[0] === 2);
+      expect(branchEntries.some((s) => s[1] === 0 && s[2] === 1)).toBe(true);
+      expect(branchEntries.some((s) => s[1] === 1 && s[2] === -1)).toBe(true);
     });
   });
 
@@ -132,14 +125,14 @@ describe("Inductor", () => {
       analogElement.stampCompanion!(1e-4, "trapezoidal", voltages, 2, [1e-4, 1e-4]);
 
       // For trapezoidal: geq = 2L/h = 2 * 0.01 / 1e-4 = 200
-      const { solver, stamps } = makeStubSolver();
-      analogElement.stamp(solver);
-      analogElement.stampReactiveCompanion!(solver);
+      const { solver, stamps } = makeCaptureSolver();
+      const ctx = makeSimpleCtx({ elements: [analogElement], matrixSize: 3, nodeCount: 2, branchCount: 1, solver });
+      analogElement.load(ctx.loadCtx);
 
       // geq appears as -geq on the branch diagonal (row=2, col=2)
-      const branchDiag = stamps.find((s) => s.row === 2 && s.col === 2);
+      const branchDiag = stamps.find((s) => s[0] === 2 && s[1] === 2);
       expect(branchDiag).toBeDefined();
-      expect(branchDiag!.value).toBeCloseTo(-200, 3);
+      expect(branchDiag![2]).toBeCloseTo(-200, 3);
     });
   });
 
@@ -154,13 +147,13 @@ describe("Inductor", () => {
       analogElement.stampCompanion!(1e-4, "bdf1", voltages, 1, [1e-4]);
 
       // For BDF-1: geq = L/h = 0.01 / 1e-4 = 100
-      const { solver, stamps } = makeStubSolver();
-      analogElement.stamp(solver);
-      analogElement.stampReactiveCompanion!(solver);
+      const { solver, stamps } = makeCaptureSolver();
+      const ctx = makeSimpleCtx({ elements: [analogElement], matrixSize: 3, nodeCount: 2, branchCount: 1, solver });
+      analogElement.load(ctx.loadCtx);
 
-      const branchDiag = stamps.find((s) => s.row === 2 && s.col === 2);
+      const branchDiag = stamps.find((s) => s[0] === 2 && s[1] === 2);
       expect(branchDiag).toBeDefined();
-      expect(branchDiag!.value).toBeCloseTo(-100, 3);
+      expect(branchDiag![2]).toBeCloseTo(-100, 3);
     });
   });
 

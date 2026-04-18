@@ -37,12 +37,16 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // ---------------------------------------------------------------------------
 
 function makeMockSolver() {
-  const stamps: Array<{ row: number; col: number; value: number }> = [];
+  const stamps: [number, number, number][] = [];
   const rhs: Record<number, number> = {};
 
   const solver = {
-    stamp: vi.fn((row: number, col: number, value: number) => {
-      stamps.push({ row, col, value });
+    allocElement: vi.fn((row: number, col: number) => {
+      stamps.push([row, col, 0]);
+      return stamps.length - 1;
+    }),
+    stampElement: vi.fn((h: number, v: number) => {
+      stamps[h][2] += v;
     }),
     stampRHS: vi.fn((row: number, value: number) => {
       rhs[row] = (rhs[row] ?? 0) + value;
@@ -52,6 +56,30 @@ function makeMockSolver() {
   };
 
   return solver;
+}
+
+function makeMinimalCtx(solver: unknown, time = 0, srcFact = 1) {
+  return {
+    solver: solver as SparseSolver,
+    voltages: new Float64Array(4),
+    iteration: 0,
+    initMode: "initFloat" as const,
+    dt: 0,
+    method: "trapezoidal" as const,
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +182,7 @@ describe("AcSource", () => {
   it("sine_at_t_zero", () => {
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sine" }, 1, 0, 2, 0);
     const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    el.load(makeMinimalCtx(solver));
     // RHS at branch row 2: V(t=0) = 5 * sin(0) = 0
     expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(0, 8));
   });
@@ -162,7 +190,7 @@ describe("AcSource", () => {
   it("sine_at_quarter_period", () => {
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sine" }, 1, 0, 2, 0.25e-3);
     const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    el.load(makeMinimalCtx(solver));
     // RHS at branch row 2: V(t=0.25ms) = 5 * sin(π/2) = 5.0
     expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(5.0, 4));
   });
@@ -171,7 +199,7 @@ describe("AcSource", () => {
     // Use t=0.75ms (3/4 period) where sin = -1, firmly in the negative half cycle
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "square" }, 1, 0, 2, 0.75e-3);
     const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    el.load(makeMinimalCtx(solver));
     // At t=0.75ms: sin(2π*1000*0.75e-3) = sin(3π/2) = -1 → V = -5
     expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(-5.0, 4));
   });
@@ -179,7 +207,7 @@ describe("AcSource", () => {
   it("triangle_linearity", () => {
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "triangle" }, 1, 0, 2, 0.125e-3);
     const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    el.load(makeMinimalCtx(solver));
     // At t=1/8 period: triangle is at half amplitude (rising) = 2.5V
     expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(2.5, 4));
   });
@@ -190,7 +218,7 @@ describe("AcSource", () => {
       1, 0, 2, 0,
     );
     const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    el.load(makeMinimalCtx(solver));
     // At t=0: sin(0)=0, so RHS = 0*scale + 2 = 2.0
     expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(2.0, 8));
   });
@@ -221,7 +249,7 @@ describe("AcSource", () => {
     const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sine" }, 1, 0, 2, 0.25e-3);
     el.setSourceScale!(0.5);
     const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    el.load(makeMinimalCtx(solver));
     expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(2.5, 4));
   });
 });
@@ -346,7 +374,7 @@ describe("ExprWaveform", () => {
     // sin(2π * 500 * 0.001) = sin(2π * 0.5) = sin(π) ≈ 0
     const el = makeExprElement("3 * sin(2 * pi * 500 * t)", 0.001);
     const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    el.load(makeMinimalCtx(solver));
     expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(0, 5));
   });
 
@@ -354,7 +382,7 @@ describe("ExprWaveform", () => {
     // "5 * t" at t=0.001 → RHS = 5 * 0.001 = 0.005V
     const el = makeExprElement("5 * t", 0.001);
     const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    el.load(makeMinimalCtx(solver));
     expect(solver.stampRHS).toHaveBeenCalledWith(2, expect.closeTo(0.005, 8));
   });
 
@@ -366,22 +394,199 @@ describe("ExprWaveform", () => {
     expect(typeof el._parseError).toBe("string");
     expect((el._parseError as string).length).toBeGreaterThan(0);
 
-    // stamp should not throw and should produce RHS = 0
+    // load should not throw and should produce RHS = 0
     const solver = makeMockSolver();
-    expect(() => el.stamp(solver as unknown as SparseSolver)).not.toThrow();
+    expect(() => el.load(makeMinimalCtx(solver))).not.toThrow();
     expect(solver.stampRHS).toHaveBeenCalledWith(2, 0);
   });
 
   it("expression_parsed_once", () => {
-    // _parsedExpr is the same object reference after two stamp calls
+    // _parsedExpr is the same object reference after two load calls
     const el = makeExprElement("5 * t", 0);
     const firstRef = el._parsedExpr;
 
     const solver1 = makeMockSolver();
-    el.stamp(solver1 as unknown as SparseSolver);
+    el.load(makeMinimalCtx(solver1));
     const solver2 = makeMockSolver();
-    el.stamp(solver2 as unknown as SparseSolver);
+    el.load(makeMinimalCtx(solver2));
 
     expect(el._parsedExpr).toBe(firstRef);
+  });
+});
+
+// ===========================================================================
+// Task C4.4 — AC voltage source srcFact + breakpoint parity
+//
+// ngspice reference: cktload.c:96-136 + VSRCload. The AC voltage source
+// multiplies its computed waveform value by CKTsrcFact before stamping.
+// Breakpoints derived from ngspice PULSE schedule (offsets 0, TR, halfPeriod,
+// halfPeriod+TF) must match squareWaveBreakpoints output bit-exact.
+// ===========================================================================
+
+describe("ac_vsource_load_srcfact_parity", () => {
+  it("sine_srcfact_05_halves_rhs_bit_exact", () => {
+    const AMPLITUDE = 5;
+    const FREQUENCY = 1000;
+    const T = 0.25e-3; // quarter period → sin(π/2) = 1 → nominal V = 5
+    const SRC_FACT = 0.5;
+
+    const el = makeAcElement({ amplitude: AMPLITUDE, frequency: FREQUENCY, waveform: "sine" }, 1, 0, 2, T);
+    const solver = makeMockSolver();
+
+    const ctx = {
+      solver: solver as unknown as SparseSolver,
+      voltages: new Float64Array(3),
+      iteration: 0,
+      initMode: "initFloat" as const,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact: SRC_FACT,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    el.load(ctx);
+
+    // NGSPICE_REF: V(t=0.25ms) * srcFact = amplitude * sin(2π*1000*0.25e-3) * 0.5.
+    const NGSPICE_REF =
+      (0 + AMPLITUDE * Math.sin(2 * Math.PI * FREQUENCY * T + 0)) * SRC_FACT;
+    expect(solver.stampRHS).toHaveBeenCalledWith(2, NGSPICE_REF);
+  });
+
+  it("square_srcfact_025_scales_rhs_bit_exact_at_negative_half", () => {
+    const AMPLITUDE = 5;
+    const FREQUENCY = 1000;
+    const T = 0.75e-3; // 3/4 period of 1kHz, sin = -1 → square = -amplitude
+    const SRC_FACT = 0.25;
+
+    const el = makeAcElement({ amplitude: AMPLITUDE, frequency: FREQUENCY, waveform: "square" }, 1, 0, 2, T);
+    const solver = makeMockSolver();
+
+    const ctx = {
+      solver: solver as unknown as SparseSolver,
+      voltages: new Float64Array(3),
+      iteration: 0,
+      initMode: "initFloat" as const,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact: SRC_FACT,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    el.load(ctx);
+
+    // NGSPICE_REF: square waveform with default riseTime/fallTime = 1ns (AC_VOLTAGE_SOURCE_DEFAULTS).
+    // At t=0.75ms (well past halfPeriod + fallTime of 0.5ms+1ns), we are firmly in the
+    // "low" half of the wave → value = -amplitude. Result after srcFact = -amplitude * srcFact.
+    const NGSPICE_REF =
+      computeWaveformValue("square", AMPLITUDE, FREQUENCY, 0, 0, T) * SRC_FACT;
+    expect(solver.stampRHS).toHaveBeenCalledWith(2, NGSPICE_REF);
+    expect(NGSPICE_REF).toBe(-AMPLITUDE * SRC_FACT);
+  });
+
+  it("srcfact_0_zeroes_rhs_but_leaves_incidence", () => {
+    const el = makeAcElement({ amplitude: 5, frequency: 1000, waveform: "sine" }, 1, 2, 3, 0.25e-3);
+    const solver = makeMockSolver();
+
+    const ctx = {
+      solver: solver as unknown as SparseSolver,
+      voltages: new Float64Array(4),
+      iteration: 0,
+      initMode: "initJct" as const,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact: 0,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    el.load(ctx);
+
+    // NGSPICE_REF at srcFact=0 → RHS entry exactly 0 (independent of waveform value).
+    expect(solver.stampRHS).toHaveBeenCalledWith(3, 0);
+    // Incidence stamps must remain (±1 at four positions).
+    const stamps = solver._stamps;
+    expect(stamps.some(([r, c, v]) => r === 0 && c === 3 && v ===  1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 1 && c === 3 && v === -1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 3 && c === 0 && v ===  1)).toBe(true);
+    expect(stamps.some(([r, c, v]) => r === 3 && c === 1 && v === -1)).toBe(true);
+  });
+});
+
+describe("ac_vsource_breakpoints_parity", () => {
+  it("square_1khz_breakpoints_exact_array_match", () => {
+    // ngspice PULSE breakpoint schedule per period (offset within period):
+    //   0, riseTime, halfPeriod, halfPeriod + fallTime
+    // Defaults: riseTime = fallTime = 1e-9 (from AC_VOLTAGE_SOURCE_DEFAULTS).
+    // For 1 kHz over (0, 2 ms) exclusive, seven breakpoints per existing
+    // square_wave_breakpoints test. The bit-exact array:
+    const FREQUENCY = 1000;
+    const RT = 1e-9;
+    const FT = 1e-9;
+    const halfPeriod = 1 / (2 * FREQUENCY);
+
+    // NGSPICE_REF: direct inline computation of each expected time.
+    const NGSPICE_REF: number[] = [
+      0 + RT,                       // 1ns
+      0 + halfPeriod,               // 0.5ms
+      0 + halfPeriod + FT,          // 0.5ms + 1ns
+      1 * (1 / FREQUENCY) + 0,      // 1ms
+      1 * (1 / FREQUENCY) + RT,     // 1ms + 1ns
+      1 * (1 / FREQUENCY) + halfPeriod, // 1.5ms
+      1 * (1 / FREQUENCY) + halfPeriod + FT, // 1.5ms + 1ns
+    ];
+
+    const el = makeAcElement({ amplitude: 5, frequency: FREQUENCY, waveform: "square" }, 1, 0, 2, 0);
+    const bps = el.getBreakpoints(0, 0.002);
+
+    // Exact array equality (same length, same element-wise IEEE-754 values).
+    expect(bps).toHaveLength(NGSPICE_REF.length);
+    for (let i = 0; i < NGSPICE_REF.length; i++) {
+      expect(bps[i]).toBe(NGSPICE_REF[i]);
+    }
+  });
+
+  it("squareWaveBreakpoints_helper_matches_inline_ngspice_schedule", () => {
+    // Parity against the factored helper (source of truth for the element).
+    const RT = 0, FT = 0;
+    const period = 1 / 1000;
+    const halfPeriod = period / 2;
+    const NGSPICE_REF = [halfPeriod, period, period + halfPeriod];
+    const helper = squareWaveBreakpoints(1000, 0, 0, 0.002, RT, FT);
+    expect(helper).toHaveLength(NGSPICE_REF.length);
+    for (let i = 0; i < NGSPICE_REF.length; i++) {
+      expect(helper[i]).toBe(NGSPICE_REF[i]);
+    }
   });
 });

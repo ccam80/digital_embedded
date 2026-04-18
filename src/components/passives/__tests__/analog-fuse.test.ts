@@ -317,7 +317,7 @@ describe("AnalogFuseElement", () => {
         setParam(_key: string, _value: number): void {},
         getPinCurrents(_v: Float64Array): number[] { return []; },
         stamp(solver: SparseSolver): void {
-          solver.stamp(1, 1, G_load);
+          solver.stampElement(solver.allocElement(1, 1), G_load);
         },
       };
 

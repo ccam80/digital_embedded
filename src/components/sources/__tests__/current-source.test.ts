@@ -22,12 +22,16 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // ---------------------------------------------------------------------------
 
 function makeMockSolver() {
-  const stamps: Array<{ row: number; col: number; value: number }> = [];
+  const stamps: [number, number, number][] = [];
   const rhs: Record<number, number> = {};
 
   const solver = {
-    stamp: vi.fn((row: number, col: number, value: number) => {
-      stamps.push({ row, col, value });
+    allocElement: vi.fn((row: number, col: number) => {
+      stamps.push([row, col, 0]);
+      return stamps.length - 1;
+    }),
+    stampElement: vi.fn((h: number, v: number) => {
+      stamps[h][2] += v;
     }),
     stampRHS: vi.fn((row: number, value: number) => {
       rhs[row] = (rhs[row] ?? 0) + value;
@@ -37,6 +41,30 @@ function makeMockSolver() {
   };
 
   return solver;
+}
+
+function makeMinimalCtx(solver: unknown) {
+  return {
+    solver: solver as SparseSolver,
+    voltages: new Float64Array(4),
+    iteration: 0,
+    initMode: "initFloat" as const,
+    dt: 0,
+    method: "trapezoidal" as const,
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -49,10 +77,10 @@ describe("CurrentSource", () => {
     const src = makeCurrentSource(1, 2, 0.01);
     const solver = makeMockSolver();
 
-    src.stamp(solver as unknown as SparseSolver);
+    src.load(makeMinimalCtx(solver));
 
     // No matrix stamps — current sources are RHS-only
-    expect(solver.stamp).toHaveBeenCalledTimes(0);
+    expect(solver.allocElement).toHaveBeenCalledTimes(0);
 
     // RHS[nodePos-1] += I  → RHS[0] += 0.01
     // RHS[nodeNeg-1] -= I  → RHS[1] -= 0.01
@@ -66,10 +94,10 @@ describe("CurrentSource", () => {
     src.setSourceScale!(0.3);
 
     const solver = makeMockSolver();
-    src.stamp(solver as unknown as SparseSolver);
+    src.load(makeMinimalCtx(solver));
 
     // No matrix stamps
-    expect(solver.stamp).toHaveBeenCalledTimes(0);
+    expect(solver.allocElement).toHaveBeenCalledTimes(0);
 
     // I * scale = 0.01 * 0.3 = 0.003
     expect(solver.stampRHS).toHaveBeenCalledWith(0,  0.003);
@@ -81,7 +109,7 @@ describe("CurrentSource", () => {
     const src = makeCurrentSource(1, 0, 0.01);
     const solver = makeMockSolver();
 
-    src.stamp(solver as unknown as SparseSolver);
+    src.load(makeMinimalCtx(solver));
 
     // Only one RHS entry (ground row suppressed)
     expect(solver.stampRHS).toHaveBeenCalledTimes(1);
@@ -119,10 +147,128 @@ describe("CurrentSource", () => {
     );
 
     const solver = makeMockSolver();
-    el.stamp(solver as unknown as SparseSolver);
+    el.load(makeMinimalCtx(solver));
 
     // Default current is 0.01 A
     expect(solver.stampRHS).toHaveBeenCalledWith(0,  0.01);
     expect(solver.stampRHS).toHaveBeenCalledWith(1, -0.01);
+  });
+});
+
+// ===========================================================================
+// Task C4.4 — Current source srcFact parity
+//
+// ngspice reference: cktload.c:96-136 + ISRCload.
+// An independent current source stamps `I * CKTsrcFact` into nodePos row,
+// `-I * CKTsrcFact` into nodeNeg row. RHS-only — no matrix entries.
+// ===========================================================================
+
+describe("isource_load_srcfact_parity", () => {
+  it("srcfact_03_scales_rhs_bit_exact", () => {
+    const CURRENT = 0.01;
+    const SRC_FACT = 0.3;
+    const src = makeCurrentSource(1, 2, CURRENT);
+    const solver = makeMockSolver();
+
+    const ctx = {
+      solver: solver as unknown as SparseSolver,
+      voltages: new Float64Array(3),
+      iteration: 0,
+      initMode: "initFloat" as const,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact: SRC_FACT,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    src.load(ctx);
+
+    // NGSPICE_REF: I * srcFact, bit-exact IEEE-754 product.
+    const NGSPICE_REF_POS = CURRENT * SRC_FACT;
+    const NGSPICE_REF_NEG = -(CURRENT * SRC_FACT);
+    expect(solver.stampRHS).toHaveBeenCalledWith(0, NGSPICE_REF_POS);
+    expect(solver.stampRHS).toHaveBeenCalledWith(1, NGSPICE_REF_NEG);
+    // Zero matrix stamps (current source is RHS-only).
+    expect(solver.allocElement).toHaveBeenCalledTimes(0);
+    expect(NGSPICE_REF_POS).toBe(0.003);
+  });
+
+  it("srcfact_0_zeroes_rhs_both_rows", () => {
+    const CURRENT = 0.015;
+    const SRC_FACT = 0;
+    const src = makeCurrentSource(1, 2, CURRENT);
+    const solver = makeMockSolver();
+
+    const ctx = {
+      solver: solver as unknown as SparseSolver,
+      voltages: new Float64Array(3),
+      iteration: 0,
+      initMode: "initJct" as const,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact: SRC_FACT,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    src.load(ctx);
+
+    expect(solver.stampRHS).toHaveBeenCalledWith(0, 0);
+    expect(solver.stampRHS).toHaveBeenCalledWith(1, -0);
+  });
+
+  it("srcfact_1_preserves_full_current", () => {
+    const CURRENT = 0.02;
+    const src = makeCurrentSource(1, 0, CURRENT);
+    const solver = makeMockSolver();
+
+    const ctx = {
+      solver: solver as unknown as SparseSolver,
+      voltages: new Float64Array(3),
+      iteration: 0,
+      initMode: "initFloat" as const,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    src.load(ctx);
+
+    // pos only (neg is ground → suppressed).
+    expect(solver.stampRHS).toHaveBeenCalledTimes(1);
+    expect(solver.stampRHS).toHaveBeenCalledWith(0, CURRENT);
   });
 });

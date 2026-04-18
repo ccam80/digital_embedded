@@ -23,6 +23,7 @@ import {
   BJT_SPICE_L1_PARAM_DEFS,
   BJT_SPICE_L1_NPN_DEFAULTS,
 } from "../bjt.js";
+import type { LoadContext } from "../../../solver/analog/element.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
@@ -138,11 +139,11 @@ function makeResistor(nodeA: number, nodeB: number, R: number): AnalogElement {
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolverType): void {
-      if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
-      if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
+      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
+      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
       if (nodeA !== 0 && nodeB !== 0) {
-        solver.stamp(nodeA - 1, nodeB - 1, -G);
-        solver.stamp(nodeB - 1, nodeA - 1, -G);
+        solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -G);
+        solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -G);
       }
     },
   };
@@ -1259,5 +1260,125 @@ describe("BJT L1 LimitingEvent instrumentation", () => {
     expect(beEv!.limitType).toBe("pnjlim");
     expect(Number.isFinite(beEv!.vBefore)).toBe(true);
     expect(Number.isFinite(beEv!.vAfter)).toBe(true);
+  });
+});
+
+// ===========================================================================
+// Task C4.3 — BJT SPICE-L1 common-emitter DC-OP parity
+//
+// Bit-exact parity for the core Gummel-Poon operating-point formula against
+// the ngspice BJTload reference (bjtload.c:398-420 + BJT Gummel-Poon body).
+// Drives through load(ctx) and reads the stored pool slots for IC / IB,
+// then compares against the inline NGSPICE_REF formula.
+//
+// ngspice → ours mapping (bjtload.c:398-462, computeSpiceL1BjtOp):
+//   csat (IS·AREA)       → tpL1.tSatCur * params.AREA
+//   betaF                → tpL1.tBetaF (= BF at TNOM)
+//   q1 = 1/(1 - Vbc·inv_VAF - Vbe·inv_VAR)
+//   q2 = If·oik + Ir·oikr
+//   sqarg = (1 + 4·q2)^NKF
+//   qb    = q1·(1 + sqarg)/2
+//   ic    = (If - Ir)/qb - Ir/BR - GMIN·Vbc
+//   ib    = If/BF + Ir/BR + GMIN·(Vbe+Vbc)
+// ===========================================================================
+
+describe("bjt_spicel1_load_dcop_parity", () => {
+  function makeL1Pool(core: any): StatePool {
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+    return pool;
+  }
+
+  function makeLoadCtx(solver: any, voltages: Float64Array, srcFact: number, initMode: "initFloat" | "initJct"): LoadContext {
+    return {
+      solver,
+      voltages,
+      iteration: 1, // past iteration-0 so limiting-collector is not required
+      initMode,
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+  }
+
+  it("common_emitter_active_ic_ib_bit_exact_vs_ngspice", () => {
+    // Default SPICE L1 NPN, then override to a minimum-coupling setup:
+    //   VAF=VAR=Inf, IKF=IKR=Inf, ISE=ISC=0, NE=NC=2 (default), NKF=0.5,
+    //   AREA=1, TNOM=REFTEMP → no temp scaling, so tSatCur = IS etc.
+    // RB=RC=RE=0 so there are no internal nodes — external pins are
+    // nodeB_int=nodeB_ext=2, nodeC_int=1, nodeE_int=3.
+    const VBE = 0.7;
+    const VCE = 5.0;
+    const VBC = VBE - VCE; // = -4.3
+
+    const props = makeSpiceL1Props({
+      IS: 1e-15, BF: 100, BR: 1,
+      NF: 1, NR: 1, NE: 2, NC: 2,
+      ISE: 0, ISC: 0, IKF: Infinity, IKR: Infinity,
+      VAF: Infinity, VAR: Infinity,
+      RB: 0, RC: 0, RE: 0, CJE: 0, CJC: 0, CJS: 0, TF: 0, TR: 0,
+      XCJC: 1, NKF: 0.5, AREA: 1, M: 1,
+      TNOM: 300.15 - 273.15, // °C so that absolute T = 300.15 K (REFTEMP → tVt=VT, no scaling)
+    });
+
+    // nodeB=2 (ext), nodeC=1, nodeE=3. No internal nodes since RB=RC=RE=0.
+    const core = createSpiceL1BjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), [], -1, props);
+    const pool = makeL1Pool(core);
+    (core as any).elementIndex = 0;
+    const el = withNodeIds(core as unknown as AnalogElementCore, [2, 1, 3]);
+
+    // Solver voltages: [V(node1), V(node2), V(node3)] = [Vc, Vb, Ve].
+    // Vbe = Vb - Ve, Vbc = Vb - Vc. Pick Ve=0, Vb=0.7 → Vbe=0.7. Vc = Vb - Vbc = 0.7 - (-4.3) = 5.0.
+    const voltages = new Float64Array([5.0, 0.7, 0.0]);
+
+    const stamps: Array<[number, number, number]> = [];
+    const rhs: Array<[number, number]> = [];
+    const solver = {
+      stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
+      stampRHS: (r: number, v: number) => rhs.push([r, v]),
+    };
+
+    // Seed pool slots so pnjlim produces pass-through (vd_old == vd_raw → no limit).
+    // BJT L1 state layout: SLOT_VBE=0, SLOT_VBC=1.
+    pool.state0[0] = VBE;
+    pool.state0[1] = VBC;
+
+    el.load(makeLoadCtx(solver, voltages, 1, "initFloat"));
+
+    // NGSPICE_REF: inline computeSpiceL1BjtOp at (Vbe, Vbc) with the chosen
+    // parameters. VAF=VAR=Inf → tinvEarlyVoltF = tinvEarlyVoltR = 0 → q1 = 1.
+    // IKF=IKR=Inf → oik = oikr = 0 → q2 = 0 → sqarg = 1 → qb = 1.
+    // C2 = ISE·AREA = 0, C4 = ISC·AREA = 0 → no non-ideal terms.
+    const IS = 1e-15;
+    const BF = 100;
+    const BR = 1;
+    const NF = 1, NR = 1;
+    const NGSPICE_nfVt = NF * VT;
+    const NGSPICE_nrVt = NR * VT;
+    const NGSPICE_expVbe = Math.exp(Math.min(VBE / NGSPICE_nfVt, 700));
+    const NGSPICE_expVbc = Math.exp(Math.min(VBC / NGSPICE_nrVt, 700));
+    const NGSPICE_If = IS * (NGSPICE_expVbe - 1);
+    const NGSPICE_Ir = IS * (NGSPICE_expVbc - 1);
+    const NGSPICE_qb = 1;
+    const NGSPICE_iTransport = (NGSPICE_If - NGSPICE_Ir) / NGSPICE_qb;
+    const NGSPICE_IC = NGSPICE_iTransport - NGSPICE_Ir / BR - GMIN * VBC;
+    const NGSPICE_IB = NGSPICE_If / BF + NGSPICE_Ir / BR + GMIN * VBE + GMIN * VBC;
+
+    // L1 state slot layout: SLOT_IC=6, SLOT_IB=7.
+    expect(pool.state0[6]).toBe(NGSPICE_IC);
+    expect(pool.state0[7]).toBe(NGSPICE_IB);
   });
 });

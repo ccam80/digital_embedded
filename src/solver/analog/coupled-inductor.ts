@@ -207,17 +207,17 @@ export class CoupledInductorPair {
     const [n2p, n2m] = nodes2;
 
     // Branch 1 row: V(n1+) − V(n1−) − g11·I1 − g12·I2 = hist1
-    if (n1p !== 0) solver.stamp(branch1, n1p - 1, 1);
-    if (n1m !== 0) solver.stamp(branch1, n1m - 1, -1);
-    solver.stamp(branch1, branch1, -g11);
-    solver.stamp(branch1, branch2, -g12);
+    if (n1p !== 0) solver.stampElement(solver.allocElement(branch1, n1p - 1), 1);
+    if (n1m !== 0) solver.stampElement(solver.allocElement(branch1, n1m - 1), -1);
+    solver.stampElement(solver.allocElement(branch1, branch1), -g11);
+    solver.stampElement(solver.allocElement(branch1, branch2), -g12);
     solver.stampRHS(branch1, hist1);
 
     // Branch 2 row: V(n2+) − V(n2−) − g12·I1 − g22·I2 = hist2
-    if (n2p !== 0) solver.stamp(branch2, n2p - 1, 1);
-    if (n2m !== 0) solver.stamp(branch2, n2m - 1, -1);
-    solver.stamp(branch2, branch1, -g12);
-    solver.stamp(branch2, branch2, -g22);
+    if (n2p !== 0) solver.stampElement(solver.allocElement(branch2, n2p - 1), 1);
+    if (n2m !== 0) solver.stampElement(solver.allocElement(branch2, n2m - 1), -1);
+    solver.stampElement(solver.allocElement(branch2, branch1), -g12);
+    solver.stampElement(solver.allocElement(branch2, branch2), -g22);
     solver.stampRHS(branch2, hist2);
   }
 

@@ -228,7 +228,7 @@ function createOpAmpElement(
 
       // G_out: output resistance between nOut and ground (always present).
       if (nOut > 0) {
-        solver.stamp(nOut - 1, nOut - 1, G_out);
+        solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), G_out);
       }
 
       if (!saturated) {
@@ -239,10 +239,10 @@ function createOpAmpElement(
         //                                                G[out,in-] += gain*G_out
         const effectiveGain = p.gain * scale;
         if (nOut > 0 && nInp > 0) {
-          solver.stamp(nOut - 1, nInp - 1, -effectiveGain * G_out);
+          solver.stampElement(solver.allocElement(nOut - 1, nInp - 1), -effectiveGain * G_out);
         }
         if (nOut > 0 && nInn > 0) {
-          solver.stamp(nOut - 1, nInn - 1, effectiveGain * G_out);
+          solver.stampElement(solver.allocElement(nOut - 1, nInn - 1), effectiveGain * G_out);
         }
       } else if (nOut > 0) {
         // Saturation: inject Norton current to clamp output to rail voltage.

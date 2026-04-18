@@ -179,6 +179,13 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   s3!: Float64Array;
   private base!: number;
 
+  // Cached matrix-entry handles (allocated lazily on first load()).
+  private _hAA: number = -1;
+  private _hBB: number = -1;
+  private _hAB: number = -1;
+  private _hBA: number = -1;
+  private _handlesInit: boolean = false;
+
   constructor(capacitance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
     this._nominalC = capacitance;
     this._IC = IC;
@@ -305,12 +312,23 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
       this.s0[this.base + SLOT_IEQ] = ceq;
       this.s0[this.base + SLOT_V] = vcap;
 
+      // Allocate matrix handles once (ngspice spGetElement pattern).
+      if (!this._handlesInit) {
+        if (n0 !== 0) this._hAA = solver.allocElement(n0 - 1, n0 - 1);
+        if (n1 !== 0) this._hBB = solver.allocElement(n1 - 1, n1 - 1);
+        if (n0 !== 0 && n1 !== 0) {
+          this._hAB = solver.allocElement(n0 - 1, n1 - 1);
+          this._hBA = solver.allocElement(n1 - 1, n0 - 1);
+        }
+        this._handlesInit = true;
+      }
+
       // Stamp companion model (capload.c:74-79).
-      if (n0 !== 0) solver.stamp(n0 - 1, n0 - 1, geq);
-      if (n1 !== 0) solver.stamp(n1 - 1, n1 - 1, geq);
+      if (n0 !== 0) solver.stampElement(this._hAA, geq);
+      if (n1 !== 0) solver.stampElement(this._hBB, geq);
       if (n0 !== 0 && n1 !== 0) {
-        solver.stamp(n0 - 1, n1 - 1, -geq);
-        solver.stamp(n1 - 1, n0 - 1, -geq);
+        solver.stampElement(this._hAB, -geq);
+        solver.stampElement(this._hBA, -geq);
       }
       if (n0 !== 0) solver.stampRHS(n0 - 1, -ceq);
       if (n1 !== 0) solver.stampRHS(n1 - 1, ceq);

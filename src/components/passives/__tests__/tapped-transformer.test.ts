@@ -29,6 +29,8 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import { makeVoltageSource, makeResistor, makeDiode, makeCapacitor, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElementCore } from "../../../solver/analog/element.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -39,6 +41,33 @@ function getFactory(entry: ModelEntry): AnalogFactory {
   return entry.factory;
 }
 
+// ---------------------------------------------------------------------------
+// makeTransientCtx — minimal LoadContext for manual transient loops
+// ---------------------------------------------------------------------------
+
+function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array): LoadContext {
+  return {
+    solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: true,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Element construction helper
@@ -133,12 +162,13 @@ describe("TappedTransformer", () => {
 
       tx.stampCompanion(dt, "trapezoidal", voltages);
       solver.beginAssembly(matrixSize);
-      vsrc.stamp(solver);
-      tx.stamp(solver);
+      const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages);
+      vsrc.load(ctx);
+      tx.load(ctx);
       tx.stampReactiveCompanion!(solver);
-      rLoad.stamp(solver);
-      rCtGnd.stamp(solver);
-      rS2Gnd.stamp(solver);
+      rLoad.load(ctx);
+      rCtGnd.load(ctx);
+      rS2Gnd.load(ctx);
       solver.finalize();
       const result = solver.factor();
       if (!result.success) throw new Error(`Singular at step ${i}`);
@@ -222,12 +252,13 @@ describe("TappedTransformer", () => {
 
       tx.stampCompanion(dt, "trapezoidal", voltages);
       solver.beginAssembly(matrixSize);
-      vsrc.stamp(solver);
-      tx.stamp(solver);
+      const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages);
+      vsrc.load(ctx);
+      tx.load(ctx);
       tx.stampReactiveCompanion!(solver);
-      rLoad1.stamp(solver);
-      rLoad2.stamp(solver);
-      rGnd.stamp(solver);
+      rLoad1.load(ctx);
+      rLoad2.load(ctx);
+      rGnd.load(ctx);
       solver.finalize();
       const result = solver.factor();
       if (!result.success) throw new Error(`Singular at step ${i}`);
@@ -317,14 +348,15 @@ describe("TappedTransformer", () => {
         d2.updateOperatingPoint?.(voltages);
 
         solver.beginAssembly(matrixSize);
-        vsrc.stamp(solver);
-        tx.stamp(solver);
+        const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages);
+        vsrc.load(ctx);
+        tx.load(ctx);
         tx.stampReactiveCompanion!(solver);
-        rCtGnd.stamp(solver);
-        cFilter.stamp(solver);
-        rLoadEl.stamp(solver);
-        d1.stamp(solver);
-        d2.stamp(solver);
+        rCtGnd.load(ctx);
+        cFilter.load(ctx);
+        rLoadEl.load(ctx);
+        d1.load(ctx);
+        d2.load(ctx);
         d1.stampNonlinear?.(solver);
         d2.stampNonlinear?.(solver);
         solver.finalize();

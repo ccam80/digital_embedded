@@ -223,10 +223,36 @@ describe("Diode", () => {
 
     element.stampCompanion!(1e-6, "trapezoidal", voltages, 1, [1e-6]);
 
-    // Now stamp should include capacitor contributions
-    const solver2 = makeMockSolver();
-    element.stamp(solver2);
-    element.stampReactiveCompanion?.(solver2);
+    // Now load should include capacitor contributions
+    const capStamps: [number, number, number][] = [];
+    const capHandles: [number, number][] = [];
+    const capSolver = {
+      allocElement: (row: number, col: number) => { capHandles.push([row, col]); return capHandles.length - 1; },
+      stampElement: (h: number, v: number) => { const [r, c] = capHandles[h]; capStamps.push([r, c, v]); },
+      stampRHS: (_row: number, _v: number) => {},
+    } as unknown as SparseSolverType;
+    const capCtx = {
+      solver: capSolver,
+      voltages,
+      iteration: 0,
+      initMode: "initFloat" as const,
+      dt: 1e-6,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6],
+      ag: new Float64Array(8),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: false,
+      isTransient: true,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+    element.load(capCtx);
 
     // Verify Cj computation: CJO / (1 - Vd/VJ)^M at Vd = -2V
     // Cj = 10pF / (1 - (-2)/0.7)^0.5 = 10pF / (1 + 2/0.7)^0.5
@@ -234,9 +260,8 @@ describe("Diode", () => {
     const expectedCj = computeJunctionCapacitance(-2, CJO, VJ, M, FC);
     expect(expectedCj).toBeCloseTo(CJO / Math.pow(1 - (-2) / VJ, M), 14);
 
-    // After stampCompanion, stamp() should have placed conductance entries
-    const stampCalls = (solver2.stamp as ReturnType<typeof vi.fn>).mock.calls;
-    expect(stampCalls.length).toBeGreaterThan(0);
+    // After load(), conductance entries must have been placed
+    expect(capStamps.length).toBeGreaterThan(0);
   });
 
   it("isNonlinear_true", () => {
@@ -337,11 +362,11 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolverType): void {
-      if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
-      if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
+      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
+      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
       if (nodeA !== 0 && nodeB !== 0) {
-        solver.stamp(nodeA - 1, nodeB - 1, -G);
-        solver.stamp(nodeB - 1, nodeA - 1, -G);
+        solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -G);
+        solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -G);
       }
     },
   };
@@ -763,28 +788,61 @@ describe("AREA scaling (Change 34)", () => {
   it("AREA=2 halves RS conductance stamp (diode with RS>0 uses internal node)", () => {
     const props1 = makeParamBag({ IS: 1e-14, N: 1, RS: 10, AREA: 1 });
     const props2 = makeParamBag({ IS: 1e-14, N: 1, RS: 10, AREA: 2 });
-    const solver1 = makeMockSolver();
-    const solver2 = makeMockSolver();
 
+    function makeCaptureSolver(): { stamps: [number, number, number][]; solver: SparseSolverType } {
+      const stamps: [number, number, number][] = [];
+      const handles: [number, number][] = [];
+      const solver = {
+        allocElement: (r: number, c: number) => { handles.push([r, c]); return handles.length - 1; },
+        stampElement: (h: number, v: number) => { const [r, c] = handles[h]; stamps.push([r, c, v]); },
+        stampRHS: (_r: number, _v: number) => {},
+      } as unknown as SparseSolverType;
+      return { stamps, solver };
+    }
+
+    function makeCtxForSolver(solver: SparseSolverType) {
+      return {
+        solver,
+        voltages: new Float64Array(10),
+        iteration: 0,
+        initMode: "initFloat" as const,
+        dt: 0,
+        method: "trapezoidal" as const,
+        order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(8),
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        isDcOp: true,
+        isTransient: false,
+        xfact: 1,
+        gmin: 1e-12,
+        uic: false,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+      };
+    }
+
+    const { stamps: stamps1, solver: solver1 } = makeCaptureSolver();
     const core1 = createDiodeElement(new Map([["A", 1], ["K", 2]]), [3], -1, props1) as any;
     const pool1 = new StatePool(Math.max(core1.stateSize, 1));
     core1.stateBaseOffset = 0;
     core1.initState(pool1);
-    core1.stamp(solver1);
+    core1.load(makeCtxForSolver(solver1));
 
+    const { stamps: stamps2, solver: solver2 } = makeCaptureSolver();
     const core2 = createDiodeElement(new Map([["A", 1], ["K", 2]]), [3], -1, props2) as any;
     const pool2 = new StatePool(Math.max(core2.stateSize, 1));
     core2.stateBaseOffset = 0;
     core2.initState(pool2);
-    core2.stamp(solver2);
+    core2.load(makeCtxForSolver(solver2));
 
-    const calls1 = (solver1 as any).stamp.mock.calls;
-    const calls2 = (solver2 as any).stamp.mock.calls;
-    expect(calls1.length).toBeGreaterThan(0);
-    expect(calls2.length).toBeGreaterThan(0);
+    expect(stamps1.length).toBeGreaterThan(0);
+    expect(stamps2.length).toBeGreaterThan(0);
     // AREA=2 halves RS, so conductance 1/RS doubles
-    const gRS1 = calls1[0][2];
-    const gRS2 = calls2[0][2];
+    const gRS1 = stamps1[0][2];
+    const gRS2 = stamps2[0][2];
     expect(Math.abs(gRS2 / gRS1 - 2)).toBeLessThan(1e-6);
   });
 });
@@ -903,5 +961,167 @@ describe("integration", () => {
     ) as string;
     expect(src).not.toMatch(/integrateCapacitor/);
     expect(src).not.toMatch(/integrateInductor/);
+  });
+});
+
+// ===========================================================================
+// Task C4.3 — Diode parity tests (diode_load_dcop_parity + _transient_parity)
+//
+// Bit-exact parity against the ngspice DIOload reference formula:
+//   geq = IS * exp(Vd/nVt) / nVt + GMIN
+//   id  = IS * (exp(Vd/nVt) - 1) + GMIN * Vd
+//   ieq = id - geq * Vd
+// Stamps: 4× (±geq) into the 2×2 block at (nodeAnode, nodeCathode), 2× RHS
+// at the same rows (-ieq at anode, +ieq at cathode).
+//
+// For transient: junction cap adds capGeq = ag[0]*Ctotal, capIeq = ccap -
+// capGeq*vd, where ccap = ag[0]*q0 + ag[1]*q1.
+// ngspice → ours mapping (dioload.c:240-285, niinteg.c:28-63):
+//   CKTag[0]        → ctx.ag[0]
+//   CKTag[1]        → ctx.ag[1]
+//   q_current       → computeJunctionCharge(Vd, ...)
+//   q_prev          → pool.state1[SLOT_Q]
+//   ieq_norton      → id - geq*Vd
+// ===========================================================================
+
+// Real SparseSolver helper imported inline for parity tests.
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+
+function makeParityCtx(
+  solver: SparseSolver,
+  voltages: Float64Array,
+  opts: { initMode?: "initFloat" | "initJct" | "transient"; isDcOp?: boolean; isTransient?: boolean; dt?: number; ag?: Float64Array },
+) {
+  return {
+    solver,
+    voltages,
+    iteration: 1,
+    initMode: opts.initMode ?? ("initFloat" as const),
+    dt: opts.dt ?? 0,
+    method: "trapezoidal" as const,
+    order: 1,
+    deltaOld: [opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0],
+    ag: opts.ag ?? new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: opts.isDcOp ?? true,
+    isTransient: opts.isTransient ?? false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("diode_load_dcop_parity", () => {
+  it("forward_bias_dcop_stamp_bit_exact_vs_ngspice_formula", () => {
+    const IS = 1e-14;
+    const N = 1;
+    const VD = 0.7;
+    const nVt = N * VT;
+
+    const props = makeParamBag({ IS, N, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(Math.max((core as unknown as { stateSize: number }).stateSize, 1));
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Seed pool.state0[SLOT_VD = 0] = VD so pnjlim passes through unchanged.
+    pool.state0[0] = VD;
+
+    // Real 2×2 SparseSolver (node indices 0 and 1 for anode and cathode rows).
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+
+    const voltages = new Float64Array([VD, 0]);
+    const ctx = makeParityCtx(solver, voltages, { initMode: "initFloat", isDcOp: true });
+    core.load(ctx);
+
+    // NGSPICE_REF (DIOload formula, dioload.c:240-285):
+    const NGSPICE_EXP = Math.exp(VD / nVt);
+    const NGSPICE_GD_RAW = (IS * NGSPICE_EXP) / nVt;
+    const NGSPICE_GD = NGSPICE_GD_RAW + GMIN;
+    const NGSPICE_ID = IS * (NGSPICE_EXP - 1) + GMIN * VD;
+    const NGSPICE_IEQ = NGSPICE_ID - NGSPICE_GD * VD;
+
+    // Read the assembled matrix. The diode writes four G stamps (anode=1→row 0,
+    // cathode=2→row 1). Sum any entries at each (row, col) pair (in case of
+    // fill-ins or multi-stamp patterns in the element implementation).
+    const entries = solver.getCSCNonZeros();
+    const sumAt = (row: number, col: number) =>
+      entries
+        .filter((e) => e.row === row && e.col === col)
+        .reduce((acc, e) => acc + e.value, 0);
+
+    expect(sumAt(0, 0)).toBe(NGSPICE_GD);
+    expect(sumAt(0, 1)).toBe(-NGSPICE_GD);
+    expect(sumAt(1, 0)).toBe(-NGSPICE_GD);
+    expect(sumAt(1, 1)).toBe(NGSPICE_GD);
+
+    // RHS: -ieq at anode (row 0), +ieq at cathode (row 1).
+    const rhsVec = solver.getRhsSnapshot();
+    expect(rhsVec[0]).toBe(-NGSPICE_IEQ);
+    expect(rhsVec[1]).toBe(NGSPICE_IEQ);
+  });
+});
+
+describe("diode_load_transient_parity", () => {
+  it("junction_cap_transient_stamp_bit_exact_vs_ngspice_niintegrate", () => {
+    // Transient trap order 1: ag[0] = 1/dt, ag[1] = -1/dt.
+    // For a diode with CJO > 0 and TT = 0, the capacitance companion stamp is
+    // capGeq = ag[0] * Ctotal, capIeq = ccap - capGeq*Vd where
+    // ccap = ag[0]*q0 + ag[1]*q1 and q0 = computeJunctionCharge(Vd, ...).
+
+    const IS = 1e-14, N = 1, CJO = 10e-12, VJ = 0.7, M = 0.5, FC = 0.5, TT = 0;
+    const dt = 1e-9;
+    const VD = 0.3;
+
+    // Trap order 1 coefficients via computeNIcomCof.
+    const ag = new Float64Array(8);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(dt, [dt, dt, dt, dt, dt, dt, dt], 1, "trapezoidal", ag, scratch);
+
+    const props = makeParamBag({ IS, N, CJO, VJ, M, TT, FC });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 0]]), [], -1, props);
+    const pool = new StatePool(9);
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Seed previous-step charge at prevVd.
+    const prevVd = 0.28;
+    const prevId = IS * (Math.exp(prevVd / (N * VT)) - 1);
+    const q1 = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevId);
+    pool.state1[7] = q1; // SLOT_Q = 7
+    pool.state0[0] = VD; // SLOT_VD seed so pnjlim pass-through
+
+    // Real SparseSolver — diode between node 1 (anode) and ground (node 0
+    // mapped to no row). matrixSize = 1 (anode only, cathode is ground).
+    const solver = new SparseSolver();
+    solver.beginAssembly(1);
+    pool.ag.set(ag);
+
+    const ctx = makeParityCtx(solver, new Float64Array([VD]), {
+      initMode: "transient",
+      isDcOp: false,
+      isTransient: true,
+      dt,
+      ag,
+    });
+
+    core.load(ctx);
+
+    // NGSPICE_REF for the combined (diode gd + capGeq) diagonal stamp at (0, 0):
+    const NGSPICE_EXP = Math.exp(VD / (N * VT));
+    const NGSPICE_GD = (IS * NGSPICE_EXP) / (N * VT) + GMIN;
+    const NGSPICE_Cj = computeJunctionCapacitance(VD, CJO, VJ, M, FC);
+    const NGSPICE_CAPGEQ = ag[0] * NGSPICE_Cj;
+
+    const entries = solver.getCSCNonZeros();
+    const sum00 = entries
+      .filter((e) => e.row === 0 && e.col === 0)
+      .reduce((acc, e) => acc + e.value, 0);
+    expect(sum00).toBe(NGSPICE_GD + NGSPICE_CAPGEQ);
   });
 });

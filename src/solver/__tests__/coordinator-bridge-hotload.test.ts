@@ -30,8 +30,14 @@ interface RhsCall { row: number; value: number }
 
 class MockSolver {
   readonly rhs: RhsCall[] = [];
+  private readonly _handles: Array<{ row: number; col: number }> = [];
 
-  stamp(_row: number, _col: number, _value: number): void { /* not needed for RHS checks */ }
+  allocElement(row: number, col: number): number {
+    this._handles.push({ row, col });
+    return this._handles.length - 1;
+  }
+
+  stampElement(_handle: number, _value: number): void { /* not needed for RHS checks */ }
 
   stampRHS(row: number, value: number): void {
     this.rhs.push({ row, value });
@@ -45,6 +51,30 @@ class MockSolver {
     const hits = this.rhs.filter((r) => r.row === row);
     return hits.length > 0 ? hits[hits.length - 1]!.value : undefined;
   }
+}
+
+function makeCtx(solver: MockSolver) {
+  return {
+    solver: solver as any,
+    voltages: new Float64Array(8),
+    iteration: 0,
+    initMode: 'initFloat' as const,
+    dt: 0,
+    method: 'trapezoidal' as const,
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +93,7 @@ describe('bridge adapter: hot-load vOH mid-simulation', () => {
     const N = 5;
     for (let i = 0; i < N; i++) {
       solver.reset();
-      adapter.stamp(solver as any);
+      adapter.load(makeCtx(solver));
     }
 
     // Verify steady state: branch RHS equals vOH = 3.3
@@ -74,7 +104,7 @@ describe('bridge adapter: hot-load vOH mid-simulation', () => {
 
     // Step again — coordinator re-stamps after param change
     solver.reset();
-    adapter.stamp(solver as any);
+    adapter.load(makeCtx(solver));
 
     // Verify: analog node target has changed to the new vOH
     expect(solver.lastRhs(BRANCH_IDX)).toBeCloseTo(5.0, 10);
@@ -92,14 +122,14 @@ describe('bridge adapter: hot-load vOH mid-simulation', () => {
     // Reach steady state
     for (let i = 0; i < 5; i++) {
       solver.reset();
-      adapter.stamp(solver as any);
+      adapter.load(makeCtx(solver));
     }
     expect(solver.lastRhs(BRANCH_IDX)).toBeCloseTo(CMOS.vOL, 10);
 
     // Hot-load vOH — should not affect the low-level voltage
     adapter.setParam('vOH', 5.0);
     solver.reset();
-    adapter.stamp(solver as any);
+    adapter.load(makeCtx(solver));
 
     // vOL is unchanged
     expect(solver.lastRhs(BRANCH_IDX)).toBeCloseTo(CMOS.vOL, 10);
@@ -113,7 +143,7 @@ describe('bridge adapter: hot-load vOH mid-simulation', () => {
     adapter.setLogicLevel(false);
     for (let i = 0; i < 3; i++) {
       solver.reset();
-      adapter.stamp(solver as any);
+      adapter.load(makeCtx(solver));
     }
 
     // Hot-load new vOH
@@ -122,7 +152,7 @@ describe('bridge adapter: hot-load vOH mid-simulation', () => {
     // Coordinator switches to high (digital output goes high)
     adapter.setLogicLevel(true);
     solver.reset();
-    adapter.stamp(solver as any);
+    adapter.load(makeCtx(solver));
 
     // Analog node target must now be 5.0, not the original 3.3
     expect(solver.lastRhs(BRANCH_IDX)).toBeCloseTo(5.0, 10);

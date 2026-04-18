@@ -85,17 +85,17 @@ function makeVoltages(size: number, nodeVoltages: Record<number, number>): Float
 }
 
 /**
- * Get the total conductance after calling stampNonlinear (includes incremental updates).
- * Calls stamp() first to get the baseline, then stampNonlinear() to get the delta.
+ * Get the total conductance after calling load(ctx) (includes incremental updates).
+ * Calls load() first to get the baseline, then stampNonlinear() to get the delta.
  */
 function readTotalOutputConductance(element: AnalogElement, nOut: number): number {
-  const solver = makeMockSolver();
-  element.stamp(solver);
+  const { solver, stamps } = makeComparatorCaptureSolver();
+  const ctx = makeComparatorParityCtx(new Float64Array(3), solver);
+  element.load(ctx);
   element.stampNonlinear!(solver);
-  const calls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls as number[][];
-  return calls
-    .filter((c) => c[0] === nOut - 1 && c[1] === nOut - 1)
-    .reduce((sum, c) => sum + c[2], 0);
+  return stamps
+    .filter((s) => s.row === nOut - 1 && s.col === nOut - 1)
+    .reduce((sum, s) => sum + s.value, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,5 +227,118 @@ describe("Comparator", () => {
     // gFinal should be within 1% of G_sat
     expect(gFinal).toBeGreaterThan(G_sat * 0.99);
     expect(gFinal).toBeLessThanOrEqual(G_sat + G_off);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C4.5 parity test — comparator_load_dcop_parity
+// ---------------------------------------------------------------------------
+//
+// Drives the open-collector comparator via load(ctx) at a canonical operating
+// point (V+=2, V-=1, vos=0, no hysteresis) and verifies the stamped output
+// conductance is bit-exact.
+//
+// Reference formulas (from comparator.ts createOpenCollectorComparatorElement):
+//   R_OFF = 1e9 → G_off = 1e-9
+//   G_sat = 1 / rSat
+//   When V+ - V- - vos > hysteresis/2: _outputActive becomes true and
+//   _outputWeight clamps to 1.0 → G_eff = G_off + 1.0 * (G_sat - G_off) = G_sat
+//   Stamp on (nOut, nOut): G_eff
+
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+
+interface ComparatorCaptureStamp { row: number; col: number; value: number; }
+interface ComparatorCaptureRhs { row: number; value: number; }
+function makeComparatorCaptureSolver(): {
+  solver: SparseSolverType;
+  stamps: ComparatorCaptureStamp[];
+  rhs: ComparatorCaptureRhs[];
+} {
+  const stamps: ComparatorCaptureStamp[] = [];
+  const rhs: ComparatorCaptureRhs[] = [];
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stamp: (row: number, col: number, value: number) => {
+      stamps.push({ row, col, value });
+    },
+    stampRHS: (row: number, value: number) => {
+      rhs.push({ row, value });
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps, rhs };
+}
+
+function makeComparatorParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("Comparator parity (C4.5)", () => {
+  it("comparator_load_dcop_parity", () => {
+    // Canonical operating point: V+=2V, V-=1V → output active (open-collector sinks).
+    // Use rSat=50, hysteresis=0, vos=0; _outputActive flips true on first load(),
+    // _outputWeight becomes 1.0 → G_eff = G_sat = 1/50 = 0.02 S.
+    const nInp = 1, nInn = 2, nOut = 3;
+    const rSat = 50;
+    const cmp = makeComparator(nInp, nInn, nOut, { rSat, hysteresis: 0, vos: 0 });
+
+    const voltages = new Float64Array(3);
+    voltages[nInp - 1] = 2;
+    voltages[nInn - 1] = 1;
+    voltages[nOut - 1] = 0;
+
+    const { solver, stamps, rhs } = makeComparatorCaptureSolver();
+    const ctx = makeComparatorParityCtx(voltages, solver);
+    cmp.load(ctx);
+
+    // Reference: with V+-V-=1 > 0 (half-hyst=0), output activates immediately.
+    // G_eff = G_off + 1.0 * (G_sat - G_off) = G_sat (exact: weight = 1.0 folds
+    // the full (G_sat - G_off) term in).
+    const NGSPICE_GOFF = 1 / 1e9;
+    const NGSPICE_GSAT = 1 / rSat;
+    const NGSPICE_GEFF = NGSPICE_GOFF + 1.0 * (NGSPICE_GSAT - NGSPICE_GOFF);
+
+    const outRow = nOut - 1;
+    const diagStamps = stamps.filter((s) => s.row === outRow && s.col === outRow);
+    const totalDiag = diagStamps.reduce((a, s) => a + s.value, 0);
+    expect(totalDiag).toBe(NGSPICE_GEFF);
+
+    // No RHS stamps at output node (open-collector passive sink, no Norton source)
+    const rhsAtOut = rhs.filter((r) => r.row === outRow);
+    expect(rhsAtOut.length).toBe(0);
   });
 });

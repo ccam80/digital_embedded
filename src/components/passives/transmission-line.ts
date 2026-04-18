@@ -365,10 +365,10 @@ class SegmentInductorElement implements ReactiveAnalogElement {
     const L = this.L;
 
     // Branch incidence (topology-constant).
-    if (nA !== 0) solver.stamp(nA - 1, b, 1);
-    if (nB !== 0) solver.stamp(nB - 1, b, -1);
-    if (nA !== 0) solver.stamp(b, nA - 1, 1);
-    if (nB !== 0) solver.stamp(b, nB - 1, -1);
+    if (nA !== 0) solver.stampElement(solver.allocElement(nA - 1, b), 1);
+    if (nB !== 0) solver.stampElement(solver.allocElement(nB - 1, b), -1);
+    if (nA !== 0) solver.stampElement(solver.allocElement(b, nA - 1), 1);
+    if (nB !== 0) solver.stampElement(solver.allocElement(b, nB - 1), -1);
 
     if (!ctx.isTransient && !ctx.isDcOp) return;
 
@@ -401,7 +401,7 @@ class SegmentInductorElement implements ReactiveAnalogElement {
       this.s0[this.base + SLOT_GEQ]    = geq;
       this.s0[this.base + SLOT_IEQ]    = ceq;
       this.s0[this.base + SLOT_I_PREV] = iNow;
-      solver.stamp(b, b, -geq);
+      solver.stampElement(solver.allocElement(b, b), -geq);
       solver.stampRHS(b, ceq);
     } else {
       this.s0[this.base + SLOT_L_PHI]  = L * iNow;
@@ -495,7 +495,7 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
       this.s0[this.base + SLOT_IEQ]    = ceq;
       this.s0[this.base + SLOT_V_PREV] = vNow;
       if (n0 !== 0) {
-        solver.stamp(n0 - 1, n0 - 1, geq);
+        solver.stampElement(solver.allocElement(n0 - 1, n0 - 1), geq);
         solver.stampRHS(n0 - 1, -ceq);
       }
     } else {
@@ -569,11 +569,11 @@ class CombinedRLElement implements ReactiveAnalogElement {
     const L = this.L;
 
     // Branch incidence and series resistance (topology-constant).
-    if (nA !== 0) solver.stamp(nA - 1, b, 1);
-    if (nB !== 0) solver.stamp(nB - 1, b, -1);
-    if (nA !== 0) solver.stamp(b, nA - 1, 1);
-    if (nB !== 0) solver.stamp(b, nB - 1, -1);
-    solver.stamp(b, b, -this.R);
+    if (nA !== 0) solver.stampElement(solver.allocElement(nA - 1, b), 1);
+    if (nB !== 0) solver.stampElement(solver.allocElement(nB - 1, b), -1);
+    if (nA !== 0) solver.stampElement(solver.allocElement(b, nA - 1), 1);
+    if (nB !== 0) solver.stampElement(solver.allocElement(b, nB - 1), -1);
+    solver.stampElement(solver.allocElement(b, b), -this.R);
 
     if (!ctx.isTransient && !ctx.isDcOp) return;
 
@@ -606,7 +606,7 @@ class CombinedRLElement implements ReactiveAnalogElement {
       this.s0[this.base + SLOT_GEQ]     = geq;
       this.s0[this.base + SLOT_IEQ]     = ceq;
       this.s0[this.base + SLOT_I_PREV]  = iNow;
-      solver.stamp(b, b, -geq);
+      solver.stampElement(solver.allocElement(b, b), -geq);
       solver.stampRHS(b, ceq);
     } else {
       this.s0[this.base + SLOT_RL_PHI]  = L * iNow;

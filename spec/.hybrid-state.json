@@ -112,12 +112,16 @@
     },
     {
       "id": "batch-4",
-      "phase": "phase_catchup Waves C4 + C5 (parity tests + SparseSolver.stamp deletion)",
+      "phase": "phase_catchup Waves C4 + C5 (parity tests + SparseSolver.stamp deletion — C5 split into 5 sub-batches of 5 files each per spec/phase-catchup-c5-batches.md)",
       "task_groups": [
         "C4.passive_reactive",
         "C4.semi_sources",
         "C4.active_rounding",
-        "C5"
+        "C5.a",
+        "C5.b",
+        "C5.c",
+        "C5.d",
+        "C5.e"
       ],
       "tasks": [
         [
@@ -133,21 +137,37 @@
           "C4.6"
         ],
         [
-          "C5.1"
+          "C5.a"
+        ],
+        [
+          "C5.b"
+        ],
+        [
+          "C5.c"
+        ],
+        [
+          "C5.d"
+        ],
+        [
+          "C5.e"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
+      "spawned": 9,
+      "completed": 3,
       "verifications_passed": 0,
       "verifications_failed": 0,
       "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "dead_implementers": 5,
       "dead_verifiers": 0,
       "group_status": {
         "C4.passive_reactive": "pending",
         "C4.semi_sources": "pending",
         "C4.active_rounding": "pending",
-        "C5": "pending"
+        "C5.a": "pending",
+        "C5.b": "pending",
+        "C5.c": "pending",
+        "C5.d": "pending",
+        "C5.e": "pending"
       }
     },
     {
@@ -298,5 +318,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-18T03:08:55.220Z"
+  "last_updated": "2026-04-18T04:07:05.353Z"
 }

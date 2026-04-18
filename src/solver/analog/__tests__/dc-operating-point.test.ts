@@ -70,10 +70,10 @@ function makeScalableVoltageSource(
     },
     stamp(solver: import("../sparse-solver.js").SparseSolver): void {
       const k = branchIdx;
-      if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
-      if (nodeNeg !== 0) solver.stamp(nodeNeg - 1, k, -1);
-      if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
-      if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos - 1, k), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg - 1, k), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos - 1), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg - 1), -1);
       solver.stampRHS(k, voltage * scale);
     },
     setParam(_key: string, _value: number): void {},

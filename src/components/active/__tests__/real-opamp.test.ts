@@ -91,12 +91,13 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
     isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(): number[] { return []; },
-    stamp(solver: SparseSolver): void {
-      if (nodeA > 0) solver.stamp(nodeA - 1, nodeA - 1, G);
-      if (nodeB > 0) solver.stamp(nodeB - 1, nodeB - 1, G);
+    load(ctx): void {
+      const { solver } = ctx;
+      if (nodeA > 0) { const h = solver.allocElement(nodeA - 1, nodeA - 1); solver.stampElement(h, G); }
+      if (nodeB > 0) { const h = solver.allocElement(nodeB - 1, nodeB - 1); solver.stampElement(h, G); }
       if (nodeA > 0 && nodeB > 0) {
-        solver.stamp(nodeA - 1, nodeB - 1, -G);
-        solver.stamp(nodeB - 1, nodeA - 1, -G);
+        const hab = solver.allocElement(nodeA - 1, nodeB - 1); solver.stampElement(hab, -G);
+        const hba = solver.allocElement(nodeB - 1, nodeA - 1); solver.stampElement(hba, -G);
       }
     },
   };
@@ -116,12 +117,13 @@ function makeDcSource(nodePos: number, nodeNeg: number, branchRow: number, volta
     setSourceScale(f: number): void { scale = f; },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(): number[] { return []; },
-    stamp(solver: SparseSolver): void {
+    load(ctx): void {
+      const { solver } = ctx;
       const k = branchRow;
-      if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
-      if (nodeNeg !== 0) solver.stamp(nodeNeg - 1, k, -1);
-      if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
-      if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
+      if (nodePos !== 0) { const h = solver.allocElement(nodePos - 1, k); solver.stampElement(h, 1); }
+      if (nodeNeg !== 0) { const h = solver.allocElement(nodeNeg - 1, k); solver.stampElement(h, -1); }
+      if (nodePos !== 0) { const h = solver.allocElement(k, nodePos - 1); solver.stampElement(h, 1); }
+      if (nodeNeg !== 0) { const h = solver.allocElement(k, nodeNeg - 1); solver.stampElement(h, -1); }
       solver.stampRHS(k, voltage * scale);
     },
   };
@@ -579,5 +581,179 @@ describe("RealOpAmp", () => {
     expect(RealOpAmpDefinition.pinLayout).toHaveLength(5);
     expect((RealOpAmpDefinition.modelRegistry?.["behavioral"] as {kind:"inline";factory:import("../../../core/registry.js").AnalogFactory}|undefined)?.factory).toBeDefined();
     expect(RealOpAmpDefinition.factory).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C4.5 parity test — real_opamp_load_dcop_parity (includes slew + finite gain)
+// ---------------------------------------------------------------------------
+//
+// Drives the real op-amp factory via load(ctx) at DC-OP. The element has
+// finite open-loop gain (aol), input offset voltage (vos), bias current
+// (iBias), input resistance (rIn), and output resistance (rOut). Slew rate
+// limiting is only active in transient (ctx.isTransient), so the DC-OP
+// canonical stamps match the bandwidth-limited VCVS formulation.
+//
+// Reference formulas (from real-opamp.ts createRealOpAmpElement, linear
+// region, no saturation, no current limit, DC-OP so geq_int=0 and aEff=aol):
+//   G_in   = 1 / rIn
+//   G_out  = 1 / rOut
+//   stamps(nInp, nInp)  += G_in
+//   stamps(nInp, nInn)  -= G_in
+//   stamps(nInn, nInp)  -= G_in
+//   stamps(nInn, nInn)  += G_in
+//   stamps(nOut, nOut)  += G_out
+//   stamps(nOut, nInp)  -= aol * scale * G_out
+//   stamps(nOut, nInn)  += aol * scale * G_out
+//   rhs(nInp)   -= abs(iBias) * scale
+//   rhs(nInn)   -= abs(iBias) * scale
+//   rhs(nOut)   += aol * scale * G_out * vos * scale
+//
+// Operating point chosen so V_out stays inside the rails (linear region).
+
+import type { SparseSolver as SparseSolverTypeForParity } from "../../../solver/analog/sparse-solver.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+
+interface RealOpAmpCaptureStamp { row: number; col: number; value: number; }
+interface RealOpAmpCaptureRhs { row: number; value: number; }
+function makeRealOpAmpCaptureSolver(): {
+  solver: SparseSolverTypeForParity;
+  stamps: RealOpAmpCaptureStamp[];
+  rhs: RealOpAmpCaptureRhs[];
+} {
+  const stamps: RealOpAmpCaptureStamp[] = [];
+  const rhs: RealOpAmpCaptureRhs[] = [];
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stamp: (row: number, col: number, value: number) => {
+      stamps.push({ row, col, value });
+    },
+    stampRHS: (row: number, value: number) => {
+      rhs.push({ row, value });
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverTypeForParity;
+  return { solver, stamps, rhs };
+}
+
+function makeRealOpAmpParityCtx(voltages: Float64Array, solver: SparseSolverTypeForParity): LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("RealOpAmp parity (C4.5)", () => {
+  it("real_opamp_load_dcop_parity", () => {
+    // Canonical DC-OP: V_in+ = 1mV, V_in- = 0, V_out = 1V (linear), Vcc+ = 15V, Vcc- = -15V.
+    // Use a fresh PropertyBag with explicit model-param defaults (finite gain case).
+    const aolVal = 1e5;
+    const gbwVal = 1e6;
+    const srVal  = 0.5e6;
+    const vosVal = 2e-3;
+    const iBiasVal = 80e-9;
+    const rInVal   = 2e6;
+    const rOutVal  = 75;
+    const iMaxVal  = 25e-3;
+    const vSatPosVal = 1.5;
+    const vSatNegVal = 1.5;
+
+    const props = makeOpAmpProps({
+      aol: aolVal,
+      gbw: gbwVal,
+      slewRate: srVal,
+      vos: vosVal,
+      iBias: iBiasVal,
+      rIn: rInVal,
+      rOut: rOutVal,
+      iMax: iMaxVal,
+      vSatPos: vSatPosVal,
+      vSatNeg: vSatNegVal,
+    });
+    const nInn = 1, nInp = 2, nOut = 3, nVccP = 4, nVccN = 5;
+    const el = createRealOpAmpElement(
+      new Map([
+        ["in-", nInn], ["in+", nInp], ["out", nOut],
+        ["Vcc+", nVccP], ["Vcc-", nVccN],
+      ]),
+      props,
+    );
+
+    const voltages = new Float64Array(5);
+    voltages[nInp - 1]  = 1e-3;
+    voltages[nInn - 1]  = 0;
+    voltages[nOut - 1]  = 1.0; // linear region, within ±(Vcc±-vSat)
+    voltages[nVccP - 1] = 15;
+    voltages[nVccN - 1] = -15;
+
+    const { solver, stamps, rhs } = makeRealOpAmpCaptureSolver();
+    const ctx = makeRealOpAmpParityCtx(voltages, solver);
+    el.load(ctx);
+
+    // Closed-form reference (ngspice-equivalent small-signal model):
+    const NGSPICE_GIN  = 1 / rInVal;
+    const NGSPICE_GOUT = 1 / rOutVal;
+    const NGSPICE_IBIAS = Math.abs(iBiasVal) * 1; // scale=1
+    // In DC-OP: geq_int=0, aEff=aol, ieq=0, rhs_out = aEff * G_out * vos
+    const NGSPICE_RHS_OUT = aolVal * 1 * NGSPICE_GOUT * vosVal * 1;
+
+    // Sum stamps by (row, col) — element uses handle-based stamping.
+    const sumAt = (row: number, col: number): number =>
+      stamps.filter((s) => s.row === row && s.col === col)
+            .reduce((a, s) => a + s.value, 0);
+
+    // Input resistance stamp (bit-exact): G_in between nInp and nInn
+    expect(sumAt(nInp - 1, nInp - 1)).toBe(NGSPICE_GIN);
+    expect(sumAt(nInn - 1, nInn - 1)).toBe(NGSPICE_GIN);
+    expect(sumAt(nInp - 1, nInn - 1)).toBe(-NGSPICE_GIN);
+    expect(sumAt(nInn - 1, nInp - 1)).toBe(-NGSPICE_GIN);
+
+    // G_out stamp on nOut diagonal
+    expect(sumAt(nOut - 1, nOut - 1)).toBe(NGSPICE_GOUT);
+
+    // VCVS cross-coupling: aol * scale * G_out
+    expect(sumAt(nOut - 1, nInp - 1)).toBe(-aolVal * NGSPICE_GOUT);
+    expect(sumAt(nOut - 1, nInn - 1)).toBe(aolVal * NGSPICE_GOUT);
+
+    // RHS: bias currents on both input nodes (bit-exact)
+    const rhsInp = rhs.filter((r) => r.row === nInp - 1).reduce((a, r) => a + r.value, 0);
+    const rhsInn = rhs.filter((r) => r.row === nInn - 1).reduce((a, r) => a + r.value, 0);
+    expect(rhsInp).toBe(-NGSPICE_IBIAS);
+    expect(rhsInn).toBe(-NGSPICE_IBIAS);
+
+    // RHS: offset-voltage contribution at nOut
+    const rhsOut = rhs.filter((r) => r.row === nOut - 1).reduce((a, r) => a + r.value, 0);
+    expect(rhsOut).toBe(NGSPICE_RHS_OUT);
   });
 });

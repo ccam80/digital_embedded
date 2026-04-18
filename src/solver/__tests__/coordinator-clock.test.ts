@@ -86,9 +86,9 @@ function buildAnalogOnlyCoordinator(): DefaultSimulationCoordinator {
           branchIndex: -1 as const,
           isNonlinear: false, isReactive: false,
           stamp(s: SparseSolverStamp) {
-            if (nodeA > 0) s.stamp(nodeA - 1, nodeA - 1, g);
-            if (nodeB > 0) s.stamp(nodeB - 1, nodeB - 1, g);
-            if (nodeA > 0 && nodeB > 0) { s.stamp(nodeA - 1, nodeB - 1, -g); s.stamp(nodeB - 1, nodeA - 1, -g); }
+            if (nodeA > 0) s.stampElement(s.allocElement(nodeA - 1, nodeA - 1), g);
+            if (nodeB > 0) s.stampElement(s.allocElement(nodeB - 1, nodeB - 1), g);
+            if (nodeA > 0 && nodeB > 0) { s.stampElement(s.allocElement(nodeA - 1, nodeB - 1), -g); s.stampElement(s.allocElement(nodeB - 1, nodeA - 1), -g); }
           },
           getPinCurrents(_v: Float64Array) { return [0, 0]; },
           setParam(_key: string, _value: number) {},

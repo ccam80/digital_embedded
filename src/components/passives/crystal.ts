@@ -333,11 +333,11 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     stampG(solver, n1, n1, this.G_s);
 
     // L_s branch incidence (B sub-matrix).
-    if (n1 !== 0) solver.stamp(n1 - 1, b, 1);
-    if (n2 !== 0) solver.stamp(n2 - 1, b, -1);
+    if (n1 !== 0) solver.stampElement(solver.allocElement(n1 - 1, b), 1);
+    if (n2 !== 0) solver.stampElement(solver.allocElement(n2 - 1, b), -1);
     // L_s KVL incidence (C sub-matrix).
-    if (n1 !== 0) solver.stamp(b, n1 - 1, 1);
-    if (n2 !== 0) solver.stamp(b, n2 - 1, -1);
+    if (n1 !== 0) solver.stampElement(solver.allocElement(b, n1 - 1), 1);
+    if (n2 !== 0) solver.stampElement(solver.allocElement(b, n2 - 1), -1);
 
     if (!isTransient && !isDcOp) return;
 
@@ -426,7 +426,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
       }
 
       // L_s companion stamp on branch row.
-      solver.stamp(b, b, -geqL);
+      solver.stampElement(solver.allocElement(b, b), -geqL);
       solver.stampRHS(b, ceqL);
 
       // C_s companion stamp (n2 ↔ nB).

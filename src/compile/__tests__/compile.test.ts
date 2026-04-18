@@ -175,11 +175,11 @@ function makeResistorAnalogEl(
     isReactive: false,
     stamp(solver: SparseSolver): void {
       const g = 1 / resistance;
-      if (n1 !== 0) { solver.stamp(n1 - 1, n1 - 1, g); }
-      if (n2 !== 0) { solver.stamp(n2 - 1, n2 - 1, g); }
+      if (n1 !== 0) { solver.stampElement(solver.allocElement(n1 - 1, n1 - 1), g); }
+      if (n2 !== 0) { solver.stampElement(solver.allocElement(n2 - 1, n2 - 1), g); }
       if (n1 !== 0 && n2 !== 0) {
-        solver.stamp(n1 - 1, n2 - 1, -g);
-        solver.stamp(n2 - 1, n1 - 1, -g);
+        solver.stampElement(solver.allocElement(n1 - 1, n2 - 1), -g);
+        solver.stampElement(solver.allocElement(n2 - 1, n1 - 1), -g);
       }
     },
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },

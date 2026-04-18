@@ -35,8 +35,15 @@ interface RhsCall   { row: number; value: number }
 class MockSolver {
   readonly stamps: StampCall[] = [];
   readonly rhs: RhsCall[] = [];
+  private readonly _handles: Array<{ row: number; col: number }> = [];
 
-  stamp(row: number, col: number, value: number): void {
+  allocElement(row: number, col: number): number {
+    this._handles.push({ row, col });
+    return this._handles.length - 1;
+  }
+
+  stampElement(handle: number, value: number): void {
+    const { row, col } = this._handles[handle];
     this.stamps.push({ row, col, value });
   }
 
@@ -59,6 +66,30 @@ class MockSolver {
     const hits = this.rhs.filter((r) => r.row === row);
     return hits.length > 0 ? hits[hits.length - 1]!.value : undefined;
   }
+}
+
+function makeCtx(solver: MockSolver) {
+  return {
+    solver: solver as any,
+    voltages: new Float64Array(8),
+    iteration: 0,
+    initMode: 'initFloat' as const,
+    dt: 0,
+    method: 'trapezoidal' as const,
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +298,7 @@ describe('bridge adapter: digital output drives analog node', () => {
     const { outputAdapter } = buildBridgeFixture('digital-to-analog');
     const solver = new MockSolver();
     outputAdapter.setLogicLevel(true);
-    outputAdapter.stamp(solver as any);
+    outputAdapter.load(makeCtx(solver));
     expect(solver.lastRhs(BRANCH_IDX)).toBeCloseTo(CMOS.vOH, 10);
   });
 
@@ -344,7 +375,7 @@ describe('bridge adapter: setParam updates electrical parameters', () => {
     const solver = new MockSolver();
     outputAdapter.setLogicLevel(true);
     outputAdapter.setParam('vOH', 5.0);
-    outputAdapter.stamp(solver as any);
+    outputAdapter.load(makeCtx(solver));
     expect(solver.lastRhs(BRANCH_IDX)).toBeCloseTo(5.0, 10);
   });
 
@@ -367,7 +398,7 @@ describe('bridge adapter: hi-z output stops driving analog node', () => {
     const { outputAdapter } = buildBridgeFixture('digital-to-analog');
     outputAdapter.setHighZ(true);
     const solver = new MockSolver();
-    outputAdapter.stamp(solver as any);
+    outputAdapter.load(makeCtx(solver));
     // Hi-Z mode: branch RHS must be 0
     expect(solver.lastRhs(BRANCH_IDX)).toBe(0);
     // Hi-Z mode: stamp(branchIdx, branchIdx, 1)
@@ -379,7 +410,7 @@ describe('bridge adapter: hi-z output stops driving analog node', () => {
     outputAdapter.setHighZ(true);
     outputAdapter.setLogicLevel(false);
     const solver = new MockSolver();
-    outputAdapter.stamp(solver as any);
+    outputAdapter.load(makeCtx(solver));
     // Hi-Z overrides logic level — branch RHS stays 0
     expect(solver.lastRhs(BRANCH_IDX)).toBe(0);
   });
@@ -390,7 +421,7 @@ describe('bridge adapter: hi-z output stops driving analog node', () => {
     outputAdapter.setHighZ(false);
     outputAdapter.setLogicLevel(false);
     const solver = new MockSolver();
-    outputAdapter.stamp(solver as any);
+    outputAdapter.load(makeCtx(solver));
     // Drive mode restored: branch RHS must be vOL
     expect(solver.lastRhs(BRANCH_IDX)).toBeCloseTo(CMOS.vOL, 10);
   });

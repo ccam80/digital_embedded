@@ -18,11 +18,12 @@ import {
 } from "../polarized-cap.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
+import { runDcOp, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -88,11 +89,14 @@ function makeResistorElement(nA: number, nB: number, resistance: number) {
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
-    stamp(solver: SparseSolver): void {
-      if (nA !== 0) solver.stamp(nA - 1, nA - 1, G);
-      if (nA !== 0 && nB !== 0) solver.stamp(nA - 1, nB - 1, -G);
-      if (nB !== 0 && nA !== 0) solver.stamp(nB - 1, nA - 1, -G);
-      if (nB !== 0) solver.stamp(nB - 1, nB - 1, G);
+    setParam(_key: string, _value: number): void {},
+    getPinCurrents(_v: Float64Array): number[] { return []; },
+    load(ctx: LoadContext): void {
+      const { solver } = ctx;
+      if (nA !== 0) solver.stampElement(solver.allocElement(nA - 1, nA - 1), G);
+      if (nA !== 0 && nB !== 0) solver.stampElement(solver.allocElement(nA - 1, nB - 1), -G);
+      if (nB !== 0 && nA !== 0) solver.stampElement(solver.allocElement(nB - 1, nA - 1), -G);
+      if (nB !== 0) solver.stampElement(solver.allocElement(nB - 1, nB - 1), G);
     },
   };
 }
@@ -221,14 +225,37 @@ describe("PolarizedCap", () => {
       const dt = RC / 500;
       const steps = 500;
 
+      // Minimal LoadContext for the transient loop — only solver and voltages are read by load().
+      const loopCtx: LoadContext = {
+        solver,
+        voltages,
+        iteration: 0,
+        initMode: "transient",
+        dt,
+        method: "bdf1",
+        order: 1,
+        deltaOld: new Float64Array([dt, dt, dt, dt, dt, dt, dt]),
+        ag: new Float64Array(8),
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        isDcOp: false,
+        isTransient: true,
+        xfact: 1,
+        gmin: 1e-12,
+        uic: false,
+        reltol: 1e-3,
+        iabstol: 1e-12,
+      };
+
       for (let step = 0; step < steps; step++) {
         cap.stampCompanion(dt, "bdf1", voltages, 1, [dt]);
 
         solver.beginAssembly(matrixSize);
-        vs.stamp(solver);
-        rSeries.stamp(solver);
-        cap.stamp(solver);
-        cap.stampReactiveCompanion!(solver);
+        loopCtx.voltages = voltages;
+        vs.load(loopCtx);
+        rSeries.load(loopCtx);
+        cap.load(loopCtx);
         solver.finalize();
 
         const factorResult = solver.factor();

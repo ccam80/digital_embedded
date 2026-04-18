@@ -162,12 +162,12 @@ class VCVSAnalogElement extends ControlledSourceElement {
   protected override _stampLinear(solver: SparseSolver): void {
     const k = this._k;
     if (this._nOutP !== 0) {
-      solver.stamp(this._nOutP - 1, k, 1);   // B[nOutP, k]
-      solver.stamp(k, this._nOutP - 1, 1);   // C[k, nOutP]
+      solver.stampElement(solver.allocElement(this._nOutP - 1, k), 1);   // B[nOutP, k]
+      solver.stampElement(solver.allocElement(k, this._nOutP - 1), 1);   // C[k, nOutP]
     }
     if (this._nOutN !== 0) {
-      solver.stamp(this._nOutN - 1, k, -1);  // B[nOutN, k]
-      solver.stamp(k, this._nOutN - 1, -1);  // C[k, nOutN]
+      solver.stampElement(solver.allocElement(this._nOutN - 1, k), -1);  // B[nOutN, k]
+      solver.stampElement(solver.allocElement(k, this._nOutN - 1), -1);  // C[k, nOutN]
     }
   }
 
@@ -201,10 +201,10 @@ class VCVSAnalogElement extends ControlledSourceElement {
 
     // Jacobian: C[k, ctrl] entries
     if (this._nCtrlP !== 0) {
-      solver.stamp(k, this._nCtrlP - 1, -derivative);
+      solver.stampElement(solver.allocElement(k, this._nCtrlP - 1), -derivative);
     }
     if (this._nCtrlN !== 0) {
-      solver.stamp(k, this._nCtrlN - 1, derivative);
+      solver.stampElement(solver.allocElement(k, this._nCtrlN - 1), derivative);
     }
 
     // NR-linearized RHS: constant term after factoring out Jacobian

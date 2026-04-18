@@ -325,8 +325,8 @@ function compileSubcircuitToMnaModel(
         isNonlinear: anyNonlinear,
         isReactive: anyReactive,
 
-        stamp(solver: import("../../core/analog-types.js").SparseSolverStamp): void {
-          for (const sub of subElements) sub.stamp(solver);
+        load(ctx: import("./load-context.js").LoadContext): void {
+          for (const sub of subElements) sub.load(ctx);
         },
 
         getPinCurrents(voltages: Float64Array): number[] {
@@ -350,21 +350,6 @@ function compileSubcircuitToMnaModel(
           }
         },
       };
-
-      if (anyNonlinear) {
-        core.stampNonlinear = (solver: import("../../core/analog-types.js").SparseSolverStamp): void => {
-          for (const sub of subElements) sub.stampNonlinear?.(solver);
-        };
-        core.updateOperatingPoint = (voltages: Readonly<Float64Array>): void => {
-          for (const sub of subElements) sub.updateOperatingPoint?.(voltages);
-        };
-      }
-
-      if (anyReactive) {
-        core.stampCompanion = (dt: number, method: import("../../core/analog-types.js").IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[]): void => {
-          for (const sub of subElements) sub.stampCompanion?.(dt, method, voltages, order, deltaOld);
-        };
-      }
 
       return core;
     },

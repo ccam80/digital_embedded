@@ -23,7 +23,8 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import type { ComponentLayout } from "../../../core/registry.js";
 import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../../../core/renderer-interface.js";
 import type { ThemeColor } from "../../../core/renderer-interface.js";
-import type { SparseSolverStamp } from "../../../core/analog-types.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -363,11 +364,36 @@ describe("Probe", () => {
   describe("AnalogProbe", () => {
     it("stamp_is_noop calls no solver methods", () => {
       const props = new PropertyBag();
-      const stampCalls: string[] = [];
+      const allocCalls: [number, number][] = [];
+      const stampElementCalls: [number, number][] = [];
+      const stampRHSCalls: [number, number][] = [];
 
-      const mockSolver: SparseSolverStamp = {
-        stamp: () => { stampCalls.push("stamp"); },
-        stampRHS: () => { stampCalls.push("stampRHS"); },
+      const captureSolver = {
+        allocElement: (row: number, col: number): number => { allocCalls.push([row, col]); return 0; },
+        stampElement: (handle: number, value: number): void => { stampElementCalls.push([handle, value]); },
+        stampRHS: (row: number, value: number): void => { stampRHSCalls.push([row, value]); },
+      } as unknown as SparseSolverType;
+
+      const ctx: LoadContext = {
+        solver: captureSolver,
+        voltages: new Float64Array(8),
+        iteration: 0,
+        initMode: "initFloat",
+        dt: 0,
+        method: "trapezoidal",
+        order: 1,
+        deltaOld: [0, 0, 0, 0, 0, 0, 0],
+        ag: new Float64Array(8),
+        srcFact: 1,
+        noncon: { value: 0 },
+        limitingCollector: null,
+        isDcOp: true,
+        isTransient: false,
+        xfact: 1,
+        gmin: 1e-12,
+        uic: false,
+        reltol: 1e-3,
+        iabstol: 1e-12,
       };
 
       const analogElement = getFactory(ProbeDefinition.modelRegistry!.behavioral!)(
@@ -379,9 +405,11 @@ describe("Probe", () => {
       );
       Object.assign(analogElement, { pinNodeIds: [3], allNodeIds: [3] });
 
-      analogElement.stamp(mockSolver);
+      analogElement.load(ctx);
 
-      expect(stampCalls).toHaveLength(0);
+      expect(allocCalls).toHaveLength(0);
+      expect(stampElementCalls).toHaveLength(0);
+      expect(stampRHSCalls).toHaveLength(0);
     });
 
     it("reads_node_voltage returns voltage at node index", () => {

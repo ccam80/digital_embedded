@@ -36,8 +36,15 @@ interface RhsCall {
 class MockSolver {
   readonly stamps: StampCall[] = [];
   readonly rhs: RhsCall[] = [];
+  private readonly _handles: Array<{ row: number; col: number }> = [];
 
-  stamp(row: number, col: number, value: number): void {
+  allocElement(row: number, col: number): number {
+    this._handles.push({ row, col });
+    return this._handles.length - 1;
+  }
+
+  stampElement(handle: number, value: number): void {
+    const { row, col } = this._handles[handle];
     this.stamps.push({ row, col, value });
   }
 
@@ -77,6 +84,30 @@ class MockSolver {
   }
 }
 
+function makeCtx(solver: MockSolver) {
+  return {
+    solver: solver as any,
+    voltages: new Float64Array(8),
+    iteration: 0,
+    initMode: "initFloat" as const,
+    dt: 0,
+    method: "trapezoidal" as const,
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Shared spec — CMOS 3.3V
 // ---------------------------------------------------------------------------
@@ -113,7 +144,7 @@ describe("BridgeOutputAdapter", () => {
   it("output adapter stamps ideal voltage source at vOL", () => {
     // Default logic level is low (vOL)
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
-    adapter.stamp(solver as any);
+    adapter.load(makeCtx(solver));
 
     // Drive mode branch equation: stamp(branchIdx, nodeIdx, 1)
     expect(solver.lastStamp(BRANCH_IDX, NODE_IDX)).toBe(1);
@@ -126,7 +157,7 @@ describe("BridgeOutputAdapter", () => {
   it("output adapter setLogicLevel(true) drives vOH", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
     adapter.setLogicLevel(true);
-    adapter.stamp(solver as any);
+    adapter.load(makeCtx(solver));
 
     // RHS must be vOH after setting level high
     expect(solver.lastRhs(BRANCH_IDX)).toBeCloseTo(CMOS_3V3.vOH, 10);
@@ -135,7 +166,7 @@ describe("BridgeOutputAdapter", () => {
   it("output adapter hi-z stamps I=0", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
     adapter.setHighZ(true);
-    adapter.stamp(solver as any);
+    adapter.load(makeCtx(solver));
 
     // Hi-Z branch equation: stamp(branchIdx, branchIdx, 1)
     expect(solver.lastStamp(BRANCH_IDX, BRANCH_IDX)).toBe(1);
@@ -147,7 +178,7 @@ describe("BridgeOutputAdapter", () => {
 
   it("loaded output adapter stamps rOut conductance on node diagonal", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, true);
-    adapter.stamp(solver as any);
+    adapter.load(makeCtx(solver));
 
     // 1/rOut must appear on the node diagonal
     const gOut = 1 / CMOS_3V3.rOut;
@@ -156,7 +187,7 @@ describe("BridgeOutputAdapter", () => {
 
   it("unloaded output adapter does not stamp rOut on node diagonal", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, false);
-    adapter.stamp(solver as any);
+    adapter.load(makeCtx(solver));
 
     // Node diagonal must be zero — no rOut conductance when unloaded
     expect(solver.sumStamp(NODE_IDX, NODE_IDX)).toBe(0);
@@ -164,7 +195,7 @@ describe("BridgeOutputAdapter", () => {
 
   it("input adapter unloaded stamps nothing", () => {
     const adapter = makeBridgeInputAdapter(CMOS_3V3, NODE, false);
-    adapter.stamp(solver as any);
+    adapter.load(makeCtx(solver));
 
     // No stamps at all when unloaded
     expect(solver.stamps.length).toBe(0);
@@ -173,7 +204,7 @@ describe("BridgeOutputAdapter", () => {
 
   it("input adapter loaded stamps rIn on node diagonal", () => {
     const adapter = makeBridgeInputAdapter(CMOS_3V3, NODE, true);
-    adapter.stamp(solver as any);
+    adapter.load(makeCtx(solver));
 
     const gIn = 1 / CMOS_3V3.rIn;
     expect(solver.sumStamp(NODE_IDX, NODE_IDX)).toBeCloseTo(gIn, 15);
@@ -193,13 +224,13 @@ describe("BridgeOutputAdapter", () => {
 
   it("setParam('rOut', 50) hot-updates output adapter conductance", () => {
     const adapter = makeBridgeOutputAdapter(CMOS_3V3, NODE, BRANCH_IDX, true);
-    adapter.stamp(solver as any);
+    adapter.load(makeCtx(solver));
     const gOutBefore = solver.sumStamp(NODE_IDX, NODE_IDX);
 
     solver.reset();
     const newROut = 100;
     adapter.setParam("rOut", newROut);
-    adapter.stamp(solver as any);
+    adapter.load(makeCtx(solver));
     const gOutAfter = solver.sumStamp(NODE_IDX, NODE_IDX);
 
     expect(gOutBefore).toBeCloseTo(1 / CMOS_3V3.rOut, 10);

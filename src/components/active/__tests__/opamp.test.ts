@@ -115,19 +115,20 @@ describe("OpAmp", () => {
     });
     opamp.updateOperatingPoint!(voltages);
 
-    const solver = makeMockSolver();
-    opamp.stamp(solver);
+    const { solver, stamps } = makeCaptureSolver();
+    opamp.load(makeOpAmpParityCtx(voltages, solver));
 
-    const stampCalls = (solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
+    const sumAt = (row: number, col: number): number =>
+      stamps.filter((s) => s.row === row && s.col === col).reduce((a, s) => a + s.value, 0);
 
     // G_out on out diagonal: stamp(out-1, out-1, G_out) = stamp(2, 2, G_out)
-    expect(stampCalls).toContainEqual([2, 2, G_out]);
+    expect(sumAt(2, 2)).toBeCloseTo(G_out, 10);
 
     // VCVS: G[out, in+] -= gain*G_out → stamp(2, 0, -gain*G_out)
-    expect(stampCalls).toContainEqual([2, 0, -1e6 * G_out]);
+    expect(sumAt(2, 0)).toBeCloseTo(-1e6 * G_out, 2);
 
     // VCVS: G[out, in-] += gain*G_out → stamp(2, 1, +gain*G_out)
-    expect(stampCalls).toContainEqual([2, 1, 1e6 * G_out]);
+    expect(sumAt(2, 1)).toBeCloseTo(1e6 * G_out, 2);
 
     // stampNonlinear in linear region: no RHS contribution
     const nlSolver = makeMockSolver();
@@ -151,13 +152,14 @@ describe("OpAmp", () => {
     opamp.updateOperatingPoint!(voltages);
 
     // stamp(): G_out on diagonal only, no VCVS entries
-    const stampSolver = makeMockSolver();
-    opamp.stamp(stampSolver);
-    const stampCalls = (stampSolver.stamp as ReturnType<typeof vi.fn>).mock.calls;
-    expect(stampCalls).toContainEqual([2, 2, G_out]);
+    const { solver: stampSolver, stamps: stampCapture } = makeCaptureSolver();
+    opamp.load(makeOpAmpParityCtx(voltages, stampSolver));
+    const sumAt2 = (row: number, col: number): number =>
+      stampCapture.filter((s) => s.row === row && s.col === col).reduce((a, s) => a + s.value, 0);
+    expect(sumAt2(2, 2)).toBeCloseTo(G_out, 10);
     // No large Jacobian entries (no VCVS in saturation)
-    const hasVcvsEntry = stampCalls.some(
-      (c: number[]) => c[0] === 2 && (c[1] === 0 || c[1] === 1) && Math.abs(c[2]) > 1,
+    const hasVcvsEntry = stampCapture.some(
+      (s) => s.row === 2 && (s.col === 0 || s.col === 1) && Math.abs(s.value) > 1,
     );
     expect(hasVcvsEntry).toBe(false);
 
@@ -219,8 +221,9 @@ describe("OpAmp", () => {
       branchIndex: -1, isNonlinear: false, isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
-      stamp(solver: SparseSolverType): void {
-        solver.stamp(nOut - 1, nOut - 1, G_load);
+      load(ctx): void {
+        const h = ctx.solver.allocElement(nOut - 1, nOut - 1);
+        ctx.solver.stampElement(h, G_load);
       },
     };
 
@@ -255,12 +258,13 @@ describe("Integration", () => {
       branchIndex: -1, isNonlinear: false, isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
-      stamp(solver: SparseSolverType): void {
-        if (nodeA > 0) solver.stamp(nodeA - 1, nodeA - 1, G);
-        if (nodeB > 0) solver.stamp(nodeB - 1, nodeB - 1, G);
+      load(ctx): void {
+        const { solver } = ctx;
+        if (nodeA > 0) { const h = solver.allocElement(nodeA - 1, nodeA - 1); solver.stampElement(h, G); }
+        if (nodeB > 0) { const h = solver.allocElement(nodeB - 1, nodeB - 1); solver.stampElement(h, G); }
         if (nodeA > 0 && nodeB > 0) {
-          solver.stamp(nodeA - 1, nodeB - 1, -G);
-          solver.stamp(nodeB - 1, nodeA - 1, -G);
+          const hab = solver.allocElement(nodeA - 1, nodeB - 1); solver.stampElement(hab, -G);
+          const hba = solver.allocElement(nodeB - 1, nodeA - 1); solver.stampElement(hba, -G);
         }
       },
     };
@@ -339,5 +343,129 @@ describe("Integration", () => {
     const vOut = result.nodeVoltages[nFeedback - 1];
     // Voltage follower: Vout = Vin = 3.7V ± 0.005V
     expect(vOut).toBeCloseTo(3.7, 2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C4.5 parity test — opamp_load_dcop_parity
+// ---------------------------------------------------------------------------
+//
+// Drives the ideal op-amp via load(ctx) at a canonical operating point (linear
+// region, unsaturated) and asserts the stamped conductance matrix and RHS
+// entries are bit-exact against the closed-form Norton approximation.
+//
+// Reference formulas (from opamp.ts createOpAmpElement):
+//   G_out     = 1 / rOut
+//   Effective = gain * srcFact
+//   Stamp on nOut diagonal:  + G_out
+//   Stamp on (nOut, nInp):   - Effective * G_out
+//   Stamp on (nOut, nInn):   + Effective * G_out
+//   RHS in linear region:      (nothing)
+//
+// Operating point is chosen with V_out inside the rails (linear region) so
+// saturation is not triggered.
+
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { OpAmpDefinition as _OpAmpDefinitionForParity } from "../opamp.js";
+
+interface CaptureStamp { row: number; col: number; value: number; }
+interface CaptureRhs { row: number; value: number; }
+function makeCaptureSolver(): { solver: SparseSolverType; stamps: CaptureStamp[]; rhs: CaptureRhs[]; } {
+  const stamps: CaptureStamp[] = [];
+  const rhs: CaptureRhs[] = [];
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stamp: (row: number, col: number, value: number) => {
+      stamps.push({ row, col, value });
+    },
+    stampRHS: (row: number, value: number) => {
+      rhs.push({ row, value });
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps, rhs };
+}
+
+function makeOpAmpParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("OpAmp parity (C4.5)", () => {
+  it("opamp_load_dcop_parity", () => {
+    // Canonical operating point: V+ = 1mV, V- = 0, V_out = 1V (within ±15V rails).
+    // gain=1e6, rOut=75 (defaults).
+    const nInp = 1, nInn = 2, nOut = 3;
+    const opamp = getFactory(_OpAmpDefinitionForParity.modelRegistry!["behavioral"]!)(
+      new Map([["in+", nInp], ["in-", nInn], ["out", nOut]]),
+      [],
+      -1,
+      (() => {
+        const props = new PropertyBag([]);
+        props.replaceModelParams({ gain: 1e6, rOut: 75 });
+        return props;
+      })(),
+      () => 0,
+    );
+
+    const voltages = new Float64Array(3);
+    voltages[nInp - 1] = 1e-3;
+    voltages[nInn - 1] = 0;
+    voltages[nOut - 1] = 1.0; // linear region, between -15 and +15
+    const { solver, stamps, rhs } = makeCaptureSolver();
+    const ctx = makeOpAmpParityCtx(voltages, solver);
+    opamp.load(ctx);
+
+    // Closed-form reference (ngspice-equivalent Norton VCVS approximation):
+    const NGSPICE_GAIN = 1e6;
+    const NGSPICE_ROUT = 75;
+    const NGSPICE_GOUT = 1 / NGSPICE_ROUT;
+    const NGSPICE_EFF = NGSPICE_GAIN * 1; // srcFact = 1
+
+    // Sum stamps by (row, col) — element may fold stamps through handle reuse.
+    const outRow = nOut - 1;
+    const sumAt = (row: number, col: number): number =>
+      stamps.filter((s) => s.row === row && s.col === col)
+            .reduce((a, s) => a + s.value, 0);
+    expect(sumAt(outRow, outRow)).toBe(NGSPICE_GOUT);
+    expect(sumAt(outRow, nInp - 1)).toBe(-NGSPICE_EFF * NGSPICE_GOUT);
+    expect(sumAt(outRow, nInn - 1)).toBe(NGSPICE_EFF * NGSPICE_GOUT);
+
+    // Linear region: no RHS stamps from the op-amp.
+    const rhsAtOut = rhs.filter((r) => r.row === outRow);
+    expect(rhsAtOut.length).toBe(0);
   });
 });

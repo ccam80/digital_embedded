@@ -258,3 +258,139 @@ describe("OTA", () => {
     expect(gain4).toBeCloseTo(gain1 * 4, 3);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C4.5 parity test — ota_load_dcop_parity
+// ---------------------------------------------------------------------------
+//
+// Drives the OTA via load(ctx) at a canonical operating point and asserts
+// the VCCS stamps and Norton RHS entries are bit-exact against the closed-form
+// transconductance model.
+//
+// Reference formulas (from ota.ts createOTAElement):
+//   twoVt   = 2 * vt
+//   xClamp  = clamp(vDiff / twoVt, -50, 50)
+//   tanhX   = tanh(xClamp)
+//   iOut    = iBias * tanhX
+//   sech2   = 1 - tanhX^2
+//   gmRaw   = iBias / twoVt * sech2
+//   gmEff   = min(|gmRaw|, gmMax)
+//   iNR     = iOut - gmEff * vDiff
+// Stamps:
+//   (OUT+, V+) -= gmEff
+//   (OUT+, V-) += gmEff
+//   (OUT-, V+) += gmEff    (but nOutN=0 here → suppressed)
+//   (OUT-, V-) -= gmEff    (but nOutN=0 here → suppressed)
+// RHS:
+//   OUT+ += iNR
+//   OUT- -= iNR            (but nOutN=0 here → suppressed)
+//
+// Canonical: V+=1mV, V-=0, Iabc node=1mA, vt=0.026, gmMax=0.01, OUT-=ground.
+
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+
+interface OtaCaptureStamp { row: number; col: number; value: number; }
+interface OtaCaptureRhs { row: number; value: number; }
+function makeOtaCaptureSolver(): {
+  solver: SparseSolverType;
+  stamps: OtaCaptureStamp[];
+  rhs: OtaCaptureRhs[];
+} {
+  const stamps: OtaCaptureStamp[] = [];
+  const rhs: OtaCaptureRhs[] = [];
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stamp: (row: number, col: number, value: number) => {
+      stamps.push({ row, col, value });
+    },
+    stampRHS: (row: number, value: number) => {
+      rhs.push({ row, value });
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps, rhs };
+}
+
+function makeOtaParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("OTA parity (C4.5)", () => {
+  it("ota_load_dcop_parity", () => {
+    const nVp = 1, nVm = 2, nIabc = 3, nOutP = 4, nOutN = 0;
+    const vt = 0.026;
+    const gmMax = 0.01;
+    const vDiff = 1e-3;
+    const iBias = 1e-3;
+    const ota = makeOTAElement(nVp, nVm, nIabc, nOutP, nOutN, { vt, gmMax });
+
+    const voltages = new Float64Array(4);
+    voltages[nVp - 1]   = vDiff;
+    voltages[nVm - 1]   = 0;
+    voltages[nIabc - 1] = iBias;
+    voltages[nOutP - 1] = 0;
+
+    const { solver, stamps, rhs } = makeOtaCaptureSolver();
+    const ctx = makeOtaParityCtx(voltages, solver);
+    ota.load(ctx);
+
+    // Closed-form reference (ngspice-equivalent small-signal Norton):
+    const NGSPICE_TWOVT = 2 * vt;
+    const NGSPICE_X     = vDiff / NGSPICE_TWOVT;
+    // x ≈ 0.019... well within the ±50 clamp, so xClamp === x bit-exactly
+    const NGSPICE_TANHX = Math.tanh(NGSPICE_X);
+    const NGSPICE_IOUT  = iBias * NGSPICE_TANHX;
+    const NGSPICE_SECH2 = 1 - NGSPICE_TANHX * NGSPICE_TANHX;
+    const NGSPICE_GMRAW = (iBias / NGSPICE_TWOVT) * NGSPICE_SECH2;
+    const NGSPICE_GMEFF = Math.min(Math.abs(NGSPICE_GMRAW), gmMax);
+    const NGSPICE_INR   = NGSPICE_IOUT - NGSPICE_GMEFF * vDiff;
+
+    // Stamps: (OUT+, V+) -= gmEff; (OUT+, V-) += gmEff.
+    // OUT- is ground (nOutN=0), so (OUT-, *) stamps are suppressed.
+    const outpRow = nOutP - 1;
+    const sumAt = (row: number, col: number): number =>
+      stamps.filter((s) => s.row === row && s.col === col)
+            .reduce((a, s) => a + s.value, 0);
+    expect(sumAt(outpRow, nVp - 1)).toBe(-NGSPICE_GMEFF);
+    expect(sumAt(outpRow, nVm - 1)).toBe(NGSPICE_GMEFF);
+
+    // RHS: OUT+ += iNR (OUT- ground, suppressed)
+    const rhsOutP = rhs.filter((r) => r.row === outpRow).reduce((a, r) => a + r.value, 0);
+    expect(rhsOutP).toBe(NGSPICE_INR);
+  });
+});

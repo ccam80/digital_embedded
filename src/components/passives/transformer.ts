@@ -307,34 +307,34 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     // Winding resistances (topology-constant, always stamped).
     if (this._rPri > 0) {
       const gPri = 1 / this._rPri;
-      if (p1 !== 0) solver.stamp(p1 - 1, p1 - 1, gPri);
-      if (p2 !== 0) solver.stamp(p2 - 1, p2 - 1, gPri);
+      if (p1 !== 0) solver.stampElement(solver.allocElement(p1 - 1, p1 - 1), gPri);
+      if (p2 !== 0) solver.stampElement(solver.allocElement(p2 - 1, p2 - 1), gPri);
       if (p1 !== 0 && p2 !== 0) {
-        solver.stamp(p1 - 1, p2 - 1, -gPri);
-        solver.stamp(p2 - 1, p1 - 1, -gPri);
+        solver.stampElement(solver.allocElement(p1 - 1, p2 - 1), -gPri);
+        solver.stampElement(solver.allocElement(p2 - 1, p1 - 1), -gPri);
       }
     }
     if (this._rSec > 0) {
       const gSec = 1 / this._rSec;
-      if (s1 !== 0) solver.stamp(s1 - 1, s1 - 1, gSec);
-      if (s2 !== 0) solver.stamp(s2 - 1, s2 - 1, gSec);
+      if (s1 !== 0) solver.stampElement(solver.allocElement(s1 - 1, s1 - 1), gSec);
+      if (s2 !== 0) solver.stampElement(solver.allocElement(s2 - 1, s2 - 1), gSec);
       if (s1 !== 0 && s2 !== 0) {
-        solver.stamp(s1 - 1, s2 - 1, -gSec);
-        solver.stamp(s2 - 1, s1 - 1, -gSec);
+        solver.stampElement(solver.allocElement(s1 - 1, s2 - 1), -gSec);
+        solver.stampElement(solver.allocElement(s2 - 1, s1 - 1), -gSec);
       }
     }
 
     // B sub-matrix: branch current incidence in KCL node rows.
-    if (p1 !== 0) solver.stamp(p1 - 1, b1, 1);
-    if (p2 !== 0) solver.stamp(p2 - 1, b1, -1);
-    if (s1 !== 0) solver.stamp(s1 - 1, b2, 1);
-    if (s2 !== 0) solver.stamp(s2 - 1, b2, -1);
+    if (p1 !== 0) solver.stampElement(solver.allocElement(p1 - 1, b1), 1);
+    if (p2 !== 0) solver.stampElement(solver.allocElement(p2 - 1, b1), -1);
+    if (s1 !== 0) solver.stampElement(solver.allocElement(s1 - 1, b2), 1);
+    if (s2 !== 0) solver.stampElement(solver.allocElement(s2 - 1, b2), -1);
 
     // C sub-matrix: KVL voltage incidence (topology-constant ±1 entries).
-    if (p1 !== 0) solver.stamp(b1, p1 - 1, 1);
-    if (p2 !== 0) solver.stamp(b1, p2 - 1, -1);
-    if (s1 !== 0) solver.stamp(b2, s1 - 1, 1);
-    if (s2 !== 0) solver.stamp(b2, s2 - 1, -1);
+    if (p1 !== 0) solver.stampElement(solver.allocElement(b1, p1 - 1), 1);
+    if (p2 !== 0) solver.stampElement(solver.allocElement(b1, p2 - 1), -1);
+    if (s1 !== 0) solver.stampElement(solver.allocElement(b2, s1 - 1), 1);
+    if (s2 !== 0) solver.stampElement(solver.allocElement(b2, s2 - 1), -1);
 
     if (!ctx.isTransient && !ctx.isDcOp) return;
 
@@ -385,11 +385,11 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
       // Branch equations:
       //   V(P1) − V(P2) − g11·I1 − g12·I2 = hist1
       //   V(S1) − V(S2) − g12·I1 − g22·I2 = hist2
-      solver.stamp(b1, b1, -g11);
-      solver.stamp(b1, b2, -g12);
+      solver.stampElement(solver.allocElement(b1, b1), -g11);
+      solver.stampElement(solver.allocElement(b1, b2), -g12);
       solver.stampRHS(b1, hist1);
-      solver.stamp(b2, b1, -g12);
-      solver.stamp(b2, b2, -g22);
+      solver.stampElement(solver.allocElement(b2, b1), -g12);
+      solver.stampElement(solver.allocElement(b2, b2), -g22);
       solver.stampRHS(b2, hist2);
 
       // Cache for diagnostics / LTE.

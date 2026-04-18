@@ -27,16 +27,20 @@ export type IntegrationMethod = "trapezoidal" | "bdf1" | "bdf2" | "gear";
 // ---------------------------------------------------------------------------
 
 /**
- * Minimal structural interface for the MNA sparse solver, containing only
- * the methods that AnalogElementCore implementations call during stamping.
+ * Minimal structural interface for the MNA sparse solver.
+ *
+ * Production elements call the full `SparseSolver` via `LoadContext.solver`
+ * and use the handle-based `allocElement` / `stampElement` / `stampRHS` API.
  *
  * The full SparseSolver class (with factorization, solve, etc.) lives in
  * solver/analog/sparse-solver.ts and satisfies this interface structurally.
  */
 export interface SparseSolverStamp {
-  stamp(row: number, col: number, value: number): void;
+  allocElement(row: number, col: number): number;
+  stampElement(handle: number, value: number): void;
   stampRHS(row: number, value: number): void;
 }
+
 
 // ---------------------------------------------------------------------------
 // ComplexSparseSolver — forward reference for AC stamp method

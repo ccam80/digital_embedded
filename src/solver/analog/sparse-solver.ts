@@ -277,15 +277,6 @@ export class SparseSolver {
     this._elVal[handle] += value;
   }
 
-  /**
-   * Convenience method: find-or-create element at (row, col) and accumulate value.
-   * Equivalent to stampElement(allocElement(row, col), value).
-   */
-  stamp(row: number, col: number, value: number): void {
-    const h = this.allocElement(row, col);
-    this._elVal[h] += value;
-  }
-
   stampRHS(row: number, value: number): void {
     this._rhs[row] += value;
   }

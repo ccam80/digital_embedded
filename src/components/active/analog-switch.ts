@@ -88,11 +88,11 @@ function stampConductance(
   nodeB: number,
   g: number,
 ): void {
-  if (nodeA > 0) solver.stamp(nodeA - 1, nodeA - 1, g);
-  if (nodeB > 0) solver.stamp(nodeB - 1, nodeB - 1, g);
+  if (nodeA > 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), g);
+  if (nodeB > 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), g);
   if (nodeA > 0 && nodeB > 0) {
-    solver.stamp(nodeA - 1, nodeB - 1, -g);
-    solver.stamp(nodeB - 1, nodeA - 1, -g);
+    solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -g);
+    solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -g);
   }
 }
 

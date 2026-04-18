@@ -274,3 +274,132 @@ describe("DAC", () => {
     expect(v3).toBeCloseTo(3.3 * scale, 3);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C4.5 parity test — dac_load_dcop_parity
+// ---------------------------------------------------------------------------
+//
+// Drives the unipolar DAC via load(ctx) at a canonical operating point
+// (VREF=5V, all bits LOW except D0 HIGH → code=1) and asserts the stamped
+// conductance + RHS entries are bit-exact against the closed-form converter.
+//
+// Reference formulas (from dac.ts createDACElement + digital-pin-model.ts):
+//   Output: stamp G_out = 1/rOut on nOut diagonal, RHS(nOut) = V_out·G_out.
+//   V_out  = V_REF * code / 2^N (unipolar); code = 1, 2^8 = 256 → V_out = 5/256.
+//   Input loading: inputModels[i].load(ctx) → stamps 1/rIn on nDi diagonal (loaded=true).
+//   inputSpec.rIn = p.rIn (from model params; default 1e7).
+
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+
+interface DacCaptureStamp { row: number; col: number; value: number; }
+function makeDacCaptureSolver(): {
+  solver: SparseSolverType;
+  stamps: DacCaptureStamp[];
+  rhs: Map<number, number>;
+} {
+  const stamps: DacCaptureStamp[] = [];
+  const rhs = new Map<number, number>();
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stamp: (row: number, col: number, value: number) => {
+      stamps.push({ row, col, value });
+    },
+    stampRHS: (row: number, value: number) => {
+      rhs.set(row, (rhs.get(row) ?? 0) + value);
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps, rhs };
+}
+
+function makeDacParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("DAC parity (C4.5)", () => {
+  it("dac_load_dcop_parity", () => {
+    // 8-bit unipolar DAC. Nodes: D0=1..D7=8, VREF=9, OUT=10, GND=0.
+    const bits = 8;
+    const dacPinNodes = new Map<string, number>();
+    for (let i = 0; i < bits; i++) dacPinNodes.set(`D${i}`, i + 1);
+    const nVref = 9, nOut = 10;
+    dacPinNodes.set("VREF", nVref);
+    dacPinNodes.set("OUT",  nOut);
+    dacPinNodes.set("GND",  0);
+
+    const props = new PropertyBag([["bits", bits]]);
+    props.replaceModelParams({ ...DAC_DEFAULTS });
+    const dac = getFactory(DACDefinition.modelRegistry!["unipolar"]!)(
+      dacPinNodes, [], -1, props, () => 0,
+    );
+
+    // Drive D0 HIGH above vIH threshold (2.0), others low. VREF=5V.
+    const matrixSize = 10; // 10 nodes, no branches needed for this test
+    const voltages = new Float64Array(matrixSize);
+    voltages[0] = 3.3;                     // D0 HIGH
+    for (let i = 1; i < bits; i++) voltages[i] = 0;  // D1..D7 LOW
+    voltages[nVref - 1] = 5.0;
+    voltages[nOut - 1]  = 0;
+
+    const { solver, stamps, rhs } = makeDacCaptureSolver();
+    const ctx = makeDacParityCtx(voltages, solver);
+    dac.load(ctx);
+
+    // Closed-form reference:
+    const NGSPICE_ROUT = Math.max(DAC_DEFAULTS.rOut, 1e-9);
+    const NGSPICE_GOUT = 1 / NGSPICE_ROUT;
+    const NGSPICE_CODE = 1;                     // only D0 HIGH
+    const NGSPICE_VREF = 5.0;
+    const NGSPICE_VOUT = NGSPICE_VREF * NGSPICE_CODE / 256;
+    const NGSPICE_RHS_OUT = NGSPICE_VOUT * NGSPICE_GOUT;
+    const NGSPICE_GIN = 1 / DAC_DEFAULTS.rIn;
+
+    const sumAt = (row: number, col: number): number =>
+      stamps.filter((s) => s.row === row && s.col === col)
+            .reduce((a, s) => a + s.value, 0);
+
+    // Output stamps on nOut diagonal (bit-exact)
+    expect(sumAt(nOut - 1, nOut - 1)).toBe(NGSPICE_GOUT);
+    expect(rhs.get(nOut - 1) ?? 0).toBe(NGSPICE_RHS_OUT);
+
+    // Digital input loading: 1/rIn on each bit's diagonal
+    for (let i = 0; i < bits; i++) {
+      expect(sumAt(i, i)).toBe(NGSPICE_GIN);
+    }
+  });
+});

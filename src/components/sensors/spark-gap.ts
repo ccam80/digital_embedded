@@ -171,14 +171,14 @@ export class SparkGapElement implements AnalogElementCore {
     const G = 1 / Math.max(this.resistance(), MIN_RESISTANCE);
 
     if (nPos !== 0 && nNeg !== 0) {
-      solver.stamp(nPos - 1, nPos - 1, G);
-      solver.stamp(nPos - 1, nNeg - 1, -G);
-      solver.stamp(nNeg - 1, nPos - 1, -G);
-      solver.stamp(nNeg - 1, nNeg - 1, G);
+      solver.stampElement(solver.allocElement(nPos - 1, nPos - 1), G);
+      solver.stampElement(solver.allocElement(nPos - 1, nNeg - 1), -G);
+      solver.stampElement(solver.allocElement(nNeg - 1, nPos - 1), -G);
+      solver.stampElement(solver.allocElement(nNeg - 1, nNeg - 1), G);
     } else if (nPos !== 0) {
-      solver.stamp(nPos - 1, nPos - 1, G);
+      solver.stampElement(solver.allocElement(nPos - 1, nPos - 1), G);
     } else if (nNeg !== 0) {
-      solver.stamp(nNeg - 1, nNeg - 1, G);
+      solver.stampElement(solver.allocElement(nNeg - 1, nNeg - 1), G);
     }
   }
 

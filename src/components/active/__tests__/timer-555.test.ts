@@ -182,12 +182,13 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
     isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(): number[] { return []; },
-    stamp(solver: SparseSolverType): void {
-      if (nodeA > 0) solver.stamp(nodeA - 1, nodeA - 1, G);
-      if (nodeB > 0) solver.stamp(nodeB - 1, nodeB - 1, G);
+    load(ctx): void {
+      const { solver } = ctx;
+      if (nodeA > 0) { const h = solver.allocElement(nodeA - 1, nodeA - 1); solver.stampElement(h, G); }
+      if (nodeB > 0) { const h = solver.allocElement(nodeB - 1, nodeB - 1); solver.stampElement(h, G); }
       if (nodeA > 0 && nodeB > 0) {
-        solver.stamp(nodeA - 1, nodeB - 1, -G);
-        solver.stamp(nodeB - 1, nodeA - 1, -G);
+        const hab = solver.allocElement(nodeA - 1, nodeB - 1); solver.stampElement(hab, -G);
+        const hba = solver.allocElement(nodeB - 1, nodeA - 1); solver.stampElement(hba, -G);
       }
     },
   };
@@ -716,11 +717,12 @@ function buildMonostableCircuit(R: number, Cval: number, VCC: number): {
     isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
-    stamp(solver: SparseSolverType): void {
+    load(ctx): void {
+      const { solver } = ctx;
       const k = brTrig;
       if (nTrig > 0) {
-        solver.stamp(nTrig - 1, k, 1);
-        solver.stamp(k, nTrig - 1, 1);
+        const h1 = solver.allocElement(nTrig - 1, k); solver.stampElement(h1, 1);
+        const h2 = solver.allocElement(k, nTrig - 1); solver.stampElement(h2, 1);
       }
       solver.stampRHS(k, _trigVoltage);
     },
@@ -880,5 +882,166 @@ describe("Monostable", () => {
     // Pulse must have the normal width (within 10%)
     const tWidthError = Math.abs(tWidthMeasured - tWidthExpected) / tWidthExpected;
     expect(tWidthError).toBeLessThan(0.10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C4.5 parity test — timer555_load_transient_parity
+// ---------------------------------------------------------------------------
+//
+// Drives the 555 timer via load(ctx) in transient mode at a canonical operating
+// point (VCC=5V, GND=0V, flipflopQ=false initial state) and asserts:
+//   - Internal voltage divider stamps: rDiv1 (VCC→CTRL, 5kΩ), rDiv2 (CTRL→GND, 10kΩ)
+//   - Output pin Norton stamp: G_out=1/rOut + V_target·G_out RHS, where rOut=10Ω
+//   - Discharge stamp: rDischarge between DIS and GND when Q=false
+//
+// All stamps bit-exact against the closed-form reference in timer-555.ts.
+
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+
+/**
+ * Capture solver that simulates both the legacy `stamp(row, col, value)`
+ * entry-point API and the handle-based `allocElement` + `stampElement` API,
+ * so elements can be driven via load(ctx) independently of ongoing Wave C5
+ * migration state. Handles are issued per (row, col) pair and captured stamps
+ * are resolved back to matrix coordinates when inspected.
+ */
+interface Timer555CaptureStamp { row: number; col: number; value: number; }
+function makeTimer555CaptureSolver(): {
+  solver: SparseSolverType;
+  stamps: Timer555CaptureStamp[];
+  rhs: Map<number, number>;
+} {
+  const stamps: Timer555CaptureStamp[] = [];
+  const rhs = new Map<number, number>();
+  // Handle table: index → {row, col}
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stamp: (row: number, col: number, value: number) => {
+      stamps.push({ row, col, value });
+    },
+    stampRHS: (row: number, value: number) => {
+      rhs.set(row, (rhs.get(row) ?? 0) + value);
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps, rhs };
+}
+
+function makeTimer555ParityCtx(
+  voltages: Float64Array,
+  solver: SparseSolverType,
+  dt = 0,
+): LoadContext {
+  const ag = new Float64Array(8);
+  if (dt > 0) {
+    // Trapezoidal order 1 coefficients (what a fresh transient step would produce).
+    ag[0] = 1 / dt;
+    ag[1] = -1 / dt;
+  }
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: dt > 0 ? "transient" : "initFloat",
+    dt,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [dt, dt, dt, dt, dt, dt, dt],
+    ag,
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: dt === 0,
+    isTransient: dt > 0,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("Timer555 parity (C4.5)", () => {
+  it("timer555_load_transient_parity", () => {
+    // Node layout: nDis=1, nTrig=2, nThr=3, nVcc=4, nCtrl=5, nOut=6, nRst=7, nGnd=8.
+    const nodes = {
+      vcc: 4, gnd: 8, trig: 2, thr: 3, ctrl: 5, rst: 7, dis: 1, out: 6,
+    };
+    const el = make555(nodes, { vDrop: 1.5, rDischarge: 10 });
+
+    // Canonical transient state: VCC=5V, GND=0V, CTRL≈2/3 VCC, OUT=0V, DIS=0V,
+    // RST=5V (not resetting), THR=0V, TRIG=5V (not triggering).
+    // flipflopQ starts false; load() reads Q and stamps accordingly. Output LOW,
+    // discharge resistor saturated, output target = vOL = 0.1 V (vGnd+0.1).
+    const matrixSize = 8;
+    const voltages = new Float64Array(matrixSize);
+    voltages[nodes.vcc - 1]  = 5;
+    voltages[nodes.gnd - 1]  = 0;
+    voltages[nodes.ctrl - 1] = 10 / 3;
+    voltages[nodes.rst - 1]  = 5;
+    voltages[nodes.trig - 1] = 5;
+
+    const { solver, stamps, rhs } = makeTimer555CaptureSolver();
+    const ctx = makeTimer555ParityCtx(voltages, solver, 1e-6);
+    el.load(ctx);
+
+    // Closed-form reference (ngspice-equivalent):
+    const NGSPICE_RDIV1 = 5000;
+    const NGSPICE_RDIV2 = 10000;
+    const NGSPICE_GDIV1 = 1 / NGSPICE_RDIV1;
+    const NGSPICE_GDIV2 = 1 / NGSPICE_RDIV2;
+    const NGSPICE_GOUT_INTERNAL = 1 / 10;  // output pin rOut=10Ω
+    const NGSPICE_GDIS = 1 / 10;             // rDischarge=10Ω when Q=false
+    const NGSPICE_VOL = 0.1;
+    const NGSPICE_RHS_OUT = NGSPICE_VOL * NGSPICE_GOUT_INTERNAL;
+
+    const vccIdx = nodes.vcc - 1, ctrlIdx = nodes.ctrl - 1, gndIdx = nodes.gnd - 1;
+    const disIdx = nodes.dis - 1, outIdx = nodes.out - 1;
+
+    // Sum all stamps at a given (row, col) coordinate — element stamps both
+    // conductance terms and, for output, G_out from DigitalOutputPinModel.
+    const sumAt = (row: number, col: number): number =>
+      stamps.filter((s) => s.row === row && s.col === col)
+            .reduce((a, s) => a + s.value, 0);
+
+    // rDiv1 stamps (VCC↔CTRL)
+    expect(sumAt(vccIdx, vccIdx)).toBe(NGSPICE_GDIV1);
+    expect(sumAt(vccIdx, ctrlIdx)).toBe(-NGSPICE_GDIV1);
+    expect(sumAt(ctrlIdx, vccIdx)).toBe(-NGSPICE_GDIV1);
+
+    // CTRL diagonal: rDiv1 + rDiv2
+    expect(sumAt(ctrlIdx, ctrlIdx)).toBe(NGSPICE_GDIV1 + NGSPICE_GDIV2);
+
+    // rDiv2 stamps (CTRL↔GND) and discharge (DIS↔GND) both land on gndIdx:
+    //   gnd diagonal = GDIV2 + GDIS
+    expect(sumAt(gndIdx, gndIdx)).toBe(NGSPICE_GDIV2 + NGSPICE_GDIS);
+    expect(sumAt(ctrlIdx, gndIdx)).toBe(-NGSPICE_GDIV2);
+    expect(sumAt(gndIdx, ctrlIdx)).toBe(-NGSPICE_GDIV2);
+
+    // Discharge resistor (DIS↔GND)
+    expect(sumAt(disIdx, disIdx)).toBe(NGSPICE_GDIS);
+    expect(sumAt(disIdx, gndIdx)).toBe(-NGSPICE_GDIS);
+    expect(sumAt(gndIdx, disIdx)).toBe(-NGSPICE_GDIS);
+
+    // Output pin Norton: G_out on OUT diagonal (via DigitalOutputPinModel handle API)
+    expect(sumAt(outIdx, outIdx)).toBe(NGSPICE_GOUT_INTERNAL);
+
+    // RHS: output Norton current = vOL·G_out at OUT node (exact)
+    expect(rhs.get(outIdx) ?? 0).toBe(NGSPICE_RHS_OUT);
   });
 });

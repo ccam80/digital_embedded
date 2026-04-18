@@ -37,6 +37,8 @@ import { makeVoltageSource, makeResistor } from "../../../solver/analog/__tests_
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -45,6 +47,67 @@ import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
+}
+
+// ---------------------------------------------------------------------------
+// makeTransientCtx — minimal LoadContext for manual transient loops
+// ---------------------------------------------------------------------------
+
+function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array): LoadContext {
+  return {
+    solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: true,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// makeCaptureSolver — records allocElement/stampElement/stampRHS calls
+// ---------------------------------------------------------------------------
+
+interface CaptureStamp { row: number; col: number; value: number; }
+
+function makeCaptureSolver(): { solver: SparseSolverType; stamps: CaptureStamp[] } {
+  const stamps: CaptureStamp[] = [];
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number): void => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+    stampRHS: (_row: number, _value: number): void => {},
+    beginAssembly: (): void => {},
+    finalize: (): void => {},
+    solve: (): Float64Array => new Float64Array(0),
+  } as unknown as SparseSolverType;
+  return { solver, stamps };
 }
 
 // ---------------------------------------------------------------------------
@@ -153,10 +216,11 @@ describe("Transformer", () => {
 
       transformer.stampCompanion(dt, "trapezoidal", voltages);
       solver.beginAssembly(matrixSize);
-      vsrc.stamp(solver);
-      transformer.stamp(solver);
+      const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages);
+      vsrc.load(ctx);
+      transformer.load(ctx);
       transformer.stampReactiveCompanion!(solver);
-      rLoad.stamp(solver);
+      rLoad.load(ctx);
       solver.finalize();
       const result = solver.factor();
       if (!result.success) throw new Error(`Singular at step ${i}`);
@@ -226,10 +290,11 @@ describe("Transformer", () => {
 
       transformer.stampCompanion(dt, "trapezoidal", voltages);
       solver.beginAssembly(matrixSize);
-      vsrc.stamp(solver);
-      transformer.stamp(solver);
+      const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages);
+      vsrc.load(ctx);
+      transformer.load(ctx);
       transformer.stampReactiveCompanion!(solver);
-      rLoad.stamp(solver);
+      rLoad.load(ctx);
       solver.finalize();
       const result = solver.factor();
       if (!result.success) throw new Error(`Singular at step ${i}`);
@@ -300,10 +365,11 @@ describe("Transformer", () => {
 
       transformer.stampCompanion(dt, "trapezoidal", voltages);
       solver.beginAssembly(matrixSize);
-      vsrc.stamp(solver);
-      transformer.stamp(solver);
+      const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages);
+      vsrc.load(ctx);
+      transformer.load(ctx);
       transformer.stampReactiveCompanion!(solver);
-      rLoad.stamp(solver);
+      rLoad.load(ctx);
       solver.finalize();
       const result = solver.factor();
       if (!result.success) throw new Error(`Singular at step ${i}`);
@@ -375,10 +441,11 @@ describe("Transformer", () => {
 
         transformer.stampCompanion(dt, "trapezoidal", voltages);
         solver.beginAssembly(matrixSize);
-        vsrc.stamp(solver);
-        transformer.stamp(solver);
+        const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages);
+        vsrc.load(ctx);
+        transformer.load(ctx);
         transformer.stampReactiveCompanion!(solver);
-        rLoad.stamp(solver);
+        rLoad.load(ctx);
         solver.finalize();
         const result = solver.factor();
         if (!result.success) throw new Error(`Singular at step ${i}`);
@@ -442,10 +509,11 @@ describe("Transformer", () => {
     for (let i = 0; i < steps; i++) {
       transformer.stampCompanion(dt, "trapezoidal", voltages);
       solver.beginAssembly(matrixSize);
-      vsrc.stamp(solver);
-      transformer.stamp(solver);
+      const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages);
+      vsrc.load(ctx);
+      transformer.load(ctx);
       transformer.stampReactiveCompanion!(solver);
-      rLoad.stamp(solver);
+      rLoad.load(ctx);
       solver.finalize();
       const result = solver.factor();
       if (!result.success) throw new Error(`Singular at step ${i}`);
@@ -464,18 +532,10 @@ describe("Transformer", () => {
      * (inductors ≈ open), the winding resistance dominates and creates
      * a measurable voltage drop across the primary.
      *
-     * We test stamp() directly: check that the resistor conductance stamps
+     * We test load() directly: check that the resistor conductance stamps
      * appear correctly in the matrix for the primary winding.
      */
-    interface StampCall { row: number; col: number; value: number; }
-    const stamps: StampCall[] = [];
-    const mockSolver = {
-      stamp: (row: number, col: number, value: number) => stamps.push({ row, col, value }),
-      stampRHS: (_row: number, _value: number) => {},
-      beginAssembly: () => {},
-      finalize: () => {},
-      solve: () => new Float64Array(0),
-    };
+    const { solver: capSolver, stamps } = makeCaptureSolver();
 
     const rPri = 10.0;
     const transformer = makeTransformerElement({
@@ -488,7 +548,9 @@ describe("Transformer", () => {
       rSec: 0,
     });
 
-    transformer.stamp(mockSolver as any);
+    const voltages = new Float64Array(8);
+    const ctx = makeTransientCtx(capSolver, voltages);
+    transformer.load(ctx);
 
     // Primary resistance conductance = 1/10 = 0.1 S
     // Stamps between node 1 (idx 0) and node 2 (idx 1)

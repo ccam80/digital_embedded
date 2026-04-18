@@ -281,11 +281,11 @@ function createTimer555Element(
 
   function stampResistor(solver: SparseSolver, nA: number, nB: number, R: number): void {
     const G = 1 / R;
-    if (nA > 0) solver.stamp(nA - 1, nA - 1, G);
-    if (nB > 0) solver.stamp(nB - 1, nB - 1, G);
+    if (nA > 0) solver.stampElement(solver.allocElement(nA - 1, nA - 1), G);
+    if (nB > 0) solver.stampElement(solver.allocElement(nB - 1, nB - 1), G);
     if (nA > 0 && nB > 0) {
-      solver.stamp(nA - 1, nB - 1, -G);
-      solver.stamp(nB - 1, nA - 1, -G);
+      solver.stampElement(solver.allocElement(nA - 1, nB - 1), -G);
+      solver.stampElement(solver.allocElement(nB - 1, nA - 1), -G);
     }
   }
 

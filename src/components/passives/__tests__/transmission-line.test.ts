@@ -25,7 +25,8 @@ import { StatePool } from "../../../solver/analog/state-pool.js";
 import { MNAEngine } from "../../../solver/analog/analog-engine.js";
 import { EngineState } from "../../../core/engine-interface.js";
 import { makeVoltageSource, makeResistor } from "../../../solver/analog/__tests__/test-helpers.js";
-import type { SparseSolverStamp } from "../../../core/analog-types.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { makeDiagnostic } from "../../../solver/analog/diagnostics.js";
 
 // ---------------------------------------------------------------------------
@@ -53,16 +54,55 @@ interface RHSCall {
   value: number;
 }
 
-function makeStubSolver(): { solver: SparseSolverStamp; stamps: StampCall[]; rhsStamps: RHSCall[] } {
+function makeStubSolver(): { solver: SparseSolverType; stamps: StampCall[]; rhsStamps: RHSCall[] } {
   const stamps: StampCall[] = [];
   const rhsStamps: RHSCall[] = [];
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
 
-  const solver: SparseSolverStamp = {
-    stamp: (row, col, value) => { stamps.push({ row, col, value }); },
-    stampRHS: (row, value) => { rhsStamps.push({ row, value }); },
-  };
+  const solver = {
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+        stamps.push({ row, col, value: 0 });
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number): void => {
+      stamps[handle].value += value;
+    },
+    stampRHS: (row: number, value: number): void => { rhsStamps.push({ row, value }); },
+  } as unknown as SparseSolverType;
 
   return { solver, stamps, rhsStamps };
+}
+
+function makeStubCtx(solver: SparseSolverType): LoadContext {
+  return {
+    solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
+    voltages: new Float64Array(200),
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: false,
+    isTransient: true,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
 }
 
 function buildTLineCircuit(opts: {
@@ -158,7 +198,7 @@ describe("TLine", () => {
       el.stampCompanion!(1e-9, "bdf1", voltages, 1, [1e-9]);
 
       const { solver, stamps } = makeStubSolver();
-      el.stamp(solver);
+      el.load(makeStubCtx(solver));
       el.stampReactiveCompanion?.(solver);
 
       // For a lossless line all resistive stamps (R_seg) should be zero conductance
@@ -229,7 +269,7 @@ describe("TLine", () => {
       el.stampCompanion!(dt, "bdf1", voltages, 1, [dt]);
 
       const { solver, stamps } = makeStubSolver();
-      el.stamp(solver);
+      el.load(makeStubCtx(solver));
       el.stampReactiveCompanion?.(solver);
 
       // BDF-1 geq = L/dt. For each segment's inductor (SegmentInductorElement):
@@ -780,7 +820,7 @@ describe("TransmissionLine", () => {
       el.stampCompanion!(1e-9, "bdf1", voltages, 1, [1e-9]);
 
       const { solver, stamps } = makeStubSolver();
-      el.stamp(solver);
+      el.load(makeStubCtx(solver));
       el.stampReactiveCompanion?.(solver);
       expect(stamps.length).toBeGreaterThan(0);
     });

@@ -206,7 +206,7 @@ class AnalogPotentiometerElement implements AnalogElement {
 
     // Stamp helper: 1-based node IDs, skip ground (node 0), -1 for solver index
     const stamp = (r: number, c: number, v: number): void => {
-      if (r !== 0 && c !== 0) solver.stamp(r - 1, c - 1, v);
+      if (r !== 0 && c !== 0) solver.stampElement(solver.allocElement(r - 1, c - 1), v);
     };
 
     // Top resistor (R_top) stamps: G_top at (A,A), (W,W), (A,W), (W,A)

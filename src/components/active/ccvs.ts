@@ -190,23 +190,23 @@ class CCVSAnalogElement extends ControlledSourceElement {
 
     // Sense 0V source incidence
     if (this._nSenseP !== 0) {
-      solver.stamp(this._nSenseP - 1, ks, 1);
-      solver.stamp(ks, this._nSenseP - 1, 1);
+      solver.stampElement(solver.allocElement(this._nSenseP - 1, ks), 1);
+      solver.stampElement(solver.allocElement(ks, this._nSenseP - 1), 1);
     }
     if (this._nSenseN !== 0) {
-      solver.stamp(this._nSenseN - 1, ks, -1);
-      solver.stamp(ks, this._nSenseN - 1, -1);
+      solver.stampElement(solver.allocElement(this._nSenseN - 1, ks), -1);
+      solver.stampElement(solver.allocElement(ks, this._nSenseN - 1), -1);
     }
     // RHS = 0V for sense source (no explicit stamp needed — beginAssembly zeros RHS)
 
     // Output voltage source incidence
     if (this._nOutP !== 0) {
-      solver.stamp(this._nOutP - 1, ko, 1);
-      solver.stamp(ko, this._nOutP - 1, 1);
+      solver.stampElement(solver.allocElement(this._nOutP - 1, ko), 1);
+      solver.stampElement(solver.allocElement(ko, this._nOutP - 1), 1);
     }
     if (this._nOutN !== 0) {
-      solver.stamp(this._nOutN - 1, ko, -1);
-      solver.stamp(ko, this._nOutN - 1, -1);
+      solver.stampElement(solver.allocElement(this._nOutN - 1, ko), -1);
+      solver.stampElement(solver.allocElement(ko, this._nOutN - 1), -1);
     }
   }
 
@@ -237,7 +237,7 @@ class CCVSAnalogElement extends ControlledSourceElement {
     const ks = this._senseBranch;
 
     // Jacobian: dV_out/dI_sense — links output branch equation to sense branch variable
-    solver.stamp(ko, ks, -derivative);
+    solver.stampElement(solver.allocElement(ko, ks), -derivative);
 
     // NR-linearized RHS
     solver.stampRHS(ko, value - derivative * ctrlValue);

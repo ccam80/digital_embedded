@@ -69,11 +69,11 @@ function stampG(
   nB: number,
   g: number,
 ): void {
-  if (nA > 0) solver.stamp(nA - 1, nA - 1, g);
-  if (nB > 0) solver.stamp(nB - 1, nB - 1, g);
+  if (nA > 0) solver.stampElement(solver.allocElement(nA - 1, nA - 1), g);
+  if (nB > 0) solver.stampElement(solver.allocElement(nB - 1, nB - 1), g);
   if (nA > 0 && nB > 0) {
-    solver.stamp(nA - 1, nB - 1, -g);
-    solver.stamp(nB - 1, nA - 1, -g);
+    solver.stampElement(solver.allocElement(nA - 1, nB - 1), -g);
+    solver.stampElement(solver.allocElement(nB - 1, nA - 1), -g);
   }
 }
 

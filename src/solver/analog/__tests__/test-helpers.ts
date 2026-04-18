@@ -73,8 +73,15 @@ export function withNodeIds(
 
 function G(solver: SparseSolver, row: number, col: number, val: number): void {
   if (row !== 0 && col !== 0) {
-    solver.stamp(row - 1, col - 1, val);
+    const h = solver.allocElement(row - 1, col - 1);
+    solver.stampElement(h, val);
   }
+}
+
+/** Unguarded stamp at absolute solver-space (row, col). */
+function S(solver: SparseSolver, row: number, col: number, val: number): void {
+  const h = solver.allocElement(row, col);
+  solver.stampElement(h, val);
 }
 
 function RHS(solver: SparseSolver, row: number, val: number): void {
@@ -184,12 +191,12 @@ export function makeVoltageSource(
       const k = branchIdx; // absolute 0-based solver row
 
       // B sub-matrix (node rows, branch column k)
-      if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
-      if (nodeNeg !== 0) solver.stamp(nodeNeg - 1, k, -1);
+      if (nodePos !== 0) S(solver, nodePos - 1, k, 1);
+      if (nodeNeg !== 0) S(solver, nodeNeg - 1, k, -1);
 
       // C sub-matrix (branch row k, node columns)
-      if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
-      if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
+      if (nodePos !== 0) S(solver, k, nodePos - 1, 1);
+      if (nodeNeg !== 0) S(solver, k, nodeNeg - 1, -1);
 
       // RHS entry for the voltage constraint (scaled by source stepping factor)
       solver.stampRHS(k, voltage * scale);
@@ -549,8 +556,8 @@ export function makeInductor(
       const k = branchIdx;
 
       // Topology-constant branch incidence stamps (always).
-      if (nodeA !== 0) solver.stamp(nodeA - 1, k, 1);
-      if (nodeB !== 0) solver.stamp(nodeB - 1, k, -1);
+      if (nodeA !== 0) S(solver, nodeA - 1, k, 1);
+      if (nodeB !== 0) S(solver, nodeB - 1, k, -1);
 
       if (!isTransient && !isDcOp) return;
 
@@ -574,19 +581,19 @@ export function makeInductor(
           ceq = cflux - ag[0] * phi0;
 
           // Branch equation: V_A - V_B - geq * I_k = ceq
-          if (nodeA !== 0) solver.stamp(k, nodeA - 1, 1);
-          if (nodeB !== 0) solver.stamp(k, nodeB - 1, -1);
-          solver.stamp(k, k, -geq);
+          if (nodeA !== 0) S(solver, k, nodeA - 1, 1);
+          if (nodeB !== 0) S(solver, k, nodeB - 1, -1);
+          S(solver, k, k, -geq);
           solver.stampRHS(k, ceq);
         } else {
           // DC short-circuit model: V_A - V_B = 0
-          if (nodeA !== 0) solver.stamp(k, nodeA - 1, 1);
-          if (nodeB !== 0) solver.stamp(k, nodeB - 1, -1);
+          if (nodeA !== 0) S(solver, k, nodeA - 1, 1);
+          if (nodeB !== 0) S(solver, k, nodeB - 1, -1);
         }
       } else {
         // DC: short circuit
-        if (nodeA !== 0) solver.stamp(k, nodeA - 1, 1);
-        if (nodeB !== 0) solver.stamp(k, nodeB - 1, -1);
+        if (nodeA !== 0) S(solver, k, nodeA - 1, 1);
+        if (nodeB !== 0) S(solver, k, nodeB - 1, -1);
       }
     },
 
@@ -684,12 +691,12 @@ export function makeAcVoltageSource(
         scale;
 
       // B sub-matrix (node rows, branch column k)
-      if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
-      if (nodeNeg !== 0) solver.stamp(nodeNeg - 1, k, -1);
+      if (nodePos !== 0) S(solver, nodePos - 1, k, 1);
+      if (nodeNeg !== 0) S(solver, nodeNeg - 1, k, -1);
 
       // C sub-matrix (branch row k, node columns)
-      if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
-      if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
+      if (nodePos !== 0) S(solver, k, nodePos - 1, 1);
+      if (nodeNeg !== 0) S(solver, k, nodeNeg - 1, -1);
 
       // RHS voltage constraint
       solver.stampRHS(k, v);

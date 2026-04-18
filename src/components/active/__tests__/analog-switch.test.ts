@@ -199,8 +199,9 @@ describe("SPST", () => {
       isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
-      stamp(solver: SparseSolverType): void {
-        solver.stamp(nOut - 1, nOut - 1, 1 / 1000);
+      load(ctx): void {
+        const h = ctx.solver.allocElement(nOut - 1, nOut - 1);
+        ctx.solver.stampElement(h, 1 / 1000);
       },
     };
 
@@ -237,8 +238,9 @@ describe("SPST", () => {
       isReactive: false,
       setParam(_key: string, _value: number): void {},
       getPinCurrents(): number[] { return []; },
-      stamp(solver: SparseSolverType): void {
-        solver.stamp(nOut - 1, nOut - 1, 1 / 1000);
+      load(ctx): void {
+        const h = ctx.solver.allocElement(nOut - 1, nOut - 1);
+        ctx.solver.stampElement(h, 1 / 1000);
       },
     };
 
@@ -345,5 +347,114 @@ describe("SPDT", () => {
     // Both paths at mid-R → neither is fully on (R_on=10) simultaneously
     expect(rNO).toBeGreaterThan(rOn * 10);
     expect(rNC).toBeGreaterThan(rOn * 10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C4.5 parity test — analog_switch_load_dcop_parity
+// ---------------------------------------------------------------------------
+//
+// Drives the SPST analog switch via load(ctx) at a canonical operating point
+// (V_ctrl=3.3V >> threshold=1.65V, rOn=10Ω, rOff=1e9Ω, transitionSharpness=20)
+// and asserts the stamped conductance between nIn and nOut is bit-exact
+// against the closed-form tanh transition.
+//
+// Reference formulas (from analog-switch.ts switchResistance + SPST load):
+//   arg    = k * (vCtrl - vTh)              (invert=false for SPST)
+//   tanhX  = tanh(arg)
+//   R      = rOff - (rOff - rOn) * 0.5 * (1 + tanhX)
+//   G      = 1 / R
+//   stamps: G on nIn diag, G on nOut diag, -G on (nIn,nOut), -G on (nOut,nIn)
+
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+
+interface SwitchCaptureStamp { row: number; col: number; value: number; }
+function makeSwitchCaptureSolver(): {
+  solver: SparseSolverType;
+  stamps: SwitchCaptureStamp[];
+} {
+  const stamps: SwitchCaptureStamp[] = [];
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stamp: (row: number, col: number, value: number) => {
+      stamps.push({ row, col, value });
+    },
+    stampRHS: (_row: number, _value: number) => {},
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps };
+}
+
+function makeSwitchParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("AnalogSwitch parity (C4.5)", () => {
+  it("analog_switch_load_dcop_parity", () => {
+    const nIn = 1, nOut = 2, nCtrl = 3;
+    const rOn = 10;
+    const rOff = 1e9;
+    const threshold = 1.65;
+    const transitionSharpness = 20;
+    const sw = makeSPST(nCtrl, nIn, nOut, { rOn, rOff, threshold, transitionSharpness });
+
+    const vCtrl = 3.3;
+    const voltages = new Float64Array(3);
+    voltages[nCtrl - 1] = vCtrl;
+
+    const { solver, stamps } = makeSwitchCaptureSolver();
+    const ctx = makeSwitchParityCtx(voltages, solver);
+    sw.load(ctx);
+
+    // Closed-form reference (ngspice-equivalent tanh transition, matching element):
+    // Element clamps rOn to max(rOn, 1e-6) and rOff to max(rOff, rOn+1) before use.
+    const NGSPICE_RON_EFF  = Math.max(rOn, 1e-6);
+    const NGSPICE_ROFF_EFF = Math.max(rOff, NGSPICE_RON_EFF + 1);
+    const NGSPICE_ARG   = transitionSharpness * (vCtrl - threshold);
+    const NGSPICE_TANHX = Math.tanh(NGSPICE_ARG);
+    const NGSPICE_R     = NGSPICE_ROFF_EFF - (NGSPICE_ROFF_EFF - NGSPICE_RON_EFF) * 0.5 * (1 + NGSPICE_TANHX);
+    const NGSPICE_G     = 1 / NGSPICE_R;
+
+    const sumAt = (row: number, col: number): number =>
+      stamps.filter((s) => s.row === row && s.col === col)
+            .reduce((a, s) => a + s.value, 0);
+    expect(sumAt(nIn - 1, nIn - 1)).toBe(NGSPICE_G);
+    expect(sumAt(nOut - 1, nOut - 1)).toBe(NGSPICE_G);
+    expect(sumAt(nIn - 1, nOut - 1)).toBe(-NGSPICE_G);
+    expect(sumAt(nOut - 1, nIn - 1)).toBe(-NGSPICE_G);
   });
 });

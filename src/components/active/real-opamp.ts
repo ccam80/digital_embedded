@@ -407,11 +407,11 @@ export function createRealOpAmpElement(
     nB: number,
     g: number,
   ): void {
-    if (nA > 0) solver.stamp(nA - 1, nA - 1, g);
-    if (nB > 0) solver.stamp(nB - 1, nB - 1, g);
+    if (nA > 0) solver.stampElement(solver.allocElement(nA - 1, nA - 1), g);
+    if (nB > 0) solver.stampElement(solver.allocElement(nB - 1, nB - 1), g);
     if (nA > 0 && nB > 0) {
-      solver.stamp(nA - 1, nB - 1, -g);
-      solver.stamp(nB - 1, nA - 1, -g);
+      solver.stampElement(solver.allocElement(nA - 1, nB - 1), -g);
+      solver.stampElement(solver.allocElement(nB - 1, nA - 1), -g);
     }
   }
 
@@ -516,7 +516,7 @@ export function createRealOpAmpElement(
       stampCond(solver, nInp, nInn, G_in);
       // Output conductance G_out (always present for NR stability)
       if (nOut > 0) {
-        solver.stamp(nOut - 1, nOut - 1, G_out);
+        solver.stampElement(solver.allocElement(nOut - 1, nOut - 1), G_out);
       }
 
       // Input bias currents
@@ -539,8 +539,8 @@ export function createRealOpAmpElement(
         const ieq = geq_int > 0
           ? (geq_int / (1 + geq_int)) * vIntPrev * G_out
           : 0;
-        if (nInp > 0) solver.stamp(nOut - 1, nInp - 1, -aEffScaled * G_out);
-        if (nInn > 0) solver.stamp(nOut - 1, nInn - 1,  aEffScaled * G_out);
+        if (nInp > 0) solver.stampElement(solver.allocElement(nOut - 1, nInp - 1), -aEffScaled * G_out);
+        if (nInn > 0) solver.stampElement(solver.allocElement(nOut - 1, nInn - 1), aEffScaled * G_out);
         solver.stampRHS(nOut - 1, ieq + aEffScaled * G_out * p.vos * scale);
       }
     },

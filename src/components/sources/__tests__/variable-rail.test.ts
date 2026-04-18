@@ -2,11 +2,12 @@
  * Tests for the Variable Rail source component.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { makeVariableRailElement, VariableRailDefinition } from "../variable-rail.js";
 import { runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { PropertyBag } from "../../../core/properties.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -34,11 +35,11 @@ function makeResistorElement(nodeA: number, nodeB: number, resistance: number): 
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
     stamp(solver: SparseSolver): void {
-      if (nodeA !== 0) solver.stamp(nodeA - 1, nodeA - 1, G);
-      if (nodeB !== 0) solver.stamp(nodeB - 1, nodeB - 1, G);
+      if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
+      if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
       if (nodeA !== 0 && nodeB !== 0) {
-        solver.stamp(nodeA - 1, nodeB - 1, -G);
-        solver.stamp(nodeB - 1, nodeA - 1, -G);
+        solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -G);
+        solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -G);
       }
     },
   };
@@ -151,5 +152,98 @@ describe("VariableRail", () => {
     );
     expect(el).toBeDefined();
     expect(el.isNonlinear).toBe(false);
+  });
+});
+
+// ===========================================================================
+// Task C4.4 — Variable Rail srcFact parity
+//
+// Variable Rail is an interactive slider, NOT an ngspice independent source.
+// Per variable-rail.ts load() documentation, ctx.srcFact is deliberately
+// ignored so slider changes take effect immediately and are unaffected by
+// DC-OP source stepping. The parity test locks that contract in: the stamped
+// RHS at the branch row must be bit-exact equal to the nominal voltage
+// regardless of ctx.srcFact.
+// ===========================================================================
+
+describe("variable_rail_load_srcfact_parity", () => {
+  function makeCaptureSolver() {
+    const stamps: Array<{ row: number; col: number; value: number }> = [];
+    const rhs: Array<{ row: number; value: number }> = [];
+    return {
+      stamp: vi.fn((row: number, col: number, value: number) => {
+        stamps.push({ row, col, value });
+      }),
+      stampRHS: vi.fn((row: number, value: number) => {
+        rhs.push({ row, value });
+      }),
+      _stamps: stamps,
+      _rhs: rhs,
+    };
+  }
+
+  function makeCtx(solver: unknown, srcFact: number) {
+    return {
+      solver: solver as SparseSolverType,
+      voltages: new Float64Array(4),
+      iteration: 0,
+      initMode: "initFloat" as const,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+  }
+
+  it("srcfact_05_rhs_ignores_srcfact_bit_exact", () => {
+    // nodePos=2 (output), nodeNeg=0 (ground), nodeInt=1, branch=2.
+    const VOLTAGE = 12;
+    const rail = makeVariableRailElement(2, 0, 1, 2, VOLTAGE, 0.01);
+    const solver = makeCaptureSolver();
+
+    rail.load(makeCtx(solver, 0.5));
+
+    // Variable rail by contract ignores srcFact — RHS stamp is the raw voltage.
+    const NGSPICE_REF = VOLTAGE; // no srcFact multiplier in variable-rail.ts load()
+    const branchRhs = solver._rhs.find((e) => e.row === 2);
+    expect(branchRhs).not.toBeUndefined();
+    expect(branchRhs!.value).toBe(NGSPICE_REF);
+  });
+
+  it("srcfact_0_still_delivers_full_voltage", () => {
+    // Source stepping at srcFact=0 would kill an ordinary DC voltage source.
+    // Variable rail must still stamp its full nominal voltage.
+    const VOLTAGE = 7.5;
+    const rail = makeVariableRailElement(2, 0, 1, 2, VOLTAGE, 0.01);
+    const solver = makeCaptureSolver();
+
+    rail.load(makeCtx(solver, 0));
+
+    const branchRhs = solver._rhs.find((e) => e.row === 2);
+    expect(branchRhs).not.toBeUndefined();
+    expect(branchRhs!.value).toBe(VOLTAGE);
+  });
+
+  it("srcfact_1_delivers_full_voltage", () => {
+    const VOLTAGE = 5;
+    const rail = makeVariableRailElement(2, 0, 1, 2, VOLTAGE, 0.01);
+    const solver = makeCaptureSolver();
+
+    rail.load(makeCtx(solver, 1));
+
+    const branchRhs = solver._rhs.find((e) => e.row === 2);
+    expect(branchRhs).not.toBeUndefined();
+    expect(branchRhs!.value).toBe(VOLTAGE);
   });
 });

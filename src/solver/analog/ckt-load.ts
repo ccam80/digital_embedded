@@ -71,11 +71,11 @@ export function cktLoad(ctx: CKTCircuitContext, iteration: number): void {
   //   CKTsrcFact            → ctx.srcFact
   if (ctx.isDcOp && (ctx.initMode === "initJct" || ctx.initMode === "initFix")) {
     for (const [node, value] of ctx.nodesets) {
-      ctx.solver.stamp(node, node, CKTNS_PIN);
+      ctx.solver.stampElement(ctx.solver.allocElement(node, node), CKTNS_PIN);
       ctx.solver.stampRHS(node, CKTNS_PIN * value * ctx.srcFact);
     }
     for (const [node, value] of ctx.ics) {
-      ctx.solver.stamp(node, node, CKTNS_PIN);
+      ctx.solver.stampElement(ctx.solver.allocElement(node, node), CKTNS_PIN);
       ctx.solver.stampRHS(node, CKTNS_PIN * value * ctx.srcFact);
     }
   }

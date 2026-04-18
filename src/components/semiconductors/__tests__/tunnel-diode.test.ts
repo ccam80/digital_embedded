@@ -279,10 +279,10 @@ describe("TunnelDiode", () => {
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_v: Float64Array): number[] { return []; },
       stamp(solver: SparseSolverType): void {
-        solver.stamp(0, 0, G); // node1 diagonal
-        solver.stamp(1, 1, G); // node2 diagonal
-        solver.stamp(0, 1, -G);
-        solver.stamp(1, 0, -G);
+        solver.stampElement(solver.allocElement(0, 0), G); // node1 diagonal
+        solver.stampElement(solver.allocElement(1, 1), G); // node2 diagonal
+        solver.stampElement(solver.allocElement(0, 1), -G);
+        solver.stampElement(solver.allocElement(1, 0), -G);
       },
     };
 
@@ -297,8 +297,8 @@ describe("TunnelDiode", () => {
       getPinCurrents(_v: Float64Array): number[] { return []; },
       stamp(solver: SparseSolverType): void {
         // KCL: add/subtract branch current from node1
-        solver.stamp(0, 2, 1);  // node1 row, branch col
-        solver.stamp(2, 0, 1);  // branch row, node1 col
+        solver.stampElement(solver.allocElement(0, 2), 1);  // node1 row, branch col
+        solver.stampElement(solver.allocElement(2, 0), 1);  // branch row, node1 col
         // Branch equation: V(node1) = vTarget
         solver.stampRHS(2, vTarget);
       },

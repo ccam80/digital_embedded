@@ -14,7 +14,7 @@ import type { SparseSolver } from "./sparse-solver.js";
  */
 export function stampG(solver: SparseSolver, row: number, col: number, val: number): void {
   if (row !== 0 && col !== 0) {
-    solver.stamp(row - 1, col - 1, val);
+    solver.stampElement(solver.allocElement(row - 1, col - 1), val);
   }
 }
 

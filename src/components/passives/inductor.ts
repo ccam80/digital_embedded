@@ -266,11 +266,11 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
 
     // Topology-constant branch incidence stamps (indload.c — matrix pointers).
     // B sub-matrix: I_branch flows into n0 and out of n1.
-    if (n0 !== 0) solver.stamp(n0 - 1, b, 1);
-    if (n1 !== 0) solver.stamp(n1 - 1, b, -1);
+    if (n0 !== 0) solver.stampElement(solver.allocElement(n0 - 1, b), 1);
+    if (n1 !== 0) solver.stampElement(solver.allocElement(n1 - 1, b), -1);
     // C sub-matrix: KVL voltage incidence.
-    if (n0 !== 0) solver.stamp(b, n0 - 1, 1);
-    if (n1 !== 0) solver.stamp(b, n1 - 1, -1);
+    if (n0 !== 0) solver.stampElement(solver.allocElement(b, n0 - 1), 1);
+    if (n1 !== 0) solver.stampElement(solver.allocElement(b, n1 - 1), -1);
 
     // Gate: inductors only participate in tran/ac/tranop (indload.c gate).
     if (!isTransient && !isDcOp) return;
@@ -327,7 +327,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
 
       // Branch equation: V(n0) - V(n1) - geq * I = ceq
       // Stamp -geq on branch diagonal and ceq on the branch RHS.
-      solver.stamp(b, b, -geq);
+      solver.stampElement(solver.allocElement(b, b), -geq);
       solver.stampRHS(b, ceq);
     } else {
       // DC operating point: short-circuit branch (V_n0 = V_n1).

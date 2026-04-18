@@ -559,12 +559,12 @@ function createAcVoltageSourceElement(
       }
 
       // B sub-matrix: node rows, branch column k
-      if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
-      if (nodeNeg !== 0) solver.stamp(nodeNeg - 1, k, -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos - 1, k), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg - 1, k), -1);
 
       // C sub-matrix: branch row k, node columns
-      if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
-      if (nodeNeg !== 0) solver.stamp(k, nodeNeg - 1, -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos - 1), 1);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(k, nodeNeg - 1), -1);
 
       // RHS voltage constraint (ctx.srcFact folded in above).
       solver.stampRHS(k, v);

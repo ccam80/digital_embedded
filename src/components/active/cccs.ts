@@ -180,12 +180,12 @@ class CCCSAnalogElement extends ControlledSourceElement {
     const ks = this._senseBranch;
 
     if (this._nSenseP !== 0) {
-      solver.stamp(this._nSenseP - 1, ks, 1);
-      solver.stamp(ks, this._nSenseP - 1, 1);
+      solver.stampElement(solver.allocElement(this._nSenseP - 1, ks), 1);
+      solver.stampElement(solver.allocElement(ks, this._nSenseP - 1), 1);
     }
     if (this._nSenseN !== 0) {
-      solver.stamp(this._nSenseN - 1, ks, -1);
-      solver.stamp(ks, this._nSenseN - 1, -1);
+      solver.stampElement(solver.allocElement(this._nSenseN - 1, ks), -1);
+      solver.stampElement(solver.allocElement(ks, this._nSenseN - 1), -1);
     }
   }
 
@@ -250,10 +250,10 @@ class CCCSAnalogElement extends ControlledSourceElement {
 
     // G sub-matrix: sense branch variable → output node rows
     if (this._nOutP !== 0) {
-      solver.stamp(this._nOutP - 1, ks, -derivative);
+      solver.stampElement(solver.allocElement(this._nOutP - 1, ks), -derivative);
     }
     if (this._nOutN !== 0) {
-      solver.stamp(this._nOutN - 1, ks, derivative);
+      solver.stampElement(solver.allocElement(this._nOutN - 1, ks), derivative);
     }
 
     // RHS: Norton constant term

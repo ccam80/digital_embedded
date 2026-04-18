@@ -205,18 +205,18 @@ export function makeVariableRailElement(
       // independent source: ctx.srcFact is deliberately ignored so slider
       // changes take effect immediately and are unaffected by DC-OP source
       // stepping. See VARIABLE_RAIL_PROPERTY_DEFS for the slider definition.
-      if (nodePos !== 0) solver.stamp(nodePos - 1, k, 1);
-      if (nodeInt !== 0) solver.stamp(nodeInt - 1, k, -1);
-      if (nodePos !== 0) solver.stamp(k, nodePos - 1, 1);
-      if (nodeInt !== 0) solver.stamp(k, nodeInt - 1, -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(nodePos - 1, k), 1);
+      if (nodeInt !== 0) solver.stampElement(solver.allocElement(nodeInt - 1, k), -1);
+      if (nodePos !== 0) solver.stampElement(solver.allocElement(k, nodePos - 1), 1);
+      if (nodeInt !== 0) solver.stampElement(solver.allocElement(k, nodeInt - 1), -1);
       solver.stampRHS(k, p.voltage);
 
       // Internal resistance: nodeInt → nodeNeg.
-      if (nodeInt !== 0) solver.stamp(nodeInt - 1, nodeInt - 1, G);
-      if (nodeNeg !== 0) solver.stamp(nodeNeg - 1, nodeNeg - 1, G);
+      if (nodeInt !== 0) solver.stampElement(solver.allocElement(nodeInt - 1, nodeInt - 1), G);
+      if (nodeNeg !== 0) solver.stampElement(solver.allocElement(nodeNeg - 1, nodeNeg - 1), G);
       if (nodeInt !== 0 && nodeNeg !== 0) {
-        solver.stamp(nodeInt - 1, nodeNeg - 1, -G);
-        solver.stamp(nodeNeg - 1, nodeInt - 1, -G);
+        solver.stampElement(solver.allocElement(nodeInt - 1, nodeNeg - 1), -G);
+        solver.stampElement(solver.allocElement(nodeNeg - 1, nodeInt - 1), -G);
       }
     },
   };

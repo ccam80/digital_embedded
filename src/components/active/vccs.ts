@@ -197,16 +197,16 @@ class VCCSAnalogElement extends ControlledSourceElement {
     // the term appears as -gm * V_ctrlP in the KCL row, i.e. current gm*V_ctrl
     // is injected INTO nOutP (enters the node).
     if (this._nOutP !== 0 && this._nCtrlP !== 0) {
-      solver.stamp(this._nOutP - 1, this._nCtrlP - 1, -gm);
+      solver.stampElement(solver.allocElement(this._nOutP - 1, this._nCtrlP - 1), -gm);
     }
     if (this._nOutP !== 0 && this._nCtrlN !== 0) {
-      solver.stamp(this._nOutP - 1, this._nCtrlN - 1, gm);
+      solver.stampElement(solver.allocElement(this._nOutP - 1, this._nCtrlN - 1), gm);
     }
     if (this._nOutN !== 0 && this._nCtrlP !== 0) {
-      solver.stamp(this._nOutN - 1, this._nCtrlP - 1, gm);
+      solver.stampElement(solver.allocElement(this._nOutN - 1, this._nCtrlP - 1), gm);
     }
     if (this._nOutN !== 0 && this._nCtrlN !== 0) {
-      solver.stamp(this._nOutN - 1, this._nCtrlN - 1, -gm);
+      solver.stampElement(solver.allocElement(this._nOutN - 1, this._nCtrlN - 1), -gm);
     }
 
     // RHS: NR-linearized independent current source (constant term).

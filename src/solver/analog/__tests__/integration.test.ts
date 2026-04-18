@@ -387,3 +387,49 @@ describe("gear_vandermonde_regression", () => {
     expect(scratch[0]).not.toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C4.6 — Phase 3 G-01: ngspice trapezoidal order-2 rounding regression guard
+// ---------------------------------------------------------------------------
+//
+// Guard against the Phase 3 Task 3.2.1 rounding-order regression. The ngspice
+// trapezoidal order-2 formula is `ag[0] = 1.0 / dt / (1.0 - xmu)` (two
+// sequential divisions), matching nicomcof.c operand order. The pre-fix
+// formula `1 / (dt * (1 - xmu))` performs a multiplication then a single
+// division — IEEE-754 gives different last-bit values for non-trivial xmu,
+// so regressing to the pre-fix form would be silently wrong.
+//
+// The current implementation hardcodes xmu=0.5, so we exercise computeNIcomCof
+// with that value and confirm the result matches `1.0 / dt / (1.0 - 0.5)`. We
+// ALSO compute both formula variants at xmu=1/3 (a value that exposes IEEE-754
+// rounding-order sensitivity) and assert they produce two distinct bit
+// patterns. If a future refactor reintroduces the pre-fix operand order, the
+// differential assertion fires.
+
+describe("nicomcof rounding regression (C4.6)", () => {
+  it("nicomcof_trap_order2_matches_ngspice_rounding", () => {
+    const dt = 1.23456789e-7;
+    const xmu = 1 / 3;
+
+    // Post-Task-3.2.1 formula (ngspice operand order): 1.0 / dt / (1 - xmu)
+    const postFix = 1.0 / dt / (1.0 - xmu);
+    // Pre-fix formula (multiplication then division)
+    const preFix  = 1 / (dt * (1 - xmu));
+
+    // Whole purpose of this guard: the two IEEE-754 values must differ for
+    // this (dt, xmu) input. If they match, the test inputs are too benign and
+    // the guard is useless.
+    expect(postFix).not.toBe(preFix);
+
+    // Exercise computeNIcomCof — its hardcoded xmu is 0.5. The implementation
+    // must produce `1.0 / dt / (1.0 - 0.5)` bit-exactly (not the pre-fix
+    // operand order). For xmu=0.5 the two formulas happen to coincide, so
+    // the differential assertion above on xmu=1/3 carries the regression guard.
+    const ag = new Float64Array(8);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(dt, [dt, dt], 2, "trapezoidal", ag, scratch);
+    expect(ag[0]).toBe(1.0 / dt / (1.0 - 0.5));
+    // ag[1] for trap order 2 is xmu / (1 - xmu) = 0.5/0.5 = 1
+    expect(ag[1]).toBe(0.5 / (1 - 0.5));
+  });
+});

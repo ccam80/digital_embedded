@@ -287,3 +287,147 @@ describe("Optocoupler", () => {
     expect(result.nodeVoltages[1]).toBeCloseTo(vCollectorExpected, 2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C4.5 parity test — optocoupler_load_dcop_parity
+// ---------------------------------------------------------------------------
+//
+// Drives the optocoupler via load(ctx) at a canonical forward-biased operating
+// point and asserts LED + phototransistor stamps are bit-exact.
+//
+// Reference formulas (from optocoupler.ts createOptocouplerElement):
+//   vd     = vA - vK
+//   On  (vd >= vF): gLed = 1/rLed, iNR = gLed * vForward
+//   Off (vd <  vF): gLed = G_OFF = 1e-9, iNR = 0
+//   LED stamps:
+//     (nA, nA) += gLed, (nA, nK) -= gLed, (nK, nA) -= gLed, (nK, nK) += gLed
+//   LED RHS:
+//     nA -= iNR, nK += iNR
+//   Phototransistor (CCCS: I_C = CTR * I_LED):
+//     iLed0 = gLed * vd - iNR
+//     iC0   = CTR * iLed0
+//     gmCtr = CTR * gLed
+//     iCnr  = iC0 - gmCtr * vd
+//     (nC, nA) -= gmCtr, (nC, nK) += gmCtr
+//     (nE, nA) += gmCtr, (nE, nK) -= gmCtr
+//   Phototransistor RHS:
+//     nC += iCnr, nE -= iCnr
+
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+
+interface OptoCaptureStamp { row: number; col: number; value: number; }
+interface OptoCaptureRhs { row: number; value: number; }
+function makeOptoCaptureSolver(): {
+  solver: SparseSolverType;
+  stamps: OptoCaptureStamp[];
+  rhs: OptoCaptureRhs[];
+} {
+  const stamps: OptoCaptureStamp[] = [];
+  const rhs: OptoCaptureRhs[] = [];
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stamp: (row: number, col: number, value: number) => {
+      stamps.push({ row, col, value });
+    },
+    stampRHS: (row: number, value: number) => {
+      rhs.push({ row, value });
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps, rhs };
+}
+
+function makeOptoParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("Optocoupler parity (C4.5)", () => {
+  it("optocoupler_load_dcop_parity", () => {
+    const nA = 1, nK = 2, nC = 3, nE = 4;
+    const ctr = 0.5;
+    const vForward = 1.2;
+    const rLed = 10;
+    const opto = makeOptocouplerElement(nA, nK, nC, nE, { ctr, vForward, rLed });
+
+    // Forward bias: vd = 3 - 0 = 3 > vForward → on
+    const voltages = new Float64Array(4);
+    voltages[nA - 1] = 3;
+    voltages[nK - 1] = 0;
+    voltages[nC - 1] = 5;
+    voltages[nE - 1] = 0;
+
+    const { solver, stamps, rhs } = makeOptoCaptureSolver();
+    const ctx = makeOptoParityCtx(voltages, solver);
+    opto.load(ctx);
+
+    // Closed-form reference:
+    const NGSPICE_VD    = 3 - 0;
+    const NGSPICE_GLED  = 1 / rLed;
+    const NGSPICE_INR   = NGSPICE_GLED * vForward;
+    const NGSPICE_ILED0 = NGSPICE_GLED * NGSPICE_VD - NGSPICE_INR;
+    const NGSPICE_IC0   = ctr * NGSPICE_ILED0;
+    const NGSPICE_GMCTR = ctr * NGSPICE_GLED;
+    const NGSPICE_ICNR  = NGSPICE_IC0 - NGSPICE_GMCTR * NGSPICE_VD;
+
+    const sumAt = (row: number, col: number): number =>
+      stamps.filter((s) => s.row === row && s.col === col)
+            .reduce((a, s) => a + s.value, 0);
+
+    // LED stamps
+    expect(sumAt(nA - 1, nA - 1)).toBe(NGSPICE_GLED);
+    expect(sumAt(nK - 1, nK - 1)).toBe(NGSPICE_GLED);
+    expect(sumAt(nA - 1, nK - 1)).toBe(-NGSPICE_GLED);
+    expect(sumAt(nK - 1, nA - 1)).toBe(-NGSPICE_GLED);
+
+    // Phototransistor cross-port stamps
+    expect(sumAt(nC - 1, nA - 1)).toBe(-NGSPICE_GMCTR);
+    expect(sumAt(nC - 1, nK - 1)).toBe(NGSPICE_GMCTR);
+    expect(sumAt(nE - 1, nA - 1)).toBe(NGSPICE_GMCTR);
+    expect(sumAt(nE - 1, nK - 1)).toBe(-NGSPICE_GMCTR);
+
+    // RHS stamps (bit-exact)
+    const rhsA = rhs.filter((r) => r.row === nA - 1).reduce((a, r) => a + r.value, 0);
+    const rhsK = rhs.filter((r) => r.row === nK - 1).reduce((a, r) => a + r.value, 0);
+    const rhsC = rhs.filter((r) => r.row === nC - 1).reduce((a, r) => a + r.value, 0);
+    const rhsE = rhs.filter((r) => r.row === nE - 1).reduce((a, r) => a + r.value, 0);
+    expect(rhsA).toBe(-NGSPICE_INR);
+    expect(rhsK).toBe(NGSPICE_INR);
+    expect(rhsC).toBe(NGSPICE_ICNR);
+    expect(rhsE).toBe(-NGSPICE_ICNR);
+  });
+});

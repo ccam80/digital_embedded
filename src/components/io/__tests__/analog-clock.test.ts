@@ -23,12 +23,16 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 
 // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function makeMockSolver() {
-  const stamps: Array<{ row: number; col: number; value: number }> = [];
+  const stamps: [number, number, number][] = [];
   const rhs: Array<{ row: number; value: number }> = [];
 
   return {
-    stamp: vi.fn((row: number, col: number, value: number) => {
-      stamps.push({ row, col, value });
+    allocElement: vi.fn((row: number, col: number) => {
+      stamps.push([row, col, 0]);
+      return stamps.length - 1;
+    }),
+    stampElement: vi.fn((h: number, v: number) => {
+      stamps[h][2] += v;
     }),
     stampRHS: vi.fn((row: number, value: number) => {
       rhs.push({ row, value });
@@ -159,11 +163,152 @@ describe("AnalogClock", () => {
   it("stamp_produces_incidence_entries — voltage source topology", () => {
     const clk = makeAnalogClockElement(1, 0, 1, 1000, 3.3);
     const solver = makeMockSolver();
-    clk.stamp(solver as unknown as SparseSolver);
+    clk.load({
+      solver: solver as unknown as SparseSolver,
+      voltages: new Float64Array(3),
+      iteration: 0,
+      initMode: "initFloat" as const,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    });
     // nodePos=1, nodeNeg=0 (ground), branchIdx=1
-    // B[1,1] = stamp(0, 1, 1); C[1,1] = stamp(1, 0, 1)
+    // B[1,1] = allocElement(0, 1) → stampElement(h, 1)
+    // C[1,1] = allocElement(1, 0) → stampElement(h, 1)
     // nodeNeg=0 stamps suppressed
-    expect(solver.stamp).toHaveBeenCalledWith(0, 1, 1); // B[nodePos, k]
-    expect(solver.stamp).toHaveBeenCalledWith(1, 0, 1); // C[k, nodePos]
+    const stamps = solver._stamps;
+    expect(stamps.some(([r, c, v]) => r === 0 && c === 1 && v === 1)).toBe(true); // B[nodePos, k]
+    expect(stamps.some(([r, c, v]) => r === 1 && c === 0 && v === 1)).toBe(true); // C[k, nodePos]
+  });
+});
+
+// ===========================================================================
+// Task C4.4 — Analog clock srcFact + breakpoint parity
+//
+// Clock is treated as an independent source for ngspice DC-OP source
+// stepping. The RHS value (vdd on even half-periods, 0 on odd half-periods)
+// is scaled by CKTsrcFact before the stamp (clock.ts load() body).
+//
+// Breakpoints are deterministic integer multiples of the half period —
+// must match exact === expected.
+// ===========================================================================
+
+describe("clock_load_srcfact_parity", () => {
+  function makeCtx(solver: unknown, srcFact: number) {
+    return {
+      solver: solver as SparseSolver,
+      voltages: new Float64Array(3),
+      iteration: 0,
+      initMode: "initFloat" as const,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(8),
+      srcFact,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      isDcOp: true,
+      isTransient: false,
+      xfact: 1,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+  }
+
+  it("srcfact_05_halves_rhs_at_high_phase_bit_exact", () => {
+    const VDD = 3.3;
+    const FREQ = 1000;
+    const BRANCH = 1;
+    let simTime = 0; // first half-period → high
+    const clk = makeAnalogClockElement(1, 0, BRANCH, FREQ, VDD, () => simTime);
+    const solver = makeMockSolver();
+
+    clk.load(makeCtx(solver, 0.5));
+
+    // NGSPICE_REF: vdd * srcFact (high half-period value after scaling).
+    const NGSPICE_REF = VDD * 0.5;
+    expect(solver.stampRHS).toHaveBeenCalledWith(BRANCH, NGSPICE_REF);
+    expect(NGSPICE_REF).toBe(1.65);
+  });
+
+  it("srcfact_025_scales_rhs_at_low_phase_to_zero", () => {
+    // In the low half-period the waveform value is 0V → 0 * srcFact = 0.
+    const VDD = 3.3;
+    const FREQ = 1000;
+    const BRANCH = 1;
+    const halfPeriod = 1 / (2 * FREQ);
+    let simTime = halfPeriod; // second half-period → low
+    const clk = makeAnalogClockElement(1, 0, BRANCH, FREQ, VDD, () => simTime);
+    const solver = makeMockSolver();
+
+    clk.load(makeCtx(solver, 0.25));
+
+    const NGSPICE_REF = 0 * 0.25;
+    expect(solver.stampRHS).toHaveBeenCalledWith(BRANCH, NGSPICE_REF);
+    expect(NGSPICE_REF).toBe(0);
+  });
+
+  it("srcfact_1_preserves_full_vdd", () => {
+    const VDD = 5;
+    const FREQ = 500;
+    const BRANCH = 2;
+    let simTime = 0; // first half-period → high
+    const clk = makeAnalogClockElement(1, 0, BRANCH, FREQ, VDD, () => simTime);
+    const solver = makeMockSolver();
+
+    clk.load(makeCtx(solver, 1));
+
+    expect(solver.stampRHS).toHaveBeenCalledWith(BRANCH, VDD);
+  });
+});
+
+describe("clock_breakpoints_parity", () => {
+  it("1khz_breakpoints_exact_array_match", () => {
+    // ngspice clock breakpoint schedule: every half-period transition in (tStart, tEnd).
+    const FREQ = 1000;
+    const halfPeriod = 1 / (2 * FREQ); // 0.0005
+
+    // NGSPICE_REF computed inline: strictly-within breakpoints at k * halfPeriod for k=1..5.
+    const NGSPICE_REF = [
+      1 * halfPeriod,
+      2 * halfPeriod,
+      3 * halfPeriod,
+      4 * halfPeriod,
+      5 * halfPeriod,
+    ];
+
+    const clk = makeAnalogClockElement(1, 0, 1, FREQ, 3.3, () => 0);
+    const bps = clk.getBreakpoints(0, 0.003);
+
+    expect(bps).toHaveLength(NGSPICE_REF.length);
+    for (let i = 0; i < NGSPICE_REF.length; i++) {
+      expect(bps[i]).toBe(NGSPICE_REF[i]);
+    }
+  });
+
+  it("nextBreakpoint_returns_next_halfperiod_exact", () => {
+    const FREQ = 2000;
+    const halfPeriod = 1 / (2 * FREQ); // 0.00025
+    const clk = makeAnalogClockElement(1, 0, 1, FREQ, 3.3, () => 0);
+
+    // NGSPICE_REF: first breakpoint strictly after 0 is 1 * halfPeriod.
+    expect(clk.nextBreakpoint(0)).toBe(halfPeriod);
+    // After halfPeriod, next is 2 * halfPeriod.
+    expect(clk.nextBreakpoint(halfPeriod)).toBe(2 * halfPeriod);
   });
 });

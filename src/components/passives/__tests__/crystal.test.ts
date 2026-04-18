@@ -251,9 +251,9 @@ describe("Crystal", () => {
         setParam(_key: string, _value: number): void {},
         getPinCurrents(_v: Float64Array): number[] { return []; },
         stamp(solver: SparseSolver): void {
-          solver.stamp(0, 0, G_bleed); // node1 → solver[0]
-          solver.stamp(1, 1, G_bleed); // node2 → solver[1]
-          solver.stamp(2, 2, G_bleed); // node3 → solver[2]
+          solver.stampElement(solver.allocElement(0, 0), G_bleed); // node1 → solver[0]
+          solver.stampElement(solver.allocElement(1, 1), G_bleed); // node2 → solver[1]
+          solver.stampElement(solver.allocElement(2, 2), G_bleed); // node3 → solver[2]
         },
       };
 

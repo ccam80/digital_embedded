@@ -204,16 +204,16 @@ function createOptocouplerElement(
       // --- Input LED stamp ---
       // Conductance stamp between anode and cathode
       if (nAnode !== 0) {
-        solver.stamp(nAnode - 1, nAnode - 1, gLed);
+        solver.stampElement(solver.allocElement(nAnode - 1, nAnode - 1), gLed);
         if (nCathode !== 0) {
-          solver.stamp(nAnode - 1, nCathode - 1, -gLed);
+          solver.stampElement(solver.allocElement(nAnode - 1, nCathode - 1), -gLed);
         }
       }
       if (nCathode !== 0) {
         if (nAnode !== 0) {
-          solver.stamp(nCathode - 1, nAnode - 1, -gLed);
+          solver.stampElement(solver.allocElement(nCathode - 1, nAnode - 1), -gLed);
         }
-        solver.stamp(nCathode - 1, nCathode - 1, gLed);
+        solver.stampElement(solver.allocElement(nCathode - 1, nCathode - 1), gLed);
       }
       // Norton offset (shifts characteristic by V_forward)
       if (nAnode !== 0) solver.stampRHS(nAnode - 1, -iNR);
@@ -227,10 +227,10 @@ function createOptocouplerElement(
       const iCnr = iC0 - gmCtr * vd;
 
       // Cross-port Jacobian
-      if (nCollector !== 0 && nAnode !== 0) solver.stamp(nCollector - 1, nAnode - 1, -gmCtr);
-      if (nCollector !== 0 && nCathode !== 0) solver.stamp(nCollector - 1, nCathode - 1, gmCtr);
-      if (nEmitter !== 0 && nAnode !== 0) solver.stamp(nEmitter - 1, nAnode - 1, gmCtr);
-      if (nEmitter !== 0 && nCathode !== 0) solver.stamp(nEmitter - 1, nCathode - 1, -gmCtr);
+      if (nCollector !== 0 && nAnode !== 0) solver.stampElement(solver.allocElement(nCollector - 1, nAnode - 1), -gmCtr);
+      if (nCollector !== 0 && nCathode !== 0) solver.stampElement(solver.allocElement(nCollector - 1, nCathode - 1), gmCtr);
+      if (nEmitter !== 0 && nAnode !== 0) solver.stampElement(solver.allocElement(nEmitter - 1, nAnode - 1), gmCtr);
+      if (nEmitter !== 0 && nCathode !== 0) solver.stampElement(solver.allocElement(nEmitter - 1, nCathode - 1), -gmCtr);
 
       if (nCollector !== 0) solver.stampRHS(nCollector - 1, iCnr);
       if (nEmitter !== 0) solver.stampRHS(nEmitter - 1, -iCnr);

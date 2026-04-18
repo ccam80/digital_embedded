@@ -6,7 +6,8 @@ import { describe, it, expect, vi } from "vitest";
 import { GroundDefinition } from "../../io/ground.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { PinDirection } from "../../../core/pin.js";
-import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -19,14 +20,43 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 
 
 // ---------------------------------------------------------------------------
-// Mock SparseSolver
+// Capture solver + minimal LoadContext builder
 // ---------------------------------------------------------------------------
 
-function makeMockSolver() {
+function makeCaptureSolver(): { solver: SparseSolverType; allocCalls: number; stampElementCalls: number; stampRHSCalls: number } {
+  let allocCalls = 0;
+  let stampElementCalls = 0;
+  let stampRHSCalls = 0;
+  const solver = {
+    allocElement: vi.fn((_row: number, _col: number): number => { allocCalls++; return 0; }),
+    stampElement: vi.fn((_handle: number, _value: number): void => { stampElementCalls++; }),
+    stampRHS: vi.fn((_row: number, _value: number): void => { stampRHSCalls++; }),
+  } as unknown as SparseSolverType;
+  return { solver, get allocCalls() { return allocCalls; }, get stampElementCalls() { return stampElementCalls; }, get stampRHSCalls() { return stampRHSCalls; } };
+}
+
+function makeLoadCtx(solver: SparseSolverType): LoadContext {
   return {
-    stamp: vi.fn(),
-    stampRHS: vi.fn(),
-  } as unknown as SparseSolver;
+    solver,
+    voltages: new Float64Array(8),
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -43,12 +73,14 @@ describe("Ground", () => {
       props,
       () => 0,
     );
-    const solver = makeMockSolver();
+    const { solver, allocCalls, stampElementCalls, stampRHSCalls } = makeCaptureSolver();
+    const ctx = makeLoadCtx(solver);
 
-    element.stamp(solver);
+    element.load(ctx);
 
-    expect((solver.stamp as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
-    expect((solver.stampRHS as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
+    expect(allocCalls).toBe(0);
+    expect(stampElementCalls).toBe(0);
+    expect(stampRHSCalls).toBe(0);
   });
 
   it("pin_layout_single_output", () => {

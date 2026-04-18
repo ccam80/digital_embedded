@@ -259,3 +259,123 @@ describe("ADC", () => {
     expect(adc.eocActive).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C4.5 parity test — adc_load_dcop_parity
+// ---------------------------------------------------------------------------
+//
+// Drives the 8-bit unipolar-instant ADC via load(ctx) at DC-OP. Without any
+// accept() rising-edge latch, all digital outputs are at their initial low
+// state, EOC is low, and analog inputs stamp only their loading conductance.
+//
+// Reference formulas (from adc.ts createADCElement + digital-pin-model.ts):
+//   inputSpec.rIn  = p.rIn  → VIN and CLK diagonal stamps = 1/rIn
+//   outputSpec.rOut = p.rOut → EOC and D0..D(N-1) diagonal stamps = 1/rOut,
+//                              RHS = vOL·(1/rOut) (all initially low → stays at vOL)
+
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+
+interface AdcCaptureStamp { row: number; col: number; value: number; }
+function makeAdcCaptureSolver(): {
+  solver: SparseSolverType;
+  stamps: AdcCaptureStamp[];
+  rhs: Map<number, number>;
+} {
+  const stamps: AdcCaptureStamp[] = [];
+  const rhs = new Map<number, number>();
+  const handles: { row: number; col: number }[] = [];
+  const handleIndex = new Map<string, number>();
+  const solver = {
+    stamp: (row: number, col: number, value: number) => {
+      stamps.push({ row, col, value });
+    },
+    stampRHS: (row: number, value: number) => {
+      rhs.set(row, (rhs.get(row) ?? 0) + value);
+    },
+    allocElement: (row: number, col: number): number => {
+      const key = `${row},${col}`;
+      let h = handleIndex.get(key);
+      if (h === undefined) {
+        h = handles.length;
+        handles.push({ row, col });
+        handleIndex.set(key, h);
+      }
+      return h;
+    },
+    stampElement: (handle: number, value: number) => {
+      const { row, col } = handles[handle];
+      stamps.push({ row, col, value });
+    },
+  } as unknown as SparseSolverType;
+  return { solver, stamps, rhs };
+}
+
+function makeAdcParityCtx(voltages: Float64Array, solver: SparseSolverType): LoadContext {
+  return {
+    solver,
+    voltages,
+    iteration: 0,
+    initMode: "initFloat",
+    dt: 0,
+    method: "trapezoidal",
+    order: 1,
+    deltaOld: [0, 0, 0, 0, 0, 0, 0],
+    ag: new Float64Array(8),
+    srcFact: 1,
+    noncon: { value: 0 },
+    limitingCollector: null,
+    isDcOp: true,
+    isTransient: false,
+    xfact: 1,
+    gmin: 1e-12,
+    uic: false,
+    reltol: 1e-3,
+    iabstol: 1e-12,
+  };
+}
+
+describe("ADC parity (C4.5)", () => {
+  it("adc_load_dcop_parity", () => {
+    // 8-bit unipolar-instant ADC. Nodes as defined at top of file.
+    const props = new PropertyBag([["bits", BITS]]);
+    props.replaceModelParams({ ...ADC_DEFAULTS });
+    const adc = getFactory(ADCDefinition.modelRegistry!["unipolar-instant"]!)(
+      makeNodeIds(), [], -1, props, () => 0,
+    );
+
+    // Canonical: VIN=2.5V, CLK=0V (no edge), VREF=5V, all others 0.
+    const voltages = makeVoltages({ [N_VIN]: 2.5, [N_CLK]: 0.0 });
+
+    const { solver, stamps, rhs } = makeAdcCaptureSolver();
+    const ctx = makeAdcParityCtx(voltages, solver);
+    adc.load(ctx);
+
+    // Closed-form reference:
+    const NGSPICE_RIN  = ADC_DEFAULTS.rIn;
+    const NGSPICE_ROUT = ADC_DEFAULTS.rOut;
+    const NGSPICE_GIN  = 1 / NGSPICE_RIN;
+    const NGSPICE_GOUT = 1 / NGSPICE_ROUT;
+    const NGSPICE_VOL  = ADC_DEFAULTS.vOL;
+    const NGSPICE_RHS_LOW = NGSPICE_VOL * NGSPICE_GOUT;
+
+    const sumAt = (row: number, col: number): number =>
+      stamps.filter((s) => s.row === row && s.col === col)
+            .reduce((a, s) => a + s.value, 0);
+
+    // Analog input loading: VIN and CLK each stamp 1/rIn on their diagonal
+    expect(sumAt(N_VIN - 1, N_VIN - 1)).toBe(NGSPICE_GIN);
+    expect(sumAt(N_CLK - 1, N_CLK - 1)).toBe(NGSPICE_GIN);
+
+    // EOC output pin (initially low): 1/rOut diag + vOL*G_out RHS
+    expect(sumAt(N_EOC - 1, N_EOC - 1)).toBe(NGSPICE_GOUT);
+    expect(rhs.get(N_EOC - 1) ?? 0).toBe(NGSPICE_RHS_LOW);
+
+    // D0..D7 output pins (all initially low): 1/rOut diag + vOL*G_out RHS per bit
+    for (let i = 0; i < BITS; i++) {
+      const idx = N_D0 + i - 1;
+      expect(sumAt(idx, idx)).toBe(NGSPICE_GOUT);
+      expect(rhs.get(idx) ?? 0).toBe(NGSPICE_RHS_LOW);
+    }
+  });
+});
