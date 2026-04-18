@@ -216,14 +216,14 @@
       ],
       "spawned": 17,
       "completed": 13,
-      "verifications_passed": 7,
-      "verifications_failed": 5,
+      "verifications_passed": 8,
+      "verifications_failed": 6,
       "stops_for_clarification": 0,
       "dead_implementers": 6,
       "dead_verifiers": 1,
       "group_status": {
         "C4.passive_reactive": "passed",
-        "C4.semi_sources": "failed",
+        "C4.semi_sources": "passed",
         "C4.active_rounding": "passed",
         "C5.a": "passed",
         "C5.b": "passed",
@@ -380,5 +380,5 @@
       }
     }
   ],
-  "last_updated": "2026-04-18T11:35:51.845Z"
+  "last_updated": "2026-04-18T11:45:39.334Z"
 }

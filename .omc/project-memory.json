@@ -276,16 +276,16 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\__tests__\\fet-base.test.ts",
+      "accessCount": 16,
+      "lastAccessed": 1776512453109,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
       "accessCount": 14,
       "lastAccessed": 1776511038420,
       "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\fet-base.test.ts",
-      "accessCount": 14,
-      "lastAccessed": 1776511745937,
-      "type": "file"
     },
     {
       "path": "src\\components\\passives\\transmission-line.ts",
@@ -312,6 +312,12 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
+      "accessCount": 9,
+      "lastAccessed": 1776512400901,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\passives\\capacitor.ts",
       "accessCount": 8,
       "lastAccessed": 1776510032817,
@@ -327,12 +333,6 @@
       "path": "src\\components\\semiconductors\\bjt.ts",
       "accessCount": 8,
       "lastAccessed": 1776510036991,
-      "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
-      "accessCount": 8,
-      "lastAccessed": 1776510041941,
       "type": "file"
     },
     {
@@ -366,6 +366,12 @@
       "type": "directory"
     },
     {
+      "path": "src\\solver\\analog\\ni-integrate.ts",
+      "accessCount": 5,
+      "lastAccessed": 1776512347741,
+      "type": "file"
+    },
+    {
       "path": "src\\components\\semiconductors\\pjfet.ts",
       "accessCount": 4,
       "lastAccessed": 1776509850855,
@@ -376,6 +382,12 @@
       "accessCount": 4,
       "lastAccessed": 1776511015182,
       "type": "directory"
+    },
+    {
+      "path": "spec\\phase-catchup.md",
+      "accessCount": 4,
+      "lastAccessed": 1776512239587,
+      "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\ni\\niinteg.c",
@@ -390,21 +402,9 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\ni-integrate.ts",
-      "accessCount": 3,
-      "lastAccessed": 1776510021788,
-      "type": "file"
-    },
-    {
-      "path": "spec\\phase-catchup.md",
-      "accessCount": 3,
-      "lastAccessed": 1776511627233,
-      "type": "file"
-    },
-    {
       "path": "src\\solver\\analog\\stamp-helpers.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776509660000,
+      "accessCount": 3,
+      "lastAccessed": 1776512460306,
       "type": "directory"
     },
     {
