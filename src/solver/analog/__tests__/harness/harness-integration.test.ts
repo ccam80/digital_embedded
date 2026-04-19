@@ -484,6 +484,8 @@ describe("time-alignment: compareSnapshots with alignment map", () => {
       initMode: "transient",
       order: 1,
       delta: dt,
+      ag: new Float64Array(7),
+      method: "trapezoidal",
       globalConverged: true,
       elemConverged: true,
       limitingEvents: [],

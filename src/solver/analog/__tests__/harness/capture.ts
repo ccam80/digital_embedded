@@ -290,13 +290,7 @@ export function createIterationCaptureHook(
       ? convergenceFailedElements.map(l => rawLabelToHumanLabel.get(l) ?? l)
       : convergenceFailedElements;
 
-    // Resolve initMode: prefer DCOP ladder's pool (when active), fall through
-    // to the base statePool. Both of these must be set by the caller before
-    // newtonRaphson runs — if both are unset we fall back to "transient" as a
-    // terminal default, which should never occur in practice.
-    const ladderMode = ctx.dcopModeLadder?.pool.initMode as InitMode | undefined;
-    const poolMode = ctx.statePool?.initMode;
-    const resolvedInitMode: InitMode = ladderMode ?? poolMode ?? "transient";
+    const resolvedInitMode: InitMode = ctx.initMode;
 
     snapshots.push({
       iteration,
@@ -309,7 +303,13 @@ export function createIterationCaptureHook(
       diagGmin: ctx.diagonalGmin,
       srcFact: ctx.srcFact,
       initMode: resolvedInitMode,
-      order: 0,
+      // ctx.ag is a live length-7 reused buffer (see CKTCircuitContext:ctx.ag
+      // allocated once in constructor at ckt-context.ts:511). A fresh copy is
+      // MANDATORY here — without `new Float64Array(...)` every snapshot would
+      // alias the latest step's coefficients, destroying per-iteration history.
+      ag: new Float64Array(ctx.ag),
+      method: ctx.loadCtx.method,
+      order: ctx.loadCtx.order,
       delta: 0,
       globalConverged,
       elemConverged,
@@ -495,12 +495,12 @@ export function createStepCaptureHook(
         analysisPhase = "tranInit";
       }
 
-      // Paint per-step fields (order, delta) onto the last iteration of the
-      // accepted attempt. This is the same "last accepted iteration" pattern
-      // used for lteDt below.
+      // Paint per-step `delta` onto the last iteration of the accepted
+      // attempt. `order` is now set per-iteration from ctx.loadCtx.order in
+      // createIterationCaptureHook — do NOT overwrite it at step-end or the
+      // per-iteration history (needed to discriminate H1 vs H2 vs H3) is lost.
       if (acceptedAttempt.iterations.length > 0) {
         const lastIter = acceptedAttempt.iterations[acceptedAttempt.iterations.length - 1]!;
-        lastIter.order = params.order;
         lastIter.delta = params.delta;
       }
 

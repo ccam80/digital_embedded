@@ -653,7 +653,18 @@ export class ComparisonSession {
         break;
       }
 
-      const nowTime = this._engine.simTime ?? 0;
+      // Derive post-step time from the engine's accepted dt rather than
+      // snapshotting simTime directly. `_engine.lastDt` is the dt that was
+      // actually accepted by this step() call (see MNAEngine.step() — set
+      // via `this._lastDt = dt` immediately before _timestep.accept()),
+      // and `_engine.simTime` is updated at the end of step() to reflect
+      // post-step committed time. Using `prevSimTime + lastDt` keeps this
+      // robust to any pre/post-advance snapshot quirks in simTime and to
+      // the engine entering an ERROR state where simTime does not advance.
+      const acceptedDt = this._engine.lastDt;
+      const nowTime = isFinite(acceptedDt) && acceptedDt > 0
+        ? prevSimTime + acceptedDt
+        : (this._engine.simTime ?? prevSimTime);
       if (nowTime > prevSimTime) {
         const lteDtValue = this._engine.getLteNextDt();
         const hasLte = isFinite(lteDtValue) && lteDtValue > 0;
@@ -667,6 +678,13 @@ export class ComparisonSession {
           ...(hasLte ? { lteDt: lteDtValue } : {}),
         });
         prevSimTime = nowTime;
+      } else {
+        // Engine did not advance (ERROR state or stalled). Avoid spinning
+        // forever in the outer for-loop.
+        this.errors.push(
+          `Our engine did not advance at step ${s} (simTime=${this._engine.simTime ?? "?"}, lastDt=${acceptedDt}).`,
+        );
+        break;
       }
 
       if (nowTime >= tStop) break;
@@ -1489,6 +1507,12 @@ export class ComparisonSession {
         residual: ourLinSys!.residual,
         residualInfinityNorm: ourLinSys!.residualInfinityNorm,
         matrix: ourLinSys!.matrix,
+        // Per-iteration integration state (length-7 ag[] snapshot + method/order)
+        // lets consumers discriminate H1 vs H2 vs H3 capacitor integration across
+        // the same NR attempt. See IterationSnapshot.ag for the copy-on-write rule.
+        ag: Array.from(ourIter.ag),
+        method: ourIter.method,
+        order: ourIter.order,
       } : null;
 
       const ngLinSys = ngIter ? _computeLinearSystemData(ngIter, matrixSize) : null;
@@ -1507,6 +1531,11 @@ export class ComparisonSession {
         residual: ngLinSys!.residual,
         residualInfinityNorm: ngLinSys!.residualInfinityNorm,
         matrix: ngLinSys!.matrix,
+        // Only slots 0/1 carry ngspice's ag0/ag1 (FFI marshals two doubles);
+        // remaining slots are 0. See ngspice-bridge.ts for the widening code.
+        ag: Array.from(ngIter.ag),
+        method: ngIter.method,
+        order: ngIter.order,
       } : null;
 
       const divergenceNorm = _l2Norm(
@@ -2670,7 +2699,7 @@ export class ComparisonSession {
     // deltaOld[1] = dt of the previous step (h1), deltaOld[2] = h_{n-2}.
     const deltaOld = this._engine.timestepDeltaOld;
     const dt = deltaOld[0] > 0 ? deltaOld[0] : this._engine.currentDt;
-    const agBuf = new Float64Array(8);
+    const agBuf = new Float64Array(7);
     const scratchBuf = new Float64Array(49);
     computeNIcomCof(dt, deltaOld as number[], order, rawMethod, agBuf, scratchBuf);
     const ag0 = agBuf[0];

@@ -36,6 +36,7 @@ import type {
   LimitingEvent,
   InitMode,
 } from "./types.js";
+import type { IntegrationMethod } from "../../../../core/analog-types.js";
 import { DEVICE_MAPPINGS } from "./device-mappings.js";
 
 // ---------------------------------------------------------------------------
@@ -778,6 +779,21 @@ export class NgspiceBridge {
         wasLimited: ev.wasLimited,
       }));
 
+      // ngspice integrateMethod FFI code (niiter.c) → harness IntegrationMethod.
+      // ngspice exposes only trapezoidal/gear in CKTintegrateMethod; our enum
+      // additionally covers bdf1/bdf2. Map code 0→bdf1 (backward Euler / TRAP
+      // with order 1 in ngspice legacy), 1→trapezoidal, 2→gear. Anything else
+      // falls back to "trapezoidal" (ngspice default).
+      const ngIntegrateMethod: IntegrationMethod =
+        raw.integrateMethod === 0 ? "bdf1"
+        : raw.integrateMethod === 2 ? "gear"
+        : "trapezoidal";
+      // Only ag0/ag1 are marshalled across the FFI (see §8.1 of ngspice-bridge
+      // struct); pad remaining slots with 0 to match the length-7 harness shape.
+      const agBuf = new Float64Array(7);
+      agBuf[0] = raw.ag0 ?? 0;
+      agBuf[1] = raw.ag1 ?? 0;
+
       const iterSnap: IterationSnapshot = {
         iteration: raw.iteration,
         voltages: raw.rhs.slice(),
@@ -791,6 +807,8 @@ export class NgspiceBridge {
         initMode: cktModeToInitMode(raw.cktMode),
         order: raw.order,
         delta: raw.dt,
+        ag: agBuf,
+        method: ngIntegrateMethod,
         globalConverged: raw.converged,
         elemConverged: raw.converged,
         limitingEvents,

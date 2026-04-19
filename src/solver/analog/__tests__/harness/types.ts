@@ -9,6 +9,7 @@
 import type { PostIterationHook } from "./capture.js";
 import type { MNAEngine } from "../../analog-engine.js";
 import type { InitMode } from "../../load-context.js";
+import type { IntegrationMethod } from "../../../../core/analog-types.js";
 
 // Re-export InitMode so harness code has a single import source.
 export type { InitMode };
@@ -179,8 +180,27 @@ export interface IterationSnapshot {
   diagGmin: number;
   srcFact: number;
   initMode: InitMode;
+  /**
+   * Integration order active at this NR iteration (1 = BDF-1, 2 = trap/BDF-2).
+   * Set per-iteration from `ctx.loadCtx.order` for our engine and from the
+   * ngspice NiIterationData.order FFI field. Populated by createIterationCaptureHook
+   * and ngspice-bridge at iteration time — no longer painted at step-end.
+   */
   order: number;
   delta: number;
+  /**
+   * Integration coefficients (CKTag[]) active at this NR iteration. Length 7,
+   * matching ngspice MAXORDER+1. Only slots 0 and 1 are populated on the
+   * ngspice side (FFI marshals ag0/ag1 only); remaining slots are 0.
+   * A fresh copy is taken per iteration — ctx.ag is a live buffer.
+   */
+  ag: Float64Array;
+  /**
+   * Integration method active at this NR iteration ("trapezoidal" | "bdf1" |
+   * "bdf2" | "gear"). Captured from `ctx.loadCtx.method` (our engine) or
+   * derived from ngspice's NiIterationData.integrateMethod code.
+   */
+  method: IntegrationMethod;
   globalConverged: boolean;
   elemConverged: boolean;
   limitingEvents: LimitingEvent[];
@@ -858,6 +878,21 @@ export interface IterationSideData {
   nodeLabels?: string[];
   /** 0-based matrix indices in the original full matrix. Length equals K. Populated only when a slice filter is active. */
   nodeIndices?: number[];
+  /**
+   * Integration coefficients active at this NR iteration. Length 7, matching
+   * ngspice MAXORDER+1. On the ngspice side only slots 0 and 1 are populated
+   * (FFI marshals ag0/ag1 only). Enables per-iteration discrimination of
+   * capacitor integration behaviour (H1 vs H2 vs H3).
+   */
+  ag: number[];
+  /**
+   * Integration method active at this iteration ("trapezoidal" | "bdf1" |
+   * "bdf2" | "gear" on our side; "backwardEuler" | "trapezoidal" | "gear2"
+   * on ngspice side). Kept as `string` to accommodate both vocabularies.
+   */
+  method: string;
+  /** Integration order active at this iteration (1 = BDF-1, 2 = trap/BDF-2). */
+  order: number;
 }
 
 export interface PairedIteration {
