@@ -234,7 +234,7 @@ export function createScrElement(
       applyInitialValues(SCR_STATE_SCHEMA, pool, base, {});
     },
 
-    refreshSubElementRefs(newS0: Float64Array): void {
+    refreshSubElementRefs(newS0: Float64Array, _newS1: Float64Array, _newS2: Float64Array, _newS3: Float64Array, _newS4: Float64Array, _newS5: Float64Array, _newS6: Float64Array, _newS7: Float64Array): void {
       s0 = newS0;
     },
 

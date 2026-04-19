@@ -58,7 +58,7 @@ function makeMockSolver() {
   return solver;
 }
 
-function makeMinimalCtx(solver: unknown, time = 0, srcFact = 1) {
+function makeMinimalCtx(solver: unknown, _time = 0, srcFact = 1) {
   return {
     solver: solver as SparseSolver,
     voltages: new Float64Array(4),

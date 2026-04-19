@@ -435,11 +435,6 @@ export function createDiodeElement(
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
   let pnjlimLimited = false;
 
-  // One-shot cold-start seed from dcopInitJct. Non-null only between
-  // primeJunctions() and the next updateOperatingPoint() call, which
-  // consumes and re-nulls it. Matches ngspice MODEINITJCT local override.
-  let primedVd: number | null = null;
-
   const element = {
     branchIndex: -1,
     isNonlinear: true,
@@ -459,7 +454,7 @@ export function createDiodeElement(
       applyInitialValues(this.stateSchema, pool, base, params);
     },
 
-    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array): void {
+    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array, _newS4: Float64Array, _newS5: Float64Array, _newS6: Float64Array, _newS7: Float64Array): void {
       s0 = newS0;
       s1 = newS1;
       s2 = newS2;
@@ -476,10 +471,18 @@ export function createDiodeElement(
         s0[base + SLOT_GEQ] = s1[base + SLOT_GEQ];
       }
 
+      // During MODEINITJCT (dioload.c:120-135), ngspice overrides vd
+      // to seeded values rather than reading from the solution vector —
+      // at that phase ctx.voltages is all zeros.
       let vdRaw: number;
-      if (primedVd !== null) {
-        vdRaw = primedVd;
-        primedVd = null;
+      if (pool.initMode === "initJct") {
+        if (params.OFF) {
+          vdRaw = 0;
+        } else if (pool.uic && !isNaN(params.IC)) {
+          vdRaw = params.IC;
+        } else {
+          vdRaw = tVcrit;
+        }
       } else {
         const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
         const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
@@ -654,15 +657,6 @@ export function createDiodeElement(
       return [id, -id];
     },
 
-    primeJunctions(): void {
-      if (params.OFF) {
-        primedVd = 0;
-      } else if (pool.uic && !isNaN(params.IC)) {
-        primedVd = params.IC;
-      } else {
-        primedVd = tVcrit;
-      }
-    },
 
     setParam(key: string, value: number): void {
       if (key in params) {

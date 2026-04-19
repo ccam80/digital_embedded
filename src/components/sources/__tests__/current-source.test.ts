@@ -90,11 +90,13 @@ describe("CurrentSource", () => {
   });
 
   it("set_scale_modifies_current", () => {
+    // ngspice vsrcload.c:54 — value = here->VSRCdcValue * ckt->CKTsrcFact
+    // Sources read ctx.srcFact directly during load(); no per-element scale method.
     const src = makeCurrentSource(1, 2, 0.01);
-    src.setSourceScale!(0.3);
 
     const solver = makeMockSolver();
-    src.load(makeMinimalCtx(solver));
+    const ctx = { ...makeMinimalCtx(solver), srcFact: 0.3 };
+    src.load(ctx);
 
     // No matrix stamps
     expect(solver.allocElement).toHaveBeenCalledTimes(0);

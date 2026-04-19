@@ -84,6 +84,8 @@ function runDcopCapture() {
     integrationCoefficients: ZERO_INTEG_COEFF,
     analysisPhase: "dcop",
     acceptedAttemptIndex: -1,
+    order: engine.integrationOrder,
+    delta: engine.currentDt,
   });
 
   engine.stepPhaseHook = null;

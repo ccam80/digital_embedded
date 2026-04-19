@@ -34,8 +34,6 @@ import type { IntegrationMethod } from "./element.js";
  * LTE error factor for trapezoidal method, indexed by (order - 1).
  * trap[0] = 0.5 (order 1), trap[1] = 1/12 (order 2).
  */
-const TRAP_LTE_FACTOR_0 = 0.5;
-const TRAP_LTE_FACTOR_1 = 1 / 12;
 
 /**
  * LTE error factor for Gear (BDF) methods, indexed by (order - 1).

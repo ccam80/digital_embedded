@@ -927,8 +927,9 @@ function makeTimer555CaptureSolver(): {
       return h;
     },
     stampElement: (handle: number, value: number) => {
-      const { row, col } = handles[handle];
-      stamps.push({ row, col, value });
+      const entry = handles[handle];
+      if (entry === undefined) return; // handle cached from a prior solver instance (DigitalOutputPinModel caches across calls)
+      stamps.push({ row: entry.row, col: entry.col, value });
     },
   } as unknown as SparseSolverType;
   return { solver, stamps, rhs };

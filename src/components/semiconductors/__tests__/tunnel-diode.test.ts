@@ -14,19 +14,16 @@ import {
   createTunnelDiodeElement,
   tunnelDiodeIV,
   TunnelDiodeDefinition,
-  TUNNEL_DIODE_PARAM_DEFAULTS,
 } from "../tunnel-diode.js";
 import { computeJunctionCapacitance, computeJunctionCharge } from "../diode.js";
 import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { newtonRaphson } from "../../../solver/analog/newton-raphson.js";
 import { DiagnosticCollector } from "../../../solver/analog/diagnostics.js";
 import { withNodeIds, runNR } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
 // Default tunnel diode parameters

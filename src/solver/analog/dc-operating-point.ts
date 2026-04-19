@@ -22,7 +22,6 @@
  *   OldCKTstate0     → ctx.dcopSavedState0
  */
 
-import type { AnalogElement } from "./element.js";
 import type { DiagnosticCollector } from "./diagnostics.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import { newtonRaphson } from "./newton-raphson.js";
@@ -58,14 +57,18 @@ type InitMode = "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | 
 
 /**
  * Scale all independent sources by factor.
- * Elements without setSourceScale are silently skipped.
+ *
+ * Sets `ctx.srcFact` (ngspice CKTsrcFact), the single source of truth for
+ * DC source stepping. Every source-device `load()` reads `ctx.srcFact`
+ * directly and multiplies its stamped value by it.
+ *
+ * ngspice reference: cktop.c:385 (gillespie_src start — `ckt->CKTsrcFact = 0;`)
+ * and cktop.c:475,514 (increment during ramp). vsrcload.c:54 and isrcload.c
+ * read `ckt->CKTsrcFact` directly in each device's load() — no per-element
+ * setter dispatch.
  */
-function scaleAllSources(elements: readonly AnalogElement[], factor: number): void {
-  for (const el of elements) {
-    if (el.setSourceScale) {
-      el.setSourceScale(factor);
-    }
-  }
+function scaleAllSources(ctx: CKTCircuitContext, factor: number): void {
+  ctx.srcFact = factor;
 }
 
 /**
@@ -277,7 +280,7 @@ export function cktncDump(
  */
 export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   const { elements, matrixSize, statePool, params } = ctx;
-  const diagnostics = ctx.diagnostics as DiagnosticCollector;
+  const diagnostics = ctx.diagnostics;
 
   ctx.dcopResult.reset();
 
@@ -626,7 +629,7 @@ function spice3Src(
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
 ): StepResult {
-  const { elements, statePool, params } = ctx;
+  const { statePool, params } = ctx;
 
   const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
@@ -638,13 +641,13 @@ function spice3Src(
 
   for (let i = 0; i <= numSrcSteps; i++) {
     const srcFact = i / numSrcSteps;
-    scaleAllSources(elements, srcFact);
+    scaleAllSources(ctx, srcFact);
     onPhaseBegin?.("dcopSrcSweep", srcFact);
     const result = runNR(ctx, params.dcTrcvMaxIter, voltages, 0, null);
     totalIter += result.iterations;
     if (!result.converged) {
       onPhaseEnd?.("nrFailedRetry", false);
-      scaleAllSources(elements, 1);
+      scaleAllSources(ctx, 1);
       return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
     }
     onPhaseEnd?.("dcopSubSolveConverged", true);
@@ -654,7 +657,7 @@ function spice3Src(
     voltages.set(result.voltages);
   }
 
-  scaleAllSources(elements, 1);
+  scaleAllSources(ctx, 1);
   return { converged: true, iterations: totalIter, voltages };
 }
 
@@ -673,14 +676,14 @@ function gillespieSrc(
   onPhaseBegin?: PhaseBeginFn,
   onPhaseEnd?: PhaseEndFn,
 ): StepResult {
-  const { elements, statePool, params } = ctx;
+  const { statePool, params } = ctx;
 
   const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
   if (statePool) {
     statePool.initMode = "initJct";
   }
-  scaleAllSources(elements, 0);
+  scaleAllSources(ctx, 0);
 
   const savedVoltages = ctx.dcopSavedVoltages;
   const savedState0 = ctx.dcopSavedState0;
@@ -717,7 +720,7 @@ function gillespieSrc(
       }
     }
     if (!bootstrapConverged) {
-      scaleAllSources(elements, 1);
+      scaleAllSources(ctx, 1);
       return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
     }
   } else {
@@ -737,7 +740,7 @@ function gillespieSrc(
 
   // cktop.c:428-538: main source stepping loop
   while (raise >= 1e-7 && convFact < 1) {
-    scaleAllSources(elements, srcFact);
+    scaleAllSources(ctx, srcFact);
     onPhaseBegin?.("dcopSrcSweep", srcFact);
     const stepResult = runNR(ctx, params.dcTrcvMaxIter, voltages, params.gshunt ?? 0, null);
     totalIter += stepResult.iterations;
@@ -776,7 +779,7 @@ function gillespieSrc(
     }
   }
 
-  scaleAllSources(elements, 1);
+  scaleAllSources(ctx, 1);
 
   if (convFact >= 1) {
     return { converged: true, iterations: totalIter, voltages };

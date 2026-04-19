@@ -15,32 +15,6 @@ import { ComplexSparseSolver } from "../complex-sparse-solver.js";
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Solve Ax=b using the solver and return [xRe, xIm]. */
-function solveSystem(
-  n: number,
-  entries: Array<[number, number, number, number]>, // [row, col, re, im]
-  rhsRe: number[],
-  rhsIm: number[]
-): [Float64Array, Float64Array] {
-  const solver = new ComplexSparseSolver();
-  solver.beginAssembly(n);
-  for (const [r, c, re, im] of entries) {
-    const h = solver.allocComplexElement(r, c);
-    solver.stampComplexElement(h, re, im);
-  }
-  for (let i = 0; i < n; i++) {
-    solver.stampRHS(i, rhsRe[i], rhsIm[i]);
-  }
-  solver.finalize();
-  solver.forceReorder();
-  const ok = solver.factor();
-  expect(ok).toBe(true);
-  const xRe = new Float64Array(n);
-  const xIm = new Float64Array(n);
-  solver.solve(xRe, xIm);
-  return [xRe, xIm];
-}
-
 // ---------------------------------------------------------------------------
 // Task 0.4.1 tests
 // ---------------------------------------------------------------------------
@@ -567,7 +541,7 @@ describe("ComplexSparseSolver — Task 0.4.3", () => {
     expect(xRe[0] - xRe[1]).toBeCloseTo(1.0, 10);
     expect(Math.abs(xIm[0] - xIm[1])).toBeLessThan(1e-10);
 
-    void elCount;
+    expect(solver.elementCount).toBe(elCount);
   });
 });
 

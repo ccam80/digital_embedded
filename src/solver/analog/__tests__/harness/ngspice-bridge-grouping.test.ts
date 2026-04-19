@@ -12,9 +12,14 @@ import type { RawNgspiceIterationEx, RawNgspiceOuterEvent } from "./types.js";
 
 // CKTmode constants (mirror of ngspice-bridge.ts internal constants)
 // Values from ref/ngspice/src/include/ngspice/cktdefs.h:166-182
-const MODETRAN   = 0x0001;
-const MODEDCOP   = 0x0010;
-const MODETRANOP = 0x0020;
+const MODETRAN      = 0x0001;
+const MODEDCOP      = 0x0010;
+const MODETRANOP    = 0x0020;
+// Real ngspice sets MODEINITFLOAT alongside MODEDCOP / MODETRANOP during the
+// dcopDirect / transient-OP iterations (cktop.c transitions through
+// INITJCT → INITFIX → INITFLOAT and leaves INITFLOAT set for subsequent
+// sub-solves). Synthetic fixtures below must mirror that bit pattern so
+// cktModeToInitMode() resolves to the expected InitMode string.
 
 function makeRaw(overrides: Partial<RawNgspiceIterationEx> = {}): RawNgspiceIterationEx {
   return {

@@ -82,6 +82,7 @@ import type {
 } from "./types.js";
 import { DEFAULT_TOLERANCE } from "./types.js";
 import { computeNIcomCof } from "../../integration.js";
+import type { IntegrationMethod } from "../../../../core/analog-types.js";
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -549,6 +550,8 @@ export class ComparisonSession {
         integrationCoefficients: _zeroDcopCoefficients(),
         analysisPhase: "dcop",
         acceptedAttemptIndex: -1,
+        order: this._engine.integrationOrder,
+        delta: this._engine.currentDt,
       });
     }
 
@@ -643,6 +646,8 @@ export class ComparisonSession {
           integrationCoefficients: this._captureIntegCoeff(),
           analysisPhase: this._curAnalysisPhase(),
           acceptedAttemptIndex: -1,
+          order: this._engine.integrationOrder,
+          delta: this._engine.currentDt,
         });
         this.errors.push(`Our engine failed at step ${s}: ${e.message}`);
         break;
@@ -650,14 +655,16 @@ export class ComparisonSession {
 
       const nowTime = this._engine.simTime ?? 0;
       if (nowTime > prevSimTime) {
-        const lteDtValue = (this._engine as any)._timestep?.currentDt as number | undefined;
+        const lteDtValue = this._engine.getLteNextDt();
+        const hasLte = isFinite(lteDtValue) && lteDtValue > 0;
         sc.endStep({
           stepEndTime: nowTime,
           integrationCoefficients: this._captureIntegCoeff(),
           analysisPhase: this._curAnalysisPhase(),
           acceptedAttemptIndex: -1,
-          lteDt: typeof lteDtValue === "number" && isFinite(lteDtValue) && lteDtValue > 0
-            ? lteDtValue : undefined,
+          order: this._engine.integrationOrder,
+          delta: this._engine.currentDt,
+          ...(hasLte ? { lteDt: lteDtValue } : {}),
         });
         prevSimTime = nowTime;
       }
@@ -2653,21 +2660,19 @@ export class ComparisonSession {
 
   private _captureIntegCoeff(): IntegrationCoefficients {
     if (!this._engine) return _zeroDcopCoefficients();
-    const ts = (this._engine as any)._timestep;
-    if (!ts) return _zeroDcopCoefficients();
-    const order: number = ts.currentOrder ?? 1;
-    const rawMethod: string = ts.currentMethod ?? "bdf1";
+    const order = this._engine.integrationOrder;
+    const rawMethod: IntegrationMethod = this._engine.integrationMethod;
     const method: "backwardEuler" | "trapezoidal" | "gear2" =
       rawMethod === "trapezoidal" ? "trapezoidal"
       : rawMethod === "bdf2" ? "gear2"
       : "backwardEuler";
-    // After a step completes: _deltaOld[0] = dt used in this step (set by setDeltaOldCurrent),
-    // _deltaOld[1] = dt of the previous step (h1), _deltaOld[2] = h_{n-2}.
-    const deltaOld: number[] = (ts as any)._deltaOld ?? [];
-    const dt: number = deltaOld[0] > 0 ? deltaOld[0] : (ts.currentDt ?? 0);
+    // After a step completes: deltaOld[0] = dt used in this step (set by setDeltaOldCurrent),
+    // deltaOld[1] = dt of the previous step (h1), deltaOld[2] = h_{n-2}.
+    const deltaOld = this._engine.timestepDeltaOld;
+    const dt = deltaOld[0] > 0 ? deltaOld[0] : this._engine.currentDt;
     const agBuf = new Float64Array(8);
     const scratchBuf = new Float64Array(49);
-    computeNIcomCof(dt, deltaOld, order, rawMethod as any, agBuf, scratchBuf);
+    computeNIcomCof(dt, deltaOld as number[], order, rawMethod, agBuf, scratchBuf);
     const ag0 = agBuf[0];
     const ag1 = agBuf[1];
     return {

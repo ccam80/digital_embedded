@@ -297,7 +297,7 @@ describe("spice-import-dialog: compile integration", () => {
         branchIndex: -1,
         isNonlinear: false,
         isReactive: false,
-        stamp(_s: SparseSolver) {},
+        stampAc(_s: SparseSolver) {},
         setParam(_k: string, _v: number): void {},
         getPinCurrents(_v: Float64Array): number[] { return []; },
       };

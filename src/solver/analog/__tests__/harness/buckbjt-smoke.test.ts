@@ -104,10 +104,6 @@ describeIfDll("ComparisonSession — buckbjt smoke test", () => {
 
     // Find inductor-related nodes (branch currents)
     for (const iter of iters) {
-      // Look for branch nodes (inductors have branch currents in the solution vector)
-      const inductorNodes = Object.entries(iter.nodes).filter(([label]) =>
-        label.toLowerCase().includes("l") || label.toLowerCase().includes("ind"));
-
       console.log(`\n  Iteration ${iter.iteration}:`);
       console.log(`    noncon: ours=${iter.noncon.ours} ng=${iter.noncon.ngspice}`);
 

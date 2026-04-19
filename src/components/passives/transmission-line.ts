@@ -340,6 +340,10 @@ class SegmentInductorElement implements ReactiveAnalogElement {
   s1!: Float64Array;
   s2!: Float64Array;
   s3!: Float64Array;
+  s4!: Float64Array;
+  s5!: Float64Array;
+  s6!: Float64Array;
+  s7!: Float64Array;
   private base!: number;
 
   constructor(nA: number, nB: number, branchIdx: number, inductance: number) {
@@ -354,6 +358,10 @@ class SegmentInductorElement implements ReactiveAnalogElement {
     this.s1 = pool.states[1];
     this.s2 = pool.states[2];
     this.s3 = pool.states[3];
+    this.s4 = pool.states[4];
+    this.s5 = pool.states[5];
+    this.s6 = pool.states[6];
+    this.s7 = pool.states[7];
     this.base = this.stateBaseOffset;
     applyInitialValues(SEGMENT_INDUCTOR_SCHEMA, pool, this.base, {});
   }
@@ -364,32 +372,30 @@ class SegmentInductorElement implements ReactiveAnalogElement {
     const nB = this.pinNodeIds[1];
     const b = this.branchIndex;
     const L = this.L;
-
-    // Branch incidence (topology-constant).
-    if (nA !== 0) solver.stampElement(solver.allocElement(nA - 1, b), 1);
-    if (nB !== 0) solver.stampElement(solver.allocElement(nB - 1, b), -1);
-    if (nA !== 0) solver.stampElement(solver.allocElement(b, nA - 1), 1);
-    if (nB !== 0) solver.stampElement(solver.allocElement(b, nB - 1), -1);
-
-    if (!ctx.isTransient && !ctx.isDcOp) return;
-
+    const base = this.base;
     const iNow = ctx.voltages[b];
+
+    // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
+    if (!ctx.isDcOp && ctx.initMode !== "initPred") {
+      this.s0[base + SLOT_L_PHI] = L * iNow;
+      if (ctx.initMode === "initTran") {
+        this.s1[base + SLOT_L_PHI] = this.s0[base + SLOT_L_PHI];
+      }
+    } else if (ctx.initMode === "initPred") {
+      this.s0[base + SLOT_L_PHI] = this.s1[base + SLOT_L_PHI];
+    }
+
+    // Companion: zero at DC (indload.c:88-90), niIntegrate at TRAN.
+    let geq = 0;
+    let ceq = 0;
     if (ctx.isTransient) {
       const ag = ctx.ag;
-      if (ctx.initMode === "initPred") {
-        this.s0[this.base + SLOT_L_PHI] = this.s1[this.base + SLOT_L_PHI];
-      } else {
-        this.s0[this.base + SLOT_L_PHI] = L * iNow;
-        if (ctx.initMode === "initTran") {
-          this.s1[this.base + SLOT_L_PHI] = this.s0[this.base + SLOT_L_PHI];
-        }
-      }
-      const phi0 = this.s0[this.base + SLOT_L_PHI];
-      const phi1 = this.s1[this.base + SLOT_L_PHI];
-      const phi2 = this.s2[this.base + SLOT_L_PHI];
-      const phi3 = this.s3[this.base + SLOT_L_PHI];
-      const ccapPrev = this.s1[this.base + SLOT_L_CCAP];
-      const { ccap, ceq, geq } = niIntegrate(
+      const phi0 = this.s0[base + SLOT_L_PHI];
+      const phi1 = this.s1[base + SLOT_L_PHI];
+      const phi2 = this.s2[base + SLOT_L_PHI];
+      const phi3 = this.s3[base + SLOT_L_PHI];
+      const ccapPrev = this.s1[base + SLOT_L_CCAP];
+      const ni = niIntegrate(
         ctx.method,
         ctx.order,
         L,
@@ -398,21 +404,26 @@ class SegmentInductorElement implements ReactiveAnalogElement {
         [phi2, phi3, 0, 0, 0],
         ccapPrev,
       );
+      geq = ni.geq;
+      ceq = ni.ceq;
+      this.s0[base + SLOT_L_CCAP] = ni.ccap;
       if (ctx.initMode === "initTran") {
-        this.s1[this.base + SLOT_L_CCAP] = ccap;
+        this.s1[base + SLOT_L_CCAP] = ni.ccap;
       }
-      this.s0[this.base + SLOT_L_CCAP] = ccap;
-      this.s0[this.base + SLOT_GEQ]    = geq;
-      this.s0[this.base + SLOT_IEQ]    = ceq;
-      this.s0[this.base + SLOT_I_PREV] = iNow;
-      solver.stampElement(solver.allocElement(b, b), -geq);
-      solver.stampRHS(b, ceq);
-    } else {
-      this.s0[this.base + SLOT_L_PHI]  = L * iNow;
-      this.s0[this.base + SLOT_I_PREV] = iNow;
-      this.s0[this.base + SLOT_GEQ]    = 0;
-      this.s0[this.base + SLOT_IEQ]    = 0;
     }
+
+    this.s0[base + SLOT_GEQ]    = geq;
+    this.s0[base + SLOT_IEQ]    = ceq;
+    this.s0[base + SLOT_I_PREV] = iNow;
+
+    // Unconditional stamps — indload.c:119-123 literal. DC writes req=veq=0
+    // to the allocated slots; the handle table preserves structural nonzeros.
+    if (nA !== 0) solver.stampElement(solver.allocElement(nA - 1, b), 1);
+    if (nB !== 0) solver.stampElement(solver.allocElement(nB - 1, b), -1);
+    if (nA !== 0) solver.stampElement(solver.allocElement(b, nA - 1), 1);
+    if (nB !== 0) solver.stampElement(solver.allocElement(b, nB - 1), -1);
+    solver.stampElement(solver.allocElement(b, b), -geq);
+    solver.stampRHS(b, ceq);
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -446,6 +457,10 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
   s1!: Float64Array;
   s2!: Float64Array;
   s3!: Float64Array;
+  s4!: Float64Array;
+  s5!: Float64Array;
+  s6!: Float64Array;
+  s7!: Float64Array;
   private base!: number;
 
   constructor(node: number, capacitance: number) {
@@ -459,6 +474,10 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
     this.s1 = pool.states[1];
     this.s2 = pool.states[2];
     this.s3 = pool.states[3];
+    this.s4 = pool.states[4];
+    this.s5 = pool.states[5];
+    this.s6 = pool.states[6];
+    this.s7 = pool.states[7];
     this.base = this.stateBaseOffset;
     applyInitialValues(SEGMENT_CAPACITOR_SCHEMA, pool, this.base, {});
   }
@@ -549,6 +568,10 @@ class CombinedRLElement implements ReactiveAnalogElement {
   s1!: Float64Array;
   s2!: Float64Array;
   s3!: Float64Array;
+  s4!: Float64Array;
+  s5!: Float64Array;
+  s6!: Float64Array;
+  s7!: Float64Array;
   private base!: number;
 
   constructor(nA: number, nB: number, branchIdx: number, resistance: number, inductance: number) {
@@ -564,6 +587,10 @@ class CombinedRLElement implements ReactiveAnalogElement {
     this.s1 = pool.states[1];
     this.s2 = pool.states[2];
     this.s3 = pool.states[3];
+    this.s4 = pool.states[4];
+    this.s5 = pool.states[5];
+    this.s6 = pool.states[6];
+    this.s7 = pool.states[7];
     this.base = this.stateBaseOffset;
     applyInitialValues(COMBINED_RL_SCHEMA, pool, this.base, {});
   }
@@ -574,33 +601,30 @@ class CombinedRLElement implements ReactiveAnalogElement {
     const nB = this.pinNodeIds[1];
     const b = this.branchIndex;
     const L = this.L;
-
-    // Branch incidence and series resistance (topology-constant).
-    if (nA !== 0) solver.stampElement(solver.allocElement(nA - 1, b), 1);
-    if (nB !== 0) solver.stampElement(solver.allocElement(nB - 1, b), -1);
-    if (nA !== 0) solver.stampElement(solver.allocElement(b, nA - 1), 1);
-    if (nB !== 0) solver.stampElement(solver.allocElement(b, nB - 1), -1);
-    solver.stampElement(solver.allocElement(b, b), -this.R);
-
-    if (!ctx.isTransient && !ctx.isDcOp) return;
-
+    const base = this.base;
     const iNow = ctx.voltages[b];
+
+    // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
+    if (!ctx.isDcOp && ctx.initMode !== "initPred") {
+      this.s0[base + SLOT_RL_PHI] = L * iNow;
+      if (ctx.initMode === "initTran") {
+        this.s1[base + SLOT_RL_PHI] = this.s0[base + SLOT_RL_PHI];
+      }
+    } else if (ctx.initMode === "initPred") {
+      this.s0[base + SLOT_RL_PHI] = this.s1[base + SLOT_RL_PHI];
+    }
+
+    // Companion: zero at DC (indload.c:88-90), niIntegrate at TRAN.
+    let geq = 0;
+    let ceq = 0;
     if (ctx.isTransient) {
       const ag = ctx.ag;
-      if (ctx.initMode === "initPred") {
-        this.s0[this.base + SLOT_RL_PHI] = this.s1[this.base + SLOT_RL_PHI];
-      } else {
-        this.s0[this.base + SLOT_RL_PHI] = L * iNow;
-        if (ctx.initMode === "initTran") {
-          this.s1[this.base + SLOT_RL_PHI] = this.s0[this.base + SLOT_RL_PHI];
-        }
-      }
-      const phi0 = this.s0[this.base + SLOT_RL_PHI];
-      const phi1 = this.s1[this.base + SLOT_RL_PHI];
-      const phi2 = this.s2[this.base + SLOT_RL_PHI];
-      const phi3 = this.s3[this.base + SLOT_RL_PHI];
-      const ccapPrev = this.s1[this.base + SLOT_RL_CCAP];
-      const { ccap, ceq, geq } = niIntegrate(
+      const phi0 = this.s0[base + SLOT_RL_PHI];
+      const phi1 = this.s1[base + SLOT_RL_PHI];
+      const phi2 = this.s2[base + SLOT_RL_PHI];
+      const phi3 = this.s3[base + SLOT_RL_PHI];
+      const ccapPrev = this.s1[base + SLOT_RL_CCAP];
+      const ni = niIntegrate(
         ctx.method,
         ctx.order,
         L,
@@ -609,21 +633,29 @@ class CombinedRLElement implements ReactiveAnalogElement {
         [phi2, phi3, 0, 0, 0],
         ccapPrev,
       );
+      geq = ni.geq;
+      ceq = ni.ceq;
+      this.s0[base + SLOT_RL_CCAP] = ni.ccap;
       if (ctx.initMode === "initTran") {
-        this.s1[this.base + SLOT_RL_CCAP] = ccap;
+        this.s1[base + SLOT_RL_CCAP] = ni.ccap;
       }
-      this.s0[this.base + SLOT_RL_CCAP] = ccap;
-      this.s0[this.base + SLOT_GEQ]     = geq;
-      this.s0[this.base + SLOT_IEQ]     = ceq;
-      this.s0[this.base + SLOT_I_PREV]  = iNow;
-      solver.stampElement(solver.allocElement(b, b), -geq);
-      solver.stampRHS(b, ceq);
-    } else {
-      this.s0[this.base + SLOT_RL_PHI]  = L * iNow;
-      this.s0[this.base + SLOT_I_PREV]  = iNow;
-      this.s0[this.base + SLOT_GEQ]     = 0;
-      this.s0[this.base + SLOT_IEQ]     = 0;
     }
+
+    this.s0[base + SLOT_GEQ]    = geq;
+    this.s0[base + SLOT_IEQ]    = ceq;
+    this.s0[base + SLOT_I_PREV] = iNow;
+
+    // Unconditional stamps — indload.c:119-123 plus the constant -R on branch
+    // diagonal. Branch equation: V(A) - V(B) - (R + geq)·I = ceq.
+    // In DC with lossless (R=0) the diagonal stamps -= 0; handle table keeps
+    // the structural nonzero so Modified Nodal Analysis stays non-singular
+    // provided there's a DC path (callers ensure this via series connections).
+    if (nA !== 0) solver.stampElement(solver.allocElement(nA - 1, b), 1);
+    if (nB !== 0) solver.stampElement(solver.allocElement(nB - 1, b), -1);
+    if (nA !== 0) solver.stampElement(solver.allocElement(b, nA - 1), 1);
+    if (nB !== 0) solver.stampElement(solver.allocElement(b, nB - 1), -1);
+    solver.stampElement(solver.allocElement(b, b), -(this.R + geq));
+    solver.stampRHS(b, ceq);
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
@@ -650,6 +682,10 @@ export class TransmissionLineElement implements AnalogElement {
   s1!: Float64Array;
   s2!: Float64Array;
   s3!: Float64Array;
+  s4!: Float64Array;
+  s5!: Float64Array;
+  s6!: Float64Array;
+  s7!: Float64Array;
   setParam(_key: string, _value: number): void {}
 
   private readonly _subElements: AnalogElement[];
@@ -754,6 +790,10 @@ export class TransmissionLineElement implements AnalogElement {
     this.s1 = pool.states[1];
     this.s2 = pool.states[2];
     this.s3 = pool.states[3];
+    this.s4 = pool.states[4];
+    this.s5 = pool.states[5];
+    this.s6 = pool.states[6];
+    this.s7 = pool.states[7];
     let offset = this.stateBaseOffset;
     for (const el of this._subElements) {
       if (el.isReactive) {
@@ -765,11 +805,12 @@ export class TransmissionLineElement implements AnalogElement {
     }
   }
 
-  refreshSubElementRefs(s0: Float64Array, s1: Float64Array, s2: Float64Array, s3: Float64Array): void {
+  refreshSubElementRefs(s0: Float64Array, s1: Float64Array, s2: Float64Array, s3: Float64Array, s4: Float64Array, s5: Float64Array, s6: Float64Array, s7: Float64Array): void {
     for (const el of this._subElements) {
       if (el.isReactive) {
         const re = el as any;
         re.s0 = s0; re.s1 = s1; re.s2 = s2; re.s3 = s3;
+        re.s4 = s4; re.s5 = s5; re.s6 = s6; re.s7 = s7;
       }
     }
   }

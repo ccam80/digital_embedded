@@ -170,11 +170,6 @@ export interface AnalogElementCore {
   ): number;
 
   /**
-   * Scale independent source magnitude for source-stepping DC convergence.
-   */
-  setSourceScale?(factor: number): void;
-
-  /**
    * Update a mutable parameter on a live compiled element without
    * recompilation. Called by the coordinator for slider/property-panel
    * hot-patching. All compiled elements must implement this method.

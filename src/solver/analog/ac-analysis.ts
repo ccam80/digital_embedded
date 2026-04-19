@@ -55,6 +55,16 @@ export interface AcCompiledCircuit {
 }
 
 /**
+ * Optional AC-analysis dependencies. Harness tests inject custom factories
+ * so a single ComplexSparseSolver instance can be spied on across a sweep.
+ * Production callers omit this entirely and get the default ComplexSparseSolver.
+ */
+export interface AcAnalysisDeps {
+  /** Factory returning the ComplexSparseSolver used for the frequency sweep. */
+  complexSolverFactory?: () => ComplexSparseSolver;
+}
+
+/**
  * AC small-signal analysis.
  *
  * Usage:
@@ -64,10 +74,16 @@ export interface AcCompiledCircuit {
 export class AcAnalysis {
   private readonly _compiled: AcCompiledCircuit;
   private readonly _params: SimulationParams;
+  private readonly _deps: AcAnalysisDeps;
 
-  constructor(compiled: AcCompiledCircuit, params?: Partial<SimulationParams>) {
+  constructor(
+    compiled: AcCompiledCircuit,
+    params?: Partial<SimulationParams>,
+    deps?: AcAnalysisDeps,
+  ) {
     this._compiled = compiled;
     this._params = { ...DEFAULT_SIMULATION_PARAMS, ...params };
+    this._deps = deps ?? {};
   }
 
   /**
@@ -84,6 +100,8 @@ export class AcAnalysis {
 
     // Step 1: Solve DC operating point
     const dcCtx = new CKTCircuitContext(compiled, resolveSimulationParams(this._params), () => {}, new SparseSolver());
+    // Share the AC sweep's diagnostic collector so DC-OP diagnostics surface upstream.
+    dcCtx.diagnostics = diagnostics;
     solveDcOperatingPoint(dcCtx);
     const dcResult = dcCtx.dcopResult;
 
@@ -151,7 +169,9 @@ export class AcAnalysis {
     const xIm = new Float64Array(N_ac);
 
     // Step 5: Frequency sweep
-    const complexSolver = new ComplexSparseSolver();
+    const complexSolver = this._deps.complexSolverFactory
+      ? this._deps.complexSolverFactory()
+      : new ComplexSparseSolver();
 
     // Handle cache for the AC voltage-source branch-row stamps.
     // Allocated once on frequency 0, reused across the sweep.
@@ -187,8 +207,11 @@ export class AcAnalysis {
       }
       complexSolver.stampRHS(branchRow, 1.0, 0.0);
 
-      complexSolver.finalize();
+      // Spec 0.4: forceReorder() MUST run before finalize() so the reorder
+      // is picked up by factor() on frequency 0. The prior ordering (finalize
+      // then forceReorder) discarded the reorder intent.
       if (fi === 0) complexSolver.forceReorder();
+      complexSolver.finalize();
       const ok = complexSolver.factor();
 
       if (ok) {

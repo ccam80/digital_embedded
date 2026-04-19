@@ -20,9 +20,8 @@
  *   matrixSize = number of circuit nodes + number of VS branch variables
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
-import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson } from "../newton-raphson.js";
 import { makeVoltageSource, makeResistor, withNodeIds, makeSimpleCtx } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";

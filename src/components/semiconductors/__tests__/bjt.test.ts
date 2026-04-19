@@ -261,10 +261,10 @@ describe("NPN", () => {
     const entries = ctx.solver.getCSCNonZeros();
     const rhs = ctx.solver.getRhsSnapshot();
 
-    // Conductance stamps: gpi(B-E), gmu(B-C), go(C-E), gm VCCS (C-B, C-E, E-B, E-E terms)
-    // Total of 16 conductance entries (4 per conductance × 4 conductances).
-    // Fresh solver starts empty — entries are unique (row, col) positions.
-    expect(entries.length).toBe(16);
+    // 9 unique (row,col) positions in the 3×3 intrinsic-BJT block. The 16 `stampG` calls
+    // in `bjt.ts:900-922` accumulate onto these 9 positions via `SparseSolver.stampElement`'s
+    // handle-keyed accumulation (sparse-solver.ts:287-289).
+    expect(entries.length).toBe(9);
     // RHS Norton currents stamped into C, B, E rows (3 rows).
     let nonzeroRhsRows = 0;
     for (let i = 0; i < rhs.length; i++) {
@@ -1013,8 +1013,10 @@ describe("StatePool — BJT simple write-back elimination", () => {
     const entries = ctx.solver.getCSCNonZeros();
     const rhs = ctx.solver.getRhsSnapshot();
 
-    // 4 conductances × 4 stamps each = 16 total (row, col) entries
-    expect(entries.length).toBe(16);
+    // 9 unique (row,col) positions in the 3×3 intrinsic-BJT block. The 16 `stampG` calls
+    // in `bjt.ts:900-922` accumulate onto these 9 positions via `SparseSolver.stampElement`'s
+    // handle-keyed accumulation (sparse-solver.ts:287-289).
+    expect(entries.length).toBe(9);
 
     // 3 nonzero RHS rows (C, B, E)
     let nonzeroRhsRows = 0;
@@ -1221,22 +1223,23 @@ describe("BJT simple LimitingEvent instrumentation", () => {
 // ---------------------------------------------------------------------------
 
 describe("BJT OFF parameter", () => {
-  it("primeJunctions_with_OFF_seeds_zero_vbe_vbc", () => {
+  it("load_at_initJct_with_OFF_seeds_zero_vbe_vbc", () => {
     const propsObj = makeBjtProps({ OFF: 1 });
-    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj) as AnalogElementCore & { primeJunctions: () => void };
+    const core = createBjtElement(1, new Map([["B", 2], ["C", 1], ["E", 3]]), -1, propsObj);
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
-    // Call primeJunctions to arm the cold-start seed
-    core.primeJunctions();
-    // Consume it via load() with zero node voltages.
+    // In-load initJct override: set pool.initMode before calling load()
+    pool.initMode = "initJct";
     const element = withNodeIds(core, [2, 1, 3]);
     const voltages = new Float64Array(3);
-    element.load(makeDcOpCtx(voltages, 3));
-    // VBE and VBC should be 0 (limited from the 0 seed)
+    const ctx = makeDcOpCtx(voltages, 3);
+    ctx.initMode = "initJct";
+    element.load(ctx);
+    // With OFF=1 and initJct mode, vbeRaw=0, vbcRaw=0 are written directly (no pnjlim)
     // slot 0 = SLOT_VBE, slot 1 = SLOT_VBC
-    expect(pool.states[0][0]).toBeCloseTo(0, 6); // SLOT_VBE
-    expect(pool.states[0][1]).toBeCloseTo(0, 6); // SLOT_VBC
+    expect(pool.state0[0]).toBeCloseTo(0, 6); // SLOT_VBE
+    expect(pool.state0[1]).toBeCloseTo(0, 6); // SLOT_VBC
   });
 
   it("checkConvergence_returns_true_during_initFix_when_OFF", () => {
@@ -1412,7 +1415,7 @@ describe("bjt_spicel1_load_dcop_parity", () => {
       VAF: Infinity, VAR: Infinity,
       RB: 0, RC: 0, RE: 0, CJE: 0, CJC: 0, CJS: 0, TF: 0, TR: 0,
       XCJC: 1, NKF: 0.5, AREA: 1, M: 1,
-      TNOM: 300.15 - 273.15, // °C so that absolute T = 300.15 K (REFTEMP → tVt=VT, no scaling)
+      TNOM: 300.15, // K (matches ngspice bjttemp.c:42 default; headless path expects Kelvin)
     });
 
     // nodeB=2 (ext), nodeC=1, nodeE=3. No internal nodes since RB=RC=RE=0.

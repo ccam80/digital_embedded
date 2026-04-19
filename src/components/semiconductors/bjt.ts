@@ -701,17 +701,15 @@ export function createBjtElement(
   let s1: Float64Array;
   let s2: Float64Array;
   let s3: Float64Array;
+  let s4: Float64Array;
+  let s5: Float64Array;
+  let s6: Float64Array;
+  let s7: Float64Array;
   let base: number;
   let pool: StatePoolRef;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, BJTload sets CKTnoncon++)
   let icheckLimited = false;
-
-  // One-shot cold-start seeds from dcopInitJct. Non-null only between
-  // primeJunctions() and the next load() call, which consumes and re-nulls
-  // them. Matches ngspice MODEINITJCT local override.
-  let primedVbe: number | null = null;
-  let primedVbc: number | null = null;
 
   return {
     branchIndex: -1,
@@ -725,6 +723,10 @@ export function createBjtElement(
     s1: new Float64Array(0),
     s2: new Float64Array(0),
     s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
@@ -732,7 +734,12 @@ export function createBjtElement(
       s1 = pool.state1;
       s2 = pool.state2;
       s3 = pool.state3;
+      s4 = pool.state4;
+      s5 = pool.state5;
+      s6 = pool.state6;
+      s7 = pool.state7;
       this.s0 = s0; this.s1 = s1; this.s2 = s2; this.s3 = s3;
+      this.s4 = s4; this.s5 = s5; this.s6 = s6; this.s7 = s7;
       base = this.stateBaseOffset;
       applyInitialValues(BJT_SIMPLE_SCHEMA, pool, base, { polarity });
       const op0 = computeBjtOp(
@@ -753,11 +760,15 @@ export function createBjtElement(
       s0[base + SLOT_IB_NORTON] = op0.ib - op0.gpi * 0 - op0.gmu * 0;
     },
 
-    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array): void {
+    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array, newS4: Float64Array, newS5: Float64Array, newS6: Float64Array, newS7: Float64Array): void {
       s0 = newS0;
       s1 = newS1;
       s2 = newS2;
       s3 = newS3;
+      s4 = newS4;
+      s5 = newS5;
+      s6 = newS6;
+      s7 = newS7;
     },
 
     load(ctx: LoadContext): void {
@@ -783,16 +794,23 @@ export function createBjtElement(
       const vcritBE = tp.tVcrit;
       const vcritBC = tp.tVcrit;
 
-      // Junction voltages (polarity-corrected for PNP). If primeJunctions
-      // armed a cold-start seed for iteration 0, consume it here and clear
-      // so iteration 1 onward reads from the shared voltages array.
+      // Junction voltages (polarity-corrected for PNP).
+      // During MODEINITJCT (bjtload.c:258-276), ngspice overrides vbe/vbc
+      // to seeded values rather than reading from the solution vector —
+      // at that phase ctx.voltages is all zeros and would mis-bias G-P.
       let vbeRaw: number;
       let vbcRaw: number;
-      if (primedVbe !== null) {
-        vbeRaw = primedVbe;
-        vbcRaw = primedVbc!;
-        primedVbe = null;
-        primedVbc = null;
+      if (pool.initMode === "initJct") {
+        if (params.OFF) {
+          vbeRaw = 0;
+          vbcRaw = 0;
+        } else if (pool.uic && !isNaN(params.ICVBE) && !isNaN(params.ICVCE)) {
+          vbeRaw = params.ICVBE;
+          vbcRaw = params.ICVBE - params.ICVCE;
+        } else {
+          vbeRaw = tp.tVcrit;
+          vbcRaw = 0;
+        }
       } else {
         vbeRaw = polarity * (vB - vE);
         vbcRaw = polarity * (vB - vC);
@@ -943,19 +961,6 @@ export function createBjtElement(
       const ib = polarity * s0[base + SLOT_IB];
       const ie = -(ic + ib); // KCL: ib + ic + ie = 0
       return [ib, ic, ie];
-    },
-
-    primeJunctions(): void {
-      if (params.OFF) {
-        primedVbe = 0;
-        primedVbc = 0;
-      } else if (pool.uic && !isNaN(params.ICVBE) && !isNaN(params.ICVCE)) {
-        primedVbe = params.ICVBE;
-        primedVbc = params.ICVBE - params.ICVCE;
-      } else {
-        primedVbe = tp.tVcrit;
-        primedVbc = 0;
-      }
     },
 
     setParam(key: string, value: number): void {
@@ -1351,17 +1356,15 @@ export function createSpiceL1BjtElement(
   let s1: Float64Array;
   let s2: Float64Array;
   let s3: Float64Array;
+  let s4: Float64Array;
+  let s5: Float64Array;
+  let s6: Float64Array;
+  let s7: Float64Array;
   let base: number;
   let pool: StatePoolRef;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, BJTload sets CKTnoncon++)
   let icheckLimited = false;
-
-  // One-shot cold-start seeds from dcopInitJct. Non-null only between
-  // primeJunctions() and the next load() call, which consumes and re-nulls
-  // them. Matches ngspice MODEINITJCT local override.
-  let primedVbe: number | null = null;
-  let primedVbc: number | null = null;
 
   const element: ReactiveAnalogElementCore = {
     branchIndex: -1,
@@ -1375,6 +1378,10 @@ export function createSpiceL1BjtElement(
     s1: new Float64Array(0),
     s2: new Float64Array(0),
     s3: new Float64Array(0),
+    s4: new Float64Array(0),
+    s5: new Float64Array(0),
+    s6: new Float64Array(0),
+    s7: new Float64Array(0),
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
@@ -1382,7 +1389,12 @@ export function createSpiceL1BjtElement(
       s1 = pool.state1;
       s2 = pool.state2;
       s3 = pool.state3;
+      s4 = pool.state4;
+      s5 = pool.state5;
+      s6 = pool.state6;
+      s7 = pool.state7;
       this.s0 = s0; this.s1 = s1; this.s2 = s2; this.s3 = s3;
+      this.s4 = s4; this.s5 = s5; this.s6 = s6; this.s7 = s7;
       base = this.stateBaseOffset;
       applyInitialValues(BJT_L1_SCHEMA, pool, base, { polarity, RB: params.RB });
       const op0 = computeSpiceL1BjtOp(
@@ -1416,11 +1428,15 @@ export function createSpiceL1BjtElement(
       s0[base + L1_SLOT_OP_GBC] = op0.gbc;
     },
 
-    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array): void {
+    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array, newS4: Float64Array, newS5: Float64Array, newS6: Float64Array, newS7: Float64Array): void {
       s0 = newS0;
       s1 = newS1;
       s2 = newS2;
       s3 = newS3;
+      s4 = newS4;
+      s5 = newS5;
+      s6 = newS6;
+      s7 = newS7;
     },
 
     /**
@@ -1471,14 +1487,22 @@ export function createSpiceL1BjtElement(
       const vSubConRaw = substConNode > 0 ? voltages[substConNode - 1] : 0;
       const vsubRaw = polarity * subs * (0 - vSubConRaw); // V_substNode=0 (substrate tied to ground)
 
-      // Consume one-shot cold-start seed from dcopInitJct, if armed.
+      // During MODEINITJCT (bjtload.c:258-276), ngspice overrides vbe/vbc
+      // to seeded values rather than reading from the solution vector —
+      // at that phase ctx.voltages is all zeros and would mis-bias G-P.
       let vbeRaw: number;
       let vbcRaw: number;
-      if (primedVbe !== null) {
-        vbeRaw = primedVbe;
-        vbcRaw = primedVbc!;
-        primedVbe = null;
-        primedVbc = null;
+      if (pool.initMode === "initJct") {
+        if (params.OFF) {
+          vbeRaw = 0;
+          vbcRaw = 0;
+        } else if (pool.uic && !isNaN(params.ICVBE) && !isNaN(params.ICVCE)) {
+          vbeRaw = params.ICVBE;
+          vbcRaw = params.ICVBE - params.ICVCE;
+        } else {
+          vbeRaw = tpL1.tVcrit;
+          vbcRaw = 0;
+        }
       } else {
         vbeRaw = polarity * (vBi - vEi);
         vbcRaw = polarity * (vBi - vCi);
@@ -2130,19 +2154,6 @@ export function createSpiceL1BjtElement(
       const ib = polarity * s0[base + L1_SLOT_IB_DC];
       const ie = -(ic + ib);
       return [ib, ic, ie];
-    },
-
-    primeJunctions(): void {
-      if (params.OFF) {
-        primedVbe = 0;
-        primedVbc = 0;
-      } else if (pool.uic && !isNaN(params.ICVBE) && !isNaN(params.ICVCE)) {
-        primedVbe = params.ICVBE;
-        primedVbc = params.ICVBE - params.ICVCE;
-      } else {
-        primedVbe = tpL1.tVcrit;
-        primedVbc = 0;
-      }
     },
 
     setParam(key: string, value: number): void {

@@ -269,6 +269,10 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
   s1!: Float64Array;
   s2!: Float64Array;
   s3!: Float64Array;
+  s4!: Float64Array;
+  s5!: Float64Array;
+  s6!: Float64Array;
+  s7!: Float64Array;
   private base!: number;
 
   constructor(
@@ -304,6 +308,10 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     this.s1 = pool.states[1];
     this.s2 = pool.states[2];
     this.s3 = pool.states[3];
+    this.s4 = pool.states[4];
+    this.s5 = pool.states[5];
+    this.s6 = pool.states[6];
+    this.s7 = pool.states[7];
     this.base = this.stateBaseOffset;
     applyInitialValues(TAPPED_TRANSFORMER_SCHEMA, pool, this.base, {});
   }
@@ -379,8 +387,10 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     if (ct !== 0) solver.stampElement(solver.allocElement(b3, ct - 1), 1);
     if (s2 !== 0) solver.stampElement(solver.allocElement(b3, s2 - 1), -1);
 
-    if (!ctx.isTransient && !ctx.isDcOp) return;
-
+    // Unified compute-then-stamp for 3×3 branch block — ngspice indload.c applied
+    // per winding + mutload.c:64-75 for each of the three mutual pairs. DC sets
+    // all scalars to zero (indload.c:88-90); TRAN uses niIntegrate on coupled
+    // fluxes. Matrix pattern is mode-invariant (handle table preserves nonzeros).
     const voltages = ctx.voltages;
     const i1Now = voltages[b1];
     const i2Now = voltages[b2];
@@ -388,24 +398,27 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     const sRef = this.s0;
     const base = this.base;
 
+    // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
+    if (!ctx.isDcOp && ctx.initMode !== "initPred") {
+      sRef[base + SLOT_PHI1] = this._l1 * i1Now + this._m12 * i2Now + this._m13 * i3Now;
+      sRef[base + SLOT_PHI2] = this._l2 * i2Now + this._m12 * i1Now + this._m23 * i3Now;
+      sRef[base + SLOT_PHI3] = this._l3 * i3Now + this._m13 * i1Now + this._m23 * i2Now;
+      if (ctx.initMode === "initTran") {
+        this.s1[base + SLOT_PHI1] = sRef[base + SLOT_PHI1];
+        this.s1[base + SLOT_PHI2] = sRef[base + SLOT_PHI2];
+        this.s1[base + SLOT_PHI3] = sRef[base + SLOT_PHI3];
+      }
+    } else if (ctx.initMode === "initPred") {
+      sRef[base + SLOT_PHI1] = this.s1[base + SLOT_PHI1];
+      sRef[base + SLOT_PHI2] = this.s1[base + SLOT_PHI2];
+      sRef[base + SLOT_PHI3] = this.s1[base + SLOT_PHI3];
+    }
+
+    // Companion coefficients — zero at DC, niIntegrate during TRAN.
+    let g11 = 0, g22 = 0, g33 = 0, g12 = 0, g13 = 0, g23 = 0;
+    let hist1 = 0, hist2 = 0, hist3 = 0;
     if (ctx.isTransient) {
       const ag = ctx.ag;
-
-      if (ctx.initMode === "initPred") {
-        sRef[base + SLOT_PHI1] = this.s1[base + SLOT_PHI1];
-        sRef[base + SLOT_PHI2] = this.s1[base + SLOT_PHI2];
-        sRef[base + SLOT_PHI3] = this.s1[base + SLOT_PHI3];
-      } else {
-        sRef[base + SLOT_PHI1] = this._l1 * i1Now + this._m12 * i2Now + this._m13 * i3Now;
-        sRef[base + SLOT_PHI2] = this._l2 * i2Now + this._m12 * i1Now + this._m23 * i3Now;
-        sRef[base + SLOT_PHI3] = this._l3 * i3Now + this._m13 * i1Now + this._m23 * i2Now;
-        if (ctx.initMode === "initTran") {
-          this.s1[base + SLOT_PHI1] = sRef[base + SLOT_PHI1];
-          this.s1[base + SLOT_PHI2] = sRef[base + SLOT_PHI2];
-          this.s1[base + SLOT_PHI3] = sRef[base + SLOT_PHI3];
-        }
-      }
-
       const phi1_0 = sRef[base + SLOT_PHI1];
       const phi2_0 = sRef[base + SLOT_PHI2];
       const phi3_0 = sRef[base + SLOT_PHI3];
@@ -428,58 +441,44 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
         ccap3 = ag[0] * phi3_0 + ag[1] * phi3_1;
       }
 
-      const g11 = ag[0] * this._l1;
-      const g22 = ag[0] * this._l2;
-      const g33 = ag[0] * this._l3;
-      const g12 = ag[0] * this._m12;
-      const g13 = ag[0] * this._m13;
-      const g23 = ag[0] * this._m23;
-      const hist1 = ccap1 - ag[0] * phi1_0;
-      const hist2 = ccap2 - ag[0] * phi2_0;
-      const hist3 = ccap3 - ag[0] * phi3_0;
-
-      solver.stampElement(solver.allocElement(b1, b1), -g11);
-      solver.stampElement(solver.allocElement(b1, b2), -g12);
-      solver.stampElement(solver.allocElement(b1, b3), -g13);
-      solver.stampRHS(b1, hist1);
-      solver.stampElement(solver.allocElement(b2, b1), -g12);
-      solver.stampElement(solver.allocElement(b2, b2), -g22);
-      solver.stampElement(solver.allocElement(b2, b3), -g23);
-      solver.stampRHS(b2, hist2);
-      solver.stampElement(solver.allocElement(b3, b1), -g13);
-      solver.stampElement(solver.allocElement(b3, b2), -g23);
-      solver.stampElement(solver.allocElement(b3, b3), -g33);
-      solver.stampRHS(b3, hist3);
-
-      sRef[base + SLOT_G11] = g11;
-      sRef[base + SLOT_G22] = g22;
-      sRef[base + SLOT_G33] = g33;
-      sRef[base + SLOT_G12] = g12;
-      sRef[base + SLOT_G13] = g13;
-      sRef[base + SLOT_G23] = g23;
-      sRef[base + SLOT_HIST1] = hist1;
-      sRef[base + SLOT_HIST2] = hist2;
-      sRef[base + SLOT_HIST3] = hist3;
-      sRef[base + SLOT_I1] = i1Now;
-      sRef[base + SLOT_I2] = i2Now;
-      sRef[base + SLOT_I3] = i3Now;
-    } else {
-      sRef[base + SLOT_PHI1] = this._l1 * i1Now + this._m12 * i2Now + this._m13 * i3Now;
-      sRef[base + SLOT_PHI2] = this._l2 * i2Now + this._m12 * i1Now + this._m23 * i3Now;
-      sRef[base + SLOT_PHI3] = this._l3 * i3Now + this._m13 * i1Now + this._m23 * i2Now;
-      sRef[base + SLOT_I1] = i1Now;
-      sRef[base + SLOT_I2] = i2Now;
-      sRef[base + SLOT_I3] = i3Now;
-      sRef[base + SLOT_G11] = 0;
-      sRef[base + SLOT_G22] = 0;
-      sRef[base + SLOT_G33] = 0;
-      sRef[base + SLOT_G12] = 0;
-      sRef[base + SLOT_G13] = 0;
-      sRef[base + SLOT_G23] = 0;
-      sRef[base + SLOT_HIST1] = 0;
-      sRef[base + SLOT_HIST2] = 0;
-      sRef[base + SLOT_HIST3] = 0;
+      g11 = ag[0] * this._l1;
+      g22 = ag[0] * this._l2;
+      g33 = ag[0] * this._l3;
+      g12 = ag[0] * this._m12;  // mutload.c:74-75 for each mutual pair
+      g13 = ag[0] * this._m13;
+      g23 = ag[0] * this._m23;
+      hist1 = ccap1 - ag[0] * phi1_0;
+      hist2 = ccap2 - ag[0] * phi2_0;
+      hist3 = ccap3 - ag[0] * phi3_0;
     }
+
+    // Unconditional 3×3 branch block — indload.c:119-123 per winding plus
+    // mutload.c:64-75 for the three mutual pairs. Structurally stable.
+    solver.stampElement(solver.allocElement(b1, b1), -g11);
+    solver.stampElement(solver.allocElement(b1, b2), -g12);
+    solver.stampElement(solver.allocElement(b1, b3), -g13);
+    solver.stampElement(solver.allocElement(b2, b1), -g12);
+    solver.stampElement(solver.allocElement(b2, b2), -g22);
+    solver.stampElement(solver.allocElement(b2, b3), -g23);
+    solver.stampElement(solver.allocElement(b3, b1), -g13);
+    solver.stampElement(solver.allocElement(b3, b2), -g23);
+    solver.stampElement(solver.allocElement(b3, b3), -g33);
+    solver.stampRHS(b1, hist1);
+    solver.stampRHS(b2, hist2);
+    solver.stampRHS(b3, hist3);
+
+    sRef[base + SLOT_G11] = g11;
+    sRef[base + SLOT_G22] = g22;
+    sRef[base + SLOT_G33] = g33;
+    sRef[base + SLOT_G12] = g12;
+    sRef[base + SLOT_G13] = g13;
+    sRef[base + SLOT_G23] = g23;
+    sRef[base + SLOT_HIST1] = hist1;
+    sRef[base + SLOT_HIST2] = hist2;
+    sRef[base + SLOT_HIST3] = hist3;
+    sRef[base + SLOT_I1] = i1Now;
+    sRef[base + SLOT_I2] = i2Now;
+    sRef[base + SLOT_I3] = i3Now;
   }
 
   getLteTimestep(

@@ -62,23 +62,23 @@ describe("AnalogElementCore", () => {
     // If the interface mistakenly re-adds any of these, tsc will error on
     // the @ts-expect-error directive itself, turning this test red.
 
-    // @ts-expect-error stamp is not part of AnalogElementCore
+    // @ts-expect-error _stamp is not part of AnalogElementCore
     const _withStamp: AnalogElementCore = {
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,
-      stamp(_solver: unknown): void {},
+      _stamp(_solver: unknown): void {},
       load(_ctx: LoadContext): void {},
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_voltages: Float64Array): number[] { return []; },
     };
 
-    // @ts-expect-error stampNonlinear is not part of AnalogElementCore
+    // @ts-expect-error deletedStampNl is not part of AnalogElementCore
     const _withStampNonlinear: AnalogElementCore = {
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,
-      stampNonlinear(_solver: unknown): void {},
+      deletedStampNl(_solver: unknown): void {},
       load(_ctx: LoadContext): void {},
       setParam(_key: string, _value: number): void {},
       getPinCurrents(_voltages: Float64Array): number[] { return []; },

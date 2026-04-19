@@ -13,6 +13,7 @@ import type {
   DcOpResult,
   SimulationParams,
 } from "../../core/analog-engine-interface.js";
+import type { IntegrationMethod } from "../../core/analog-types.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { DEFAULT_SIMULATION_PARAMS, resolveSimulationParams } from "../../core/analog-engine-interface.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
@@ -139,7 +140,7 @@ export class MNAEngine implements AnalogEngine {
     this._elements = compiled.elements;
     this._devProbeRan = false;
 
-    const { matrixSize, elements } = compiled;
+    const { elements } = compiled;
 
     this._solver = new SparseSolver();
     this._timestep = new TimestepController(this._params);
@@ -265,6 +266,13 @@ export class MNAEngine implements AnalogEngine {
       if (statePool) {
         const poolSnapshot = statePool.state0.slice();
         const ctx = this._ctx!;
+        // Prime the solver so element.load() can call allocElement safely.
+        // Without this the shared solver's column linked list is empty, and
+        // every allocElement call corrupts it via undefined-index coercion —
+        // the exact failure mode that hung tests using larger circuits.
+        // The stamps produced here are discarded by the next cktLoad()'s
+        // beginAssembly, so it costs us nothing to re-prime.
+        ctx.solver.beginAssembly(ctx.matrixSize);
         for (const element of this._elements) {
           if (isPoolBacked(element)) {
             const violations = assertPoolIsSoleMutableState(
@@ -339,8 +347,6 @@ export class MNAEngine implements AnalogEngine {
     // Phase tracking for stepPhaseHook: first attempt is tranInit on step 0, tranNR thereafter.
     // Subsequent loop iterations in the same step are retries.
     let _stepAttemptCount = 0;
-
-    const wasFirsttime = this._firsttime;
 
     for (;;) {
       // ngspice dctran.c:735 — deltaOld[0] = delta each iteration.
@@ -622,6 +628,44 @@ export class MNAEngine implements AnalogEngine {
   /** Current integration order (1 = BDF-1 startup, 2 = order-2 free-running). */
   get integrationOrder(): number {
     return this._timestep.currentOrder;
+  }
+
+  /**
+   * Read-only access to the engine's pre-allocated CKTCircuitContext.
+   * Required by harness tests that drive the capture hook directly rather
+   * than through the real NR loop. Null until init() has been called.
+   */
+  get cktContext(): CKTCircuitContext | null {
+    return this._ctx;
+  }
+
+  /** Current timestep (seconds) used by the timestep controller. */
+  get currentDt(): number {
+    return this._timestep.currentDt;
+  }
+
+  /** Active numerical integration method for the current step. */
+  get integrationMethod(): IntegrationMethod {
+    return this._timestep.currentMethod;
+  }
+
+  /**
+   * Read-only view of the timestep history (ngspice CKTdeltaOld).
+   * Element 0 is the dt of the most recent step; index i is (i+1)-steps ago.
+   * Length 7. Used by the harness to recompute integration coefficients.
+   */
+  get timestepDeltaOld(): readonly number[] {
+    return this._timestep.deltaOld;
+  }
+
+  /**
+   * The LTE-proposed next timestep (seconds) as set by the most recent accepted step.
+   * After each accepted transient step, _timestep.currentDt is updated to the LTE-proposed
+   * next dt before accept() is called. This is the quantity ngspice reports as nextDelta
+   * in RawNgspiceOuterEvent.
+   */
+  getLteNextDt(): number {
+    return this._timestep.currentDt;
   }
 
   /** Register a state-change listener. */
@@ -933,8 +977,15 @@ export class MNAEngine implements AnalogEngine {
    */
   configure(params: Partial<SimulationParams>): void {
     this._params = resolveSimulationParams({ ...this._params, ...params });
-    this._timestep = new TimestepController(this._params);
-    this._seedBreakpoints();
+    // Non-destructive update: preserves currentDt (clamped to new maxTimeStep),
+    // _acceptedSteps, _deltaOld history, currentOrder, currentMethod, and the
+    // breakpoint queue. Only tolerance / step-bound fields are refreshed.
+    this._timestep.updateParams(this._params);
+    // Propagate refreshed tolerances into the CKTCircuitContext — without this,
+    // NR still reads the stale constructor-captured reltol/iabstol/voltTol.
+    if (this._ctx) {
+      this._ctx.refreshTolerances(this._params);
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -989,6 +1040,7 @@ export class MNAEngine implements AnalogEngine {
     elemConverged: boolean,
     limitingEvents: LimitingEvent[],
     convergenceFailedElements: string[],
+    ctx: CKTCircuitContext,
   ) => void) | null = null;
 
   /** When true, NR collects all failing element indices instead of short-circuiting. */

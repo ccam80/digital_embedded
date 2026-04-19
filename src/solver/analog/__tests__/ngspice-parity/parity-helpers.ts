@@ -1,5 +1,5 @@
 import { accessSync } from "node:fs";
-import type { CaptureSession, IterationSnapshot } from "../harness/types.js";
+import type { CaptureSession, IterationSnapshot, InitMode } from "../harness/types.js";
 import { DEVICE_MAPPINGS } from "../harness/device-mappings.js";
 import { describe, expect } from "vitest";
 
@@ -13,7 +13,7 @@ export function dllAvailable(): boolean {
   return _dllAvailable;
 }
 
-export const describeIfDll: typeof describe = dllAvailable() ? describe : describe.skip;
+export const describeIfDll = dllAvailable() ? describe : describe.skip;
 
 /**
  * Assert that two IterationSnapshots match bit-exact across rhsOld[], state0[],
@@ -92,64 +92,51 @@ export function assertIterationMatch(
     `${ctxLabel} noncon: ours=${ours.noncon} ngspice=${ngspice.noncon} absDelta=${nonconDelta}`,
   ).toBe(0);
 
-  // Compare diagGmin if present on both sides
-  const ourDiagGmin = (ours as any).diagGmin as number | undefined;
-  const ngDiagGmin = (ngspice as any).diagGmin as number | undefined;
-  if (ourDiagGmin !== undefined && ngDiagGmin !== undefined) {
-    const absDelta = Math.abs(ourDiagGmin - ngDiagGmin);
+  // Compare diagGmin (required field — absence of population surfaces here)
+  {
+    const absDelta = Math.abs(ours.diagGmin - ngspice.diagGmin);
     expect(
       absDelta,
-      `${ctxLabel} diagGmin: ours=${ourDiagGmin} ngspice=${ngDiagGmin} absDelta=${absDelta}`,
+      `${ctxLabel} diagGmin: ours=${ours.diagGmin} ngspice=${ngspice.diagGmin} absDelta=${absDelta}`,
     ).toBe(0);
   }
 
-  // Compare srcFact if present on both sides
-  const ourSrcFact = (ours as any).srcFact as number | undefined;
-  const ngSrcFact = (ngspice as any).srcFact as number | undefined;
-  if (ourSrcFact !== undefined && ngSrcFact !== undefined) {
-    const absDelta = Math.abs(ourSrcFact - ngSrcFact);
+  // Compare srcFact (required field — absence of population surfaces here)
+  {
+    const absDelta = Math.abs(ours.srcFact - ngspice.srcFact);
     expect(
       absDelta,
-      `${ctxLabel} srcFact: ours=${ourSrcFact} ngspice=${ngSrcFact} absDelta=${absDelta}`,
+      `${ctxLabel} srcFact: ours=${ours.srcFact} ngspice=${ngspice.srcFact} absDelta=${absDelta}`,
     ).toBe(0);
   }
 
-  // Compare initMode if present on both sides
-  const ourInitMode = (ours as any).initMode as number | undefined;
-  const ngInitMode = (ngspice as any).initMode as number | undefined;
-  if (ourInitMode !== undefined && ngInitMode !== undefined) {
-    const absDelta = Math.abs(ourInitMode - ngInitMode);
+  // Compare initMode (required field — absence of population surfaces here)
+  expect(
+    ours.initMode,
+    `${ctxLabel} initMode: ours=${ours.initMode} ngspice=${ngspice.initMode}`,
+  ).toBe(ngspice.initMode);
+
+  // Compare order (required field — absence of population surfaces here)
+  {
+    const absDelta = Math.abs(ours.order - ngspice.order);
     expect(
       absDelta,
-      `${ctxLabel} initMode: ours=${ourInitMode} ngspice=${ngInitMode} absDelta=${absDelta}`,
+      `${ctxLabel} order: ours=${ours.order} ngspice=${ngspice.order} absDelta=${absDelta}`,
     ).toBe(0);
   }
 
-  // Compare order if present on both sides
-  const ourOrder = (ours as any).order as number | undefined;
-  const ngOrder = (ngspice as any).order as number | undefined;
-  if (ourOrder !== undefined && ngOrder !== undefined) {
-    const absDelta = Math.abs(ourOrder - ngOrder);
+  // Compare delta (required field — absence of population surfaces here)
+  {
+    const absDelta = Math.abs(ours.delta - ngspice.delta);
     expect(
       absDelta,
-      `${ctxLabel} order: ours=${ourOrder} ngspice=${ngOrder} absDelta=${absDelta}`,
-    ).toBe(0);
-  }
-
-  // Compare delta if present on both sides
-  const ourDelta = (ours as any).delta as number | undefined;
-  const ngDelta = (ngspice as any).delta as number | undefined;
-  if (ourDelta !== undefined && ngDelta !== undefined) {
-    const absDelta = Math.abs(ourDelta - ngDelta);
-    expect(
-      absDelta,
-      `${ctxLabel} delta: ours=${ourDelta} ngspice=${ngDelta} absDelta=${absDelta}`,
+      `${ctxLabel} delta: ours=${ours.delta} ngspice=${ngspice.delta} absDelta=${absDelta}`,
     ).toBe(0);
   }
 
   // Compare lteDt if present on both sides (added by task 7.1.2)
-  const ourLteDt = (ours as any).lteDt as number | undefined;
-  const ngLteDt = (ngspice as any).lteDt as number | undefined;
+  const ourLteDt = ours.lteDt;
+  const ngLteDt = ngspice.lteDt;
   if (ourLteDt !== undefined && ngLteDt !== undefined) {
     const absDelta = Math.abs(ourLteDt - ngLteDt);
     expect(
@@ -267,7 +254,7 @@ function _inferDeviceType(label: string): string | null {
 interface ModeEntry {
   stepIndex: number;
   iterIndex: number;
-  initMode: number;
+  initMode: InitMode;
 }
 
 function _extractModeSequence(session: CaptureSession): ModeEntry[] {
@@ -278,8 +265,7 @@ function _extractModeSequence(session: CaptureSession): ModeEntry[] {
       const attempt = step.attempts[ai]!;
       for (let ii = 0; ii < attempt.iterations.length; ii++) {
         const snap = attempt.iterations[ii]!;
-        const initMode = (snap as any).initMode as number | undefined;
-        entries.push({ stepIndex: si, iterIndex: ii, initMode: initMode ?? 0 });
+        entries.push({ stepIndex: si, iterIndex: ii, initMode: snap.initMode });
       }
     }
   }
@@ -321,9 +307,9 @@ function _flattenGminSteps(session: CaptureSession): GminEntry[] {
         attempt.phase === "dcopGminDynamic" || attempt.phase === "dcopGminSpice3";
       if (isGmin) {
         const diagGmin =
-          (attempt.phaseParameter !== undefined
+          attempt.phaseParameter !== undefined
             ? attempt.phaseParameter
-            : (attempt.iterations[0] as any)?.diagGmin) ?? 0;
+            : attempt.iterations[0]?.diagGmin ?? 0;
         entries.push({ stepIndex: si, attemptIndex: ai, diagGmin });
       }
     }
@@ -345,9 +331,9 @@ function _flattenSrcFactSteps(session: CaptureSession): SrcFactEntry[] {
       const attempt = step.attempts[ai]!;
       if (attempt.phase === "dcopSrcSweep") {
         const srcFact =
-          (attempt.phaseParameter !== undefined
+          attempt.phaseParameter !== undefined
             ? attempt.phaseParameter
-            : (attempt.iterations[0] as any)?.srcFact) ?? 0;
+            : attempt.iterations[0]?.srcFact ?? 0;
         entries.push({ stepIndex: si, attemptIndex: ai, srcFact });
       }
     }

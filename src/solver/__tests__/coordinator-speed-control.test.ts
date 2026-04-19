@@ -54,7 +54,7 @@ function makeResistorAnalogEl(n1: number, n2: number, resistance: number): Analo
   return {
     pinNodeIds: [n1, n2], allNodeIds: [n1, n2], branchIndex: -1,
     isNonlinear: false, isReactive: false,
-    stamp(solver: SparseSolverStamp): void {
+    stampAc(solver: SparseSolverStamp): void {
       const g = 1 / resistance;
       if (n1 !== 0) { solver.stampElement(solver.allocElement(n1 - 1, n1 - 1), g); }
       if (n2 !== 0) { solver.stampElement(solver.allocElement(n2 - 1, n2 - 1), g); }

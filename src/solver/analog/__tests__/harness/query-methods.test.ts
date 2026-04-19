@@ -800,24 +800,6 @@ describe("Fix 1: simTime reads stepStartTime, not undefined simTime field", () =
 // ---------------------------------------------------------------------------
 
 describe("Fix 2 & 3: asymmetric step counts — ours shorter than ngspice", () => {
-  async function createAsymmetricSession() {
-    // Create self-compare session, then truncate _ourSession to simulate our side crashing early.
-    const { session } = await createHwrSession();
-    await (session as any).runDcOp?.();
-    // By now selfCompare cloned ours→ng. Truncate ours to 1 step while ng keeps all.
-    const ourSteps = (session as any)._ourSession.steps;
-    const ngSteps = (session as any)._ngSessionAligned?.()?.steps ?? (session as any)._ngSession?.steps ?? [];
-    const originalOurLen = ourSteps.length;
-    const originalNgLen = ngSteps.length;
-    if (originalOurLen <= 1 || originalNgLen <= 1) {
-      // DC-op only has 1 step; use the session as-is and mark it symmetric
-      return { session, ourLen: originalOurLen, ngLen: originalNgLen };
-    }
-    // Truncate ours to 1 step
-    ourSteps.splice(1);
-    return { session, ourLen: 1, ngLen: originalNgLen };
-  }
-
   it("63. getStepEnd on an ngspice-only step does not throw and returns presence 'ngspiceOnly'", async () => {
     // Use a freshly built transient self-compare session; simulate asymmetry by injecting
     // extra steps into the ngspice session.

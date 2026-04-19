@@ -9,6 +9,8 @@ import { isPoolBacked } from "../../element.js";
 import type { StatePool } from "../../state-pool.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import type { NRAttemptRecord } from "../../convergence-log.js";
+import type { CKTCircuitContext } from "../../ckt-context.js";
+import type { InitMode } from "../../load-context.js";
 import type {
   TopologySnapshot,
   IterationSnapshot,
@@ -234,6 +236,7 @@ export type PostIterationHook = (
   elemConverged: boolean,
   limitingEvents: LimitingEvent[],
   convergenceFailedElements: string[],
+  ctx: CKTCircuitContext,
 ) => void;
 
 /**
@@ -270,7 +273,7 @@ export function createIterationCaptureHook(
 
   const hook: PostIterationHook = (
     iteration, voltages, prevVoltages, noncon, globalConverged, elemConverged,
-    limitingEvents, convergenceFailedElements,
+    limitingEvents, convergenceFailedElements, ctx,
   ) => {
     let maxDelta = 0;
     let maxDeltaNode = -1;
@@ -287,6 +290,14 @@ export function createIterationCaptureHook(
       ? convergenceFailedElements.map(l => rawLabelToHumanLabel.get(l) ?? l)
       : convergenceFailedElements;
 
+    // Resolve initMode: prefer DCOP ladder's pool (when active), fall through
+    // to the base statePool. Both of these must be set by the caller before
+    // newtonRaphson runs — if both are unset we fall back to "transient" as a
+    // terminal default, which should never occur in practice.
+    const ladderMode = ctx.dcopModeLadder?.pool.initMode as InitMode | undefined;
+    const poolMode = ctx.statePool?.initMode;
+    const resolvedInitMode: InitMode = ladderMode ?? poolMode ?? "transient";
+
     snapshots.push({
       iteration,
       voltages: voltages.slice(),
@@ -295,6 +306,11 @@ export function createIterationCaptureHook(
       matrix: solver.getCSCNonZeros(),
       elementStates: captureElementStates(elements, statePool, elementLabels),
       noncon,
+      diagGmin: ctx.diagonalGmin,
+      srcFact: ctx.srcFact,
+      initMode: resolvedInitMode,
+      order: 0,
+      delta: 0,
       globalConverged,
       elemConverged,
       limitingEvents: [...limitingEvents],
@@ -360,6 +376,12 @@ export function createStepCaptureHook(
     integrationCoefficients: IntegrationCoefficients;
     analysisPhase: "dcop" | "tranInit" | "tranFloat";
     acceptedAttemptIndex: number;
+    /** Integration order for the step (1 = BDF-1, 2 = trap/BDF-2). Required. */
+    order: number;
+    /** Timestep used for the step (seconds). Required. */
+    delta: number;
+    /** LTE-proposed next timestep from TimestepController.computeNewDt(). */
+    lteDt?: number;
   }): void;
   /** Set the stepStartTime for the currently-open step (called before endStep). */
   setStepStartTime(t: number): void;
@@ -448,6 +470,10 @@ export function createStepCaptureHook(
       integrationCoefficients: IntegrationCoefficients;
       analysisPhase: "dcop" | "tranInit" | "tranFloat";
       acceptedAttemptIndex: number;
+      /** Integration order for the step (1 = BDF-1, 2 = trap/BDF-2). */
+      order: number;
+      /** Timestep used for the step (seconds). */
+      delta: number;
       /** LTE-proposed next timestep from TimestepController.computeNewDt(). */
       lteDt?: number;
     }): void {
@@ -467,6 +493,15 @@ export function createStepCaptureHook(
       let analysisPhase = params.analysisPhase;
       if (acceptedAttempt.phase === "tranInit") {
         analysisPhase = "tranInit";
+      }
+
+      // Paint per-step fields (order, delta) onto the last iteration of the
+      // accepted attempt. This is the same "last accepted iteration" pattern
+      // used for lteDt below.
+      if (acceptedAttempt.iterations.length > 0) {
+        const lastIter = acceptedAttempt.iterations[acceptedAttempt.iterations.length - 1]!;
+        lastIter.order = params.order;
+        lastIter.delta = params.delta;
       }
 
       // Populate lteDt on the last iteration of the accepted attempt so

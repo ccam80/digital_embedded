@@ -11,7 +11,7 @@
  * DC-OP: V_IN=0V (NMOS off). Transient: stopTime=200µs, maxStep=1µs.
  */
 
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { resolve } from "path";
 import { ComparisonSession } from "../harness/comparison-session.js";
 import {

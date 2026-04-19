@@ -385,8 +385,9 @@ export function createRealOpAmpElement(
   let slewLimited = false;
   let _vOutPrev = 0; void _vOutPrev;      // output voltage at previous accepted timestep
 
-  // Source scale for source-stepping DC convergence
-  let scale = 1;
+  // Source scale for source-stepping DC convergence — read from ctx.srcFact
+  // (ngspice CKTsrcFact) in load() and cached for getPinCurrents().
+  let lastSrcFact = 1;
 
   // Transient: effective gain reduced from A_OL by bandwidth limiting.
   // In DC mode (no companion): aEff = p.aol. In transient: aEff < p.aol.
@@ -420,13 +421,11 @@ export function createRealOpAmpElement(
     isNonlinear: true,
     isReactive: true,
 
-    setSourceScale(factor: number): void {
-      scale = factor;
-    },
-
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
       const voltages = ctx.voltages;
+      const scale = ctx.srcFact;
+      lastSrcFact = scale;
       const G_in   = 1 / Math.max(p.rIn,  1e-9);
       const G_out  = 1 / Math.max(p.rOut, 1e-9);
       const iMax   = Math.max(p.iMax,   1e-12);
@@ -575,7 +574,7 @@ export function createRealOpAmpElement(
 
       const G_in  = 1 / Math.max(p.rIn,  1e-9);
       const G_out = 1 / Math.max(p.rOut, 1e-9);
-      const iBiasScaled = Math.abs(p.iBias) * scale;
+      const iBiasScaled = Math.abs(p.iBias) * lastSrcFact;
 
       // Input pin currents (resistor + bias)
       const iInn = (nInn > 0 ? (vInn - vInp) * G_in : 0) + iBiasScaled;

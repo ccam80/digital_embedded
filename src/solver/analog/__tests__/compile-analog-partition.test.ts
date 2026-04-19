@@ -85,7 +85,7 @@ function makeStubElement(nodeIds: number[]): AnalogElement {
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
-    stamp(_s: SparseSolver) { /* no-op */ },
+    stampAc(_s: SparseSolver) { /* no-op */ },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array) { return nodeIds.map(() => 0); },
   };

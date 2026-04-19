@@ -151,11 +151,7 @@ export function generateSpiceNetlist(
         s = nodes[2] ?? 0;
         b = nodes[2] ?? 0;
       } else {
-        // Fallback for any other MOSFET variant
-        d = nodes[0] ?? 0;
-        g = nodes[1] ?? 0;
-        s = nodes[2] ?? 0;
-        b = nodes[3] ?? 0;
+        throw new Error(`netlist-generator: unknown MOSFET typeId '${typeId}' — add an explicit pin-order branch`);
       }
       line = `${label} ${d} ${g} ${s} ${b} ${modelName} W=${W} L=${L}`;
       if (!modelCards.has(modelName)) {

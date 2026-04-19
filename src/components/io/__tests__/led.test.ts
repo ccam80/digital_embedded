@@ -739,7 +739,7 @@ function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: num
     isReactive: false,
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return []; },
-    stamp(solver: SparseSolverType): void {
+    stampAc(solver: SparseSolverType): void {
       if (nodeA !== 0) solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), G);
       if (nodeB !== 0) solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), G);
       if (nodeA !== 0 && nodeB !== 0) {

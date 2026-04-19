@@ -43,7 +43,7 @@ function makeResistorAnalogEl(nodeA: number, nodeB: number, r: number): AnalogEl
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
-    stamp(s: SparseSolver) {
+    stampAc(s: SparseSolver) {
       if (nodeA > 0) s.stampElement(s.allocElement(nodeA - 1, nodeA - 1), g);
       if (nodeB > 0) s.stampElement(s.allocElement(nodeB - 1, nodeB - 1), g);
       if (nodeA > 0 && nodeB > 0) { s.stampElement(s.allocElement(nodeA - 1, nodeB - 1), -g); s.stampElement(s.allocElement(nodeB - 1, nodeA - 1), -g); }

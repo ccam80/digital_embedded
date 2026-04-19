@@ -27,7 +27,7 @@ import {
 } from "../fet-base.js";
 import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../../components/sources/dc-voltage-source.js";
-import { withNodeIds, runDcOp, makeResistor, makeSimpleCtx } from "./test-helpers.js";
+import { withNodeIds, runDcOp, makeResistor } from "./test-helpers.js";
 import { StatePool } from "../state-pool.js";
 import type { SparseSolver as SparseSolverType } from "../sparse-solver.js";
 import type { AnalogElement } from "../element.js";
@@ -98,13 +98,29 @@ function withState(element: AnalogElementCore): ReactiveAnalogElement {
 // solver so tests can assert the conductance stamp pattern.
 // ---------------------------------------------------------------------------
 
-function makeSpySolver() {
-  return {
+// Spy solver records allocElement+stampElement pairs so tests can assert the
+// conductance stamp pattern after the Phase-6 two-step API migration.
+// allocElement(row, col) returns a numeric handle; stampElement(handle, val)
+// records a {row, col, val} triple in `spyStampCalls`.
+// ref: ngspice mos1load.c ~700-900 stamp block (two-step pattern)
+function makeSpySolver(): SparseSolverType & { spyStampCalls: { row: number; col: number; val: number }[] } {
+  const _handles: { row: number; col: number }[] = [];
+  const spyStampCalls: { row: number; col: number; val: number }[] = [];
+  const solver = {
     stamp: vi.fn(),
     stampRHS: vi.fn(),
-    allocElement: vi.fn().mockReturnValue(0),
-    stampElement: vi.fn(),
-  } as unknown as SparseSolverType;
+    allocElement: vi.fn((row: number, col: number): number => {
+      const h = _handles.length;
+      _handles.push({ row, col });
+      return h;
+    }),
+    stampElement: vi.fn((handle: number, val: number): void => {
+      const entry = _handles[handle];
+      if (entry !== undefined) spyStampCalls.push({ row: entry.row, col: entry.col, val });
+    }),
+    spyStampCalls,
+  };
+  return solver as unknown as SparseSolverType & { spyStampCalls: { row: number; col: number; val: number }[] };
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +316,10 @@ describe("Refactor", () => {
       voltages[1] = 3;
     }
 
-    const stampCalls = (ctx.solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
+    // Phase-6 migration: production uses allocElement+stampElement (two-step pattern).
+    // ref: ngspice mos1load.c ~700-900 stamp block
+    const spySolver = ctx.solver as ReturnType<typeof makeSpySolver>;
+    const stampCalls = spySolver.spyStampCalls;
 
     // Expect conductance entries at D-G (gm), D-D (gds), S-G (-gm), S-D (-gds)
     // nodeD=1 → matrix index 0; nodeG=2 → matrix index 1; nodeS=0 → skipped
@@ -308,20 +327,20 @@ describe("Refactor", () => {
     // Expected non-zero stamps: [0,1] for gm (D,G), [0,0] for gds (D,D)
     // S rows skipped since nodeS=0
 
-    const nonzeroStamps = stampCalls.filter((call) => Math.abs(call[2] as number) > 1e-15);
+    const nonzeroStamps = stampCalls.filter((s) => Math.abs(s.val) > 1e-15);
     expect(nonzeroStamps.length).toBeGreaterThan(0);
 
     // Find D-G entry (gm): row=D-1=0, col=G-1=1. The load() path may write the
     // same (row,col) more than once — sum the values to get the net stamp.
-    const dgContribs = stampCalls.filter((c) => c[0] === 0 && c[1] === 1);
+    const dgContribs = stampCalls.filter((s) => s.row === 0 && s.col === 1);
     expect(dgContribs.length).toBeGreaterThan(0);
-    const dgTotal = dgContribs.reduce((acc, c) => acc + (c[2] as number), 0);
+    const dgTotal = dgContribs.reduce((acc, s) => acc + s.val, 0);
     expect(dgTotal).toBeGreaterThan(0);
 
     // Find D-D entry (gds): row=D-1=0, col=D-1=0.
-    const ddContribs = stampCalls.filter((c) => c[0] === 0 && c[1] === 0);
+    const ddContribs = stampCalls.filter((s) => s.row === 0 && s.col === 0);
     expect(ddContribs.length).toBeGreaterThan(0);
-    const ddTotal = ddContribs.reduce((acc, c) => acc + (c[2] as number), 0);
+    const ddTotal = ddContribs.reduce((acc, s) => acc + s.val, 0);
     expect(ddTotal).toBeGreaterThan(0);
   });
 });
@@ -378,19 +397,22 @@ describe("AbstractFetElement", () => {
       voltages[2] = 0;
     }
 
-    const stampCalls = (ctx.solver.stamp as ReturnType<typeof vi.fn>).mock.calls;
+    // Phase-6 migration: production uses allocElement+stampElement (two-step pattern).
+    // ref: ngspice mos1load.c ~700-900 stamp block
+    const spySolver = ctx.solver as ReturnType<typeof makeSpySolver>;
+    const stampCalls = spySolver.spyStampCalls;
 
     // D=node2 → row/col index 1; G=node1 → row/col index 0; S=node3 → row/col index 2
     // gm appears at [D,G] = [1,0] and [-gm at S,G = 2,0]. Sum duplicate stamps.
-    const dgContribs = stampCalls.filter((c) => c[0] === 1 && c[1] === 0);
+    const dgContribs = stampCalls.filter((s) => s.row === 1 && s.col === 0);
     expect(dgContribs.length).toBeGreaterThan(0);
-    const dgTotal = dgContribs.reduce((acc, c) => acc + (c[2] as number), 0);
+    const dgTotal = dgContribs.reduce((acc, s) => acc + s.val, 0);
     expect(dgTotal).toBeGreaterThan(0); // gm > 0
 
     // gds appears at [D,D] = [1,1]
-    const ddContribs = stampCalls.filter((c) => c[0] === 1 && c[1] === 1);
+    const ddContribs = stampCalls.filter((s) => s.row === 1 && s.col === 1);
     expect(ddContribs.length).toBeGreaterThan(0);
-    const ddTotal = ddContribs.reduce((acc, c) => acc + (c[2] as number), 0);
+    const ddTotal = ddContribs.reduce((acc, s) => acc + s.val, 0);
     expect(ddTotal).toBeGreaterThan(0); // gds > 0
   });
 });

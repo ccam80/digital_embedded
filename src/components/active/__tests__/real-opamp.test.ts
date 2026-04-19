@@ -108,14 +108,12 @@ function makeResistor(nodeA: number, nodeB: number, resistance: number): AnalogE
  * Create an ideal DC voltage source (1-based nodes, absolute branch row).
  */
 function makeDcSource(nodePos: number, nodeNeg: number, branchRow: number, voltage: number): AnalogElement {
-  let scale = 1;
   return {
     pinNodeIds: [nodePos, nodeNeg],
     allNodeIds: [nodePos, nodeNeg],
     branchIndex: branchRow,
     isNonlinear: false,
     isReactive: false,
-    setSourceScale(f: number): void { scale = f; },
     setParam(_key: string, _value: number): void {},
     getPinCurrents(): number[] { return []; },
     load(ctx): void {
@@ -125,7 +123,7 @@ function makeDcSource(nodePos: number, nodeNeg: number, branchRow: number, volta
       if (nodeNeg !== 0) { const h = solver.allocElement(nodeNeg - 1, k); solver.stampElement(h, -1); }
       if (nodePos !== 0) { const h = solver.allocElement(k, nodePos - 1); solver.stampElement(h, 1); }
       if (nodeNeg !== 0) { const h = solver.allocElement(k, nodeNeg - 1); solver.stampElement(h, -1); }
-      solver.stampRHS(k, voltage * scale);
+      solver.stampRHS(k, voltage * ctx.srcFact);
     },
   };
 }

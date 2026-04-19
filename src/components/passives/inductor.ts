@@ -195,6 +195,10 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   s1!: Float64Array;
   s2!: Float64Array;
   s3!: Float64Array;
+  s4!: Float64Array;
+  s5!: Float64Array;
+  s6!: Float64Array;
+  s7!: Float64Array;
   private base!: number;
 
   constructor(branchIdx: number, inductance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
@@ -222,6 +226,10 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     this.s1 = pool.states[1];
     this.s2 = pool.states[2];
     this.s3 = pool.states[3];
+    this.s4 = pool.states[4];
+    this.s5 = pool.states[5];
+    this.s6 = pool.states[6];
+    this.s7 = pool.states[7];
     this.base = this.stateBaseOffset;
     applyInitialValues(INDUCTOR_SCHEMA, pool, this.base, {});
   }
@@ -251,12 +259,15 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   }
 
   /**
-   * Unified load() — ngspice indload.c INDload.
+   * Unified load() — ngspice indload.c INDload (lines 35-124).
    *
-   * Stamps the branch-current incidence (B/C sub-matrices) always, reads the
-   * branch current, computes flux phi = L*I, NIintegrates inline using
-   * ctx.ag[], and stamps the companion (-geq on branch diagonal, ceq on RHS).
-   * Dual of the capacitor Appendix D2 pattern with charge→flux / C→L.
+   * Matches the ngspice structure literally: one stamp sequence for all modes.
+   * In DC (MODEDC) we set req=veq=0 (indload.c:88-90); in TRAN we compute them
+   * via niIntegrate. The five stamps (±1 incidence, -req branch diagonal, +veq
+   * RHS) then run unconditionally (indload.c:119-123). Matrix pattern is
+   * mode-invariant; the sparse handle table keeps the structural nonzero.
+   *
+   * Flux update is guarded by !(MODEDC|MODEINITPRED) (indload.c:43).
    */
   load(ctx: LoadContext): void {
     const { solver, voltages, initMode, isDcOp, isTransient, ag } = ctx;
@@ -264,19 +275,9 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     const n1 = this.pinNodeIds[1];
     const b = this.branchIndex;
     const L = this.L;
+    const base = this.base;
 
-    // Topology-constant branch incidence stamps (indload.c — matrix pointers).
-    // B sub-matrix: I_branch flows into n0 and out of n1.
-    if (n0 !== 0) solver.stampElement(solver.allocElement(n0 - 1, b), 1);
-    if (n1 !== 0) solver.stampElement(solver.allocElement(n1 - 1, b), -1);
-    // C sub-matrix: KVL voltage incidence.
-    if (n0 !== 0) solver.stampElement(solver.allocElement(b, n0 - 1), 1);
-    if (n1 !== 0) solver.stampElement(solver.allocElement(b, n1 - 1), -1);
-
-    // Gate: inductors only participate in tran/ac/tranop (indload.c gate).
-    if (!isTransient && !isDcOp) return;
-
-    // Initial condition gate (dual of capload.c:32-36).
+    // Initial condition gate (dual of capload.c:32-36; indload.c:44-46 uic path).
     const cond1 = (isDcOp && initMode === "initJct") ||
                   (ctx.uic && initMode === "initTran" && !isNaN(this._IC));
 
@@ -290,24 +291,30 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     const n0v = n0 > 0 ? voltages[n0 - 1] : 0;
     const n1v = n1 > 0 ? voltages[n1 - 1] : 0;
 
-    if (isTransient) {
-      // #ifndef PREDICTOR dual (indload.c flux storage).
-      if (initMode === "initPred") {
-        this.s0[this.base + SLOT_PHI] = this.s1[this.base + SLOT_PHI];
-      } else {
-        this.s0[this.base + SLOT_PHI] = L * iNow;
-        if (initMode === "initTran") {
-          this.s1[this.base + SLOT_PHI] = this.s0[this.base + SLOT_PHI];
-        }
+    // Flux-state update — guarded by !(MODEDC|MODEINITPRED) per indload.c:43.
+    // DC (including DCOP) skips flux update entirely; in initPred we copy
+    // state1→state0 (indload.c:94-96); otherwise state0 = L*i (indload.c:47-50).
+    if (!isDcOp && initMode !== "initPred") {
+      this.s0[base + SLOT_PHI] = L * iNow;
+      if (initMode === "initTran") {
+        this.s1[base + SLOT_PHI] = this.s0[base + SLOT_PHI];
       }
+    } else if (initMode === "initPred") {
+      this.s0[base + SLOT_PHI] = this.s1[base + SLOT_PHI];
+    }
 
-      // NIintegrate via shared helper (niinteg.c:17-80, indload.c NIintegrate call).
-      const phi0 = this.s0[this.base + SLOT_PHI];
-      const phi1 = this.s1[this.base + SLOT_PHI];
-      const phi2 = this.s2[this.base + SLOT_PHI];
-      const phi3 = this.s3[this.base + SLOT_PHI];
-      const ccapPrev = this.s1[this.base + SLOT_CCAP];
-      const { ccap, ceq, geq } = niIntegrate(
+    // Compute req, veq — DC case writes zero (indload.c:88-90), TRAN calls
+    // NIintegrate (indload.c:91-109) for trapezoidal/gear integration.
+    let req = 0;
+    let veq = 0;
+    let ccap = 0;
+    if (isTransient) {
+      const phi0 = this.s0[base + SLOT_PHI];
+      const phi1 = this.s1[base + SLOT_PHI];
+      const phi2 = this.s2[base + SLOT_PHI];
+      const phi3 = this.s3[base + SLOT_PHI];
+      const ccapPrev = this.s1[base + SLOT_CCAP];
+      const ni = niIntegrate(
         ctx.method,
         ctx.order,
         L,
@@ -316,31 +323,32 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
         [phi2, phi3, 0, 0, 0],
         ccapPrev,
       );
-      this.s0[this.base + SLOT_CCAP] = ccap;
-
+      ccap = ni.ccap;
+      veq = ni.ceq;
+      req = ni.geq;
+      this.s0[base + SLOT_CCAP] = ccap;
       if (initMode === "initTran") {
-        this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];
+        this.s1[base + SLOT_CCAP] = ccap;
       }
-
-      // Cache companion state for diagnostics.
-      this.s0[this.base + SLOT_GEQ]  = geq;
-      this.s0[this.base + SLOT_IEQ]  = ceq;
-      this.s0[this.base + SLOT_I]    = iNow;
-      this.s0[this.base + SLOT_VOLT] = n0v - n1v;
-
-      // Branch equation: V(n0) - V(n1) - geq * I = ceq
-      // Stamp -geq on branch diagonal and ceq on the branch RHS.
-      solver.stampElement(solver.allocElement(b, b), -geq);
-      solver.stampRHS(b, ceq);
-    } else {
-      // DC operating point: short-circuit branch (V_n0 = V_n1).
-      // Branch incidence already stamped above; no geq/ceq stamp.
-      this.s0[this.base + SLOT_PHI]  = L * iNow;
-      this.s0[this.base + SLOT_I]    = iNow;
-      this.s0[this.base + SLOT_VOLT] = n0v - n1v;
-      this.s0[this.base + SLOT_GEQ] = 0;
-      this.s0[this.base + SLOT_IEQ] = 0;
     }
+
+    // Diagnostic cache (mode-invariant bookkeeping).
+    this.s0[base + SLOT_GEQ]  = req;
+    this.s0[base + SLOT_IEQ]  = veq;
+    this.s0[base + SLOT_I]    = iNow;
+    this.s0[base + SLOT_VOLT] = n0v - n1v;
+
+    // Unconditional stamp sequence — matches indload.c:119-123 exactly.
+    // B sub-matrix: I_branch flows into n0, out of n1 (INDposIbrptr/INDnegIbrptr).
+    if (n0 !== 0) solver.stampElement(solver.allocElement(n0 - 1, b), 1);
+    if (n1 !== 0) solver.stampElement(solver.allocElement(n1 - 1, b), -1);
+    // C sub-matrix: KVL incidence (INDibrPosptr/INDibrNegptr).
+    if (n0 !== 0) solver.stampElement(solver.allocElement(b, n0 - 1), 1);
+    if (n1 !== 0) solver.stampElement(solver.allocElement(b, n1 - 1), -1);
+    // Branch diagonal (-req) and RHS (+veq) — stamped even if req=veq=0 at DC.
+    // allocElement is idempotent via handle table → structural nonzero preserved.
+    solver.stampElement(solver.allocElement(b, b), -req);
+    solver.stampRHS(b, veq);
   }
 
   getPinCurrents(voltages: Float64Array): number[] {

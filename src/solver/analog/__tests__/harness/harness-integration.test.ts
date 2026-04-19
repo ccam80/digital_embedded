@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { MNAEngine } from "../../analog-engine.js";
-import type { ConcreteCompiledAnalogCircuit } from "../../analog-engine.js";
+import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import { EngineState } from "../../../../core/engine-interface.js";
 import { makeResistor, makeVoltageSource, makeDiode, makeCapacitor } from "../test-helpers.js";
 import { StatePool } from "../../state-pool.js";
@@ -104,7 +104,7 @@ describe("harness integration", () => {
   });
 
   it("postIterationHook fires during DC OP (nonlinear circuit)", () => {
-    const { circuit, pool } = makeHWR();
+    const { circuit } = makeHWR();
     engine.init(circuit);
     let hookCallCount = 0;
     engine.postIterationHook = (_i: number, _v: Float64Array, _p: Float64Array, _n: number, _g: boolean, _e: boolean, _le: unknown[], _cf: string[]) => { hookCallCount++; };
@@ -114,7 +114,7 @@ describe("harness integration", () => {
   });
 
   it("postIterationHook fires during DC OP (linear circuit)", () => {
-    const { circuit, pool } = makeRC();
+    const { circuit } = makeRC();
     engine.init(circuit);
     let hookCallCount = 0;
     let lastGlobalConverged = false;
@@ -139,19 +139,19 @@ describe("harness integration", () => {
     };
     capture.setStepStartTime(0);
     engine.dcOperatingPoint();
-    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1 });
+    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1, order: engine.integrationOrder, delta: engine.currentDt });
     let prevTime = 0;
     for (let i = 0; i < 10; i++) {
       engine.step();
       if (engine.getState() === EngineState.ERROR) break;
       const t = engine.simTime;
       if (t > prevTime) {
-        capture.endStep({ stepEndTime: t, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "tranFloat", acceptedAttemptIndex: -1 });
+        capture.endStep({ stepEndTime: t, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "tranFloat", acceptedAttemptIndex: -1, order: engine.integrationOrder, delta: engine.currentDt });
         prevTime = t;
       }
     }
     engine.stepPhaseHook = null;
-    engine.postIterationHook = undefined;
+    engine.postIterationHook = null;
     const steps = capture.getSteps();
     expect(steps.length).toBeGreaterThan(1);
     expect(steps[0].stepStartTime).toBe(0);
@@ -169,19 +169,19 @@ describe("harness integration", () => {
     };
     capture.setStepStartTime(0);
     engine.dcOperatingPoint();
-    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1 });
+    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1, order: engine.integrationOrder, delta: engine.currentDt });
     let prevTime = 0;
     for (let i = 0; i < 5; i++) {
       engine.step();
       if (engine.getState() === EngineState.ERROR) break;
       const t = engine.simTime;
       if (t > prevTime) {
-        capture.endStep({ stepEndTime: t, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "tranFloat", acceptedAttemptIndex: -1 });
+        capture.endStep({ stepEndTime: t, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "tranFloat", acceptedAttemptIndex: -1, order: engine.integrationOrder, delta: engine.currentDt });
         prevTime = t;
       }
     }
     engine.stepPhaseHook = null;
-    engine.postIterationHook = undefined;
+    engine.postIterationHook = null;
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     const summary = convergenceSummary(session);
     expect(summary.totalSteps).toBeGreaterThan(0);
@@ -201,19 +201,19 @@ describe("harness integration", () => {
     };
     capture.setStepStartTime(0);
     engine.dcOperatingPoint();
-    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1 });
+    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1, order: engine.integrationOrder, delta: engine.currentDt });
     let prevTime = 0;
     for (let i = 0; i < 5; i++) {
       engine.step();
       if (engine.getState() === EngineState.ERROR) break;
       const t = engine.simTime;
       if (t > prevTime) {
-        capture.endStep({ stepEndTime: t, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "tranFloat", acceptedAttemptIndex: -1 });
+        capture.endStep({ stepEndTime: t, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "tranFloat", acceptedAttemptIndex: -1, order: engine.integrationOrder, delta: engine.currentDt });
         prevTime = t;
       }
     }
     engine.stepPhaseHook = null;
-    engine.postIterationHook = undefined;
+    engine.postIterationHook = null;
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     const trajectory = nodeVoltageTrajectory(session, 0);
     expect(trajectory.length).toBeGreaterThan(0);
@@ -231,9 +231,9 @@ describe("harness integration", () => {
     };
     capture.setStepStartTime(0);
     engine.dcOperatingPoint();
-    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1 });
+    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1, order: engine.integrationOrder, delta: engine.currentDt });
     engine.stepPhaseHook = null;
-    engine.postIterationHook = undefined;
+    engine.postIterationHook = null;
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     expect(querySteps(session, { converged: true }).length).toBe(session.steps.length);
     expect(querySteps(session, { converged: false }).length).toBe(0);
@@ -250,9 +250,9 @@ describe("harness integration", () => {
     };
     capture.setStepStartTime(0);
     engine.dcOperatingPoint();
-    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1 });
+    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1, order: engine.integrationOrder, delta: engine.currentDt });
     engine.stepPhaseHook = null;
-    engine.postIterationHook = undefined;
+    engine.postIterationHook = null;
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     const results = compareSnapshots(session, session);
     expect(results.length).toBeGreaterThan(0);
@@ -273,9 +273,9 @@ describe("harness integration", () => {
     };
     capture.setStepStartTime(0);
     engine.dcOperatingPoint();
-    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1 });
+    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1, order: engine.integrationOrder, delta: engine.currentDt });
     engine.stepPhaseHook = null;
-    engine.postIterationHook = undefined;
+    engine.postIterationHook = null;
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     const formatted = formatComparison(compareSnapshots(session, session)[0]);
     expect(formatted).toContain("Step 0");
@@ -293,9 +293,9 @@ describe("harness integration", () => {
     };
     capture.setStepStartTime(0);
     engine.dcOperatingPoint();
-    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1 });
+    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1, order: engine.integrationOrder, delta: engine.currentDt });
     engine.stepPhaseHook = null;
-    engine.postIterationHook = undefined;
+    engine.postIterationHook = null;
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     expect(findFirstDivergence(compareSnapshots(session, session))).toBeNull();
   });
@@ -368,9 +368,9 @@ describe("harness integration", () => {
     capture.beginAttempt("dcopDirect", 5e-10);
     engine.dcOperatingPoint();
     capture.endAttempt("accepted", true);
-    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: 1 });
+    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: 1, order: engine.integrationOrder, delta: engine.currentDt });
 
-    engine.postIterationHook = undefined;
+    engine.postIterationHook = null;
     const steps = capture.getSteps();
     expect(steps.length).toBe(1);
     expect(steps[0].converged).toBe(true);
@@ -393,9 +393,9 @@ describe("harness integration", () => {
     };
     capture.setStepStartTime(0);
     engine.dcOperatingPoint();
-    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1 });
+    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1, order: engine.integrationOrder, delta: engine.currentDt });
     engine.stepPhaseHook = null;
-    engine.postIterationHook = undefined;
+    engine.postIterationHook = null;
     const steps = capture.getSteps();
     expect(steps.length).toBe(1);
     // With phase-aware API, attempts array is always present
@@ -446,9 +446,9 @@ describe("harness integration", () => {
     };
     capture.setStepStartTime(0);
     engine.dcOperatingPoint();
-    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1 });
+    capture.endStep({ stepEndTime: 0, integrationCoefficients: ZERO_INTEG_COEFF, analysisPhase: "dcop", acceptedAttemptIndex: -1, order: engine.integrationOrder, delta: engine.currentDt });
     engine.stepPhaseHook = null;
-    engine.postIterationHook = undefined;
+    engine.postIterationHook = null;
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     const result = findLargestDelta(session, 1);
     expect(result).not.toBeNull();
@@ -462,12 +462,15 @@ describe("time-alignment: compareSnapshots with alignment map", () => {
       matrixSize: 1, nodeCount: 1, branchCount: 0, elementCount: 0,
       elements: [],
       nodeLabels: new Map<number, string>([[1, "N1"]]),
-      matrixRowLabels: new Map<number, string>(),
+      matrixRowLabels: new Map<number, string>([[0, "N1"]]),
       matrixColLabels: new Map<number, string>(),
     };
   }
 
   function makeStep(stepStartTime: number, dt: number, voltage: number): import("./types.js").StepSnapshot {
+    // Synthetic fixture for map-level ordering/query tests — numeric fields are
+    // driven by topology, not by real engine state. initMode uses "transient"
+    // as the canonical free-running transient tag (InitMode string union).
     const iter: import("./types.js").IterationSnapshot = {
       iteration: 0,
       voltages: new Float64Array([voltage]),
@@ -476,6 +479,11 @@ describe("time-alignment: compareSnapshots with alignment map", () => {
       matrix: [],
       elementStates: [],
       noncon: 0,
+      diagGmin: 0,
+      srcFact: 1,
+      initMode: "transient",
+      order: 1,
+      delta: dt,
       globalConverged: true,
       elemConverged: true,
       limitingEvents: [],
@@ -500,6 +508,7 @@ describe("time-alignment: compareSnapshots with alignment map", () => {
       iterations: [iter],
       converged: true,
       iterationCount: 1,
+      totalIterationCount: 1,
       integrationCoefficients: ZERO_INTEG_COEFF,
       analysisPhase: "tranFloat",
     };

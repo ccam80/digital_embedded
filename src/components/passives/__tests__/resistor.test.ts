@@ -208,7 +208,6 @@ describe("Integration", () => {
 import {
   makeResistor as makeResistorLoadCtx,
   makeVoltageSource as makeVoltageSourceLoadCtx,
-  makeSimpleCtx,
 } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElementCore } from "../../../solver/analog/element.js";
 

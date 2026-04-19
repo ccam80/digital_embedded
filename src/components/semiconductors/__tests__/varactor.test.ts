@@ -20,6 +20,7 @@ import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js"
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
@@ -121,28 +122,28 @@ function getCapacitanceAtBias(
   dt = 1e-6,
 ): number {
   // Drive to operating point (vAnode = vd, vCathode = 0) using load(ctx) in DC-OP.
+  // Use a fresh real SparseSolver each iteration so allocElement/stampElement work.
   const voltages = new Float64Array(2);
   voltages[0] = vd;
   voltages[1] = 0;
-  const nullSolver = {
-    stamp: () => {},
-    stampRHS: () => {},
-  } as unknown as SparseSolverType;
-  const dcCtx = makeLoadCtx(voltages, nullSolver, { isDcOp: true });
   for (let i = 0; i < 50; i++) {
+    const dcSolver = new SparseSolver();
+    dcSolver.beginAssembly(2);
+    const dcCtx = makeLoadCtx(voltages, dcSolver, { isDcOp: true });
     element.load(dcCtx);
     voltages[0] = vd;
     voltages[1] = 0;
   }
 
   // Now compute the companion capacitance with trapezoidal order-2 at this bias.
-  // ag[0] = 2/dt for trapezoidal order 2; ag[1] = 1 per computeNIcomCof. We feed
-  // ag explicitly so we don't need to invoke the integration scratch buffer.
+  // ag[0] = 2/dt for trapezoidal order 2; ag[1] = 1 per computeNIcomCof.
   const ag = new Float64Array(8);
   ag[0] = 2 / dt;
   ag[1] = 1;
 
-  const tranCtx = makeLoadCtx(voltages, nullSolver, {
+  const tranSolver = new SparseSolver();
+  tranSolver.beginAssembly(2);
+  const tranCtx = makeLoadCtx(voltages, tranSolver, {
     isTransient: true,
     dt,
     method: "trapezoidal",
@@ -300,12 +301,10 @@ describe("Varactor", () => {
     const voltages = new Float64Array(2);
     voltages[0] = vd;
     voltages[1] = 0;
-    const nullSolver = {
-      stamp: () => {},
-      stampRHS: () => {},
-    } as unknown as SparseSolverType;
-    const dcCtx = makeLoadCtx(voltages, nullSolver, { isDcOp: true });
     for (let i = 0; i < 50; i++) {
+      const dcSolver = new SparseSolver();
+      dcSolver.beginAssembly(2);
+      const dcCtx = makeLoadCtx(voltages, dcSolver, { isDcOp: true });
       varactor.load(dcCtx);
     }
     const idNow = Math.exp(vd / (IS > 0 ? 0.02585 : 1)) * IS - IS;
@@ -316,7 +315,9 @@ describe("Varactor", () => {
     const ag = new Float64Array(8);
     ag[0] = 2 / dt;
     ag[1] = 1;
-    const tranCtx = makeLoadCtx(voltages, nullSolver, {
+    const tranSolver = new SparseSolver();
+    tranSolver.beginAssembly(2);
+    const tranCtx = makeLoadCtx(voltages, tranSolver, {
       isTransient: true,
       dt,
       method: "trapezoidal",
@@ -436,16 +437,14 @@ describe("integration", () => {
     const q1_val = computeJunctionCharge(prevVd, cjo, vj, m, fc, tt, prevId);
     pool.state1[7] = q1_val;
 
-    const stamps: Array<[number, number, number]> = [];
-    const rhs: Array<[number, number]> = [];
-    const mockSolver = {
-      stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
-      stampRHS: (r: number, v: number) => rhs.push([r, v]),
-    } as unknown as SparseSolverType;
+    // Real SparseSolver — varactor between node 1 (anode) and ground (node 0
+    // mapped to no row). matrixSize = 1 (anode only, cathode is ground).
+    const solver = new SparseSolver();
+    solver.beginAssembly(1);
 
     pool.ag.set(ag);
     const ctx = {
-      solver: mockSolver,
+      solver,
       voltages: new Float64Array([vd, 0]),
       iteration: 0,
       initMode: "transient" as const,
@@ -484,7 +483,8 @@ describe("integration", () => {
     expect(capIeq_expected).toBe(ccap_expected - capGeq_expected * vd);
 
     // Verify the element stamped the correct capGeq: find diagonal (0,0) contributions
-    const total00 = stamps.filter(([r, c]) => r === 0 && c === 0).reduce((sum, s) => sum + s[2], 0);
+    const entries = solver.getCSCNonZeros();
+    const total00 = entries.filter((e) => e.row === 0 && e.col === 0).reduce((sum, e) => sum + e.value, 0);
     const gd_junction = gdRaw + 1e-12; // GMIN added in varactor load()
     expect(total00).toBe(gd_junction + capGeq_expected);
   });

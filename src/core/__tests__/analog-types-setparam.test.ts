@@ -8,7 +8,7 @@ describe("AnalogElementCore.setParam", () => {
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,
-      stamp() {},
+      stampAc() {},
       getPinCurrents() { return []; },
     };
     // If this compiles without the @ts-expect-error triggering,
@@ -21,7 +21,7 @@ describe("AnalogElementCore.setParam", () => {
       branchIndex: -1,
       isNonlinear: false,
       isReactive: false,
-      stamp() {},
+      stampAc() {},
       getPinCurrents() { return []; },
       setParam(_key: string, _value: number) {},
     };

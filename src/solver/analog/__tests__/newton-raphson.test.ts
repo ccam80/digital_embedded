@@ -3,13 +3,12 @@
  * and the makeDiode test element.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
 import { DiagnosticCollector } from "../diagnostics.js";
 import { newtonRaphson, pnjlim, fetlim } from "../newton-raphson.js";
 import { CKTCircuitContext } from "../ckt-context.js";
 import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
-import { StatePool } from "../state-pool.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
 
 // ---------------------------------------------------------------------------

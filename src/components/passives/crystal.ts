@@ -264,6 +264,10 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   s1!: Float64Array;
   s2!: Float64Array;
   s3!: Float64Array;
+  s4!: Float64Array;
+  s5!: Float64Array;
+  s6!: Float64Array;
+  s7!: Float64Array;
   private base!: number;
 
   /**
@@ -296,6 +300,10 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     this.s1 = pool.states[1];
     this.s2 = pool.states[2];
     this.s3 = pool.states[3];
+    this.s4 = pool.states[4];
+    this.s5 = pool.states[5];
+    this.s6 = pool.states[6];
+    this.s7 = pool.states[7];
     this.base = this.stateBaseOffset;
     applyInitialValues(CRYSTAL_SCHEMA, pool, this.base, {});
   }

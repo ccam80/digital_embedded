@@ -13,7 +13,7 @@ import { SparseSolver } from "./sparse-solver.js";
 import type { AnalogElement } from "./element.js";
 import { isPoolBacked } from "./element.js";
 import type { StatePool } from "./state-pool.js";
-import type { DiagnosticCollector } from "./diagnostics.js";
+import { DiagnosticCollector } from "./diagnostics.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import type { LimitingEvent } from "./newton-raphson.js";
 import { NodeVoltageHistory } from "./integration.js";
@@ -309,8 +309,8 @@ export class CKTCircuitContext {
   // Instrumentation
   // -------------------------------------------------------------------------
 
-  /** Diagnostic collector. Null when diagnostics are disabled. */
-  diagnostics: DiagnosticCollector | null;
+  /** Diagnostic collector. Always non-null; default-constructed in the ctor. */
+  diagnostics: DiagnosticCollector;
   /** When non-null, elements push LimitingEvent objects here during NR. */
   limitingCollector: LimitingEvent[] | null;
   /** When true, collect all failing element indices (not just first). */
@@ -328,6 +328,7 @@ export class CKTCircuitContext {
     elemConverged: boolean,
     limitingEvents: LimitingEvent[],
     convergenceFailedElements: string[],
+    ctx: CKTCircuitContext,
   ) => void) | null;
   /** When true, checkAllConvergedDetailed is called instead of checkAllConverged. */
   detailedConvergence: boolean;
@@ -347,7 +348,7 @@ export class CKTCircuitContext {
    * Called before each NR iteration to re-stamp reactive nonlinear companions.
    * Null when no hook is needed.
    */
-  preIterationHook: ((iteration: number, iterVoltages: Float64Array) => void) | null;
+  preIterationHook: ((iteration: number, iterVoltages: Float64Array, ctx: CKTCircuitContext) => void) | null;
 
   /**
    * Pre-allocated array for convergence-failed element labels.
@@ -542,7 +543,7 @@ export class CKTCircuitContext {
     this.ics = new Map();
 
     // Instrumentation (defaults — engine sets these after construction)
-    this.diagnostics = null;
+    this.diagnostics = new DiagnosticCollector();
     this.limitingCollector = null;
     this.enableBlameTracking = false;
     this.postIterationHook = null;
@@ -576,6 +577,36 @@ export class CKTCircuitContext {
     for (let i = 0; i < matrixSize; i++) {
       this._ncDumpPool[i] = { node: 0, delta: 0, tol: 0 };
     }
+  }
+
+  /**
+   * Refresh tolerance fields and loadCtx scalars from a new set of resolved
+   * simulation parameters. Used by MNAEngine.configure() to hot-load tolerances
+   * after the constructor has captured them by value. Mirrors the tolerance
+   * block of the constructor; does NOT reallocate any buffers.
+   */
+  refreshTolerances(params: ResolvedSimulationParams): void {
+    // Tolerances (matches constructor order/semantics above).
+    this.reltol = params.reltol;
+    this.abstol = params.voltTol;
+    this.voltTol = params.voltTol;
+    this.iabstol = params.abstol;
+    this.maxIterations = params.maxIterations;
+    this.transientMaxIterations = params.transientMaxIterations;
+    this.dcTrcvMaxIter = params.dcTrcvMaxIter;
+
+    // Damping
+    this.nodeDamping = params.nodeDamping ? 1 : 0;
+    this.diagonalGmin = params.diagGmin ?? 0;
+
+    // Load-context scalars derived from params
+    this.loadCtx.reltol = params.reltol;
+    this.loadCtx.iabstol = params.abstol;
+    this.loadCtx.gmin = params.gmin ?? 1e-12;
+
+    // Keep the full params reference in sync so downstream readers
+    // (e.g. solveDcOperatingPoint) see the new values.
+    this.params = params;
 
     // Pre-computed element lists
     this.nonlinearElements = elements.filter(el => el.isNonlinear);

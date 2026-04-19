@@ -9,8 +9,9 @@
  *     matrixSize = 3: node1=idx0, node2=idx1, branch=idx2
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { MNAEngine } from "../analog-engine.js";
+import * as NiPredModule from "../ni-pred.js";
 import type { ConcreteCompiledAnalogCircuit } from "../analog-engine.js";
 import type { AnalogEngine } from "../../../core/analog-engine-interface.js";
 import type { Engine } from "../../../core/engine-interface.js";
@@ -541,17 +542,6 @@ describe("MNAEngine", () => {
     }
 
     // Verify the engine landed at or very close to at least one edge boundary.
-    // Collect simTimes that are multiples of edgePeriod.
-    let hitEdge = false;
-    for (let edge = edgePeriod; edge <= target + 1e-15; edge += edgePeriod) {
-      // Check if engine stopped within 1ns of this edge at any point.
-      // Since breakpoints are honored, simTime should have been at each edge.
-      // We verify by checking simTime is close to a multiple of edgePeriod.
-      if (Math.abs(engine.simTime - edge) < 1e-9) {
-        hitEdge = true;
-        break;
-      }
-    }
     // simTime at end should be very close to a multiple of edgePeriod
     const remainder = engine.simTime % edgePeriod;
     const nearEdge = remainder < 1e-9 || Math.abs(remainder - edgePeriod) < 1e-9;
@@ -910,55 +900,55 @@ describe("method_stable_across_ringing", () => {
       expect(engine.getState()).not.toBe(EngineState.ERROR);
     }
 
-    // Access internal timestep controller.
-    const ts = (engine as unknown as { _timestep: { currentMethod: string } })._timestep;
     // Method must remain trapezoidal — no BDF-2 switching.
-    expect(ts.currentMethod).not.toBe("bdf2");
+    expect(engine.integrationMethod).not.toBe("bdf2");
     // Method is either trapezoidal (initial) or bdf1 (post-breakpoint reset only).
-    expect(["trapezoidal", "bdf1"]).toContain(ts.currentMethod);
+    expect(["trapezoidal", "bdf1"]).toContain(engine.integrationMethod);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.1.2 — first_step_uses_trapezoidal
+// Task 5.1.2 — first_step_uses_order_1
 // ---------------------------------------------------------------------------
 
-describe("first_step_uses_trapezoidal", () => {
-  it("first_step_uses_trapezoidal", () => {
-    // Run one transient step. Assert integration coefficients match trapezoidal.
-    // For trapezoidal order 2: ag[0] = 2/dt, ag[1] = -2/dt (ngspice NIcomCof trap).
-    // For BDF-1: ag[0] = 1/dt, ag[1] = -1/dt.
-    // We verify the method is trapezoidal before and after the first step.
+describe("first_step_uses_order_1", () => {
+  it("first_step_uses_order_1", () => {
+    // Run one transient step. Assert integration coefficients match BDF-1
+    // (order 1), not trapezoidal (order 2).
+    //
+    // ngspice alignment:
+    //   - ref/ngspice/src/spicelib/analysis/dctran.c:315 sets
+    //     `ckt->CKTorder = 1` at transient entry.
+    //   - ref/ngspice/src/maths/ni/niinteg.c:20-21 gives the order-1
+    //     coefficients: ag[0] = 1/dt, ag[1] = -1/dt.
+    //   - Order-2 promotion (dctran.c:881-892) only happens AFTER the
+    //     order-1 LTE gate passes on step 0/1.
+    //
+    // So on the very first step the method field may be "trapezoidal"
+    // (matching the ngspice default CKTintegrateMethod) but the order is
+    // 1 and the coefficients written into ctx.ag are the BDF-1 ones.
     const circuit = makeRCCircuit();
     const engine = new MNAEngine();
     engine.init(circuit);
     engine.dcOperatingPoint();
 
-    // Check method before first step.
-    const ts = (engine as unknown as { _timestep: { currentMethod: string; currentOrder: number } })._timestep;
-    expect(ts.currentMethod).toBe("trapezoidal");
-    expect(ts.currentOrder).toBe(2);
+    // Check order before first step — ngspice dctran.c:315.
+    expect(engine.integrationOrder).toBe(1);
 
     // Run one step.
     engine.step();
     expect(engine.getState()).not.toBe(EngineState.ERROR);
 
-    // After first step, the engine ran with trapezoidal.
-    // The method may have been reset to bdf1 by a breakpoint if one was at t=0,
-    // but initially it was trapezoidal.
-    // Check that the integration coefficients written to ctx.ag match trapezoidal:
-    // ag[0] = 2/dt for trapezoidal (order 2).
+    // After first step, the integration coefficients written to ctx.ag
+    // must match BDF-1: ag[0] = 1/dt (niinteg.c:20-21).
     const ctx = (engine as unknown as { _ctx: { ag: number[]; loadCtx: { dt: number } } })._ctx;
     const dt = engine.lastDt;
-    // Trapezoidal: ag[0] = 2/dt, ag[1] = -2/dt (NIcomCof trap formula).
-    // We check the ratio: ag[0] * dt should be 2 for trapezoidal, 1 for bdf1.
-    // After the step, ag[] holds the coefficients from the accepted step.
-    if (dt > 0) {
-      const ag0 = ctx.ag[0];
-      // ag[0] * dt should be 2 for trapezoidal or 1 for bdf1.
-      // Since we start trapezoidal, expect 2.
-      expect(ag0 * dt).toBeCloseTo(2, 6);
-    }
+    // Tightened per Phase 5 review V-1: the assertion runs unconditionally —
+    // if dt === 0 after a successful first step, that itself is a real bug
+    // and should surface as a test failure, not a silent skip.
+    const ag0 = ctx.ag[0];
+    // ag[0] * dt should be 1 for BDF-1 (order 1) on the first step.
+    expect(ag0 * dt).toBeCloseTo(1, 6);
   });
 });
 
@@ -968,36 +958,34 @@ describe("first_step_uses_trapezoidal", () => {
 
 describe("predictor_gate_off_by_default", () => {
   it("predictor_gate_off_by_default", () => {
-    // Audit: the predictor code path in step() is gated by
-    // `this._stepCount > 0 && (this._params.predictor ?? false)`.
-    // When predictor is explicitly set to false, predictVoltages is never called.
-    // This is an audit test — verify that the gate works by running with
-    // predictor: false and confirming no error/corruption occurs (predictor
-    // is bypassed, not invoked).
-    const circuit = makeRCCircuit();
-    const engine = new MNAEngine();
-    engine.init(circuit);
-    engine.configure({ predictor: false });
-    engine.dcOperatingPoint();
+    // Tightened per Phase 5 review: spy on the real predictVoltages function
+    // and assert it is never called when predictor: false. This is a true
+    // behavioural assertion — the previous structural checks on _voltages /
+    // _prevVoltages were implementation-detail tests masquerading as behaviour.
+    const spy = vi.spyOn(NiPredModule, "predictVoltages");
 
-    // Run 10 steps with predictor explicitly disabled.
-    for (let i = 0; i < 10; i++) {
-      engine.step();
-      expect(engine.getState()).not.toBe(EngineState.ERROR);
+    try {
+      const circuit = makeRCCircuit();
+      const engine = new MNAEngine();
+      engine.init(circuit);
+      engine.configure({ predictor: false });
+      engine.dcOperatingPoint();
+
+      // Run 10 steps with predictor explicitly disabled.
+      for (let i = 0; i < 10; i++) {
+        engine.step();
+        expect(engine.getState()).not.toBe(EngineState.ERROR);
+      }
+
+      // Sanity check — simulation actually advanced (so the loop had something
+      // to potentially invoke the predictor on).
+      expect(engine.simTime).toBeGreaterThan(0);
+
+      // The real behavioural assertion.
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
     }
-
-    // Verify predictor is false in resolved params.
-    const params = (engine as unknown as { _params: { predictor?: boolean } })._params;
-    expect(params.predictor ?? false).toBe(false);
-
-    // Engine ran 10 steps successfully without calling predictVoltages.
-    // No code path invokes computeAgp or predictVoltages when predictor is false.
-    expect(engine.simTime).toBeGreaterThan(0);
-
-    // Verify no parallel voltage buffer exists (confirming correct architecture).
-    const e = engine as unknown as Record<string, unknown>;
-    expect(e._voltages).toBeUndefined();
-    expect(e._prevVoltages).toBeUndefined();
   });
 });
 

@@ -2,7 +2,7 @@
  * Smoke test for the ngspice FFI bridge.
  * Requires NGSPICE_DLL_PATH env var pointing to instrumented spice.dll.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it } from 'vitest';
 import { NgspiceBridge } from './harness/ngspice-bridge.js';
 import { resolve } from 'path';
 

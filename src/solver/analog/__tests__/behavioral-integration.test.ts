@@ -30,7 +30,6 @@ import { MNAEngine } from "../analog-engine.js";
 import type { ConcreteCompiledAnalogCircuit } from "../analog-engine.js";
 import { StatePool } from "../state-pool.js";
 import { EngineState } from "../../../core/engine-interface.js";
-import { SparseSolver } from "../sparse-solver.js";
 import {
   makeVoltageSource,
   makeResistor,

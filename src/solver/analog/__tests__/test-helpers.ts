@@ -171,16 +171,12 @@ export function makeVoltageSource(
   branchIdx: number,
   voltage: number,
 ): AnalogElement {
-  let scale = 1;
   return {
     pinNodeIds: [nodePos, nodeNeg],
     allNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
-    setSourceScale(factor: number): void {
-      scale = factor;
-    },
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
@@ -199,8 +195,9 @@ export function makeVoltageSource(
       if (nodePos !== 0) S(solver, k, nodePos - 1, 1);
       if (nodeNeg !== 0) S(solver, k, nodeNeg - 1, -1);
 
-      // RHS entry for the voltage constraint (scaled by source stepping factor)
-      solver.stampRHS(k, voltage * scale);
+      // RHS entry for the voltage constraint (scaled by source stepping factor
+      // via ctx.srcFact — ngspice CKTsrcFact).
+      solver.stampRHS(k, voltage * ctx.srcFact);
     },
 
     getPinCurrents(voltages: Float64Array): number[] {
@@ -232,26 +229,24 @@ export function makeCurrentSource(
   nodeNeg: number,
   current: number,
 ): AnalogElement {
-  let scale = 1;
+  let lastSrcFact = 1;
   return {
     pinNodeIds: [nodePos, nodeNeg],
     allNodeIds: [nodePos, nodeNeg],
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
-    setSourceScale(factor: number): void {
-      scale = factor;
-    },
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
       const { solver } = ctx;
-      RHS(solver, nodePos, current * scale);
-      RHS(solver, nodeNeg, -(current * scale));
+      lastSrcFact = ctx.srcFact;
+      RHS(solver, nodePos, current * ctx.srcFact);
+      RHS(solver, nodeNeg, -(current * ctx.srcFact));
     },
 
     getPinCurrents(): number[] {
-      const I = current * scale;
+      const I = current * lastSrcFact;
       return [I, -I];
     },
   };
@@ -685,16 +680,12 @@ export function makeAcVoltageSource(
   dcOffset: number,
   getTime: () => number,
 ): AnalogElement {
-  let scale = 1;
   return {
     pinNodeIds: [nodePos, nodeNeg],
     allNodeIds: [nodePos, nodeNeg],
     branchIndex: branchIdx,
     isNonlinear: false,
     isReactive: false,
-    setSourceScale(factor: number): void {
-      scale = factor;
-    },
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
@@ -703,7 +694,7 @@ export function makeAcVoltageSource(
       const t = getTime();
       const v =
         (dcOffset + amplitude * Math.sin(2 * Math.PI * frequency * t + phase)) *
-        scale;
+        ctx.srcFact;
 
       // B sub-matrix (node rows, branch column k)
       if (nodePos !== 0) S(solver, nodePos - 1, k, 1);
@@ -796,6 +787,14 @@ export function makeSimpleCtx(opts: SimpleCtxOptions): CKTCircuitContext {
     solver,
   );
   ctx.diagnostics = diagnostics;
+  // Production drives loads through cktLoad(), which calls beginAssembly().
+  // Tests that call element.load(ctx.loadCtx) directly skip that driver and
+  // hit an uninitialized SparseSolver, silently corrupting its linked list.
+  // Prime any real SparseSolver here so callers get a ready-to-use ctx;
+  // stub/capture solvers (without beginAssembly) are left alone.
+  if (solver instanceof SparseSolver) {
+    solver.beginAssembly(opts.matrixSize);
+  }
   return ctx;
 }
 

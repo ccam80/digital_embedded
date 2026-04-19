@@ -231,7 +231,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     reltol, abstol, iabstol,
   } = ctx;
 
-  const diagnostics = ctx.diagnostics as DiagnosticCollector;
+  const diagnostics = ctx.diagnostics;
 
   // ngspice niiter.c:37-38 — unconditional floor: if (maxIter < 100) maxIter = 100;
   // Bypassed when exactMaxIterations is set (INITJCT/INITFIX need exactly 1 iteration).
@@ -453,7 +453,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
     // Post-iteration hook for external instrumentation
     const limitingEvents = ctx.limitingCollector ?? [];
-    ctx.postIterationHook?.(iteration, voltages, prevVoltages, ctx.noncon, globalConverged, elemConverged, limitingEvents, convergenceFailedElements);
+    ctx.postIterationHook?.(iteration, voltages, prevVoltages, ctx.noncon, globalConverged, elemConverged, limitingEvents, convergenceFailedElements, ctx);
 
     // ---- STEP J: Unified INITF dispatcher (ngspice niiter.c:1050-1085) ----
     const initPool = ladder ? ladder.pool : (statePool as { initMode: string } | null);

@@ -2,12 +2,13 @@
  * DC Voltage Source — ideal independent voltage source for MNA simulation.
  *
  * Introduces one extra MNA branch row to enforce the voltage constraint.
- * Supports setSourceScale for DC operating point source-stepping.
+ * Reads `ctx.srcFact` (ngspice CKTsrcFact) directly inside load() to apply
+ * DC-OP source stepping — matches ngspice vsrcload.c:54 exactly.
  *
  * MNA stamp convention (1-based node IDs, solver uses 0-based):
  *   B[nodePos, k] += 1    C[k, nodePos] += 1
  *   B[nodeNeg, k] -= 1    C[k, nodeNeg] -= 1
- *   RHS[k]        += V * scale
+ *   RHS[k]        += V * srcFact
  *
  * where k is the absolute branch row index in the MNA matrix.
  */

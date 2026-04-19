@@ -54,7 +54,7 @@ describe("AnalogClock", () => {
     const nodeNeg = 0;
     const branchIdx = 1;
 
-    const clk = makeAnalogClockElement(nodePos, nodeNeg, branchIdx, freq, vdd);
+    const clk = makeAnalogClockElement(nodePos, nodeNeg, branchIdx, freq, vdd, () => 0);
     const solver = makeMockSolver();
 
     // At t=0: first half-period → vdd
@@ -78,7 +78,7 @@ describe("AnalogClock", () => {
     const freq = 1000;
     const halfPeriod = 1 / (2 * freq); // 0.5ms
 
-    const clk = makeAnalogClockElement(1, 0, 1, freq, 3.3);
+    const clk = makeAnalogClockElement(1, 0, 1, freq, 3.3, () => 0);
     const solver = makeMockSolver();
 
     // Measure transitions: output should be high at t=0, low at t=halfPeriod
@@ -98,7 +98,7 @@ describe("AnalogClock", () => {
 
   it("registers_breakpoints — getBreakpoints returns transition times", () => {
     const freq = 1000;
-    const clk = makeAnalogClockElement(1, 0, 1, freq, 3.3);
+    const clk = makeAnalogClockElement(1, 0, 1, freq, 3.3, () => 0);
 
     // Over 0..2ms there should be breakpoints at 0.5ms, 1ms, 1.5ms, 2ms (exclusive end)
     const bps = clk.getBreakpoints(0, 0.002);
@@ -120,7 +120,7 @@ describe("AnalogClock", () => {
 
   it("registers_breakpoints_via_callback — getBreakpoints returns correct transition times", () => {
     const freq = 1000;
-    const clk = makeAnalogClockElement(1, 0, 1, freq, 3.3);
+    const clk = makeAnalogClockElement(1, 0, 1, freq, 3.3, () => 0);
     const bps = clk.getBreakpoints(0, 0.003);
 
     // Transitions at 0.5ms, 1ms, 1.5ms, 2ms, 2.5ms (strictly within (0, 3ms))
@@ -161,7 +161,7 @@ describe("AnalogClock", () => {
   });
 
   it("stamp_produces_incidence_entries — voltage source topology", () => {
-    const clk = makeAnalogClockElement(1, 0, 1, 1000, 3.3);
+    const clk = makeAnalogClockElement(1, 0, 1, 1000, 3.3, () => 0);
     const solver = makeMockSolver();
     clk.load({
       solver: solver as unknown as SparseSolver,

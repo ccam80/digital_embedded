@@ -34,6 +34,7 @@ import type {
   IntegrationCoefficients,
   MatrixEntry,
   LimitingEvent,
+  InitMode,
 } from "./types.js";
 import { DEVICE_MAPPINGS } from "./device-mappings.js";
 
@@ -46,6 +47,7 @@ const MODETRANOP     = 0x0020;
 const MODEINITFLOAT  = 0x0100;
 const MODEINITJCT    = 0x0200;
 const MODEINITFIX    = 0x0400;
+const MODEINITSMSIG  = 0x0800;
 const MODEINITTRAN   = 0x1000;
 const MODEINITPRED   = 0x2000;
 
@@ -80,6 +82,35 @@ function cktModeToPhase(mode: number, phaseFlags: number): NRPhase {
   return "tranNR";
 }
 
+/**
+ * Map ngspice CKTmode flags to our InitMode string union.
+ *
+ * Inspection order mirrors ngspice's MODEINIT* priority (cktdefs.h): the INIT
+ * bits are mutually exclusive within a solve, so we test each and return the
+ * corresponding string. When no INIT bit is set:
+ *   - MODEDCOP / MODETRANOP alone → "initFloat" (ngspice's post-ladder
+ *     dcopDirect phase has either MODEINITFLOAT set or no init flag at all;
+ *     either way our engine's pool.initMode is "initFloat" during that state)
+ *   - MODETRAN alone → "transient"
+ * Any other pattern is a real mismatch with ngspice and we throw so the
+ * divergence surfaces immediately.
+ */
+function cktModeToInitMode(cktMode: number): InitMode {
+  if (cktMode & MODEINITJCT)   return "initJct";
+  if (cktMode & MODEINITFIX)   return "initFix";
+  if (cktMode & MODEINITFLOAT) return "initFloat";
+  if (cktMode & MODEINITSMSIG) return "initSmsig";
+  if (cktMode & MODEINITTRAN)  return "initTran";
+  if (cktMode & MODEINITPRED)  return "initPred";
+  if (cktMode & (MODEDCOP | MODETRANOP)) return "initFloat";
+  if (cktMode & MODETRAN)      return "transient";
+  throw new Error(
+    `cktModeToInitMode: unmapped cktMode 0x${cktMode.toString(16)} — ` +
+    `no MODEDCOP / MODETRANOP / MODEINIT* / MODETRAN bit is set. ` +
+    `This is a real mismatch with ngspice.`,
+  );
+}
+
 function cktModeToRole(
   mode: number,
   phaseFlags: number,
@@ -94,13 +125,28 @@ function cktModeToRole(
   return undefined;
 }
 
-function cktModeToAnalysisPhase(mode: number): "dcop" | "tranInit" | "tranFloat" {
-  if (mode & MODEDCOP)     return "dcop";
-  if (mode & MODETRANOP)   return "dcop";  // transient's internal DC OP is still a DC OP
-  if (mode & MODEINITTRAN) return "tranInit";
-  if (mode & MODETRAN)     return "tranFloat";
-  return "dcop";
+function initModeToAnalysisPhase(initMode: InitMode): "dcop" | "tranInit" | "tranFloat" {
+  // Map the now-typed InitMode to analysisPhase. DCOP init ladder stages
+  // (initJct/initFix/initFloat) and the final initSmsig pass all happen
+  // during DC operating point. initTran is transient init. Free-running
+  // transient is initPred / "transient".
+  switch (initMode) {
+    case "initJct":
+    case "initFix":
+    case "initFloat":
+    case "initSmsig":
+      return "dcop";
+    case "initTran":
+      return "tranInit";
+    case "initPred":
+    case "transient":
+      return "tranFloat";
+  }
 }
+
+// cktModeToAnalysisPhase — removed. flushStep now uses initModeToAnalysisPhase
+// with the typed IterationSnapshot.initMode field instead of the stashed raw
+// numeric cktMode.
 
 /** Extract only the ngspice-side integration coefficients from a raw iteration. */
 function _ngspiceIntegCoeff(raw: RawNgspiceIterationEx | undefined): IntegrationCoefficients["ngspice"] {
@@ -146,7 +192,6 @@ interface PendingStep {
 export class NgspiceBridge {
   private _dllPath: string;
   private _lib: any;
-  private _koffi: any = null;
   private _cmd: any = null;
 
   private _iterations: RawNgspiceIterationEx[] = [];
@@ -161,7 +206,6 @@ export class NgspiceBridge {
   async init(): Promise<void> {
     const koffiModule = await import("koffi");
     const koffi = (koffiModule as any).default ?? koffiModule;
-    this._koffi = koffi;
     this._lib = koffi.load(this._dllPath);
 
     const uid = `_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -321,12 +365,12 @@ export class NgspiceBridge {
           ? Float64Array.from(koffi.decode(d.state2, "double", numStates))
           : new Float64Array(numStates);
 
-        const matrixColPtrArr = matrixNnz > 0 && d.matrixColPtr
-          ? Array.from(koffi.decode(d.matrixColPtr, "int", matrixSize + 1)) : null;
-        const matrixRowIdxArr = matrixNnz > 0 && d.matrixRowIdx
-          ? Array.from(koffi.decode(d.matrixRowIdx, "int", matrixNnz)) : null;
-        const matrixValsArr = matrixNnz > 0 && d.matrixVals
-          ? Array.from(koffi.decode(d.matrixVals, "double", matrixNnz)) : null;
+        const matrixColPtrArr: number[] | null = matrixNnz > 0 && d.matrixColPtr
+          ? Array.from(koffi.decode(d.matrixColPtr, "int", matrixSize + 1)) as number[] : null;
+        const matrixRowIdxArr: number[] | null = matrixNnz > 0 && d.matrixRowIdx
+          ? Array.from(koffi.decode(d.matrixRowIdx, "int", matrixNnz)) as number[] : null;
+        const matrixValsArr: number[] | null = matrixNnz > 0 && d.matrixVals
+          ? Array.from(koffi.decode(d.matrixVals, "double", matrixNnz)) as number[] : null;
 
         const matrix: MatrixEntry[] = [];
         if (matrixColPtrArr && matrixRowIdxArr && matrixValsArr) {
@@ -545,7 +589,7 @@ export class NgspiceBridge {
     let prevIteration = -1;
     let prevPhase: NRPhase | null = null;
 
-    const flushAttempt = (step: PendingStep, outcome: NRAttemptOutcome, isLastInStep = false): void => {
+    const flushAttempt = (step: PendingStep, outcome: NRAttemptOutcome): void => {
       const pa = step.pendingAttempt;
       if (!pa || pa.iterations.length === 0) {
         step.pendingAttempt = null;
@@ -601,8 +645,8 @@ export class NgspiceBridge {
         ngspice: ngspiceCoeff,
       };
 
-      const analysisPhase = step.attempts[0]
-        ? cktModeToAnalysisPhase((step.attempts[0].iterations[0] as any)?._rawCktMode ?? 0)
+      const analysisPhase = step.attempts[0]?.iterations[0]
+        ? initModeToAnalysisPhase(step.attempts[0].iterations[0].initMode)
         : "dcop";
 
       // stepEndTime: for accepted transient step it is simTime (post-advance);
@@ -683,7 +727,7 @@ export class NgspiceBridge {
             else if (outerEv.finalFailure) outcome = "finalFailure";
             else if (outerEv.accepted) outcome = "accepted";
           }
-          flushAttempt(currentStep, outcome, true);
+          flushAttempt(currentStep, outcome);
         }
         flushStep(currentStep);
         currentStep = { stepStartTime: stepStartTimeOfRaw, attempts: [], pendingAttempt: null };
@@ -701,8 +745,6 @@ export class NgspiceBridge {
 
       if (currentStep.pendingAttempt === null || isIterReset || isPhaseChange) {
         if (currentStep.pendingAttempt && (isIterReset || isPhaseChange)) {
-          // Determine outcome from outer callback if available
-          const outerEv = outerByTime.get(currentStep.stepStartTime);
           let outcome: NRAttemptOutcome;
           if (currentStep.pendingAttempt.iterations.length > 0) {
             const lastIter = currentStep.pendingAttempt.iterations[currentStep.pendingAttempt.iterations.length - 1]!;
@@ -744,6 +786,11 @@ export class NgspiceBridge {
         matrix: raw.matrix ?? [],
         elementStates,
         noncon: raw.noncon,
+        diagGmin: raw.phaseGmin,
+        srcFact: raw.phaseSrcFact,
+        initMode: cktModeToInitMode(raw.cktMode),
+        order: raw.order,
+        delta: raw.dt,
         globalConverged: raw.converged,
         elemConverged: raw.converged,
         limitingEvents,
@@ -752,7 +799,6 @@ export class NgspiceBridge {
       };
       // Stash raw fields needed for later (not on the public type)
       (iterSnap as any)._rawIteration = raw.iteration;
-      (iterSnap as any)._rawCktMode = raw.cktMode;
 
       currentStep.pendingAttempt!.iterations.push(iterSnap);
 
@@ -775,7 +821,7 @@ export class NgspiceBridge {
           const lastIter = currentStep.pendingAttempt.iterations[currentStep.pendingAttempt.iterations.length - 1]!;
           outcome = lastIter.globalConverged ? "accepted" : "finalFailure";
         }
-        flushAttempt(currentStep, outcome, true);
+        flushAttempt(currentStep, outcome);
       }
       flushStep(currentStep);
     }

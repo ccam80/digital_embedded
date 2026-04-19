@@ -21,7 +21,7 @@
  *  - readLogicLevel thresholds correctly
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   DigitalOutputPinModel,
   DigitalInputPinModel,
@@ -232,7 +232,6 @@ describe("DigitalOutputPinModel", () => {
     ag[0] = 1e10;
     ag[1] = 0.5e10;
 
-    const prevVoltage = 0;
     const C = CMOS_3V3.cOut;
 
     const ctx = makeCtx({ solver, ag, dt: 1e-9, isTransient: true });

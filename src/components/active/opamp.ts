@@ -185,9 +185,11 @@ function createOpAmpElement(
   let saturated = false;
   let vOutTarget = 0; // clamped target output voltage
 
-  // Source-stepping scale: ramped from 0 to 1 by the DC OP solver.
-  // At scale=0 the effective gain is 0 (trivial circuit); at scale=1 full gain.
-  let scale = 1;
+  // Source-stepping scale: ramped from 0 to 1 by the DC OP solver via
+  // ctx.srcFact (ngspice CKTsrcFact). Captured from the most recent load()
+  // call so getPinCurrents() reports consistent source-stepped currents.
+  // At srcFact=0 the effective gain is 0 (trivial circuit); at srcFact=1 full gain.
+  let lastSrcFact = 1;
 
   function readNode(voltages: Float64Array, n: number): number {
     return n > 0 ? voltages[n - 1] : 0;
@@ -198,13 +200,11 @@ function createOpAmpElement(
     isNonlinear: true,
     isReactive: false,
 
-    setSourceScale(factor: number): void {
-      scale = factor;
-    },
-
     load(ctx: LoadContext): void {
       const solver = ctx.solver;
       const voltages = ctx.voltages;
+      const scale = ctx.srcFact;
+      lastSrcFact = scale;
       const G_out = 1 / Math.max(p.rOut, 1e-9);
 
       // Read operating-point voltages and determine saturation state.
@@ -263,10 +263,10 @@ function createOpAmpElement(
       const vOut = readNode(voltages, nOut);
       // In linear region vOutTarget was set to vOut (current operating point),
       // but we need the ideal target to compute the current correctly.
-      // Reconstruct: in linear, target = gain * scale * (V_inp - V_inn).
+      // Reconstruct: in linear, target = gain * srcFact * (V_inp - V_inn).
       const idealTarget = saturated
         ? vOutTarget
-        : p.gain * scale * (vInp - vInn);
+        : p.gain * lastSrcFact * (vInp - vInn);
       const iOut = nOut > 0 ? (vOut - idealTarget) * G_out : 0;
 
       // pinLayout order: in-, in+, out

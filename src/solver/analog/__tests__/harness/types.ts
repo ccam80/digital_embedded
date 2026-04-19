@@ -8,6 +8,10 @@
 
 import type { PostIterationHook } from "./capture.js";
 import type { MNAEngine } from "../../analog-engine.js";
+import type { InitMode } from "../../load-context.js";
+
+// Re-export InitMode so harness code has a single import source.
+export type { InitMode };
 
 // ---------------------------------------------------------------------------
 // Asymmetric step presence (Goal B)
@@ -172,6 +176,11 @@ export interface IterationSnapshot {
   matrix: MatrixEntry[];
   elementStates: ElementStateSnapshot[];
   noncon: number;
+  diagGmin: number;
+  srcFact: number;
+  initMode: InitMode;
+  order: number;
+  delta: number;
   globalConverged: boolean;
   elemConverged: boolean;
   limitingEvents: LimitingEvent[];

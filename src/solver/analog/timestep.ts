@@ -121,8 +121,13 @@ export class TimestepController {
   /**
    * Integration order derived from currentMethod.
    * 1 for bdf1, 2 for trapezoidal and bdf2. ngspice: CKTorder.
+   *
+   * Initialized to 1 to match ngspice dctran.c:315 (`ckt->CKTorder = 1;` at
+   * transient entry). Order is promoted to 2 only after the first order-1
+   * LTE gate passes — see tryOrderPromotion() and the firsttime branch at
+   * dctran.c:849-872 that skips CKTtrunc on step 0.
    */
-  currentOrder: number = 2;
+  currentOrder: number = 1;
 
   /**
    * Shift the deltaOld history ring. Called by the engine BEFORE the for(;;)
@@ -163,6 +168,11 @@ export class TimestepController {
       params.minTimeStep,
       Math.min(params.maxTimeStep, params.firstStep),
     );
+    // ngspice default CKTintegrateMethod = TRAPEZOIDAL (set in
+    // ref/ngspice/src/spicelib/analysis/cktsetup.c — paired with
+    // dctran.c:315 `ckt->CKTorder = 1` so the first step runs BDF-1
+    // semantics via the order-1 coefficients even though the configured
+    // method is trapezoidal).
     this.currentMethod = "trapezoidal";
     this._breakpoints = [];
     this._lastAcceptedSimTime = -Infinity;
@@ -195,6 +205,49 @@ export class TimestepController {
     this._delmin = params.tStop != null
       ? params.tStop * 1e-11
       : params.minTimeStep;
+  }
+
+  /**
+   * Non-destructive in-place update of parameter-derived fields.
+   *
+   * Used by MNAEngine.configure() to hot-load a new tolerance / maxTimeStep
+   * without rebuilding the controller, so `currentDt`, `_acceptedSteps`,
+   * `_deltaOld`, `currentOrder`, `currentMethod`, `_stepCount`, and the
+   * breakpoint queue are all preserved across the call.
+   *
+   * Only fields that originate from `params` are refreshed:
+   *   - maxTimeStep / minTimeStep / _delmin (derived from tStop when set)
+   *   - _lteParams (trtol, reltol, abstol, chgtol) — cast past readonly
+   *     because the struct is logically immutable per computeNewDt call but
+   *     we deliberately refresh it once on configure().
+   *   - currentDt is clamped down to the new maxTimeStep only if it exceeds
+   *     it (never raised). firstStep is NOT re-applied.
+   */
+  updateParams(params: ResolvedSimulationParams): void {
+    this._params = params;
+
+    // LTE params — readonly at the interface level; this is the one legal
+    // refresh point, mirroring the constructor's _lteParams allocation.
+    const lte = this._lteParams as {
+      trtol: number;
+      reltol: number;
+      abstol: number;
+      chgtol: number;
+    };
+    lte.trtol = params.trtol;
+    lte.reltol = params.reltol;
+    lte.abstol = params.abstol;
+    lte.chgtol = params.chargeTol;
+
+    // Re-derive _delmin from tStop like the constructor does.
+    this._delmin = params.tStop != null
+      ? params.tStop * 1e-11
+      : params.minTimeStep;
+
+    // Clamp currentDt down to the new ceiling; never raise it.
+    if (this.currentDt > params.maxTimeStep) {
+      this.currentDt = params.maxTimeStep;
+    }
   }
 
   /**
@@ -405,6 +458,17 @@ export class TimestepController {
     }
     this._lastAcceptedSimTime = simTime;
 
+    // ngspice spec map rows 302-306 (spec/state-machines/ngspice-timestep-vs-timestep.md):
+    // pin order=1 during the firsttime startup window (steps 0 and 1) so
+    // the order-2 divided-difference LTE cannot fire on step 1 with
+    // deltaOld[1..] = maxTimeStep seeds (dctran.c:316-318), which would
+    // divide rounding noise by h0·h1·(h0+h1) ≈ 1e-20 s³ and cause dt
+    // collapse. ngspice's firsttime branch (dctran.c:849-872) does the
+    // same by goto nextTime, skipping CKTtrunc entirely on step 0; on
+    // step 1 order is still 1 until the order-1 LTE gate passes
+    // (dctran.c:881-892).
+    this._updateMethodForStartup();
+
     this._acceptedSteps++;
 
     // deltaOld rotation removed — now performed by the engine before/inside
@@ -446,6 +510,32 @@ export class TimestepController {
         0.1 * Math.min(this._savedDelta, nextBreakGap),
         2 * this._params.minTimeStep,
       );
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Startup order pin (ngspice firsttime replacement)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Pin `currentOrder = 1` during the startup window so order-2 LTE cannot
+   * fire on step 0 or step 1. Matches the ngspice firsttime state machine:
+   *  - dctran.c:315 sets `ckt->CKTorder = 1` at transient entry.
+   *  - dctran.c:849-872 does `firsttime=0; goto nextTime;` on step 0,
+   *    skipping CKTtrunc entirely.
+   *  - dctran.c:881-892 only promotes to order 2 AFTER order-1 LTE passes
+   *    (gated on `newdelta > .9 * CKTdelta` at line 880).
+   *
+   * Called by accept() BEFORE `_acceptedSteps++`, so step 0 (_acceptedSteps=0
+   * pre-increment) and step 1 (_acceptedSteps=1 pre-increment) are both
+   * pinned at order=1. tryOrderPromotion()'s `_acceptedSteps <= 1` gate
+   * then allows promotion from step 2 onward (dctran.c:864-866 equivalent).
+   *
+   * Spec map: spec/state-machines/ngspice-timestep-vs-timestep.md rows 302-306.
+   */
+  private _updateMethodForStartup(): void {
+    if (this._acceptedSteps <= 1) {
+      this.currentOrder = 1;
     }
   }
 

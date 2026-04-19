@@ -238,6 +238,10 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
   s1!: Float64Array;
   s2!: Float64Array;
   s3!: Float64Array;
+  s4!: Float64Array;
+  s5!: Float64Array;
+  s6!: Float64Array;
+  s7!: Float64Array;
   private _base!: number;
 
   constructor(
@@ -266,6 +270,10 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     this.s1 = pool.states[1];
     this.s2 = pool.states[2];
     this.s3 = pool.states[3];
+    this.s4 = pool.states[4];
+    this.s5 = pool.states[5];
+    this.s6 = pool.states[6];
+    this.s7 = pool.states[7];
     this._base = this.stateBaseOffset;
     applyInitialValues(TRANSFORMER_SCHEMA, pool, this._base, {});
   }
@@ -280,7 +288,7 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     if (!this.s0) {
       throw new Error("AnalogTransformerElement.updateDerivedParams called before initState");
     }
-    applyInitialValues(TRANSFORMER_SCHEMA, { states: [this.s0, this.s1, this.s2, this.s3], state0: this.s0, state1: this.s1, state2: this.s2, state3: this.s3, totalSlots: this.s0.length, tranStep: 0 } as StatePoolRef, this._base, {});
+    applyInitialValues(TRANSFORMER_SCHEMA, { states: [this.s0, this.s1, this.s2, this.s3, this.s4, this.s5, this.s6, this.s7], state0: this.s0, state1: this.s1, state2: this.s2, state3: this.s3, state4: this.s4, state5: this.s5, state6: this.s6, state7: this.s7, totalSlots: this.s0.length, tranStep: 0 } as StatePoolRef, this._base, {});
   }
 
   /**
@@ -336,29 +344,33 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     if (s1 !== 0) solver.stampElement(solver.allocElement(b2, s1 - 1), 1);
     if (s2 !== 0) solver.stampElement(solver.allocElement(b2, s2 - 1), -1);
 
-    if (!ctx.isTransient && !ctx.isDcOp) return;
-
+    // Unified compute-then-stamp for branch block — matches indload.c:88-123
+    // applied per winding, plus mutload.c:64-75 pattern for off-diagonal mutual
+    // coupling. In DC (MODEDC) all scalars are zero (indload.c:88-90); in TRAN
+    // they come from niIntegrate on the coupled flux linkages. The 2×2 stamp
+    // pattern is mode-invariant (structural nonzero preserved via handle table).
     const voltages = ctx.voltages;
     const i1Now = voltages[b1];
     const i2Now = voltages[b2];
+    const base = this._base;
 
+    // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
+    if (!ctx.isDcOp && ctx.initMode !== "initPred") {
+      this.s0[base + SLOT_PHI1] = L1 * i1Now + M * i2Now;
+      this.s0[base + SLOT_PHI2] = L2 * i2Now + M * i1Now;
+      if (ctx.initMode === "initTran") {
+        this.s1[base + SLOT_PHI1] = this.s0[base + SLOT_PHI1];
+        this.s1[base + SLOT_PHI2] = this.s0[base + SLOT_PHI2];
+      }
+    } else if (ctx.initMode === "initPred") {
+      this.s0[base + SLOT_PHI1] = this.s1[base + SLOT_PHI1];
+      this.s0[base + SLOT_PHI2] = this.s1[base + SLOT_PHI2];
+    }
+
+    // Companion coefficients — zero at DC, niIntegrate-derived during TRAN.
+    let g11 = 0, g22 = 0, g12 = 0, hist1 = 0, hist2 = 0;
     if (ctx.isTransient) {
       const ag = ctx.ag;
-      const base = this._base;
-
-      // Compute current-step flux linkages from branch currents.
-      if (ctx.initMode === "initPred") {
-        this.s0[base + SLOT_PHI1] = this.s1[base + SLOT_PHI1];
-        this.s0[base + SLOT_PHI2] = this.s1[base + SLOT_PHI2];
-      } else {
-        this.s0[base + SLOT_PHI1] = L1 * i1Now + M * i2Now;
-        this.s0[base + SLOT_PHI2] = L2 * i2Now + M * i1Now;
-        if (ctx.initMode === "initTran") {
-          this.s1[base + SLOT_PHI1] = this.s0[base + SLOT_PHI1];
-          this.s1[base + SLOT_PHI2] = this.s0[base + SLOT_PHI2];
-        }
-      }
-
       const phi1_0 = this.s0[base + SLOT_PHI1];
       const phi2_0 = this.s0[base + SLOT_PHI2];
       const phi1_1 = this.s1[base + SLOT_PHI1];
@@ -376,44 +388,31 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
         ccap2 = ag[0] * phi2_0 + ag[1] * phi2_1;
       }
 
-      const g11 = ag[0] * L1;
-      const g22 = ag[0] * L2;
-      const g12 = ag[0] * M;
-      const hist1 = ccap1 - ag[0] * phi1_0;
-      const hist2 = ccap2 - ag[0] * phi2_0;
-
-      // Branch equations:
-      //   V(P1) − V(P2) − g11·I1 − g12·I2 = hist1
-      //   V(S1) − V(S2) − g12·I1 − g22·I2 = hist2
-      solver.stampElement(solver.allocElement(b1, b1), -g11);
-      solver.stampElement(solver.allocElement(b1, b2), -g12);
-      solver.stampRHS(b1, hist1);
-      solver.stampElement(solver.allocElement(b2, b1), -g12);
-      solver.stampElement(solver.allocElement(b2, b2), -g22);
-      solver.stampRHS(b2, hist2);
-
-      // Cache for diagnostics / LTE.
-      this.s0[base + SLOT_G11]   = g11;
-      this.s0[base + SLOT_G22]   = g22;
-      this.s0[base + SLOT_G12]   = g12;
-      this.s0[base + SLOT_HIST1] = hist1;
-      this.s0[base + SLOT_HIST2] = hist2;
-      this.s0[base + SLOT_I1]    = i1Now;
-      this.s0[base + SLOT_I2]    = i2Now;
-    } else {
-      // DC operating point: short-circuit branches.
-      // Branch incidence already stamped; currents determined by V(P1)=V(P2), V(S1)=V(S2).
-      const base = this._base;
-      this.s0[base + SLOT_PHI1] = L1 * i1Now + M * i2Now;
-      this.s0[base + SLOT_PHI2] = L2 * i2Now + M * i1Now;
-      this.s0[base + SLOT_I1]   = i1Now;
-      this.s0[base + SLOT_I2]   = i2Now;
-      this.s0[base + SLOT_G11]  = 0;
-      this.s0[base + SLOT_G22]  = 0;
-      this.s0[base + SLOT_G12]  = 0;
-      this.s0[base + SLOT_HIST1] = 0;
-      this.s0[base + SLOT_HIST2] = 0;
+      g11 = ag[0] * L1;
+      g22 = ag[0] * L2;
+      g12 = ag[0] * M;  // mutload.c:74-75: MUTbr1br2 -= MUTfactor*ag[0], MUTfactor = M.
+      hist1 = ccap1 - ag[0] * phi1_0;
+      hist2 = ccap2 - ag[0] * phi2_0;
     }
+
+    // Unconditional 2×2 branch block stamp — matches indload.c:119-123 twice
+    // (self-inductance diagonals) plus mutload.c:74-75 (mutual off-diagonals).
+    // Pattern is stable across modes; allocElement handle table is idempotent.
+    solver.stampElement(solver.allocElement(b1, b1), -g11);
+    solver.stampElement(solver.allocElement(b1, b2), -g12);
+    solver.stampElement(solver.allocElement(b2, b1), -g12);
+    solver.stampElement(solver.allocElement(b2, b2), -g22);
+    solver.stampRHS(b1, hist1);
+    solver.stampRHS(b2, hist2);
+
+    // Diagnostic cache (mode-invariant bookkeeping).
+    this.s0[base + SLOT_G11]   = g11;
+    this.s0[base + SLOT_G22]   = g22;
+    this.s0[base + SLOT_G12]   = g12;
+    this.s0[base + SLOT_HIST1] = hist1;
+    this.s0[base + SLOT_HIST2] = hist2;
+    this.s0[base + SLOT_I1]    = i1Now;
+    this.s0[base + SLOT_I2]    = i2Now;
   }
 
   getLteTimestep(

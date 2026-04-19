@@ -56,7 +56,7 @@ function makeResistorElement(nodeA: number, nodeB: number): AnalogElement {
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
-    stamp(_s: SparseSolver) {},
+    stampAc(_s: SparseSolver) {},
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
     setParam(_key: string, _value: number) {},
   };

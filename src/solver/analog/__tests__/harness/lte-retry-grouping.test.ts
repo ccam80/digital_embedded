@@ -70,8 +70,11 @@ function fakeIter(
   hook: ((...args: any[]) => void) | undefined,
   noncon: number,
   converged: boolean,
+  engine: MNAEngine,
 ): void {
   if (!hook) return;
+  const ctx = engine.cktContext;
+  if (!ctx) throw new Error("fakeIter: engine.cktContext is null — init() must be called first");
   (hook as any)(
     0,
     new Float64Array(3),
@@ -81,6 +84,7 @@ function fakeIter(
     converged,
     [],
     [],
+    ctx,
   );
 }
 
@@ -103,12 +107,12 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
 
     // Attempt 1: NR converges but LTE check fails → lteRejectedRetry
     sc.beginAttempt("tranNR" as NRPhase, 1e-9);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
     // Attempt 2: smaller dt, both NR and LTE pass → accepted
     sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
     sc.endStep({
@@ -116,6 +120,8 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
       integrationCoefficients: TRAN_INTEG_COEFF,
       analysisPhase: "tranFloat",
       acceptedAttemptIndex: 1,
+      order: engine.integrationOrder,
+      delta: engine.currentDt,
     });
 
     engine.postIterationHook = null;
@@ -137,11 +143,11 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     sc.setStepStartTime(1e-9);
 
     sc.beginAttempt("tranNR" as NRPhase, 1e-9);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
     sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
     sc.endStep({
@@ -149,6 +155,8 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
       integrationCoefficients: TRAN_INTEG_COEFF,
       analysisPhase: "tranFloat",
       acceptedAttemptIndex: 1,
+      order: engine.integrationOrder,
+      delta: engine.currentDt,
     });
 
     engine.postIterationHook = null;
@@ -171,11 +179,11 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     sc.setStepStartTime(1e-9);
 
     sc.beginAttempt("tranNR" as NRPhase, 1e-9);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
     sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
     sc.endStep({
@@ -183,6 +191,8 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
       integrationCoefficients: TRAN_INTEG_COEFF,
       analysisPhase: "tranFloat",
       acceptedAttemptIndex: 1,
+      order: engine.integrationOrder,
+      delta: engine.currentDt,
     });
 
     engine.postIterationHook = null;
@@ -204,11 +214,11 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     sc.setStepStartTime(1e-9);
 
     sc.beginAttempt("tranNR" as NRPhase, 1e-9);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
     sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
     sc.endStep({
@@ -216,6 +226,8 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
       integrationCoefficients: TRAN_INTEG_COEFF,
       analysisPhase: "tranFloat",
       acceptedAttemptIndex: 1,
+      order: engine.integrationOrder,
+      delta: engine.currentDt,
     });
 
     engine.postIterationHook = null;
@@ -237,11 +249,11 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     sc.setStepStartTime(1e-9);
 
     sc.beginAttempt("tranNR" as NRPhase, 1e-9);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
     sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
     sc.endStep({
@@ -249,6 +261,8 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
       integrationCoefficients: TRAN_INTEG_COEFF,
       analysisPhase: "tranFloat",
       acceptedAttemptIndex: 1,
+      order: engine.integrationOrder,
+      delta: engine.currentDt,
     });
 
     engine.postIterationHook = null;
@@ -269,11 +283,11 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     sc.setStepStartTime(1e-9);
 
     sc.beginAttempt("tranNR" as NRPhase, 1e-9);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
     sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
     sc.endStep({
@@ -281,6 +295,8 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
       integrationCoefficients: TRAN_INTEG_COEFF,
       analysisPhase: "tranFloat",
       acceptedAttemptIndex: 1,
+      order: engine.integrationOrder,
+      delta: engine.currentDt,
     });
 
     engine.postIterationHook = null;
@@ -301,11 +317,11 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     sc.setStepStartTime(1e-9);
 
     sc.beginAttempt("tranNR" as NRPhase, 1e-9);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
 
     sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
 
     sc.endStep({
@@ -313,6 +329,8 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
       integrationCoefficients: TRAN_INTEG_COEFF,
       analysisPhase: "tranFloat",
       acceptedAttemptIndex: 1,
+      order: engine.integrationOrder,
+      delta: engine.currentDt,
     });
 
     engine.postIterationHook = null;
@@ -334,30 +352,34 @@ describe("lte-retry-grouping: LTE-rejected attempt + retry grouped in same step"
     // Step 1 at t=1e-9
     sc.setStepStartTime(1e-9);
     sc.beginAttempt("tranNR" as NRPhase, 1e-9);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
     sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
     sc.endStep({
       stepEndTime: 1e-9,
       integrationCoefficients: TRAN_INTEG_COEFF,
       analysisPhase: "tranFloat",
       acceptedAttemptIndex: 1,
+      order: engine.integrationOrder,
+      delta: engine.currentDt,
     });
 
     // Step 2 at t=2e-9 (stepStartTime auto-advanced from previous stepEndTime)
     sc.beginAttempt("tranNR" as NRPhase, 1e-9);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("lteRejectedRetry" as NRAttemptOutcome, true);
     sc.beginAttempt("tranLteRetry" as NRPhase, 5e-10);
-    fakeIter(engine.postIterationHook, 0, true);
+    fakeIter(engine.postIterationHook, 0, true, engine);
     sc.endAttempt("accepted" as NRAttemptOutcome, true);
     sc.endStep({
       stepEndTime: 2e-9,
       integrationCoefficients: TRAN_INTEG_COEFF,
       analysisPhase: "tranFloat",
       acceptedAttemptIndex: 1,
+      order: engine.integrationOrder,
+      delta: engine.currentDt,
     });
 
     engine.postIterationHook = null;

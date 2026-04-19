@@ -1090,14 +1090,8 @@ describe("integration", () => {
 
     // Compute expected czbd at room temperature (capfact ≈ 1 at TNOM=300.15K=REFTEMP)
     // vbd = -vds = -0.5V (reverse bias, below tDepCap which requires argD > 0)
-    const vbd = -vds;   // = -0.5V (ngspice convention: vBulk - vDrain)
-    const argD = 1 - vbd / PB;  // = 1 + 0.5/0.7 > 1 → depletion formula
-    const sargD = Math.exp(-MJ * Math.log(argD));
     // czbd ≈ CBD (at room temp, capfact = 1)
     const czbd = CBD;
-    const capbd = czbd * sargD;
-    const qbd = PB * czbd * (1 - argD * sargD) / (1 - MJ);
-
     // Seed previous-step charge in s1 (simulates one accepted prior step)
     const prevVbd = -0.4;
     const prevArgD = 1 - prevVbd / PB;
@@ -1300,10 +1294,7 @@ describe("mosfet_spicel1_load_dcop_parity", () => {
     const NGSPICE_GDS    = NGSPICE_Beta * LAMBDA * NGSPICE_vgst * NGSPICE_vgst * 0.5 + GMIN; // = GMIN
     const NGSPICE_GMBS   = 0;                              // GAMMA=0 → no body effect
     // Bulk drain junction: vbd = vbs - vds = 0 - 3 = -3V (< -3*VT → reverse saturation)
-    const NGSPICE_vbd    = 0 - VDS;                        // = -3
     const NGSPICE_GBD    = GMIN;                           // gbd = GMIN when vbd <= -3*VT
-    const NGSPICE_cbdI   = GMIN * NGSPICE_vbd - IS_JCT;   // cbdI = GMIN*(-3) - IS
-    const NGSPICE_ceqbd  = NGSPICE_cbdI - NGSPICE_GBD * NGSPICE_vbd; // = -IS
     // Norton: ids - gm*vgs - gds*vds - gmbs*vbs (vbs=0)
     const NGSPICE_nortonId = NGSPICE_IDS
       - NGSPICE_GM  * VGS

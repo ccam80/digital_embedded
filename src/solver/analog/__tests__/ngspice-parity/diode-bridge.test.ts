@@ -10,7 +10,7 @@
  * Transient: stopTime=33.3ms, maxStep=100µs.
  */
 
-import { describe, it, expect } from "vitest";
+import { it, expect } from "vitest";
 import { resolve } from "path";
 import { ComparisonSession } from "../harness/comparison-session.js";
 import {

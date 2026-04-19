@@ -166,9 +166,6 @@ export function resolveSlice(
     // matrixRowLabels is keyed by 0-based row index
     const fromMatrix = topology.matrixRowLabels.get(idx);
     if (fromMatrix !== undefined) return fromMatrix;
-    // fallback: nodeLabels is keyed by 1-based nodeId
-    const fromNode = topology.nodeLabels.get(idx + 1);
-    if (fromNode !== undefined) return fromNode;
     return `row${idx}`;
   });
 

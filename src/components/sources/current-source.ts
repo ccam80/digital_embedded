@@ -2,11 +2,12 @@
  * Current Source — ideal independent current source for MNA simulation.
  *
  * Stamps only into the RHS vector — no G-matrix entries required.
- * Supports setSourceScale for DC operating point source-stepping.
+ * Reads `ctx.srcFact` (ngspice CKTsrcFact) directly inside load() to apply
+ * DC-OP source stepping — matches ngspice isrcload.c exactly.
  *
  * MNA stamp convention (current I flows from nodeNeg to nodePos through source):
- *   RHS[nodePos] += I * scale   (current enters nodePos)
- *   RHS[nodeNeg] -= I * scale   (current leaves nodeNeg)
+ *   RHS[nodePos] += I * srcFact   (current enters nodePos)
+ *   RHS[nodeNeg] -= I * srcFact   (current leaves nodeNeg)
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";

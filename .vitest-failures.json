@@ -1,63 +1,2823 @@
 {
   "summary": {
-    "passed": 62,
-    "failed": 8,
-    "skipped": 0,
-    "totalFiles": 3,
-    "durationSeconds": 0.7
+    "passed": 8166,
+    "failed": 439,
+    "skipped": 28,
+    "totalFiles": 380,
+    "durationSeconds": 17.6
   },
   "failures": [
     {
-      "message": "solver.allocElement is not a function",
+      "message": "ctx.elementsWithConvergence is not iterable",
+      "count": 274,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "DC operating point has all-finite node voltages (ground synthesis produces solvable matrix)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "DC parallel split: junction wires carry correct individual currents",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "4-node ladder: junction wires satisfy KCL at every node",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "RLC junction: wire currents match element currents at every AC timestep",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "wire current at each pin matches component body current",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "current into resistor equals current out despite misaligned pins",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "runs DCOP when initialize() is called explicitly",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "initialize() is idempotent",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "compile without opts runs DCOP immediately (backwards compatible)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "resistor resistance prop survives build() translation (regression: modelRegistry paramDefs knownKeys)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "compiles a pure analog circuit in auto mode",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "mixed digital→analog: And gate (digital mode) output drives Resistor via bridge — analog voltage present",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "mixed digital→analog: And gate output = LOW → analog voltage near zero",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "Port is skipped as a neutral element in the analog MNA matrix (no analog model)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "compile() does not throw when Port sits between digital And gate and analog Resistor",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "Port label appears in readAllSignals() for a pure analog circuit",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "readSignal() via Port label works in a pure analog circuit",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "readSignal() returns a value for Port at digital-analog boundary",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "prints per-step Vc vs analytical",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "prints per-step V_R vs analytical",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "RC step response: exponential charging matches V(1-e^-t/τ)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "RL step response: V_R matches 1-e^-t/τ (R=10, L=1mH, τ=100µs)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "series RLC ring-down: oscillatory with strictly decreasing envelope",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "reltol configurability: tight reltol produces different result and more steps",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "fresh engine per compile: identical circuits produce bit-for-bit identical results",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "RC capacitor zero-crossings at f=20Hz (f<<fc): 2±1 crossings and peak≥0.95",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "RL resistor zero-crossings at f=200Hz (f<<fc): ≥6 crossings over 4 periods",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "circuit with applySpiceImportResult compiles without errors",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "parsed .MODEL card applied via applySpiceImportResult: circuit compiles and DC converges",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "compile with default IS vs IS=1e-20 produces different collector voltage",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "deserialized circuit produces same DC result as pre-serialization",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "applySpiceImportResult then facade.compile succeeds with zero error diagnostics",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "parseModelCard then applySpiceImportResult stores params and DC converges",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "IS=1e-20 override: BJT in cutoff, DC converges with ≥3 node voltages",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "applySpiceImportResult with IS override changes element model params vs default",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "default params remain at BJT defaults when only IS is overridden",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "deserialized circuit with overrides produces same DC result as pre-serialization",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "snapshotSignals contains non-zero voltages after DC op",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "simTime advances after step",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "returns null for an element not in the analog domain",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "returns a Map for an analog domain element",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "returned map contains at least one pin entry",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "all pin voltage values are finite numbers",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "voltage source pins span a non-zero potential after DC op",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "returns undefined for a wire not in the circuit",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "at least one circuit wire maps to an analog node ID",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "mapped wire node IDs are non-negative integers (0 = ground node)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "voltageRange is { min: 0, max: 0 } before any tracking",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "updateVoltageTracking does not throw",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "voltageRange max is positive after tracking a 5V DC circuit",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "voltageRange min <= max after tracking",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "voltageRange spans a non-zero range for circuit with voltage differences",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "voltageRange resets to { min: 0, max: 0 } after coordinator.reset()",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "voltageRange does not shrink after additional tracking",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "signal_passes_when_on",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nr_converges_during_transition",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "current_mirror_gain_1",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "current_gain_10",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nonlinear_expression",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "transresistance_1k",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "zero_current_zero_output",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "sense_port_zero_voltage_drop",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "full_scale",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "zero_code",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "midscale",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "monotonic_ramp",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "lsb_step_size",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "3.3V CMOS driving 5V VREF — default thresholds detect HIGH correctly",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "3.3V CMOS driving 5V VREF — LOW correctly detected",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "voltage between thresholds reads as LOW (indeterminate → 0)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "custom vIH/vIL thresholds are respected",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "custom vIH/vIL — drive above custom threshold reads HIGH",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "output scales with VREF from wire",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "output_impedance",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "inverting_amplifier",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "voltage_follower",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "current_transfer",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "galvanic_isolation",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "led_forward_voltage",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "zero_input_zero_output",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "ctr_scaling",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "linear_region",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "tanh_limiting",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "gm_proportional_to_ibias",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "vca_circuit",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "inverting_amplifier_gain",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "output_saturates_at_rails",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "large_signal_step",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "small_signal_not_slew_limited",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "output_offset_with_gain",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "output_current_clamped",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "load_741_model",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "internal_divider_voltages",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "oscillates_at_correct_frequency",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "duty_cycle",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "pulse_width",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "retrigger_ignored_during_pulse",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "linear_transconductance",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "zero_control_zero_output",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nonlinear_square_law",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "unity_gain_buffer",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "gain_of_10",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nonlinear_expression",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "output_drives_load",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "stamps conductance into MNA solver when intact",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "intact fuse in series with load resistor: current = V / (R_cold + R_load)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "DC source across crystal produces near-zero current (capacitors block DC)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "DC current through capacitor equals V/R_leak in steady state",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "voltage_divider_dc_op",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "3-resistor divider Vs=5V R=1k/1k/1k matches ngspice bit-exact",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "common_emitter_amplifier",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "npn_cutoff_with_zero_base_drive",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "setParam('BF', 50) shifts DC OP to match SPICE reference",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "setParam('IS', 1e-12) shifts DC OP to match SPICE reference",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "zero_resistance_zero_capacitance_matches_simple_model_dc_op",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "diode_resistor_dc_op",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "setParam('IS', 1e-11) shifts DC OP to match SPICE reference",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "setParam('N', 2) shifts DC OP to match SPICE reference",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "converges_within_10_iterations",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "common_source_nmos",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "setParam('VTO', 2.5) shifts DC OP to match SPICE reference",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "setParam('KP', 240µ) shifts DC OP to match SPICE reference",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "blocks_without_gate",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nr_converges_in_ndr_region",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "zener_regulator",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "pin index 0 (neg) carries +I, pin index 1 (pos) carries -I",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "setParam current update propagates to getPinCurrents",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "switched_resistor_divider",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "dc_op_resistor_divider",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "dc_op_diode_circuit",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "dc_op_returns_result",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "transient_rc_decay",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "sim_time_advances",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "last_dt_reflects_adaptive_step",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "reset_clears_state",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "diagnostics_emitted_on_dc_op",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "breakpoint_honored",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "get_branch_current",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "pulse_breakpoint_scheduled",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "transientDcop_converges_and_seeds_state",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "predictor_off_rc_regression",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "transient_fuse_blows_under_overcurrent",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "runner_integration",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "rc_transient_without_separate_loops",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "xfact_computed_from_deltaOld",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "method_stable_across_ringing",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "first_step_uses_order_1",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "no_closures_in_step",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "dc_op_with_behavioral_and_gate",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "dc_op_one_input_low",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "transient_edge_rate",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "input_loading_measurable",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "ttl_logic_family_different_thresholds",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "factory_created_and_gate_runs_in_engine",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "dff_factory_runs_in_engine",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "tri_state_high",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "tri_state_hiz",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "forward_current_lights",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "digit_display",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "DC op result after compile has converged === true and all finite node voltages",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "first coordinator.step() does not transition engine to ERROR",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step 0 and step 1 iteration-by-iteration",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "captures per-iteration state at stagnation point",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "DC operating point converges",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "transient stepping does not error after 50 steps",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "survives 2000 transient steps without ERROR state",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "survives 600µs of sim time (matches UI run duration)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "resistor_divider_dc",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "two_voltage_sources_series",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "current_source_with_resistor",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "e_singular_recovery_via_cktLoad",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "half-wave rectifier converges and diode forward voltage is correct",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "RC circuit runs transient steps stably with capacitor near Vs",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "statePool state0 has non-zero values after DC operating point",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "statePool state1 is updated after accepted transient step",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "diode circuit runs 100 transient steps without error",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "reset restores initial values in statePool",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "simple_resistor_divider_direct",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "diode_circuit_direct",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "direct_success_emits_converged_info",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "gmin_stepping_fallback",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "source_stepping_fallback",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "numGminSteps_1_selects_dynamicGmin",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "numGminSteps_10_selects_spice3Gmin",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "spice3Src_emits_uniform_phase_parameters",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "gshunt_zero_is_noop",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "gshunt_nonzero_used_as_gtarget",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "failure_reports_blame",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "dcopFinalize_transitions_initMode_to_initFloat",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "writes_into_ctx_dcopResult",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "zero_alloc_gmin_stepping",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "noncon_set_before_each_nr_call",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "dynamicGmin_initial_diagGmin_matches_ngspice",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "dynamicGmin_clean_solve_uses_dcMaxIter",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "spice3Gmin_uses_gshunt_when_nonzero",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "spice3Gmin_uses_gmin_when_gshunt_zero",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "spice3Src_no_extra_clean_solve",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "gillespieSrc_source_stepping_uses_gshunt",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "emits dcopInitJct phase marker before dcopInitFloat",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "NPN CE circuit (fixtures/npn-ce-harness.dts): DC OP converges with priming",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nmos_dc_unchanged",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "pmos_dc_unchanged",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "resistor_divider_dc_op_via_compiler",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "diode_circuit_dc_op_via_compiler",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "rc_steady_state_no_drift",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "rl_dc_steady_state_tight_tolerance",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "two_diodes_in_series",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "parallel_diodes",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "diode_clamp_on_resistor_divider",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "anti_parallel_diodes",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "resistor_divider_2_to_1_ratio",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "diode_shockley_equation_consistency",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "superposition_two_sources",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nmos_common_source_dc_op",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nmos_triode_region_dc_op",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "pmos_common_source_dc_op",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "gaussian_distribution",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "output_statistics",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "reproducible_with_seed",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "linear_sweep",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "log_sweep",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "ac_sweep_at_each_value",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "linear_converges_in_two_iterations",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "writes_into_ctx_nrResult",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "zero_allocations_in_nr_loop",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "diode_circuit_converges",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "diode_reverse_bias",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "blame_scalars_populated",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "initial_guess_used",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nonlinear_circuit_runs_at_least_2_iterations_with_state_pool",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nonlinear_circuit_forced_noncon_on_iteration_0",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "initTran_transitions_to_initFloat_after_iteration_0",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "initPred_transitions_to_initFloat_immediately",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "transient_mode_allows_convergence_without_ladder",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "no_pool_allows_convergence",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "uic_bypass_not_triggered_without_isDcOp",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "ipass_skipped_without_nodesets",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "ipass_fires_with_nodesets",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nr_retries_with_reorder_after_numerical_singular",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "forceReorder_called_on_initJct_to_initFix",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "forceReorder_called_on_initTran_first_iteration",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "e_singular_recovers_via_continue",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "e_singular_recovery_reloads_and_refactors",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "steady-state amplitude matches analytical |H(f)|",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "output amplitude is attenuated relative to input",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "output phase lags input",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "DC operating point is zero for pure AC source",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "higher frequency produces greater attenuation",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "transient stepping produces time-varying output",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "full pipeline: compile → DC OP → transient → analytical match",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "mna_50node_realistic_circuit_performance",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "produces exactly 1 step",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step has stepStartTime === 0",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step has stepEndTime === 0",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step dt === 0 (boot step is DCOP, no timestepping)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step has at least one attempt with a DCOP phase",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step analysisPhase === 'dcop'",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step accepted === true and converged === true for a simple converging circuit",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step has at least 1 NR iteration captured",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "captureElementStates snapshots pool-backed elements",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "iteration capture hook records NR iterations during DC OP",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "postIterationHook fires during DC OP (nonlinear circuit)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "postIterationHook fires during DC OP (linear circuit)",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step capture hook packages iterations into step snapshots",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "convergenceSummary reports correct statistics",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nodeVoltageTrajectory returns voltage history",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "querySteps filters by convergence",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "compareSnapshots returns all-pass for self-comparison",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "formatComparison produces readable output",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "findFirstDivergence returns null for identical sessions",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step capture hook supports retry tracking via beginAttempt/endAttempt",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step capture hook emits single attempt when no retries",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "SparseSolver exposes dimension, getRhsSnapshot, getCSCNonZeros",
+          "line": 390,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "findLargestDelta identifies worst convergence point",
+          "line": 390,
+          "column": 30
+        }
+      ]
+    },
+    {
+      "message": "expected [Function] to not throw an error but 'TypeError: elements is not iterable' was thrown",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\compile\\__tests__\\coordinator.test.ts",
+          "test": "step does not throw for analog-only circuit",
+          "line": 444,
+          "column": 36
+        },
+        {
+          "file": "src\\compile\\__tests__\\coordinator.test.ts",
+          "test": "step works without bridges when both backends exist",
+          "line": 527,
+          "column": 36
+        }
+      ]
+    },
+    {
+      "message": "elements is not iterable",
       "count": 8,
       "locations": [
         {
+          "file": "src\\solver\\analog\\state-pool.ts",
+          "test": "reset clears bridge state and notifies observers",
+          "line": 87,
+          "column": 22
+        },
+        {
+          "file": "src\\solver\\analog\\state-pool.ts",
+          "test": "dispose cleans up both backends without throwing",
+          "line": 87,
+          "column": 22
+        },
+        {
+          "file": "src\\solver\\analog\\state-pool.ts",
+          "test": "dcOperatingPoint() sets analysisPhase to \"dcop\"",
+          "line": 87,
+          "column": 22
+        },
+        {
+          "file": "src\\solver\\analog\\state-pool.ts",
+          "test": "first analog step() sets analysisPhase to \"tranInit\"",
+          "line": 87,
+          "column": 22
+        },
+        {
+          "file": "src\\solver\\analog\\state-pool.ts",
+          "test": "analysisPhase transitions to \"tranFloat\" after order promotion (after 3+ accepted steps)",
+          "line": 87,
+          "column": 22
+        },
+        {
+          "file": "src\\solver\\analog\\state-pool.ts",
+          "test": "cross-component current equality through real compiled lrctest.dig",
+          "line": 87,
+          "column": 22
+        },
+        {
+          "file": "src\\solver\\analog\\state-pool.ts",
+          "test": "component-as-node KCL: wire at pin A ≈ wire at pin B ≈ body current",
+          "line": 87,
+          "column": 22
+        },
+        {
+          "file": "src\\solver\\analog\\state-pool.ts",
+          "test": "rc_lowpass",
+          "line": 87,
+          "column": 22
+        }
+      ]
+    },
+    {
+      "message": "expected [Function] to not throw an error but 'TypeError: ctx.elementsWithConvergenc…' was thrown",
+      "count": 3,
+      "locations": [
+        {
+          "file": "src\\headless\\__tests__\\port-analog-mixed.test.ts",
+          "test": "compiles a circuit with Port connected to Resistor without errors",
+          "line": 67,
+          "column": 47
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-mcp-surface.test.ts",
+          "test": "compile() on buckbjt fixture does not throw",
+          "line": 34,
+          "column": 37
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\buckbjt-stagnation-regression.test.ts",
+          "test": "compiles without throwing",
+          "line": 39,
+          "column": 37
+        }
+      ]
+    },
+    {
+      "message": "Invalid .dts document: \"circuit.elements[4].modelParamDeltas.params[\"ICVBE\"]\" must be a number or string",
+      "count": 4,
+      "locations": [
+        {
+          "file": "src\\io\\dts-schema.ts",
+          "test": "circuit.metadata.models entry survives serialize -> deserialize",
+          "line": 437,
+          "column": 15
+        },
+        {
+          "file": "src\\io\\dts-schema.ts",
+          "test": "deserialized circuit with metadata.models compiles cleanly",
+          "line": 437,
+          "column": 15
+        },
+        {
+          "file": "src\\io\\dts-schema.ts",
+          "test": "serialize → deserialize preserves SPICE model name and params",
+          "line": 437,
+          "column": 15
+        },
+        {
+          "file": "src\\io\\dts-schema.ts",
+          "test": "overrides survive serialize -> deserialize -> recompile",
+          "line": 437,
+          "column": 15
+        }
+      ]
+    },
+    {
+      "message": "element.load is not a function",
+      "count": 6,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\ckt-load.ts",
+          "test": "dcOperatingPoint returns a DcOpResult",
+          "line": 57,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-load.ts",
+          "test": "red_led_forward_drop",
+          "line": 57,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-load.ts",
+          "test": "blue_led_forward_drop",
+          "line": 57,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-load.ts",
+          "test": "dc_output_matches_voltage — 12V rail into open circuit; output = 12V ± 0.01V",
+          "line": 57,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-load.ts",
+          "test": "voltage_change_updates_output — 5V then 10V; new output = 10V",
+          "line": 57,
+          "column": 13
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-load.ts",
+          "test": "internal_resistance_limits_current — 12V rail with R_int=0.1Ω into 1Ω load; output ≈ 10.9V",
+          "line": 57,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "expected [Function] to not throw an error but 'ReferenceError: elements is not defin…' was thrown",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\__tests__\\coordinator-slider-snapshot.test.ts",
+          "test": "does not throw for resistor in analog domain",
+          "line": 189,
+          "column": 89
+        }
+      ]
+    },
+    {
+      "message": "solver.allocElement is not a function",
+      "count": 1,
+      "locations": [
+        {
           "file": "src\\solver\\analog\\stamp-helpers.ts",
-          "test": "capacitance_decreases_with_reverse_bias",
+          "test": "junction_cap_transient_matches_ngspice",
           "line": 17,
+          "column": 32
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading '2')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\capacitor.test.ts",
+          "test": "stampCompanion preserves V_PREV across calls (slot 2 tracks previous voltage)",
+          "line": 130,
+          "column": 7
+        }
+      ]
+    },
+    {
+      "message": "expected -3 to not be close to -3, received difference is 0, but expected 0.005",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\capacitor.test.ts",
+          "test": "stampCompanion_uses_s1_charge_when_initPred",
+          "line": 436,
+          "column": 21
+        }
+      ]
+    },
+    {
+      "message": "expected 5 to be 4 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\inductor.test.ts",
+          "test": "stamps branch incidence and conductance entries",
+          "line": 176,
+          "column": 29
+        }
+      ]
+    },
+    {
+      "message": "Singular at step 5 NR 17",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\tapped-transformer.test.ts",
+          "test": "full_wave_rectifier — two diodes + CT ground produce DC output ≈ Vpeak_sec",
+          "line": 367,
+          "column": 36
+        }
+      ]
+    },
+    {
+      "message": "expected 0.9975437318359646 to be less than 0.1",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\transformer.test.ts",
+          "test": "power_conservation — P_primary ≈ P_secondary for k=0.99 within 10%",
+          "line": 428,
+          "column": 27
+        }
+      ]
+    },
+    {
+      "message": "expected 4.128440366972478 to be less than 0.25",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\passives\\__tests__\\transformer.test.ts",
+          "test": "dc_blocks — DC source on primary produces ~0 secondary voltage in steady state",
+          "line": 562,
+          "column": 18
+        }
+      ]
+    },
+    {
+      "message": "elements is not defined",
+      "count": 9,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\ckt-context.ts",
+          "test": "step input arrives at port 2 approximately at delay τ",
+          "line": 612,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-context.ts",
+          "test": "matched load produces no reflection — output voltage ≈ input/2",
+          "line": 612,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-context.ts",
+          "test": "lossy line output is less than lossless for same parameters",
+          "line": 612,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-context.ts",
+          "test": "N=50 delay more accurate than N=5",
+          "line": 612,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-context.ts",
+          "test": "unterminated line: voltage at port2 rises above source step voltage",
+          "line": 612,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-context.ts",
+          "test": "configure_changes_tolerances",
+          "line": 612,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-context.ts",
+          "test": "predictor_off_uses_last_converged_guess",
+          "line": 612,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-context.ts",
+          "test": "predictor_gate_off_by_default",
+          "line": 612,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\ckt-context.ts",
+          "test": "rc_steady_state_current_zero",
+          "line": 612,
+          "column": 30
+        }
+      ]
+    },
+    {
+      "message": "expected 0.000005674679845410129 to be 0.000005674679845410128 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\bjt.test.ts",
+          "test": "common_emitter_active_ic_ib_bit_exact_vs_ngspice",
+          "line": 1462,
+          "column": 28
+        }
+      ]
+    },
+    {
+      "message": "expected 103.17450166223666 to be close to 100, received difference is 3.174501662236665, but expected 0.5",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "conducts_positive_when_triggered",
+          "line": 159,
+          "column": 15
+        }
+      ]
+    },
+    {
+      "message": "expected 103.1745016622365 to be close to 100, received difference is 3.1745016622364943, but expected 0.5",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\components\\semiconductors\\__tests__\\triac.test.ts",
+          "test": "conducts_negative_when_triggered",
+          "line": 173,
+          "column": 15
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'reset')",
+      "count": 17,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "selects_correct_input",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "selects_low_input",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "all_selector_values_route_correctly",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "routes_to_correct_output",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "all_outputs_low_when_input_low",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "routes_each_selector_value",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "one_hot_output",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "all_selector_values_produce_one_hot",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "both_high_outputs_high",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "one_low_outputs_low",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "inverts",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "truth_table_all_combinations",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "truth_table_all_combinations",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "converges_within_5_iterations",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "indeterminate_input_holds_previous",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "input_loads_source",
+          "line": 241,
+          "column": 16
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "nand_factory_correct_truth_table",
+          "line": 241,
+          "column": 16
+        }
+      ]
+    },
+    {
+      "message": "expected 0.02 to be +0 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\bridge-compilation.test.ts",
+          "test": "per-net ideal override on boundary group produces unloaded output adapter",
+          "line": 183,
+          "column": 35
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'length')",
+      "count": 75,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "buckbjt_load_dcop_parity: rhsOld + noncon + diagGmin + srcFact bit-exact vs ngspice",
+          "line": 399,
+          "column": 55
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\ckt-context.test.ts",
+          "test": "allocates_all_buffers_at_init",
+          "line": 142,
+          "column": 34
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\ckt-context.test.ts",
+          "test": "precomputed_lists_match_element_flags",
+          "line": 208,
+          "column": 34
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "ourSession has at least 2 steps (boot + at least one transient step)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step 0 has stepStartTime === 0",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step 0 has at least 2 attempts (DCOP attempt + tranInit attempt)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step 0 contains a DCOP-phase attempt",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step 0 contains a transient-phase attempt (tranInit or tranNR)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "acceptedAttemptIndex points at a transient-phase attempt (not a DCOP sub-solve)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "step 0 accepted === true",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "subsequent steps have stepStartTime > 0",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "transient: CCAP in capacitor and BJT junctions over first steps/retries",
+          "line": 399,
+          "column": 55
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "transient: inductor current divergence over iterations in step 1",
+          "line": 399,
+          "column": 55
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "transient: PNP BJT internal node agreement in step 1",
+          "line": 399,
+          "column": 55
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "lteDt_captured_from_ours: lteDt is finite positive on every accepted transient step",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "prints per-attempt dt for buckbjt with various tran args",
+          "line": 399,
+          "column": 55
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "19. Returns one entry per element in topology",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "20. Each ComponentInfo has non-empty label and deviceType",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "21. PaginationOpts offset=1, limit=1 returns exactly one entry",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "22. Returns one entry per unique node in nodeLabels",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "23. NodeInfo.ourIndex matches key in nodeLabels",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "24. connectedComponents is non-empty for nodes connected to elements",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "25. Returns labels for matching type in HWR circuit (type sourced from topology)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "26. Returns empty array for nonexistent type 'scr'",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "27. Case-insensitive: getComponentsByType('DIODE') matches same as 'diode'",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "28. Self-comparison: getDivergences() returns totalCount: 0 and empty entries",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "29. worstByCategory has all null values when no divergences",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "30. Default limit is 100: with 200 artificial divergences, entries.length === 100",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "31. opts.step filter: only returns divergences from that step",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "32. getStepEndRange(0, 0) returns exactly 1 element matching getStepEnd(0)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "33. Out-of-range: getStepEndRange(100, 200) returns empty array",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "34. Returns SlotTrace with correct label and slotName",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "35. totalSteps equals number of simulation steps captured",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "36. Nonexistent component throws 'Component not found: ...'",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "37. Returns StateHistoryReport with all six state objects",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "38. state0 matches elementStates from the iteration",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "39. Out-of-range step throws 'Step out of range: ...'",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "40. getMatrixLabeled entries have non-empty rowLabel and colLabel",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "41. Self-comparison: all matrix entries withinTol:true, absDelta:0",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "42. compareMatrixAt filter 'all' has totalEntries >= mismatch-filtered count",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "43. getRhsLabeled entries count equals matrixSize",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "44. Returns IntegrationCoefficientsReport with both ours and ngspice fields",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "45. Out-of-range step throws 'Step out of range'",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "46. Nonexistent label with no limiting events returns noEvents:true, junctions:[]",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "47. Nonexistent label does not throw — returns empty report",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "48. Self-comparison with converged circuit: all elements have ourConverged:true",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "49. disagreementCount is 0 when both engines agree (self-comparison)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "50. toJSON() returns an object serializable by JSON.stringify without error",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "51. No Map, Float64Array, NaN, or Infinity in JSON.stringify(session.toJSON())",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "52. opts.includeAllSteps:true includes step entries; default includes none for self-comparison (no divergences)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "53. traceComponent with slots filter returns only matching slots in states",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "54. traceNode with onlyDivergences:true returns empty iterations in self-comparison (none diverge)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "55. create(opts) is equivalent to new + init: listComponents works without calling init manually",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "56. After dispose(), ourSession and ngspiceSession are null; dispose() is idempotent",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "57. getComponentSlots with step provided returns ComponentSlotsSnapshot",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "58. getComponentSlots without step returns ComponentSlotsTrace",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "59. getComponentSlots with nonexistent component throws 'Component not found'",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "60. traceNode steps have numeric stepStartTime (not NaN or -Inf)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "61. getIterations steps have numeric stepStartTime (not NaN or -Inf)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "62. getSummary firstDivergence has stepStartTime (not simTime) — structural type check",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "63. getStepEnd on an ngspice-only step does not throw and returns presence 'ngspiceOnly'",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "64. traceNode step count equals max(ours, ngspice) when ours is shorter",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "65. traceNode ngspice-only steps have null ours voltage (NaN raw) and finite ngspice voltage",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "5-step self-compare returns presenceCounts: { both: 5, oursOnly: 0, ngspiceOnly: 0 }",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "self-compare getStepShape(0).stepStartTimeDelta is exactly 0 (Goal F mechanical proof)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "truncated ourSession reports presence: ngspiceOnly for the missing tail",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "returns 0 for t=0 on a session with boot step (0,0)",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "returns null for t > simTime",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "creates session and runs transient",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "self-compare: timeAlign=true and false both return equal indices",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "self-compare tran: default timeAlign is true, dcop default is false",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "self-compare DCOP: all entries have entryKind='both' and numeric values",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "injected ngspice topology with internal BJT nodes produces engineSpecific entries for unmapped rows",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "creates session and runs transient",
+          "line": 377,
+          "column": 57
+        },
+        {
+          "file": "src\\solver\\analog\\newton-raphson.ts",
+          "test": "8. per-element convergence: our engine reports failures",
+          "line": 399,
+          "column": 55
+        }
+      ]
+    },
+    {
+      "message": "expected false to be true // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\dc-operating-point.test.ts",
+          "test": "dynamicGmin_factor_cap_uses_param",
+          "line": 772,
+          "column": 40
+        }
+      ]
+    },
+    {
+      "message": "element.primeJunctions is not a function",
+      "count": 6,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\dcop-init-jct.test.ts",
+          "test": "NPN: arms Vbe=tVcrit, Vbc=0 as per-device local override",
+          "line": 162,
+          "column": 15
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\dcop-init-jct.test.ts",
+          "test": "PNP: arms Vbe=+tVcrit, Vbc=0 (same forward-bias magnitude as NPN)",
+          "line": 206,
+          "column": 15
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\dcop-init-jct.test.ts",
+          "test": "grounded collector (nodeC=0): priming is independent of node topology",
+          "line": 230,
+          "column": 15
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\dcop-init-jct.test.ts",
+          "test": "NPN L1: arms Vbe=tVcrit, Vbc=0 as per-device local override",
+          "line": 265,
+          "column": 15
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\dcop-init-jct.test.ts",
+          "test": "arms Vd=tVcrit as per-device local override",
+          "line": 301,
+          "column": 15
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\dcop-init-jct.test.ts",
+          "test": "grounded cathode: priming is independent of node topology",
+          "line": 334,
+          "column": 15
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of null (reading 'steps')",
+      "count": 7,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "both engines produce steps",
+          "line": 56,
           "column": 32
         },
         {
-          "file": "src\\solver\\analog\\stamp-helpers.ts",
-          "test": "cjo_at_zero_bias",
-          "line": 17,
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "every paired step has a finite stepStartTimeDelta",
+          "line": 66,
+          "column": 42
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "first step of both engines has stepStartTime === 0",
+          "line": 78,
           "column": 32
         },
         {
-          "file": "src\\solver\\analog\\stamp-helpers.ts",
-          "test": "cv_formula_correct",
-          "line": 17,
-          "column": 32
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "index-paired steps report stepStartTimeDelta = ours.stepStartTime - ng.stepStartTime",
+          "line": 83,
+          "column": 42
         },
         {
-          "file": "src\\solver\\analog\\stamp-helpers.ts",
-          "test": "vco_circuit",
-          "line": 17,
-          "column": 32
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "stepStartTime values are monotonically non-decreasing in both engines",
+          "line": 100,
+          "column": 42
         },
         {
-          "file": "src\\solver\\analog\\stamp-helpers.ts",
-          "test": "change35_uses_computeJunctionCharge_for_q0",
-          "line": 17,
-          "column": 32
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "timeAlign=true pairs a mid-run step by time when step counts differ",
+          "line": 110,
+          "column": 42
         },
         {
-          "file": "src\\solver\\analog\\stamp-helpers.ts",
-          "test": "change36_uses_computeJunctionCapacitance_with_fc_linearization",
-          "line": 17,
-          "column": 32
+          "file": "src\\solver\\analog\\__tests__\\harness\\step-alignment.test.ts",
+          "test": "timeAlign=false pairs by positional index (ngspiceStepIndex === ourStepIndex)",
+          "line": 130,
+          "column": 42
+        }
+      ]
+    },
+    {
+      "message": "ComparisonSession: call runDcOp() or runTransient() first",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\comparison-session.ts",
+          "test": "session has steps on both sides (presence counts have both > 0)",
+          "line": 2507,
+          "column": 13
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading '_nodeMap')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "1. topology: node mapping populated",
+          "line": 49,
+          "column": 27
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading '_ourTopology')",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "2. topology: element type is always a non-empty string",
+          "line": 65,
+          "column": 64
         },
         {
-          "file": "src\\solver\\analog\\stamp-helpers.ts",
-          "test": "change37_tt_adds_diffusion_capacitance",
-          "line": 17,
-          "column": 32
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "3. topology: matrixRowLabels and matrixColLabels populated",
+          "line": 78,
+          "column": 35
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'ourSession')",
+      "count": 9,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "4. integration coefficients: ag0 non-zero for transient steps",
+          "line": 91,
+          "column": 30
         },
         {
-          "file": "src\\solver\\analog\\stamp-helpers.ts",
-          "test": "cvoltage_dependent_transient_matches_ngspice",
-          "line": 17,
-          "column": 32
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "5. integration coefficients: method transitions to trapezoidal",
+          "line": 118,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "6. analysis phase: not all steps are tranFloat",
+          "line": 145,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "7. analysis phase: tranInit precedes tranFloat",
+          "line": 155,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "10. limiting events: our engine captures events (Item 9)",
+          "line": 209,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "12. state history: state1Slots and state2Slots populated",
+          "line": 252,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "13. pre-solve RHS: populated and not all zero",
+          "line": 286,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "14. limiting comparison: sign is postLimit - preLimit",
+          "line": 311,
+          "column": 30
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "16. step alignment: first step at time 0",
+          "line": 377,
+          "column": 30
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading '_ngSessionReindexed')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "11. limiting events: ngspice captures events (C-side Item 9)",
+          "line": 236,
+          "column": 24
+        }
+      ]
+    },
+    {
+      "message": "Cannot read properties of undefined (reading 'getSessionShape')",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "15. step shape: getSessionShape reports both-sided presence for a real run",
+          "line": 366,
+          "column": 27
         }
       ]
     }

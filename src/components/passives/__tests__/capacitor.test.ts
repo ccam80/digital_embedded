@@ -20,7 +20,6 @@ import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js"
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
-import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext, InitMode } from "../../../solver/analog/load-context.js";
 
@@ -397,9 +396,6 @@ describe("Capacitor", () => {
 // ---------------------------------------------------------------------------
 
 describe("Capacitor initPred", () => {
-  // SLOT_Q = 3 in capacitor state schema
-  const SLOT_Q = 3;
-
   it("stampCompanion_uses_s1_charge_when_initPred", () => {
     const C = 1e-6; // 1µF
     const props = new PropertyBag();
@@ -469,12 +465,14 @@ describe("Capacitor initPred", () => {
     // GEQ = C/dt = 1e-6/1e-6 = 1
     const geq = pool.states[0][0];
     expect(geq).toBeCloseTo(1, 6);
-    // ceq = ccap - geq*vNow (BDF1: ccap = (q0-q1)/dt, q1=0 since no previous accepted step)
-    // With UIC: q0 = C*IC = 5e-6 → ccap = 5e-6/1e-6 = 5 → ceq = 5 - 1*2 = 3
+    // ngspice capload.c:60-63 + niinteg.c:77-78: on MODEINITTRAN, state1[qcap] = state0[qcap].
+    // With UIC: q0 = C*IC = 5e-6. initTran seeds q1 = q0 = C*IC = 5e-6 (capload.c:60-63).
+    // Under BDF-1: ccap = ag[0]*q0 + ag[1]*q1 = (1/dt)*(C*IC) + (-1/dt)*(C*IC) = 0
+    //              ceq  = ccap - ag[0]*q0 = 0 - (1/dt)*(C*IC) = -(1e-6*5)/1e-6 = -5
     // Without UIC: q0 = C*vNow = 2e-6 → ccap = 2 → ceq = 2 - 2 = 0
     const ceq = pool.states[0][1];
     expect(ceq).not.toBeCloseTo(0, 2);
-    expect(ceq).toBeCloseTo(3, 3);
+    expect(ceq).toBeCloseTo(-5, 3);
   });
 });
 
@@ -567,9 +565,6 @@ describe("Capacitor M multiplicity", () => {
 // We configure C=1e-6 F and vcap=1e-6 V so the element-computed q0 = C * vcap
 // equals exactly 1e-12, matching the spec.
 
-import type { LoadContext } from "../../../solver/analog/load-context.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-
 const SLOT_GEQ_CAP  = 0;
 const SLOT_IEQ_CAP  = 1;
 const SLOT_V_CAP    = 2;
@@ -645,8 +640,9 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
     const q0_actual = (re as unknown as { s0: Float64Array }).s0[base + SLOT_Q_CAP];
     expect(q0_actual).toBe(1e-12);
 
-    // ngspice niinteg.c trap-order-2 formula (bit-exact target):
-    const expectedCcap = ag0 * (q0_actual - q1) + ag1 * ccapPrev;
+    // ngspice niinteg.c:32-34 TRAPEZOIDAL order 2: ccap = -state1[ccap]*ag[1] + ag[0]*(q0-q1)
+    // (prior test expected formula had wrong sign on ag[1]*ccapPrev)
+    const expectedCcap = -ccapPrev * ag1 + ag0 * (q0_actual - q1);
 
     const actualCcap = (re as unknown as { s0: Float64Array }).s0[base + SLOT_CCAP_CAP];
     expect(actualCcap).toBe(expectedCcap);

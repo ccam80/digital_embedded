@@ -16,7 +16,6 @@ import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory } from "../../../core/registry.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-import type { AnalogElement } from "../../../solver/analog/element.js";
 import { withNodeIds, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 
 // ---------------------------------------------------------------------------

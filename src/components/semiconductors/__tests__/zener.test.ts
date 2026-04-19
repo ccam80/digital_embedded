@@ -14,7 +14,6 @@ import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds, runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";

@@ -485,57 +485,46 @@ describe("AC", () => {
 
 describe("AC — Task 0.4.4", () => {
   it("ac_sweep_caller_reuses_branch_handles_across_frequencies", () => {
-    // Verify the handle-caching contract in ac-analysis.ts directly by simulating
-    // the frequency-sweep loop logic: allocComplexElement called on fi===0 only,
-    // stampComplexElement called on every fi.
-    // Uses a direct ComplexSparseSolver instance (no DC-OP path).
+    // Tightened per Phase 0.4 review: exercise the actual AcAnalysis.run()
+    // production path with a real RC circuit and a spy injected through the
+    // solver-factory dep. The previous version re-implemented the sweep loop
+    // inline, making the assertions tautological against the test code rather
+    // than the production code.
     const { ComplexSparseSolver: CSS } = ComplexSolverModule;
 
-    const N_ac = 2; // 1 node + 1 branch row
-    const sourceNodeIdx = 0;
-    const branchRow = 1;
-    const numFreq = 3;
+    const R = 1000;
+    const C = 1e-6;
+    const circuit = makeRcLowpassCircuit(R, C);
 
-    const complexSolver = new CSS();
+    const injectedSolver = new CSS();
+    const allocSpy = vi.spyOn(injectedSolver, "allocComplexElement");
 
-    // Spy on allocComplexElement to count calls
-    const allocSpy = vi.spyOn(complexSolver, "allocComplexElement");
+    const ac = new AcAnalysis(circuit, undefined, {
+      complexSolverFactory: () => injectedSolver,
+    });
 
-    let acBranchHandleA = -1;
-    let acBranchHandleB = -1;
+    ac.run({
+      type: "lin",
+      numPoints: 3,
+      fStart: 100,
+      fStop: 10000,
+      sourceLabel: "source",
+      outputNodes: ["out"],
+    });
 
-    for (let fi = 0; fi < numFreq; fi++) {
-      complexSolver.beginAssembly(N_ac);
-
-      // Simulate element stamps — no-op here (minimal fixture)
-
-      // Production caller handle-caching logic (mirrors ac-analysis.ts)
-      if (fi === 0) {
-        acBranchHandleA = complexSolver.allocComplexElement(sourceNodeIdx, branchRow);
-        acBranchHandleB = complexSolver.allocComplexElement(branchRow, sourceNodeIdx);
-      }
-      complexSolver.stampComplexElement(acBranchHandleA, 1.0, 0.0);
-      complexSolver.stampComplexElement(acBranchHandleB, 1.0, 0.0);
-      complexSolver.stampRHS(branchRow, 1.0, 0.0);
-
-      complexSolver.finalize();
-      if (fi === 0) complexSolver.forceReorder();
-      complexSolver.factor();
-      const xRe = new Float64Array(N_ac);
-      const xIm = new Float64Array(N_ac);
-      complexSolver.solve(xRe, xIm);
-    }
-
-    // allocComplexElement must be called exactly twice (both on fi===0)
-    expect(allocSpy.mock.calls.length).toBe(2);
-
-    // Both allocations happen with the branch row positions
-    expect(allocSpy.mock.calls[0]).toEqual([sourceNodeIdx, branchRow]);
-    expect(allocSpy.mock.calls[1]).toEqual([branchRow, sourceNodeIdx]);
-
-    // Handles are stable: same handle returned if called again
-    expect(acBranchHandleA).toBe(complexSolver.allocComplexElement(sourceNodeIdx, branchRow));
-    expect(acBranchHandleB).toBe(complexSolver.allocComplexElement(branchRow, sourceNodeIdx));
+    // The AC voltage-source branch handles (two of them) must be allocated
+    // exactly once — on fi===0 only — and reused from the cache afterwards.
+    // The RC-lowpass element stamps also allocate on fi===0 (for R and C
+    // admittances), so we filter to just the branch-row allocations that the
+    // handle cache is supposed to guard.
+    const matrixSize = circuit.matrixSize;
+    const branchRow = matrixSize;
+    const sourceNodeIdx = 0; // "source" → node 1 → 0-based idx 0
+    const branchAllocCalls = allocSpy.mock.calls.filter(
+      c => (c[0] === sourceNodeIdx && c[1] === branchRow) ||
+           (c[0] === branchRow && c[1] === sourceNodeIdx),
+    );
+    expect(branchAllocCalls.length).toBe(2);
 
     allocSpy.mockRestore();
   });
@@ -547,43 +536,44 @@ describe("AC — Task 0.4.4", () => {
 
 describe("AC — Task 0.4.5", () => {
   it("ac_sweep_single_reorder_across_frequencies", () => {
-    // 5-point AC sweep: forceReorder() called once before fi===0 factor.
-    // lastFactorUsedReorder === true on frequency 0, false on frequencies 1-4.
+    // Tightened per Phase 0.4 review: run the real AcAnalysis.run() path and
+    // observe lastFactorUsedReorder on the solver that production actually
+    // uses. Injected via the solver-factory dep so the spy sees every factor()
+    // call from the real sweep loop.
     const { ComplexSparseSolver: CSS } = ComplexSolverModule;
 
-    const N_ac = 2; // 1 node + 1 branch row
-    const sourceNodeIdx = 0;
-    const branchRow = 1;
-    const numFreq = 5;
+    const R = 1000;
+    const C = 1e-6;
+    const circuit = makeRcLowpassCircuit(R, C);
 
-    const complexSolver = new CSS();
-    let acBranchHandleA = -1;
-    let acBranchHandleB = -1;
-
+    const injectedSolver = new CSS();
     const reorderFlags: boolean[] = [];
 
-    for (let fi = 0; fi < numFreq; fi++) {
-      complexSolver.beginAssembly(N_ac);
+    // Record lastFactorUsedReorder after every factor() call by patching the
+    // solver instance in place — zero allocations, no prototype pollution.
+    const realFactor = injectedSolver.factor.bind(injectedSolver);
+    injectedSolver.factor = () => {
+      const ok = realFactor();
+      reorderFlags.push(injectedSolver.lastFactorUsedReorder);
+      return ok;
+    };
 
-      if (fi === 0) {
-        acBranchHandleA = complexSolver.allocComplexElement(sourceNodeIdx, branchRow);
-        acBranchHandleB = complexSolver.allocComplexElement(branchRow, sourceNodeIdx);
-      }
-      complexSolver.stampComplexElement(acBranchHandleA, 1.0, 0.0);
-      complexSolver.stampComplexElement(acBranchHandleB, 1.0, 0.0);
-      complexSolver.stampRHS(branchRow, 1.0, 0.0);
-      complexSolver.finalize();
-      if (fi === 0) complexSolver.forceReorder();
-      complexSolver.factor();
-      reorderFlags.push(complexSolver.lastFactorUsedReorder);
-      const xRe = new Float64Array(N_ac);
-      const xIm = new Float64Array(N_ac);
-      complexSolver.solve(xRe, xIm);
-    }
+    const ac = new AcAnalysis(circuit, undefined, {
+      complexSolverFactory: () => injectedSolver,
+    });
 
-    // Frequency 0 (fi===0): full reorder used
+    const numFreq = 5;
+    ac.run({
+      type: "lin",
+      numPoints: numFreq,
+      fStart: 100,
+      fStop: 10000,
+      sourceLabel: "source",
+      outputNodes: ["out"],
+    });
+
+    expect(reorderFlags.length).toBe(numFreq);
     expect(reorderFlags[0]).toBe(true);
-    // Frequencies 1-4: numeric-only path
     for (let fi = 1; fi < numFreq; fi++) {
       expect(reorderFlags[fi]).toBe(false);
     }

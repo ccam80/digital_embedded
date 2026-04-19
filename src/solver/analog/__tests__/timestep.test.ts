@@ -53,7 +53,7 @@ function makeReactiveElement(truncationError: number): AnalogElement {
     branchIndex: -1,
     isNonlinear: false,
     isReactive: true,
-    stamp(_solver: SparseSolver): void {},
+    stampAc(_solver: SparseSolver): void {},
     getLteTimestep(
       dt: number,
       _deltaOld: readonly number[],
@@ -289,10 +289,22 @@ describe("post_breakpoint_bdf1_reset_preserved", () => {
 
 describe("initial_method_is_trapezoidal", () => {
   it("initial_method_is_trapezoidal", () => {
-    // Assert new TimestepController has currentMethod === "trapezoidal".
+    // Assert new TimestepController has currentMethod === "trapezoidal"
+    // (ngspice CKTintegrateMethod default) and currentOrder === 1
+    // (ngspice dctran.c:315 — `ckt->CKTorder = 1` at transient entry).
+    // Order-2 promotion only happens after the order-1 LTE gate passes
+    // (dctran.c:881-892).
     const ctrl = new TimestepController(DEFAULT_PARAMS);
     expect(ctrl.currentMethod).toBe("trapezoidal");
-    expect(ctrl.currentOrder).toBe(2);
+    expect(ctrl.currentOrder).toBe(1);
+  });
+
+  it("initial_order_is_1", () => {
+    // Direct assertion that the ngspice dctran.c:315 initial order (1)
+    // is respected at controller construction. Order-2 promotion is
+    // gated on the first order-1 LTE succeeding (dctran.c:881-892) and
+    // must not be preempted by the controller.
+    expect(new TimestepController(DEFAULT_PARAMS).currentOrder).toBe(1);
   });
 });
 
@@ -348,17 +360,11 @@ describe("breakpoint_ulps_comparison", () => {
     // Actually test: simTime is 200 ULPs BELOW bp (not past it).
     f64[0] = bp;
     i64[0] = bpBits - 200n;
-    const simTimeFarBelow = f64[0];
-
     const ctrl3 = new TimestepController(params);
     ctrl3.addBreakpoint(bp);
     // With delmin = 1e-3 * 1e-11 = 1e-14, and bp - simTimeFarBelow ≈ 200 ULPs ≈ 2.2e-20,
     // which is < delmin=1e-14, so breakpoint IS consumed.
     // Instead test with large gap: 1000 ULPs below bp.
-    f64[0] = bp;
-    i64[0] = bpBits - 1000n;
-    const simTimeWayBelow = f64[0];
-
     // With delmin = 1e-14 and gap ≈ 1000 ULPs ≈ 1.1e-19 which is still < delmin.
     // We need to verify that 200 ULPs > 100 ULP threshold means not consumed
     // when simTime is BEFORE bp by 200 ULPs and > delmin gap.

@@ -229,6 +229,17 @@ export class SparseSolver {
    * O(column chain length) when the matrix exceeds the handle table size.
    */
   allocElement(row: number, col: number): number {
+    // Guard: without beginAssembly(), _extToIntCol is zero-length, so
+    // _extToIntCol[col] → undefined, which Int32Array writes in
+    // _insertIntoCol coerce to 0 — producing a self-referential cycle
+    // in the column linked list that makes the next search spin forever.
+    // Throw loudly instead.
+    if (this._n === 0) {
+      throw new Error(
+        `SparseSolver.allocElement(${row}, ${col}) called before ` +
+        `beginAssembly(). Call solver.beginAssembly(matrixSize) first.`,
+      );
+    }
     // Fast path: handle table lookup keyed by the caller's (original) row/col.
     if (this._n > 0 && this._n <= this._handleTableN) {
       const idx = row * this._handleTableN + col;

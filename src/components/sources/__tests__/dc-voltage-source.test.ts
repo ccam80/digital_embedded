@@ -99,11 +99,12 @@ describe("DcVoltageSource", () => {
   });
 
   it("set_scale_modifies_rhs", () => {
+    // ngspice vsrcload.c:54 — value = here->VSRCdcValue * ckt->CKTsrcFact
+    // Sources read ctx.srcFact directly during load(); no per-element scale method.
     const src = makeDcVoltageSource(1, 2, 3, 10);
-    src.setSourceScale!(0.5);
 
     const solver = makeMockSolver();
-    const ctx = { ...makeMinimalCtx(solver), srcFact: 1 };
+    const ctx = { ...makeMinimalCtx(solver), srcFact: 0.5 };
     src.load(ctx);
 
     // Incidence stamps are always ±1

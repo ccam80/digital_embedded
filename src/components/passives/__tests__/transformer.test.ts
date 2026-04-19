@@ -651,12 +651,15 @@ describe("AnalogTransformerElement state pool", () => {
 
     const Ls = Lp / (N * N);
     const M = k * Math.sqrt(Lp * Ls);
-    // G11 = 2*L1/dt
-    expect(pool.state0[0]).toBeCloseTo((2 * Lp) / dt, 8);
-    // G22 = 2*L2/dt
-    expect(pool.state0[1]).toBeCloseTo((2 * Ls) / dt, 8);
-    // G12 = 2*M/dt
-    expect(pool.state0[2]).toBeCloseTo((2 * M) / dt, 8);
+    // niinteg.c:28-63: trap companion conductance = ag[0]*L.
+    // At order=1 (ngspice default at transient entry per dctran.c:315),
+    // computeNIcomCof sets ag[0] = 1/dt (BDF-1 / trapezoidal order 1).
+    // G11 = ag[0] * L1 = L1/dt
+    expect(pool.state0[0]).toBeCloseTo(Lp / dt, 8);
+    // G22 = ag[0] * L2 = L2/dt
+    expect(pool.state0[1]).toBeCloseTo(Ls / dt, 8);
+    // G12 = ag[0] * M = M/dt
+    expect(pool.state0[2]).toBeCloseTo(M / dt, 8);
   });
 
   it("load accumulates I1/I2 branch currents into pool slots after a step", () => {

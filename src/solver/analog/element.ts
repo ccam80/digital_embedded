@@ -92,15 +92,6 @@ export interface AnalogElement {
   setParam(key: string, value: number): void;
 
   /**
-   * Scale independent source magnitude for source-stepping DC convergence.
-   *
-   * Called by the DC operating point solver during source stepping. The
-   * factor argument ramps from 0 (sources disabled) to 1 (full magnitude).
-   * Elements that are not independent sources do not implement this method.
-   */
-  setSourceScale?(factor: number): void;
-
-  /**
    * Stamp the element's frequency-domain small-signal model for AC analysis.
    *
    * Called once per frequency point during an AC sweep. Resistors stamp
