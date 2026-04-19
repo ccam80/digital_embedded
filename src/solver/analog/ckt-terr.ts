@@ -30,10 +30,8 @@ import type { IntegrationMethod } from "./element.js";
 // Method-specific LTE coefficients (ngspice trdefs.h / geardefs.h)
 // ---------------------------------------------------------------------------
 
-/**
- * LTE error factor for trapezoidal method, indexed by (order - 1).
- * trap[0] = 0.5 (order 1), trap[1] = 1/12 (order 2).
- */
+// ngspice cktterr.c:32-35 trapCoeff[]
+const TRAP_LTE_FACTORS = [0.5, 1 / 12];
 
 /**
  * LTE error factor for Gear (BDF) methods, indexed by (order - 1).
@@ -173,50 +171,44 @@ export function cktTerr(
   const tol = Math.max(volttol, chargetol);
 
   // ------------------------------------------------------------------
-  // Step 3: Method-specific LTE factor and timestep formula
+  // Step 3: Unified LTE factor and timestep formula (ngspice cktterr.c:60-75)
   //
-  // ngspice cktterr.c / ckttrunc.c NEWTRUNC path:
-  //   TRAP order 1: del = deltaOld[0] * sqrt(|trtol * tol * 2 / diff|)
-  //   TRAP order 2: del = |deltaOld[0] * trtol * tol * 3 * (deltaOld[0]+deltaOld[1]) / diff|
-  //   GEAR: del = trtol * tol / (factor * ddiff) then root by (order+1)
+  // Both TRAP and GEAR use the same formula, differing only in the
+  // coefficient table.  ngspice cktterr.c:69:
+  //   del = trtol * tol / MAX(abstol, factor * |diff[0]|)
+  // then root extraction by order (not order+1).
   // ------------------------------------------------------------------
 
-  if (method === "trapezoidal") {
-    if (ddiff === 0) return Infinity;
-    if (order <= 1) {
-      // ngspice cktterr.c TRAP order 1: del = deltaOld[0] * sqrt(trtol * tol * 2 / diff)
-      const d0 = deltaOld.length > 0 ? deltaOld[0] : dt;
-      const inner = params.trtol * tol * 2 / ddiff;
-      return d0 * Math.sqrt(inner);
-    } else {
-      // ngspice cktterr.c TRAP order 2: del = |deltaOld[0] * trtol * tol * 3 * (deltaOld[0]+deltaOld[1]) / diff|
-      const d0 = deltaOld.length > 0 ? deltaOld[0] : dt;
-      const d1 = deltaOld.length > 1 ? deltaOld[1] : d0;
-      return Math.abs(d0 * params.trtol * tol * 3 * (d0 + d1) / diff0);
-    }
-  }
+  // ngspice cktterr.c:60-68: select factor from method-specific table
+  const coeffTable = method === "trapezoidal" ? TRAP_LTE_FACTORS : GEAR_LTE_FACTORS;
+  const factor = coeffTable[Math.max(0, Math.min(coeffTable.length - 1, order - 1))];
 
-  // GEAR / BDF-1 / BDF-2: factor-based formula with root extraction
-  // ngspice geardefs.h: GEAR_LTE_FACTORS indexed by (order-1)
-  const factor = GEAR_LTE_FACTORS[Math.min(order - 1, GEAR_LTE_FACTORS.length - 1)];
-
+  if (ddiff === 0) return Infinity;
   const denom = Math.max(params.abstol, factor * ddiff);
   if (!(denom > 0)) return Infinity;
-  const del = params.trtol * tol / denom;
+  // ngspice cktterr.c:69
+  let del = params.trtol * tol / denom;
 
   // ------------------------------------------------------------------
-  // Step 4: Root extraction (ngspice cktterr.c:70-74, V6 fix)
-  //   GEAR order 1: sqrt(del)
-  //   GEAR order >= 2: del^(1/(order+1))
+  // Step 4: Root extraction (ngspice cktterr.c:70-74)
+  //   order == 1: del is the proposed dt directly (no root)
+  //   order == 2: del = sqrt(del)
+  //   order  > 2: del = exp(log(del) / order)
   // ------------------------------------------------------------------
 
-  if (order === 1) {
-    // ngspice cktterr.c GEAR order 1: Math.sqrt(del)
-    return Math.sqrt(del);
-  } else {
-    // ngspice cktterr.c GEAR order >= 2: exp(log(tmp) / (order+1))
-    return Math.exp(Math.log(del) / (order + 1));
+  if (order === 2) {
+    // ngspice cktterr.c:70-71
+    del = Math.sqrt(del);
+  } else if (order > 2) {
+    // ngspice cktterr.c:72-74
+    del = Math.exp(Math.log(del) / order);
   }
+
+  // ngspice cktterr.c:74 *timeStep = MIN(*timeStep, del).
+  // *timeStep is caller-initialised to CKTmaxStep and threaded across
+  // elements. Aggregation + maxStep + 2*dt growth cap are applied by
+  // timestep.ts; here we return the per-element LTE-allowed dt only.
+  return del;
 }
 
 // ---------------------------------------------------------------------------

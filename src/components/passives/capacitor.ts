@@ -255,13 +255,13 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
    * source). Matches the Appendix D2 reference pattern.
    */
   load(ctx: LoadContext): void {
-    const { solver, voltages, initMode, isDcOp, isTransient, ag } = ctx;
+    const { solver, voltages, initMode, isDcOp, isTransient, isAc, ag } = ctx;
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const C = this.C;
 
     // Gate: capacitors only participate in tran/ac/tranop (capload.c:30).
-    if (!isTransient && !isDcOp) return;
+    if (!isTransient && !isDcOp && !isAc) return;
 
     // Determine if using initial condition (capload.c:32-36).
     const cond1 = (isDcOp && initMode === "initJct") ||

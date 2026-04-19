@@ -143,7 +143,6 @@ export class MNAEngine implements AnalogEngine {
     const { elements } = compiled;
 
     this._solver = new SparseSolver();
-    this._timestep = new TimestepController(this._params);
     this._history = new HistoryStore(elements.length);
     this._diagnostics = new DiagnosticCollector();
     this._convergenceLog.clear();
@@ -174,12 +173,25 @@ export class MNAEngine implements AnalogEngine {
           );
         }
       }
+      // D2: plumb UIC from params onto the state pool. Reactive elements
+      // (capacitor.ts, inductor.ts) and semiconductors (diode.ts, bjt.ts)
+      // read pool.uic directly. Mirrors ngspice traninit.c:35 where
+      // CKTmode = job->TRANmode carries MODEUIC.
+      cac.statePool.uic = this._params.uic ?? false;
     }
 
     this._firsttime = false;
 
     // Construct CKTCircuitContext for NR and DC-OP call sites.
     // Shares the same solver and elements as the rest of init().
+    //
+    // Order matters: the ctx constructor allocates ctx.deltaOld (length 7,
+    // seeded to params.maxTimeStep). The TimestepController is then built
+    // with a reference to THAT same array, so ctx.deltaOld and the
+    // controller's internal CKTdeltaOld[] are identical by identity —
+    // matches ngspice where CKTdeltaOld[7] lives on CKTcircuit. The
+    // addBreakpoint closure captures `this._timestep` by reference, so it
+    // resolves correctly after the controller is assigned below.
     this._ctx = new CKTCircuitContext(
       {
         nodeCount: compiled.nodeCount,
@@ -192,6 +204,7 @@ export class MNAEngine implements AnalogEngine {
       (t) => this._timestep.addBreakpoint(t),
       this._solver,
     );
+    this._timestep = new TimestepController(this._params, this._ctx.deltaOld);
     // Wire diagnostics
     this._ctx.diagnostics = this._diagnostics;
 
@@ -219,7 +232,15 @@ export class MNAEngine implements AnalogEngine {
     }
     this._lastDt = 0;
     this._firsttime = false;
-    this._timestep = new TimestepController(this._params);
+    // Preserve the unified CKTdeltaOld identity: reseed the SAME shared buffer
+    // that ctx.deltaOld points at, rather than letting the new controller
+    // self-allocate. Without this the TimestepController would allocate a
+    // fresh length-7 array, breaking `ctx.deltaOld === timestep.deltaOld`
+    // and forcing copy-loop drift back into the engine.
+    this._timestep = new TimestepController(
+      this._params,
+      this._ctx ? this._ctx.deltaOld : undefined,
+    );
     this._diagnostics.clear();
     this._convergenceLog.clear();
     this._stepCount = 0;
@@ -347,6 +368,9 @@ export class MNAEngine implements AnalogEngine {
     // Phase tracking for stepPhaseHook: first attempt is tranInit on step 0, tranNR thereafter.
     // Subsequent loop iterations in the same step are retries.
     let _stepAttemptCount = 0;
+    // ngspice dctran.c MODEINITPRED: set once before the first NR of a step,
+    // cleared to "transient" after the first load() pass completes.
+    let firstNrForThisStep = true;
 
     for (;;) {
       // ngspice dctran.c:735 — deltaOld[0] = delta each iteration.
@@ -405,8 +429,13 @@ export class MNAEngine implements AnalogEngine {
       }
 
       // --- NR solve (ngspice dctran.c:770 NIiter) ---
-      // xfact = deltaOld[0] / deltaOld[1] for predictor extrapolation in element load().
-      // Written here so all elements read the correct value during this NR call.
+      // ctx.deltaOld and timestep.deltaOld share the same backing array
+      // (wired in MNAEngine.init), so rotateDeltaOld()/setDeltaOldCurrent()
+      // updates are visible here without an explicit copy loop.
+      //
+      // xfact = deltaOld[0] / deltaOld[1] for predictor extrapolation in
+      // element load(). Written here so all elements read the correct value
+      // during this NR call.
       ctx.loadCtx.xfact = ctx.deltaOld[0] / ctx.deltaOld[1];
       // dt for reactive elements to use in load() (CKTdelta).
       ctx.loadCtx.dt = dt;
@@ -420,21 +449,19 @@ export class MNAEngine implements AnalogEngine {
       ctx.dcopModeLadder = null;
       ctx.exactMaxIterations = false;
       ctx.onIteration0Complete = null;
-      newtonRaphson(ctx);
-      const nrResult = ctx.nrResult;
-
-      if (statePool) {
+      // ngspice dctran.c MODEINITPRED: set before the first NR iteration of a
+      // new step only. On retries the predictor has already run once; revert
+      // to "transient" so capacitor.ts does not re-copy s0[SLOT_Q] = s1[SLOT_Q]
+      // on every iteration and collapse the divided difference.
+      if (statePool && firstNrForThisStep) {
         statePool.initMode = "initPred";
       }
-
-      // ngspice dctran.c:795-799 + capload.c:60-62:
-      // On first transient step (firsttime), copy s0->s1 for q0==q1,
-      // then seed s2/s3 from s1. Fires every NIiter return while firsttime
-      // (including retries), matching ngspice which runs these copies
-      // unconditionally after NIiter when firsttime is set.
-      if (this._firsttime && statePool) {
-        statePool.states[1].set(statePool.states[0]);
-        statePool.seedFromState1();
+      newtonRaphson(ctx);
+      const nrResult = ctx.nrResult;
+      // After the first load() pass, revert initMode to "transient".
+      if (statePool && firstNrForThisStep) {
+        statePool.initMode = "transient";
+        firstNrForThisStep = false;
       }
 
       // --- Logging (merged from initial and retry blocks) ---
@@ -550,6 +577,14 @@ export class MNAEngine implements AnalogEngine {
     // Accept the timestep — rotation already happened before the retry loop.
     if (statePool) {
       statePool.tranStep++;
+      // ngspice dctran.c:795-799 + capload.c:60-62:
+      // On first transient step (firsttime), copy s0->s1 for q0==q1,
+      // then seed s2/s3 from s1. Runs once per accepted step, not per NR retry,
+      // so prior-step history is never overwritten by a failed attempt.
+      if (this._firsttime) {
+        statePool.states[1].set(statePool.states[0]);
+        statePool.seedFromState1();
+      }
     }
 
     // NIpred: push fully-accepted solution into history for next step predictor.
@@ -735,6 +770,9 @@ export class MNAEngine implements AnalogEngine {
           el.initState(cac.statePool);
         }
       }
+      // D2: re-apply UIC onto the pool after reset() so semiconductors and
+      // reactive elements see the params.uic flag during DC-OP load passes.
+      cac.statePool.uic = this._params.uic ?? false;
     }
 
     const phaseHook = this.stepPhaseHook;
@@ -744,10 +782,14 @@ export class MNAEngine implements AnalogEngine {
     ctx.limitingCollector = this.limitingCollector;
     ctx.nodesets = cac.nodesets ?? new Map();
     ctx.ics = cac.ics ?? new Map();
-    ctx.srcFact = this._params.srcFact ?? 1;
-    // D3: standalone .OP takes MODEDCOP only, NOT MODETRANOP. vsrcload.c:410-411
-    // gates srcFact scaling on MODETRANOP, so this flag must be false here even
-    // though srcFact is non-1 during source-stepping sub-solves.
+    // D3: standalone .OP is MODEDCOP only (not MODETRANOP). vsrcload.c:410-411
+    // scales source value by CKTsrcFact ONLY under MODETRANOP, so for
+    // standalone .OP the source-load srcFact path is gated off by the flag
+    // below. CKTsrcFact itself must enter the ladder at 1 — the source-
+    // stepping sub-solve (gillespieSrc / spice3Src) mutates ctx.srcFact
+    // internally during the ramp, but the ladder entry value must be 1 so
+    // source-scaling only kicks in when the sub-solve asks for it.
+    ctx.srcFact = 1;
     ctx.isTransientDcop = false;
     ctx.isAc = false;
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
@@ -826,6 +868,11 @@ export class MNAEngine implements AnalogEngine {
           el.initState(cac.statePool);
         }
       }
+      // D2: re-apply UIC onto the pool after reset() — reset() clears state
+      // arrays and mode fields but not uic; this keeps the assignment explicit
+      // next to reset() so future maintenance does not silently drop it.
+      // Mirrors ngspice traninit.c:35 (CKTmode = job->TRANmode carrying MODEUIC).
+      cac.statePool.uic = this._params.uic ?? false;
     }
 
     const phaseHook = this.stepPhaseHook;
@@ -851,6 +898,11 @@ export class MNAEngine implements AnalogEngine {
     }
 
     return result;
+  }
+
+  /** Public entry point for transient DC-op. Delegates to _transientDcop(). */
+  transientDcop(): DcOpResult {
+    return this._transientDcop();
   }
 
   /**
@@ -1126,6 +1178,11 @@ export class MNAEngine implements AnalogEngine {
       // ctx.ag is CKTag[7] (cktdefs.h:97) read by elements via loadCtx.ag (D1).
       ctx.ag[0] = 0;
       ctx.ag[1] = 0;
+      // ngspice dctran.c:316-318 — CKTdeltaOld[i] = CKTmaxStep for all 7 slots
+      // at transient init. ctx.deltaOld is seeded in the CKTCircuitContext
+      // constructor, and the TimestepController references the same backing
+      // array (D2 unification). No copy loop needed — `ctx.deltaOld ===
+      // timestep.deltaOld` by identity.
       cac.statePool.seedHistory();
       cac.statePool.refreshElementRefs(ctx.poolBackedElements as unknown as PoolBackedAnalogElement[]);
       this._firsttime = true;

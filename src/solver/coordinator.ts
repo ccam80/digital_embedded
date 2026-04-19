@@ -358,7 +358,8 @@ export class DefaultSimulationCoordinator implements SimulationCoordinator {
       this._initialized = true;
       return;
     }
-    this._cachedDcOpResult = (this._analog as MNAEngine).dcOperatingPoint();
+    // ngspice dctran.c:230-233 MODETRANOP|MODEINITJCT entry for transient boot.
+    this._cachedDcOpResult = (this._analog as MNAEngine).transientDcop();
     this._initialized = true;
   }
 
