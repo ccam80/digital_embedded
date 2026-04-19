@@ -54,7 +54,7 @@ function makeAcResistor(nodeA: number, nodeB: number, resistance: number): Analo
     load(_ctx: LoadContext): void {},
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
-    stampAc(solver: ComplexSparseSolver, _omega: number): void {
+    stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {
       const a = nodeA > 0 ? nodeA - 1 : -1;
       const b = nodeB > 0 ? nodeB - 1 : -1;
       stampMatrix(solver, a, a, G, 0);
@@ -83,7 +83,7 @@ function makeAcCapacitor(nodeA: number, nodeB: number, capacitance: number): Ana
     load(_ctx: LoadContext): void {},
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
-    stampAc(solver: ComplexSparseSolver, omega: number): void {
+    stampAc(solver: ComplexSparseSolver, omega: number, _ctx: LoadContext): void {
       const jOmegaC = omega * capacitance; // imaginary part of admittance
       const a = nodeA > 0 ? nodeA - 1 : -1;
       const b = nodeB > 0 ? nodeB - 1 : -1;
@@ -111,7 +111,7 @@ function makeAcInductor(nodeA: number, nodeB: number, inductance: number): Analo
     load(_ctx: LoadContext): void {},
     setParam(_key: string, _value: number): void {},
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
-    stampAc(solver: ComplexSparseSolver, omega: number): void {
+    stampAc(solver: ComplexSparseSolver, omega: number, _ctx: LoadContext): void {
       // Y_L = 1/(jωL) = -j/(ωL)
       const admIm = -1 / (omega * inductance);
       const a = nodeA > 0 ? nodeA - 1 : -1;

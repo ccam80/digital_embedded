@@ -90,9 +90,12 @@ function makeTransientCtx(
     limitingCollector: null,
     isDcOp: false,
     isTransient: true,
+<<<<<<< HEAD
 
     isTransientDcop: false,
 
+=======
+>>>>>>> e427e072 (D4: add isAc flag and pass LoadContext to stampAc (ngspice alignment))
     isAc: false,
     xfact: 1,
     gmin: 1e-12,
@@ -854,9 +857,12 @@ describe("transformer_load_transient_parity (C4.2)", () => {
         limitingCollector: null,
         isDcOp: false,
         isTransient: true,
+<<<<<<< HEAD
 
         isTransientDcop: false,
 
+=======
+>>>>>>> e427e072 (D4: add isAc flag and pass LoadContext to stampAc (ngspice alignment))
         isAc: false,
         xfact: 1,
         gmin: 1e-12,

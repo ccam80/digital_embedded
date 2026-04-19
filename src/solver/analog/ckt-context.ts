@@ -239,7 +239,7 @@ export class CKTCircuitContext {
    * transient NR. See LoadContext.isTransientDcop for full semantics.
    */
   isTransientDcop: boolean = false;
-  /** True during AC small-signal sweeps (ngspice MODEAC, cktdefs.h). */
+  /** True during AC small-signal sweeps (ngspice MODEAC bit; acan.c:285). */
   isAc: boolean = false;
   /** Source stepping scale factor (ngspice srcFact). */
   srcFact: number = 1;

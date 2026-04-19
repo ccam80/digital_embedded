@@ -178,6 +178,18 @@ export class AcAnalysis {
     let acBranchHandleA = -1;
     let acBranchHandleB = -1;
 
+    // D4: ngspice acan.c:285 — `CKTmode = (CKTmode & MODEUIC) | MODEAC` at top
+    // of frequency loop. We preserve the LoadContext's uic field (set from
+    // params.uic at ctx construction) and flip isAc=true / isDcOp=false /
+    // isTransient=false for the entire sweep.
+    const acLoadCtx = dcCtx.loadCtx;
+    acLoadCtx.isAc = true;
+    acLoadCtx.isDcOp = false;
+    acLoadCtx.isTransient = false;
+    dcCtx.isAc = true;
+    dcCtx.isDcOp = false;
+    dcCtx.isTransient = false;
+
     for (let fi = 0; fi < numFreq; fi++) {
       const f = frequencies[fi];
       const omega = 2 * Math.PI * f;
@@ -188,7 +200,7 @@ export class AcAnalysis {
       // Stamp all element AC contributions
       for (const el of compiled.elements) {
         if (el.stampAc) {
-          el.stampAc(complexSolver, omega);
+          el.stampAc(complexSolver, omega, acLoadCtx);
         }
       }
 

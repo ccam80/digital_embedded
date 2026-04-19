@@ -178,8 +178,13 @@ export interface AnalogElementCore {
 
   /**
    * Stamp the element's frequency-domain small-signal model for AC analysis.
+   * D4: receives LoadContext; see src/solver/analog/element.ts for semantics.
    */
-  stampAc?(solver: ComplexSparseSolver, omega: number): void;
+  stampAc?(
+    solver: ComplexSparseSolver,
+    omega: number,
+    ctx: import("../solver/analog/load-context.js").LoadContext,
+  ): void;
 
   /**
    * True if this element performs nonlinear stamping inside load().

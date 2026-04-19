@@ -380,9 +380,12 @@ describe("Relay", () => {
         limitingCollector: null,
         isDcOp: false,
         isTransient: true,
+<<<<<<< HEAD
 
         isTransientDcop: false,
 
+=======
+>>>>>>> e427e072 (D4: add isAc flag and pass LoadContext to stampAc (ngspice alignment))
         isAc: false,
         xfact: 0,
         gmin: 1e-12,
@@ -513,9 +516,12 @@ describe("Task 6.4.3 — remaining pin loading propagates", () => {
       limitingCollector: null,
       isDcOp: false,
       isTransient: false,
+<<<<<<< HEAD
 
       isTransientDcop: false,
 
+=======
+>>>>>>> e427e072 (D4: add isAc flag and pass LoadContext to stampAc (ngspice alignment))
       isAc: false,
       xfact: 0,
       gmin: 1e-12,

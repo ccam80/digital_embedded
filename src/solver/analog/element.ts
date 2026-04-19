@@ -98,8 +98,14 @@ export interface AnalogElement {
    * conductance (same as DC); capacitors stamp jωC admittance; inductors
    * stamp 1/(jωL) admittance; nonlinear elements stamp linearized
    * small-signal conductances at the DC operating point.
+   *
+   * D4: receives the shared LoadContext (ngspice re-uses CKTcircuit in
+   * ACload()). During AC sweeps `ctx.isAc === true`, `ctx.isDcOp === false`,
+   * `ctx.isTransient === false`. `ctx.uic` mirrors the MODEUIC bit preserved
+   * across the AC-mode mask (acan.c:285). Element sites that do not need the
+   * context should simply ignore the third parameter.
    */
-  stampAc?(solver: ComplexSparseSolver, omega: number): void;
+  stampAc?(solver: ComplexSparseSolver, omega: number, ctx: LoadContext): void;
 
   /**
    * Arm a one-shot per-device junction seed for cold-start NR convergence.

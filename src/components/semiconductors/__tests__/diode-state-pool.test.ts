@@ -61,9 +61,12 @@ function makeDcOpCtx(voltages: Float64Array): LoadContext {
     limitingCollector: null,
     isDcOp: true,
     isTransient: false,
+<<<<<<< HEAD
 
     isTransientDcop: false,
 
+=======
+>>>>>>> e427e072 (D4: add isAc flag and pass LoadContext to stampAc (ngspice alignment))
     isAc: false,
     xfact: 1,
     gmin: 1e-12,
@@ -92,9 +95,12 @@ function makeTranCtx(voltages: Float64Array, dt: number, ag: Float64Array): Load
     limitingCollector: null,
     isDcOp: false,
     isTransient: true,
+<<<<<<< HEAD
 
     isTransientDcop: false,
 
+=======
+>>>>>>> e427e072 (D4: add isAc flag and pass LoadContext to stampAc (ngspice alignment))
     isAc: false,
     xfact: 1,
     gmin: 1e-12,
