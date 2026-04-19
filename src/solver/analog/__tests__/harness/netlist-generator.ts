@@ -58,7 +58,7 @@ export function generateSpiceNetlist(
   // One element line per compiled element
   for (let i = 0; i < compiled.elements.length; i++) {
     const el = compiled.elements[i];
-    const label = elementLabels.get(i) ?? `element_${i}`;
+    const rawLabel = elementLabels.get(i) ?? `element_${i}`;
     const circuitEl = compiled.elementToCircuitElement.get(i);
 
     if (!circuitEl) continue;
@@ -72,8 +72,17 @@ export function generateSpiceNetlist(
 
     let line: string;
 
-    // elementLabels already include the SPICE prefix (e.g., "Q1", "R1"),
-    // so we use label directly as the instance name.
+    // SPICE infers the element type from the first letter of the instance name.
+    // User-authored labels (e.g. "Vc" for a capacitor, "Vs" for a voltage source,
+    // "r1" vs "R1") may not start with the correct SPICE prefix for their type —
+    // emitting them verbatim silently reinterprets the device on the ngspice side
+    // (a capacitor labeled "Vc" becomes a voltage source in ngspice). When the
+    // label's first letter (case-insensitive) does not match the required SPICE
+    // prefix, prepend the prefix so ngspice parses the element as the correct type.
+    const requiredPrefix = spec.prefix.toUpperCase();
+    const label = rawLabel.charAt(0).toUpperCase() === requiredPrefix
+      ? rawLabel
+      : `${requiredPrefix}${rawLabel}`;
 
     if (typeId === "Resistor") {
       const R = getPropNumber(props, "resistance", 1000);
