@@ -23,6 +23,7 @@ import { GroundDefinition } from '../../components/io/ground.js';
 import type { Pin } from '../../core/pin.js';
 import type { ComponentDefinition } from '../../core/registry.js';
 import type { AnalogElement } from '../analog/element.js';
+import type { LoadContext } from '../analog/load-context.js';
 import type { SparseSolver } from '../analog/sparse-solver.js';
 import type { CircuitElement } from '../../core/element.js';
 import type { SerializedElement } from '../../core/element.js';
@@ -43,6 +44,18 @@ function makeResistorAnalogEl(nodeA: number, nodeB: number, r: number): AnalogEl
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
+    load(ctx: LoadContext): void {
+      if (nodeA !== 0 && nodeB !== 0) {
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeA - 1, nodeA - 1), +g);
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeB - 1, nodeB - 1), +g);
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeA - 1, nodeB - 1), -g);
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeB - 1, nodeA - 1), -g);
+      } else if (nodeA !== 0) {
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeA - 1, nodeA - 1), +g);
+      } else if (nodeB !== 0) {
+        ctx.solver.stampElement(ctx.solver.allocElement(nodeB - 1, nodeB - 1), +g);
+      }
+    },
     stampAc(s: SparseSolver) {
       if (nodeA > 0) s.stampElement(s.allocElement(nodeA - 1, nodeA - 1), g);
       if (nodeB > 0) s.stampElement(s.allocElement(nodeB - 1, nodeB - 1), g);
@@ -95,9 +108,9 @@ function makeGroundDef(): ComponentDefinition {
     models: {},
     modelRegistry: {
       behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
-        branchIndex: -1 as const,
+        pinNodeIds: [] as number[], allNodeIds: [] as number[], branchIndex: -1 as const,
         isNonlinear: false, isReactive: false,
-        stamp(_s: SparseSolver) {},
+        load(_ctx: LoadContext): void {},
         getPinCurrents(_v: Float64Array) { return [0]; },
         setParam(_key: string, _value: number) {},
       }), paramDefs: [], params: {} },

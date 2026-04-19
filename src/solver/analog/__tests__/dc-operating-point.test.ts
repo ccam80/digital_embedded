@@ -44,18 +44,24 @@ import type { SimulationParams } from "../../../core/analog-engine-interface.js"
 const noopBreakpoint = (_t: number): void => {};
 
 /**
- * Create a test element that forces NR to report non-convergence unless
- * diagonalGmin > 0 (i.e., gmin stepping is active). This element always
- * sets noncon.value++ in its load() when ctx.gmin === 0, simulating a
- * nonlinear device that requires gmin regularisation to converge.
+ * Create a test element that forces NR to report non-convergence until
+ * ctx.gmin > 0 (i.e., gmin stepping is active). ctx.gmin (LoadContext.gmin)
+ * equals CKTdiagGmin — set per-iteration by ckt-load.ts from ctx.diagonalGmin.
+ * This element bumps noncon.value++ while ctx.gmin === 0 and no positive gmin
+ * has been seen yet, simulating a nonlinear device that requires gmin
+ * regularisation to converge. Once gmin stepping has warmed up the operating
+ * point, the flag is set and the final clean solve (gmin=0) is not blocked.
  *
  * Used to reliably force the gmin/src stepping paths in tests.
- * Only one node is affected (nodeA); it stamps a unit conductance to keep
+ * Only one node is affected (nodeA); it stamps a small conductance to keep
  * the matrix non-singular.
  */
 function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogElement {
   const Is = 1e-14;
   const vt = 0.025852;
+  // Once gmin stepping has started (diagonalGmin > 0 observed at least once),
+  // stop blocking so the final clean solve can converge normally.
+  let seenPositiveDiagGmin = false;
   function stampG(solver: import("../sparse-solver.js").SparseSolver, row: number, col: number, val: number): void {
     if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row - 1, col - 1), val);
   }
@@ -88,6 +94,15 @@ function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogEleme
       // RHS stamps
       if (nodeA !== 0) solver.stampRHS(nodeA - 1, -ieq);
       if (nodeB !== 0) solver.stampRHS(nodeB - 1, ieq);
+      // Track whether gmin stepping has started. ctx.gmin (LoadContext.gmin)
+      // equals CKTdiagGmin — set by ckt-load.ts from ctx.diagonalGmin before
+      // each NR iteration. Once a positive gmin is seen, the operating point
+      // has been warmed up and the final clean solve (gmin=0) can converge.
+      if (ctx.gmin > 0) seenPositiveDiagGmin = true;
+      // Force non-convergence when gmin=0 so direct NR fails and the
+      // gmin stepping fallback is reliably entered. Stop blocking once gmin
+      // stepping has warmed up the solution.
+      if (ctx.gmin === 0 && !seenPositiveDiagGmin) ctx.noncon.value++;
     },
 
     getPinCurrents(_v: Float64Array): number[] { return nodeB === 0 ? [0] : [0, 0]; },
@@ -110,6 +125,9 @@ function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogEleme
  */
 function makeSrcSteppingRequiredElement(nodeA: number, nodeB: number = 0): AnalogElement {
   const vt = 0.025852;
+  // Once source stepping has started (srcFact < 1 observed at least once),
+  // stop blocking so the final full-scale step can converge.
+  let seenPartialSrcFact = false;
   function stampG(solver: import("../sparse-solver.js").SparseSolver, row: number, col: number, val: number): void {
     if (row !== 0 && col !== 0) solver.stampElement(solver.allocElement(row - 1, col - 1), val);
   }
@@ -142,6 +160,14 @@ function makeSrcSteppingRequiredElement(nodeA: number, nodeB: number = 0): Analo
       stampG(solver, nodeB, nodeA, -geq);
       if (nodeA !== 0) solver.stampRHS(nodeA - 1, -ieq);
       if (nodeB !== 0) solver.stampRHS(nodeB - 1, ieq);
+      // Track whether source stepping has started (srcFact < 1 means we're
+      // inside the stepping ramp). Once seen, allow the final full-scale step
+      // to converge normally so spice3Src/gillespieSrc can complete.
+      if (ctx.srcFact < 1) seenPartialSrcFact = true;
+      // Force non-convergence at full scale until source stepping has warmed
+      // up the operating point. Direct NR and gmin stepping both run at
+      // srcFact=1 and fail here, triggering the source-stepping fallback.
+      if (ctx.srcFact >= 1 && !seenPartialSrcFact) ctx.noncon.value++;
     },
 
     getPinCurrents(_v: Float64Array): number[] { return nodeB === 0 ? [0] : [0, 0]; },
@@ -743,14 +769,13 @@ describe("DcOP", () => {
     // Use makeGminDependentElement to force the dynamicGmin path (direct NR
     // fails because gmin=0). Run with gminFactor=10 and gminFactor=20, count
     // gmin steps. Larger factor → fewer steps (gmin decreases faster).
-    // SURFACED: Cannot force dynamicGmin path without out-of-scope mock; reporting red-detecting-real-divergence per tests-red protocol
     const makeElements = () => [
       makeVoltageSource(1, 0, 1, 5),
       makeResistor(1, 0, 1000),
       makeGminDependentElement(1),
     ];
 
-    const ctx10 = makeCtx(makeElements(), 2, 1, {
+    const ctx10 = makeCtx(makeElements(), 1, 1, {
       ...DEFAULT_PARAMS,
       gmin: 1e-12,
       gminFactor: 10,
@@ -759,7 +784,7 @@ describe("DcOP", () => {
     ctx10._onPhaseBegin = (phase) => { if (phase === "dcopGminDynamic") steps10++; };
     solveDcOperatingPoint(ctx10);
 
-    const ctx20 = makeCtx(makeElements(), 2, 1, {
+    const ctx20 = makeCtx(makeElements(), 1, 1, {
       ...DEFAULT_PARAMS,
       gmin: 1e-12,
       gminFactor: 20,
@@ -793,7 +818,6 @@ describe("DcOP", () => {
     // The clean solve runs with gshunt=0; if it used dcTrcvMaxIter=3 it may
     // fail. With maxIterations=100 it has adequate budget. We verify the solver
     // converges AND used the dynamicGmin path.
-    // SURFACED: Cannot force dynamicGmin path without out-of-scope mock; reporting red-detecting-real-divergence per tests-red protocol
     const elements = [
       makeVoltageSource(1, 0, 1, 5),
       makeResistor(1, 0, 1000),
@@ -930,7 +954,6 @@ describe("DcOP", () => {
     // spice3Src loop succeeds (intermediate srcFact values).
     // numSrcSteps=4 forces spice3Src (numSrcSteps > 1).
     // Count NR calls in dcopSrcSweep phase: must be numSrcSteps+1=5, not 6.
-    // SURFACED: Cannot force spice3Src path without out-of-scope mock; reporting red-detecting-real-divergence per tests-red protocol
     const numSrcSteps = 4;
     const elements = [
       makeVoltageSource(1, 0, 1, 5),
@@ -984,7 +1007,6 @@ describe("DcOP", () => {
     // gillespieSrc stepping loop uses intermediate srcFact → element converges.
     // Capture ctx.diagonalGmin inside postIterationHook during dcopSrcSweep
     // phase with param > 0 (stepping loop NR calls).
-    // SURFACED: Cannot force gillespieSrc path without out-of-scope mock; reporting red-detecting-real-divergence per tests-red protocol
     const gshuntVal = 1e-9;
     const elements = [
       makeVoltageSource(1, 0, 1, 5),

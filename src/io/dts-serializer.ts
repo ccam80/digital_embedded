@@ -136,6 +136,11 @@ function elementToDtsElement(
       const deltaParams: Record<string, number | string> = {};
       for (const key of bag.getModelParamKeys()) {
         const current = bag.getModelParam<number>(key);
+        // NaN-default params (BJT ICVBE/ICVCE, diode IC, capacitor IC, etc.)
+        // use NaN as the "unset" sentinel — every model's load() guards with
+        // isNaN(). NaN !== NaN would otherwise route an unchanged sentinel into
+        // the delta, where JSON.stringify(NaN) === "null" trips the schema.
+        if (isNaN(current)) continue;
         if (current !== defaults[key]) {
           deltaParams[key] = encodeInfinity(current);
         }

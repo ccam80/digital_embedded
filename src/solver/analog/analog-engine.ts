@@ -1105,6 +1105,12 @@ export class MNAEngine implements AnalogEngine {
       // so that elements reading ag[0] during the first transient NR see ag0=0 (DC form)
       // for the initial companion stamp, not a stale value.
       cac.statePool.analysisMode = "tran";
+      // ngspice dctran.c:346 — `CKTmode = (CKTmode & MODEUIC) | MODETRAN | MODEINITTRAN`.
+      // Set isTransient ONCE here, post-DCOP / pre-first-step. Reactive elements
+      // (capacitor, inductor, transmission-line, transformer, …) gate their
+      // companion stamps on `isTransient || isDcOp`; without this assignment the
+      // entire reactive ladder is invisible to every transient NR call.
+      ctx.isTransient = true;
       cac.statePool.ag[0] = 0;
       cac.statePool.ag[1] = 0;
       cac.statePool.seedHistory();

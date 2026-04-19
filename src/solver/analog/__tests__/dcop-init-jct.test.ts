@@ -158,12 +158,12 @@ describe("dcopInitJct", () => {
       const { element, pool } = withState(core);
       withNodeIds(element, [1, 2, 3]);
 
-      // Arm the seed (no argument).
-      element.primeJunctions!();
-
+      // Prime junctions by setting initJct mode and calling load().
+      pool.initMode = "initJct";
       const voltages = new Float64Array(3); // shared MNA vector stays at zero
       const ctx = makeSoloLoadCtx(voltages);
       element.load(ctx);
+      pool.initMode = "transient";
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_NPN_DEFAULTS.IS, BJT_NPN_DEFAULTS.AREA);
       const base = (element as any).stateBaseOffset as number;
@@ -203,9 +203,10 @@ describe("dcopInitJct", () => {
       const { element, pool } = withState(core);
       withNodeIds(element, [1, 2, 3]);
 
-      element.primeJunctions!();
+      pool.initMode = "initJct";
       const voltages = new Float64Array(3);
       element.load(makeSoloLoadCtx(voltages));
+      pool.initMode = "transient";
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_NPN_DEFAULTS.IS, BJT_NPN_DEFAULTS.AREA);
       const base = (element as any).stateBaseOffset as number;
@@ -227,9 +228,10 @@ describe("dcopInitJct", () => {
       const { element, pool } = withState(core);
       withNodeIds(element, [1, 0, 2]);
 
-      element.primeJunctions!();
+      pool.initMode = "initJct";
       const voltages = new Float64Array(2);
       element.load(makeSoloLoadCtx(voltages));
+      pool.initMode = "transient";
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_NPN_DEFAULTS.IS, BJT_NPN_DEFAULTS.AREA);
       const base = (element as any).stateBaseOffset as number;
@@ -262,10 +264,11 @@ describe("dcopInitJct", () => {
       const { element, pool } = withState(core);
       withNodeIds(element, [1, 2, 3]);
 
-      element.primeJunctions!();
+      pool.initMode = "initJct";
       const voltages = new Float64Array(3);
       const ctx = makeSoloLoadCtx(voltages);
       element.load(ctx);
+      pool.initMode = "transient";
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_SPICE_L1_NPN_DEFAULTS.IS, BJT_SPICE_L1_NPN_DEFAULTS.AREA);
       const base = (element as any).stateBaseOffset as number;
@@ -298,10 +301,11 @@ describe("dcopInitJct", () => {
       const { element, pool } = withState(core as any);
       withNodeIds(element, [1, 2]);
 
-      element.primeJunctions!();
+      pool.initMode = "initJct";
       const voltages = new Float64Array(2);
       const ctx = makeSoloLoadCtx(voltages);
       element.load(ctx);
+      pool.initMode = "transient";
 
       const nVt = DIODE_PARAM_DEFAULTS.N * VT_ROOM;
       const tVcrit = nVt * Math.log(nVt / (DIODE_PARAM_DEFAULTS.IS * Math.SQRT2));
@@ -331,9 +335,10 @@ describe("dcopInitJct", () => {
       const { element, pool } = withState(core as any);
       withNodeIds(element, [1, 0]);
 
-      element.primeJunctions!();
+      pool.initMode = "initJct";
       const voltages = new Float64Array(1);
       element.load(makeSoloLoadCtx(voltages));
+      pool.initMode = "transient";
 
       const nVt = DIODE_PARAM_DEFAULTS.N * VT_ROOM;
       const tVcrit = nVt * Math.log(nVt / (DIODE_PARAM_DEFAULTS.IS * Math.SQRT2));

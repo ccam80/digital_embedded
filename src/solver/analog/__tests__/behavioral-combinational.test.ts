@@ -15,10 +15,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { SparseSolver } from "../sparse-solver.js";
-import { DiagnosticCollector } from "../diagnostics.js";
-import { newtonRaphson } from "../newton-raphson.js";
-import { makeVoltageSource, makeResistor, withNodeIds } from "./test-helpers.js";
+import { makeVoltageSource, makeResistor, withNodeIds, runNR } from "./test-helpers.js";
 import {
   BehavioralMuxElement,
   BehavioralDemuxElement,
@@ -66,9 +63,17 @@ const NR_OPTS = { maxIterations: 50, reltol: 1e-3, abstol: 1e-6, iabstol: 1e-12 
 // ---------------------------------------------------------------------------
 
 function solve(elements: AnalogElement[], matrixSize: number) {
-  const solver = new SparseSolver();
-  const diagnostics = new DiagnosticCollector();
-  return newtonRaphson({ solver, elements, matrixSize, ...NR_OPTS, diagnostics });
+  // nodeCount = number of actual circuit nodes (matrixSize minus branch rows).
+  // The test builders set branch rows starting at nodeCount, so we derive
+  // nodeCount by counting unique non-zero node IDs across all elements.
+  const nodeIds = new Set<number>();
+  for (const el of elements) {
+    for (const n of el.allNodeIds) {
+      if (n > 0) nodeIds.add(n);
+    }
+  }
+  const nodeCount = nodeIds.size;
+  return runNR({ elements, matrixSize, nodeCount, params: NR_OPTS, isDcOp: true });
 }
 
 // ---------------------------------------------------------------------------

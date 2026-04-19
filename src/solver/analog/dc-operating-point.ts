@@ -150,6 +150,12 @@ function runNR(
   exactMaxIterations?: boolean,
 ): StepResult {
   ctx.isDcOp = true;
+  // Mutually exclusive with isTransient — matches ngspice's MODEDCOP/MODETRAN
+  // bitfield where dctran.c:346 overwrites MODEDCOP with MODETRAN. Without this
+  // pair, a reset() → step() → dcOp() sequence would carry isTransient=true
+  // into the DCOP solve and elements gating on `isTransient || isDcOp` would
+  // see both flags simultaneously.
+  ctx.isTransient = false;
   ctx.maxIterations = maxIterations;
   ctx.initialGuess = initialGuess;
   ctx.diagonalGmin = diagonalGmin;

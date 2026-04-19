@@ -6,8 +6,8 @@
  *   -q / --quiet   Minimal output (summary line + JSON path). Sets VITEST_QUIET=1.
  */
 import { spawnSync } from 'child_process';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'fs';
+import { dirname, resolve } from 'path';
 
 const args = process.argv.slice(2);
 const quietMode = args.includes('-q') || args.includes('--quiet');
@@ -18,8 +18,23 @@ if (quietMode) env.VITEST_QUIET = '1';
 const vitest = spawnSync('npx', ['vitest', 'run'], { stdio: 'inherit', shell: true, env });
 // In quiet mode, suppress Playwright's stdout (JSON reporter still writes to file)
 const pwStdio = quietMode ? ['inherit', 'pipe', 'pipe'] : 'inherit';
+// Redirect Chromium's per-worker profile dirs AND browser binaries into the
+// project tree so Windows Defender exclusions cover them. TEMP/TMP/TMPDIR
+// control profile scratch (os.tmpdir()); PLAYWRIGHT_BROWSERS_PATH controls
+// where chromium.exe is installed/resolved.
+const pwTmp = resolve('.playwright-tmp');
+const pwBrowsers = resolve('.playwright-browsers');
+rmSync(pwTmp, { recursive: true, force: true });
+mkdirSync(pwTmp, { recursive: true });
+const pwEnv = {
+  ...env,
+  TEMP: pwTmp,
+  TMP: pwTmp,
+  TMPDIR: pwTmp,
+  PLAYWRIGHT_BROWSERS_PATH: pwBrowsers,
+};
 const pwStart = Date.now();
-const playwright = spawnSync('npx', ['playwright', 'test'], { stdio: pwStdio, shell: true, env });
+const playwright = spawnSync('npx', ['playwright', 'test'], { stdio: pwStdio, shell: true, env: pwEnv });
 const pwDuration = ((Date.now() - pwStart) / 1000).toFixed(1);
 
 // --- Merge reports into a single combined JSON ---

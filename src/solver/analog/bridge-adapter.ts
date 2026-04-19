@@ -113,11 +113,15 @@ export class BridgeOutputAdapter implements AnalogElement {
   /**
    * Post-accepted-step update for the C_out companion state.
    *
-   * Only active for transient solves with a loaded, capacitive output pin.
+   * Active for transient solves AND post-DCOP priming (dt=0, ag[0]=0):
+   * the ngspice DEVaccept analog runs after CKTop with MODETRAN set so that
+   * _prevVoltage is seeded with the DCOP node voltage before the first
+   * transient NR stamps a companion. Without this, the companion injects a
+   * fictitious step-change from _prevVoltage=0 and LTE destabilises.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     if (!this._pinModel.loaded || this._pinModel.capacitance <= 0) return;
-    if (!ctx.isTransient || ctx.dt <= 0) return;
+    if (!ctx.isTransient) return;
     const v = readMnaVoltage(this._pinModel.nodeId, ctx.voltages);
     this._pinModel.accept(ctx, v);
   }
@@ -205,11 +209,14 @@ export class BridgeInputAdapter implements AnalogElement {
   /**
    * Post-accepted-step update for the C_in companion state.
    *
-   * Only active for transient solves with a loaded, capacitive input pin.
+   * Active for transient solves AND post-DCOP priming (dt=0, ag[0]=0):
+   * the ngspice DEVaccept analog runs after CKTop with MODETRAN set so that
+   * _prevVoltage is seeded with the DCOP node voltage before the first
+   * transient NR stamps a companion.
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     if (!this._pinModel.loaded || this._pinModel.capacitance <= 0) return;
-    if (!ctx.isTransient || ctx.dt <= 0) return;
+    if (!ctx.isTransient) return;
     const v = readMnaVoltage(this._pinModel.nodeId, ctx.voltages);
     this._pinModel.accept(ctx, v);
   }

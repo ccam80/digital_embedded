@@ -747,6 +747,19 @@ function makeResistorElementForLed(nodeA: number, nodeB: number, resistance: num
         solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -G);
       }
     },
+    load(ctx: import("../../../solver/analog/load-context.js").LoadContext): void {
+      const solver = ctx.solver;
+      if (nodeA !== 0 && nodeB !== 0) {
+        solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), +G);
+        solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), +G);
+        solver.stampElement(solver.allocElement(nodeA - 1, nodeB - 1), -G);
+        solver.stampElement(solver.allocElement(nodeB - 1, nodeA - 1), -G);
+      } else if (nodeA !== 0) {
+        solver.stampElement(solver.allocElement(nodeA - 1, nodeA - 1), +G);
+      } else if (nodeB !== 0) {
+        solver.stampElement(solver.allocElement(nodeB - 1, nodeB - 1), +G);
+      }
+    },
   };
 }
 

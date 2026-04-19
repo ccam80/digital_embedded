@@ -18,6 +18,7 @@ import type { MeasurementObserver } from '../../core/engine-interface.js';
 import type { SerializedElement } from '../../core/element.js';
 import type { RenderContext, Rect } from '../../core/renderer-interface.js';
 import type { AnalogElement } from '../../solver/analog/element.js';
+import type { LoadContext } from '../../solver/analog/load-context.js';
 import type { SparseSolver } from '../../solver/analog/sparse-solver.js';
 import type { SignalAddress, CompiledCircuitUnified } from '../types.js';
 import { ConcreteCompiledAnalogCircuit } from '../../solver/analog/compiled-analog-circuit.js';
@@ -133,6 +134,19 @@ function makeResistorAnalogEl(n1: number, n2: number, resistance: number): Analo
         solver.stampElement(solver.allocElement(n2 - 1, n1 - 1), -g);
       }
     },
+    load(ctx: LoadContext): void {
+      const g = 1 / resistance;
+      if (n1 !== 0 && n2 !== 0) {
+        ctx.solver.stampElement(ctx.solver.allocElement(n1 - 1, n1 - 1), +g);
+        ctx.solver.stampElement(ctx.solver.allocElement(n2 - 1, n2 - 1), +g);
+        ctx.solver.stampElement(ctx.solver.allocElement(n1 - 1, n2 - 1), -g);
+        ctx.solver.stampElement(ctx.solver.allocElement(n2 - 1, n1 - 1), -g);
+      } else if (n1 !== 0) {
+        ctx.solver.stampElement(ctx.solver.allocElement(n1 - 1, n1 - 1), +g);
+      } else if (n2 !== 0) {
+        ctx.solver.stampElement(ctx.solver.allocElement(n2 - 1, n2 - 1), +g);
+      }
+    },
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },
     setParam(_key: string, _value: number): void {},
   };
@@ -186,7 +200,7 @@ function makeGroundDef(): ComponentDefinition {
       behavioral: { kind: 'inline' as const, factory: (_pinNodes: ReadonlyMap<string, number>) => ({
         pinNodeIds: [], allNodeIds: [], branchIndex: -1,
         isNonlinear: false, isReactive: false,
-        stamp(_s: SparseSolver) {},
+        load(_ctx: LoadContext): void {},
         getPinCurrents(_v: Float64Array) { return [0]; },
       }), paramDefs: [], params: {} },
     },

@@ -22,10 +22,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { SparseSolver } from "../sparse-solver.js";
-import { DiagnosticCollector } from "../diagnostics.js";
-import { newtonRaphson } from "../newton-raphson.js";
-import { makeVoltageSource, makeResistor, withNodeIds } from "./test-helpers.js";
+import { makeVoltageSource, makeResistor, withNodeIds, runNR } from "./test-helpers.js";
 import {
   BehavioralGateElement,
   makeAndAnalogFactory,
@@ -87,9 +84,6 @@ function make2InputGateCircuit(
   vA: number,
   vB: number,
 ) {
-  const solver = new SparseSolver();
-  const diagnostics = new DiagnosticCollector();
-
   // Ideal voltage sources driving input nodes (1-based circuit nodes)
   const vsA = makeVoltageSource(1, 0, 3, vA); // node 1, branch row 3
   const vsB = makeVoltageSource(2, 0, 4, vB); // node 2, branch row 4
@@ -99,7 +93,7 @@ function make2InputGateCircuit(
 
   const elements: AnalogElement[] = [vsA, vsB, rLoad, withNodeIds(gateElement, [1, 2, 3])];
 
-  return { solver, diagnostics, elements, matrixSize: 5 };
+  return { elements, matrixSize: 5 };
 }
 
 /**
@@ -115,30 +109,23 @@ function make1InputGateCircuit(
   gateElement: BehavioralGateElement,
   vIn: number,
 ) {
-  const solver = new SparseSolver();
-  const diagnostics = new DiagnosticCollector();
-
   const vsIn = makeVoltageSource(1, 0, 2, vIn); // node 1, branch row 2
   const rLoad = makeResistor(2, 0, LOAD_R);
 
   const elements: AnalogElement[] = [vsIn, rLoad, withNodeIds(gateElement, [1, 2])];
 
-  return { solver, diagnostics, elements, matrixSize: 3 };
+  return { elements, matrixSize: 3 };
 }
 
-function solve(
-  solver: SparseSolver,
-  diagnostics: DiagnosticCollector,
-  elements: AnalogElement[],
-  matrixSize: number,
-) {
-  return newtonRaphson({
-    solver,
-    elements,
-    matrixSize,
-    ...NR_OPTS,
-    diagnostics,
-  });
+function solve(elements: AnalogElement[], matrixSize: number) {
+  const nodeIds = new Set<number>();
+  for (const el of elements) {
+    for (const n of el.allNodeIds) {
+      if (n > 0) nodeIds.add(n);
+    }
+  }
+  const nodeCount = nodeIds.size;
+  return runNR({ elements, matrixSize, nodeCount, params: NR_OPTS, isDcOp: true });
 }
 
 /**
@@ -181,7 +168,7 @@ describe("AND", () => {
     const { solver, diagnostics, elements, matrixSize } =
       make2InputGateCircuit(gate, VDD, VDD);
 
-    const result = solve(solver, diagnostics, elements, matrixSize);
+    const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
     // Output node is solver index 2 (circuit node 3)
@@ -196,7 +183,7 @@ describe("AND", () => {
     const { solver, diagnostics, elements, matrixSize } =
       make2InputGateCircuit(gate, VDD, GND);
 
-    const result = solve(solver, diagnostics, elements, matrixSize);
+    const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
     const vOut = result.voltages[2];
@@ -214,24 +201,14 @@ describe("NOT", () => {
     // Input HIGH → output LOW
     const gateHigh = make1InputGate((inputs) => !inputs[0]);
     const highCircuit = make1InputGateCircuit(gateHigh, VDD);
-    const resultHigh = solve(
-      highCircuit.solver,
-      highCircuit.diagnostics,
-      highCircuit.elements,
-      highCircuit.matrixSize,
-    );
+    const resultHigh = solve(highCircuit.elements, highCircuit.matrixSize);
     expect(resultHigh.converged).toBe(true);
     expect(resultHigh.voltages[1]).toBeCloseTo(0.0, 2);
 
     // Input LOW → output HIGH
     const gateLow = make1InputGate((inputs) => !inputs[0]);
     const lowCircuit = make1InputGateCircuit(gateLow, GND);
-    const resultLow = solve(
-      lowCircuit.solver,
-      lowCircuit.diagnostics,
-      lowCircuit.elements,
-      lowCircuit.matrixSize,
-    );
+    const resultLow = solve(lowCircuit.elements, lowCircuit.matrixSize);
     expect(resultLow.converged).toBe(true);
     const vOut = resultLow.voltages[1];
     expect(vOut).toBeGreaterThan(3.0);
@@ -257,7 +234,7 @@ describe("NAND", () => {
       const gate = make2InputGate((inputs) => !(inputs[0] && inputs[1]));
       const { solver, diagnostics, elements, matrixSize } =
         make2InputGateCircuit(gate, vA, vB);
-      const result = solve(solver, diagnostics, elements, matrixSize);
+      const result = solve(elements, matrixSize);
 
       expect(result.converged).toBe(true);
       const vOut = result.voltages[2];
@@ -288,7 +265,7 @@ describe("XOR", () => {
       const gate = make2InputGate((inputs) => inputs[0] !== inputs[1]);
       const { solver, diagnostics, elements, matrixSize } =
         make2InputGateCircuit(gate, vA, vB);
-      const result = solve(solver, diagnostics, elements, matrixSize);
+      const result = solve(elements, matrixSize);
 
       expect(result.converged).toBe(true);
       const vOut = result.voltages[2];
@@ -311,7 +288,7 @@ describe("NR", () => {
     const { solver, diagnostics, elements, matrixSize } =
       make2InputGateCircuit(gate, VDD, VDD);
 
-    const result = solve(solver, diagnostics, elements, matrixSize);
+    const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
     expect(result.iterations).toBeLessThanOrEqual(5);
@@ -325,7 +302,7 @@ describe("NR", () => {
     const { solver, diagnostics, elements, matrixSize } =
       make2InputGateCircuit(gate, 1.5, VDD);
 
-    const result = solve(solver, diagnostics, elements, matrixSize);
+    const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
     // Initial latch is false, so AND output should be LOW
@@ -348,8 +325,6 @@ describe("Loading", () => {
     // actually for rIn=10MΩ and Rsource=1kΩ: sag = 3.3 * 1000 / (1e7+1000) ≈ 0.33mV
     // The spec's intention is that the loading IS measurable but small.
     // We verify the node voltage is slightly below 3.3V.
-    const solver = new SparseSolver();
-    const diagnostics = new DiagnosticCollector();
 
     // Node 1 = input node (0-based solver: 0)
     // 1kΩ from 3.3V source to node 1 (driving through resistor, not ideal VS)
@@ -385,13 +360,7 @@ describe("Loading", () => {
     const elements: AnalogElement[] = [vs, rSource, rLoad, withNodeIds(gate, [1, 2])];
     const matrixSize = 4; // solver nodes 0,1,2 + branch row 3
 
-    const result = newtonRaphson({
-      solver,
-      elements,
-      matrixSize,
-      ...NR_OPTS,
-      diagnostics,
-    });
+    const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
     // Input node (solver 0) should be slightly below 3.3V due to rIn loading
@@ -460,7 +429,7 @@ describe("Factory", () => {
 
     const { solver, diagnostics, elements, matrixSize } =
       make2InputGateCircuit(nandGate, VDD, VDD);
-    const result = solve(solver, diagnostics, elements, matrixSize);
+    const result = solve(elements, matrixSize);
 
     expect(result.converged).toBe(true);
     // NAND(HIGH, HIGH) = LOW

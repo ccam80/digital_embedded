@@ -469,6 +469,16 @@ export class CKTCircuitContext {
     this.elements = elements;
     this.statePool = circuit.statePool ?? null;
 
+    // Pre-computed element lists (zero-alloc invariant per spec phase-1).
+    // Populated once at construction; mirrors ngspice's per-device-type
+    // CKThead[] linked lists assembled at parse time, never rebuilt.
+    this.nonlinearElements = elements.filter(el => el.isNonlinear);
+    this.reactiveElements = elements.filter(el => el.isReactive);
+    this.poolBackedElements = elements.filter(el => isPoolBacked(el));
+    this.elementsWithConvergence = elements.filter(el => el.checkConvergence !== undefined);
+    this.elementsWithLte = elements.filter(el => el.getLteTimestep !== undefined);
+    this.elementsWithAcceptStep = elements.filter(el => el.acceptStep !== undefined);
+
     // Matrix / solver — shared instance owned by the engine
     this.solver = solver;
 
@@ -607,17 +617,6 @@ export class CKTCircuitContext {
     // Keep the full params reference in sync so downstream readers
     // (e.g. solveDcOperatingPoint) see the new values.
     this.params = params;
-
-    // Pre-computed element lists
-    this.nonlinearElements = elements.filter(el => el.isNonlinear);
-    this.reactiveElements = elements.filter(el => el.isReactive);
-    this.poolBackedElements = elements.filter(el => isPoolBacked(el));
-    this.elementsWithConvergence = elements.filter(el => el.checkConvergence !== undefined);
-    this.elementsWithLte = elements.filter(el => el.getLteTimestep !== undefined);
-    this.elementsWithAcceptStep = elements.filter(el => el.acceptStep !== undefined);
-
-    // Derive hadNodeset from nodesets size — populated later by engine
-    this.hadNodeset = false;
   }
 
   /**
