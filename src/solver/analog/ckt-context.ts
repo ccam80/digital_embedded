@@ -188,8 +188,17 @@ export class CKTCircuitContext {
   /** Per-node voltage history for NIpred predictor (CKTsols[]). */
   nodeVoltageHistory: NodeVoltageHistory;
   /**
-   * Previous timestep history for Vandermonde solve (ngspice deltaOld[]).
-   * Pre-allocated length 7, matching computeNIcomCof/solveGearVandermonde signature.
+   * Previous timestep history (ngspice CKTdeltaOld[7], cktdefs.h).
+   *
+   * Unified storage — the TimestepController references this SAME array by
+   * identity (no duplicate buffer, no explicit copies). Elements read via
+   * loadCtx.deltaOld / ctx.deltaOld inside load(); the timestep controller
+   * writes via rotateDeltaOld()/setDeltaOldCurrent(). Guaranteed invariant:
+   * `ctx.deltaOld === ctx.timestep._deltaOld` after the engine wires the
+   * two together in MNAEngine.init().
+   *
+   * Seeded in the constructor to `params.maxTimeStep` across all 7 slots,
+   * matching ngspice dctran.c:316-317 at transient init.
    */
   deltaOld: number[];
 
@@ -375,7 +384,6 @@ export class CKTCircuitContext {
    */
   dcopModeLadder: {
     runPrimeJunctions(): void;
-    pool: { initMode: string };
     onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number): void;
     onModeEnd(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iteration: number, converged: boolean): void;
   } | null;
@@ -385,12 +393,6 @@ export class CKTCircuitContext {
    * Required for INITJCT/INITFIX DC op phases that need exactly 1 iteration.
    */
   exactMaxIterations: boolean;
-
-  /**
-   * Optional initial guess for the NR solution vector.
-   * When non-null, copied into prevVoltages at NR entry.
-   */
-  initialGuess: Float64Array | null;
 
   /**
    * Hook fired once after iteration 0 completes (before iteration 1 begins).
@@ -508,7 +510,11 @@ export class CKTCircuitContext {
     // Integration
     this.ag = new Float64Array(7);
     this.agp = new Float64Array(7);
-    this.deltaOld = new Array(7).fill(0);
+    // ngspice dctran.c:316-317: CKTdeltaOld[i] = CKTmaxStep for all 7 slots at
+    // transient init. Seeded here so every CKTCircuitContext is born with
+    // ngspice-faithful deltaOld contents, and the TimestepController wired in
+    // MNAEngine.init() inherits them (shared-reference invariant).
+    this.deltaOld = new Array<number>(7).fill(params.maxTimeStep);
     this.nodeVoltageHistory = new NodeVoltageHistory();
     this.nodeVoltageHistory.initNodeVoltages(matrixSize);
 
@@ -577,7 +583,6 @@ export class CKTCircuitContext {
     // NR call-specific parameters (set by caller before each newtonRaphson call)
     this.dcopModeLadder = null;
     this.exactMaxIterations = false;
-    this.initialGuess = null;
     this.onIteration0Complete = null;
 
     // DC-OP phase callbacks (set by engine before solveDcOperatingPoint call)
@@ -623,6 +628,9 @@ export class CKTCircuitContext {
     this.loadCtx.reltol = params.reltol;
     this.loadCtx.iabstol = params.abstol;
     this.loadCtx.gmin = params.gmin ?? 1e-12;
+    // D2: re-apply UIC so hot-loaded params propagate to the load context
+    // (mirrors the constructor seeding at loadCtx literal).
+    this.loadCtx.uic = params.uic ?? false;
 
     // Keep the full params reference in sync so downstream readers
     // (e.g. solveDcOperatingPoint) see the new values.

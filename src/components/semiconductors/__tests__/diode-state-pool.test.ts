@@ -55,7 +55,7 @@ function makeDcOpCtx(voltages: Float64Array): LoadContext {
     method: "trapezoidal",
     order: 1,
     deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(8),
+    ag: new Float64Array(7),
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
@@ -271,10 +271,9 @@ describe("diode state pool migration", () => {
 
     // Second call: transient load exercises the capacitor companion path and writes SLOT_V.
     const dt = 1e-6;
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     ag[0] = 1 / dt;
     ag[1] = -1 / dt;
-    pool.ag.set(ag);
     element.load(makeTranCtx(voltages, dt, ag));
 
     // After first transient load, SLOT_V should hold the current junction voltage

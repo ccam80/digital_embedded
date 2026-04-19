@@ -67,7 +67,7 @@ function driveFuseStep(fuse: AnalogFuseElement, dt: number, voltages: Float64Arr
     method: "trapezoidal",
     order: 1,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
-    ag: new Float64Array(8),
+    ag: new Float64Array(7),
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,

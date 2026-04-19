@@ -30,7 +30,7 @@ import type { LoadContext, InitMode } from "../../../solver/analog/load-context.
 // ---------------------------------------------------------------------------
 
 function companionAg(dt: number, method: string, order: number): Float64Array {
-  const ag = new Float64Array(8);
+  const ag = new Float64Array(7);
   if (method === "trapezoidal") {
     if (order === 1) {
       ag[0] = 1 / dt;
@@ -610,7 +610,7 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
     voltages[0] = vcap;
     voltages[1] = 0;
 
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     ag[0] = ag0;
     ag[1] = ag1;
 
@@ -728,7 +728,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
     props.setModelParam("capacitance", C_val);
     const element = makeCapacitorElement(new Map([["pos", 2], ["neg", 0]]), props);
 
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     ag[0] = ag0;
     ag[1] = ag1;
 

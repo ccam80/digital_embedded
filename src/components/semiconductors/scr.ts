@@ -262,7 +262,7 @@ export function createScrElement(
 
       let vakLimited: number;
       let vgkLimited: number;
-      if (pool.initMode === "initJct") {
+      if (ctx.initMode === "initJct") {
         // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
         vakLimited = vakRaw;
         vgkLimited = vgkRaw;

@@ -7,4 +7,6 @@ nul
 test_results/
 .omc/
 test-results/
+.playwright-tmp/
+.playwright-browsers/
 dist/

@@ -99,7 +99,7 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
     method: "trapezoidal",
     order: 1,
     deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(8),
+    ag: new Float64Array(7),
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
@@ -1105,7 +1105,6 @@ describe("integration", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(3);
 
-    pool.ag.set(ag);
     const ctx: LoadContext = {
       solver,
       voltages: new Float64Array([vds, vgs, 0]),
@@ -1266,7 +1265,7 @@ describe("mosfet_spicel1_load_dcop_parity", () => {
       method: "trapezoidal",
       order: 1,
       deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(8),
+      ag: new Float64Array(7),
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,

@@ -337,7 +337,7 @@ function makeDacParityCtx(voltages: Float64Array, solver: SparseSolverType): Loa
     method: "trapezoidal",
     order: 1,
     deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(8),
+    ag: new Float64Array(7),
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,

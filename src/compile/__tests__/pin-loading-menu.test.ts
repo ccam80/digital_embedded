@@ -24,8 +24,9 @@ import { ComponentRegistry } from '../../core/registry.js';
 import type { ComponentDefinition, ComponentModels } from '../../core/registry.js';
 import { ComponentCategory } from '../../core/registry.js';
 import type { SerializedElement, CircuitElement } from '../../core/element.js';
-import type { SparseSolver } from '../../solver/analog/sparse-solver.js';
+import type { ComplexSparseSolver } from '../../solver/analog/complex-sparse-solver.js';
 import type { AnalogElement } from '../../solver/analog/element.js';
+import type { LoadContext } from '../../solver/analog/load-context.js';
 import { createTestElementFromDecls } from '../../test-fixtures/test-element.js';
 import { noopExecFn } from '../../test-fixtures/execute-stubs.js';
 
@@ -56,7 +57,7 @@ function makeResistorElement(nodeA: number, nodeB: number): AnalogElement {
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
-    stampAc(_s: SparseSolver) {},
+    stampAc(_s: ComplexSparseSolver, _omega: number, _ctx: LoadContext) {},
     getPinCurrents(_v: Float64Array) { return [0, 0]; },
     setParam(_key: string, _value: number) {},
   };

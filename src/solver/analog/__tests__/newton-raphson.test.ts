@@ -184,7 +184,6 @@ describe("NR", () => {
       ctx.rhs.fill(0);
       ctx.rhsOld.fill(0);
       ctx.nrResult.reset();
-      ctx.initialGuess = null;
 
       newtonRaphson(ctx);
 
@@ -267,7 +266,7 @@ describe("NR", () => {
     guess[0] = -5.0;   // Vs+ node (node 1, index 0) — set by voltage source
     guess[1] = 0.68;   // diode anode (node 2, index 1) — near expected Vd
     guess[2] = 0.0043; // branch current (index 2)
-    ctx2.initialGuess = guess;
+    ctx2.rhsOld.set(guess);
 
     newtonRaphson(ctx2);
 
@@ -283,7 +282,7 @@ describe("NR", () => {
 
   it("nonlinear_circuit_runs_at_least_2_iterations_with_state_pool", () => {
     const ctx = makeDiodeCtx(5.0);
-    ctx.statePool!.initMode = "initTran";
+    ctx.initMode ="initTran";
 
     newtonRaphson(ctx);
 
@@ -309,7 +308,7 @@ describe("NR", () => {
 
   it("initTran_transitions_to_initFloat_after_iteration_0", () => {
     const ctx = makeDiodeCtx(5.0);
-    ctx.statePool!.initMode = "initTran";
+    ctx.initMode ="initTran";
 
     newtonRaphson(ctx);
 
@@ -320,7 +319,7 @@ describe("NR", () => {
 
   it("initPred_transitions_to_initFloat_immediately", () => {
     const ctx = makeDiodeCtx(5.0);
-    ctx.statePool!.initMode = "initPred";
+    ctx.initMode ="initPred";
 
     newtonRaphson(ctx);
 
@@ -330,7 +329,7 @@ describe("NR", () => {
 
   it("transient_mode_allows_convergence_without_ladder", () => {
     const ctx = makeDiodeCtx(5.0);
-    ctx.statePool!.initMode = "transient";
+    ctx.initMode ="transient";
 
     newtonRaphson(ctx);
 
@@ -680,8 +679,6 @@ describe("NR NISHOULDREORDER lifecycle", () => {
 
     let forceReorderCalled = false;
     const realSolver = ctx.solver;
-    const pool2 = { initMode: "initJct" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" };
-
     const proxySolver = new Proxy(realSolver, {
       get(target, prop) {
         if (prop === "forceReorder") {
@@ -697,9 +694,9 @@ describe("NR NISHOULDREORDER lifecycle", () => {
     }) as SparseSolver;
 
     ctx.solver = proxySolver;
+    ctx.initMode = "initJct";
     ctx.dcopModeLadder = {
       runPrimeJunctions(): void {},
-      pool: pool2,
       onModeBegin(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number): void {},
       onModeEnd(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number, _converged: boolean): void {},
     };
@@ -707,7 +704,7 @@ describe("NR NISHOULDREORDER lifecycle", () => {
     newtonRaphson(ctx);
 
     expect(forceReorderCalled).toBe(true);
-    expect(pool2.initMode).not.toBe("initJct");
+    expect(ctx.initMode).not.toBe("initJct");
   });
 
   it("forceReorder_called_on_initTran_first_iteration", () => {
@@ -722,7 +719,7 @@ describe("NR NISHOULDREORDER lifecycle", () => {
     const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
     const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = new DiagnosticCollector();
-    ctx.statePool!.initMode = "initTran";
+    ctx.initMode ="initTran";
 
     let forceReorderCallCount = 0;
     const realSolver = ctx.solver;

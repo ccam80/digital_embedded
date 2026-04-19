@@ -70,7 +70,7 @@ function makeTransientCtx(
   const method = opts.method ?? "trapezoidal";
   const order = opts.order ?? 1;
   const deltaOld = [dt, dt, dt, dt, dt, dt, dt];
-  const ag = new Float64Array(8);
+  const ag = new Float64Array(7);
   const scratch = new Float64Array(64);
   if (dt > 0) {
     computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
@@ -825,7 +825,7 @@ describe("transformer_load_transient_parity (C4.2)", () => {
       stampRHS: (_row: number, _v: number): void => {},
     } as unknown as SparseSolverType;
 
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     ag[0] = ag0;
     ag[1] = ag1;
 

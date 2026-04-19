@@ -87,7 +87,7 @@ function buildUnitCtx(
     method: "trapezoidal",
     order: 1,
     deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(8),
+    ag: new Float64Array(7),
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
@@ -392,7 +392,7 @@ describe("integration", () => {
     const dt = 1e-9;
     const vd = 0.2; // in the tunnel region
 
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     computeNIcomCof(dt, [dt, dt, dt, dt, dt, dt, dt], 2, "trapezoidal", ag, scratch);
 
@@ -421,7 +421,6 @@ describe("integration", () => {
     // Real SparseSolver — anode=node 1 mapped to row 0, cathode=ground.
     const solver = new SparseSolver();
     solver.beginAssembly(1);
-    pool.ag.set(ag);
     const ctx: import("../../../solver/analog/load-context.js").LoadContext = {
       solver,
       voltages: new Float64Array([vd, 0]),

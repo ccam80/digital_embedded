@@ -888,7 +888,7 @@ describe("integration", () => {
     const dt = 1e-9;
     const vd = 1.8;
 
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     computeNIcomCof(dt, [dt, dt, dt, dt, dt, dt, dt], 2, "trapezoidal", ag, scratch);
 
@@ -918,7 +918,6 @@ describe("integration", () => {
       stampRHS: (r: number, v: number) => rhs.push([r, v]),
     } as any;
 
-    pool.ag.set(ag);
     const ctx = {
       solver: mockSolver,
       voltages: new Float64Array([vd]),

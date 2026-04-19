@@ -144,7 +144,6 @@ type PhaseEndFn = ((outcome: DcOpNRAttemptOutcome, converged: boolean) => void) 
 function runNR(
   ctx: CKTCircuitContext,
   maxIterations: number,
-  initialGuess: Float64Array,
   diagonalGmin: number,
   ladder: CKTCircuitContext["dcopModeLadder"],
   exactMaxIterations?: boolean,
@@ -163,7 +162,6 @@ function runNR(
   // isAc stays false — there is no AC sub-solve inside the DCOP ladder.
   ctx.isAc = false;
   ctx.maxIterations = maxIterations;
-  ctx.initialGuess = initialGuess;
   ctx.diagonalGmin = diagonalGmin;
   ctx.dcopModeLadder = ladder;
   ctx.exactMaxIterations = exactMaxIterations ?? false;
@@ -195,11 +193,7 @@ function cktop(
   preExistingVoltages: Float64Array,
   ladder: CKTCircuitContext["dcopModeLadder"],
 ): StepResult {
-  if (ctx.statePool) {
-    ctx.statePool.initMode = firstMode;
-  } else if (ladder) {
-    ladder.pool.initMode = firstMode;
-  }
+  ctx.initMode = firstMode;
   if (ctx.params.noOpIter) {
     return {
       converged: true,
@@ -207,7 +201,8 @@ function cktop(
       voltages: preExistingVoltages,
     };
   }
-  return runNR(ctx, maxIter, preExistingVoltages, ctx.diagonalGmin, ladder);
+  ctx.rhsOld.set(preExistingVoltages);
+  return runNR(ctx, maxIter, ctx.diagonalGmin, ladder);
 }
 
 // ---------------------------------------------------------------------------
@@ -228,13 +223,11 @@ function dcopFinalize(
   ctx: CKTCircuitContext,
   voltages: Float64Array,
 ): void {
-  const pool = ctx.statePool;
-  if (pool) {
-    pool.initMode = "initSmsig";
-  }
+  ctx.initMode = "initSmsig";
   const savedHook = ctx.postIterationHook;
   ctx.postIterationHook = null;
-  runNR(ctx, 1, voltages, ctx.diagonalGmin, null, true);
+  ctx.rhsOld.set(voltages);
+  runNR(ctx, 1, ctx.diagonalGmin, null, true);
   ctx.postIterationHook = savedHook;
 }
 
@@ -303,7 +296,6 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   // Build the mode ladder. Always emits the correct phase sequence:
   //   dcopInitJct begin → (per iter: initJct→initFix→initFloat) → end
   // -------------------------------------------------------------------------
-  const pool = statePool ?? null;
 
   onPhaseBegin?.("dcopInitJct");
 
@@ -315,7 +307,6 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
         }
       }
     },
-    pool: pool ?? { initMode: "initJct" as InitMode },
     onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iteration: number): void {
       onPhaseBegin?.(phase);
     },
@@ -492,9 +483,7 @@ function dynamicGmin(
   // Use ctx.dcopVoltages as the working buffer
   const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
-  if (statePool) {
-    statePool.initMode = "initJct";
-  }
+  ctx.initMode = "initJct";
 
   // Use ctx.dcopSavedVoltages and ctx.dcopSavedState0 for snapshots
   const savedVoltages = ctx.dcopSavedVoltages;
@@ -508,15 +497,14 @@ function dynamicGmin(
 
   while (true) {
     onPhaseBegin?.("dcopGminDynamic", diagGmin);
-    const result = runNR(ctx, params.dcTrcvMaxIter, voltages, diagGmin, null);
+    ctx.rhsOld.set(voltages);
+    const result = runNR(ctx, params.dcTrcvMaxIter, diagGmin, null);
     totalIter += result.iterations;
     voltages.set(result.voltages);
 
     if (result.converged) {
       onPhaseEnd?.("dcopSubSolveConverged", true);
-      if (statePool) {
-        statePool.initMode = "initFloat";
-      }
+      ctx.initMode = "initFloat";
       if (diagGmin <= gtarget) {
         break;
       }
@@ -553,7 +541,8 @@ function dynamicGmin(
 
   // Final clean solve with gshunt diagonal (ngspice cktop.c:253 uses CKTdcMaxIter = maxIterations)
   onPhaseBegin?.("dcopGminDynamic", 0);
-  const cleanResult = runNR(ctx, params.maxIterations, voltages, params.gshunt ?? 0, null);
+  ctx.rhsOld.set(voltages);
+  const cleanResult = runNR(ctx, params.maxIterations, params.gshunt ?? 0, null);
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
 
@@ -583,9 +572,7 @@ function spice3Gmin(
 
   const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
-  if (statePool) {
-    statePool.initMode = "initJct";
-  }
+  ctx.initMode = "initJct";
 
   let totalIter = 0;
 
@@ -599,7 +586,8 @@ function spice3Gmin(
 
   for (let i = 0; i <= numGminSteps; i++) {
     onPhaseBegin?.("dcopGminSpice3", diagGmin);
-    const result = runNR(ctx, params.dcTrcvMaxIter, voltages, diagGmin, null);
+    ctx.rhsOld.set(voltages);
+    const result = runNR(ctx, params.dcTrcvMaxIter, diagGmin, null);
     totalIter += result.iterations;
 
     if (!result.converged) {
@@ -608,16 +596,15 @@ function spice3Gmin(
     }
 
     onPhaseEnd?.("dcopSubSolveConverged", true);
-    if (statePool) {
-      statePool.initMode = "initFloat";
-    }
+    ctx.initMode = "initFloat";
     voltages.set(result.voltages);
     diagGmin /= gminFactor;
   }
 
   // Final clean solve with gshunt diagonal
   onPhaseBegin?.("dcopGminSpice3", 0);
-  const cleanResult = runNR(ctx, params.dcTrcvMaxIter, voltages, params.gshunt ?? 0, null);
+  ctx.rhsOld.set(voltages);
+  const cleanResult = runNR(ctx, params.dcTrcvMaxIter, params.gshunt ?? 0, null);
   totalIter += cleanResult.iterations;
   onPhaseEnd?.(cleanResult.converged ? "accepted" : "finalFailure", cleanResult.converged);
 
@@ -645,9 +632,7 @@ function spice3Src(
 
   const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
-  if (statePool) {
-    statePool.initMode = "initJct";
-  }
+  ctx.initMode = "initJct";
   let totalIter = 0;
   const numSrcSteps = params.numSrcSteps ?? 1;
 
@@ -655,7 +640,8 @@ function spice3Src(
     const srcFact = i / numSrcSteps;
     scaleAllSources(ctx, srcFact);
     onPhaseBegin?.("dcopSrcSweep", srcFact);
-    const result = runNR(ctx, params.dcTrcvMaxIter, voltages, 0, null);
+    ctx.rhsOld.set(voltages);
+    const result = runNR(ctx, params.dcTrcvMaxIter, 0, null);
     totalIter += result.iterations;
     if (!result.converged) {
       onPhaseEnd?.("nrFailedRetry", false);
@@ -663,9 +649,7 @@ function spice3Src(
       return { converged: false, iterations: totalIter, voltages: ctx.dcopVoltages };
     }
     onPhaseEnd?.("dcopSubSolveConverged", true);
-    if (statePool) {
-      statePool.initMode = "initFloat";
-    }
+    ctx.initMode = "initFloat";
     voltages.set(result.voltages);
   }
 
@@ -692,9 +676,7 @@ function gillespieSrc(
 
   const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
-  if (statePool) {
-    statePool.initMode = "initJct";
-  }
+  ctx.initMode = "initJct";
   scaleAllSources(ctx, 0);
 
   const savedVoltages = ctx.dcopSavedVoltages;
@@ -704,7 +686,8 @@ function gillespieSrc(
 
   // cktop.c:370-385: zero-source NR solve
   onPhaseBegin?.("dcopSrcSweep", 0);
-  const zeroResult = runNR(ctx, params.dcTrcvMaxIter, voltages, 0, null);
+  ctx.rhsOld.set(voltages);
+  const zeroResult = runNR(ctx, params.dcTrcvMaxIter, 0, null);
   totalIter += zeroResult.iterations;
   voltages.set(zeroResult.voltages);
 
@@ -715,7 +698,8 @@ function gillespieSrc(
     let bootstrapConverged = false;
     for (let decade = 0; decade <= 10; decade++) {
       onPhaseBegin?.("dcopSrcSweep", 0);
-      const bResult = runNR(ctx, params.dcTrcvMaxIter, voltages, diagGmin, null);
+      ctx.rhsOld.set(voltages);
+      const bResult = runNR(ctx, params.dcTrcvMaxIter, diagGmin, null);
       totalIter += bResult.iterations;
       voltages.set(bResult.voltages);
       if (!bResult.converged) {
@@ -723,9 +707,7 @@ function gillespieSrc(
         break;
       }
       onPhaseEnd?.("dcopSubSolveConverged", true);
-      if (statePool) {
-        statePool.initMode = "initFloat";
-      }
+      ctx.initMode = "initFloat";
       diagGmin /= 10;
       if (decade === 10) {
         bootstrapConverged = true;
@@ -737,9 +719,7 @@ function gillespieSrc(
     }
   } else {
     onPhaseEnd?.("dcopSubSolveConverged", true);
-    if (statePool) {
-      statePool.initMode = "initFloat";
-    }
+    ctx.initMode = "initFloat";
   }
 
   // cktop.c:420-424: initialise stepping parameters
@@ -754,14 +734,13 @@ function gillespieSrc(
   while (raise >= 1e-7 && convFact < 1) {
     scaleAllSources(ctx, srcFact);
     onPhaseBegin?.("dcopSrcSweep", srcFact);
-    const stepResult = runNR(ctx, params.dcTrcvMaxIter, voltages, params.gshunt ?? 0, null);
+    ctx.rhsOld.set(voltages);
+    const stepResult = runNR(ctx, params.dcTrcvMaxIter, params.gshunt ?? 0, null);
     totalIter += stepResult.iterations;
 
     if (stepResult.converged) {
       onPhaseEnd?.("dcopSubSolveConverged", true);
-      if (statePool) {
-        statePool.initMode = "initFloat";
-      }
+      ctx.initMode = "initFloat";
       voltages.set(stepResult.voltages);
       saveSnapshot(voltages, savedVoltages, statePool, savedState0);
       convFact = srcFact;

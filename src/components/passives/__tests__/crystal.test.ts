@@ -443,7 +443,7 @@ describe("Crystal", () => {
       // computeNIcomCof would emit (ag[0] = 1/dt, ag[1] = -1/dt); the crystal's
       // unified load() runs inline NIintegrate and writes geqL into SLOT_GEQ_L.
       const dt = 1e-6;
-      const ag = new Float64Array(8);
+      const ag = new Float64Array(7);
       ag[0] = 1 / dt;
       ag[1] = -1 / dt;
       // Real sparse solver — crystal.load allocates matrix handles on first call.
@@ -544,7 +544,7 @@ describe("crystal_load_transient_parity (C4.2)", () => {
       stampRHS: (_row: number, _v: number): void => {},
     } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
 
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     ag[0] = ag0;
     ag[1] = ag1;
 

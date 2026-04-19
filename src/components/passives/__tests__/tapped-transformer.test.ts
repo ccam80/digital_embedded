@@ -50,7 +50,7 @@ function getFactory(entry: ModelEntry): AnalogFactory {
 // ---------------------------------------------------------------------------
 
 function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: number = 1e-6): LoadContext {
-  const ag = new Float64Array(8);
+  const ag = new Float64Array(7);
   // Trapezoidal order 1: ag[0] = 1/dt, ag[1] = -1/dt.
   if (dt > 0) {
     ag[0] = 1 / dt;
@@ -600,7 +600,7 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
       stampRHS: (_row: number, _v: number): void => {},
     } as unknown as SparseSolverType;
 
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     ag[0] = ag0;
     ag[1] = ag1;
 

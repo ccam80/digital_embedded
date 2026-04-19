@@ -22,6 +22,8 @@ import { PropertyBag } from "../../core/properties.js";
 import type { PropertyBag as PropertyBagType, PropertyValue } from "../../core/properties.js";
 import type { AnalogElement } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { ComplexSparseSolver } from "../../solver/analog/complex-sparse-solver.js";
+import type { LoadContext } from "../../solver/analog/load-context.js";
 import type { SerializedElement } from "../../core/element.js";
 import { createTestElementFromDecls } from "../../test-fixtures/test-element.js";
 import { noopExecFn } from "../../test-fixtures/execute-stubs.js";
@@ -173,13 +175,21 @@ function makeResistorAnalogEl(
     branchIndex: -1,
     isNonlinear: false,
     isReactive: false,
-    stampAc(solver: SparseSolver): void {
+    stampAc(solver: ComplexSparseSolver, _omega: number, _ctx: LoadContext): void {
       const g = 1 / resistance;
-      if (n1 !== 0) { solver.stampElement(solver.allocElement(n1 - 1, n1 - 1), g); }
-      if (n2 !== 0) { solver.stampElement(solver.allocElement(n2 - 1, n2 - 1), g); }
+      if (n1 !== 0) {
+        const h = solver.allocComplexElement(n1 - 1, n1 - 1);
+        solver.stampComplexElement(h, g, 0);
+      }
+      if (n2 !== 0) {
+        const h = solver.allocComplexElement(n2 - 1, n2 - 1);
+        solver.stampComplexElement(h, g, 0);
+      }
       if (n1 !== 0 && n2 !== 0) {
-        solver.stampElement(solver.allocElement(n1 - 1, n2 - 1), -g);
-        solver.stampElement(solver.allocElement(n2 - 1, n1 - 1), -g);
+        const hab = solver.allocComplexElement(n1 - 1, n2 - 1);
+        solver.stampComplexElement(hab, -g, 0);
+        const hba = solver.allocComplexElement(n2 - 1, n1 - 1);
+        solver.stampComplexElement(hba, -g, 0);
       }
     },
     getPinCurrents(_v: Float64Array): number[] { return [0, 0]; },

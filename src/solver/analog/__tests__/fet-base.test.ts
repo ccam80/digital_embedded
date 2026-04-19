@@ -140,7 +140,7 @@ function makeDirectLoadCtx(voltages: Float64Array, overrides: Partial<LoadContex
     method: "trapezoidal",
     order: 1,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
-    ag: overrides.ag ?? new Float64Array(8),
+    ag: overrides.ag ?? new Float64Array(7),
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
@@ -277,7 +277,7 @@ describe("Refactor", () => {
 
     // Transient load() must run the reactive companion path without throwing.
     const dt = 1e-9;
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     ag[0] = 1 / dt;  // bdf1 order-1 coefficient
     ag[1] = -1 / dt;
     const tranCtx = makeDirectLoadCtx(voltages, {

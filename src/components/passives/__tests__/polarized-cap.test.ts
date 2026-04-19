@@ -68,7 +68,7 @@ function makeDiagnosticCtx(
     method: "trapezoidal",
     order: 1,
     deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(8),
+    ag: new Float64Array(7),
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
@@ -98,7 +98,7 @@ function makeSlotLoadCtx(
   initMode: LoadContext["initMode"],
 ): LoadContext {
   const deltaOld = [dt, dt, dt, dt, dt, dt, dt];
-  const ag = new Float64Array(8);
+  const ag = new Float64Array(7);
   const scratch = new Float64Array(64);
   computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
   return {
@@ -252,7 +252,7 @@ describe("PolarizedCap", () => {
       const voltages = new Float64Array(matrixSize);
 
       const deltaOld = [dt, dt, dt, dt, dt, dt, dt];
-      const ag = new Float64Array(8);
+      const ag = new Float64Array(7);
       const scratch = new Float64Array(64);
       computeNIcomCof(dt, deltaOld, 1, "bdf1", ag, scratch);
 
@@ -337,7 +337,7 @@ describe("PolarizedCap", () => {
       const method: IntegrationMethod = "bdf1";
       const order = 1;
       const deltaOld = [dt, dt, dt, dt, dt, dt, dt];
-      const ag = new Float64Array(8);
+      const ag = new Float64Array(7);
       const scratch = new Float64Array(64);
       computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
 
@@ -628,7 +628,7 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
       stampRHS: (_row: number, _v: number): void => {},
     } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
 
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     ag[0] = ag0;
     ag[1] = ag1;
 

@@ -814,7 +814,6 @@ export interface SimpleNROptions {
   diagnostics?: DiagnosticCollector;
   statePool?: StatePool;
   maxIterations?: number;
-  initialGuess?: Float64Array;
 }
 
 export function runNR(opts: SimpleNROptions): NRResult {
@@ -838,9 +837,6 @@ export function runNR(opts: SimpleNROptions): NRResult {
   ctx.diagnostics = diagnostics;
   if (opts.maxIterations !== undefined) {
     ctx.maxIterations = opts.maxIterations;
-  }
-  if (opts.initialGuess !== undefined) {
-    ctx.initialGuess = opts.initialGuess;
   }
   newtonRaphson(ctx);
   return ctx.nrResult;

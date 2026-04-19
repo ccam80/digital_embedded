@@ -63,7 +63,7 @@ function acceptStep(mem: MemristorElement, dt: number, voltages: Float64Array): 
     method: "trapezoidal",
     order: 1,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
-    ag: new Float64Array(8),
+    ag: new Float64Array(7),
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
@@ -308,7 +308,7 @@ describe("Memristor", () => {
         method: "trapezoidal",
         order: 1,
         deltaOld: [0, 0, 0, 0, 0, 0, 0],
-        ag: new Float64Array(8),
+        ag: new Float64Array(7),
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
@@ -436,7 +436,7 @@ describe("memristor_load_transient_parity (C4.2)", () => {
       stampRHS: (_row: number, _v: number): void => {},
     } as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver;
 
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     ag[0] = 1 / dt;
     ag[1] = -1 / dt;
 

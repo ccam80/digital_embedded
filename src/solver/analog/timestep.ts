@@ -115,8 +115,15 @@ export class TimestepController {
    * Timestep history for CKTterr divided differences.
    * [0] = current trial dt (set by setDeltaOldCurrent), [1] = h_{n-1} (previous accepted dt), [2] = h_{n-2}, [3] = h_{n-3}.
    * Pre-allocated once; shifted in rotateDeltaOld(). ngspice: CKTdeltaOld[].
+   *
+   * UNIFIED STORAGE — when the controller is wired into a CKTCircuitContext
+   * (via the optional `sharedDeltaOld` ctor argument), this field holds the
+   * SAME `number[]` reference as `ctx.deltaOld`. Matches ngspice where
+   * CKTdeltaOld[7] lives on CKTcircuit, not on a separate timestep struct.
+   * Standalone TimestepController instances (unit tests, pre-init
+   * defaults) allocate their own length-7 array.
    */
-  private _deltaOld: number[] = [0, 0, 0, 0, 0, 0, 0];
+  private _deltaOld: number[];
 
   /**
    * Integration order derived from currentMethod.
@@ -161,8 +168,23 @@ export class TimestepController {
    */
   private _lteResult = { newDt: 0, worstRatio: 0 };
 
-  constructor(params: ResolvedSimulationParams) {
+  constructor(params: ResolvedSimulationParams, sharedDeltaOld?: number[]) {
     this._params = params;
+    // Unified CKTdeltaOld storage: reference the context's buffer when one is
+    // provided (MNAEngine.init path), else self-allocate for standalone usage
+    // (unit tests, pre-init field defaults). Length MUST be 7 — matches
+    // ngspice CKTdeltaOld[7] (cktdefs.h).
+    if (sharedDeltaOld !== undefined) {
+      if (sharedDeltaOld.length !== 7) {
+        throw new Error(
+          `TimestepController: sharedDeltaOld must have length 7 ` +
+          `(matches ngspice CKTdeltaOld[7]), got ${sharedDeltaOld.length}.`,
+        );
+      }
+      this._deltaOld = sharedDeltaOld;
+    } else {
+      this._deltaOld = [0, 0, 0, 0, 0, 0, 0];
+    }
     // Use the explicit firstStep parameter. Clamp to [minTimeStep, maxTimeStep].
     this.currentDt = Math.max(
       params.minTimeStep,

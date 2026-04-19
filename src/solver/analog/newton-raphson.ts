@@ -243,17 +243,11 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   // Use ctx.rhs and ctx.rhsOld as the voltage ping-pong buffers.
   // nrResult.voltages already points to ctx.rhs.
   let voltages = ctx.rhs;
-  voltages.fill(0);
   let prevVoltages = ctx.rhsOld;
 
   const statePool = ctx.statePool ?? null;
   let oldState0: Float64Array | null = null;
   let ipass = 0;
-
-  // Initialize from initial guess if provided.
-  if (ctx.initialGuess) {
-    prevVoltages.set(ctx.initialGuess);
-  }
 
   // Step D state: preorder runs at most once per solve.
   let didPreorder = false;
@@ -264,7 +258,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   // dcopModeLadder: set initial initMode and prime junctions before iter 0.
   const ladder = ctx.dcopModeLadder ?? null;
   if (ladder) {
-    ladder.pool.initMode = "initJct";
+    ctx.initMode = "initJct";
     ladder.runPrimeJunctions();
   }
 
@@ -458,8 +452,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     ctx.postIterationHook?.(iteration, voltages, prevVoltages, ctx.noncon, globalConverged, elemConverged, limitingEvents, convergenceFailedElements, ctx);
 
     // ---- STEP J: Unified INITF dispatcher (ngspice niiter.c:1050-1085) ----
-    const initPool = ladder ? ladder.pool : (statePool as { initMode: string } | null);
-    const curInitMode = initPool?.initMode ?? "transient";
+    const curInitMode = ctx.initMode;
 
     if (curInitMode === "initFloat" || curInitMode === "transient") {
       if (ctx.noncon === 0 && globalConverged && elemConverged) {
@@ -479,7 +472,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
         }
       }
     } else if (curInitMode === "initJct") {
-      if (initPool) initPool.initMode = "initFix";
+      ctx.initMode = "initFix";
       solver.forceReorder();
       if (ladder) {
         ladder.onModeEnd("dcopInitJct", iteration, false);
@@ -487,7 +480,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       }
     } else if (curInitMode === "initFix") {
       if (ctx.noncon === 0) {
-        if (initPool) initPool.initMode = "initFloat";
+        ctx.initMode = "initFloat";
         ipass = 1;
         if (ladder) {
           ladder.onModeEnd("dcopInitFix", iteration, false);
@@ -495,14 +488,14 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
         }
       }
     } else if (curInitMode === "initTran") {
-      if (initPool) initPool.initMode = "initFloat";
+      ctx.initMode = "initFloat";
       if (iteration <= 0) {
         solver.forceReorder();
       }
     } else if (curInitMode === "initPred") {
-      if (initPool) initPool.initMode = "initFloat";
+      ctx.initMode = "initFloat";
     } else if (curInitMode === "initSmsig") {
-      if (initPool) initPool.initMode = "initFloat";
+      ctx.initMode = "initFloat";
     }
 
     // Split marker: after iteration 0, let the harness observe cold linearization

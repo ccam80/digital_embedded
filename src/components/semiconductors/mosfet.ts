@@ -939,6 +939,10 @@ class MosfetAnalogElement extends AbstractFetElement {
   // Last computed vdsat for Meyer caps
   private _lastVdsat: number = 0;
 
+  // Cached initMode from the most recent load() ctx — used by _stampCompanion / _updateChargeFlux
+  // which are called from the base load() without a ctx parameter.
+  private _ctxInitMode: string = "initFloat";
+
   /** Junction charge at forward-bias boundary (drain/source). Used by charge-based integration. */
   get _junctionChargeAtDepCap(): { qd: number; qs: number } {
     return { qd: this._f4d, qs: this._f4s };
@@ -1202,7 +1206,7 @@ class MosfetAnalogElement extends AbstractFetElement {
       // Average with previous step's half-cap (mos1load.c:769-786)
       const prevMeyerGs = this.s1[base + SLOT_MEYER_GS];
       const prevMeyerGd = this.s1[base + SLOT_MEYER_GD];
-      const firstTran = this._pool.initMode === "initTran";
+      const firstTran = this._ctxInitMode === "initTran";
       const cgs = (firstTran ? 2 * meyerGs : meyerGs + prevMeyerGs) + gsOverlap;
       const cgd = (firstTran ? 2 * meyerGd : meyerGd + prevMeyerGd) + gdOverlap;
       return { cgs, cgd };
@@ -1213,13 +1217,14 @@ class MosfetAnalogElement extends AbstractFetElement {
   }
 
   protected override _updateOp(ctx: LoadContext): void {
+    this._ctxInitMode = ctx.initMode;
     const voltages = ctx.voltages;
     const limitingCollector = ctx.limitingCollector;
     this._updateOpImpl(voltages, limitingCollector ?? null, ctx);
   }
 
   private _updateOpImpl(voltages: Readonly<Float64Array>, limitingCollector: LimitingEvent[] | null, ctx: LoadContext): void {
-    if (this._pool.initMode === "initPred") {
+    if (ctx.initMode === "initPred") {
       // mos1load.c:206-225: copy voltage-old references for fetlim/pnjlim limiting
       const base = this.stateBaseOffset;
       const s0 = this._s0;
@@ -1233,7 +1238,7 @@ class MosfetAnalogElement extends AbstractFetElement {
     // mos1load.c:419-433: during MODEINITJCT, primeJunctions() has already set
     // _vgs, _vds, _vsb directly. Skip MNA voltage reads and all voltage limiting —
     // use primed values as-is for I-V evaluation.
-    if (this._pool.initMode === "initJct") {
+    if (ctx.initMode === "initJct") {
       this._pnjlimLimited = false;
       this._swapped = false;
       const base = this.stateBaseOffset;
@@ -1603,7 +1608,7 @@ class MosfetAnalogElement extends AbstractFetElement {
   }
 
   override checkConvergence(ctx: LoadContext): boolean {
-    if (this._p.OFF && this._pool.initMode === "initFix") return true;
+    if (this._p.OFF && ctx.initMode === "initFix") return true;
     return super.checkConvergence(ctx);
   }
 
@@ -1755,7 +1760,7 @@ class MosfetAnalogElement extends AbstractFetElement {
       }
       s0[base + SLOT_MEYER_GB] = meyerCapgb;
       const prevMeyerGb = this.s1[base + SLOT_MEYER_GB];
-      const totalGb = (this._pool.initMode === "initTran" ? 2 * meyerCapgb : meyerCapgb + prevMeyerGb) + gbOverlap;
+      const totalGb = (this._ctxInitMode === "initTran" ? 2 * meyerCapgb : meyerCapgb + prevMeyerGb) + gbOverlap;
       const qgb = totalGb * vgb;
       const q1_gb = s1[base + SLOT_Q_GB];
       const q2_gb = this.s2[base + SLOT_Q_GB];
@@ -1771,7 +1776,7 @@ class MosfetAnalogElement extends AbstractFetElement {
     }
 
     // ngspice mos1load.c:842-853 — zero gate-bulk cap companions during MODEINITTRAN
-    if (this._pool.initMode === "initTran") {
+    if (this._ctxInitMode === "initTran") {
       s0[base + SLOT_CAP_GEQ_GB] = 0;
       s0[base + SLOT_CAP_IEQ_GB] = 0;
       s0[base + SLOT_CCAP_GB] = 0;
@@ -1822,7 +1827,7 @@ class MosfetAnalogElement extends AbstractFetElement {
         meyerCapgb = meyer.capgb;
       }
       const prevMeyerGbU = s1[base + SLOT_MEYER_GB];
-      const isFirstCallU = this._pool.initMode === "initTran";
+      const isFirstCallU = this._ctxInitMode === "initTran";
       const totalGb = (isFirstCallU ? 2 * meyerCapgb : meyerCapgb + prevMeyerGbU) + gbOverlap;
       const prevVgb = s1[base + SLOT_V_GB];
       const prevQgb = s1[base + SLOT_Q_GB];
@@ -1906,7 +1911,7 @@ class MosfetAnalogElement extends AbstractFetElement {
         const q2_gb = this.s2[base + SLOT_Q_GB];
         const meyerGbNow = s0[base + SLOT_MEYER_GB];
         const meyerGbPrev = s1[base + SLOT_MEYER_GB];
-        const isFirstCallU2 = this._pool.initMode === "initTran";
+        const isFirstCallU2 = this._ctxInitMode === "initTran";
         const totalGbRecalc = (isFirstCallU2 ? 2 * meyerGbNow : meyerGbNow + meyerGbPrev) + gbOverlap;
         if (totalGbRecalc > 0) {
           s0[base + SLOT_CCAP_GB] = order >= 2

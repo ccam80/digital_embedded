@@ -31,7 +31,7 @@ import type { LoadContext, InitMode } from "../../../solver/analog/load-context.
 // ---------------------------------------------------------------------------
 
 function companionAg(dt: number, method: string, order: number): Float64Array {
-  const ag = new Float64Array(8);
+  const ag = new Float64Array(7);
   if (method === "trapezoidal") {
     if (order === 1) {
       ag[0] = 1 / dt;
@@ -164,7 +164,7 @@ describe("Inductor", () => {
       const ctx: LoadContext = {
         solver, voltages, iteration: 0, initMode: "initFloat", dt: 0,
         method: "trapezoidal", order: 1,
-        deltaOld: [0, 0, 0, 0, 0, 0, 0], ag: new Float64Array(8),
+        deltaOld: [0, 0, 0, 0, 0, 0, 0], ag: new Float64Array(7),
         srcFact: 1, noncon: { value: 0 }, limitingCollector: null,
         isDcOp: false, isTransient: false, isTransientDcop: false, isAc: false, xfact: 1, gmin: 1e-12, uic: false,
         reltol: 1e-3, iabstol: 1e-12,
@@ -528,7 +528,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
     props.setModelParam("inductance", L_val);
     const element = makeInductorElement(new Map([["A", 2], ["B", 0]]), 3, props);
 
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     ag[0] = ag0;
     ag[1] = ag1;
 

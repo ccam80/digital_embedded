@@ -940,7 +940,7 @@ function makeTimer555ParityCtx(
   solver: SparseSolverType,
   dt = 0,
 ): LoadContext {
-  const ag = new Float64Array(8);
+  const ag = new Float64Array(7);
   if (dt > 0) {
     // Trapezoidal order 1 coefficients (what a fresh transient step would produce).
     ag[0] = 1 / dt;

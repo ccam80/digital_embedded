@@ -162,7 +162,7 @@ describe("gear_vandermonde_zero_alloc", () => {
     // solveGearVandermonde no longer allocates — it uses the scratch buffer passed
     // via computeNIcomCof. Verify correct coefficients for GEAR orders 2-6 and
     // that the scratch buffer is mutated (not a new allocation path).
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     const h = 1e-6;
 
@@ -225,7 +225,7 @@ describe("computeNIcomCof", () => {
   const scratch = new Float64Array(49);
 
   it("fills ag with zeros when dt <= 0", () => {
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     ag.fill(99); // pre-fill to confirm overwrite
     computeNIcomCof(0, [0, 0], 1, "bdf1", ag, scratch);
     for (let i = 0; i < ag.length; i++) {
@@ -234,21 +234,21 @@ describe("computeNIcomCof", () => {
   });
 
   it("BDF-1 order 1: ag[0]=1/dt, ag[1]=-1/dt", () => {
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     computeNIcomCof(h, [h, h], 1, "bdf1", ag, scratch);
     expect(ag[0]).toBe(1 / h);
     expect(ag[1]).toBe(-1 / h);
   });
 
   it("trapezoidal order 1: ag[0]=1/dt, ag[1]=-1/dt", () => {
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     computeNIcomCof(h, [h, h], 1, "trapezoidal", ag, scratch);
     expect(ag[0]).toBe(1 / h);
     expect(ag[1]).toBe(-1 / h);
   });
 
   it("trapezoidal order 2: ag[0]=2/dt, ag[1]=1 (xmu=0.5)", () => {
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     computeNIcomCof(h, [h, h], 2, "trapezoidal", ag, scratch);
     // xmu=0.5: ag[0] = 1/dt/(1-0.5) = 2/dt; ag[1] = 0.5/(1-0.5) = 1
     expect(ag[0]).toBe(2 / h);
@@ -256,7 +256,7 @@ describe("computeNIcomCof", () => {
   });
 
   it("BDF-2 equal steps: ag[0]=3/(2h), ag[1]=-2/h, ag[2]=1/(2h)", () => {
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     computeNIcomCof(h, [h, h], 2, "bdf2", ag, scratch);
     // With h1=h: r1=1, r2=2, u22=2*(2-1)=2, rhs2=1/h
     // ag2 = (1/h)/2 = 1/(2h), ag1 = (-1/h - 2/(2h))/1 = -2/h
@@ -269,7 +269,7 @@ describe("computeNIcomCof", () => {
   it("BDF-2 degenerate (h1=0): safeH1=dt yields equal-steps BDF-2 coefficients", () => {
     // When deltaOld[1]=0, safeH1 defaults to dt, which gives equal-steps BDF-2, not BE.
     // Spec: h1 = deltaOld[1] > 0 ? deltaOld[1] : dt — so h1=dt → equal steps BDF-2.
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     computeNIcomCof(h, [h, 0], 2, "bdf2", ag, scratch);
     // h1=0 → safeH1=dt=h → same as equal steps
     expect(ag[0]).toBe(3 / (2 * h));
@@ -280,7 +280,7 @@ describe("computeNIcomCof", () => {
   it("GEAR order 2 equal steps matches BDF-2: ag[0]=3/(2h), ag[1]=-2/h, ag[2]=1/(2h)", () => {
     // GEAR method with order=2 and equal steps should produce same coefficients as BDF-2.
     // nicomcof.c: Vandermonde with r[1]=1, r[2]=2 gives ag*dt = [1.5, -2, 0.5].
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     computeNIcomCof(h, [h, h], 2, "gear", ag, scratch);
     expect(ag[0]).toBe(3 / (2 * h));
@@ -292,7 +292,7 @@ describe("computeNIcomCof", () => {
     // Known GEAR-3 equal-step coefficients from numerical integration tables.
     // nicomcof.c Vandermonde with r[1]=1, r[2]=2, r[3]=3.
     // ag*dt = [11/6, -3, 3/2, -1/3]
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     computeNIcomCof(h, [h, h, h], 3, "gear", ag, scratch);
     expect(ag[0]).toBe(11 / (6 * h));
@@ -306,7 +306,7 @@ describe("computeNIcomCof", () => {
     // ag*dt = [25/12, -4, 3, -4/3, 1/4]
     // Closed-form rationals differ from LU output by 1 ULP; we assert the LU
     // bit-pattern per ngspice (ref/ngspice/src/maths/ni/nicomcof.c:42-117).
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     computeNIcomCof(h, [h, h, h, h], 4, "gear", ag, scratch);
     expect(ag[0]).toBe(2083333.333333333);
@@ -320,7 +320,7 @@ describe("computeNIcomCof", () => {
     // Known GEAR-5 equal-step coefficients.
     // Closed-form rationals differ from LU output by 1 ULP; we assert the LU
     // bit-pattern per ngspice (ref/ngspice/src/maths/ni/nicomcof.c:42-117).
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     computeNIcomCof(h, [h, h, h, h, h], 5, "gear", ag, scratch);
     expect(ag[0]).toBe(2283333.3333333335);
@@ -335,7 +335,7 @@ describe("computeNIcomCof", () => {
     // Known GEAR-6 equal-step coefficients.
     // Closed-form rationals differ from LU output by 1 ULP; we assert the LU
     // bit-pattern per ngspice (ref/ngspice/src/maths/ni/nicomcof.c:42-117).
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     computeNIcomCof(h, [h, h, h, h, h, h], 6, "gear", ag, scratch);
     expect(ag[0]).toBe(2450000.0000000005);
@@ -349,7 +349,7 @@ describe("computeNIcomCof", () => {
 
   it("GEAR coefficients sum to zero (interpolation constraint)", () => {
     // For all GEAR orders, sum(ag) = 0 (the polynomial interpolates Q correctly).
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     for (const order of [2, 3, 4, 5, 6]) {
       ag.fill(0);
@@ -371,7 +371,7 @@ describe("gear_vandermonde_regression", () => {
     // Regression test: Phase 1 converted solveGearVandermonde to use a flat scratch buffer.
     // This test verifies numerical correctness of GEAR order 4 coefficients.
     const h = 1e-6;
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     // Allocate scratch independently (not from CKTCircuitContext)
     const scratch = new Float64Array(49);
 
@@ -432,7 +432,7 @@ describe("nicomcof rounding regression (C4.6)", () => {
     // must produce `1.0 / dt / (1.0 - 0.5)` bit-exactly (not the pre-fix
     // operand order). For xmu=0.5 the two formulas happen to coincide, so
     // the differential assertion above on xmu=1/3 carries the regression guard.
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     computeNIcomCof(dt, [dt, dt], 2, "trapezoidal", ag, scratch);
     expect(ag[0]).toBe(1.0 / dt / (1.0 - 0.5));

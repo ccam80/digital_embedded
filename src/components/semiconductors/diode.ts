@@ -465,7 +465,7 @@ export function createDiodeElement(
       const voltages = ctx.voltages;
 
       // initPred path: adopt predictor values from previous accepted step
-      if (pool.initMode === "initPred") {
+      if (ctx.initMode === "initPred") {
         s0[base + SLOT_VD]  = s1[base + SLOT_VD];
         s0[base + SLOT_ID]  = s1[base + SLOT_ID];
         s0[base + SLOT_GEQ] = s1[base + SLOT_GEQ];
@@ -475,7 +475,7 @@ export function createDiodeElement(
       // to seeded values rather than reading from the solution vector —
       // at that phase ctx.voltages is all zeros.
       let vdRaw: number;
-      if (pool.initMode === "initJct") {
+      if (ctx.initMode === "initJct") {
         if (params.OFF) {
           vdRaw = 0;
         } else if (pool.uic && !isNaN(params.IC)) {
@@ -494,7 +494,7 @@ export function createDiodeElement(
       // Apply pnjlim — dioload.c:180-191
       const vdOld = s0[base + SLOT_VD];
       let vdLimited: number;
-      if (pool.initMode === "initJct") {
+      if (ctx.initMode === "initJct") {
         // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
         vdLimited = vdRaw;
         pnjlimLimited = false;
@@ -588,7 +588,7 @@ export function createDiodeElement(
         const q2 = s2[base + SLOT_Q];
         const q3 = s3[base + SLOT_Q];
 
-        if (pool.initMode === "initTran") {
+        if (ctx.initMode === "initTran") {
           // dioload.c:391-393: MODEINITTRAN copies q0→q1 so first-step history matches
           s1[base + SLOT_Q] = q0;
           q1 = q0;
@@ -613,7 +613,7 @@ export function createDiodeElement(
         s0[base + SLOT_Q] = q0;
         s0[base + SLOT_CCAP] = ccap;
 
-        if (pool.initMode === "initTran") {
+        if (ctx.initMode === "initTran") {
           // dioload.c:399-402: MODEINITTRAN copies ccap0→ccap1
           s1[base + SLOT_CCAP] = ccap;
         }
@@ -630,7 +630,7 @@ export function createDiodeElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      if (params.OFF && pool.initMode === "initFix") return true;
+      if (params.OFF && ctx.initMode === "initFix") return true;
 
       // ngspice icheck gate: if voltage was limited in load(),
       // declare non-convergence immediately (DIOload sets CKTnoncon++)

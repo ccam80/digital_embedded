@@ -94,7 +94,7 @@ function buildUnitCtx(
     method: "trapezoidal",
     order: 1,
     deltaOld: [0, 0, 0, 0, 0, 0, 0],
-    ag: new Float64Array(8),
+    ag: new Float64Array(7),
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
@@ -303,7 +303,7 @@ describe("Diode", () => {
       method: "trapezoidal",
       order: 1,
       deltaOld: [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6],
-      ag: new Float64Array(8),
+      ag: new Float64Array(7),
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
@@ -865,7 +865,7 @@ describe("AREA scaling", () => {
         method: "trapezoidal" as const,
         order: 1,
         deltaOld: [0, 0, 0, 0, 0, 0, 0],
-        ag: new Float64Array(8),
+        ag: new Float64Array(7),
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
@@ -929,7 +929,7 @@ describe("integration", () => {
     const vd = 0.3;
 
     // Compute ag[] via computeNIcomCof (trapezoidal order 2)
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     computeNIcomCof(dt, [dt, dt, dt, dt, dt, dt, dt], 2, "trapezoidal", ag, scratch);
 
@@ -951,7 +951,6 @@ describe("integration", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(1);
 
-    pool.ag.set(ag);
     const ctx = buildUnitCtx(solver, new Float64Array([vd, 0]), {
       initMode: "transient",
       dt,
@@ -1038,7 +1037,7 @@ function makeParityCtx(
     method: "trapezoidal" as const,
     order: 1,
     deltaOld: [opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0, opts.dt ?? 0],
-    ag: opts.ag ?? new Float64Array(8),
+    ag: opts.ag ?? new Float64Array(7),
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
@@ -1118,7 +1117,7 @@ describe("diode_load_transient_parity", () => {
     const VD = 0.3;
 
     // Trap order 1 coefficients via computeNIcomCof.
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     computeNIcomCof(dt, [dt, dt, dt, dt, dt, dt, dt], 1, "trapezoidal", ag, scratch);
 
@@ -1139,7 +1138,6 @@ describe("diode_load_transient_parity", () => {
     // mapped to no row). matrixSize = 1 (anode only, cathode is ground).
     const solver = new SparseSolver();
     solver.beginAssembly(1);
-    pool.ag.set(ag);
 
     const ctx = makeParityCtx(solver, new Float64Array([VD]), {
       initMode: "transient",

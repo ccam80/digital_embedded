@@ -267,7 +267,7 @@ export class NJfetAnalogElement extends AbstractFetElement {
     const limitingCollector = ctx.limitingCollector;
     // jfetload.c: during MODEINITJCT, primeJunctions() has already set _vgs, _vds,
     // _vgs_junction directly. Skip MNA voltage reads and all voltage limiting.
-    if (this._pool.initMode === "initJct") {
+    if (ctx.initMode === "initJct") {
       this._pnjlimLimited = false;
       this._swapped = false;
 

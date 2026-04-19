@@ -7,14 +7,6 @@ export class StatePool {
   tranStep: number = 0;
 
   /**
-   * Current DC-OP mode (niiter.c:991-997).
-   * Driven by dcopModeLadder inside newtonRaphson().
-   * Reset to "transient" when reset() is called.
-   * "transient" means no DC-OP mode constraint (normal transient NR).
-   */
-  initMode: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" = "transient";
-
-  /**
    * Analysis mode — distinguishes DC-OP from transient NR iterations.
    * Maps to ngspice CKTmode bit flags:
    *   "dcOp" ↔ MODEDCOP | MODETRANOP (bjtload.c:249, dctran.c:346-348 pre-flip)
@@ -119,7 +111,6 @@ export class StatePool {
   reset(): void {
     for (const buf of this.states) buf.fill(0);
     this.tranStep = 0;
-    this.initMode = "transient";
     this.analysisMode = "dcOp";
     this.dt = 0;
   }

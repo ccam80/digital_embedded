@@ -452,7 +452,7 @@ describe("SparseSolver real MNA circuit", () => {
     // Stamp all elements into a raw SparseSolver via the load(ctx) interface.
     const rawSolver = new SparseSolver();
     const rawVoltages = new Float64Array(matrixSize);
-    const rawAg = new Float64Array(8);
+    const rawAg = new Float64Array(7);
     const rawCtx: import("../load-context.js").LoadContext = {
       solver: rawSolver,
       voltages: rawVoltages,

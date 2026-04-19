@@ -187,7 +187,7 @@ export function createVaractorElement(
       // Apply pnjlim to prevent exponential runaway, using vold from pool
       const vdOld = s0[base + SLOT_VD];
       let vdLimited: number;
-      if (pool.initMode === "initJct") {
+      if (ctx.initMode === "initJct") {
         // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
         vdLimited = vdRaw;
         pnjlimLimited = false;

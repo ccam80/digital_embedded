@@ -93,7 +93,7 @@ function makeLoadCtx(
     method: "trapezoidal",
     order: 1,
     deltaOld: [dt, dt, dt, dt, dt, dt, dt],
-    ag: overrides.ag ?? new Float64Array(8),
+    ag: overrides.ag ?? new Float64Array(7),
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
@@ -139,7 +139,7 @@ function getCapacitanceAtBias(
 
   // Now compute the companion capacitance with trapezoidal order-2 at this bias.
   // ag[0] = 2/dt for trapezoidal order 2; ag[1] = 1 per computeNIcomCof.
-  const ag = new Float64Array(8);
+  const ag = new Float64Array(7);
   ag[0] = 2 / dt;
   ag[1] = 1;
 
@@ -316,7 +316,7 @@ describe("Varactor", () => {
 
     // Run load(ctx) in transient mode to exercise the reactive-companion path
     // that writes the Q slot.
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     ag[0] = 2 / dt;
     ag[1] = 1;
     const tranSolver = new SparseSolver();
@@ -424,7 +424,7 @@ describe("integration", () => {
     const dt = 1e-9;
     const vd = -2.0; // reverse bias
 
-    const ag = new Float64Array(8);
+    const ag = new Float64Array(7);
     const scratch = new Float64Array(49);
     computeNIcomCof(dt, [dt, dt, dt, dt, dt, dt, dt], 2, "trapezoidal", ag, scratch);
 
@@ -448,7 +448,6 @@ describe("integration", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(1);
 
-    pool.ag.set(ag);
     const ctx = {
       solver,
       voltages: new Float64Array([vd, 0]),

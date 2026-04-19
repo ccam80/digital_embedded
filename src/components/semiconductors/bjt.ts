@@ -774,7 +774,7 @@ export function createBjtElement(
     load(ctx: LoadContext): void {
       const voltages = ctx.voltages;
 
-      if (pool.initMode === "initPred") {
+      if (ctx.initMode === "initPred") {
         s0[base + SLOT_VBE] = s1[base + SLOT_VBE];
         s0[base + SLOT_VBC] = s1[base + SLOT_VBC];
         s0[base + SLOT_IC]  = s1[base + SLOT_IC];
@@ -800,7 +800,7 @@ export function createBjtElement(
       // at that phase ctx.voltages is all zeros and would mis-bias G-P.
       let vbeRaw: number;
       let vbcRaw: number;
-      if (pool.initMode === "initJct") {
+      if (ctx.initMode === "initJct") {
         if (params.OFF) {
           vbeRaw = 0;
           vbcRaw = 0;
@@ -822,7 +822,7 @@ export function createBjtElement(
       let vbcLimited: number;
       let vbeLimFlag = false;
       let vbcLimFlag = false;
-      if (pool.initMode === "initJct") {
+      if (ctx.initMode === "initJct") {
         vbeLimited = vbeRaw;
         vbcLimited = vbcRaw;
         icheckLimited = false;
@@ -922,7 +922,7 @@ export function createBjtElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      if (params.OFF && pool.initMode === "initFix") return true;
+      if (params.OFF && ctx.initMode === "initFix") return true;
 
       const voltages = ctx.voltages;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
@@ -1464,7 +1464,7 @@ export function createSpiceL1BjtElement(
       const dt = ctx.dt;
 
       // --- Step 1: initPred — copy last accepted linearization ---
-      if (pool.initMode === "initPred") {
+      if (ctx.initMode === "initPred") {
         s0[base + L1_SLOT_VBE] = s1[base + L1_SLOT_VBE];
         s0[base + L1_SLOT_VBC] = s1[base + L1_SLOT_VBC];
         s0[base + L1_SLOT_IC]  = s1[base + L1_SLOT_IC];
@@ -1492,7 +1492,7 @@ export function createSpiceL1BjtElement(
       // at that phase ctx.voltages is all zeros and would mis-bias G-P.
       let vbeRaw: number;
       let vbcRaw: number;
-      if (pool.initMode === "initJct") {
+      if (ctx.initMode === "initJct") {
         if (params.OFF) {
           vbeRaw = 0;
           vbcRaw = 0;
@@ -1517,7 +1517,7 @@ export function createSpiceL1BjtElement(
       let vbeLimFlag = false;
       let vbcLimFlag = false;
       let vsubLimFlag = false;
-      if (pool.initMode === "initJct") {
+      if (ctx.initMode === "initJct") {
         vbeLimited = vbeRaw;
         vbcLimited = vbcRaw;
         vsubLimited = vsubRaw;
@@ -1687,7 +1687,7 @@ export function createSpiceL1BjtElement(
         s0[base + L1_SLOT_V_BC] = vbcLimited;
         s0[base + L1_SLOT_V_CS] = vsubLimited;
 
-        const isFirstTranCall = pool.initMode === "initTran";
+        const isFirstTranCall = ctx.initMode === "initTran";
 
         // --- B-E junction charge + total capacitance ---
         // BJ13: XTF-modified diffusion cap using gbe (bjtload.c:584-585,593)
@@ -2067,7 +2067,7 @@ export function createSpiceL1BjtElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      if (params.OFF && pool.initMode === "initFix") return true;
+      if (params.OFF && ctx.initMode === "initFix") return true;
 
       const voltages = ctx.voltages;
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;

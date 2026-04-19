@@ -197,7 +197,7 @@ describe("variable_rail_load_srcfact_parity", () => {
       method: "trapezoidal" as const,
       order: 1,
       deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(8),
+      ag: new Float64Array(7),
       srcFact,
       noncon: { value: 0 },
       limitingCollector: null,
