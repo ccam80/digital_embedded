@@ -242,8 +242,11 @@ export class TimestepController {
    *   - _lteParams (trtol, reltol, abstol, chgtol) — cast past readonly
    *     because the struct is logically immutable per computeNewDt call but
    *     we deliberately refresh it once on configure().
-   *   - currentDt is clamped down to the new maxTimeStep only if it exceeds
-   *     it (never raised). firstStep is NOT re-applied.
+   *   - currentDt: while no step has been taken (_isFirstGetClampedDt),
+   *     firstStep is re-applied exactly as the constructor does. Once the
+   *     first getClampedDt has run, currentDt reflects accepted-step history
+   *     and is only clamped DOWN to the new maxTimeStep (never raised), so
+   *     hot-loading tolerances mid-run cannot restart the step history.
    */
   updateParams(params: ResolvedSimulationParams): void {
     this._params = params;
@@ -266,8 +269,19 @@ export class TimestepController {
       ? params.tStop * 1e-11
       : params.minTimeStep;
 
-    // Clamp currentDt down to the new ceiling; never raise it.
-    if (this.currentDt > params.maxTimeStep) {
+    if (this._isFirstGetClampedDt) {
+      // No step has been taken yet. Re-apply firstStep exactly as the
+      // constructor does — this lets callers (e.g. the ngspice comparison
+      // harness) legitimately reconfigure firstStep after engine
+      // construction but before runTransient. Without this branch the
+      // engine silently ignores a harness-supplied firstStep and runs
+      // with the DEFAULT_SIMULATION_PARAMS value baked in at field init.
+      this.currentDt = Math.max(
+        params.minTimeStep,
+        Math.min(params.maxTimeStep, params.firstStep),
+      );
+    } else if (this.currentDt > params.maxTimeStep) {
+      // Mid-run: only clamp currentDt down to the new ceiling; never raise.
       this.currentDt = params.maxTimeStep;
     }
   }
