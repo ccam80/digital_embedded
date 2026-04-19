@@ -424,7 +424,7 @@ export class MNAEngine implements AnalogEngine {
         computeNIcomCof(dt, this._timestep.deltaOld, this._timestep.currentOrder,
           this._timestep.currentMethod, this._ctx!.ag, this._ctx!.gearMatScratch);
         if (this._firsttime) {
-          statePool.initMode = "initTran";
+          ctx.initMode = "initTran";
         }
       }
 
@@ -439,8 +439,19 @@ export class MNAEngine implements AnalogEngine {
       ctx.loadCtx.xfact = ctx.deltaOld[0] / ctx.deltaOld[1];
       // dt for reactive elements to use in load() (CKTdelta).
       ctx.loadCtx.dt = dt;
+      // Synchronize integration order and method with the timestep controller
+      // before NR. ngspice stores CKTorder and CKTintegrateMethod on the CKT
+      // struct itself — a single source of truth read by both NIcomCof (ag[])
+      // and every device load routine. Our timestep controller is a separate
+      // object; without this copy, loadCtx.order/method stay at their ckt-
+      // context.ts:537 init values while timestep.currentOrder/currentMethod
+      // promote after LTE acceptance (tryOrderPromotion). That desync causes
+      // niIntegrate to apply the order-1 formula to order-2 ag[] coefficients
+      // (ag[1] = xmu/(1-xmu) = 1.0 for TRAP order 2, interpreted as -1/dt
+      // under order 1), producing catastrophic companion-current errors.
+      ctx.loadCtx.order = this._timestep.currentOrder;
+      ctx.loadCtx.method = this._timestep.currentMethod;
       ctx.maxIterations = params.transientMaxIterations;
-      ctx.initialGuess = ctx.rhs;
       ctx.enableBlameTracking = logging;
       ctx.postIterationHook = this.postIterationHook;
       ctx.detailedConvergence = this.detailedConvergence;
@@ -449,18 +460,17 @@ export class MNAEngine implements AnalogEngine {
       ctx.dcopModeLadder = null;
       ctx.exactMaxIterations = false;
       ctx.onIteration0Complete = null;
-      // ngspice dctran.c MODEINITPRED: set before the first NR iteration of a
-      // new step only. On retries the predictor has already run once; revert
-      // to "transient" so capacitor.ts does not re-copy s0[SLOT_Q] = s1[SLOT_Q]
-      // on every iteration and collapse the divided difference.
-      if (statePool && firstNrForThisStep) {
-        statePool.initMode = "initPred";
+      // ngspice dctran.c: MODEINITPRED is set ONLY at step > 0 (dctran.c:794),
+      // never at firsttime (dctran.c:346 uses MODEINITTRAN instead). initTran
+      // was already written at line 427 for firsttime and must not be clobbered.
+      if (statePool && firstNrForThisStep && !this._firsttime) {
+        ctx.initMode = "initPred";
       }
       newtonRaphson(ctx);
       const nrResult = ctx.nrResult;
       // After the first load() pass, revert initMode to "transient".
       if (statePool && firstNrForThisStep) {
-        statePool.initMode = "transient";
+        ctx.initMode = "transient";
         firstNrForThisStep = false;
       }
 
@@ -492,7 +502,7 @@ export class MNAEngine implements AnalogEngine {
         this._timestep.currentDt = dt;
         this._timestep.currentOrder = 1;                // ngspice dctran.c:810 — order, NOT method
         if (this._firsttime && statePool) {
-          statePool.initMode = "initTran";
+          ctx.initMode = "initTran";
         }
         // fall through to delmin check below
       } else {
