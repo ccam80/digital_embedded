@@ -452,7 +452,7 @@ describe("Capacitor initPred", () => {
 
     // initTran + uic: q0 = C * IC
     pool.initMode = "initTran";
-    (pool as any).uic = true;
+    pool.uic = true;
     // Node voltage is 2V (different from IC=5V)
     {
       const { solver } = makeCaptureSolver();

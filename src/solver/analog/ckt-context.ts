@@ -530,7 +530,7 @@ export class CKTCircuitContext {
       isTransient: false,
       xfact: 0,
       gmin: params.gmin ?? 1e-12,
-      uic: false,
+      uic: params.uic ?? false,
       reltol: params.reltol,
       iabstol: params.abstol,
     };

@@ -355,8 +355,8 @@ describe("NR", () => {
     // When isDcOp=true and statePool.uic=true, NR must skip all iteration and
     // return { converged: true, iterations: 0 } after a single CKTload.
     const ctx = makeDiodeCtx(5.0);
-    // Replace statePool with one that has uic=true
-    (ctx.statePool as unknown as { uic: boolean }).uic = true;
+    // Set uic via loadCtx (D2: uic plumbed from params onto LoadContext).
+    ctx.loadCtx.uic = true;
     ctx.isDcOp = true;
 
     newtonRaphson(ctx);
@@ -368,7 +368,7 @@ describe("NR", () => {
   it("uic_bypass_not_triggered_without_isDcOp", () => {
     // When isDcOp is not set (transient path), statePool.uic must not trigger the bypass.
     const ctx = makeDiodeCtx(5.0);
-    (ctx.statePool as unknown as { uic: boolean }).uic = true;
+    ctx.loadCtx.uic = true;
     ctx.isDcOp = false;
 
     newtonRaphson(ctx);

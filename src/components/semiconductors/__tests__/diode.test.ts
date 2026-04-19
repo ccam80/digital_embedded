@@ -392,8 +392,8 @@ describe("Diode", () => {
     const el = withNodeIds(element, [1, 2]);
 
     // Enable UIC mode on pool so initJct takes the IC path.
-    // StatePool carries uic as a dynamic property (not declared in class).
-    (pool as unknown as { uic: boolean }).uic = true;
+    // StatePool.uic field added in D2.
+    pool.uic = true;
     pool.initMode = "initJct";
 
     // In-load initJct override: pool.uic=true and IC=0.5 → vdRaw=0.5 set directly.

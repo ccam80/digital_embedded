@@ -269,7 +269,9 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   }
 
   // MODETRANOP && MODEUIC: single CKTload, no iteration (ngspice dctran.c UIC path).
-  if (ctx.isDcOp && statePool && (statePool as { uic?: boolean }).uic) {
+  // D2: reads ctx.loadCtx.uic (plumbed from params.uic) — no more unsound statePool cast.
+  // D3 will narrow from isDcOp to isTransientDcop once that field exists.
+  if (ctx.isDcOp && ctx.loadCtx.uic) {
     [voltages, prevVoltages] = [prevVoltages, voltages];
     ctx.rhsOld.set(prevVoltages);
     cktLoad(ctx, 0);
