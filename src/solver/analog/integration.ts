@@ -178,7 +178,7 @@ export class NodeVoltageHistory {
  *
  * Mirrors ngspice nicomcof.c. Called once per transient retry iteration in
  * analog-engine.ts step(), BEFORE companion stamping. Elements read ag[0] etc.
- * from statePool.ag instead of deriving 1/dt locally.
+ * from ctx.ag instead of deriving 1/dt locally.
  *
  * ag[0] = coefficient on Q_n (current timepoint)
  * ag[1] = coefficient on Q_{n-1}

@@ -43,14 +43,6 @@ export class StatePool {
    */
   temperature: number = 300.15;
 
-  /**
-   * Integration coefficients shared across all elements (ngspice CKTag[]).
-   * Size 8 to support GEAR orders 3-6 in future. ag[0] = 1/dt for BDF-1/TRAP,
-   * ag[1] = -1/dt. Zeroed at DCOP-to-transient transition (dctran.c:348).
-   * Computed each transient step by computeNIcomCof() (task 3.2.1).
-   */
-  ag: Float64Array = new Float64Array(8);
-
   constructor(totalSlots: number) {
     this.totalSlots = totalSlots;
     this.states = [
@@ -113,14 +105,13 @@ export class StatePool {
     this.states[0] = recycled;
   }
 
-  /** Zero all state arrays and integration coefficients. */
+  /** Zero all state arrays. Integration coefficients live on CKTCircuitContext.ag. */
   reset(): void {
     for (const buf of this.states) buf.fill(0);
     this.tranStep = 0;
     this.initMode = "transient";
     this.analysisMode = "dcOp";
     this.dt = 0;
-    this.ag.fill(0);
   }
 
   /**

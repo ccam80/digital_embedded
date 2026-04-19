@@ -333,39 +333,6 @@ describe('StatePool', () => {
     });
   });
 
-  describe('ag[] integration coefficients', () => {
-    it('initialises ag to an 8-element Float64Array of zeros', () => {
-      const pool = new StatePool(4);
-      expect(pool.ag).toBeInstanceOf(Float64Array);
-      expect(pool.ag.length).toBe(8);
-      expect(Array.from(pool.ag)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
-    });
-
-    it('ag is writable — setting ag[0] and ag[1] is reflected', () => {
-      const pool = new StatePool(4);
-      pool.ag[0] = 1e6;
-      pool.ag[1] = -1e6;
-      expect(pool.ag[0]).toBe(1e6);
-      expect(pool.ag[1]).toBe(-1e6);
-    });
-
-    it('reset() zeros ag[]', () => {
-      const pool = new StatePool(4);
-      pool.ag[0] = 1e6;
-      pool.ag[1] = -1e6;
-      pool.ag[3] = 42;
-      pool.reset();
-      expect(Array.from(pool.ag)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
-    });
-
-    it('ag[] is independent per StatePool instance', () => {
-      const pool1 = new StatePool(4);
-      const pool2 = new StatePool(4);
-      pool1.ag[0] = 999;
-      expect(pool2.ag[0]).toBe(0);
-    });
-  });
-
   describe('seedHistory()', () => {
     it('seeds state1 through state7 from state0', () => {
       const pool = new StatePool(3);

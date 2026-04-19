@@ -631,8 +631,10 @@ describe("integration", () => {
     const ag0 = 1.0 / dt / (1.0 - xmu);
     // ag[1] = xmu/(1-xmu)
     const ag1 = xmu / (1.0 - xmu);
-    pool.ag[0] = ag0;
-    pool.ag[1] = ag1;
+    // D1: ag buffer lives on the LoadContext, not on StatePool.
+    const agBuf = new Float64Array(7);
+    agBuf[0] = ag0;
+    agBuf[1] = ag1;
 
     // Build a minimal LoadContext for the transient load() call.
     // The mock solver captures stamps but we only care about pool state after load().
@@ -658,7 +660,7 @@ describe("integration", () => {
       method: "trapezoidal",
       order: 2,
       deltaOld: [dt, dt, dt, dt, dt, dt, dt],
-      ag: pool.ag,
+      ag: agBuf,
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
