@@ -108,10 +108,7 @@ function makeCtx(overrides: Partial<LoadContext> & { solver?: MockSolver } = {})
     limitingCollector: null,
     isDcOp: overrides.isDcOp ?? false,
     isTransient: overrides.isTransient ?? false,
-<<<<<<< HEAD
     isTransientDcop: false,
-=======
->>>>>>> e427e072 (D4: add isAc flag and pass LoadContext to stampAc (ngspice alignment))
     isAc: false,
     xfact: 0,
     gmin: 1e-12,

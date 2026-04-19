@@ -961,10 +961,7 @@ function makeTimer555ParityCtx(
     limitingCollector: null,
     isDcOp: dt === 0,
     isTransient: dt > 0,
-<<<<<<< HEAD
     isTransientDcop: false,
-=======
->>>>>>> e427e072 (D4: add isAc flag and pass LoadContext to stampAc (ngspice alignment))
     isAc: false,
     xfact: 1,
     gmin: 1e-12,

@@ -99,12 +99,7 @@ function makeLoadCtx(
     limitingCollector: null,
     isDcOp: false,
     isTransient: false,
-<<<<<<< HEAD
-
     isTransientDcop: false,
-
-=======
->>>>>>> e427e072 (D4: add isAc flag and pass LoadContext to stampAc (ngspice alignment))
     isAc: false,
     xfact: 1,
     gmin: 1e-12,
@@ -152,12 +147,7 @@ function getCapacitanceAtBias(
   tranSolver.beginAssembly(2);
   const tranCtx = makeLoadCtx(voltages, tranSolver, {
     isTransient: true,
-<<<<<<< HEAD
-
     isTransientDcop: false,
-
-=======
->>>>>>> e427e072 (D4: add isAc flag and pass LoadContext to stampAc (ngspice alignment))
     isAc: false,
     dt,
     method: "trapezoidal",
@@ -333,12 +323,7 @@ describe("Varactor", () => {
     tranSolver.beginAssembly(2);
     const tranCtx = makeLoadCtx(voltages, tranSolver, {
       isTransient: true,
-<<<<<<< HEAD
-
       isTransientDcop: false,
-
-=======
->>>>>>> e427e072 (D4: add isAc flag and pass LoadContext to stampAc (ngspice alignment))
       isAc: false,
       dt,
       method: "trapezoidal",
@@ -479,12 +464,7 @@ describe("integration", () => {
       limitingCollector: null,
       isDcOp: false,
       isTransient: true,
-<<<<<<< HEAD
-
       isTransientDcop: false,
-
-=======
->>>>>>> e427e072 (D4: add isAc flag and pass LoadContext to stampAc (ngspice alignment))
       isAc: false,
       xfact: 1,
       gmin: 1e-12,
