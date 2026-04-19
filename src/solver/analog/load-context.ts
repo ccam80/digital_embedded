@@ -57,6 +57,21 @@ export interface LoadContext {
   isDcOp: boolean;
   /** True during transient solves. */
   isTransient: boolean;
+  /**
+   * True during the pre-first-step DCOP invocation of transient analysis
+   * (ngspice MODETRANOP, cktdefs.h:172). Distinguishes the transient-boot
+   * DCOP from a standalone .OP (MODEDCOP, cktdefs.h:171). Elements that
+   * scale contributions only under MODETRANOP (e.g. vsrcload.c:410-411
+   * srcFact multiply) gate on this flag instead of on isDcOp alone.
+   * Mutually compatible with isDcOp=true; never true during transient NR
+   * or standalone .OP; never true during AC.
+   */
+  isTransientDcop: boolean;
+  /**
+   * True during AC small-signal sweeps. Mutually exclusive with isDcOp and
+   * isTransient. Mirrors ngspice acan.c:285 `CKTmode = (CKTmode & MODEUIC) | MODEAC`.
+   */
+  isAc: boolean;
   /** Extrapolation factor for predictor (deltaOld[0] / deltaOld[1]). */
   xfact: number;
   /** Diagonal conductance added for numerical stability (CKTgmin). */

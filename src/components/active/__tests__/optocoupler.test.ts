@@ -368,6 +368,10 @@ function makeOptoParityCtx(voltages: Float64Array, solver: SparseSolverType): Lo
     limitingCollector: null,
     isDcOp: true,
     isTransient: false,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

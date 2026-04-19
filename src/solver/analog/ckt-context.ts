@@ -233,6 +233,14 @@ export class CKTCircuitContext {
   isDcOp: boolean = false;
   /** True during transient solves. */
   isTransient: boolean = false;
+  /**
+   * True during transient-boot DCOP (ngspice MODETRANOP, cktdefs.h:172).
+   * False during standalone .OP (MODEDCOP, cktdefs.h:171) and during
+   * transient NR. See LoadContext.isTransientDcop for full semantics.
+   */
+  isTransientDcop: boolean = false;
+  /** True during AC small-signal sweeps (ngspice MODEAC, cktdefs.h). */
+  isAc: boolean = false;
   /** Source stepping scale factor (ngspice srcFact). */
   srcFact: number = 1;
   /** True when nodesets are present (derived from nodesets.size > 0). */
@@ -528,6 +536,8 @@ export class CKTCircuitContext {
       limitingCollector: null,
       isDcOp: false,
       isTransient: false,
+      isTransientDcop: false,
+      isAc: false,
       xfact: 0,
       gmin: params.gmin ?? 1e-12,
       uic: params.uic ?? false,

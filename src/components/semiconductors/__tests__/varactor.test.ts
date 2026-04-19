@@ -99,6 +99,10 @@ function makeLoadCtx(
     limitingCollector: null,
     isDcOp: false,
     isTransient: false,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -145,6 +149,10 @@ function getCapacitanceAtBias(
   tranSolver.beginAssembly(2);
   const tranCtx = makeLoadCtx(voltages, tranSolver, {
     isTransient: true,
+
+    isTransientDcop: false,
+
+    isAc: false,
     dt,
     method: "trapezoidal",
     order: 2,
@@ -319,6 +327,10 @@ describe("Varactor", () => {
     tranSolver.beginAssembly(2);
     const tranCtx = makeLoadCtx(voltages, tranSolver, {
       isTransient: true,
+
+      isTransientDcop: false,
+
+      isAc: false,
       dt,
       method: "trapezoidal",
       order: 2,
@@ -458,6 +470,10 @@ describe("integration", () => {
       limitingCollector: null,
       isDcOp: false,
       isTransient: true,
+
+      isTransientDcop: false,
+
+      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,

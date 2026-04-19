@@ -203,6 +203,10 @@ describe("variable_rail_load_srcfact_parity", () => {
       limitingCollector: null,
       isDcOp: true,
       isTransient: false,
+
+      isTransientDcop: false,
+
+      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,

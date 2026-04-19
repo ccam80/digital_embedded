@@ -745,6 +745,11 @@ export class MNAEngine implements AnalogEngine {
     ctx.nodesets = cac.nodesets ?? new Map();
     ctx.ics = cac.ics ?? new Map();
     ctx.srcFact = this._params.srcFact ?? 1;
+    // D3: standalone .OP takes MODEDCOP only, NOT MODETRANOP. vsrcload.c:410-411
+    // gates srcFact scaling on MODETRANOP, so this flag must be false here even
+    // though srcFact is non-1 during source-stepping sub-solves.
+    ctx.isTransientDcop = false;
+    ctx.isAc = false;
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
     solveDcOperatingPoint(ctx);
@@ -831,6 +836,11 @@ export class MNAEngine implements AnalogEngine {
     ctx.nodesets = cac.nodesets ?? new Map();
     ctx.ics = cac.ics ?? new Map();
     ctx.srcFact = this._params.srcFact ?? 1;
+    // D3: transient-boot DCOP runs under MODETRANOP per dctran.c:190,219-220,231-232.
+    // Reset to false after DCOP converges in _seedFromDcop, before the first
+    // real transient step.
+    ctx.isTransientDcop = true;
+    ctx.isAc = false;
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
     solveDcOperatingPoint(ctx);
@@ -1106,13 +1116,16 @@ export class MNAEngine implements AnalogEngine {
       // for the initial companion stamp, not a stale value.
       cac.statePool.analysisMode = "tran";
       // ngspice dctran.c:346 — `CKTmode = (CKTmode & MODEUIC) | MODETRAN | MODEINITTRAN`.
-      // Set isTransient ONCE here, post-DCOP / pre-first-step. Reactive elements
-      // (capacitor, inductor, transmission-line, transformer, …) gate their
-      // companion stamps on `isTransient || isDcOp`; without this assignment the
-      // entire reactive ladder is invisible to every transient NR call.
+      // Set isTransient true and clear isTransientDcop: leaving MODETRANOP,
+      // entering MODETRAN. Reactive elements gate companion stamps on
+      // `isTransient || isDcOp`; without isTransient=true the reactive ladder
+      // is invisible to every transient NR call.
       ctx.isTransient = true;
-      cac.statePool.ag[0] = 0;
-      cac.statePool.ag[1] = 0;
+      ctx.isTransientDcop = false;
+      ctx.loadCtx.isTransientDcop = false;
+      // ctx.ag is CKTag[7] (cktdefs.h:97) read by elements via loadCtx.ag (D1).
+      ctx.ag[0] = 0;
+      ctx.ag[1] = 0;
       cac.statePool.seedHistory();
       cac.statePool.refreshElementRefs(ctx.poolBackedElements as unknown as PoolBackedAnalogElement[]);
       this._firsttime = true;

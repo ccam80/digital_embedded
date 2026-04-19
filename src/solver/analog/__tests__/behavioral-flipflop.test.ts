@@ -128,6 +128,8 @@ function makeCtx(
     limitingCollector: null,
     isDcOp: false,
     isTransient: dt > 0,
+    isTransientDcop: false,
+    isAc: false,
     xfact: 0,
     gmin: 1e-12,
     uic: false,
@@ -340,6 +342,10 @@ function makeMinimalFlipflopCtx(voltages?: Float64Array): LoadContext {
     limitingCollector: null,
     isDcOp: false,
     isTransient: false,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 0,
     gmin: 1e-12,
     uic: false,

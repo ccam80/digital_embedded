@@ -88,6 +88,10 @@ function makeCtx(v: Float64Array = new Float64Array(8)): LoadContext {
     limitingCollector: null,
     isDcOp: false,
     isTransient: false,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 0,
     gmin: 1e-12,
     uic: false,

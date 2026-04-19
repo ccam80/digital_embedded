@@ -509,6 +509,8 @@ describe("Integration", () => {
         limitingCollector: null,
         isDcOp: false,
         isTransient: ctxDt > 0,
+        isTransientDcop: false,
+        isAc: false,
         xfact: 0,
         gmin: 1e-12,
         uic: false,

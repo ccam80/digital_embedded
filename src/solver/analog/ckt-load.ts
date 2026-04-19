@@ -50,6 +50,8 @@ export function cktLoad(ctx: CKTCircuitContext, iteration: number): void {
   ctx.loadCtx.gmin = ctx.diagonalGmin;
   ctx.loadCtx.isDcOp = ctx.isDcOp;
   ctx.loadCtx.isTransient = ctx.isTransient;
+  ctx.loadCtx.isTransientDcop = ctx.isTransientDcop;
+  ctx.loadCtx.isAc = ctx.isAc;
   ctx.loadCtx.noncon.value = 0;
 
   // Step 3: single device loop (ngspice cktload.c:71-95, calls DEVload)

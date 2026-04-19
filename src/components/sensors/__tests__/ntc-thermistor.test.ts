@@ -84,6 +84,10 @@ function makeAcceptCtx(voltages: Float64Array, dt: number): import("../../../sol
     limitingCollector: null,
     isDcOp: false,
     isTransient: true,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

@@ -961,6 +961,8 @@ function makeTimer555ParityCtx(
     limitingCollector: null,
     isDcOp: dt === 0,
     isTransient: dt > 0,
+    isTransientDcop: false,
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

@@ -84,6 +84,10 @@ function makeCompanionCtx(opts: {
     limitingCollector: null,
     isDcOp: false,
     isTransient: true,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: opts.uic ?? false,
@@ -627,6 +631,10 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
       limitingCollector: null,
       isDcOp: false,
       isTransient: true,
+
+      isTransientDcop: false,
+
+      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -786,6 +794,10 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
         limitingCollector: null,
         isDcOp: false,
         isTransient: true,
+
+        isTransientDcop: false,
+
+        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,

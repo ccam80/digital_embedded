@@ -81,6 +81,10 @@ function makeCompanionCtx(opts: {
     limitingCollector: null,
     isDcOp: false,
     isTransient: true,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: opts.uic ?? false,
@@ -164,7 +168,7 @@ describe("Inductor", () => {
         method: "trapezoidal", order: 1,
         deltaOld: [0, 0, 0, 0, 0, 0, 0], ag: new Float64Array(8),
         srcFact: 1, noncon: { value: 0 }, limitingCollector: null,
-        isDcOp: false, isTransient: false, xfact: 1, gmin: 1e-12, uic: false,
+        isDcOp: false, isTransient: false, isTransientDcop: false, isAc: false, xfact: 1, gmin: 1e-12, uic: false,
         reltol: 1e-3, iabstol: 1e-12,
       };
       analogElement.load(ctx);
@@ -604,6 +608,10 @@ describe("inductor_load_transient_parity (C4.2)", () => {
         limitingCollector: null,
         isDcOp: false,
         isTransient: true,
+
+        isTransientDcop: false,
+
+        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,

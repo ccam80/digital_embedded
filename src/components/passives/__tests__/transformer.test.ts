@@ -90,6 +90,10 @@ function makeTransientCtx(
     limitingCollector: null,
     isDcOp: false,
     isTransient: true,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -850,6 +854,10 @@ describe("transformer_load_transient_parity (C4.2)", () => {
         limitingCollector: null,
         isDcOp: false,
         isTransient: true,
+
+        isTransientDcop: false,
+
+        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,

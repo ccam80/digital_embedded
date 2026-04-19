@@ -503,6 +503,10 @@ function makeMinimalCtx(voltages?: Float64Array): LoadContext {
     limitingCollector: null,
     isDcOp: false,
     isTransient: false,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 0,
     gmin: 1e-12,
     uic: false,

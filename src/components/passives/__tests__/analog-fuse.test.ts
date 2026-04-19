@@ -73,6 +73,10 @@ function driveFuseStep(fuse: AnalogFuseElement, dt: number, voltages: Float64Arr
     limitingCollector: null,
     isDcOp: false,
     isTransient: true,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

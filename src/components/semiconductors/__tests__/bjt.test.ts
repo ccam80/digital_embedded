@@ -99,6 +99,10 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
     limitingCollector: null,
     isDcOp: true,
     isTransient: false,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -1315,6 +1319,10 @@ describe("BJT L1 LimitingEvent instrumentation", () => {
       limitingCollector: collector,
       isDcOp: true,
       isTransient: false,
+
+      isTransientDcop: false,
+
+      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -1390,6 +1398,10 @@ describe("bjt_spicel1_load_dcop_parity", () => {
       limitingCollector: null,
       isDcOp: true,
       isTransient: false,
+
+      isTransientDcop: false,
+
+      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,

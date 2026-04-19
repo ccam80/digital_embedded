@@ -108,6 +108,8 @@ function makeCtx(overrides: Partial<LoadContext> & { solver?: MockSolver } = {})
     limitingCollector: null,
     isDcOp: overrides.isDcOp ?? false,
     isTransient: overrides.isTransient ?? false,
+    isTransientDcop: false,
+    isAc: false,
     xfact: 0,
     gmin: 1e-12,
     uic: false,

@@ -343,6 +343,10 @@ function makeDacParityCtx(voltages: Float64Array, solver: SparseSolverType): Loa
     limitingCollector: null,
     isDcOp: true,
     isTransient: false,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

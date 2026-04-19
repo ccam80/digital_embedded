@@ -156,6 +156,12 @@ function runNR(
   // into the DCOP solve and elements gating on `isTransient || isDcOp` would
   // see both flags simultaneously.
   ctx.isTransient = false;
+  // D3: isTransientDcop is set by the CALLER (analog-engine.ts) for the
+  // _transientDcop path and left false for standalone .OP. Do NOT modify it
+  // here — all DCOP sub-solves (gmin stepping, source stepping, initSmsig
+  // finalize) inherit the caller's MODETRANOP vs MODEDCOP distinction.
+  // isAc stays false — there is no AC sub-solve inside the DCOP ladder.
+  ctx.isAc = false;
   ctx.maxIterations = maxIterations;
   ctx.initialGuess = initialGuess;
   ctx.diagonalGmin = diagonalGmin;

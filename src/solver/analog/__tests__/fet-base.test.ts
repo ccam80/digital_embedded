@@ -146,6 +146,10 @@ function makeDirectLoadCtx(voltages: Float64Array, overrides: Partial<LoadContex
     limitingCollector: null,
     isDcOp: false,
     isTransient: false,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -280,6 +284,10 @@ describe("Refactor", () => {
     ag[1] = -1 / dt;
     const tranCtx = makeDirectLoadCtx(voltages, {
       isTransient: true,
+
+      isTransientDcop: false,
+
+      isAc: false,
       dt,
       method: "bdf1",
       order: 1,
@@ -666,6 +674,10 @@ describe("integration", () => {
       limitingCollector: null,
       isDcOp: false,
       isTransient: true,
+
+      isTransientDcop: false,
+
+      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,

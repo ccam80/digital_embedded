@@ -105,6 +105,10 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
     limitingCollector: null,
     isDcOp: true,
     isTransient: false,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -1119,6 +1123,10 @@ describe("integration", () => {
       limitingCollector: null,
       isDcOp: false,
       isTransient: true,
+
+      isTransientDcop: false,
+
+      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -1268,6 +1276,10 @@ describe("mosfet_spicel1_load_dcop_parity", () => {
       limitingCollector: null,
       isDcOp: true,
       isTransient: false,
+
+      isTransientDcop: false,
+
+      isAc: false,
       xfact: 1,
       gmin: GMIN,
       uic: false,

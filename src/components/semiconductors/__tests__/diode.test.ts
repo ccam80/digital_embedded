@@ -100,6 +100,10 @@ function buildUnitCtx(
     limitingCollector: null,
     isDcOp: true,
     isTransient: false,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -307,6 +311,10 @@ describe("Diode", () => {
       limitingCollector: null,
       isDcOp: false,
       isTransient: true,
+
+      isTransientDcop: false,
+
+      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -867,6 +875,10 @@ describe("AREA scaling", () => {
         limitingCollector: null,
         isDcOp: true,
         isTransient: false,
+
+        isTransientDcop: false,
+
+        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,
@@ -955,6 +967,10 @@ describe("integration", () => {
       ag,
       isDcOp: false,
       isTransient: true,
+
+      isTransientDcop: false,
+
+      isAc: false,
     });
 
     (core as AnalogElementCore as unknown as { load(c: LoadContext): void }).load(ctx);
@@ -1019,7 +1035,7 @@ describe("integration", () => {
 function makeParityCtx(
   solver: SparseSolver,
   voltages: Float64Array,
-  opts: { initMode?: "initFloat" | "initJct" | "transient"; isDcOp?: boolean; isTransient?: boolean; dt?: number; ag?: Float64Array },
+  opts: { initMode?: "initFloat" | "initJct" | "transient"; isDcOp?: boolean; isTransient?: boolean; isTransientDcop?: boolean; isAc?: boolean; dt?: number; ag?: Float64Array },
 ) {
   return {
     solver,
@@ -1036,6 +1052,8 @@ function makeParityCtx(
     limitingCollector: null,
     isDcOp: opts.isDcOp ?? true,
     isTransient: opts.isTransient ?? false,
+    isTransientDcop: opts.isTransientDcop ?? false,
+    isAc: opts.isAc ?? false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -1135,6 +1153,10 @@ describe("diode_load_transient_parity", () => {
       initMode: "transient",
       isDcOp: false,
       isTransient: true,
+
+      isTransientDcop: false,
+
+      isAc: false,
       dt,
       ag,
     });

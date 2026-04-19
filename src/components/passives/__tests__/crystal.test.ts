@@ -454,7 +454,7 @@ describe("Crystal", () => {
         method: "trapezoidal", order: 1,
         deltaOld: [dt, dt, dt, dt, dt, dt, dt], ag,
         srcFact: 1, noncon: { value: 0 }, limitingCollector: null,
-        isDcOp: false, isTransient: true, xfact: 1, gmin: 1e-12, uic: false,
+        isDcOp: false, isTransient: true, isTransientDcop: false, isAc: false, xfact: 1, gmin: 1e-12, uic: false,
         reltol: 1e-3, iabstol: 1e-12,
       };
       element.load(ctx);
@@ -572,6 +572,10 @@ describe("crystal_load_transient_parity (C4.2)", () => {
         limitingCollector: null,
         isDcOp: false,
         isTransient: true,
+
+        isTransientDcop: false,
+
+        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,

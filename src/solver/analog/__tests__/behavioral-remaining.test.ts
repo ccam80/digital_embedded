@@ -380,6 +380,10 @@ describe("Relay", () => {
         limitingCollector: null,
         isDcOp: false,
         isTransient: true,
+
+        isTransientDcop: false,
+
+        isAc: false,
         xfact: 0,
         gmin: 1e-12,
         uic: false,
@@ -509,6 +513,10 @@ describe("Task 6.4.3 — remaining pin loading propagates", () => {
       limitingCollector: null,
       isDcOp: false,
       isTransient: false,
+
+      isTransientDcop: false,
+
+      isAc: false,
       xfact: 0,
       gmin: 1e-12,
       uic: false,

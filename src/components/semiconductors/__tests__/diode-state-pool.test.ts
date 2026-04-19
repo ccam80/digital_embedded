@@ -61,6 +61,10 @@ function makeDcOpCtx(voltages: Float64Array): LoadContext {
     limitingCollector: null,
     isDcOp: true,
     isTransient: false,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -88,6 +92,10 @@ function makeTranCtx(voltages: Float64Array, dt: number, ag: Float64Array): Load
     limitingCollector: null,
     isDcOp: false,
     isTransient: true,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

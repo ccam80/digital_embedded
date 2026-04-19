@@ -296,6 +296,10 @@ function makeComparatorParityCtx(voltages: Float64Array, solver: SparseSolverTyp
     limitingCollector: null,
     isDcOp: true,
     isTransient: false,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -324,6 +328,10 @@ function makeComparatorTransientCtx(
     limitingCollector: null,
     isDcOp: false,
     isTransient: true,
+
+    isTransientDcop: false,
+
+    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
