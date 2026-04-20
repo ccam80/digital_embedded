@@ -253,3 +253,14 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Files modified**: `src/solver/analog/ckt-context.ts`
 - **Tests**: 46/50 passing (same 4 pre-existing failures)
 - **Details**: Converted noncon from plain field (noncon: number = 0) to getter/setter pair forwarding through loadCtx.noncon.value — single storage location per ngspice CKTnoncon (C3 fix). Added troubleNode: number | null field with JSDoc citing ngspice cktload.c:64-65. Initialized troubleNode = null in constructor after enableBlameTracking = false.
+
+## Task 2.2.1: Rewrite `cktLoad` gating
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/ckt-load.ts` — dropped `iteration` param; added imports of MODEDC, MODEINITJCT, MODEINITFIX, MODETRANOP, MODEUIC from ckt-mode.ts; removed legacy field propagation (initMode, isDcOp, isTransient, isTransientDcop, isAc); added `ctx.loadCtx.cktMode = ctx.cktMode` propagation; added null-guard `typeof element.load !== "function"` in device loop; added troubleNode zeroing when `ctx.loadCtx.noncon.value > 0`; replaced nodeset gate with `(ctx.cktMode & MODEDC) && (ctx.cktMode & (MODEINITJCT | MODEINITFIX))`; replaced IC gate with `(ctx.cktMode & MODETRANOP) && !(ctx.cktMode & MODEUIC)` as separate block; removed duplicate `ctx.loadCtx.noncon.value = 0` reset; removed trailing `ctx.noncon = ctx.loadCtx.noncon.value` assignment
+  - `src/solver/analog/newton-raphson.ts` — updated both `cktLoad(ctx, 0)` and `cktLoad(ctx, iteration)` call sites to `cktLoad(ctx)` (no iteration arg)
+  - `src/solver/analog/__tests__/ckt-load.test.ts` — added MODE* imports from ckt-mode.ts; replaced all `cktLoad(ctx, N)` calls with `cktLoad(ctx)`; updated CKTload tests to set `ctx.cktMode` via bitfields instead of legacy `ctx.isDcOp`/`ctx.initMode`; replaced nodeset/IC describe blocks with bitfield-gated tests (MODEDCOP|MODEINITJCT, MODEDCOP|MODEINITFIX, MODETRANOP without/with MODEUIC); added troubleNode describe block with 2 tests
+  - `src/solver/analog/__tests__/test-helpers.ts` — removed dead `ctx.iteration > 0` guard from makeDiode's noncon increment (ctx.iteration no longer exists on LoadContext after Wave 2.1 removed the field)
+- **Tests**: 43/47 passing on targeted suite (ckt-load.test.ts + newton-raphson.test.ts); 4 failing are all pre-existing baseline failures (initTran_transitions_to_initFloat_after_iteration_0, initPred_transitions_to_initFloat_immediately, transient_mode_allows_convergence_without_ladder, ipass_skipped_without_nodesets)

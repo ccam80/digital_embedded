@@ -347,9 +347,7 @@ export function makeDiode(
       const vdOld = s0[base + SLOT_VD];
       const limResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
       const vdLimited = limResult.value;
-      // Increment noncon only on iterations > 0 (matches ngspice DEVload convention:
-      // iteration 0 uses initial guess, limiting only counts on subsequent iterations).
-      if (limResult.limited && ctx.iteration > 0) noncon.value++;
+      if (limResult.limited) noncon.value++;
       s0[base + SLOT_VD] = vdLimited;
 
       const expArg = vdLimited / nVt;

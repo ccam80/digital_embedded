@@ -296,32 +296,32 @@
     },
     {
       "path": "src\\solver\\analog\\ckt-context.ts",
-      "accessCount": 133,
-      "lastAccessed": 1776719873752,
+      "accessCount": 136,
+      "lastAccessed": 1776720047119,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\dc-operating-point.ts",
-      "accessCount": 125,
-      "lastAccessed": 1776675587043,
+      "accessCount": 126,
+      "lastAccessed": 1776720023598,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 117,
-      "lastAccessed": 1776715590985,
+      "accessCount": 120,
+      "lastAccessed": 1776720124091,
       "type": "directory"
     },
     {
       "path": "",
-      "accessCount": 82,
-      "lastAccessed": 1776715295896,
+      "accessCount": 83,
+      "lastAccessed": 1776720047638,
       "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\diode.ts",
-      "accessCount": 60,
-      "lastAccessed": 1776677274678,
+      "accessCount": 63,
+      "lastAccessed": 1776720318790,
       "type": "file"
     },
     {
@@ -337,16 +337,16 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\ckt-load.ts",
-      "accessCount": 44,
-      "lastAccessed": 1776719883636,
-      "type": "directory"
+      "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
+      "accessCount": 50,
+      "lastAccessed": 1776720358877,
+      "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
-      "accessCount": 43,
-      "lastAccessed": 1776602412425,
-      "type": "file"
+      "path": "src\\solver\\analog\\ckt-load.ts",
+      "accessCount": 46,
+      "lastAccessed": 1776720112365,
+      "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",

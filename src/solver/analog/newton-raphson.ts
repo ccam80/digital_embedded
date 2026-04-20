@@ -273,7 +273,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   if (ctx.isDcOp && ctx.loadCtx.uic) {
     [voltages, prevVoltages] = [prevVoltages, voltages];
     ctx.rhsOld.set(prevVoltages);
-    cktLoad(ctx, 0);
+    cktLoad(ctx);
     ctx.nrResult.converged = true;
     ctx.nrResult.iterations = 0;
     ctx.rhs.set(prevVoltages);
@@ -289,7 +289,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
     // ---- STEP B: CKTload — single-pass device evaluation ----
     ctx.rhsOld.set(prevVoltages);
-    cktLoad(ctx, iteration);
+    cktLoad(ctx);
 
     // ---- STEP D: Preorder (ngspice niiter.c:844-855, NIDIDPREORDER gate) ----
     // solver.preorder() is idempotent via solver._didPreorder; calling

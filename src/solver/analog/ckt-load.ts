@@ -7,6 +7,13 @@
  */
 
 import type { CKTCircuitContext } from "./ckt-context.js";
+import {
+  MODEDC,
+  MODEINITJCT,
+  MODEINITFIX,
+  MODETRANOP,
+  MODEUIC,
+} from "./ckt-mode.js";
 
 /**
  * Large conductance used to enforce nodeset and IC node voltages.
@@ -22,60 +29,75 @@ const CKTNS_PIN = 1e10;
  *
  * Matches ngspice cktload.c:29-158:
  *   1. Clear matrix and RHS (beginAssembly)
- *   2. Update per-iteration load context fields
- *   3. Single device loop — element.load(ctx.loadCtx)
- *   4. Apply nodesets/ICs (DC mode, initJct or initFix only)
- *   5. Finalize matrix
+ *   2. Propagate per-call scalars to loadCtx (cktMode, voltages, srcFact, gmin)
+ *   3. Single device loop — element.load(ctx.loadCtx) with null-guard
+ *   4. Apply nodesets (MODEDC + MODEINITJCT|MODEINITFIX gate)
+ *   5. Apply ICs (MODETRANOP + !MODEUIC gate)
+ *   6. Finalize matrix
  *
  * Variable mapping (ngspice -> ours):
  *   CKTdelta      -> ctx.loadCtx.dt       (set by engine before NR call)
- *   CKTmode       -> ctx.loadCtx.initMode  (set by engine / NR loop)
+ *   CKTmode       -> ctx.loadCtx.cktMode  (mirrored from ctx.cktMode each call)
  *   CKTag[]       -> ctx.loadCtx.ag        (set by engine via computeNIcomCof)
  *   CKTnoncon     -> ctx.loadCtx.noncon.value  (mutable ref -- elements increment)
  *   CKTsrcFact    -> ctx.loadCtx.srcFact
  *   CKTgmin       -> ctx.loadCtx.gmin
- *
- * @param ctx       - Circuit context carrying all solver state and buffers.
- * @param iteration - Current NR iteration index (0-based).
+ *   CKTtroubleNode-> ctx.troubleNode      (zeroed each time noncon rises)
  */
-export function cktLoad(ctx: CKTCircuitContext, iteration: number): void {
-  // Step 1: clear matrix and RHS (ngspice cktload.c:34-47)
+export function cktLoad(ctx: CKTCircuitContext): void {
+  // Step 1: clear matrix and RHS (ngspice cktload.c:34-47, :52-56).
+  // Note: ngspice cktload.c:57-58 — CKTnoncon is NOT reset here in the
+  // default build; it only runs under `#ifdef STEPDEBUG`. NR owner
+  // (newtonRaphson) is responsible for `ctx.noncon = 0` before the call.
   ctx.solver.beginAssembly(ctx.matrixSize);
 
-  // Step 2: update per-iteration load context fields
-  ctx.loadCtx.iteration = iteration;
+  // Step 2: propagate per-call context scalars to loadCtx.
   ctx.loadCtx.voltages = ctx.rhsOld;
-  ctx.loadCtx.initMode = ctx.initMode;
-  ctx.loadCtx.srcFact = ctx.srcFact;
-  ctx.loadCtx.gmin = ctx.diagonalGmin;
-  ctx.loadCtx.isDcOp = ctx.isDcOp;
-  ctx.loadCtx.isTransient = ctx.isTransient;
-  ctx.loadCtx.isTransientDcop = ctx.isTransientDcop;
-  ctx.loadCtx.isAc = ctx.isAc;
-  ctx.loadCtx.noncon.value = 0;
+  ctx.loadCtx.cktMode  = ctx.cktMode;   // single source of truth (F3/F4).
+  ctx.loadCtx.srcFact  = ctx.srcFact;
+  ctx.loadCtx.gmin     = ctx.diagonalGmin;
 
-  // Step 3: single device loop (ngspice cktload.c:71-95, calls DEVload)
+  // Step 3: single device loop (ngspice cktload.c:61-75). Null-guard matches
+  // ngspice `if (DEVices[i] && DEVices[i]->DEVload && ckt->CKThead[i])`.
+  // Our element list is statically filtered at compile time (only non-null
+  // elements are pushed), but the typeof guard documents the contract and
+  // protects against pluggable subclasses that fail to provide load().
   for (const element of ctx.elements) {
+    if (typeof element.load !== "function") continue;
     element.load(ctx.loadCtx);
+    // CKTtroubleNode tracking — ngspice cktload.c:64-65: the most recent
+    // device-load to bump noncon zeros the trouble-node pointer so the
+    // owning consumer can identify the blame element.
+    if (ctx.loadCtx.noncon.value > 0) {
+      ctx.troubleNode = null;
+    }
   }
-  ctx.noncon = ctx.loadCtx.noncon.value;
 
-  // Step 4: apply nodesets/ICs inside cktLoad (ngspice cktload.c:96-136)
-  // Only in DC mode during initJct or initFix.
-  // Both nodesets and ICs receive srcFact scaling on the RHS target voltage,
-  // matching ngspice CKTnodeset/CKTic enforcement.
+  // Step 4a: nodeset enforcement. ngspice cktload.c:104-129.
+  // Gate: (CKTmode & MODEDC) && (CKTmode & (MODEINITJCT | MODEINITFIX))
+  // — any DC-family analysis (DCOP, TRANOP, DCTRANCURVE) during JCT or FIX.
   //
   // Variable mapping (ngspice cktload.c → ours):
-  //   ckt->CKTnodeset       → ctx.nodesets
-  //   ckt->CKTnodeValues    → ctx.ics
-  //   1e10 (conductance)    → CKTNS_PIN
-  //   *ckt->CKTrhs += ...   → ctx.solver.stampRHS(node, val)
-  //   CKTsrcFact            → ctx.srcFact
-  if (ctx.isDcOp && (ctx.initMode === "initJct" || ctx.initMode === "initFix")) {
+  //   ckt->CKTnodeset    → ctx.nodesets
+  //   1e10 (conductance) → CKTNS_PIN
+  //   *ckt->CKTrhs += …  → ctx.solver.stampRHS(node, val)
+  //   CKTsrcFact         → ctx.srcFact
+  if ((ctx.cktMode & MODEDC) && (ctx.cktMode & (MODEINITJCT | MODEINITFIX))) {
     for (const [node, value] of ctx.nodesets) {
       ctx.solver.stampElement(ctx.solver.allocElement(node, node), CKTNS_PIN);
       ctx.solver.stampRHS(node, CKTNS_PIN * value * ctx.srcFact);
     }
+  }
+
+  // Step 4b: IC enforcement. ngspice cktload.c:130-157.
+  // Gate: (CKTmode & MODETRANOP) && !(CKTmode & MODEUIC)
+  // — transient-boot DCOP only, and only when UIC was NOT requested.
+  //
+  // Variable mapping (ngspice cktload.c → ours):
+  //   ckt->CKTnodeValues → ctx.ics
+  //   1e10 (conductance) → CKTNS_PIN
+  //   CKTsrcFact         → ctx.srcFact
+  if ((ctx.cktMode & MODETRANOP) && !(ctx.cktMode & MODEUIC)) {
     for (const [node, value] of ctx.ics) {
       ctx.solver.stampElement(ctx.solver.allocElement(node, node), CKTNS_PIN);
       ctx.solver.stampRHS(node, CKTNS_PIN * value * ctx.srcFact);
