@@ -292,15 +292,20 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       didPreorder = true;
     }
 
-    // Add gmin to every diagonal element before factorization.
-    if (ctx.diagonalGmin) {
-      solver.addDiagonalGmin(ctx.diagonalGmin);
-    }
-
-    // ---- STEP E: Factorize ----
-    // ngspice niiter.c:888-891: E_SINGULAR on numerical-only path sets NISHOULDREORDER
-    // and does `continue` (returns to top of for(;;), re-executes CKTload).
-    const factorResult = solver.factor();
+    // ---- STEP E: Factorize (gmin stamped atomically inside factor()) ----
+    // ngspice SMPluFac/SMPreorder call LoadGmin internally, immediately
+    // before spFactor/spOrderAndFactor (spsmp.c:173, 197). We mirror that by
+    // passing diagGmin into factor() rather than calling addDiagonalGmin
+    // separately — this keeps the gmin stamp and the factorization atomic
+    // and aligned with ngspice's invariant that no caller observes a
+    // post-gmin, pre-factor matrix.
+    //
+    // ngspice niiter.c:888-891: E_SINGULAR on the numerical-only path sets
+    // NISHOULDREORDER and does `continue` (back to CKTload). factor() itself
+    // now handles the partial-pivot-guard-driven fallthrough (spfactor.c:225)
+    // by dispatching back through factorWithReorder internally, so a
+    // `success: false` return here is a genuine singular-matrix failure.
+    const factorResult = solver.factor(ctx.diagonalGmin);
     if (!factorResult.success) {
       if (!solver.lastFactorUsedReorder) {
         solver.forceReorder();

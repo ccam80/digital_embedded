@@ -91,3 +91,37 @@ Progress is recorded here by implementation agents. Each completed task appends 
   - Rewrote `addDiagonalGmin` to be a thin delegate to `_applyDiagGmin` with doc marking it test-only (production callers must use `factor(diagGmin)`)
   - Added JSDoc to `_applyDiagGmin` explaining why it does NOT set `_needsReorder` (ngspice LoadGmin invariant, spsmp.c:169-175/194-200)
   - Added `if (gmin === 0) return` short-circuit in `_applyDiagGmin` (matches prior `addDiagonalGmin` body and ngspice LoadGmin zero-skip)
+
+## Task 1.2.1: Extend `FactorResult` with `needsReorder` sentinel; add `_findLargestInColBelow` helper
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/sparse-solver.ts`
+- **Tests**: 86/86 passing (sparse-solver.test.ts + complex-sparse-solver.test.ts + rl-iter0-probe.test.ts)
+- **Changes**:
+  - Extended `FactorResult` interface with optional `needsReorder?: boolean` field, mirroring ngspice ReorderingRequired sentinel at spfactor.c:225
+  - Added private `_findLargestInColBelow(startE: number): number` method before `_searchForPivot`, mirrors ngspice FindLargestInCol (spfactor.c:1850-1863)
+
+## Task 1.2.2: Rewrite `_numericLUReusePivots` with column-relative partial-pivot guard
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/sparse-solver.ts`
+- **Tests**: 86/86 passing
+- **Changes**:
+  - Added `elNextInCol`, `diag`, `relThreshold`, `absThreshold` local refs to _numericLUReusePivots
+  - Added per-step partial-pivot guard per ngspice spfactor.c:218-226: computes `largestInCol * relThreshold >= diagMag || diagMag <= absThreshold` BEFORE writing L/U values, returns `{ success: false, needsReorder: true }` on failure
+  - Changed final `minDiag <= absThreshold` return to include `needsReorder: true`
+  - Guard fires before any CSC mutation for the failed column, preserving matrix atomicity
+
+## Task 1.2.3: Rewrite public `factor()` to accept `diagGmin?`, re-dispatch on `needsReorder`
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/sparse-solver.ts`, `src/solver/analog/newton-raphson.ts`
+- **Tests**: 86/86 passing
+- **Changes**:
+  - Rewrote `factor()` signature to `factor(diagGmin?: number)`, passes `diagGmin` to both `factorWithReorder` and `factorNumerical`
+  - Added re-dispatch block: when `factorNumerical` returns `{ success: false, needsReorder: true }`, sets `_needsReorder = true` and calls `factorWithReorder(undefined)` (gmin already applied once, not doubled)
+  - Added JSDoc explaining ngspice SMPluFac/SMPreorder atomic gmin invariant and spfactor.c:225 fall-through
+  - Updated `newton-raphson.ts`: removed separate `addDiagonalGmin` call, passes `ctx.diagonalGmin` directly into `solver.factor(ctx.diagonalGmin)` for atomic gmin+factor per ngspice spsmp.c:173,197

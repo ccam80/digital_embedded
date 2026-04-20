@@ -18,6 +18,14 @@ export interface FactorResult {
   success: boolean;
   conditionEstimate?: number;
   singularRow?: number;
+  /**
+   * True when factorNumerical detected that the stored pivot order is no
+   * longer numerically adequate and a full reorder is required. Mirrors
+   * ngspice ReorderingRequired = YES at spfactor.c:225. The caller (factor())
+   * must dispatch to factorWithReorder; NR-loop callers must not treat this
+   * as a singular-matrix failure.
+   */
+  needsReorder?: boolean;
 }
 
 /**
@@ -455,7 +463,22 @@ export class SparseSolver {
     }
   }
 
-  factor(): FactorResult {
+  /**
+   * Factor the currently-assembled matrix.
+   *
+   * ngspice mapping:
+   *   - `diagGmin` → `LoadGmin(Matrix, Gmin)` called INSIDE SMPluFac / SMPreorder
+   *     before the corresponding `spFactor`/`spOrderAndFactor` (spsmp.c:173,
+   *     197). Making `factor()` accept `diagGmin` and stamp it here keeps the
+   *     gmin + factorization pair atomic, mirroring ngspice's invariant that
+   *     callers never see a post-gmin, pre-factor matrix state.
+   *   - `needsReorder` sentinel from `_numericLUReusePivots` → ReorderingRequired
+   *     at spfactor.c:225. The numeric-reuse path's per-step partial-pivot
+   *     guard can demand a full reorder; dispatching back through
+   *     `factorWithReorder` here is the ngspice fall-through equivalent.
+   *     This must NOT be conflated with a singular-matrix failure.
+   */
+  factor(diagGmin?: number): FactorResult {
     if (this._capturePreFactorMatrix) {
       const n = this._n;
       const snap: Array<{ row: number; col: number; value: number }> = [];
@@ -472,10 +495,25 @@ export class SparseSolver {
     }
     if (this._needsReorder || !this._hasPivotOrder) {
       this.lastFactorUsedReorder = true;
-      return this.factorWithReorder();
+      return this.factorWithReorder(diagGmin);
     }
     this.lastFactorUsedReorder = false;
-    return this.factorNumerical();
+    const result = this.factorNumerical(diagGmin);
+    if (!result.success && result.needsReorder) {
+      // ngspice spfactor.c:225 fall-through: partial-pivot guard failed at
+      // some step k; re-run the full reorder from step 0. This is NOT a
+      // singular-matrix failure. diagGmin has already been stamped once by
+      // factorNumerical's _applyDiagGmin call, so forward it again; the
+      // gmin must reach the factored matrix exactly once, and the first
+      // application was discarded with the abandoned numeric factorization.
+      // Because _numericLUReusePivots aborts before mutating _elVal, the
+      // underlying matrix is still the original A + gmin·I; the full
+      // reorder must NOT add gmin a second time.
+      this._needsReorder = true;
+      this.lastFactorUsedReorder = true;
+      return this.factorWithReorder(/* diagGmin */ undefined);
+    }
+    return result;
   }
 
   /**
@@ -1269,6 +1307,10 @@ export class SparseSolver {
     const aHandles = this._aMatrixHandlesByCol;
     const elVal = this._elVal;
     const elRow = this._elRow;
+    const elNextInCol = this._elNextInCol;
+    const diag = this._diag;
+    const relThreshold = this._relThreshold;
+    const absThreshold = this._absThreshold;
     const lCscToElem = this._lCscToElem;
     const uCscToElem = this._uCscToElem;
 
@@ -1311,9 +1353,29 @@ export class SparseSolver {
 
       const pivotRow = q[k];
       const diagVal = x[pivotRow];
-      if (Math.abs(diagVal) <= this._absThreshold) {
+      const diagMag = Math.abs(diagVal);
+
+      // --- ngspice column-relative partial-pivot guard (spfactor.c:218-226).
+      // pPivot->NextInCol is the first sub-diagonal element in the column.
+      // If LargestInCol * RelThreshold >= |pPivot|, the stored pivot order is
+      // no longer numerically adequate and a full reorder is required. Signal
+      // this by returning { success: false, needsReorder: true } so factor()
+      // falls through to factorWithReorder. This must fire BEFORE writing
+      // this column's L/U values so the scatter from a rejected column does
+      // not pollute the factored CSC.
+      const diagE = diag[k];
+      if (diagE >= 0) {
+        const largestInCol = this._findLargestInColBelow(elNextInCol[diagE]);
+        if (largestInCol * relThreshold >= diagMag || diagMag <= absThreshold) {
+          for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
+          return { success: false, needsReorder: true };
+        }
+      } else if (diagMag <= absThreshold) {
+        // No diagonal pool element (unusual after reorder); still enforce the
+        // absolute tolerance guard. Do NOT demand reorder here — this path
+        // indicates structural singularity of the factored pivot.
         for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
-        return { success: false };
+        return { success: false, needsReorder: true };
       }
 
       // U scatter: write CSC and mirror onto _elVal[e] via reverse map so
@@ -1349,7 +1411,7 @@ export class SparseSolver {
       }
     }
 
-    if (minDiag <= this._absThreshold) return { success: false };
+    if (minDiag <= this._absThreshold) return { success: false, needsReorder: true };
     return { success: true, conditionEstimate: minDiag > 0 ? maxDiag / minDiag : Infinity };
   }
 
@@ -1464,6 +1526,26 @@ export class SparseSolver {
    *   RelThreshold → this._relThreshold
    *   AbsThreshold → this._absThreshold
    */
+  /**
+   * Return the largest |_elVal[e]| in the current column chain starting at
+   * element `startE` (which must be the first entry BELOW the diagonal, i.e.
+   * `_elNextInCol[diagE]`). Skips fill-ins is NOT done here — ngspice walks
+   * every live element in the column regardless of fill-in flag, because
+   * by the time _numericLUReusePivots runs those fill-ins are real entries
+   * in the factored chain.
+   * Mirrors ngspice FindLargestInCol (spfactor.c:1850-1863).
+   */
+  private _findLargestInColBelow(startE: number): number {
+    let largest = 0;
+    let e = startE;
+    while (e >= 0) {
+      const mag = Math.abs(this._elVal[e]);
+      if (mag > largest) largest = mag;
+      e = this._elNextInCol[e];
+    }
+    return largest;
+  }
+
   private _searchForPivot(
     k: number,
     x: Float64Array,
