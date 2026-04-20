@@ -43,7 +43,125 @@
           "description": "Removed 3 surviving Math.exp(Math.min(...,700)) clamps in bjt.ts at lines 1703/1901/1934 that the implementer missed; targeted vitest 66/67 (only pre-existing 1-ulp ngspice failure remains)"
         }
       ]
+    },
+    {
+      "id": "batch-p1-w1.1",
+      "task_groups": [
+        "1.1"
+      ],
+      "tasks": [
+        [
+          "1.1.1",
+          "1.1.2",
+          "1.1.3",
+          "1.1.4",
+          "1.1.5"
+        ]
+      ],
+      "spawned": 1,
+      "completed": 1,
+      "verifications_passed": 1,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "1.1": "passed"
+      },
+      "user_required_tasks": {
+        "1.1": []
+      },
+      "user_acks": {}
+    },
+    {
+      "id": "batch-p1-w1.2",
+      "task_groups": [
+        "1.2"
+      ],
+      "tasks": [
+        [
+          "1.2.1",
+          "1.2.2",
+          "1.2.3"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "1.2": "pending"
+      },
+      "user_required_tasks": {
+        "1.2": []
+      },
+      "user_acks": {}
+    },
+    {
+      "id": "batch-p1-w1.3",
+      "task_groups": [
+        "1.3"
+      ],
+      "tasks": [
+        [
+          "1.3.1",
+          "1.3.2",
+          "1.3.3"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "1.3": "pending"
+      },
+      "user_required_tasks": {
+        "1.3": []
+      },
+      "user_acks": {}
+    },
+    {
+      "id": "batch-p1-w1.4-1.5",
+      "task_groups": [
+        "1.4",
+        "1.5"
+      ],
+      "tasks": [
+        [
+          "1.4.1",
+          "1.4.2",
+          "1.4.3"
+        ],
+        [
+          "1.5.1",
+          "1.5.2",
+          "1.5.3"
+        ]
+      ],
+      "spawned": 0,
+      "completed": 0,
+      "verifications_passed": 0,
+      "verifications_failed": 0,
+      "stops_for_clarification": 0,
+      "dead_implementers": 0,
+      "dead_verifiers": 0,
+      "group_status": {
+        "1.4": "pending",
+        "1.5": "pending"
+      },
+      "user_required_tasks": {
+        "1.4": [],
+        "1.5": []
+      },
+      "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-20T12:02:33.332Z"
+  "last_updated": "2026-04-20T12:30:04.369Z"
 }

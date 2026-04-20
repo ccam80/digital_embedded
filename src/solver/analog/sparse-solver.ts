@@ -20,8 +20,21 @@ export interface FactorResult {
   singularRow?: number;
 }
 
-const PIVOT_THRESHOLD = 1e-3;
-const PIVOT_ABS_THRESHOLD = 1e-13;
+/**
+ * Default pivot thresholds — ngspice spalloc.c:192-193 and spconfig.h:331.
+ *
+ *   DEFAULT_PIVOT_REL_THRESHOLD === Matrix->RelThreshold default === 1e-3
+ *   DEFAULT_PIVOT_ABS_THRESHOLD === Matrix->AbsThreshold default === 0.0
+ *
+ * These are module-level defaults only; the live values used during
+ * factorization live on SparseSolver instance fields `_relThreshold` and
+ * `_absThreshold`, which the CKT context overrides per factor call via the
+ * setPivotTolerances() setter. Matches ngspice's CKTpivotRelTol and
+ * CKTpivotAbsTol plumbed through SMPluFac/SMPreorder (niiter.c:863-864,
+ * 883-884, spsmp.c:169-200).
+ */
+const DEFAULT_PIVOT_REL_THRESHOLD = 1e-3;
+const DEFAULT_PIVOT_ABS_THRESHOLD = 0.0;
 
 // Bit flag stored in _elFlags to distinguish fill-in entries from A-matrix entries.
 const FLAG_FILL_IN = 1;
@@ -191,7 +204,33 @@ export class SparseSolver {
   private _capturePreFactorMatrix = false;
 
   // =========================================================================
-  // State flags
+  // State flags — ngspice mapping (spdefs.h:761 + :642-644, :69)
+  //
+  //   Matrix->NeedsOrdering  → _needsReorder
+  //   Matrix->Factored       → _hasPivotOrder (inverse: !_hasPivotOrder ⇒ !Factored)
+  //   IS_FACTORED(Matrix)    → _hasPivotOrder && !_needsReorder
+  //   NIDIDPREORDER bit      → _didPreorder (CKT-lifetime — see S3)
+  //
+  // Set/clear lifecycle (must match ngspice exactly — see Item #10 audit):
+  //   _needsReorder = true:
+  //     * _initStructure — initial (ngspice spalloc.c:170 NeedsOrdering=YES)
+  //     * allocElement (new A-entry, not fill-in) — ngspice spbuild.c:788
+  //     * forceReorder() — ngspice niiter.c:858, 861 NISHOULDREORDER
+  //     * invalidateTopology() — ngspice spStripMatrix path (sputils.c:1112)
+  //   _needsReorder = false:
+  //     * factorWithReorder() success — ngspice spfactor.c:279
+  //
+  //   _hasPivotOrder = true:
+  //     * factorWithReorder() success — ngspice spfactor.c:281 Factored=YES
+  //   _hasPivotOrder = false:
+  //     * _initStructure — ngspice spCreate initial
+  //     * invalidateTopology() — ngspice spStripMatrix path
+  //
+  //   _didPreorder = true:
+  //     * preorder() first call — ngspice niiter.c:854 NIDIDPREORDER
+  //   _didPreorder = false:
+  //     * _initStructure — ngspice spCreate initial
+  //     * invalidateTopology() — ngspice NIreinit (nireinit.c:42 clears CKTniState)
   // =========================================================================
   private _needsReorder: boolean = false;
   private _didPreorder: boolean = false;
@@ -200,6 +239,22 @@ export class SparseSolver {
   private _structureEmpty: boolean = true;
   /** Matrix size for which workspace arrays were last allocated. -1 = never. */
   private _workspaceN: number = -1;
+
+  /**
+   * Pivot relative threshold (ngspice Matrix->RelThreshold, spalloc.c:192).
+   * Default from DEFAULT_PIVOT_REL_THRESHOLD; callers override via
+   * setPivotTolerances() to mirror CKTpivotRelTol plumbed through SMPreorder
+   * (niiter.c:863-864, spsmp.c:194).
+   */
+  private _relThreshold: number = DEFAULT_PIVOT_REL_THRESHOLD;
+
+  /**
+   * Pivot absolute threshold (ngspice Matrix->AbsThreshold, spalloc.c:193).
+   * Default 0.0 matches ngspice's default. Callers override via
+   * setPivotTolerances() to mirror CKTpivotAbsTol plumbed through SMPluFac
+   * (niiter.c:883-884, spsmp.c:169).
+   */
+  private _absThreshold: number = DEFAULT_PIVOT_ABS_THRESHOLD;
 
   /** True when the most recent factor() call dispatched to factorWithReorder. */
   lastFactorUsedReorder: boolean = false;
@@ -278,10 +333,23 @@ export class SparseSolver {
 
     // Allocate new element. _elCol stores the original column (ngspice
     // Element->Col convention); chain membership uses the internal column.
+    //
+    // ngspice spcCreateElement (spbuild.c:786-788): every new non-fill-in
+    // element sets Matrix->NeedsOrdering = YES. This is the only place in
+    // ngspice where stamp-time topology changes flag a reorder; the same
+    // invariant belongs here so stamp passes that introduce a new A-entry
+    // between solves (e.g. a newly-activated comparator output, a newly-
+    // added nodeset, a hot-loaded model change that enables a new coupling)
+    // force the next factor() through factorWithReorder. Fill-ins created
+    // by _numericLUMarkowitz set FLAG_FILL_IN and take a different code
+    // path (ngspice spcGetFillin, spbuild.c:781) that does NOT flag
+    // NeedsOrdering — mirrored by _numericLUMarkowitz calling _newElement
+    // directly without going through allocElement.
     const newE = this._newElement(row, col, 0, 0);
     this._insertIntoRow(newE, row);
     this._insertIntoCol(newE, internalCol);
     if (row === col) this._diag[internalCol] = newE;
+    this._needsReorder = true;
 
     // Record in handle table
     if (this._n <= this._handleTableN) {
@@ -462,10 +530,41 @@ export class SparseSolver {
     for (let k = 0; k < n; k++) x[pcp[k]] = b[k];
   }
 
+  /**
+   * Wipe the persistent linked structure so the next beginAssembly() rebuilds
+   * it from scratch. Mirrors ngspice spStripMatrix (sputils.c:1104-1145),
+   * which sets NeedsOrdering = YES at line 1112 so the next factor uses the
+   * full reorder path. We match that invariant here.
+   *
+   * Not currently invoked from any production path — kept as a test helper
+   * for fixture teardown AND as the canonical API for any future consumer
+   * that needs to force a structural rebuild without destroying the solver
+   * instance. See the Item #11 / S7 audit notes at the top of this file.
+   */
   invalidateTopology(): void {
     this._structureEmpty = true;
     this._hasPivotOrder = false;
     this._didPreorder = false;
+    // ngspice spStripMatrix (sputils.c:1112): NeedsOrdering = YES.
+    this._needsReorder = true;
+  }
+
+  /**
+   * Set the pivot tolerances used by the next factor() call.
+   *
+   * Mirrors ngspice CKTpivotAbsTol / CKTpivotRelTol being forwarded to
+   * SMPluFac (PivTol, ignored), SMPreorder (PivTol, PivRel), which store
+   * into Matrix->RelThreshold / Matrix->AbsThreshold inside spOrderAndFactor
+   * (spfactor.c:204-211). Called by the NR loop before every factor() call.
+   *
+   * Relative threshold must satisfy 0 < rel <= 1 to match ngspice semantics;
+   * ngspice silently falls back to the stored default when the value is
+   * out of range (spfactor.c:204-208). We mirror that fallback here so
+   * per-call tolerance mistakes never disable pivoting.
+   */
+  setPivotTolerances(relThreshold: number, absThreshold: number): void {
+    if (relThreshold > 0 && relThreshold <= 1) this._relThreshold = relThreshold;
+    if (absThreshold >= 0) this._absThreshold = absThreshold;
   }
 
   /**
@@ -557,19 +656,18 @@ export class SparseSolver {
   }
 
   /**
-   * Add a conductance value to every diagonal element of the assembled matrix.
-   * Matches ngspice LoadGmin (spsmp.c:448-478).
-   * Must be called after beginAssembly()+stamps+finalize() but before factor().
+   * Test-only: add gmin to every diagonal element of the assembled matrix.
+   *
+   * Production callers MUST NOT invoke this directly — use `factor(diagGmin)`
+   * so the gmin stamp and the factorization are atomic, mirroring ngspice's
+   * SMPluFac(Matrix, PivTol, Gmin) wrapper which calls LoadGmin + spFactor
+   * back-to-back with no intermediate observable state (spsmp.c:169-175).
+   *
+   * Kept public for harness instrumentation tests that need to inspect the
+   * post-gmin, pre-factor matrix snapshot via getPreFactorMatrixSnapshot().
    */
   addDiagonalGmin(gmin: number): void {
-    if (gmin === 0) return;
-    const n = this._n;
-    const diag = this._diag;
-    const elVal = this._elVal;
-    for (let i = 0; i < n; i++) {
-      const e = diag[i];
-      if (e >= 0) elVal[e] += gmin;
-    }
+    this._applyDiagGmin(gmin);
   }
 
   // =========================================================================
@@ -699,7 +797,13 @@ export class SparseSolver {
 
     this._structureEmpty = false;
     this._hasPivotOrder = false;
-    this._needsReorder = false;
+    // ngspice spalloc.c:170 — Matrix->NeedsOrdering = YES on initial Create.
+    // Previously set to false; the net dispatch result was still "reorder"
+    // (because _hasPivotOrder was also false), but aligning the primitive
+    // flag with ngspice removes a divergence that could bite if downstream
+    // logic queries _needsReorder directly.
+    this._needsReorder = true;
+    this._didPreorder = false;
   }
 
   /**
@@ -1207,7 +1311,7 @@ export class SparseSolver {
 
       const pivotRow = q[k];
       const diagVal = x[pivotRow];
-      if (Math.abs(diagVal) < PIVOT_ABS_THRESHOLD) {
+      if (Math.abs(diagVal) <= this._absThreshold) {
         for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
         return { success: false };
       }
@@ -1245,7 +1349,7 @@ export class SparseSolver {
       }
     }
 
-    if (minDiag < PIVOT_ABS_THRESHOLD) return { success: false };
+    if (minDiag <= this._absThreshold) return { success: false };
     return { success: true, conditionEstimate: minDiag > 0 ? maxDiag / minDiag : Infinity };
   }
 
@@ -1357,8 +1461,8 @@ export class SparseSolver {
    *   MarkowitzCol[] → _markowitzCol[]
    *   MarkowitzProduct[] → _markowitzProd[]
    *   Singletons → _singletons
-   *   RelThreshold → PIVOT_THRESHOLD
-   *   AbsThreshold → PIVOT_ABS_THRESHOLD
+   *   RelThreshold → this._relThreshold
+   *   AbsThreshold → this._absThreshold
    */
   private _searchForPivot(
     k: number,
@@ -1381,7 +1485,8 @@ export class SparseSolver {
 
     if (absMax === 0) return -1;
 
-    const relThreshold = PIVOT_THRESHOLD * absMax;
+    const relThreshold = this._relThreshold * absMax;
+    const absThreshold = this._absThreshold;
 
     // Phase 1: Singletons
     if (this._singletons > 0) {
@@ -1392,7 +1497,7 @@ export class SparseSolver {
         if (pinv[i] >= 0) continue;
         if (mProd[i] !== 0) continue;
         const v = Math.abs(x[i]);
-        if (v < PIVOT_ABS_THRESHOLD || v < relThreshold) continue;
+        if (v <= absThreshold || v < relThreshold) continue;
         if (v > bestVal) { bestVal = v; bestRow = i; }
       }
       if (bestRow >= 0) return bestRow;
@@ -1408,7 +1513,7 @@ export class SparseSolver {
         if (pinv[i] >= 0) continue;
         if (i !== k) continue;
         const v = Math.abs(x[i]);
-        if (v < PIVOT_ABS_THRESHOLD || v < relThreshold) continue;
+        if (v <= absThreshold || v < relThreshold) continue;
         const prod = mProd[i];
         if (prod < bestProd || (prod === bestProd && v > bestVal)) {
           bestProd = prod; bestVal = v; bestRow = i;
@@ -1427,7 +1532,7 @@ export class SparseSolver {
         const row = this._elRow[e];
         if (pinv[row] < 0) {
           const v = Math.abs(x[row]);
-          if (v >= PIVOT_ABS_THRESHOLD && v >= relThreshold) {
+          if (v > absThreshold && v >= relThreshold) {
             const prod = mRow[row] * mCol[k];
             if (prod < bestProd || (prod === bestProd && v > bestVal)) {
               bestProd = prod; bestVal = v; bestRow = row;
@@ -1498,7 +1603,17 @@ export class SparseSolver {
   // Internal: apply diagonal gmin
   // =========================================================================
 
+  /**
+   * Add gmin to every diagonal element. ngspice LoadGmin (spsmp.c:422-440).
+   *
+   * Intentionally does NOT set this._needsReorder = true: ngspice's
+   * invariant is that LoadGmin is always wrapped atomically with spFactor
+   * (SMPluFac, spsmp.c:169-175) or spOrderAndFactor (SMPreorder, :194-200),
+   * so the gmin-stamped matrix is never observed without an immediate
+   * re-factor. Our factor(diagGmin?) wrapper preserves that atomicity.
+   */
   private _applyDiagGmin(gmin: number): void {
+    if (gmin === 0) return;
     const n = this._n;
     const diag = this._diag;
     const elVal = this._elVal;
