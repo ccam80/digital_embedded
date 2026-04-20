@@ -213,3 +213,11 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Files created**: none
 - **Files modified**: `src/solver/analog/complex-sparse-solver.ts`, `src/solver/analog/__tests__/complex-sparse-solver.test.ts`
 - **Tests**: 23/23 passing
+
+---
+## Phase 1 Complete
+- **Batches**: 5 (w1.1, w1.2, w1.3, w1.4-1.5)
+- **All verified**: yes (5/5 task_groups passed on final pass)
+- **Recovery events**: batch-p1-w1.3 had a dead implementer (first attempt); replacement implementer completed Wave 1.3 work and fixed a critical architectural bug in the dead implementer's Phase 3 column-swap / x[] re-scatter logic in `_numericLUMarkowitz` (without which `performance_50_node` regressed to residual 11263 vs spec <1e-8).
+- **Targeted tests on final state**: sparse-solver.test.ts + complex-sparse-solver.test.ts + newton-raphson.test.ts + rl-iter0-probe.test.ts — 121/125 passing (4 pre-existing baseline failures carried forward, 0 regressions).
+---
