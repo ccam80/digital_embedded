@@ -1,35 +1,10 @@
 {
   "summary": {
-    "passed": 14,
-    "failed": 2,
+    "passed": 86,
+    "failed": 0,
     "skipped": 0,
-    "totalFiles": 1,
-    "durationSeconds": 2.6
+    "totalFiles": 3,
+    "durationSeconds": 0.6
   },
-  "failures": [
-    {
-      "message": "expected false to be true // Object.is equality",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-          "test": "10. limiting events: our engine captures events (Item 9)",
-          "line": 230,
-          "column": 27
-        }
-      ]
-    },
-    {
-      "message": "expected -1 to be greater than or equal to 0",
-      "count": 1,
-      "locations": [
-        {
-          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
-          "test": "14. limiting comparison: sign is postLimit - preLimit",
-          "line": 331,
-          "column": 24
-        }
-      ]
-    }
-  ]
+  "failures": []
 }

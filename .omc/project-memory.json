@@ -284,9 +284,15 @@
   "hotPaths": [
     {
       "path": "src",
-      "accessCount": 181,
-      "lastAccessed": 1776678191455,
+      "accessCount": 183,
+      "lastAccessed": 1776688153999,
       "type": "directory"
+    },
+    {
+      "path": "src\\components\\semiconductors\\bjt.ts",
+      "accessCount": 162,
+      "lastAccessed": 1776686524332,
+      "type": "file"
     },
     {
       "path": "src\\solver\\analog\\dc-operating-point.ts",
@@ -295,10 +301,10 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors\\bjt.ts",
-      "accessCount": 122,
-      "lastAccessed": 1776678096004,
-      "type": "file"
+      "path": "src\\solver\\analog\\newton-raphson.ts",
+      "accessCount": 109,
+      "lastAccessed": 1776688762907,
+      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\ckt-context.ts",
@@ -307,15 +313,9 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 103,
-      "lastAccessed": 1776678173095,
-      "type": "directory"
-    },
-    {
       "path": "",
-      "accessCount": 77,
-      "lastAccessed": 1776674470830,
+      "accessCount": 80,
+      "lastAccessed": 1776685874433,
       "type": "directory"
     },
     {
@@ -325,16 +325,16 @@
       "type": "file"
     },
     {
+      "path": "src\\components\\semiconductors\\mosfet.ts",
+      "accessCount": 51,
+      "lastAccessed": 1776685835911,
+      "type": "directory"
+    },
+    {
       "path": "src\\components\\passives\\capacitor.ts",
       "accessCount": 50,
       "lastAccessed": 1776675627343,
       "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\mosfet.ts",
-      "accessCount": 45,
-      "lastAccessed": 1776678171401,
-      "type": "directory"
     },
     {
       "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
@@ -445,6 +445,12 @@
       "type": "directory"
     },
     {
+      "path": "src\\components\\semiconductors",
+      "accessCount": 15,
+      "lastAccessed": 1776686530231,
+      "type": "directory"
+    },
+    {
       "path": "ref\\ngspice\\src",
       "accessCount": 14,
       "lastAccessed": 1776675562546,
@@ -455,6 +461,18 @@
       "accessCount": 14,
       "lastAccessed": 1776678080133,
       "type": "directory"
+    },
+    {
+      "path": "src\\components\\semiconductors\\njfet.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776685840474,
+      "type": "file"
+    },
+    {
+      "path": "src\\components\\semiconductors\\pjfet.ts",
+      "accessCount": 13,
+      "lastAccessed": 1776685841588,
+      "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\ni\\nicomcof.c",
@@ -469,28 +487,10 @@
       "type": "file"
     },
     {
-      "path": "src\\components\\semiconductors",
-      "accessCount": 11,
-      "lastAccessed": 1776678185756,
-      "type": "directory"
-    },
-    {
       "path": "ref\\ngspice\\src\\spicelib\\devices\\dio\\dioload.c",
       "accessCount": 9,
       "lastAccessed": 1776677237386,
       "type": "directory"
-    },
-    {
-      "path": "src\\components\\semiconductors\\pjfet.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776677254792,
-      "type": "file"
-    },
-    {
-      "path": "src\\components\\semiconductors\\njfet.ts",
-      "accessCount": 9,
-      "lastAccessed": 1776678200228,
-      "type": "file"
     },
     {
       "path": "ref\\ngspice\\src\\maths\\ni\\niinteg.c",
@@ -508,6 +508,12 @@
       "path": "ref\\ngspice\\src\\spicelib\\devices\\mos1\\mos1load.c",
       "accessCount": 8,
       "lastAccessed": 1776678141986,
+      "type": "directory"
+    },
+    {
+      "path": "src/components/semiconductors/bjt.ts",
+      "accessCount": 7,
+      "lastAccessed": 1776686402577,
       "type": "directory"
     },
     {
@@ -541,9 +547,9 @@
       "type": "directory"
     },
     {
-      "path": "src/components/semiconductors/bjt.ts",
-      "accessCount": 2,
-      "lastAccessed": 1776570870281,
+      "path": "src/components/semiconductors/mosfet.ts",
+      "accessCount": 3,
+      "lastAccessed": 1776685659357,
       "type": "directory"
     },
     {
@@ -562,12 +568,6 @@
       "path": "ref\\ngspice\\src\\frontend\\spiceif.c",
       "accessCount": 1,
       "lastAccessed": 1776508292474,
-      "type": "directory"
-    },
-    {
-      "path": "src/components/semiconductors/mosfet.ts",
-      "accessCount": 1,
-      "lastAccessed": 1776508356144,
       "type": "directory"
     },
     {

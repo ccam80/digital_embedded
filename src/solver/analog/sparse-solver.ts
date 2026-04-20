@@ -694,6 +694,56 @@ export class SparseSolver {
   }
 
   /**
+   * Swap internal columns k and col2 during Markowitz pivot selection.
+   *
+   * Unlike _swapColumns (used by preorder() for symmetric twins), this
+   * method handles arbitrary column permutation: it swaps _colHead[k] and
+   * _colHead[col2], updates _preorderColPerm/_extToIntCol to keep the
+   * ext↔int map consistent, and refreshes _diag[k]/_diag[col2] by searching
+   * the new chain for each column's diagonal entry.
+   *
+   * Mirrors ngspice spcColExchange (sputils.c) driven by ExchangeRowsAndCols
+   * (spfactor.c) during mid-factorization pivot selection.
+   */
+  private _swapColumnsForPivot(k: number, col2: number): void {
+    if (k === col2) return;
+    // Swap column heads.
+    const tmpHead = this._colHead[k];
+    this._colHead[k] = this._colHead[col2];
+    this._colHead[col2] = tmpHead;
+
+    // Swap internal↔external permutation entries.
+    const origK = this._preorderColPerm[k];
+    const origC = this._preorderColPerm[col2];
+    this._preorderColPerm[k] = origC;
+    this._preorderColPerm[col2] = origK;
+    this._extToIntCol[origK] = col2;
+    this._extToIntCol[origC] = k;
+
+    // Refresh _diag[k] and _diag[col2] by scanning the new chains.
+    this._diag[k] = this._findDiagOnColumn(k);
+    this._diag[col2] = this._findDiagOnColumn(col2);
+  }
+
+  /**
+   * Search column internalCol's chain for its diagonal pool element.
+   * The diagonal element satisfies _elRow[e] === _preorderColPerm[internalCol]
+   * because row indices are never permuted; the original column at internal
+   * position internalCol is _preorderColPerm[internalCol], and the diagonal
+   * of that original column has row == that same original column value.
+   * Returns pool handle, or -1 if absent.
+   */
+  private _findDiagOnColumn(internalCol: number): number {
+    const diagRow = this._preorderColPerm[internalCol];
+    let e = this._colHead[internalCol];
+    while (e >= 0) {
+      if (this._elRow[e] === diagRow) return e;
+      e = this._elNextInCol[e];
+    }
+    return -1;
+  }
+
+  /**
    * Test-only: add gmin to every diagonal element of the assembled matrix.
    *
    * Production callers MUST NOT invoke this directly — use `factor(diagGmin)`
@@ -1199,13 +1249,84 @@ export class SparseSolver {
       }
 
       // 4-phase Markowitz pivot selection
-      const pivotRow = this._searchForPivot(k, x, xNzIdx, xNzCount, pinv);
+      const pivotResult = this._searchForPivot(k, x, xNzIdx, xNzCount, pinv);
 
-      if (pivotRow < 0) {
+      if (pivotResult === null) {
         for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
         return { success: false, singularRow: k };
       }
 
+      // When pivot came from a different column (SearchEntireMatrix found a
+      // better candidate in chosenCol != k), swap columns and re-scatter the
+      // new column k so x[] reflects the correct residual for this step.
+      // Mirrors ngspice ExchangeRowsAndCols before the L/U commit loop.
+      if (pivotResult.col !== k) {
+        // Clear old x[] values from column k.
+        for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
+        xNzCount = 0;
+        this._elMark.fill(-1);
+
+        // Bring chosen column into position k.
+        this._swapColumnsForPivot(k, pivotResult.col);
+
+        // Re-scatter the new column k (formerly pivotResult.col) into x[].
+        const newOrigColK = this._preorderColPerm[k];
+        let rae = this._colHead[k];
+        while (rae >= 0) {
+          const row = this._elRow[rae];
+          rowToElem[row] = rae;
+          this._elMark[row] = k;
+          if (!(this._elFlags[rae] & FLAG_FILL_IN)) {
+            if (x[row] === 0) xNzIdx[xNzCount++] = row;
+            x[row] += this._elVal[rae];
+          }
+          rae = this._elNextInCol[rae];
+        }
+
+        // Re-run triangular solve for the new column k.
+        this._reachMark.fill(-1);
+        const reachTop2 = this._reach(k);
+        for (let ri = reachTop2; ri < n; ri++) {
+          const j = reachStack[ri];
+          const qj = q[j];
+          if (x[qj] === 0) continue;
+          const ljp0 = this._lColPtr[j];
+          const ljp1 = this._lColPtr[j + 1];
+          for (let lp = ljp0; lp < ljp1; lp++) {
+            const li = this._lRowIdx[lp];
+            if (x[li] === 0) xNzIdx[xNzCount++] = li;
+            x[li] -= this._lVals[lp] * x[qj];
+          }
+        }
+
+        // Re-run fill-in insertion for the new column k.
+        hadFillin = false;
+        for (let idx = 0; idx < xNzCount; idx++) {
+          const i = xNzIdx[idx];
+          if (x[i] === 0 || pinv[i] >= 0) continue;
+          if (this._elMark[i] === k) continue;
+          const fe = this._newElement(i, newOrigColK, 0, FLAG_FILL_IN);
+          this._insertIntoRow(fe, i);
+          this._insertIntoCol(fe, k);
+          rowToElem[i] = fe;
+          this._elMark[i] = k;
+          this._markowitzRow[i]++;
+          this._markowitzCol[k]++;
+          hadFillin = true;
+        }
+
+        if (hadFillin) {
+          let singletons = 0;
+          for (let i = 0; i < n; i++) {
+            if (pinv[i] >= 0) continue;
+            this._markowitzProd[i] = this._markowitzRow[i] * this._markowitzCol[i];
+            if (this._markowitzProd[i] === 0) singletons++;
+          }
+          this._singletons = singletons;
+        }
+      }
+
+      const pivotRow = pivotResult.row;
       pinv[pivotRow] = k;
       q[k] = pivotRow;
 
@@ -1511,12 +1632,20 @@ export class SparseSolver {
   // =========================================================================
 
   /**
-   * 4-phase Markowitz pivot search matching ngspice SearchForPivot (spfactor.c).
+   * Markowitz pivot search matching ngspice SearchForPivot (spfactor.c:947-994).
    *
-   * Phase 1: Singleton detection (mProd == 0, magnitude threshold).
-   * Phase 2: Diagonal preference (minimum mProd, diagonal entry at column k).
-   * Phase 3: Column search via linked structure (minimum mRow*mCol product).
-   * Phase 4: Last-resort — largest magnitude among all unpivoted rows.
+   * Phase 1: Singleton detection — SearchForSingleton (mProd == 0, magnitude
+   *          threshold). Mirrors spfactor.c:951-977.
+   * Phase 2: Diagonal preference — QuicklySearchDiagonal / SearchDiagonal.
+   *          Uses _diag[k] pool-handle lookup (ngspice Matrix->Diag[Step])
+   *          rather than an original-row equality test. Mirrors spfactor.c:
+   *          1255-1383.
+   * Phase 3 / 4 unified: SearchEntireMatrix — walks every column j in [k, n),
+   *          computes per-column LargestInCol, selects minimum MarkowitzProduct
+   *          with (Magnitude > RelThreshold * LargestInCol) &&
+   *          (Magnitude > AbsThreshold). Tie-break on LargestInCol/Magnitude
+   *          ratio (ngspice RatioOfAccepted). Last-resort: globally largest
+   *          element (pLargestElement). Mirrors spfactor.c:1730-1809.
    *
    * ngspice variable mapping:
    *   MarkowitzRow[] → _markowitzRow[]
@@ -1525,6 +1654,7 @@ export class SparseSolver {
    *   Singletons → _singletons
    *   RelThreshold → this._relThreshold
    *   AbsThreshold → this._absThreshold
+   *   Matrix->Diag[Step] → this._diag[k]
    */
   /**
    * Return the largest |_elVal[e]| in the current column chain starting at
@@ -1552,7 +1682,8 @@ export class SparseSolver {
     xNzIdx: Int32Array,
     xNzCount: number,
     pinv: Int32Array
-  ): number {
+  ): { row: number; col: number } | null {
+    const n = this._n;
     const mProd = this._markowitzProd;
     const mRow = this._markowitzRow;
     const mCol = this._markowitzCol;
@@ -1565,7 +1696,7 @@ export class SparseSolver {
       if (v > absMax) absMax = v;
     }
 
-    if (absMax === 0) return -1;
+    if (absMax === 0) return null;
 
     const relThreshold = this._relThreshold * absMax;
     const absThreshold = this._absThreshold;
@@ -1582,61 +1713,141 @@ export class SparseSolver {
         if (v <= absThreshold || v < relThreshold) continue;
         if (v > bestVal) { bestVal = v; bestRow = i; }
       }
-      if (bestRow >= 0) return bestRow;
+      if (bestRow >= 0) return { row: bestRow, col: k };
     }
 
-    // Phase 2: Diagonal preference
+    // Phase 2: Diagonal preference — ngspice QuicklySearchDiagonal,
+    // spfactor.c:1255-1383. Test the diagonal of the CURRENT internal column
+    // k, which after preorder corresponds to ORIGINAL row _preorderColPerm[k]
+    // — NOT original row k. _diag[k] is the authoritative pool handle for
+    // that diagonal; prefer it when available.
     {
-      let bestRow = -1;
-      let bestProd = Infinity;
-      let bestVal = 0;
-      for (let idx = 0; idx < xNzCount; idx++) {
-        const i = xNzIdx[idx];
-        if (pinv[i] >= 0) continue;
-        if (i !== k) continue;
-        const v = Math.abs(x[i]);
-        if (v <= absThreshold || v < relThreshold) continue;
-        const prod = mProd[i];
-        if (prod < bestProd || (prod === bestProd && v > bestVal)) {
-          bestProd = prod; bestVal = v; bestRow = i;
-        }
-      }
-      if (bestRow >= 0) return bestRow;
-    }
-
-    // Phase 3: Column search via linked structure
-    {
-      let bestRow = -1;
-      let bestProd = Infinity;
-      let bestVal = 0;
-      let e = this._colHead[k];
-      while (e >= 0) {
-        const row = this._elRow[e];
-        if (pinv[row] < 0) {
-          const v = Math.abs(x[row]);
+      const diagE = this._diag[k];
+      if (diagE >= 0) {
+        const diagRow = this._elRow[diagE];
+        if (pinv[diagRow] < 0) {
+          const v = Math.abs(x[diagRow]);
           if (v > absThreshold && v >= relThreshold) {
-            const prod = mRow[row] * mCol[k];
-            if (prod < bestProd || (prod === bestProd && v > bestVal)) {
-              bestProd = prod; bestVal = v; bestRow = row;
-            }
+            return { row: diagRow, col: k };
           }
         }
-        e = this._elNextInCol[e];
       }
-      if (bestRow >= 0) return bestRow;
     }
 
-    // Phase 4: Last-resort — largest magnitude
+    // Phase 3 / 4 unified: SearchEntireMatrix — ngspice spfactor.c:1730-1809.
+    //
+    // ngspice walks every column I in [Step, Size], computes LargestInCol
+    // per column, and selects the element minimising MarkowitzProduct subject
+    // to (Magnitude > RelThreshold * LargestInCol) && (Magnitude > AbsThreshold).
+    // For column == k we reuse the dense scatter x[]; for every other column
+    // j > k we must compute each candidate's residual magnitude.
+    //
+    // Gilbert-Peierls LU does not keep linked-list residual values live
+    // between column eliminations, so to evaluate a non-k column we walk
+    // its live _elVal chain — which holds the ORIGINAL A-matrix value for
+    // columns not yet eliminated (because _numericLUMarkowitz only writes
+    // back L/U values for column k at commit time; columns > k still carry
+    // their unmodified A values). This is correct: ngspice's linked-list
+    // values for unprocessed columns are likewise the un-eliminated
+    // A values at this point in the factorization.
+    //
+    // For ties on MarkowitzProduct the largest Magnitude/LargestInCol ratio
+    // wins (ngspice RatioOfAccepted at spfactor.c:1782-1791). Last-resort
+    // fallback picks the globally-largest element (pLargestElement at
+    // spfactor.c:1800-1808).
     {
-      let bestRow = -1;
-      let bestVal = 0;
-      for (let idx = 0; idx < xNzCount; idx++) {
-        const i = xNzIdx[idx];
-        if (pinv[i] >= 0) continue;
-        const v = Math.abs(x[i]);
-        if (v > bestVal) { bestVal = v; bestRow = i; }
+      let chosenRow = -1;
+      let chosenCol = -1;
+      let minProd = Infinity;
+      let bestRatio = Infinity;
+      let largestMagRow = -1;
+      let largestMagCol = -1;
+      let largestMag = 0;
+
+      for (let col = k; col < n; col++) {
+        // Find first unpivoted element in this column (ngspice skips while
+        // pElement->Row < Step, i.e. already-pivoted rows).
+        let firstUnpivoted = this._colHead[col];
+        while (firstUnpivoted >= 0 && pinv[this._elRow[firstUnpivoted]] >= 0) {
+          firstUnpivoted = this._elNextInCol[firstUnpivoted];
+        }
+        if (firstUnpivoted < 0) continue;
+
+        // Per-column largest magnitude (ngspice FindLargestInCol, spfactor.c:1850).
+        // For col == k use the dense scatter x[]; for col > k walk _elVal.
+        let largestInCol = 0;
+        if (col === k) {
+          for (let idx = 0; idx < xNzCount; idx++) {
+            const r = xNzIdx[idx];
+            if (pinv[r] >= 0) continue;
+            const vv = Math.abs(x[r]);
+            if (vv > largestInCol) largestInCol = vv;
+          }
+        } else {
+          let w = firstUnpivoted;
+          while (w >= 0) {
+            const r = this._elRow[w];
+            if (pinv[r] < 0) {
+              const vv = Math.abs(this._elVal[w]);
+              if (vv > largestInCol) largestInCol = vv;
+            }
+            w = this._elNextInCol[w];
+          }
+        }
+        if (largestInCol === 0) continue;
+
+        const colThreshold = this._relThreshold * largestInCol;
+
+        // Walk each unpivoted element in this column, testing both for
+        // pivot acceptability and for global largestMag bookkeeping.
+        let w = firstUnpivoted;
+        while (w >= 0) {
+          const row = this._elRow[w];
+          if (pinv[row] < 0) {
+            const v = col === k ? Math.abs(x[row]) : Math.abs(this._elVal[w]);
+            if (v > largestMag) {
+              largestMag = v;
+              largestMagRow = row;
+              largestMagCol = col;
+            }
+            if (v > colThreshold && v > this._absThreshold) {
+              const prod = mRow[row] * mCol[col];
+              if (prod < minProd) {
+                minProd = prod;
+                bestRatio = largestInCol / v;
+                chosenRow = row;
+                chosenCol = col;
+              } else if (prod === minProd) {
+                const ratio = largestInCol / v;
+                if (ratio < bestRatio) {
+                  bestRatio = ratio;
+                  chosenRow = row;
+                  chosenCol = col;
+                }
+              }
+            }
+          }
+          w = this._elNextInCol[w];
+        }
       }
-      return bestRow;
+
+      if (chosenRow >= 0) {
+        // Return chosenCol to the caller so it can swap columns and re-scatter
+        // before committing L/U. The column swap must happen in the caller
+        // (not here) so x[] can be cleared, column chosenCol re-scattered, and
+        // the triangular solve re-run on the new column k — ensuring x[chosenRow]
+        // holds the correct residual value. Mirrors ngspice ExchangeRowsAndCols
+        // (spfactor.c) which runs before the L/U commit loop.
+        return { row: chosenRow, col: chosenCol };
+      }
+
+      // No acceptable pivot under threshold — ngspice spSMALL_PIVOT path
+      // (spfactor.c:1807-1808): return the globally largest-magnitude
+      // element and accept the small-pivot warning.
+      if (largestMagRow >= 0) {
+        return { row: largestMagRow, col: largestMagCol };
+      }
+      return null;
     }
   }
 

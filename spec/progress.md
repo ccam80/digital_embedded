@@ -125,3 +125,37 @@ Progress is recorded here by implementation agents. Each completed task appends 
   - Added re-dispatch block: when `factorNumerical` returns `{ success: false, needsReorder: true }`, sets `_needsReorder = true` and calls `factorWithReorder(undefined)` (gmin already applied once, not doubled)
   - Added JSDoc explaining ngspice SMPluFac/SMPreorder atomic gmin invariant and spfactor.c:225 fall-through
   - Updated `newton-raphson.ts`: removed separate `addDiagonalGmin` call, passes `ctx.diagonalGmin` directly into `solver.factor(ctx.diagonalGmin)` for atomic gmin+factor per ngspice spsmp.c:173,197
+
+## Task 1.3.1: Replace all `PIVOT_*` constant references in `_searchForPivot`; update doc comments
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/sparse-solver.ts`
+- **Tests**: 86/86 passing (sparse-solver.test.ts + complex-sparse-solver.test.ts + rl-iter0-probe.test.ts)
+- **Changes**:
+  - The dead prior implementer had already applied all Wave 1.3 code changes to sparse-solver.ts but died before recording progress or calling complete-implementer.sh
+  - Doc comment updated: `PIVOT_THRESHOLD` → `this._relThreshold`, `PIVOT_ABS_THRESHOLD` → `this._absThreshold`; full ngspice variable mapping table added including `Matrix->Diag[Step] → this._diag[k]`
+  - All uses of `PIVOT_THRESHOLD` / `PIVOT_ABS_THRESHOLD` in `_searchForPivot` replaced with `this._relThreshold` / `this._absThreshold` locals
+
+## Task 1.3.2: Fix Phase-2 diagonal lookup: replace `i !== k` filter with `_diag[k]` pool-handle lookup
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/sparse-solver.ts`
+- **Tests**: 86/86 passing
+- **Changes**:
+  - Phase 2 block replaced: removed `i !== k` filter (which incorrectly assumed original row k is always the diagonal after preorder); replaced with `_diag[k]` pool-handle lookup per ngspice QuicklySearchDiagonal (spfactor.c:1255-1383)
+  - Added `_findDiagOnColumn(internalCol)` private helper using `_preorderColPerm[internalCol]` as the target row (since row indices are never permuted, only columns via _extToIntCol)
+  - Added `_swapColumnsForPivot(k, col2)` private helper for arbitrary column permutation during Phase 3 pivot selection (mirrors ngspice spcColExchange/ExchangeRowsAndCols)
+
+## Task 1.3.3: Rewrite Phase-3/4 as SearchEntireMatrix; add `_swapColumnsForPivot` + `_findDiagOnColumn` helpers
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/sparse-solver.ts`
+- **Tests**: 86/86 passing
+- **Changes**:
+  - Replaced Phase 3 (column-k-only scan) + Phase 4 (largest-magnitude last-resort) with unified SearchEntireMatrix block (ngspice spfactor.c:1730-1809): walks every column j in [k, n), computes per-column LargestInCol, selects minimum MarkowitzProduct with threshold checks, tie-breaks on LargestInCol/Magnitude ratio (RatioOfAccepted), falls back to pLargestElement
+  - Fixed critical architectural bug in dead implementer's code: changed `_searchForPivot` return type from `number` to `{ row: number; col: number } | null` so cross-column pivot selection is handled correctly; column swap + x[] re-scatter now happen in `_numericLUMarkowitz` caller (not inside `_searchForPivot`): when `pivotResult.col !== k`, old scatter cleared, `_swapColumnsForPivot` called, new column k re-scattered, triangular solve re-run, fill-ins re-inserted — ensuring `x[pivotRow]` holds the correct residual value
+  - For col == k: magnitudes from dense x[]; for col > k: magnitudes from live _elVal chain (original A-matrix values, correct since uneliminated columns still carry original values)
+  - `_findDiagOnColumn` uses `_preorderColPerm[internalCol]` to find diagonal row (row indices never permuted)
