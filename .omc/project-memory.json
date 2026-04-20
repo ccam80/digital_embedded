@@ -296,8 +296,8 @@
     },
     {
       "path": "src\\solver\\analog\\ckt-context.ts",
-      "accessCount": 131,
-      "lastAccessed": 1776719722527,
+      "accessCount": 133,
+      "lastAccessed": 1776719873752,
       "type": "file"
     },
     {
@@ -337,16 +337,16 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\ckt-load.ts",
+      "accessCount": 44,
+      "lastAccessed": 1776719883636,
+      "type": "directory"
+    },
+    {
       "path": "src\\solver\\analog\\__tests__\\test-helpers.ts",
       "accessCount": 43,
       "lastAccessed": 1776602412425,
       "type": "file"
-    },
-    {
-      "path": "src\\solver\\analog\\ckt-load.ts",
-      "accessCount": 42,
-      "lastAccessed": 1776678163934,
-      "type": "directory"
     },
     {
       "path": "src\\components\\semiconductors\\__tests__\\mosfet.test.ts",
