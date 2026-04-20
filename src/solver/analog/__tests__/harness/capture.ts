@@ -255,6 +255,7 @@ export function createIterationCaptureHook(
   drainForLog: () => NRAttemptRecord["iterationDetails"];
 } {
   solver.enablePreSolveRhsCapture(true);
+  solver.enablePreFactorMatrixCapture(true);
   let snapshots: IterationSnapshot[] = [];
   let detailBuffer: NonNullable<NRAttemptRecord["iterationDetails"]> = [];
 
@@ -297,7 +298,7 @@ export function createIterationCaptureHook(
       voltages: voltages.slice(),
       prevVoltages: prevVoltages.slice(),
       preSolveRhs: solver.getPreSolveRhsSnapshot().slice(),
-      matrix: solver.getCSCNonZeros(),
+      matrix: solver.getPreFactorMatrixSnapshot().slice(),
       elementStates: captureElementStates(elements, statePool, elementLabels),
       noncon,
       diagGmin: ctx.diagonalGmin,

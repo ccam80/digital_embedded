@@ -179,6 +179,18 @@ export class SparseSolver {
   private _capturePreSolveRhs = false;
 
   // =========================================================================
+  // Pre-factor matrix capture
+  // =========================================================================
+  // Factorization overwrites _elVal[e] with combined L/U values (see
+  // _numericLUMarkowitz lines 1055, 1067, 1084 and _numericLUReusePivots
+  // lines 1183, 1192 — ngspice spMatrix semantics). Post-factor snapshots
+  // via getCSCNonZeros() therefore report LU data, not the A matrix that
+  // was factored. This capture snapshots the A matrix at factor() entry
+  // so harness consumers see the system that was actually solved.
+  private _preFactorMatrix: Array<{ row: number; col: number; value: number }> | null = null;
+  private _capturePreFactorMatrix = false;
+
+  // =========================================================================
   // State flags
   // =========================================================================
   private _needsReorder: boolean = false;
@@ -376,6 +388,20 @@ export class SparseSolver {
   }
 
   factor(): FactorResult {
+    if (this._capturePreFactorMatrix) {
+      const n = this._n;
+      const snap: Array<{ row: number; col: number; value: number }> = [];
+      for (let col = 0; col < n; col++) {
+        let e = this._colHead[col];
+        while (e >= 0) {
+          if (!(this._elFlags[e] & FLAG_FILL_IN)) {
+            snap.push({ row: this._elRow[e], col: this._elCol[e], value: this._elVal[e] });
+          }
+          e = this._elNextInCol[e];
+        }
+      }
+      this._preFactorMatrix = snap;
+    }
     if (this._needsReorder || !this._hasPivotOrder) {
       this.lastFactorUsedReorder = true;
       return this.factorWithReorder();
@@ -569,6 +595,20 @@ export class SparseSolver {
 
   getPreSolveRhsSnapshot(): Float64Array {
     return this._preSolveRhs ?? new Float64Array(0);
+  }
+
+  enablePreFactorMatrixCapture(enabled: boolean): void {
+    this._capturePreFactorMatrix = enabled;
+    if (!enabled) this._preFactorMatrix = null;
+  }
+
+  /**
+   * Returns the A matrix non-zero entries snapshotted at the most recent
+   * factor() entry, before factorization mutated _elVal. Empty if capture
+   * was never enabled or factor() has not been called since enabling.
+   */
+  getPreFactorMatrixSnapshot(): ReadonlyArray<{ row: number; col: number; value: number }> {
+    return this._preFactorMatrix ?? [];
   }
 
   /**
