@@ -10,6 +10,7 @@ import { newtonRaphson, pnjlim, fetlim } from "../newton-raphson.js";
 import { CKTCircuitContext } from "../ckt-context.js";
 import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
+import { MODETRANOP, MODEUIC, MODEDCOP, MODEINITJCT } from "../ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helpers — build CKTCircuitContext for test circuits
@@ -351,12 +352,12 @@ describe("NR", () => {
   // ---------------------------------------------------------------------------
 
   it("uic_bypass_returns_converged_with_zero_iterations", () => {
-    // When isDcOp=true and statePool.uic=true, NR must skip all iteration and
-    // return { converged: true, iterations: 0 } after a single CKTload.
+    // Gate: isTranOp(cktMode) && isUic(cktMode) — transient-boot DCOP with UIC.
+    // ngspice dctran.c:117-189: single CKTload, no NR iteration.
     const ctx = makeDiodeCtx(5.0);
-    // Set uic via loadCtx (D2: uic plumbed from params onto LoadContext).
+    // Set cktMode to MODETRANOP | MODEUIC | MODEINITJCT (transient-boot DCOP + UIC).
+    ctx.cktMode = MODETRANOP | MODEUIC | MODEINITJCT;
     ctx.loadCtx.uic = true;
-    ctx.isDcOp = true;
 
     newtonRaphson(ctx);
 
@@ -364,17 +365,17 @@ describe("NR", () => {
     expect(ctx.nrResult.iterations).toBe(0);
   });
 
-  it("uic_bypass_not_triggered_without_isDcOp", () => {
-    // When isDcOp is not set (transient path), statePool.uic must not trigger the bypass.
+  it("uic_bypass_not_triggered_without_tranop", () => {
+    // Standalone .OP with UIC=true must NOT take the single-load exit.
+    // The bypass only fires on MODETRANOP (transient-boot), not MODEDCOP.
     const ctx = makeDiodeCtx(5.0);
+    ctx.cktMode = MODEDCOP | MODEINITJCT;
     ctx.loadCtx.uic = true;
-    ctx.isDcOp = false;
 
     newtonRaphson(ctx);
 
-    // The UIC bypass would return { converged: true, iterations: 0 }.
-    // Without isDcOp=true that path is skipped, so iterations must not be 0
-    // with converged=true simultaneously.
+    // Without MODETRANOP the UIC bypass is skipped; NR runs fully.
+    // iterations must not be 0 with converged=true simultaneously.
     expect(ctx.nrResult.converged === true && ctx.nrResult.iterations === 0).toBe(false);
   });
 

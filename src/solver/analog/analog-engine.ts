@@ -37,6 +37,10 @@ import { isPoolBacked } from "./element.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledWithBridges } from "./compiled-analog-circuit.js";
 import type { StatePool } from "./state-pool.js";
 import { assertPoolIsSoleMutableState } from "../../solver/analog/state-schema.js";
+import {
+  MODEUIC, MODEDCOP, MODETRAN, MODETRANOP,
+  MODEINITJCT, MODEINITTRAN, MODEINITPRED,
+} from "./ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // ConcreteCompiledAnalogCircuit — minimal interface for what MNAEngine needs
@@ -115,7 +119,6 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
   private _simTime: number = 0;
   private _lastDt: number = 0;
-  private _firsttime: boolean = false;
 
   // -------------------------------------------------------------------------
   // Solver configuration
@@ -180,8 +183,6 @@ export class MNAEngine implements AnalogEngine {
       cac.statePool.uic = this._params.uic ?? false;
     }
 
-    this._firsttime = false;
-
     // Construct CKTCircuitContext for NR and DC-OP call sites.
     // Shares the same solver and elements as the rest of init().
     //
@@ -231,7 +232,6 @@ export class MNAEngine implements AnalogEngine {
       }
     }
     this._lastDt = 0;
-    this._firsttime = false;
     // Preserve the unified CKTdeltaOld identity: reseed the SAME shared buffer
     // that ctx.deltaOld points at, rather than letting the new controller
     // self-allocate. Without this the TimestepController would allocate a
@@ -368,9 +368,6 @@ export class MNAEngine implements AnalogEngine {
     // Phase tracking for stepPhaseHook: first attempt is tranInit on step 0, tranNR thereafter.
     // Subsequent loop iterations in the same step are retries.
     let _stepAttemptCount = 0;
-    // ngspice dctran.c MODEINITPRED: set once before the first NR of a step,
-    // cleared to "transient" after the first load() pass completes.
-    let firstNrForThisStep = true;
 
     for (;;) {
       // ngspice dctran.c:735 — deltaOld[0] = delta each iteration.
@@ -423,9 +420,9 @@ export class MNAEngine implements AnalogEngine {
         statePool.dt = dt;
         computeNIcomCof(dt, this._timestep.deltaOld, this._timestep.currentOrder,
           this._timestep.currentMethod, this._ctx!.ag, this._ctx!.gearMatScratch);
-        if (this._firsttime) {
-          ctx.initMode = "initTran";
-        }
+        // MODEINITTRAN is already live in ctx.cktMode from _seedFromDcop.
+        // niiter's INITF dispatcher will clear it to MODEINITFLOAT after the
+        // first cktLoad. No deferred write needed.
       }
 
       // --- NR solve (ngspice dctran.c:770 NIiter) ---
@@ -460,19 +457,17 @@ export class MNAEngine implements AnalogEngine {
       ctx.dcopModeLadder = null;
       ctx.exactMaxIterations = false;
       ctx.onIteration0Complete = null;
-      // ngspice dctran.c: MODEINITPRED is set ONLY at step > 0 (dctran.c:794),
-      // never at firsttime (dctran.c:346 uses MODEINITTRAN instead). initTran
-      // was already written at line 427 for firsttime and must not be clobbered.
-      if (statePool && firstNrForThisStep && !this._firsttime) {
-        ctx.initMode = "initPred";
-      }
+      // ngspice dctran.c:794 — MODEINITPRED is set AFTER NIiter returns, not
+      // before. On the first transient step the mode is MODEINITTRAN (set by
+      // _seedFromDcop); niiter's INITF dispatcher clears that to MODEINITFLOAT
+      // after the first cktLoad. For all subsequent steps, dctran.c:794's
+      // post-NIiter write puts MODEINITPRED back on cktMode (in the acceptance
+      // block below), which niiter again clears to MODEINITFLOAT in its
+      // dispatcher. No per-step write is needed here.
+      // The prior ctx.initMode = "transient" sentinel is removed; it had no
+      // ngspice analogue.
       newtonRaphson(ctx);
       const nrResult = ctx.nrResult;
-      // After the first load() pass, revert initMode to "transient".
-      if (statePool && firstNrForThisStep) {
-        ctx.initMode = "transient";
-        firstNrForThisStep = false;
-      }
 
       // --- Logging (merged from initial and retry blocks) ---
       if (logging) {
@@ -501,17 +496,25 @@ export class MNAEngine implements AnalogEngine {
         dt = dt / 8;                                    // ngspice dctran.c:802
         this._timestep.currentDt = dt;
         this._timestep.currentOrder = 1;                // ngspice dctran.c:810 — order, NOT method
-        if (this._firsttime && statePool) {
-          ctx.initMode = "initTran";
+        // dctran.c:820-822 — on NR failure while firsttime, restore MODEINITTRAN
+        // on CKTmode. "firsttime" in ngspice is 1 between dctran.c:189 and 864
+        // (the first successful step's acceptance). We detect it as _stepCount === 0.
+        if (this._stepCount === 0 && statePool) {
+          ctx.cktMode = (ctx.cktMode & MODEUIC) | MODETRAN | MODEINITTRAN;
+          ctx.initMode = "initTran";  // legacy mirror
         }
         // fall through to delmin check below
       } else {
         // --- NR CONVERGED — evaluate LTE (ngspice dctran.c:830+) ---
         this._timestep.currentDt = dt;
 
-        // ngspice dctran.c:849-866: firsttime && converged -> skip LTE, accept immediately
-        if (this._firsttime) {
-          this._firsttime = false;  // ngspice dctran.c:864: firsttime = 0
+        // ngspice dctran.c:849-866: firsttime && converged -> skip LTE, accept
+        // immediately. Our firsttime proxy is _stepCount === 0: before the
+        // first-step increment it is 0, and dctran.c:864 sets firsttime = 0
+        // just before jumping to nextTime where STATaccepted increments.
+        // Our equivalent increment is at _stepCount++ at the end of step(),
+        // giving the same one-shot semantics.
+        if (this._stepCount === 0) {
           this.stepPhaseHook?.onAttemptEnd("accepted", true);
           newDt = dt;
           worstRatio = 0;
@@ -587,12 +590,11 @@ export class MNAEngine implements AnalogEngine {
     // Accept the timestep — rotation already happened before the retry loop.
     if (statePool) {
       statePool.tranStep++;
-      // ngspice dctran.c:795-799 + capload.c:60-62:
-      // On first transient step (firsttime), copy s0->s1 for q0==q1,
-      // then seed s2/s3 from s1. Runs once per accepted step, not per NR retry,
-      // so prior-step history is never overwritten by a failed attempt.
-      if (this._firsttime) {
-        statePool.states[1].set(statePool.states[0]);
+      // ngspice dctran.c:795-799: on firsttime acceptance, seed s2..s7 from s1.
+      // states[1] already holds the DCOP state from _seedFromDcop (bcopy at
+      // dctran.c:349-350). seedFromState1 copies s1 into s2..s7, matching
+      // dctran.c:795-799. Runs once per first-step acceptance.
+      if (this._stepCount === 0) {
         statePool.seedFromState1();
       }
     }
@@ -647,6 +649,16 @@ export class MNAEngine implements AnalogEngine {
         el.acceptStep(this._simTime, addBP);
       }
     }
+
+    // ngspice dctran.c:794 — `ckt->CKTmode = (ckt->CKTmode & MODEUIC) |
+    // MODETRAN | MODEINITPRED;` Set AFTER NIiter returns, landing mode for
+    // the NEXT step's first cktLoad. Under #ifndef PREDICTOR (ngspice
+    // default), MODEINITPRED is effectively equivalent to MODEINITFLOAT;
+    // the distinction matters only if PREDICTOR is enabled at ngspice build
+    // time (it is not, by default).
+    const uicBit = ctx.cktMode & MODEUIC;
+    ctx.cktMode = uicBit | MODETRAN | MODEINITPRED;
+    ctx.initMode = "initPred";  // legacy mirror
 
     // Notify measurement observers
     this._stepCount++;
@@ -792,14 +804,19 @@ export class MNAEngine implements AnalogEngine {
     ctx.limitingCollector = this.limitingCollector;
     ctx.nodesets = cac.nodesets ?? new Map();
     ctx.ics = cac.ics ?? new Map();
-    // D3: standalone .OP is MODEDCOP only (not MODETRANOP). vsrcload.c:410-411
+    // dcop.c:82 — firstmode = (CKTmode & MODEUIC) | MODEDCOP | MODEINITJCT
+    // Standalone .OP is MODEDCOP only (not MODETRANOP). vsrcload.c:410-411
     // scales source value by CKTsrcFact ONLY under MODETRANOP, so for
-    // standalone .OP the source-load srcFact path is gated off by the flag
-    // below. CKTsrcFact itself must enter the ladder at 1 — the source-
-    // stepping sub-solve (gillespieSrc / spice3Src) mutates ctx.srcFact
-    // internally during the ramp, but the ladder entry value must be 1 so
-    // source-scaling only kicks in when the sub-solve asks for it.
+    // standalone .OP the source-load srcFact path is gated off by the
+    // analysis bits. CKTsrcFact enters at 1 — the source-stepping sub-solve
+    // (gillespieSrc / spice3Src) mutates ctx.srcFact internally during the
+    // ramp, but the ladder entry value must be 1.
     ctx.srcFact = 1;
+    const uicBitDcop = ctx.cktMode & MODEUIC;
+    ctx.cktMode = uicBitDcop | MODEDCOP | MODEINITJCT;
+    // Legacy mirrors:
+    ctx.isDcOp = true;
+    ctx.isTransient = false;
     ctx.isTransientDcop = false;
     ctx.isAc = false;
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
@@ -892,10 +909,17 @@ export class MNAEngine implements AnalogEngine {
     ctx.limitingCollector = this.limitingCollector;
     ctx.nodesets = cac.nodesets ?? new Map();
     ctx.ics = cac.ics ?? new Map();
-    ctx.srcFact = this._params.srcFact ?? 1;
-    // D3: transient-boot DCOP runs under MODETRANOP per dctran.c:190,219-220,231-232.
-    // Reset to false after DCOP converges in _seedFromDcop, before the first
-    // real transient step.
+    // dctran.c:190,231 — save_mode = (CKTmode & MODEUIC) | MODETRANOP | MODEINITJCT
+    // Preserve UIC; replace analysis and INITF bits entirely. Reset to the
+    // first-transient-step mode inside _seedFromDcop after DCOP converges.
+    // srcFact always enters at 1; dctran.c does not read srcFact at transient-
+    // boot DCOP entry (cktop.c:385 sets CKTsrcFact=0 inside gillespie sub-solve).
+    ctx.srcFact = 1;
+    const uicBitTransDcop = ctx.cktMode & MODEUIC;
+    ctx.cktMode = uicBitTransDcop | MODETRANOP | MODEINITJCT;
+    // Legacy mirrors (removed once F4 devices read cktMode):
+    ctx.isDcOp = true;
+    ctx.isTransient = true;   // MODETRAN bit is set inside MODETRANOP
     ctx.isTransientDcop = true;
     ctx.isAc = false;
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
@@ -1155,60 +1179,61 @@ export class MNAEngine implements AnalogEngine {
   // -------------------------------------------------------------------------
 
   /**
-   * Post-convergence seeding sequence shared by dcOperatingPoint() and
-   * _transientDcop().
+   * Transition from converged DCOP to the first transient timestep.
    *
-   * Copies converged voltages into engine state, seeds state pool history.
+   * Direct port of ngspice dctran.c:346-350:
    *
-   * Matches ngspice dctran.c:346-350 post-CKTop sequence:
-   *   CKTmode set to MODETRAN -> CKTag[] zeroed -> bcopy seeds state1 from state0.
+   *     ckt->CKTmode = (ckt->CKTmode & MODEUIC) | MODETRAN | MODEINITTRAN;
+   *     ckt->CKTag[0] = ckt->CKTag[1] = 0;
+   *     bcopy(ckt->CKTstate0, ckt->CKTstate1,
+   *           (size_t) ckt->CKTnumStates * sizeof(double));
+   *
+   * Three statements. No cktLoad, no NR, no device.accept sweep, no
+   * per-element ref refresh beyond the defensive resync below.
    */
   private _seedFromDcop(
     result: DcOpResult,
-    elements: readonly AnalogElement[],
+    _elements: readonly AnalogElement[],
     cac: CompiledWithBridges,
   ): void {
     const ctx = this._ctx!;
     ctx.rhs.set(result.nodeVoltages);
 
     if (cac.statePool) {
-      // ngspice dctran.c:346-350: set analysis mode, zero CKTag[], then copy state.
-      // Order matters: analysisMode must be "tran" and ag[] zeroed BEFORE state0->state1
-      // so that elements reading ag[0] during the first transient NR see ag0=0 (DC form)
-      // for the initial companion stamp, not a stale value.
-      cac.statePool.analysisMode = "tran";
-      // ngspice dctran.c:346 — `CKTmode = (CKTmode & MODEUIC) | MODETRAN | MODEINITTRAN`.
-      // Set isTransient true and clear isTransientDcop: leaving MODETRANOP,
-      // entering MODETRAN. Reactive elements gate companion stamps on
-      // `isTransient || isDcOp`; without isTransient=true the reactive ladder
-      // is invisible to every transient NR call.
+      // dctran.c:346 — CKTmode = (CKTmode & MODEUIC) | MODETRAN | MODEINITTRAN
+      // Preserve MODEUIC only; replace the analysis and INITF bits entirely.
+      const uic = ctx.cktMode & MODEUIC;
+      ctx.cktMode = uic | MODETRAN | MODEINITTRAN;
+
+      // Sync deprecated mirrors so any device still reading the legacy flags
+      // during the F4 transition sees consistent values.
+      ctx.initMode = "initTran";
+      ctx.isDcOp = false;
       ctx.isTransient = true;
       ctx.isTransientDcop = false;
-      ctx.loadCtx.isTransientDcop = false;
-      // ctx.ag is CKTag[7] (cktdefs.h:97) read by elements via loadCtx.ag (D1).
+      ctx.isAc = false;
+      cac.statePool.analysisMode = "tran";
+
+      // dctran.c:348 — CKTag[0] = CKTag[1] = 0
       ctx.ag[0] = 0;
       ctx.ag[1] = 0;
-      // ngspice dctran.c:316-318 — CKTdeltaOld[i] = CKTmaxStep for all 7 slots
-      // at transient init. ctx.deltaOld is seeded in the CKTCircuitContext
-      // constructor, and the TimestepController references the same backing
-      // array (D2 unification). No copy loop needed — `ctx.deltaOld ===
-      // timestep.deltaOld` by identity.
-      cac.statePool.seedHistory();
-      cac.statePool.refreshElementRefs(ctx.poolBackedElements as unknown as PoolBackedAnalogElement[]);
-      this._firsttime = true;
-    }
 
-    // Seed reactive element history (e.g. _prevClockVoltage) from the DC-OP
-    // solution so the first transient step can correctly detect signal edges.
-    // Matches ngspice DEVaccept post-CKTop call: elements are notified of the
-    // accepted DC operating point before any transient NR iteration begins.
-    const addBP = ctx.addBreakpointBound;
-    ctx.loadCtx.voltages = ctx.rhs;
-    ctx.loadCtx.dt = 0;
-    for (const el of elements) {
-      if (el.accept) {
-        el.accept(ctx.loadCtx, 0, addBP);
-      }
+      // dctran.c:349-350 — bcopy(CKTstate0, CKTstate1, numStates*sizeof(double))
+      // Copy current state into the "last accepted" slot. No seeding of
+      // state2..state7 yet — ngspice does that in the first-step acceptance
+      // block (dctran.c:795-799), not here. See step()'s _stepCount === 0
+      // branch for that seeding.
+      cac.statePool.states[1].set(cac.statePool.states[0]);
+
+      // refreshElementRefs is pure reference-rebinding: rewrites s0..s7
+      // pointer fields on each PoolBackedAnalogElement so they point at the
+      // pool's current states[0..7] arrays. No scalar or state value is
+      // mutated. Kept as a defensive resync; the .set() above modified
+      // states[1]'s backing memory and any subsequent pool-level rotation
+      // (rotateStateVectors) needs devices to see the rotated slots.
+      cac.statePool.refreshElementRefs(
+        ctx.poolBackedElements as unknown as PoolBackedAnalogElement[],
+      );
     }
   }
 

@@ -1,26 +1,32 @@
 {
   "summary": {
-    "passed": 43,
-    "failed": 4,
+    "passed": 79,
+    "failed": 5,
     "skipped": 0,
-    "totalFiles": 2,
-    "durationSeconds": 0.5
+    "totalFiles": 4,
+    "durationSeconds": 2.4
   },
   "failures": [
     {
       "message": "expected undefined to be 'initFloat' // Object.is equality",
-      "count": 2,
+      "count": 3,
       "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\dc-operating-point.test.ts",
+          "test": "dcopFinalize_transitions_initMode_to_initFloat",
+          "line": 518,
+          "column": 37
+        },
         {
           "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
           "test": "initTran_transitions_to_initFloat_after_iteration_0",
-          "line": 317,
+          "line": 318,
           "column": 37
         },
         {
           "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
           "test": "initPred_transitions_to_initFloat_immediately",
-          "line": 327,
+          "line": 328,
           "column": 37
         }
       ]
@@ -32,7 +38,7 @@
         {
           "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
           "test": "transient_mode_allows_convergence_without_ladder",
-          "line": 338,
+          "line": 339,
           "column": 37
         }
       ]
@@ -44,7 +50,7 @@
         {
           "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
           "test": "ipass_skipped_without_nodesets",
-          "line": 514,
+          "line": 515,
           "column": 26
         }
       ]

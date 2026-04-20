@@ -264,3 +264,23 @@ Progress is recorded here by implementation agents. Each completed task appends 
   - `src/solver/analog/__tests__/ckt-load.test.ts` — added MODE* imports from ckt-mode.ts; replaced all `cktLoad(ctx, N)` calls with `cktLoad(ctx)`; updated CKTload tests to set `ctx.cktMode` via bitfields instead of legacy `ctx.isDcOp`/`ctx.initMode`; replaced nodeset/IC describe blocks with bitfield-gated tests (MODEDCOP|MODEINITJCT, MODEDCOP|MODEINITFIX, MODETRANOP without/with MODEUIC); added troubleNode describe block with 2 tests
   - `src/solver/analog/__tests__/test-helpers.ts` — removed dead `ctx.iteration > 0` guard from makeDiode's noncon increment (ctx.iteration no longer exists on LoadContext after Wave 2.1 removed the field)
 - **Tests**: 43/47 passing on targeted suite (ckt-load.test.ts + newton-raphson.test.ts); 4 failing are all pre-existing baseline failures (initTran_transitions_to_initFloat_after_iteration_0, initPred_transitions_to_initFloat_immediately, transient_mode_allows_convergence_without_ladder, ipass_skipped_without_nodesets)
+
+## Task 2.3: Wave 2.3 (F3 D1–D5 Engine rewrite — tasks 2.3.1 through 2.3.8)
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/dc-operating-point.ts` — tasks 2.3.1, 2.3.2, 2.3.5, 2.3.7
+  - `src/solver/analog/analog-engine.ts` — tasks 2.3.3, 2.3.4, 2.3.6
+  - `src/solver/analog/newton-raphson.ts` — task 2.3.8
+  - `src/solver/analog/__tests__/newton-raphson.test.ts` — updated UIC bypass tests to use cktMode bitfield
+- **Tests**: 79/84 passing; 5 failing are all pre-existing baseline failures
+- **Changes**:
+  - 2.3.1: Rewrote `dcopFinalize` to single `cktLoad(ctx)` after `setInitf(ctx.cktMode, MODEINITSMSIG)`; removed runNR/save-restore dance; removed `exactMaxIterations` parameter from `runNR` since no callers pass true
+  - 2.3.2: Gated all 3 `dcopFinalize` call sites on `!ctx.isTransientDcop` (direct/gmin/src convergence paths)
+  - 2.3.3: Rewrote `_seedFromDcop` as 3-statement dctran.c:346-350 port; removed `el.accept()` sweep, `_firsttime` write, `seedHistory()` call; added direct `states[1].set(states[0])`
+  - 2.3.4: Deleted `_firsttime` field + all 9 read/write sites; removed `firstNrForThisStep`; removed `"transient"` initMode sentinel; rewrote step() branches to use `_stepCount === 0`; added post-NIiter `cktMode = MODETRAN | MODEINITPRED` write (dctran.c:794)
+  - 2.3.5: Removed `ctx.isTransient = false` in `runNR`; replaced with `ctx.isTransient = (ctx.cktMode & MODETRAN) !== 0` (derived from cktMode)
+  - 2.3.6: `_transientDcop` sets `ctx.cktMode = uic | MODETRANOP | MODEINITJCT`; `dcOperatingPoint` sets `ctx.cktMode = uic | MODEDCOP | MODEINITJCT`; changed `srcFact = params.srcFact ?? 1` to `srcFact = 1` in `_transientDcop`
+  - 2.3.7: Converted all 10 `ctx.initMode = "initJct/Float"` writes in sub-solver functions to `setInitf(ctx.cktMode, MODEINITJCT/FLOAT)` + legacy mirror; also converted `cktop` firstMode parameter to bitfield
+  - 2.3.8: Changed UIC early-exit gate from `ctx.isDcOp && ctx.loadCtx.uic` to `isTranOp(ctx.cktMode) && isUic(ctx.cktMode)` (AD1 fix); updated test to use `MODETRANOP | MODEUIC | MODEINITJCT`

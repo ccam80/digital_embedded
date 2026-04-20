@@ -10,6 +10,7 @@ import type { DiagnosticCollector } from "./diagnostics.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import type { CKTCircuitContext } from "./ckt-context.js";
 import { cktLoad } from "./ckt-load.js";
+import { isTranOp, isUic } from "./ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // LimitingEvent — records a single voltage-limiting call per junction per NR iteration
@@ -268,9 +269,10 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   }
 
   // MODETRANOP && MODEUIC: single CKTload, no iteration (ngspice dctran.c UIC path).
-  // D2: reads ctx.loadCtx.uic (plumbed from params.uic) — no more unsound statePool cast.
-  // D3 will narrow from isDcOp to isTransientDcop once that field exists.
-  if (ctx.isDcOp && ctx.loadCtx.uic) {
+  // ngspice dctran.c:117-189 — UIC early-exit exists only in DCtran, not DCop.
+  // Gate on isTranOp(cktMode) && isUic(cktMode): standalone .OP with UIC=true
+  // must NOT take this path — it must run the full CKTop ladder.
+  if (isTranOp(ctx.cktMode) && isUic(ctx.cktMode)) {
     [voltages, prevVoltages] = [prevVoltages, voltages];
     ctx.rhsOld.set(prevVoltages);
     cktLoad(ctx);
