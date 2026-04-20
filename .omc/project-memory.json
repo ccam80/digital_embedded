@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1776596474902,
+  "lastScanned": 1776682953310,
   "projectRoot": "C:\\local_working_projects\\digital_in_browser",
   "techStack": {
     "languages": [
@@ -83,7 +83,7 @@
       "path": "circuits",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1776596474866,
+      "lastAccessed": 1776682953275,
       "keyFiles": [
         "and-gate.dig",
         "half-adder.dig",
@@ -95,7 +95,7 @@
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 5,
-      "lastAccessed": 1776596474866,
+      "lastAccessed": 1776682953276,
       "keyFiles": [
         "simulator.html",
         "tutorial-editor.html",
@@ -108,21 +108,21 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1776596474866,
+      "lastAccessed": 1776682953276,
       "keyFiles": []
     },
     "e2e": {
       "path": "e2e",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776596474867,
+      "lastAccessed": 1776682953276,
       "keyFiles": []
     },
     "fixtures": {
       "path": "fixtures",
       "purpose": "Test fixtures",
       "fileCount": 16,
-      "lastAccessed": 1776596474867,
+      "lastAccessed": 1776682953293,
       "keyFiles": [
         "analog-rc-workflow.dig",
         "broken_chain.dig",
@@ -135,67 +135,54 @@
       "path": "lib",
       "purpose": "Library code",
       "fileCount": 0,
-      "lastAccessed": 1776596474886,
+      "lastAccessed": 1776682953293,
       "keyFiles": []
-    },
-    "local_working_projectsdigital_in_browser.claudeworktreesecdc34a-audit": {
-      "path": "local_working_projectsdigital_in_browser.claudeworktreesecdc34a-audit",
-      "purpose": null,
-      "fileCount": 27,
-      "lastAccessed": 1776596474886,
-      "keyFiles": [
-        "CLAUDE.md",
-        "e2e-results.json",
-        "eslint.config.js",
-        "local_working_projectsdigital_in_browserspecstate-machines_gen_integ.cjs",
-        "mcp-stderr.log"
-      ]
     },
     "modules": {
       "path": "modules",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776596474886,
+      "lastAccessed": 1776682953293,
       "keyFiles": []
     },
     "ref": {
       "path": "ref",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1776596474886,
+      "lastAccessed": 1776682953293,
       "keyFiles": []
     },
     "scripts": {
       "path": "scripts",
       "purpose": "Build/utility scripts",
-      "fileCount": 6,
-      "lastAccessed": 1776596474887,
+      "fileCount": 7,
+      "lastAccessed": 1776682953293,
       "keyFiles": [
         "circuit-mcp-server.ts",
+        "extract-reports.mjs",
         "generate-spice-references.sh",
         "mcp-wrapper.mjs",
-        "run-all-tests.mjs",
-        "transform-compare.js"
+        "run-all-tests.mjs"
       ]
     },
     "spec": {
       "path": "spec",
       "purpose": "Test specifications",
-      "fileCount": 18,
-      "lastAccessed": 1776596474887,
+      "fileCount": 16,
+      "lastAccessed": 1776682953294,
       "keyFiles": [
         "analog-snapshot-analysis.md",
-        "ngspice-alignment-master.md",
-        "phase-0-sparse-solver-rewrite.md",
-        "phase-1-zero-alloc-infrastructure.md",
-        "phase-2-nr-loop-alignment.md"
+        "ngspice-alignment-divergences.md",
+        "ngspice-alignment-F-bjt.md",
+        "ngspice-alignment-F-mos.md",
+        "ngspice-alignment-F1-sparse-solver.md"
       ]
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 1,
-      "lastAccessed": 1776596474887,
+      "lastAccessed": 1776682953294,
       "keyFiles": [
         "main.ts"
       ]
@@ -203,17 +190,31 @@
     "test-results": {
       "path": "test-results",
       "purpose": null,
-      "fileCount": 1,
-      "lastAccessed": 1776596474888,
+      "fileCount": 3,
+      "lastAccessed": 1776682953294,
       "keyFiles": [
+        "playwright-failures.json",
         "test-failures.json"
+      ]
+    },
+    "tmp-hang-circuits": {
+      "path": "tmp-hang-circuits",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1776682953295,
+      "keyFiles": [
+        "rc-ac-lowpass.dts",
+        "rc-step.dts",
+        "rl-ac.dts",
+        "rl-step.dts",
+        "rlc-ringdown.dts"
       ]
     },
     "tutorials": {
       "path": "tutorials",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1776596474888,
+      "lastAccessed": 1776682953295,
       "keyFiles": [
         "index.json"
       ]
@@ -222,18 +223,18 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 5,
-      "lastAccessed": 1776596474888,
+      "lastAccessed": 1776682953296,
       "keyFiles": [
         "memory-editor-DEA45Iu0.js",
         "search-B4BtHZDg.js",
-        "simulator-DQi7xvvi.js"
+        "simulator-4S55luQI.js"
       ]
     },
     "e2e\\fixtures": {
       "path": "e2e\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 8,
-      "lastAccessed": 1776596474889,
+      "lastAccessed": 1776682953296,
       "keyFiles": [
         "harness.html",
         "master1-digital.dts",
@@ -244,7 +245,7 @@
       "path": "scripts\\__tests__",
       "purpose": "Test files",
       "fileCount": 2,
-      "lastAccessed": 1776596474890,
+      "lastAccessed": 1776682953297,
       "keyFiles": [
         "circuit-mcp-server.test.ts",
         "circuit-tools-w2t2.test.ts"
@@ -254,7 +255,7 @@
       "path": "src\\app",
       "purpose": "Application code",
       "fileCount": 25,
-      "lastAccessed": 1776596474891,
+      "lastAccessed": 1776682953298,
       "keyFiles": [
         "analysis-dialogs.ts",
         "app-context.ts",
@@ -265,7 +266,7 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 4,
-      "lastAccessed": 1776596474891,
+      "lastAccessed": 1776682953299,
       "keyFiles": [
         "draw-helpers.ts",
         "generic-shape.ts",
@@ -276,7 +277,7 @@
       "path": "src\\fixtures",
       "purpose": "Test fixtures",
       "fileCount": 0,
-      "lastAccessed": 1776596474892,
+      "lastAccessed": 1776682953299,
       "keyFiles": []
     }
   },
