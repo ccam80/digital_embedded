@@ -284,3 +284,13 @@ Progress is recorded here by implementation agents. Each completed task appends 
   - 2.3.6: `_transientDcop` sets `ctx.cktMode = uic | MODETRANOP | MODEINITJCT`; `dcOperatingPoint` sets `ctx.cktMode = uic | MODEDCOP | MODEINITJCT`; changed `srcFact = params.srcFact ?? 1` to `srcFact = 1` in `_transientDcop`
   - 2.3.7: Converted all 10 `ctx.initMode = "initJct/Float"` writes in sub-solver functions to `setInitf(ctx.cktMode, MODEINITJCT/FLOAT)` + legacy mirror; also converted `cktop` firstMode parameter to bitfield
   - 2.3.8: Changed UIC early-exit gate from `ctx.isDcOp && ctx.loadCtx.uic` to `isTranOp(ctx.cktMode) && isUic(ctx.cktMode)` (AD1 fix); updated test to use `MODETRANOP | MODEUIC | MODEINITJCT`
+
+## Task 2.3 (retry): Fix NR convergence regression from "transient" sentinel removal
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**:
+  - `src/solver/analog/newton-raphson.ts` — Rewrote INITF dispatcher (Step J) to read `initf(ctx.cktMode)` instead of `ctx.initMode`; all mode transitions now write both `ctx.cktMode = setInitf(...)` and legacy mirror `ctx.initMode`; ladder initialization path now also syncs `ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT)` when ladder is present; added imports for `initf`, `setInitf`, `MODEINITFLOAT`, `MODEINITJCT`, `MODEINITFIX`, `MODEINITTRAN`, `MODEINITPRED`, `MODEINITSMSIG`
+  - `src/solver/analog/__tests__/newton-raphson.test.ts` — Added `MODETRAN`, `MODEINITTRAN`, `setInitf` to ckt-mode import; fixed `forceReorder_called_on_initTran_first_iteration` test setup to set `ctx.cktMode = setInitf(MODETRAN, MODEINITTRAN)` alongside `ctx.initMode = "initTran"` (test was setting legacy field without the bitfield, inconsistent with new architecture)
+- **Tests**: 79/84 passing (5 pre-existing baseline failures, 0 new regressions)
+- **Root cause fixed**: INITF dispatcher read `ctx.initMode` (legacy string, defaulting to "transient") while `ctx.cktMode` (source of truth) held `MODEDCOP | MODEINITFLOAT`. After sentinel removal, no path updated `ctx.initMode` to "initFloat", so the convergence branch never fired. Fix: dispatcher now reads `initf(ctx.cktMode)` and transitions write both the bitfield and the legacy mirror atomically.

@@ -10,7 +10,7 @@ import { newtonRaphson, pnjlim, fetlim } from "../newton-raphson.js";
 import { CKTCircuitContext } from "../ckt-context.js";
 import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
-import { MODETRANOP, MODEUIC, MODEDCOP, MODEINITJCT } from "../ckt-mode.js";
+import { MODETRANOP, MODEUIC, MODEDCOP, MODEINITJCT, MODETRAN, MODEINITTRAN, setInitf } from "../ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helpers — build CKTCircuitContext for test circuits
@@ -720,7 +720,8 @@ describe("NR NISHOULDREORDER lifecycle", () => {
     const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
     const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = new DiagnosticCollector();
-    ctx.initMode ="initTran";
+    ctx.cktMode = setInitf(MODETRAN, MODEINITTRAN);
+    ctx.initMode = "initTran";  // legacy mirror
 
     let forceReorderCallCount = 0;
     const realSolver = ctx.solver;

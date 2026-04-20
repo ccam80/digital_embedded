@@ -232,20 +232,27 @@
           "2.3.8"
         ]
       ],
-      "spawned": 1,
-      "completed": 1,
+      "spawned": 3,
+      "completed": 3,
       "verifications_passed": 0,
-      "verifications_failed": 0,
+      "verifications_failed": 2,
       "stops_for_clarification": 0,
       "dead_implementers": 0,
       "dead_verifiers": 0,
       "group_status": {
-        "2.3": "pending"
+        "2.3": "failed"
       },
       "user_required_tasks": {
         "2.3": []
       },
-      "user_acks": {}
+      "user_acks": {},
+      "recovery_log": [
+        {
+          "script": "i-fixed-it.sh",
+          "timestamp": "2026-04-20T21:42:54.048Z",
+          "description": "Removed stray || curInitMode === 'transient' branch at newton-raphson.ts:475 (Wave 2.3 task 2.3.4 spec Deliverable 4e — only deviation in otherwise-correct 8-task batch)"
+        }
+      ]
     },
     {
       "id": "batch-p2-w2.4",
@@ -329,5 +336,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-20T21:39:04.486Z"
+  "last_updated": "2026-04-20T21:49:02.613Z"
 }

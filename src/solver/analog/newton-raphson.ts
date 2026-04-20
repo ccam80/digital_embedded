@@ -10,7 +10,11 @@ import type { DiagnosticCollector } from "./diagnostics.js";
 import { makeDiagnostic } from "./diagnostics.js";
 import type { CKTCircuitContext } from "./ckt-context.js";
 import { cktLoad } from "./ckt-load.js";
-import { isTranOp, isUic } from "./ckt-mode.js";
+import {
+  isTranOp, isUic, initf, setInitf,
+  MODEINITFLOAT, MODEINITJCT, MODEINITFIX,
+  MODEINITTRAN, MODEINITPRED, MODEINITSMSIG,
+} from "./ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // LimitingEvent — records a single voltage-limiting call per junction per NR iteration
@@ -264,7 +268,8 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   // dcopModeLadder: set initial initMode and prime junctions before iter 0.
   const ladder = ctx.dcopModeLadder ?? null;
   if (ladder) {
-    ctx.initMode = "initJct";
+    ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
+    ctx.initMode = "initJct";  // legacy mirror
     ladder.runPrimeJunctions();
   }
 
@@ -470,9 +475,10 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     ctx.postIterationHook?.(iteration, voltages, prevVoltages, ctx.noncon, globalConverged, elemConverged, limitingEvents, convergenceFailedElements, ctx);
 
     // ---- STEP J: Unified INITF dispatcher (ngspice niiter.c:1050-1085) ----
-    const curInitMode = ctx.initMode;
+    // Read current INITF bits from cktMode (single source of truth).
+    const curInitf = initf(ctx.cktMode);
 
-    if (curInitMode === "initFloat" || curInitMode === "transient") {
+    if (curInitf === MODEINITFLOAT) {
       if (ctx.noncon === 0 && globalConverged && elemConverged) {
         if (ctx.isDcOp && ctx.hadNodeset && ipass > 0) {
           ipass--;
@@ -489,31 +495,36 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
           return;
         }
       }
-    } else if (curInitMode === "initJct") {
-      ctx.initMode = "initFix";
+    } else if (curInitf === MODEINITJCT) {
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITFIX);
+      ctx.initMode = "initFix";  // legacy mirror
       solver.forceReorder();
       if (ladder) {
         ladder.onModeEnd("dcopInitJct", iteration, false);
         ladder.onModeBegin("dcopInitFix", iteration + 1);
       }
-    } else if (curInitMode === "initFix") {
+    } else if (curInitf === MODEINITFIX) {
       if (ctx.noncon === 0) {
-        ctx.initMode = "initFloat";
+        ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
+        ctx.initMode = "initFloat";  // legacy mirror
         ipass = 1;
         if (ladder) {
           ladder.onModeEnd("dcopInitFix", iteration, false);
           ladder.onModeBegin("dcopInitFloat", iteration + 1);
         }
       }
-    } else if (curInitMode === "initTran") {
-      ctx.initMode = "initFloat";
+    } else if (curInitf === MODEINITTRAN) {
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
+      ctx.initMode = "initFloat";  // legacy mirror
       if (iteration <= 0) {
         solver.forceReorder();
       }
-    } else if (curInitMode === "initPred") {
-      ctx.initMode = "initFloat";
-    } else if (curInitMode === "initSmsig") {
-      ctx.initMode = "initFloat";
+    } else if (curInitf === MODEINITPRED) {
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
+      ctx.initMode = "initFloat";  // legacy mirror
+    } else if (curInitf === MODEINITSMSIG) {
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
+      ctx.initMode = "initFloat";  // legacy mirror
     }
 
     // Split marker: after iteration 0, let the harness observe cold linearization
