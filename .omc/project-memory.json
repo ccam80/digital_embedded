@@ -295,6 +295,12 @@
       "type": "file"
     },
     {
+      "path": "src\\solver\\analog\\ckt-context.ts",
+      "accessCount": 131,
+      "lastAccessed": 1776719722527,
+      "type": "file"
+    },
+    {
       "path": "src\\solver\\analog\\dc-operating-point.ts",
       "accessCount": 125,
       "lastAccessed": 1776675587043,
@@ -305,12 +311,6 @@
       "accessCount": 117,
       "lastAccessed": 1776715590985,
       "type": "directory"
-    },
-    {
-      "path": "src\\solver\\analog\\ckt-context.ts",
-      "accessCount": 116,
-      "lastAccessed": 1776715599959,
-      "type": "file"
     },
     {
       "path": "",

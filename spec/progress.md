@@ -221,3 +221,35 @@ Progress is recorded here by implementation agents. Each completed task appends 
 - **Recovery events**: batch-p1-w1.3 had a dead implementer (first attempt); replacement implementer completed Wave 1.3 work and fixed a critical architectural bug in the dead implementer's Phase 3 column-swap / x[] re-scatter logic in `_numericLUMarkowitz` (without which `performance_50_node` regressed to residual 11263 vs spec <1e-8).
 - **Targeted tests on final state**: sparse-solver.test.ts + complex-sparse-solver.test.ts + newton-raphson.test.ts + rl-iter0-probe.test.ts — 121/125 passing (4 pre-existing baseline failures carried forward, 0 regressions).
 ---
+
+## Task 2.1.1: Create `ckt-mode.ts`: 14 MODE* constants with ngspice hex verbatim + helpers
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: `src/solver/analog/ckt-mode.ts`
+- **Files modified**: none
+- **Tests**: 46/50 passing on targeted suite (4 pre-existing failures from baseline: initTran_transitions_to_initFloat_after_iteration_0, initPred_transitions_to_initFloat_immediately, transient_mode_allows_convergence_without_ladder, ipass_skipped_without_nodesets)
+- **Details**: Created ckt-mode.ts with 14 MODE* constants matching ngspice cktdefs.h:165-185 hex values verbatim (verified by direct comparison). Includes INITF_MASK, MODE_ANALYSIS_MASK composites. Exports all 8 helpers: setInitf, setAnalysis, isDcop, isTran, isTranOp, isAc, isUic, initf.
+
+## Task 2.1.2: Migrate LoadContext: remove InitMode type + legacy boolean fields, add cktMode: number
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/load-context.ts`
+- **Tests**: 46/50 passing (same 4 pre-existing failures)
+- **Details**: Removed InitMode type export, removed fields: iteration, initMode, isDcOp, isTransient, isTransientDcop, isAc. Added cktMode: number as first field. Retained uic: boolean temporarily per spec. LoadContext now matches ngspice CKTcircuit fields accessed inside DEVload.
+
+## Task 2.1.3: Add cktMode field to CKTCircuitContext; mark legacy mirrors @deprecated; init to MODEDCOP | MODEINITFLOAT
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/ckt-context.ts`
+- **Tests**: 46/50 passing (same 4 pre-existing failures)
+- **Details**: Added cktMode: number field defaulting to MODEDCOP | MODEINITFLOAT. Marked initMode, isDcOp, isTransient, isTransientDcop, isAc as @deprecated with migration guidance. Removed InitMode re-export from load-context.ts (it no longer exports it); defined InitMode locally in ckt-context.ts for transition window. Added import of MODEDCOP, MODEINITFLOAT from ckt-mode.ts. Updated loadCtx initializer to add cktMode field and remove legacy fields (iteration, initMode, isDcOp, isTransient, isTransientDcop, isAc).
+
+## Task 2.1.4: Collapse ctx.noncon dual-storage to accessor; add troubleNode field
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/ckt-context.ts`
+- **Tests**: 46/50 passing (same 4 pre-existing failures)
+- **Details**: Converted noncon from plain field (noncon: number = 0) to getter/setter pair forwarding through loadCtx.noncon.value — single storage location per ngspice CKTnoncon (C3 fix). Added troubleNode: number | null field with JSDoc citing ngspice cktload.c:64-65. Initialized troubleNode = null in constructor after enableBlameTracking = false.

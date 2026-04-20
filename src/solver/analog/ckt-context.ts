@@ -17,8 +17,22 @@ import { DiagnosticCollector } from "./diagnostics.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
 import type { LimitingEvent } from "./newton-raphson.js";
 import { NodeVoltageHistory } from "./integration.js";
-export type { InitMode, LoadContext } from "./load-context.js";
-import type { InitMode, LoadContext } from "./load-context.js";
+export type { LoadContext } from "./load-context.js";
+import type { LoadContext } from "./load-context.js";
+import { MODEDCOP, MODEINITFLOAT } from "./ckt-mode.js";
+
+/**
+ * @deprecated Transition-window type for the legacy initMode string field.
+ * Remove once F4 device migration to cktMode bitfield is complete.
+ */
+export type InitMode =
+  | "initJct"
+  | "initFix"
+  | "initFloat"
+  | "initTran"
+  | "initPred"
+  | "initSmsig"
+  | "transient";
 
 // ---------------------------------------------------------------------------
 // NRResult — mutable result class for Newton-Raphson iterations
@@ -229,26 +243,62 @@ export class CKTCircuitContext {
   // Assembler state
   // -------------------------------------------------------------------------
 
-  /** Non-convergence counter (ngspice CKTnoncon). Reset each NR iteration. */
-  noncon: number = 0;
+  /**
+   * Non-convergence counter (ngspice CKTnoncon). Accessor through loadCtx.noncon
+   * so there is exactly one storage location across the ckt / loadCtx boundary
+   * (C3 fix — ngspice has a single CKTnoncon field on CKTcircuit).
+   */
+  get noncon(): number { return this.loadCtx.noncon.value; }
+  set noncon(v: number) { this.loadCtx.noncon.value = v; }
 
   // -------------------------------------------------------------------------
-  // Mode flags
+  // Mode flags — single CKTmode bitfield (ngspice cktdefs.h:163-209)
   // -------------------------------------------------------------------------
 
-  /** Current NR init mode. */
+  /**
+   * ngspice CKTmode — single bitfield holding analysis bits (MODEDCOP,
+   * MODETRAN, MODEAC, MODEUIC) and INITF bits (MODEINITJCT, MODEINITFIX,
+   * MODEINITFLOAT, MODEINITTRAN, MODEINITPRED, MODEINITSMSIG). See
+   * ./ckt-mode.ts for constants and helpers.
+   *
+   * This replaces the prior fanout of statePool.analysisMode +
+   * ctx.isTransient + ctx.isTransientDcop + ctx.loadCtx.isTransientDcop,
+   * which drifted out of sync because there were four writers and no
+   * invariant. `cktMode` is the single source of truth; LoadContext exposes
+   * it to devices via `loadCtx.cktMode`.
+   *
+   * Defaults to MODEDCOP | MODEINITFLOAT — ngspice's post-reset analysis-
+   * idle state.
+   */
+  cktMode: number = MODEDCOP | MODEINITFLOAT;
+
+  /**
+   * @deprecated Use `initf(cktMode)` / `setInitf(cktMode, MODEINITx)`. Kept
+   * for the transition window; `ckt-load.ts` still mirrors this into
+   * `loadCtx.initMode`. Will be removed once F4 lands device-side
+   * `loadCtx.cktMode` readers.
+   */
   initMode: InitMode = "transient";
-  /** True during DC operating point solves. */
+  /**
+   * @deprecated Use `isDcop(cktMode)`. Mirrored from `cktMode` for the
+   * transition window.
+   */
   isDcOp: boolean = false;
-  /** True during transient solves. */
+  /**
+   * @deprecated Use `isTran(cktMode) && !isTranOp(cktMode)` for "real"
+   * transient, or `isTran(cktMode)` for "any transient including boot".
+   * Mirrored from `cktMode` for the transition window.
+   */
   isTransient: boolean = false;
   /**
-   * True during transient-boot DCOP (ngspice MODETRANOP, cktdefs.h:172).
-   * False during standalone .OP (MODEDCOP, cktdefs.h:171) and during
-   * transient NR. See LoadContext.isTransientDcop for full semantics.
+   * @deprecated Use `isTranOp(cktMode)`. Mirrored from `cktMode` for the
+   * transition window.
    */
   isTransientDcop: boolean = false;
-  /** True during AC small-signal sweeps (ngspice MODEAC bit; acan.c:285). */
+  /**
+   * @deprecated Use `isAc(cktMode)`. Mirrored from `cktMode` for the
+   * transition window.
+   */
   isAc: boolean = false;
   /** Source stepping scale factor (ngspice srcFact). */
   srcFact: number = 1;
@@ -342,6 +392,14 @@ export class CKTCircuitContext {
   limitingCollector: LimitingEvent[] | null;
   /** When true, collect all failing element indices (not just first). */
   enableBlameTracking: boolean;
+  /**
+   * ngspice CKTtroubleNode mirror (cktload.c:64-65). The most recent
+   * device-load that incremented noncon zeros this out. Owning consumers
+   * (diagnostic emitters, convergence log) may populate it with the blamed
+   * node id after the device loop to identify the element whose non-
+   * convergence tripped the NR retry. Null when no blame has been assigned.
+   */
+  troubleNode: number | null;
   /**
    * Post-iteration hook for harness instrumentation.
    * Called after each NR iteration's convergence check.
@@ -538,10 +596,9 @@ export class CKTCircuitContext {
     // Load context — pre-allocated once, mutated in place each NR iteration
     const nonconRef = { value: 0 };
     this.loadCtx = {
+      cktMode: MODEDCOP | MODEINITFLOAT,
       solver: this._solver,
-      iteration: 0,
       voltages: this.rhsOld,
-      initMode: "transient",
       dt: 0,
       method: "trapezoidal",
       order: 1,
@@ -550,10 +607,6 @@ export class CKTCircuitContext {
       srcFact: 1,
       noncon: nonconRef,
       limitingCollector: null,
-      isDcOp: false,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 0,
       gmin: params.gmin ?? 1e-12,
       uic: params.uic ?? false,
@@ -584,6 +637,7 @@ export class CKTCircuitContext {
     this.diagnostics = new DiagnosticCollector();
     this.limitingCollector = null;
     this.enableBlameTracking = false;
+    this.troubleNode = null;
     this.postIterationHook = null;
     this.detailedConvergence = false;
 

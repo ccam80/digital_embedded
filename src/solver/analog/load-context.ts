@@ -11,32 +11,29 @@ import type { IntegrationMethod } from "../../core/analog-types.js";
 import type { LimitingEvent } from "./newton-raphson.js";
 
 // ---------------------------------------------------------------------------
-// InitMode — canonical type for pool.initMode values
-// ---------------------------------------------------------------------------
-
-/** Pool initMode values used throughout the DCOP and transient flow. */
-export type InitMode =
-  | "initJct"
-  | "initFix"
-  | "initFloat"
-  | "initTran"
-  | "initPred"
-  | "initSmsig"
-  | "transient";
-
-// ---------------------------------------------------------------------------
 // LoadContext
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// F4 migration: the boolean fan-out (isDcOp / isTransient / isTransientDcop /
+// isAc / initMode) is replaced by a single cktMode bitfield that mirrors
+// ngspice CKTmode exactly (cktdefs.h:165-185). Device load() methods now test
+// individual bits via ctx.cktMode & MODE* from ./ckt-mode.ts.
+// ---------------------------------------------------------------------------
+
 export interface LoadContext {
+  /**
+   * ngspice CKTmode bitfield. OR of MODETRAN|MODEAC|MODEDCOP|MODETRANOP|
+   * MODEINITJCT|MODEINITFIX|MODEINITFLOAT|MODEINITSMSIG|MODEINITTRAN|
+   * MODEUIC|MODEDCTRANCURVE as defined in ./ckt-mode.ts and
+   * ref/ngspice/src/include/ngspice/cktdefs.h:165-185.
+   * Tested with `ctx.cktMode & MODEXXX`; never stored as booleans.
+   */
+  cktMode: number;
   /** Sparse solver — element stamps conductance and RHS directly into this. */
   solver: SparseSolver;
   /** Previous NR iteration voltages (CKTrhsOld). */
   voltages: Float64Array;
-  /** Current NR iteration index (0-based). */
-  iteration: number;
-  /** DC-OP / transient init mode (CKTmode & INITF). */
-  initMode: InitMode;
   /** Current timestep in seconds (CKTdelta). 0 during DC-OP. */
   dt: number;
   /** Active numerical integration method. */
@@ -53,30 +50,15 @@ export interface LoadContext {
   noncon: { value: number };
   /** When non-null, elements push LimitingEvent records here during NR. */
   limitingCollector: LimitingEvent[] | null;
-  /** True during DC operating point solves. */
-  isDcOp: boolean;
-  /** True during transient solves. */
-  isTransient: boolean;
-  /**
-   * True during the pre-first-step DCOP invocation of transient analysis
-   * (ngspice MODETRANOP, cktdefs.h:172). Distinguishes the transient-boot
-   * DCOP from a standalone .OP (MODEDCOP, cktdefs.h:171). Elements that
-   * scale contributions only under MODETRANOP (e.g. vsrcload.c:410-411
-   * srcFact multiply) gate on this flag instead of on isDcOp alone.
-   * Mutually compatible with isDcOp=true; never true during transient NR
-   * or standalone .OP; never true during AC.
-   */
-  isTransientDcop: boolean;
-  /**
-   * True during AC small-signal sweeps. Mutually exclusive with isDcOp and
-   * isTransient. Mirrors ngspice acan.c:285 `CKTmode = (CKTmode & MODEUIC) | MODEAC`.
-   */
-  isAc: boolean;
   /** Extrapolation factor for predictor (deltaOld[0] / deltaOld[1]). */
   xfact: number;
   /** Diagonal conductance added for numerical stability (CKTgmin). */
   gmin: number;
-  /** Use initial conditions flag (CKT MODEUIC). */
+  /**
+   * Use-Initial-Conditions bit mirror. Redundant with (cktMode & MODEUIC)
+   * but retained because many call sites already read it; engines MUST keep
+   * both in sync. Remove once every reader is migrated to cktMode.
+   */
   uic: boolean;
   /** Relative convergence tolerance (CKTreltol). */
   reltol: number;
