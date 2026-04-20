@@ -308,8 +308,8 @@
     },
     {
       "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 120,
-      "lastAccessed": 1776720124091,
+      "accessCount": 122,
+      "lastAccessed": 1776720477795,
       "type": "directory"
     },
     {
@@ -344,8 +344,8 @@
     },
     {
       "path": "src\\solver\\analog\\ckt-load.ts",
-      "accessCount": 46,
-      "lastAccessed": 1776720112365,
+      "accessCount": 48,
+      "lastAccessed": 1776720476648,
       "type": "directory"
     },
     {
