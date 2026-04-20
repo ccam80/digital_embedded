@@ -296,14 +296,14 @@
     },
     {
       "path": "src\\solver\\analog\\dc-operating-point.ts",
-      "accessCount": 153,
-      "lastAccessed": 1776721549374,
+      "accessCount": 157,
+      "lastAccessed": 1776721839685,
       "type": "file"
     },
     {
       "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 144,
-      "lastAccessed": 1776721691018,
+      "accessCount": 147,
+      "lastAccessed": 1776721833740,
       "type": "directory"
     },
     {
