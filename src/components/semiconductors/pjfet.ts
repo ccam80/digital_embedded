@@ -98,9 +98,7 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
     const vgsResult = pnjlim(vgsNew, vgsOld, vt_n, vcrit);
     this._pnjlimLimited = vgsResult.limited;
 
-    let vds = vdsNew;
-    if (vds < -50) vds = -50;
-    if (vds > 10) vds = 10;
+    const vds = vdsNew;
 
     return { vgs: vgsResult.value, vds, swapped: false };
   }

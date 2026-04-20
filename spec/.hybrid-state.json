@@ -1,0 +1,49 @@
+{
+  "batches": [
+    {
+      "id": "batch-p0-w0.1",
+      "task_groups": [
+        "0.1.b",
+        "0.1.c",
+        "0.1.d"
+      ],
+      "tasks": [
+        [
+          "0.1.2"
+        ],
+        [
+          "0.1.3"
+        ],
+        [
+          "0.1.4"
+        ]
+      ],
+      "spawned": 5,
+      "completed": 4,
+      "verifications_passed": 3,
+      "verifications_failed": 1,
+      "stops_for_clarification": 0,
+      "dead_implementers": 1,
+      "dead_verifiers": 0,
+      "group_status": {
+        "0.1.b": "passed",
+        "0.1.c": "passed",
+        "0.1.d": "passed"
+      },
+      "user_required_tasks": {
+        "0.1.b": [],
+        "0.1.c": [],
+        "0.1.d": []
+      },
+      "user_acks": {},
+      "recovery_log": [
+        {
+          "script": "i-fixed-it.sh",
+          "timestamp": "2026-04-20T12:00:36.920Z",
+          "description": "Removed 3 surviving Math.exp(Math.min(...,700)) clamps in bjt.ts at lines 1703/1901/1934 that the implementer missed; targeted vitest 66/67 (only pre-existing 1-ulp ngspice failure remains)"
+        }
+      ]
+    }
+  ],
+  "last_updated": "2026-04-20T12:02:33.332Z"
+}

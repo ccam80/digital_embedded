@@ -545,7 +545,7 @@ function computeBjtOp(
   // Polynomial approximation for reverse-bias (vbe < -3*nfVt)
   let If: number, gbe: number;
   if (vbe >= -3 * nfVt) {
-    const expVbe = Math.exp(Math.min(vbe / nfVt, 700));
+    const expVbe = Math.exp(vbe / nfVt);
     If = csat * (expVbe - 1);
     gbe = csat * expVbe / nfVt;
   } else {
@@ -557,7 +557,7 @@ function computeBjtOp(
 
   let Ir: number, gbc: number;
   if (vbc >= -3 * nrVt) {
-    const expVbc = Math.exp(Math.min(vbc / nrVt, 700));
+    const expVbc = Math.exp(vbc / nrVt);
     Ir = csat * (expVbc - 1);
     gbc = csat * expVbc / nrVt;
   } else {
@@ -577,7 +577,7 @@ function computeBjtOp(
   const iTransport = (If - Ir) / qb;
 
   // BJ4: Non-ideal BC current computation moved before ic for -cbcn subtraction
-  const ibcNonIdealForIc = (c4 > 0 ? c4 * (Math.exp(Math.min(vbc / ncVt, 700)) - 1) : 0) + GMIN * vbc;
+  const ibcNonIdealForIc = (c4 > 0 ? c4 * (Math.exp(vbc / ncVt) - 1) : 0) + GMIN * vbc;
 
   // Terminal collector current: transport - reverse base - cbcn (ngspice cc)
   const ic = iTransport - Ir / betaR - ibcNonIdealForIc;
@@ -585,8 +585,8 @@ function computeBjtOp(
   // Non-ideal base current contributions (c2, c4 with leakage emission coefficients NE/NC)
   const ibIdeal = If / betaF + Ir / betaR;
   const ibNonIdeal =
-    (c2 > 0 ? c2 * (Math.exp(Math.min(vbe / neVt, 700)) - 1) : 0) +
-    (c4 > 0 ? c4 * (Math.exp(Math.min(vbc / ncVt, 700)) - 1) : 0);
+    (c2 > 0 ? c2 * (Math.exp(vbe / neVt) - 1) : 0) +
+    (c4 > 0 ? c4 * (Math.exp(vbc / ncVt) - 1) : 0);
   // GMIN current contributions to base (ngspice cben/cbcn)
   const ib = ibIdeal + ibNonIdeal + GMIN * vbe + GMIN * vbc;
 
@@ -606,8 +606,8 @@ function computeBjtOp(
   const gm = dIfdVbe / qb - iTransport * dqbdVbe / qb - go;
 
   // Input/feedback conductances with GMIN on non-ideal terms (ngspice gben/gbcn)
-  const gpi = dIfdVbe / betaF + (c2 > 0 ? c2 * Math.exp(Math.min(vbe / neVt, 700)) / neVt : 0) + GMIN;
-  const gmu = dIrdVbc / betaR + (c4 > 0 ? c4 * Math.exp(Math.min(vbc / ncVt, 700)) / ncVt : 0) + GMIN;
+  const gpi = dIfdVbe / betaF + (c2 > 0 ? c2 * Math.exp(vbe / neVt) / neVt : 0) + GMIN;
+  const gmu = dIrdVbc / betaR + (c4 > 0 ? c4 * Math.exp(vbc / ncVt) / ncVt : 0) + GMIN;
 
   return { vbe, vbc, ic, ib, gm, go, gpi, gmu, cbe: 0, gbe, dqbdvc: dqbdVbc, dqbdve: dqbdVbe, qb, gbc, If, Ir };
 }
@@ -1013,7 +1013,7 @@ function computeSpiceL1BjtOp(
   // Forward and reverse junction currents and conductances (ngspice bjtload.c:398-420)
   let If: number, gbe: number;
   if (vbe >= -3 * nfVt) {
-    const expVbe = Math.exp(Math.min(vbe / nfVt, 700));
+    const expVbe = Math.exp(vbe / nfVt);
     If = csat * (expVbe - 1);
     gbe = csat * expVbe / nfVt;
   } else {
@@ -1025,7 +1025,7 @@ function computeSpiceL1BjtOp(
 
   let Ir: number, gbc: number;
   if (vbc >= -3 * nrVt) {
-    const expVbc = Math.exp(Math.min(vbc / nrVt, 700));
+    const expVbc = Math.exp(vbc / nrVt);
     Ir = csat * (expVbc - 1);
     gbc = csat * expVbc / nrVt;
   } else {
@@ -1051,7 +1051,7 @@ function computeSpiceL1BjtOp(
   let ibcNonIdeal: number, gbcn: number;
   if (c4 > 0) {
     if (vbc >= -3 * ncVt) {
-      const expVbcNC = Math.exp(Math.min(vbc / ncVt, 700));
+      const expVbcNC = Math.exp(vbc / ncVt);
       ibcNonIdeal = c4 * (expVbcNC - 1);
       gbcn = c4 * expVbcNC / ncVt;
     } else {
@@ -1072,7 +1072,7 @@ function computeSpiceL1BjtOp(
   let ibeNonIdeal: number, gben: number;
   if (c2 > 0) {
     if (vbe >= -3 * neVt) {
-      const expVbeNE = Math.exp(Math.min(vbe / neVt, 700));
+      const expVbeNE = Math.exp(vbe / neVt);
       ibeNonIdeal = c2 * (expVbeNE - 1);
       gben = c2 * expVbeNE / neVt;
     } else {
@@ -1604,7 +1604,7 @@ export function createSpiceL1BjtElement(
         if (params.XTF > 0) {
           argtf_dc = params.XTF;
           if (ovtf_dc !== 0) {
-            argtf_dc = argtf_dc * Math.exp(Math.min(vbcLimited * ovtf_dc, 700));
+            argtf_dc = argtf_dc * Math.exp(vbcLimited * ovtf_dc);
           }
           const xjtf_dc = params.ITF * params.AREA;
           if (xjtf_dc > 0) {
@@ -1656,7 +1656,7 @@ export function createSpiceL1BjtElement(
       let cdsub: number;
       if (csubsat > 0) {
         if (vsubLimited > -3 * vts) {
-          const expSub = Math.exp(Math.min(vsubLimited / vts, 700));
+          const expSub = Math.exp(vsubLimited / vts);
           gdsub = csubsat * expSub / vts + GMIN;
           cdsub = csubsat * (expSub - 1) + GMIN * vsubLimited;
         } else {
@@ -1700,7 +1700,7 @@ export function createSpiceL1BjtElement(
           const ITF_safe = Math.max(params.ITF * params.AREA, 1e-30);
           const icRatio = If_val / (If_val + ITF_safe);
           const VTF_safe = params.VTF === Infinity ? 1e30 : params.VTF;
-          const expTerm = Math.exp(Math.min(vbcLimited / (1.44 * VTF_safe), 700));
+          const expTerm = Math.exp(vbcLimited / (1.44 * VTF_safe));
           const argtf = params.XTF * icRatio * icRatio * expTerm;
           const arg2 = argtf * (3 - icRatio - icRatio);
           const cbe_mod = If_val * (1 + argtf) / Math.max(op.qb, 1e-30);
@@ -1898,7 +1898,7 @@ export function createSpiceL1BjtElement(
                 const ITF_safe_run = Math.max(params.ITF * params.AREA, 1e-30);
                 const icRatioRun = opIf / (opIf + ITF_safe_run);
                 const VTF_safe_run = params.VTF === Infinity ? 1e30 : params.VTF;
-                const expTermRun = Math.exp(Math.min(vbcLimited / (1.44 * VTF_safe_run), 700));
+                const expTermRun = Math.exp(vbcLimited / (1.44 * VTF_safe_run));
                 argtf_run = params.XTF * icRatioRun * icRatioRun * expTermRun;
               }
               const cbe_mod_run = opIf * (1 + argtf_run) / Math.max(opQb, 1e-30);
@@ -1931,7 +1931,7 @@ export function createSpiceL1BjtElement(
                 const ITF_safe = Math.max(params.ITF * params.AREA, 1e-30);
                 const icRatioInit = opIf / (opIf + ITF_safe);
                 const VTF_safe = params.VTF === Infinity ? 1e30 : params.VTF;
-                const expTermInit = Math.exp(Math.min(vbcLimited / (1.44 * VTF_safe), 700));
+                const expTermInit = Math.exp(vbcLimited / (1.44 * VTF_safe));
                 initArgtf = params.XTF * icRatioInit * icRatioInit * expTermInit;
               }
               const cbe_mod_init = opIf * (1 + initArgtf) / Math.max(opQb, 1e-30);

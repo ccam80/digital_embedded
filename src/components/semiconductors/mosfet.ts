@@ -781,32 +781,6 @@ export function computeCapacitances(
   };
 }
 
-/**
- * Evaluate junction capacitance at voltage V across the junction.
- *
- * Uses the standard SPICE FC linearization:
- *   For V < FC*PB: C = C0 * (1 - V/PB)^(-MJ)
- *   For V >= FC*PB: linear extension from FC*PB tangent
- *
- * @param c0   Zero-bias capacitance (F)
- * @param v    Voltage across junction (positive = forward bias)
- * @param pb   Junction built-in potential (PB)
- * @param mj   Grading coefficient (MJ or MJSW)
- * @param fc   Forward-bias coefficient (FC)
- */
-export function junctionCap(c0: number, v: number, pb: number, mj: number, fc: number): number {
-  if (c0 === 0) return 0;
-  const pbSafe = Math.max(pb, 0.1);
-  const vBound = fc * pbSafe;
-  if (v < vBound) {
-    return c0 * Math.pow(1 - v / pbSafe, -mj);
-  } else {
-    // Linearized above FC*PB to avoid divergence
-    const f2 = Math.pow(1 - fc, 1 + mj);
-    return c0 * (1 - fc * (1 + mj) + mj * v / pbSafe) / f2;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // devQmeyer — Meyer gate capacitance model (devsup.c:625-689)
 // ---------------------------------------------------------------------------
