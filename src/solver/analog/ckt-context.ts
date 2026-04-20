@@ -312,6 +312,16 @@ export class CKTCircuitContext {
   nodeDamping: number;
   /** Diagonal gmin conductance for stepping (ngspice CKTdiagGmin). */
   diagonalGmin: number;
+  /**
+   * Pivot absolute threshold (ngspice CKTpivotAbsTol). Forwarded into the
+   * SparseSolver via setPivotTolerances before every factor() call, mirroring
+   * niiter.c:863, 883 where SMPreorder/SMPluFac receive ckt->CKTpivotAbsTol.
+   */
+  pivotAbsTol: number;
+  /**
+   * Pivot relative threshold (ngspice CKTpivotRelTol). See pivotAbsTol.
+   */
+  pivotRelTol: number;
 
   // -------------------------------------------------------------------------
   // Nodesets / ICs
@@ -563,6 +573,8 @@ export class CKTCircuitContext {
     // Damping
     this.nodeDamping = params.nodeDamping ? 1 : 0;
     this.diagonalGmin = params.diagGmin ?? 0;
+    this.pivotAbsTol = params.pivotAbsTol ?? 0;
+    this.pivotRelTol = params.pivotRelTol ?? 1e-3;
 
     // Nodesets / ICs (populated by engine after construction)
     this.nodesets = new Map();
@@ -623,6 +635,8 @@ export class CKTCircuitContext {
     // Damping
     this.nodeDamping = params.nodeDamping ? 1 : 0;
     this.diagonalGmin = params.diagGmin ?? 0;
+    this.pivotAbsTol = params.pivotAbsTol ?? 0;
+    this.pivotRelTol = params.pivotRelTol ?? 1e-3;
 
     // Load-context scalars derived from params
     this.loadCtx.reltol = params.reltol;

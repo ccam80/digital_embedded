@@ -89,6 +89,20 @@ export interface SimulationParams {
   uic?: boolean;
   /** Active diagonal gmin during stepping (ngspice CKTdiagGmin). Persistent engine state. Default: 0 */
   diagGmin?: number;
+  /**
+   * Pivot absolute threshold forwarded into SparseSolver per factor call.
+   * Mirrors ngspice CKTpivotAbsTol (niiter.c:863, 883; spsmp.c:169, 194).
+   * Default: 0 (matches ngspice spalloc.c:193).
+   */
+  pivotAbsTol?: number;
+  /**
+   * Pivot relative threshold forwarded into SparseSolver per factor call.
+   * Mirrors ngspice CKTpivotRelTol (niiter.c:864; spfactor.c:204-208).
+   * Must satisfy 0 < rel <= 1; out-of-range values are ignored at the
+   * SparseSolver level (see setPivotTolerances). Default: 1e-3
+   * (matches ngspice spconfig.h:331 DEFAULT_THRESHOLD).
+   */
+  pivotRelTol?: number;
   /** Requested output timestep for initial delta formula (ngspice CKTstep). */
   outputStep?: number;
   /** Start time for data output — skip initial transient (ngspice CKTinitTime). Default: 0 */
@@ -143,6 +157,8 @@ export const DEFAULT_SIMULATION_PARAMS: ResolvedSimulationParams = {
   predictor: true,
   gshunt: 0,
   diagGmin: 0,
+  pivotAbsTol: 0,
+  pivotRelTol: 1e-3,
   initTime: 0,
   maxOrder: 2,
   lteReltol: 1e-3,

@@ -19,8 +19,18 @@
 
 import type { ComplexSparseSolver as IComplexSparseSolver } from "./element.js";
 
-const PIVOT_THRESHOLD = 0.01;
-const PIVOT_ABS_THRESHOLD2 = 1e-600; // compare to mag2, so threshold^2
+/**
+ * Default pivot thresholds for complex factorization.
+ * ngspice spConfig.h:331 DEFAULT_THRESHOLD = 1e-3 (RelThreshold).
+ * Complex path uses the same RelThreshold field — no separate complex default.
+ * AbsThreshold default is 0.0; abs threshold comparisons use absThreshold² (mag² compare).
+ *
+ * ngspice variable mapping:
+ *   DEFAULT_THRESHOLD (spConfig.h:331) → DEFAULT_PIVOT_REL_THRESHOLD_COMPLEX
+ *   AbsThreshold default 0.0           → DEFAULT_PIVOT_ABS_THRESHOLD_COMPLEX
+ */
+const DEFAULT_PIVOT_REL_THRESHOLD_COMPLEX = 1e-3;
+const DEFAULT_PIVOT_ABS_THRESHOLD_COMPLEX = 0.0;
 
 // Bit flag stored in _elFlags to distinguish fill-in entries from A-matrix entries.
 const FLAG_FILL_IN = 1;
@@ -161,6 +171,22 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
   private _structureEmpty: boolean = true;
   private _workspaceN: number = -1;
 
+  /**
+   * Relative pivot threshold for complex factorization.
+   * Default from DEFAULT_PIVOT_REL_THRESHOLD_COMPLEX; callers override via
+   * setComplexPivotTolerances() to mirror CKTpivotRelTol plumbed through
+   * SMPreorder (spfactor.c). ngspice: Matrix->RelThreshold.
+   */
+  private _relThresholdComplex: number = DEFAULT_PIVOT_REL_THRESHOLD_COMPLEX;
+
+  /**
+   * Absolute pivot threshold for complex factorization.
+   * Default from DEFAULT_PIVOT_ABS_THRESHOLD_COMPLEX; callers override via
+   * setComplexPivotTolerances() to mirror CKTpivotAbsTol plumbed through
+   * SMPluFac (spfactor.c). ngspice: Matrix->AbsThreshold.
+   */
+  private _absThresholdComplex: number = DEFAULT_PIVOT_ABS_THRESHOLD_COMPLEX;
+
   /** True when the most recent factor() call dispatched to full reorder. */
   lastFactorUsedReorder: boolean = false;
 
@@ -202,6 +228,8 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
     this._insertIntoRow(newE, row);
     this._insertIntoCol(newE, internalCol);
     if (row === col) this._diag[internalCol] = newE;
+    // ngspice spbuild.c:788: NeedsOrdering = YES when a new element is inserted.
+    this._needsReorderComplex = true;
 
     if (this._n <= this._handleTableN) {
       this._handleTable[row * this._handleTableN + col] = newE + 1;
@@ -325,6 +353,17 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
   }
 
   /**
+   * Override per-instance pivot tolerances for complex factorization.
+   * Mirrors the real-solver setPivotTolerances() pattern.
+   * ngspice: CKTpivotRelTol → SMPreorder RelThreshold (spfactor.c),
+   *          CKTpivotAbsTol → SMPluFac AbsThreshold (spfactor.c).
+   */
+  setComplexPivotTolerances(relThreshold: number, absThreshold: number): void {
+    if (relThreshold > 0 && relThreshold <= 1) this._relThresholdComplex = relThreshold;
+    if (absThreshold >= 0) this._absThresholdComplex = absThreshold;
+  }
+
+  /**
    * Solve the assembled complex system.
    * On return, xRe[i] and xIm[i] contain the solution at index i.
    *
@@ -399,6 +438,8 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
     this._structureEmpty = true;
     this._hasComplexPivotOrder = false;
     this._didPreorderComplex = false;
+    // ngspice spStripMatrix (sputils.c:1112): NeedsOrdering = YES.
+    this._needsReorderComplex = true;
   }
 
   /**
@@ -900,7 +941,8 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
       const diagRe = xRe[pivotRow];
       const diagIm = xIm[pivotRow];
       const diagMag2 = diagRe * diagRe + diagIm * diagIm;
-      if (diagMag2 < PIVOT_ABS_THRESHOLD2) {
+      const absT = this._absThresholdComplex;
+      if (diagMag2 < absT * absT) {
         for (let idx = 0; idx < xNzCount; idx++) {
           xRe[xNzIdx[idx]] = 0;
           xIm[xNzIdx[idx]] = 0;
@@ -1048,7 +1090,8 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
       const diagRe = xRe[pivotRow];
       const diagIm = xIm[pivotRow];
       const diagMag2 = diagRe * diagRe + diagIm * diagIm;
-      if (diagMag2 < PIVOT_ABS_THRESHOLD2) {
+      const absT2 = this._absThresholdComplex;
+      if (diagMag2 < absT2 * absT2) {
         for (let idx = 0; idx < xNzCount; idx++) {
           xRe[xNzIdx[idx]] = 0;
           xIm[xNzIdx[idx]] = 0;
@@ -1145,6 +1188,8 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
     const mProd = this._markowitzProd;
     const mRow = this._markowitzRow;
     const mCol = this._markowitzCol;
+    const relThreshold = this._relThresholdComplex;
+    const absThreshold = this._absThresholdComplex;
 
     let absMax2 = 0;
     for (let idx = 0; idx < xNzCount; idx++) {
@@ -1157,7 +1202,8 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
 
     if (absMax2 === 0) return -1;
 
-    const threshold2 = PIVOT_THRESHOLD * PIVOT_THRESHOLD * absMax2;
+    const threshold2 = relThreshold * relThreshold * absMax2;
+    const absThreshold2 = absThreshold * absThreshold;
 
     // Phase 1: Singletons
     if (this._singletons > 0) {
@@ -1169,7 +1215,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
         if (mProd[i] !== 0) continue;
         const re = xRe[i], im = xIm[i];
         const mag2 = re * re + im * im;
-        if (mag2 < PIVOT_ABS_THRESHOLD2 || mag2 < threshold2) continue;
+        if (mag2 < absThreshold2 || mag2 < threshold2) continue;
         if (mag2 > bestMag2) { bestMag2 = mag2; bestRow = i; }
       }
       if (bestRow >= 0) return bestRow;
@@ -1186,7 +1232,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
         if (i !== k) continue;
         const re = xRe[i], im = xIm[i];
         const mag2 = re * re + im * im;
-        if (mag2 < PIVOT_ABS_THRESHOLD2 || mag2 < threshold2) continue;
+        if (mag2 < absThreshold2 || mag2 < threshold2) continue;
         const prod = mProd[i];
         if (prod < bestProd || (prod === bestProd && mag2 > bestMag2)) {
           bestProd = prod; bestMag2 = mag2; bestRow = i;
@@ -1206,7 +1252,7 @@ export class ComplexSparseSolver implements IComplexSparseSolver {
         if (pinv[row] < 0) {
           const re = xRe[row], im = xIm[row];
           const mag2 = re * re + im * im;
-          if (mag2 >= PIVOT_ABS_THRESHOLD2 && mag2 >= threshold2) {
+          if (mag2 >= absThreshold2 && mag2 >= threshold2) {
             const prod = mRow[row] * mCol[k];
             if (prod < bestProd || (prod === bestProd && mag2 > bestMag2)) {
               bestProd = prod; bestMag2 = mag2; bestRow = row;

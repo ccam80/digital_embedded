@@ -249,8 +249,13 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   let oldState0: Float64Array | null = null;
   let ipass = 0;
 
-  // Step D state: preorder runs at most once per solve.
-  let didPreorder = false;
+  // Step D state: preorder runs at most once per CKT lifetime. ngspice
+  // NIDIDPREORDER (cktdefs.h:143) is a CKT-state bit cleared only by
+  // NIreinit (nireinit.c:42); our equivalent is solver._didPreorder, set
+  // inside solver.preorder() and cleared by solver.invalidateTopology().
+  // A per-NR-call local flag would be per-invocation scope — the wrong
+  // scope — so we drop it entirely and rely on solver.preorder() being
+  // idempotent.
 
   // Hoist the iter-0 split hook to avoid per-iteration property lookup.
   const onIter0Complete = ctx.onIteration0Complete;
@@ -286,11 +291,11 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     ctx.rhsOld.set(prevVoltages);
     cktLoad(ctx, iteration);
 
-    // ---- STEP D: Preorder (once per solve) ----
-    if (!didPreorder) {
-      solver.preorder();
-      didPreorder = true;
-    }
+    // ---- STEP D: Preorder (ngspice niiter.c:844-855, NIDIDPREORDER gate) ----
+    // solver.preorder() is idempotent via solver._didPreorder; calling
+    // every iteration is harmless and matches ngspice's own behaviour of
+    // gating every iteration on the bit.
+    solver.preorder();
 
     // ---- STEP E: Factorize (gmin stamped atomically inside factor()) ----
     // ngspice SMPluFac/SMPreorder call LoadGmin internally, immediately
@@ -305,6 +310,12 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // now handles the partial-pivot-guard-driven fallthrough (spfactor.c:225)
     // by dispatching back through factorWithReorder internally, so a
     // `success: false` return here is a genuine singular-matrix failure.
+    // ngspice niiter.c:863-864, 883-884 — CKTpivotAbsTol/CKTpivotRelTol are
+    // forwarded into SMPreorder/SMPluFac every iteration. setPivotTolerances
+    // is a cheap scalar store; doing it here (not just once at ctx
+    // construction) matches ngspice's per-call semantic and lets hot-loaded
+    // params propagate without an engine rebuild.
+    solver.setPivotTolerances(ctx.pivotRelTol, ctx.pivotAbsTol);
     const factorResult = solver.factor(ctx.diagonalGmin);
     if (!factorResult.success) {
       if (!solver.lastFactorUsedReorder) {

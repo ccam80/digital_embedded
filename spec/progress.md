@@ -159,3 +159,57 @@ Progress is recorded here by implementation agents. Each completed task appends 
   - Fixed critical architectural bug in dead implementer's code: changed `_searchForPivot` return type from `number` to `{ row: number; col: number } | null` so cross-column pivot selection is handled correctly; column swap + x[] re-scatter now happen in `_numericLUMarkowitz` caller (not inside `_searchForPivot`): when `pivotResult.col !== k`, old scatter cleared, `_swapColumnsForPivot` called, new column k re-scattered, triangular solve re-run, fill-ins re-inserted — ensuring `x[pivotRow]` holds the correct residual value
   - For col == k: magnitudes from dense x[]; for col > k: magnitudes from live _elVal chain (original A-matrix values, correct since uneliminated columns still carry original values)
   - `_findDiagOnColumn` uses `_preorderColPerm[internalCol]` to find diagonal row (row indices never permuted)
+
+## Task 1.4.1: Extend `SimulationParams` with `pivotAbsTol?`/`pivotRelTol?` + defaults (0, 1e-3) in `DEFAULT_SIMULATION_PARAMS`
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/core/analog-engine-interface.ts`
+- **Tests**: 114/118 passing (4 pre-existing failures from baseline: initTran_transitions_to_initFloat_after_iteration_0, initPred_transitions_to_initFloat_immediately, transient_mode_allows_convergence_without_ladder, ipass_skipped_without_nodesets)
+- **Changes**:
+  - Added `pivotAbsTol?: number` field to `SimulationParams` interface with JSDoc citing ngspice CKTpivotAbsTol (niiter.c:863, 883; spsmp.c:169, 194)
+  - Added `pivotRelTol?: number` field to `SimulationParams` interface with JSDoc citing ngspice CKTpivotRelTol (niiter.c:864; spfactor.c:204-208)
+  - Added `pivotAbsTol: 0` and `pivotRelTol: 1e-3` to `DEFAULT_SIMULATION_PARAMS` (matches ngspice spalloc.c:193 and spconfig.h:331)
+
+## Task 1.4.2: Extend `CKTCircuitContext` with `pivotAbsTol`/`pivotRelTol` fields; wire constructor + `refreshTolerances`
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/ckt-context.ts`
+- **Tests**: 114/118 passing (same 4 pre-existing failures)
+- **Changes**:
+  - Added `pivotAbsTol: number` and `pivotRelTol: number` fields to `CKTCircuitContext` class declaration with JSDoc citing niiter.c:863, 883
+  - Wired both fields in constructor: `this.pivotAbsTol = params.pivotAbsTol ?? 0; this.pivotRelTol = params.pivotRelTol ?? 1e-3`
+  - Wired both fields in `refreshTolerances`: same assignments for hot-load propagation
+
+## Task 1.4.3: NR-loop integration: `setPivotTolerances` pre-factor; drop NR-local `didPreorder`; call `solver.preorder()` unconditionally
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/newton-raphson.ts`
+- **Tests**: 114/118 passing (same 4 pre-existing failures)
+- **Changes**:
+  - Replaced `let didPreorder = false` local flag with explanatory comment citing ngspice NIDIDPREORDER (cktdefs.h:143, nireinit.c:42)
+  - Replaced guarded `if (!didPreorder) { solver.preorder(); didPreorder = true; }` block with unconditional `solver.preorder()` (idempotent via solver._didPreorder) with comment citing niiter.c:844-855
+  - Added `solver.setPivotTolerances(ctx.pivotRelTol, ctx.pivotAbsTol)` immediately before `solver.factor(ctx.diagonalGmin)`, citing niiter.c:863-864, 883-884
+
+## Task 1.5.1: Complex `invalidateTopology` sets `_needsReorderComplex=true`
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/complex-sparse-solver.ts`, `src/solver/analog/__tests__/complex-sparse-solver.test.ts`
+- **Tests**: 23/23 passing
+
+## Task 1.5.2: Complex `allocComplexElement` sets `_needsReorderComplex=true` after `_diag[internalCol]=newE`
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/complex-sparse-solver.ts`, `src/solver/analog/__tests__/complex-sparse-solver.test.ts`
+- **Tests**: 23/23 passing
+
+## Task 1.5.3: Complex threshold constants (`PIVOT_THRESHOLD` `0.01 → 1e-3`) + per-instance tolerances mirroring real-solver
+- **Status**: complete
+- **Agent**: implementer
+- **Files created**: none
+- **Files modified**: `src/solver/analog/complex-sparse-solver.ts`, `src/solver/analog/__tests__/complex-sparse-solver.test.ts`
+- **Tests**: 23/23 passing

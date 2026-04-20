@@ -631,3 +631,215 @@ describe("ComplexSparseSolver — Task 0.4.5", () => {
     expect(solver.lastFactorUsedReorder).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Wave 1.5 tests — Complex solver mirror (F1.2, F1.3, F1.4)
+// ---------------------------------------------------------------------------
+
+describe("ComplexSparseSolver — Wave 1.5 (F1.2: invalidateTopology sets _needsReorderComplex)", () => {
+  it("invalidateTopology_sets_needsReorderComplex_so_next_factor_uses_reorder_path", () => {
+    // Arrange: fully assembled and factored solver (no reorder needed for 2nd factor)
+    const n = 2;
+    const solver = new ComplexSparseSolver();
+
+    function assemble(): void {
+      solver.beginAssembly(n);
+      solver.stampComplexElement(solver.allocComplexElement(0, 0), 2, 1);
+      solver.stampComplexElement(solver.allocComplexElement(0, 1), -1, 0);
+      solver.stampComplexElement(solver.allocComplexElement(1, 0), -1, 0);
+      solver.stampComplexElement(solver.allocComplexElement(1, 1), 2, 1);
+      solver.stampRHS(0, 1, 0);
+      solver.stampRHS(1, 1, 0);
+      solver.finalize();
+    }
+
+    assemble();
+    solver.forceReorder();
+    solver.factor();
+    expect(solver.lastFactorUsedReorder).toBe(true);
+
+    // Second factor without forceReorder → numeric path
+    assemble();
+    solver.factor();
+    expect(solver.lastFactorUsedReorder).toBe(false);
+
+    // invalidateTopology must set _needsReorderComplex = true
+    solver.invalidateTopology();
+
+    // After invalidateTopology, next assembly + factor must use the full reorder path
+    assemble();
+    solver.factor();
+    expect(solver.lastFactorUsedReorder).toBe(true);
+  });
+
+  it("invalidateTopology_clears_pivot_order_and_resets_structure", () => {
+    const n = 2;
+    const solver = new ComplexSparseSolver();
+    solver.beginAssembly(n);
+    solver.stampComplexElement(solver.allocComplexElement(0, 0), 3, 0);
+    solver.stampComplexElement(solver.allocComplexElement(1, 1), 4, 0);
+    solver.finalize();
+    solver.forceReorder();
+    solver.factor();
+    expect(solver.lastFactorUsedReorder).toBe(true);
+
+    solver.invalidateTopology();
+
+    // Structure must be rebuilt: element count resets to 0 on next beginAssembly
+    solver.beginAssembly(n);
+    expect(solver.elementCount).toBe(0);
+  });
+});
+
+describe("ComplexSparseSolver — Wave 1.5 (F1.3: allocComplexElement sets _needsReorderComplex)", () => {
+  it("allocComplexElement_new_entry_triggers_reorder_on_next_factor", () => {
+    // Arrange: assemble and factor 2×2 system to establish pivot order
+    const n = 3;
+    const solver = new ComplexSparseSolver();
+    solver.beginAssembly(n);
+    solver.stampComplexElement(solver.allocComplexElement(0, 0), 2, 1);
+    solver.stampComplexElement(solver.allocComplexElement(1, 1), 2, 1);
+    solver.stampComplexElement(solver.allocComplexElement(2, 2), 2, 1);
+    solver.stampRHS(0, 1, 0);
+    solver.stampRHS(1, 1, 0);
+    solver.stampRHS(2, 1, 0);
+    solver.finalize();
+    solver.forceReorder();
+    solver.factor();
+    expect(solver.lastFactorUsedReorder).toBe(true);
+
+    // Reassemble without new elements — should use numeric path
+    solver.beginAssembly(n);
+    solver.stampComplexElement(solver.allocComplexElement(0, 0), 2, 1);
+    solver.stampComplexElement(solver.allocComplexElement(1, 1), 2, 1);
+    solver.stampComplexElement(solver.allocComplexElement(2, 2), 2, 1);
+    solver.stampRHS(0, 1, 0);
+    solver.stampRHS(1, 1, 0);
+    solver.stampRHS(2, 1, 0);
+    solver.finalize();
+    solver.factor();
+    expect(solver.lastFactorUsedReorder).toBe(false);
+
+    // Now add a NEW off-diagonal element — allocComplexElement must set _needsReorderComplex
+    solver.beginAssembly(n);
+    solver.stampComplexElement(solver.allocComplexElement(0, 0), 2, 1);
+    solver.stampComplexElement(solver.allocComplexElement(1, 1), 2, 1);
+    solver.stampComplexElement(solver.allocComplexElement(2, 2), 2, 1);
+    // New element: (0,1) not previously allocated
+    solver.stampComplexElement(solver.allocComplexElement(0, 1), -0.5, 0);
+    solver.stampRHS(0, 1, 0);
+    solver.stampRHS(1, 1, 0);
+    solver.stampRHS(2, 1, 0);
+    solver.finalize();
+    solver.factor();
+    // New element inserted → reorder must have been triggered
+    expect(solver.lastFactorUsedReorder).toBe(true);
+  });
+});
+
+describe("ComplexSparseSolver — Wave 1.5 (F1.4: threshold constants + per-instance tolerances)", () => {
+  it("setComplexPivotTolerances_method_exists_and_accepts_valid_values", () => {
+    const solver = new ComplexSparseSolver();
+    // Must exist and not throw
+    expect(() => solver.setComplexPivotTolerances(1e-3, 0.0)).not.toThrow();
+    expect(() => solver.setComplexPivotTolerances(0.01, 1e-12)).not.toThrow();
+  });
+
+  it("setComplexPivotTolerances_ignores_out_of_range_values", () => {
+    const n = 2;
+    const solver = new ComplexSparseSolver();
+    solver.beginAssembly(n);
+    solver.stampComplexElement(solver.allocComplexElement(0, 0), 2, 1);
+    solver.stampComplexElement(solver.allocComplexElement(1, 1), 3, 0);
+    solver.stampRHS(0, 1, 0);
+    solver.stampRHS(1, 2, 0);
+    solver.finalize();
+
+    // Out-of-range rel threshold (> 1) and negative abs threshold must be silently ignored
+    solver.setComplexPivotTolerances(2.0, -1.0);
+
+    solver.forceReorder();
+    const ok = solver.factor();
+    expect(ok).toBe(true);
+
+    const xRe = new Float64Array(n);
+    const xIm = new Float64Array(n);
+    solver.solve(xRe, xIm);
+
+    // x[0] = 1/(2+j) = (2-j)/5
+    expect(xRe[0]).toBeCloseTo(2 / 5, 10);
+    expect(xIm[0]).toBeCloseTo(-1 / 5, 10);
+    // x[1] = 2/3
+    expect(xRe[1]).toBeCloseTo(2 / 3, 10);
+    expect(xIm[1]).toBeCloseTo(0, 10);
+  });
+
+  it("default_rel_threshold_is_1e_minus_3_matching_ngspice_DEFAULT_THRESHOLD", () => {
+    // With rel threshold = 1e-3, a pivot whose magnitude is >= 1e-3 * colMax
+    // must be accepted. Build a 2×2 system with a small but valid pivot and verify solve.
+    const n = 2;
+    const solver = new ComplexSparseSolver();
+    solver.setComplexPivotTolerances(1e-3, 0.0);
+    solver.beginAssembly(n);
+    solver.stampComplexElement(solver.allocComplexElement(0, 0), 1000, 0);
+    solver.stampComplexElement(solver.allocComplexElement(0, 1), 1, 0);
+    solver.stampComplexElement(solver.allocComplexElement(1, 0), 1, 0);
+    solver.stampComplexElement(solver.allocComplexElement(1, 1), 2, 0);
+    solver.stampRHS(0, 1001, 0);
+    solver.stampRHS(1, 3, 0);
+    solver.finalize();
+    solver.forceReorder();
+    const ok = solver.factor();
+    expect(ok).toBe(true);
+
+    const xRe = new Float64Array(n);
+    const xIm = new Float64Array(n);
+    solver.solve(xRe, xIm);
+
+    // Verify A*x = b by residual
+    const r0 = 1000 * xRe[0] + xRe[1] - 1001;
+    const r1 = xRe[0] + 2 * xRe[1] - 3;
+    expect(Math.abs(r0)).toBeLessThan(1e-8);
+    expect(Math.abs(r1)).toBeLessThan(1e-8);
+  });
+
+  it("setComplexPivotTolerances_affects_pivot_selection_solve_still_correct", () => {
+    // Verify solve produces correct result after tolerance override
+    const n = 3;
+    const solver = new ComplexSparseSolver();
+    solver.setComplexPivotTolerances(1e-3, 0.0);
+    solver.beginAssembly(n);
+    solver.stampComplexElement(solver.allocComplexElement(0, 0), 2, 1);
+    solver.stampComplexElement(solver.allocComplexElement(0, 1), -1, 0);
+    solver.stampComplexElement(solver.allocComplexElement(1, 0), -1, 0);
+    solver.stampComplexElement(solver.allocComplexElement(1, 1), 2, 1);
+    solver.stampComplexElement(solver.allocComplexElement(1, 2), -1, 0);
+    solver.stampComplexElement(solver.allocComplexElement(2, 1), -1, 0);
+    solver.stampComplexElement(solver.allocComplexElement(2, 2), 2, 1);
+    solver.stampRHS(0, 1, 0);
+    solver.stampRHS(1, 0, 0);
+    solver.stampRHS(2, 1, 0);
+    solver.finalize();
+    solver.forceReorder();
+    const ok = solver.factor();
+    expect(ok).toBe(true);
+
+    const xRe = new Float64Array(n);
+    const xIm = new Float64Array(n);
+    solver.solve(xRe, xIm);
+
+    // Verify residual A*x = b
+    const res0Re = 2 * xRe[0] - xIm[0] + (-1) * xRe[1] - 1;
+    const res0Im = 2 * xIm[0] + xRe[0] + (-1) * xIm[1];
+    const res1Re = (-1) * xRe[0] + 2 * xRe[1] - xIm[1] + (-1) * xRe[2];
+    const res1Im = (-1) * xIm[0] + 2 * xIm[1] + xRe[1] + (-1) * xIm[2];
+    const res2Re = (-1) * xRe[1] + 2 * xRe[2] - xIm[2] - 1;
+    const res2Im = (-1) * xIm[1] + 2 * xIm[2] + xRe[2];
+    expect(Math.abs(res0Re)).toBeLessThan(1e-10);
+    expect(Math.abs(res0Im)).toBeLessThan(1e-10);
+    expect(Math.abs(res1Re)).toBeLessThan(1e-10);
+    expect(Math.abs(res1Im)).toBeLessThan(1e-10);
+    expect(Math.abs(res2Re)).toBeLessThan(1e-10);
+    expect(Math.abs(res2Im)).toBeLessThan(1e-10);
+  });
+});
