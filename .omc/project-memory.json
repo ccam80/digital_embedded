@@ -301,16 +301,16 @@
       "type": "file"
     },
     {
-      "path": "src\\solver\\analog\\ckt-context.ts",
-      "accessCount": 114,
-      "lastAccessed": 1776715367540,
-      "type": "file"
+      "path": "src\\solver\\analog\\newton-raphson.ts",
+      "accessCount": 117,
+      "lastAccessed": 1776715590985,
+      "type": "directory"
     },
     {
-      "path": "src\\solver\\analog\\newton-raphson.ts",
-      "accessCount": 114,
-      "lastAccessed": 1776715398399,
-      "type": "directory"
+      "path": "src\\solver\\analog\\ckt-context.ts",
+      "accessCount": 116,
+      "lastAccessed": 1776715599959,
+      "type": "file"
     },
     {
       "path": "",

@@ -1,10 +1,53 @@
 {
   "summary": {
-    "passed": 23,
-    "failed": 0,
+    "passed": 121,
+    "failed": 4,
     "skipped": 0,
-    "totalFiles": 1,
-    "durationSeconds": 0.3
+    "totalFiles": 4,
+    "durationSeconds": 0.6
   },
-  "failures": []
+  "failures": [
+    {
+      "message": "expected undefined to be 'initFloat' // Object.is equality",
+      "count": 2,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "initTran_transitions_to_initFloat_after_iteration_0",
+          "line": 317,
+          "column": 37
+        },
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "initPred_transitions_to_initFloat_immediately",
+          "line": 327,
+          "column": 37
+        }
+      ]
+    },
+    {
+      "message": "expected undefined to be 'transient' // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "transient_mode_allows_convergence_without_ladder",
+          "line": 338,
+          "column": 37
+        }
+      ]
+    },
+    {
+      "message": "expected 9 to be 7 // Object.is equality",
+      "count": 1,
+      "locations": [
+        {
+          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
+          "test": "ipass_skipped_without_nodesets",
+          "line": 514,
+          "column": 26
+        }
+      ]
+    }
+  ]
 }
