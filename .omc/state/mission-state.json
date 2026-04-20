@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-04-20T19:58:11.777Z",
+  "updatedAt": "2026-04-20T20:00:22.725Z",
   "missions": [
     {
       "id": "session:21c4cbb9-908b-4260-be26-2718be466e7d:none",
@@ -40943,15 +40943,15 @@
       "name": "none",
       "objective": "Session mission",
       "createdAt": "2026-04-20T19:52:10.822Z",
-      "updatedAt": "2026-04-20T19:58:11.777Z",
+      "updatedAt": "2026-04-20T20:00:22.725Z",
       "status": "done",
-      "workerCount": 1,
+      "workerCount": 2,
       "taskCounts": {
-        "total": 1,
+        "total": 2,
         "pending": 0,
         "blocked": 0,
         "inProgress": 0,
-        "completed": 1,
+        "completed": 2,
         "failed": 0
       },
       "agents": [
@@ -40964,6 +40964,16 @@
           "latestUpdate": "completed",
           "completedSummary": null,
           "updatedAt": "2026-04-20T19:58:11.777Z"
+        },
+        {
+          "name": "claude-orchestrator:wave-verifier:a8d070f",
+          "role": "claude-orchestrator:wave-verifier",
+          "ownership": "a8d070fd9dba9beba",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-04-20T20:00:22.725Z"
         }
       ],
       "timeline": [
@@ -40982,6 +40992,22 @@
           "agent": "claude-orchestrator:implementer:ad70fce",
           "detail": "completed",
           "sourceKey": "session-stop:ad70fced6921b7a22"
+        },
+        {
+          "id": "session-start:a8d070fd9dba9beba:2026-04-20T19:58:50.132Z",
+          "at": "2026-04-20T19:58:50.132Z",
+          "kind": "update",
+          "agent": "claude-orchestrator:wave-verifier:a8d070f",
+          "detail": "started claude-orchestrator:wave-verifier:a8d070f",
+          "sourceKey": "session-start:a8d070fd9dba9beba"
+        },
+        {
+          "id": "session-stop:a8d070fd9dba9beba:2026-04-20T20:00:22.725Z",
+          "at": "2026-04-20T20:00:22.725Z",
+          "kind": "completion",
+          "agent": "claude-orchestrator:wave-verifier:a8d070f",
+          "detail": "completed",
+          "sourceKey": "session-stop:a8d070fd9dba9beba"
         }
       ]
     }
