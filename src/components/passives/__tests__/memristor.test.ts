@@ -17,6 +17,7 @@ import type { AnalogFactory } from "../../../core/registry.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { MODETRAN, MODEINITFLOAT, MODEDCOP, MODEINITTRAN } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Test defaults matching MemristorDefinition
@@ -57,8 +58,7 @@ function acceptStep(mem: MemristorElement, dt: number, voltages: Float64Array): 
   const ctx: LoadContext = {
     solver: new SparseSolver(),
     voltages,
-    iteration: 0,
-    initMode: "transient",
+    cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     method: "trapezoidal",
     order: 1,
@@ -67,10 +67,6 @@ function acceptStep(mem: MemristorElement, dt: number, voltages: Float64Array): 
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: true,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -302,8 +298,7 @@ describe("Memristor", () => {
       const ctx: LoadContext = {
         solver,
         voltages: new Float64Array(2),
-        iteration: 0,
-        initMode: "initFloat",
+        cktMode: MODEDCOP | MODEINITFLOAT,
         dt: 0,
         method: "trapezoidal",
         order: 1,
@@ -312,10 +307,6 @@ describe("Memristor", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: true,
-        isTransient: false,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,
@@ -450,8 +441,7 @@ describe("memristor_load_transient_parity (C4.2)", () => {
       const ctx: LoadContext = {
         solver,
         voltages,
-        iteration: 0,
-        initMode: step === 0 ? "initTran" : "transient",
+        cktMode: MODETRAN | (step === 0 ? MODEINITTRAN : MODEINITFLOAT),
         dt,
         method,
         order,
@@ -460,10 +450,6 @@ describe("memristor_load_transient_parity (C4.2)", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: false,
-        isTransient: true,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,

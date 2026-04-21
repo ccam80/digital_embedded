@@ -20,6 +20,7 @@ import {
   DigitalInputPinModel,
   readMnaVoltage,
 } from "./digital-pin-model.js";
+import { MODETRAN } from "./ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // BridgeOutputAdapter
@@ -121,7 +122,7 @@ export class BridgeOutputAdapter implements AnalogElement {
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     if (!this._pinModel.loaded || this._pinModel.capacitance <= 0) return;
-    if (!ctx.isTransient) return;
+    if (!(ctx.cktMode & MODETRAN)) return;
     const v = readMnaVoltage(this._pinModel.nodeId, ctx.voltages);
     this._pinModel.accept(ctx, v);
   }
@@ -216,7 +217,7 @@ export class BridgeInputAdapter implements AnalogElement {
    */
   accept(ctx: LoadContext, _simTime: number, _addBreakpoint: (t: number) => void): void {
     if (!this._pinModel.loaded || this._pinModel.capacitance <= 0) return;
-    if (!ctx.isTransient) return;
+    if (!(ctx.cktMode & MODETRAN)) return;
     const v = readMnaVoltage(this._pinModel.nodeId, ctx.voltages);
     this._pinModel.accept(ctx, v);
   }

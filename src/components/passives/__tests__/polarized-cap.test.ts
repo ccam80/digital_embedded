@@ -26,6 +26,7 @@ import type { AnalogElementCore, ReactiveAnalogElement } from "../../../solver/a
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import type { IntegrationMethod } from "../../../core/analog-types.js";
+import { MODETRAN, MODEDC, MODEDCOP, MODEINITTRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -60,10 +61,9 @@ function makeDiagnosticCtx(
   voltages: Float64Array,
 ): LoadContext {
   return {
+    cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     voltages,
-    iteration: 0,
-    initMode: "initFloat",
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -72,10 +72,6 @@ function makeDiagnosticCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -95,17 +91,16 @@ function makeSlotLoadCtx(
   dt: number,
   method: IntegrationMethod,
   order: number,
-  initMode: LoadContext["initMode"],
+  cktMode: number,
 ): LoadContext {
   const deltaOld = [dt, dt, dt, dt, dt, dt, dt];
   const ag = new Float64Array(7);
   const scratch = new Float64Array(64);
   computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
   return {
+    cktMode,
     solver,
     voltages,
-    iteration: 0,
-    initMode,
     dt,
     method,
     order,
@@ -114,10 +109,6 @@ function makeSlotLoadCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: true,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -257,10 +248,9 @@ describe("PolarizedCap", () => {
       computeNIcomCof(dt, deltaOld, 1, "bdf1", ag, scratch);
 
       const ctx: LoadContext = {
+        cktMode: MODETRAN | MODEINITTRAN,
         solver,
         voltages,
-        iteration: 0,
-        initMode: "initTran",
         dt,
         method: "bdf1",
         order: 1,
@@ -269,10 +259,6 @@ describe("PolarizedCap", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: false,
-        isTransient: true,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,
@@ -327,7 +313,6 @@ describe("PolarizedCap", () => {
       const { pool: capPool } = withState(cap);
 
       const matrixSize = 4;
-      const solver = new SparseSolver();
       const voltages = new Float64Array(matrixSize);
 
       // Run 500 steps at dt = RC/500 = 20µs using BDF-1 (no ringing on step input)
@@ -341,38 +326,37 @@ describe("PolarizedCap", () => {
       const scratch = new Float64Array(64);
       computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
 
-      // Reused across iterations — mutated in place.
-      const loopCtx: LoadContext = {
-        solver,
-        voltages,
-        iteration: 0,
-        initMode: "initTran",
-        dt,
-        method,
-        order,
-        deltaOld,
-        ag,
-        srcFact: 1,
-        noncon: { value: 0 },
-        limitingCollector: null,
-        isDcOp: false,
-        isTransient: true,
-        isTransientDcop: false,
-        isAc: false,
-        xfact: 1,
-        gmin: 1e-12,
-        uic: false,
-        reltol: 1e-3,
-        iabstol: 1e-12,
-      };
-
       for (let step = 0; step < steps; step++) {
-        loopCtx.initMode = step === 0 ? "initTran" : "initFloat";
+        // Fresh solver each step: SparseSolver._numericLUMarkowitz permanently
+        // permutes _colHead via _swapColumnsForPivot during Markowitz pivot
+        // selection. Reusing the same solver across steps causes accumulated
+        // column swaps that corrupt subsequent factorizations.
+        const solver = new SparseSolver();
+
+        const cktMode = step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT);
+        const ctx: LoadContext = {
+          cktMode,
+          solver,
+          voltages,
+          dt,
+          method,
+          order,
+          deltaOld,
+          ag,
+          srcFact: 1,
+          noncon: { value: 0 },
+          limitingCollector: null,
+          xfact: 1,
+          gmin: 1e-12,
+          uic: false,
+          reltol: 1e-3,
+          iabstol: 1e-12,
+        };
 
         solver.beginAssembly(matrixSize);
-        vs.load(loopCtx);
-        rSeries.load(loopCtx);
-        cap.load(loopCtx);
+        vs.load(ctx);
+        rSeries.load(ctx);
+        cap.load(ctx);
         solver.finalize();
 
         const factorResult = solver.factor();
@@ -380,14 +364,18 @@ describe("PolarizedCap", () => {
           throw new Error(`Singular matrix at step ${step}`);
         }
         solver.solve(voltages);
-        // Re-load once with the post-solve voltages so the state pool stores the
-        // accepted-step values (ngspice post-step state-commit pattern) before
-        // rotating history.
-        solver.beginAssembly(matrixSize);
-        vs.load(loopCtx);
-        rSeries.load(loopCtx);
-        cap.load(loopCtx);
-        solver.finalize();
+
+        // Accept pass: commit post-solve state (updated voltages) to pool.
+        // Uses a no-op stub solver to call cap.load() for state writes only,
+        // without disturbing the main solver or creating a stale second assembly.
+        let _sR = -1, _sC = -1;
+        const stubSolver = {
+          allocElement: (r: number, c: number) => { _sR = r; _sC = c; return 0; },
+          stampElement: (_h: number, _v: number) => {},
+          stampRHS: (_r: number, _v: number) => {},
+        } as unknown as SparseSolver;
+        cap.load({ ...ctx, solver: stubSolver });
+
         capPool.rotateStateVectors();
         capPool.refreshElementRefs([cap as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       }
@@ -518,7 +506,7 @@ describe("PolarizedCap", () => {
       const voltages = new Float64Array([5, 0]); // node1=5V, node2=0V
       const solver = new SparseSolver();
       solver.beginAssembly(2);
-      el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "bdf1", 1, "initTran"));
+      el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "bdf1", 1, MODETRAN | MODEINITTRAN));
       solver.finalize();
       expect(pool.state0[0]).toBeGreaterThan(0); // GEQ = C/dt > 0
       // IEQ = ceq = 0 on first step (zero charge history): ccap = C*vNow/dt, geq*vNow = C*vNow/dt → ceq=0
@@ -532,7 +520,7 @@ describe("PolarizedCap", () => {
       const voltages = new Float64Array([0, 3]); // node1=0, node2=3V
       const solver = new SparseSolver();
       solver.beginAssembly(2);
-      el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "bdf1", 1, "initTran"));
+      el.load(makeSlotLoadCtx(solver, voltages, 1e-6, "bdf1", 1, MODETRAN | MODEINITTRAN));
       solver.finalize();
       expect(pool.state0[2]).toBeCloseTo(3, 6); // V_PREV = vNow = 3V
     });
@@ -641,10 +629,9 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
       matValues.fill(0);
 
       const ctx: LoadContext = {
+        cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
         voltages,
-        iteration: 0,
-        initMode: step === 0 ? "initTran" : "transient",
         dt,
         method,
         order,
@@ -653,10 +640,6 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: false,
-        isTransient: true,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,

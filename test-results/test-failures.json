@@ -1,18 +1,73 @@
 {
   "summary": {
     "vitest": {
-      "passed": 49,
-      "failed": 0,
-      "skipped": 0,
-      "totalFiles": 1,
-      "durationSeconds": 0.6
+      "passed": 247,
+      "failed": 6,
+      "skipped": 11,
+      "totalFiles": 28,
+      "durationSeconds": 6.3
     },
     "playwright": null,
-    "totalFailed": 0,
-    "totalPassed": 49
+    "totalFailed": 6,
+    "totalPassed": 247
   },
   "failures": {
-    "vitest": [],
+    "vitest": [
+      {
+        "message": "MODEINITTRAN is not defined",
+        "count": 4,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\fet-base.ts",
+            "test": "transient: CCAP in capacitor and BJT junctions over first steps/retries",
+            "line": 567,
+            "column": 29
+          },
+          {
+            "file": "src\\solver\\analog\\fet-base.ts",
+            "test": "transient: inductor current divergence over iterations in step 1",
+            "line": 567,
+            "column": 29
+          },
+          {
+            "file": "src\\solver\\analog\\fet-base.ts",
+            "test": "transient: PNP BJT internal node agreement in step 1",
+            "line": 567,
+            "column": 29
+          },
+          {
+            "file": "src\\solver\\analog\\fet-base.ts",
+            "test": "8. per-element convergence: our engine reports failures",
+            "line": 567,
+            "column": 29
+          }
+        ]
+      },
+      {
+        "message": "expected false to be true // Object.is equality",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+            "test": "10. limiting events: our engine captures events (Item 9)",
+            "line": 230,
+            "column": 27
+          }
+        ]
+      },
+      {
+        "message": "expected -1 to be greater than or equal to 0",
+        "count": 1,
+        "locations": [
+          {
+            "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+            "test": "14. limiting comparison: sign is postLimit - preLimit",
+            "line": 331,
+            "column": 24
+          }
+        ]
+      }
+    ],
     "playwright": []
   }
 }

@@ -243,6 +243,7 @@ describe("Comparator", () => {
 //   Stamp on (nOut, nOut): G_eff
 
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { MODEDCOP, MODEINITFLOAT, MODETRAN } from "../../../solver/analog/ckt-mode.js";
 
 interface ComparatorCaptureStamp { row: number; col: number; value: number; }
 interface ComparatorCaptureRhs { row: number; value: number; }
@@ -284,8 +285,7 @@ function makeComparatorParityCtx(voltages: Float64Array, solver: SparseSolverTyp
   return {
     solver,
     voltages,
-    iteration: 0,
-    initMode: "initFloat",
+    cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -294,10 +294,6 @@ function makeComparatorParityCtx(voltages: Float64Array, solver: SparseSolverTyp
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -314,8 +310,7 @@ function makeComparatorTransientCtx(
   return {
     solver,
     voltages,
-    iteration: 0,
-    initMode: "transient",
+    cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     method: "trapezoidal",
     order: 1,
@@ -324,10 +319,6 @@ function makeComparatorTransientCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: true,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

@@ -28,6 +28,7 @@ import {
 } from "../digital-pin-model.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { LoadContext } from "../load-context.js";
+import { MODEDCOP, MODEINITFLOAT, MODETRAN } from "../ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Mock SparseSolver — records allocElement / stampElement / stampRHS calls
@@ -96,8 +97,7 @@ function makeCtx(overrides: Partial<LoadContext> & { solver?: MockSolver } = {})
   return {
     solver: solver as any,
     voltages: new Float64Array(16),
-    iteration: 0,
-    initMode: "transient",
+    cktMode: overrides.cktMode ?? MODEINITFLOAT,
     dt: overrides.dt ?? 0,
     method: overrides.method ?? "trapezoidal",
     order: overrides.order ?? 1,
@@ -106,10 +106,6 @@ function makeCtx(overrides: Partial<LoadContext> & { solver?: MockSolver } = {})
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: overrides.isDcOp ?? false,
-    isTransient: overrides.isTransient ?? false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 0,
     gmin: 1e-12,
     uic: false,
@@ -236,7 +232,7 @@ describe("DigitalOutputPinModel", () => {
 
     const C = CMOS_3V3.cOut;
 
-    const ctx = makeCtx({ solver, ag, dt: 1e-9, isTransient: true });
+    const ctx = makeCtx({ solver, ag, dt: 1e-9, cktMode: MODETRAN | MODEINITFLOAT });
     pin.load(ctx);
 
     // Inline companion geq = ag[0] * C
@@ -256,7 +252,7 @@ describe("DigitalOutputPinModel", () => {
     ag[0] = 1e10;
     ag[1] = 0;
 
-    const ctx = makeCtx({ solver, ag, dt: 1e-9, isTransient: true });
+    const ctx = makeCtx({ solver, ag, dt: 1e-9, cktMode: MODETRAN | MODEINITFLOAT });
 
     // First load — prevVoltage = 0, prevCurrent = 0
     pin.load(ctx);

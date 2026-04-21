@@ -15,6 +15,18 @@ import { PropertyBag } from "../../../core/properties.js";
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import { withNodeIds, runDcOp, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
+import {
+  MODEDCOP,
+  MODETRAN,
+  MODEAC,
+  MODETRANOP,
+  MODEUIC,
+  MODEINITFLOAT,
+  MODEINITJCT,
+  MODEINITFIX,
+  MODEINITSMSIG,
+  MODEINITTRAN,
+} from "../../../solver/analog/ckt-mode.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
@@ -88,8 +100,7 @@ function buildUnitCtx(
   return {
     solver,
     voltages,
-    iteration: 0,
-    initMode: "initFloat",
+    cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -98,10 +109,6 @@ function buildUnitCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -120,7 +127,7 @@ function driveToOp(
   element: AnalogElement,
   voltages: Float64Array,
   iterations: number,
-  opts: { matrixSize?: number; limitingCollector?: LimitingEvent[] | null; iteration?: number } = {},
+  opts: { matrixSize?: number; limitingCollector?: LimitingEvent[] | null } = {},
 ): void {
   const matrixSize = opts.matrixSize ?? Math.max(voltages.length, element.pinNodeIds.length, 1);
   for (let i = 0; i < iterations; i++) {
@@ -128,7 +135,6 @@ function driveToOp(
     solver.beginAssembly(matrixSize);
     const ctx = buildUnitCtx(solver, voltages, {
       limitingCollector: opts.limitingCollector ?? null,
-      iteration: opts.iteration ?? 0,
     });
     element.load(ctx);
   }
@@ -297,8 +303,7 @@ describe("Diode", () => {
     const capCtx: LoadContext = {
       solver: capSolver,
       voltages,
-      iteration: 0,
-      initMode: "initFloat",
+      cktMode: MODETRAN | MODEINITFLOAT,
       dt: 1e-6,
       method: "trapezoidal",
       order: 1,
@@ -307,10 +312,6 @@ describe("Diode", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: false,
-      isTransient: true,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -356,7 +357,7 @@ describe("Diode", () => {
 
   it("load_at_initJct_with_OFF_zeroes_voltage", () => {
     // Gap 17.1: A diode with OFF=1 should have its junction voltage set to 0V
-    // when load() is called with initMode="initJct". During DCOP initFix mode,
+    // when load() is called with MODEINITJCT. During DCOP initFix mode,
     // checkConvergence must also return true (suppressing noncon).
     //
     // OFF maps to ngspice .ic OFF: dioload.c skips junction during initFix.
@@ -365,29 +366,27 @@ describe("Diode", () => {
     const { element, pool } = withState(core);
     const el = withNodeIds(element, [1, 2]);
 
-    // In-load initJct override: OFF path sets vdRaw=0 directly (no pnjlim).
-    pool.initMode = "initJct";
+    // In-load MODEINITJCT: OFF path sets vdRaw=0 directly (no pnjlim).
     const voltages = new Float64Array(2);
     voltages[0] = 5; // would give Vd=5V without OFF, but initJct+OFF overrides
     voltages[1] = 0;
     const solver = new SparseSolver();
     solver.beginAssembly(2);
-    el.load(buildUnitCtx(solver, voltages, { initMode: "initJct" }));
+    el.load(buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT }));
 
     // After initJct load with OFF=1, SLOT_VD (index 0) must be 0.
     expect(pool.state0[0]).toBeCloseTo(0, 10);
 
     // checkConvergence with initFix mode must return true (OFF suppresses noncon).
-    pool.initMode = "initFix";
     const convSolver = new SparseSolver();
     convSolver.beginAssembly(2);
-    const converged = el.checkConvergence!(buildUnitCtx(convSolver, voltages, { initMode: "initFix" }));
+    const converged = el.checkConvergence!(buildUnitCtx(convSolver, voltages, { cktMode: MODEDCOP | MODEINITFIX }));
     expect(converged).toBe(true);
   });
 
   it("load_at_initJct_with_uic_ic_sets_voltage", () => {
     // Gap 17.2: A diode with IC=0.5 and pool.uic=true should set SLOT_VD=0.5V
-    // when load() is called with initMode="initJct".
+    // when load() is called with MODEINITJCT.
     //
     // This maps to ngspice .ic V(node)=0.5 with UIC: dioload.c uses IC directly.
     const propsObj = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, IC: 0.5 });
@@ -398,15 +397,14 @@ describe("Diode", () => {
     // Enable UIC mode on pool so initJct takes the IC path.
     // StatePool.uic field added in D2.
     pool.uic = true;
-    pool.initMode = "initJct";
 
-    // In-load initJct override: pool.uic=true and IC=0.5 → vdRaw=0.5 set directly.
+    // In-load MODEINITJCT: pool.uic=true and IC=0.5 → vdRaw=0.5 set directly.
     const voltages = new Float64Array(2);
     voltages[0] = 0;
     voltages[1] = 0;
     const solver = new SparseSolver();
     solver.beginAssembly(2);
-    el.load(buildUnitCtx(solver, voltages, { initMode: "initJct" }));
+    el.load(buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT }));
 
     // SLOT_VD (index 0) must be 0.5V (no pnjlim applied during initJct).
     expect(pool.state0[0]).toBeCloseTo(0.5, 6);
@@ -567,10 +565,10 @@ describe("Diode LimitingEvent instrumentation", () => {
     return withNodeIds(core, [1, 2]);
   }
 
-  function loadOnce(element: AnalogElement, voltages: Float64Array, collector: LimitingEvent[] | null, iteration = 1): void {
+  function loadOnce(element: AnalogElement, voltages: Float64Array, collector: LimitingEvent[] | null): void {
     const solver = new SparseSolver();
     solver.beginAssembly(Math.max(voltages.length, element.pinNodeIds.length));
-    element.load(buildUnitCtx(solver, voltages, { limitingCollector: collector, iteration }));
+    element.load(buildUnitCtx(solver, voltages, { limitingCollector: collector }));
   }
 
   it("pushes AK pnjlim event when limitingCollector provided", () => {
@@ -859,8 +857,7 @@ describe("AREA scaling", () => {
       return {
         solver,
         voltages: new Float64Array(10),
-        iteration: 0,
-        initMode: "initFloat" as const,
+        cktMode: MODEDCOP | MODEINITFLOAT,
         dt: 0,
         method: "trapezoidal" as const,
         order: 1,
@@ -869,10 +866,6 @@ describe("AREA scaling", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: true,
-        isTransient: false,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,
@@ -945,23 +938,19 @@ describe("integration", () => {
     const prevVd = 0.28;
     const prevId = IS * (Math.exp(prevVd / (N * VT)) - 1);
     const q1_val = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevId);
-    pool.state1[7] = q1_val; // SLOT_Q = 7
+    pool.state1[6] = q1_val; // SLOT_Q = 6 (dioload.c DIOcapCharge)
 
     // Real SparseSolver — anode=node 1 mapped to row 0, cathode=ground.
     const solver = new SparseSolver();
     solver.beginAssembly(1);
 
     const ctx = buildUnitCtx(solver, new Float64Array([vd, 0]), {
-      initMode: "transient",
+      cktMode: MODETRAN | MODEINITFLOAT,
       dt,
       method: "trapezoidal",
       order: 2,
       deltaOld: [dt, dt, dt, dt, dt, dt, dt],
       ag,
-      isDcOp: false,
-      isTransient: true,
-      isTransientDcop: false,
-      isAc: false,
     });
 
     (core as AnalogElementCore as unknown as { load(c: LoadContext): void }).load(ctx);
@@ -1026,13 +1015,12 @@ describe("integration", () => {
 function makeParityCtx(
   solver: SparseSolver,
   voltages: Float64Array,
-  opts: { initMode?: "initFloat" | "initJct" | "transient"; isDcOp?: boolean; isTransient?: boolean; isTransientDcop?: boolean; isAc?: boolean; dt?: number; ag?: Float64Array },
+  opts: { cktMode?: number; dt?: number; ag?: Float64Array },
 ) {
   return {
     solver,
     voltages,
-    iteration: 1,
-    initMode: opts.initMode ?? ("initFloat" as const),
+    cktMode: opts.cktMode ?? (MODEDCOP | MODEINITFLOAT),
     dt: opts.dt ?? 0,
     method: "trapezoidal" as const,
     order: 1,
@@ -1041,10 +1029,6 @@ function makeParityCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: opts.isDcOp ?? true,
-    isTransient: opts.isTransient ?? false,
-    isTransientDcop: opts.isTransientDcop ?? false,
-    isAc: opts.isAc ?? false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -1074,7 +1058,7 @@ describe("diode_load_dcop_parity", () => {
     solver.beginAssembly(2);
 
     const voltages = new Float64Array([VD, 0]);
-    const ctx = makeParityCtx(solver, voltages, { initMode: "initFloat", isDcOp: true });
+    const ctx = makeParityCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITFLOAT });
     core.load(ctx);
 
     // NGSPICE_REF (DIOload formula, dioload.c:240-285):
@@ -1131,7 +1115,7 @@ describe("diode_load_transient_parity", () => {
     const prevVd = 0.28;
     const prevId = IS * (Math.exp(prevVd / (N * VT)) - 1);
     const q1 = computeJunctionCharge(prevVd, CJO, VJ, M, FC, TT, prevId);
-    pool.state1[7] = q1; // SLOT_Q = 7
+    pool.state1[6] = q1; // SLOT_Q = 6 (dioload.c DIOcapCharge)
     pool.state0[0] = VD; // SLOT_VD seed so pnjlim pass-through
 
     // Real SparseSolver — diode between node 1 (anode) and ground (node 0
@@ -1140,11 +1124,7 @@ describe("diode_load_transient_parity", () => {
     solver.beginAssembly(1);
 
     const ctx = makeParityCtx(solver, new Float64Array([VD]), {
-      initMode: "transient",
-      isDcOp: false,
-      isTransient: true,
-      isTransientDcop: false,
-      isAc: false,
+      cktMode: MODETRAN | MODEINITFLOAT,
       dt,
       ag,
     });
@@ -1162,5 +1142,310 @@ describe("diode_load_transient_parity", () => {
       .filter((e) => e.row === 0 && e.col === 0)
       .reduce((acc, e) => acc + e.value, 0);
     expect(sum00).toBe(NGSPICE_GD + NGSPICE_CAPGEQ);
+  });
+});
+
+// ===========================================================================
+// Task 2.4.1 — MODEINITSMSIG + bitfield migration
+//
+// Tests for dioload.c:126-127 (MODEINITSMSIG seeds vd from CKTstate0),
+// dioload.c:128-129 (MODEINITTRAN seeds vd from CKTstate1),
+// dioload.c:316-317 cap-gate expansion to include MODEAC | MODEINITSMSIG,
+// and dioload.c:360-372 small-signal store-back gating.
+//
+// Task 2.4.9a — A7 fix: checkConvergence OFF short-circuit under MODEINITSMSIG
+// ===========================================================================
+
+describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
+  it("MODEINITSMSIG seeds vdRaw from state0 (not NR iterate)", () => {
+    // dioload.c:126-127: when MODEINITSMSIG is set, vd comes from CKTstate0,
+    // ignoring the voltage iterate. We seed state0[SLOT_VD] to 0.4V and
+    // present a very different iterate (2.0V). The stored VD after load()
+    // must be 0.4V (from state0), not 2.0V.
+    const IS = 1e-14, N = 1;
+    const props = makeParamBag({ IS, N, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(Math.max((core as any).stateSize, 1));
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Seed state0[SLOT_VD = 0] to 0.4V
+    pool.state0[0] = 0.4;
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const voltages = new Float64Array([2.0, 0]); // would give Vd=2V if iterated
+
+    core.load({
+      solver,
+      voltages,
+      cktMode: MODEDCOP | MODEINITSMSIG,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      xfact: 0,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    });
+
+    // SLOT_VD must remain 0.4V (seeded from state0, not the 2V iterate).
+    expect(pool.state0[0]).toBeCloseTo(0.4, 6);
+  });
+
+  it("MODEINITTRAN seeds vdRaw from state1 (dioload.c:128-129)", () => {
+    // dioload.c:128-129: MODEINITTRAN seeds vd from CKTstate1.
+    const IS = 1e-14, N = 1;
+    const props = makeParamBag({ IS, N, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(Math.max((core as any).stateSize, 1));
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Seed state1[SLOT_VD = 0] to 0.35V
+    pool.state1[0] = 0.35;
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const voltages = new Float64Array([3.0, 0]);
+
+    core.load({
+      solver,
+      voltages,
+      cktMode: MODETRAN | MODEINITTRAN,
+      dt: 1e-9,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      xfact: 0,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    });
+
+    // SLOT_VD must be 0.35V (seeded from state1, not the 3V iterate).
+    expect(pool.state0[0]).toBeCloseTo(0.35, 6);
+  });
+
+  it("MODEINITSMSIG skips pnjlim (no noncon increment)", () => {
+    // dioload.c:126-135: MODEINITSMSIG sets vd directly without pnjlim.
+    // A large iterate would normally trigger limiting. But with MODEINITSMSIG
+    // vd is taken from state0, so pnjlimLimited stays false → noncon stays 0.
+    const IS = 1e-14, N = 1;
+    const props = makeParamBag({ IS, N, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5 });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(Math.max((core as any).stateSize, 1));
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+
+    pool.state0[0] = 0.3; // reasonable operating point in state0
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const noncon = { value: 0 };
+
+    core.load({
+      solver,
+      voltages: new Float64Array([5.0, 0]), // large jump — would limit if not SMSIG
+      cktMode: MODEDCOP | MODEINITSMSIG,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon,
+      limitingCollector: null,
+      xfact: 0,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    });
+
+    expect(noncon.value).toBe(0);
+  });
+
+  it("cap gate fires under MODEAC (dioload.c:316-317)", () => {
+    // dioload.c:316-317: cap block fires under MODEAC.
+    const IS = 1e-14, N = 1, CJO = 10e-12, VJ = 0.7, M = 0.5, FC = 0.5, TT = 0;
+    const props = makeParamBag({ IS, N, CJO, VJ, M, TT, FC });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(9);
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+    pool.state0[0] = 0.3; // seed VD
+
+    const ag = new Float64Array(7);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(1e-9, [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9], 1, "trapezoidal", ag, scratch);
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+
+    core.load({
+      solver,
+      voltages: new Float64Array([0.3, 0]),
+      cktMode: MODEAC | MODEINITSMSIG,
+      dt: 1e-9,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag,
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      xfact: 0,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    });
+
+    // MODEINITSMSIG: SLOT_CAP_CURRENT (index 4) holds capd (Farads) = Ctotal.
+    // With CJO=10pF at Vd=0.3V, Ctotal > 0 — dioload.c:363.
+    expect(pool.state0[4]).toBeGreaterThan(0);
+  });
+
+  it("cap gate fires under MODETRANOP | MODEUIC (dioload.c:316-317)", () => {
+    // dioload.c:316-317: OR condition: (MODETRANOP && MODEUIC) also fires cap.
+    const IS = 1e-14, N = 1, CJO = 10e-12, VJ = 0.7, M = 0.5, FC = 0.5, TT = 0;
+    const props = makeParamBag({ IS, N, CJO, VJ, M, TT, FC });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(9);
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+    pool.state0[0] = 0.3;
+
+    const ag = new Float64Array(7);
+    const scratch = new Float64Array(49);
+    computeNIcomCof(1e-9, [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9], 1, "trapezoidal", ag, scratch);
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+
+    core.load({
+      solver,
+      voltages: new Float64Array([0.3, 0]),
+      cktMode: MODETRANOP | MODEUIC | MODEINITJCT,
+      dt: 1e-9,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag,
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      xfact: 0,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    });
+
+    // SLOT_CAP_CURRENT (index 4) holds iqcap (A) under MODETRAN/MODEUIC — dioload.c:363.
+    expect(pool.state0[4]).toBeGreaterThan(0);
+  });
+
+  it("cap gate does NOT fire under pure MODEDCOP (not transient, AC, or SMSIG)", () => {
+    // Under pure MODEDCOP (DC-OP), caps are open — no reactive stamp should appear.
+    const IS = 1e-14, N = 1, CJO = 10e-12, VJ = 0.7, M = 0.5, FC = 0.5, TT = 0;
+    const props = makeParamBag({ IS, N, CJO, VJ, M, TT, FC });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(9);
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+    pool.state0[0] = 0.3;
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+
+    core.load({
+      solver,
+      voltages: new Float64Array([0.3, 0]),
+      cktMode: MODEDCOP | MODEINITFLOAT,
+      dt: 0,
+      method: "trapezoidal" as const,
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      xfact: 0,
+      gmin: 1e-12,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    });
+
+    // SLOT_CAP_CURRENT (index 4) must remain 0 — cap block not entered under DCOP.
+    expect(pool.state0[4]).toBe(0);
+  });
+});
+
+describe("diode checkConvergence A7 fix (MODEINITFIX | MODEINITSMSIG)", () => {
+  it("OFF device returns true under MODEINITFIX (pre-existing)", () => {
+    // OFF device must short-circuit noncon under MODEINITFIX.
+    const props = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, OFF: 1 });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(Math.max((core as any).stateSize, 1));
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+    const el = withNodeIds(core, [1, 2]);
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const result = el.checkConvergence!(buildUnitCtx(solver, new Float64Array(2), { cktMode: MODEDCOP | MODEINITFIX }));
+    expect(result).toBe(true);
+  });
+
+  it("OFF device returns true under MODEINITSMSIG (A7 fix)", () => {
+    // A7: ngspice mos1load.c:738-742 skips noncon under MODEINITSMSIG too.
+    // Before this fix, checkConvergence only short-circuited on MODEINITFIX.
+    const props = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, OFF: 1 });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(Math.max((core as any).stateSize, 1));
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+    const el = withNodeIds(core, [1, 2]);
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const result = el.checkConvergence!(buildUnitCtx(solver, new Float64Array(2), { cktMode: MODEDCOP | MODEINITSMSIG }));
+    expect(result).toBe(true);
+  });
+
+  it("non-OFF device does NOT short-circuit under MODEINITSMSIG", () => {
+    // OFF=0: checkConvergence must proceed to the voltage convergence check,
+    // not return true unconditionally.
+    const props = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, OFF: 0 });
+    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, props);
+    const pool = new StatePool(Math.max((core as any).stateSize, 1));
+    (core as any).stateBaseOffset = 0;
+    core.initState(pool);
+    // Seed state0[SLOT_VD] to 0.3V so convergence check sees a small delta.
+    pool.state0[0] = 0.3;
+    const el = withNodeIds(core, [1, 2]);
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    // Voltages match state0 exactly → should converge.
+    const convergedVoltages = new Float64Array([0.3, 0]);
+    const result = el.checkConvergence!(buildUnitCtx(solver, convergedVoltages, { cktMode: MODEDCOP | MODEINITSMSIG }));
+    // Since OFF=0, it falls through to the convergence math; with matching
+    // voltages the delta is 0, so it must converge.
+    expect(result).toBe(true);
   });
 });

@@ -36,6 +36,7 @@ import {
 } from "../../core/registry.js";
 import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/element.js";
+import { MODETRAN, MODEAC } from "../../solver/analog/ckt-mode.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import {
   computeJunctionCapacitance,
@@ -115,7 +116,7 @@ export function tunnelDiodeIV(
   // --- Tunnel current component ---
   // I_t(V) = I_p * (V/V_p) * exp(1 - V/V_p)
   const uT = v / vp;
-  const expT = Math.exp(Math.min(1 - uT, 700));
+  const expT = Math.exp(1 - uT);
   const iTunnel = ip * uT * expT;
   // dI_t/dV = I_p/V_p * exp(1 - V/V_p) * (1 - V/V_p)
   //         = (I_p/V_p) * expT * (1 - uT)
@@ -124,15 +125,14 @@ export function tunnelDiodeIV(
   // --- Excess current component ---
   // I_x(V) = I_v * exp((V - V_v) / V_x)
   const excessArg = (v - vv) / VX;
-  const expX = Math.exp(Math.min(excessArg, 700));
+  const expX = Math.exp(excessArg);
   const iExcess = iv * expX;
   // dI_x/dV = I_v / V_x * exp((V - V_v) / V_x)
   const dIExcess = (iv / VX) * expX;
 
   // --- Thermal (Shockley) component ---
   const nVt = nCoeff * VT;
-  const thermalArg = Math.min(v / nVt, 700);
-  const expTh = Math.exp(thermalArg);
+  const expTh = Math.exp(v / nVt);
   const iThermal = iS * (expTh - 1);
   // dI_thermal/dV = IS / (N*VT) * exp(V/(N*VT))
   const dIThermal = (iS * expTh) / nVt;
@@ -320,7 +320,7 @@ export function createTunnelDiodeElement(
       stampRHS(solver, nodeCathode, ieq);
 
       // Reactive companion: junction capacitance + transit-time diffusion cap
-      if (hasCapacitance && ctx.isTransient) {
+      if (hasCapacitance && (ctx.cktMode & (MODETRAN | MODEAC))) {
         const order = ctx.order;
         const method = ctx.method;
 

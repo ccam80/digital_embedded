@@ -124,7 +124,6 @@ function computeIp(vpk: number, vgk: number, props?: PropertyBag): number {
   for (let i = 1; i <= steps; i++) {
     ctx.loadCtx.voltages[0] = vpk * i / steps;
     ctx.loadCtx.voltages[1] = vgk * i / steps;
-    ctx.loadCtx.iteration = i - 1;
     elem.load(ctx.loadCtx);
   }
 
@@ -258,7 +257,6 @@ describe("Triode", () => {
       // Converge operating point via repeated load() calls (triode's load
       // clamps per-iteration V_GK step internally).
       for (let i = 0; i < 10; i++) {
-        ctx.loadCtx.iteration = i;
         elem.load(ctx.loadCtx);
       }
 
@@ -296,7 +294,6 @@ describe("Triode", () => {
       ctx.loadCtx.voltages[1] = 1.0; // V_GK = 1V > 0
 
       for (let i = 0; i < 5; i++) {
-        ctx.loadCtx.iteration = i;
         elem.load(ctx.loadCtx);
       }
 
@@ -340,7 +337,6 @@ describe("Triode", () => {
         const alpha = (iter + 1) / maxIter;
         ctx.loadCtx.voltages[0] = targetVpk * alpha;
         ctx.loadCtx.voltages[1] = targetVgk * alpha;
-        ctx.loadCtx.iteration = iter;
 
         elem.load(ctx.loadCtx);
 

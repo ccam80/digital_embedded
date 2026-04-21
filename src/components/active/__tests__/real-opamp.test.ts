@@ -16,6 +16,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import { withNodeIds, runDcOp, makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
 import { newtonRaphson } from "../../../solver/analog/newton-raphson.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
+import { MODETRAN, MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -167,9 +168,9 @@ function runTransient(
   const vOut = new Float64Array(nSteps);
   const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount });
   // Configure the ctx for transient stepping: BDF-1 trapezoidal, dt, ag coefficients.
-  ctx.isDcOp = false;
-  ctx.isTransient = true;
-  ctx.dt = dt;
+  ctx.cktMode = MODETRAN | MODEINITFLOAT;
+  ctx.loadCtx.cktMode = MODETRAN | MODEINITFLOAT;
+  ctx.loadCtx.dt = dt;
   ctx.ag[0] = 1 / dt;
   ctx.ag[1] = -1 / dt;
 
@@ -595,7 +596,7 @@ describe("RealOpAmp", () => {
 // Drives the real op-amp factory via load(ctx) at DC-OP. The element has
 // finite open-loop gain (aol), input offset voltage (vos), bias current
 // (iBias), input resistance (rIn), and output resistance (rOut). Slew rate
-// limiting is only active in transient (ctx.isTransient), so the DC-OP
+// limiting is only active in transient (MODETRAN), so the DC-OP
 // canonical stamps match the bandwidth-limited VCVS formulation.
 //
 // Reference formulas (from real-opamp.ts createRealOpAmpElement, linear
@@ -656,10 +657,9 @@ function makeRealOpAmpCaptureSolver(): {
 
 function makeRealOpAmpParityCtx(voltages: Float64Array, solver: SparseSolverTypeForParity): LoadContext {
   return {
+    cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     voltages,
-    iteration: 0,
-    initMode: "initFloat",
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -668,10 +668,6 @@ function makeRealOpAmpParityCtx(voltages: Float64Array, solver: SparseSolverType
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

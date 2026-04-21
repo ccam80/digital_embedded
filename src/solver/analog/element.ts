@@ -20,7 +20,7 @@ export type {
 
 import type { AnalogElementCore, ComplexSparseSolver, IntegrationMethod, StatePoolRef } from "../../core/analog-types.js";
 import type { StateSchema } from "./state-schema.js";
-export type { LoadContext, InitMode } from "./load-context.js";
+export type { LoadContext } from "./load-context.js";
 import type { LoadContext } from "./load-context.js";
 
 // ---------------------------------------------------------------------------
@@ -100,10 +100,9 @@ export interface AnalogElement {
    * small-signal conductances at the DC operating point.
    *
    * D4: receives the shared LoadContext (ngspice re-uses CKTcircuit in
-   * ACload()). During AC sweeps `ctx.isAc === true`, `ctx.isDcOp === false`,
-   * `ctx.isTransient === false`. `ctx.uic` mirrors the MODEUIC bit preserved
-   * across the AC-mode mask (acan.c:285). Element sites that do not need the
-   * context should simply ignore the third parameter.
+   * ACload()). `ctx.uic` mirrors the MODEUIC bit preserved across the
+   * AC-mode mask (acan.c:285). Element sites that do not need the context
+   * should simply ignore the third parameter.
    */
   stampAc?(solver: ComplexSparseSolver, omega: number, ctx: LoadContext): void;
 

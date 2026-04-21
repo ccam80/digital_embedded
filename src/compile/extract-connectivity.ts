@@ -81,8 +81,11 @@ export function resolveModelAssignments(
     const runtimeKeys = runtimeModels?.[el.typeId] ? Object.keys(runtimeModels[el.typeId]!) : [];
     const mnaKeys = runtimeKeys.length > 0 ? [...new Set([...staticKeys, ...runtimeKeys])] : staticKeys;
     // The element's "model" property is the source of truth (set at creation).
-    // requestedKey comes from the element's bag. Fall back to definition only
-    // for legacy circuits that predate model-property-at-creation.
+    // requestedKey comes from the element's bag.
+    // IMPLEMENTATION FAILURE — does not match ngspice spec.
+    // Original excuse: "Fall back to definition only for legacy circuits that predate model-property-at-creation"
+    // Remedy: re-implement per spec. Do not weaken tests. Do not patch symptoms.
+    // See spec/reviews/ for the finding that identified this.
     const candidateKey = requestedKey ?? def.defaultModel ?? (hasDigital ? 'digital' : mnaKeys[0] ?? 'neutral');
 
     // Validate the candidate key against available models.

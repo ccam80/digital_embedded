@@ -24,6 +24,10 @@ import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
+import {
+  MODETRAN, MODEAC, MODETRANOP, MODEDC,
+  MODEINITJCT, MODEINITTRAN, MODEINITPRED, MODEUIC,
+} from "../../solver/analog/ckt-mode.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import {
@@ -41,7 +45,7 @@ export const { paramDefs: CAPACITOR_PARAM_DEFS, defaults: CAPACITOR_DEFAULTS } =
     capacitance: { default: 1e-6, unit: "F", description: "Capacitance in farads", min: 1e-15 },
   },
   secondary: {
-    IC:   { default: NaN,    unit: "V",    description: "Initial condition voltage for UIC" },
+    IC:   { default: 0.0,    unit: "V",    description: "Initial condition voltage for UIC" },
     TC1:  { default: 0,                    description: "Linear temperature coefficient" },
     TC2:  { default: 0,                    description: "Quadratic temperature coefficient" },
     TNOM: { default: 300.15, unit: "K",    description: "Nominal temperature for TC coefficients" },
@@ -255,17 +259,18 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
    * source). Matches the Appendix D2 reference pattern.
    */
   load(ctx: LoadContext): void {
-    const { solver, voltages, initMode, isDcOp, isTransient, isAc, ag } = ctx;
+    const { solver, voltages, ag, cktMode: mode } = ctx;
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const C = this.C;
 
-    // Gate: capacitors only participate in tran/ac/tranop (capload.c:30).
-    if (!isTransient && !isDcOp && !isAc) return;
+    // ngspice capload.c:30 — participate only in MODETRAN | MODEAC | MODETRANOP.
+    if (!(mode & (MODETRAN | MODEAC | MODETRANOP))) return;
 
-    // Determine if using initial condition (capload.c:32-36).
-    const cond1 = (isDcOp && initMode === "initJct") ||
-                  (ctx.uic && initMode === "initTran" && !isNaN(this._IC));
+    // capload.c:32-36 — IC gate.
+    const cond1 =
+      ((mode & MODEDC) && (mode & MODEINITJCT)) ||
+      ((mode & MODEUIC) && (mode & MODEINITTRAN));
 
     // Read terminal voltage (capload.c:49-51).
     let vcap: number;
@@ -277,15 +282,15 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
       vcap = v0 - v1;
     }
 
-    if (isTransient) {
+    if (mode & (MODETRAN | MODEAC)) {
       // #ifndef PREDICTOR (capload.c:53-65).
-      if (initMode === "initPred") {
+      if (mode & MODEINITPRED) {
         // Copy state1 charge to state0 (capload.c:55-56).
         this.s0[this.base + SLOT_Q] = this.s1[this.base + SLOT_Q];
       } else {
         // Compute charge Q = C * V (capload.c:58).
         this.s0[this.base + SLOT_Q] = C * vcap;
-        if (initMode === "initTran") {
+        if (mode & MODEINITTRAN) {
           // Seed state1 from state0 (capload.c:60-62).
           this.s1[this.base + SLOT_Q] = this.s0[this.base + SLOT_Q];
         }
@@ -309,7 +314,7 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
       this.s0[this.base + SLOT_CCAP] = ccap;
 
       // Seed state1 companion current on first tran step (capload.c:70-72).
-      if (initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];
       }
 

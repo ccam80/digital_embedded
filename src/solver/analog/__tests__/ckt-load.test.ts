@@ -42,9 +42,7 @@ describe('Stamping', () => {
     const Vs = makeVoltageSource(1, 0, nodeCount, 5);
     const elements = [R1, R2, Vs];
     const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, branchCount });
-    ctx.isDcOp = true;
-    ctx.isTransient = false;
-    ctx.initMode = 'initFloat';
+    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
     newtonRaphson(ctx);
     expect(ctx.nrResult.converged).toBe(true);
     expect(ctx.nrResult.voltages[0]).toBeCloseTo(5.0, 8);
@@ -60,9 +58,7 @@ describe('Stamping', () => {
     const V2src = makeVoltageSource(2, 1, nodeCount + 1, 2);
     const elements = [R, V1, V2src];
     const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, branchCount });
-    ctx.isDcOp = true;
-    ctx.isTransient = false;
-    ctx.initMode = 'initFloat';
+    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
     newtonRaphson(ctx);
     expect(ctx.nrResult.converged).toBe(true);
     expect(ctx.nrResult.voltages[0]).toBeCloseTo(3.0, 8);
@@ -77,9 +73,7 @@ describe('Stamping', () => {
     const R = makeResistor(1, 0, 1000);
     const elements = [I, R];
     const ctx = makeSimpleCtx({ elements, matrixSize, nodeCount, branchCount: 0 });
-    ctx.isDcOp = true;
-    ctx.isTransient = false;
-    ctx.initMode = 'initFloat';
+    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
     newtonRaphson(ctx);
     expect(ctx.nrResult.converged).toBe(true);
     expect(ctx.nrResult.voltages[0]).toBeCloseTo(1.0, 8);
@@ -341,7 +335,7 @@ describe('E_SINGULAR', () => {
     }) as SparseSolver;
 
     const ctx = makeSimpleCtx({ solver: proxySolver, elements, matrixSize, nodeCount, branchCount });
-    ctx.isDcOp = true;
+    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
 
     newtonRaphson(ctx);
 

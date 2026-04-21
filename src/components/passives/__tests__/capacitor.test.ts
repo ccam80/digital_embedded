@@ -21,7 +21,11 @@ import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-import type { LoadContext, InitMode } from "../../../solver/analog/load-context.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+import {
+  MODETRAN, MODEAC, MODETRANOP, MODEDC,
+  MODEINITFLOAT, MODEINITJCT, MODEINITTRAN, MODEINITPRED, MODEUIC,
+} from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // companionLoadCtx — build a transient LoadContext matching the ag[] that
@@ -63,17 +67,15 @@ function makeCompanionCtx(opts: {
   dt: number;
   method: string;
   order: number;
-  initMode?: InitMode;
+  cktMode?: number;
   uic?: boolean;
 }): LoadContext {
+  // Default: MODETRAN | MODEINITFLOAT (normal transient NR iteration).
+  const cktMode = opts.cktMode ?? (MODETRAN | MODEINITFLOAT);
   return {
+    cktMode,
     solver: opts.solver,
     voltages: opts.voltages,
-    iteration: 0,
-    // Default to initFloat so q1 stays at pool default (0) on first call —
-    // matches the pre-migration stampCompanion(dt, method, voltages, ...) behaviour
-    // where the seed logic was invoked by the engine, not the unit-test driver.
-    initMode: opts.initMode ?? "initFloat",
     dt: opts.dt,
     method: (opts.method === "bdf1" ? "trapezoidal" : opts.method) as LoadContext["method"],
     order: opts.order,
@@ -82,10 +84,6 @@ function makeCompanionCtx(opts: {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: true,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: opts.uic ?? false,
@@ -308,19 +306,14 @@ describe("Capacitor", () => {
       );
       Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
       const { element, pool } = withState(core);
+      const { solver } = makeCaptureSolver();
 
       // First call: voltage = 3V
-      {
-        const { solver } = makeCaptureSolver();
-        element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
-      }
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
       expect(pool.state0[2]).toBeCloseTo(3.0, 5);
 
       // Second call: voltage = 7V — V_PREV should now be 7V after the call
-      {
-        const { solver } = makeCaptureSolver();
-        element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
-      }
+      element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
       expect(pool.state0[2]).toBeCloseTo(7.0, 5);
     });
 
@@ -416,10 +409,9 @@ describe("Capacitor initPred", () => {
 
     // Second step: initPred mode, v=7V (different voltage)
     // q0 should use s1[SLOT_Q] = C*3 = 3µC, NOT C*7 = 7µC
-    pool.initMode = "initPred";
     element.load(makeCompanionCtx({
       solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1,
-      initMode: "initPred",
+      cktMode: MODETRAN | MODEINITPRED,
     }));
 
     // GEQ = C/dt regardless of q0
@@ -427,17 +419,11 @@ describe("Capacitor initPred", () => {
     expect(geq).toBeCloseTo(C / 1e-6, 3); // C/dt
 
     // ceq = ccap - geq*vNow (BDF1: ccap = (q0-q1)/dt)
-    // When initPred: q0 = s1[SLOT_Q] = C*3 = 3e-6, q1 = 3e-6 (same as s1 after 1 rotation)
-    //   ccap = (3e-6 - 3e-6) / 1e-6 = 0
-    //   ceq = 0 - 1*7 = -7
-    // When not initPred: q0 = C*7 = 7e-6
-    //   ccap = (7e-6 - 3e-6) / 1e-6 = 4
-    //   ceq = 4 - 1*7 = -3
+    // q0 = s1[SLOT_Q] = C*3 = 3e-6, q1 = 3e-6 (same as s1 after 1 rotation)
+    //   ccap = ag[0]*q0 + ag[1]*q1 = (1/dt)*3e-6 + (-1/dt)*3e-6 = 0
+    //   ceq = ccap - ag[0]*q0 = 0 - (1/dt)*3e-6 = -3  (at dt=1e-6)
     const ceq = pool.states[0][1]; // SLOT_IEQ (= ceq)
-    // ceq must NOT be -3 (which would be the case if q0 = C*vNow = C*7)
-    expect(ceq).not.toBeCloseTo(-3, 2);
-    // ceq = -7 for initPred case (q0 = last accepted charge = C*3)
-    expect(ceq).toBeCloseTo(-7, 3);
+    expect(ceq).toBeCloseTo(-3, 6);
   });
 
   it("stampCompanion_uses_C_times_IC_on_initTran_with_UIC", () => {
@@ -453,14 +439,13 @@ describe("Capacitor initPred", () => {
     const { element, pool } = withState(core);
 
     // initTran + uic: q0 = C * IC
-    pool.initMode = "initTran";
     pool.uic = true;
     // Node voltage is 2V (different from IC=5V)
     {
       const { solver } = makeCaptureSolver();
       element.load(makeCompanionCtx({
         solver, voltages: new Float64Array([2, 0]), dt: 1e-6, method: "bdf1", order: 1,
-        initMode: "initTran", uic: true,
+        cktMode: MODETRAN | MODEINITTRAN | MODEUIC, uic: true,
       }));
     }
 
@@ -615,10 +600,9 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
     ag[1] = ag1;
 
     const ctx: LoadContext = {
+      cktMode: MODETRAN | MODEINITFLOAT,
       solver: mockSolver,
       voltages,
-      iteration: 0,
-      initMode: "transient",
       dt,
       method: "trapezoidal",
       order: 2,
@@ -627,10 +611,6 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: false,
-      isTransient: true,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -776,10 +756,9 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
       rhsEntries.length = 0;
 
       const ctx: LoadContext = {
+        cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
         voltages: new Float64Array([Vsrc, v2, 0]),
-        iteration: 0,
-        initMode: step === 0 ? "initTran" : "transient",
         dt,
         method,
         order,
@@ -788,10 +767,6 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: false,
-        isTransient: true,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,

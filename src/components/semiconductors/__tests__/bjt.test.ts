@@ -33,6 +33,10 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import { createTestPropertyBag } from "../../../test-fixtures/model-fixtures.js";
+import {
+  MODEDCOP, MODEINITFLOAT, MODEINITJCT, MODEINITFIX, MODETRAN,
+  setInitf, setAnalysis,
+} from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: allocate a StatePool for a single element and call initState
@@ -85,10 +89,9 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
   const solver = new SparseSolver();
   solver.beginAssembly(matrixSize);
   return {
+    cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     voltages,
-    iteration: 1,
-    initMode: "initFloat",
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -97,10 +100,6 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -182,8 +181,8 @@ function computeExpectedOp(
 ): { ic: number; ib: number; gm: number; go: number; gpi: number; gmu: number } {
   const nfVt = p.NF * VT;
   const nrVt = p.NR * VT;
-  const expVbe = Math.exp(Math.min(vbe / nfVt, 700));
-  const expVbc = Math.exp(Math.min(vbc / nrVt, 700));
+  const expVbe = Math.exp(vbe / nfVt);
+  const expVbc = Math.exp(vbc / nrVt);
   const If = p.IS * (expVbe - 1);
   const Ir = p.IS * (expVbc - 1);
 
@@ -1231,12 +1230,10 @@ describe("BJT OFF parameter", () => {
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
-    // In-load initJct override: set pool.initMode before calling load()
-    pool.initMode = "initJct";
     const element = withNodeIds(core, [2, 1, 3]);
     const voltages = new Float64Array(3);
     const ctx = makeDcOpCtx(voltages, 3);
-    ctx.initMode = "initJct";
+    ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
     element.load(ctx);
     // With OFF=1 and initJct mode, vbeRaw=0, vbcRaw=0 are written directly (no pnjlim)
     // slot 0 = SLOT_VBE, slot 1 = SLOT_VBC
@@ -1250,11 +1247,10 @@ describe("BJT OFF parameter", () => {
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
-    pool.initMode = "initFix";
     const element = withNodeIds(core, [2, 1, 3]);
     const voltages = new Float64Array(3);
     const ctx = makeDcOpCtx(voltages, 3);
-    ctx.initMode = "initFix";
+    ctx.cktMode = setInitf(ctx.cktMode, MODEINITFIX);
     const result = element.checkConvergence!(ctx);
     expect(result).toBe(true);
   });
@@ -1266,20 +1262,15 @@ describe("BJT OFF parameter", () => {
     const pool = new StatePool(core.stateSize);
     core.stateBaseOffset = 0;
     core.initState(pool);
-    pool.initMode = "transient";
     const element = withNodeIds(core, [2, 1, 3]);
     // Update to set stored VBE/VBC via a transient load pass.
     const voltages = new Float64Array(3);
     const loadCtx = makeDcOpCtx(voltages, 3);
-    loadCtx.initMode = "transient";
-    loadCtx.isDcOp = false;
-    loadCtx.isTransient = true;
+    loadCtx.cktMode = setInitf(setAnalysis(0, MODETRAN), MODEINITFLOAT);
     element.load(loadCtx);
     // checkConvergence should not blindly return true in transient mode
     const ctx = makeDcOpCtx(voltages, 3);
-    ctx.initMode = "transient";
-    ctx.isDcOp = false;
-    ctx.isTransient = true;
+    ctx.cktMode = setInitf(setAnalysis(0, MODETRAN), MODEINITFLOAT);
     const result = element.checkConvergence!(ctx);
     // Converged (all zeros → no icheck limitation) — result may be true or false
     // but the key is it doesn't throw
@@ -1303,10 +1294,9 @@ describe("BJT L1 LimitingEvent instrumentation", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(10);
     return {
+      cktMode: MODEDCOP | MODEINITFLOAT,
       solver,
       voltages,
-      iteration: 1,
-      initMode: "initFloat",
       dt: 0,
       method: "trapezoidal",
       order: 1,
@@ -1315,10 +1305,6 @@ describe("BJT L1 LimitingEvent instrumentation", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: collector,
-      isDcOp: true,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -1378,12 +1364,11 @@ describe("bjt_spicel1_load_dcop_parity", () => {
     return pool;
   }
 
-  function makeLoadCtx(solver: any, voltages: Float64Array, srcFact: number, initMode: "initFloat" | "initJct"): LoadContext {
+  function makeLoadCtx(solver: any, voltages: Float64Array, srcFact: number, cktMode: number): LoadContext {
     return {
+      cktMode,
       solver,
       voltages,
-      iteration: 1, // past iteration-0 so limiting-collector is not required
-      initMode,
       dt: 0,
       method: "trapezoidal",
       order: 1,
@@ -1392,10 +1377,6 @@ describe("bjt_spicel1_load_dcop_parity", () => {
       srcFact,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: true,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -1442,7 +1423,7 @@ describe("bjt_spicel1_load_dcop_parity", () => {
     pool.state0[0] = VBE;
     pool.state0[1] = VBC;
 
-    el.load(makeLoadCtx(solver, voltages, 1, "initFloat"));
+    el.load(makeLoadCtx(solver, voltages, 1, MODEDCOP | MODEINITFLOAT));
 
     // NGSPICE_REF: inline computeSpiceL1BjtOp at (Vbe, Vbc) with the chosen
     // parameters. VAF=VAR=Inf → tinvEarlyVoltF = tinvEarlyVoltR = 0 → q1 = 1.
@@ -1454,8 +1435,8 @@ describe("bjt_spicel1_load_dcop_parity", () => {
     const NF = 1, NR = 1;
     const NGSPICE_nfVt = NF * VT;
     const NGSPICE_nrVt = NR * VT;
-    const NGSPICE_expVbe = Math.exp(Math.min(VBE / NGSPICE_nfVt, 700));
-    const NGSPICE_expVbc = Math.exp(Math.min(VBC / NGSPICE_nrVt, 700));
+    const NGSPICE_expVbe = Math.exp(VBE / NGSPICE_nfVt);
+    const NGSPICE_expVbc = Math.exp(VBC / NGSPICE_nrVt);
     const NGSPICE_If = IS * (NGSPICE_expVbe - 1);
     const NGSPICE_Ir = IS * (NGSPICE_expVbc - 1);
     const NGSPICE_qb = 1;

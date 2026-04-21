@@ -28,6 +28,7 @@ import { SparseSolver } from "../sparse-solver.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement } from "../element.js";
 import { isPoolBacked } from "../element.js";
 import type { LoadContext } from "../load-context.js";
+import { MODETRAN, MODEINITPRED, MODEINITTRAN } from "../ckt-mode.js";
 import { pnjlim, newtonRaphson } from "../newton-raphson.js";
 import { niIntegrate } from "../ni-integrate.js";
 import { StatePool } from "../state-pool.js";
@@ -351,8 +352,7 @@ export function makeDiode(
       s0[base + SLOT_VD] = vdLimited;
 
       const expArg = vdLimited / nVt;
-      const clampedArg = Math.min(expArg, 700);
-      const expVal = Math.exp(clampedArg);
+      const expVal = Math.exp(expArg);
       const id = is * (expVal - 1);
       s0[base + SLOT_ID] = id;
       s0[base + SLOT_GEQ] = (is * expVal) / nVt + GMIN;
@@ -438,46 +438,45 @@ export function makeCapacitor(
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
-      const { solver, voltages, initMode, isDcOp, isTransient, ag } = ctx;
+      const { solver, voltages, ag } = ctx;
+      const mode = ctx.cktMode;
 
-      if (!isTransient && !isDcOp) return;
+      if (!(mode & MODETRAN)) return;
 
       const vA = nodeA > 0 ? voltages[nodeA - 1] : 0;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
       const vcap = vA - vB;
 
-      if (isTransient) {
-        if (initMode === "initPred") {
-          q0 = q1;
-        } else {
-          q0 = capacitance * vcap;
-          if (initMode === "initTran") {
-            q1 = q0;
-            firstTranStep = false;
-          }
+      if (mode & MODEINITPRED) {
+        q0 = q1;
+      } else {
+        q0 = capacitance * vcap;
+        if (mode & MODEINITTRAN) {
+          q1 = q0;
+          firstTranStep = false;
         }
+      }
 
-        // NIintegrate via shared helper (niinteg.c:17-80).
-        const result = niIntegrate(
-          ctx.method,
-          ctx.order,
-          capacitance,
-          ag,
-          q0, q1,
-          [q2, q3, 0, 0, 0],
-          ccapPrev,
-        );
-        geq = result.geq;
-        ceq = result.ceq;
+      // NIintegrate via shared helper (niinteg.c:17-80).
+      const result = niIntegrate(
+        ctx.method,
+        ctx.order,
+        capacitance,
+        ag,
+        q0, q1,
+        [q2, q3, 0, 0, 0],
+        ccapPrev,
+      );
+      geq = result.geq;
+      ceq = result.ceq;
 
-        if (!firstTranStep) {
-          G(solver, nodeA, nodeA, geq);
-          G(solver, nodeA, nodeB, -geq);
-          G(solver, nodeB, nodeA, -geq);
-          G(solver, nodeB, nodeB, geq);
-          RHS(solver, nodeA, -ceq);
-          RHS(solver, nodeB, ceq);
-        }
+      if (!firstTranStep) {
+        G(solver, nodeA, nodeA, geq);
+        G(solver, nodeA, nodeB, -geq);
+        G(solver, nodeB, nodeA, -geq);
+        G(solver, nodeB, nodeB, geq);
+        RHS(solver, nodeA, -ceq);
+        RHS(solver, nodeB, ceq);
       }
       // DC operating point: no matrix stamp (capacitor is open in DC).
     },
@@ -560,23 +559,22 @@ export function makeInductor(
     setParam(_key: string, _value: number): void {},
 
     load(ctx: LoadContext): void {
-      const { solver, voltages, initMode, isDcOp, isTransient, ag } = ctx;
+      const { solver, voltages, ag } = ctx;
+      const mode = ctx.cktMode;
       const k = branchIdx;
 
       // Topology-constant branch incidence stamps (always).
       if (nodeA !== 0) S(solver, nodeA - 1, k, 1);
       if (nodeB !== 0) S(solver, nodeB - 1, k, -1);
 
-      if (!isTransient && !isDcOp) return;
-
-      if (isTransient) {
+      if (mode & MODETRAN) {
         const iNow = voltages[k];
 
-        if (initMode === "initPred") {
+        if (mode & MODEINITPRED) {
           phi0 = phi1;
         } else {
           phi0 = inductance * iNow;
-          if (initMode === "initTran") {
+          if (mode & MODEINITTRAN) {
             phi1 = phi0;
             companionActive = true;
           }

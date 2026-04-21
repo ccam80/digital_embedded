@@ -22,6 +22,7 @@ import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: allocate a StatePool for a single element and call initState
@@ -76,8 +77,7 @@ function makeDcOpCtx(voltages: Float64Array): LoadContext {
   return {
     solver,
     voltages,
-    iteration: 1,
-    initMode: "initFloat",
+    cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -86,10 +86,6 @@ function makeDcOpCtx(voltages: Float64Array): LoadContext {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

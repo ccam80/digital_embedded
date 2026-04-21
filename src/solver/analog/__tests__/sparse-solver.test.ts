@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SparseSolver } from "../sparse-solver.js";
+import { MODEDCOP, MODEINITFLOAT } from "../ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -456,8 +457,7 @@ describe("SparseSolver real MNA circuit", () => {
     const rawCtx: import("../load-context.js").LoadContext = {
       solver: rawSolver,
       voltages: rawVoltages,
-      iteration: 0,
-      initMode: "initFloat",
+      cktMode: MODEDCOP | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal",
       order: 1,
@@ -466,10 +466,6 @@ describe("SparseSolver real MNA circuit", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: true,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -679,7 +675,7 @@ describe("SparseSolver factorWithReorder", () => {
     solver.finalize();
     const result = solver.factorWithReorder();
     expect(result.success).toBe(false);
-    expect(result.singularRow).toBeDefined();
+    expect(result.singularRow).toBe(1);
   });
 
   it("applies diagGmin to diagonal before factoring", () => {
@@ -756,6 +752,7 @@ describe("SparseSolver factorNumerical", () => {
 
     const r2 = solver.factorNumerical();
     expect(r2.success).toBe(false);
+    expect(r2.needsReorder).toBe(true);
   });
 
   it("applies diagGmin before numerical factorization", () => {
@@ -816,8 +813,7 @@ describe("SparseSolver factor dispatch", () => {
     solver.stampRHS(1, 2);
     solver.finalize();
 
-    // First factor: topology is dirty so forceReorder is implied via finalize;
-    // _needsReorder starts false so numerical path is taken first.
+    // First factor: _needsReorder starts true (allocElement sets it).
     // Force reorder explicitly then factor to establish pivot order.
     solver.forceReorder();
     solver.factor();

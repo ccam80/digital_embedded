@@ -21,19 +21,6 @@ export type { LoadContext } from "./load-context.js";
 import type { LoadContext } from "./load-context.js";
 import { MODEDCOP, MODEINITFLOAT } from "./ckt-mode.js";
 
-/**
- * @deprecated Transition-window type for the legacy initMode string field.
- * Remove once F4 device migration to cktMode bitfield is complete.
- */
-export type InitMode =
-  | "initJct"
-  | "initFix"
-  | "initFloat"
-  | "initTran"
-  | "initPred"
-  | "initSmsig"
-  | "transient";
-
 // ---------------------------------------------------------------------------
 // NRResult — mutable result class for Newton-Raphson iterations
 // ---------------------------------------------------------------------------
@@ -261,10 +248,7 @@ export class CKTCircuitContext {
    * MODEINITFLOAT, MODEINITTRAN, MODEINITPRED, MODEINITSMSIG). See
    * ./ckt-mode.ts for constants and helpers.
    *
-   * This replaces the prior fanout of statePool.analysisMode +
-   * ctx.isTransient + ctx.isTransientDcop + ctx.loadCtx.isTransientDcop,
-   * which drifted out of sync because there were four writers and no
-   * invariant. `cktMode` is the single source of truth; LoadContext exposes
+   * `cktMode` is the single source of truth; LoadContext exposes
    * it to devices via `loadCtx.cktMode`.
    *
    * Defaults to MODEDCOP | MODEINITFLOAT — ngspice's post-reset analysis-
@@ -272,34 +256,6 @@ export class CKTCircuitContext {
    */
   cktMode: number = MODEDCOP | MODEINITFLOAT;
 
-  /**
-   * @deprecated Use `initf(cktMode)` / `setInitf(cktMode, MODEINITx)`. Kept
-   * for the transition window; `ckt-load.ts` still mirrors this into
-   * `loadCtx.initMode`. Will be removed once F4 lands device-side
-   * `loadCtx.cktMode` readers.
-   */
-  initMode: InitMode = "transient";
-  /**
-   * @deprecated Use `isDcop(cktMode)`. Mirrored from `cktMode` for the
-   * transition window.
-   */
-  isDcOp: boolean = false;
-  /**
-   * @deprecated Use `isTran(cktMode) && !isTranOp(cktMode)` for "real"
-   * transient, or `isTran(cktMode)` for "any transient including boot".
-   * Mirrored from `cktMode` for the transition window.
-   */
-  isTransient: boolean = false;
-  /**
-   * @deprecated Use `isTranOp(cktMode)`. Mirrored from `cktMode` for the
-   * transition window.
-   */
-  isTransientDcop: boolean = false;
-  /**
-   * @deprecated Use `isAc(cktMode)`. Mirrored from `cktMode` for the
-   * transition window.
-   */
-  isAc: boolean = false;
   /** Source stepping scale factor (ngspice srcFact). */
   srcFact: number = 1;
   /** True when nodesets are present (derived from nodesets.size > 0). */

@@ -22,6 +22,7 @@ import {
 } from "../../core/registry.js";
 import type { AnalogElementCore, PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
 import type { IntegrationMethod } from "../../solver/analog/element.js";
+import { MODETRAN, MODEAC, MODEINITJCT } from "../../solver/analog/ckt-mode.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import {
@@ -280,20 +281,28 @@ function createLedAnalogElement(
       const nVt = params.N * LED_VT;
       const vcrit = nVt * Math.log(nVt / (params.IS * Math.SQRT2));
 
-      const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
-      const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
-      const vdRaw = va - vc;
+      let vdRaw: number;
+      let vdLimited: number;
 
-      const vdOld = s0[base + SLOT_VD];
-      const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
-      const vdLimited = vdResult.value;
-      pnjlimLimited = vdResult.limited;
-      if (pnjlimLimited) ctx.noncon.value++;
+      if (ctx.cktMode & MODEINITJCT) {
+        // dioload.c:133-136: MODEINITJCT seeds junction from tVcrit (or 0 if OFF).
+        vdRaw = params.OFF ? 0 : vcrit;
+        vdLimited = vdRaw;
+        pnjlimLimited = false;
+      } else {
+        const va = nodeAnode > 0 ? voltages[nodeAnode - 1] : 0;
+        const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
+        vdRaw = va - vc;
+        const vdOld = s0[base + SLOT_VD];
+        const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
+        vdLimited = vdResult.value;
+        pnjlimLimited = vdResult.limited;
+        if (pnjlimLimited) ctx.noncon.value++;
+      }
 
       s0[base + SLOT_VD] = vdLimited;
 
-      const expArg = Math.min(vdLimited / nVt, 700);
-      const expVal = Math.exp(expArg);
+      const expVal = Math.exp(vdLimited / nVt);
       const idRaw = params.IS * (expVal - 1);
       const gdRaw = (params.IS * expVal) / nVt;
       const gd = gdRaw + LED_GMIN;
@@ -311,7 +320,7 @@ function createLedAnalogElement(
       stampRHS(solver, nodeAnode, -ieq);
       stampRHS(solver, nodeCathode, ieq);
 
-      if (hasCapacitance && ctx.isTransient) {
+      if (hasCapacitance && (ctx.cktMode & (MODETRAN | MODEAC))) {
         const order = ctx.order;
         const method = ctx.method;
 

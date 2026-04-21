@@ -36,6 +36,10 @@ import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import {
+  MODEDCOP, MODEINITFLOAT, MODEINITFIX, MODETRAN,
+  setInitf, setAnalysis,
+} from "../../../solver/analog/ckt-mode.js";
+import {
   SLOT_Q_DB,
   SLOT_CCAP_DB,
   SLOT_CAP_GEQ_DB,
@@ -91,10 +95,9 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
   const solver = new SparseSolver();
   solver.beginAssembly(matrixSize);
   return {
+    cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     voltages,
-    iteration: 1,
-    initMode: "initFloat",
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -103,10 +106,6 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -429,9 +428,8 @@ describe("NMOS", () => {
 
     // Set up state pool so analysisMode="tran" (transient)
     // The pool is accessed via the element's internal reference (_pool).
-    const pool = (core as unknown as { _pool: { analysisMode: string; initMode: string } })._pool;
+    const pool = (core as unknown as { _pool: { analysisMode: string } })._pool;
     pool.analysisMode = "tran";
-    pool.initMode = "transient";
 
     // Drive to operating point: Vgs=3V, Vds=5V, Vs=0
     const voltages = new Float64Array(3);
@@ -1023,11 +1021,10 @@ describe("MOSFET primeJunctions", () => {
   });
 
   it("checkConvergence_returns_true_during_initFix_when_OFF", () => {
-    const { element, pool } = makeNmosElement({ OFF: 1 });
-    pool.initMode = "initFix";
+    const { element } = makeNmosElement({ OFF: 1 });
     const voltages = new Float64Array(4);
     const ctx = makeDcOpCtx(voltages, 4);
-    ctx.initMode = "initFix";
+    ctx.cktMode = setInitf(ctx.cktMode, MODEINITFIX);
     const result = element.checkConvergence(ctx);
     expect(result).toBe(true);
   });
@@ -1106,10 +1103,9 @@ describe("integration", () => {
     solver.beginAssembly(3);
 
     const ctx: LoadContext = {
+      cktMode: setInitf(setAnalysis(0, MODETRAN), MODEINITFLOAT),
       solver,
       voltages: new Float64Array([vds, vgs, 0]),
-      iteration: 0,
-      initMode: "transient",
       dt,
       method: "trapezoidal",
       order: 2,
@@ -1118,10 +1114,6 @@ describe("integration", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: false,
-      isTransient: true,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -1129,7 +1121,6 @@ describe("integration", () => {
       iabstol: 1e-12,
     };
 
-    pool.initMode = "transient";
     core.load(ctx);
 
     // The _stampCompanion path writes directly to s0 slots
@@ -1257,10 +1248,9 @@ describe("mosfet_spicel1_load_dcop_parity", () => {
     solver.beginAssembly(2);
 
     const ctx: LoadContext = {
+      cktMode: MODEDCOP | MODEINITFLOAT,
       solver,
       voltages,
-      iteration: 1,
-      initMode: "initFloat",
       dt: 0,
       method: "trapezoidal",
       order: 1,
@@ -1269,10 +1259,6 @@ describe("mosfet_spicel1_load_dcop_parity", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: true,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: GMIN,
       uic: false,

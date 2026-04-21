@@ -24,6 +24,7 @@ import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
+import { MODETRAN, MODEDC, MODEDCOP, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: allocate a StatePool for a single element and call initState
@@ -85,10 +86,9 @@ function makeLoadCtx(
 ): LoadContext {
   const dt = overrides.dt ?? 0;
   return {
+    cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     voltages,
-    iteration: 0,
-    initMode: "transient",
     dt,
     method: "trapezoidal",
     order: 1,
@@ -97,10 +97,6 @@ function makeLoadCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -131,7 +127,7 @@ function getCapacitanceAtBias(
   for (let i = 0; i < 50; i++) {
     const dcSolver = new SparseSolver();
     dcSolver.beginAssembly(2);
-    const dcCtx = makeLoadCtx(voltages, dcSolver, { isDcOp: true });
+    const dcCtx = makeLoadCtx(voltages, dcSolver, { cktMode: MODEDC | MODEINITFLOAT });
     element.load(dcCtx);
     voltages[0] = vd;
     voltages[1] = 0;
@@ -146,9 +142,7 @@ function getCapacitanceAtBias(
   const tranSolver = new SparseSolver();
   tranSolver.beginAssembly(2);
   const tranCtx = makeLoadCtx(voltages, tranSolver, {
-    isTransient: true,
-    isTransientDcop: false,
-    isAc: false,
+    cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     method: "trapezoidal",
     order: 2,
@@ -308,7 +302,7 @@ describe("Varactor", () => {
     for (let i = 0; i < 50; i++) {
       const dcSolver = new SparseSolver();
       dcSolver.beginAssembly(2);
-      const dcCtx = makeLoadCtx(voltages, dcSolver, { isDcOp: true });
+      const dcCtx = makeLoadCtx(voltages, dcSolver, { cktMode: MODEDC | MODEINITFLOAT });
       varactor.load(dcCtx);
     }
     const idNow = Math.exp(vd / (IS > 0 ? 0.02585 : 1)) * IS - IS;
@@ -322,9 +316,7 @@ describe("Varactor", () => {
     const tranSolver = new SparseSolver();
     tranSolver.beginAssembly(2);
     const tranCtx = makeLoadCtx(voltages, tranSolver, {
-      isTransient: true,
-      isTransientDcop: false,
-      isAc: false,
+      cktMode: MODETRAN | MODEINITFLOAT,
       dt,
       method: "trapezoidal",
       order: 2,
@@ -449,10 +441,9 @@ describe("integration", () => {
     solver.beginAssembly(1);
 
     const ctx = {
+      cktMode: MODETRAN | MODEINITFLOAT,
       solver,
       voltages: new Float64Array([vd, 0]),
-      iteration: 0,
-      initMode: "transient" as const,
       dt,
       method: "trapezoidal" as const,
       order: 2,
@@ -461,10 +452,6 @@ describe("integration", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: false,
-      isTransient: true,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,

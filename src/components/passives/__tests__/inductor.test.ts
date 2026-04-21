@@ -22,7 +22,11 @@ import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
-import type { LoadContext, InitMode } from "../../../solver/analog/load-context.js";
+import type { LoadContext } from "../../../solver/analog/load-context.js";
+import {
+  MODETRAN, MODEDC, MODEDCOP,
+  MODEINITFLOAT, MODEINITTRAN,
+} from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // companion context builder — replaces the deleted stampCompanion(dt, method,
@@ -63,14 +67,15 @@ function makeCompanionCtx(opts: {
   dt: number;
   method: string;
   order: number;
-  initMode?: InitMode;
+  cktMode?: number;
   uic?: boolean;
 }): LoadContext {
+  // Default: MODETRAN | MODEINITFLOAT (normal transient NR iteration).
+  const cktMode = opts.cktMode ?? (MODETRAN | MODEINITFLOAT);
   return {
+    cktMode,
     solver: opts.solver,
     voltages: opts.voltages,
-    iteration: 0,
-    initMode: opts.initMode ?? "initFloat",
     dt: opts.dt,
     method: (opts.method === "bdf1" ? "trapezoidal" : opts.method) as LoadContext["method"],
     order: opts.order,
@@ -79,10 +84,6 @@ function makeCompanionCtx(opts: {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: true,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: opts.uic ?? false,
@@ -162,20 +163,21 @@ describe("Inductor", () => {
       // branch incidence entries are stamped (no companion branch diagonal term).
       const voltages = new Float64Array([0, 0, 0]);
       const ctx: LoadContext = {
-        solver, voltages, iteration: 0, initMode: "initFloat", dt: 0,
+        cktMode: MODEDCOP | MODEINITFLOAT,
+        solver, voltages, dt: 0,
         method: "trapezoidal", order: 1,
         deltaOld: [0, 0, 0, 0, 0, 0, 0], ag: new Float64Array(7),
         srcFact: 1, noncon: { value: 0 }, limitingCollector: null,
-        isDcOp: false, isTransient: false, isTransientDcop: false, isAc: false, xfact: 1, gmin: 1e-12, uic: false,
+        xfact: 1, gmin: 1e-12, uic: false,
         reltol: 1e-3, iabstol: 1e-12,
       };
       analogElement.load(ctx);
 
-      // Should have: 2 B-matrix incidence + 2 C/D-matrix branch (topology only) = 4
+      // Should have: 2 B-matrix incidence + 2 C/D-matrix branch + 1 branch diagonal = 5
       // B-matrix (node rows): (0,2)=+1, (1,2)=-1
       // C/D-matrix (branch row): (2,0)=+1, (2,1)=-1
-      // Note: (2,2)=-geq is stamped only during transient (DC: short-circuit, no companion term)
-      expect(stamps.length).toBe(4);
+      // D-matrix diagonal (branch row): (2,2)=-req stamped unconditionally per indload.c:119-123
+      expect(stamps.length).toBe(5);
 
       // B sub-matrix: branch current incidence in node KCL rows
       const nodeEntries = stamps.filter((s) => s[0] < 2);
@@ -592,10 +594,9 @@ describe("inductor_load_transient_parity (C4.2)", () => {
       const voltages = new Float64Array([Vsrc, v2, 0, i_L]);
 
       const ctx: LoadContext = {
+        cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
         voltages,
-        iteration: 0,
-        initMode: step === 0 ? "initTran" : "transient",
         dt,
         method,
         order,
@@ -604,10 +605,6 @@ describe("inductor_load_transient_parity (C4.2)", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: false,
-        isTransient: true,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,

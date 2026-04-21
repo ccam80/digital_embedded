@@ -1,10 +1,7 @@
 /**
  * CKTmode bitfield — single source of truth for simulation mode.
  *
- * Direct port of ngspice `CKTmode` (cktdefs.h:160-209). Replaces the fanned-out
- * representation we previously used (statePool.analysisMode + ctx.isTransient +
- * ctx.isTransientDcop + ctx.loadCtx.isTransientDcop), which drifted out of
- * sync and required manual write-mirroring at every call site.
+ * Direct port of ngspice `CKTmode` (cktdefs.h:160-209).
  *
  * Values are the exact ngspice hex constants from
  * ref/ngspice/src/include/ngspice/cktdefs.h:165-185.
@@ -107,7 +104,7 @@ export function setAnalysis(mode: number, analysis: number): number {
 
 /** True if this is any kind of DC-OP (standalone .OP or transient-boot). */
 export function isDcop(mode: number): boolean {
-  return (mode & MODEDCOP) !== 0;
+  return (mode & MODEDC) !== 0;
 }
 
 /** True if in transient analysis (MODETRAN bit set, includes MODETRANOP during boot DCOP). */

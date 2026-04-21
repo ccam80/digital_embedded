@@ -42,6 +42,7 @@ import type { LoadContext } from "../../../solver/analog/load-context.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import type { IntegrationMethod } from "../../../core/analog-types.js";
+import { MODETRAN, MODEINITTRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -63,7 +64,7 @@ function makeTransientCtx(
     dt?: number;
     method?: IntegrationMethod;
     order?: number;
-    initMode?: LoadContext["initMode"];
+    cktMode?: number;
   } = {},
 ): LoadContext {
   const dt = opts.dt ?? 0;
@@ -76,10 +77,9 @@ function makeTransientCtx(
     computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
   }
   return {
+    cktMode: opts.cktMode ?? (MODETRAN | MODEINITFLOAT),
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     voltages,
-    iteration: 0,
-    initMode: opts.initMode ?? "initFloat",
     dt,
     method,
     order,
@@ -88,10 +88,6 @@ function makeTransientCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: true,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -242,7 +238,7 @@ describe("Transformer", () => {
         dt,
         method: "trapezoidal",
         order: 1,
-        initMode: i === 0 ? "initTran" : "initFloat",
+        cktMode: i === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
       });
       vsrc.load(ctx);
       transformer.load(ctx);
@@ -319,7 +315,7 @@ describe("Transformer", () => {
         dt,
         method: "trapezoidal",
         order: 1,
-        initMode: i === 0 ? "initTran" : "initFloat",
+        cktMode: i === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
       });
       vsrc.load(ctx);
       transformer.load(ctx);
@@ -397,7 +393,7 @@ describe("Transformer", () => {
         dt,
         method: "trapezoidal",
         order: 1,
-        initMode: i === 0 ? "initTran" : "initFloat",
+        cktMode: i === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
       });
       vsrc.load(ctx);
       transformer.load(ctx);
@@ -476,7 +472,7 @@ describe("Transformer", () => {
           dt,
           method: "trapezoidal",
           order: 1,
-          initMode: i === 0 ? "initTran" : "initFloat",
+          cktMode: i === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         });
         vsrc.load(ctx);
         transformer.load(ctx);
@@ -547,7 +543,7 @@ describe("Transformer", () => {
         dt,
         method: "trapezoidal",
         order: 1,
-        initMode: i === 0 ? "initTran" : "initFloat",
+        cktMode: i === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
       });
       vsrc.load(ctx);
       transformer.load(ctx);
@@ -646,7 +642,7 @@ describe("AnalogTransformerElement state pool", () => {
       dt,
       method: "trapezoidal",
       order: 1,
-      initMode: "initTran",
+      cktMode: MODETRAN | MODEINITTRAN,
     });
     el.load(ctx);
     solver.finalize();
@@ -679,7 +675,7 @@ describe("AnalogTransformerElement state pool", () => {
       dt,
       method: "trapezoidal",
       order: 1,
-      initMode: "initTran",
+      cktMode: MODETRAN | MODEINITTRAN,
     });
     el.load(ctx);
     solver.finalize();
@@ -838,10 +834,9 @@ describe("transformer_load_transient_parity (C4.2)", () => {
       matValues.fill(0);
 
       const ctx: LoadContext = {
+        cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
         voltages,
-        iteration: 0,
-        initMode: step === 0 ? "initTran" : "transient",
         dt,
         method,
         order,
@@ -850,10 +845,6 @@ describe("transformer_load_transient_parity (C4.2)", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: false,
-        isTransient: true,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,

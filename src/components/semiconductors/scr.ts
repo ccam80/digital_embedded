@@ -29,6 +29,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { MODEINITJCT } from "../../solver/analog/ckt-mode.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -159,7 +160,7 @@ export function createScrElement(
 
   function computeOperatingPoint(vak: number, vgk: number): void {
     // Gate current through a small forward-biased junction (simplified model)
-    const iGate = p.iS * (Math.exp(Math.min(vgk / nVt, 700)) - 1) + GMIN * vgk;
+    const iGate = p.iS * (Math.exp(vgk / nVt) - 1) + GMIN * vgk;
 
     const a2 = computeAlpha2(iGate);
     const a1clamped = Math.min(p.alpha1, ALPHA_MAX);
@@ -192,7 +193,7 @@ export function createScrElement(
 
     // Gate junction model: forward-biased diode linearized at the (already
     // pnjlim-limited) vgk operating point.
-    const expVgk = Math.exp(Math.min(vgk / nVt, 700));
+    const expVgk = Math.exp(vgk / nVt);
     const gGate = (p.iS * expVgk) / nVt + GMIN;
     const iGateCurrent = p.iS * (expVgk - 1);
     s0[base + SLOT_G_GATE_GEQ] = gGate;
@@ -262,7 +263,7 @@ export function createScrElement(
 
       let vakLimited: number;
       let vgkLimited: number;
-      if (ctx.initMode === "initJct") {
+      if (ctx.cktMode & MODEINITJCT) {
         // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
         vakLimited = vakRaw;
         vgkLimited = vgkRaw;

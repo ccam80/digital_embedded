@@ -31,6 +31,7 @@ import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { MODEDCOP, MODEINITFLOAT, MODETRAN } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -133,8 +134,7 @@ function makeAcceptCtx(voltages: Float64Array, dt: number): LoadContext {
   // Mutate fields that makeSimpleCtx's default values leave at DC-OP settings.
   (ctx as { voltages: Float64Array }).voltages = voltages;
   (ctx as { dt: number }).dt = dt;
-  (ctx as { isDcOp: boolean }).isDcOp = false;
-  (ctx as { isTransient: boolean }).isTransient = true;
+  (ctx as { cktMode: number }).cktMode = MODETRAN | MODEINITFLOAT;
   return ctx;
 }
 
@@ -338,8 +338,7 @@ function makeAdcParityCtx(voltages: Float64Array, solver: SparseSolverType): Loa
   return {
     solver,
     voltages,
-    iteration: 0,
-    initMode: "initFloat",
+    cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -348,10 +347,6 @@ function makeAdcParityCtx(voltages: Float64Array, solver: SparseSolverType): Loa
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

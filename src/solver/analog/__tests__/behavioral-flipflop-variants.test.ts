@@ -30,6 +30,7 @@ import { RSAsyncDefinition } from "../../../components/flipflops/rs-async.js";
 import { DAsyncDefinition } from "../../../components/flipflops/d-async.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { LoadContext } from "../load-context.js";
+import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -76,8 +77,7 @@ function makeCtx(v: Float64Array = new Float64Array(8)): LoadContext {
       stamp: (_r: number, _c: number, _v: number) => {},
     } as any,
     voltages: v,
-    iteration: 0,
-    initMode: "transient" as const,
+    cktMode: MODETRAN | MODEINITFLOAT,
     dt: 0,
     method: "bdf1" as const,
     order: 1,
@@ -86,10 +86,6 @@ function makeCtx(v: Float64Array = new Float64Array(8)): LoadContext {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 0,
     gmin: 1e-12,
     uic: false,
@@ -99,7 +95,7 @@ function makeCtx(v: Float64Array = new Float64Array(8)): LoadContext {
 }
 
 function makeAcceptCtx(v: Float64Array): LoadContext {
-  return { ...makeCtx(v), dt: 1e-9, isTransient: true };
+  return { ...makeCtx(v), dt: 1e-9 };
 }
 
 /**

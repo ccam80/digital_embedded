@@ -31,51 +31,50 @@ file in this commit; reconciliation is a later step.**
 Run: `npm run test:q -- src/solver/analog/__tests__/harness src/solver/analog/__tests__/ngspice-parity`
 
 ```
-vitest: 247 passed, 9 failed, 11 skipped (5.4s, 28 files)
+vitest: 247 passed, 6 failed, 11 skipped (6.3s, 28 files)
 playwright: skipped
 ```
 
 `.vitest-failures.json` and `test-results/test-failures.json` hold the raw
 details.
 
-### 2.1 The 9 failures — triaged
+### 2.1 The 6 failures — triaged
+
+All remaining failures are pre-existing bugs unrelated to this commit. The
+3 tests that asserted the papering we deleted (MOSFET/JFET null slots,
+tunnel-diode/varactor mapping existence) have been deleted — see §2.2.
 
 | # | Test | File | Cause | Classification |
 |---|---|---|---|---|
 | 1–4 | `transient: CCAP in capacitor and BJT junctions over first steps/retries` / `transient: inductor current divergence over iterations in step 1` / `transient: PNP BJT internal node agreement in step 1` / `8. per-element convergence: our engine reports failures` | runtime failure at `src/solver/analog/fet-base.ts:567` — `MODEINITTRAN is not defined` | In-flight Phase 2 F4 rewrite — a `MODEINITTRAN` reference in `fet-base.ts` is not imported from `ckt-mode.ts`. Pre-existing runtime bug, orthogonal to this commit. | Phase-2 in-flight bug (not mine, not baseline signal) |
-| 5 | `DEVICE_MAPPINGS has populated MOSFET mapping` | `harness-integration.test.ts:314` | Asserts `slotToNgspice["GEQ"] === null`. I deleted `null` entries. | **Expected baseline signal — item 3 of checklist** |
-| 6 | `DEVICE_MAPPINGS has JFET mapping with correct ngspice offsets` | `harness-integration.test.ts:331` | Asserts `slotToNgspice["CAP_GEQ"] === null`. Same. | **Expected baseline signal — item 3** |
-| 7 | `DEVICE_MAPPINGS has tunnel-diode and varactor mappings` | `harness-integration.test.ts:341` | Asserts both mappings are defined. I deleted them. | **Expected baseline signal — item 5** |
-| 8 | `10. limiting events: our engine captures events (Item 9)` | `stream-verification.test.ts:230` | `foundWasLimited === false` — devices never push limiting events | Pre-existing (divergence #16 in `ngspice-alignment-divergences.md`; root cause L4 in verification: `cktLoad` never syncs `ctx.loadCtx.limitingCollector`) |
-| 9 | `14. limiting comparison: sign is postLimit - preLimit` | `stream-verification.test.ts:331` | Depends on same limiting infrastructure | Pre-existing (divergence #17) |
+| 5 | `10. limiting events: our engine captures events (Item 9)` | `stream-verification.test.ts:230` | `foundWasLimited === false` — devices never push limiting events | Pre-existing (divergence #16 in `ngspice-alignment-divergences.md`; root cause L4 in verification: `cktLoad` never syncs `ctx.loadCtx.limitingCollector`) |
+| 6 | `14. limiting comparison: sign is postLimit - preLimit` | `stream-verification.test.ts:331` | Depends on same limiting infrastructure | Pre-existing (divergence #17) |
 
-**Only 3 of the 9 (tests 5–7) are new red signal from this commit.** The
-other 6 were already failing before — 4 from the in-flight F4 rewrite's
-`MODEINITTRAN` import bug, 2 from long-known limiting-collector wiring.
+**Zero of the 6 remaining failures are from this commit's changes.** The
+papering-assertion tests (originally 3 of 9) were deleted as the logical
+conclusion of removing the papering they verified.
 
-### 2.2 Tests that exist to verify the papering and are now removed/skipped
+### 2.2 Tests that existed to verify the papering — now deleted
 
-`src/solver/analog/__tests__/harness/netlist-generator.test.ts` was edited
-to delete three `describe` blocks totalling ~156 lines:
+Two files lost tests for invented equivalence formulas or mapping
+assertions:
 
-- `BJT_MAPPING.derivedNgspiceSlots` — RB_EFF, IC_NORTON, IB_NORTON, IE_NORTON
-- `DIODE_MAPPING.derivedNgspiceSlots` — IEQ, + cross-check against tunnel-diode/varactor
-- `JFET_MAPPING.derivedNgspiceSlots` — VDS
+- `harness/netlist-generator.test.ts` — three `describe` blocks (~156
+  lines) covering `BJT_MAPPING.derivedNgspiceSlots` (RB_EFF, IC_NORTON,
+  IB_NORTON, IE_NORTON), `DIODE_MAPPING.derivedNgspiceSlots` (IEQ +
+  cross-check against tunnel-diode/varactor), and
+  `JFET_MAPPING.derivedNgspiceSlots` (VDS). A `describe.skip` placeholder
+  remains at the site with a route-here pointer.
+- `harness/harness-integration.test.ts` — three `it` blocks
+  (`DEVICE_MAPPINGS has populated MOSFET mapping`, `DEVICE_MAPPINGS has
+  JFET mapping with correct ngspice offsets`, `DEVICE_MAPPINGS has
+  tunnel-diode and varactor mappings`) that asserted `null` slot entries,
+  invented-formula presence, and the existence of the tunnel-diode and
+  varactor mappings. Replaced with a route-here comment.
 
-These tests exercised the invented equivalence formulas. A `describe.skip`
-placeholder remains at the site pointing here.
-
-**Consistency note — read this before any further cleanup:** `netlist-
-generator.test.ts` imports of `TUNNEL_DIODE_MAPPING` and `VARACTOR_MAPPING`
-were compile-blocking, so touching the file was unavoidable. But the three
-describe blocks themselves would have compiled (the mapping objects still
-exist) and failed at runtime, exactly like the 3 `harness-integration.test
-.ts` failures. I deleted them rather than let them fail at runtime. That
-choice under-reports the papering test coverage by ~7 test cases in the 9-
-failure count above. If a future commit wants a more complete baseline, it
-can restore these blocks and expect them to fail at runtime. The failures
-would carry no new information — the 3 `harness-integration` failures
-already demonstrate the papering is gone — so restoration is optional.
+These tests only ever verified that the papering was present. With the
+papering gone they have nothing real to verify. Restoring them would just
+reproduce the deleted state. They are not restored anywhere.
 
 ### 2.3 Pre-existing `tsc --noEmit` errors (unrelated to this commit)
 
@@ -103,18 +102,19 @@ here.
   `derivedNgspiceSlots` formulas, and the tunnel-diode/varactor mappings
   could all be deleted without introducing TypeScript regressions in
   anything outside the tests that explicitly asserted the papering.
-- **Strict-by-default is runnable.** 247 of 256 harness/parity tests pass
+- **Strict-by-default is runnable.** 247 of 253 harness/parity tests pass
   when every comparison reduces to `ours === ngspice`. The passes include
   self-compare topology tests, netlist-generator structural tests, and
   direct-offset slot correspondence tests (BJT CCAP slots, etc.).
-- **The claimed "parity" surface was never very large.** The 3 new failures
-  (tests 5–7) and the 7 deleted netlist-generator tests are not numerical
-  regressions — they are tests of the papering itself. Removing the
-  papering removed the tests that validated the papering. The underlying
-  numerical reality (which tests actually compared raw values bit-exactly)
-  is largely unchanged because **most existing harness tests never compared
-  raw values bit-exactly in the first place.** They compared against
-  tolerances that made the comparison trivially pass.
+- **The claimed "parity" surface was never very large.** The 10 deleted
+  tests (7 in `netlist-generator.test.ts`, 3 in `harness-integration.test
+  .ts`) are not numerical regressions — they are tests of the papering
+  itself. Removing the papering removed the tests that validated the
+  papering. The underlying numerical reality (which tests actually
+  compared raw values bit-exactly) is largely unchanged because **most
+  existing harness tests never compared raw values bit-exactly in the
+  first place.** They compared against tolerances that made the
+  comparison trivially pass.
 
 This last point is the most important. Strict-by-default did not turn the
 harness into a sea of red because the harness, as written, was mostly

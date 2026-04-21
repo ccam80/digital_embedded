@@ -61,6 +61,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { MODETRAN } from "../../solver/analog/ckt-mode.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { defineModelParams } from "../../core/model-params.js";
 
@@ -436,7 +437,7 @@ export function createRealOpAmpElement(
       // Update companion coefficient at the start of each NR iteration.
       // During transient NR: geq_int = tau/dt. During DC: geq_int = 0 (no
       // history term, pure VCVS).
-      if (ctx.isTransient && ctx.dt > 0) {
+      if ((ctx.cktMode & MODETRAN) && ctx.dt > 0) {
         const tau = aol / (2 * Math.PI * Math.max(p.gbw, 1));
         geq_int = tau / ctx.dt;
       } else {

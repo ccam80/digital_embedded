@@ -42,6 +42,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { MODEDC, MODEINITPRED, MODEINITTRAN, MODETRAN } from "../../solver/analog/ckt-mode.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
@@ -399,16 +400,17 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     const base = this.base;
 
     // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
-    if (!ctx.isDcOp && ctx.initMode !== "initPred") {
+    const mode = ctx.cktMode;
+    if (!(mode & (MODEDC | MODEINITPRED))) {
       sRef[base + SLOT_PHI1] = this._l1 * i1Now + this._m12 * i2Now + this._m13 * i3Now;
       sRef[base + SLOT_PHI2] = this._l2 * i2Now + this._m12 * i1Now + this._m23 * i3Now;
       sRef[base + SLOT_PHI3] = this._l3 * i3Now + this._m13 * i1Now + this._m23 * i2Now;
-      if (ctx.initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[base + SLOT_PHI1] = sRef[base + SLOT_PHI1];
         this.s1[base + SLOT_PHI2] = sRef[base + SLOT_PHI2];
         this.s1[base + SLOT_PHI3] = sRef[base + SLOT_PHI3];
       }
-    } else if (ctx.initMode === "initPred") {
+    } else if (mode & MODEINITPRED) {
       sRef[base + SLOT_PHI1] = this.s1[base + SLOT_PHI1];
       sRef[base + SLOT_PHI2] = this.s1[base + SLOT_PHI2];
       sRef[base + SLOT_PHI3] = this.s1[base + SLOT_PHI3];
@@ -417,7 +419,7 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     // Companion coefficients — zero at DC, niIntegrate during TRAN.
     let g11 = 0, g22 = 0, g33 = 0, g12 = 0, g13 = 0, g23 = 0;
     let hist1 = 0, hist2 = 0, hist3 = 0;
-    if (ctx.isTransient) {
+    if (mode & MODETRAN) {
       const ag = ctx.ag;
       const phi1_0 = sRef[base + SLOT_PHI1];
       const phi2_0 = sRef[base + SLOT_PHI2];

@@ -50,6 +50,7 @@ import {
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { AnalogElement } from "../element.js";
 import { PropertyBag } from "../../../core/properties.js";
+import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Shared electrical constants
@@ -497,8 +498,7 @@ describe("Integration", () => {
       return {
         solver: nullSolver,
         voltages: v,
-        iteration: 0,
-        initMode: "transient" as const,
+        cktMode: MODETRAN | MODEINITFLOAT,
         dt: ctxDt,
         method,
         order: 1,
@@ -507,10 +507,6 @@ describe("Integration", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: false,
-        isTransient: ctxDt > 0,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 0,
         gmin: 1e-12,
         uic: false,

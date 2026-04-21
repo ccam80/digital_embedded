@@ -28,6 +28,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { MODEDC, MODEINITPRED, MODEINITTRAN, MODETRAN } from "../../solver/analog/ckt-mode.js";
 import { CoupledInductorPair } from "../../solver/analog/coupled-inductor.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -355,21 +356,22 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     const base = this._base;
 
     // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
-    if (!ctx.isDcOp && ctx.initMode !== "initPred") {
+    const mode = ctx.cktMode;
+    if (!(mode & (MODEDC | MODEINITPRED))) {
       this.s0[base + SLOT_PHI1] = L1 * i1Now + M * i2Now;
       this.s0[base + SLOT_PHI2] = L2 * i2Now + M * i1Now;
-      if (ctx.initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[base + SLOT_PHI1] = this.s0[base + SLOT_PHI1];
         this.s1[base + SLOT_PHI2] = this.s0[base + SLOT_PHI2];
       }
-    } else if (ctx.initMode === "initPred") {
+    } else if (mode & MODEINITPRED) {
       this.s0[base + SLOT_PHI1] = this.s1[base + SLOT_PHI1];
       this.s0[base + SLOT_PHI2] = this.s1[base + SLOT_PHI2];
     }
 
     // Companion coefficients — zero at DC, niIntegrate-derived during TRAN.
     let g11 = 0, g22 = 0, g12 = 0, hist1 = 0, hist2 = 0;
-    if (ctx.isTransient) {
+    if (mode & MODETRAN) {
       const ag = ctx.ag;
       const phi1_0 = this.s0[base + SLOT_PHI1];
       const phi2_0 = this.s0[base + SLOT_PHI2];

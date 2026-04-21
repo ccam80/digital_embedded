@@ -6,6 +6,7 @@ import { describe, it, expect, vi } from "vitest";
 import { makeAnalogClockElement, ClockDefinition } from "../clock.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -166,8 +167,7 @@ describe("AnalogClock", () => {
     clk.load({
       solver: solver as unknown as SparseSolver,
       voltages: new Float64Array(3),
-      iteration: 0,
-      initMode: "initFloat" as const,
+      cktMode: MODEDCOP | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal" as const,
       order: 1,
@@ -176,10 +176,6 @@ describe("AnalogClock", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: true,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -212,8 +208,7 @@ describe("clock_load_srcfact_parity", () => {
     return {
       solver: solver as SparseSolver,
       voltages: new Float64Array(3),
-      iteration: 0,
-      initMode: "initFloat" as const,
+      cktMode: MODEDCOP | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal" as const,
       order: 1,
@@ -222,10 +217,6 @@ describe("clock_load_srcfact_parity", () => {
       srcFact,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: true,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,

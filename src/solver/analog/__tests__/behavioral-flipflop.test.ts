@@ -17,6 +17,7 @@ import { DigitalInputPinModel, DigitalOutputPinModel } from "../digital-pin-mode
 import { DDefinition } from "../../../components/flipflops/d.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { LoadContext } from "../load-context.js";
+import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 import type { IntegrationMethod } from "../../../core/analog-types.js";
 
 function makeNullSolver() {
@@ -116,8 +117,7 @@ function makeCtx(
   return {
     solver: makeNullSolver(),
     voltages: v,
-    iteration: 0,
-    initMode: "transient" as const,
+    cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     method,
     order: 1,
@@ -126,10 +126,6 @@ function makeCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: dt > 0,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 0,
     gmin: 1e-12,
     uic: false,
@@ -330,8 +326,7 @@ function makeMinimalFlipflopCtx(voltages?: Float64Array): LoadContext {
       stampRHS: (_i: number, _v: number) => {},
     } as any,
     voltages: voltages ?? new Float64Array(16),
-    iteration: 0,
-    initMode: "transient" as const,
+    cktMode: MODETRAN | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal" as const,
     order: 1,
@@ -340,10 +335,6 @@ function makeMinimalFlipflopCtx(voltages?: Float64Array): LoadContext {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 0,
     gmin: 1e-12,
     uic: false,

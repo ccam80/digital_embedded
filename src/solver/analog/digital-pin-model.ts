@@ -13,6 +13,7 @@
 
 import type { LoadContext } from "./load-context.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
+import { MODETRAN } from "./ckt-mode.js";
 
 /**
  * Read voltage for an MNA node from the solver solution vector.
@@ -117,7 +118,7 @@ export class DigitalOutputPinModel {
    *   Hi-Z mode:   1/rHiZ diagonal only.
    *   (loaded flag governs whether these stamps happen at all for "direct".)
    *
-   * When loaded and cOut > 0 and ctx.isTransient: inline companion stamp
+   * When loaded and cOut > 0 and (ctx.cktMode & MODETRAN): inline companion stamp
    * using ctx.ag[] — no external integrateCapacitor helper.
    */
   load(ctx: LoadContext): void {
@@ -174,7 +175,7 @@ export class DigitalOutputPinModel {
     }
 
     // Inline companion stamp for C_out (transient, loaded, cOut > 0)
-    if (this._loaded && this._spec.cOut > 0 && ctx.isTransient && ctx.dt > 0) {
+    if (this._loaded && this._spec.cOut > 0 && (ctx.cktMode & MODETRAN) !== 0 && ctx.dt > 0) {
       const C = this._spec.cOut;
       const ag0 = ctx.ag[0];
       const ag1 = ctx.ag[1] ?? 0;
@@ -299,7 +300,7 @@ export class DigitalInputPinModel {
    * Unified per-NR-iteration load.
    *
    * No-op when !_loaded. When loaded, stamps 1/rIn on the node diagonal.
-   * When loaded and cIn > 0 and ctx.isTransient: inline companion stamp
+   * When loaded and cIn > 0 and (ctx.cktMode & MODETRAN): inline companion stamp
    * using ctx.ag[] — no external integrateCapacitor helper.
    */
   load(ctx: LoadContext): void {
@@ -317,7 +318,7 @@ export class DigitalInputPinModel {
     solver.stampElement(this._hNodeDiag, 1 / this._spec.rIn);
 
     // Inline companion stamp for C_in (transient, cIn > 0)
-    if (this._spec.cIn > 0 && ctx.isTransient && ctx.dt > 0) {
+    if (this._spec.cIn > 0 && (ctx.cktMode & MODETRAN) !== 0 && ctx.dt > 0) {
       const C = this._spec.cIn;
       const ag0 = ctx.ag[0];
       const ag1 = ctx.ag[1] ?? 0;

@@ -1,57 +1,63 @@
 {
   "summary": {
-    "passed": 79,
-    "failed": 5,
-    "skipped": 0,
-    "totalFiles": 4,
-    "durationSeconds": 2.2
+    "passed": 247,
+    "failed": 6,
+    "skipped": 11,
+    "totalFiles": 28,
+    "durationSeconds": 6.3
   },
   "failures": [
     {
-      "message": "expected undefined to be 'initFloat' // Object.is equality",
-      "count": 3,
+      "message": "MODEINITTRAN is not defined",
+      "count": 4,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\dc-operating-point.test.ts",
-          "test": "dcopFinalize_transitions_initMode_to_initFloat",
-          "line": 518,
-          "column": 37
+          "file": "src\\solver\\analog\\fet-base.ts",
+          "test": "transient: CCAP in capacitor and BJT junctions over first steps/retries",
+          "line": 567,
+          "column": 29
         },
         {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "initTran_transitions_to_initFloat_after_iteration_0",
-          "line": 318,
-          "column": 37
+          "file": "src\\solver\\analog\\fet-base.ts",
+          "test": "transient: inductor current divergence over iterations in step 1",
+          "line": 567,
+          "column": 29
         },
         {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "initPred_transitions_to_initFloat_immediately",
-          "line": 328,
-          "column": 37
+          "file": "src\\solver\\analog\\fet-base.ts",
+          "test": "transient: PNP BJT internal node agreement in step 1",
+          "line": 567,
+          "column": 29
+        },
+        {
+          "file": "src\\solver\\analog\\fet-base.ts",
+          "test": "8. per-element convergence: our engine reports failures",
+          "line": 567,
+          "column": 29
         }
       ]
     },
     {
-      "message": "expected undefined to be 'transient' // Object.is equality",
+      "message": "expected false to be true // Object.is equality",
       "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "transient_mode_allows_convergence_without_ladder",
-          "line": 339,
-          "column": 37
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "10. limiting events: our engine captures events (Item 9)",
+          "line": 230,
+          "column": 27
         }
       ]
     },
     {
-      "message": "expected 9 to be 7 // Object.is equality",
+      "message": "expected -1 to be greater than or equal to 0",
       "count": 1,
       "locations": [
         {
-          "file": "src\\solver\\analog\\__tests__\\newton-raphson.test.ts",
-          "test": "ipass_skipped_without_nodesets",
-          "line": 515,
-          "column": 26
+          "file": "src\\solver\\analog\\__tests__\\harness\\stream-verification.test.ts",
+          "test": "14. limiting comparison: sign is postLimit - preLimit",
+          "line": 331,
+          "column": 24
         }
       ]
     }

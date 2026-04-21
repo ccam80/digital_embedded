@@ -32,6 +32,7 @@ import type { AnalogElement, AnalogElementCore } from "../element.js";
 import type { ReactiveAnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
 import type { SparseSolver } from "../sparse-solver.js";
+import { MODEDCOP, MODEINITFLOAT, MODEINITJCT, setInitf } from "../ckt-mode.js";
 
 const registry = createDefaultRegistry();
 
@@ -64,10 +65,9 @@ function makeNullSolver(): SparseSolver {
 
 function makeSoloLoadCtx(voltages: Float64Array): LoadContext {
   return {
+    cktMode: MODEDCOP | MODEINITFLOAT,
     solver: makeNullSolver(),
     voltages,
-    iteration: 0,
-    initMode: "transient",
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -76,10 +76,6 @@ function makeSoloLoadCtx(voltages: Float64Array): LoadContext {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -163,9 +159,9 @@ describe("dcopInitJct", () => {
       // Prime junctions by setting initJct mode and calling load().
       const voltages = new Float64Array(3); // shared MNA vector stays at zero
       const ctx = makeSoloLoadCtx(voltages);
-      ctx.initMode = "initJct";
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
       element.load(ctx);
-      ctx.initMode = "transient";
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_NPN_DEFAULTS.IS, BJT_NPN_DEFAULTS.AREA);
       const base = (element as any).stateBaseOffset as number;
@@ -207,9 +203,9 @@ describe("dcopInitJct", () => {
 
       const voltages = new Float64Array(3);
       const ctx = makeSoloLoadCtx(voltages);
-      ctx.initMode = "initJct";
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
       element.load(ctx);
-      ctx.initMode = "transient";
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_NPN_DEFAULTS.IS, BJT_NPN_DEFAULTS.AREA);
       const base = (element as any).stateBaseOffset as number;
@@ -233,9 +229,9 @@ describe("dcopInitJct", () => {
 
       const voltages = new Float64Array(2);
       const ctx = makeSoloLoadCtx(voltages);
-      ctx.initMode = "initJct";
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
       element.load(ctx);
-      ctx.initMode = "transient";
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_NPN_DEFAULTS.IS, BJT_NPN_DEFAULTS.AREA);
       const base = (element as any).stateBaseOffset as number;
@@ -270,9 +266,9 @@ describe("dcopInitJct", () => {
 
       const voltages = new Float64Array(3);
       const ctx = makeSoloLoadCtx(voltages);
-      ctx.initMode = "initJct";
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
       element.load(ctx);
-      ctx.initMode = "transient";
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
 
       const tVcrit = computeTVcrit(VT_ROOM, BJT_SPICE_L1_NPN_DEFAULTS.IS, BJT_SPICE_L1_NPN_DEFAULTS.AREA);
       const base = (element as any).stateBaseOffset as number;
@@ -307,9 +303,9 @@ describe("dcopInitJct", () => {
 
       const voltages = new Float64Array(2);
       const ctx = makeSoloLoadCtx(voltages);
-      ctx.initMode = "initJct";
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
       element.load(ctx);
-      ctx.initMode = "transient";
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
 
       const nVt = DIODE_PARAM_DEFAULTS.N * VT_ROOM;
       const tVcrit = nVt * Math.log(nVt / (DIODE_PARAM_DEFAULTS.IS * Math.SQRT2));
@@ -341,9 +337,9 @@ describe("dcopInitJct", () => {
 
       const voltages = new Float64Array(1);
       const ctx = makeSoloLoadCtx(voltages);
-      ctx.initMode = "initJct";
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
       element.load(ctx);
-      ctx.initMode = "transient";
+      ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
 
       const nVt = DIODE_PARAM_DEFAULTS.N * VT_ROOM;
       const tVcrit = nVt * Math.log(nVt / (DIODE_PARAM_DEFAULTS.IS * Math.SQRT2));

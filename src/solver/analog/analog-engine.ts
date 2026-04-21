@@ -453,7 +453,6 @@ export class MNAEngine implements AnalogEngine {
       ctx.postIterationHook = this.postIterationHook;
       ctx.detailedConvergence = this.detailedConvergence;
       ctx.limitingCollector = this.limitingCollector;
-      ctx.isDcOp = false;
       ctx.dcopModeLadder = null;
       ctx.exactMaxIterations = false;
       ctx.onIteration0Complete = null;
@@ -464,8 +463,6 @@ export class MNAEngine implements AnalogEngine {
       // post-NIiter write puts MODEINITPRED back on cktMode (in the acceptance
       // block below), which niiter again clears to MODEINITFLOAT in its
       // dispatcher. No per-step write is needed here.
-      // The prior ctx.initMode = "transient" sentinel is removed; it had no
-      // ngspice analogue.
       newtonRaphson(ctx);
       const nrResult = ctx.nrResult;
 
@@ -501,7 +498,6 @@ export class MNAEngine implements AnalogEngine {
         // (the first successful step's acceptance). We detect it as _stepCount === 0.
         if (this._stepCount === 0 && statePool) {
           ctx.cktMode = (ctx.cktMode & MODEUIC) | MODETRAN | MODEINITTRAN;
-          ctx.initMode = "initTran";  // legacy mirror
         }
         // fall through to delmin check below
       } else {
@@ -658,7 +654,6 @@ export class MNAEngine implements AnalogEngine {
     // time (it is not, by default).
     const uicBit = ctx.cktMode & MODEUIC;
     ctx.cktMode = uicBit | MODETRAN | MODEINITPRED;
-    ctx.initMode = "initPred";  // legacy mirror
 
     // Notify measurement observers
     this._stepCount++;
@@ -814,11 +809,6 @@ export class MNAEngine implements AnalogEngine {
     ctx.srcFact = 1;
     const uicBitDcop = ctx.cktMode & MODEUIC;
     ctx.cktMode = uicBitDcop | MODEDCOP | MODEINITJCT;
-    // Legacy mirrors:
-    ctx.isDcOp = true;
-    ctx.isTransient = false;
-    ctx.isTransientDcop = false;
-    ctx.isAc = false;
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
     solveDcOperatingPoint(ctx);
@@ -917,11 +907,6 @@ export class MNAEngine implements AnalogEngine {
     ctx.srcFact = 1;
     const uicBitTransDcop = ctx.cktMode & MODEUIC;
     ctx.cktMode = uicBitTransDcop | MODETRANOP | MODEINITJCT;
-    // Legacy mirrors (removed once F4 devices read cktMode):
-    ctx.isDcOp = true;
-    ctx.isTransient = true;   // MODETRAN bit is set inside MODETRANOP
-    ctx.isTransientDcop = true;
-    ctx.isAc = false;
     ctx._onPhaseBegin = phaseHook ? (phase: string, param?: number) => phaseHook.onAttemptBegin(phase as DcOpNRPhase, param ?? 0) : null;
     ctx._onPhaseEnd = phaseHook ? (outcome: string, converged: boolean) => phaseHook.onAttemptEnd(outcome as DcOpNRAttemptOutcome, converged) : null;
     solveDcOperatingPoint(ctx);
@@ -1199,20 +1184,17 @@ export class MNAEngine implements AnalogEngine {
     const ctx = this._ctx!;
     ctx.rhs.set(result.nodeVoltages);
 
+    for (const el of _elements) {
+      if (typeof (el as any).initVoltages === "function") {
+        (el as any).initVoltages(ctx.rhs);
+      }
+    }
+
     if (cac.statePool) {
       // dctran.c:346 — CKTmode = (CKTmode & MODEUIC) | MODETRAN | MODEINITTRAN
       // Preserve MODEUIC only; replace the analysis and INITF bits entirely.
       const uic = ctx.cktMode & MODEUIC;
       ctx.cktMode = uic | MODETRAN | MODEINITTRAN;
-
-      // Sync deprecated mirrors so any device still reading the legacy flags
-      // during the F4 transition sees consistent values.
-      ctx.initMode = "initTran";
-      ctx.isDcOp = false;
-      ctx.isTransient = true;
-      ctx.isTransientDcop = false;
-      ctx.isAc = false;
-      cac.statePool.analysisMode = "tran";
 
       // dctran.c:348 — CKTag[0] = CKTag[1] = 0
       ctx.ag[0] = 0;
@@ -1224,16 +1206,6 @@ export class MNAEngine implements AnalogEngine {
       // block (dctran.c:795-799), not here. See step()'s _stepCount === 0
       // branch for that seeding.
       cac.statePool.states[1].set(cac.statePool.states[0]);
-
-      // refreshElementRefs is pure reference-rebinding: rewrites s0..s7
-      // pointer fields on each PoolBackedAnalogElement so they point at the
-      // pool's current states[0..7] arrays. No scalar or state value is
-      // mutated. Kept as a defensive resync; the .set() above modified
-      // states[1]'s backing memory and any subsequent pool-level rotation
-      // (rotateStateVectors) needs devices to see the rotated slots.
-      cac.statePool.refreshElementRefs(
-        ctx.poolBackedElements as unknown as PoolBackedAnalogElement[],
-      );
     }
   }
 

@@ -30,6 +30,17 @@ import {
 } from "../../core/registry.js";
 import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
+import {
+  MODEINITJCT,
+  MODEINITFIX,
+  MODEINITSMSIG,
+  MODEINITTRAN,
+  MODEINITPRED,
+  MODETRAN,
+  MODEAC,
+  MODETRANOP,
+  MODEUIC,
+} from "../../solver/analog/ckt-mode.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import type { LteParams } from "../../solver/analog/ckt-terr.js";
@@ -59,28 +70,29 @@ const GMIN = 1e-12;
 
 // Slot index constants — shared between both schema variants.
 const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
-const SLOT_CAP_GEQ = 4, SLOT_CAP_IEQ = 5, SLOT_V = 6, SLOT_Q = 7;
-const SLOT_CCAP = 8;
+// SLOT_CAP_CURRENT dual semantics (dioload.c:363): under MODETRAN holds iqcap (A);
+// under MODEINITSMSIG holds capd (F) = raw total capacitance.
+const SLOT_CAP_CURRENT = 4, SLOT_V = 5, SLOT_Q = 6;
+const SLOT_CCAP = 7;
 
 /** Schema for resistive diode (no junction capacitance): 4 slots. */
 export const DIODE_SCHEMA: StateSchema = defineStateSchema("DiodeElement", [
-  { name: "VD",      doc: "pnjlim-limited junction voltage",                  init: { kind: "zero" } },
-  { name: "GEQ",     doc: "NR companion conductance",                         init: { kind: "constant", value: GMIN } },
-  { name: "IEQ",     doc: "NR companion Norton current",                      init: { kind: "zero" } },
-  { name: "ID",      doc: "Diode current at operating point",                 init: { kind: "zero" } },
+  { name: "VD",          doc: "pnjlim-limited junction voltage",                  init: { kind: "zero" } },
+  { name: "GEQ",         doc: "NR companion conductance",                         init: { kind: "constant", value: GMIN } },
+  { name: "IEQ",         doc: "NR companion Norton current",                      init: { kind: "zero" } },
+  { name: "ID",          doc: "Diode current at operating point",                 init: { kind: "zero" } },
 ]);
 
-/** Schema for capacitive diode (CJO > 0 or TT > 0): 9 slots. */
+/** Schema for capacitive diode (CJO > 0 or TT > 0): 8 slots. */
 export const DIODE_CAP_SCHEMA: StateSchema = defineStateSchema("DiodeElement_cap", [
-  { name: "VD",      doc: "pnjlim-limited junction voltage",                  init: { kind: "zero" } },
-  { name: "GEQ",     doc: "NR companion conductance",                         init: { kind: "constant", value: GMIN } },
-  { name: "IEQ",     doc: "NR companion Norton current",                      init: { kind: "zero" } },
-  { name: "ID",      doc: "Diode current at operating point",                 init: { kind: "zero" } },
-  { name: "CAP_GEQ", doc: "Junction-capacitance companion conductance",       init: { kind: "zero" } },
-  { name: "CAP_IEQ", doc: "Junction-capacitance companion history current",   init: { kind: "zero" } },
-  { name: "V",       doc: "Junction voltage at current step (for companion)", init: { kind: "zero" } },
-  { name: "Q",       doc: "Junction charge at current step",                  init: { kind: "zero" } },
-  { name: "CCAP",    doc: "Companion current (NIintegrate)",                  init: { kind: "zero" } },
+  { name: "VD",          doc: "pnjlim-limited junction voltage",                  init: { kind: "zero" } },
+  { name: "GEQ",         doc: "NR companion conductance",                         init: { kind: "constant", value: GMIN } },
+  { name: "IEQ",         doc: "NR companion Norton current",                      init: { kind: "zero" } },
+  { name: "ID",          doc: "Diode current at operating point",                 init: { kind: "zero" } },
+  { name: "CAP_CURRENT", doc: "MODETRAN: iqcap (A); MODEINITSMSIG: capd (F) — dioload.c:363 DIOcapCurrent", init: { kind: "zero" } },
+  { name: "V",           doc: "Junction voltage at current step (for companion)", init: { kind: "zero" } },
+  { name: "Q",           doc: "Junction charge at current step (DIOcapCharge)",  init: { kind: "zero" } },
+  { name: "CCAP",        doc: "Companion current (NIintegrate)",                  init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -329,9 +341,8 @@ export function computeDiodeIV(
   vtebrk: number,
 ): { id: number; gd: number } {
   if (vd >= -3 * nVt) {
-    // Region 1 — Forward: dioload.c:232-234
-    const expArg = Math.min(vd / nVt, 700);
-    const evd = Math.exp(expArg);
+    // Region 1 — Forward: dioload.c:247 evd = exp(vd/vte); no clamp
+    const evd = Math.exp(vd / nVt);
     return { id: IS * (evd - 1), gd: IS * evd / nVt };
   } else if (BV >= Infinity || vd >= -BV) {
     // Region 2 — Smooth reverse (cubic): dioload.c:238-244
@@ -340,7 +351,7 @@ export function computeDiodeIV(
     return { id: -IS * (1 + arg), gd: IS * 3 * arg / vd };
   } else {
     // Region 3 — Breakdown: dioload.c:246-252
-    const evrev = Math.exp(Math.min(-(BV + vd) / vtebrk, 700));
+    const evrev = Math.exp(-(BV + vd) / vtebrk);
     return { id: -IS * evrev, gd: IS * evrev / vtebrk };
   }
 }
@@ -440,7 +451,7 @@ export function createDiodeElement(
     isNonlinear: true,
     isReactive: hasCapacitance,
     poolBacked: true as const,
-    stateSize: hasCapacitance ? 9 : 4,
+    stateSize: hasCapacitance ? 8 : 4,
     stateSchema: hasCapacitance ? DIODE_CAP_SCHEMA : DIODE_SCHEMA,
     stateBaseOffset: -1,
 
@@ -463,27 +474,43 @@ export function createDiodeElement(
 
     load(ctx: LoadContext): void {
       const voltages = ctx.voltages;
+      const mode = ctx.cktMode;   // F4: bitfield (ckt-mode.ts)
 
-      // initPred path: adopt predictor values from previous accepted step
-      if (ctx.initMode === "initPred") {
+      // MODEINITPRED — #ifndef PREDICTOR path. dioload.c:98-99 (#ifndef
+      // PREDICTOR block): adopt predictor-extrapolated vd, but since ngspice
+      // ships with PREDICTOR #undef by default, this branch is NEVER entered
+      // in reference builds (nipred.c:20 early-returns, cktdefs.h builds
+      // never set MODEINITPRED). We retain an inert branch so state rotation
+      // still works if a future engine re-enables the predictor, matching
+      // dioload.c:128.
+      if (mode & MODEINITPRED) {
         s0[base + SLOT_VD]  = s1[base + SLOT_VD];
         s0[base + SLOT_ID]  = s1[base + SLOT_ID];
         s0[base + SLOT_GEQ] = s1[base + SLOT_GEQ];
       }
 
-      // During MODEINITJCT (dioload.c:120-135), ngspice overrides vd
-      // to seeded values rather than reading from the solution vector —
-      // at that phase ctx.voltages is all zeros.
+      // Select linearization voltage according to ngspice dioload.c:126-137.
       let vdRaw: number;
-      if (ctx.initMode === "initJct") {
-        if (params.OFF) {
-          vdRaw = 0;
-        } else if (pool.uic && !isNaN(params.IC)) {
-          vdRaw = params.IC;
+      if (mode & MODEINITSMSIG) {
+        // dioload.c:126-127: MODEINITSMSIG seeds vd from CKTstate0.
+        vdRaw = s0[base + SLOT_VD];
+      } else if (mode & MODEINITTRAN) {
+        // dioload.c:128-129: MODEINITTRAN seeds vd from CKTstate1.
+        vdRaw = s1[base + SLOT_VD];
+      } else if (mode & MODEINITJCT) {
+        // dioload.c:130-136: MODEINITJCT dispatch verbatim.
+        if ((mode & MODETRANOP) && (mode & MODEUIC)) {
+          vdRaw = params.IC;  // dioload.c:131-132: DIOinitCond
+        } else if (params.OFF) {
+          vdRaw = 0;           // dioload.c:133-134
         } else {
-          vdRaw = tVcrit;
+          vdRaw = tVcrit;      // dioload.c:135-136: DIOtVcrit
         }
+      } else if ((mode & MODEINITFIX) && params.OFF) {
+        // dioload.c:137-138: MODEINITFIX && DIOoff → vd = 0
+        vdRaw = 0;
       } else {
+        // Normal linearization from the NR iterate.
         const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
         const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
         vdRaw = va - vc;
@@ -491,11 +518,11 @@ export function createDiodeElement(
 
       const vtebrk = params.NBV * vt;
 
-      // Apply pnjlim — dioload.c:180-191
+      // Apply pnjlim — dioload.c:180-191.
       const vdOld = s0[base + SLOT_VD];
       let vdLimited: number;
-      if (ctx.initMode === "initJct") {
-        // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
+      if (mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) {
+        // dioload.c:126-135: these phases set vd directly — no pnjlim.
         vdLimited = vdRaw;
         pnjlimLimited = false;
       } else if (tBV < Infinity && vdRaw < Math.min(0, -tBV + 10 * vtebrk)) {
@@ -573,8 +600,13 @@ export function createDiodeElement(
       stampRHS(solver, nodeJunction, -ieq);
       stampRHS(solver, nodeCathode, ieq);
 
-      // Reactive companion: junction capacitance + transit-time diffusion cap
-      if (hasCapacitance && ctx.isTransient) {
+      // Reactive companion: junction capacitance + transit-time diffusion cap.
+      // ngspice dioload.c:316-317: gated on MODETRAN | MODEAC | MODEINITSMSIG
+      // OR (MODETRANOP && MODEUIC).
+      const capGate =
+        (mode & (MODETRAN | MODEAC | MODEINITSMSIG)) !== 0 ||
+        ((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0);
+      if (hasCapacitance && capGate) {
         const order = ctx.order;
         const method = ctx.method;
 
@@ -588,7 +620,7 @@ export function createDiodeElement(
         const q2 = s2[base + SLOT_Q];
         const q3 = s3[base + SLOT_Q];
 
-        if (ctx.initMode === "initTran") {
+        if (mode & MODEINITTRAN) {
           // dioload.c:391-393: MODEINITTRAN copies q0→q1 so first-step history matches
           s1[base + SLOT_Q] = q0;
           q1 = q0;
@@ -607,16 +639,27 @@ export function createDiodeElement(
           ccapPrev,
         );
         const capIeq = ccap - capGeq * vdLimited;
-        s0[base + SLOT_CAP_GEQ] = capGeq;
-        s0[base + SLOT_CAP_IEQ] = capIeq;
         s0[base + SLOT_V] = vdLimited;
         s0[base + SLOT_Q] = q0;
         s0[base + SLOT_CCAP] = ccap;
 
-        if (ctx.initMode === "initTran") {
+        if (mode & MODEINITTRAN) {
           // dioload.c:399-402: MODEINITTRAN copies ccap0→ccap1
           s1[base + SLOT_CCAP] = ccap;
         }
+
+        // Small-signal parameter store-back (dioload.c:360-374). Only during
+        // MODEINITSMSIG, and only when NOT (MODETRANOP && MODEUIC).
+        if ((mode & MODEINITSMSIG) &&
+            !((mode & MODETRANOP) && (mode & MODEUIC))) {
+          // dioload.c:363: store raw capd (Farads) into DIOcapCurrent slot.
+          s0[base + SLOT_CAP_CURRENT] = Ctotal;
+          // dioload.c:374: continue — skip niIntegrate companion stamp.
+          return;
+        }
+
+        // dioload.c: MODETRAN path — store iqcap (A) into DIOcapCurrent slot.
+        s0[base + SLOT_CAP_CURRENT] = ccap;
 
         if (capGeq !== 0 || capIeq !== 0) {
           stampG(solver, nodeJunction, nodeJunction, capGeq);
@@ -630,7 +673,7 @@ export function createDiodeElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      if (params.OFF && ctx.initMode === "initFix") return true;
+      if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
       // ngspice icheck gate: if voltage was limited in load(),
       // declare non-convergence immediately (DIOload sets CKTnoncon++)

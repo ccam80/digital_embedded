@@ -315,6 +315,7 @@ describe("Optocoupler", () => {
 
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 interface OptoCaptureStamp { row: number; col: number; value: number; }
 interface OptoCaptureRhs { row: number; value: number; }
@@ -356,8 +357,7 @@ function makeOptoParityCtx(voltages: Float64Array, solver: SparseSolverType): Lo
   return {
     solver,
     voltages,
-    iteration: 0,
-    initMode: "initFloat",
+    cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -366,10 +366,6 @@ function makeOptoParityCtx(voltages: Float64Array, solver: SparseSolverType): Lo
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

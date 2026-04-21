@@ -116,6 +116,10 @@ export class BehavioralDFlipflopElement implements AnalogElementCore {
     (this as unknown as { _vIH: number })._vIH = vIH;
   }
 
+  initVoltages(rhs: Float64Array): void {
+    this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
+  }
+
   load(ctx: LoadContext): void {
     // Delegate stamping to pin models
     this._clockPin.load(ctx);

@@ -38,7 +38,7 @@ export class StatePool {
   /**
    * Use Initial Conditions flag (ngspice MODEUIC).
    * Seeded from AnalogParams.uic via CKTCircuitContext.loadCtx.uic (D2).
-   * When true and initMode === "initTran", reactive elements apply their
+   * When true and (ctx.cktMode & MODEINITTRAN) !== 0, reactive elements apply their
    * IC= parameter as the initial state (capacitor.ts:260, inductor.ts:281,
    * diode.ts:660, bjt.ts:952/2139) rather than computing from DC-OP.
    * Mirrors traninit.c:35: CKTmode = job->TRANmode (which carries MODEUIC).

@@ -22,6 +22,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { PoolBackedAnalogElementCore, LoadContext } from "../../solver/analog/element.js";
+import { MODEINITJCT } from "../../solver/analog/ckt-mode.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -191,7 +192,7 @@ export function createZenerElement(
       const vdOld = s0[base + SLOT_VD];
       let vdLimited: number;
 
-      if (ctx.initMode === "initJct") {
+      if (ctx.cktMode & MODEINITJCT) {
         // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
         vdLimited = vdRaw;
         pnjlimLimited = false;
@@ -229,16 +230,14 @@ export function createZenerElement(
       let ieq: number;
       if (vdLimited >= -params.BV) {
         // Forward region and normal reverse region: standard Shockley
-        const expArg = Math.min(vdLimited / nVt, 700);
-        const expVal = Math.exp(expArg);
+        const expVal = Math.exp(vdLimited / nVt);
         const id = params.IS * (expVal - 1);
         geq = (params.IS * expVal) / nVt + GMIN;
         ieq = id - geq * vdLimited;
         s0[base + SLOT_ID] = id;
       } else {
         // Reverse breakdown region: Id = -IS * exp(-(Vd + BV) / (NBV*Vt))
-        const bdExpArg = Math.min(-(vdLimited + params.BV) / nbvVt, 700);
-        const bdExpVal = Math.exp(bdExpArg);
+        const bdExpVal = Math.exp(-(vdLimited + params.BV) / nbvVt);
         const id = -params.IS * bdExpVal;
         geq = (params.IS * bdExpVal) / nbvVt + GMIN;
         ieq = id - geq * vdLimited;

@@ -6,6 +6,7 @@ import { describe, it, expect, vi } from "vitest";
 import { makeDcVoltageSource, DcVoltageSourceDefinition } from "../dc-voltage-source.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { SparseSolver } from "../../../solver/analog/sparse-solver.js";
+import { MODEDCOP, MODEINITFLOAT, MODEINITJCT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -47,8 +48,7 @@ function makeMinimalCtx(solver: unknown) {
   return {
     solver: solver as SparseSolver,
     voltages: new Float64Array(4),
-    iteration: 0,
-    initMode: "initFloat" as const,
+    cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal" as const,
     order: 1,
@@ -57,10 +57,6 @@ function makeMinimalCtx(solver: unknown) {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -194,8 +190,7 @@ describe("dc_vsource_load_srcfact_parity", () => {
     const ctx = {
       solver: solver as unknown as SparseSolver,
       voltages: new Float64Array(4),
-      iteration: 0,
-      initMode: "initFloat" as const,
+      cktMode: MODEDCOP | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal" as const,
       order: 1,
@@ -204,10 +199,6 @@ describe("dc_vsource_load_srcfact_parity", () => {
       srcFact: SRC_FACT,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: true,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -235,8 +226,7 @@ describe("dc_vsource_load_srcfact_parity", () => {
     const ctx = {
       solver: solver as unknown as SparseSolver,
       voltages: new Float64Array(3),
-      iteration: 0,
-      initMode: "initFloat" as const,
+      cktMode: MODEDCOP | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal" as const,
       order: 1,
@@ -245,10 +235,6 @@ describe("dc_vsource_load_srcfact_parity", () => {
       srcFact: SRC_FACT,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: true,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,
@@ -274,8 +260,7 @@ describe("dc_vsource_load_srcfact_parity", () => {
     const ctx = {
       solver: solver as unknown as SparseSolver,
       voltages: new Float64Array(4),
-      iteration: 0,
-      initMode: "initJct" as const,
+      cktMode: MODEDCOP | MODEINITJCT,
       dt: 0,
       method: "trapezoidal" as const,
       order: 1,
@@ -284,10 +269,6 @@ describe("dc_vsource_load_srcfact_parity", () => {
       srcFact: SRC_FACT,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: true,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,

@@ -45,6 +45,7 @@ import {
 } from "../../core/registry.js";
 import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
 import { stampG } from "../../solver/analog/stamp-helpers.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
@@ -326,7 +327,8 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
    * All three reactive components use ctx.ag[] coefficients directly.
    */
   load(ctx: LoadContext): void {
-    const { solver, voltages, initMode, isDcOp, isTransient, ag } = ctx;
+    const { solver, voltages, ag } = ctx;
+    const mode = ctx.cktMode;
     const nA = this.pinNodeIds[0];
     const nB = this.pinNodeIds[1];
     const n1 = this.pinNodeIds[2];
@@ -347,7 +349,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     if (n1 !== 0) solver.stampElement(solver.allocElement(b, n1 - 1), 1);
     if (n2 !== 0) solver.stampElement(solver.allocElement(b, n2 - 1), -1);
 
-    if (!isTransient && !isDcOp) return;
+    if (!(mode & (MODETRAN | MODETRANOP))) return;
 
     const iNow = voltages[b];
     const vA = nA > 0 ? voltages[nA - 1] : 0;
@@ -356,31 +358,31 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const vCs = vN2 - vBv;
     const vC0 = vA - vBv;
 
-    if (isTransient) {
+    if (mode & MODETRAN) {
       // L_s flux update.
-      if (initMode === "initPred") {
+      if (mode & MODEINITPRED) {
         this.s0[base + SLOT_PHI_L] = this.s1[base + SLOT_PHI_L];
       } else {
         this.s0[base + SLOT_PHI_L] = this.L_s * iNow;
-        if (initMode === "initTran") {
+        if (mode & MODEINITTRAN) {
           this.s1[base + SLOT_PHI_L] = this.s0[base + SLOT_PHI_L];
         }
       }
       // C_s charge update.
-      if (initMode === "initPred") {
+      if (mode & MODEINITPRED) {
         this.s0[base + SLOT_Q_CS] = this.s1[base + SLOT_Q_CS];
       } else {
         this.s0[base + SLOT_Q_CS] = this.C_s * vCs;
-        if (initMode === "initTran") {
+        if (mode & MODEINITTRAN) {
           this.s1[base + SLOT_Q_CS] = this.s0[base + SLOT_Q_CS];
         }
       }
       // C_0 charge update.
-      if (initMode === "initPred") {
+      if (mode & MODEINITPRED) {
         this.s0[base + SLOT_Q_C0] = this.s1[base + SLOT_Q_C0];
       } else {
         this.s0[base + SLOT_Q_C0] = this.C_0 * vC0;
-        if (initMode === "initTran") {
+        if (mode & MODEINITTRAN) {
           this.s1[base + SLOT_Q_C0] = this.s0[base + SLOT_Q_C0];
         }
       }
@@ -397,7 +399,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
       this.s0[base + SLOT_CCAP_L] = ccapL;
       const geqL = ag[0] * this.L_s;
       const ceqL = ccapL - ag[0] * phiL_0;
-      if (initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[base + SLOT_CCAP_L] = ccapL;
       }
 
@@ -413,7 +415,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
       this.s0[base + SLOT_CCAP_CS] = ccapCs;
       const geqCs = ag[0] * this.C_s;
       const ceqCs = ccapCs - ag[0] * qCs_0;
-      if (initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[base + SLOT_CCAP_CS] = ccapCs;
       }
 
@@ -429,7 +431,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
       this.s0[base + SLOT_CCAP_C0] = ccapC0;
       const geqC0 = ag[0] * this.C_0;
       const ceqC0 = ccapC0 - ag[0] * qC0_0;
-      if (initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[base + SLOT_CCAP_C0] = ccapC0;
       }
 

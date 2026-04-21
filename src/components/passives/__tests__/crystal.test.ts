@@ -26,6 +26,7 @@ import { runDcOp } from "../../../solver/analog/__tests__/test-helpers.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { MODETRAN, MODEINITTRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -450,11 +451,12 @@ describe("Crystal", () => {
       const solver = new SparseSolver();
       solver.beginAssembly(5);
       const ctx: LoadContext = {
-        solver, voltages, iteration: 0, initMode: "initFloat", dt,
+        cktMode: MODETRAN | MODEINITFLOAT,
+        solver, voltages, dt,
         method: "trapezoidal", order: 1,
         deltaOld: [dt, dt, dt, dt, dt, dt, dt], ag,
         srcFact: 1, noncon: { value: 0 }, limitingCollector: null,
-        isDcOp: false, isTransient: true, isTransientDcop: false, isAc: false, xfact: 1, gmin: 1e-12, uic: false,
+        xfact: 1, gmin: 1e-12, uic: false,
         reltol: 1e-3, iabstol: 1e-12,
       };
       element.load(ctx);
@@ -558,10 +560,9 @@ describe("crystal_load_transient_parity (C4.2)", () => {
       matValues.fill(0);
 
       const ctx: LoadContext = {
+        cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
         voltages,
-        iteration: 0,
-        initMode: step === 0 ? "initTran" : "transient",
         dt,
         method,
         order,
@@ -570,10 +571,6 @@ describe("crystal_load_transient_parity (C4.2)", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: false,
-        isTransient: true,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,

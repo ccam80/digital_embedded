@@ -27,6 +27,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { MODETRAN, MODEAC, MODEINITJCT } from "../../solver/analog/ckt-mode.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { computeJunctionCapacitance, computeJunctionCharge } from "./diode.js";
@@ -187,7 +188,7 @@ export function createVaractorElement(
       // Apply pnjlim to prevent exponential runaway, using vold from pool
       const vdOld = s0[base + SLOT_VD];
       let vdLimited: number;
-      if (ctx.initMode === "initJct") {
+      if (ctx.cktMode & MODEINITJCT) {
         // dioload.c:130-136: MODEINITJCT sets vd directly — no pnjlim
         vdLimited = vdRaw;
         pnjlimLimited = false;
@@ -214,8 +215,7 @@ export function createVaractorElement(
       s0[base + SLOT_VD] = vdLimited;
 
       // Shockley equation linearized at operating point
-      const expArg = Math.min(vdLimited / nVt, 700);
-      const expVal = Math.exp(expArg);
+      const expVal = Math.exp(vdLimited / nVt);
       const id = p.iS * (expVal - 1);
       const gd = (p.iS * expVal) / nVt + GMIN;
       const ieq = id - gd * vdLimited;
@@ -232,7 +232,7 @@ export function createVaractorElement(
       stampRHS(solver, nodeCathode, ieq);
 
       // Reactive companion: varactor's PRIMARY purpose — voltage-controlled capacitance
-      if (ctx.isTransient) {
+      if (ctx.cktMode & (MODETRAN | MODEAC)) {
         const order = ctx.order;
         const method = ctx.method;
 

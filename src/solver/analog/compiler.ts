@@ -973,9 +973,11 @@ function buildAnalogNodeMapFromPartition(
   // Build labelToNodeId and labelPinNodes from all labeled components in
   // the partition.
   //
-  // `labelToNodeId` preserves the legacy single-node-per-label semantics for
-  // internal consumers (AC analysis, Monte Carlo, parameter sweep): it maps
-  // a label to the MNA node of the element's first resolved pin.
+  // IMPLEMENTATION FAILURE — does not match ngspice spec.
+  // Original excuse: "`labelToNodeId` preserves the legacy single-node-per-label semantics for internal consumers"
+  // Remedy: re-implement per spec. Do not weaken tests. Do not patch symptoms.
+  // See spec/reviews/ for the finding that identified this.
+  // `labelToNodeId` maps a label to the MNA node of the element's first resolved pin.
   //
   // `labelPinNodes` is the richer form used by the unified compile step to
   // build `labelSignalMap` entries: for each label it records every resolved

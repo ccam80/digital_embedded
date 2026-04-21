@@ -300,58 +300,10 @@ describe("harness integration", () => {
     expect(findFirstDivergence(compareSnapshots(session, session))).toBeNull();
   });
 
-  it("DEVICE_MAPPINGS has populated MOSFET mapping", () => {
-    const mos = DEVICE_MAPPINGS.mosfet;
-    expect(Object.keys(mos.slotToNgspice).length).toBeGreaterThan(0);
-    expect(Object.keys(mos.ngspiceToSlot).length).toBeGreaterThan(0);
-    // ngspice mos1defs.h: MOS1vbd=0, MOS1vbs=1, MOS1vgs=2, MOS1vds=3,
-    // MOS1capgs=4, MOS1qgs=5, MOS1cqgs=6, ..., MOS1cqgb=12.
-    expect(mos.slotToNgspice["VGS"]).toBe(2);
-    expect(mos.slotToNgspice["VDS"]).toBe(3);
-    expect(mos.slotToNgspice["Q_GS"]).toBe(5);
-    expect(mos.slotToNgspice["CCAP_GB"]).toBe(12);
-    // VSB is sign-inverted vs MOS1vbs — mapped via derivedNgspiceSlots, not direct.
-    expect(mos.slotToNgspice["VSB"]).toBeNull();
-    expect(mos.derivedNgspiceSlots?.VSB).toBeDefined();
-  });
-
-  it("DEVICE_MAPPINGS has JFET mapping with correct ngspice offsets", () => {
-    const jfet = DEVICE_MAPPINGS.jfet;
-    expect(jfet).toBeDefined();
-    expect(jfet.deviceType).toBe("jfet");
-    expect(jfet.slotToNgspice["VGS"]).toBe(0);      // JFETvgs
-    expect(jfet.slotToNgspice["GM"]).toBe(5);        // JFETgm
-    expect(jfet.slotToNgspice["GDS"]).toBe(6);       // JFETgds
-    expect(jfet.slotToNgspice["IDS"]).toBe(3);       // JFETcd
-    expect(jfet.slotToNgspice["Q_GS"]).toBe(9);      // JFETqgs
-    expect(jfet.slotToNgspice["CCAP_GS"]).toBe(10);  // JFETcqgs
-    expect(jfet.slotToNgspice["Q_GD"]).toBe(11);     // JFETqgd
-    expect(jfet.slotToNgspice["CCAP_GD"]).toBe(12);  // JFETcqgd
-    // No bulk for JFET
-    expect(jfet.slotToNgspice["VSB"]).toBeNull();
-    expect(jfet.slotToNgspice["Q_GB"]).toBeNull();
-    // Reverse mapping
-    expect(jfet.ngspiceToSlot[0]).toBe("VGS");
-    expect(jfet.ngspiceToSlot[3]).toBe("IDS");
-    expect(jfet.ngspiceToSlot[9]).toBe("Q_GS");
-  });
-
-  it("DEVICE_MAPPINGS has tunnel-diode and varactor mappings", () => {
-    const td = DEVICE_MAPPINGS["tunnel-diode"];
-    expect(td).toBeDefined();
-    expect(td.deviceType).toBe("tunnel-diode");
-    expect(td.slotToNgspice["VD"]).toBe(0);
-    expect(td.slotToNgspice["ID"]).toBe(1);
-    expect(td.slotToNgspice["GEQ"]).toBe(2);
-    expect(td.slotToNgspice["Q"]).toBe(3);
-    expect(td.slotToNgspice["CCAP"]).toBe(4);
-
-    const v = DEVICE_MAPPINGS.varactor;
-    expect(v).toBeDefined();
-    expect(v.deviceType).toBe("varactor");
-    expect(v.slotToNgspice["VD"]).toBe(0);
-    expect(v.slotToNgspice["Q"]).toBe(3);
-  });
+  // Three tests that verified the papering removed by commit dcf56e23 have
+  // been deleted here (MOSFET VSB null + derivedNgspiceSlots.VSB, JFET null
+  // slots, tunnel-diode/varactor mapping existence). Route:
+  // spec/parity-forcing-function-plan.md and spec/baseline-reality.md §2.1.
 
   it("step capture hook supports retry tracking via beginAttempt/endAttempt", () => {
     const { circuit, pool } = makeHWR();

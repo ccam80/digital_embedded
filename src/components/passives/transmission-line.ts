@@ -50,6 +50,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { MODEDC, MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
 import { stampG } from "../../solver/analog/stamp-helpers.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
@@ -376,19 +377,20 @@ class SegmentInductorElement implements ReactiveAnalogElement {
     const iNow = ctx.voltages[b];
 
     // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
-    if (!ctx.isDcOp && ctx.initMode !== "initPred") {
+    const mode = ctx.cktMode;
+    if (!(mode & (MODEDC | MODEINITPRED))) {
       this.s0[base + SLOT_L_PHI] = L * iNow;
-      if (ctx.initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[base + SLOT_L_PHI] = this.s0[base + SLOT_L_PHI];
       }
-    } else if (ctx.initMode === "initPred") {
+    } else if (mode & MODEINITPRED) {
       this.s0[base + SLOT_L_PHI] = this.s1[base + SLOT_L_PHI];
     }
 
     // Companion: zero at DC (indload.c:88-90), niIntegrate at TRAN.
     let geq = 0;
     let ceq = 0;
-    if (ctx.isTransient) {
+    if (!(mode & MODEDC)) {
       const ag = ctx.ag;
       const phi0 = this.s0[base + SLOT_L_PHI];
       const phi1 = this.s1[base + SLOT_L_PHI];
@@ -407,7 +409,7 @@ class SegmentInductorElement implements ReactiveAnalogElement {
       geq = ni.geq;
       ceq = ni.ceq;
       this.s0[base + SLOT_L_CCAP] = ni.ccap;
-      if (ctx.initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[base + SLOT_L_CCAP] = ni.ccap;
       }
     }
@@ -483,19 +485,20 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
   }
 
   load(ctx: LoadContext): void {
-    if (!ctx.isTransient && !ctx.isDcOp) return;
+    const mode = ctx.cktMode;
+    if (!(mode & (MODETRAN | MODETRANOP))) return;
     const solver = ctx.solver;
     const n0 = this.pinNodeIds[0];
     const vNow = n0 > 0 ? ctx.voltages[n0 - 1] : 0;
     const C = this.C;
 
-    if (ctx.isTransient) {
+    if (mode & MODETRAN) {
       const ag = ctx.ag;
-      if (ctx.initMode === "initPred") {
+      if (mode & MODEINITPRED) {
         this.s0[this.base + SLOT_C_Q] = this.s1[this.base + SLOT_C_Q];
       } else {
         this.s0[this.base + SLOT_C_Q] = C * vNow;
-        if (ctx.initMode === "initTran") {
+        if (mode & MODEINITTRAN) {
           this.s1[this.base + SLOT_C_Q] = this.s0[this.base + SLOT_C_Q];
         }
       }
@@ -513,7 +516,7 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
         [q2, q3, 0, 0, 0],
         ccapPrev,
       );
-      if (ctx.initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[this.base + SLOT_C_CCAP] = ccap;
       }
       this.s0[this.base + SLOT_C_CCAP] = ccap;
@@ -605,19 +608,20 @@ class CombinedRLElement implements ReactiveAnalogElement {
     const iNow = ctx.voltages[b];
 
     // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
-    if (!ctx.isDcOp && ctx.initMode !== "initPred") {
+    const mode = ctx.cktMode;
+    if (!(mode & (MODEDC | MODEINITPRED))) {
       this.s0[base + SLOT_RL_PHI] = L * iNow;
-      if (ctx.initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[base + SLOT_RL_PHI] = this.s0[base + SLOT_RL_PHI];
       }
-    } else if (ctx.initMode === "initPred") {
+    } else if (mode & MODEINITPRED) {
       this.s0[base + SLOT_RL_PHI] = this.s1[base + SLOT_RL_PHI];
     }
 
     // Companion: zero at DC (indload.c:88-90), niIntegrate at TRAN.
     let geq = 0;
     let ceq = 0;
-    if (ctx.isTransient) {
+    if (!(mode & MODEDC)) {
       const ag = ctx.ag;
       const phi0 = this.s0[base + SLOT_RL_PHI];
       const phi1 = this.s1[base + SLOT_RL_PHI];
@@ -636,7 +640,7 @@ class CombinedRLElement implements ReactiveAnalogElement {
       geq = ni.geq;
       ceq = ni.ceq;
       this.s0[base + SLOT_RL_CCAP] = ni.ccap;
-      if (ctx.initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[base + SLOT_RL_CCAP] = ni.ccap;
       }
     }

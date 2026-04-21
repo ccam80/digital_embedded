@@ -56,6 +56,7 @@ import { ButtonLEDDefinition } from "../../../components/io/button-led.js";
 // ---------------------------------------------------------------------------
 import type { ModelEntry, AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../load-context.js";
+import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
   return entry.factory;
@@ -368,8 +369,7 @@ describe("Relay", () => {
       return {
         solver: solver as any,
         voltages: v,
-        iteration: 0,
-        initMode: "transient" as const,
+        cktMode: MODETRAN | MODEINITFLOAT,
         dt,
         method: "trapezoidal" as const,
         order: 1,
@@ -378,10 +378,6 @@ describe("Relay", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: false,
-        isTransient: true,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 0,
         gmin: 1e-12,
         uic: false,
@@ -499,8 +495,7 @@ describe("Task 6.4.3 — remaining pin loading propagates", () => {
     const ctx: LoadContext = {
       solver: solver as any,
       voltages: new Float64Array(16),
-      iteration: 0,
-      initMode: "transient" as const,
+      cktMode: MODETRAN | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal" as const,
       order: 1,
@@ -509,10 +504,6 @@ describe("Task 6.4.3 — remaining pin loading propagates", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: false,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 0,
       gmin: 1e-12,
       uic: false,

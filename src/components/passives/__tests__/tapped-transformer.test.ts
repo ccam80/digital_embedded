@@ -27,10 +27,16 @@ import {
 import { PropertyBag } from "../../../core/properties.js";
 import { ComponentCategory, ComponentRegistry } from "../../../core/registry.js";
 import { SparseSolver } from "../../../solver/analog/sparse-solver.js";
-import { makeVoltageSource, makeResistor, makeDiode, makeCapacitor, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
+import { makeVoltageSource, makeResistor, makeDiode, makeCapacitor, makeAcVoltageSource, allocateStatePool } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElementCore } from "../../../solver/analog/element.js";
+import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import { MODETRAN, MODEINITTRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
+import { ConcreteCompiledAnalogCircuit } from "../../../solver/analog/compiled-analog-circuit.js";
+import { StatePool } from "../../../solver/analog/state-pool.js";
+import { MNAEngine } from "../../../solver/analog/analog-engine.js";
+import { EngineState } from "../../../core/engine-interface.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -57,10 +63,9 @@ function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: 
     ag[1] = -1 / dt;
   }
   return {
+    cktMode: MODETRAN | MODEINITFLOAT,
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     voltages,
-    iteration: 0,
-    initMode: "initFloat",
     dt,
     method: "trapezoidal",
     order: 1,
@@ -69,16 +74,47 @@ function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: 
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: true,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
   };
+}
+
+// ---------------------------------------------------------------------------
+// buildTxCircuit — compile a transformer circuit for use with MNAEngine
+// ---------------------------------------------------------------------------
+
+function buildTxCircuit(opts: {
+  nodeCount: number;
+  branchCount: number;
+  elements: AnalogElement[];
+}): ConcreteCompiledAnalogCircuit {
+  let offset = 0;
+  for (const el of opts.elements) {
+    if ((el as unknown as { poolBacked?: boolean }).poolBacked) {
+      (el as unknown as { stateBaseOffset: number }).stateBaseOffset = offset;
+      offset += (el as unknown as { stateSize: number }).stateSize ?? 0;
+    }
+  }
+  const statePool = new StatePool(Math.max(offset, 1));
+  for (const el of opts.elements) {
+    if ((el as unknown as { poolBacked?: boolean }).poolBacked &&
+        (el as unknown as { initState?: (p: StatePool) => void }).initState) {
+      (el as unknown as { initState: (p: StatePool) => void }).initState(statePool);
+    }
+  }
+  return new ConcreteCompiledAnalogCircuit({
+    nodeCount: opts.nodeCount,
+    branchCount: opts.branchCount,
+    elements: opts.elements,
+    labelToNodeId: new Map(),
+    wireToNodeId: new Map(),
+    models: new Map(),
+    elementToCircuitElement: new Map(),
+    statePool,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -125,25 +161,25 @@ describe("TappedTransformer", () => {
      *   Load: Rload between S1 and S2 (nodes 2 and 4), CT not loaded (floating mid)
      *   Branches: bVsrc=4, bTx1=5, bTx2=6, bTx3=7
      *   matrixSize = nodeCount(4) + branchCount(4) = 8
+     *
+     * Uses MNAEngine for proper NR + adaptive timestepping to handle the stiff
+     * coupled-inductor system (k=0.99 → near-singular L matrix).
      */
     const N = 2;
     const Vpeak = 10.0;
     const freq = 1000;
-    const Lp = 500e-3; // large L for good coupling at 1kHz
+    const Lp = 500e-3;
     const k = 0.99;
-    // Use a high-impedance load so transformer is nearly unloaded — secondary
-    // voltage is close to open-circuit value (each half ≈ Vpeak for N=2).
-    const Rload = 100e3; // 100kΩ — very light load
-    const dt = 1 / (freq * 400);
+    const Rload = 100e3;
     const numCycles = 20;
-    const steps = numCycles * 400;
+    const period = 1 / freq;
 
     const nodeCount = 4;
-    const bVsrc = nodeCount + 0;
-    const bTx1 = nodeCount + 1;
-    const matrixSize = nodeCount + 4;
+    const bVsrc = nodeCount + 0;  // branch row 4
+    const bTx1 = nodeCount + 1;   // branch row 5
 
-    // pinNodeIds: [p1, p2, s1, ct, s2]
+    const engine = new MNAEngine();
+
     const tx = makeTappedTransformer({
       pinNodeIds: [1, 0, 2, 3, 4],
       branch1: bTx1,
@@ -152,43 +188,31 @@ describe("TappedTransformer", () => {
       k,
     });
 
-    // Load resistor across full secondary (S1 to S2 = nodes 2 to 4)
     const rLoad = makeResistor(2, 4, Rload);
-    // CT and S2 tied to gnd via high-impedance reference to avoid floating
     const rCtGnd = makeResistor(3, 0, 1e6);
     const rS2Gnd = makeResistor(4, 0, 1e6);
+    const vsrc = makeAcVoltageSource(1, 0, bVsrc, Vpeak, freq, 0, 0, () => engine.simTime);
 
-    allocateStatePool([tx as AnalogElementCore]);
+    const compiled = buildTxCircuit({
+      nodeCount,
+      branchCount: 4,
+      elements: [vsrc, tx as unknown as AnalogElement, rLoad, rCtGnd, rS2Gnd],
+    });
 
-    const solver = new SparseSolver();
-    let voltages = new Float64Array(matrixSize);
+    engine.init(compiled);
+    engine.configure({ maxTimeStep: period / 100 });
+    engine.transientDcop();
+
     let maxVS1CT = 0;
     let maxVCTS2 = 0;
     let maxVS1S2 = 0;
-    const lastCycleStart = (numCycles - 1) * 400;
 
-    for (let i = 0; i < steps; i++) {
-      const t = i * dt;
-      const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
-      const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
-
-      solver.beginAssembly(matrixSize);
-      const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, dt);
-      vsrc.load(ctx);
-      tx.load(ctx);
-      rLoad.load(ctx);
-      rCtGnd.load(ctx);
-      rS2Gnd.load(ctx);
-      solver.finalize();
-      const result = solver.factor();
-      if (!result.success) throw new Error(`Singular at step ${i}`);
-      solver.solve(voltages);
-
-      if (i >= lastCycleStart) {
-        // node 2 = S1 (index 1), node 3 = CT (index 2), node 4 = S2 (index 3)
-        const vs1 = voltages[1];
-        const vct = voltages[2];
-        const vs2 = voltages[3];
+    while (engine.simTime < numCycles * period && engine.getState() !== EngineState.ERROR) {
+      engine.step();
+      if (engine.simTime >= (numCycles - 1) * period) {
+        const vs1 = engine.getNodeVoltage(2);
+        const vct = engine.getNodeVoltage(3);
+        const vs2 = engine.getNodeVoltage(4);
         const absS1CT = Math.abs(vs1 - vct);
         const absCTS2 = Math.abs(vct - vs2);
         const absS1S2 = Math.abs(vs1 - vs2);
@@ -197,6 +221,8 @@ describe("TappedTransformer", () => {
         if (absS1S2 > maxVS1S2) maxVS1S2 = absS1S2;
       }
     }
+
+    expect(engine.getState()).not.toBe(EngineState.ERROR);
 
     // For N=2 with near-open-circuit load: each half ≈ Vpeak (1:1 per half).
     // Tolerances ±15% for inductive losses with k=0.99.
@@ -247,7 +273,7 @@ describe("TappedTransformer", () => {
     // Ground S2 via reference
     const rGnd = makeResistor(4, 0, 0.1); // low resistance to gnd for S2
 
-    allocateStatePool([tx as AnalogElementCore]);
+    const pool = allocateStatePool([tx as AnalogElementCore]);
 
     const solver = new SparseSolver();
     let voltages = new Float64Array(matrixSize);
@@ -262,6 +288,7 @@ describe("TappedTransformer", () => {
 
       solver.beginAssembly(matrixSize);
       const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, dt);
+      if (i === 0) ctx.cktMode = MODETRAN | MODEINITTRAN;
       vsrc.load(ctx);
       tx.load(ctx);
       rLoad1.load(ctx);
@@ -271,6 +298,8 @@ describe("TappedTransformer", () => {
       const result = solver.factor();
       if (!result.success) throw new Error(`Singular at step ${i}`);
       solver.solve(voltages);
+      pool.rotateStateVectors();
+      pool.refreshElementRefs([tx as AnalogElementCore]);
 
       if (i >= lastCycleStart) {
         const vs1 = voltages[1]; // node 2
@@ -303,6 +332,8 @@ describe("TappedTransformer", () => {
      * Nodes: 1=P1, 2=S1, 3=CT(gnd ref), 4=S2, 5=out
      * Branches: bVsrc=5, bTx1=6, bTx2=7, bTx3=8
      * matrixSize = nodeCount(5) + branchCount(4) = 9
+     *
+     * Uses MNAEngine for proper NR + adaptive timestepping.
      */
     const N = 2;
     const Vpeak = 10.0;
@@ -310,14 +341,14 @@ describe("TappedTransformer", () => {
     const Lp = 500e-3;
     const k = 0.99;
     const Rload = 500.0;
-    const dt = 1 / (freq * 200);
     const numCycles = 40;
-    const steps = numCycles * 200;
+    const period = 1 / freq;
 
     const nodeCount = 5;
-    const bVsrc = nodeCount + 0;
-    const bTx1 = nodeCount + 1;
-    const matrixSize = nodeCount + 4;
+    const bVsrc = nodeCount + 0;  // branch row 5
+    const bTx1 = nodeCount + 1;   // branch row 6
+
+    const engine = new MNAEngine();
 
     const tx = makeTappedTransformer({
       pinNodeIds: [1, 0, 2, 3, 4],
@@ -327,81 +358,35 @@ describe("TappedTransformer", () => {
       k,
     });
 
-    // CT tied firmly to gnd
     const rCtGnd = makeResistor(3, 0, 0.01);
-
-    // Diodes: D1 anode=S1(2), cathode=out(5); D2 anode=S2(4), cathode=out(5)
     const d1 = makeDiode(2, 5, 1e-14, 1.0);
     const d2 = makeDiode(4, 5, 1e-14, 1.0);
-    const pool = allocateStatePool([tx as unknown as AnalogElementCore, d1, d2]);
-
-    // Filter cap 1000µF + load
     const cFilter = makeCapacitor(5, 0, 1000e-6);
     const rLoadEl = makeResistor(5, 0, Rload);
+    const vsrc = makeAcVoltageSource(1, 0, bVsrc, Vpeak, freq, 0, 0, () => engine.simTime);
 
-    const solver = new SparseSolver();
-    let voltages = new Float64Array(matrixSize);
+    const compiled = buildTxCircuit({
+      nodeCount,
+      branchCount: 4,
+      elements: [vsrc, tx as unknown as AnalogElement, rCtGnd, d1, d2, cFilter, rLoadEl],
+    });
 
-    for (let i = 0; i < steps; i++) {
-      const t = i * dt;
-      const vSrc = Vpeak * Math.sin(2 * Math.PI * freq * t);
-      const vsrc = makeVoltageSource(1, 0, bVsrc, vSrc);
+    engine.init(compiled);
+    engine.configure({ maxTimeStep: period / 100 });
+    engine.transientDcop();
 
-      // NR loop for diodes (up to 50 iterations per timestep). On the first
-      // NR iteration of the very first step, use initMode="initTran" so
-      // reactive elements seed state1 history from state0. After convergence
-      // we call element.accept(ctx,...) to advance history (q1 ← current q).
-      let lastCtx: LoadContext | null = null;
-      for (let nr = 0; nr < 50; nr++) {
-        solver.beginAssembly(matrixSize);
-        const ctx = makeTransientCtx(solver as unknown as SparseSolverType, voltages, dt);
-        if (i === 0 && nr === 0) ctx.initMode = "initTran";
-        vsrc.load(ctx);
-        tx.load(ctx);
-        rCtGnd.load(ctx);
-        cFilter.load(ctx);
-        rLoadEl.load(ctx);
-        d1.load(ctx);
-        d2.load(ctx);
-        solver.finalize();
-
-        const result = solver.factor();
-        if (!result.success) throw new Error(`Singular at step ${i} NR ${nr}`);
-
-        solver.solve(voltages);
-
-        // Check convergence — elements checkConvergence takes a LoadContext in the
-        // migrated API; diode test-helper uses checkConvergence(ctx).
-        const d1conv = d1.checkConvergence?.(ctx) ?? true;
-        const d2conv = d2.checkConvergence?.(ctx) ?? true;
-        lastCtx = ctx;
-        if (d1conv && d2conv) break;
-      }
-
-      // Advance reactive element history after the step converges.
-      if (lastCtx) {
-        lastCtx.voltages = voltages;
-        cFilter.accept?.(lastCtx, i * dt, () => {});
-        d1.accept?.(lastCtx, i * dt, () => {});
-        d2.accept?.(lastCtx, i * dt, () => {});
-      }
-      // Rotate pool-backed state history so the tapped transformer's s1 holds
-      // the just-accepted step (ngspice dctran.c post-accept rotation).
-      pool.rotateStateVectors();
-      pool.refreshElementRefs([
-        tx as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore,
-        d1 as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore,
-        d2 as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore,
-      ]);
+    while (engine.simTime < numCycles * period && engine.getState() !== EngineState.ERROR) {
+      engine.step();
     }
 
-    // Measure final DC output at node 5 (index 4)
-    const vOut = voltages[4];
+    expect(engine.getState()).not.toBe(EngineState.ERROR);
+
+    // Measure DC output at node 5
+    const vOut = engine.getNodeVoltage(5);
 
     // For N=2 (1:1 per half), each secondary half peak ≈ Vpeak = 10V.
-    // After full-wave rectification: V_dc ≈ Vpeak - V_diode.
-    // Allow ±30% tolerance for transformer inductive losses and diode model
-    // startup transients with single-NR-iteration per timestep approach.
+    // After full-wave rectification: V_dc ≈ Vpeak - V_diode ≈ 9.3V.
+    // Allow ±30% tolerance for transformer inductive losses.
     const expectedDC = Vpeak - 0.7;
     expect(vOut).toBeGreaterThan(expectedDC * 0.70);
     expect(vOut).toBeLessThan(expectedDC * 1.30);
@@ -613,10 +598,9 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
       matValues.fill(0);
 
       const ctx: LoadContext = {
+        cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
         voltages,
-        iteration: 0,
-        initMode: step === 0 ? "initTran" : "transient",
         dt,
         method,
         order,
@@ -625,10 +609,6 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: false,
-        isTransient: true,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,

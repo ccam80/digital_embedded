@@ -29,9 +29,8 @@ import { cktLoad } from "./ckt-load.js";
 import type { CKTCircuitContext } from "./ckt-context.js";
 import {
   setInitf,
-  MODETRAN,
-  MODEINITJCT, MODEINITFIX, MODEINITFLOAT, MODEINITSMSIG,
-  MODEINITTRAN, MODEINITPRED,
+  isTranOp,
+  MODEINITJCT, MODEINITFLOAT, MODEINITSMSIG,
 } from "./ckt-mode.js";
 
 // Phase and outcome types re-exported from harness types for use in production code.
@@ -51,12 +50,6 @@ export type DcOpNRAttemptOutcome =
   | "dcopSubSolveConverged"
   | "dcopPhaseHandoff"
   | "finalFailure";
-
-// ---------------------------------------------------------------------------
-// InitMode — type alias for pool.initMode values
-// ---------------------------------------------------------------------------
-
-type InitMode = "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -158,17 +151,10 @@ function runNR(
   // the cktMode write — standalone .OP sets MODEDCOP | MODEINITJCT (dcop.c:82)
   // and transient-boot DCOP sets MODETRANOP | MODEINITJCT (dctran.c:231).
   // Sub-solves (gmin/src stepping ladders) inherit those bits and only flip
-  // the INITF sub-field via ladder.onModeBegin. No ctx.isTransient = false
-  // write here — the cktMode bitfield already encodes the correct analysis
-  // mode and sub-solves must not clobber it (MODETRANOP has MODETRAN set,
-  // and zeroing it here would break srcFact scaling inside the transient-boot
-  // ladder).
-
-  // Legacy mirror maintenance during F4 transition:
-  ctx.isDcOp = true;
-  ctx.isAc = false;
-  // isTransient is derived from cktMode's MODETRAN bit; update the mirror.
-  ctx.isTransient = (ctx.cktMode & MODETRAN) !== 0;
+  // the INITF sub-field via ladder.onModeBegin. The cktMode bitfield already
+  // encodes the correct analysis mode and sub-solves must not clobber it
+  // (MODETRANOP has MODETRAN set, and zeroing it here would break srcFact
+  // scaling inside the transient-boot ladder).
 
   ctx.maxIterations = maxIterations;
   ctx.diagonalGmin = diagonalGmin;
@@ -196,24 +182,12 @@ function runNR(
  */
 function cktop(
   ctx: CKTCircuitContext,
-  firstMode: InitMode,
-  _continueMode: InitMode,
+  firstInitf: number,
   maxIter: number,
   preExistingVoltages: Float64Array,
   ladder: CKTCircuitContext["dcopModeLadder"],
 ): StepResult {
-  // Translate the string-typed firstMode parameter into its INITF bit and
-  // write both cktMode (source of truth) and initMode (legacy mirror).
-  const firstInitf =
-    firstMode === "initJct"   ? MODEINITJCT   :
-    firstMode === "initFix"   ? MODEINITFIX   :
-    firstMode === "initFloat" ? MODEINITFLOAT :
-    firstMode === "initTran"  ? MODEINITTRAN  :
-    firstMode === "initPred"  ? MODEINITPRED  :
-    firstMode === "initSmsig" ? MODEINITSMSIG :
-    MODEINITFLOAT;
   ctx.cktMode = setInitf(ctx.cktMode, firstInitf);
-  ctx.initMode = firstMode;
   if (ctx.params.noOpIter) {
     return {
       converged: true,
@@ -250,9 +224,9 @@ function cktop(
  * observed leaking "initSmsig" — matches niiter.c's post-converge INITF
  * dispatcher landing mode.
  *
- * Runs ONLY on the standalone .OP path (isTransientDcop === false). The
+ * Runs ONLY on the standalone .OP path (!isTranOp(ctx.cktMode)). The
  * transient-boot DCOP path (dctran.c:230-346) has no smsig load and callers
- * must skip this function — see task 2.3.2 gates at each call site.
+ * must skip this function — gate on !isTranOp(ctx.cktMode) at each call site.
  */
 function dcopFinalize(
   ctx: CKTCircuitContext,
@@ -261,7 +235,6 @@ function dcopFinalize(
   // dcop.c:127 — flip INITF bits to MODEINITSMSIG; analysis bits stay as set
   // by the caller (MODEDCOP for standalone .OP).
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITSMSIG);
-  ctx.initMode = "initSmsig";  // legacy mirror
   // Elements read voltages via loadCtx.voltages — cktLoad sets that to
   // ctx.rhsOld each call. Seed the converged solution.
   ctx.rhsOld.set(voltages);
@@ -273,7 +246,6 @@ function dcopFinalize(
   // next analysis starting. _seedFromDcop overwrites the mode unconditionally,
   // so this is a belt-and-suspenders landing.
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
-  ctx.initMode = "initFloat";  // legacy mirror
 }
 
 // ---------------------------------------------------------------------------
@@ -367,8 +339,7 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
 
   const directResult = cktop(
     ctx,
-    "initJct",
-    "initFloat",
+    MODEINITJCT,
     params.maxIterations,
     voltages,
     ladder,
@@ -381,9 +352,9 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
     voltages.set(directResult.voltages);
     // ngspice DCtran (dctran.c:230-346) performs NO CKTload after the
     // transient-boot CKTop returns. The initSmsig load fires only from DCop
-    // (dcop.c:127,153) on the standalone .OP path. Gate on isTransientDcop
+    // (dcop.c:127,153) on the standalone .OP path. Gate on !isTranOp(ctx.cktMode)
     // so transient-boot DCOP skips the smsig pass entirely.
-    if (!ctx.isTransientDcop) {
+    if (!isTranOp(ctx.cktMode)) {
       dcopFinalize(ctx, voltages);
     }
     diagnostics.emit(
@@ -419,7 +390,7 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   if (gminResult.converged) {
     voltages.set(gminResult.voltages);
     // smsig load is .OP-only — skip on transient-boot DCOP (dctran.c:230-346).
-    if (!ctx.isTransientDcop) {
+    if (!isTranOp(ctx.cktMode)) {
       dcopFinalize(ctx, voltages);
     }
     const gminMethod = numGminSteps <= 1 ? "dynamic-gmin" : "spice3-gmin";
@@ -458,7 +429,7 @@ export function solveDcOperatingPoint(ctx: CKTCircuitContext): void {
   if (srcResult.converged) {
     voltages.set(srcResult.voltages);
     // smsig load is .OP-only — skip on transient-boot DCOP (dctran.c:230-346).
-    if (!ctx.isTransientDcop) {
+    if (!isTranOp(ctx.cktMode)) {
       dcopFinalize(ctx, voltages);
     }
     const srcMethod = numSrcSteps <= 1 ? "gillespie-src" : "spice3-src";
@@ -541,7 +512,6 @@ function dynamicGmin(
   const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);  // cktop.c:35 firstmode=MODEINITJCT
-  ctx.initMode = "initJct";  // legacy mirror
 
   // Use ctx.dcopSavedVoltages and ctx.dcopSavedState0 for snapshots
   const savedVoltages = ctx.dcopSavedVoltages;
@@ -563,7 +533,6 @@ function dynamicGmin(
     if (result.converged) {
       onPhaseEnd?.("dcopSubSolveConverged", true);
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:179 continuemode=MODEINITFLOAT
-      ctx.initMode = "initFloat";  // legacy mirror
       if (diagGmin <= gtarget) {
         break;
       }
@@ -632,7 +601,6 @@ function spice3Gmin(
   const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);  // cktop.c:291 firstmode=MODEINITJCT
-  ctx.initMode = "initJct";  // legacy mirror
 
   let totalIter = 0;
 
@@ -657,7 +625,6 @@ function spice3Gmin(
 
     onPhaseEnd?.("dcopSubSolveConverged", true);
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:319 continuemode=MODEINITFLOAT
-    ctx.initMode = "initFloat";  // legacy mirror
     voltages.set(result.voltages);
     diagGmin /= gminFactor;
   }
@@ -694,7 +661,6 @@ function spice3Src(
   const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);  // cktop.c:591 firstmode=MODEINITJCT
-  ctx.initMode = "initJct";  // legacy mirror
   let totalIter = 0;
   const numSrcSteps = params.numSrcSteps ?? 1;
 
@@ -712,7 +678,6 @@ function spice3Src(
     }
     onPhaseEnd?.("dcopSubSolveConverged", true);
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:603 continuemode=MODEINITFLOAT
-    ctx.initMode = "initFloat";  // legacy mirror
     voltages.set(result.voltages);
   }
 
@@ -740,7 +705,6 @@ function gillespieSrc(
   const voltages = ctx.dcopVoltages;
   zeroState(voltages, statePool);
   ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);  // cktop.c:381 firstmode=MODEINITJCT
-  ctx.initMode = "initJct";  // legacy mirror
   scaleAllSources(ctx, 0);
 
   const savedVoltages = ctx.dcopSavedVoltages;
@@ -772,7 +736,6 @@ function gillespieSrc(
       }
       onPhaseEnd?.("dcopSubSolveConverged", true);
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:453 continuemode=MODEINITFLOAT
-      ctx.initMode = "initFloat";  // legacy mirror
       diagGmin /= 10;
       if (decade === 10) {
         bootstrapConverged = true;
@@ -785,7 +748,6 @@ function gillespieSrc(
   } else {
     onPhaseEnd?.("dcopSubSolveConverged", true);
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:453-497 continuemode=MODEINITFLOAT
-    ctx.initMode = "initFloat";  // legacy mirror
   }
 
   // cktop.c:420-424: initialise stepping parameters
@@ -807,7 +769,6 @@ function gillespieSrc(
     if (stepResult.converged) {
       onPhaseEnd?.("dcopSubSolveConverged", true);
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);  // cktop.c:497 continuemode=MODEINITFLOAT
-      ctx.initMode = "initFloat";  // legacy mirror
       voltages.set(stepResult.voltages);
       saveSnapshot(voltages, savedVoltages, statePool, savedState0);
       convFact = srcFact;

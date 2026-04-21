@@ -27,6 +27,7 @@ import { SparseSolver } from "./sparse-solver.js";
 import { DiagnosticCollector, makeDiagnostic } from "./diagnostics.js";
 import { solveDcOperatingPoint } from "./dc-operating-point.js";
 import { CKTCircuitContext } from "./ckt-context.js";
+import { MODEAC, MODEUIC } from "./ckt-mode.js";
 import type { AnalogElement } from "./element.js";
 import type { SimulationParams } from "../../core/analog-engine-interface.js";
 import type { Diagnostic } from "../../compile/types.js";
@@ -178,17 +179,10 @@ export class AcAnalysis {
     let acBranchHandleA = -1;
     let acBranchHandleB = -1;
 
-    // D4: ngspice acan.c:285 — `CKTmode = (CKTmode & MODEUIC) | MODEAC` at top
-    // of frequency loop. We preserve the LoadContext's uic field (set from
-    // params.uic at ctx construction) and flip isAc=true / isDcOp=false /
-    // isTransient=false for the entire sweep.
+    // acan.c:285: CKTmode = (CKTmode & MODEUIC) | MODEAC
     const acLoadCtx = dcCtx.loadCtx;
-    acLoadCtx.isAc = true;
-    acLoadCtx.isDcOp = false;
-    acLoadCtx.isTransient = false;
-    dcCtx.isAc = true;
-    dcCtx.isDcOp = false;
-    dcCtx.isTransient = false;
+    acLoadCtx.cktMode = (dcCtx.cktMode & MODEUIC) | MODEAC;
+    dcCtx.cktMode = acLoadCtx.cktMode;
 
     for (let fi = 0; fi < numFreq; fi++) {
       const f = frequencies[fi];

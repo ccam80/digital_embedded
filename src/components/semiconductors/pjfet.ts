@@ -31,12 +31,23 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import { NJfetAnalogElement } from "./njfet.js";
+import { SLOT_VGS, SLOT_VDS } from "../../solver/analog/fet-base.js";
+import { SLOT_VGS_JUNCTION } from "./njfet.js";
 import type { LoadContext } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams } from "../../core/model-params.js";
 import { VT } from "../../core/constants.js";
+import {
+  MODEINITSMSIG,
+  MODEINITTRAN,
+  MODEINITJCT,
+  MODETRAN,
+  MODEAC,
+  MODETRANOP,
+  MODEUIC,
+} from "../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -113,9 +124,47 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
   protected override _updateOp(ctx: LoadContext): void {
     const voltages = ctx.voltages;
     const limitingCollector = ctx.limitingCollector;
-    // jfetload.c: during MODEINITJCT, primeJunctions() has already set _vgs, _vds,
-    // _vgs_junction directly. Skip MNA voltage reads and all voltage limiting.
-    if (ctx.initMode === "initJct") {
+    const mode = ctx.cktMode;
+
+    if (mode & MODEINITSMSIG) {
+      // jfetload.c:103-105: seed vgs/vgd from CKTstate0.
+      const base = this.stateBaseOffset;
+      this._vgs = this._s0[base + SLOT_VGS];
+      this._vds = this._s0[base + SLOT_VDS];
+      this._vgs_junction = this._s0[base + SLOT_VGS_JUNCTION];
+      this._pnjlimLimited = false;
+      this._swapped = false;
+      this._ids = this.computeIds(this._vgs, this._vds);
+      this._gm = this.computeGm(this._vgs, this._vds);
+      this._gds = this.computeGds(this._vgs, this._vds);
+      const vt_n = VT * this._p.N;
+      const expArg = this._vgs_junction / vt_n;
+      this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
+      this._id_junction = this._p.IS * (Math.exp(expArg) - 1);
+      return;
+    }
+
+    if (mode & MODEINITTRAN) {
+      // jfetload.c:106-108: seed vgs/vgd from CKTstate1.
+      const base = this.stateBaseOffset;
+      this._vgs = this.s1[base + SLOT_VGS];
+      this._vds = this.s1[base + SLOT_VDS];
+      this._vgs_junction = this.s1[base + SLOT_VGS_JUNCTION];
+      this._pnjlimLimited = false;
+      this._swapped = false;
+      this._ids = this.computeIds(this._vgs, this._vds);
+      this._gm = this.computeGm(this._vgs, this._vds);
+      this._gds = this.computeGds(this._vgs, this._vds);
+      const vt_n = VT * this._p.N;
+      const expArg = this._vgs_junction / vt_n;
+      this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
+      this._id_junction = this._p.IS * (Math.exp(expArg) - 1);
+      return;
+    }
+
+    if (mode & MODEINITJCT) {
+      // jfetload.c: during MODEINITJCT, primeJunctions() has already set _vgs, _vds,
+      // _vgs_junction directly. Skip MNA voltage reads and all voltage limiting.
       this._pnjlimLimited = false;
       this._swapped = false;
 
@@ -125,7 +174,7 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
 
       // Gate junction I-V at primed vgs_junction
       const vt_n = VT * this._p.N;
-      const expArg = Math.min(this._vgs_junction / vt_n, 80);
+      const expArg = this._vgs_junction / vt_n;
       const igJunction = this._p.IS * (Math.exp(expArg) - 1);
       this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
       this._id_junction = igJunction;
@@ -187,11 +236,18 @@ export class PJfetAnalogElement extends NJfetAnalogElement {
       });
     }
 
-    const expArg = Math.min(this._vgs_junction / vt_n, 80);
+    const expArg = this._vgs_junction / vt_n;
     const igJunction = this._p.IS * (Math.exp(expArg) - 1);
     this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
     this._id_junction = igJunction;
     if (this._pnjlimLimited) ctx.noncon.value++;
+  }
+
+  /** jfetload.c:425-426 */
+  protected override _capGate(ctx: LoadContext): boolean {
+    const cktMode = ctx.cktMode;
+    return (cktMode & (MODETRAN | MODEAC | MODEINITSMSIG)) !== 0 ||
+      ((cktMode & MODETRANOP) !== 0 && (cktMode & MODEUIC) !== 0);
   }
 
   protected override _stampNonlinear(solver: SparseSolver): void {

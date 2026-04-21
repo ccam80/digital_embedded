@@ -12,6 +12,7 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
+import { MODEDCOP, MODEINITFLOAT } from "../ckt-mode.js";
 import {
   makeBridgeOutputAdapter,
   makeBridgeInputAdapter,
@@ -88,8 +89,7 @@ function makeCtx(solver: MockSolver) {
   return {
     solver: solver as any,
     voltages: new Float64Array(8),
-    iteration: 0,
-    initMode: "initFloat" as const,
+    cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal" as const,
     order: 1,
@@ -98,10 +98,6 @@ function makeCtx(solver: MockSolver) {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

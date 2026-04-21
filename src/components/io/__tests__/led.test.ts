@@ -54,6 +54,7 @@ import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
+import { MODETRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -913,16 +914,17 @@ describe("integration", () => {
 
     const stamps: Array<[number, number, number]> = [];
     const rhs: Array<[number, number]> = [];
+    let _allocRow = -1, _allocCol = -1;
     const mockSolver = {
-      stamp: (r: number, c: number, v: number) => stamps.push([r, c, v]),
+      allocElement: (r: number, c: number) => { _allocRow = r; _allocCol = c; return 0; },
+      stampElement: (_h: number, v: number) => stamps.push([_allocRow, _allocCol, v]),
       stampRHS: (r: number, v: number) => rhs.push([r, v]),
     } as any;
 
     const ctx = {
+      cktMode: MODETRAN | MODEINITFLOAT,
       solver: mockSolver,
       voltages: new Float64Array([vd]),
-      iteration: 0,
-      initMode: "transient" as const,
       dt,
       method: "trapezoidal" as const,
       order: 2,
@@ -931,10 +933,6 @@ describe("integration", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: false,
-      isTransient: true,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,

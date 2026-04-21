@@ -94,6 +94,10 @@ export class BehavioralCounterElement implements AnalogElementCore {
     this._pinModelsByLabel = pinModelsByLabel;
   }
 
+  initVoltages(rhs: Float64Array): void {
+    this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
+  }
+
   load(ctx: LoadContext): void {
     this._enPin.load(ctx);
     this._clockPin.load(ctx);
@@ -247,6 +251,10 @@ export class BehavioralRegisterElement implements AnalogElementCore {
     this._bitWidth = bitWidth;
     this._vIH = vIH;
     this._pinModelsByLabel = pinModelsByLabel;
+  }
+
+  initVoltages(rhs: Float64Array): void {
+    this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
   load(ctx: LoadContext): void {
@@ -487,6 +495,10 @@ export class BehavioralCounterPresetElement implements AnalogElementCore {
     this._maxValue = maxValue;
     this._vIH = vIH;
     this._pinModelsByLabel = pinModelsByLabel;
+  }
+
+  initVoltages(rhs: Float64Array): void {
+    this._prevClockVoltage = readMnaVoltage(this._clockPin.nodeId, rhs);
   }
 
   load(ctx: LoadContext): void {

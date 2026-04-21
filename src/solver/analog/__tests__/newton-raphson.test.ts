@@ -10,7 +10,7 @@ import { newtonRaphson, pnjlim, fetlim } from "../newton-raphson.js";
 import { CKTCircuitContext } from "../ckt-context.js";
 import { makeResistor, makeVoltageSource, makeDiode, allocateStatePool } from "./test-helpers.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
-import { MODETRANOP, MODEUIC, MODEDCOP, MODEINITJCT, MODETRAN, MODEINITTRAN, setInitf } from "../ckt-mode.js";
+import { MODETRANOP, MODEUIC, MODEDCOP, MODEINITFLOAT, MODEINITJCT, MODETRAN, MODEINITTRAN, MODEINITPRED, setInitf, setAnalysis, initf } from "../ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helpers — build CKTCircuitContext for test circuits
@@ -283,7 +283,7 @@ describe("NR", () => {
 
   it("nonlinear_circuit_runs_at_least_2_iterations_with_state_pool", () => {
     const ctx = makeDiodeCtx(5.0);
-    ctx.initMode ="initTran";
+    ctx.cktMode = setInitf(setAnalysis(ctx.cktMode, MODETRAN), MODEINITTRAN);
 
     newtonRaphson(ctx);
 
@@ -309,34 +309,32 @@ describe("NR", () => {
 
   it("initTran_transitions_to_initFloat_after_iteration_0", () => {
     const ctx = makeDiodeCtx(5.0);
-    ctx.initMode ="initTran";
+    ctx.cktMode = setInitf(setAnalysis(ctx.cktMode, MODETRAN), MODEINITTRAN);
 
     newtonRaphson(ctx);
 
     expect(ctx.nrResult.converged).toBe(true);
     // After NR completes, initMode must be "initFloat"
-    expect(ctx.statePool!.initMode).toBe("initFloat");
+    expect(initf(ctx.cktMode)).toBe(MODEINITFLOAT);
   });
 
   it("initPred_transitions_to_initFloat_immediately", () => {
     const ctx = makeDiodeCtx(5.0);
-    ctx.initMode ="initPred";
+    ctx.cktMode = setInitf(setAnalysis(ctx.cktMode, MODETRAN), MODEINITPRED);
 
     newtonRaphson(ctx);
 
     expect(ctx.nrResult.converged).toBe(true);
-    expect(ctx.statePool!.initMode).toBe("initFloat");
+    expect(initf(ctx.cktMode)).toBe(MODEINITFLOAT);
   });
 
   it("transient_mode_allows_convergence_without_ladder", () => {
     const ctx = makeDiodeCtx(5.0);
-    ctx.initMode ="transient";
+    ctx.cktMode = setInitf(setAnalysis(ctx.cktMode, MODETRAN), MODEINITFLOAT);
 
     newtonRaphson(ctx);
 
     expect(ctx.nrResult.converged).toBe(true);
-    // "transient" mode stays unchanged (no automaton fires for it)
-    expect(ctx.statePool!.initMode).toBe("transient");
   });
 
   it("no_pool_allows_convergence", () => {
@@ -484,17 +482,15 @@ describe("ipass hadNodeset gate", () => {
     const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
     const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = new DiagnosticCollector();
-    ctx.isDcOp = true;
+    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
     // No nodesets added — hadNodeset stays false
     expect(ctx.hadNodeset).toBe(false);
 
-    const pool2 = { initMode: "initFix" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" };
     let initFloatBeginIter = -1;
     let convergeIter = -1;
 
     ctx.dcopModeLadder = {
       runPrimeJunctions(): void {},
-      pool: pool2,
       onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iter: number): void {
         if (phase === "dcopInitFloat") initFloatBeginIter = iter;
       },
@@ -528,20 +524,18 @@ describe("ipass hadNodeset gate", () => {
     const circuit = { nodeCount: 2, branchCount: 1, matrixSize: 3, elements, statePool: pool };
     const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = new DiagnosticCollector();
-    ctx.isDcOp = true;
+    ctx.cktMode = MODEDCOP | MODEINITFLOAT;
 
     // Add a nodeset and update hadNodeset
     ctx.nodesets.set(1, 5.0);
     ctx.updateHadNodeset();
     expect(ctx.hadNodeset).toBe(true);
 
-    const pool2 = { initMode: "initFix" as "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient" };
     let initFloatBeginIter = -1;
     let convergeIter = -1;
 
     ctx.dcopModeLadder = {
       runPrimeJunctions(): void {},
-      pool: pool2,
       onModeBegin(phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", iter: number): void {
         if (phase === "dcopInitFloat") initFloatBeginIter = iter;
       },
@@ -695,7 +689,7 @@ describe("NR NISHOULDREORDER lifecycle", () => {
     }) as SparseSolver;
 
     ctx.solver = proxySolver;
-    ctx.initMode = "initJct";
+    ctx.cktMode = setInitf(MODEDCOP, MODEINITJCT);
     ctx.dcopModeLadder = {
       runPrimeJunctions(): void {},
       onModeBegin(_phase: "dcopInitJct" | "dcopInitFix" | "dcopInitFloat", _iter: number): void {},
@@ -705,7 +699,7 @@ describe("NR NISHOULDREORDER lifecycle", () => {
     newtonRaphson(ctx);
 
     expect(forceReorderCalled).toBe(true);
-    expect(ctx.initMode).not.toBe("initJct");
+    expect(initf(ctx.cktMode)).not.toBe(MODEINITJCT);
   });
 
   it("forceReorder_called_on_initTran_first_iteration", () => {
@@ -721,7 +715,6 @@ describe("NR NISHOULDREORDER lifecycle", () => {
     const ctx = new CKTCircuitContext(circuit, DEFAULT_SIMULATION_PARAMS, noopBreakpoint, new SparseSolver());
     ctx.diagnostics = new DiagnosticCollector();
     ctx.cktMode = setInitf(MODETRAN, MODEINITTRAN);
-    ctx.initMode = "initTran";  // legacy mirror
 
     let forceReorderCallCount = 0;
     const realSolver = ctx.solver;

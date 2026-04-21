@@ -24,6 +24,7 @@ import { withNodeIds, runNR } from "../../../solver/analog/__tests__/test-helper
 import { StatePool } from "../../../solver/analog/state-pool.js";
 import type { AnalogElement, AnalogElementCore, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
+import { MODETRAN, MODEDC, MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Default tunnel diode parameters
@@ -79,10 +80,9 @@ function buildUnitCtx(
   overrides: Partial<import("../../../solver/analog/load-context.js").LoadContext> = {},
 ): import("../../../solver/analog/load-context.js").LoadContext {
   return {
+    cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     voltages,
-    iteration: 0,
-    initMode: "initFloat",
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -91,10 +91,6 @@ function buildUnitCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -422,10 +418,9 @@ describe("integration", () => {
     const solver = new SparseSolver();
     solver.beginAssembly(1);
     const ctx: import("../../../solver/analog/load-context.js").LoadContext = {
+      cktMode: MODETRAN | MODEINITFLOAT,
       solver,
       voltages: new Float64Array([vd, 0]),
-      iteration: 0,
-      initMode: "transient",
       dt,
       method: "trapezoidal",
       order: 2,
@@ -434,10 +429,6 @@ describe("integration", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: false,
-      isTransient: true,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,

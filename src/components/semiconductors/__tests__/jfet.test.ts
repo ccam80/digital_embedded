@@ -20,6 +20,7 @@ import {
   SLOT_GD_JUNCTION,
   SLOT_ID_JUNCTION,
 } from "../njfet.js";
+import { SLOT_VGS, SLOT_VDS } from "../../../solver/analog/fet-base.js";
 import { VT } from "../../../core/constants.js";
 import {
   PJfetDefinition,
@@ -36,6 +37,15 @@ import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import {
+  MODEDCOP,
+  MODEINITFLOAT,
+  MODEAC,
+  MODEINITSMSIG,
+  MODEINITTRAN,
+  MODETRAN,
+  MODETRANOP,
+} from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // withState — allocate a StatePool and call initState on the element
@@ -95,10 +105,9 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
   const solver = new SparseSolver();
   solver.beginAssembly(matrixSize);
   return {
+    cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     voltages,
-    iteration: 1,
-    initMode: "initFloat",
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -107,10 +116,6 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -608,10 +613,9 @@ describe("jfet_load_dcop_parity", () => {
     solver.beginAssembly(2);
 
     const ctx: LoadContext = {
+      cktMode: MODEDCOP | MODEINITFLOAT,
       solver,
       voltages,
-      iteration: 1,
-      initMode: "initFloat",
       dt: 0,
       method: "trapezoidal",
       order: 1,
@@ -620,10 +624,6 @@ describe("jfet_load_dcop_parity", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: true,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: GMIN,
       uic: false,
@@ -673,6 +673,189 @@ describe("jfet_load_dcop_parity", () => {
     // G node RHS = -nortonIg
     expect(rhs[0]).toBe(-NGSPICE_nortonIg);
     // D node RHS = -nortonId
+    expect(rhs[1]).toBe(-NGSPICE_nortonId);
+  });
+});
+
+// ===========================================================================
+// MODEINITSMSIG branch — jfetload.c:103-105
+//
+// When cktMode has MODEINITSMSIG set, _updateOp must read vgs/vds/vgs_junction
+// from CKTstate0 (s0), NOT from ctx.voltages. The resulting stamps must
+// match formulas computed from the seeded state0 values, not the voltages array.
+// ===========================================================================
+
+describe("NJFET MODEINITSMSIG branch", () => {
+  it("seeds_vgs_vds_from_state0_ignores_voltages", () => {
+    const VGS_STATE0 = -1.5;
+    const VDS_STATE0 = 4.0;
+    const VGS_JCT_STATE0 = -1.5;
+    const VTO = -2.0;
+    const BETA = 1e-4;
+    const LAMBDA = 0;
+    const IS = 1e-14;
+    const N = 1;
+    const GMIN_VAL = 1e-12;
+
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams({
+      VTO, BETA, LAMBDA, IS, N,
+      CGS: 0, CGD: 0, PB: 1.0, FC: 0.5,
+      RD: 0, RS: 0, KF: 0, AF: 1, TNOM: 27,
+    });
+    const core = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Seed state0 with known operating point
+    pool.state0[SLOT_VGS] = VGS_STATE0;
+    pool.state0[SLOT_VDS] = VDS_STATE0;
+    pool.state0[SLOT_VGS_JUNCTION] = VGS_JCT_STATE0;
+
+    // Voltages array has DIFFERENT values — must be ignored under MODEINITSMSIG
+    const voltages = new Float64Array([99.0, 99.0]); // G=99V, D=99V — should not be used
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const ctx: LoadContext = {
+      cktMode: MODEAC | MODEINITSMSIG,
+      solver,
+      voltages,
+      dt: 0,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [0, 0, 0, 0, 0, 0, 0],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      xfact: 1,
+      gmin: GMIN_VAL,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    const el = withNodeIds(core as unknown as AnalogElementCore, [1, 2, 0]);
+    el.load(ctx);
+
+    // Expected values computed from state0 seed (saturation: vds=4 >= vgst=0.5)
+    const vgst = VGS_STATE0 - VTO; // = 0.5
+    const NGSPICE_IDS = (BETA / 2) * vgst * vgst * (1 + LAMBDA * VDS_STATE0);
+    const NGSPICE_GM  = BETA * vgst * (1 + LAMBDA * VDS_STATE0) + GMIN_VAL;
+    const NGSPICE_GDS = (BETA / 2) * vgst * vgst * LAMBDA + GMIN_VAL;
+    const vt_n = VT * N;
+    const expArg = Math.min(VGS_JCT_STATE0 / vt_n, 80);
+    const NGSPICE_GD_JCT = (IS / vt_n) * Math.exp(expArg) + GMIN_VAL;
+    const NGSPICE_ID_JCT = IS * (Math.exp(expArg) - 1);
+    const NGSPICE_nortonId = NGSPICE_IDS - NGSPICE_GM * VGS_STATE0 - NGSPICE_GDS * VDS_STATE0;
+    const NGSPICE_nortonIg = NGSPICE_ID_JCT - NGSPICE_GD_JCT * VGS_JCT_STATE0;
+
+    const entries = solver.getCSCNonZeros();
+    const sumAt = (row: number, col: number): number =>
+      entries
+        .filter((e) => e.row === row && e.col === col)
+        .reduce((acc, e) => acc + e.value, 0);
+
+    // G row: gate-junction conductance
+    expect(sumAt(0, 0)).toBe(NGSPICE_GD_JCT);
+    // D row: gm and gds
+    expect(sumAt(1, 0)).toBe(NGSPICE_GM);
+    expect(sumAt(1, 1)).toBe(NGSPICE_GDS);
+
+    const rhs = solver.getRhsSnapshot();
+    expect(rhs[0]).toBe(-NGSPICE_nortonIg);
+    expect(rhs[1]).toBe(-NGSPICE_nortonId);
+  });
+});
+
+// ===========================================================================
+// MODEINITTRAN branch — jfetload.c:106-108
+//
+// When cktMode has MODEINITTRAN set, _updateOp must read vgs/vds/vgs_junction
+// from CKTstate1 (s1), NOT from ctx.voltages.
+// ===========================================================================
+
+describe("NJFET MODEINITTRAN branch", () => {
+  it("seeds_vgs_vds_from_state1_ignores_voltages", () => {
+    const VGS_STATE1 = -0.8;
+    const VDS_STATE1 = 3.0;
+    const VGS_JCT_STATE1 = -0.8;
+    const VTO = -2.0;
+    const BETA = 1e-4;
+    const LAMBDA = 0;
+    const IS = 1e-14;
+    const N = 1;
+    const GMIN_VAL = 1e-12;
+
+    const propsObj = createTestPropertyBag();
+    propsObj.replaceModelParams({
+      VTO, BETA, LAMBDA, IS, N,
+      CGS: 0, CGD: 0, PB: 1.0, FC: 0.5,
+      RD: 0, RS: 0, KF: 0, AF: 1, TNOM: 27,
+    });
+    const core = createNJfetElement(new Map([["G", 1], ["S", 0], ["D", 2]]), [], -1, propsObj);
+    const pool = new StatePool(core.stateSize);
+    core.stateBaseOffset = 0;
+    core.initState(pool);
+
+    // Seed state1 (s1) with known operating point
+    pool.state1[SLOT_VGS] = VGS_STATE1;
+    pool.state1[SLOT_VDS] = VDS_STATE1;
+    pool.state1[SLOT_VGS_JUNCTION] = VGS_JCT_STATE1;
+
+    // Voltages array has DIFFERENT values — must be ignored under MODEINITTRAN
+    const voltages = new Float64Array([88.0, 88.0]);
+
+    const solver = new SparseSolver();
+    solver.beginAssembly(2);
+    const ctx: LoadContext = {
+      cktMode: MODETRAN | MODETRANOP | MODEINITTRAN,
+      solver,
+      voltages,
+      dt: 1e-9,
+      method: "trapezoidal",
+      order: 1,
+      deltaOld: [1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9, 1e-9],
+      ag: new Float64Array(7),
+      srcFact: 1,
+      noncon: { value: 0 },
+      limitingCollector: null,
+      xfact: 1,
+      gmin: GMIN_VAL,
+      uic: false,
+      reltol: 1e-3,
+      iabstol: 1e-12,
+    };
+
+    const el = withNodeIds(core as unknown as AnalogElementCore, [1, 2, 0]);
+    el.load(ctx);
+
+    // Expected values from state1 seed (saturation: vds=3 >= vgst=1.2)
+    const vgst = VGS_STATE1 - VTO; // = 1.2
+    const NGSPICE_IDS = (BETA / 2) * vgst * vgst * (1 + LAMBDA * VDS_STATE1);
+    const NGSPICE_GM  = BETA * vgst * (1 + LAMBDA * VDS_STATE1) + GMIN_VAL;
+    const NGSPICE_GDS = (BETA / 2) * vgst * vgst * LAMBDA + GMIN_VAL;
+    const vt_n = VT * N;
+    const expArg = Math.min(VGS_JCT_STATE1 / vt_n, 80);
+    const NGSPICE_GD_JCT = (IS / vt_n) * Math.exp(expArg) + GMIN_VAL;
+    const NGSPICE_ID_JCT = IS * (Math.exp(expArg) - 1);
+    const NGSPICE_nortonId = NGSPICE_IDS - NGSPICE_GM * VGS_STATE1 - NGSPICE_GDS * VDS_STATE1;
+    const NGSPICE_nortonIg = NGSPICE_ID_JCT - NGSPICE_GD_JCT * VGS_JCT_STATE1;
+
+    const entries = solver.getCSCNonZeros();
+    const sumAt = (row: number, col: number): number =>
+      entries
+        .filter((e) => e.row === row && e.col === col)
+        .reduce((acc, e) => acc + e.value, 0);
+
+    expect(sumAt(0, 0)).toBe(NGSPICE_GD_JCT);
+    expect(sumAt(1, 0)).toBe(NGSPICE_GM);
+    expect(sumAt(1, 1)).toBe(NGSPICE_GDS);
+
+    const rhs = solver.getRhsSnapshot();
+    expect(rhs[0]).toBe(-NGSPICE_nortonIg);
     expect(rhs[1]).toBe(-NGSPICE_nortonId);
   });
 });

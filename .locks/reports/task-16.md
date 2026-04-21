@@ -1,0 +1,2 @@
+C-6: Replaced `firstMode: InitMode, _continueMode: InitMode` params in `cktop()` with `firstInitf: number`; deleted the internal 6-branch string→bit translation; updated the 1 call site to pass `MODEINITJCT` directly. Removed now-unused imports `MODEINITFIX`, `MODEINITTRAN`, `MODEINITPRED`, `MODETRAN` from ckt-mode.js import.
+C-7: Rewrote stale comment at former line 239 from `isTransientDcop === false` to `!isTranOp(ctx.cktMode)`; rewrote stale comment at former line 368 (same fix). Both `InitMode` and `isTransientDcop` now have 0 hits in dc-operating-point.ts.

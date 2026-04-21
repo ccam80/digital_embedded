@@ -34,6 +34,7 @@ import type { AnalogElement } from "../element.js";
 import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
+import { MODEDCOP, MODEINITFLOAT, MODETRAN } from "../ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Default model parameters (same as mosfet.test.ts for exact comparison)
@@ -134,8 +135,7 @@ function makeDirectLoadCtx(voltages: Float64Array, overrides: Partial<LoadContex
   return {
     solver: makeSpySolver(),
     voltages,
-    iteration: 0,
-    initMode: "transient",
+    cktMode: overrides.cktMode ?? MODEINITFLOAT,
     dt,
     method: "trapezoidal",
     order: 1,
@@ -144,10 +144,6 @@ function makeDirectLoadCtx(voltages: Float64Array, overrides: Partial<LoadContex
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -270,7 +266,7 @@ describe("Refactor", () => {
     voltages[1] = 0; // V(node2=S) = 0V
     voltages[2] = 5; // V(node3=D) = 5V
 
-    const dcCtx = makeDirectLoadCtx(voltages, { isDcOp: true });
+    const dcCtx = makeDirectLoadCtx(voltages, { cktMode: MODEDCOP | MODEINITFLOAT });
     for (let i = 0; i < 10; i++) {
       element.load(dcCtx);
     }
@@ -281,9 +277,7 @@ describe("Refactor", () => {
     ag[0] = 1 / dt;  // bdf1 order-1 coefficient
     ag[1] = -1 / dt;
     const tranCtx = makeDirectLoadCtx(voltages, {
-      isTransient: true,
-      isTransientDcop: false,
-      isAc: false,
+      cktMode: MODETRAN | MODEINITFLOAT,
       dt,
       method: "bdf1",
       order: 1,
@@ -313,7 +307,7 @@ describe("Refactor", () => {
     voltages[0] = 5; // V(node1=D) = 5V
     voltages[1] = 3; // V(node2=G) = 3V
 
-    const ctx = makeDirectLoadCtx(voltages, { isDcOp: true });
+    const ctx = makeDirectLoadCtx(voltages, { cktMode: MODEDCOP | MODEINITFLOAT });
     for (let i = 0; i < 50; i++) {
       element.load(ctx);
       voltages[0] = 5;
@@ -393,7 +387,7 @@ describe("AbstractFetElement", () => {
     voltages[1] = 5; // V(node2=D) = 5V
     voltages[2] = 0; // V(node3=S) = 0
 
-    const ctx = makeDirectLoadCtx(voltages, { isDcOp: true });
+    const ctx = makeDirectLoadCtx(voltages, { cktMode: MODEDCOP | MODEINITFLOAT });
     for (let i = 0; i < 50; i++) {
       element.load(ctx);
       voltages[0] = 3;
@@ -467,7 +461,7 @@ describe("StatePool migration", () => {
     voltages[0] = 5; // V(node1=D) = 5V
     voltages[1] = 3; // V(node2=G) = 3V
 
-    const ctx = makeDirectLoadCtx(voltages, { isDcOp: true });
+    const ctx = makeDirectLoadCtx(voltages, { cktMode: MODEDCOP | MODEINITFLOAT });
     for (let i = 0; i < 20; i++) {
       element.load(ctx);
       voltages[0] = 5;
@@ -491,7 +485,7 @@ describe("StatePool migration", () => {
     const voltages = new Float64Array([5.0, 3.0]);
     const snapshot = new Float64Array(voltages);
 
-    const ctx = makeDirectLoadCtx(voltages, { isDcOp: true });
+    const ctx = makeDirectLoadCtx(voltages, { cktMode: MODEDCOP | MODEINITFLOAT });
     for (let i = 0; i < 10; i++) {
       element.load(ctx);
     }
@@ -514,7 +508,7 @@ describe("StatePool migration", () => {
     voltages[0] = 0; // V(D) = 0V (less than source)
     voltages[1] = 3; // V(G) = 3V
 
-    const ctx = makeDirectLoadCtx(voltages, { isDcOp: true });
+    const ctx = makeDirectLoadCtx(voltages, { cktMode: MODEDCOP | MODEINITFLOAT });
     for (let i = 0; i < 5; i++) {
       element.load(ctx);
     }
@@ -537,7 +531,7 @@ describe("StatePool migration", () => {
 
     // Drive to a known operating point
     const voltages = new Float64Array([5.0, 3.0]);
-    const ctx = makeDirectLoadCtx(voltages, { isDcOp: true });
+    const ctx = makeDirectLoadCtx(voltages, { cktMode: MODEDCOP | MODEINITFLOAT });
     for (let i = 0; i < 10; i++) {
       element.load(ctx);
       voltages[0] = 5.0;
@@ -548,7 +542,7 @@ describe("StatePool migration", () => {
 
     // Mutate state with different voltages
     const voltages2 = new Float64Array([1.0, 0.5]);
-    const ctx2 = makeDirectLoadCtx(voltages2, { isDcOp: true });
+    const ctx2 = makeDirectLoadCtx(voltages2, { cktMode: MODEDCOP | MODEINITFLOAT });
     for (let i = 0; i < 5; i++) {
       element.load(ctx2);
       voltages2[0] = 1.0;
@@ -658,8 +652,7 @@ describe("integration", () => {
     const ctx: LoadContext = {
       solver: mockSolver,
       voltages,
-      iteration: 0,
-      initMode: "transient",
+      cktMode: MODETRAN | MODEINITFLOAT,
       dt,
       method: "trapezoidal",
       order: 2,
@@ -668,10 +661,6 @@ describe("integration", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: false,
-      isTransient: true,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 1,
       gmin: 1e-12,
       uic: false,

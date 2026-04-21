@@ -1,0 +1,3 @@
+Added `initVoltages(rhs: Float64Array): void` to all four behavioral elements with `_prevClockVoltage`: `BehavioralDFlipflopElement` (behavioral-flipflop.ts:119), `BehavioralCounterElement` (behavioral-sequential.ts:97), `BehavioralRegisterElement` (behavioral-sequential.ts:256), `BehavioralCounterPresetElement` (behavioral-sequential.ts:500).
+Added call site in `analog-engine.ts` `_seedFromDcop` (after `ctx.rhs.set(result.nodeVoltages)`) that iterates all elements and calls `initVoltages(ctx.rhs)` on any element that implements it.
+`_prevClockVoltage` in behavioral-flipflop.ts now has 3 write sites: field init (NaN), initVoltages (DC-OP seed), accept (per-step update).

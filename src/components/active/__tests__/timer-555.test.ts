@@ -890,6 +890,7 @@ describe("Monostable", () => {
 // All stamps bit-exact against the closed-form reference in timer-555.ts.
 
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { MODEDCOP, MODEINITFLOAT, MODETRAN } from "../../../solver/analog/ckt-mode.js";
 
 /**
  * Capture solver that simulates both the legacy `stamp(row, col, value)`
@@ -949,8 +950,7 @@ function makeTimer555ParityCtx(
   return {
     solver,
     voltages,
-    iteration: 0,
-    initMode: dt > 0 ? "transient" : "initFloat",
+    cktMode: dt > 0 ? MODETRAN | MODEINITFLOAT : MODEDCOP | MODEINITFLOAT,
     dt,
     method: "trapezoidal",
     order: 1,
@@ -959,10 +959,6 @@ function makeTimer555ParityCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: dt === 0,
-    isTransient: dt > 0,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

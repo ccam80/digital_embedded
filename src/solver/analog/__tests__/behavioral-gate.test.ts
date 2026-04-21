@@ -40,6 +40,7 @@ import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import { PropertyBag } from "../../../core/properties.js";
 import type { AnalogElement } from "../element.js";
 import type { LoadContext } from "../load-context.js";
+import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -491,8 +492,7 @@ function makeMinimalCtx(voltages?: Float64Array): LoadContext {
       stampRHS: (_i: number, _v: number) => {},
     } as any,
     voltages: voltages ?? new Float64Array(16),
-    iteration: 0,
-    initMode: "transient" as const,
+    cktMode: MODETRAN | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal" as const,
     order: 1,
@@ -501,10 +501,6 @@ function makeMinimalCtx(voltages?: Float64Array): LoadContext {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 0,
     gmin: 1e-12,
     uic: false,

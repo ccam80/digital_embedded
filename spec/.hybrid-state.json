@@ -286,19 +286,19 @@
           "2.4.7"
         ]
       ],
-      "spawned": 0,
-      "completed": 0,
-      "verifications_passed": 0,
-      "verifications_failed": 0,
+      "spawned": 9,
+      "completed": 7,
+      "verifications_passed": 1,
+      "verifications_failed": 4,
       "stops_for_clarification": 0,
-      "dead_implementers": 0,
+      "dead_implementers": 2,
       "dead_verifiers": 0,
       "group_status": {
-        "2.4.diode": "pending",
-        "2.4.bjt": "pending",
-        "2.4.mosfet": "pending",
-        "2.4.jfet": "pending",
-        "2.4.passives": "pending"
+        "2.4.diode": "failed",
+        "2.4.bjt": "failed",
+        "2.4.mosfet": "failed",
+        "2.4.jfet": "passed",
+        "2.4.passives": "failed"
       },
       "user_required_tasks": {
         "2.4.diode": [],
@@ -336,5 +336,5 @@
       "user_acks": {}
     }
   ],
-  "last_updated": "2026-04-20T21:51:09.614Z"
+  "last_updated": "2026-04-20T23:53:31.851Z"
 }

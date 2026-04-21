@@ -30,6 +30,10 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import {
+  MODEINITJCT, MODEINITFIX, MODEINITSMSIG, MODEINITTRAN, MODEINITPRED,
+  MODETRAN, MODEAC, MODETRANOP, MODEUIC,
+} from "../../solver/analog/ckt-mode.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
 import { defineModelParams, deviceParams } from "../../core/model-params.js";
@@ -47,8 +51,6 @@ import {
 // ---------------------------------------------------------------------------
 // Physical constants
 // ---------------------------------------------------------------------------
-
-// BJ1: VT import removed — all code now uses tp.vt (temperature-dependent thermal voltage)
 
 /** Minimum conductance for numerical stability. */
 const GMIN = 1e-12;
@@ -773,8 +775,9 @@ export function createBjtElement(
 
     load(ctx: LoadContext): void {
       const voltages = ctx.voltages;
+      const mode = ctx.cktMode;
 
-      if (ctx.initMode === "initPred") {
+      if (mode & MODEINITPRED) {
         s0[base + SLOT_VBE] = s1[base + SLOT_VBE];
         s0[base + SLOT_VBC] = s1[base + SLOT_VBC];
         s0[base + SLOT_IC]  = s1[base + SLOT_IC];
@@ -800,7 +803,15 @@ export function createBjtElement(
       // at that phase ctx.voltages is all zeros and would mis-bias G-P.
       let vbeRaw: number;
       let vbcRaw: number;
-      if (ctx.initMode === "initJct") {
+      if (mode & MODEINITSMSIG) {
+        // bjtload.c:236-244: MODEINITSMSIG seeds vbe/vbc from CKTstate0.
+        vbeRaw = s0[base + SLOT_VBE];
+        vbcRaw = s0[base + SLOT_VBC];
+      } else if (mode & MODEINITTRAN) {
+        // bjtload.c:245-252: MODEINITTRAN seeds from CKTstate1.
+        vbeRaw = s1[base + SLOT_VBE];
+        vbcRaw = s1[base + SLOT_VBC];
+      } else if (mode & MODEINITJCT) {
         if (params.OFF) {
           vbeRaw = 0;
           vbcRaw = 0;
@@ -817,12 +828,12 @@ export function createBjtElement(
       }
 
       // Apply pnjlim to both junctions using vold from pool.
-      // bjtload.c:258-276: during MODEINITJCT, voltages are set directly — no pnjlim applied.
+      // bjtload.c:258-276: during MODEINITJCT/MODEINITSMSIG/MODEINITTRAN, voltages are set directly — no pnjlim applied.
       let vbeLimited: number;
       let vbcLimited: number;
       let vbeLimFlag = false;
       let vbcLimFlag = false;
-      if (ctx.initMode === "initJct") {
+      if (mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) {
         vbeLimited = vbeRaw;
         vbcLimited = vbcRaw;
         icheckLimited = false;
@@ -922,7 +933,7 @@ export function createBjtElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      if (params.OFF && ctx.initMode === "initFix") return true;
+      if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
       const voltages = ctx.voltages;
       const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
@@ -1464,7 +1475,8 @@ export function createSpiceL1BjtElement(
       const dt = ctx.dt;
 
       // --- Step 1: initPred — copy last accepted linearization ---
-      if (ctx.initMode === "initPred") {
+      const mode = ctx.cktMode;
+      if (mode & MODEINITPRED) {
         s0[base + L1_SLOT_VBE] = s1[base + L1_SLOT_VBE];
         s0[base + L1_SLOT_VBC] = s1[base + L1_SLOT_VBC];
         s0[base + L1_SLOT_IC]  = s1[base + L1_SLOT_IC];
@@ -1487,12 +1499,28 @@ export function createSpiceL1BjtElement(
       const vSubConRaw = substConNode > 0 ? voltages[substConNode - 1] : 0;
       const vsubRaw = polarity * subs * (0 - vSubConRaw); // V_substNode=0 (substrate tied to ground)
 
-      // During MODEINITJCT (bjtload.c:258-276), ngspice overrides vbe/vbc
-      // to seeded values rather than reading from the solution vector —
-      // at that phase ctx.voltages is all zeros and would mis-bias G-P.
+      // bjtload.c:236-252: select linearization voltages based on mode.
+      // ctx.voltages is CKTrhsOld (previous NR iteration solution vector).
+      const rhsOld = voltages;
       let vbeRaw: number;
       let vbcRaw: number;
-      if (ctx.initMode === "initJct") {
+      // bjtload.c:239-244: vbx/vsub seeded from CKTrhsOld in MODEINITSMSIG and MODEINITTRAN.
+      let vbx = polarity * ((nodeB_ext > 0 ? rhsOld[nodeB_ext - 1] : 0) - vCi);
+      let vsub = vsubRaw;
+      if (mode & MODEINITSMSIG) {
+        // bjtload.c:236-244: MODEINITSMSIG seeds vbe/vbc from CKTstate0; vbx/vsub from CKTrhsOld.
+        vbeRaw = s0[base + L1_SLOT_VBE];
+        vbcRaw = s0[base + L1_SLOT_VBC];
+        vbx = polarity * ((nodeB_ext > 0 ? rhsOld[nodeB_ext - 1] : 0) - (nodeC_int > 0 ? rhsOld[nodeC_int - 1] : 0)); // bjtload.c:239-241
+        vsub = polarity * subs * (0 - (substConNode > 0 ? rhsOld[substConNode - 1] : 0)); // bjtload.c:242-244
+      } else if (mode & MODEINITTRAN) {
+        // bjtload.c:245-252: MODEINITTRAN seeds vbe/vbc from CKTstate1; vbx/vsub from CKTrhsOld.
+        vbeRaw = s1[base + L1_SLOT_VBE];
+        vbcRaw = s1[base + L1_SLOT_VBC];
+        vbx = polarity * ((nodeB_ext > 0 ? rhsOld[nodeB_ext - 1] : 0) - (nodeC_int > 0 ? rhsOld[nodeC_int - 1] : 0)); // bjtload.c:248-250
+        vsub = polarity * subs * (0 - (substConNode > 0 ? rhsOld[substConNode - 1] : 0)); // bjtload.c:251-253
+      } else if (mode & MODEINITJCT) {
+        // bjtload.c:258-276: MODEINITJCT dispatch — OFF branch, UIC branch, and the else (vcrit) branch.
         if (params.OFF) {
           vbeRaw = 0;
           vbcRaw = 0;
@@ -1508,7 +1536,7 @@ export function createSpiceL1BjtElement(
         vbcRaw = polarity * (vBi - vCi);
       }
 
-      // --- Step 3: Apply pnjlim (skipped during MODEINITJCT per bjtload.c:258-276) ---
+      // --- Step 3: Apply pnjlim (skipped during MODEINITJCT/MODEINITSMSIG/MODEINITTRAN per bjtload.c:258-276) ---
       const vcritBE = tpL1.tVcrit;
       const vcritBC = tpL1.tVcrit;
       let vbeLimited: number;
@@ -1517,7 +1545,7 @@ export function createSpiceL1BjtElement(
       let vbeLimFlag = false;
       let vbcLimFlag = false;
       let vsubLimFlag = false;
-      if (ctx.initMode === "initJct") {
+      if (mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) {
         vbeLimited = vbeRaw;
         vbcLimited = vbcRaw;
         vsubLimited = vsubRaw;
@@ -1620,7 +1648,7 @@ export function createSpiceL1BjtElement(
 
       // BJ14: ag0 comes from ctx.ag[0] (CKTag[0] from NIcomCof) during transient,
       // zero during DC-OP. Matches bjtload.c:727 where GEQCB = ag[0] * geqcb_dc.
-      const ag0 = ctx.isTransient ? ag[0] : 0;
+      const ag0 = (mode & MODETRAN) ? ag[0] : 0;
       const geqcb_now = ag0 * geqcb_dc;
       s0[base + L1_SLOT_GEQCB] = geqcb_now;
 
@@ -1687,7 +1715,7 @@ export function createSpiceL1BjtElement(
         s0[base + L1_SLOT_V_BC] = vbcLimited;
         s0[base + L1_SLOT_V_CS] = vsubLimited;
 
-        const isFirstTranCall = ctx.initMode === "initTran";
+        const isFirstTranCall = (mode & MODEINITTRAN) !== 0;
 
         // --- B-E junction charge + total capacitance ---
         // BJ13: XTF-modified diffusion cap using gbe (bjtload.c:584-585,593)
@@ -1760,7 +1788,12 @@ export function createSpiceL1BjtElement(
         // --- Inline NIintegrate using ctx.ag[] (niinteg.c:28-63) ---
         // niinteg: ccap = ag[0]*q0 + ag[1]*q1 (+ ag[2]*q2 for order>=2);
         //          geq = ag[0]*C; ceq = ccap - ag[0]*q0.
-        if (ctx.isTransient && dt > 0) {
+        // bjtload.c:561-563: gate on MODETRAN | MODEAC | MODEINITSMSIG | (MODETRANOP && MODEUIC).
+        const capGate =
+          (mode & (MODETRAN | MODEAC)) !== 0 ||
+          ((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0) ||
+          (mode & MODEINITSMSIG) !== 0;
+        if (capGate) {
           const xcjc = Math.min(Math.max(params.XCJC, 0), 1);
 
           // B-E
@@ -1843,6 +1876,15 @@ export function createSpiceL1BjtElement(
             s0[base + L1_SLOT_CAP_GEQ_CS] = 0;
             s0[base + L1_SLOT_CAP_IEQ_CS] = 0;
             s0[base + L1_SLOT_CCAP_CS] = 0;
+          }
+
+          // bjtload.c:674-689: small-signal parameter store-back under MODEINITSMSIG.
+          if ((mode & MODEINITSMSIG) !== 0 &&
+              !(((mode & MODETRANOP) === MODETRANOP) && (mode & MODEUIC) !== 0)) {
+            // bjtload.c:676-680: store diffusion caps (capbe=CdBE, capbc=CdBC, capsub=CtotalCS).
+            s0[base + L1_SLOT_CAP_GEQ_BE] = CdBE;
+            s0[base + L1_SLOT_CAP_GEQ_BC_INT] = CdBC;
+            s0[base + L1_SLOT_CAP_GEQ_CS] = CtotalCS;
           }
 
           // bjtload.c:725-734 lumping — augment DC conductances/currents with
@@ -2045,7 +2087,12 @@ export function createSpiceL1BjtElement(
 
       // BC external cap (1-XCJC portion) — stamps on external B/C nodes.
       // CS cap — stamps on substConNode.
-      if (hasCapacitance && ctx.isTransient) {
+      // bjtload.c:561-563: same capGate as the NIintegrate block above.
+      const stampCapGate =
+        (mode & (MODETRAN | MODEAC)) !== 0 ||
+        ((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0) ||
+        (mode & MODEINITSMSIG) !== 0;
+      if (hasCapacitance && stampCapGate) {
         const geqBCext = s0[base + L1_SLOT_CAP_GEQ_BC_EXT];
         const ieqBCext = s0[base + L1_SLOT_CAP_IEQ_BC_EXT];
         if (geqBCext !== 0 || ieqBCext !== 0) {
@@ -2067,7 +2114,7 @@ export function createSpiceL1BjtElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      if (params.OFF && ctx.initMode === "initFix") return true;
+      if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
       const voltages = ctx.voltages;
       const vBi = nodeB_int > 0 ? voltages[nodeB_int - 1] : 0;

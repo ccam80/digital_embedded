@@ -11,7 +11,7 @@ import { makeDiagnostic } from "./diagnostics.js";
 import type { CKTCircuitContext } from "./ckt-context.js";
 import { cktLoad } from "./ckt-load.js";
 import {
-  isTranOp, isUic, initf, setInitf,
+  isTranOp, isUic, isDcop, initf, setInitf,
   MODEINITFLOAT, MODEINITJCT, MODEINITFIX,
   MODEINITTRAN, MODEINITPRED, MODEINITSMSIG,
 } from "./ckt-mode.js";
@@ -269,7 +269,6 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   const ladder = ctx.dcopModeLadder ?? null;
   if (ladder) {
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);
-    ctx.initMode = "initJct";  // legacy mirror
     ladder.runPrimeJunctions();
   }
 
@@ -429,7 +428,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     }
 
     // ---- STEP I: Newton damping (ngspice niiter.c:204-229) ----
-    if (ctx.nodeDamping && ctx.noncon !== 0 && ctx.isDcOp && iteration > 0) {
+    if (ctx.nodeDamping && ctx.noncon !== 0 && isDcop(ctx.cktMode) && iteration > 0) {
       let maxDelta = 0;
       for (let i = 0; i < nodeCount; i++) {
         const delta = Math.abs(voltages[i] - prevVoltages[i]);
@@ -480,7 +479,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
 
     if (curInitf === MODEINITFLOAT) {
       if (ctx.noncon === 0 && globalConverged && elemConverged) {
-        if (ctx.isDcOp && ctx.hadNodeset && ipass > 0) {
+        if (isDcop(ctx.cktMode) && ctx.hadNodeset && ipass > 0) {
           ipass--;
           ctx.noncon = 1;
         } else {
@@ -497,7 +496,6 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       }
     } else if (curInitf === MODEINITJCT) {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFIX);
-      ctx.initMode = "initFix";  // legacy mirror
       solver.forceReorder();
       if (ladder) {
         ladder.onModeEnd("dcopInitJct", iteration, false);
@@ -506,7 +504,6 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     } else if (curInitf === MODEINITFIX) {
       if (ctx.noncon === 0) {
         ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
-        ctx.initMode = "initFloat";  // legacy mirror
         ipass = 1;
         if (ladder) {
           ladder.onModeEnd("dcopInitFix", iteration, false);
@@ -515,16 +512,13 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
       }
     } else if (curInitf === MODEINITTRAN) {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
-      ctx.initMode = "initFloat";  // legacy mirror
       if (iteration <= 0) {
         solver.forceReorder();
       }
     } else if (curInitf === MODEINITPRED) {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
-      ctx.initMode = "initFloat";  // legacy mirror
     } else if (curInitf === MODEINITSMSIG) {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
-      ctx.initMode = "initFloat";  // legacy mirror
     }
 
     // Split marker: after iteration 0, let the harness observe cold linearization

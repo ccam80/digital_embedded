@@ -22,6 +22,7 @@ import { CounterPresetDefinition } from "../../../components/memory/counter-pres
 import { RegisterDefinition } from "../../../components/memory/register.js";
 import type { ResolvedPinElectrical } from "../../../core/pin-electrical.js";
 import type { LoadContext } from "../load-context.js";
+import { MODETRAN, MODEINITFLOAT } from "../ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -38,8 +39,7 @@ function makeCtx(v: Float64Array = new Float64Array(16)): LoadContext {
       stamp: (_r: number, _c: number, _v: number) => {},
     } as any,
     voltages: v,
-    iteration: 0,
-    initMode: "transient" as const,
+    cktMode: MODETRAN | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal" as const,
     order: 1,
@@ -48,10 +48,6 @@ function makeCtx(v: Float64Array = new Float64Array(16)): LoadContext {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 0,
     gmin: 1e-12,
     uic: false,
@@ -61,7 +57,7 @@ function makeCtx(v: Float64Array = new Float64Array(16)): LoadContext {
 }
 
 function makeAcceptCtx(v: Float64Array, dt = 1e-9): LoadContext {
-  return { ...makeCtx(v), dt, isTransient: true };
+  return { ...makeCtx(v), dt };
 }
 function getFactory(entry: ModelEntry): AnalogFactory {
   if (entry.kind !== "inline") throw new Error("Expected inline ModelEntry");
@@ -484,8 +480,7 @@ describe("Task 6.4.3 — sequential pin loading propagates", () => {
     const ctx: LoadContext = {
       solver: solver as any,
       voltages: new Float64Array(16),
-      iteration: 0,
-      initMode: "transient" as const,
+      cktMode: MODETRAN | MODEINITFLOAT,
       dt: 0,
       method: "trapezoidal" as const,
       order: 1,
@@ -494,10 +489,6 @@ describe("Task 6.4.3 — sequential pin loading propagates", () => {
       srcFact: 1,
       noncon: { value: 0 },
       limitingCollector: null,
-      isDcOp: false,
-      isTransient: false,
-      isTransientDcop: false,
-      isAc: false,
       xfact: 0,
       gmin: 1e-12,
       uic: false,

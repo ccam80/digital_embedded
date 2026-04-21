@@ -38,6 +38,7 @@ import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { VT } from "../../core/constants.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
+import { MODEINITJCT } from "../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -173,7 +174,7 @@ export function createTriacElement(
 
   function computeOperatingPoint(vmt: number, vg1: number): void {
     // Gate current (forward-biased gate-MT1 junction)
-    const iGate = p.iS * (Math.exp(Math.min(vg1 / nVt, 700)) - 1) + GMIN * vg1;
+    const iGate = p.iS * (Math.exp(vg1 / nVt) - 1) + GMIN * vg1;
 
     const a2 = computeAlpha2(iGate);
     const a1c = Math.min(p.alpha1, ALPHA_MAX);
@@ -234,7 +235,7 @@ export function createTriacElement(
     }
 
     // Gate junction: linearized at (already pnjlim-limited) vg1
-    const expVg = Math.exp(Math.min(vg1 / nVt, 700));
+    const expVg = Math.exp(vg1 / nVt);
     const gGate = (p.iS * expVg) / nVt + GMIN;
     const iGateCurrent = p.iS * (expVg - 1);
     s0[base + SLOT_G_GATE_GEQ] = gGate;
@@ -294,14 +295,25 @@ export function createTriacElement(
       const vmtRaw = v2 - v1;
       const vg1Raw = vG - v1;
 
-      // Apply pnjlim to MT1-MT2 voltage for NR stability
-      const vmtResult = pnjlim(vmtRaw, s0[base + SLOT_VAK], nVt, vcritMain);
-      const vmtLimited = vmtResult.value;
-      // Apply pnjlim to gate-MT1 voltage
-      const vg1Result = pnjlim(vg1Raw, s0[base + SLOT_VGK], nVt, vcritGate);
-      const vg1Limited = vg1Result.value;
-      pnjlimLimited = vmtResult.limited || vg1Result.limited;
-      if (pnjlimLimited) ctx.noncon.value++;
+      let vmtLimited: number;
+      let vg1Limited: number;
+      let vmtWasLimited = false;
+      let vg1WasLimited = false;
+      if (ctx.cktMode & MODEINITJCT) {
+        // dioload.c:130-136: seed junction voltages directly from vcrit without pnjlim
+        vmtLimited = vcritMain;
+        vg1Limited = vcritGate;
+        pnjlimLimited = false;
+      } else {
+        const vmtResult = pnjlim(vmtRaw, s0[base + SLOT_VAK], nVt, vcritMain);
+        vmtLimited = vmtResult.value;
+        vmtWasLimited = vmtResult.limited;
+        const vg1Result = pnjlim(vg1Raw, s0[base + SLOT_VGK], nVt, vcritGate);
+        vg1Limited = vg1Result.value;
+        vg1WasLimited = vg1Result.limited;
+        pnjlimLimited = vmtWasLimited || vg1WasLimited;
+        if (pnjlimLimited) ctx.noncon.value++;
+      }
 
       if (ctx.limitingCollector) {
         ctx.limitingCollector.push({
@@ -311,7 +323,7 @@ export function createTriacElement(
           limitType: "pnjlim",
           vBefore: vmtRaw,
           vAfter: vmtLimited,
-          wasLimited: vmtResult.limited,
+          wasLimited: vmtWasLimited,
         });
         ctx.limitingCollector.push({
           elementIndex: (this as any).elementIndex ?? -1,
@@ -320,7 +332,7 @@ export function createTriacElement(
           limitType: "pnjlim",
           vBefore: vg1Raw,
           vAfter: vg1Limited,
-          wasLimited: vg1Result.limited,
+          wasLimited: vg1WasLimited,
         });
       }
 

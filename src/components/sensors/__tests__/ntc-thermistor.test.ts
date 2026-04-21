@@ -22,6 +22,7 @@ import { ComponentCategory } from "../../../core/registry.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import { makeSimpleCtx } from "../../../solver/analog/__tests__/test-helpers.js";
+import { MODETRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -72,8 +73,7 @@ function makeAcceptCtx(voltages: Float64Array, dt: number): import("../../../sol
   return {
     solver: undefined as unknown as SparseSolverType,
     voltages,
-    iteration: 0,
-    initMode: "transient",
+    cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     method: "trapezoidal",
     order: 1,
@@ -82,10 +82,6 @@ function makeAcceptCtx(voltages: Float64Array, dt: number): import("../../../sol
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: true,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

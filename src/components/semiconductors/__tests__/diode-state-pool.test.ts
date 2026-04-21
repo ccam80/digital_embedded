@@ -15,6 +15,7 @@ import { VT } from "../../../core/constants.js";
 import { withNodeIds } from "../../../solver/analog/__tests__/test-helpers.js";
 import type { AnalogElement, ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { MODEDCOP, MODETRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 const SLOT_VD = 0;
 const SLOT_GEQ = 1;
@@ -47,10 +48,9 @@ function makeDcOpCtx(voltages: Float64Array): LoadContext {
   const solver = new SparseSolver();
   solver.beginAssembly(2);
   return {
+    cktMode: MODEDCOP | MODEINITFLOAT,
     solver,
     voltages,
-    iteration: 1,
-    initMode: "initFloat",
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -59,10 +59,6 @@ function makeDcOpCtx(voltages: Float64Array): LoadContext {
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -76,10 +72,9 @@ function makeTranCtx(voltages: Float64Array, dt: number, ag: Float64Array): Load
   const solver = new SparseSolver();
   solver.beginAssembly(2);
   return {
+    cktMode: MODETRAN | MODEINITFLOAT,
     solver,
     voltages,
-    iteration: 1,
-    initMode: "transient",
     dt,
     method: "trapezoidal",
     order: 1,
@@ -88,10 +83,6 @@ function makeTranCtx(voltages: Float64Array, dt: number, ag: Float64Array): Load
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: true,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

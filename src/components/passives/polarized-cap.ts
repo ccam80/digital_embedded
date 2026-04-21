@@ -39,6 +39,7 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { AnalogElementCore, ReactiveAnalogElement, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
+import { MODETRAN, MODETRANOP, MODEINITPRED, MODEINITTRAN } from "../../solver/analog/ckt-mode.js";
 import { stampG } from "../../solver/analog/stamp-helpers.js";
 import type { Diagnostic } from "../../compile/types.js";
 import { defineModelParams } from "../../core/model-params.js";
@@ -305,7 +306,8 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
    *   - Polarity diagnostic when reverse-biased beyond reverseMax.
    */
   load(ctx: LoadContext): void {
-    const { solver, voltages, initMode, isDcOp, isTransient, ag } = ctx;
+    const { solver, voltages, ag } = ctx;
+    const mode = ctx.cktMode;
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
     const nCap = this.pinNodeIds[2];
@@ -350,20 +352,20 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     }
 
     // Capacitor body (between nCap and nNeg).
-    if (!isTransient && !isDcOp) return;
+    if (!(mode & (MODETRAN | MODETRANOP))) return;
     const C = this.C;
 
     const vCapNode = nCap > 0 ? voltages[nCap - 1] : 0;
     const vNegNode = nNeg > 0 ? voltages[nNeg - 1] : 0;
     const vNow = vCapNode - vNegNode;
 
-    if (isTransient) {
+    if (mode & MODETRAN) {
       // Charge update (capload.c pattern).
-      if (initMode === "initPred") {
+      if (mode & MODEINITPRED) {
         this.s0[this.base + SLOT_Q] = this.s1[this.base + SLOT_Q];
       } else {
         this.s0[this.base + SLOT_Q] = C * vNow;
-        if (initMode === "initTran") {
+        if (mode & MODEINITTRAN) {
           this.s1[this.base + SLOT_Q] = this.s0[this.base + SLOT_Q];
         }
       }
@@ -384,7 +386,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
       );
       this.s0[this.base + SLOT_CCAP] = ccap;
 
-      if (initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];
       }
 

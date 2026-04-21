@@ -35,7 +35,7 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import { AbstractFetElement, FET_BASE_SCHEMA } from "../../solver/analog/fet-base.js";
+import { AbstractFetElement, FET_BASE_SCHEMA, SLOT_VGS, SLOT_VDS } from "../../solver/analog/fet-base.js";
 import type { FetCapacitances } from "../../solver/analog/fet-base.js";
 import type { LoadContext } from "../../solver/analog/element.js";
 import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
@@ -45,6 +45,15 @@ import { defineModelParams } from "../../core/model-params.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { VT } from "../../core/constants.js";
+import {
+  MODEINITSMSIG,
+  MODEINITTRAN,
+  MODEINITJCT,
+  MODETRAN,
+  MODEAC,
+  MODETRANOP,
+  MODEUIC,
+} from "../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Physical constants
@@ -262,9 +271,47 @@ export class NJfetAnalogElement extends AbstractFetElement {
   protected override _updateOp(ctx: LoadContext): void {
     const voltages = ctx.voltages;
     const limitingCollector = ctx.limitingCollector;
-    // jfetload.c: during MODEINITJCT, primeJunctions() has already set _vgs, _vds,
-    // _vgs_junction directly. Skip MNA voltage reads and all voltage limiting.
-    if (ctx.initMode === "initJct") {
+    const mode = ctx.cktMode;
+
+    if (mode & MODEINITSMSIG) {
+      // jfetload.c:103-105: seed vgs/vgd from CKTstate0.
+      const base = this.stateBaseOffset;
+      this._vgs = this._s0[base + SLOT_VGS];
+      this._vds = this._s0[base + SLOT_VDS];
+      this._vgs_junction = this._s0[base + SLOT_VGS_JUNCTION];
+      this._pnjlimLimited = false;
+      this._swapped = false;
+      this._ids = this.computeIds(this._vgs, this._vds);
+      this._gm = this.computeGm(this._vgs, this._vds);
+      this._gds = this.computeGds(this._vgs, this._vds);
+      const vt_n = VT * this._p.N;
+      const expArg = this._vgs_junction / vt_n;
+      this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
+      this._id_junction = this._p.IS * (Math.exp(expArg) - 1);
+      return;
+    }
+
+    if (mode & MODEINITTRAN) {
+      // jfetload.c:106-108: seed vgs/vgd from CKTstate1.
+      const base = this.stateBaseOffset;
+      this._vgs = this.s1[base + SLOT_VGS];
+      this._vds = this.s1[base + SLOT_VDS];
+      this._vgs_junction = this.s1[base + SLOT_VGS_JUNCTION];
+      this._pnjlimLimited = false;
+      this._swapped = false;
+      this._ids = this.computeIds(this._vgs, this._vds);
+      this._gm = this.computeGm(this._vgs, this._vds);
+      this._gds = this.computeGds(this._vgs, this._vds);
+      const vt_n = VT * this._p.N;
+      const expArg = this._vgs_junction / vt_n;
+      this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
+      this._id_junction = this._p.IS * (Math.exp(expArg) - 1);
+      return;
+    }
+
+    if (mode & MODEINITJCT) {
+      // jfetload.c: during MODEINITJCT, primeJunctions() has already set _vgs, _vds,
+      // _vgs_junction directly. Skip MNA voltage reads and all voltage limiting.
       this._pnjlimLimited = false;
       this._swapped = false;
 
@@ -274,7 +321,7 @@ export class NJfetAnalogElement extends AbstractFetElement {
 
       // Gate junction I-V at primed vgs_junction
       const vt_n = VT * this._p.N;
-      const expArg = Math.min(this._vgs_junction / vt_n, 80);
+      const expArg = this._vgs_junction / vt_n;
       const igJunction = this._p.IS * (Math.exp(expArg) - 1);
       this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
       this._id_junction = igJunction;
@@ -335,12 +382,19 @@ export class NJfetAnalogElement extends AbstractFetElement {
     }
 
     // Gate junction I-V (Shockley): Ig = IS*(exp(Vgs/(N*Vt)) - 1)
-    const expArg = Math.min(this._vgs_junction / vt_n, 80);
+    const expArg = this._vgs_junction / vt_n;
     const igJunction = this._p.IS * (Math.exp(expArg) - 1);
     this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
     this._id_junction = igJunction;
 
     if (this._pnjlimLimited) ctx.noncon.value++;
+  }
+
+  /** jfetload.c:425-426 */
+  protected override _capGate(ctx: LoadContext): boolean {
+    const cktMode = ctx.cktMode;
+    return (cktMode & (MODETRAN | MODEAC | MODEINITSMSIG)) !== 0 ||
+      ((cktMode & MODETRANOP) !== 0 && (cktMode & MODEUIC) !== 0);
   }
 
   protected override _stampNonlinear(solver: SparseSolver): void {

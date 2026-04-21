@@ -246,7 +246,6 @@ describe("Diac", () => {
       drivingCtx.loadCtx.voltages[0] = 0;    // MT1
       drivingCtx.loadCtx.voltages[1] = 100;  // MT2 (100V positive)
       drivingCtx.loadCtx.voltages[2] = 0.65; // Gate (forward-biased, simulating diac delivery)
-      drivingCtx.loadCtx.iteration = i;
       triacEl.load(drivingCtx.loadCtx);
     }
 

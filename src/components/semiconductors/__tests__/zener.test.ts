@@ -19,6 +19,7 @@ import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
 
 // ---------------------------------------------------------------------------
@@ -76,8 +77,7 @@ function buildUnitCtx(
   return {
     solver,
     voltages,
-    iteration: 0,
-    initMode: "initFloat",
+    cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -86,10 +86,6 @@ function buildUnitCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -382,7 +378,6 @@ describe("Zener", () => {
     solver.beginAssembly(2);
     const jumpCtx = buildUnitCtx(solver, voltages, {
       limitingCollector: limitingEvents,
-      iteration: 1,
     });
     element.load(jumpCtx);
 

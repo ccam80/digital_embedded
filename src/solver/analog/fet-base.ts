@@ -24,6 +24,7 @@ import type { StateSchema } from "./state-schema.js";
 import { cktTerr } from "./ckt-terr.js";
 import type { LteParams } from "./ckt-terr.js";
 import { niIntegrate } from "./ni-integrate.js";
+import { MODETRAN, MODEAC, MODEINITSMSIG, MODETRANOP, MODEUIC } from "./ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // FetCapacitances interface
@@ -190,6 +191,9 @@ export abstract class AbstractFetElement implements AnalogElementCore {
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, sets CKTnoncon++)
   protected _pnjlimLimited: boolean = false;
 
+  // Most-recent ctx.cktMode captured in load() for use in _stampCompanion.
+  protected _ctxCktMode: number = 0;
+
   // State pool interface
   readonly poolBacked = true as const;
   readonly stateSchema = FET_BASE_SCHEMA;
@@ -252,6 +256,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
    */
   load(ctx: LoadContext): void {
     // 1-6: update internal linearization from current NR iterate
+    this._ctxCktMode = ctx.cktMode;
     this._updateOp(ctx);
 
     // 7: stamp topology-constant + nonlinear Norton equivalent
@@ -259,7 +264,8 @@ export abstract class AbstractFetElement implements AnalogElementCore {
     this._stampNonlinear(ctx.solver);
 
     // 8: reactive companion integration + stamp (if reactive & transient)
-    if (this.isReactive && ctx.isTransient) {
+    const capGate = this._capGate(ctx);
+    if (this.isReactive && capGate) {
       this._stampCompanion(ctx.dt, ctx.method, ctx.voltages, ctx.order, ctx.deltaOld, ctx.ag);
       this._stampReactiveCompanion(ctx.solver);
     }
@@ -493,6 +499,14 @@ export abstract class AbstractFetElement implements AnalogElementCore {
 
     const caps = this.computeCapacitances(vgsNow, vdsNow);
 
+    // jfetload.c:463-466: MODEINITSMSIG stores raw cap values into state0
+    // and skips NIintegrate (small-signal linearization seed only).
+    if (this._ctxCktMode & MODEINITSMSIG) {
+      this._s0[base + SLOT_Q_GS] = caps.cgs;
+      this._s0[base + SLOT_Q_GD] = caps.cgd;
+      return;
+    }
+
     if (caps.cgs > 0) {
       // Meyer incremental charge: Q = cgs*(vgs - prevVgs) + prevQ
       const prevVgs = this.s1[base + SLOT_V_GS];
@@ -549,8 +563,8 @@ export abstract class AbstractFetElement implements AnalogElementCore {
       this._s0[base + SLOT_CCAP_GD] = 0;
     }
 
-    // ngspice mos1load.c:842-853 — zero gate cap companions during MODEINITTRAN
-    if (isFirstCall) {
+    // mos1load.c:862-873: zero gate-cap companions when MODEINITTRAN or not in MODETRAN
+    if ((this._ctxCktMode & MODEINITTRAN) !== 0 || (this._ctxCktMode & MODETRAN) === 0) {
       this._s0[base + SLOT_CAP_GEQ_GS] = 0;
       this._s0[base + SLOT_CAP_IEQ_GS] = 0;
       this._s0[base + SLOT_CCAP_GS] = 0;
@@ -727,4 +741,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
    * @returns FetCapacitances with cgs, cgd, and optional cds/cgb
    */
   abstract computeCapacitances(vgs: number, vds: number): FetCapacitances;
+
+  /** Returns true when reactive companion should be computed this NR step. */
+  protected abstract _capGate(ctx: LoadContext): boolean;
 }

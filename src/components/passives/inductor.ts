@@ -24,6 +24,9 @@ import { formatSI } from "../../editor/si-format.js";
 import type { AnalogElementCore, ReactiveAnalogElementCore, IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
 import { niIntegrate } from "../../solver/analog/ni-integrate.js";
+import {
+  MODEDC, MODEINITJCT, MODEINITTRAN, MODEINITPRED, MODEUIC,
+} from "../../solver/analog/ckt-mode.js";
 import { defineModelParams } from "../../core/model-params.js";
 import type { StatePoolRef } from "../../core/analog-types.js";
 import { defineStateSchema, applyInitialValues } from "../../solver/analog/state-schema.js";
@@ -270,7 +273,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
    * Flux update is guarded by !(MODEDC|MODEINITPRED) (indload.c:43).
    */
   load(ctx: LoadContext): void {
-    const { solver, voltages, initMode, isDcOp, isTransient, ag } = ctx;
+    const { solver, voltages, ag, cktMode: mode } = ctx;
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const b = this.branchIndex;
@@ -278,8 +281,9 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     const base = this.base;
 
     // Initial condition gate (dual of capload.c:32-36; indload.c:44-46 uic path).
-    const cond1 = (isDcOp && initMode === "initJct") ||
-                  (ctx.uic && initMode === "initTran" && !isNaN(this._IC));
+    const cond1 =
+      ((mode & MODEDC) && (mode & MODEINITJCT)) ||
+      ((mode & MODEUIC) && (mode & MODEINITTRAN) && !isNaN(this._IC));
 
     let iNow: number;
     if (cond1) {
@@ -291,15 +295,13 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     const n0v = n0 > 0 ? voltages[n0 - 1] : 0;
     const n1v = n1 > 0 ? voltages[n1 - 1] : 0;
 
-    // Flux-state update — guarded by !(MODEDC|MODEINITPRED) per indload.c:43.
-    // DC (including DCOP) skips flux update entirely; in initPred we copy
-    // state1→state0 (indload.c:94-96); otherwise state0 = L*i (indload.c:47-50).
-    if (!isDcOp && initMode !== "initPred") {
+    // Flux-state update gated on !(MODEDC | MODEINITPRED), per indload.c:43.
+    if (!(mode & (MODEDC | MODEINITPRED))) {
       this.s0[base + SLOT_PHI] = L * iNow;
-      if (initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[base + SLOT_PHI] = this.s0[base + SLOT_PHI];
       }
-    } else if (initMode === "initPred") {
+    } else if (mode & MODEINITPRED) {
       this.s0[base + SLOT_PHI] = this.s1[base + SLOT_PHI];
     }
 
@@ -308,7 +310,8 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     let req = 0;
     let veq = 0;
     let ccap = 0;
-    if (isTransient) {
+    // indload.c:88-109: req=veq=0 at DC, niIntegrate otherwise.
+    if (!(mode & MODEDC)) {
       const phi0 = this.s0[base + SLOT_PHI];
       const phi1 = this.s1[base + SLOT_PHI];
       const phi2 = this.s2[base + SLOT_PHI];
@@ -327,7 +330,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
       veq = ni.ceq;
       req = ni.geq;
       this.s0[base + SLOT_CCAP] = ccap;
-      if (initMode === "initTran") {
+      if (mode & MODEINITTRAN) {
         this.s1[base + SLOT_CCAP] = ccap;
       }
     }

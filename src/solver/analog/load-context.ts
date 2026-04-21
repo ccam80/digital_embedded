@@ -14,13 +14,6 @@ import type { LimitingEvent } from "./newton-raphson.js";
 // LoadContext
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// F4 migration: the boolean fan-out (isDcOp / isTransient / isTransientDcop /
-// isAc / initMode) is replaced by a single cktMode bitfield that mirrors
-// ngspice CKTmode exactly (cktdefs.h:165-185). Device load() methods now test
-// individual bits via ctx.cktMode & MODE* from ./ckt-mode.ts.
-// ---------------------------------------------------------------------------
-
 export interface LoadContext {
   /**
    * ngspice CKTmode bitfield. OR of MODETRAN|MODEAC|MODEDCOP|MODETRANOP|

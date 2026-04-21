@@ -22,6 +22,7 @@ import { runDcOp, makeSimpleCtx } from "../../../solver/analog/__tests__/test-he
 import { makeDcVoltageSource } from "../../sources/dc-voltage-source.js";
 import type { AnalogElement } from "../../../solver/analog/element.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { MODETRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 import type { Diagnostic } from "../../../compile/types.js";
 import { ComponentRegistry } from "../../../core/registry.js";
 import type { AnalogFactory } from "../../../core/registry.js";
@@ -61,8 +62,7 @@ function driveFuseStep(fuse: AnalogFuseElement, dt: number, voltages: Float64Arr
   const ctx: LoadContext = {
     solver,
     voltages,
-    iteration: 0,
-    initMode: "transient",
+    cktMode: MODETRAN | MODEINITFLOAT,
     dt,
     method: "trapezoidal",
     order: 1,
@@ -71,10 +71,6 @@ function driveFuseStep(fuse: AnalogFuseElement, dt: number, voltages: Float64Arr
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: true,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,

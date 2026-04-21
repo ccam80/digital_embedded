@@ -18,6 +18,7 @@
 
 import type { SparseSolver } from "./sparse-solver.js";
 import type { AnalogElementCore, LoadContext } from "./element.js";
+import { MODETRAN } from "./ckt-mode.js";
 import type { PropertyBag } from "../../core/properties.js";
 import type { ResolvedPinElectrical } from "../../core/pin-electrical.js";
 import {
@@ -584,7 +585,7 @@ export function createRelayAnalogElement(
       // Contact variable resistance (current contact state)
       stampG(s, nodeContactA, nodeContactB, contactG());
 
-      if (ctx.isTransient && ctx.dt > 0 && L > 0) {
+      if ((ctx.cktMode & MODETRAN) !== 0 && ctx.dt > 0 && L > 0) {
         // Inductor companion model: G_eq = dt/(2L) for trapezoidal,
         // dt/L for BDF-1, 2/3 * dt/L for BDF-2
         const factor = ctx.method === "bdf1" ? 1 : (ctx.method === "bdf2" ? 2 / 3 : 0.5);
@@ -693,7 +694,7 @@ export function createRelayDTAnalogElement(
       stampG(s, nodeCommon, nodeThrow, gThrow());
       stampG(s, nodeCommon, nodeRest, gRest());
 
-      if (ctx.isTransient && ctx.dt > 0 && L > 0) {
+      if ((ctx.cktMode & MODETRAN) !== 0 && ctx.dt > 0 && L > 0) {
         const factor = ctx.method === "bdf1" ? 1 : (ctx.method === "bdf2" ? 2 / 3 : 0.5);
         geqL = (ctx.dt * factor) / L;
         const vCoil1 = nodeCoil1 > 0 ? voltages[nodeCoil1 - 1] : 0;

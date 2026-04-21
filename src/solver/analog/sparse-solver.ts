@@ -479,20 +479,6 @@ export class SparseSolver {
    *     This must NOT be conflated with a singular-matrix failure.
    */
   factor(diagGmin?: number): FactorResult {
-    if (this._capturePreFactorMatrix) {
-      const n = this._n;
-      const snap: Array<{ row: number; col: number; value: number }> = [];
-      for (let col = 0; col < n; col++) {
-        let e = this._colHead[col];
-        while (e >= 0) {
-          if (!(this._elFlags[e] & FLAG_FILL_IN)) {
-            snap.push({ row: this._elRow[e], col: this._elCol[e], value: this._elVal[e] });
-          }
-          e = this._elNextInCol[e];
-        }
-      }
-      this._preFactorMatrix = snap;
-    }
     if (this._needsReorder || !this._hasPivotOrder) {
       this.lastFactorUsedReorder = true;
       return this.factorWithReorder(diagGmin);
@@ -500,15 +486,6 @@ export class SparseSolver {
     this.lastFactorUsedReorder = false;
     const result = this.factorNumerical(diagGmin);
     if (!result.success && result.needsReorder) {
-      // ngspice spfactor.c:225 fall-through: partial-pivot guard failed at
-      // some step k; re-run the full reorder from step 0. This is NOT a
-      // singular-matrix failure. diagGmin has already been stamped once by
-      // factorNumerical's _applyDiagGmin call, so forward it again; the
-      // gmin must reach the factored matrix exactly once, and the first
-      // application was discarded with the abandoned numeric factorization.
-      // Because _numericLUReusePivots aborts before mutating _elVal, the
-      // underlying matrix is still the original A + gmin·I; the full
-      // reorder must NOT add gmin a second time.
       this._needsReorder = true;
       this.lastFactorUsedReorder = true;
       return this.factorWithReorder(/* diagGmin */ undefined);
@@ -798,6 +775,29 @@ export class SparseSolver {
   }
 
   /**
+   * Snapshot the currently-assembled matrix into _preFactorMatrix, skipped
+   * when capture is disabled. Called from factorWithReorder / factorNumerical
+   * IMMEDIATELY AFTER _applyDiagGmin so the snapshot reflects the matrix that
+   * is actually about to be factored — matching ngspice's invariant that
+   * LoadGmin + spFactor are observed atomically.
+   */
+  private _takePreFactorSnapshotIfEnabled(): void {
+    if (!this._capturePreFactorMatrix) return;
+    const n = this._n;
+    const snap: Array<{ row: number; col: number; value: number }> = [];
+    for (let col = 0; col < n; col++) {
+      let e = this._colHead[col];
+      while (e >= 0) {
+        if (!(this._elFlags[e] & FLAG_FILL_IN)) {
+          snap.push({ row: this._elRow[e], col: this._elCol[e], value: this._elVal[e] });
+        }
+        e = this._elNextInCol[e];
+      }
+    }
+    this._preFactorMatrix = snap;
+  }
+
+  /**
    * Return assembled matrix as array of non-zero entries in original ordering.
    * Used by comparison harness. Not for hot-path use.
    */
@@ -886,10 +886,6 @@ export class SparseSolver {
     this._structureEmpty = false;
     this._hasPivotOrder = false;
     // ngspice spalloc.c:170 — Matrix->NeedsOrdering = YES on initial Create.
-    // Previously set to false; the net dispatch result was still "reorder"
-    // (because _hasPivotOrder was also false), but aligning the primitive
-    // flag with ngspice removes a divergence that could bite if downstream
-    // logic queries _needsReorder directly.
     this._needsReorder = true;
     this._didPreorder = false;
   }
@@ -1492,9 +1488,8 @@ export class SparseSolver {
           return { success: false, needsReorder: true };
         }
       } else if (diagMag <= absThreshold) {
-        // No diagonal pool element (unusual after reorder); still enforce the
-        // absolute tolerance guard. Do NOT demand reorder here — this path
-        // indicates structural singularity of the factored pivot.
+        // No diagonal pool element (unusual after reorder); absolute tolerance
+        // guard fires — demand reorder just as the relative-threshold path does.
         for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
         return { success: false, needsReorder: true };
       }
@@ -1606,6 +1601,7 @@ export class SparseSolver {
    */
   factorWithReorder(diagGmin?: number): FactorResult {
     if (diagGmin) this._applyDiagGmin(diagGmin);
+    this._takePreFactorSnapshotIfEnabled();
     if (this._needsReorder) {
       this._allocateWorkspace();
       this._needsReorder = false;
@@ -1624,6 +1620,7 @@ export class SparseSolver {
    */
   factorNumerical(diagGmin?: number): FactorResult {
     if (diagGmin) this._applyDiagGmin(diagGmin);
+    this._takePreFactorSnapshotIfEnabled();
     return this._numericLUReusePivots();
   }
 

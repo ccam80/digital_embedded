@@ -25,6 +25,7 @@ import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LimitingEvent } from "../../../solver/analog/newton-raphson.js";
+import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: allocate a StatePool for a single element and call initState
@@ -109,8 +110,7 @@ function buildUnitCtx(
   return {
     solver,
     voltages,
-    iteration: 0,
-    initMode: "initFloat",
+    cktMode: MODEDCOP | MODEINITFLOAT,
     dt: 0,
     method: "trapezoidal",
     order: 1,
@@ -119,10 +119,6 @@ function buildUnitCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: true,
-    isTransient: false,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -471,7 +467,6 @@ describe("SCR LimitingEvent instrumentation", () => {
     solver.beginAssembly(3);
     element.load(buildUnitCtx(solver, voltages, {
       limitingCollector: collector,
-      iteration: 1,
     }));
   }
 

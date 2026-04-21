@@ -25,6 +25,7 @@ import type { RenderContext, Point, TextAnchor, FontSpec, PathData } from "../..
 import type { ThemeColor } from "../../../core/renderer-interface.js";
 import type { SparseSolver as SparseSolverType } from "../../../solver/analog/sparse-solver.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
+import { MODEDCOP, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -377,8 +378,7 @@ describe("Probe", () => {
       const ctx: LoadContext = {
         solver: captureSolver,
         voltages: new Float64Array(8),
-        iteration: 0,
-        initMode: "initFloat",
+        cktMode: MODEDCOP | MODEINITFLOAT,
         dt: 0,
         method: "trapezoidal",
         order: 1,
@@ -387,10 +387,6 @@ describe("Probe", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: true,
-        isTransient: false,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,

@@ -30,6 +30,7 @@ import type { LoadContext } from "../../../solver/analog/load-context.js";
 import { makeDiagnostic } from "../../../solver/analog/diagnostics.js";
 import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import type { IntegrationMethod } from "../../../core/analog-types.js";
+import { MODETRAN, MODEINITTRAN, MODEINITFLOAT } from "../../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
 // Helper: narrow ModelEntry to inline factory (throws if netlist kind)
@@ -90,7 +91,7 @@ function makeStubCtx(
     dt?: number;
     method?: IntegrationMethod;
     order?: number;
-    initMode?: LoadContext["initMode"];
+    cktMode?: number;
   } = {},
 ): LoadContext {
   const dt = opts.dt ?? 1e-9;
@@ -101,10 +102,9 @@ function makeStubCtx(
   const scratch = new Float64Array(64);
   if (dt > 0) computeNIcomCof(dt, deltaOld, order, method, ag, scratch);
   return {
+    cktMode: opts.cktMode ?? (MODETRAN | MODEINITTRAN),
     solver: solver as unknown as import("../../../solver/analog/sparse-solver.js").SparseSolver,
     voltages: opts.voltages ?? new Float64Array(200),
-    iteration: 0,
-    initMode: opts.initMode ?? "initTran",
     dt,
     method,
     order,
@@ -113,10 +113,6 @@ function makeStubCtx(
     srcFact: 1,
     noncon: { value: 0 },
     limitingCollector: null,
-    isDcOp: false,
-    isTransient: true,
-    isTransientDcop: false,
-    isAc: false,
     xfact: 1,
     gmin: 1e-12,
     uic: false,
@@ -215,7 +211,7 @@ describe("TLine", () => {
 
       const voltages = new Float64Array(6 + N);
       const { solver, stamps } = makeStubSolver();
-      el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "bdf1", order: 1, initMode: "initTran" }));
+      el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "bdf1", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
 
       // For a lossless line all resistive stamps (R_seg) should be zero conductance
       // or equivalent to MIN_CONDUCTANCE (1e-12 S). The inductors will also stamp
@@ -283,7 +279,7 @@ describe("TLine", () => {
       const dt = 1e-9;
       const voltages = new Float64Array(nodeCount + N);
       const { solver, stamps } = makeStubSolver();
-      el.load(makeStubCtx(solver, { voltages, dt, method: "bdf1", order: 1, initMode: "initTran" }));
+      el.load(makeStubCtx(solver, { voltages, dt, method: "bdf1", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
 
       // BDF-1 geq = L/dt. For each segment's inductor (SegmentInductorElement):
       // geq = lSeg / dt = 50e-9 / 1e-9 = 50
@@ -493,6 +489,7 @@ describe("TLine", () => {
       const engine = new MNAEngine();
       engine.init(compiled);
       engine.configure({ maxTimeStep: tau / 10 });
+      engine.transientDcop();
 
       // Run to steady state (many τ)
       let steps = 0;
@@ -680,6 +677,7 @@ describe("TLine", () => {
       const engine = new MNAEngine();
       engine.init(compiled);
       engine.configure({ maxTimeStep: tau / 20 });
+      engine.transientDcop();
 
       // Run to steady state (open circuit → voltage rises to Vs = 1V at Port2)
       let steps = 0;
@@ -831,7 +829,7 @@ describe("TransmissionLine", () => {
 
       const voltages = new Float64Array(nodeCount + 3);
       const { solver, stamps } = makeStubSolver();
-      el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "bdf1", order: 1, initMode: "initTran" }));
+      el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "bdf1", order: 1, cktMode: MODETRAN | MODEINITTRAN }));
       expect(stamps.length).toBeGreaterThan(0);
     });
 
@@ -896,7 +894,7 @@ describe("TransmissionLine", () => {
       el.initState!(pool);
       const voltages = new Float64Array(2 + 2 * (N - 1) + N);
       const { solver } = makeStubSolver();
-      expect(() => el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "bdf1", order: 1, initMode: "initTran" }))).not.toThrow();
+      expect(() => el.load(makeStubCtx(solver, { voltages, dt: 1e-9, method: "bdf1", order: 1, cktMode: MODETRAN | MODEINITTRAN }))).not.toThrow();
     });
 
     it("SegmentInductorElement sub-elements declare stateSchema with 5 slots", () => {
@@ -1069,10 +1067,9 @@ describe("transmission_line_load_transient_parity (C4.2)", () => {
       matValues.fill(0);
 
       const ctx: LoadContext = {
+        cktMode: step === 0 ? (MODETRAN | MODEINITTRAN) : (MODETRAN | MODEINITFLOAT),
         solver,
         voltages,
-        iteration: 0,
-        initMode: step === 0 ? "initTran" : "transient",
         dt,
         method,
         order,
@@ -1081,10 +1078,6 @@ describe("transmission_line_load_transient_parity (C4.2)", () => {
         srcFact: 1,
         noncon: { value: 0 },
         limitingCollector: null,
-        isDcOp: false,
-        isTransient: true,
-        isTransientDcop: false,
-        isAc: false,
         xfact: 1,
         gmin: 1e-12,
         uic: false,
