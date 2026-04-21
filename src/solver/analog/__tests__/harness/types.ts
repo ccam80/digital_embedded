@@ -8,11 +8,7 @@
 
 import type { PostIterationHook } from "./capture.js";
 import type { MNAEngine } from "../../analog-engine.js";
-import type { InitMode } from "../../load-context.js";
 import type { IntegrationMethod } from "../../../../core/analog-types.js";
-
-// Re-export InitMode so harness code has a single import source.
-export type { InitMode };
 
 // ---------------------------------------------------------------------------
 // Asymmetric step presence (Goal B)
@@ -179,7 +175,7 @@ export interface IterationSnapshot {
   noncon: number;
   diagGmin: number;
   srcFact: number;
-  initMode: InitMode;
+  initMode: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "unknown";
   /**
    * Integration order active at this NR iteration (1 = BDF-1, 2 = trap/BDF-2).
    * Set per-iteration from `ctx.loadCtx.order` for our engine and from the
@@ -339,24 +335,6 @@ export interface DeviceMapping {
 // ---------------------------------------------------------------------------
 // Comparison result
 // ---------------------------------------------------------------------------
-
-/** Tolerance specification for comparison. */
-export interface Tolerance {
-  vAbsTol: number;
-  iAbsTol: number;
-  relTol: number;
-  qAbsTol: number;
-  timeDeltaTol: number;
-}
-
-/** Default tolerances matching ngspice SPICE3 defaults. */
-export const DEFAULT_TOLERANCE: Tolerance = {
-  vAbsTol: 1e-6,
-  iAbsTol: 1e-12,
-  relTol: 1e-3,
-  qAbsTol: 1e-14,
-  timeDeltaTol: 1e-12,
-};
 
 /** One comparison between our snapshot and ngspice's at one iteration. */
 export interface ComparisonResult {

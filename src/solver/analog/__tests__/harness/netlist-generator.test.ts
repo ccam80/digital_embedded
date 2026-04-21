@@ -2,14 +2,7 @@
  * Tests for Item 5 (BJT companion current mapping) and Item 12 (netlist generator).
  */
 import { describe, it, expect } from "vitest";
-import {
-  BJT_MAPPING,
-  DEVICE_MAPPINGS,
-  DIODE_MAPPING,
-  JFET_MAPPING,
-  TUNNEL_DIODE_MAPPING,
-  VARACTOR_MAPPING,
-} from "./device-mappings.js";
+import { BJT_MAPPING, DEVICE_MAPPINGS } from "./device-mappings.js";
 import { generateSpiceNetlist } from "./netlist-generator.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import { PropertyBag } from "../../../../core/properties.js";
@@ -416,162 +409,15 @@ describe("generateSpiceNetlist", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Derived ngspice slots — synthesize BJT quantities (RB_EFF, Norton currents)
-// from raw CKTstate so they can be compared against our engine.
+// Derived-ngspice-slot tests removed in the parity forcing function commit.
+// These blocks exercised invented equivalence formulas (BJT Norton currents,
+// diode IEQ = ID − GEQ·VD, JFET VDS = VGS − VGD, tunnel-diode/varactor IEQ).
+// Under strict bit-exact parity those formulas are architectural papering —
+// ngspice does not persist these quantities, so no genuine comparison exists.
+// Route: spec/parity-forcing-function-plan.md §3.4 and the forthcoming
+// architectural-alignment.md (Track A).
 // ---------------------------------------------------------------------------
 
-describe("BJT_MAPPING.derivedNgspiceSlots", () => {
-  // Build a synthetic per-device state slice mimicking CKTstate0 layout.
-  // Offsets used by the formulas:
-  //   0 vbe, 1 vbc, 2 cc, 3 cb, 4 gpi, 5 gmu, 6 gm, 7 go, 16 gx, 18 geqcb
-  function makeState(overrides: Partial<Record<number, number>>): Float64Array {
-    const s = new Float64Array(21);
-    for (const [k, v] of Object.entries(overrides)) s[Number(k)] = v as number;
-    return s;
-  }
-
-  it("defines the four derived slots", () => {
-    const d = BJT_MAPPING.derivedNgspiceSlots!;
-    expect(d).toBeDefined();
-    expect(Object.keys(d).sort()).toEqual(["IB_NORTON", "IC_NORTON", "IE_NORTON", "RB_EFF"]);
-  });
-
-  it("RB_EFF = 1 / gx", () => {
-    const s = makeState({ 16: 0.01 }); // gx = 10 mS → rb = 100 Ω
-    expect(BJT_MAPPING.derivedNgspiceSlots!.RB_EFF.compute(s, 0)).toBeCloseTo(100, 10);
-  });
-
-  it("RB_EFF returns +Infinity when gx is zero", () => {
-    const s = makeState({});
-    expect(BJT_MAPPING.derivedNgspiceSlots!.RB_EFF.compute(s, 0)).toBe(Number.POSITIVE_INFINITY);
-  });
-
-  it("IC_NORTON matches cc - (gm+go)*vbe + (gmu+go)*vbc", () => {
-    const s = makeState({
-      0: 0.7,    // vbe
-      1: -0.3,   // vbc
-      2: 1e-3,   // cc (ic)
-      5: 2e-6,   // gmu
-      6: 40e-3,  // gm
-      7: 1e-5,   // go
-    });
-    const expected = 1e-3 - (40e-3 + 1e-5) * 0.7 + (2e-6 + 1e-5) * -0.3;
-    expect(BJT_MAPPING.derivedNgspiceSlots!.IC_NORTON.compute(s, 0)).toBeCloseTo(expected, 15);
-  });
-
-  it("IB_NORTON matches cb - gpi*vbe - gmu*vbc - geqcb*vbc", () => {
-    const s = makeState({
-      0: 0.65,   // vbe
-      1: -0.4,   // vbc
-      3: 5e-6,   // cb (ib)
-      4: 5e-4,   // gpi
-      5: 1e-7,   // gmu
-      18: 1e-8,  // geqcb
-    });
-    const expected = 5e-6 - 5e-4 * 0.65 - 1e-7 * -0.4 - 1e-8 * -0.4;
-    expect(BJT_MAPPING.derivedNgspiceSlots!.IB_NORTON.compute(s, 0)).toBeCloseTo(expected, 15);
-  });
-
-  it("IE_NORTON matches -(cc+cb) + (gm+go+gpi)*vbe - (go-geqcb)*vbc", () => {
-    const s = makeState({
-      0: 0.68,
-      1: -0.2,
-      2: 2e-3,
-      3: 2e-5,
-      4: 5e-4,
-      6: 30e-3,
-      7: 2e-5,
-      18: 3e-9,
-    });
-    const expected = -(2e-3 + 2e-5)
-      + (30e-3 + 2e-5 + 5e-4) * 0.68
-      - (2e-5 - 3e-9) * -0.2;
-    expect(BJT_MAPPING.derivedNgspiceSlots!.IE_NORTON.compute(s, 0)).toBeCloseTo(expected, 14);
-  });
-
-  it("respects the base offset — reads from state[base+offset], not state[offset]", () => {
-    const s = new Float64Array(42);
-    // Write device 2's state starting at offset 21.
-    s[21 + 16] = 0.005; // gx
-    expect(BJT_MAPPING.derivedNgspiceSlots!.RB_EFF.compute(s, 21)).toBeCloseTo(200, 10);
-    // Device at base 0 has gx=0 so gets Infinity.
-    expect(BJT_MAPPING.derivedNgspiceSlots!.RB_EFF.compute(s, 0)).toBe(Number.POSITIVE_INFINITY);
-  });
-});
-
-describe("DIODE_MAPPING.derivedNgspiceSlots", () => {
-  // ngspice diode state layout (diodefs.h): 0 vd, 1 cd, 2 gd, 3 qcap, 4 ccap.
-  function makeDioState(vd: number, id: number, geq: number): Float64Array {
-    const s = new Float64Array(5);
-    s[0] = vd;
-    s[1] = id;
-    s[2] = geq;
-    return s;
-  }
-
-  it("defines IEQ", () => {
-    expect(DIODE_MAPPING.derivedNgspiceSlots).toBeDefined();
-    expect(Object.keys(DIODE_MAPPING.derivedNgspiceSlots!)).toEqual(["IEQ"]);
-  });
-
-  it("IEQ = ID - GEQ*VD (matches dioload.c cdeq = cd - gd*vd)", () => {
-    // Forward-biased silicon diode at typical operating point:
-    // vd = 0.65 V, id = 1 mA, gd ≈ id/Vt ≈ 1e-3/25.85e-3 ≈ 0.0387 S
-    const vd = 0.65;
-    const id = 1e-3;
-    const geq = id / 25.85e-3;
-    const s = makeDioState(vd, id, geq);
-    const expected = id - geq * vd;
-    expect(DIODE_MAPPING.derivedNgspiceSlots!.IEQ.compute(s, 0)).toBeCloseTo(expected, 15);
-  });
-
-  it("IEQ is zero when diode is at VD=0, ID=0", () => {
-    const s = makeDioState(0, 0, 0);
-    expect(DIODE_MAPPING.derivedNgspiceSlots!.IEQ.compute(s, 0)).toBe(0);
-  });
-
-  it("IEQ respects base offset", () => {
-    const s = new Float64Array(15);
-    s[10 + 0] = 0.7;    // vd
-    s[10 + 1] = 2e-3;   // id
-    s[10 + 2] = 0.05;   // geq
-    const expected = 2e-3 - 0.05 * 0.7;
-    expect(DIODE_MAPPING.derivedNgspiceSlots!.IEQ.compute(s, 10)).toBeCloseTo(expected, 15);
-  });
-
-  it("tunnel-diode and varactor share the same IEQ formula", () => {
-    const s = new Float64Array(5);
-    s[0] = 0.55;
-    s[1] = 5e-4;
-    s[2] = 0.02;
-    const dio = DIODE_MAPPING.derivedNgspiceSlots!.IEQ.compute(s, 0);
-    const td  = TUNNEL_DIODE_MAPPING.derivedNgspiceSlots!.IEQ.compute(s, 0);
-    const var_ = VARACTOR_MAPPING.derivedNgspiceSlots!.IEQ.compute(s, 0);
-    expect(td).toBe(dio);
-    expect(var_).toBe(dio);
-  });
-});
-
-describe("JFET_MAPPING.derivedNgspiceSlots", () => {
-  // ngspice jfet state offsets: 0 vgs, 1 vgd, 2 cg, 3 cd, 4 cgd,
-  //                             5 gm, 6 gds, 7 ggs, 8 ggd,
-  //                             9 qgs, 10 cqgs, 11 qgd, 12 cqgd.
-  it("defines VDS", () => {
-    expect(JFET_MAPPING.derivedNgspiceSlots).toBeDefined();
-    expect(Object.keys(JFET_MAPPING.derivedNgspiceSlots!)).toEqual(["VDS"]);
-  });
-
-  it("VDS = VGS - VGD", () => {
-    const s = new Float64Array(13);
-    s[0] = 3.0;  // vgs
-    s[1] = -2.0; // vgd → vds = 5
-    expect(JFET_MAPPING.derivedNgspiceSlots!.VDS.compute(s, 0)).toBe(5);
-  });
-
-  it("VDS respects base offset", () => {
-    const s = new Float64Array(26);
-    s[13 + 0] = 1.5;
-    s[13 + 1] = 0.3;
-    expect(JFET_MAPPING.derivedNgspiceSlots!.VDS.compute(s, 13)).toBeCloseTo(1.2, 15);
-  });
+describe.skip("BJT_MAPPING.derivedNgspiceSlots (removed — see plan)", () => {
+  it("placeholder so the describe block is not empty", () => { expect(true).toBe(true); });
 });

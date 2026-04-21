@@ -41,7 +41,6 @@ import type {
   ComponentTrace,
   NodeTrace,
   SessionSummary,
-  Tolerance,
   ComparisonResult,
   IntegrationCoefficients,
   NRPhase,
@@ -80,7 +79,6 @@ import type {
   AttemptDetail,
   AttemptQuery,
 } from "./types.js";
-import { DEFAULT_TOLERANCE } from "./types.js";
 import { computeNIcomCof } from "../../integration.js";
 import type { IntegrationMethod } from "../../../../core/analog-types.js";
 
@@ -149,13 +147,12 @@ function _computeLinearSystemData(
   return { rhs, residual, residualInfinityNorm, matrix: denseA };
 }
 
-function makeComparedValue(
-  ours: number,
-  ngspice: number,
-  absTol: number,
-  relTol: number,
-): ComparedValue {
-  // Both NaN means data is simply unavailable — treat as matching with zero delta.
+/**
+ * Build a ComparedValue under strict bit-exact equality. `withinTol` means
+ * `ours === ngspice` (IEEE-754 identity). Both-NaN means data is unavailable
+ * and is treated as matching with zero delta.
+ */
+function makeComparedValue(ours: number, ngspice: number): ComparedValue {
   if (isNaN(ours) && isNaN(ngspice)) {
     return { ours, ngspice, delta: 0, absDelta: 0, relDelta: 0, withinTol: true };
   }
@@ -163,12 +160,7 @@ function makeComparedValue(
   const absDelta = Math.abs(delta);
   const refMag = Math.max(Math.abs(ours), Math.abs(ngspice));
   const relDelta = refMag > 0 ? absDelta / refMag : absDelta;
-  const withinTol = absDelta <= absTol + relTol * refMag;
-  return { ours, ngspice, delta, absDelta, relDelta, withinTol };
-}
-
-function simpleCompared(ours: number, ngspice: number): ComparedValue {
-  return makeComparedValue(ours, ngspice, 0, 0);
+  return { ours, ngspice, delta, absDelta, relDelta, withinTol: ours === ngspice };
 }
 
 function applyPagination<T>(arr: T[], opts?: PaginationOpts): T[] {
@@ -243,8 +235,6 @@ export interface ComparisonSessionOptions {
   cirPath?: string;
   /** Path to ngspice DLL. Defaults to NGSPICE_DLL_PATH env or standard build location. */
   dllPath?: string;
-  /** Tolerance overrides. */
-  tolerance?: Partial<Tolerance>;
   /** Max timestep steps to run on our engine per run. Default: 5000. */
   maxOurSteps?: number;
   /** When true, skip ngspice and compare our engine against a deep clone of itself. */
@@ -348,7 +338,6 @@ function _vectorL2(v: Float64Array | undefined, start: number, end: number): num
 
 export class ComparisonSession {
   protected _opts: ComparisonSessionOptions;
-  protected _tol: Tolerance;
   protected _dllPath: string;
 
   // Our engine state (set in init())
@@ -396,7 +385,6 @@ export class ComparisonSession {
 
   constructor(opts: ComparisonSessionOptions) {
     this._opts = opts;
-    this._tol = { ...DEFAULT_TOLERANCE, ...opts.tolerance };
     this._dllPath = getDllPath(opts);
   }
 
@@ -416,11 +404,9 @@ export class ComparisonSession {
     analysis: "dcop" | "tran";
     tStop?: number;
     maxStep?: number;
-    tolerance?: Partial<Tolerance>;
   }): Promise<ComparisonSession> {
     const session = new ComparisonSession({
       dtsPath: opts.dtsPath ?? "<inline>",
-      ...(opts.tolerance ? { tolerance: opts.tolerance } : {}),
       selfCompare: true,
     });
     await session.initSelfCompare(opts.buildCircuit);
@@ -785,14 +771,14 @@ export class ComparisonSession {
         this._ourTopology.nodeLabels.forEach((label, nodeId) => {
           const ngV = nodeId > 0 && nodeId - 1 < ngFinal.voltages.length
             ? ngFinal.voltages[nodeId - 1] : NaN;
-          nodes[label] = makeComparedValue(NaN, ngV, this._tol.vAbsTol, this._tol.relTol);
+          nodes[label] = makeComparedValue(NaN, ngV);
         });
 
         this._ourTopology.matrixRowLabels.forEach((label, row) => {
           if (row < this._ourTopology.nodeCount) return;
           const ourV = NaN;
           const ngV = row < ngFinal.voltages.length ? ngFinal.voltages[row] : NaN;
-          branches[label] = makeComparedValue(ourV, ngV, this._tol.iAbsTol, this._tol.relTol);
+          branches[label] = makeComparedValue(ourV, ngV);
         });
       }
 
@@ -801,11 +787,11 @@ export class ComparisonSession {
         ourStepIndex: -1,
         ngspiceStepIndex: ngStepIndex,
         presence,
-        stepStartTime: simpleCompared(NaN, ngStep.stepStartTime),
-        stepEndTime: simpleCompared(NaN, ngStep.stepEndTime),
-        dt: simpleCompared(NaN, ngStep.dt),
+        stepStartTime: makeComparedValue(NaN, ngStep.stepStartTime),
+        stepEndTime: makeComparedValue(NaN, ngStep.stepEndTime),
+        dt: makeComparedValue(NaN, ngStep.dt),
         converged: { ours: false, ngspice: ngStep.converged },
-        iterationCount: simpleCompared(NaN, ngStep.iterationCount),
+        iterationCount: makeComparedValue(NaN, ngStep.iterationCount),
         nodes,
         branches,
         components,
@@ -840,14 +826,14 @@ export class ComparisonSession {
           ? ourFinal.voltages[nodeId - 1] : 0;
         const ngV = ngFinal && nodeId > 0 && nodeId - 1 < ngFinal.voltages.length
           ? ngFinal.voltages[nodeId - 1] : NaN;
-        nodes[label] = makeComparedValue(ourV, ngV, this._tol.vAbsTol, this._tol.relTol);
+        nodes[label] = makeComparedValue(ourV, ngV);
       });
 
       this._ourTopology.matrixRowLabels.forEach((label, row) => {
         if (row < this._ourTopology.nodeCount) return;
         const ourV = ourFinal && row < ourFinal.voltages.length ? ourFinal.voltages[row] : NaN;
         const ngV = ngFinal && row < ngFinal.voltages.length ? ngFinal.voltages[row] : NaN;
-        branches[label] = makeComparedValue(ourV, ngV, this._tol.iAbsTol, this._tol.relTol);
+        branches[label] = makeComparedValue(ourV, ngV);
       });
 
       for (const es of ourFinal.elementStates) {
@@ -856,7 +842,7 @@ export class ComparisonSession {
         const slots: Record<string, ComparedValue> = {};
         for (const [slot, value] of Object.entries(es.slots)) {
           const ngValue = ngEs?.slots[slot] ?? NaN;
-          slots[slot] = makeComparedValue(value, ngValue, this._slotTol(slot), this._tol.relTol);
+          slots[slot] = makeComparedValue(value, ngValue);
         }
         const topoEl = this._ourTopology.elements.find(
           el => el.label.toUpperCase() === es.label.toUpperCase());
@@ -874,11 +860,11 @@ export class ComparisonSession {
       ourStepIndex: stepIndex,
       ngspiceStepIndex: ngStepIndex,
       presence,
-      stepStartTime: simpleCompared(ourSST, ngSST),
-      stepEndTime: simpleCompared(ourSET, ngSET),
-      dt: simpleCompared(ourStep.dt, ngStep?.dt ?? NaN),
+      stepStartTime: makeComparedValue(ourSST, ngSST),
+      stepEndTime: makeComparedValue(ourSET, ngSET),
+      dt: makeComparedValue(ourStep.dt, ngStep?.dt ?? NaN),
       converged: { ours: ourStep.converged, ngspice: ngStep?.converged ?? false },
-      iterationCount: simpleCompared(ourStep.iterationCount, ngStep?.iterationCount ?? NaN),
+      iterationCount: makeComparedValue(ourStep.iterationCount, ngStep?.iterationCount ?? NaN),
       nodes,
       branches,
       components,
@@ -926,14 +912,14 @@ export class ComparisonSession {
             ? ourIter.voltages[nodeId - 1] : 0;
           const ngV = ngIter && nodeId > 0 && nodeId - 1 < ngIter.voltages.length
             ? ngIter.voltages[nodeId - 1] : NaN;
-          nodes[label] = makeComparedValue(ourV, ngV, this._tol.vAbsTol, this._tol.relTol);
+          nodes[label] = makeComparedValue(ourV, ngV);
         });
 
         this._ourTopology.matrixRowLabels.forEach((label, row) => {
           if (row < this._ourTopology.nodeCount) return;
           const ourV = row < ourIter.voltages.length ? ourIter.voltages[row] : NaN;
           const ngV = ngIter && row < ngIter.voltages.length ? ngIter.voltages[row] : NaN;
-          rhs[label] = makeComparedValue(ourV, ngV, this._tol.iAbsTol, this._tol.relTol);
+          rhs[label] = makeComparedValue(ourV, ngV);
         });
 
         if (ourIter.preSolveRhs.length > 0) {
@@ -942,7 +928,7 @@ export class ComparisonSession {
               ? ourIter.preSolveRhs[nodeId - 1] : 0;
             const ngR = ngIter?.preSolveRhs && nodeId > 0 && nodeId - 1 < ngIter.preSolveRhs.length
               ? ngIter.preSolveRhs[nodeId - 1] : NaN;
-            rhs[label] = makeComparedValue(ourR, ngR, this._tol.iAbsTol, this._tol.relTol);
+            rhs[label] = makeComparedValue(ourR, ngR);
           });
         }
 
@@ -952,7 +938,7 @@ export class ComparisonSession {
           const comp: Record<string, ComparedValue> = {};
           for (const [slot, value] of Object.entries(es.slots)) {
             const ngValue = ngEs?.slots[slot] ?? NaN;
-            comp[slot] = makeComparedValue(value, ngValue, this._slotTol(slot), this._tol.relTol);
+            comp[slot] = makeComparedValue(value, ngValue);
           }
           comps[es.label] = comp;
         }
@@ -984,7 +970,7 @@ export class ComparisonSession {
         stepIndex,
         iteration: ii,
         stepStartTime: ourStep?.stepStartTime ?? ngStep?.stepStartTime ?? 0,
-        noncon: makeComparedValue(ourIter?.noncon ?? 0, ngIter?.noncon ?? NaN, 0, 0),
+        noncon: makeComparedValue(ourIter?.noncon ?? 0, ngIter?.noncon ?? NaN),
         nodes,
         rhs,
         matrixDiffs,
@@ -1221,8 +1207,7 @@ export class ComparisonSession {
       const shape = this.getStepShape(i);
       steps.push(shape);
       presenceCounts[shape.presence]++;
-      if (shape.stepStartTimeDelta !== null
-          && Math.abs(shape.stepStartTimeDelta) > this._tol.timeDeltaTol) {
+      if (shape.stepStartTimeDelta !== null && shape.stepStartTimeDelta !== 0) {
         largeTimeDeltas.push({ stepIndex: i, delta: shape.stepStartTimeDelta });
       }
     }
@@ -1427,9 +1412,9 @@ export class ComparisonSession {
       stepIndex: "index" in query ? query.index : ourStepIndex,
       ourStepIndex,
       ngspiceStepIndex: ngStepIndex,
-      stepStartTime: simpleCompared(ourSST, ngSST),
-      stepEndTime: simpleCompared(ourSET, ngSET),
-      dt: simpleCompared(ourStep?.dt ?? NaN, ngStep?.dt ?? NaN),
+      stepStartTime: makeComparedValue(ourSST, ngSST),
+      stepEndTime: makeComparedValue(ourSET, ngSET),
+      dt: makeComparedValue(ourStep?.dt ?? NaN, ngStep?.dt ?? NaN),
       ours: ourAttempts,
       ngspice: ngAttempts,
       pairing,
@@ -1804,7 +1789,7 @@ export class ComparisonSession {
       traceSteps.push({
         stepIndex: si,
         stepStartTime: step.stepStartTime,
-        value: makeComparedValue(ourVal, ngVal, this._slotTol(slotName), this._tol.relTol),
+        value: makeComparedValue(ourVal, ngVal),
       });
     }
 
@@ -1890,7 +1875,7 @@ export class ComparisonSession {
       const matchedNames: string[] = [];
       for (const [k, v] of matched) {
         const ngV = ngEs?.slots[k] ?? NaN;
-        slots[k] = makeComparedValue(v, ngV, this._slotTol(k), this._tol.relTol);
+        slots[k] = makeComparedValue(v, ngV);
         matchedNames.push(k);
       }
 
@@ -1927,7 +1912,7 @@ export class ComparisonSession {
         if (si === 0) matchedNames = matched.map(([k]) => k);
         for (const [k, v] of matched) {
           const ngV = ngEs?.slots[k] ?? NaN;
-          slots[k] = makeComparedValue(v, ngV, this._slotTol(k), this._tol.relTol);
+          slots[k] = makeComparedValue(v, ngV);
         }
 
         traceSteps.push({ stepIndex: si, stepStartTime: step.stepStartTime, slots });
@@ -1982,7 +1967,7 @@ export class ComparisonSession {
             // Apply slot filter if provided
             if (opts?.slots && !opts.slots.includes(slot)) continue;
             const ngValue = ngEs?.slots[slot] ?? NaN;
-            states[slot] = makeComparedValue(value, ngValue, this._slotTol(slot), this._tol.relTol);
+            states[slot] = makeComparedValue(value, ngValue);
           }
         }
 
@@ -1995,7 +1980,7 @@ export class ComparisonSession {
             const ourV = nodeId - 1 < ourIter.voltages.length ? ourIter.voltages[nodeId - 1] : 0;
             const ngV = ngIter && nodeId - 1 < ngIter.voltages.length
               ? ngIter.voltages[nodeId - 1] : NaN;
-            pinVoltages[pinLabel] = makeComparedValue(ourV, ngV, this._tol.vAbsTol, this._tol.relTol);
+            pinVoltages[pinLabel] = makeComparedValue(ourV, ngV);
           }
         }
 
@@ -2045,7 +2030,7 @@ export class ComparisonSession {
           ? ourIter.voltages[ourIndex - 1] : NaN;
         const ngV = ngIter && ourIndex > 0 && ourIndex - 1 < ngIter.voltages.length
           ? ngIter.voltages[ourIndex - 1] : NaN;
-        const cv = makeComparedValue(ourV, ngV, this._tol.vAbsTol, this._tol.relTol);
+        const cv = makeComparedValue(ourV, ngV);
         if (opts?.onlyDivergences && cv.withinTol) continue;
         iters.push({ iteration: ii, voltage: cv });
       }
@@ -2141,7 +2126,7 @@ export class ComparisonSession {
 
     return {
       analysis: this._analysis ?? "dcop",
-      stepCount: simpleCompared(
+      stepCount: makeComparedValue(
         this._ourSession!.steps.length,
         ngAligned?.steps.length ?? 0,
       ),
@@ -2221,9 +2206,7 @@ export class ComparisonSession {
 
         const hasMapping = ngRow !== undefined && ngCol !== undefined;
         const absDelta = hasMapping && !isNaN(ngVal) ? Math.abs(e.value - ngVal) : NaN;
-        const refMag = Math.max(Math.abs(e.value), Math.abs(ngVal));
-        const relTol = this._tol.relTol;
-        const withinTol = hasMapping && !isNaN(ngVal) ? absDelta <= 1e-6 + relTol * refMag : false;
+        const withinTol = hasMapping && !isNaN(ngVal) ? e.value === ngVal : false;
 
         if (hasMapping && !isNaN(ngVal)) {
           entries.push({
@@ -2311,7 +2294,7 @@ export class ComparisonSession {
       const ourV = ourIter?.preSolveRhs[i] ?? 0;
       const ngV = ngIter?.preSolveRhs[i] ?? NaN;
       const absDelta = Math.abs(ourV - ngV);
-      const withinTol = isNaN(ngV) ? false : absDelta <= this._tol.iAbsTol + this._tol.relTol * Math.max(Math.abs(ourV), Math.abs(ngV));
+      const withinTol = isNaN(ngV) ? false : ourV === ngV;
       entries.push({ index: i, rowLabel, ours: ourV, ngspice: ngV, absDelta, withinTol });
     }
 
@@ -2334,8 +2317,8 @@ export class ComparisonSession {
       ours,
       ngspice,
       methodMatch: ours.method === ngspice.method,
-      ag0Compared: simpleCompared(ours.ag0, ngspice.ag0),
-      ag1Compared: simpleCompared(ours.ag1, ngspice.ag1),
+      ag0Compared: makeComparedValue(ours.ag0, ngspice.ag0),
+      ag1Compared: makeComparedValue(ours.ag1, ngspice.ag1),
     };
   }
 
@@ -2519,7 +2502,6 @@ export class ComparisonSession {
   get ngspiceSession(): CaptureSession | null { return this._ngSession; }
   get ngspiceSessionAligned(): CaptureSession | null { return this._ngSessionReindexed; }
   get nodeMap(): NodeMapping[] { return this._nodeMap; }
-  get tolerance(): Tolerance { return this._tol; }
 
   // ---------------------------------------------------------------------------
   // Internal helpers
@@ -2647,16 +2629,10 @@ export class ComparisonSession {
           }
         : undefined;
       this._comparisons = (this._ourSession && ng)
-        ? compareSnapshots(this._ourSession, ng, this._tol, matrixMaps)
+        ? compareSnapshots(this._ourSession, ng, matrixMaps)
         : [];
     }
     return this._comparisons;
-  }
-
-  private _slotTol(slotName: string): number {
-    const isCharge = slotName.startsWith("Q_") || slotName.startsWith("CCAP");
-    const isVoltage = slotName.startsWith("V") && !slotName.startsWith("VON");
-    return isCharge ? this._tol.qAbsTol : isVoltage ? this._tol.vAbsTol : this._tol.iAbsTol;
   }
 
   private _findNodeIdByLabel(label: string, nodeLabels: Map<number, string>): number | null {

@@ -1,26 +1,20 @@
 /**
  * Comparison engine: diffs our CaptureSession against ngspice's
  * CaptureSession and produces ComparisonResult objects.
+ *
+ * Strict-by-default: `withinTol` on every diff means `ours === ngspice` (bit-
+ * exact IEEE-754 match). plan.md Appendix A demands `absDelta === 0`; a
+ * tolerance abstraction that could be tuned away from zero silently raises
+ * that bar, so none exists. If you want looser comparison, post-process the
+ * ComparisonResult.
  */
 
 import type {
   CaptureSession,
   ComparisonResult,
-  Tolerance,
   DeviceMapping,
 } from "./types.js";
-import { DEFAULT_TOLERANCE } from "./types.js";
 import { DEVICE_MAPPINGS } from "./device-mappings.js";
-
-// ---------------------------------------------------------------------------
-// Tolerance check helpers
-// ---------------------------------------------------------------------------
-
-function withinTol(ours: number, theirs: number, absTol: number, relTol: number): boolean {
-  const absDelta = Math.abs(ours - theirs);
-  const refMag = Math.max(Math.abs(ours), Math.abs(theirs));
-  return absDelta <= absTol + relTol * refMag;
-}
 
 // ---------------------------------------------------------------------------
 // Snapshot comparison
@@ -34,15 +28,13 @@ function withinTol(ours: number, theirs: number, absTol: number, relTol: number)
  * and presence set to "oursOnly" or "ngspiceOnly". Within each paired step,
  * iterations are compared pairwise up to the minimum count.
  *
- * @param ours     - Our engine's capture session
- * @param ref      - ngspice reference capture session
- * @param tolerance - Comparison tolerances
+ * @param ours - Our engine's capture session
+ * @param ref  - ngspice reference capture session
  * @returns Array of ComparisonResult, one per compared iteration (or sentinel for asymmetric steps)
  */
 export function compareSnapshots(
   ours: CaptureSession,
   ref:  CaptureSession,
-  tolerance: Tolerance = DEFAULT_TOLERANCE,
   matrixMaps?: {
     ngRowToOurRow: ReadonlyMap<number, number>;
     ngColToOurCol: ReadonlyMap<number, number>;
@@ -74,8 +66,7 @@ export function compareSnapshots(
       continue;
     }
 
-    const stepEndTimeDelta = Math.abs(ourStep.stepEndTime - refStep.stepEndTime);
-    const timeMismatched = stepEndTimeDelta > tolerance.timeDeltaTol;
+    const timeMismatched = ourStep.stepEndTime !== refStep.stepEndTime;
 
     const iterCount = Math.min(ourStep.iterations.length, refStep.iterations.length);
 
@@ -91,7 +82,6 @@ export function compareSnapshots(
         const t = refIter.voltages[n];
         const absDelta = Math.abs(o - t);
         const refMag = Math.max(Math.abs(o), Math.abs(t));
-        const wt = withinTol(o, t, tolerance.vAbsTol, tolerance.relTol);
         voltageDiffs.push({
           nodeIndex: n,
           label: ours.topology.nodeLabels.get(n + 1) ?? `node_${n}`,
@@ -99,7 +89,7 @@ export function compareSnapshots(
           theirs: t,
           absDelta,
           relDelta: refMag > 0 ? absDelta / refMag : absDelta,
-          withinTol: wt,
+          withinTol: o === t,
         });
       }
 
@@ -109,13 +99,12 @@ export function compareSnapshots(
       for (let r = 0; r < rhsLen; r++) {
         const o = ourIter.preSolveRhs[r];
         const t = refIter.preSolveRhs[r];
-        const absDelta = Math.abs(o - t);
         rhsDiffs.push({
           index: r,
           ours: o,
           theirs: t,
-          absDelta,
-          withinTol: withinTol(o, t, tolerance.iAbsTol, tolerance.relTol),
+          absDelta: Math.abs(o - t),
+          withinTol: o === t,
         });
       }
 
@@ -139,9 +128,8 @@ export function compareSnapshots(
         const [r, c] = key.split(",").map(Number);
         const o = ourMap.get(key) ?? 0;
         const t = refMap.get(key) ?? 0;
-        const absDelta = Math.abs(o - t);
-        if (!withinTol(o, t, tolerance.iAbsTol, tolerance.relTol)) {
-          matrixDiffs.push({ row: r, col: c, ours: o, theirs: t, absDelta, withinTol: false });
+        if (o !== t) {
+          matrixDiffs.push({ row: r, col: c, ours: o, theirs: t, absDelta: Math.abs(o - t), withinTol: false });
         }
       }
 
@@ -181,28 +169,20 @@ export function compareSnapshots(
           }
         }
 
-        // Compare each mapped slot
+        // Compare each mapped slot — strict bit-exact match
         for (const slotName of comparableSlots) {
           if (!(slotName in ourEs.slots) || !(slotName in refEs.slots)) continue;
 
           const o = ourEs.slots[slotName];
           const t = refEs.slots[slotName];
-          const absDelta = Math.abs(o - t);
-          // Use charge tolerance for Q/CCAP slots, voltage for V slots, current for others
-          const isCharge = slotName.startsWith("Q_") || slotName.startsWith("CCAP");
-          const isVoltage = slotName.startsWith("V") && !slotName.startsWith("VON");
-          const absTol = isCharge ? tolerance.qAbsTol
-            : isVoltage ? tolerance.vAbsTol
-            : tolerance.iAbsTol;
-          const wt = withinTol(o, t, absTol, tolerance.relTol);
 
           stateDiffs.push({
             elementLabel: ourEs.label,
             slotName,
             ours: o,
             theirs: t,
-            absDelta,
-            withinTol: wt,
+            absDelta: Math.abs(o - t),
+            withinTol: o === t,
           });
         }
       }
@@ -270,12 +250,13 @@ export function formatComparison(result: ComparisonResult): string {
 }
 
 /**
- * Find the first iteration where divergence exceeds a threshold.
+ * Find the first iteration where any voltage differs from ngspice.
  * Useful for pinpointing when our engine starts deviating from ngspice.
+ * Strict-by-default: any non-zero absDelta counts as divergence.
  */
 export function findFirstDivergence(
   results: ComparisonResult[],
-  threshold: number = 1e-3,
+  threshold: number = 0,
 ): ComparisonResult | null {
   for (const r of results) {
     if (r.timeMismatched) continue;
