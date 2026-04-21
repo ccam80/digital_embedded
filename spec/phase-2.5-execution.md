@@ -45,7 +45,7 @@
 |---|---|---|---|
 | W0 | Interface + LoadContext core | ✓ | 39ab73ca |
 | W1.1 | Diode family (diode + zener + F2 varactor→diode) | ✓ | f8586dc6 |
-| W1.2 | BJT (L0 + L1) | — | — |
+| W1.2 | BJT (L0 + L1) | ✓ | (pending commit) |
 | W1.3 | MOSFET (L1) + G1 sign convention | — | — |
 | W1.4 | JFET (N + P + fet-base collapse) | — | — |
 | W1.5 | Reactive passives (capacitor, polarized-cap, inductor, transformer, tapped-transformer) | — | — |
@@ -199,7 +199,7 @@ For each device in the lane:
 **Files:**
 - `src/components/semiconductors/diode.ts` + `__tests__/diode.test.ts`
 - `src/components/semiconductors/zener.ts` + `__tests__/zener.test.ts`
-- `src/components/semiconductors/varactor.ts` — **delete the file** per F2; rewire any importers to use `diode.ts` with varactor-specific params
+- `src/components/semiconductors/varactor.ts` — **delete the invented varactor simulation code** per F2; **retain** the `VaractorElement` visual class + `VaractorDefinition` palette entry; factory routes placements to `createDiodeElement` with varactor-specific params (same pattern as `schottky.ts`). No shim layer, no type assertions, no re-exports of diode symbols under varactor names — if any are present, the port has introduced a shim and must be redone. **Amended 2026-04-22** (original text read "delete the file per F2"; ambiguous against F2's architectural intent — F2 targets the invented simulation code, not user-facing palette symbols)
 - `src/components/semiconductors/__tests__/diode-state-pool.test.ts` — delete (inspects intermediate pool state)
 
 **Ngspice source:** `ref/ngspice/src/spicelib/devices/dio/dioload.c` — read `DIOload` entire function. Key sections:
