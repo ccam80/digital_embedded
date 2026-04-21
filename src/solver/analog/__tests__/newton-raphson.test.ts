@@ -355,7 +355,6 @@ describe("NR", () => {
     const ctx = makeDiodeCtx(5.0);
     // Set cktMode to MODETRANOP | MODEUIC | MODEINITJCT (transient-boot DCOP + UIC).
     ctx.cktMode = MODETRANOP | MODEUIC | MODEINITJCT;
-    ctx.loadCtx.uic = true;
 
     newtonRaphson(ctx);
 
@@ -367,8 +366,7 @@ describe("NR", () => {
     // Standalone .OP with UIC=true must NOT take the single-load exit.
     // The bypass only fires on MODETRANOP (transient-boot), not MODEDCOP.
     const ctx = makeDiodeCtx(5.0);
-    ctx.cktMode = MODEDCOP | MODEINITJCT;
-    ctx.loadCtx.uic = true;
+    ctx.cktMode = MODEDCOP | MODEINITJCT | MODEUIC;
 
     newtonRaphson(ctx);
 

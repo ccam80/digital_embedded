@@ -108,7 +108,6 @@ function makeCtx(overrides: Partial<LoadContext> & { solver?: MockSolver } = {})
     limitingCollector: null,
     xfact: 0,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
     ...overrides,

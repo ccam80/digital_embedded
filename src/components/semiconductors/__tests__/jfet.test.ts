@@ -118,7 +118,6 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
     limitingCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
   };
@@ -626,7 +625,6 @@ describe("jfet_load_dcop_parity", () => {
       limitingCollector: null,
       xfact: 1,
       gmin: GMIN,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     };
@@ -732,7 +730,6 @@ describe("NJFET MODEINITSMSIG branch", () => {
       limitingCollector: null,
       xfact: 1,
       gmin: GMIN_VAL,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     };
@@ -824,7 +821,6 @@ describe("NJFET MODEINITTRAN branch", () => {
       limitingCollector: null,
       xfact: 1,
       gmin: GMIN_VAL,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     };

@@ -93,7 +93,6 @@ function buildUnitCtx(
     limitingCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
     ...overrides,
@@ -431,7 +430,6 @@ describe("integration", () => {
       limitingCollector: null,
       xfact: 1,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     };

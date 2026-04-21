@@ -74,7 +74,6 @@ function makeDiagnosticCtx(
     limitingCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
   };
@@ -111,7 +110,6 @@ function makeSlotLoadCtx(
     limitingCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
   };
@@ -261,7 +259,6 @@ describe("PolarizedCap", () => {
         limitingCollector: null,
         xfact: 1,
         gmin: 1e-12,
-        uic: false,
         reltol: 1e-3,
         iabstol: 1e-12,
       };
@@ -348,7 +345,6 @@ describe("PolarizedCap", () => {
           limitingCollector: null,
           xfact: 1,
           gmin: 1e-12,
-          uic: false,
           reltol: 1e-3,
           iabstol: 1e-12,
         };
@@ -377,7 +373,6 @@ describe("PolarizedCap", () => {
         cap.load({ ...ctx, solver: stubSolver });
 
         capPool.rotateStateVectors();
-        capPool.refreshElementRefs([cap as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       }
 
       // After RC seconds, V(cap_pos = node2, solver index 1) ≈ 5*(1-exp(-1)) ≈ 3.161V
@@ -642,7 +637,6 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
         limitingCollector: null,
         xfact: 1,
         gmin: 1e-12,
-        uic: false,
         reltol: 1e-3,
         iabstol: 1e-12,
       };

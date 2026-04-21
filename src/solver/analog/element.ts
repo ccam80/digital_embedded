@@ -100,9 +100,10 @@ export interface AnalogElement {
    * small-signal conductances at the DC operating point.
    *
    * D4: receives the shared LoadContext (ngspice re-uses CKTcircuit in
-   * ACload()). `ctx.uic` mirrors the MODEUIC bit preserved across the
-   * AC-mode mask (acan.c:285). Element sites that do not need the context
-   * should simply ignore the third parameter.
+   * ACload()). The MODEUIC bit is preserved across the AC-mode mask
+   * (acan.c:285) and may be tested via `(ctx.cktMode & MODEUIC) !== 0`.
+   * Element sites that do not need the context should simply ignore the
+   * third parameter.
    */
   stampAc?(solver: ComplexSparseSolver, omega: number, ctx: LoadContext): void;
 

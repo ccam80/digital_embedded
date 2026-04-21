@@ -670,7 +670,6 @@ function makeRealOpAmpParityCtx(voltages: Float64Array, solver: SparseSolverType
     limitingCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
   };

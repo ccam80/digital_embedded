@@ -450,7 +450,6 @@ describe("Task 6.4.3 — combinational pin loading propagates", () => {
       limitingCollector: null,
       xfact: 0,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     };

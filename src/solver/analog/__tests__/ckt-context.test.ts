@@ -12,7 +12,6 @@ import { describe, it, expect } from "vitest";
 import { CKTCircuitContext, NRResult, DcOpResult } from "../ckt-context.js";
 import { makeResistor, makeDiode, makeCapacitor, allocateStatePool } from "./test-helpers.js";
 import { DEFAULT_SIMULATION_PARAMS } from "../../../core/analog-engine-interface.js";
-import { isPoolBacked } from "../element.js";
 import { SparseSolver } from "../sparse-solver.js";
 
 // ---------------------------------------------------------------------------
@@ -141,7 +140,6 @@ describe("CKTCircuitContext", () => {
     // Pre-computed element lists are populated
     expect(ctx.nonlinearElements.length).toBeGreaterThan(0);
     expect(ctx.reactiveElements.length).toBeGreaterThan(0);
-    expect(ctx.poolBackedElements.length).toBeGreaterThan(0);
 
     // matrixSize and nodeCount match input
     expect(ctx.matrixSize).toBe(sz);
@@ -215,13 +213,6 @@ describe("CKTCircuitContext", () => {
     expect(ctx.reactiveElements.length).toBe(expectedReactive.length);
     for (const el of expectedReactive) {
       expect(ctx.reactiveElements).toContain(el);
-    }
-
-    // poolBackedElements: exactly pool-backed elements
-    const expectedPoolBacked = circuit.elements.filter(el => isPoolBacked(el));
-    expect(ctx.poolBackedElements.length).toBe(expectedPoolBacked.length);
-    for (const el of expectedPoolBacked) {
-      expect(ctx.poolBackedElements).toContain(el);
     }
 
     // elementsWithConvergence: elements implementing checkConvergence()

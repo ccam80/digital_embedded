@@ -1,22 +1,8 @@
-import type { PoolBackedAnalogElementCore } from "./element.js";
-
 export class StatePool {
   /** Ring buffer of state arrays. [0]=current, [1]=prev, [2]=prev2, [3]=prev3. */
   states: Float64Array[];
   readonly totalSlots: number;
   tranStep: number = 0;
-
-  /**
-   * Analysis mode — distinguishes DC-OP from transient NR iterations.
-   * Maps to ngspice CKTmode bit flags:
-   *   "dcOp" ↔ MODEDCOP | MODETRANOP (bjtload.c:249, dctran.c:346-348 pre-flip)
-   *   "tran" ↔ MODETRAN | MODEINITTRAN (dctran.c:346)
-   * Used by semiconductor elements to decide whether to scale capacitor
-   * feedback conductances (geqcb) by CKTag[0] (= 1/dt for TRAP order-1).
-   * Flipped to "tran" in dc-operating-point.ts after DC-OP converges and
-   * the first transient step begins (ngspice dctran.c:346).
-   */
-  analysisMode: "dcOp" | "tran" = "dcOp";
 
   /**
    * Current integration timestep (dt) for the transient step being loaded.
@@ -34,16 +20,6 @@ export class StatePool {
    * temperature coefficient computation.
    */
   temperature: number = 300.15;
-
-  /**
-   * Use Initial Conditions flag (ngspice MODEUIC).
-   * Seeded from AnalogParams.uic via CKTCircuitContext.loadCtx.uic (D2).
-   * When true and (ctx.cktMode & MODEINITTRAN) !== 0, reactive elements apply their
-   * IC= parameter as the initial state (capacitor.ts:260, inductor.ts:281,
-   * diode.ts:660, bjt.ts:952/2139) rather than computing from DC-OP.
-   * Mirrors traninit.c:35: CKTmode = job->TRANmode (which carries MODEUIC).
-   */
-  uic: boolean = false;
 
   constructor(totalSlots: number) {
     this.totalSlots = totalSlots;
@@ -68,31 +44,6 @@ export class StatePool {
   get state6(): Float64Array { return this.states[6]; }
   get state7(): Float64Array { return this.states[7]; }
 
-  /** Update all pool-backed elements' s0-s7 references after rotation. */
-  refreshElementRefs(elements: readonly { poolBacked?: boolean }[]): void {
-    const s0 = this.states[0];
-    const s1 = this.states[1];
-    const s2 = this.states[2];
-    const s3 = this.states[3];
-    const s4 = this.states[4];
-    const s5 = this.states[5];
-    const s6 = this.states[6];
-    const s7 = this.states[7];
-    for (const el of elements) {
-      if (!el.poolBacked) continue;
-      const pel = el as PoolBackedAnalogElementCore;
-      pel.s0 = s0;
-      pel.s1 = s1;
-      pel.s2 = s2;
-      pel.s3 = s3;
-      pel.s4 = s4;
-      pel.s5 = s5;
-      pel.s6 = s6;
-      pel.s7 = s7;
-      pel.refreshSubElementRefs?.(s0, s1, s2, s3, s4, s5, s6, s7);
-    }
-  }
-
   /**
    * Ring rotation of state arrays — pointer swap, not data copy.
    * After rotation: states[0] is fresh recycled storage (was states[n-1]),
@@ -111,7 +62,6 @@ export class StatePool {
   reset(): void {
     for (const buf of this.states) buf.fill(0);
     this.tranStep = 0;
-    this.analysisMode = "dcOp";
     this.dt = 0;
   }
 

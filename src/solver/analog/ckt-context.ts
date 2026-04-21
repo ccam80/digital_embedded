@@ -11,7 +11,6 @@
 
 import { SparseSolver } from "./sparse-solver.js";
 import type { AnalogElement } from "./element.js";
-import { isPoolBacked } from "./element.js";
 import type { StatePool } from "./state-pool.js";
 import { DiagnosticCollector } from "./diagnostics.js";
 import type { ResolvedSimulationParams } from "../../core/analog-engine-interface.js";
@@ -142,6 +141,7 @@ export class CKTCircuitContext {
     this._solver = s;
     if (this.loadCtx !== undefined) {
       this.loadCtx.solver = s;
+      this.loadCtx.matrix = s;
     }
   };
 
@@ -282,8 +282,6 @@ export class CKTCircuitContext {
   nonlinearElements: readonly AnalogElement[];
   /** Elements with isReactive === true. */
   reactiveElements: readonly AnalogElement[];
-  /** Pool-backed elements (implement PoolBackedAnalogElement interface). */
-  poolBackedElements: readonly AnalogElement[];
   /** Elements that implement checkConvergence() for element-level convergence. */
   elementsWithConvergence: readonly AnalogElement[];
   /** Elements that implement getLteTimestep() for LTE control. */
@@ -508,7 +506,6 @@ export class CKTCircuitContext {
     // CKThead[] linked lists assembled at parse time, never rebuilt.
     this.nonlinearElements = elements.filter(el => el.isNonlinear);
     this.reactiveElements = elements.filter(el => el.isReactive);
-    this.poolBackedElements = elements.filter(el => isPoolBacked(el));
     this.elementsWithConvergence = elements.filter(el => el.checkConvergence !== undefined);
     this.elementsWithLte = elements.filter(el => el.getLteTimestep !== undefined);
     this.elementsWithAcceptStep = elements.filter(el => el.acceptStep !== undefined);
@@ -551,23 +548,35 @@ export class CKTCircuitContext {
 
     // Load context — pre-allocated once, mutated in place each NR iteration
     const nonconRef = { value: 0 };
+    // CKTtemp default (300.15 K = REFTEMP) matches ngspice CONSTreftemp.
+    const ctxTemp = 300.15;
+    // vt = k*T/q where k=1.380649e-23, q=1.602176634e-19
+    const ctxVt = (1.380649e-23 * ctxTemp) / 1.602176634e-19;
     this.loadCtx = {
       cktMode: MODEDCOP | MODEINITFLOAT,
       solver: this._solver,
+      matrix: this._solver,
       voltages: this.rhsOld,
+      rhs: this.rhs,
+      rhsOld: this.rhsOld,
+      time: 0,
       dt: 0,
+      delta: 0,
       method: "trapezoidal",
       order: 1,
       deltaOld: this.deltaOld,
       ag: this.ag,
+      agVector: this.ag,
       srcFact: 1,
       noncon: nonconRef,
       limitingCollector: null,
+      convergenceCollector: null,
       xfact: 0,
       gmin: params.gmin ?? 1e-12,
-      uic: params.uic ?? false,
       reltol: params.reltol,
       iabstol: params.abstol,
+      temp: ctxTemp,
+      vt: ctxVt,
     };
 
     // Tolerances
@@ -652,9 +661,6 @@ export class CKTCircuitContext {
     this.loadCtx.reltol = params.reltol;
     this.loadCtx.iabstol = params.abstol;
     this.loadCtx.gmin = params.gmin ?? 1e-12;
-    // D2: re-apply UIC so hot-loaded params propagate to the load context
-    // (mirrors the constructor seeding at loadCtx literal).
-    this.loadCtx.uic = params.uic ?? false;
 
     // Keep the full params reference in sync so downstream readers
     // (e.g. solveDcOperatingPoint) see the new values.

@@ -76,7 +76,6 @@ function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: 
     limitingCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
   };
@@ -299,7 +298,6 @@ describe("TappedTransformer", () => {
       if (!result.success) throw new Error(`Singular at step ${i}`);
       solver.solve(voltages);
       pool.rotateStateVectors();
-      pool.refreshElementRefs([tx as AnalogElementCore]);
 
       if (i >= lastCycleStart) {
         const vs1 = voltages[1]; // node 2
@@ -611,7 +609,6 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
         limitingCollector: null,
         xfact: 1,
         gmin: 1e-12,
-        uic: false,
         reltol: 1e-3,
         iabstol: 1e-12,
       };

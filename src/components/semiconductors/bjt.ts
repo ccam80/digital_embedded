@@ -815,7 +815,7 @@ export function createBjtElement(
         if (params.OFF) {
           vbeRaw = 0;
           vbcRaw = 0;
-        } else if (pool.uic && !isNaN(params.ICVBE) && !isNaN(params.ICVCE)) {
+        } else if ((mode & MODEUIC) && !isNaN(params.ICVBE) && !isNaN(params.ICVCE)) {
           vbeRaw = params.ICVBE;
           vbcRaw = params.ICVBE - params.ICVCE;
         } else {
@@ -1524,7 +1524,7 @@ export function createSpiceL1BjtElement(
         if (params.OFF) {
           vbeRaw = 0;
           vbcRaw = 0;
-        } else if (pool.uic && !isNaN(params.ICVBE) && !isNaN(params.ICVCE)) {
+        } else if ((mode & MODEUIC) && !isNaN(params.ICVBE) && !isNaN(params.ICVCE)) {
           vbeRaw = params.ICVBE;
           vbcRaw = params.ICVBE - params.ICVCE;
         } else {

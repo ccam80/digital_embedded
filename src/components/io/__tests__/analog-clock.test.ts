@@ -178,7 +178,6 @@ describe("AnalogClock", () => {
       limitingCollector: null,
       xfact: 1,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     });
@@ -219,7 +218,6 @@ describe("clock_load_srcfact_parity", () => {
       limitingCollector: null,
       xfact: 1,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     };

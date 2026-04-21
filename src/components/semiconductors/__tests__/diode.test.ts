@@ -111,7 +111,6 @@ function buildUnitCtx(
     limitingCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
     ...overrides,
@@ -314,7 +313,6 @@ describe("Diode", () => {
       limitingCollector: null,
       xfact: 1,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     };
@@ -384,31 +382,6 @@ describe("Diode", () => {
     expect(converged).toBe(true);
   });
 
-  it("load_at_initJct_with_uic_ic_sets_voltage", () => {
-    // Gap 17.2: A diode with IC=0.5 and pool.uic=true should set SLOT_VD=0.5V
-    // when load() is called with MODEINITJCT.
-    //
-    // This maps to ngspice .ic V(node)=0.5 with UIC: dioload.c uses IC directly.
-    const propsObj = makeParamBag({ IS: 1e-14, N: 1, CJO: 0, VJ: 0.7, M: 0.5, TT: 0, FC: 0.5, IC: 0.5 });
-    const core = createDiodeElement(new Map([["A", 1], ["K", 2]]), [], -1, propsObj);
-    const { element, pool } = withState(core);
-    const el = withNodeIds(element, [1, 2]);
-
-    // Enable UIC mode on pool so initJct takes the IC path.
-    // StatePool.uic field added in D2.
-    pool.uic = true;
-
-    // In-load MODEINITJCT: pool.uic=true and IC=0.5 → vdRaw=0.5 set directly.
-    const voltages = new Float64Array(2);
-    voltages[0] = 0;
-    voltages[1] = 0;
-    const solver = new SparseSolver();
-    solver.beginAssembly(2);
-    el.load(buildUnitCtx(solver, voltages, { cktMode: MODEDCOP | MODEINITJCT }));
-
-    // SLOT_VD (index 0) must be 0.5V (no pnjlim applied during initJct).
-    expect(pool.state0[0]).toBeCloseTo(0.5, 6);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -868,7 +841,6 @@ describe("AREA scaling", () => {
         limitingCollector: null,
         xfact: 1,
         gmin: 1e-12,
-        uic: false,
         reltol: 1e-3,
         iabstol: 1e-12,
       };
@@ -1031,7 +1003,6 @@ function makeParityCtx(
     limitingCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
   };
@@ -1190,7 +1161,6 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       limitingCollector: null,
       xfact: 0,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     });
@@ -1229,7 +1199,6 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       limitingCollector: null,
       xfact: 0,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     });
@@ -1269,7 +1238,6 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       limitingCollector: null,
       xfact: 0,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     });
@@ -1308,7 +1276,6 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       limitingCollector: null,
       xfact: 0,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     });
@@ -1349,7 +1316,6 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       limitingCollector: null,
       xfact: 0,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     });
@@ -1385,7 +1351,6 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       limitingCollector: null,
       xfact: 0,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     });

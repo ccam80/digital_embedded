@@ -32,7 +32,6 @@ function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: 
     limitingCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
   };
@@ -91,7 +90,6 @@ describe("tx trace with NR", () => {
       if (Math.abs(vs1-vct) > maxVS1CT) maxVS1CT = Math.abs(vs1-vct);
 
       pool.rotateStateVectors();
-      pool.refreshElementRefs([tx as AnalogElementCore]);
     }
     console.log(`maxVS1CT after 400 steps (1 cycle) = ${maxVS1CT}`);
   });

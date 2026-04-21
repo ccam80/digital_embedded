@@ -82,14 +82,6 @@ export interface StatePoolRef {
   /** Current DC-OP mode (niiter.c:991-997). "transient" during normal transient NR. Absent → treated as "transient". */
   readonly initMode?: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "transient";
   /**
-   * Analysis mode. "dcOp" during DC operating point, "tran" for transient NR.
-   * Maps to ngspice CKTmode MODEDCOP/MODETRANOP vs MODETRAN|MODEINITTRAN.
-   * Absent → treated as "dcOp" (conservative default for older callers).
-   */
-  readonly analysisMode?: "dcOp" | "tran";
-  /** Use Initial Conditions mode. ngspice: MODEUIC. Absent → false. */
-  readonly uic?: boolean;
-  /**
    * Current transient integration timestep written by the engine before each
    * stamp pass. 0 during DC-OP. Used by elements to derive ag0 locally
    * (NIcomCof equivalent, nicomcof.c:33-51).

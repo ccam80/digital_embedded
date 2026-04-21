@@ -355,7 +355,6 @@ describe("Inductor", () => {
       const { solver } = makeCaptureSolver();
       element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0, 0.5]), dt: 1e-4, method: "bdf1", order: 1 }));
       pool.rotateStateVectors();
-      pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       // Second call: i=0.6, s1 now has i=0.5
       element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0, 0.6]), dt: 1e-4, method: "bdf1", order: 1 }));
 
@@ -607,7 +606,6 @@ describe("inductor_load_transient_parity (C4.2)", () => {
         limitingCollector: null,
         xfact: 1,
         gmin: 1e-12,
-        uic: false,
         reltol: 1e-3,
         iabstol: 1e-12,
       };

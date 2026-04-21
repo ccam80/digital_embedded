@@ -180,7 +180,7 @@ export abstract class AbstractFetElement implements AnalogElementCore {
    */
   abstract readonly polaritySign: 1 | -1;
 
-  // State pool backing arrays — bound in initState(), refreshed by StatePool.refreshElementRefs()
+  // State pool backing arrays — bound in initState().
   protected _s0!: Float64Array;
   s0!: Float64Array;
   s1!: Float64Array;

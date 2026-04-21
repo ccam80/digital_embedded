@@ -329,7 +329,6 @@ describe("Capacitor", () => {
       const { solver } = makeCaptureSolver();
       element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
       pool.rotateStateVectors();
-      pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
 
       const lteParams = { trtol: 7, reltol: 1e-3, abstol: 1e-6, chgtol: 1e-14 };
@@ -351,7 +350,6 @@ describe("Capacitor", () => {
       const { solver } = makeCaptureSolver();
       element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
       pool.rotateStateVectors();
-      pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       // Second call: v2 = 7V
       element.load(makeCompanionCtx({ solver, voltages: new Float64Array([7, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
 
@@ -375,7 +373,6 @@ describe("Capacitor", () => {
       const { solver } = makeCaptureSolver();
       element.load(makeCompanionCtx({ solver, voltages: new Float64Array([5, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
       pool.rotateStateVectors();
-      pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
       // Second call: v2 = 0V (zero crossing)
       element.load(makeCompanionCtx({ solver, voltages: new Float64Array([0, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
 
@@ -405,7 +402,6 @@ describe("Capacitor initPred", () => {
     const { solver } = makeCaptureSolver();
     element.load(makeCompanionCtx({ solver, voltages: new Float64Array([3, 0]), dt: 1e-6, method: "bdf1", order: 1 }));
     pool.rotateStateVectors();
-    pool.refreshElementRefs([element as unknown as import("../../../solver/analog/element.js").PoolBackedAnalogElementCore]);
 
     // Second step: initPred mode, v=7V (different voltage)
     // q0 should use s1[SLOT_Q] = C*3 = 3µC, NOT C*7 = 7µC
@@ -426,41 +422,6 @@ describe("Capacitor initPred", () => {
     expect(ceq).toBeCloseTo(-3, 6);
   });
 
-  it("stampCompanion_uses_C_times_IC_on_initTran_with_UIC", () => {
-    const C = 1e-6;
-    const IC = 5.0; // initial voltage = 5V
-    const props = new PropertyBag();
-    props.setModelParam("capacitance", C);
-    props.setModelParam("IC", IC);
-    const core = getFactory(CapacitorDefinition.modelRegistry!.behavioral!)(
-      new Map([["pos", 1], ["neg", 2]]), [], -1, props, () => 0,
-    );
-    Object.assign(core, { pinNodeIds: [1, 2], allNodeIds: [1, 2] });
-    const { element, pool } = withState(core);
-
-    // initTran + uic: q0 = C * IC
-    pool.uic = true;
-    // Node voltage is 2V (different from IC=5V)
-    {
-      const { solver } = makeCaptureSolver();
-      element.load(makeCompanionCtx({
-        solver, voltages: new Float64Array([2, 0]), dt: 1e-6, method: "bdf1", order: 1,
-        cktMode: MODETRAN | MODEINITTRAN | MODEUIC, uic: true,
-      }));
-    }
-
-    // GEQ = C/dt = 1e-6/1e-6 = 1
-    const geq = pool.states[0][0];
-    expect(geq).toBeCloseTo(1, 6);
-    // ngspice capload.c:60-63 + niinteg.c:77-78: on MODEINITTRAN, state1[qcap] = state0[qcap].
-    // With UIC: q0 = C*IC = 5e-6. initTran seeds q1 = q0 = C*IC = 5e-6 (capload.c:60-63).
-    // Under BDF-1: ccap = ag[0]*q0 + ag[1]*q1 = (1/dt)*(C*IC) + (-1/dt)*(C*IC) = 0
-    //              ceq  = ccap - ag[0]*q0 = 0 - (1/dt)*(C*IC) = -(1e-6*5)/1e-6 = -5
-    // Without UIC: q0 = C*vNow = 2e-6 → ccap = 2 → ceq = 2 - 2 = 0
-    const ceq = pool.states[0][1];
-    expect(ceq).not.toBeCloseTo(0, 2);
-    expect(ceq).toBeCloseTo(-5, 3);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -613,7 +574,6 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
       limitingCollector: null,
       xfact: 1,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     };
@@ -769,7 +729,6 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
         limitingCollector: null,
         xfact: 1,
         gmin: 1e-12,
-        uic: false,
         reltol: 1e-3,
         iabstol: 1e-12,
       };

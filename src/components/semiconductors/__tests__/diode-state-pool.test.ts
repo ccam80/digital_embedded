@@ -61,7 +61,6 @@ function makeDcOpCtx(voltages: Float64Array): LoadContext {
     limitingCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
   };
@@ -85,7 +84,6 @@ function makeTranCtx(voltages: Float64Array, dt: number, ag: Float64Array): Load
     limitingCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
   };

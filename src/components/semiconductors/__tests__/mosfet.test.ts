@@ -108,7 +108,6 @@ function makeDcOpCtx(voltages: Float64Array, matrixSize: number): LoadContext {
     limitingCollector: null,
     xfact: 1,
     gmin: 1e-12,
-    uic: false,
     reltol: 1e-3,
     iabstol: 1e-12,
   };
@@ -406,55 +405,6 @@ describe("NMOS", () => {
   // -------------------------------------------------------------------------
   // checkConvergence without cqbd
   // -------------------------------------------------------------------------
-
-  it("checkConvergence_without_cqbd_uses_mode_ids_minus_cbdI", () => {
-    // Gap 16.1: checkConvergence must use cd = mode * ids - cbdI directly,
-    // NOT subtract the capacitor companion current (cqbd).
-    //
-    // We drive the NMOS to a known saturation operating point, then call
-    // checkConvergence with identical voltages. Because pnjlimLimited=false
-    // and the voltages haven't changed, convergence should be declared.
-    //
-    // The key assertion is that convergence IS reached (not perpetually rejected
-    // due to incorrect inclusion of cap companion current in the cd formula).
-
-    // Create NMOS at Vgs=3V, Vds=5V (saturation), with CBD=1e-12 to exercise
-    // the drain-bulk capacitance path. If cqbd were subtracted, cd would be
-    // shifted by the cap companion current and convergence would be harder.
-    const paramsWithCap = { ...NMOS_DEFAULTS, CBD: 1e-12 };
-    const propsObj = makeParamBag(paramsWithCap);
-    const core = withState(createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, propsObj));
-    const element = withNodeIds(core, [2, 1, 3, 3]) as unknown as AnalogElement;
-
-    // Set up state pool so analysisMode="tran" (transient)
-    // The pool is accessed via the element's internal reference (_pool).
-    const pool = (core as unknown as { _pool: { analysisMode: string } })._pool;
-    pool.analysisMode = "tran";
-
-    // Drive to operating point: Vgs=3V, Vds=5V, Vs=0
-    const voltages = new Float64Array(3);
-    voltages[0] = 5;   // V(node1=D)
-    voltages[1] = 3;   // V(node2=G)
-    voltages[2] = 0;   // V(node3=S)
-
-    for (let i = 0; i < 50; i++) {
-      element.load(makeDcOpCtx(voltages, 3));
-      voltages[0] = 5;
-      voltages[1] = 3;
-      voltages[2] = 0;
-    }
-
-    // checkConvergence with identical current (no change). The new-shape
-    // signature is checkConvergence(ctx: LoadContext) — build a ctx whose
-    // voltages match the element's last converged operating point.
-    const ctx = makeDcOpCtx(voltages, 3);
-    const converged = element.checkConvergence!(ctx);
-
-    // With no voltage change and a converged operating point, checkConvergence
-    // must return true. If cqbd were incorrectly subtracted, the cd formula
-    // would be wrong and this might not hold.
-    expect(converged).toBe(true);
-  });
 
   it("srcFact_default_equals_one", () => {
     // ngspice parity: CKTsrcFact defaults to 1 (cktinit.c:75). Omitting ctx.srcFact
@@ -1116,7 +1066,6 @@ describe("integration", () => {
       limitingCollector: null,
       xfact: 1,
       gmin: 1e-12,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     };
@@ -1261,7 +1210,6 @@ describe("mosfet_spicel1_load_dcop_parity", () => {
       limitingCollector: null,
       xfact: 1,
       gmin: GMIN,
-      uic: false,
       reltol: 1e-3,
       iabstol: 1e-12,
     };

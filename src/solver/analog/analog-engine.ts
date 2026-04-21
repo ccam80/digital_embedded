@@ -32,7 +32,7 @@ import type { DcOpNRPhase, DcOpNRAttemptOutcome } from "./dc-operating-point.js"
 import { newtonRaphson } from "./newton-raphson.js";
 import type { LimitingEvent } from "./newton-raphson.js";
 import { CKTCircuitContext } from "./ckt-context.js";
-import type { AnalogElement, PoolBackedAnalogElement } from "./element.js";
+import type { AnalogElement } from "./element.js";
 import { isPoolBacked } from "./element.js";
 import type { ConcreteCompiledAnalogCircuit as CompiledWithBridges } from "./compiled-analog-circuit.js";
 import type { StatePool } from "./state-pool.js";
@@ -176,11 +176,6 @@ export class MNAEngine implements AnalogEngine {
           );
         }
       }
-      // D2: plumb UIC from params onto the state pool. Reactive elements
-      // (capacitor.ts, inductor.ts) and semiconductors (diode.ts, bjt.ts)
-      // read pool.uic directly. Mirrors ngspice traninit.c:35 where
-      // CKTmode = job->TRANmode carries MODEUIC.
-      cac.statePool.uic = this._params.uic ?? false;
     }
 
     // Construct CKTCircuitContext for NR and DC-OP call sites.
@@ -362,7 +357,6 @@ export class MNAEngine implements AnalogEngine {
     // Elements read/write states[0] during NR; states[1] holds the last accepted state.
     if (statePool) {
       statePool.rotateStateVectors();
-      statePool.refreshElementRefs(this._ctx!.poolBackedElements as unknown as PoolBackedAnalogElement[]);
     }
 
     // Phase tracking for stepPhaseHook: first attempt is tranInit on step 0, tranNR thereafter.
@@ -787,9 +781,6 @@ export class MNAEngine implements AnalogEngine {
           el.initState(cac.statePool);
         }
       }
-      // D2: re-apply UIC onto the pool after reset() so semiconductors and
-      // reactive elements see the params.uic flag during DC-OP load passes.
-      cac.statePool.uic = this._params.uic ?? false;
     }
 
     const phaseHook = this.stepPhaseHook;
@@ -854,8 +845,7 @@ export class MNAEngine implements AnalogEngine {
    * Find the DC operating point for transient analysis initialisation.
    *
    * Called by the transient solver before the first timestep to establish
-   * initial conditions. Uses MODETRANOP flags (analysisMode="dcOp" with
-   * statePool.analysisMode still in dcOp mode) to distinguish this run
+   * initial conditions. Uses MODETRANOP flag to distinguish this run
    * from a standalone dcOperatingPoint() call.
    *
    * Matches ngspice dctran.c:346-350 where CKTmode is set to
@@ -885,11 +875,6 @@ export class MNAEngine implements AnalogEngine {
           el.initState(cac.statePool);
         }
       }
-      // D2: re-apply UIC onto the pool after reset() — reset() clears state
-      // arrays and mode fields but not uic; this keeps the assignment explicit
-      // next to reset() so future maintenance does not silently drop it.
-      // Mirrors ngspice traninit.c:35 (CKTmode = job->TRANmode carrying MODEUIC).
-      cac.statePool.uic = this._params.uic ?? false;
     }
 
     const phaseHook = this.stepPhaseHook;
