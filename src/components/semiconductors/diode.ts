@@ -435,13 +435,12 @@ export function createDiodeElement(
 
   const hasCapacitance = params.CJO > 0 || params.TT > 0;
 
-  // Pool binding — set by initState
-  let s0: Float64Array;
-  let s1: Float64Array;
-  let s2: Float64Array;
-  let s3: Float64Array;
-  let base: number;
+  // Pool binding — only the pool reference is retained. Individual state
+  // arrays are NOT cached as member variables: every access inside load()
+  // reads pool.states[N] at call time. Mirrors ngspice CKTstate0/1/2/3
+  // pointer access (cktload.c never caches state pointers on devices).
   let pool: StatePoolRef;
+  let base: number;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
   let pnjlimLimited = false;
@@ -457,39 +456,32 @@ export function createDiodeElement(
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      s0 = pool.state0;
-      s1 = pool.state1;
-      s2 = pool.state2;
-      s3 = pool.state3;
       base = this.stateBaseOffset;
       applyInitialValues(this.stateSchema, pool, base, params);
     },
 
-    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array, _newS4: Float64Array, _newS5: Float64Array, _newS6: Float64Array, _newS7: Float64Array): void {
-      s0 = newS0;
-      s1 = newS1;
-      s2 = newS2;
-      s3 = newS3;
-    },
-
     load(ctx: LoadContext): void {
+      // Direct state-array access per call — no cached Float64Array refs.
+      // Mirrors ngspice CKTstate0/1/2/3 pointer semantics in dioload.c.
+      const s0 = pool.states[0];
+      const s1 = pool.states[1];
+      const s2 = pool.states[2];
+      const s3 = pool.states[3];
+
       const voltages = ctx.voltages;
       const mode = ctx.cktMode;   // F4: bitfield (ckt-mode.ts)
 
-      // MODEINITPRED — #ifndef PREDICTOR path. dioload.c:98-99 (#ifndef
-      // PREDICTOR block): adopt predictor-extrapolated vd, but since ngspice
-      // ships with PREDICTOR #undef by default, this branch is NEVER entered
-      // in reference builds (nipred.c:20 early-returns, cktdefs.h builds
-      // never set MODEINITPRED). We retain an inert branch so state rotation
-      // still works if a future engine re-enables the predictor, matching
-      // dioload.c:128.
+      // MODEINITPRED — #ifndef PREDICTOR path. dioload.c:141-149 (#ifndef
+      // PREDICTOR block): adopt predictor-extrapolated vd. ngspice ships
+      // with PREDICTOR #undef by default; we retain the inert branch so
+      // state rotation still works if a future engine re-enables it.
       if (mode & MODEINITPRED) {
         s0[base + SLOT_VD]  = s1[base + SLOT_VD];
         s0[base + SLOT_ID]  = s1[base + SLOT_ID];
         s0[base + SLOT_GEQ] = s1[base + SLOT_GEQ];
       }
 
-      // Select linearization voltage according to ngspice dioload.c:126-137.
+      // Select linearization voltage according to ngspice dioload.c:126-139.
       let vdRaw: number;
       if (mode & MODEINITSMSIG) {
         // dioload.c:126-127: MODEINITSMSIG seeds vd from CKTstate0.
@@ -510,7 +502,7 @@ export function createDiodeElement(
         // dioload.c:137-138: MODEINITFIX && DIOoff → vd = 0
         vdRaw = 0;
       } else {
-        // Normal linearization from the NR iterate.
+        // dioload.c:151-152: vd = CKTrhsOld[DIOposPrimeNode] - CKTrhsOld[DIOnegNode]
         const va = nodeJunction > 0 ? voltages[nodeJunction - 1] : 0;
         const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
         vdRaw = va - vc;
@@ -518,15 +510,15 @@ export function createDiodeElement(
 
       const vtebrk = params.NBV * vt;
 
-      // Apply pnjlim — dioload.c:180-191.
+      // Apply pnjlim — dioload.c:180-204.
       const vdOld = s0[base + SLOT_VD];
       let vdLimited: number;
       if (mode & (MODEINITJCT | MODEINITSMSIG | MODEINITTRAN)) {
-        // dioload.c:126-135: these phases set vd directly — no pnjlim.
+        // dioload.c:126-138: these phases set vd directly — no pnjlim.
         vdLimited = vdRaw;
         pnjlimLimited = false;
       } else if (tBV < Infinity && vdRaw < Math.min(0, -tBV + 10 * vtebrk)) {
-        // Breakdown reflection: limit in the reflected domain
+        // dioload.c:183-195: breakdown path — pnjlim in reflected domain.
         let vdtemp = -(vdRaw + tBV);
         const vdtempOld = -(vdOld + tBV);
         const reflResult = pnjlim(vdtemp, vdtempOld, vtebrk, tVcrit);
@@ -534,7 +526,7 @@ export function createDiodeElement(
         pnjlimLimited = reflResult.limited;
         vdLimited = -(vdtemp + tBV);
       } else {
-        // Normal forward/reverse limiting: dioload.c:189-191
+        // dioload.c:196-204: standard forward/reverse pnjlim.
         const vdResult = pnjlim(vdRaw, vdOld, nVt, tVcrit);
         vdLimited = vdResult.value;
         pnjlimLimited = vdResult.limited;
@@ -556,10 +548,10 @@ export function createDiodeElement(
 
       s0[base + SLOT_VD] = vdLimited;
 
-      // 3-region I-V: dioload.c:232-252
+      // dioload.c:245-265: three-region I-V computation (no evd clamp).
       const { id: idRaw, gd: gdRaw } = computeDiodeIV(vdLimited, tIS, nVt, tBV, vtebrk);
 
-      // High-injection correction (IKF forward, IKR reverse)
+      // dioload.c:290-314: high-injection correction (IKF forward, IKR reverse)
       let gdCorr = gdRaw;
       if (isFinite(params.IKF) && params.IKF > 0 && idRaw > 0) {
         const ikfRatio = idRaw / params.IKF;
@@ -571,9 +563,9 @@ export function createDiodeElement(
         gdCorr /= sqrtTerm * (1 + sqrtTerm);
       }
 
-      // Add GMIN — dioload.c:283-300
+      // dioload.c:298-299, 310-311: add CKTgmin to gd, id += gmin * vd.
       const gd = gdCorr + GMIN;
-      const id = idRaw + GMIN * vdLimited;  // DD5: store id + GMIN*vd
+      const id = idRaw + GMIN * vdLimited;
 
       s0[base + SLOT_ID] = id;
       s0[base + SLOT_GEQ] = gd;
@@ -582,7 +574,7 @@ export function createDiodeElement(
 
       const solver = ctx.solver;
 
-      // Stamp series resistance RS between anode pin and internal junction node
+      // dioload.c:435: DIOposPosPtr += gspr (series resistance conductance)
       if (params.RS > 0 && nodeJunction !== nodeAnode) {
         const gRS = 1 / params.RS;
         stampG(solver, nodeAnode, nodeAnode, gRS);
@@ -591,8 +583,7 @@ export function createDiodeElement(
         stampG(solver, nodeJunction, nodeJunction, gRS);
       }
 
-      // Stamp nonlinear companion model: conductance gd in parallel, Norton offset ieq
-      // Junction is between nodeJunction and nodeCathode
+      // dioload.c:429-441: load current vector + junction conductance stamps.
       stampG(solver, nodeJunction, nodeJunction, gd);
       stampG(solver, nodeJunction, nodeCathode, -gd);
       stampG(solver, nodeCathode, nodeJunction, -gd);
@@ -600,9 +591,8 @@ export function createDiodeElement(
       stampRHS(solver, nodeJunction, -ieq);
       stampRHS(solver, nodeCathode, ieq);
 
-      // Reactive companion: junction capacitance + transit-time diffusion cap.
-      // ngspice dioload.c:316-317: gated on MODETRAN | MODEAC | MODEINITSMSIG
-      // OR (MODETRANOP && MODEUIC).
+      // dioload.c:316-317: capacitance gated on
+      //   (MODETRAN | MODEAC | MODEINITSMSIG) || ((MODETRANOP) && (MODEUIC))
       const capGate =
         (mode & (MODETRAN | MODEAC | MODEINITSMSIG)) !== 0 ||
         ((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0);
@@ -610,9 +600,9 @@ export function createDiodeElement(
         const order = ctx.order;
         const method = ctx.method;
 
-        // Depletion + transit-time capacitance at current operating point
+        // dioload.c:321-355: depletion + diffusion cap + total charge.
         const Cj = computeJunctionCapacitance(vdLimited, tCJO, tVJ, params.M, params.FC);
-        const Ct = params.TT * gd;  // dioload.c:338: diffcap = TT * gdb
+        const Ct = params.TT * gd;  // dioload.c:351: diffcap = TT * gdb
         const Ctotal = Cj + Ct;
 
         const q0 = computeJunctionCharge(vdLimited, tCJO, tVJ, params.M, params.FC, params.TT, idRaw);
@@ -626,7 +616,7 @@ export function createDiodeElement(
           q1 = q0;
         }
 
-        // NIintegrate via shared helper (niinteg.c:17-80).
+        // dioload.c:395: NIintegrate via shared helper (niinteg.c:17-80).
         const ag = ctx.ag;
         const ccapPrev = s1[base + SLOT_CCAP];
         const { ccap, geq: capGeq } = niIntegrate(
@@ -648,17 +638,19 @@ export function createDiodeElement(
           s1[base + SLOT_CCAP] = ccap;
         }
 
-        // Small-signal parameter store-back (dioload.c:360-374). Only during
-        // MODEINITSMSIG, and only when NOT (MODETRANOP && MODEUIC).
+        // dioload.c:360-374: small-signal store-back, gated on MODEINITSMSIG
+        // and NOT (MODETRANOP && MODEUIC). D2 — MODEINITSMSIG body.
         if ((mode & MODEINITSMSIG) &&
             !((mode & MODETRANOP) && (mode & MODEUIC))) {
-          // dioload.c:363: store raw capd (Farads) into DIOcapCurrent slot.
+          // dioload.c:363: *(CKTstate0 + DIOcapCurrent) = capd (Farads)
           s0[base + SLOT_CAP_CURRENT] = Ctotal;
-          // dioload.c:374: continue — skip niIntegrate companion stamp.
+          // dioload.c:374: continue — skip matrix/RHS cap companion stamp.
           return;
         }
 
-        // dioload.c: MODETRAN path — store iqcap (A) into DIOcapCurrent slot.
+        // dioload.c:397-398: MODETRAN path — gd += geq, cd += ccap. We
+        // mirror by stamping the capacitance companion below. SLOT_CAP_CURRENT
+        // stores iqcap (Amps) per dioload.c DIOcapCurrent semantics.
         s0[base + SLOT_CAP_CURRENT] = ccap;
 
         if (capGeq !== 0 || capIeq !== 0) {
@@ -673,10 +665,10 @@ export function createDiodeElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
+      const s0 = pool.states[0];
       if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
 
-      // ngspice icheck gate: if voltage was limited in load(),
-      // declare non-convergence immediately (DIOload sets CKTnoncon++)
+      // dioload.c:411-416: CKTnoncon bump on pnjlim → non-convergence
       if (pnjlimLimited) return false;
 
       const voltages = ctx.voltages;
@@ -684,7 +676,7 @@ export function createDiodeElement(
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
 
-      // ngspice DIOconvTest: current-prediction convergence
+      // dioconv.c: DIOconvTest — current-prediction convergence
       const delvd = vdRaw - s0[base + SLOT_VD];
       const id = s0[base + SLOT_ID];
       const gd = s0[base + SLOT_GEQ];
@@ -696,7 +688,7 @@ export function createDiodeElement(
     getPinCurrents(_voltages: Float64Array): number[] {
       // pinLayout order: [A (anode), K (cathode)]
       // Positive = current flowing INTO element at that pin.
-      const id = s0[base + SLOT_ID];
+      const id = pool.states[0][base + SLOT_ID];
       return [id, -id];
     },
 
@@ -718,6 +710,10 @@ export function createDiodeElement(
       method: IntegrationMethod,
       lteParams: LteParams,
     ): number {
+      const s0 = pool.states[0];
+      const s1 = pool.states[1];
+      const s2 = pool.states[2];
+      const s3 = pool.states[3];
       const _q0 = s0[base + SLOT_Q];
       const _q1 = s1[base + SLOT_Q];
       const _q2 = s2[base + SLOT_Q];

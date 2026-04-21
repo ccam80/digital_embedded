@@ -109,23 +109,18 @@ export function createZenerElement(
   // State pool slot indices
   const SLOT_VD = 0, SLOT_GEQ = 1, SLOT_IEQ = 2, SLOT_ID = 3;
 
-  // Pool binding — set by initState
-  let s0: Float64Array;
-  let s1: Float64Array;
-  let s2: Float64Array;
-  let s3: Float64Array;
-  let s4: Float64Array;
-  let s5: Float64Array;
-  let s6: Float64Array;
-  let s7: Float64Array;
-  let base: number;
+  // Pool binding — only the pool reference is retained. Individual state
+  // arrays are NOT cached as member variables: every access inside load()
+  // reads pool.states[N] at call time. Mirrors ngspice CKTstate0 pointer
+  // access (dioload.c never caches state pointers on devices).
   let pool: StatePoolRef;
+  let base: number;
 
   // Ephemeral per-iteration pnjlim limiting flag (ngspice icheck, DIOload sets CKTnoncon++)
   let pnjlimLimited = false;
 
   // One-shot cold-start seed from dcopInitJct. Non-null only between
-  // primeJunctions() and the next updateOperatingPoint() call.
+  // primeJunctions() and the next load() call.
   let primedVd: number | null = null;
 
   return {
@@ -147,32 +142,14 @@ export function createZenerElement(
 
     initState(poolRef: StatePoolRef): void {
       pool = poolRef;
-      s0 = pool.state0;
-      s1 = pool.state1;
-      s2 = pool.state2;
-      s3 = pool.state3;
-      s4 = pool.state4;
-      s5 = pool.state5;
-      s6 = pool.state6;
-      s7 = pool.state7;
-      this.s0 = s0; this.s1 = s1; this.s2 = s2; this.s3 = s3;
-      this.s4 = s4; this.s5 = s5; this.s6 = s6; this.s7 = s7;
       base = this.stateBaseOffset;
       applyInitialValues(ZENER_STATE_SCHEMA, pool, base, {});
     },
 
-    refreshSubElementRefs(newS0: Float64Array, newS1: Float64Array, newS2: Float64Array, newS3: Float64Array, newS4: Float64Array, newS5: Float64Array, newS6: Float64Array, newS7: Float64Array): void {
-      s0 = newS0;
-      s1 = newS1;
-      s2 = newS2;
-      s3 = newS3;
-      s4 = newS4;
-      s5 = newS5;
-      s6 = newS6;
-      s7 = newS7;
-    },
-
     load(ctx: LoadContext): void {
+      // Direct state-array access per call — no cached Float64Array refs.
+      const s0 = pool.states[0];
+
       const voltages = ctx.voltages;
       let vdRaw: number;
       if (primedVd !== null) {
@@ -197,14 +174,14 @@ export function createZenerElement(
         vdLimited = vdRaw;
         pnjlimLimited = false;
       } else if (vdRaw < Math.min(0, -params.BV + 10 * nbvVt)) {
-        // Breakdown region: apply pnjlim in reflected domain (dioload.c:180-191)
+        // dioload.c:183-195: breakdown path — pnjlim in reflected domain.
         const vdtemp = -(vdRaw + params.BV);
         const vdtempOld = -(vdOld + params.BV);
         const reflResult = pnjlim(vdtemp, vdtempOld, nbvVt, vcrit);
         pnjlimLimited = reflResult.limited;
         vdLimited = -(reflResult.value + params.BV);
       } else {
-        // Forward/normal reverse: standard pnjlim
+        // dioload.c:196-204: standard pnjlim.
         const vdResult = pnjlim(vdRaw, vdOld, nVt, vcrit);
         vdLimited = vdResult.value;
         pnjlimLimited = vdResult.limited;
@@ -229,14 +206,16 @@ export function createZenerElement(
       let geq: number;
       let ieq: number;
       if (vdLimited >= -params.BV) {
-        // Forward region and normal reverse region: standard Shockley
+        // Forward region and normal reverse region (dioload.c:247-249 forward
+        // branch): Id = IS * (exp(vd/nVt) - 1)
         const expVal = Math.exp(vdLimited / nVt);
         const id = params.IS * (expVal - 1);
         geq = (params.IS * expVal) / nVt + GMIN;
         ieq = id - geq * vdLimited;
         s0[base + SLOT_ID] = id;
       } else {
-        // Reverse breakdown region: Id = -IS * exp(-(Vd + BV) / (NBV*Vt))
+        // Breakdown region (dioload.c:261-263):
+        //   Id = -IS * exp(-(Vd + BV) / (NBV*Vt))
         const bdExpVal = Math.exp(-(vdLimited + params.BV) / nbvVt);
         const id = -params.IS * bdExpVal;
         geq = (params.IS * bdExpVal) / nbvVt + GMIN;
@@ -246,6 +225,7 @@ export function createZenerElement(
       s0[base + SLOT_GEQ] = geq;
       s0[base + SLOT_IEQ] = ieq;
 
+      // dioload.c:429-441: load current vector + junction conductance stamps.
       const solver = ctx.solver;
       stampG(solver, nodeAnode, nodeAnode, geq);
       stampG(solver, nodeAnode, nodeCathode, -geq);
@@ -256,8 +236,8 @@ export function createZenerElement(
     },
 
     checkConvergence(ctx: LoadContext): boolean {
-      // ngspice icheck gate: if voltage was limited in load(),
-      // declare non-convergence immediately (DIOload sets CKTnoncon++)
+      const s0 = pool.states[0];
+      // dioload.c:411-416: CKTnoncon bump on pnjlim → non-convergence
       if (pnjlimLimited) return false;
 
       const voltages = ctx.voltages;
@@ -265,7 +245,7 @@ export function createZenerElement(
       const vc = nodeCathode > 0 ? voltages[nodeCathode - 1] : 0;
       const vdRaw = va - vc;
 
-      // ngspice DIOconvTest: current-prediction convergence
+      // dioconv.c DIOconvTest: current-prediction convergence
       const delvd = vdRaw - s0[base + SLOT_VD];
       const id = s0[base + SLOT_ID];
       const gd = s0[base + SLOT_GEQ];
@@ -277,7 +257,7 @@ export function createZenerElement(
     getPinCurrents(_voltages: Float64Array): number[] {
       // pinLayout order: [A (anode), K (cathode)]
       // Positive = current flowing INTO element at that pin.
-      const id = s0[base + SLOT_ID];
+      const id = pool.states[0][base + SLOT_ID];
       return [id, -id];
     },
 

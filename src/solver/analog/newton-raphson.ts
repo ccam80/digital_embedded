@@ -81,7 +81,14 @@ export interface PnjlimResult {
 const _pnjlimResult: PnjlimResult = { value: 0, limited: false };
 
 /**
- * Direct JavaScript port of ngspice DEVpnjlim (devsup.c:50-58).
+ * Direct JavaScript port of ngspice DEVpnjlim (devsup.c:50-84).
+ *
+ * Includes the Gillespie negative-bias branch (devsup.c:67-82) — D4 in
+ * spec/architectural-alignment.md. When vnew is not above the forward
+ * critical-voltage threshold but is negative, the reverse clamp engages:
+ *   vold > 0:  arg = -vold - 1
+ *   vold <= 0: arg = 2*vold - 1
+ *   if vnew < arg, clamp vnew = arg and flag limited
  *
  * Variable mapping (ngspice → ours):
  *   vnew   → vnew   (proposed new junction voltage)
@@ -93,20 +100,44 @@ const _pnjlimResult: PnjlimResult = { value: 0, limited: false };
  */
 export function pnjlim(vnew: number, vold: number, vt: number, vcrit: number): PnjlimResult {
   let limited: boolean;
+  // devsup.c:54: forward limiting branch
   if ((vnew > vcrit) && (Math.abs(vnew - vold) > (vt + vt))) {
     if (vold > 0) {
-      const arg = 1 + (vnew - vold) / vt;
+      // devsup.c:56-61
+      const arg = (vnew - vold) / vt;
       if (arg > 0) {
-        vnew = vold + vt * Math.log(arg);
+        vnew = vold + vt * (2 + Math.log(arg - 2));
       } else {
-        vnew = vcrit;
+        vnew = vold - vt * (2 + Math.log(2 - arg));
       }
     } else {
+      // devsup.c:62-64: vold <= 0 forward limit
       vnew = vt * Math.log(vnew / vt);
     }
     limited = true;
   } else {
-    limited = false;
+    // devsup.c:66-82: Gillespie negative-bias branch (D4).
+    // Engages when the forward limit does not apply but vnew is negative.
+    if (vnew < 0) {
+      let arg: number;
+      if (vold > 0) {
+        // devsup.c:68-69
+        arg = -1 * vold - 1;
+      } else {
+        // devsup.c:70-72
+        arg = 2 * vold - 1;
+      }
+      // devsup.c:73-78: clamp vnew when it overshoots the reverse bound
+      if (vnew < arg) {
+        vnew = arg;
+        limited = true;
+      } else {
+        limited = false;
+      }
+    } else {
+      // devsup.c:79-81
+      limited = false;
+    }
   }
   _pnjlimResult.value = vnew;
   _pnjlimResult.limited = limited;

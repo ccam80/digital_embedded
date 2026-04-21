@@ -738,38 +738,13 @@ describe("IKF/IKR high-injection correction", () => {
     expect(gdWithIkf).toBeLessThan(gdNoIkf);
   });
 
-  it("IKF correction matches formula: gdRaw / (sqrt(1+id/ikf) * (1+sqrt(1+id/ikf)))", () => {
-    const vd = 0.8;
-    const IKF = 1e-4;
-    const IS = 1e-14;
-    const N = 1;
-    const nVt = N * VT;
-
-    // Compute expected gd from the formula
-    const expArg = Math.min(vd / nVt, 700);
-    const evd = Math.exp(expArg);
-    const idRaw = IS * (evd - 1);
-    const gdRaw = IS * evd / nVt;
-    const sqrtTerm = Math.sqrt(1 + idRaw / IKF);
-    const expectedGd = gdRaw / (sqrtTerm * (1 + sqrtTerm)) + 1e-12; // + GMIN
-
-    const actualGd = diodeGd(vd, { IS, IKF });
-    expect(Math.abs(actualGd - expectedGd) / expectedGd).toBeLessThan(0.001);
-  });
-
-  it("IKF=Infinity applies no correction (denominator stays at 2, same as no IKF branch)", () => {
-    // When IKF=Infinity, the correction branch is skipped entirely
-    const vd = 0.7;
-    const gdWithInfIkf = diodeGd(vd, { IKF: Infinity });
-    // Compute expected raw gd (no correction applied)
-    const IS = 1e-14;
-    const nVt = VT;
-    const expArg = Math.min(vd / nVt, 700);
-    const evd = Math.exp(expArg);
-    const gdRaw = IS * evd / nVt;
-    const expectedGd = gdRaw + 1e-12; // + GMIN
-    expect(Math.abs(gdWithInfIkf - expectedGd) / expectedGd).toBeLessThan(0.001);
-  });
+  // Two prior tests with hand-computed expected values containing
+  // `Math.min(vd/nVt, 700)` were deleted in Phase 2.5 W1.1 per the A1
+  // test-handling rule. The clamp is D-1 banned (ngspice dioload.c does
+  // not clamp the exponent argument), and the expected values were hand-
+  // computed rather than produced by the ngspice harness. The surviving
+  // IKF/IKR tests below compare against Infinity-vs-finite deltas, which
+  // test behavioural direction without locking in a numerical value.
 
   it("IKR correction reduces gd for reverse-biased diode with finite IKR", () => {
     const vd = -0.05;
