@@ -2,8 +2,11 @@
 
 **Date:** 2026-04-21
 **Author:** Claude (Opus 4.7) with user
-**Status:** Draft — every item is PROPOSED. User must approve each item
-individually before it is treated as decided.
+**Status:** All items APPROVED as of 2026-04-21 (see §0.5 approval log).
+Doc is now the single source of truth for digiTS vs ngspice architectural
+alignment. Moves from design to execution: each APPROVED FIX item
+becomes an execution track; each APPROVED ACCEPT item becomes a harness
+constraint.
 **Supersedes:** `ngspice-alignment-divergences.md` + `ngspice-alignment-
 verification.md` once every item here reaches an APPROVED state.
 **Feeder docs:** `audit-papered-divergences.md` (source of the ~38 items
@@ -56,42 +59,68 @@ PROPOSED → (user review) → APPROVED FIX  → (implementation) → LANDED
 
 ---
 
+## 0.5. Approval log
+
+- **2026-04-21** — A1 APPROVED FIX (collapse `_updateOp`/`_stampCompanion`
+  split; umbrella fix for all C-AUD state-slot inventions).
+- **2026-04-21** — E1 APPROVED ACCEPT (model registry stays, per-level
+  ngspice references documented; `defaultModel` may not be read at
+  runtime for dispatch).
+- **2026-04-21** — F4 APPROVED wholesale per subgroup (F4a 11 devices
+  FIX, F4b 4 composite devices FIX, F4c 15 digiTS-only devices ACCEPT).
+- **2026-04-21** — Batch approvals in ID order: **A2–A4** (state pool
+  cleanup, all FIX), **B1–B5** (solver architecture, all FIX),
+  **C1–C3** (engine control flow, all FIX), **D1–D4** (init-mode
+  dispatch, all FIX), **E2–E4** (framework-level accepts, all ACCEPT),
+  **F1** (tunnel-diode ACCEPT), **F2** (varactor FIX), **F3** (triode
+  ACCEPT), **G1** (MOSFET sign convention FIX), **H1–H2** (limiting /
+  gmin ownership FIX), **I2–I3** (policy items acknowledged).
+- **2026-04-21** — I1 APPROVED STRICTER POLICY — no suppression of
+  anomalies; diffs present loudly, only. Stricter than the originally
+  proposed "cite the structural item" rule. Reconciliation pass will
+  enumerate existing suppression patterns for removal.
+
+Every item in `architectural-alignment.md` is now APPROVED. The doc
+moves from design to execution. Undecided items: none.
+
+---
+
 ## 1. Summary table
 
 | ID | Item | Verdict |
 |---|---|---|
 | A1 | `_updateOp` / `_stampCompanion` split via StatePool (the generator) | **APPROVED FIX** (2026-04-21) |
-| A2 | `pool.uic` boolean duplicate of `cktMode & MODEUIC` | PROPOSED FIX |
-| A3 | `statePool.analysisMode` string field duplicates `CKTmode` | PROPOSED FIX |
-| A4 | `poolBackedElements` + `refreshElementRefs` defensive resync | PROPOSED FIX |
-| B1 | `_numericLUReusePivots` absolute threshold, not column-relative | PROPOSED FIX |
-| B2 | `_hasPivotOrder` conflates Factored + NeedsOrdering | PROPOSED FIX |
-| B3 | Gmin stamped outside factor, not passed to factor routine | PROPOSED FIX |
-| B4 | `invalidateTopology` trigger parity unverified | PROPOSED FIX |
-| B5 | tranInit reorder before vs after iter-0 solve | PROPOSED FIX |
-| C1 | `dcopFinalize` runs full NR pass vs single CKTload | PROPOSED FIX |
-| C2 | `_firsttime` flag vs direct MODEINITTRAN assignment | PROPOSED FIX |
-| C3 | `cktLoad(ctx, iteration)` has iteration parameter | PROPOSED FIX |
-| D1 | `"initSmsig"` mode reaches no device code | PROPOSED FIX |
-| D2 | Diode MODEINITSMSIG body empty | PROPOSED FIX |
-| D3 | BJT L1 `dt > 0` gate hides MODEINITSMSIG entirely | PROPOSED FIX |
-| D4 | `pnjlim` missing Gillespie negative-bias branch | PROPOSED FIX |
+| A2 | `pool.uic` boolean duplicate of `cktMode & MODEUIC` | **APPROVED FIX** (2026-04-21) |
+| A3 | `statePool.analysisMode` string field duplicates `CKTmode` | **APPROVED FIX** (2026-04-21) |
+| A4 | `poolBackedElements` + `refreshElementRefs` defensive resync | **APPROVED FIX** (2026-04-21) |
+| B1 | `_numericLUReusePivots` absolute threshold, not column-relative | **APPROVED FIX** (2026-04-21) |
+| B2 | `_hasPivotOrder` conflates Factored + NeedsOrdering | **APPROVED FIX** (2026-04-21) |
+| B3 | Gmin stamped outside factor, not passed to factor routine | **APPROVED FIX** (2026-04-21) |
+| B4 | `invalidateTopology` trigger parity unverified | **APPROVED FIX** (2026-04-21) |
+| B5 | tranInit reorder before vs after iter-0 solve | **APPROVED FIX** (2026-04-21) |
+| C1 | `dcopFinalize` runs full NR pass vs single CKTload | **APPROVED FIX** (2026-04-21) |
+| C2 | `_firsttime` flag vs direct MODEINITTRAN assignment | **APPROVED FIX** (2026-04-21) |
+| C3 | `cktLoad(ctx, iteration)` has iteration parameter | **APPROVED FIX** (2026-04-21) |
+| D1 | `"initSmsig"` mode reaches no device code | **APPROVED FIX** (2026-04-21) |
+| D2 | Diode MODEINITSMSIG body empty | **APPROVED FIX** (2026-04-21) |
+| D3 | BJT L1 `dt > 0` gate hides MODEINITSMSIG entirely | **APPROVED FIX** (2026-04-21) |
+| D4 | `pnjlim` missing Gillespie negative-bias branch | **APPROVED FIX** (2026-04-21) |
 | E1 | `modelRegistry` + `defaultModel` + `spice-l0..l3` split | **APPROVED ACCEPT** (2026-04-21) |
-| E2 | `behavioral-*.ts` family has no ngspice counterpart | PROPOSED ACCEPT |
-| E3 | `bridge-adapter` + `digital-pin-model` mixed-signal layer | PROPOSED ACCEPT |
-| E4 | Engine-agnostic coordinator / editor layer | PROPOSED ACCEPT |
-| F1 | Tunnel-diode as separate device | PROPOSED ACCEPT |
-| F2 | Varactor as separate device vs ngspice diode-reuse | PROPOSED FIX |
-| F3 | Triode (vacuum tube) as a device | PROPOSED ACCEPT |
+| E2 | `behavioral-*.ts` family has no ngspice counterpart | **APPROVED ACCEPT** (2026-04-21) |
+| E3 | `bridge-adapter` + `digital-pin-model` mixed-signal layer | **APPROVED ACCEPT** (2026-04-21) |
+| E4 | Engine-agnostic coordinator / editor layer | **APPROVED ACCEPT** (2026-04-21) |
+| F1 | Tunnel-diode as separate device | **APPROVED ACCEPT** (2026-04-21) |
+| F2 | Varactor as separate device vs ngspice diode-reuse | **APPROVED FIX** (2026-04-21) |
+| F3 | Triode (vacuum tube) as a device | **APPROVED ACCEPT** (2026-04-21) |
 | F4a | 11 devices with direct ngspice primitive (schottky, zener, T-line, VSWITCH, G/E/F/H sources, potentiometer, transformer, tapped-transformer) | **APPROVED FIX** (2026-04-21) |
 | F4b | 4 composite devices (polarized-cap, crystal, optocoupler, LDR) | **APPROVED FIX** (2026-04-21) |
 | F4c | 15 digiTS-only devices (DIAC, SCR, TRIAC, memristor, analog-fuse, spark-gap, NTC-thermistor, ADC, DAC, comparator, schmitt-trigger, OTA, 555 timer, opamp, real-opamp) | **APPROVED ACCEPT** (2026-04-21) |
-| G1 | MOSFET VSB/VBD sign convention vs ngspice MOS1vbs/MOS1vbd | PROPOSED FIX |
-| H1 | `ctx.loadCtx.limitingCollector` never synced by cktLoad | PROPOSED FIX |
-| H2 | `addDiagonalGmin` / `_needsReorder` ownership | PROPOSED FIX |
-| I1 | Band-aid commits papering structural divergences | POLICY — see §I |
-| I2 | Untrusted ngspice citations in code comments | POLICY — see §I |
-| I3 | Alignment specs half-implemented | POLICY — see §I |
+| G1 | MOSFET VSB/VBD sign convention vs ngspice MOS1vbs/MOS1vbd | **APPROVED FIX** (2026-04-21) |
+| H1 | `ctx.loadCtx.limitingCollector` never synced by cktLoad | **APPROVED FIX** (2026-04-21) |
+| H2 | `addDiagonalGmin` / `_needsReorder` ownership | **APPROVED FIX** (2026-04-21) |
+| I1 | No suppression of anomalies — diffs present loudly, only | **APPROVED STRICTER POLICY** (2026-04-21) |
+| I2 | Untrusted ngspice citations in code comments | **APPROVED POLICY** (2026-04-21) |
+| I3 | Alignment specs half-implemented | **APPROVED POLICY** (2026-04-21) |
 
 **BLOCKERs routed from Step 1 (baseline-reality.md §2.1):**
 - MOSFET `GEQ`-family slot mapping gap → symptom of **A1**.
@@ -400,7 +429,7 @@ Numerical bug currently mis-labeled as "citation divergence".
 
 ---
 
-## E. Framework-level decisions (USER DECISION REQUIRED for E1)
+## E. Framework-level decisions
 
 These are not fix-the-function items — they are whole-framework
 questions. Deciding to keep them means per-NR-iteration bit-exact parity
@@ -430,8 +459,6 @@ The element's `model` property is the sole source of truth after
 placement (CLAUDE.md §Component Model Architecture). Any code that
 reads `defaultModel` for dispatch is a bug.
 
-
-
 **Source IDs:** S-AUD-5. Files: `src/compile/extract-connectivity.ts:77-97`,
 `src/headless/netlist-types.ts:84`, `CLAUDE.md` "Component Model
 Architecture" section.
@@ -440,21 +467,11 @@ fixed at netlist parse time.
 **What digiTS does:** a component carries multiple runtime-selectable
 models (behavioral + spice-l1..l3 + device-specific variants).
 
-**Cost of ACCEPT:** none for per-model bit-exact comparison — when the
-selected model is e.g. spice-l1, comparison can be against ngspice L1.
-The registry layer is orthogonal. But the BJT L2/L3/MEXTRAM branches
-have no ngspice counterpart inside ngspice's own bjt1/bjt2 files (ngspice
-uses separate device structs), so bit-exact parity for those levels
-requires citing different ngspice files per level.
-
-**Proposed verdict:** **USER DECISION REQUIRED.** Options:
-- **E1-KEEP:** registry stays, each level compares against its own
-  ngspice reference file. Documented explicitly per model.
-- **E1-COLLAPSE:** split each level into its own component class (one
-  DEVice struct equivalent per level). Larger refactor.
-
-Recommending E1-KEEP with per-level ngspice references documented, but
-flagging for user call.
+**Note on L2/L3/MEXTRAM:** the BJT L2/L3/MEXTRAM variants have no
+counterpart inside ngspice's own `bjt1`/`bjt2` files — ngspice uses
+separate device structs per level. Bit-exact parity for those levels
+requires citing the matching ngspice device directory per level; the
+registry in digiTS remains the organizational shell.
 
 ### E2. `behavioral-*.ts` family
 
@@ -712,17 +729,50 @@ These are meta-items about how the project maintains alignment going
 forward. They don't have a structural code item to fix; they are
 process guards.
 
-### I1. Band-aid commits papering structural divergences
+### I1. No suppression of anomalies — diffs present loudly, only — **APPROVED STRICTER POLICY** (2026-04-21)
 
-**Source IDs:** DIV-13. Named instance: commit `d4dc1e3c` save/restore
-`postIterationHook` dance around dcopFinalize NR pass (C1).
+**Source IDs:** DIV-13 (band-aid commits). Canonical existing instance:
+commit `d4dc1e3c` save/restore `postIterationHook` dance around
+dcopFinalize's NR pass (C1 removes this dance entirely).
 
-**Policy:** every future commit whose diff includes a "suppress
-spurious X" / "ignore when Y" / "save/restore Z" shape must cite the
-structural divergence it is masking and whether that divergence is
-listed in this doc. If it is not listed, STOP — this is an
-unacknowledged architectural divergence and must be escalated as a new
-item.
+**Policy (stricter than originally proposed):**
+
+Any divergence, anomaly, or unexpected state surfaces in output. No
+code may:
+
+- Suppress, swallow, or mute spurious events of any kind.
+- Save a value, mutate, and restore it to hide a transient write.
+- Catch an exception without re-raising or escalating it to a visible
+  log level.
+- Gate error/warning emission on a "this is expected under X" condition.
+- Filter log output based on "noise vs signal" heuristics.
+- Add a conditional that exists solely to silence an assertion, warning,
+  or test that would otherwise fire.
+- Wrap a call in a try/catch whose catch block does anything other
+  than (a) attach context and rethrow, or (b) record the failure at a
+  visible level.
+
+**Rationale:** suppression patterns exist *only* because a structural
+divergence produces behavior that should not exist. Silencing the
+evidence instead of fixing the generator is exactly the papering
+pattern the forcing function was designed to eliminate. If an anomaly
+is truly benign, it stops firing when the generator is fixed; a
+suppression is always a band-aid over a structural bug.
+
+**Enforcement:** every future commit whose diff introduces one of the
+above patterns is rejected at review. If a divergence is known and
+explicitly ACCEPTED elsewhere in this doc, the divergence surfaces
+loudly and the test that would otherwise fail is marked
+excluded-by-design citing the specific ACCEPTED item. Exclusions are
+explicit and named, not silent.
+
+**Backlog:** existing suppression patterns in the codebase must be
+enumerated and removed. Search surface: save/restore pairs, try/catch
+without re-raise, `if (spurious || expected)` gates, suppressed
+logging, test skip annotations without an APPROVED ACCEPT reference.
+First removal is the `dcopFinalize` hook save/restore dance — falls
+out of C1 naturally. A reconciliation pass against the codebase (post
+this doc's approvals landing) enumerates the rest.
 
 ### I2. ngspice citations in code comments are untrusted
 
