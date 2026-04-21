@@ -146,6 +146,52 @@ Cross-method transfer slots are deleted; their values become locals in
 `load()`. Every invented slot listed below is removed from every device's
 state schema. Execution is a new track; this item is the umbrella.
 
+**Test handling during A1 execution (added 2026-04-21):**
+
+The per-component unit tests under `src/components/**/__tests__/*.test.ts`
+are largely obsoleted by A1 and should be deleted as they fail during
+execution, not fixed. Concrete rule:
+
+> **Any assertion whose expected value was computed by hand, rather than
+> produced by ngspice, is subject to deletion during A1.**
+
+Why: those tests depend on helpers like `withState` that construct a
+fake `StatePool` at `stateBaseOffset = 0` and inspect intermediate
+slot values between `_updateOp` and `_stampCompanion`. A1 deletes the
+slots (SLOT_CAP_GEQ, SLOT_IEQ_*, cross-method transfer slots) those
+tests inspect, and collapses the two methods into a single `load()` so
+the "inspect the pool between methods" pattern ceases to mean anything.
+Fixing them would just re-encode new hand-computed expected values at
+the new interface — that is papering under a different coat (I1
+stricter policy captures this: the hand-computed expected value is a
+baseline for divergence).
+
+**What survives per-component testing (keep, clearly labeled):**
+
+1. **Parameter plumbing / error paths** — `setParam` wiring, param
+   validation, throw-on-bad-input. The harness cannot localize these
+   (a bad param just looks like DC-OP failure in a full circuit).
+2. **F4c digiTS-only devices** — DIAC, SCR, TRIAC, memristor,
+   analog-fuse, spark-gap, NTC-thermistor, ADC, DAC, comparator,
+   schmitt-trigger, OTA, 555 timer, opamp, real-opamp. These have no
+   ngspice reference; they must be self-compare snapshots, clearly
+   labeled as such per F4 ACCEPT constraint §3.
+3. **Engine-agnostic interface contracts** — how the device plugs into
+   the pluggable-engine interface, not the physics. A narrow slice.
+
+**Sequencing:** do not pre-delete per-component tests before A1. Let A1
+delete the slots those tests inspect, and the failures surface
+naturally. Triage the failed tests one-by-one into *delete* (testing
+hand-computed values on deleted slots), *migrate to harness* (testing
+device behavior that should be compared to ngspice), or *keep as
+labeled survivor* (parameter plumbing, F4c, interface contracts).
+
+This pattern is the concrete application of I1 (no suppression) at the
+test layer: tests whose purpose was to encode "we diverge from ngspice
+in a way that produces value X" are a form of suppression — they
+baseline the divergence as expected state. Deleting them is consistent
+with the stricter I1 policy.
+
 
 
 **Source IDs:** S-AUD-1; generates C-AUD-1, C-AUD-2, C-AUD-4, C-AUD-5,
