@@ -100,7 +100,7 @@ Ensure `LoadContext` provides (mirroring ngspice `CKTcircuit` load-time fields):
 - `agVector: Float64Array` (integration coefficients — ag[0] = `1/delta` for trap, etc.)
 - `rhs: Float64Array`, `rhsOld: Float64Array`
 - `matrix: SparseMatrix`
-- `nodes: NodeMap`
+- ~~`nodes: NodeMap`~~ — **STRICKEN 2026-04-22.** No such type exists; ngspice `load()` functions don't take a node lookup (devices hold their own resolved pin indices and index `CKTrhs`/`CKTmatrix` directly). LoadContext's `matrix` + `rhs` are sufficient.
 - `limitingCollector: LimitingEventList` (for H1 — must be synced on every load call)
 - `convergenceCollector: ConvergenceEventList` (for checkConvergence — see H2)
 - `xfact: number` (initPred extrapolation factor — cite `cktdefs.h`)
@@ -183,7 +183,7 @@ For each device in the lane:
 
 3. **Delete `_updateOp()` and `_stampCompanion()`.** The whole methods, not just their bodies.
 
-4. **Delete invented cross-method state slots.** From the device's `stateSchema`. Slots that had direct ngspice correspondences in `device-mappings.ts` survive (those are the ones kept after papering removal). Any slot that only existed to transit values between `_updateOp` and `_stampCompanion` is deleted.
+4. **Delete invented cross-method state slots.** From the device's `stateSchema`. Slots that had direct ngspice correspondences in `device-mappings.ts` survive (those are the ones kept after papering removal). Any slot that only existed to transit values between `_updateOp` and `_stampCompanion` is deleted. **Additionally, delete cached `Float64Array` references to `pool.states[N]` held as device member variables.** Every state access in the new `load()` goes through `pool.states[0]` (or the compiled access path) at call time. Ngspice does not cache `CKTstate0` pointers on devices, and neither does the ported code. This is the fix for the stale-ref issue surfaced after A4's deletion of `refreshElementRefs`.
 
 5. **Apply test handling rule** (`spec/architectural-alignment.md` §A1):
    - Delete tests asserting on hand-computed expected values of intermediate state.
