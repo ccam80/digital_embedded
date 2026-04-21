@@ -60,7 +60,7 @@ PROPOSED → (user review) → APPROVED FIX  → (implementation) → LANDED
 
 | ID | Item | Verdict |
 |---|---|---|
-| A1 | `_updateOp` / `_stampCompanion` split via StatePool (the generator) | PROPOSED FIX |
+| A1 | `_updateOp` / `_stampCompanion` split via StatePool (the generator) | **APPROVED FIX** (2026-04-21) |
 | A2 | `pool.uic` boolean duplicate of `cktMode & MODEUIC` | PROPOSED FIX |
 | A3 | `statePool.analysisMode` string field duplicates `CKTmode` | PROPOSED FIX |
 | A4 | `poolBackedElements` + `refreshElementRefs` defensive resync | PROPOSED FIX |
@@ -76,7 +76,7 @@ PROPOSED → (user review) → APPROVED FIX  → (implementation) → LANDED
 | D2 | Diode MODEINITSMSIG body empty | PROPOSED FIX |
 | D3 | BJT L1 `dt > 0` gate hides MODEINITSMSIG entirely | PROPOSED FIX |
 | D4 | `pnjlim` missing Gillespie negative-bias branch | PROPOSED FIX |
-| E1 | `modelRegistry` + `defaultModel` + `spice-l0..l3` split | USER DECISION REQUIRED |
+| E1 | `modelRegistry` + `defaultModel` + `spice-l0..l3` split | **APPROVED ACCEPT** (2026-04-21) |
 | E2 | `behavioral-*.ts` family has no ngspice counterpart | PROPOSED ACCEPT |
 | E3 | `bridge-adapter` + `digital-pin-model` mixed-signal layer | PROPOSED ACCEPT |
 | E4 | Engine-agnostic coordinator / editor layer | PROPOSED ACCEPT |
@@ -107,7 +107,15 @@ The root architectural decision under which most invented-slot problems
 sit. A1 is the generator; A2–A4 are independent cleanup items on the
 same pool object.
 
-### A1. `_updateOp` / `_stampCompanion` split via StatePool
+### A1. `_updateOp` / `_stampCompanion` split via StatePool — **APPROVED FIX** (2026-04-21)
+
+**Verdict:** APPROVED FIX — collapse `_updateOp` + `_stampCompanion` into
+a single `load()` per device mirroring ngspice's corresponding function.
+Cross-method transfer slots are deleted; their values become locals in
+`load()`. Every invented slot listed below is removed from every device's
+state schema. Execution is a new track; this item is the umbrella.
+
+
 
 **Source IDs:** S-AUD-1; generates C-AUD-1, C-AUD-2, C-AUD-4, C-AUD-5,
 C-AUD-6, C-AUD-7, C-AUD-8.
@@ -396,7 +404,31 @@ These are not fix-the-function items — they are whole-framework
 questions. Deciding to keep them means per-NR-iteration bit-exact parity
 with ngspice is structurally unreachable for the affected surface area.
 
-### E1. `modelRegistry` + `defaultModel` + `spice-l0..l3` split
+### E1. `modelRegistry` + `defaultModel` + `spice-l0..l3` split — **APPROVED ACCEPT** (2026-04-21)
+
+**Verdict:** APPROVED ACCEPT — the model registry stays. Each level
+compares against its own ngspice reference file, documented per model:
+- spice-l1 BJT → `ref/ngspice/src/spicelib/devices/bjt/*`
+- spice-l2 BJT → `ref/ngspice/src/spicelib/devices/bjt2/*`
+- spice-l1 MOSFET → `ref/ngspice/src/spicelib/devices/mos1/*`
+- spice-l2 MOSFET → `ref/ngspice/src/spicelib/devices/mos2/*`
+- spice-l3 MOSFET → `ref/ngspice/src/spicelib/devices/mos3/*`
+- spice-l1 JFET → `ref/ngspice/src/spicelib/devices/jfet/*`
+- spice-l2 JFET → `ref/ngspice/src/spicelib/devices/jfet2/*`
+- diode → `ref/ngspice/src/spicelib/devices/dio/*`
+
+**Documented numerical cost:** none for per-model bit-exact comparison
+— when a component runs under model X, the harness compares against
+the ngspice file for model X. The registry is an organizational shell
+around the per-model loads.
+
+**Constraint that comes with accepting:** no code path may read
+`defaultModel` at runtime (compile, param merge, or model resolution).
+The element's `model` property is the sole source of truth after
+placement (CLAUDE.md §Component Model Architecture). Any code that
+reads `defaultModel` for dispatch is a bug.
+
+
 
 **Source IDs:** S-AUD-5. Files: `src/compile/extract-connectivity.ts:77-97`,
 `src/headless/netlist-types.ts:84`, `CLAUDE.md` "Component Model
@@ -510,17 +542,103 @@ removed in Step 1).
 **Proposed verdict:** **ACCEPT.** Triode excluded from harness. No
 "VGS_JUNCTION ≈ ngspice something" claims.
 
-### F4. SCR / Triac / DIAC / memristor / crystal / transmission-line / tapped-transformer / analog-fuse / polarized-cap / NTC-thermistor / spark-gap
+### F4. The digiTS-only / non-core-ngspice device menagerie
 
-**Source IDs:** scan of `src/components/**` files already modified in
-the fix-list work (visible in git status).
-**Ngspice counterpart:** mixed — some have ngspice equivalents
-(polarized-cap = diode + ideal-cap composition in ngspice), others do
-not (memristor, spark-gap).
+**Source:** full inventory of `src/components/{semiconductors,passives,
+sensors,active}/*.ts`, minus the devices already covered in F1/F2/F3
+(tunnel-diode, varactor, triode) and minus the trivially-equivalent
+primitives (resistor, capacitor, inductor, diode, BJT, MOSFET, JFET).
 
-**Proposed verdict:** **USER DECISION REQUIRED per device.** User
-reviews each and marks FIX (there's an ngspice equivalent, converge)
-or ACCEPT (digiTS-only, exclude from harness).
+Grouped by ngspice-parity feasibility. User marks each row FIX or
+ACCEPT (can batch-approve a subgroup). My recommendation is in the
+right column, for user override.
+
+#### F4a — Direct ngspice primitive exists (recommended FIX)
+
+For each of these, ngspice has a single primitive we can compare
+against bit-exact. "FIX" here means: parity harness covers the device,
+any invented slots are removed, the device's load path mirrors the
+ngspice source file.
+
+| Device | File | ngspice ref | Recommend |
+|---|---|---|---|
+| Schottky diode | `semiconductors/schottky.ts` | `dio/*` (parameter set) | FIX |
+| Zener diode | `semiconductors/zener.ts` | `dio/*` (breakdown params) | FIX |
+| Transmission line (lossless) | `passives/transmission-line.ts` | `tra/*` (T element) / `ltra/*` | FIX |
+| Analog switch (voltage-controlled) | `active/analog-switch.ts` | `sw/*` (VSWITCH) | FIX |
+| VCCS | `active/vccs.ts` | `vccs/*` (G source) | FIX |
+| VCVS | `active/vcvs.ts` | `vcvs/*` (E source) | FIX |
+| CCCS | `active/cccs.ts` | `cccs/*` (F source) | FIX |
+| CCVS | `active/ccvs.ts` | `ccvs/*` (H source) | FIX |
+| Potentiometer | `passives/potentiometer.ts` | `res/*` (two-resistor expansion or parameterized `res`) | FIX |
+| Transformer | `passives/transformer.ts` | coupled inductors `K<name> L1 L2 k` | FIX |
+| Tapped transformer | `passives/tapped-transformer.ts` | coupled inductors (K with tap) | FIX |
+
+#### F4b — Composite of ngspice primitives (recommended FIX)
+
+ngspice models these by composition, not as a single primitive.
+"FIX" here means: the digiTS component compiles to the same primitive
+composition ngspice would use, and parity is checked at the composite
+sub-circuit level.
+
+| Device | File | ngspice composition | Recommend |
+|---|---|---|---|
+| Polarized capacitor | `passives/polarized-cap.ts` | `cap/*` + `dio/*` (reverse-bias clamp) | FIX |
+| Crystal | `passives/crystal.ts` | series RLC + parallel C tank | FIX |
+| Optocoupler | `active/optocoupler.ts` | LED (diode) + phototransistor (BJT) | FIX |
+| LDR | `sensors/ldr.ts` | parameterized `res/*` | FIX |
+
+#### F4c — digiTS-only, no ngspice equivalent (recommended ACCEPT)
+
+ngspice has no core primitive and no conventional composition for
+these. Some have ngspice *subcircuit models* from vendors, but those
+are not part of `ref/ngspice/src/spicelib/devices/`. "ACCEPT" here
+means: harness excludes the device from parity comparison; tests for
+these devices are self-compare only (digiTS vs its own prior snapshot).
+
+| Device | File | Why no ngspice equivalent | Recommend |
+|---|---|---|---|
+| DIAC | `semiconductors/diac.ts` | not a core ngspice device | ACCEPT |
+| SCR | `semiconductors/scr.ts` | not a core ngspice device | ACCEPT |
+| TRIAC | `semiconductors/triac.ts` | not a core ngspice device | ACCEPT |
+| Memristor | `passives/memristor.ts` | not in ngspice at all | ACCEPT |
+| Analog fuse | `passives/analog-fuse.ts` | not in ngspice | ACCEPT |
+| Spark gap | `sensors/spark-gap.ts` | not in ngspice | ACCEPT |
+| NTC thermistor | `sensors/ntc-thermistor.ts` | behavioral, not in core ngspice | ACCEPT |
+| ADC | `active/adc.ts` | behavioral mixed-signal, not an ngspice primitive | ACCEPT |
+| DAC | `active/dac.ts` | behavioral mixed-signal, not an ngspice primitive | ACCEPT |
+| Comparator | `active/comparator.ts` | behavioral composite | ACCEPT |
+| Schmitt trigger | `active/schmitt-trigger.ts` | behavioral composite | ACCEPT |
+| OTA | `active/ota.ts` | typically subcircuit, no primitive | ACCEPT |
+| 555 timer | `active/timer-555.ts` | subcircuit library, no primitive | ACCEPT |
+| Opamp (ideal) | `active/opamp.ts` | behavioral; ngspice uses VCVS macromodel | ACCEPT |
+| Real opamp | `active/real-opamp.ts` | behavioral; ngspice uses subcircuit macromodel | ACCEPT |
+
+#### F4 constraint (ACCEPT items)
+
+For every ACCEPT item:
+1. The harness must assert the device is absent from any circuit
+   declared "bit-exact parity with ngspice".
+2. The device's state pool schema is free to contain invented slots
+   (since the comparison is self-compare) — but those slots do not leak
+   into the main comparison harness through any mapping/tolerance
+   mechanism.
+3. Tests for these devices cite "self-compare snapshot" explicitly. No
+   "equivalent to ngspice X" claims in comments or docs.
+
+#### F4 constraint (FIX items)
+
+For every FIX item in F4a/F4b:
+1. A1 (state-pool collapse) lands first — no new device-level slot
+   collapse work happens before A1's umbrella decision is executed.
+2. The cited ngspice reference file is the single source of truth for
+   load ordering, state layout, and sign conventions.
+3. Parity harness gets a dedicated test file per device comparing at
+   matrix-entry and state-slot granularity.
+
+**User action:** approve the recommendation column wholesale, or mark
+individual rows differently. Any batch is fine — typical shape is
+"approve all F4a as FIX, all F4b as FIX, all F4c as ACCEPT".
 
 ---
 

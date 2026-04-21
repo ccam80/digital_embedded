@@ -41,6 +41,22 @@ Never propose "pragmatic", "simple", "fastest", or "minimal" solutions. Always i
 
 When implementing or fixing any SPICE-derived algorithm (convergence, stamps, limiting, integration), match the corresponding ngspice source function exactly (e.g., `BJTconvTest`, `DIOload`). Provide a mapping table from ngspice variables to ours.
 
+### ngspice Parity Vocabulary — Banned Closing Verdicts
+
+When comparing digiTS against ngspice, the following words are banned as closing verdicts on any divergence:
+
+- *mapping* / *mapping table* — if you need one to declare equivalence, the item is architectural, not numerical
+- *tolerance* / *within tolerance* / *close enough* — strict bit-exact is the bar; if you can't meet it, escalate
+- *equivalent to* / *equivalent under* — if they're truly equivalent, they match bit-exact; otherwise they're not equivalent
+- *pre-existing* / *pre-existing failure* — an item being old does not make it acceptable
+- *intentional divergence* — every accepted divergence is an item in `spec/architectural-alignment.md`, not an in-line justification
+- *citation divergence* / *documentation hygiene* (used to close a numerical gap) — if the cited ngspice file differs from code behavior, either the code or the citation is wrong; neither is a doc-cleanup task
+- *partial* as a closing verdict on a parity item
+
+**Remedy when you would have used one of these words:** STOP and escalate. The item belongs in `spec/architectural-alignment.md` (architectural divergence) or `spec/fix-list-phase-2-audit.md` (numerical bug). Agents do not add items to `architectural-alignment.md` — that is a user action. Your escalation report includes: the cited ngspice file, the digiTS file, the specific quantities that differ, why you think it's architectural rather than numerical, and the user prompt needed to resolve it.
+
+Rationale: `spec/parity-forcing-function-plan.md` §1 documents how these words, used as closing verdicts, raised the tolerance floor across the project and sheltered real numerical bugs. Banning them at the vocabulary level prevents the drift.
+
 ### ngspice Comparison Harness — First Tool for Numerical Issues
 
 For ANY numerical discrepancy, convergence failure, or model correctness question, the **first step** is to compare per-NR-iteration internal node/branch values against ngspice using the instrumented test harness. Do not theorize about code differences — run the comparison and find the exact iteration where values diverge. See `docs/ngspice-harness-howto.md` for setup and usage. The harness captures per-iteration voltages, device states (`CKTstate0`), and convergence data from both engines side-by-side.
