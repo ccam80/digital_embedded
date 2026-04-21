@@ -44,7 +44,7 @@
 | Wave | Title | Status | Commit |
 |---|---|---|---|
 | W0 | Interface + LoadContext core | ✓ | 39ab73ca |
-| W1.1 | Diode family (diode + zener + F2 varactor→diode) | — | — |
+| W1.1 | Diode family (diode + zener + F2 varactor→diode) | ✓ | f8586dc6 |
 | W1.2 | BJT (L0 + L1) | — | — |
 | W1.3 | MOSFET (L1) + G1 sign convention | — | — |
 | W1.4 | JFET (N + P + fet-base collapse) | — | — |
