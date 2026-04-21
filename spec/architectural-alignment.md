@@ -83,7 +83,9 @@ PROPOSED → (user review) → APPROVED FIX  → (implementation) → LANDED
 | F1 | Tunnel-diode as separate device | PROPOSED ACCEPT |
 | F2 | Varactor as separate device vs ngspice diode-reuse | PROPOSED FIX |
 | F3 | Triode (vacuum tube) as a device | PROPOSED ACCEPT |
-| F4 | SCR / Triac / DIAC / memristor / crystal / transmission-line / tapped-transformer / analog-fuse / polarized-cap / NTC-thermistor / spark-gap | USER DECISION REQUIRED |
+| F4a | 11 devices with direct ngspice primitive (schottky, zener, T-line, VSWITCH, G/E/F/H sources, potentiometer, transformer, tapped-transformer) | **APPROVED FIX** (2026-04-21) |
+| F4b | 4 composite devices (polarized-cap, crystal, optocoupler, LDR) | **APPROVED FIX** (2026-04-21) |
+| F4c | 15 digiTS-only devices (DIAC, SCR, TRIAC, memristor, analog-fuse, spark-gap, NTC-thermistor, ADC, DAC, comparator, schmitt-trigger, OTA, 555 timer, opamp, real-opamp) | **APPROVED ACCEPT** (2026-04-21) |
 | G1 | MOSFET VSB/VBD sign convention vs ngspice MOS1vbs/MOS1vbd | PROPOSED FIX |
 | H1 | `ctx.loadCtx.limitingCollector` never synced by cktLoad | PROPOSED FIX |
 | H2 | `addDiagonalGmin` / `_needsReorder` ownership | PROPOSED FIX |
@@ -542,7 +544,11 @@ removed in Step 1).
 **Proposed verdict:** **ACCEPT.** Triode excluded from harness. No
 "VGS_JUNCTION ≈ ngspice something" claims.
 
-### F4. The digiTS-only / non-core-ngspice device menagerie
+### F4. The digiTS-only / non-core-ngspice device menagerie — **APPROVED** (2026-04-21) wholesale per subgroup
+
+F4a APPROVED FIX, F4b APPROVED FIX, F4c APPROVED ACCEPT. Breakdown below.
+
+
 
 **Source:** full inventory of `src/components/{semiconductors,passives,
 sensors,active}/*.ts`, minus the devices already covered in F1/F2/F3
