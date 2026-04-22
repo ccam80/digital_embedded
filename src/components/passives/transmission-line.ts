@@ -337,15 +337,7 @@ class SegmentInductorElement implements ReactiveAnalogElement {
   setParam(_key: string, _value: number): void {}
 
   private readonly L: number;
-  s0!: Float64Array;
-  s1!: Float64Array;
-  s2!: Float64Array;
-  s3!: Float64Array;
-  s4!: Float64Array;
-  s5!: Float64Array;
-  s6!: Float64Array;
-  s7!: Float64Array;
-  private base!: number;
+  private _pool!: StatePoolRef;
 
   constructor(nA: number, nB: number, branchIdx: number, inductance: number) {
     this.pinNodeIds = [nA, nB];
@@ -355,16 +347,8 @@ class SegmentInductorElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.states[0];
-    this.s1 = pool.states[1];
-    this.s2 = pool.states[2];
-    this.s3 = pool.states[3];
-    this.s4 = pool.states[4];
-    this.s5 = pool.states[5];
-    this.s6 = pool.states[6];
-    this.s7 = pool.states[7];
-    this.base = this.stateBaseOffset;
-    applyInitialValues(SEGMENT_INDUCTOR_SCHEMA, pool, this.base, {});
+    this._pool = pool;
+    applyInitialValues(SEGMENT_INDUCTOR_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
   load(ctx: LoadContext): void {
@@ -373,18 +357,22 @@ class SegmentInductorElement implements ReactiveAnalogElement {
     const nB = this.pinNodeIds[1];
     const b = this.branchIndex;
     const L = this.L;
-    const base = this.base;
+    const base = this.stateBaseOffset;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
     const iNow = ctx.voltages[b];
 
     // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
     const mode = ctx.cktMode;
     if (!(mode & (MODEDC | MODEINITPRED))) {
-      this.s0[base + SLOT_L_PHI] = L * iNow;
+      s0[base + SLOT_L_PHI] = L * iNow;
       if (mode & MODEINITTRAN) {
-        this.s1[base + SLOT_L_PHI] = this.s0[base + SLOT_L_PHI];
+        s1[base + SLOT_L_PHI] = s0[base + SLOT_L_PHI];
       }
     } else if (mode & MODEINITPRED) {
-      this.s0[base + SLOT_L_PHI] = this.s1[base + SLOT_L_PHI];
+      s0[base + SLOT_L_PHI] = s1[base + SLOT_L_PHI];
     }
 
     // Companion: zero at DC (indload.c:88-90), niIntegrate at TRAN.
@@ -392,11 +380,11 @@ class SegmentInductorElement implements ReactiveAnalogElement {
     let ceq = 0;
     if (!(mode & MODEDC)) {
       const ag = ctx.ag;
-      const phi0 = this.s0[base + SLOT_L_PHI];
-      const phi1 = this.s1[base + SLOT_L_PHI];
-      const phi2 = this.s2[base + SLOT_L_PHI];
-      const phi3 = this.s3[base + SLOT_L_PHI];
-      const ccapPrev = this.s1[base + SLOT_L_CCAP];
+      const phi0 = s0[base + SLOT_L_PHI];
+      const phi1 = s1[base + SLOT_L_PHI];
+      const phi2 = s2[base + SLOT_L_PHI];
+      const phi3 = s3[base + SLOT_L_PHI];
+      const ccapPrev = s1[base + SLOT_L_CCAP];
       const ni = niIntegrate(
         ctx.method,
         ctx.order,
@@ -408,15 +396,15 @@ class SegmentInductorElement implements ReactiveAnalogElement {
       );
       geq = ni.geq;
       ceq = ni.ceq;
-      this.s0[base + SLOT_L_CCAP] = ni.ccap;
+      s0[base + SLOT_L_CCAP] = ni.ccap;
       if (mode & MODEINITTRAN) {
-        this.s1[base + SLOT_L_CCAP] = ni.ccap;
+        s1[base + SLOT_L_CCAP] = ni.ccap;
       }
     }
 
-    this.s0[base + SLOT_GEQ]    = geq;
-    this.s0[base + SLOT_IEQ]    = ceq;
-    this.s0[base + SLOT_I_PREV] = iNow;
+    s0[base + SLOT_GEQ]    = geq;
+    s0[base + SLOT_IEQ]    = ceq;
+    s0[base + SLOT_I_PREV] = iNow;
 
     // Unconditional stamps — indload.c:119-123 literal. DC writes req=veq=0
     // to the allocated slots; the handle table preserves structural nonzeros.
@@ -455,15 +443,7 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
   setParam(_key: string, _value: number): void {}
 
   private readonly C: number;
-  s0!: Float64Array;
-  s1!: Float64Array;
-  s2!: Float64Array;
-  s3!: Float64Array;
-  s4!: Float64Array;
-  s5!: Float64Array;
-  s6!: Float64Array;
-  s7!: Float64Array;
-  private base!: number;
+  private _pool!: StatePoolRef;
 
   constructor(node: number, capacitance: number) {
     this.pinNodeIds = [node, 0];
@@ -472,16 +452,8 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.states[0];
-    this.s1 = pool.states[1];
-    this.s2 = pool.states[2];
-    this.s3 = pool.states[3];
-    this.s4 = pool.states[4];
-    this.s5 = pool.states[5];
-    this.s6 = pool.states[6];
-    this.s7 = pool.states[7];
-    this.base = this.stateBaseOffset;
-    applyInitialValues(SEGMENT_CAPACITOR_SCHEMA, pool, this.base, {});
+    this._pool = pool;
+    applyInitialValues(SEGMENT_CAPACITOR_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
   load(ctx: LoadContext): void {
@@ -491,22 +463,27 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
     const n0 = this.pinNodeIds[0];
     const vNow = n0 > 0 ? ctx.voltages[n0 - 1] : 0;
     const C = this.C;
+    const base = this.stateBaseOffset;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
 
     if (mode & MODETRAN) {
       const ag = ctx.ag;
       if (mode & MODEINITPRED) {
-        this.s0[this.base + SLOT_C_Q] = this.s1[this.base + SLOT_C_Q];
+        s0[base + SLOT_C_Q] = s1[base + SLOT_C_Q];
       } else {
-        this.s0[this.base + SLOT_C_Q] = C * vNow;
+        s0[base + SLOT_C_Q] = C * vNow;
         if (mode & MODEINITTRAN) {
-          this.s1[this.base + SLOT_C_Q] = this.s0[this.base + SLOT_C_Q];
+          s1[base + SLOT_C_Q] = s0[base + SLOT_C_Q];
         }
       }
-      const q0 = this.s0[this.base + SLOT_C_Q];
-      const q1 = this.s1[this.base + SLOT_C_Q];
-      const q2 = this.s2[this.base + SLOT_C_Q];
-      const q3 = this.s3[this.base + SLOT_C_Q];
-      const ccapPrev = this.s1[this.base + SLOT_C_CCAP];
+      const q0 = s0[base + SLOT_C_Q];
+      const q1 = s1[base + SLOT_C_Q];
+      const q2 = s2[base + SLOT_C_Q];
+      const q3 = s3[base + SLOT_C_Q];
+      const ccapPrev = s1[base + SLOT_C_CCAP];
       const { ccap, ceq, geq } = niIntegrate(
         ctx.method,
         ctx.order,
@@ -517,28 +494,30 @@ class SegmentCapacitorElement implements ReactiveAnalogElement {
         ccapPrev,
       );
       if (mode & MODEINITTRAN) {
-        this.s1[this.base + SLOT_C_CCAP] = ccap;
+        s1[base + SLOT_C_CCAP] = ccap;
       }
-      this.s0[this.base + SLOT_C_CCAP] = ccap;
-      this.s0[this.base + SLOT_GEQ]    = geq;
-      this.s0[this.base + SLOT_IEQ]    = ceq;
-      this.s0[this.base + SLOT_V_PREV] = vNow;
+      s0[base + SLOT_C_CCAP] = ccap;
+      s0[base + SLOT_GEQ]    = geq;
+      s0[base + SLOT_IEQ]    = ceq;
+      s0[base + SLOT_V_PREV] = vNow;
       if (n0 !== 0) {
         solver.stampElement(solver.allocElement(n0 - 1, n0 - 1), geq);
         solver.stampRHS(n0 - 1, -ceq);
       }
     } else {
-      this.s0[this.base + SLOT_C_Q]    = C * vNow;
-      this.s0[this.base + SLOT_V_PREV] = vNow;
-      this.s0[this.base + SLOT_GEQ]    = 0;
-      this.s0[this.base + SLOT_IEQ]    = 0;
+      s0[base + SLOT_C_Q]    = C * vNow;
+      s0[base + SLOT_V_PREV] = vNow;
+      s0[base + SLOT_GEQ]    = 0;
+      s0[base + SLOT_IEQ]    = 0;
     }
   }
 
   getPinCurrents(voltages: Float64Array): number[] {
     const n0 = this.pinNodeIds[0];
     const v = n0 > 0 ? voltages[n0 - 1] : 0;
-    const I = this.s0[this.base + SLOT_GEQ] * v + this.s0[this.base + SLOT_IEQ];
+    const base = this.stateBaseOffset;
+    const s0 = this._pool.states[0];
+    const I = s0[base + SLOT_GEQ] * v + s0[base + SLOT_IEQ];
     return [I, -I];
   }
 }
@@ -567,15 +546,7 @@ class CombinedRLElement implements ReactiveAnalogElement {
 
   private readonly R: number;
   private readonly L: number;
-  s0!: Float64Array;
-  s1!: Float64Array;
-  s2!: Float64Array;
-  s3!: Float64Array;
-  s4!: Float64Array;
-  s5!: Float64Array;
-  s6!: Float64Array;
-  s7!: Float64Array;
-  private base!: number;
+  private _pool!: StatePoolRef;
 
   constructor(nA: number, nB: number, branchIdx: number, resistance: number, inductance: number) {
     this.pinNodeIds = [nA, nB];
@@ -586,16 +557,8 @@ class CombinedRLElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.states[0];
-    this.s1 = pool.states[1];
-    this.s2 = pool.states[2];
-    this.s3 = pool.states[3];
-    this.s4 = pool.states[4];
-    this.s5 = pool.states[5];
-    this.s6 = pool.states[6];
-    this.s7 = pool.states[7];
-    this.base = this.stateBaseOffset;
-    applyInitialValues(COMBINED_RL_SCHEMA, pool, this.base, {});
+    this._pool = pool;
+    applyInitialValues(COMBINED_RL_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
   load(ctx: LoadContext): void {
@@ -604,18 +567,22 @@ class CombinedRLElement implements ReactiveAnalogElement {
     const nB = this.pinNodeIds[1];
     const b = this.branchIndex;
     const L = this.L;
-    const base = this.base;
+    const base = this.stateBaseOffset;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
     const iNow = ctx.voltages[b];
 
     // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
     const mode = ctx.cktMode;
     if (!(mode & (MODEDC | MODEINITPRED))) {
-      this.s0[base + SLOT_RL_PHI] = L * iNow;
+      s0[base + SLOT_RL_PHI] = L * iNow;
       if (mode & MODEINITTRAN) {
-        this.s1[base + SLOT_RL_PHI] = this.s0[base + SLOT_RL_PHI];
+        s1[base + SLOT_RL_PHI] = s0[base + SLOT_RL_PHI];
       }
     } else if (mode & MODEINITPRED) {
-      this.s0[base + SLOT_RL_PHI] = this.s1[base + SLOT_RL_PHI];
+      s0[base + SLOT_RL_PHI] = s1[base + SLOT_RL_PHI];
     }
 
     // Companion: zero at DC (indload.c:88-90), niIntegrate at TRAN.
@@ -623,11 +590,11 @@ class CombinedRLElement implements ReactiveAnalogElement {
     let ceq = 0;
     if (!(mode & MODEDC)) {
       const ag = ctx.ag;
-      const phi0 = this.s0[base + SLOT_RL_PHI];
-      const phi1 = this.s1[base + SLOT_RL_PHI];
-      const phi2 = this.s2[base + SLOT_RL_PHI];
-      const phi3 = this.s3[base + SLOT_RL_PHI];
-      const ccapPrev = this.s1[base + SLOT_RL_CCAP];
+      const phi0 = s0[base + SLOT_RL_PHI];
+      const phi1 = s1[base + SLOT_RL_PHI];
+      const phi2 = s2[base + SLOT_RL_PHI];
+      const phi3 = s3[base + SLOT_RL_PHI];
+      const ccapPrev = s1[base + SLOT_RL_CCAP];
       const ni = niIntegrate(
         ctx.method,
         ctx.order,
@@ -639,15 +606,15 @@ class CombinedRLElement implements ReactiveAnalogElement {
       );
       geq = ni.geq;
       ceq = ni.ceq;
-      this.s0[base + SLOT_RL_CCAP] = ni.ccap;
+      s0[base + SLOT_RL_CCAP] = ni.ccap;
       if (mode & MODEINITTRAN) {
-        this.s1[base + SLOT_RL_CCAP] = ni.ccap;
+        s1[base + SLOT_RL_CCAP] = ni.ccap;
       }
     }
 
-    this.s0[base + SLOT_GEQ]    = geq;
-    this.s0[base + SLOT_IEQ]    = ceq;
-    this.s0[base + SLOT_I_PREV] = iNow;
+    s0[base + SLOT_GEQ]    = geq;
+    s0[base + SLOT_IEQ]    = ceq;
+    s0[base + SLOT_I_PREV] = iNow;
 
     // Unconditional stamps — indload.c:119-123 plus the constant -R on branch
     // diagonal. Branch equation: V(A) - V(B) - (R + geq)·I = ceq.
@@ -682,14 +649,7 @@ export class TransmissionLineElement implements AnalogElement {
   stateSize: number = 0;
   stateBaseOffset = -1;
   readonly stateSchema: StateSchema;
-  s0!: Float64Array;
-  s1!: Float64Array;
-  s2!: Float64Array;
-  s3!: Float64Array;
-  s4!: Float64Array;
-  s5!: Float64Array;
-  s6!: Float64Array;
-  s7!: Float64Array;
+  private _pool!: StatePoolRef;
   setParam(_key: string, _value: number): void {}
 
   private readonly _subElements: AnalogElement[];
@@ -790,14 +750,7 @@ export class TransmissionLineElement implements AnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.states[0];
-    this.s1 = pool.states[1];
-    this.s2 = pool.states[2];
-    this.s3 = pool.states[3];
-    this.s4 = pool.states[4];
-    this.s5 = pool.states[5];
-    this.s6 = pool.states[6];
-    this.s7 = pool.states[7];
+    this._pool = pool;
     let offset = this.stateBaseOffset;
     for (const el of this._subElements) {
       if (el.isReactive) {
@@ -805,16 +758,6 @@ export class TransmissionLineElement implements AnalogElement {
         re.stateBaseOffset = offset;
         re.initState(pool);
         offset += re.stateSize;
-      }
-    }
-  }
-
-  refreshSubElementRefs(s0: Float64Array, s1: Float64Array, s2: Float64Array, s3: Float64Array, s4: Float64Array, s5: Float64Array, s6: Float64Array, s7: Float64Array): void {
-    for (const el of this._subElements) {
-      if (el.isReactive) {
-        const re = el as any;
-        re.s0 = s0; re.s1 = s1; re.s2 = s2; re.s3 = s3;
-        re.s4 = s4; re.s5 = s5; re.s6 = s6; re.s7 = s7;
       }
     }
   }
@@ -829,16 +772,20 @@ export class TransmissionLineElement implements AnalogElement {
     let minDt = Infinity;
     const SLOT_Q_PHI = 3;
     const SLOT_CCAP_SUB = 4;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
     for (const el of this._subElements) {
       if (!el.isReactive) continue;
-      const re = el as any;
+      const re = el as ReactiveAnalogElement;
       const base = re.stateBaseOffset;
-      const ccap0 = re.s0[base + SLOT_CCAP_SUB];
-      const ccap1 = re.s1[base + SLOT_CCAP_SUB];
-      const q0 = re.s0[base + SLOT_Q_PHI];
-      const q1 = re.s1[base + SLOT_Q_PHI];
-      const q2 = re.s2[base + SLOT_Q_PHI];
-      const q3 = re.s3[base + SLOT_Q_PHI];
+      const ccap0 = s0[base + SLOT_CCAP_SUB];
+      const ccap1 = s1[base + SLOT_CCAP_SUB];
+      const q0 = s0[base + SLOT_Q_PHI];
+      const q1 = s1[base + SLOT_Q_PHI];
+      const q2 = s2[base + SLOT_Q_PHI];
+      const q3 = s3[base + SLOT_Q_PHI];
       const proposed = cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
       if (proposed < minDt) minDt = proposed;
     }

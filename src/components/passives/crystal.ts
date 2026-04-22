@@ -260,16 +260,8 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   private C_s: number;
   private C_0: number;
 
-  // Pool references — bound in initState()
-  s0!: Float64Array;
-  s1!: Float64Array;
-  s2!: Float64Array;
-  s3!: Float64Array;
-  s4!: Float64Array;
-  s5!: Float64Array;
-  s6!: Float64Array;
-  s7!: Float64Array;
-  private base!: number;
+  // Pool reference — set by initState(); state arrays accessed via pool.states[N] at call time.
+  private _pool!: StatePoolRef;
 
   /**
    * @param pinNodeIds - [n_A, n_B, n1, n2] where n1 and n2 are internal nodes
@@ -297,16 +289,8 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.states[0];
-    this.s1 = pool.states[1];
-    this.s2 = pool.states[2];
-    this.s3 = pool.states[3];
-    this.s4 = pool.states[4];
-    this.s5 = pool.states[5];
-    this.s6 = pool.states[6];
-    this.s7 = pool.states[7];
-    this.base = this.stateBaseOffset;
-    applyInitialValues(CRYSTAL_SCHEMA, pool, this.base, {});
+    this._pool = pool;
+    applyInitialValues(CRYSTAL_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
   updateDerivedParams(Rs: number, Ls: number, Cs: number, C0: number): void {
@@ -334,7 +318,7 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     const n1 = this.pinNodeIds[2];
     const n2 = this.pinNodeIds[3];
     const b = this.branchIndex;
-    const base = this.base;
+    const base = this.stateBaseOffset;
 
     // R_s conductance (nA ↔ n1).
     stampG(solver, nA, nA, this.G_s);
@@ -351,6 +335,10 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
 
     if (!(mode & (MODETRAN | MODETRANOP))) return;
 
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+
     const iNow = voltages[b];
     const vA = nA > 0 ? voltages[nA - 1] : 0;
     const vBv = nB > 0 ? voltages[nB - 1] : 0;
@@ -361,78 +349,78 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     if (mode & MODETRAN) {
       // L_s flux update.
       if (mode & MODEINITPRED) {
-        this.s0[base + SLOT_PHI_L] = this.s1[base + SLOT_PHI_L];
+        s0[base + SLOT_PHI_L] = s1[base + SLOT_PHI_L];
       } else {
-        this.s0[base + SLOT_PHI_L] = this.L_s * iNow;
+        s0[base + SLOT_PHI_L] = this.L_s * iNow;
         if (mode & MODEINITTRAN) {
-          this.s1[base + SLOT_PHI_L] = this.s0[base + SLOT_PHI_L];
+          s1[base + SLOT_PHI_L] = s0[base + SLOT_PHI_L];
         }
       }
       // C_s charge update.
       if (mode & MODEINITPRED) {
-        this.s0[base + SLOT_Q_CS] = this.s1[base + SLOT_Q_CS];
+        s0[base + SLOT_Q_CS] = s1[base + SLOT_Q_CS];
       } else {
-        this.s0[base + SLOT_Q_CS] = this.C_s * vCs;
+        s0[base + SLOT_Q_CS] = this.C_s * vCs;
         if (mode & MODEINITTRAN) {
-          this.s1[base + SLOT_Q_CS] = this.s0[base + SLOT_Q_CS];
+          s1[base + SLOT_Q_CS] = s0[base + SLOT_Q_CS];
         }
       }
       // C_0 charge update.
       if (mode & MODEINITPRED) {
-        this.s0[base + SLOT_Q_C0] = this.s1[base + SLOT_Q_C0];
+        s0[base + SLOT_Q_C0] = s1[base + SLOT_Q_C0];
       } else {
-        this.s0[base + SLOT_Q_C0] = this.C_0 * vC0;
+        s0[base + SLOT_Q_C0] = this.C_0 * vC0;
         if (mode & MODEINITTRAN) {
-          this.s1[base + SLOT_Q_C0] = this.s0[base + SLOT_Q_C0];
+          s1[base + SLOT_Q_C0] = s0[base + SLOT_Q_C0];
         }
       }
 
       // NIintegrate for L_s flux.
-      const phiL_0 = this.s0[base + SLOT_PHI_L];
-      const phiL_1 = this.s1[base + SLOT_PHI_L];
+      const phiL_0 = s0[base + SLOT_PHI_L];
+      const phiL_1 = s1[base + SLOT_PHI_L];
       let ccapL: number;
       if (ctx.order >= 2 && ag.length > 2) {
-        ccapL = ag[0] * phiL_0 + ag[1] * phiL_1 + ag[2] * this.s2[base + SLOT_PHI_L];
+        ccapL = ag[0] * phiL_0 + ag[1] * phiL_1 + ag[2] * s2[base + SLOT_PHI_L];
       } else {
         ccapL = ag[0] * phiL_0 + ag[1] * phiL_1;
       }
-      this.s0[base + SLOT_CCAP_L] = ccapL;
+      s0[base + SLOT_CCAP_L] = ccapL;
       const geqL = ag[0] * this.L_s;
       const ceqL = ccapL - ag[0] * phiL_0;
       if (mode & MODEINITTRAN) {
-        this.s1[base + SLOT_CCAP_L] = ccapL;
+        s1[base + SLOT_CCAP_L] = ccapL;
       }
 
       // NIintegrate for C_s charge.
-      const qCs_0 = this.s0[base + SLOT_Q_CS];
-      const qCs_1 = this.s1[base + SLOT_Q_CS];
+      const qCs_0 = s0[base + SLOT_Q_CS];
+      const qCs_1 = s1[base + SLOT_Q_CS];
       let ccapCs: number;
       if (ctx.order >= 2 && ag.length > 2) {
-        ccapCs = ag[0] * qCs_0 + ag[1] * qCs_1 + ag[2] * this.s2[base + SLOT_Q_CS];
+        ccapCs = ag[0] * qCs_0 + ag[1] * qCs_1 + ag[2] * s2[base + SLOT_Q_CS];
       } else {
         ccapCs = ag[0] * qCs_0 + ag[1] * qCs_1;
       }
-      this.s0[base + SLOT_CCAP_CS] = ccapCs;
+      s0[base + SLOT_CCAP_CS] = ccapCs;
       const geqCs = ag[0] * this.C_s;
       const ceqCs = ccapCs - ag[0] * qCs_0;
       if (mode & MODEINITTRAN) {
-        this.s1[base + SLOT_CCAP_CS] = ccapCs;
+        s1[base + SLOT_CCAP_CS] = ccapCs;
       }
 
       // NIintegrate for C_0 charge.
-      const qC0_0 = this.s0[base + SLOT_Q_C0];
-      const qC0_1 = this.s1[base + SLOT_Q_C0];
+      const qC0_0 = s0[base + SLOT_Q_C0];
+      const qC0_1 = s1[base + SLOT_Q_C0];
       let ccapC0: number;
       if (ctx.order >= 2 && ag.length > 2) {
-        ccapC0 = ag[0] * qC0_0 + ag[1] * qC0_1 + ag[2] * this.s2[base + SLOT_Q_C0];
+        ccapC0 = ag[0] * qC0_0 + ag[1] * qC0_1 + ag[2] * s2[base + SLOT_Q_C0];
       } else {
         ccapC0 = ag[0] * qC0_0 + ag[1] * qC0_1;
       }
-      this.s0[base + SLOT_CCAP_C0] = ccapC0;
+      s0[base + SLOT_CCAP_C0] = ccapC0;
       const geqC0 = ag[0] * this.C_0;
       const ceqC0 = ccapC0 - ag[0] * qC0_0;
       if (mode & MODEINITTRAN) {
-        this.s1[base + SLOT_CCAP_C0] = ccapC0;
+        s1[base + SLOT_CCAP_C0] = ccapC0;
       }
 
       // L_s companion stamp on branch row.
@@ -456,29 +444,29 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
       if (nB !== 0) solver.stampRHS(nB - 1, ceqC0);
 
       // Cache.
-      this.s0[base + SLOT_GEQ_L]  = geqL;
-      this.s0[base + SLOT_IEQ_L]  = ceqL;
-      this.s0[base + SLOT_I_L]    = iNow;
-      this.s0[base + SLOT_GEQ_CS] = geqCs;
-      this.s0[base + SLOT_IEQ_CS] = ceqCs;
-      this.s0[base + SLOT_V_CS]   = vCs;
-      this.s0[base + SLOT_GEQ_C0] = geqC0;
-      this.s0[base + SLOT_IEQ_C0] = ceqC0;
-      this.s0[base + SLOT_V_C0]   = vC0;
+      s0[base + SLOT_GEQ_L]  = geqL;
+      s0[base + SLOT_IEQ_L]  = ceqL;
+      s0[base + SLOT_I_L]    = iNow;
+      s0[base + SLOT_GEQ_CS] = geqCs;
+      s0[base + SLOT_IEQ_CS] = ceqCs;
+      s0[base + SLOT_V_CS]   = vCs;
+      s0[base + SLOT_GEQ_C0] = geqC0;
+      s0[base + SLOT_IEQ_C0] = ceqC0;
+      s0[base + SLOT_V_C0]   = vC0;
     } else {
       // DC-OP: just store, no reactive stamps.
-      this.s0[base + SLOT_PHI_L] = this.L_s * iNow;
-      this.s0[base + SLOT_Q_CS]  = this.C_s * vCs;
-      this.s0[base + SLOT_Q_C0]  = this.C_0 * vC0;
-      this.s0[base + SLOT_I_L]   = iNow;
-      this.s0[base + SLOT_V_CS]  = vCs;
-      this.s0[base + SLOT_V_C0]  = vC0;
-      this.s0[base + SLOT_GEQ_L]  = 0;
-      this.s0[base + SLOT_IEQ_L]  = 0;
-      this.s0[base + SLOT_GEQ_CS] = 0;
-      this.s0[base + SLOT_IEQ_CS] = 0;
-      this.s0[base + SLOT_GEQ_C0] = 0;
-      this.s0[base + SLOT_IEQ_C0] = 0;
+      s0[base + SLOT_PHI_L] = this.L_s * iNow;
+      s0[base + SLOT_Q_CS]  = this.C_s * vCs;
+      s0[base + SLOT_Q_C0]  = this.C_0 * vC0;
+      s0[base + SLOT_I_L]   = iNow;
+      s0[base + SLOT_V_CS]  = vCs;
+      s0[base + SLOT_V_C0]  = vC0;
+      s0[base + SLOT_GEQ_L]  = 0;
+      s0[base + SLOT_IEQ_L]  = 0;
+      s0[base + SLOT_GEQ_CS] = 0;
+      s0[base + SLOT_IEQ_CS] = 0;
+      s0[base + SLOT_GEQ_C0] = 0;
+      s0[base + SLOT_IEQ_C0] = 0;
     }
   }
 
@@ -495,8 +483,10 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
 
     // C_0 shunt current flowing into pin A: I = geqC0 * (vA - vB) + ieqC0
     const vB = nB > 0 ? voltages[nB - 1] : 0;
-    const geqC0 = this.s0[this.base + SLOT_GEQ_C0];
-    const ieqC0 = this.s0[this.base + SLOT_IEQ_C0];
+    const s0 = this._pool.states[0];
+    const base = this.stateBaseOffset;
+    const geqC0 = s0[base + SLOT_GEQ_C0];
+    const ieqC0 = s0[base + SLOT_IEQ_C0];
     const iShunt = geqC0 * (vA - vB) + ieqC0;
 
     // Total current into pin A = motional arm current + shunt current
@@ -511,31 +501,37 @@ export class AnalogCrystalElement implements ReactiveAnalogElement {
     method: IntegrationMethod,
     lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
   ): number {
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
+    const base = this.stateBaseOffset;
+
     // L_s (flux-based): use stored ccap from s0 and s1
-    const phi0 = this.s0[this.base + SLOT_PHI_L];
-    const phi1 = this.s1[this.base + SLOT_PHI_L];
-    const phi2 = this.s2[this.base + SLOT_PHI_L];
-    const phi3 = this.s3[this.base + SLOT_PHI_L];
-    const ccap0L = this.s0[this.base + SLOT_CCAP_L];
-    const ccap1L = this.s1[this.base + SLOT_CCAP_L];
+    const phi0 = s0[base + SLOT_PHI_L];
+    const phi1 = s1[base + SLOT_PHI_L];
+    const phi2 = s2[base + SLOT_PHI_L];
+    const phi3 = s3[base + SLOT_PHI_L];
+    const ccap0L = s0[base + SLOT_CCAP_L];
+    const ccap1L = s1[base + SLOT_CCAP_L];
     const dtL = cktTerr(dt, deltaOld, order, method, phi0, phi1, phi2, phi3, ccap0L, ccap1L, lteParams);
 
     // C_s (charge-based): use stored ccap from s0 and s1
-    const qCs0 = this.s0[this.base + SLOT_Q_CS];
-    const qCs1 = this.s1[this.base + SLOT_Q_CS];
-    const qCs2 = this.s2[this.base + SLOT_Q_CS];
-    const qCs3 = this.s3[this.base + SLOT_Q_CS];
-    const ccap0Cs = this.s0[this.base + SLOT_CCAP_CS];
-    const ccap1Cs = this.s1[this.base + SLOT_CCAP_CS];
+    const qCs0 = s0[base + SLOT_Q_CS];
+    const qCs1 = s1[base + SLOT_Q_CS];
+    const qCs2 = s2[base + SLOT_Q_CS];
+    const qCs3 = s3[base + SLOT_Q_CS];
+    const ccap0Cs = s0[base + SLOT_CCAP_CS];
+    const ccap1Cs = s1[base + SLOT_CCAP_CS];
     const dtCs = cktTerr(dt, deltaOld, order, method, qCs0, qCs1, qCs2, qCs3, ccap0Cs, ccap1Cs, lteParams);
 
     // C_0 (charge-based): use stored ccap from s0 and s1
-    const qC00 = this.s0[this.base + SLOT_Q_C0];
-    const qC01 = this.s1[this.base + SLOT_Q_C0];
-    const qC02 = this.s2[this.base + SLOT_Q_C0];
-    const qC03 = this.s3[this.base + SLOT_Q_C0];
-    const ccap0C0 = this.s0[this.base + SLOT_CCAP_C0];
-    const ccap1C0 = this.s1[this.base + SLOT_CCAP_C0];
+    const qC00 = s0[base + SLOT_Q_C0];
+    const qC01 = s1[base + SLOT_Q_C0];
+    const qC02 = s2[base + SLOT_Q_C0];
+    const qC03 = s3[base + SLOT_Q_C0];
+    const ccap0C0 = s0[base + SLOT_CCAP_C0];
+    const ccap1C0 = s1[base + SLOT_CCAP_C0];
     const dtC0 = cktTerr(dt, deltaOld, order, method, qC00, qC01, qC02, qC03, ccap0C0, ccap1C0, lteParams);
 
     return Math.min(dtL, dtCs, dtC0);
