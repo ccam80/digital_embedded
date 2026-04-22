@@ -1008,9 +1008,9 @@ export function createBjtElement(
 // State schema — BJT SPICE L1. Only the slots that have direct ngspice
 // correspondences survive the W1.2 excision. bjtdefs.h offsets:
 //   BJTvbe=0, BJTvbc=1, BJTcc=2, BJTcb=3, BJTgpi=4, BJTgmu=5, BJTgm=6,
-//   BJTgo=7, BJTqbe=8, BJTcqbe=9, BJTqbc=10, BJTcqbc=11, BJTqcs=12,
-//   BJTcqcs=13, BJTqbx=14, BJTcqbx=15, BJTgx=16, BJTcexbc=17, BJTgeqcb=18,
-//   BJTgccs=19, BJTgeqbx=20, BJTvsub=21, BJTgdsub=22, BJTcdsub=23.
+//   BJTgo=7, BJTqbe=8, BJTcqbe=9, BJTqbc=10, BJTcqbc=11, BJTqsub=12,
+//   BJTcqsub=13, BJTqbx=14, BJTcqbx=15, BJTgx=16, BJTcexbc=17, BJTgeqcb=18,
+//   BJTgccs=19, BJTgeqbx=20, BJTvsub=21, BJTcdsub=22, BJTgdsub=23.
 //
 // Invented cross-method cap slots (W1.2 A1 excision):
 //   - CAP_GEQ_BE / CAP_IEQ_BE
@@ -1020,8 +1020,8 @@ export function createBjtElement(
 // All deleted. The lumping goes inline into gpi/gmu/cc/cb per bjtload.c:725-734.
 //
 // Ngspice-correspondent slots kept (in bjtdefs.h order):
-//   VBE, VBC, CC, CB, GPI, GMU, GM, GO, QBE, CQBE, QBC, CQBC, QCS, CQCS,
-//   QBX, CQBX, CEXBC, GEQCB, GDSUB, CDSUB, VSUB
+//   VBE, VBC, CC, CB, GPI, GMU, GM, GO, QBE, CQBE, QBC, CQBC, QSUB, CQSUB,
+//   QBX, CQBX, CEXBC, GEQCB, CDSUB, GDSUB, VSUB
 // ---------------------------------------------------------------------------
 
 export const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element", [
@@ -1037,8 +1037,8 @@ export const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element",
   { name: "CQBE",  doc: "bjtdefs.h BJTcqbe=9 (NIintegrate ccap)",   init: { kind: "zero" } },
   { name: "QBC",   doc: "bjtdefs.h BJTqbc=10 (bjtload.c:634-642)",  init: { kind: "zero" } },
   { name: "CQBC",  doc: "bjtdefs.h BJTcqbc=11",                     init: { kind: "zero" } },
-  { name: "QCS",   doc: "bjtdefs.h BJTqcs=12",                      init: { kind: "zero" } },
-  { name: "CQCS",  doc: "bjtdefs.h BJTcqcs=13",                     init: { kind: "zero" } },
+  { name: "QSUB",  doc: "bjtdefs.h BJTqsub=12",                     init: { kind: "zero" } },
+  { name: "CQSUB", doc: "bjtdefs.h BJTcqsub=13",                    init: { kind: "zero" } },
   { name: "QBX",   doc: "bjtdefs.h BJTqbx=14 (bjtload.c:646-654)",  init: { kind: "zero" } },
   { name: "CQBX",  doc: "bjtdefs.h BJTcqbx=15",                     init: { kind: "zero" } },
   { name: "GX",    doc: "bjtdefs.h BJTgx=16 (base-resistance cond)",init: { kind: "fromParams", compute: (_p) => _p["RB"] > 0 ? 1 / _p["RB"] : 0 } },
@@ -1047,8 +1047,8 @@ export const BJT_L1_SCHEMA: StateSchema = defineStateSchema("BjtSpiceL1Element",
   { name: "GCSUB", doc: "bjtdefs.h BJTgccs=19 subst cap cond",      init: { kind: "zero" } },
   { name: "GEQBX", doc: "bjtdefs.h BJTgeqbx=20 B-X cap cond",       init: { kind: "zero" } },
   { name: "VSUB",  doc: "bjtdefs.h BJTvsub=21",                     init: { kind: "zero" } },
-  { name: "GDSUB", doc: "bjtdefs.h BJTgdsub=22",                    init: { kind: "zero" } },
-  { name: "CDSUB", doc: "bjtdefs.h BJTcdsub=23",                    init: { kind: "zero" } },
+  { name: "CDSUB", doc: "bjtdefs.h BJTcdsub=22",                    init: { kind: "zero" } },
+  { name: "GDSUB", doc: "bjtdefs.h BJTgdsub=23",                    init: { kind: "zero" } },
 ]);
 
 // ---------------------------------------------------------------------------
@@ -1164,8 +1164,8 @@ export function createSpiceL1BjtElement(
   const SLOT_CQBE = 9;
   const SLOT_QBC = 10;
   const SLOT_CQBC = 11;
-  const SLOT_QCS = 12;
-  const SLOT_CQCS = 13;
+  const SLOT_QSUB = 12;
+  const SLOT_CQSUB = 13;
   const SLOT_QBX = 14;
   const SLOT_CQBX = 15;
   const SLOT_GX  = 16;
@@ -1174,8 +1174,8 @@ export function createSpiceL1BjtElement(
   const SLOT_GCSUB = 19;
   const SLOT_GEQBX = 20;
   const SLOT_VSUB  = 21;
-  const SLOT_GDSUB = 22;
-  const SLOT_CDSUB = 23;
+  const SLOT_CDSUB = 22;
+  const SLOT_GDSUB = 23;
 
   let pool: StatePoolRef;
   let base: number;
@@ -1434,7 +1434,7 @@ export function createSpiceL1BjtElement(
       let geqbx = 0;
       let gcsub = 0;
       // ceqbx and ceqsub are computed at RHS-stamp time (bjtload.c:799-802)
-      // using the stored CQCS/CQBX state. No init needed here.
+      // using the stored CQSUB/CQBX state. No init needed here.
 
       const capBlockGate = (mode & (MODETRAN | MODEAC)) !== 0
                         || ((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0)
@@ -1534,7 +1534,7 @@ export function createSpiceL1BjtElement(
           capbx = czbxf2 * (f3c + xmc * vbxRaw / pc);
         }
 
-        // bjtload.c:655-665: QCS + capsub.
+        // bjtload.c:655-665: QSUB + capsub.
         let qcs: number;
         if (vsubLimited < 0) {
           const arg = 1 - vsubLimited / ps;
@@ -1549,14 +1549,14 @@ export function createSpiceL1BjtElement(
         s0[base + SLOT_QBE] = qbe;
         s0[base + SLOT_QBC] = qbc;
         s0[base + SLOT_QBX] = qbx;
-        s0[base + SLOT_QCS] = qcs;
+        s0[base + SLOT_QSUB] = qcs;
 
         // bjtload.c:674-703: MODEINITSMSIG store-back (and NOT transOP&&UIC).
         if ((mode & MODEINITSMSIG) !== 0 &&
             !((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0)) {
           s0[base + SLOT_CQBE] = capbe;
           s0[base + SLOT_CQBC] = capbc;
-          s0[base + SLOT_CQCS] = capsub;
+          s0[base + SLOT_CQSUB] = capsub;
           s0[base + SLOT_CQBX] = capbx;
           s0[base + SLOT_CEXBC] = geqcb;
           // bjtload.c:703 `continue` — skip NIintegrate + stamps for smsig.
@@ -1584,7 +1584,7 @@ export function createSpiceL1BjtElement(
           s1[base + SLOT_QBE] = qbe;
           s1[base + SLOT_QBC] = qbc;
           s1[base + SLOT_QBX] = qbx;
-          s1[base + SLOT_QCS] = qcs;
+          s1[base + SLOT_QSUB] = qcs;
         }
 
         // bjtload.c:725-734: NIintegrate (B-E, B-C) + geqcb scaled by ag[0].
@@ -1639,15 +1639,15 @@ export function createSpiceL1BjtElement(
           // These stay as separate stamps (bjtload.c:823,838-842), not lumped
           // into gpi/gmu.
           {
-            const ccapPrev = s1[base + SLOT_CQCS];
-            const q2 = s2[base + SLOT_QCS];
-            const q3 = s3[base + SLOT_QCS];
+            const ccapPrev = s1[base + SLOT_CQSUB];
+            const q2 = s2[base + SLOT_QSUB];
+            const q3 = s3[base + SLOT_QSUB];
             const { ccap, geq } = niIntegrate(
               ctx.method, ctx.order, capsub, ag,
-              qcs, s1[base + SLOT_QCS],
+              qcs, s1[base + SLOT_QSUB],
               [q2, q3, 0, 0, 0], ccapPrev,
             );
-            s0[base + SLOT_CQCS] = ccap;
+            s0[base + SLOT_CQSUB] = ccap;
             gcsub = geq;
           }
           {
@@ -1664,7 +1664,7 @@ export function createSpiceL1BjtElement(
           }
           if (mode & MODEINITTRAN) {
             s1[base + SLOT_CQBX] = s0[base + SLOT_CQBX];
-            s1[base + SLOT_CQCS] = s0[base + SLOT_CQCS];
+            s1[base + SLOT_CQSUB] = s0[base + SLOT_CQSUB];
           }
         }
         // End cap block.
@@ -1690,7 +1690,7 @@ export function createSpiceL1BjtElement(
 
       // bjtload.c:798-805: compute ceq RHS entries (using lumped gpi/gmu/cc/cb).
       const geqsub = gcsub + gdsub;
-      const ceqsub = polarity * subs * (s0[base + SLOT_CQCS] + cdsub - vsubLimited * geqsub);
+      const ceqsub = polarity * subs * (s0[base + SLOT_CQSUB] + cdsub - vsubLimited * geqsub);
       const ceqbx = polarity * (s0[base + SLOT_CQBX] - vbxRaw * geqbx);
       const ceqbe = polarity * (cc + cb - vbeLimited * (gm + go + gpi) + vbcLimited * (go - geqcb));
       const ceqbc = polarity * (-cc + vbeLimited * (gm + go) - vbcLimited * (gmu + go));
@@ -1811,8 +1811,8 @@ export function createSpiceL1BjtElement(
       }
       if (tp.tSubSatCur > 0) {
         const dtCS = cktTerr(dt, deltaOld, order, method,
-          s0[base + SLOT_QCS], s1[base + SLOT_QCS], s2[base + SLOT_QCS], s3[base + SLOT_QCS],
-          s0[base + SLOT_CQCS], s1[base + SLOT_CQCS], lteParams);
+          s0[base + SLOT_QSUB], s1[base + SLOT_QSUB], s2[base + SLOT_QSUB], s3[base + SLOT_QSUB],
+          s0[base + SLOT_CQSUB], s1[base + SLOT_CQSUB], lteParams);
         if (dtCS < minDt) minDt = dtCS;
       }
       return minDt;

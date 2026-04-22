@@ -98,9 +98,8 @@ export const DIODE_MAPPING: DeviceMapping = {
 //   BJTvsub=21, BJTcdsub=22, BJTgdsub=23
 //
 // Post-W1.2 rename: digiTS schema matches ngspice slot names for the
-// resistive/cap-storage portion. Schema uses QCS/CQCS for the offset-12/13
-// pair whose ngspice name is qsub/cqsub — same physical quantity (substrate
-// junction charge and companion current), under digiTS's historical name.
+// resistive/cap-storage portion. Post-W1.9 close-out rename: QSUB/CQSUB
+// now match ngspice bjtdefs.h BJTqsub=12 / BJTcqsub=13 exactly.
 //
 // Note on augmentation: our GPI/GMU/CC/CB (slots 4,5,2,3) are cap-augmented
 // during transient — bjtload.c:725-734 lumps cap companion geq/ieq into
@@ -122,8 +121,8 @@ export const BJT_MAPPING: DeviceMapping = {
     CQBE: 9,
     QBC: 10,
     CQBC: 11,
-    QCS: 12,
-    CQCS: 13,
+    QSUB: 12,
+    CQSUB: 13,
     QBX: 14,
     CQBX: 15,
     GX: 16,
@@ -145,8 +144,8 @@ export const BJT_MAPPING: DeviceMapping = {
     9: "CQBE",
     10: "QBC",
     11: "CQBC",
-    12: "QCS",
-    13: "CQCS",
+    12: "QSUB",
+    13: "CQSUB",
     14: "QBX",
     15: "CQBX",
     16: "GX",

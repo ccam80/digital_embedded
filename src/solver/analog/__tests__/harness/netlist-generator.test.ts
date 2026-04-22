@@ -13,42 +13,42 @@ import type { AnalogElement, LoadContext } from "../../element.js";
 import type { StatePool } from "../../state-pool.js";
 
 describe("BJT_MAPPING companion current slots", () => {
-  it("slotToNgspice maps CCAP_BE to offset 9", () => {
-    expect(BJT_MAPPING.slotToNgspice["CCAP_BE"]).toBe(9);
+  it("slotToNgspice maps CQBE to offset 9", () => {
+    expect(BJT_MAPPING.slotToNgspice["CQBE"]).toBe(9);
   });
-  it("slotToNgspice maps CCAP_BC to offset 11", () => {
-    expect(BJT_MAPPING.slotToNgspice["CCAP_BC"]).toBe(11);
+  it("slotToNgspice maps CQBC to offset 11", () => {
+    expect(BJT_MAPPING.slotToNgspice["CQBC"]).toBe(11);
   });
-  it("slotToNgspice maps CCAP_CS to offset 13", () => {
-    expect(BJT_MAPPING.slotToNgspice["CCAP_CS"]).toBe(13);
+  it("slotToNgspice maps CQSUB to offset 13", () => {
+    expect(BJT_MAPPING.slotToNgspice["CQSUB"]).toBe(13);
   });
-  it("ngspiceToSlot maps offset 9 to CCAP_BE", () => {
-    expect(BJT_MAPPING.ngspiceToSlot[9]).toBe("CCAP_BE");
+  it("ngspiceToSlot maps offset 9 to CQBE", () => {
+    expect(BJT_MAPPING.ngspiceToSlot[9]).toBe("CQBE");
   });
-  it("ngspiceToSlot maps offset 11 to CCAP_BC", () => {
-    expect(BJT_MAPPING.ngspiceToSlot[11]).toBe("CCAP_BC");
+  it("ngspiceToSlot maps offset 11 to CQBC", () => {
+    expect(BJT_MAPPING.ngspiceToSlot[11]).toBe("CQBC");
   });
-  it("ngspiceToSlot maps offset 13 to CCAP_CS", () => {
-    expect(BJT_MAPPING.ngspiceToSlot[13]).toBe("CCAP_CS");
+  it("ngspiceToSlot maps offset 13 to CQSUB", () => {
+    expect(BJT_MAPPING.ngspiceToSlot[13]).toBe("CQSUB");
   });
-  it("slotToNgspice and ngspiceToSlot are consistent for CCAP slots", () => {
+  it("slotToNgspice and ngspiceToSlot are consistent for CQ slots", () => {
     for (const [slot, offset] of Object.entries(BJT_MAPPING.slotToNgspice)) {
-      if (slot.startsWith("CCAP_") && offset !== null) {
+      if (slot.startsWith("CQ") && offset !== null) {
         expect(BJT_MAPPING.ngspiceToSlot[offset]).toBe(slot);
       }
     }
   });
-  it("CCAP slots do not conflict with Q slots", () => {
-    expect(BJT_MAPPING.ngspiceToSlot[8]).toBe("Q_BE");
-    expect(BJT_MAPPING.ngspiceToSlot[10]).toBe("Q_BC");
-    expect(BJT_MAPPING.ngspiceToSlot[12]).toBe("Q_CS");
+  it("CQ slots do not conflict with Q slots", () => {
+    expect(BJT_MAPPING.ngspiceToSlot[8]).toBe("QBE");
+    expect(BJT_MAPPING.ngspiceToSlot[10]).toBe("QBC");
+    expect(BJT_MAPPING.ngspiceToSlot[12]).toBe("QSUB");
   });
-  it("DEVICE_MAPPINGS registry bjt entry has CCAP slots", () => {
+  it("DEVICE_MAPPINGS registry bjt entry has CQ slots", () => {
     const mapping = DEVICE_MAPPINGS["bjt"];
     expect(mapping).toBeDefined();
-    expect(mapping.slotToNgspice["CCAP_BE"]).toBe(9);
-    expect(mapping.slotToNgspice["CCAP_BC"]).toBe(11);
-    expect(mapping.slotToNgspice["CCAP_CS"]).toBe(13);
+    expect(mapping.slotToNgspice["CQBE"]).toBe(9);
+    expect(mapping.slotToNgspice["CQBC"]).toBe(11);
+    expect(mapping.slotToNgspice["CQSUB"]).toBe(13);
   });
 });
 
