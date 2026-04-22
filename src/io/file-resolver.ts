@@ -228,7 +228,8 @@ export class NodeResolver implements FileResolver {
     try {
       return await this._readFileFn(`${this._basePath}${fileName}`);
     } catch {
-      // fall through to subdirectory search
+      // Multi-candidate resolver control flow (matches Digital's subcircuit
+      // search). Per spec/i1-suppression-backlog.md §4.2 retain-with-reason.
     }
 
     // Search subdirectories if readdirFn was provided
@@ -240,6 +241,8 @@ export class NodeResolver implements FileResolver {
         try {
           return await this._readFileFn(`${this._basePath}${subdir}/${fileName}`);
         } catch {
+          // Multi-candidate resolver control flow — try next subdir. Per
+          // spec/i1-suppression-backlog.md §4.2 retain-with-reason.
           continue;
         }
       }
@@ -265,12 +268,17 @@ export class NodeResolver implements FileResolver {
             await this._readdirFn(`${this._basePath}${entry}`);
             dirs.push(entry);
           } catch {
-            // not a directory or not accessible
+            // Probe-as-directory heuristic — failure means entry is a file,
+            // not a directory. Per spec/i1-suppression-backlog.md §4.2
+            // retain-with-reason (load-bearing control flow).
           }
         }
       }
       return dirs;
     } catch {
+      // readdir of the base path itself is a diagnostic anomaly, not part
+      // of normal resolver flow. Surface it rather than silencing.
+      console.warn(`[file-resolver] Failed to list subdirectories of "${this._basePath}"; subcircuit search will be limited to base directory.`);
       return [];
     }
   }

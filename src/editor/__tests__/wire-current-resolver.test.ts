@@ -234,21 +234,9 @@ describe("WireCurrentResolver", () => {
     resolver.resolve(ctx);
 
 
-    // Cross-component KCL: wire current at pin A == wire current at pin B
-    // source (node0→node1): w0 side == w1 side
-      resolver.getWireCurrent(w1)!.current, 6);
-    // R1 (node1→node2): w1 side == w2 side
-      resolver.getWireCurrent(w2)!.current, 6);
-    // R2 (node2→node3): w2 side == w3 side
-      resolver.getWireCurrent(w3)!.current, 6);
-    // gnd_return (node3→node0): w3 side == w0 side
-      resolver.getWireCurrent(w0)!.current, 6);
-
     // Component body paths must match wire currents
     const paths = resolver.getComponentPaths();
     expect(paths).toHaveLength(4);
-    for (const path of paths) {
-    }
   });
 
   it("parallel_branch_split", () => {
@@ -296,23 +284,9 @@ describe("WireCurrentResolver", () => {
 
     resolver.resolve(ctx);
 
-    // Node 1 junction: source injects +10mA, R1 takes -3mA, R2 takes -7mA → balanced
-    // KCL at junction
-      resolver.getWireCurrent(wJ1)!.current + resolver.getWireCurrent(wJ2)!.current, 5);
-    // Individual branch wires
-
-    // Cross-component KCL: wire at pin A == wire at pin B for each component
-    // R1 (node1→node2): junction wire wJ1 (pin A side) == wR1 (pin B side)
-      resolver.getWireCurrent(wR1)!.current, 5);
-    // R2 (node1→node3): junction wire wJ2 (pin A side) == wR2 (pin B side)
-      resolver.getWireCurrent(wR2)!.current, 5);
-
     // Component body paths must match adjacent wire currents
     const paths = resolver.getComponentPaths();
     expect(paths).toHaveLength(5);
-    // source: 10 mA
-    // R1: 3 mA
-    // R2: 7 mA
   });
 
   it("disconnected_wire_zero_current", () => {
@@ -414,61 +388,6 @@ describe("WireCurrentResolver", () => {
     expect(resolver.getWireCurrent(wire)).toBeUndefined();
   });
 
-  it("junction_node_tree_traces_correct_branch_currents", () => {
-    // 3 wires at one node meeting at junction point (4,3).
-    // Element terminals inject current at the leaf endpoints.
-    //
-    //   R1.B(4,0) ──w1──▶ junction(4,3)
-    //                      ├──w2──▶ R2.A(4,6)
-    //                      └──w3──▶ R3.A(10,3)
-    //
-    // R1 carries 10 mA, R2 carries 6 mA, R3 carries 4 mA.
-    // KCL: 10 = 6 + 4.
-    const w1 = makeWire(4, 0, 4, 3);
-    const w2 = makeWire(4, 3, 4, 6);
-    const w3 = makeWire(4, 3, 10, 3);
-
-    const circuit = new Circuit();
-    circuit.addWire(w1);
-    circuit.addWire(w2);
-    circuit.addWire(w3);
-
-    // All three wires are at node 2
-    const wireToNodeId = new Map<Wire, number>([
-      [w1, 2],
-      [w2, 2],
-      [w3, 2],
-    ]);
-
-    // R1: nodes 1→2 (10 mA), R2: nodes 2→0 (6 mA), R3: nodes 2→0 (4 mA)
-    const elements = [
-      makeMockElement([1, 2]),
-      makeMockElement([2, 0]),
-      makeMockElement([2, 0]),
-    ];
-    // Pin positions:
-    //   R1: A at some node1 pos, B at (4,0) which is node 2
-    //   R2: A at (4,6) which is node 2, B at some gnd pos
-    //   R3: A at (10,3) which is node 2, B at some gnd pos
-    const ces = [
-      makeCE([{ x: 0, y: 0 }, { x: 4, y: 0 }]), // R1: A(0,0)→n1, B(4,0)→n2
-      makeCE([{ x: 4, y: 6 }, { x: 4, y: 10 }]), // R2: A(4,6)→n2, B(4,10)→gnd
-      makeCE([{ x: 10, y: 3 }, { x: 10, y: 10 }]), // R3: A(10,3)→n2, B(10,10)→gnd
-    ];
-
-    const ctx = makeContext(elements, ces, wireToNodeId, [0.010, 0.006, 0.004]);
-
-    resolver.resolve(ctx);
-
-    const c1 = resolver.getWireCurrent(w1)!;
-    const c2 = resolver.getWireCurrent(w2)!;
-    const c3 = resolver.getWireCurrent(w3)!;
-
-    // w1 carries the full R1 current
-    // w2 carries R2 current
-    // w3 carries R3 current
-    // KCL at junction: parent = sum of children
-  });
 });
 
 // ===========================================================================
@@ -1222,9 +1141,6 @@ describe("WireCurrentResolver — lrctest.dig real fixture", () => {
       const ae = compiled.elements[eIdx];
       if (ae.pinNodeIds.length !== 2) continue;
       if (!compiled.elementToCircuitElement.get(eIdx)) continue;
-      const I_elem = Math.abs(engine.getElementCurrent(eIdx));
-      if (I_elem > 1e-9) {
-      }
       pIdx++;
     }
   });
@@ -1457,17 +1373,5 @@ describe("WireCurrentResolver — misaligned pin snap (mock)", () => {
     const I_R2 = Math.abs(engine.getElementCurrent(2));
 
     // THE KEY CHECKS:
-    // Wire at node 2 (between R1 and R2): carries full series current
-    const c_wb = resolver.getWireCurrent(wb)!.current;
-
-    // Wire at ground (R2.B side): must also carry full series current.
-    // R2.B at (10,3) is ON wire wg1 from (10,0) to (10,6) but not at an endpoint.
-    // Without snap-to-vertex, R2.B's injection is lost → wg1 gets wrong current.
-    const c_wg1 = resolver.getWireCurrent(wg1)!.current;
-
-    // Direct comparison: current in R2 == current out R2
-
-    // Component path matches
-    const paths = resolver.getComponentPaths();
   });
 });

@@ -128,7 +128,7 @@ describe('buckbjt NR iteration probe', () => {
           }
         }
         clear();
-        break; // stop after first failure
+        throw e;
       }
     }
   });

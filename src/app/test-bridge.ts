@@ -279,30 +279,22 @@ export function createTestBridge(
 
     readSignalByLabel(label: string): { type: 'digital'; value: number } | { type: 'analog'; voltage: number } | null {
       const coordinator = coordinatorGetter();
-      try {
-        const sv = coordinator.readByLabel(label);
-        return sv.type === 'digital'
-          ? { type: 'digital', value: sv.value }
-          : { type: 'analog', voltage: sv.voltage };
-      } catch {
-        return null;
-      }
+      const sv = coordinator.readByLabel(label);
+      return sv.type === 'digital'
+        ? { type: 'digital', value: sv.value }
+        : { type: 'analog', voltage: sv.voltage };
     },
 
     readAllSignalValues(): Record<string, { type: 'digital'; value: number } | { type: 'analog'; voltage: number }> | null {
       const coordinator = coordinatorGetter();
-      try {
-        const all = coordinator.readAllSignals();
-        const result: Record<string, { type: 'digital'; value: number } | { type: 'analog'; voltage: number }> = {};
-        for (const [label, sv] of all) {
-          result[label] = sv.type === 'digital'
-            ? { type: 'digital', value: sv.value }
-            : { type: 'analog', voltage: sv.voltage };
-        }
-        return result;
-      } catch {
-        return null;
+      const all = coordinator.readAllSignals();
+      const result: Record<string, { type: 'digital'; value: number } | { type: 'analog'; voltage: number }> = {};
+      for (const [label, sv] of all) {
+        result[label] = sv.type === 'digital'
+          ? { type: 'digital', value: sv.value }
+          : { type: 'analog', voltage: sv.voltage };
       }
+      return result;
     },
 
     getPinExitDirection(elementLabel: string, pinLabel: string) {

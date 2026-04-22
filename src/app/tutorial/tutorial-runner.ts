@@ -98,8 +98,11 @@ function loadProgress(manifest: TutorialManifest): TutorialProgress {
       const steps = manifest.steps.map(s => stepMap.get(s.id) ?? makeStepProgress(s.id));
       return { ...parsed, steps };
     }
-  } catch {
-    // Corrupted or unavailable — fall through to fresh init
+  } catch (e) {
+    // Corrupted localStorage entry or unavailable storage — surface the
+    // anomaly and fall through to fresh init. Per
+    // spec/i1-suppression-backlog.md §4.2 replaced prior silent swallow.
+    console.warn(`[tutorial-runner] Failed to load progress for "${manifest.id}"; starting fresh.`, e);
   }
   return initProgress(manifest);
 }
@@ -108,8 +111,10 @@ function saveProgress(progress: TutorialProgress): void {
   try {
     progress.lastActivityAt = now();
     localStorage.setItem(storageKey(progress.tutorialId), JSON.stringify(progress));
-  } catch {
-    // localStorage unavailable (e.g. private browsing quota) — ignore
+  } catch (e) {
+    // localStorage quota exceeded or unavailable — surface the anomaly.
+    // Per spec/i1-suppression-backlog.md §4.2 replaced prior silent swallow.
+    console.warn(`[tutorial-runner] Failed to save progress for "${progress.tutorialId}".`, e);
   }
 }
 

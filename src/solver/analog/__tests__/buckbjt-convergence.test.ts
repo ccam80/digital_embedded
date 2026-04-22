@@ -50,7 +50,7 @@ const DLL_PATH = resolve(
   'ref/ngspice/visualc-shared/x64/Release/bin/spice.dll',
 );
 let dllAvailable = false;
-try { accessSync(DLL_PATH); dllAvailable = true; } catch { /* gate below */ }
+try { accessSync(DLL_PATH); dllAvailable = true; } catch { console.warn(`ngspice DLL not found: ${DLL_PATH} — harness tests will be skipped`); }
 const describeIfDll = dllAvailable ? describe : describe.skip;
 
 // Phases whose phaseParameter carries diagGmin (ngspice CKTdiagGmin).

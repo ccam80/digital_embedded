@@ -533,11 +533,9 @@ function isElementEnabled(el: CircuitElement): boolean {
 function contextToMap(ctx: HGSContext): HGSMap {
   const map = new HGSMap();
   for (const key of ctx.getLocalKeys()) {
-    try {
-      map.set(key, ctx.getVar(key));
-    } catch {
-      // skip inaccessible variables
-    }
+    // Keys from getLocalKeys() are guaranteed resolvable by the context
+    // that produced them; no try/catch needed.
+    map.set(key, ctx.getVar(key));
   }
   return map;
 }

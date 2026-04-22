@@ -66,8 +66,11 @@ export class FileHistory {
           this._paths.length = MAX_ENTRIES;
         }
       }
-    } catch {
-      // Corrupted storage — silently keep empty history.
+    } catch (e) {
+      // Corrupted localStorage entry — surface the anomaly and keep empty
+      // history. Per spec/i1-suppression-backlog.md §4.2 the prior silent
+      // swallow hid real parse/quota errors.
+      console.warn(`[file-history] Failed to parse stored history; keeping empty.`, e);
     }
   }
 }

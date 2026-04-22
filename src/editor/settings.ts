@@ -115,8 +115,11 @@ export class AppSettings {
           )[key];
         }
       }
-    } catch {
-      // Corrupted storage — fall back to defaults silently.
+    } catch (e) {
+      // Corrupted localStorage entry — surface the anomaly and fall back to
+      // defaults. Per spec/i1-suppression-backlog.md §4.2 the prior silent
+      // swallow hid real parse/quota errors.
+      console.warn(`[settings] Failed to parse stored settings; using defaults.`, e);
     }
   }
 

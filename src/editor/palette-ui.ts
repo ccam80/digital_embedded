@@ -466,8 +466,11 @@ export class PaletteUI {
       const minLineScale = (1.5 * dpr) / scale;
       renderer.setGridScale(Math.min(scale, 1 / minLineScale));
       element.draw(renderer);
-    } catch {
-      // If rendering fails, just return empty canvas
+    } catch (e) {
+      // Surface icon-rendering failure so a broken component doesn't
+      // produce a silent blank-tile palette. Per
+      // spec/i1-suppression-backlog.md §4.2 replaced prior silent swallow.
+      console.warn(`[palette-ui] Failed to render palette icon for "${def.name}".`, e);
     }
 
     return canvas;

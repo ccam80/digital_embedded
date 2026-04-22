@@ -11,6 +11,13 @@
  *
  * Pixel comparison catches shape, position, and proportion errors that
  * fingerprint counting (poly/line/circle/text counts) cannot.
+ *
+ * Silent-catch policy (per spec/i1-suppression-backlog.md §4.2
+ * retain-with-reason): the factory/draw/bbox try/catch blocks in this
+ * suite DO NOT suppress anomalies — they record FACTORY_ERROR /
+ * DRAW_ERROR / bboxOverflow=-1 audit rows in the results array, which is
+ * the intended failure-report output of the test. Re-raising would break
+ * the per-component report generation.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";

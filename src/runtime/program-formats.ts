@@ -52,7 +52,8 @@ export function detectFormatFromContent(content: string, filename?: string): Pro
     try {
       return detectFormatFromExtension(filename);
     } catch {
-      // fall through to CSV heuristic
+      // Dual-detector fallback: unknown extension → content heuristic.
+      // Per spec/i1-suppression-backlog.md §4.2 retain-with-reason.
     }
   }
 

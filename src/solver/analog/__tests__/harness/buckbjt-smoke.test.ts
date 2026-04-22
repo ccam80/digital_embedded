@@ -16,7 +16,7 @@ const DLL_PATH = resolve(
 );
 
 let dllAvailable = false;
-try { accessSync(DLL_PATH); dllAvailable = true; } catch { /* */ }
+try { accessSync(DLL_PATH); dllAvailable = true; } catch { console.warn(`ngspice DLL not found: ${DLL_PATH} — harness tests will be skipped`); }
 
 const describeIfDll = dllAvailable ? describe : describe.skip;
 

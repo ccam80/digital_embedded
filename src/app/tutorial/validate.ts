@@ -170,13 +170,10 @@ export function validateManifest(
 
     // Test data parsing
     if (step.testData) {
-      try {
-        // We import parseTestData dynamically to avoid circular deps at type level.
-        // At validation time, the caller has already loaded the module.
-        validateTestDataSyntax(step.testData, step.id, diagnostics);
-      } catch {
-        // validateTestDataSyntax handles its own error reporting
-      }
+      // validateTestDataSyntax appends to `diagnostics` directly; it does
+      // not throw on malformed input. Per spec/i1-suppression-backlog.md
+      // §4.2 the prior try/catch hid real bugs.
+      validateTestDataSyntax(step.testData, step.id, diagnostics);
     }
 
     // Palette spec validation

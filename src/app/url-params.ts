@@ -146,7 +146,11 @@ export async function loadModuleConfig(
     if (!res.ok) return null;
     const config = (await res.json()) as ModuleConfig;
     return { config, moduleBase };
-  } catch {
+  } catch (e) {
+    // Network error or malformed JSON — surface the anomaly and return
+    // null so the caller can decide. Per spec/i1-suppression-backlog.md
+    // §4.2 replaced prior silent swallow.
+    console.warn(`[url-params] Failed to load module config from "${configUrl}".`, e);
     return null;
   }
 }

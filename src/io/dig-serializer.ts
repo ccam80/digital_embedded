@@ -63,6 +63,8 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
         const inner = labels.map((l) => `<string>${escapeXml(l)}</string>`).join("");
         return `<inverterConfig>${inner}</inverterConfig>`;
       } catch {
+        // Dual-format fallback (JSON-encoded vs raw string). Per
+        // spec/i1-suppression-backlog.md §4.2 retain-with-reason.
         return `<string>${escapeXml(value)}</string>`;
       }
     }
@@ -72,6 +74,8 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
         const c = JSON.parse(value) as { r: number; g: number; b: number; a: number };
         return `<awt-color>\n            <red>${c.r}</red>\n            <green>${c.g}</green>\n            <blue>${c.b}</blue>\n            <alpha>${c.a}</alpha>\n          </awt-color>`;
       } catch {
+        // Dual-format fallback (JSON-encoded vs raw string). Per
+        // spec/i1-suppression-backlog.md §4.2 retain-with-reason.
         return `<string>${escapeXml(value)}</string>`;
       }
     }
@@ -84,6 +88,8 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
         const iv = JSON.parse(value) as { value: string; highZ: boolean };
         return `<value v="${iv.value}" z="${iv.highZ}"/>`;
       } catch {
+        // Dual-format fallback (JSON-encoded vs raw string). Per
+        // spec/i1-suppression-backlog.md §4.2 retain-with-reason.
         return `<string>${escapeXml(value)}</string>`;
       }
     }
@@ -108,6 +114,9 @@ function propertyValueToXml(xmlName: string, value: PropertyValue): string {
     try {
       return `<string>${escapeXml(JSON.stringify(value))}</string>`;
     } catch {
+      // JSON.stringify throws on circular objects. The serializer must emit
+      // valid XML regardless. Per spec/i1-suppression-backlog.md §4.2
+      // retain-with-reason.
       return `<string>[unserializable]</string>`;
     }
   }
