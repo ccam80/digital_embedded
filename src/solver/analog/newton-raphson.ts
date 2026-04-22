@@ -296,7 +296,7 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
   // Hoist the iter-0 split hook to avoid per-iteration property lookup.
   const onIter0Complete = ctx.onIteration0Complete;
 
-  // dcopModeLadder: set initial initMode and prime junctions before iter 0.
+  // dcopModeLadder: set initial INITF bit (MODEINITJCT) and prime junctions before iter 0.
   const ladder = ctx.dcopModeLadder ?? null;
   if (ladder) {
     ctx.cktMode = setInitf(ctx.cktMode, MODEINITJCT);

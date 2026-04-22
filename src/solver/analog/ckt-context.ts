@@ -402,7 +402,8 @@ export class CKTCircuitContext {
 
   /**
    * DC operating point mode ladder for initJct/initFix/initFloat transitions.
-   * Null during transient NR (mode handled through statePool.initMode directly).
+   * Null during transient NR (INITF state carried via `cktMode` bitfield —
+   * see `initf()` / `setInitf()` in ckt-mode.ts; cktdefs.h:177-182).
    */
   dcopModeLadder: {
     runPrimeJunctions(): void;

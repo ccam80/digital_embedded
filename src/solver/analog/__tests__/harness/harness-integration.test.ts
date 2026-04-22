@@ -421,8 +421,9 @@ describe("time-alignment: compareSnapshots with alignment map", () => {
 
   function makeStep(stepStartTime: number, dt: number, voltage: number): import("./types.js").StepSnapshot {
     // Synthetic fixture for map-level ordering/query tests — numeric fields are
-    // driven by topology, not by real engine state. initMode uses "transient"
-    // as the canonical free-running transient tag (InitMode string union).
+    // driven by topology, not by real engine state. initMode is the diagnostic
+    // label produced by `bitsToName(cktMode)` (ckt-mode.ts). For a free-running
+    // transient step cktMode has MODETRAN set, so the label is "MODETRAN".
     const iter: import("./types.js").IterationSnapshot = {
       iteration: 0,
       voltages: new Float64Array([voltage]),
@@ -433,7 +434,7 @@ describe("time-alignment: compareSnapshots with alignment map", () => {
       noncon: 0,
       diagGmin: 0,
       srcFact: 1,
-      initMode: "transient",
+      initMode: "MODETRAN",
       order: 1,
       delta: dt,
       ag: new Float64Array(7),

@@ -131,3 +131,52 @@ export function isUic(mode: number): boolean {
 export function initf(mode: number): number {
   return mode & INITF_MASK;
 }
+
+// ---- Diagnostic decoder ------------------------------------------------------
+
+/**
+ * Decode a `cktMode` bitfield into a pipe-joined string of the `MODE*` symbol
+ * names currently set, for diagnostic output (harness snapshots, convergence
+ * log, error messages).
+ *
+ * Decoded bits (cktdefs.h:165-185):
+ *   - MODETRAN         (0x0001) — cktdefs.h:166
+ *   - MODEAC           (0x0002) — cktdefs.h:167
+ *   - MODEDCOP         (0x0010) — cktdefs.h:171
+ *   - MODETRANOP       (0x0020) — cktdefs.h:172
+ *   - MODEDCTRANCURVE  (0x0040) — cktdefs.h:173
+ *   - MODEINITFLOAT    (0x0100) — cktdefs.h:177
+ *   - MODEINITJCT      (0x0200) — cktdefs.h:178
+ *   - MODEINITFIX      (0x0400) — cktdefs.h:179
+ *   - MODEINITSMSIG    (0x0800) — cktdefs.h:180
+ *   - MODEINITTRAN     (0x1000) — cktdefs.h:181
+ *   - MODEINITPRED     (0x2000) — cktdefs.h:182
+ *   - MODEUIC          (0x10000) — cktdefs.h:185
+ *
+ * Multiple bits are joined with `|` in the order listed above (analysis class
+ * first, then INITF, then UIC) — e.g. `"MODEDCOP|MODEINITJCT"`. Returns
+ * `"MODE_NONE"` when `mode === 0` (no bits set).
+ *
+ * This helper is for diagnostic use only — production control flow must read
+ * the bitfield directly via `initf()`, `isDcop()`, etc.
+ */
+export function bitsToName(mode: number): string {
+  if (mode === 0) return "MODE_NONE";
+  const parts: string[] = [];
+  // Analysis-class bits (cktdefs.h:166-173)
+  if (mode & MODETRAN)        parts.push("MODETRAN");
+  if (mode & MODEAC)          parts.push("MODEAC");
+  if (mode & MODEDCOP)        parts.push("MODEDCOP");
+  if (mode & MODETRANOP)      parts.push("MODETRANOP");
+  if (mode & MODEDCTRANCURVE) parts.push("MODEDCTRANCURVE");
+  // INITF bits (cktdefs.h:177-182)
+  if (mode & MODEINITFLOAT)   parts.push("MODEINITFLOAT");
+  if (mode & MODEINITJCT)     parts.push("MODEINITJCT");
+  if (mode & MODEINITFIX)     parts.push("MODEINITFIX");
+  if (mode & MODEINITSMSIG)   parts.push("MODEINITSMSIG");
+  if (mode & MODEINITTRAN)    parts.push("MODEINITTRAN");
+  if (mode & MODEINITPRED)    parts.push("MODEINITPRED");
+  // Orthogonal flag (cktdefs.h:185)
+  if (mode & MODEUIC)         parts.push("MODEUIC");
+  return parts.length > 0 ? parts.join("|") : `MODE_UNKNOWN(0x${mode.toString(16)})`;
+}

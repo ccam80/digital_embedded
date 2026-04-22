@@ -314,7 +314,8 @@ describe("NR", () => {
     newtonRaphson(ctx);
 
     expect(ctx.nrResult.converged).toBe(true);
-    // After NR completes, initMode must be "initFloat"
+    // After NR completes, INITF must have decayed to MODEINITFLOAT
+    // (niiter.c:1070-1071 INITF dispatcher, cktdefs.h:177).
     expect(initf(ctx.cktMode)).toBe(MODEINITFLOAT);
   });
 

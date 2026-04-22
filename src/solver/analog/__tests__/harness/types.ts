@@ -175,7 +175,17 @@ export interface IterationSnapshot {
   noncon: number;
   diagGmin: number;
   srcFact: number;
-  initMode: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "initSmsig" | "unknown";
+  /**
+   * Human-readable decoded `cktMode` label, produced by `bitsToName(cktMode)`
+   * from ckt-mode.ts (cktdefs.h:165-185). Example values:
+   *   - "MODEDCOP|MODEINITJCT"
+   *   - "MODETRAN|MODEINITFLOAT"
+   *   - "MODETRAN"
+   *   - "MODE_NONE"
+   * Phase 2.5 W2.3 replaced the former string union (initJct / initFix / …)
+   * with this bitfield-derived label.
+   */
+  initMode: string;
   /**
    * Integration order active at this NR iteration (1 = BDF-1, 2 = trap/BDF-2).
    * Set per-iteration from `ctx.loadCtx.order` for our engine and from the

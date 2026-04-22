@@ -79,11 +79,11 @@ export interface StatePoolRef {
   readonly totalSlots: number;
   /** Number of accepted transient steps. 0 = MODEINITTRAN equivalent. */
   readonly tranStep: number;
-  /** Current DC-OP mode (niiter.c:991-997). "transient" during normal transient NR. Absent → treated as "transient". */
-  // D1 (Phase 2.5 W2.2): removed "initSmsig" member. Small-signal AC init
-  // mode routes through the cktMode bitfield bit MODEINITSMSIG (cktdefs.h:180)
-  // — there is no string name for it. W2.3 deletes this union entirely.
-  readonly initMode?: "initJct" | "initFix" | "initFloat" | "initTran" | "initPred" | "transient";
+  // Phase 2.5 W2.3: `initMode` string union deleted. INITF state lives in
+  // the `cktMode` bitfield (LoadContext.cktMode) — read via
+  // `initf(cktMode) === MODEINIT...` and written via
+  // `setInitf(cktMode, MODEINIT...)` per cktdefs.h:177-182. For diagnostic
+  // labels use `bitsToName(cktMode)` from ckt-mode.ts.
   /**
    * Current transient integration timestep written by the engine before each
    * stamp pass. 0 during DC-OP. Used by elements to derive ag0 locally

@@ -19,7 +19,7 @@ const MODETRANOP    = 0x0020;
 // dcopDirect / transient-OP iterations (cktop.c transitions through
 // INITJCT → INITFIX → INITFLOAT and leaves INITFLOAT set for subsequent
 // sub-solves). Synthetic fixtures below must mirror that bit pattern so
-// cktModeToInitMode() resolves to the expected InitMode string.
+// `bitsToName()` (ckt-mode.ts) produces the expected decoded cktMode label.
 
 function makeRaw(overrides: Partial<RawNgspiceIterationEx> = {}): RawNgspiceIterationEx {
   return {

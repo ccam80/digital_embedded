@@ -1,5 +1,5 @@
 import { accessSync } from "node:fs";
-import type { CaptureSession, IterationSnapshot, InitMode } from "../harness/types.js";
+import type { CaptureSession, IterationSnapshot } from "../harness/types.js";
 import { DEVICE_MAPPINGS } from "../harness/device-mappings.js";
 import { describe, expect } from "vitest";
 
@@ -254,7 +254,9 @@ function _inferDeviceType(label: string): string | null {
 interface ModeEntry {
   stepIndex: number;
   iterIndex: number;
-  initMode: InitMode;
+  // W2.3: `initMode` is a human-readable cktMode label from
+  // `bitsToName(cktMode)` (cktdefs.h:165-185), e.g. "MODEDCOP|MODEINITJCT".
+  initMode: string;
 }
 
 function _extractModeSequence(session: CaptureSession): ModeEntry[] {

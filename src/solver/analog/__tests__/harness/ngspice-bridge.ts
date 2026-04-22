@@ -34,9 +34,9 @@ import type {
   IntegrationCoefficients,
   MatrixEntry,
   LimitingEvent,
-  InitMode,
 } from "./types.js";
 import type { IntegrationMethod } from "../../../../core/analog-types.js";
+import { bitsToName } from "../../ckt-mode.js";
 import { DEVICE_MAPPINGS } from "./device-mappings.js";
 
 // ---------------------------------------------------------------------------
@@ -48,7 +48,6 @@ const MODETRANOP     = 0x0020;
 const MODEINITFLOAT  = 0x0100;
 const MODEINITJCT    = 0x0200;
 const MODEINITFIX    = 0x0400;
-const MODEINITSMSIG  = 0x0800;
 const MODEINITTRAN   = 0x1000;
 const MODEINITPRED   = 0x2000;
 
@@ -83,35 +82,6 @@ function cktModeToPhase(mode: number, phaseFlags: number): NRPhase {
   return "tranNR";
 }
 
-/**
- * Map ngspice CKTmode flags to our InitMode string union.
- *
- * Inspection order mirrors ngspice's MODEINIT* priority (cktdefs.h): the INIT
- * bits are mutually exclusive within a solve, so we test each and return the
- * corresponding string. When no INIT bit is set:
- *   - MODEDCOP / MODETRANOP alone → "initFloat" (ngspice's post-ladder
- *     dcopDirect phase has either MODEINITFLOAT set or no init flag at all;
- *     either way our engine's pool.initMode is "initFloat" during that state)
- *   - MODETRAN alone → "transient"
- * Any other pattern is a real mismatch with ngspice and we throw so the
- * divergence surfaces immediately.
- */
-function cktModeToInitMode(cktMode: number): InitMode {
-  if (cktMode & MODEINITJCT)   return "initJct";
-  if (cktMode & MODEINITFIX)   return "initFix";
-  if (cktMode & MODEINITFLOAT) return "initFloat";
-  if (cktMode & MODEINITSMSIG) return "initSmsig";
-  if (cktMode & MODEINITTRAN)  return "initTran";
-  if (cktMode & MODEINITPRED)  return "initPred";
-  if (cktMode & (MODEDCOP | MODETRANOP)) return "initFloat";
-  if (cktMode & MODETRAN)      return "transient";
-  throw new Error(
-    `cktModeToInitMode: unmapped cktMode 0x${cktMode.toString(16)} — ` +
-    `no MODEDCOP / MODETRANOP / MODEINIT* / MODETRAN bit is set. ` +
-    `This is a real mismatch with ngspice.`,
-  );
-}
-
 function cktModeToRole(
   mode: number,
   phaseFlags: number,
@@ -126,28 +96,20 @@ function cktModeToRole(
   return undefined;
 }
 
-function initModeToAnalysisPhase(initMode: InitMode): "dcop" | "tranInit" | "tranFloat" {
-  // Map the now-typed InitMode to analysisPhase. DCOP init ladder stages
-  // (initJct/initFix/initFloat) and the final initSmsig pass all happen
-  // during DC operating point. initTran is transient init. Free-running
-  // transient is initPred / "transient".
-  switch (initMode) {
-    case "initJct":
-    case "initFix":
-    case "initFloat":
-    case "initSmsig":
-      return "dcop";
-    case "initTran":
-      return "tranInit";
-    case "initPred":
-    case "transient":
-      return "tranFloat";
-  }
+/**
+ * Classify a `cktMode` bitfield into the coarse analysisPhase bucket used by
+ * StepSnapshot. DCOP init ladder stages (MODEDCOP / MODETRANOP, plus the
+ * MODEINITJCT/FIX/FLOAT/SMSIG sub-phases) collapse to "dcop". MODEINITTRAN
+ * is the first transient NR call after DCOP → "tranInit". Anything else
+ * running under MODETRAN is free-running transient → "tranFloat".
+ *
+ * Cite cktdefs.h:166-182 for the bit assignments.
+ */
+function cktModeToAnalysisPhase(cktMode: number): "dcop" | "tranInit" | "tranFloat" {
+  if (cktMode & (MODEDCOP | MODETRANOP)) return "dcop";
+  if (cktMode & MODEINITTRAN) return "tranInit";
+  return "tranFloat";
 }
-
-// cktModeToAnalysisPhase — removed. flushStep now uses initModeToAnalysisPhase
-// with the typed IterationSnapshot.initMode field instead of the stashed raw
-// numeric cktMode.
 
 /** Extract only the ngspice-side integration coefficients from a raw iteration. */
 function _ngspiceIntegCoeff(raw: RawNgspiceIterationEx | undefined): IntegrationCoefficients["ngspice"] {
@@ -646,8 +608,14 @@ export class NgspiceBridge {
         ngspice: ngspiceCoeff,
       };
 
-      const analysisPhase = step.attempts[0]?.iterations[0]
-        ? initModeToAnalysisPhase(step.attempts[0].iterations[0].initMode)
+      // Derive analysisPhase from the numeric cktMode of the first captured
+      // iteration. We look it up via simTimeStart + iteration number rather
+      // than re-parsing the diagnostic string label produced by bitsToName().
+      const firstRawForPhase = this._iterations.find(
+        r => r.simTimeStart === step.stepStartTime,
+      );
+      const analysisPhase = firstRawForPhase
+        ? cktModeToAnalysisPhase(firstRawForPhase.cktMode)
         : "dcop";
 
       // stepEndTime: for accepted transient step it is simTime (post-advance);
@@ -804,7 +772,7 @@ export class NgspiceBridge {
         noncon: raw.noncon,
         diagGmin: raw.phaseGmin,
         srcFact: raw.phaseSrcFact,
-        initMode: cktModeToInitMode(raw.cktMode),
+        initMode: bitsToName(raw.cktMode),
         order: raw.order,
         delta: raw.dt,
         ag: agBuf,

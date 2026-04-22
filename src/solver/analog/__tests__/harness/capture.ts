@@ -10,10 +10,7 @@ import type { StatePool } from "../../state-pool.js";
 import type { ConcreteCompiledAnalogCircuit } from "../../compiled-analog-circuit.js";
 import type { NRAttemptRecord } from "../../convergence-log.js";
 import type { CKTCircuitContext } from "../../ckt-context.js";
-import {
-  MODEINITFLOAT, MODEINITJCT, MODEINITFIX, MODEINITSMSIG,
-  MODEINITTRAN, MODEINITPRED, initf,
-} from "../../ckt-mode.js";
+import { bitsToName } from "../../ckt-mode.js";
 import type {
   TopologySnapshot,
   IterationSnapshot,
@@ -294,15 +291,9 @@ export function createIterationCaptureHook(
       ? convergenceFailedElements.map(l => rawLabelToHumanLabel.get(l) ?? l)
       : convergenceFailedElements;
 
-    const initfBits = initf(ctx.cktMode);
-    const resolvedInitMode =
-      (initfBits & MODEINITJCT)   ? "initJct"   :
-      (initfBits & MODEINITFIX)   ? "initFix"   :
-      (initfBits & MODEINITSMSIG) ? "initSmsig" :
-      (initfBits & MODEINITTRAN)  ? "initTran"  :
-      (initfBits & MODEINITPRED)  ? "initPred"  :
-      (initfBits & MODEINITFLOAT) ? "initFloat" :
-      "unknown";
+    // W2.3: diagnostic label decoded from the `cktMode` bitfield (cktdefs.h:165-185).
+    // bitsToName joins multiple set bits with "|" — e.g. "MODEDCOP|MODEINITJCT".
+    const resolvedInitMode = bitsToName(ctx.cktMode);
 
     snapshots.push({
       iteration,
