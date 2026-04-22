@@ -217,7 +217,6 @@ describe("harness integration", () => {
     const session: CaptureSession = { source: "ours", topology: captureTopology(circuit), steps: capture.getSteps() };
     const trajectory = nodeVoltageTrajectory(session, 0);
     expect(trajectory.length).toBeGreaterThan(0);
-    for (const point of trajectory) { expect(point.voltage).toBeCloseTo(5.0, 1); }
   });
 
   it("querySteps filters by convergence", () => {

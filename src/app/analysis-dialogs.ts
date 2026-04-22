@@ -151,10 +151,8 @@ function renderKMapTab(container: HTMLElement, ttModel: TruthTable): void {
     ctx2.textAlign = 'center';
     ctx2.textBaseline = 'middle';
 
-    try {
-      const minResult = minimize(ttModel, selectedOutput);
-      kmapTab.setImplicants(minResult.primeImplicants);
-    } catch (_e) { /* ignore */ }
+    const minResult = minimize(ttModel, selectedOutput);
+    kmapTab.setImplicants(minResult.primeImplicants);
 
     const kctx = {
       drawRect(x: number, y: number, w: number, h: number) {
@@ -212,9 +210,10 @@ function renderExpressionsTab(container: HTMLElement, ttModel: TruthTable): void
     tr.appendChild(nameCell);
 
     let minExpr = '', sopExpr = '', posExpr = '';
-    try { const m = minimize(ttModel, i); minExpr = exprToString(m.selectedCover); } catch (e) { minExpr = 'Error'; }
-    try { sopExpr = exprToString(generateSOP(ttModel, i)); } catch (_e) { sopExpr = 'Error'; }
-    try { posExpr = exprToString(generatePOS(ttModel, i)); } catch (_e) { posExpr = 'Error'; }
+    const m = minimize(ttModel, i);
+    minExpr = exprToString(m.selectedCover);
+    sopExpr = exprToString(generateSOP(ttModel, i));
+    posExpr = exprToString(generatePOS(ttModel, i));
 
     for (const val of [minExpr, sopExpr, posExpr]) {
       const td = document.createElement('td');

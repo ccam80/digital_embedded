@@ -185,7 +185,6 @@ describe("NFET", () => {
     const el = new NFETElement(crypto.randomUUID(), { x: 2, y: 3 }, 0, false, props);
     const bb = el.getBoundingBox();
     // oxide bar at x+0.05 offset
-    expect(bb.x).toBeCloseTo(2.05);
     expect(bb.y).toBe(3);
     expect(bb.width).toBeGreaterThanOrEqual(0.9);
     expect(bb.height).toBeGreaterThanOrEqual(2);

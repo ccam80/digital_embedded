@@ -408,16 +408,3 @@ describe("generateSpiceNetlist", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Derived-ngspice-slot tests removed in the parity forcing function commit.
-// These blocks exercised invented equivalence formulas (BJT Norton currents,
-// diode IEQ = ID − GEQ·VD, JFET VDS = VGS − VGD, tunnel-diode/varactor IEQ).
-// Under strict bit-exact parity those formulas are architectural papering —
-// ngspice does not persist these quantities, so no genuine comparison exists.
-// Route: spec/parity-forcing-function-plan.md §3.4 and the forthcoming
-// architectural-alignment.md (Track A).
-// ---------------------------------------------------------------------------
-
-describe.skip("BJT_MAPPING.derivedNgspiceSlots (removed — see plan)", () => {
-  it("placeholder so the describe block is not empty", () => { expect(true).toBe(true); });
-});

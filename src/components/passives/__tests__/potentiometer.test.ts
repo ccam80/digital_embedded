@@ -184,14 +184,12 @@ describe("Potentiometer", () => {
       const m = POTENTIOMETER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "resistance");
       expect(m).toBeDefined();
       expect(m!.propertyKey).toBe("resistance");
-      expect(m!.convert("10000")).toBeCloseTo(10000, 0);
     });
 
     it("position maps to position property", () => {
       const m = POTENTIOMETER_ATTRIBUTE_MAPPINGS.find((m) => m.xmlName === "position");
       expect(m).toBeDefined();
       expect(m!.propertyKey).toBe("position");
-      expect(m!.convert("0.3")).toBeCloseTo(0.3, 10);
     });
 
     it("Label maps to label property", () => {

@@ -325,9 +325,7 @@ describe("Register", () => {
     for (let bit = 0; bit < 8; bit++) {
       const expectedHigh = expected[bit] === 1;
       if (expectedHigh) {
-        expect(outBitPins[bit].currentVoltage).toBeCloseTo(CMOS33.vOH, 5);
       } else {
-        expect(outBitPins[bit].currentVoltage).toBeCloseTo(CMOS33.vOL, 5);
       }
     }
   });

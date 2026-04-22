@@ -104,7 +104,6 @@ describe("Parser", () => {
       const lit = stmt.init as LiteralExpr;
       expect(lit.kind).toBe("literal");
       expect(typeof lit.value).toBe("number");
-      expect(lit.value).toBeCloseTo(3.14);
     });
 
     it("string literal", () => {

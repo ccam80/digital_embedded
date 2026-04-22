@@ -135,7 +135,9 @@ export function initSimulationController(
           currentScaleMode: parsed.currentScaleMode === 'logarithmic' ? 'logarithmic' : 'linear',
         };
       }
-    } catch { /* ignore */ }
+    } catch (err) {
+      throw new Error(`Failed to load engine settings from localStorage: ${err instanceof Error ? err.message : String(err)}`);
+    }
     return { snapshotBudgetMb: 64, oscillationLimit: 1000, currentSpeedScale: 200, currentScaleMode: 'linear' };
   }
 
@@ -377,14 +379,14 @@ export function initSimulationController(
     // 1. Snapshot all signal state by stable keys (labels + pins).
     const savedLabels = new Map<string, SignalValue>();
     for (const [label, addr] of coordinator.compiled.labelSignalMap) {
-      try { savedLabels.set(label, coordinator.readSignal(addr)); } catch { /* skip */ }
+      savedLabels.set(label, coordinator.readSignal(addr));
     }
 
     const savedPins = new Map<string, SignalValue>();
     const fullUnified = coordinator.compiled as unknown as CompiledCircuitUnified;
     if (fullUnified.pinSignalMap) {
       for (const [pinKey, addr] of fullUnified.pinSignalMap) {
-        try { savedPins.set(pinKey, coordinator.readSignal(addr)); } catch { /* skip */ }
+        savedPins.set(pinKey, coordinator.readSignal(addr));
       }
     }
 
@@ -412,7 +414,7 @@ export function initSimulationController(
     for (const [label, value] of savedLabels) {
       const addr = newCompiled.labelSignalMap.get(label);
       if (addr) {
-        try { newCoordinator.writeSignal(addr, value); } catch { /* net gone or type mismatch */ }
+        newCoordinator.writeSignal(addr, value);
       }
     }
 
@@ -421,7 +423,7 @@ export function initSimulationController(
       for (const [pinKey, value] of savedPins) {
         const addr = newCompiled.pinSignalMap.get(pinKey);
         if (addr) {
-          try { newCoordinator.writeSignal(addr, value); } catch { /* pin gone or type mismatch */ }
+          newCoordinator.writeSignal(addr, value);
         }
       }
     }

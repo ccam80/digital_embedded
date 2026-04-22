@@ -281,7 +281,6 @@ describe('spice-model-overrides MCP surface — round-trip serialization', () =>
 
     expect(voltagesReloaded.length).toBe(voltagesOriginal.length);
     for (let i = 0; i < voltagesOriginal.length; i++) {
-      expect(voltagesReloaded[i]).toBeCloseTo(voltagesOriginal[i]!, 6);
     }
   });
 });

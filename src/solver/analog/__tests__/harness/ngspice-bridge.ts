@@ -858,9 +858,9 @@ export class NgspiceBridge {
 
   dispose(): void {
     if (this._lib) {
-      try { this._lib.func("void ni_outer_register(void*)")(null); } catch {}
-      try { this._lib.func("void ni_instrument_register(void*)")(null); } catch {}
-      try { this._lib.func("void ni_topology_register(void*)")(null); } catch {}
+      this._lib.func("void ni_outer_register(void*)")(null);
+      this._lib.func("void ni_instrument_register(void*)")(null);
+      this._lib.func("void ni_topology_register(void*)")(null);
       this._lib = null;
     }
   }

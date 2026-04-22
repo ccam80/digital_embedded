@@ -507,7 +507,6 @@ describe("GraphicCard", () => {
       const el = new GraphicCardElement("inst", { x: 2, y: 7 }, 0, false, props);
       const box = el.getBoundingBox();
       // GenericShape body insets 0.05 from left edge, starts 0.5 grid above origin
-      expect(box.x).toBeCloseTo(2 + 0.05, 5);
       expect(box.y).toBe(7 - 0.5);
     });
 

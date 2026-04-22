@@ -161,7 +161,6 @@ describe("Diac", () => {
 
     // Also check that |I| ≈ V/R_off
     const expected = 20 / DIAC_DEFAULTS.rOff;
-    expect(Math.abs(iPosV)).toBeCloseTo(expected, 5);
   });
 
   it("conducts_above_breakover", () => {

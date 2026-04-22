@@ -900,14 +900,14 @@ function extractAnalogPragmas(text: string): { tolerance?: Tolerance; abstol?: n
         const pct = Number(valStr.slice(0, -1));
         if (!isNaN(pct)) pragmas.tolerance = { relative: pct / 100 };
       } else {
-        try { pragmas.tolerance = { absolute: parseSIValue(valStr) }; } catch { /* ignore malformed */ }
+        pragmas.tolerance = { absolute: parseSIValue(valStr) };
       }
     } else if (rest.startsWith('abstol ')) {
       const valStr = rest.slice('abstol '.length).trim();
-      try { pragmas.abstol = parseSIValue(valStr); } catch { /* ignore malformed */ }
+      pragmas.abstol = parseSIValue(valStr);
     } else if (rest.startsWith('settle ')) {
       const valStr = rest.slice('settle '.length).trim();
-      try { pragmas.settle = parseSIValue(valStr); } catch { /* ignore malformed */ }
+      pragmas.settle = parseSIValue(valStr);
     }
   }
   return pragmas;

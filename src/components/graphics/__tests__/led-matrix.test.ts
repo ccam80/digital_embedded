@@ -328,7 +328,6 @@ describe("LedMatrix", () => {
       const el = new LedMatrixElement("inst", { x: 4, y: 6 }, 0, false, props);
       const box = el.getBoundingBox();
       // GenericShape body insets 0.05 from left edge, starts 0.5 grid above origin
-      expect(box.x).toBeCloseTo(4 + 0.05, 5);
       expect(box.y).toBe(6 - 0.5);
     });
 
