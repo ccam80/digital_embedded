@@ -1,20 +1,18 @@
 /**
  * P-channel JFET analog component.
  *
- * Implements the polarity-inverted dual of the N-channel JFET.
- * The P-JFET uses the same Shichman-Hodges model with polaritySign = -1,
- * inverting all junction voltage signs and current directions.
+ * Port of ngspice `ref/ngspice/src/spicelib/devices/jfet/jfetload.c::JFETload`.
+ * Single-pass `load()` per device per NR iteration (Wave 6.1 unified interface).
+ * No `_updateOp`/`_stampCompanion` split — gate-junction caps lump inline into
+ * the stamps per `jfetload.c:477-492`.
  *
- * I-V equations (P-channel, VTO > 0):
- *   V_P = VTO (pinch-off, positive for P-channel)
- *   Uses polarity = -1: Vsg = Vs - Vg, Vsd = Vs - Vd
- *   Cutoff  (V_SG <= V_P):                 I_SD = 0
- *   Linear  (0 < V_SD < V_SG - V_P):       I_SD = β·[(V_SG-V_P)·V_SD - V_SD²/2]·(1+λ·V_SD)
- *   Saturation (V_SD >= V_SG - V_P > 0):   I_SD = β/2·(V_SG-V_P)²·(1+λ·V_SD)
+ * Invented cross-method slots deleted per Phase 2.5 Wave 1.4 A1. Only slots
+ * with direct ngspice correspondence in `jfetdefs.h:154-166` survive.
  *
- * Gate junction (now between G and S, forward-biased when Vgs > 0 for P-JFET,
- * i.e. when Vg > Vs, i.e. the gate is positive relative to source):
- *   I_G = IS·(exp(V_GS/(Vt)) - 1) with V_GS sign inverted by polarity
+ * D-10 (fet-base collapse): NJFET and PJFET are each self-contained closure
+ * factories. No shared abstract class. Sign-polarity is a literal `-1`
+ * constant below (P-channel, jfetdefs.h:235 `#define PJF -1`); the N-channel
+ * sibling in `njfet.ts` carries its own `+1` literal.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -30,32 +28,35 @@ import {
   type AttributeMapping,
   type ComponentDefinition,
 } from "../../core/registry.js";
-import { NJfetAnalogElement } from "./njfet.js";
-import { SLOT_VGS, SLOT_VDS } from "../../solver/analog/fet-base.js";
-import { SLOT_VGS_JUNCTION } from "./njfet.js";
-import type { LoadContext } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
+import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { pnjlim } from "../../solver/analog/newton-raphson.js";
+import { cktTerr } from "../../solver/analog/ckt-terr.js";
+import type { LteParams } from "../../solver/analog/ckt-terr.js";
+import { niIntegrate } from "../../solver/analog/ni-integrate.js";
 import { defineModelParams } from "../../core/model-params.js";
-import { VT } from "../../core/constants.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
 import {
-  MODEINITSMSIG,
-  MODEINITTRAN,
-  MODEINITJCT,
-  MODETRAN,
-  MODEAC,
-  MODETRANOP,
-  MODEUIC,
+  defineStateSchema,
+  applyInitialValues,
+  type StateSchema,
+} from "../../solver/analog/state-schema.js";
+import {
+  MODEINITJCT, MODEINITFIX, MODEINITSMSIG, MODEINITTRAN, MODEINITPRED,
+  MODETRAN, MODEAC, MODETRANOP, MODEUIC,
 } from "../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
-// Physical constants
+// Physical constants (ngspice const.h values)
 // ---------------------------------------------------------------------------
 
-// VT (thermal voltage) imported from ../../core/constants.js
+const CONSTboltz = 1.3806226e-23;
+const CHARGE = 1.6021918e-19;
+const CONSTKoverQ = CONSTboltz / CHARGE;
+const REFTEMP = 300.15;
+const CONSTroot2 = Math.SQRT2;
 
-/** Minimum conductance for numerical stability (GMIN). */
+/** Minimum conductance for numerical stability (CKTgmin). */
 const GMIN = 1e-12;
 
 // ---------------------------------------------------------------------------
@@ -77,228 +78,161 @@ export const { paramDefs: PJFET_PARAM_DEFS, defaults: PJFET_PARAM_DEFAULTS } = d
     FC:   { default: 0.5,               description: "Forward-bias capacitance coefficient" },
     RD:   { default: 0,     unit: "Ω",  description: "Drain ohmic resistance" },
     RS:   { default: 0,     unit: "Ω",  description: "Source ohmic resistance" },
+    B:    { default: 1.0,               description: "Sydney University doping-tail parameter" },
+    TCV:  { default: 0.0,   unit: "V/K",description: "Threshold voltage temperature coefficient" },
+    BEX:  { default: 0.0,               description: "Mobility temperature exponent" },
+    AREA: { default: 1.0,               description: "Area factor" },
+    M:    { default: 1.0,               description: "Parallel multiplier" },
     KF:   { default: 0,                 description: "Flicker noise coefficient" },
     AF:   { default: 1,                 description: "Flicker noise exponent" },
-    TNOM: { default: 27,    unit: "°C", description: "Nominal temperature for parameters" },
+    TNOM: { default: REFTEMP, unit: "K", description: "Nominal temperature for parameters" },
+    OFF:  { default: 0,                 description: "Initial condition: device off (0=false, 1=true)" },
   },
 });
 
 // ---------------------------------------------------------------------------
-// PJfetAnalogElement
+// PjfetParams — resolved model parameters
 // ---------------------------------------------------------------------------
 
-/**
- * P-channel JFET analog element.
- *
- * Extends NJfetAnalogElement with polaritySign = -1. All junction voltages
- * and currents are sign-inverted: internal computations use Vsg and Vsd
- * (source-gate and source-drain) as positive quantities when the device is on.
- */
-export class PJfetAnalogElement extends NJfetAnalogElement {
-  override readonly polaritySign: 1 | -1 = -1;
-
-  override limitVoltages(
-    vgsOld: number,
-    _vdsOld: number,
-    vgsNew: number,
-    vdsNew: number,
-  ): { vgs: number; vds: number; swapped?: boolean } {
-    // For P-JFET, apply pnjlim on the sign-inverted gate junction
-    const vt_n = VT * this._p.N;
-    const vcrit = vt_n * Math.log(vt_n / (Math.SQRT2 * this._p.IS));
-    const vgsResult = pnjlim(vgsNew, vgsOld, vt_n, vcrit);
-    this._pnjlimLimited = vgsResult.limited;
-
-    const vds = vdsNew;
-
-    return { vgs: vgsResult.value, vds, swapped: false };
-  }
-
-  override primeJunctions(): void {
-    // jfetload.c:115-118: MODEINITJCT sets vgs=-1, vgd=-1 (polarity handled at voltage-read time)
-    this._vgs = -1;
-    this._vds = 0;  // vgs - vgd = -1 - (-1) = 0
-    this._vgs_junction = -1;
-  }
-
-  protected override _updateOp(ctx: LoadContext): void {
-    const voltages = ctx.voltages;
-    const limitingCollector = ctx.limitingCollector;
-    const mode = ctx.cktMode;
-
-    if (mode & MODEINITSMSIG) {
-      // jfetload.c:103-105: seed vgs/vgd from CKTstate0.
-      const base = this.stateBaseOffset;
-      this._vgs = this._s0[base + SLOT_VGS];
-      this._vds = this._s0[base + SLOT_VDS];
-      this._vgs_junction = this._s0[base + SLOT_VGS_JUNCTION];
-      this._pnjlimLimited = false;
-      this._swapped = false;
-      this._ids = this.computeIds(this._vgs, this._vds);
-      this._gm = this.computeGm(this._vgs, this._vds);
-      this._gds = this.computeGds(this._vgs, this._vds);
-      const vt_n = VT * this._p.N;
-      const expArg = this._vgs_junction / vt_n;
-      this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
-      this._id_junction = this._p.IS * (Math.exp(expArg) - 1);
-      return;
-    }
-
-    if (mode & MODEINITTRAN) {
-      // jfetload.c:106-108: seed vgs/vgd from CKTstate1.
-      const base = this.stateBaseOffset;
-      this._vgs = this.s1[base + SLOT_VGS];
-      this._vds = this.s1[base + SLOT_VDS];
-      this._vgs_junction = this.s1[base + SLOT_VGS_JUNCTION];
-      this._pnjlimLimited = false;
-      this._swapped = false;
-      this._ids = this.computeIds(this._vgs, this._vds);
-      this._gm = this.computeGm(this._vgs, this._vds);
-      this._gds = this.computeGds(this._vgs, this._vds);
-      const vt_n = VT * this._p.N;
-      const expArg = this._vgs_junction / vt_n;
-      this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
-      this._id_junction = this._p.IS * (Math.exp(expArg) - 1);
-      return;
-    }
-
-    if (mode & MODEINITJCT) {
-      // jfetload.c: during MODEINITJCT, primeJunctions() has already set _vgs, _vds,
-      // _vgs_junction directly. Skip MNA voltage reads and all voltage limiting.
-      this._pnjlimLimited = false;
-      this._swapped = false;
-
-      this._ids = this.computeIds(this._vgs, this._vds);
-      this._gm = this.computeGm(this._vgs, this._vds);
-      this._gds = this.computeGds(this._vgs, this._vds);
-
-      // Gate junction I-V at primed vgs_junction
-      const vt_n = VT * this._p.N;
-      const expArg = this._vgs_junction / vt_n;
-      const igJunction = this._p.IS * (Math.exp(expArg) - 1);
-      this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
-      this._id_junction = igJunction;
-      return;
-    }
-
-    const nodeG = this.gateNode;
-    const nodeD = this.drainNode;
-    const nodeS = this.sourceNode;
-
-    const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-    const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
-    const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
-
-    // P-channel: use polarity = -1 inversion (Vsg = -(Vg - Vs), Vsd = -(Vd - Vs))
-    const vGraw = -1 * (vG - vS);  // Vsg
-    const vDraw = -1 * (vD - vS);  // Vsd
-
-    this._pnjlimLimited = false;
-    const limited = this.limitVoltages(this._vgs, this._vds, vGraw, vDraw);
-    if (limitingCollector) {
-      limitingCollector.push({
-        elementIndex: this.elementIndex ?? -1,
-        label: this.label ?? "",
-        junction: "GS",
-        limitType: "pnjlim",
-        vBefore: vGraw,
-        vAfter: limited.vgs,
-        wasLimited: limited.vgs !== vGraw,
-      });
-    }
-    this._vgs = limited.vgs; // internal Vsg (positive when device on)
-    this._vds = limited.vds; // internal Vsd (positive)
-    this._swapped = false;
-
-    this._ids = this.computeIds(this._vgs, this._vds);
-    this._gm = this.computeGm(this._vgs, this._vds);
-    this._gds = this.computeGds(this._vgs, this._vds);
-
-    // Gate junction: for P-JFET, junction is between G and S
-    // Forward biased when Vgs > 0 (in raw terms, i.e. Vg > Vs)
-    // Use raw Vgs (not polarity-inverted) for junction
-    const vGSraw = vG - vS;
-    const vt_n = VT * this._p.N;
-    const vcrit = vt_n * Math.log(vt_n / (Math.SQRT2 * this._p.IS));
-    const vgsJunctionBefore = this._vgs_junction;
-    const gateJunctionResult = pnjlim(vGSraw, this._vgs_junction, vt_n, vcrit);
-    this._vgs_junction = gateJunctionResult.value;
-    this._pnjlimLimited = this._pnjlimLimited || gateJunctionResult.limited;
-    if (limitingCollector) {
-      limitingCollector.push({
-        elementIndex: this.elementIndex ?? -1,
-        label: this.label ?? "",
-        junction: "GS_junction",
-        limitType: "pnjlim",
-        vBefore: vgsJunctionBefore,
-        vAfter: this._vgs_junction,
-        wasLimited: gateJunctionResult.limited,
-      });
-    }
-
-    const expArg = this._vgs_junction / vt_n;
-    const igJunction = this._p.IS * (Math.exp(expArg) - 1);
-    this._gd_junction = (this._p.IS / vt_n) * Math.exp(expArg) + GMIN;
-    this._id_junction = igJunction;
-    if (this._pnjlimLimited) ctx.noncon.value++;
-  }
-
-  /** jfetload.c:425-426 */
-  protected override _capGate(ctx: LoadContext): boolean {
-    const cktMode = ctx.cktMode;
-    return (cktMode & (MODETRAN | MODEAC | MODEINITSMSIG)) !== 0 ||
-      ((cktMode & MODETRANOP) !== 0 && (cktMode & MODEUIC) !== 0);
-  }
-
-  protected override _stampNonlinear(solver: SparseSolver): void {
-    const nodeG = this.gateNode;
-    const nodeD = this.drainNode;
-    const nodeS = this.sourceNode;
-
-    const gmS = this._gm;
-    const gdsS = this._gds;
-
-    // For P-JFET: current flows from S to D (opposite to N-JFET)
-    // Norton: I_SD = ids, with polarity = -1 meaning current into S, out of D
-    // gm: dI_SD/dV_SG — stamp as current from D to S controlled by V_SG=Vgs(internal)
-    // In terms of MNA nodes with polarity -1:
-    // The linearized stamp is: current into D node = -ids_polarity
-
-    // Transconductance: current from S to D controlled by V_SG
-    // Stamp same topology as N-JFET but sign of Norton current inverted
-    stampG(solver, nodeD, nodeG, -gmS);
-    stampG(solver, nodeD, nodeS, gmS);
-    stampG(solver, nodeS, nodeG, gmS);
-    stampG(solver, nodeS, nodeS, -gmS);
-
-    // Output conductance gds (for Vsd)
-    stampG(solver, nodeD, nodeD, gdsS);
-    stampG(solver, nodeD, nodeS, -gdsS);
-    stampG(solver, nodeS, nodeD, -gdsS);
-    stampG(solver, nodeS, nodeS, gdsS);
-
-    // Norton current: polarity -1 means positive ids flows from S to D
-    // KCL at S: +norton, at D: -norton
-    const nortonId = (this._ids - this._gm * this._vgs - this._gds * this._vds);
-    stampRHS(solver, nodeS, -nortonId);
-    stampRHS(solver, nodeD, nortonId);
-
-    // Gate junction diode (between G and S, raw Vgs orientation)
-    const gd = this._gd_junction;
-    const nortonIg = (this._id_junction - this._gd_junction * this._vgs_junction);
-
-    stampG(solver, nodeG, nodeG, gd);
-    stampG(solver, nodeG, nodeS, -gd);
-    stampG(solver, nodeS, nodeG, -gd);
-    stampG(solver, nodeS, nodeS, gd);
-
-    stampRHS(solver, nodeG, -nortonIg);
-    stampRHS(solver, nodeS, nortonIg);
-  }
+interface PjfetParams {
+  VTO: number;
+  BETA: number;
+  LAMBDA: number;
+  IS: number;
+  N: number;
+  CGS: number;
+  CGD: number;
+  PB: number;
+  FC: number;
+  RD: number;
+  RS: number;
+  B: number;
+  TCV: number;
+  BEX: number;
+  AREA: number;
+  M: number;
+  KF: number;
+  AF: number;
+  TNOM: number;
+  OFF: number;
 }
 
 // ---------------------------------------------------------------------------
-// Factory
+// State schema — JFET (Phase 2.5 Wave 1.4 A1 post-excision).
+//
+// Only slots with direct correspondence in `jfetdefs.h:154-166` JFETstate<n>
+// offsets survive. Same layout as the N-channel sibling — the schema is
+// polarity-agnostic (ngspice shares JFETstate between NJF and PJF).
+// ---------------------------------------------------------------------------
+
+export const PJFET_SCHEMA: StateSchema = defineStateSchema("PjfetElement", [
+  { name: "VGS",  doc: "jfetdefs.h JFETvgs=0",  init: { kind: "zero" } },
+  { name: "VGD",  doc: "jfetdefs.h JFETvgd=1",  init: { kind: "zero" } },
+  { name: "CG",   doc: "jfetdefs.h JFETcg=2",   init: { kind: "zero" } },
+  { name: "CD",   doc: "jfetdefs.h JFETcd=3",   init: { kind: "zero" } },
+  { name: "CGD",  doc: "jfetdefs.h JFETcgd=4",  init: { kind: "zero" } },
+  { name: "GM",   doc: "jfetdefs.h JFETgm=5",   init: { kind: "zero" } },
+  { name: "GDS",  doc: "jfetdefs.h JFETgds=6",  init: { kind: "zero" } },
+  { name: "GGS",  doc: "jfetdefs.h JFETggs=7",  init: { kind: "zero" } },
+  { name: "GGD",  doc: "jfetdefs.h JFETggd=8",  init: { kind: "zero" } },
+  { name: "QGS",  doc: "jfetdefs.h JFETqgs=9",  init: { kind: "zero" } },
+  { name: "CQGS", doc: "jfetdefs.h JFETcqgs=10",init: { kind: "zero" } },
+  { name: "QGD",  doc: "jfetdefs.h JFETqgd=11", init: { kind: "zero" } },
+  { name: "CQGD", doc: "jfetdefs.h JFETcqgd=12",init: { kind: "zero" } },
+]);
+
+// Slot indices (match PJFET_SCHEMA order, mirror jfetdefs.h).
+const SLOT_VGS  = 0;
+const SLOT_VGD  = 1;
+const SLOT_CG   = 2;
+const SLOT_CD   = 3;
+const SLOT_CGD  = 4;
+const SLOT_GM   = 5;
+const SLOT_GDS  = 6;
+const SLOT_GGS  = 7;
+const SLOT_GGD  = 8;
+const SLOT_QGS  = 9;
+const SLOT_CQGS = 10;
+const SLOT_QGD  = 11;
+const SLOT_CQGD = 12;
+
+// ---------------------------------------------------------------------------
+// PJFET temperature-corrected parameters (jfettemp.c port, local copy).
+// ---------------------------------------------------------------------------
+
+interface PjfetTempParams {
+  vt: number;
+  tSatCur: number;
+  tGatePot: number;
+  tCGS: number;
+  tCGD: number;
+  corDepCap: number;
+  vcrit: number;
+  f1: number;
+  f2: number;
+  f3: number;
+  tThreshold: number;
+  tBeta: number;
+  bFac: number;
+}
+
+function computePjfetTempParams(p: PjfetParams): PjfetTempParams {
+  // jfettemp.c:43-49.
+  const vtnom = CONSTKoverQ * p.TNOM;
+  const fact1 = p.TNOM / REFTEMP;
+  const kt1 = CONSTboltz * p.TNOM;
+  const egfet1 = 1.16 - (7.02e-4 * p.TNOM * p.TNOM) / (p.TNOM + 1108);
+  const arg1 = -egfet1 / (kt1 + kt1) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP));
+  const pbfact1 = -2 * vtnom * (1.5 * Math.log(fact1) + CHARGE * arg1);
+  const pbo = (p.PB - pbfact1) / fact1;
+  const gmaold = (p.PB - pbo) / pbo;
+  const cjfact = 1 / (1 + 0.5 * (4e-4 * (p.TNOM - REFTEMP) - gmaold));
+
+  const fcClamped = p.FC > 0.95 ? 0.95 : p.FC;
+
+  const xfc = Math.log(1 - fcClamped);
+  const f2 = Math.exp((1 + 0.5) * xfc);
+  const f3 = 1 - fcClamped * (1 + 0.5);
+
+  // jfettemp.c:75-77: Sydney University bFac.
+  const bFac = (1 - p.B) / (p.PB - p.VTO);
+
+  const temp = REFTEMP;
+  const vt = temp * CONSTKoverQ;
+  const fact2 = temp / REFTEMP;
+  const ratio1 = temp / p.TNOM - 1;
+  let tSatCur = p.IS * Math.exp(ratio1 * 1.11 / vt);
+  let tCGS = p.CGS * cjfact;
+  let tCGD = p.CGD * cjfact;
+  const kt = CONSTboltz * temp;
+  const egfet = 1.16 - (7.02e-4 * temp * temp) / (temp + 1108);
+  const arg = -egfet / (kt + kt) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP));
+  const pbfact = -2 * vt * (1.5 * Math.log(fact2) + CHARGE * arg);
+  const tGatePot = fact2 * pbo + pbfact;
+  const gmanew = (tGatePot - pbo) / pbo;
+  const cjfact1 = 1 + 0.5 * (4e-4 * (temp - REFTEMP) - gmanew);
+  tCGS *= cjfact1;
+  tCGD *= cjfact1;
+
+  const corDepCap = fcClamped * tGatePot;
+  const f1 = tGatePot * (1 - Math.exp((1 - 0.5) * xfc)) / (1 - 0.5);
+  const vcrit = vt * Math.log(vt / (CONSTroot2 * tSatCur));
+
+  const tThreshold = p.VTO - p.TCV * (temp - p.TNOM);
+  const tBeta = p.BETA * Math.pow(temp / p.TNOM, p.BEX);
+
+  return {
+    vt, tSatCur, tGatePot, tCGS, tCGD,
+    corDepCap, vcrit, f1, f2, f3,
+    tThreshold, tBeta, bFac,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// createPJfetElement — P-channel JFET factory (polarity literal = -1).
+// Single load() ported from jfetload.c line-by-line. No _updateOp/
+// _stampCompanion. No cached Float64Array state refs — pool.states[N] at
+// call time.
 // ---------------------------------------------------------------------------
 
 export function createPJfetElement(
@@ -306,12 +240,15 @@ export function createPJfetElement(
   _internalNodeIds: readonly number[],
   _branchIdx: number,
   props: PropertyBag,
-): PJfetAnalogElement {
-  const nodeG = pinNodes.get("G")!; // gate
-  const nodeD = pinNodes.get("D")!; // drain
-  const nodeS = pinNodes.get("S")!; // source
+) {
+  // P-channel polarity literal (jfetdefs.h:235 `#define PJF -1`).
+  const polarity: -1 = -1;
 
-  const p = {
+  const nodeG = pinNodes.get("G")!;
+  const nodeD = pinNodes.get("D")!;
+  const nodeS = pinNodes.get("S")!;
+
+  const params: PjfetParams = {
     VTO:    props.getModelParam<number>("VTO"),
     BETA:   props.getModelParam<number>("BETA"),
     LAMBDA: props.getModelParam<number>("LAMBDA"),
@@ -323,11 +260,540 @@ export function createPJfetElement(
     FC:     props.getModelParam<number>("FC"),
     RD:     props.getModelParam<number>("RD"),
     RS:     props.getModelParam<number>("RS"),
+    B:      props.getModelParam<number>("B"),
+    TCV:    props.getModelParam<number>("TCV"),
+    BEX:    props.getModelParam<number>("BEX"),
+    AREA:   props.getModelParam<number>("AREA"),
+    M:      props.getModelParam<number>("M"),
     KF:     props.getModelParam<number>("KF"),
     AF:     props.getModelParam<number>("AF"),
     TNOM:   props.getModelParam<number>("TNOM"),
+    OFF:    props.getModelParam<number>("OFF"),
   };
-  return new PJfetAnalogElement(nodeG, nodeD, nodeS, p);
+
+  let tp = computePjfetTempParams(params);
+  const hasCapacitance = params.CGS > 0 || params.CGD > 0;
+
+  let pool: StatePoolRef;
+  let base: number;
+
+  // Ephemeral per-iteration icheck flag (jfetload.c:500-508 CKTnoncon bump).
+  let icheckLimited = false;
+
+  // One-shot cold-start seed flag from primeJunctions(); consumed by next
+  // load() and cleared.
+  let primedFromJct = false;
+
+  return {
+    branchIndex: -1,
+    isNonlinear: true,
+    isReactive: hasCapacitance,
+    poolBacked: true as const,
+    stateSchema: PJFET_SCHEMA,
+    stateSize: PJFET_SCHEMA.size,
+    stateBaseOffset: -1,
+
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
+      base = this.stateBaseOffset;
+      applyInitialValues(PJFET_SCHEMA, pool, base, {});
+    },
+
+    /**
+     * Single-pass load mirroring jfetload.c::JFETload line-by-line for
+     * P-channel (polarity literal = -1).
+     */
+    load(ctx: LoadContext): void {
+      const s0 = pool.states[0];
+      const s1 = pool.states[1];
+      const s2 = pool.states[2];
+      const mode = ctx.cktMode;
+      const voltages = ctx.voltages;
+      const solver = ctx.solver;
+      const m = params.M;
+
+      // jfetload.c:95-98: dc model parameters (area-scaled).
+      const beta = tp.tBeta * params.AREA;
+      const gdpr = (params.RD > 0 ? 1 / params.RD : 0) * params.AREA;
+      const gspr = (params.RS > 0 ? 1 / params.RS : 0) * params.AREA;
+      const csat = tp.tSatCur * params.AREA;
+      const vt_temp = tp.vt;
+      const vto = tp.tThreshold;
+
+      let icheck = 1;
+
+      // jfetload.c:103-164: linearization voltage dispatch per cktMode.
+      let vgs: number;
+      let vgd: number;
+
+      if (primedFromJct) {
+        // Consume one-shot seed from primeJunctions() — MODEINITJCT/!OFF
+        // branch (jfetload.c:115-118) seed vgs=-1, vgd=-1.
+        vgs = s0[base + SLOT_VGS];
+        vgd = s0[base + SLOT_VGD];
+        primedFromJct = false;
+        icheck = 0;
+      } else if (mode & MODEINITSMSIG) {
+        // jfetload.c:103-105: seed from CKTstate0.
+        vgs = s0[base + SLOT_VGS];
+        vgd = s0[base + SLOT_VGD];
+        icheck = 0;
+      } else if (mode & MODEINITTRAN) {
+        // jfetload.c:106-108: seed from CKTstate1.
+        vgs = s1[base + SLOT_VGS];
+        vgd = s1[base + SLOT_VGD];
+        icheck = 0;
+      } else if ((mode & MODEINITJCT) && (mode & MODETRANOP) && (mode & MODEUIC)) {
+        // jfetload.c:109-114: UIC with IC params. PjfetParams has no ICVDS/
+        // ICVGS, so IC values collapse to zero. Polarity = -1; polarity * 0
+        // = 0 either way.
+        vgs = 0;
+        vgd = 0;
+        icheck = 0;
+      } else if ((mode & MODEINITJCT) && params.OFF === 0) {
+        // jfetload.c:115-118: initJct, device on → vgs=-1, vgd=-1.
+        vgs = -1;
+        vgd = -1;
+        icheck = 0;
+      } else if ((mode & MODEINITJCT) ||
+                 ((mode & MODEINITFIX) && params.OFF !== 0)) {
+        // jfetload.c:119-122: initJct w/ OFF or initFix+OFF → zero.
+        vgs = 0;
+        vgd = 0;
+        icheck = 0;
+      } else if (mode & MODEINITPRED) {
+        // jfetload.c:124-149: predictor step (#ifndef PREDICTOR default is
+        // inert in ngspice). Use state1 rotation fallback.
+        const vgs1 = s1[base + SLOT_VGS];
+        const vgd1 = s1[base + SLOT_VGD];
+        const deltaOldRatio = ctx.deltaOld[1] > 0 ? ctx.delta / ctx.deltaOld[1] : 0;
+        const xfact = deltaOldRatio;
+        s0[base + SLOT_VGS] = vgs1;
+        vgs = (1 + xfact) * vgs1 - xfact * s2[base + SLOT_VGS];
+        s0[base + SLOT_VGD] = vgd1;
+        vgd = (1 + xfact) * vgd1 - xfact * s2[base + SLOT_VGD];
+        icheck = 0;
+      } else {
+        // jfetload.c:151-164: general iteration — read from CKTrhsOld with
+        // polarity pre-multiply. jfetload.c:154-161:
+        //   vgs = type * (rhsOld[gate] - rhsOld[sourcePrime]);
+        //   vgd = type * (rhsOld[gate] - rhsOld[drainPrime]);
+        // P-channel polarity = -1 → negate the raw difference.
+        const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
+        const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
+        const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
+        const vgsRaw = polarity * (vG - vS);
+        const vgdRaw = polarity * (vG - vD);
+        vgs = vgsRaw;
+        vgd = vgdRaw;
+
+        // jfetload.c:211-242: voltage limiting — pnjlim then fetlim
+        // (DEVfetlim — three-zone gate-threshold limiter from devsup.c).
+        const vgsOld = s0[base + SLOT_VGS];
+        const vgdOld = s0[base + SLOT_VGD];
+
+        const vgsResult = pnjlim(vgs, vgsOld, vt_temp, tp.vcrit);
+        vgs = vgsResult.value;
+        icheck = vgsResult.limited ? 1 : 0;
+
+        const vgdResult = pnjlim(vgd, vgdOld, vt_temp, tp.vcrit);
+        vgd = vgdResult.value;
+        if (vgdResult.limited) icheck = 1;
+
+        if (ctx.limitingCollector) {
+          ctx.limitingCollector.push({
+            elementIndex: (this as any).elementIndex ?? -1,
+            label: (this as any).label ?? "",
+            junction: "GS",
+            limitType: "pnjlim",
+            vBefore: vgsRaw,
+            vAfter: vgs,
+            wasLimited: vgsResult.limited,
+          });
+          ctx.limitingCollector.push({
+            elementIndex: (this as any).elementIndex ?? -1,
+            label: (this as any).label ?? "",
+            junction: "GD",
+            limitType: "pnjlim",
+            vBefore: vgdRaw,
+            vAfter: vgd,
+            wasLimited: vgdResult.limited,
+          });
+        }
+
+        // jfetload.c:230-242: DEVfetlim — inline so P-channel file stays
+        // self-contained per spec §4 D-10 (no shared helper across NJFET
+        // and PJFET).
+        {
+          const vto_local = vto;
+          const vtsthi = Math.abs(2 * (vgsOld - vto_local)) + 2;
+          const vtstlo = vtsthi / 2 + 2;
+          const vtox = vto_local + 3.5;
+          const delv = vgs - vgsOld;
+          let vOut = vgs;
+          if (vgsOld >= vto_local) {
+            if (vgsOld >= vtox) {
+              if (delv <= 0) {
+                if (vOut >= vtox) {
+                  if (-delv > vtstlo) vOut = vgsOld - vtstlo;
+                } else {
+                  vOut = Math.max(vOut, vto_local + 2);
+                }
+              } else {
+                if (delv >= vtsthi) vOut = vgsOld + vtsthi;
+              }
+            } else {
+              if (delv <= 0) vOut = Math.max(vOut, vto_local - 0.5);
+              else vOut = Math.min(vOut, vto_local + 4);
+            }
+          } else {
+            if (delv <= 0) {
+              if (-delv > vtsthi) vOut = vgsOld - vtsthi;
+            } else {
+              const vtemp = vto_local + 0.5;
+              if (vOut <= vtemp) {
+                if (delv > vtstlo) vOut = vgsOld + vtstlo;
+              } else {
+                vOut = vtemp;
+              }
+            }
+          }
+          vgs = vOut;
+        }
+        {
+          const vto_local = vto;
+          const vtsthi = Math.abs(2 * (vgdOld - vto_local)) + 2;
+          const vtstlo = vtsthi / 2 + 2;
+          const vtox = vto_local + 3.5;
+          const delv = vgd - vgdOld;
+          let vOut = vgd;
+          if (vgdOld >= vto_local) {
+            if (vgdOld >= vtox) {
+              if (delv <= 0) {
+                if (vOut >= vtox) {
+                  if (-delv > vtstlo) vOut = vgdOld - vtstlo;
+                } else {
+                  vOut = Math.max(vOut, vto_local + 2);
+                }
+              } else {
+                if (delv >= vtsthi) vOut = vgdOld + vtsthi;
+              }
+            } else {
+              if (delv <= 0) vOut = Math.max(vOut, vto_local - 0.5);
+              else vOut = Math.min(vOut, vto_local + 4);
+            }
+          } else {
+            if (delv <= 0) {
+              if (-delv > vtsthi) vOut = vgdOld - vtsthi;
+            } else {
+              const vtemp = vto_local + 0.5;
+              if (vOut <= vtemp) {
+                if (delv > vtstlo) vOut = vgdOld + vtstlo;
+              } else {
+                vOut = vtemp;
+              }
+            }
+          }
+          vgd = vOut;
+        }
+      }
+
+      icheckLimited = icheck === 1;
+
+      // jfetload.c:247: vds = vgs - vgd.
+      const vds = vgs - vgd;
+
+      // jfetload.c:249-270: gate junction currents and conductances.
+      let cg: number, cgd: number;
+      let ggs: number, ggd: number;
+
+      // jfetload.c:250-259: gate-source junction.
+      if (vgs < -3 * vt_temp) {
+        let arg = 3 * vt_temp / (vgs * Math.E);
+        arg = arg * arg * arg;
+        cg = -csat * (1 + arg) + GMIN * vgs;
+        ggs = csat * 3 * arg / vgs + GMIN;
+      } else {
+        const evgs = Math.exp(vgs / vt_temp);
+        ggs = csat * evgs / vt_temp + GMIN;
+        cg = csat * (evgs - 1) + GMIN * vgs;
+      }
+
+      // jfetload.c:261-270: gate-drain junction.
+      if (vgd < -3 * vt_temp) {
+        let arg = 3 * vt_temp / (vgd * Math.E);
+        arg = arg * arg * arg;
+        cgd = -csat * (1 + arg) + GMIN * vgd;
+        ggd = csat * 3 * arg / vgd + GMIN;
+      } else {
+        const evgd = Math.exp(vgd / vt_temp);
+        ggd = csat * evgd / vt_temp + GMIN;
+        cgd = csat * (evgd - 1) + GMIN * vgd;
+      }
+
+      // jfetload.c:272: cg = cg + cgd.
+      cg = cg + cgd;
+
+      // jfetload.c:274-348: Sydney University drain current / derivatives.
+      let cdrain: number, gm: number, gds: number;
+      const Bfac0 = tp.bFac;
+
+      if (vds >= 0) {
+        // jfetload.c:276-311: normal mode.
+        const vgst = vgs - vto;
+        if (vgst <= 0) {
+          cdrain = 0;
+          gm = 0;
+          gds = 0;
+        } else {
+          const betap = beta * (1 + params.LAMBDA * vds);
+          let Bfac = Bfac0;
+          if (vgst >= vds) {
+            const apart = 2 * params.B + 3 * Bfac * (vgst - vds);
+            const cpart = vds * (vds * (Bfac * vds - params.B) + vgst * apart);
+            cdrain = betap * cpart;
+            gm = betap * vds * (apart + 3 * Bfac * vgst);
+            gds = betap * (vgst - vds) * apart
+                + beta * params.LAMBDA * cpart;
+          } else {
+            Bfac = vgst * Bfac;
+            gm = betap * vgst * (2 * params.B + 3 * Bfac);
+            const cpart = vgst * vgst * (params.B + Bfac);
+            cdrain = betap * cpart;
+            gds = params.LAMBDA * beta * cpart;
+          }
+        }
+      } else {
+        // jfetload.c:312-348: inverse mode.
+        const vgdt = vgd - vto;
+        if (vgdt <= 0) {
+          cdrain = 0;
+          gm = 0;
+          gds = 0;
+        } else {
+          const betap = beta * (1 - params.LAMBDA * vds);
+          let Bfac = Bfac0;
+          if (vgdt + vds >= 0) {
+            const apart = 2 * params.B + 3 * Bfac * (vgdt + vds);
+            const cpart = vds * (-vds * (-Bfac * vds - params.B) + vgdt * apart);
+            cdrain = betap * cpart;
+            gm = betap * vds * (apart + 3 * Bfac * vgdt);
+            gds = betap * (vgdt + vds) * apart
+                - beta * params.LAMBDA * cpart - gm;
+          } else {
+            Bfac = vgdt * Bfac;
+            gm = -betap * vgdt * (2 * params.B + 3 * Bfac);
+            const cpart = vgdt * vgdt * (params.B + Bfac);
+            cdrain = -betap * cpart;
+            gds = params.LAMBDA * beta * cpart - gm;
+          }
+        }
+      }
+
+      // jfetload.c:423-424: cd = cdrain - cgd.
+      let cd = cdrain - cgd;
+
+      // jfetload.c:425-494: charge storage + NIintegrate for transient.
+      const capGate = (mode & (MODETRAN | MODEAC | MODEINITSMSIG)) !== 0
+        || ((mode & MODETRANOP) !== 0 && (mode & MODEUIC) !== 0);
+
+      if (capGate) {
+        const czgs = tp.tCGS * params.AREA;
+        const czgd = tp.tCGD * params.AREA;
+        const twop = tp.tGatePot + tp.tGatePot;
+        const fcpb2 = tp.corDepCap * tp.corDepCap;
+        const czgsf2 = czgs / tp.f2;
+        const czgdf2 = czgd / tp.f2;
+
+        // jfetload.c:436-446: G-S junction cap + charge.
+        let capgs: number;
+        if (vgs < tp.corDepCap) {
+          const sarg = Math.sqrt(1 - vgs / tp.tGatePot);
+          s0[base + SLOT_QGS] = twop * czgs * (1 - sarg);
+          capgs = czgs / sarg;
+        } else {
+          s0[base + SLOT_QGS] = czgs * tp.f1
+            + czgsf2 * (tp.f3 * (vgs - tp.corDepCap)
+            + (vgs * vgs - fcpb2) / (twop + twop));
+          capgs = czgsf2 * (tp.f3 + vgs / twop);
+        }
+
+        // jfetload.c:447-457: G-D junction cap + charge.
+        let capgd: number;
+        if (vgd < tp.corDepCap) {
+          const sarg = Math.sqrt(1 - vgd / tp.tGatePot);
+          s0[base + SLOT_QGD] = twop * czgd * (1 - sarg);
+          capgd = czgd / sarg;
+        } else {
+          s0[base + SLOT_QGD] = czgd * tp.f1
+            + czgdf2 * (tp.f3 * (vgd - tp.corDepCap)
+            + (vgd * vgd - fcpb2) / (twop + twop));
+          capgd = czgdf2 * (tp.f3 + vgd / twop);
+        }
+
+        // jfetload.c:461-493: store + NIintegrate (skipped for UIC TRANOP).
+        if (!((mode & MODETRANOP) && (mode & MODEUIC))) {
+          if (mode & MODEINITSMSIG) {
+            // jfetload.c:463-466: store raw caps and continue.
+            s0[base + SLOT_QGS] = capgs;
+            s0[base + SLOT_QGD] = capgd;
+          } else {
+            // jfetload.c:471-476: MODEINITTRAN copies state0 → state1.
+            if (mode & MODEINITTRAN) {
+              s1[base + SLOT_QGS] = s0[base + SLOT_QGS];
+              s1[base + SLOT_QGD] = s0[base + SLOT_QGD];
+            }
+
+            // jfetload.c:477-482: NIintegrate G-S cap, lump geq into ggs.
+            const ag = ctx.ag;
+            {
+              const q0 = s0[base + SLOT_QGS];
+              const q1 = s1[base + SLOT_QGS];
+              const q2 = s2[base + SLOT_QGS];
+              const ccapPrev = s1[base + SLOT_CQGS];
+              const { ccap, geq } = niIntegrate(
+                ctx.method,
+                ctx.order,
+                capgs,
+                ag,
+                q0, q1,
+                [q2, 0, 0, 0, 0],
+                ccapPrev,
+              );
+              s0[base + SLOT_CQGS] = ccap;
+              ggs = ggs + geq;
+              cg = cg + ccap;
+            }
+
+            // jfetload.c:481-486: NIintegrate G-D cap, lump geq into ggd.
+            {
+              const q0 = s0[base + SLOT_QGD];
+              const q1 = s1[base + SLOT_QGD];
+              const q2 = s2[base + SLOT_QGD];
+              const ccapPrev = s1[base + SLOT_CQGD];
+              const { ccap, geq } = niIntegrate(
+                ctx.method,
+                ctx.order,
+                capgd,
+                ag,
+                q0, q1,
+                [q2, 0, 0, 0, 0],
+                ccapPrev,
+              );
+              s0[base + SLOT_CQGD] = ccap;
+              ggd = ggd + geq;
+              cg = cg + ccap;
+              cd = cd - ccap;
+              cgd = cgd + ccap;
+            }
+
+            if (mode & MODEINITTRAN) {
+              s1[base + SLOT_CQGS] = s0[base + SLOT_CQGS];
+              s1[base + SLOT_CQGD] = s0[base + SLOT_CQGD];
+            }
+          }
+        }
+      }
+
+      // jfetload.c:498-508: CKTnoncon increment on icheck failure.
+      if (icheckLimited) ctx.noncon.value++;
+
+      // jfetload.c:509-517: write accepted state back to state0.
+      s0[base + SLOT_VGS] = vgs;
+      s0[base + SLOT_VGD] = vgd;
+      s0[base + SLOT_CG]  = cg;
+      s0[base + SLOT_CD]  = cd;
+      s0[base + SLOT_CGD] = cgd;
+      s0[base + SLOT_GM]  = gm;
+      s0[base + SLOT_GDS] = gds;
+      s0[base + SLOT_GGS] = ggs;
+      s0[base + SLOT_GGD] = ggd;
+
+      // jfetload.c:521-532: RHS stamps (polarity = JFETtype = -1 for PJFET).
+      const ceqgd = polarity * (cgd - ggd * vgd);
+      const ceqgs = polarity * ((cg - cgd) - ggs * vgs);
+      const cdreq = polarity * ((cd + cgd) - gds * vds - gm * vgs);
+
+      stampRHS(solver, nodeG, m * (-ceqgs - ceqgd));
+      stampRHS(solver, nodeD, m * (-cdreq + ceqgd));
+      stampRHS(solver, nodeS, m * (cdreq + ceqgs));
+
+      // jfetload.c:534-550: Y-matrix stamps.
+      stampG(solver, nodeG, nodeG, m * (ggd + ggs));
+      stampG(solver, nodeG, nodeD, m * (-ggd));
+      stampG(solver, nodeG, nodeS, m * (-ggs));
+      stampG(solver, nodeD, nodeG, m * (gm - ggd));
+      stampG(solver, nodeD, nodeD, m * (gdpr + gds + ggd));
+      stampG(solver, nodeD, nodeS, m * (-gds - gm));
+      stampG(solver, nodeS, nodeG, m * (-ggs - gm));
+      stampG(solver, nodeS, nodeD, m * (-gds));
+      stampG(solver, nodeS, nodeS, m * (gspr + gds + gm + ggs));
+    },
+
+    primeJunctions(): void {
+      // jfetload.c:115-118: MODEINITJCT + !OFF branch sets vgs = -1, vgd = -1.
+      const s0 = pool.states[0];
+      if (params.OFF) {
+        s0[base + SLOT_VGS] = 0;
+        s0[base + SLOT_VGD] = 0;
+      } else {
+        s0[base + SLOT_VGS] = -1;
+        s0[base + SLOT_VGD] = -1;
+      }
+      primedFromJct = true;
+    },
+
+    getPinCurrents(_voltages: Float64Array): number[] {
+      const s0 = pool.states[0];
+      // jfet.c:33 JFET_CD: id = polarity * cd.
+      const id = polarity * s0[base + SLOT_CD];
+      const ig = polarity * s0[base + SLOT_CG];
+      // pinLayout order: [G, D, S] per buildPJfetPinDeclarations.
+      // KCL: iS = -(ig + id).
+      const iS = -(ig + id);
+      return [ig, id, iS];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in params) {
+        (params as unknown as Record<string, number>)[key] = value;
+        tp = computePjfetTempParams(params);
+      }
+    },
+
+    get _p(): PjfetParams {
+      return params;
+    },
+
+    getLteTimestep(
+      dt: number,
+      deltaOld: readonly number[],
+      order: number,
+      method: IntegrationMethod,
+      lteParams: LteParams,
+    ): number {
+      const s0 = pool.states[0];
+      const s1 = pool.states[1];
+      const s2 = pool.states[2];
+      const s3 = pool.states[3];
+      let minDt = Infinity;
+      const pairs: [number, number][] = [
+        [SLOT_QGS, SLOT_CQGS],
+        [SLOT_QGD, SLOT_CQGD],
+      ];
+      for (const [slotQ, slotCcap] of pairs) {
+        const q0 = s0[base + slotQ];
+        const q1 = s1[base + slotQ];
+        const q2 = s2[base + slotQ];
+        const q3 = s3[base + slotQ];
+        const ccap0 = s0[base + slotCcap];
+        const ccap1 = s1[base + slotCcap];
+        const dtSlot = cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
+        if (dtSlot < minDt) minDt = dtSlot;
+      }
+      return minDt;
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
