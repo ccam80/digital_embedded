@@ -291,6 +291,7 @@ function makeComparatorParityCtx(voltages: Float64Array, solver: SparseSolverTyp
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
   };
 }
 
@@ -315,6 +316,7 @@ function makeComparatorTransientCtx(
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
   };
 }
 

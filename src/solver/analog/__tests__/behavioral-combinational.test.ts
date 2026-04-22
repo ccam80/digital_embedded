@@ -452,6 +452,7 @@ describe("Task 6.4.3 — combinational pin loading propagates", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      cktFixLimit: false,
     };
 
     element.load(ctx);

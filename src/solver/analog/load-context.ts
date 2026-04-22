@@ -134,4 +134,11 @@ export interface LoadContext {
   temp: number;
   /** Thermal voltage in volts (ngspice CKTvt = k * temp / q). */
   vt: number;
+  /**
+   * Fix-limit mode flag (ngspice CKTfixLimit per cktdefs.h).
+   * When true, the reverse-mode limvds guard in MOSFET load is skipped.
+   * Default false — matches ngspice's default (CKTfixLimit not set).
+   * See mos1load.c:385: `if(!(ckt->CKTfixLimit)) { ... limvds(-vds, ...) }`.
+   */
+  cktFixLimit: boolean;
 }

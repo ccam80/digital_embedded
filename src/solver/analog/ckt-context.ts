@@ -578,6 +578,7 @@ export class CKTCircuitContext {
       iabstol: params.abstol,
       temp: ctxTemp,
       vt: ctxVt,
+      cktFixLimit: false,
     };
 
     // Tolerances

@@ -89,6 +89,7 @@ function makeCompanionCtx(opts: {
     uic: opts.uic ?? false,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
   };
 }
 
@@ -560,6 +561,7 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      cktFixLimit: false,
     };
 
     element.load(ctx);

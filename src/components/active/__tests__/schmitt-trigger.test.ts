@@ -90,6 +90,7 @@ function makeSchmittLoadCtx(voltages: Float64Array, solver: SparseSolverType): L
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
   };
 }
 
@@ -435,6 +436,7 @@ function makeSchmittParityCtx(voltages: Float64Array, solver: SparseSolverType):
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
   };
 }
 

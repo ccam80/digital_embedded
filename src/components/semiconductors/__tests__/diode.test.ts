@@ -113,6 +113,7 @@ function buildUnitCtx(
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
     ...overrides,
   };
 }
@@ -315,6 +316,7 @@ describe("Diode", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      cktFixLimit: false,
     };
     capSolver.beginAssembly(2);
     element.load(capCtx);
@@ -815,6 +817,7 @@ describe("AREA scaling", () => {
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        cktFixLimit: false,
       };
     }
 
@@ -977,6 +980,7 @@ function makeParityCtx(
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
   };
 }
 
@@ -1135,6 +1139,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      cktFixLimit: false,
     });
 
     // SLOT_VD must remain 0.4V (seeded from state0, not the 2V iterate).
@@ -1172,6 +1177,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      cktFixLimit: false,
     });
 
     // SLOT_VD must be 0.35V (seeded from state1, not the 3V iterate).
@@ -1210,6 +1216,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      cktFixLimit: false,
     });
 
     expect(noncon.value).toBe(0);
@@ -1248,6 +1255,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      cktFixLimit: false,
     });
 
     // MODEINITSMSIG: SLOT_CAP_CURRENT (index 4) holds capd (Farads) = Ctotal.
@@ -1288,6 +1296,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      cktFixLimit: false,
     });
 
     // SLOT_CAP_CURRENT (index 4) holds iqcap (A) under MODETRAN/MODEUIC — dioload.c:363.
@@ -1323,6 +1332,7 @@ describe("diode MODEINITSMSIG seeding (dioload.c:126-127)", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      cktFixLimit: false,
     });
 
     // SLOT_CAP_CURRENT (index 4) must remain 0 — cap block not entered under DCOP.

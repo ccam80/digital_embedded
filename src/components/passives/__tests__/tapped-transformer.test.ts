@@ -78,6 +78,7 @@ function makeTransientCtx(solver: SparseSolverType, voltages: Float64Array, dt: 
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
   };
 }
 
@@ -605,6 +606,7 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        cktFixLimit: false,
       };
 
       el.load(ctx);

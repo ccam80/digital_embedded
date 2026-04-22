@@ -89,6 +89,7 @@ function makeCompanionCtx(opts: {
     uic: opts.uic ?? false,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
   };
 }
 
@@ -169,7 +170,7 @@ describe("Inductor", () => {
         deltaOld: [0, 0, 0, 0, 0, 0, 0], ag: new Float64Array(7),
         srcFact: 1, noncon: { value: 0 }, limitingCollector: null,
         xfact: 1, gmin: 1e-12, uic: false,
-        reltol: 1e-3, iabstol: 1e-12,
+        reltol: 1e-3, iabstol: 1e-12, cktFixLimit: false,
       };
       analogElement.load(ctx);
 
@@ -594,6 +595,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        cktFixLimit: false,
       };
 
       element.load(ctx);

@@ -75,6 +75,7 @@ function driveFuseStep(fuse: AnalogFuseElement, dt: number, voltages: Float64Arr
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
   };
   fuse.load(ctx);
   fuse.accept(ctx, 0, () => {});

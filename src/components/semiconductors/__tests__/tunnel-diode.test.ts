@@ -95,6 +95,7 @@ function buildUnitCtx(
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
     ...overrides,
   };
 }
@@ -432,6 +433,7 @@ describe("integration", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      cktFixLimit: false,
     };
 
     core.load(ctx);

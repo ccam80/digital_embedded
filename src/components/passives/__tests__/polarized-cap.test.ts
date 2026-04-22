@@ -76,6 +76,7 @@ function makeDiagnosticCtx(
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
   };
 }
 
@@ -112,6 +113,7 @@ function makeSlotLoadCtx(
     gmin: 1e-12,
     reltol: 1e-3,
     iabstol: 1e-12,
+    cktFixLimit: false,
   };
 }
 
@@ -260,6 +262,7 @@ describe("PolarizedCap", () => {
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        cktFixLimit: false,
       };
 
       solver.beginAssembly(matrixSize);
@@ -346,6 +349,7 @@ describe("PolarizedCap", () => {
           gmin: 1e-12,
           reltol: 1e-3,
           iabstol: 1e-12,
+          cktFixLimit: false,
         };
 
         solver.beginAssembly(matrixSize);
@@ -636,6 +640,7 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        cktFixLimit: false,
       };
 
       element.load(ctx);

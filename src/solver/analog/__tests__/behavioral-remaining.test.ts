@@ -378,6 +378,7 @@ describe("Relay", () => {
         gmin: 1e-12,
         reltol: 1e-3,
         iabstol: 1e-12,
+        cktFixLimit: false,
       };
     }
 
@@ -502,6 +503,7 @@ describe("Task 6.4.3 — remaining pin loading propagates", () => {
       gmin: 1e-12,
       reltol: 1e-3,
       iabstol: 1e-12,
+      cktFixLimit: false,
     };
 
     element.load(ctx);
