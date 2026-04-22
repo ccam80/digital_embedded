@@ -51,7 +51,7 @@
 | W1.5 | Reactive passives (capacitor, polarized-cap, inductor, transformer, tapped-transformer) | ✓ | 781b1943 |
 | W1.6 | F4c digiTS-only semiconductors (triac, scr, diac, tunnel-diode, triode, LED) | ✓ | 46e1dae7 |
 | W1.7 | F4c digiTS-only passives / sensors (crystal, transmission-line, memristor, analog-fuse, ntc-thermistor, spark-gap) | ✓ | d8643e83 |
-| W1.8 | Active F4b composites (real-opamp, comparator, ota, schmitt-trigger, analog-switch, optocoupler, timer-555, opamp) | — | — |
+| W1.8 | Active F4b composites (real-opamp, comparator, ota, schmitt-trigger, analog-switch, optocoupler, timer-555, opamp) | ✓ | b6e52a6a |
 | W1.9 | `device-mappings.ts` schema sync — harness slot-correspondence follows W1.1–W1.8 renames | — | — |
 | W2.1 | Solver architectural fixes — B1, B2, B3, B4, B5 | — | — |
 | W2.2 | Control-flow fixes — C1, C2, C3, D1, H1, H2 | — | — |
