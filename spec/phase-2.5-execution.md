@@ -52,7 +52,7 @@
 | W1.6 | F4c digiTS-only semiconductors (triac, scr, diac, tunnel-diode, triode, LED) | ✓ | 46e1dae7 |
 | W1.7 | F4c digiTS-only passives / sensors (crystal, transmission-line, memristor, analog-fuse, ntc-thermistor, spark-gap) | ✓ | d8643e83 |
 | W1.8 | Active devices — 5 F4c confirmed, 3 composition lanes pending (see triage 2026-04-22) | ▶ | b6e52a6a (partial) |
-| W1.8a | Optocoupler composition — LED → `diode.ts`, phototransistor → `bjt.ts`, CCCS coupling | — | — |
+| W1.8a | Optocoupler composition — LED → `diode.ts`, phototransistor → `bjt.ts`, CCCS coupling | ✓ | 130ddd8a |
 | W1.8b | Analog-switch direct port — `sw/*` VSWITCH primitive | — | — |
 | W1.8c | 555 timer composition — two comparators + RS flip-flop + BJT output + R-divider | — | — |
 | W1.9 | `device-mappings.ts` schema sync — harness slot-correspondence follows W1.1–W1.8 renames | — | — |
