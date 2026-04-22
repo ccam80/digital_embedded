@@ -324,7 +324,7 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
    */
   load(ctx: LoadContext): void {
     const solver = ctx.solver;
-    const [p1, p2, s1, ct, s2] = this.pinNodeIds;
+    const [p1, p2, sec1, ct, sec2] = this.pinNodeIds;
     const b1 = this.branchIndex;
     const b2 = this._b2;
     const b3 = this._b3;
@@ -342,35 +342,35 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     if (this._rSec > 0) {
       const gSec = 1 / this._rSec;
       // Sec half-1 (S1 ↔ CT)
-      if (s1 !== 0) solver.stampElement(solver.allocElement(s1 - 1, s1 - 1), gSec);
+      if (sec1 !== 0) solver.stampElement(solver.allocElement(sec1 - 1, sec1 - 1), gSec);
       if (ct !== 0) solver.stampElement(solver.allocElement(ct - 1, ct - 1), gSec);
-      if (s1 !== 0 && ct !== 0) {
-        solver.stampElement(solver.allocElement(s1 - 1, ct - 1), -gSec);
-        solver.stampElement(solver.allocElement(ct - 1, s1 - 1), -gSec);
+      if (sec1 !== 0 && ct !== 0) {
+        solver.stampElement(solver.allocElement(sec1 - 1, ct - 1), -gSec);
+        solver.stampElement(solver.allocElement(ct - 1, sec1 - 1), -gSec);
       }
       // Sec half-2 (CT ↔ S2)
       if (ct !== 0) solver.stampElement(solver.allocElement(ct - 1, ct - 1), gSec);
-      if (s2 !== 0) solver.stampElement(solver.allocElement(s2 - 1, s2 - 1), gSec);
-      if (ct !== 0 && s2 !== 0) {
-        solver.stampElement(solver.allocElement(ct - 1, s2 - 1), -gSec);
-        solver.stampElement(solver.allocElement(s2 - 1, ct - 1), -gSec);
+      if (sec2 !== 0) solver.stampElement(solver.allocElement(sec2 - 1, sec2 - 1), gSec);
+      if (ct !== 0 && sec2 !== 0) {
+        solver.stampElement(solver.allocElement(ct - 1, sec2 - 1), -gSec);
+        solver.stampElement(solver.allocElement(sec2 - 1, ct - 1), -gSec);
       }
     }
 
     // Branch incidence (B and C sub-matrices, topology-constant).
     if (p1 !== 0) solver.stampElement(solver.allocElement(p1 - 1, b1), 1);
     if (p2 !== 0) solver.stampElement(solver.allocElement(p2 - 1, b1), -1);
-    if (s1 !== 0) solver.stampElement(solver.allocElement(s1 - 1, b2), 1);
+    if (sec1 !== 0) solver.stampElement(solver.allocElement(sec1 - 1, b2), 1);
     if (ct !== 0) solver.stampElement(solver.allocElement(ct - 1, b2), -1);
     if (ct !== 0) solver.stampElement(solver.allocElement(ct - 1, b3), 1);
-    if (s2 !== 0) solver.stampElement(solver.allocElement(s2 - 1, b3), -1);
+    if (sec2 !== 0) solver.stampElement(solver.allocElement(sec2 - 1, b3), -1);
 
     if (p1 !== 0) solver.stampElement(solver.allocElement(b1, p1 - 1), 1);
     if (p2 !== 0) solver.stampElement(solver.allocElement(b1, p2 - 1), -1);
-    if (s1 !== 0) solver.stampElement(solver.allocElement(b2, s1 - 1), 1);
+    if (sec1 !== 0) solver.stampElement(solver.allocElement(b2, sec1 - 1), 1);
     if (ct !== 0) solver.stampElement(solver.allocElement(b2, ct - 1), -1);
     if (ct !== 0) solver.stampElement(solver.allocElement(b3, ct - 1), 1);
-    if (s2 !== 0) solver.stampElement(solver.allocElement(b3, s2 - 1), -1);
+    if (sec2 !== 0) solver.stampElement(solver.allocElement(b3, sec2 - 1), -1);
 
     // Unified compute-then-stamp for 3×3 branch block — ngspice indload.c applied
     // per winding + mutload.c:64-75 for each of the three mutual pairs. DC sets
