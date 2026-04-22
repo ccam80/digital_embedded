@@ -46,12 +46,13 @@
 | W0 | Interface + LoadContext core | ✓ | 39ab73ca |
 | W1.1 | Diode family (diode + zener + F2 varactor→diode) | ✓ | f8586dc6 |
 | W1.2 | BJT (L0 + L1) | ✓ | 5b3fadf3 |
-| W1.3 | MOSFET (L1) + G1 sign convention | — | — |
+| W1.3 | MOSFET (L1) + G1 sign convention | ✓ | 2b2b58a9 |
 | W1.4 | JFET (N + P + fet-base collapse) | — | — |
 | W1.5 | Reactive passives (capacitor, polarized-cap, inductor, transformer, tapped-transformer) | — | — |
 | W1.6 | F4c digiTS-only semiconductors (triac, scr, diac, tunnel-diode, triode, LED) | — | — |
 | W1.7 | F4c digiTS-only passives / sensors (crystal, transmission-line, memristor, analog-fuse, ntc-thermistor, spark-gap) | — | — |
 | W1.8 | Active F4b composites (real-opamp, comparator, ota, schmitt-trigger, analog-switch, optocoupler, timer-555, opamp) | — | — |
+| W1.9 | `device-mappings.ts` schema sync — harness slot-correspondence follows W1.1–W1.8 renames | — | — |
 | W2.1 | Solver architectural fixes — B1, B2, B3, B4, B5 | — | — |
 | W2.2 | Control-flow fixes — C1, C2, C3, D1, H1, H2 | — | — |
 | W2.3 | `InitMode` string deletion (production + harness) | — | — |
@@ -291,6 +292,33 @@ Same pattern as W1.6 — no ngspice source, mechanical fold of `_updateOp` + `_s
 **Files:** `real-opamp.ts`, `comparator.ts`, `ota.ts`, `schmitt-trigger.ts`, `analog-switch.ts`, `optocoupler.ts`, `timer-555.ts`, `opamp.ts` + tests
 
 F4b = composite of ngspice primitives. For each, identify the ngspice primitives composed (e.g., real-opamp = diff-pair + cascode + output stage; each primitive has an ngspice load function). Port each primitive via the already-landed W1.1-W1.5 lanes, compose in the device's own `load()`.
+
+### W1.9 — `device-mappings.ts` schema sync
+
+**Scope:** harness-infrastructure sync lane. Single-file, serial, cheap. Not a per-device port — picks up the slot-correspondence drift that each W1.x lane created when renaming schema slots to match ngspice.
+
+**Rationale:** per §1 principle 2 (file-scope partitioning) each W1.x lane is bounded to its device files and does not touch the harness. Slot renames therefore accumulate in `device-mappings.ts` as stale key references until swept here. Making each W1.x lane edit `device-mappings.ts` inline would turn it into a merge-conflict hot spot across parallelizable lanes, which W1.9 avoids.
+
+**Files:**
+- `src/solver/analog/__tests__/harness/device-mappings.ts`
+
+**Process:**
+1. For every `DeviceMapping` in the file, cross-check current `slotToNgspice` / `ngspiceToSlot` keys against the post-port `stateSchema` in the corresponding device's `.ts` file.
+2. Update renamed keys to match the device-side names. Known drift at the time this lane opens:
+   - W1.2 BJT: `IC→CC`, `IB→CB`, `Q_BE→QBE`, `CCAP_BE→CQBE`, `CEXBC_NOW→CEXBC` (plus the analogous `_BC` / `_CS` renames).
+   - W1.1 diode: walk schema at `diode.ts` and reconcile any slot-name changes against the mapping's current keys.
+   - W1.3–W1.8: whatever renames those lanes introduce; sweep at the time W1.9 runs.
+3. Preserve ngspice offset integers — they come from ngspice header files (`diodefs.h`, `bjtdefs.h`, `mos1defs.h`, `jfetdefs.h`, `capdefs.h`, `inddefs.h`) and do not change. Only slot-name keys shift.
+4. Add mappings for any new slot that corresponds to an existing ngspice offset and didn't exist pre-W1.x. Omit any mapping whose slot was excised by A1 (cross-method transfer slots are deleted, not re-mapped under a new name).
+5. Run `npm run test:q -- src/solver/analog/__tests__/harness src/solver/analog/__tests__/ngspice-parity` and confirm no "slot not found" / undefined-key errors from lookup drift. Convergence failures are not W1.9's concern — they go to W3.
+6. Commit: `Phase 2.5 W1.9 — device-mappings.ts schema sync`.
+
+**What this lane does NOT do:**
+- No harness architecture changes (the broader harness rewrite to actually compare raw values per-NR-iteration is a post-A1 follow-up — see `spec/baseline-reality.md` §4).
+- No new comparison sites, no tolerance re-introduction, no translation tables, no `derivedNgspiceSlots` blocks. The papering-removal stance from commit `dcf56e23` is permanent.
+- No per-device `.ts` edits. W1.1–W1.8 are landed and stand.
+
+**Dependency:** every W1.x lane from W1.1 through W1.8 must be committed before W1.9 opens. W1.9 is the terminal lane of the W1 block; W2.x lanes can already run in parallel with W1.x and do not depend on W1.9.
 
 ---
 
