@@ -182,7 +182,7 @@ export class ComparatorElement extends AbstractCircuitElement {
  *
  * Node IDs are 1-based; solver rows/cols are 0-based (nodeId - 1).
  */
-function createOpenCollectorComparatorElement(
+export function createOpenCollectorComparatorElement(
   pinNodes: ReadonlyMap<string, number>,
   props: PropertyBag,
 ): AnalogElementCore {
