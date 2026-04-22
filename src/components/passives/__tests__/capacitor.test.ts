@@ -533,11 +533,11 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
     props.setModelParam("capacitance", capacitance);
     const element = makeCapacitorElement(new Map([["pos", 1], ["neg", 2]]), props);
 
-    // Seed previous-step state: s1[SLOT_Q] = q1, s1[SLOT_CCAP] = ccapPrev.
-    const re = element as unknown as { s1: Float64Array; stateBaseOffset: number };
+    // Seed previous-step state via pool.states[1] (s1 field deleted per A4).
+    const re = element as unknown as { _pool: { states: Float64Array[] }; stateBaseOffset: number };
     const base = re.stateBaseOffset;
-    re.s1[base + SLOT_Q_CAP]    = q1;
-    re.s1[base + SLOT_CCAP_CAP] = ccapPrev;
+    re._pool.states[1][base + SLOT_Q_CAP]    = q1;
+    re._pool.states[1][base + SLOT_CCAP_CAP] = ccapPrev;
 
     // Trap order-2 integration coefficients (ngspice niinteg.c operand order):
     const ag0 = 1.0 / dt / (1.0 - xmu);
@@ -580,15 +580,15 @@ describe("Capacitor trap-order-2 xmu parity (C4.6)", () => {
 
     element.load(ctx);
 
-    // q0 the element wrote to s0:
-    const q0_actual = (re as unknown as { s0: Float64Array }).s0[base + SLOT_Q_CAP];
+    // q0 the element wrote to s0 (accessed via pool.states[0]):
+    const q0_actual = re._pool.states[0][base + SLOT_Q_CAP];
     expect(q0_actual).toBe(1e-12);
 
     // ngspice niinteg.c:32-34 TRAPEZOIDAL order 2: ccap = -state1[ccap]*ag[1] + ag[0]*(q0-q1)
     // (prior test expected formula had wrong sign on ag[1]*ccapPrev)
     const expectedCcap = -ccapPrev * ag1 + ag0 * (q0_actual - q1);
 
-    const actualCcap = (re as unknown as { s0: Float64Array }).s0[base + SLOT_CCAP_CAP];
+    const actualCcap = re._pool.states[0][base + SLOT_CCAP_CAP];
     expect(actualCcap).toBe(expectedCcap);
   });
 });
@@ -706,7 +706,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
     }
 
     const poolEl = element as unknown as {
-      s0: Float64Array; s1: Float64Array; stateBaseOffset: number;
+      _pool: { states: Float64Array[] }; stateBaseOffset: number;
     };
 
     // 10-step transient loop
@@ -741,7 +741,7 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
       expect(ctx.method).toBe(method);
 
       // Rotate state: s1 ← s0 (simulates pool.rotateStateVectors for single element)
-      poolEl.s1.set(poolEl.s0);
+      poolEl._pool.states[1].set(poolEl._pool.states[0]);
 
       // Advance to next accepted voltage (reference value for next step input)
       v2 = refV2[step];
@@ -762,19 +762,20 @@ describe("capacitor_load_transient_parity (C4.2)", () => {
     const SLOT_GEQ_F = 0;  // SLOT_GEQ = 0 in CAPACITOR_SCHEMA
     const SLOT_IEQ_F = 1;  // SLOT_IEQ = 1 in CAPACITOR_SCHEMA
     const base = poolEl.stateBaseOffset;
+    const s0 = poolEl._pool.states[0];
 
     // geq = ag[0]*C — bit-exact (niinteg.c:77)
-    expect(poolEl.s0[base + SLOT_GEQ_F]).toBe(geq);
+    expect(s0[base + SLOT_GEQ_F]).toBe(geq);
 
     // ceq at step 9 (last, 0-indexed) = ag[1]*C * refV2[7]
     // (s1[SLOT_Q] contains C*refV2[7] after the step-8 rotation)
     const ceq_last = ag1 * C_val * refV2[7];
-    expect(poolEl.s0[base + SLOT_IEQ_F]).toBe(ceq_last);
+    expect(s0[base + SLOT_IEQ_F]).toBe(ceq_last);
 
     // Post-step node 2 voltage (v2 after step 9): refV2[9] bit-exact reference.
     // The element was fed voltages[1]=refV2[8] at step 9.
     // v_cap stored in s0[SLOT_V] = refV2[8] (the input vcap for step 9).
     const SLOT_V_F = 2;  // SLOT_V = 2 in CAPACITOR_SCHEMA
-    expect(poolEl.s0[base + SLOT_V_F]).toBe(refV2[8]);
+    expect(s0[base + SLOT_V_F]).toBe(refV2[8]);
   });
 });

@@ -587,7 +587,7 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
     element.initState(pool);
 
     const poolEl = element as unknown as {
-      s0: Float64Array; s1: Float64Array; stateBaseOffset: number;
+      _pool: { states: Float64Array[] }; stateBaseOffset: number;
     };
 
     // Handle-based capture solver (persistent handles across steps)
@@ -649,7 +649,7 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
       expect(ctx.method).toBe(method);
 
       // Rotate state: s1 ← s0
-      poolEl.s1.set(poolEl.s0);
+      poolEl._pool.states[1].set(poolEl._pool.states[0]);
     }
 
     // After 10 steps: assert companion state from last load() call.
@@ -657,11 +657,12 @@ describe("polarized_cap_load_transient_parity (C4.2)", () => {
     const SLOT_GEQ_PC = 0;
     const SLOT_IEQ_PC = 1;
     const base = poolEl.stateBaseOffset;
+    const s0 = poolEl._pool.states[0];
 
     // geq = ag[0]*C — bit-exact (niinteg.c:77, capload.c)
     // All cap voltages are zero so q=0 every step → ceq = ag[1]*0 = 0.
-    expect(poolEl.s0[base + SLOT_GEQ_PC]).toBe(geq);
-    expect(poolEl.s0[base + SLOT_IEQ_PC]).toBe(0);
+    expect(s0[base + SLOT_GEQ_PC]).toBe(geq);
+    expect(s0[base + SLOT_IEQ_PC]).toBe(0);
 
     // G_esr and G_leak are topology-constant — referenced only to confirm
     // the element was constructed with the intended parameters.

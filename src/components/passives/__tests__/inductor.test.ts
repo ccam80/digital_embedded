@@ -577,7 +577,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
     }
 
     const poolEl = element as unknown as {
-      s0: Float64Array; s1: Float64Array; stateBaseOffset: number;
+      _pool: { states: Float64Array[] }; stateBaseOffset: number;
     };
 
     // matrixSize=4: node1(idx0), node2(idx1), bVsrc(idx2), bL(idx3)
@@ -618,7 +618,7 @@ describe("inductor_load_transient_parity (C4.2)", () => {
       expect(ctx.method).toBe(method);
 
       // Rotate state: s1 ← s0
-      poolEl.s1.set(poolEl.s0);
+      poolEl._pool.states[1].set(poolEl._pool.states[0]);
 
       // Advance to next accepted values
       v2 = refV2[step];
@@ -635,19 +635,20 @@ describe("inductor_load_transient_parity (C4.2)", () => {
     const SLOT_IEQ_L = 1;
     const SLOT_PHI_L = 3;
     const base = poolEl.stateBaseOffset;
+    const s0 = poolEl._pool.states[0];
 
     // geq = ag[0]*L — bit-exact (niinteg.c:77)
-    expect(poolEl.s0[base + SLOT_GEQ_L]).toBe(geq);
+    expect(s0[base + SLOT_GEQ_L]).toBe(geq);
 
     // ceq at step 9 = ag[1]*phi1, where phi1 = s1[SLOT_PHI] = L*refI[7]
     // (s1 holds the s0 from step 8, where phi0 = L*refI[7])
     // Match element's exact float op order: ag[1] * (L * i_prev)
     const phi1_last = L_val * refI[7];
     const ceq_last = ag1 * phi1_last;
-    expect(poolEl.s0[base + SLOT_IEQ_L]).toBe(ceq_last);
+    expect(s0[base + SLOT_IEQ_L]).toBe(ceq_last);
 
     // phi0 stored at step 9: L * i_L fed in = L * refI[8] (element: s0[PHI] = L * iNow)
     const phi0_last = L_val * refI[8];
-    expect(poolEl.s0[base + SLOT_PHI_L]).toBe(phi0_last);
+    expect(s0[base + SLOT_PHI_L]).toBe(phi0_last);
   });
 });

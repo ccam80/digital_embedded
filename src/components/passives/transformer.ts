@@ -235,15 +235,7 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
   private readonly _branch2: number;
   private _rPri: number;
   private _rSec: number;
-  s0!: Float64Array;
-  s1!: Float64Array;
-  s2!: Float64Array;
-  s3!: Float64Array;
-  s4!: Float64Array;
-  s5!: Float64Array;
-  s6!: Float64Array;
-  s7!: Float64Array;
-  private _base!: number;
+  private _pool!: StatePoolRef;
 
   constructor(
     pinNodeIds: number[],
@@ -267,16 +259,8 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.states[0];
-    this.s1 = pool.states[1];
-    this.s2 = pool.states[2];
-    this.s3 = pool.states[3];
-    this.s4 = pool.states[4];
-    this.s5 = pool.states[5];
-    this.s6 = pool.states[6];
-    this.s7 = pool.states[7];
-    this._base = this.stateBaseOffset;
-    applyInitialValues(TRANSFORMER_SCHEMA, pool, this._base, {});
+    this._pool = pool;
+    applyInitialValues(TRANSFORMER_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
   setParam(_key: string, _value: number): void {}
@@ -286,10 +270,10 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     this._pair = new CoupledInductorPair(lPrimary, lSecondary, k);
     this._rPri = rPri;
     this._rSec = rSec;
-    if (!this.s0) {
+    if (!this._pool) {
       throw new Error("AnalogTransformerElement.updateDerivedParams called before initState");
     }
-    applyInitialValues(TRANSFORMER_SCHEMA, { states: [this.s0, this.s1, this.s2, this.s3, this.s4, this.s5, this.s6, this.s7], state0: this.s0, state1: this.s1, state2: this.s2, state3: this.s3, state4: this.s4, state5: this.s5, state6: this.s6, state7: this.s7, totalSlots: this.s0.length, tranStep: 0 } as StatePoolRef, this._base, {});
+    applyInitialValues(TRANSFORMER_SCHEMA, this._pool, this.stateBaseOffset, {});
   }
 
   /**
@@ -353,36 +337,39 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     const voltages = ctx.voltages;
     const i1Now = voltages[b1];
     const i2Now = voltages[b2];
-    const base = this._base;
+    const base = this.stateBaseOffset;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
 
     // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
     const mode = ctx.cktMode;
     if (!(mode & (MODEDC | MODEINITPRED))) {
-      this.s0[base + SLOT_PHI1] = L1 * i1Now + M * i2Now;
-      this.s0[base + SLOT_PHI2] = L2 * i2Now + M * i1Now;
+      s0[base + SLOT_PHI1] = L1 * i1Now + M * i2Now;
+      s0[base + SLOT_PHI2] = L2 * i2Now + M * i1Now;
       if (mode & MODEINITTRAN) {
-        this.s1[base + SLOT_PHI1] = this.s0[base + SLOT_PHI1];
-        this.s1[base + SLOT_PHI2] = this.s0[base + SLOT_PHI2];
+        s1[base + SLOT_PHI1] = s0[base + SLOT_PHI1];
+        s1[base + SLOT_PHI2] = s0[base + SLOT_PHI2];
       }
     } else if (mode & MODEINITPRED) {
-      this.s0[base + SLOT_PHI1] = this.s1[base + SLOT_PHI1];
-      this.s0[base + SLOT_PHI2] = this.s1[base + SLOT_PHI2];
+      s0[base + SLOT_PHI1] = s1[base + SLOT_PHI1];
+      s0[base + SLOT_PHI2] = s1[base + SLOT_PHI2];
     }
 
     // Companion coefficients — zero at DC, niIntegrate-derived during TRAN.
     let g11 = 0, g22 = 0, g12 = 0, hist1 = 0, hist2 = 0;
     if (mode & MODETRAN) {
       const ag = ctx.ag;
-      const phi1_0 = this.s0[base + SLOT_PHI1];
-      const phi2_0 = this.s0[base + SLOT_PHI2];
-      const phi1_1 = this.s1[base + SLOT_PHI1];
-      const phi2_1 = this.s1[base + SLOT_PHI2];
+      const phi1_0 = s0[base + SLOT_PHI1];
+      const phi2_0 = s0[base + SLOT_PHI2];
+      const phi1_1 = s1[base + SLOT_PHI1];
+      const phi2_1 = s1[base + SLOT_PHI2];
 
       let ccap1: number;
       let ccap2: number;
       if (ctx.order >= 2 && ag.length > 2) {
-        const phi1_2 = this.s2[base + SLOT_PHI1];
-        const phi2_2 = this.s2[base + SLOT_PHI2];
+        const phi1_2 = s2[base + SLOT_PHI1];
+        const phi2_2 = s2[base + SLOT_PHI2];
         ccap1 = ag[0] * phi1_0 + ag[1] * phi1_1 + ag[2] * phi1_2;
         ccap2 = ag[0] * phi2_0 + ag[1] * phi2_1 + ag[2] * phi2_2;
       } else {
@@ -408,13 +395,13 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     solver.stampRHS(b2, hist2);
 
     // Diagnostic cache (mode-invariant bookkeeping).
-    this.s0[base + SLOT_G11]   = g11;
-    this.s0[base + SLOT_G22]   = g22;
-    this.s0[base + SLOT_G12]   = g12;
-    this.s0[base + SLOT_HIST1] = hist1;
-    this.s0[base + SLOT_HIST2] = hist2;
-    this.s0[base + SLOT_I1]    = i1Now;
-    this.s0[base + SLOT_I2]    = i2Now;
+    s0[base + SLOT_G11]   = g11;
+    s0[base + SLOT_G22]   = g22;
+    s0[base + SLOT_G12]   = g12;
+    s0[base + SLOT_HIST1] = hist1;
+    s0[base + SLOT_HIST2] = hist2;
+    s0[base + SLOT_I1]    = i1Now;
+    s0[base + SLOT_I2]    = i2Now;
   }
 
   getLteTimestep(
@@ -424,18 +411,22 @@ export class AnalogTransformerElement implements ReactiveAnalogElement {
     method: IntegrationMethod,
     lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
   ): number {
-    const base = this._base;
+    const base = this.stateBaseOffset;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
     // Winding 1 flux (inductor pattern: pass 0,0 for ccap)
-    const phi1_0 = this.s0[base + SLOT_PHI1];
-    const phi1_1 = this.s1[base + SLOT_PHI1];
-    const phi1_2 = this.s2[base + SLOT_PHI1];
-    const phi1_3 = this.s3[base + SLOT_PHI1];
+    const phi1_0 = s0[base + SLOT_PHI1];
+    const phi1_1 = s1[base + SLOT_PHI1];
+    const phi1_2 = s2[base + SLOT_PHI1];
+    const phi1_3 = s3[base + SLOT_PHI1];
     const dt1 = cktTerr(dt, deltaOld, order, method, phi1_0, phi1_1, phi1_2, phi1_3, 0, 0, lteParams);
     // Winding 2 flux (inductor pattern: pass 0,0 for ccap)
-    const phi2_0 = this.s0[base + SLOT_PHI2];
-    const phi2_1 = this.s1[base + SLOT_PHI2];
-    const phi2_2 = this.s2[base + SLOT_PHI2];
-    const phi2_3 = this.s3[base + SLOT_PHI2];
+    const phi2_0 = s0[base + SLOT_PHI2];
+    const phi2_1 = s1[base + SLOT_PHI2];
+    const phi2_2 = s2[base + SLOT_PHI2];
+    const phi2_3 = s3[base + SLOT_PHI2];
     const dt2 = cktTerr(dt, deltaOld, order, method, phi2_0, phi2_1, phi2_2, phi2_3, 0, 0, lteParams);
     return Math.min(dt1, dt2);
   }

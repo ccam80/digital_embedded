@@ -559,7 +559,7 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
     allocateStatePool([el]);
 
     const poolEl = el as unknown as {
-      s0: Float64Array; s1: Float64Array; stateBaseOffset: number;
+      _pool: { states: Float64Array[] }; stateBaseOffset: number;
     };
 
     // Handle-based capture solver (persistent handles across steps)
@@ -621,7 +621,7 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
       expect(ctx.method).toBe(method);
 
       // Rotate state: s1 ← s0
-      poolEl.s1.set(poolEl.s0);
+      poolEl._pool.states[1].set(poolEl._pool.states[0]);
     }
 
     // After 10 steps: assert companion state from last load().
@@ -629,28 +629,29 @@ describe("tapped_transformer_load_transient_parity (C4.2)", () => {
     //   G11=0, G22=1, G33=2, G12=3, G13=4, G23=5,
     //   HIST1=6, HIST2=7, HIST3=8, I1=9, I2=10, I3=11, PHI1=12, PHI2=13, PHI3=14
     const base = poolEl.stateBaseOffset;
+    const s0 = poolEl._pool.states[0];
 
     // Companion conductances — bit-exact (niinteg.c:77)
-    expect(poolEl.s0[base + 0]).toBe(g11);
-    expect(poolEl.s0[base + 1]).toBe(g22);
-    expect(poolEl.s0[base + 2]).toBe(g33);
-    expect(poolEl.s0[base + 3]).toBe(g12);
-    expect(poolEl.s0[base + 4]).toBe(g13);
-    expect(poolEl.s0[base + 5]).toBe(g23);
+    expect(s0[base + 0]).toBe(g11);
+    expect(s0[base + 1]).toBe(g22);
+    expect(s0[base + 2]).toBe(g33);
+    expect(s0[base + 3]).toBe(g12);
+    expect(s0[base + 4]).toBe(g13);
+    expect(s0[base + 5]).toBe(g23);
 
     // History terms = 0 (all voltages zero → all flux = 0)
-    expect(poolEl.s0[base + 6]).toBe(0);
-    expect(poolEl.s0[base + 7]).toBe(0);
-    expect(poolEl.s0[base + 8]).toBe(0);
+    expect(s0[base + 6]).toBe(0);
+    expect(s0[base + 7]).toBe(0);
+    expect(s0[base + 8]).toBe(0);
 
     // Branch currents = 0 (voltages array all zero)
-    expect(poolEl.s0[base + 9]).toBe(0);
-    expect(poolEl.s0[base + 10]).toBe(0);
-    expect(poolEl.s0[base + 11]).toBe(0);
+    expect(s0[base + 9]).toBe(0);
+    expect(s0[base + 10]).toBe(0);
+    expect(s0[base + 11]).toBe(0);
 
     // Flux linkages = 0 (all currents zero)
-    expect(poolEl.s0[base + 12]).toBe(0);
-    expect(poolEl.s0[base + 13]).toBe(0);
-    expect(poolEl.s0[base + 14]).toBe(0);
+    expect(s0[base + 12]).toBe(0);
+    expect(s0[base + 13]).toBe(0);
+    expect(s0[base + 14]).toBe(0);
   });
 });

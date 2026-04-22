@@ -796,7 +796,7 @@ describe("transformer_load_transient_parity (C4.2)", () => {
     const { element } = withState(el);
 
     const poolEl = element as unknown as {
-      s0: Float64Array; s1: Float64Array; stateBaseOffset: number;
+      _pool: { states: Float64Array[] }; stateBaseOffset: number;
     };
 
     // Handle-based capture solver (persistent handles across steps)
@@ -858,29 +858,30 @@ describe("transformer_load_transient_parity (C4.2)", () => {
       expect(ctx.method).toBe(method);
 
       // Rotate state: s1 ← s0
-      poolEl.s1.set(poolEl.s0);
+      poolEl._pool.states[1].set(poolEl._pool.states[0]);
     }
 
     // After 10 steps: assert companion state from last load().
     // TRANSFORMER_SCHEMA slot indices:
     //   G11=0, G22=1, G12=2, HIST1=3, HIST2=4, I1=5, I2=6, PHI1=7, PHI2=8
     const base = poolEl.stateBaseOffset;
+    const s0 = poolEl._pool.states[0];
 
     // Companion conductances — bit-exact (niinteg.c:77)
-    expect(poolEl.s0[base + 0]).toBe(g11);
-    expect(poolEl.s0[base + 1]).toBe(g22);
-    expect(poolEl.s0[base + 2]).toBe(g12);
+    expect(s0[base + 0]).toBe(g11);
+    expect(s0[base + 1]).toBe(g22);
+    expect(s0[base + 2]).toBe(g12);
 
     // History terms = 0 (all voltages zero, all flux linkages = 0)
-    expect(poolEl.s0[base + 3]).toBe(0);
-    expect(poolEl.s0[base + 4]).toBe(0);
+    expect(s0[base + 3]).toBe(0);
+    expect(s0[base + 4]).toBe(0);
 
     // Branch currents stored = 0 (voltages array all zero)
-    expect(poolEl.s0[base + 5]).toBe(0);
-    expect(poolEl.s0[base + 6]).toBe(0);
+    expect(s0[base + 5]).toBe(0);
+    expect(s0[base + 6]).toBe(0);
 
     // Flux linkages at step 9 = L1*0 + M*0 = 0
-    expect(poolEl.s0[base + 7]).toBe(0);
-    expect(poolEl.s0[base + 8]).toBe(0);
+    expect(s0[base + 7]).toBe(0);
+    expect(s0[base + 8]).toBe(0);
   });
 });

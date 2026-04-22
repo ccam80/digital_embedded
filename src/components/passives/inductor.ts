@@ -194,15 +194,6 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
   private _SCALE: number;
   private _M: number;
   private _pool!: StatePoolRef;
-  s0!: Float64Array;
-  s1!: Float64Array;
-  s2!: Float64Array;
-  s3!: Float64Array;
-  s4!: Float64Array;
-  s5!: Float64Array;
-  s6!: Float64Array;
-  s7!: Float64Array;
-  private base!: number;
 
   constructor(branchIdx: number, inductance: number, IC: number, TC1: number, TC2: number, TNOM: number, SCALE: number, M: number) {
     this.branchIndex = branchIdx;
@@ -225,16 +216,7 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    this.s0 = pool.states[0];
-    this.s1 = pool.states[1];
-    this.s2 = pool.states[2];
-    this.s3 = pool.states[3];
-    this.s4 = pool.states[4];
-    this.s5 = pool.states[5];
-    this.s6 = pool.states[6];
-    this.s7 = pool.states[7];
-    this.base = this.stateBaseOffset;
-    applyInitialValues(INDUCTOR_SCHEMA, pool, this.base, {});
+    applyInitialValues(INDUCTOR_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
   setParam(key: string, value: number): void {
@@ -278,7 +260,11 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     const n1 = this.pinNodeIds[1];
     const b = this.branchIndex;
     const L = this.L;
-    const base = this.base;
+    const base = this.stateBaseOffset;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
 
     // Initial condition gate (dual of capload.c:32-36; indload.c:44-46 uic path).
     const cond1 =
@@ -297,12 +283,12 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
 
     // Flux-state update gated on !(MODEDC | MODEINITPRED), per indload.c:43.
     if (!(mode & (MODEDC | MODEINITPRED))) {
-      this.s0[base + SLOT_PHI] = L * iNow;
+      s0[base + SLOT_PHI] = L * iNow;
       if (mode & MODEINITTRAN) {
-        this.s1[base + SLOT_PHI] = this.s0[base + SLOT_PHI];
+        s1[base + SLOT_PHI] = s0[base + SLOT_PHI];
       }
     } else if (mode & MODEINITPRED) {
-      this.s0[base + SLOT_PHI] = this.s1[base + SLOT_PHI];
+      s0[base + SLOT_PHI] = s1[base + SLOT_PHI];
     }
 
     // Compute req, veq — DC case writes zero (indload.c:88-90), TRAN calls
@@ -312,11 +298,11 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     let ccap = 0;
     // indload.c:88-109: req=veq=0 at DC, niIntegrate otherwise.
     if (!(mode & MODEDC)) {
-      const phi0 = this.s0[base + SLOT_PHI];
-      const phi1 = this.s1[base + SLOT_PHI];
-      const phi2 = this.s2[base + SLOT_PHI];
-      const phi3 = this.s3[base + SLOT_PHI];
-      const ccapPrev = this.s1[base + SLOT_CCAP];
+      const phi0 = s0[base + SLOT_PHI];
+      const phi1 = s1[base + SLOT_PHI];
+      const phi2 = s2[base + SLOT_PHI];
+      const phi3 = s3[base + SLOT_PHI];
+      const ccapPrev = s1[base + SLOT_CCAP];
       const ni = niIntegrate(
         ctx.method,
         ctx.order,
@@ -329,17 +315,17 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
       ccap = ni.ccap;
       veq = ni.ceq;
       req = ni.geq;
-      this.s0[base + SLOT_CCAP] = ccap;
+      s0[base + SLOT_CCAP] = ccap;
       if (mode & MODEINITTRAN) {
-        this.s1[base + SLOT_CCAP] = ccap;
+        s1[base + SLOT_CCAP] = ccap;
       }
     }
 
     // Diagnostic cache (mode-invariant bookkeeping).
-    this.s0[base + SLOT_GEQ]  = req;
-    this.s0[base + SLOT_IEQ]  = veq;
-    this.s0[base + SLOT_I]    = iNow;
-    this.s0[base + SLOT_VOLT] = n0v - n1v;
+    s0[base + SLOT_GEQ]  = req;
+    s0[base + SLOT_IEQ]  = veq;
+    s0[base + SLOT_I]    = iNow;
+    s0[base + SLOT_VOLT] = n0v - n1v;
 
     // Unconditional stamp sequence — matches indload.c:119-123 exactly.
     // B sub-matrix: I_branch flows into n0, out of n1 (INDposIbrptr/INDnegIbrptr).
@@ -366,12 +352,17 @@ export class AnalogInductorElement implements ReactiveAnalogElementCore {
     method: IntegrationMethod,
     lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
   ): number {
-    const phi0 = this.s0[this.base + SLOT_PHI];
-    const phi1 = this.s1[this.base + SLOT_PHI];
-    const phi2 = this.s2[this.base + SLOT_PHI];
-    const phi3 = this.s3[this.base + SLOT_PHI];
-    const ccap0 = this.s0[this.base + SLOT_CCAP];
-    const ccap1 = this.s1[this.base + SLOT_CCAP];
+    const base = this.stateBaseOffset;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
+    const phi0 = s0[base + SLOT_PHI];
+    const phi1 = s1[base + SLOT_PHI];
+    const phi2 = s2[base + SLOT_PHI];
+    const phi3 = s3[base + SLOT_PHI];
+    const ccap0 = s0[base + SLOT_CCAP];
+    const ccap1 = s1[base + SLOT_CCAP];
     return cktTerr(dt, deltaOld, order, method, phi0, phi1, phi2, phi3, ccap0, ccap1, lteParams);
   }
 }

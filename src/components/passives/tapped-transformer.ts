@@ -266,15 +266,7 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
   private _m13: number;
   private _m23: number;
 
-  s0!: Float64Array;
-  s1!: Float64Array;
-  s2!: Float64Array;
-  s3!: Float64Array;
-  s4!: Float64Array;
-  s5!: Float64Array;
-  s6!: Float64Array;
-  s7!: Float64Array;
-  private base!: number;
+  private _pool!: StatePoolRef;
 
   constructor(
     pinNodeIds: number[],
@@ -305,16 +297,8 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.states[0];
-    this.s1 = pool.states[1];
-    this.s2 = pool.states[2];
-    this.s3 = pool.states[3];
-    this.s4 = pool.states[4];
-    this.s5 = pool.states[5];
-    this.s6 = pool.states[6];
-    this.s7 = pool.states[7];
-    this.base = this.stateBaseOffset;
-    applyInitialValues(TAPPED_TRANSFORMER_SCHEMA, pool, this.base, {});
+    this._pool = pool;
+    applyInitialValues(TAPPED_TRANSFORMER_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
   updateDerivedParams(lPrimary: number, turnsRatio: number, k: number, rPri: number, rSec: number): void {
@@ -396,8 +380,11 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     const i1Now = voltages[b1];
     const i2Now = voltages[b2];
     const i3Now = voltages[b3];
-    const sRef = this.s0;
-    const base = this.base;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const sRef = s0;
+    const base = this.stateBaseOffset;
 
     // Flux update guard mirrors !(MODEDC|MODEINITPRED) from indload.c:43.
     const mode = ctx.cktMode;
@@ -406,14 +393,14 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
       sRef[base + SLOT_PHI2] = this._l2 * i2Now + this._m12 * i1Now + this._m23 * i3Now;
       sRef[base + SLOT_PHI3] = this._l3 * i3Now + this._m13 * i1Now + this._m23 * i2Now;
       if (mode & MODEINITTRAN) {
-        this.s1[base + SLOT_PHI1] = sRef[base + SLOT_PHI1];
-        this.s1[base + SLOT_PHI2] = sRef[base + SLOT_PHI2];
-        this.s1[base + SLOT_PHI3] = sRef[base + SLOT_PHI3];
+        s1[base + SLOT_PHI1] = sRef[base + SLOT_PHI1];
+        s1[base + SLOT_PHI2] = sRef[base + SLOT_PHI2];
+        s1[base + SLOT_PHI3] = sRef[base + SLOT_PHI3];
       }
     } else if (mode & MODEINITPRED) {
-      sRef[base + SLOT_PHI1] = this.s1[base + SLOT_PHI1];
-      sRef[base + SLOT_PHI2] = this.s1[base + SLOT_PHI2];
-      sRef[base + SLOT_PHI3] = this.s1[base + SLOT_PHI3];
+      sRef[base + SLOT_PHI1] = s1[base + SLOT_PHI1];
+      sRef[base + SLOT_PHI2] = s1[base + SLOT_PHI2];
+      sRef[base + SLOT_PHI3] = s1[base + SLOT_PHI3];
     }
 
     // Companion coefficients — zero at DC, niIntegrate during TRAN.
@@ -424,16 +411,16 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
       const phi1_0 = sRef[base + SLOT_PHI1];
       const phi2_0 = sRef[base + SLOT_PHI2];
       const phi3_0 = sRef[base + SLOT_PHI3];
-      const phi1_1 = this.s1[base + SLOT_PHI1];
-      const phi2_1 = this.s1[base + SLOT_PHI2];
-      const phi3_1 = this.s1[base + SLOT_PHI3];
+      const phi1_1 = s1[base + SLOT_PHI1];
+      const phi2_1 = s1[base + SLOT_PHI2];
+      const phi3_1 = s1[base + SLOT_PHI3];
       let ccap1: number;
       let ccap2: number;
       let ccap3: number;
       if (ctx.order >= 2 && ag.length > 2) {
-        const phi1_2 = this.s2[base + SLOT_PHI1];
-        const phi2_2 = this.s2[base + SLOT_PHI2];
-        const phi3_2 = this.s2[base + SLOT_PHI3];
+        const phi1_2 = s2[base + SLOT_PHI1];
+        const phi2_2 = s2[base + SLOT_PHI2];
+        const phi3_2 = s2[base + SLOT_PHI3];
         ccap1 = ag[0] * phi1_0 + ag[1] * phi1_1 + ag[2] * phi1_2;
         ccap2 = ag[0] * phi2_0 + ag[1] * phi2_1 + ag[2] * phi2_2;
         ccap3 = ag[0] * phi3_0 + ag[1] * phi3_1 + ag[2] * phi3_2;
@@ -490,16 +477,20 @@ export class AnalogTappedTransformerElement implements ReactiveAnalogElement {
     method: IntegrationMethod,
     lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
   ): number {
-    const b = this.base;
+    const b = this.stateBaseOffset;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
     // All three windings are flux-based: pass 0,0 for ccap (inductor pattern)
     const dt1 = cktTerr(dt, deltaOld, order, method,
-      this.s0[b + SLOT_PHI1], this.s1[b + SLOT_PHI1], this.s2[b + SLOT_PHI1], this.s3[b + SLOT_PHI1],
+      s0[b + SLOT_PHI1], s1[b + SLOT_PHI1], s2[b + SLOT_PHI1], s3[b + SLOT_PHI1],
       0, 0, lteParams);
     const dt2 = cktTerr(dt, deltaOld, order, method,
-      this.s0[b + SLOT_PHI2], this.s1[b + SLOT_PHI2], this.s2[b + SLOT_PHI2], this.s3[b + SLOT_PHI2],
+      s0[b + SLOT_PHI2], s1[b + SLOT_PHI2], s2[b + SLOT_PHI2], s3[b + SLOT_PHI2],
       0, 0, lteParams);
     const dt3 = cktTerr(dt, deltaOld, order, method,
-      this.s0[b + SLOT_PHI3], this.s1[b + SLOT_PHI3], this.s2[b + SLOT_PHI3], this.s3[b + SLOT_PHI3],
+      s0[b + SLOT_PHI3], s1[b + SLOT_PHI3], s2[b + SLOT_PHI3], s3[b + SLOT_PHI3],
       0, 0, lteParams);
     return Math.min(dt1, dt2, dt3);
   }

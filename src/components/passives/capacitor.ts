@@ -178,15 +178,6 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
   private _SCALE: number;
   private _M: number;
   private _pool!: StatePoolRef;
-  s0!: Float64Array;
-  s1!: Float64Array;
-  s2!: Float64Array;
-  s3!: Float64Array;
-  s4!: Float64Array;
-  s5!: Float64Array;
-  s6!: Float64Array;
-  s7!: Float64Array;
-  private base!: number;
 
   // Cached matrix-entry handles (allocated lazily on first load()).
   private _hAA: number = -1;
@@ -215,16 +206,7 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
 
   initState(pool: StatePoolRef): void {
     this._pool = pool;
-    this.s0 = pool.states[0];
-    this.s1 = pool.states[1];
-    this.s2 = pool.states[2];
-    this.s3 = pool.states[3];
-    this.s4 = pool.states[4];
-    this.s5 = pool.states[5];
-    this.s6 = pool.states[6];
-    this.s7 = pool.states[7];
-    this.base = this.stateBaseOffset;
-    applyInitialValues(CAPACITOR_SCHEMA, pool, this.base, {});
+    applyInitialValues(CAPACITOR_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
   setParam(key: string, value: number): void {
@@ -263,6 +245,12 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     const n0 = this.pinNodeIds[0];
     const n1 = this.pinNodeIds[1];
     const C = this.C;
+    const base = this.stateBaseOffset;
+    // pool.states[N] accessed at call time — no cached Float64Array refs (A4).
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
 
     // ngspice capload.c:30 — participate only in MODETRAN | MODEAC | MODETRANOP.
     if (!(mode & (MODETRAN | MODEAC | MODETRANOP))) return;
@@ -286,22 +274,22 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
       // #ifndef PREDICTOR (capload.c:53-65).
       if (mode & MODEINITPRED) {
         // Copy state1 charge to state0 (capload.c:55-56).
-        this.s0[this.base + SLOT_Q] = this.s1[this.base + SLOT_Q];
+        s0[base + SLOT_Q] = s1[base + SLOT_Q];
       } else {
         // Compute charge Q = C * V (capload.c:58).
-        this.s0[this.base + SLOT_Q] = C * vcap;
+        s0[base + SLOT_Q] = C * vcap;
         if (mode & MODEINITTRAN) {
           // Seed state1 from state0 (capload.c:60-62).
-          this.s1[this.base + SLOT_Q] = this.s0[this.base + SLOT_Q];
+          s1[base + SLOT_Q] = s0[base + SLOT_Q];
         }
       }
 
       // NIintegrate via shared helper (capload.c:67-68, niinteg.c:17-80).
-      const q0 = this.s0[this.base + SLOT_Q];
-      const q1 = this.s1[this.base + SLOT_Q];
-      const q2 = this.s2[this.base + SLOT_Q];
-      const q3 = this.s3[this.base + SLOT_Q];
-      const ccapPrev = this.s1[this.base + SLOT_CCAP];
+      const q0 = s0[base + SLOT_Q];
+      const q1 = s1[base + SLOT_Q];
+      const q2 = s2[base + SLOT_Q];
+      const q3 = s3[base + SLOT_Q];
+      const ccapPrev = s1[base + SLOT_CCAP];
       const { ccap, ceq, geq } = niIntegrate(
         ctx.method,
         ctx.order,
@@ -311,17 +299,17 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
         [q2, q3, 0, 0, 0],
         ccapPrev,
       );
-      this.s0[this.base + SLOT_CCAP] = ccap;
+      s0[base + SLOT_CCAP] = ccap;
 
       // Seed state1 companion current on first tran step (capload.c:70-72).
       if (mode & MODEINITTRAN) {
-        this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];
+        s1[base + SLOT_CCAP] = s0[base + SLOT_CCAP];
       }
 
       // Cache companion state for diagnostic readout / getPinCurrents.
-      this.s0[this.base + SLOT_GEQ] = geq;
-      this.s0[this.base + SLOT_IEQ] = ceq;
-      this.s0[this.base + SLOT_V] = vcap;
+      s0[base + SLOT_GEQ] = geq;
+      s0[base + SLOT_IEQ] = ceq;
+      s0[base + SLOT_V] = vcap;
 
       // Allocate matrix handles once (ngspice spGetElement pattern).
       if (!this._handlesInit) {
@@ -345,10 +333,10 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
       if (n1 !== 0) solver.stampRHS(n1 - 1, ceq);
     } else {
       // DC operating point: just store charge, no matrix stamp (capload.c:84).
-      this.s0[this.base + SLOT_Q] = C * vcap;
-      this.s0[this.base + SLOT_V] = vcap;
-      this.s0[this.base + SLOT_GEQ] = 0;
-      this.s0[this.base + SLOT_IEQ] = 0;
+      s0[base + SLOT_Q] = C * vcap;
+      s0[base + SLOT_V] = vcap;
+      s0[base + SLOT_GEQ] = 0;
+      s0[base + SLOT_IEQ] = 0;
     }
   }
 
@@ -357,8 +345,10 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     const n1 = this.pinNodeIds[1];
     const v0 = n0 > 0 ? voltages[n0 - 1] : 0;
     const v1 = n1 > 0 ? voltages[n1 - 1] : 0;
-    const geq = this.s0[this.base + SLOT_GEQ];
-    const ieq = this.s0[this.base + SLOT_IEQ];
+    const s0 = this._pool.states[0];
+    const base = this.stateBaseOffset;
+    const geq = s0[base + SLOT_GEQ];
+    const ieq = s0[base + SLOT_IEQ];
     const I = geq * (v0 - v1) + ieq;
     return [I, -I];
   }
@@ -370,12 +360,17 @@ export class AnalogCapacitorElement implements ReactiveAnalogElementCore {
     method: IntegrationMethod,
     lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
   ): number {
-    const q0 = this.s0[this.base + SLOT_Q];
-    const q1 = this.s1[this.base + SLOT_Q];
-    const q2 = this.s2[this.base + SLOT_Q];
-    const q3 = this.s3[this.base + SLOT_Q];
-    const ccap0 = this.s0[this.base + SLOT_CCAP];
-    const ccap1 = this.s1[this.base + SLOT_CCAP];
+    const base = this.stateBaseOffset;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
+    const q0 = s0[base + SLOT_Q];
+    const q1 = s1[base + SLOT_Q];
+    const q2 = s2[base + SLOT_Q];
+    const q3 = s3[base + SLOT_Q];
+    const ccap0 = s0[base + SLOT_CCAP];
+    const ccap1 = s1[base + SLOT_CCAP];
     return cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
   }
 }

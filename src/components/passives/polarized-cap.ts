@@ -243,15 +243,7 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   private G_esr: number;
   private G_leak: number;
   private reverseMax: number;
-  s0!: Float64Array;
-  s1!: Float64Array;
-  s2!: Float64Array;
-  s3!: Float64Array;
-  s4!: Float64Array;
-  s5!: Float64Array;
-  s6!: Float64Array;
-  s7!: Float64Array;
-  private base!: number;
+  private _pool!: StatePoolRef;
 
   private readonly _emitDiagnostic: (diag: Diagnostic) => void;
   private _reverseBiasDiagEmitted: boolean = false;
@@ -282,16 +274,8 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
   }
 
   initState(pool: StatePoolRef): void {
-    this.s0 = pool.states[0];
-    this.s1 = pool.states[1];
-    this.s2 = pool.states[2];
-    this.s3 = pool.states[3];
-    this.s4 = pool.states[4];
-    this.s5 = pool.states[5];
-    this.s6 = pool.states[6];
-    this.s7 = pool.states[7];
-    this.base = this.stateBaseOffset;
-    applyInitialValues(POLARIZED_CAP_SCHEMA, pool, this.base, {});
+    this._pool = pool;
+    applyInitialValues(POLARIZED_CAP_SCHEMA, pool, this.stateBaseOffset, {});
   }
 
   /**
@@ -311,6 +295,12 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     const nPos = this.pinNodeIds[0];
     const nNeg = this.pinNodeIds[1];
     const nCap = this.pinNodeIds[2];
+    const base = this.stateBaseOffset;
+    // pool.states[N] accessed at call time — no cached Float64Array refs (A4).
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
 
     // ESR conductance (nPos ↔ nCap).
     stampG(solver, nPos, nPos, this.G_esr);
@@ -362,19 +352,19 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     if (mode & MODETRAN) {
       // Charge update (capload.c pattern).
       if (mode & MODEINITPRED) {
-        this.s0[this.base + SLOT_Q] = this.s1[this.base + SLOT_Q];
+        s0[base +SLOT_Q] = s1[base +SLOT_Q];
       } else {
-        this.s0[this.base + SLOT_Q] = C * vNow;
+        s0[base +SLOT_Q] = C * vNow;
         if (mode & MODEINITTRAN) {
-          this.s1[this.base + SLOT_Q] = this.s0[this.base + SLOT_Q];
+          s1[base +SLOT_Q] = s0[base +SLOT_Q];
         }
       }
 
-      const q0 = this.s0[this.base + SLOT_Q];
-      const q1 = this.s1[this.base + SLOT_Q];
-      const q2 = this.s2[this.base + SLOT_Q];
-      const q3 = this.s3[this.base + SLOT_Q];
-      const ccapPrev = this.s1[this.base + SLOT_CCAP];
+      const q0 = s0[base +SLOT_Q];
+      const q1 = s1[base +SLOT_Q];
+      const q2 = s2[base +SLOT_Q];
+      const q3 = s3[base +SLOT_Q];
+      const ccapPrev = s1[base +SLOT_CCAP];
       const { ccap, ceq, geq } = niIntegrate(
         ctx.method,
         ctx.order,
@@ -384,15 +374,15 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
         [q2, q3, 0, 0, 0],
         ccapPrev,
       );
-      this.s0[this.base + SLOT_CCAP] = ccap;
+      s0[base +SLOT_CCAP] = ccap;
 
       if (mode & MODEINITTRAN) {
-        this.s1[this.base + SLOT_CCAP] = this.s0[this.base + SLOT_CCAP];
+        s1[base +SLOT_CCAP] = s0[base +SLOT_CCAP];
       }
 
-      this.s0[this.base + SLOT_GEQ] = geq;
-      this.s0[this.base + SLOT_IEQ] = ceq;
-      this.s0[this.base + SLOT_V]   = vNow;
+      s0[base +SLOT_GEQ] = geq;
+      s0[base +SLOT_IEQ] = ceq;
+      s0[base +SLOT_V]   = vNow;
 
       // Stamp companion between nCap and nNeg.
       stampG(solver, nCap, nCap, geq);
@@ -403,10 +393,10 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
       if (nNeg !== 0) solver.stampRHS(nNeg - 1, ceq);
     } else {
       // DC operating point.
-      this.s0[this.base + SLOT_Q] = C * vNow;
-      this.s0[this.base + SLOT_V] = vNow;
-      this.s0[this.base + SLOT_GEQ] = 0;
-      this.s0[this.base + SLOT_IEQ] = 0;
+      s0[base +SLOT_Q] = C * vNow;
+      s0[base +SLOT_V] = vNow;
+      s0[base +SLOT_GEQ] = 0;
+      s0[base +SLOT_IEQ] = 0;
     }
   }
 
@@ -434,12 +424,17 @@ export class AnalogPolarizedCapElement implements ReactiveAnalogElement {
     method: IntegrationMethod,
     lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
   ): number {
-    const q0 = this.s0[this.base + SLOT_Q];
-    const q1 = this.s1[this.base + SLOT_Q];
-    const q2 = this.s2[this.base + SLOT_Q];
-    const q3 = this.s3[this.base + SLOT_Q];
-    const ccap0 = this.s0[this.base + SLOT_CCAP];
-    const ccap1 = this.s1[this.base + SLOT_CCAP];
+    const base = this.stateBaseOffset;
+    const s0 = this._pool.states[0];
+    const s1 = this._pool.states[1];
+    const s2 = this._pool.states[2];
+    const s3 = this._pool.states[3];
+    const q0 = s0[base + SLOT_Q];
+    const q1 = s1[base + SLOT_Q];
+    const q2 = s2[base + SLOT_Q];
+    const q3 = s3[base + SLOT_Q];
+    const ccap0 = s0[base + SLOT_CCAP];
+    const ccap1 = s1[base + SLOT_CCAP];
     return cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
   }
 }
