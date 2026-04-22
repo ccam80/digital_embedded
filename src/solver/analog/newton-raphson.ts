@@ -364,11 +364,23 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // ngspice's invariant that no caller observes a post-gmin, pre-factor
     // matrix.
     //
-    // ngspice niiter.c:888-891: E_SINGULAR on the numerical-only path sets
-    // NISHOULDREORDER and does `continue` (back to CKTload). factor() itself
-    // now handles the partial-pivot-guard-driven fallthrough (spfactor.c:225)
-    // by dispatching back through factorWithReorder internally, so a
-    // `success: false` return here is a genuine singular-matrix failure.
+    // H2 (Phase 2.5 W2.2) — NR owns the diagonal-Gmin decision points
+    // mirroring niiter.c::NIiter:
+    //   (a) forceReorder() dispatch — niiter.c:856-859 NISHOULDREORDER
+    //       trigger on INITJCT/INITTRAN (see lines 353-357 above).
+    //   (b) diagGmin forwarded every factor call — niiter.c:863-864 and
+    //       :883-884 pass ckt->CKTdiagGmin into SMPreorder/SMPluFac every
+    //       iteration. Our factor(ctx.diagonalGmin) below mirrors that.
+    //   (c) E_SINGULAR retry loop — niiter.c:888-891 sets NISHOULDREORDER
+    //       and `continue`s; we mirror with forceReorder() + continue
+    //       below (lines ~380-383).
+    // The gmin-stepping ladder (setting ctx.diagonalGmin across multiple
+    // NR invocations) lives in dc-operating-point.ts::dynamicGmin /
+    // spice3Gmin / gillespieSrc, matching ngspice's cktop.c::dynamicgmin
+    // / spice3gmin / gillespie_src. NR owns per-iteration decisions; the
+    // DC-OP ladder owns cross-solve gmin ramping. No stand-alone
+    // addDiagonalGmin API exists.
+    //
     // ngspice niiter.c:863-864, 883-884 — CKTpivotAbsTol/CKTpivotRelTol are
     // forwarded into SMPreorder/SMPluFac every iteration. setPivotTolerances
     // is a cheap scalar store; doing it here (not just once at ctx
@@ -377,6 +389,9 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     solver.setPivotTolerances(ctx.pivotRelTol, ctx.pivotAbsTol);
     const factorResult = solver.factor(ctx.diagonalGmin);
     if (!factorResult.success) {
+      // H2 (Phase 2.5 W2.2) — mirror niiter.c:888-891: on SMPluFac E_SINGULAR
+      // NR sets NISHOULDREORDER and does `continue` back to CKTload. We
+      // invoke solver.forceReorder() and `continue` for the same effect.
       if (!solver.lastFactorUsedReorder) {
         solver.forceReorder();
         continue;

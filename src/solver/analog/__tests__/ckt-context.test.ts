@@ -260,13 +260,14 @@ describe("CKTCircuitContext", () => {
     expect(lc.voltages).toBeInstanceOf(Float64Array);
     expect(lc.voltages).toBe(ctx.rhsOld);
 
-    // iteration — 0-based, starts at 0
-    expect(typeof lc.iteration).toBe("number");
-    expect(lc.iteration).toBe(0);
-
-    // initMode — one of the valid InitMode values
-    const validModes = ["initJct", "initFix", "initFloat", "initTran", "initPred", "initSmsig", "transient"];
-    expect(validModes).toContain(lc.initMode);
+    // Deleted per Phase 2.5 W2.2 (C3 + D1) + A1 §Test handling rule:
+    //   lc.iteration — removed by C3 (cktLoad no longer takes an iteration param;
+    //   iteration-sensitive behavior keys on cktMode INITF bits).
+    //   lc.initMode — removed by D1; INITF state lives in cktMode bitfield only.
+    //   These assertions inspected non-existent LoadContext fields.
+    //
+    // cktMode check — bitfield is the sole source of truth for analysis + INITF.
+    expect(typeof lc.cktMode).toBe("number");
 
     // dt — 0 at construction (DC mode)
     expect(typeof lc.dt).toBe("number");
@@ -299,9 +300,10 @@ describe("CKTCircuitContext", () => {
     // limitingCollector — null at construction
     expect(lc.limitingCollector).toBeNull();
 
-    // isDcOp / isTransient — both false at construction (engine flips them)
-    expect(lc.isDcOp).toBe(false);
-    expect(lc.isTransient).toBe(false);
+    // Deleted per Phase 2.5 W2.2 (A2+A3 already landed) + A1 §Test handling:
+    //   lc.isDcOp / lc.isTransient / lc.uic — all removed in A2/A3/C2. The
+    //   canonical readers test against cktMode bitfield bits (MODEDCOP,
+    //   MODETRAN, MODEUIC) per ckt-mode.ts helpers.
 
     // xfact — 0 until first step computes deltaOld[0]/deltaOld[1]
     expect(lc.xfact).toBe(0);
@@ -309,9 +311,6 @@ describe("CKTCircuitContext", () => {
     // gmin — positive number
     expect(typeof lc.gmin).toBe("number");
     expect(lc.gmin).toBeGreaterThan(0);
-
-    // uic — false at construction (set by solveDcOperatingPoint when requested)
-    expect(lc.uic).toBe(false);
 
     // reltol — matches params
     expect(typeof lc.reltol).toBe("number");

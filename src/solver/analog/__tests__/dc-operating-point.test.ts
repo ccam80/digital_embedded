@@ -498,25 +498,16 @@ describe("DcOP", () => {
     expect(ctx.dcopResult.nodeVoltages.length).toBe(ctx.matrixSize);
   });
 
-  it("dcopFinalize_transitions_initMode_to_initFloat", () => {
-    // After solveDcOperatingPoint converges, dcopFinalize transitions
-    // MODEINITSMSIG → MODEINITFLOAT per niiter.c:1070-1071:
-    //   if (ckt->CKTmode & MODEINITSMSIG)
-    //     ckt->CKTmode = (...) | MODEINITFLOAT;
-    // Our newton-raphson.ts Step J (lines ~502-504) mirrors this exactly.
-    const elements = [
-      makeVoltageSource(1, 0, 1, 3),
-      makeResistor(1, 0, 1000),
-    ];
-    const ctx = makeCtx(elements, 1, 1);
-
-    solveDcOperatingPoint(ctx);
-
-    expect(ctx.dcopResult.converged).toBe(true);
-    // ngspice niiter.c:1070-1071: MODEINITSMSIG transitions to MODEINITFLOAT
-    // inside the finalize NIiter load — not left as initSmsig.
-    expect(ctx.statePool?.initMode).toBe("initFloat");
-  });
+  // Deleted per Phase 2.5 W2.2 + A1 §Test handling rule:
+  //   dcopFinalize_transitions_initMode_to_initFloat
+  // Inspected ctx.statePool?.initMode — a string-typed field that never
+  // existed as a writable mirror in production (StatePoolRef.initMode is a
+  // harness-surface read-only optional). cktMode bitfield is the sole
+  // source of truth for INITF state (D1). Post-W2.2, there is no
+  // string-mode to assert on. The equivalent bitfield check
+  // (`initf(ctx.cktMode) === MODEINITFLOAT`) is already covered by the
+  // newton-raphson test surface for the INITF dispatcher (niiter.c:1070-
+  // 1071). W2.3 removes the string type entirely.
 
   // ---------------------------------------------------------------------------
   // New spec tests: writes_into_ctx_dcopResult and zero_alloc_gmin_stepping

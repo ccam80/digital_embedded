@@ -701,8 +701,9 @@ describe("NR NISHOULDREORDER lifecycle", () => {
   });
 
   it("forceReorder_called_on_initTran_first_iteration", () => {
-    // Run NR with statePool.initMode = "initTran". On iteration 0, the STEP J
-    // initTran branch calls forceReorder() when iteration <= 0.
+    // Run NR with cktMode INITF bits = MODEINITTRAN. On iteration 0, the
+    // STEP J initTran branch calls forceReorder() when iteration <= 0
+    // (mirrors niiter.c:856-859 NISHOULDREORDER trigger).
     const vs = makeVoltageSource(1, 0, 2, 5.0);
     const r = makeResistor(1, 2, 1000);
     const d = makeDiode(2, 0, 1e-14, 1);

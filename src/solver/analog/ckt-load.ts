@@ -56,6 +56,24 @@ export function cktLoad(ctx: CKTCircuitContext): void {
   ctx.loadCtx.cktMode  = ctx.cktMode;   // single source of truth (F3/F4).
   ctx.loadCtx.srcFact  = ctx.srcFact;
   ctx.loadCtx.gmin     = ctx.diagonalGmin;
+  // H1 (Phase 2.5 W2.2): sync the limiting-event collector into the device-
+  // facing LoadContext on every cktLoad call. Devices push into
+  // ctx.limitingCollector (the LoadContext param they receive) when they
+  // invoke pnjlim/fetlim/limvds — without this propagation, the outer
+  // CKTCircuitContext.limitingCollector set by analog-engine.ts (:449/:790/
+  // :884) would be invisible to device code, so harness assertions that
+  // look at the collector would see zero events.
+  //
+  // ngspice reference: niiter.c:657-660 resets ni_limit_count at the top of
+  // every NR iteration (`ckt->CKTnoncon = 0; ni_limit_reset();`) BEFORE
+  // CKTload runs. The NR loop in newton-raphson.ts already performs the
+  // `.length = 0` reset at iteration top (lines 323-325); this sync wires
+  // the per-iteration state through to the device-facing ctx. Pairing the
+  // sync with the other per-call scalar propagations in cktLoad guarantees
+  // every invocation — NR loop, dcopFinalize (dcop.c:153), or UIC early-
+  // exit (niiter.c:628-637) — sees a consistent collector reference on the
+  // LoadContext handed to devices.
+  ctx.loadCtx.limitingCollector = ctx.limitingCollector;
 
   // Step 3: single device loop (ngspice cktload.c:61-75). Null-guard matches
   // ngspice `if (DEVices[i] && DEVices[i]->DEVload && ckt->CKThead[i])`.

@@ -56,8 +56,8 @@
 | W1.8b | Analog-switch direct port — `sw/*` VSWITCH primitive | ✓ | 63efc924 |
 | W1.8c | 555 timer composition — two comparators + RS flip-flop + BJT output + R-divider | ✓ | 52a6b576 (reworked, supersedes 8b298ca9) |
 | W1.9 | `device-mappings.ts` schema sync — harness slot-correspondence follows W1.1–W1.8 renames | ✓ | 563c8d49 + close-out (harness rename + BJT CDSUB/GDSUB swap + QCS→QSUB) |
-| W2.1 | Solver architectural fixes — B1, B2, B3, B4, B5 | — | — |
-| W2.2 | Control-flow fixes — C1, C2, C3, D1, H1, H2 | — | — |
+| W2.1 | Solver architectural fixes — B1, B2, B3, B4, B5 | ✓ | 28db1913 |
+| W2.2 | Control-flow fixes — C1, C2, C3, D1, H1, H2 | ▶ | — |
 | W2.3 | `InitMode` string deletion (production + harness) | — | — |
 | W2.4 | Aggressive I1 test regeneration | — | — |
 | W3 | Wrap-up — convergence harness run + user review | — | — |
@@ -400,7 +400,7 @@ Parallelizable with W1.x once W0 lands (different files).
 - B1: `_numericLUReusePivots` absolute threshold → column-relative per `ngspice/src/sparse/spfactor.c`
 - B2: `_hasPivotOrder` conflation → separate `Factored` and `NeedsOrdering` states per ngspice `MATRIX` state
 - B3: Gmin stamped inside factor routine, not outside (cite `spfactor.c`)
-- B4: `invalidateTopology` trigger parity per ngspice `SMPgetError` + `NIcomCof`
+- B4: `invalidateTopology` trigger parity per ngspice `spalloc.c:170` + `spbuild.c:788` (authoritative sources per `spec/architectural-alignment.md §B4`). Prior text cited `SMPgetError` + `NIcomCof` — neither touches the `NeedsOrdering` state; `SMPgetError` wraps `spWhereSingular` at `spsmp.c:302-308` and `NIcomCof` computes integration coefficients.
 - B5: tranInit reorder before iter-0 solve per `ngspice/src/spicelib/analysis/dctran.c::CKTdoJob`
 
 ### W2.2 — Control-flow fixes
@@ -457,8 +457,14 @@ Not an executor task. User-driven.
    - **Convergence failure** (device doesn't solve to the right fixed point): becomes a post-A1 PARITY item against the new `load()` structure. Example: the D-8 canary measurement happens here.
    - **Suppression residue**: a test that's failing because an I1 suppression was removed and the underlying bug surfaces. Usually means a real bug; becomes PARITY.
    - **Test deletion missed**: a test that should have been deleted per the §Test handling rule but survived. Delete it.
-4. Append the remaining PARITY list to a new `spec/post-a1-parity.md` — the new work list for Phase 3 onwards.
-5. Commit: "Phase 2.5 complete — Track A landed, post-A1 PARITY list captured."
+4. **Known pre-flagged watch items** — classify under the scheme in (3) during W3; do not let these silently pass:
+   - `mna-end-to-end::rl_dc_steady_state_tight_tolerance` — observed 97.56 vs expected `<0.1` at W2.1 close. Originally framed as §B5 100 kV RL overshoot on `tmp-hang-circuits/rl-step.dts`; current symptom shape differs. Could be pre-existing, could be a fresh regression from a W1.x or W2.x port. Per §1 principle 4 not investigated at the wave that surfaced it; W3 owns the classification.
+5. **Verify the unmapped digiTS-only integration slots** flagged at W1.9 close (diode `CCAP`, inductor `CCAP`, and any peer slots the W1.5 port introduces under the same pattern). For each such slot, trace the write/read lifetime:
+   - Written once per call-frame and read only within the same call-frame → cross-method transfer slot that escaped A1. Open a post-A1 PARITY item to excise.
+   - Written at timestep N and read at timestep N+1 (or later) → genuine per-device state with no ngspice counterpart. Add to `spec/architectural-alignment.md` §I2 as a documented digiTS-only slot category with a one-line note on why no ngspice offset exists.
+   Do not add a `slotToNgspice` entry for either case — unmapped is the correct harness stance.
+6. Append the remaining PARITY list to a new `spec/post-a1-parity.md` — the new work list for Phase 3 onwards.
+7. Commit: "Phase 2.5 complete — Track A landed, post-A1 PARITY list captured."
 
 ---
 

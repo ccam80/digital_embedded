@@ -206,7 +206,8 @@ function cktop(
 /**
  * Finalize the standalone .OP DC operating point after convergence.
  *
- * ngspice `DCop` (dcop.c:127,153) performs exactly:
+ * C1 (Phase 2.5 W2.2): single CKTload mirrors ngspice `DCop`
+ * (dcop.c:127 mode write, dcop.c:153 CKTload call) exactly:
  *   ckt->CKTmode = (ckt->CKTmode & MODEUIC) | MODEDCOP | MODEINITSMSIG;
  *   converged = CKTload(ckt);
  *
@@ -217,12 +218,12 @@ function cktop(
  * quantities (e.g. geqcb for capacitors) into state0 using those voltages.
  *
  * After the load, ngspice does NOT reset CKTmode — the next consumer owns
- * it. For our engine, no consumer reads initMode after standalone .OP
+ * it. For our engine, no consumer reads the INITF bits after standalone .OP
  * finalize (the next user call either resets, reconfigures, or transitions
  * to transient via _seedFromDcop which writes its own mode). We still clear
- * the INITF bits to MODEINITFLOAT on return so ctx.initMode is never
- * observed leaking "initSmsig" — matches niiter.c's post-converge INITF
- * dispatcher landing mode.
+ * the INITF bits to MODEINITFLOAT on return so cktMode never leaks
+ * MODEINITSMSIG across analysis boundaries — matches niiter.c:1070-1071's
+ * post-converge INITF dispatcher landing mode (MODEINITSMSIG → MODEINITFLOAT).
  *
  * Runs ONLY on the standalone .OP path (!isTranOp(ctx.cktMode)). The
  * transient-boot DCOP path (dctran.c:230-346) has no smsig load and callers
