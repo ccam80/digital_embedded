@@ -79,7 +79,7 @@ function makeGminDependentElement(nodeA: number, nodeB: number = 0): AnalogEleme
       const vB = nodeB === 0 ? 0 : ctx.voltages[nodeB - 1];
       const v = vA - vB;
       // Shockley diode residual — ill-conditioned at diagonalGmin=0, solvable
-      // once ctx.diagonalGmin > 0 (added externally by SparseSolver.addDiagonalGmin).
+      // once ctx.diagonalGmin > 0 (stamped atomically inside SparseSolver.factor).
       // Mirrors ngspice dioload.c:298,310 but intentionally omits the internal
       // CKTgmin addition — only the outer diagonalGmin stepping stabilizes it.
       const expv = v > 40 * vt ? Math.exp(40) : Math.exp(v / vt);

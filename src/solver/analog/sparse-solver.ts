@@ -212,37 +212,54 @@ export class SparseSolver {
   private _capturePreFactorMatrix = false;
 
   // =========================================================================
-  // State flags — ngspice mapping (spdefs.h:761 + :642-644, :69)
+  // State flags — ngspice MatrixFrame fields (spdefs.h:733-788) + macro :69.
   //
+  // B2 fix (Phase 2.5 W2.1): we no longer conflate Factored + NeedsOrdering
+  // into a single boolean. ngspice's `MatrixFrame` has two orthogonal flags:
+  //   Matrix->Factored       (spdefs.h:748)  — "matrix has an LU factorization"
+  //   Matrix->NeedsOrdering  (spdefs.h:761)  — "matrix topology changed; next
+  //                                             factor must reorder, not reuse"
+  // and a derived predicate:
+  //   IS_FACTORED(m)         (spdefs.h:69)   — `((m)->Factored && !(m)->NeedsOrdering)`
+  //
+  // Our fields are named after the ngspice fields:
+  //   Matrix->Factored       → _factored
   //   Matrix->NeedsOrdering  → _needsReorder
-  //   Matrix->Factored       → _hasPivotOrder (inverse: !_hasPivotOrder ⇒ !Factored)
-  //   IS_FACTORED(Matrix)    → _hasPivotOrder && !_needsReorder
+  //   IS_FACTORED(Matrix)    → (_factored && !_needsReorder)
   //   NIDIDPREORDER bit      → _didPreorder (CKT-lifetime — see S3)
   //
   // Set/clear lifecycle (must match ngspice exactly — see Item #10 audit):
-  //   _needsReorder = true:
-  //     * _initStructure — initial (ngspice spalloc.c:170 NeedsOrdering=YES)
-  //     * allocElement (new A-entry, not fill-in) — ngspice spbuild.c:788
-  //     * forceReorder() — ngspice niiter.c:858, 861 NISHOULDREORDER
-  //     * invalidateTopology() — ngspice spStripMatrix path (sputils.c:1112)
+  //   _needsReorder = true (ngspice NeedsOrdering = YES):
+  //     * _initStructure — initial alloc (spalloc.c:170)
+  //     * allocElement (new A-entry, not fill-in) — spbuild.c:788 inside
+  //       spcCreateElement (B4 trigger: mid-assembly A-matrix insertion)
+  //     * forceReorder() — niiter.c:858 NISHOULDREORDER on (MODEINITJCT ||
+  //       (MODEINITTRAN && iterno==1))
+  //     * invalidateTopology() — spStripMatrix path (sputils.c:1112)
   //   _needsReorder = false:
-  //     * factorWithReorder() success — ngspice spfactor.c:279
+  //     * factorWithReorder() success — spfactor.c:279 `NeedsOrdering = NO`
   //
-  //   _hasPivotOrder = true:
-  //     * factorWithReorder() success — ngspice spfactor.c:281 Factored=YES
-  //   _hasPivotOrder = false:
-  //     * _initStructure — ngspice spCreate initial
-  //     * invalidateTopology() — ngspice spStripMatrix path
+  //   _factored = true (ngspice Factored = YES):
+  //     * factorWithReorder() success — spfactor.c:281 `Factored = YES`
+  //     * factorNumerical() success   — spfactor.c:412 `Factored = YES`
+  //   _factored = false:
+  //     * _initStructure — spCreate initial (Factored implicitly NO)
+  //     * invalidateTopology() — spStripMatrix path
   //
   //   _didPreorder = true:
-  //     * preorder() first call — ngspice niiter.c:854 NIDIDPREORDER
+  //     * preorder() first call — niiter.c:854 NIDIDPREORDER
   //   _didPreorder = false:
-  //     * _initStructure — ngspice spCreate initial
-  //     * invalidateTopology() — ngspice NIreinit (nireinit.c:42 clears CKTniState)
+  //     * _initStructure — spCreate initial
+  //     * invalidateTopology() — NIreinit (nireinit.c:42 clears CKTniState)
   // =========================================================================
   private _needsReorder: boolean = false;
   private _didPreorder: boolean = false;
-  private _hasPivotOrder: boolean = false;
+  /**
+   * ngspice MatrixFrame.Factored (spdefs.h:748). True iff the matrix currently
+   * holds an LU factorization that can be reused by factorNumerical (modulo
+   * the _needsReorder flag: IS_FACTORED = _factored && !_needsReorder).
+   */
+  private _factored: boolean = false;
   /** True when linked structure has never been built, or after invalidateTopology(). */
   private _structureEmpty: boolean = true;
   /** Matrix size for which workspace arrays were last allocated. -1 = never. */
@@ -342,17 +359,18 @@ export class SparseSolver {
     // Allocate new element. _elCol stores the original column (ngspice
     // Element->Col convention); chain membership uses the internal column.
     //
-    // ngspice spcCreateElement (spbuild.c:786-788): every new non-fill-in
-    // element sets Matrix->NeedsOrdering = YES. This is the only place in
-    // ngspice where stamp-time topology changes flag a reorder; the same
-    // invariant belongs here so stamp passes that introduce a new A-entry
-    // between solves (e.g. a newly-activated comparator output, a newly-
-    // added nodeset, a hot-loaded model change that enables a new coupling)
-    // force the next factor() through factorWithReorder. Fill-ins created
-    // by _numericLUMarkowitz set FLAG_FILL_IN and take a different code
-    // path (ngspice spcGetFillin, spbuild.c:781) that does NOT flag
-    // NeedsOrdering — mirrored by _numericLUMarkowitz calling _newElement
-    // directly without going through allocElement.
+    // B4 (Phase 2.5 W2.1): ngspice spcCreateElement (spbuild.c:786-788):
+    //     pElement = spcGetElement( Matrix );
+    //     Matrix->Originals++;
+    //     Matrix->NeedsOrdering = YES;
+    // Every new non-fill-in element sets Matrix->NeedsOrdering = YES. This
+    // is the ONLY stamp-time trigger for NeedsOrdering in ngspice. Our
+    // invariant mirror: every allocElement that actually allocates (i.e.
+    // misses the existing-element fast path above) sets _needsReorder,
+    // forcing the next factor() through factorWithReorder. Fill-ins created
+    // by _numericLUMarkowitz set FLAG_FILL_IN and route through
+    // _newElement directly; ngspice's equivalent is spcGetFillin
+    // (spbuild.c:779-782), which does NOT touch NeedsOrdering.
     const newE = this._newElement(row, col, 0, 0);
     this._insertIntoRow(newE, row);
     this._insertIntoCol(newE, internalCol);
@@ -466,20 +484,29 @@ export class SparseSolver {
   /**
    * Factor the currently-assembled matrix.
    *
-   * ngspice mapping:
-   *   - `diagGmin` → `LoadGmin(Matrix, Gmin)` called INSIDE SMPluFac / SMPreorder
-   *     before the corresponding `spFactor`/`spOrderAndFactor` (spsmp.c:173,
-   *     197). Making `factor()` accept `diagGmin` and stamp it here keeps the
-   *     gmin + factorization pair atomic, mirroring ngspice's invariant that
-   *     callers never see a post-gmin, pre-factor matrix state.
-   *   - `needsReorder` sentinel from `_numericLUReusePivots` → ReorderingRequired
-   *     at spfactor.c:225. The numeric-reuse path's per-step partial-pivot
-   *     guard can demand a full reorder; dispatching back through
-   *     `factorWithReorder` here is the ngspice fall-through equivalent.
-   *     This must NOT be conflated with a singular-matrix failure.
+   * ngspice counterparts:
+   *   - `diagGmin` → `LoadGmin(Matrix, Gmin)`, called INSIDE `SMPluFac`
+   *     (spsmp.c:173) and `SMPreorder` (spsmp.c:197) before the matching
+   *     `spFactor` / `spOrderAndFactor` invocation. B3 (Phase 2.5 W2.1):
+   *     the gmin stamp belongs inside the factor routine so callers never
+   *     observe a post-gmin, pre-factor matrix.
+   *   - Dispatch: `spFactor(Matrix)` at spfactor.c:333-335 forwards to
+   *     `spOrderAndFactor` when `Matrix->NeedsOrdering` is set. Our B2
+   *     predicate `_needsReorder || !_factored` is the same guard expanded
+   *     with `Factored = NO` catching the first-ever factor call.
+   *   - `needsReorder` sentinel from `_numericLUReusePivots` → spfactor.c:225
+   *     `ReorderingRequired = YES; break`, landing the outer `for` exit in
+   *     the full-reorder section at spfactor.c:231-237. The numeric-reuse
+   *     path's per-step column-relative pivot guard can demand a full
+   *     reorder — this is NOT a singular-matrix failure.
    */
   factor(diagGmin?: number): FactorResult {
-    if (this._needsReorder || !this._hasPivotOrder) {
+    // B2: IS_FACTORED predicate from ngspice spdefs.h:69 —
+    //   `((m)->Factored && !(m)->NeedsOrdering)`.
+    // Reuse the stored pivot order only when both conditions hold. Otherwise
+    // dispatch to factorWithReorder, which mirrors spFactor's fallthrough at
+    // spfactor.c:333-335 (calls spOrderAndFactor when NeedsOrdering is set).
+    if (this._needsReorder || !this._factored) {
       this.lastFactorUsedReorder = true;
       return this.factorWithReorder(diagGmin);
     }
@@ -558,7 +585,9 @@ export class SparseSolver {
    */
   invalidateTopology(): void {
     this._structureEmpty = true;
-    this._hasPivotOrder = false;
+    // B2: clear Factored (spdefs.h:748). spStripMatrix clears the linked
+    // structure and the factorization along with it.
+    this._factored = false;
     this._didPreorder = false;
     // ngspice spStripMatrix (sputils.c:1112): NeedsOrdering = YES.
     this._needsReorder = true;
@@ -720,21 +749,6 @@ export class SparseSolver {
     return -1;
   }
 
-  /**
-   * Test-only: add gmin to every diagonal element of the assembled matrix.
-   *
-   * Production callers MUST NOT invoke this directly — use `factor(diagGmin)`
-   * so the gmin stamp and the factorization are atomic, mirroring ngspice's
-   * SMPluFac(Matrix, PivTol, Gmin) wrapper which calls LoadGmin + spFactor
-   * back-to-back with no intermediate observable state (spsmp.c:169-175).
-   *
-   * Kept public for harness instrumentation tests that need to inspect the
-   * post-gmin, pre-factor matrix snapshot via getPreFactorMatrixSnapshot().
-   */
-  addDiagonalGmin(gmin: number): void {
-    this._applyDiagGmin(gmin);
-  }
-
   // =========================================================================
   // Harness instrumentation accessors
   // =========================================================================
@@ -884,7 +898,9 @@ export class SparseSolver {
     this._markowitzProd = new Float64Array(n);
 
     this._structureEmpty = false;
-    this._hasPivotOrder = false;
+    // B2: Factored starts at NO (spdefs.h:748 default — spCreate zero-allocates
+    // MatrixFrame, so Factored = NO implicitly).
+    this._factored = false;
     // ngspice spalloc.c:170 — Matrix->NeedsOrdering = YES on initial Create.
     this._needsReorder = true;
     this._didPreorder = false;
@@ -1472,24 +1488,49 @@ export class SparseSolver {
       const diagVal = x[pivotRow];
       const diagMag = Math.abs(diagVal);
 
-      // --- ngspice column-relative partial-pivot guard (spfactor.c:218-226).
-      // pPivot->NextInCol is the first sub-diagonal element in the column.
-      // If LargestInCol * RelThreshold >= |pPivot|, the stored pivot order is
-      // no longer numerically adequate and a full reorder is required. Signal
-      // this by returning { success: false, needsReorder: true } so factor()
-      // falls through to factorWithReorder. This must fire BEFORE writing
-      // this column's L/U values so the scatter from a rejected column does
-      // not pollute the factored CSC.
+      // B1 (Phase 2.5 W2.1): column-relative partial-pivot guard, mechanical
+      // port of ngspice spfactor.c:214-227 (the `if (!Matrix->NeedsOrdering)`
+      // reuse-pivots branch of spOrderAndFactor):
+      //
+      //     for (Step = 1; Step <= Size; Step++) {
+      //         pPivot = Matrix->Diag[Step];
+      //         LargestInCol = FindLargestInCol(pPivot->NextInCol);   // :218
+      //         if ((LargestInCol * RelThreshold < ELEMENT_MAG(pPivot))) {
+      //             ... RealRowColElimination ...                     // :219-223
+      //         } else {
+      //             ReorderingRequired = YES;                         // :225
+      //             break;
+      //         }
+      //     }
+      //
+      // Ngspice accepts the stored pivot iff
+      //     LargestInCol * RelThreshold < |pPivot|
+      // (strict less-than). Negating that: reorder is required when
+      //     LargestInCol * RelThreshold >= |pPivot|.
+      //
+      // pPivot = Matrix->Diag[Step], so pPivot->NextInCol is the first entry
+      // BELOW the diagonal in column Step — matching `elNextInCol[diagE]`.
+      //
+      // On rejection we return { success: false, needsReorder: true } so that
+      // factor() falls through to factorWithReorder (ngspice's "partial
+      // reordering" dispatch at spfactor.c:231-237 where `break` from the
+      // reuse loop lands the control flow in the full reorder section). This
+      // fires BEFORE writing this column's L/U values so a rejected pivot
+      // never pollutes the CSC.
       const diagE = diag[k];
       if (diagE >= 0) {
         const largestInCol = this._findLargestInColBelow(elNextInCol[diagE]);
+        // spfactor.c:219 — strict < on the acceptance side, so >= on reject.
         if (largestInCol * relThreshold >= diagMag || diagMag <= absThreshold) {
           for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
           return { success: false, needsReorder: true };
         }
       } else if (diagMag <= absThreshold) {
-        // No diagonal pool element (unusual after reorder); absolute tolerance
-        // guard fires — demand reorder just as the relative-threshold path does.
+        // No diagonal pool element — cannot even evaluate the spfactor.c:219
+        // test. Ngspice asserts Matrix->Diag[Step] exists for every Step after
+        // a successful reorder (spfactor.c:217 dereference without a NULL
+        // check); hitting this branch means the linked structure is
+        // inconsistent with the pivot order. Demand a full reorder.
         for (let idx = 0; idx < xNzCount; idx++) x[xNzIdx[idx]] = 0;
         return { success: false, needsReorder: true };
       }
@@ -1600,15 +1641,24 @@ export class SparseSolver {
    * Operates on original column order per ngspice spOrderAndFactor.
    */
   factorWithReorder(diagGmin?: number): FactorResult {
+    // B3: Gmin stamped INSIDE the factor routine — ngspice spsmp.c:194-200
+    // `SMPreorder` body: `LoadGmin(Matrix, Gmin); return spOrderAndFactor(...)`.
+    // LoadGmin (spsmp.c:422-440) adds Gmin to every diagonal element, then
+    // spOrderAndFactor consumes that already-stamped matrix. The stamp +
+    // factor pair is never observed separately.
     if (diagGmin) this._applyDiagGmin(diagGmin);
     this._takePreFactorSnapshotIfEnabled();
     if (this._needsReorder) {
       this._allocateWorkspace();
-      this._needsReorder = false;
     }
     const result = this._numericLUMarkowitz();
     if (result.success) {
-      this._hasPivotOrder = true;
+      // B2: ngspice spfactor.c:279-281
+      //   Matrix->NeedsOrdering = NO;
+      //   Matrix->Reordered = YES;
+      //   Matrix->Factored = YES;
+      this._needsReorder = false;
+      this._factored = true;
       this._buildCSCFromLinked();
     }
     return result;
@@ -1616,12 +1666,22 @@ export class SparseSolver {
 
   /**
    * Numerical-only factorization reusing pivot order from last factorWithReorder call.
-   * ngspice: spFactor (spfactor.c).
+   * ngspice: spFactor (spfactor.c:322-414).
    */
   factorNumerical(diagGmin?: number): FactorResult {
+    // B3: Gmin stamped INSIDE the factor routine — ngspice spsmp.c:169-175
+    // `SMPluFac` body: `spSetReal(Matrix); LoadGmin(Matrix, Gmin); return spFactor(Matrix);`
     if (diagGmin) this._applyDiagGmin(diagGmin);
     this._takePreFactorSnapshotIfEnabled();
-    return this._numericLUReusePivots();
+    const result = this._numericLUReusePivots();
+    // B2: ngspice spfactor.c:412 `Matrix->Factored = YES` on successful spFactor.
+    // The numerical-reuse path preserves _needsReorder = false (it was already
+    // false when we entered; a failure here returns needsReorder:true and
+    // factor() dispatches to factorWithReorder, which sets both flags).
+    if (result.success) {
+      this._factored = true;
+    }
+    return result;
   }
 
   // =========================================================================
@@ -1894,13 +1954,17 @@ export class SparseSolver {
   // =========================================================================
 
   /**
-   * Add gmin to every diagonal element. ngspice LoadGmin (spsmp.c:422-440).
+   * Add gmin to every diagonal element — mechanical port of ngspice LoadGmin
+   * (spsmp.c:422-440). Private in ngspice (`static` on spsmp.c:109), private
+   * here too: external code must not stamp gmin outside the factor routine.
    *
-   * Intentionally does NOT set this._needsReorder = true: ngspice's
-   * invariant is that LoadGmin is always wrapped atomically with spFactor
-   * (SMPluFac, spsmp.c:169-175) or spOrderAndFactor (SMPreorder, :194-200),
-   * so the gmin-stamped matrix is never observed without an immediate
-   * re-factor. Our factor(diagGmin?) wrapper preserves that atomicity.
+   * Called only from factorWithReorder (ngspice SMPreorder body, spsmp.c:197)
+   * and factorNumerical (ngspice SMPluFac body, spsmp.c:173). This preserves
+   * the ngspice invariant that `LoadGmin(m,g) ; spFactor(m)` is an atomic
+   * unit — no caller observes a post-gmin pre-factor matrix state.
+   *
+   * Intentionally does NOT set _needsReorder: the stamp is consumed by the
+   * same factor call, never persisting beyond it.
    */
   private _applyDiagGmin(gmin: number): void {
     if (gmin === 0) return;

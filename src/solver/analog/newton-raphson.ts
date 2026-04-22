@@ -334,13 +334,35 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
     // gating every iteration on the bit.
     solver.preorder();
 
+    // ---- B5 (Phase 2.5 W2.1): NISHOULDREORDER trigger before factor ----
+    // Mechanical port of ngspice niiter.c:856-859, which sits BETWEEN
+    // SMPpreOrder (matching our solver.preorder() above) and the
+    // SMPreorder/SMPluFac dispatch:
+    //
+    //     if( (ckt->CKTmode & MODEINITJCT) ||
+    //             ( (ckt->CKTmode & MODEINITTRAN) && (iterno==1))) {
+    //         ckt->CKTniState |= NISHOULDREORDER;
+    //     }
+    //
+    // Our `iteration` counter is 0-based; ngspice's `iterno` is 1-based and
+    // has already been incremented at this point in niiter.c (niiter.c:670),
+    // so ngspice's `iterno == 1` corresponds to our `iteration === 0`.
+    //
+    // forceReorder() sets _needsReorder = true, which factor() below then
+    // routes through factorWithReorder (ngspice SMPreorder path).
+    const curInitfNow = initf(ctx.cktMode);
+    if (curInitfNow === MODEINITJCT ||
+        (curInitfNow === MODEINITTRAN && iteration === 0)) {
+      solver.forceReorder();
+    }
+
     // ---- STEP E: Factorize (gmin stamped atomically inside factor()) ----
-    // ngspice SMPluFac/SMPreorder call LoadGmin internally, immediately
-    // before spFactor/spOrderAndFactor (spsmp.c:173, 197). We mirror that by
-    // passing diagGmin into factor() rather than calling addDiagonalGmin
-    // separately — this keeps the gmin stamp and the factorization atomic
-    // and aligned with ngspice's invariant that no caller observes a
-    // post-gmin, pre-factor matrix.
+    // B3 (Phase 2.5 W2.1): ngspice SMPluFac/SMPreorder call LoadGmin
+    // internally, immediately before spFactor/spOrderAndFactor (spsmp.c:173,
+    // 197). The gmin stamp lives inside factor(); there is no external
+    // addDiagonalGmin API — the stamp + factor pair is atomic, matching
+    // ngspice's invariant that no caller observes a post-gmin, pre-factor
+    // matrix.
     //
     // ngspice niiter.c:888-891: E_SINGULAR on the numerical-only path sets
     // NISHOULDREORDER and does `continue` (back to CKTload). factor() itself
@@ -542,10 +564,12 @@ export function newtonRaphson(ctx: CKTCircuitContext): void {
         }
       }
     } else if (curInitf === MODEINITTRAN) {
+      // B5 (Phase 2.5 W2.1): the NISHOULDREORDER trigger moved to the top of
+      // the loop (before factor), matching ngspice niiter.c:856-859. Here we
+      // only mirror niiter.c:1074 — clear MODEINITTRAN and set MODEINITFLOAT
+      // for subsequent iterations:
+      //     ckt->CKTmode = (ckt->CKTmode&(~INITF))|MODEINITFLOAT;
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
-      if (iteration <= 0) {
-        solver.forceReorder();
-      }
     } else if (curInitf === MODEINITPRED) {
       ctx.cktMode = setInitf(ctx.cktMode, MODEINITFLOAT);
     } else if (curInitf === MODEINITSMSIG) {
