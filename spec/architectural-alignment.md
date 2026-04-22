@@ -79,6 +79,26 @@ PROPOSED → (user review) → APPROVED FIX  → (implementation) → LANDED
   anomalies; diffs present loudly, only. Stricter than the originally
   proposed "cite the structural item" rule. Reconciliation pass will
   enumerate existing suppression patterns for removal.
+- **2026-04-22** — W1.8 composition triage. Phase 2.5 Wave 1.8's
+  scope text incorrectly lumped 8 active devices as "F4b composites";
+  the W1.8 executor correctly surfaced that most were already classified
+  F4c (or F4a) per this doc. Rulings:
+  - **real-opamp, opamp, comparator, OTA, schmitt-trigger**: F4c
+    **APPROVED ACCEPT** confirmed as originally classified — genuinely
+    digiTS-only behavioral models with no ngspice primitive or
+    conventional composition. Landed behavioral implementations at
+    commit `b6e52a6a` stand under F4c self-compare rules.
+  - **optocoupler**: F4b **APPROVED FIX** unchanged — composition
+    pending in Wave 1.8a (LED → `diode.ts`, phototransistor → `bjt.ts`
+    with CCCS coupling). Current PWL implementation is a shortcut, not
+    a fundamental behavioral choice.
+  - **analog-switch**: F4a **APPROVED FIX** unchanged — direct port
+    against `sw/*` (VSWITCH) primitive pending in Wave 1.8b. Landed
+    behavioral `R_on`/`R_off` implementation is a shortcut.
+  - **timer-555**: promoted F4c → F4b **APPROVED FIX** — is a genuine
+    composite (two comparators + RS flip-flop + BJT output + R-divider);
+    all primitives exist in already-landed W1.x lanes. Composition
+    pending in Wave 1.8c.
 
 Every item in `architectural-alignment.md` is now APPROVED. The doc
 moves from design to execution. Undecided items: none.
@@ -113,8 +133,8 @@ moves from design to execution. Undecided items: none.
 | F2 | Varactor as separate device vs ngspice diode-reuse | **APPROVED FIX** (2026-04-21) |
 | F3 | Triode (vacuum tube) as a device | **APPROVED ACCEPT** (2026-04-21) |
 | F4a | 11 devices with direct ngspice primitive (schottky, zener, T-line, VSWITCH, G/E/F/H sources, potentiometer, transformer, tapped-transformer) | **APPROVED FIX** (2026-04-21) |
-| F4b | 4 composite devices (polarized-cap, crystal, optocoupler, LDR) | **APPROVED FIX** (2026-04-21) |
-| F4c | 15 digiTS-only devices (DIAC, SCR, TRIAC, memristor, analog-fuse, spark-gap, NTC-thermistor, ADC, DAC, comparator, schmitt-trigger, OTA, 555 timer, opamp, real-opamp) | **APPROVED ACCEPT** (2026-04-21) |
+| F4b | 5 composite devices (polarized-cap, crystal, optocoupler, LDR, 555 timer) | **APPROVED FIX** (2026-04-21; 555 timer moved from F4c 2026-04-22) |
+| F4c | 14 digiTS-only devices (DIAC, SCR, TRIAC, memristor, analog-fuse, spark-gap, NTC-thermistor, ADC, DAC, comparator, schmitt-trigger, OTA, opamp, real-opamp) | **APPROVED ACCEPT** (2026-04-21) |
 | G1 | MOSFET VSB/VBD sign convention vs ngspice MOS1vbs/MOS1vbd | **APPROVED FIX** (2026-04-21) |
 | H1 | `ctx.loadCtx.limitingCollector` never synced by cktLoad | **APPROVED FIX** (2026-04-21) |
 | H2 | `addDiagonalGmin` / `_needsReorder` ownership | **APPROVED FIX** (2026-04-21) |
@@ -670,6 +690,7 @@ sub-circuit level.
 | Crystal | `passives/crystal.ts` | series RLC + parallel C tank | FIX |
 | Optocoupler | `active/optocoupler.ts` | LED (diode) + phototransistor (BJT) | FIX |
 | LDR | `sensors/ldr.ts` | parameterized `res/*` | FIX |
+| 555 timer | `active/timer-555.ts` | two comparators + RS flip-flop + BJT output + R-divider (all primitives exist in W1.x) | FIX (moved from F4c 2026-04-22) |
 
 #### F4c — digiTS-only, no ngspice equivalent (recommended ACCEPT)
 
@@ -693,7 +714,6 @@ these devices are self-compare only (digiTS vs its own prior snapshot).
 | Comparator | `active/comparator.ts` | behavioral composite | ACCEPT |
 | Schmitt trigger | `active/schmitt-trigger.ts` | behavioral composite | ACCEPT |
 | OTA | `active/ota.ts` | typically subcircuit, no primitive | ACCEPT |
-| 555 timer | `active/timer-555.ts` | subcircuit library, no primitive | ACCEPT |
 | Opamp (ideal) | `active/opamp.ts` | behavioral; ngspice uses VCVS macromodel | ACCEPT |
 | Real opamp | `active/real-opamp.ts` | behavioral; ngspice uses subcircuit macromodel | ACCEPT |
 

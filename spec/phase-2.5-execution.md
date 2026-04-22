@@ -51,7 +51,10 @@
 | W1.5 | Reactive passives (capacitor, polarized-cap, inductor, transformer, tapped-transformer) | ✓ | 781b1943 |
 | W1.6 | F4c digiTS-only semiconductors (triac, scr, diac, tunnel-diode, triode, LED) | ✓ | 46e1dae7 |
 | W1.7 | F4c digiTS-only passives / sensors (crystal, transmission-line, memristor, analog-fuse, ntc-thermistor, spark-gap) | ✓ | d8643e83 |
-| W1.8 | Active F4b composites (real-opamp, comparator, ota, schmitt-trigger, analog-switch, optocoupler, timer-555, opamp) | ✓ | b6e52a6a |
+| W1.8 | Active devices — 5 F4c confirmed, 3 composition lanes pending (see triage 2026-04-22) | ▶ | b6e52a6a (partial) |
+| W1.8a | Optocoupler composition — LED → `diode.ts`, phototransistor → `bjt.ts`, CCCS coupling | — | — |
+| W1.8b | Analog-switch direct port — `sw/*` VSWITCH primitive | — | — |
+| W1.8c | 555 timer composition — two comparators + RS flip-flop + BJT output + R-divider | — | — |
 | W1.9 | `device-mappings.ts` schema sync — harness slot-correspondence follows W1.1–W1.8 renames | — | — |
 | W2.1 | Solver architectural fixes — B1, B2, B3, B4, B5 | — | — |
 | W2.2 | Control-flow fixes — C1, C2, C3, D1, H1, H2 | — | — |
@@ -287,11 +290,74 @@ For each device in the lane:
 
 Same pattern as W1.6 — no ngspice source, mechanical fold of `_updateOp` + `_stampCompanion` into `load()`.
 
-### W1.8 — Active F4b composites
+### W1.8 — Active devices (AMENDED 2026-04-22)
 
-**Files:** `real-opamp.ts`, `comparator.ts`, `ota.ts`, `schmitt-trigger.ts`, `analog-switch.ts`, `optocoupler.ts`, `timer-555.ts`, `opamp.ts` + tests
+**Original scope error:** W1.8 as originally authored lumped 8 active devices as "F4b composites". Cross-check against `spec/architectural-alignment.md` F-series (§F4) revealed only 1 of the 8 was actually F4b in the source doc; the rest were already F4c (or F4a). The W1.8 executor's reclassification was partially correct — for the five genuinely behavioral devices it was the right call — but silently declaring the wave done was the papering pattern, not a valid closing verdict.
 
-F4b = composite of ngspice primitives. For each, identify the ngspice primitives composed (e.g., real-opamp = diff-pair + cascode + output stage; each primitive has an ngspice load function). Port each primitive via the already-landed W1.1-W1.5 lanes, compose in the device's own `load()`.
+**Triage ruling (2026-04-22):**
+
+| Device | Pre-W1.8 classification in `architectural-alignment.md` | Ruling | Landed code at `b6e52a6a` |
+|---|---|---|---|
+| `real-opamp.ts` | F4c | **F4c confirmed** — behavioral BDF-1 companion + slew clamp; no ngspice primitive | **Keep as-is** (F4c self-compare) |
+| `comparator.ts` | F4c | **F4c confirmed** — hysteresis state machine; no ngspice primitive | **Keep as-is** |
+| `ota.ts` | F4c | **F4c confirmed** — VCCS + tanh; tanh saturation is digiTS-owned | **Keep as-is** |
+| `schmitt-trigger.ts` | F4c | **F4c confirmed** — hysteresis state machine by definition | **Keep as-is** |
+| `opamp.ts` (ideal) | F4c | **F4c confirmed** — ngspice has no ideal-opamp primitive | **Keep as-is** |
+| `optocoupler.ts` | F4b | **F4b — composition pending (W1.8a)** — LED really is a diode; phototransistor really is a BJT | Shortcut PWL — incomplete |
+| `analog-switch.ts` | F4a | **F4a — direct port pending (W1.8b)** — `sw/*` VSWITCH primitive exists | Behavioral `R_on`/`R_off` — incomplete |
+| `timer-555.ts` | F4c → **F4b** | **F4b promotion — composition pending (W1.8c)** — genuine composite of comparators + RS flip-flop + BJT + R-divider; all primitives exist in W1.x | Behavioral — incomplete |
+
+The five F4c-confirmed devices need no further W1.x work — they are landed under F4c self-compare rules (see F4 constraint §3 in `architectural-alignment.md`: tests cite "self-compare snapshot"; no "equivalent to ngspice X" claims in comments). Any remaining tests that claim ngspice equivalence for these devices are deleted per A1 §Test handling rule in the normal course of W2.4.
+
+The three composition lanes (W1.8a, W1.8b, W1.8c) complete the wave. None block W1.9; all can run in parallel.
+
+### W1.8a — Optocoupler composition (F4b)
+
+**Files:** `src/components/active/optocoupler.ts` + `__tests__/optocoupler.test.ts`
+
+**Ngspice reference:** no single primitive; compose from `ref/ngspice/src/spicelib/devices/dio/dioload.c` (LED junction) and `ref/ngspice/src/spicelib/devices/bjt/bjtload.c` (phototransistor). Coupling is a CCCS whose source current is the LED's forward current scaled by the optocoupler's CTR (current-transfer ratio) parameter; coupling primitive is ngspice `cccs/*` (F source).
+
+**Process:**
+1. Replace the inline PWL LED with an instantiated `DiodeElement` configured with LED-forward-voltage params (`Vf`, `Is`, `n`) exposed on the optocoupler's public param surface.
+2. Replace the inline phototransistor current-driven behavior with an instantiated `BJTElement` whose base current is supplied by a CCCS driven by the LED forward current scaled by `CTR`. The BJT's other terminals wire to the package collector/emitter.
+3. Delete any remaining inline junction/conductance computation — all of it is now handled by the instantiated diode and BJT `load()` methods.
+4. Optocoupler's own `load()` composes: diode `load()` on the input side, CCCS stamp for the coupling, BJT `load()` on the output side. No new `_updateOp`/`_stampCompanion` invention.
+5. Apply A1 §Test handling rule to tests — delete hand-computed expected values; keep parameter-plumbing (`Vf`, `CTR`, etc.) and post-load observable-state tests.
+
+**Commit:** `Phase 2.5 W1.8a — optocoupler composition (LED + phototransistor + CCCS)`
+
+### W1.8b — Analog-switch direct port (F4a)
+
+**Files:** `src/components/active/analog-switch.ts` + `__tests__/analog-switch.test.ts`
+
+**Ngspice reference:** `ref/ngspice/src/spicelib/devices/sw/swload.c` — read `SWload` entire function. Key sections: voltage-controlled threshold logic, `Ron`/`Roff` transition, hysteresis handling if present in our schema.
+
+**Process:**
+1. Rewrite `load()` to mirror `SWload` directly. Ngspice's `S` element has a control voltage, on-threshold, off-threshold, `Ron`, `Roff`, and a transition function — map each digiTS param to the corresponding ngspice `SWmodel` field.
+2. Remove any behavioral `R_on`/`R_off` logic that doesn't correspond to `swload.c`.
+3. If the digiTS analog-switch has features beyond the ngspice `S` primitive (e.g., rise-time limited switching), those features are F4c-behavioral extensions and are labelled as such in a comment block — the parity-comparable portion matches `SWload` bit-exact.
+4. Apply A1 §Test handling rule.
+
+**Commit:** `Phase 2.5 W1.8b — analog-switch port to sw/* VSWITCH primitive`
+
+### W1.8c — 555 timer composition (F4b, promoted from F4c)
+
+**Files:** `src/components/active/timer-555.ts` + `__tests__/timer-555.test.ts`
+
+**Ngspice reference:** no single primitive. The 555's textbook internal schematic composes:
+- Two comparators (use the `comparator.ts` F4c-behavioral device as internal building blocks OR, if the BJT-diff-pair composite version lands first, use that — for W1.8c's scope, `comparator.ts` F4c is fine since the 555 itself is F4b via composition, not F4b via purely-F4a primitives).
+- An RS flip-flop (digital primitive; digiTS has one in the digital layer or it composes from two cross-coupled gates).
+- A BJT discharge transistor (instantiate `BJTElement`).
+- An internal R-divider (instantiate three `ResistorElement` instances, or a parameterized `res/*` chain).
+
+**Process:**
+1. Rewrite `timer-555.ts` to instantiate the sub-components above and wire them per the 555's internal schematic. The device's `load()` composes by calling each sub-component's `load()` (or by emitting them into the netlist at compile time, if the codebase's composite pattern works that way — match whatever W1.8a optocoupler establishes).
+2. Delete inline behavioral threshold logic, inline flip-flop state, inline discharge transistor modeling.
+3. Preserve the public param surface (`Vcc`, threshold levels, output polarity) by mapping to the internal R-divider values and comparator thresholds.
+4. Apply A1 §Test handling rule.
+5. **Note on F4b-via-F4c:** Using `comparator.ts` (F4c-behavioral) inside a F4b composite is acceptable because the *555's composition shape* matches ngspice's textbook schematic; parity harness comparison happens at the 555's external terminals, not at the comparator's internal node voltages. The internal comparators are implementation detail.
+
+**Commit:** `Phase 2.5 W1.8c — 555 timer composition (2 comparators + RS FF + BJT + R-divider)`
 
 ### W1.9 — `device-mappings.ts` schema sync
 
