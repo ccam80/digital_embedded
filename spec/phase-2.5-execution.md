@@ -47,7 +47,7 @@
 | W1.1 | Diode family (diode + zener + F2 varactor→diode) | ✓ | f8586dc6 |
 | W1.2 | BJT (L0 + L1) | ✓ | 5b3fadf3 |
 | W1.3 | MOSFET (L1) + G1 sign convention | ✓ | 2b2b58a9 |
-| W1.4 | JFET (N + P + fet-base collapse) | — | — |
+| W1.4 | JFET (N + P + fet-base collapse) | ✓ | b62d6148 |
 | W1.5 | Reactive passives (capacitor, polarized-cap, inductor, transformer, tapped-transformer) | — | — |
 | W1.6 | F4c digiTS-only semiconductors (triac, scr, diac, tunnel-diode, triode, LED) | — | — |
 | W1.7 | F4c digiTS-only passives / sensors (crystal, transmission-line, memristor, analog-fuse, ntc-thermistor, spark-gap) | — | — |
