@@ -26,7 +26,7 @@ import type { DeviceMapping } from "./types.js";
 // ---------------------------------------------------------------------------
 // Capacitor
 // ---------------------------------------------------------------------------
-// ngspice cap state offsets (capdefs.h): qcap=0, ccap=1.
+// ngspice cap state offsets (capdefs.h:66-67): CAPqcap=0, CAPccap=1.
 
 export const CAPACITOR_MAPPING: DeviceMapping = {
   deviceType: "capacitor",
@@ -43,7 +43,9 @@ export const CAPACITOR_MAPPING: DeviceMapping = {
 // ---------------------------------------------------------------------------
 // Inductor
 // ---------------------------------------------------------------------------
-// ngspice ind state offsets (inddefs.h): flux=0, ccap=1.
+// ngspice ind state offsets (inddefs.h:68): INDflux=0. INDstate has a single
+// offset — no companion-current state entry. The digiTS schema's CCAP slot
+// is an NIintegrate output with no ngspice CKTstate correspondence.
 
 export const INDUCTOR_MAPPING: DeviceMapping = {
   deviceType: "inductor",
@@ -52,96 +54,106 @@ export const INDUCTOR_MAPPING: DeviceMapping = {
   },
   ngspiceToSlot: {
     0: "PHI",
-    1: "NG_VOLT",
   },
 };
 
 // ---------------------------------------------------------------------------
 // Diode
 // ---------------------------------------------------------------------------
-// ngspice dio state offsets (diodefs.h):
+// ngspice dio state offsets (diodefs.h:154-158):
 //   DIOvoltage=0, DIOcurrent=1, DIOconduct=2,
 //   DIOcapCharge=3, DIOcapCurrent=4, DIOinitCond=5 (not compared)
+//
+// Post-D-2a rename: digiTS slot for DIOcapCurrent is `CAP_CURRENT` (dual
+// semantics per dioload.c:363: iqcap in MODETRAN, capd in MODEINITSMSIG).
+// The digiTS schema `CCAP` slot is a niIntegrate companion-current output
+// with no ngspice CKTstate correspondence — not mapped.
 
 export const DIODE_MAPPING: DeviceMapping = {
   deviceType: "diode",
   slotToNgspice: {
     VD: 0,
-    GEQ: 2,
     ID: 1,
+    GEQ: 2,
     Q: 3,
-    CCAP: 4,
+    CAP_CURRENT: 4,
   },
   ngspiceToSlot: {
     0: "VD",
     1: "ID",
     2: "GEQ",
     3: "Q",
-    4: "CCAP",
+    4: "CAP_CURRENT",
   },
 };
 
 // ---------------------------------------------------------------------------
 // BJT (SPICE L1 — Gummel-Poon)
 // ---------------------------------------------------------------------------
-// ngspice bjt state offsets (bjtdefs.h):
+// ngspice bjt state offsets (bjtdefs.h:289-313):
 //   BJTvbe=0, BJTvbc=1, BJTcc=2, BJTcb=3, BJTgpi=4, BJTgmu=5,
 //   BJTgm=6, BJTgo=7, BJTqbe=8, BJTcqbe=9, BJTqbc=10, BJTcqbc=11,
-//   BJTqcs=12, BJTcqcs=13, BJTqbx=14, BJTcqbx=15, BJTgx=16,
-//   BJTcexbc=17, BJTgeqcb=18, BJTgccs=19, BJTgeqbx=20
+//   BJTqsub=12, BJTcqsub=13, BJTqbx=14, BJTcqbx=15, BJTgx=16,
+//   BJTcexbc=17, BJTgeqcb=18, BJTgcsub=19, BJTgeqbx=20,
+//   BJTvsub=21, BJTcdsub=22, BJTgdsub=23
 //
-// Note on augmentation: our GPI/GMU/IC/IB (slots 2,3,6,7) are cap-augmented
-// during transient — stampCompanion lumps cap companion geq/ieq into these
-// slots to match ngspice bjtload.c:725-734. The slot-to-offset mappings below
-// therefore compare our cap-augmented values against ngspice's CKTstate0
-// offsets, which are likewise cap-augmented.
+// Post-W1.2 rename: digiTS schema matches ngspice slot names for the
+// resistive/cap-storage portion. Schema uses QCS/CQCS for the offset-12/13
+// pair whose ngspice name is qsub/cqsub — same physical quantity (substrate
+// junction charge and companion current), under digiTS's historical name.
+//
+// Note on augmentation: our GPI/GMU/CC/CB (slots 4,5,2,3) are cap-augmented
+// during transient — bjtload.c:725-734 lumps cap companion geq/ieq into
+// these slots. The mappings below therefore compare our cap-augmented
+// values against ngspice's CKTstate0 offsets, which are likewise augmented.
 
 export const BJT_MAPPING: DeviceMapping = {
   deviceType: "bjt",
   slotToNgspice: {
     VBE: 0,
     VBC: 1,
+    CC: 2,
+    CB: 3,
     GPI: 4,
     GMU: 5,
     GM: 6,
     GO: 7,
-    IC: 2,
-    IB: 3,
+    QBE: 8,
+    CQBE: 9,
+    QBC: 10,
+    CQBC: 11,
+    QCS: 12,
+    CQCS: 13,
+    QBX: 14,
+    CQBX: 15,
+    GX: 16,
+    CEXBC: 17,
     GEQCB: 18,
-    Q_BE: 8,
-    Q_BC: 10,
-    Q_CS: 12,
-    CCAP_BE: 9,
-    CCAP_BC: 11,
-    CCAP_CS: 13,
-    CEXBC_NOW: 17,
+    GCSUB: 19,
+    GEQBX: 20,
   },
   ngspiceToSlot: {
     0: "VBE",
     1: "VBC",
-    2: "IC",
-    3: "IB",
+    2: "CC",
+    3: "CB",
     4: "GPI",
     5: "GMU",
     6: "GM",
     7: "GO",
-    8: "Q_BE",
-    9: "CCAP_BE",
-    10: "Q_BC",
-    11: "CCAP_BC",
-    12: "Q_CS",
-    13: "CCAP_CS",
-    // Offsets 14-20 have no direct slot in our schema; exposed under
-    // ngspice-native names so raw values are still visible in ngspice-side
-    // reports. No ours-side comparison is possible for these — the absence
-    // of a comparable slot is a BLOCKER, not a mapping deficiency.
-    14: "NG_QBX",
-    15: "NG_CQBX",
-    16: "NG_GX",
-    17: "CEXBC_NOW",
+    8: "QBE",
+    9: "CQBE",
+    10: "QBC",
+    11: "CQBC",
+    12: "QCS",
+    13: "CQCS",
+    14: "QBX",
+    15: "CQBX",
+    16: "GX",
+    17: "CEXBC",
     18: "GEQCB",
-    19: "NG_GCCS",
-    20: "NG_GEQBX",
+    19: "GCSUB",
+    20: "GEQBX",
   },
 };
 
@@ -155,83 +167,97 @@ export const BJT_MAPPING: DeviceMapping = {
 //   MOS1capgb=10, MOS1qgb=11, MOS1cqgb=12,
 //   MOS1qbd=13,   MOS1cqbd=14,
 //   MOS1qbs=15,   MOS1cqbs=16
+//
+// Post-W1.3 rename: digiTS schema matches ngspice names exactly for
+// slots 0-16. Schema slots 17-27 (CD, CBD, CBS, GBD, GBS, GM, GDS, GMBS,
+// MODE, VON, VDSAT) correspond to MOS1instance struct fields, NOT to
+// CKTstate offsets — they are not comparable via the state-pool path.
 
 export const MOSFET_MAPPING: DeviceMapping = {
   deviceType: "mosfet",
   slotToNgspice: {
+    VBD: 0,
+    VBS: 1,
     VGS: 2,
     VDS: 3,
-    MEYER_GS: 4,
-    Q_GS: 5,
-    CCAP_GS: 6,
-    MEYER_GD: 7,
-    Q_GD: 8,
-    CCAP_GD: 9,
-    MEYER_GB: 10,
-    Q_GB: 11,
-    CCAP_GB: 12,
-    Q_DB: 13,
-    CCAP_DB: 14,
-    Q_SB: 15,
-    CCAP_SB: 16,
+    CAPGS: 4,
+    QGS: 5,
+    CQGS: 6,
+    CAPGD: 7,
+    QGD: 8,
+    CQGD: 9,
+    CAPGB: 10,
+    QGB: 11,
+    CQGB: 12,
+    QBD: 13,
+    CQBD: 14,
+    QBS: 15,
+    CQBS: 16,
   },
   ngspiceToSlot: {
-    0: "NG_VBD",
-    1: "NG_VBS",
+    0: "VBD",
+    1: "VBS",
     2: "VGS",
     3: "VDS",
-    4: "MEYER_GS",
-    5: "Q_GS",
-    6: "CCAP_GS",
-    7: "MEYER_GD",
-    8: "Q_GD",
-    9: "CCAP_GD",
-    10: "MEYER_GB",
-    11: "Q_GB",
-    12: "CCAP_GB",
-    13: "Q_DB",
-    14: "CCAP_DB",
-    15: "Q_SB",
-    16: "CCAP_SB",
+    4: "CAPGS",
+    5: "QGS",
+    6: "CQGS",
+    7: "CAPGD",
+    8: "QGD",
+    9: "CQGD",
+    10: "CAPGB",
+    11: "QGB",
+    12: "CQGB",
+    13: "QBD",
+    14: "CQBD",
+    15: "QBS",
+    16: "CQBS",
   },
 };
 
 // ---------------------------------------------------------------------------
 // JFET (N-channel / P-channel)
 // ---------------------------------------------------------------------------
-// ngspice jfet state offsets (jfetdefs.h):
+// ngspice jfet state offsets (jfetdefs.h:154-166):
 //   JFETvgs=0, JFETvgd=1, JFETcg=2, JFETcd=3, JFETcgd=4,
 //   JFETgm=5, JFETgds=6, JFETggs=7, JFETggd=8,
 //   JFETqgs=9, JFETcqgs=10, JFETqgd=11, JFETcqgd=12
+//
+// Post-W1.4 rename: digiTS schema matches ngspice names exactly. The
+// prior fet-base invented slots (IDS, ID_JUNCTION, GD_JUNCTION, MEYER_GS,
+// CCAP_GS/GD, etc.) are A1-excised.
 
 export const JFET_MAPPING: DeviceMapping = {
   deviceType: "jfet",
   slotToNgspice: {
     VGS: 0,
+    VGD: 1,
+    CG: 2,
+    CD: 3,
+    CGD: 4,
     GM: 5,
     GDS: 6,
-    IDS: 3,
-    Q_GS: 9,
-    Q_GD: 11,
-    CCAP_GS: 10,
-    CCAP_GD: 12,
-    GD_JUNCTION: 7,
-    ID_JUNCTION: 2,
+    GGS: 7,
+    GGD: 8,
+    QGS: 9,
+    CQGS: 10,
+    QGD: 11,
+    CQGD: 12,
   },
   ngspiceToSlot: {
     0: "VGS",
-    1: "NG_VGD",
-    2: "ID_JUNCTION",
-    3: "IDS",
-    4: "NG_CGD",
+    1: "VGD",
+    2: "CG",
+    3: "CD",
+    4: "CGD",
     5: "GM",
     6: "GDS",
-    7: "GD_JUNCTION",
-    8: "NG_GGD",
-    9: "Q_GS",
-    10: "CCAP_GS",
-    11: "Q_GD",
-    12: "CCAP_GD",
+    7: "GGS",
+    8: "GGD",
+    9: "QGS",
+    10: "CQGS",
+    11: "QGD",
+    12: "CQGD",
   },
 };
 
