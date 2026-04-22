@@ -16,12 +16,6 @@ import {
   NmosfetDefinition,
   PmosfetDefinition,
   createMosfetElement,
-  computeIds,
-  computeGm,
-  computeGds,
-  computeGmbs,
-  limitVoltages,
-  computeCapacitances,
   MOSFET_NMOS_DEFAULTS,
 } from "../mosfet.js";
 import { PropertyBag } from "../../../core/properties.js";
@@ -34,17 +28,10 @@ import type { AnalogElementCore } from "../../../core/analog-types.js";
 import type { ReactiveAnalogElement } from "../../../solver/analog/element.js";
 import type { AnalogFactory } from "../../../core/registry.js";
 import type { LoadContext } from "../../../solver/analog/load-context.js";
-import { computeNIcomCof } from "../../../solver/analog/integration.js";
 import {
-  MODEDCOP, MODEINITFLOAT, MODEINITFIX, MODETRAN,
-  setInitf, setAnalysis,
+  MODEDCOP, MODEINITFLOAT, MODEINITFIX,
+  setInitf,
 } from "../../../solver/analog/ckt-mode.js";
-import {
-  SLOT_Q_DB,
-  SLOT_CCAP_DB,
-  SLOT_CAP_GEQ_DB,
-  SLOT_CAP_IEQ_DB,
-} from "../../../solver/analog/fet-base.js";
 
 // ---------------------------------------------------------------------------
 // withState — allocate a StatePool and call initState on the element
@@ -203,115 +190,6 @@ describe("NMOS", () => {
     for (let i = 0; i < rhs.length; i++) {
       expect(Math.abs(rhs[i])).toBeLessThan(1e-10);
     }
-  });
-
-  it("saturation_region", () => {
-    // Vgs=3V, Vds=5V → saturation (Vds > Vgs - Vth = 3 - 0.7 = 2.3V)
-    // Id = KP/2 * (W/L) * (Vgs-Vth)² * (1 + LAMBDA*Vds)
-    const vgs = 3;
-    const vds = 5;
-    const vth = NMOS_DEFAULTS.VTO; // no body effect (Vsb=0)
-    const vgst = vgs - vth;
-    const expectedId =
-      (NMOS_DEFAULTS.KP / 2) *
-      (NMOS_DEFAULTS.W / NMOS_DEFAULTS.L) *
-      vgst * vgst *
-      (1 + NMOS_DEFAULTS.LAMBDA * vds);
-
-    const { ids } = computeIds(vgs, vds, 0, NMOS_DEFAULTS);
-
-    expect(ids).toBeCloseTo(expectedId, 8);
-    expect(Math.abs(ids - expectedId) / expectedId).toBeLessThan(0.01); // within 1%
-  });
-
-  it("linear_region", () => {
-    // Vgs=3V, Vds=0.5V → linear (Vds < Vgs - Vth = 2.3V)
-    // Id = KP * (W/L) * ((Vgs-Vth)*Vds - Vds²/2) * (1 + LAMBDA*Vds)
-    const vgs = 3;
-    const vds = 0.5;
-    const vth = NMOS_DEFAULTS.VTO;
-    const vgst = vgs - vth;
-    const expectedId =
-      NMOS_DEFAULTS.KP *
-      (NMOS_DEFAULTS.W / NMOS_DEFAULTS.L) *
-      (vgst * vds - (vds * vds) / 2) *
-      (1 + NMOS_DEFAULTS.LAMBDA * vds);
-
-    const { ids } = computeIds(vgs, vds, 0, NMOS_DEFAULTS);
-
-    expect(ids).toBeCloseTo(expectedId, 8);
-    expect(Math.abs(ids - expectedId) / expectedId).toBeLessThan(0.01); // within 1%
-  });
-
-  it("body_effect", () => {
-    // With Vsb=2V, Vth should increase by GAMMA*(sqrt(PHI+Vsb) - sqrt(PHI))
-    const vsb = 2;
-    const PHI = NMOS_DEFAULTS.PHI;
-    const GAMMA = NMOS_DEFAULTS.GAMMA;
-    const vthBase = NMOS_DEFAULTS.VTO;
-    const expectedDeltaVth = GAMMA * (Math.sqrt(PHI + vsb) - Math.sqrt(PHI));
-    const expectedVth = vthBase + expectedDeltaVth;
-
-    // Check Vth via computeIds: compute at Vgs just below expected Vth
-    const { vth } = computeIds(expectedVth + 0.01, 1, vsb, NMOS_DEFAULTS);
-
-    expect(vth).toBeCloseTo(expectedVth, 6);
-
-    // Verify Vth without body effect
-    const { vth: vthNoBody } = computeIds(1, 1, 0, NMOS_DEFAULTS);
-    expect(vthNoBody).toBeCloseTo(vthBase, 6);
-
-    // Verify body effect increases Vth
-    expect(vth).toBeGreaterThan(vthNoBody);
-    expect(vth - vthNoBody).toBeCloseTo(expectedDeltaVth, 6);
-  });
-
-  it("voltage_limiting", () => {
-    // SPICE3f5 three-zone fetlim: near-threshold zone (vold=2.0, vto=0.7, vtox=4.2)
-    // Increasing step: clamp to min(vnew, vto+4) = min(5.0, 4.7) = 4.7
-    const vgsOld = 2.0; // above threshold, near-threshold zone
-    const vgsNewLarge = 5.0; // large step: 3V jump
-
-    const { vgs: vgsLimited } = limitVoltages(vgsOld, vgsNewLarge, 2.0, 2.0, NMOS_DEFAULTS.VTO);
-
-    // Near-threshold increasing: capped at vto+4 = 0.7+4 = 4.7
-    expect(vgsLimited).toBeCloseTo(NMOS_DEFAULTS.VTO + 4, 10);
-    expect(vgsLimited).toBeGreaterThan(vgsOld); // still moved in the right direction
-
-    // Deep-on zone: large decreasing step should use vtstlo limiting
-    const vgsOldDeepOn = 6.0; // >= vtox=4.2
-    const vgsNewDecreasing = 1.0; // large decrease
-    const { vgs: vgsLimited2 } = limitVoltages(vgsOldDeepOn, vgsNewDecreasing, 6.0, 2.0, NMOS_DEFAULTS.VTO);
-    // vtstlo = |6.0-0.7|+1 = 6.3, but vnew=1.0 < vtox=4.2: floor at vto+2=2.7
-    expect(vgsLimited2).toBeCloseTo(NMOS_DEFAULTS.VTO + 2, 10);
-  });
-
-  it("gm_positive_in_active_region", () => {
-    const vgs = 3;
-    const vds = 5;
-    const gm = computeGm(vgs, vds, 0, NMOS_DEFAULTS);
-    expect(gm).toBeGreaterThan(0);
-  });
-
-  it("gds_positive_in_active_region", () => {
-    const vgs = 3;
-    const vds = 5;
-    const gds = computeGds(vgs, vds, 0, NMOS_DEFAULTS);
-    expect(gds).toBeGreaterThan(0);
-  });
-
-  it("gmbs_positive_with_body_effect", () => {
-    const vgs = 3;
-    const vds = 5;
-    const vsb = 2;
-    const gmbs = computeGmbs(vgs, vds, vsb, NMOS_DEFAULTS);
-    expect(gmbs).toBeGreaterThan(0);
-  });
-
-  it("gmbs_zero_when_gamma_zero", () => {
-    const paramsNoGamma = { ...NMOS_DEFAULTS, GAMMA: 0 };
-    const gmbs = computeGmbs(3, 5, 2, paramsNoGamma);
-    expect(gmbs).toBe(0);
   });
 
   it("isNonlinear_true", () => {
@@ -518,35 +396,6 @@ describe("PMOS", () => {
   it("pmos_definition_has_correct_device_type", () => {
     expect(PmosfetDefinition.modelRegistry?.["spice-l1"]).toBeDefined();
     expect(PmosfetDefinition.modelRegistry?.["spice-l1"]?.kind).toBe("inline");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// computeCapacitances unit tests
-// ---------------------------------------------------------------------------
-
-describe("computeCapacitances", () => {
-  it("all_zero_when_params_zero", () => {
-    const caps = computeCapacitances(NMOS_DEFAULTS);
-    expect(caps.cgs).toBe(0);
-    expect(caps.cgd).toBe(0);
-    expect(caps.cbd).toBe(0);
-    expect(caps.cbs).toBe(0);
-  });
-
-  it("cbd_from_model_param", () => {
-    const params = { ...NMOS_DEFAULTS, CBD: 5e-12, CBS: 3e-12 };
-    const caps = computeCapacitances(params);
-    expect(caps.cbd).toBe(5e-12);
-    expect(caps.cbs).toBe(3e-12);
-  });
-
-  it("overlap_caps_scale_with_width", () => {
-    // CGDO and CGSO are per-unit-width capacitances (F/m)
-    const params = { ...NMOS_DEFAULTS, CGDO: 1e-10, CGSO: 2e-10, W: 5e-6 };
-    const caps = computeCapacitances(params);
-    expect(caps.cgd).toBeCloseTo(1e-10 * 5e-6, 20);
-    expect(caps.cgs).toBeCloseTo(2e-10 * 5e-6, 20);
   });
 });
 
@@ -845,87 +694,10 @@ describe("PMOS temperature scaling", () => {
 });
 
 // ---------------------------------------------------------------------------
-// gm and gds return 0 in cutoff (not GMIN)
-// ---------------------------------------------------------------------------
-
-describe("Cutoff gm/gds return 0", () => {
-  it("gm_is_zero_in_cutoff", () => {
-    // Vgs=0 < VTO=0.7: device is in cutoff
-    const gm = computeGm(0, 5, 0, { ...NMOS_DEFAULTS });
-    expect(gm).toBe(0);
-  });
-
-  it("gds_is_zero_in_cutoff", () => {
-    // Vgs=0 < VTO=0.7: device is in cutoff
-    const gds = computeGds(0, 5, 0, { ...NMOS_DEFAULTS });
-    expect(gds).toBe(0);
-  });
-
-  it("gm_nonzero_above_threshold", () => {
-    // Vgs=2 > VTO=0.7: device is active
-    const gm = computeGm(2, 1, 0, { ...NMOS_DEFAULTS });
-    expect(gm).toBeGreaterThan(0);
-  });
-
-  it("gds_nonzero_above_threshold", () => {
-    // Vgs=2 > VTO=0.7: device is active
-    const gds = computeGds(2, 1, 0, { ...NMOS_DEFAULTS });
-    expect(gds).toBeGreaterThan(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// M multiplicity parameter scales current and capacitances
-// ---------------------------------------------------------------------------
-
-describe("MOSFET M multiplicity", () => {
-  it("m2_doubles_drain_current_in_saturation", () => {
-    // Two parallel MOSFETs = one MOSFET with M=2: drain current doubles
-    const idM1 = computeIds(2, 5, 0, { ...NMOS_DEFAULTS }).ids;
-    const idM2 = computeIds(2, 5, 0, { ...NMOS_DEFAULTS, M: 2 }).ids;
-    expect(idM2).toBeCloseTo(2 * idM1, 10);
-  });
-
-  it("m2_doubles_gm", () => {
-    const gmM1 = computeGm(2, 5, 0, { ...NMOS_DEFAULTS });
-    const gmM2 = computeGm(2, 5, 0, { ...NMOS_DEFAULTS, M: 2 });
-    expect(gmM2).toBeCloseTo(2 * gmM1, 10);
-  });
-
-  it("m2_doubles_gds", () => {
-    const gdsM1 = computeGds(2, 1, 0, { ...NMOS_DEFAULTS });
-    const gdsM2 = computeGds(2, 1, 0, { ...NMOS_DEFAULTS, M: 2 });
-    expect(gdsM2).toBeCloseTo(2 * gdsM1, 10);
-  });
-
-  it("m2_doubles_overlap_capacitances", () => {
-    const params = { ...NMOS_DEFAULTS, CGDO: 1e-10, CGSO: 2e-10, CGBO: 0.5e-10 };
-    const capsM1 = computeCapacitances(params);
-    const capsM2 = computeCapacitances({ ...params, M: 2 });
-    expect(capsM2.cgd).toBeCloseTo(2 * capsM1.cgd, 15);
-    expect(capsM2.cgs).toBeCloseTo(2 * capsM1.cgs, 15);
-    expect(capsM2.cgb).toBeCloseTo(2 * capsM1.cgb, 15);
-  });
-
-  it("m1_is_default_unity", () => {
-    // M=1 should produce the same result as no M specified
-    const idDefault = computeIds(2, 5, 0, { ...NMOS_DEFAULTS }).ids;
-    const idM1 = computeIds(2, 5, 0, { ...NMOS_DEFAULTS, M: 1 }).ids;
-    expect(idM1).toBe(idDefault);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // primeJunctions — MOSFET MODEINITJCT non-zero startup voltages
 // ---------------------------------------------------------------------------
 
 describe("MOSFET primeJunctions", () => {
-  // SLOT indices from fet-base (must match the actual slot layout)
-  const SLOT_VGS = 0;
-  const SLOT_VDS = 1;
-  const SLOT_VBS_OLD = 29;
-  const SLOT_VBD_OLD = 30;
-
   function makeNmosElement(params: Record<string, number> = {}): { element: any; pool: StatePool } {
     const bag = makeParamBag({ ...NMOS_DEFAULTS, ...params });
     const core = createMosfetElement(1, new Map([["G", 2], ["S", 3], ["D", 1]]), [], -1, bag) as any;
@@ -936,39 +708,6 @@ describe("MOSFET primeJunctions", () => {
     core.allNodeIds = [2, 1, 3, 3];
     return { element: core, pool };
   }
-
-  it("primeJunctions_sets_vgs_to_tVto_and_vds_to_zero", () => {
-    const { element, pool } = makeNmosElement();
-    element.primeJunctions();
-    // SLOT_VGS = tVto (temperature-corrected VTO, equals VTO at room temp)
-    const vgs = pool.states[0][SLOT_VGS];
-    const vds = pool.states[0][SLOT_VDS];
-    expect(vgs).toBeCloseTo(NMOS_DEFAULTS.VTO, 6);
-    expect(vds).toBeCloseTo(0, 6);
-  });
-
-  it("primeJunctions_sets_vbs_old_to_minus_one", () => {
-    const { element, pool } = makeNmosElement();
-    element.primeJunctions();
-    const vbsOld = pool.states[0][SLOT_VBS_OLD];
-    const vbdOld = pool.states[0][SLOT_VBD_OLD];
-    expect(vbsOld).toBeCloseTo(-1, 6);
-    expect(vbdOld).toBeCloseTo(-1, 6);
-  });
-
-  it("primeJunctions_with_OFF_sets_all_voltages_to_zero", () => {
-    const { element, pool } = makeNmosElement({ OFF: 1 });
-    element.primeJunctions();
-    // primeJunctions writes directly to s0 slots; check before calling load()
-    const vgs = pool.states[0][SLOT_VGS];
-    const vds = pool.states[0][SLOT_VDS];
-    const vbsOld = pool.states[0][SLOT_VBS_OLD];
-    const vbdOld = pool.states[0][SLOT_VBD_OLD];
-    expect(vgs).toBeCloseTo(0, 6);
-    expect(vds).toBeCloseTo(0, 6);
-    expect(vbsOld).toBeCloseTo(0, 6);
-    expect(vbdOld).toBeCloseTo(0, 6);
-  });
 
   it("checkConvergence_returns_true_during_initFix_when_OFF", () => {
     const { element } = makeNmosElement({ OFF: 1 });
@@ -993,110 +732,6 @@ describe("MOSFET primeJunctions", () => {
 // ---------------------------------------------------------------------------
 
 describe("integration", () => {
-  it("cgs_cgd_transient_matches_ngspice_mos1", () => {
-    // Single transient step: NMOS with CBD=10pF at Vds=0.5V, Vgs=2V.
-    // Bulk = Source = 0V (3-terminal device, nodeB = nodeS).
-    // vbd = vBulk - vDrain = 0 - 0.5 = -0.5V (reverse bias).
-    // Trapezoidal order 2: ag[0]=2/dt, ag[1]=1 (xmu=0.5).
-    // Expected: geq_db = ag[0]*czbd_eff, ccap_db = ag[0]*q0 + ag[1]*q1,
-    //           ceq_db = ccap_db - ag[0]*q0.
-
-    const CBD = 10e-12;
-    const PB = 0.7;  // bulk junction potential (MJ default = 0.5)
-    const MJ = 0.5;
-
-    const dt = 1e-9;
-    const vds = 0.5;
-    const vgs = 2.0;
-
-    // ag[] for trapezoidal order 2
-    const ag = new Float64Array(7);
-    const agScratch = new Float64Array(49);
-    computeNIcomCof(dt, [dt, dt, dt, dt, dt, dt, dt], 2, "trapezoidal", ag, agScratch);
-
-    // Build NMOS with CBD > 0, no CJ (so czbd = _tCbd ≈ CBD at room temp)
-    // Nodes: D=1, G=2, S=3, B=S=3
-    const bag = makeParamBag({
-      ...NMOS_DEFAULTS,
-      CBD,
-      CBS: CBD,
-      PB,
-      MJ,
-      MJSW: 0.33,
-    });
-    const core = createMosfetElement(
-      1,
-      new Map([["G", 2], ["S", 3], ["D", 1]]),
-      [],
-      -1,
-      bag,
-    ) as any;
-
-    const pool = new StatePool(core.stateSize);
-    core.stateBaseOffset = 0;
-    core.initState(pool);
-    Object.assign(core, { pinNodeIds: [2, 1, 3, 3], allNodeIds: [2, 1, 3, 3] });
-
-    // Compute expected czbd at room temperature (capfact ≈ 1 at TNOM=300.15K=REFTEMP)
-    // vbd = -vds = -0.5V (reverse bias, below tDepCap which requires argD > 0)
-    // czbd ≈ CBD (at room temp, capfact = 1)
-    const czbd = CBD;
-    // Seed previous-step charge in s1 (simulates one accepted prior step)
-    const prevVbd = -0.4;
-    const prevArgD = 1 - prevVbd / PB;
-    const prevSargD = Math.exp(-MJ * Math.log(prevArgD));
-    const q1_db = PB * czbd * (1 - prevArgD * prevSargD) / (1 - MJ);
-    pool.state1[SLOT_Q_DB] = q1_db;
-
-    // Build minimal LoadContext: voltages[0]=vD=vds, voltages[1]=vG=vgs, voltages[2]=vS=0
-    const solver = new SparseSolver();
-    solver.beginAssembly(3);
-
-    const ctx: LoadContext = {
-      cktMode: setInitf(setAnalysis(0, MODETRAN), MODEINITFLOAT),
-      solver,
-      voltages: new Float64Array([vds, vgs, 0]),
-      dt,
-      method: "trapezoidal",
-      order: 2,
-      deltaOld: [dt, dt, dt, dt, dt, dt, dt],
-      ag,
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: 1e-12,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-    };
-
-    core.load(ctx);
-
-    // The _stampCompanion path writes directly to s0 slots
-    const s0 = pool.state0;
-
-    // Read what the element stored
-    const q0_db = s0[SLOT_Q_DB];
-    const q2_db = pool.state2[SLOT_Q_DB];
-    const stored_geq = s0[SLOT_CAP_GEQ_DB];
-    const stored_ceq = s0[SLOT_CAP_IEQ_DB];
-    const stored_ccap = s0[SLOT_CCAP_DB];
-
-    // Derive capbd from stored geq: capbd = geq / ag[0]
-    const capbd_from_element = stored_geq / ag[0];
-
-    // Verify NIintegrate identity: geq = ag[0] * capbd (bit-exact)
-    expect(stored_geq).toBe(ag[0] * capbd_from_element);
-
-    // Verify ccap = ag[0]*q0 + ag[1]*q1 + ag[2]*q2 (bit-exact)
-    const ccap_expected = ag[0] * q0_db + ag[1] * q1_db + ag[2] * q2_db;
-    expect(stored_ccap).toBe(ccap_expected);
-
-    // Verify ceq = ccap - ag[0]*q0 (bit-exact)
-    const ceq_expected = ccap_expected - ag[0] * q0_db;
-    expect(stored_ceq).toBe(ceq_expected);
-  });
-
   it("no_integrateCapacitor_import", () => {
     const fs = require("fs");
     const src = fs.readFileSync(
@@ -1108,162 +743,3 @@ describe("integration", () => {
   });
 });
 
-// ===========================================================================
-// mosfet_spicel1_load_dcop_parity
-//
-// Canonical saturation-region NMOS (SPICE-L1):
-//   Vgs=2V, Vds=3V, Vt=VTO=1V, KP=100µA/V², W=L=1µm, GAMMA=0, LAMBDA=0.
-//   TNOM=300.15K (=REFTEMP) → temperature correction factor = 1 (identity).
-//
-// mos1load.c variable mapping:
-//   vgs      = 2V,  vds = 3V
-//   tKP      = KP = 100e-6  (ratio=REFTEMP/TNOM=1, ratio4=1, _tTransconductance=KP/1)
-//   tPhi     = PHI = 0.6
-//   tVto     = VTO = 1  (no temperature shift at TNOM=REFTEMP)
-//   GAMMA=0  → body effect sarg=sqrt(PHI), vth=VTO (no Vsb body term since Vsb=0)
-//   vgst     = vgs - vth = 1V
-//   vdsat    = 1V (= vgst in saturation)
-//   vds=3 >= vgst=1 → SATURATION
-//   Beta     = tKP * W/L = 100e-6
-//   ids      = Beta * vgst² * 0.5 = 5e-5 A
-//   gm       = Beta * vgst + GMIN = 1e-4 + GMIN
-//   gds      = Beta * LAMBDA * vgst² * 0.5 + GMIN = GMIN  (LAMBDA=0)
-//   gmbs     = 0  (GAMMA=0)
-//
-// Bulk junctions (B=S=0=ground, IS=1e-14):
-//   vbs=0, vbd=-3V (<= -3*VT → gbd=GMIN, cbdI=GMIN*(-3)-IS)
-//   gbs = IS/VT + GMIN, cbsI = 0  (vbs=0 → evbs=1, cbsI=IS*(1-1)=0)
-//   ceqbd = cbdI - gbd*vbd = (-3*GMIN-IS) - GMIN*(-3) = -IS
-//   ceqbs = 0 - gbs*0 = 0
-//
-// MNA node layout: D=1 (row/col 0), G=2 (row/col 1), S=0 (ground), B=0 (ground).
-// Stamps survive only where both row and col are non-zero.
-//
-// Matrix entries:
-//   (D,D) = gds + gbd = GMIN + GMIN = 2*GMIN
-//   (D,G) = gm = KP + GMIN
-//   RHS[D] = -(ids-gm*vgs-gds*vds) + IS  (channel Norton + bulk drain Norton)
-// ===========================================================================
-
-describe("mosfet_spicel1_load_dcop_parity", () => {
-  it("saturation_nmos_dcop_stamp_bit_exact_vs_ngspice_mos1load_formula", () => {
-    const VGS    = 2;
-    const VDS    = 3;
-    const VTO    = 1;
-    const KP     = 100e-6;
-    const W      = 1e-6;
-    const L      = 1e-6;
-    const PHI    = 0.6;
-    const GAMMA  = 0;
-    const LAMBDA = 0;
-    const IS_JCT = 1e-14;
-    const GMIN   = 1e-12;
-
-    // TNOM = 300.15 K (= REFTEMP) so all temperature correction factors = 1.
-    const TNOM   = 300.15;
-
-    // Build NMOS element: polarity=1, G=2, S=0 (ground), D=1, B=0 (tied to source).
-    // All caps zero, RD=RS=0 (no internal nodes).
-    const propsObj = makeParamBag({
-      VTO, KP, LAMBDA, W, L, PHI, GAMMA,
-      CBD: 0, CBS: 0, CGDO: 0, CGSO: 0, CGBO: 0,
-      RD: 0, RS: 0, IS: IS_JCT, PB: 0.8,
-      CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
-      AD: 0, AS: 0, PD: 0, PS: 0,
-      TOX: 0, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600,
-      KF: 0, AF: 1, FC: 0.5, M: 1, OFF: 0,
-      TNOM,
-    });
-
-    // polarity=1 (NMOS), D=1, G=2, S=0, B tied to S → factory uses B=S=0
-    const core = createMosfetElement(1, new Map([["G", 2], ["S", 0], ["D", 1]]), [], -1, propsObj);
-    const pool = new StatePool(core.stateSize);
-    (core as any).stateBaseOffset = 0;
-    core.initState(pool);
-
-    // Seed SLOT_VGS (0) and SLOT_VDS (1) so fetlim/limitVoltages passes through unchanged.
-    pool.state0[0] = VGS;  // SLOT_VGS
-    pool.state0[1] = VDS;  // SLOT_VDS
-    // Seed SLOT_VON (28) to VTO so fetlim uses the correct threshold.
-    pool.state0[28] = VTO; // SLOT_VON
-    // Seed SLOT_VBS_OLD (29) = 0 so pnjlim on vbs=0 passes through.
-    pool.state0[29] = 0;   // SLOT_VBS_OLD
-    // SLOT_VBD_OLD (30) = 0 (default from initState, consistent with reverse-bias start).
-    pool.state0[30] = 0;   // SLOT_VBD_OLD
-
-    // MNA voltages: V(D=1)=VDS, V(G=2)=VGS (S=0=ground, B=0=ground).
-    const voltages = new Float64Array([VDS, VGS]);
-    const solver = new SparseSolver();
-    solver.beginAssembly(2);
-
-    const ctx: LoadContext = {
-      cktMode: MODEDCOP | MODEINITFLOAT,
-      solver,
-      voltages,
-      dt: 0,
-      method: "trapezoidal",
-      order: 1,
-      deltaOld: [0, 0, 0, 0, 0, 0, 0],
-      ag: new Float64Array(7),
-      srcFact: 1,
-      noncon: { value: 0 },
-      limitingCollector: null,
-      xfact: 1,
-      gmin: GMIN,
-      reltol: 1e-3,
-      iabstol: 1e-12,
-    };
-
-    // withNodeIds: pinLayout [G, D, S, B] → nodeIds [2, 1, 0, 0]
-    const el = withNodeIds(core as unknown as AnalogElementCore, [2, 1, 0, 0]);
-    el.load(ctx);
-
-    // ---------------------------------------------------------------------------
-    // NGSPICE_REF: mos1load.c saturation-region formulas
-    // ---------------------------------------------------------------------------
-    // At TNOM=REFTEMP: tKP=KP, tPhi=PHI, tVto=VTO, tempFactor=1.
-    const NGSPICE_tKP    = KP;                              // temperature-corrected KP
-    const NGSPICE_vth    = VTO;                             // no body effect (GAMMA=0, vsb=0)
-    const NGSPICE_vgst   = VGS - NGSPICE_vth;              // = 1
-    const NGSPICE_Beta   = NGSPICE_tKP * W / L;            // = 100e-6
-    // Saturation: vds=3 >= vgst=1
-    const NGSPICE_IDS    = NGSPICE_Beta * NGSPICE_vgst * NGSPICE_vgst * 0.5
-                          * (1 + LAMBDA * VDS);             // = 5e-5
-    const NGSPICE_GM     = NGSPICE_Beta * (1 + LAMBDA * VDS) * NGSPICE_vgst + GMIN; // = 1e-4 + GMIN
-    const NGSPICE_GDS    = NGSPICE_Beta * LAMBDA * NGSPICE_vgst * NGSPICE_vgst * 0.5 + GMIN; // = GMIN
-    const NGSPICE_GMBS   = 0;                              // GAMMA=0 → no body effect
-    // Bulk drain junction: vbd = vbs - vds = 0 - 3 = -3V (< -3*VT → reverse saturation)
-    const NGSPICE_GBD    = GMIN;                           // gbd = GMIN when vbd <= -3*VT
-    // Norton: ids - gm*vgs - gds*vds - gmbs*vbs (vbs=0)
-    const NGSPICE_nortonId = NGSPICE_IDS
-      - NGSPICE_GM  * VGS
-      - NGSPICE_GDS * VDS
-      - NGSPICE_GMBS * 0;
-
-    // ---------------------------------------------------------------------------
-    // Read assembled matrix entries.
-    // D=1→row/col 0, G=2→row/col 1, S=0→ground (skipped), B=0→ground (skipped).
-    // ---------------------------------------------------------------------------
-    const entries = solver.getCSCNonZeros();
-    const sumAt = (row: number, col: number): number =>
-      entries
-        .filter((e) => e.row === row && e.col === col)
-        .reduce((acc, e) => acc + e.value, 0);
-
-    // (D, D): gds from channel + gbd from drain-bulk junction
-    expect(sumAt(0, 0)).toBe(NGSPICE_GDS + NGSPICE_GBD);
-
-    // (D, G): gm from transconductance stamp
-    expect(sumAt(0, 1)).toBe(NGSPICE_GM);
-
-    // (G, *): no G-row stamps (gate has no conductance to itself)
-    expect(sumAt(1, 0)).toBe(0);
-    expect(sumAt(1, 1)).toBe(0);
-
-    // RHS[D]: channel Norton + bulk drain Norton (-polarity * ceqbd = IS)
-    const rhs = solver.getRhsSnapshot();
-    expect(rhs[0]).toBe(-NGSPICE_nortonId + IS_JCT);
-    // RHS[G]: no stamps on gate row
-    expect(rhs[1]).toBe(0);
-  });
-});

@@ -1,29 +1,24 @@
 /**
- * MOSFET analog components — N-channel and P-channel MOSFETs.
+ * MOSFET analog components — N-channel and P-channel MOSFETs (SPICE Level 1).
  *
- * Implements the Level 1 SPICE MOSFET model (Shichman-Hodges) with:
- *   - Three operating regions: cutoff, linear (triode), saturation
- *   - Body effect via GAMMA and PHI parameters
- *   - Channel-length modulation via LAMBDA
- *   - Gate-source voltage limiting via fetlim()
- *   - Source/drain swap detection for symmetric device
- *   - Junction capacitances (CBD, CBS) and overlap capacitances (CGDO, CGSO, CGBO)
- *   - Drain/source ohmic resistances (RD, RS) via internal nodes
- *   - Process parameter derivation: KP from UO/TOX, GAMMA from NSUB/TOX, PHI from NSUB
- *   - Area-based junction caps: CJ, CJSW with grading and FC linearization
+ * Port of ngspice `ref/ngspice/src/spicelib/devices/mos1/mos1load.c::MOS1load`.
+ * Single-pass `load()` per device per NR iteration (Wave 6.1 unified interface).
+ * No `_updateOp`/`_stampCompanion` split — cap companions lump inline into the
+ * gpi/gmu-analog MOS stamps per `mos1load.c:900-end`.
  *
- * PMOS is implemented as the NMOS model with polarity = -1, which inverts
- * all junction voltage signs and current directions.
+ * Invented cross-method slots deleted per Phase 2.5 Wave 1.3 A1 (11 cap+Q
+ * slots cited in C-AUD-6). Only slots with direct ngspice MOS1state<n>
+ * correspondence in `mos1defs.h:269-291` survive.
  *
- * I-V equations (NMOS, polarity = +1):
- *   Vth = VTO + GAMMA * (sqrt(PHI + Vsb) - sqrt(PHI))
- *   Cutoff (Vgs < Vth):        Id = 0
- *   Linear (Vds < Vgs - Vth): Id = KP*(W/L)*((Vgs-Vth)*Vds - Vds²/2)*(1+LAMBDA*Vds)
- *   Saturation (Vds >= Vgs-Vth): Id = KP/2*(W/L)*(Vgs-Vth)²*(1+LAMBDA*Vds)
+ * G1 — Sign convention (Phase 2.5 W1.3 ruling 2026-04-21): digiTS now uses
+ * ngspice's VBS / VBD convention — `vbs = vb - vs`, `vbd = vb - vd`. Prior
+ * code used VSB/VBD with an opposite sign; every site — limiting,
+ * cap-voltage updates, current evaluation, stamps — is ported from
+ * `mos1load.c:150-250` verbatim with the ngspice convention.
  *
- * MNA stamp convention (3-terminal: D, G, S):
- *   The linearized MOSFET produces conductances between terminals plus
- *   Norton current sources at D and S.
+ * PMOS is the NMOS model with polarity=-1, matching ngspice `MOS1type`.
+ * All junction voltages are polarity-signed at the vbs/vgs/vds read site
+ * (mos1load.c:231-239) and un-polarity-signed at the stamp site.
  */
 
 import { AbstractCircuitElement } from "../../core/element.js";
@@ -40,63 +35,40 @@ import {
   type ComponentDefinition,
 } from "../../core/registry.js";
 import type { IntegrationMethod, LoadContext } from "../../solver/analog/element.js";
-import type { SparseSolver } from "../../solver/analog/sparse-solver.js";
 import { stampG, stampRHS } from "../../solver/analog/stamp-helpers.js";
 import { fetlim, limvds, pnjlim } from "../../solver/analog/newton-raphson.js";
-import type { LimitingEvent } from "../../solver/analog/newton-raphson.js";
-import { VT } from "../../core/constants.js";
-import { computeNIcomCof } from "../../solver/analog/integration.js";
 import { cktTerr } from "../../solver/analog/ckt-terr.js";
-import {
-  AbstractFetElement,
-  SLOT_VGS,
-  SLOT_VDS,
-  SLOT_VSB,
-  SLOT_GMBS,
-  SLOT_GBD,
-  SLOT_GBS,
-  SLOT_CBD_I,
-  SLOT_CBS_I,
-  SLOT_VBD,
-  SLOT_CAP_GEQ_GB,
-  SLOT_CAP_IEQ_GB,
-  SLOT_CAP_GEQ_DB,
-  SLOT_CAP_IEQ_DB,
-  SLOT_CAP_GEQ_SB,
-  SLOT_CAP_IEQ_SB,
-  SLOT_V_DB,
-  SLOT_V_SB,
-  SLOT_V_GB,
-  SLOT_VON,
-  SLOT_VBS_OLD,
-  SLOT_VBD_OLD,
-  SLOT_MODE,
-  SLOT_Q_GB,
-  SLOT_MEYER_GS,
-  SLOT_MEYER_GD,
-  SLOT_MEYER_GB,
-  SLOT_CCAP_GB,
-  SLOT_Q_DB,
-  SLOT_Q_SB,
-  SLOT_CCAP_DB,
-  SLOT_CCAP_SB,
-} from "../../solver/analog/fet-base.js";
-import type { FetCapacitances } from "../../solver/analog/fet-base.js";
+import type { LteParams } from "../../solver/analog/ckt-terr.js";
 import { defineModelParams, deviceParams } from "../../core/model-params.js";
+import type { StatePoolRef } from "../../core/analog-types.js";
+import {
+  defineStateSchema,
+  applyInitialValues,
+  type StateSchema,
+} from "../../solver/analog/state-schema.js";
 import {
   MODEINITFLOAT, MODEINITJCT, MODEINITFIX, MODEINITSMSIG,
   MODEINITTRAN, MODEINITPRED, MODETRAN, MODETRANOP, MODEAC, MODEUIC,
 } from "../../solver/analog/ckt-mode.js";
 
 // ---------------------------------------------------------------------------
-// Physical constants
+// Physical constants (ngspice const.h / defines.h values)
 // ---------------------------------------------------------------------------
 
-/** Minimum conductance for numerical stability (GMIN). */
+/** Minimum conductance for numerical stability (CKTgmin). */
 const GMIN = 1e-12;
 
-/** Elementary charge (C) — ngspice CHARGE from const.h. */
+/** Boltzmann constant (CONSTboltz). */
+const CONSTboltz = 1.3806226e-23;
+/** Elementary charge (CHARGE). */
 const Q = 1.6021918e-19;
+/** k/q (CONSTKoverQ). */
+const KoverQ = CONSTboltz / Q;
+/** Reference temperature (REFTEMP). */
+const REFTEMP = 300.15;
+/** Exponential-argument ceiling (defines.h:35 MAX_EXP_ARG). */
+const MAX_EXP_ARG = 709.0;
+
 /** Permittivity of free space (F/m). */
 const EPS0 = 8.854214871e-12;
 /** Relative permittivity of SiO2. */
@@ -107,113 +79,45 @@ const EPS_SI = 11.7;
 const NI = 1.45e10;
 
 // ---------------------------------------------------------------------------
-// Stamp helpers — node 0 is ground (skipped)
-// ---------------------------------------------------------------------------
-
-
-// ---------------------------------------------------------------------------
-// MosfetParams — resolved model parameters
+// MosfetParams / ResolvedMosfetParams — raw PropertyBag → typed
 // ---------------------------------------------------------------------------
 
 interface MosfetParams {
-  // Primary I-V params (always required)
-  VTO: number;
-  KP: number;
-  LAMBDA: number;
-  PHI: number;
-  GAMMA: number;
-  W: number;
-  L: number;
-  // Capacitance params (optional, default 0)
-  CBD?: number;
-  CBS?: number;
-  CGDO?: number;
-  CGSO?: number;
-  CGBO?: number;
-  // Terminal resistance params (optional, default 0)
-  RD?: number;
-  RS?: number;
-  // Junction params (optional, with SPICE defaults)
-  IS?: number;
-  PB?: number;
-  CJ?: number;
-  MJ?: number;
-  CJSW?: number;
-  MJSW?: number;
-  JS?: number;
-  RSH?: number;
-  FC?: number;
-  // Area/perimeter params (optional, default 0)
-  AD?: number;
-  AS?: number;
-  PD?: number;
-  PS?: number;
-  // Temperature param (optional, default 300.15 K)
-  TNOM?: number;
-  // Process params (optional, default 0/off)
-  TOX?: number;
-  NSUB?: number;
-  NSS?: number;
-  TPG?: number;
-  LD?: number;
-  UO?: number;
-  // Noise params (optional, default 0/1)
-  KF?: number;
-  AF?: number;
-  // Parallel device multiplier (optional, default 1)
-  M?: number;
-  // Initial condition: device off (optional, default 0=false)
-  OFF?: number;
+  VTO: number; KP: number; LAMBDA: number; PHI: number; GAMMA: number;
+  W: number; L: number;
+  CBD?: number; CBS?: number; CGDO?: number; CGSO?: number; CGBO?: number;
+  RD?: number; RS?: number;
+  IS?: number; PB?: number;
+  CJ?: number; MJ?: number; CJSW?: number; MJSW?: number;
+  JS?: number; RSH?: number; FC?: number;
+  AD?: number; AS?: number; PD?: number; PS?: number;
+  TNOM?: number; TOX?: number; NSUB?: number; NSS?: number; TPG?: number;
+  LD?: number; UO?: number;
+  KF?: number; AF?: number;
+  M?: number; OFF?: number;
 }
 
-/** MosfetParams with all fields guaranteed present (after resolveParams). */
 interface ResolvedMosfetParams {
-  VTO: number;
-  KP: number;
-  LAMBDA: number;
-  PHI: number;
-  GAMMA: number;
-  W: number;
-  L: number;
-  CBD: number;
-  CBS: number;
-  CGDO: number;
-  CGSO: number;
-  CGBO: number;
-  RD: number;
-  RS: number;
-  IS: number;
-  PB: number;
-  CJ: number;
-  MJ: number;
-  CJSW: number;
-  MJSW: number;
-  JS: number;
-  RSH: number;
-  FC: number;
-  AD: number;
-  AS: number;
-  PD: number;
-  PS: number;
-  TNOM: number;
-  TOX: number;
-  NSUB: number;
-  NSS: number;
-  TPG: number;
-  LD: number;
-  UO: number;
-  KF: number;
-  AF: number;
-  M: number;
-  OFF: number;
-  // Temperature-corrected values threaded from _recomputeTempParams
+  VTO: number; KP: number; LAMBDA: number; PHI: number; GAMMA: number;
+  W: number; L: number;
+  CBD: number; CBS: number; CGDO: number; CGSO: number; CGBO: number;
+  RD: number; RS: number;
+  IS: number; PB: number;
+  CJ: number; MJ: number; CJSW: number; MJSW: number;
+  JS: number; RSH: number; FC: number;
+  AD: number; AS: number; PD: number; PS: number;
+  TNOM: number; TOX: number; NSUB: number; NSS: number; TPG: number;
+  LD: number; UO: number;
+  KF: number; AF: number;
+  M: number; OFF: number;
+  // Temperature-corrected values — populated by MosfetTempParams
   _tKP?: number;
   _tPhi?: number;
   _tVto?: number;
 }
 
 // ---------------------------------------------------------------------------
-// Model parameter declarations
+// Model parameter declarations — NMOS
 // ---------------------------------------------------------------------------
 
 export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS } = defineModelParams({
@@ -246,7 +150,7 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
     AS:     { default: 0,    unit: "m²",     description: "Source area" },
     PD:     { default: 0,    unit: "m",      description: "Drain perimeter" },
     PS:     { default: 0,    unit: "m",      description: "Source perimeter" },
-    TNOM:   { default: 300.15, unit: "K",    description: "Nominal temperature" },
+    TNOM:   { default: REFTEMP, unit: "K",   description: "Nominal temperature" },
     TOX:    { default: 1e-7, unit: "m",      description: "Oxide thickness" },
     NSUB:   { default: 0,    unit: "cm⁻³",   description: "Substrate doping" },
     NSS:    { default: 0,    unit: "cm⁻²",   description: "Surface state density" },
@@ -264,10 +168,9 @@ export const { paramDefs: MOSFET_NMOS_PARAM_DEFS, defaults: MOSFET_NMOS_DEFAULTS
 // ---------------------------------------------------------------------------
 // Built-in NMOS model presets
 // Sources: ON Semi MODPEX 2004, Zetex 1985, IR/Symmetry MODPEX 1996
-// All values extracted from published .SUBCKT Level 1 .MODEL MM NMOS lines.
 // ---------------------------------------------------------------------------
 
-/** Small signal NMOS (TO-92, 60V/200mA). Source: ON Semi 2N7000.REV0.LIB (Symmetry MODPEX 2004-03-31). */
+/** Small signal NMOS (TO-92, 60V/200mA). Source: ON Semi 2N7000.REV0.LIB. */
 const NMOS_2N7000 = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   VTO: 2.236, KP: 0.0932174, LAMBDA: 0, W: 1e-6, L: 1e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1.0724e-11, CGSO: 1.79115e-7,
@@ -276,7 +179,7 @@ const NMOS_2N7000 = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 });
 
-/** Small signal NMOS (TO-92, 60V/500mA). Source: Zetex BS170/ZTX model (rev 12/85). */
+/** Small signal NMOS (TO-92, 60V/500mA). Source: Zetex BS170/ZTX (12/85). */
 const NMOS_BS170 = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   VTO: 1.824, KP: 0.1233, LAMBDA: 0, W: 1e-6, L: 1e-6,
   PHI: 0.6, GAMMA: 0, CBD: 35e-12, CBS: 0, CGDO: 3e-12, CGSO: 28e-12,
@@ -285,7 +188,7 @@ const NMOS_BS170 = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 });
 
-/** Medium power NMOS (TO-220, 100V/17A). Source: IR irf530n_IR (Symmetry MODPEX 1996-04-24). */
+/** Medium power NMOS (TO-220, 100V/17A). Source: IR irf530n_IR. */
 const NMOS_IRF530N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   VTO: 3.63019, KP: 17.6091, LAMBDA: 0.00363922, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 2.4372e-7, CGSO: 5.59846e-6,
@@ -294,7 +197,7 @@ const NMOS_IRF530N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 });
 
-/** High power NMOS (TO-220, 100V/33A). Source: IR irf540n_IR (Symmetry MODPEX 1996-04-24). */
+/** High power NMOS (TO-220, 100V/33A). Source: IR irf540n_IR. */
 const NMOS_IRF540N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   VTO: 3.55958, KP: 28.379, LAMBDA: 0.000888191, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1.77276e-8, CGSO: 1.23576e-5,
@@ -303,7 +206,7 @@ const NMOS_IRF540N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 });
 
-/** High power NMOS (TO-220, 55V/49A). Source: IR irfz44n_IR (Symmetry MODPEX 1996-04-24). */
+/** High power NMOS (TO-220, 55V/49A). Source: IR irfz44n_IR. */
 const NMOS_IRFZ44N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   VTO: 3.56214, KP: 39.3974, LAMBDA: 0, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 2.2826e-7, CGSO: 1.25255e-5,
@@ -311,6 +214,10 @@ const NMOS_IRFZ44N = deviceParams(MOSFET_NMOS_PARAM_DEFS, {
   CJ: 0, MJ: 0.5, CJSW: 0, MJSW: 0.5, JS: 0, RSH: 0,
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 600, KF: 0, AF: 1, FC: 0.5,
 });
+
+// ---------------------------------------------------------------------------
+// Model parameter declarations — PMOS
+// ---------------------------------------------------------------------------
 
 export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS } = defineModelParams({
   primary: {
@@ -342,7 +249,7 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
     AS:     { default: 0,    unit: "m²",     description: "Source area" },
     PD:     { default: 0,    unit: "m",      description: "Drain perimeter" },
     PS:     { default: 0,    unit: "m",      description: "Source perimeter" },
-    TNOM:   { default: 300.15, unit: "K",    description: "Nominal temperature" },
+    TNOM:   { default: REFTEMP, unit: "K",   description: "Nominal temperature" },
     TOX:    { default: 1e-7, unit: "m",      description: "Oxide thickness" },
     NSUB:   { default: 0,    unit: "cm⁻³",   description: "Substrate doping" },
     NSS:    { default: 0,    unit: "cm⁻²",   description: "Surface state density" },
@@ -359,11 +266,10 @@ export const { paramDefs: MOSFET_PMOS_PARAM_DEFS, defaults: MOSFET_PMOS_DEFAULTS
 
 // ---------------------------------------------------------------------------
 // Built-in PMOS model presets
-// Sources: Zetex/Diodes Inc., IR/Symmetry MODPEX (KiCad-Spice-Library irf.lib)
-// All values extracted from published .SUBCKT Level 1 .MODEL MM PMOS lines.
+// Sources: Zetex/Diodes Inc., IR/Symmetry MODPEX
 // ---------------------------------------------------------------------------
 
-/** Small signal PMOS (TO-92, -45V/230mA). Source: Zetex/Diodes Inc. BS250P v1.0 (2003-03-19). */
+/** Small signal PMOS (TO-92, -45V/230mA). Source: Zetex BS250P v1.0. */
 const PMOS_BS250 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   VTO: -3.193, KP: 0.277, LAMBDA: 0.012, W: 1e-6, L: 1e-6,
   PHI: 0.6, GAMMA: 0, CBD: 105e-12, CBS: 0, CGDO: 0, CGSO: 0,
@@ -372,7 +278,7 @@ const PMOS_BS250 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 });
 
-/** Medium power PMOS (TO-220, -100V/6.8A). Source: IR irf9520_IR (KiCad-Spice-Library irf.lib). */
+/** Medium power PMOS (TO-220, -100V/6.8A). Source: IR irf9520_IR. */
 const PMOS_IRF9520 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   VTO: -3.41185, KP: 3.46967, LAMBDA: 0.0289226, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 3.45033e-6,
@@ -381,7 +287,7 @@ const PMOS_IRF9520 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 });
 
-/** High power PMOS (TO-247, -200V/12A). Source: IR irfp9240_IR (KiCad-Spice-Library irf.lib). */
+/** High power PMOS (TO-247, -200V/12A). Source: IR irfp9240_IR. */
 const PMOS_IRFP9240 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   VTO: -3.67839, KP: 6.41634, LAMBDA: 0.0117285, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 1.08446e-5,
@@ -390,7 +296,7 @@ const PMOS_IRFP9240 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 });
 
-/** High power PMOS (TO-220, -100V/40A). Source: IR irf5210_IR (KiCad-Spice-Library irf.lib). */
+/** High power PMOS (TO-220, -100V/40A). Source: IR irf5210_IR. */
 const PMOS_IRF5210 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   VTO: -3.79917, KP: 12.9564, LAMBDA: 0.00220079, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 2.34655e-5,
@@ -399,7 +305,7 @@ const PMOS_IRF5210 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   TOX: 1e-7, NSUB: 0, NSS: 0, TPG: 1, LD: 0, UO: 250, KF: 0, AF: 1, FC: 0.5,
 });
 
-/** High power PMOS (TO-220, -55V/74A). Source: IR irf4905_IR (ngspice/KiCad-Spice-Library). */
+/** High power PMOS (TO-220, -55V/74A). Source: IR irf4905_IR. */
 const PMOS_IRF4905 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
   VTO: -3.53713, KP: 23.3701, LAMBDA: 0.00549383, W: 100e-6, L: 100e-6,
   PHI: 0.6, GAMMA: 0, CBD: 0, CBS: 0, CGDO: 1e-11, CGSO: 2.84439e-5,
@@ -413,87 +319,46 @@ const PMOS_IRF4905 = deviceParams(MOSFET_PMOS_PARAM_DEFS, {
 // ---------------------------------------------------------------------------
 
 /**
- * Derive KP, GAMMA, and PHI from process parameters when NSUB > 0 and TOX > 0.
- *
- * This mirrors the standard ngspice/SPICE Level 1 derivation:
+ * Derive KP, GAMMA, PHI from NSUB/TOX when present. Same ngspice MOS1 Level 1
+ * derivation:
  *   Cox  = εox / TOX
- *   KP   = UO * 1e-4 * Cox            (UO in cm²/Vs → m²/Vs via *1e-4)
- *   GAMMA = sqrt(2 * q * εsi * NSUB*1e6) / Cox  (NSUB in cm⁻³ → m⁻³ via *1e6)
+ *   KP   = UO * 1e-4 * Cox
+ *   GAMMA = sqrt(2 * q * εsi * NSUB*1e6) / Cox
  *   PHI  = 2 * Vt * ln(NSUB / ni)
- *
- * Only derived when the user hasn't explicitly set the params (i.e., they're at
- * their default values: KP_default for the polarity, GAMMA=0, PHI=0.6).
- *
- * Area-based junction caps (CJ, CJSW) are resolved here too:
- *   CBD = CJ * W*L + CJSW * 2*(W+L)   (when CJ > 0 and CBD = 0)
- *   CBS = same formula
- *
- * @param raw - Raw params from PropertyBag
- * @param kpDefault - Default KP for this polarity (2e-5 NMOS, 1e-5 PMOS)
- * @returns Resolved MosfetParams with any derived values applied
  */
 function resolveParams(raw: MosfetParams, kpDefault: number): ResolvedMosfetParams {
-  // Expand optional fields to full resolved params with SPICE defaults
   const p: ResolvedMosfetParams = {
-    VTO:  raw.VTO,
-    KP:   raw.KP,
-    LAMBDA: raw.LAMBDA,
-    PHI:  raw.PHI,
-    GAMMA: raw.GAMMA,
-    W:    raw.W,
-    L:    raw.L,
-    CBD:  raw.CBD  ?? 0,
-    CBS:  raw.CBS  ?? 0,
-    CGDO: raw.CGDO ?? 0,
-    CGSO: raw.CGSO ?? 0,
-    CGBO: raw.CGBO ?? 0,
-    RD:   raw.RD   ?? 0,
-    RS:   raw.RS   ?? 0,
-    IS:   raw.IS   ?? 1e-14,
-    PB:   raw.PB   ?? 0.8,
-    CJ:   raw.CJ   ?? 0,
-    MJ:   raw.MJ   ?? 0.5,
-    CJSW: raw.CJSW ?? 0,
-    MJSW: raw.MJSW ?? 0.5,
-    JS:   raw.JS   ?? 0,
-    RSH:  raw.RSH  ?? 0,
-    FC:   raw.FC   ?? 0.5,
-    AD:   raw.AD   ?? 0,
-    AS:   raw.AS   ?? 0,
-    PD:   raw.PD   ?? 0,
-    PS:   raw.PS   ?? 0,
-    TNOM: raw.TNOM ?? 300.15,
-    TOX:  raw.TOX  ?? 1e-7,
-    NSUB: raw.NSUB ?? 0,
-    NSS:  raw.NSS  ?? 0,
-    TPG:  raw.TPG  ?? 1,
-    LD:   raw.LD   ?? 0,
-    UO:   raw.UO   ?? 600,
-    KF:   raw.KF   ?? 0,
-    AF:   raw.AF   ?? 1,
-    M:    raw.M    ?? 1,
-    OFF:  raw.OFF  ?? 0,
+    VTO:  raw.VTO, KP: raw.KP, LAMBDA: raw.LAMBDA,
+    PHI: raw.PHI, GAMMA: raw.GAMMA, W: raw.W, L: raw.L,
+    CBD:  raw.CBD  ?? 0, CBS: raw.CBS ?? 0,
+    CGDO: raw.CGDO ?? 0, CGSO: raw.CGSO ?? 0, CGBO: raw.CGBO ?? 0,
+    RD:   raw.RD   ?? 0, RS: raw.RS ?? 0,
+    IS:   raw.IS   ?? 1e-14, PB: raw.PB ?? 0.8,
+    CJ:   raw.CJ   ?? 0, MJ: raw.MJ ?? 0.5,
+    CJSW: raw.CJSW ?? 0, MJSW: raw.MJSW ?? 0.5,
+    JS:   raw.JS   ?? 0, RSH: raw.RSH ?? 0, FC: raw.FC ?? 0.5,
+    AD:   raw.AD   ?? 0, AS: raw.AS ?? 0, PD: raw.PD ?? 0, PS: raw.PS ?? 0,
+    TNOM: raw.TNOM ?? REFTEMP,
+    TOX:  raw.TOX  ?? 1e-7, NSUB: raw.NSUB ?? 0, NSS: raw.NSS ?? 0,
+    TPG:  raw.TPG  ?? 1, LD: raw.LD ?? 0, UO: raw.UO ?? 600,
+    KF:   raw.KF   ?? 0, AF: raw.AF ?? 1,
+    M:    raw.M    ?? 1, OFF: raw.OFF ?? 0,
   };
 
   if (p.NSUB > 0 && p.TOX > 0) {
     const cox = (EPS_OX * EPS0) / p.TOX;
     const epsSi = EPS_SI * EPS0;
-    // cm⁻³ → m⁻³ multiply by 1e6
     const nsubM3 = p.NSUB * 1e6;
+    const vtRoom = REFTEMP * KoverQ;
 
-    // Derive KP if still at default
     if (p.KP === kpDefault) {
       p.KP = (p.UO * 1e-4) * cox;
     }
-
-    // Derive GAMMA if still at default (0)
     if (p.GAMMA === 0) {
       p.GAMMA = Math.sqrt(2 * Q * epsSi * nsubM3) / cox;
     }
-
-    // Derive PHI if still at default (0.6)
     if (p.PHI === 0.6) {
-      const phi = 2 * VT * Math.log(p.NSUB / NI);
+      const phi = 2 * vtRoom * Math.log(p.NSUB / NI);
       if (phi > 0.1) p.PHI = phi;
     }
   }
@@ -508,20 +373,172 @@ function resolveParams(raw: MosfetParams, kpDefault: number): ResolvedMosfetPara
 }
 
 // ---------------------------------------------------------------------------
-// computeIds — drain current for three operating regions
+// computeTempParams — ngspice mos1temp.c:44-289 port
+// ---------------------------------------------------------------------------
+
+interface MosfetTempParams {
+  tTransconductance: number;  // mos1temp.c:165-166
+  tPhi: number;               // mos1temp.c:168-169
+  tVbi: number;               // mos1temp.c:170-174
+  tVto: number;               // mos1temp.c:175
+  tSatCur: number;            // mos1temp.c:177
+  tSatCurDens: number;        // mos1temp.c:178
+  tBulkPot: number;           // mos1temp.c:190
+  tDepCap: number;            // mos1temp.c:200
+  tCbd: number;
+  tCbs: number;
+  tCj: number;
+  tCjsw: number;
+  drainSatCur: number;        // mos1load.c:131-141
+  sourceSatCur: number;       // mos1load.c:131-141
+  drainVcrit: number;         // mos1temp.c:202-216
+  sourceVcrit: number;
+  // Junction cap f2/f3/f4 linearization coefficients (mos1temp.c:218-289)
+  czbd: number; czbdsw: number; czbs: number; czbssw: number;
+  f2d: number; f3d: number; f4d: number;
+  f2s: number; f3s: number; f4s: number;
+}
+
+function computeTempParams(p: ResolvedMosfetParams, polarity: 1 | -1): MosfetTempParams {
+  // --- Model-level (mos1temp.c:45-51) ---
+  const fact1 = p.TNOM / REFTEMP;
+  const vtnom = p.TNOM * KoverQ;
+  const kt1 = CONSTboltz * p.TNOM;
+  const egfet1 = 1.16 - (7.02e-4 * p.TNOM * p.TNOM) / (p.TNOM + 1108);
+  const arg1 = -egfet1 / (kt1 + kt1) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP));
+  const pbfact1 = -2 * vtnom * (1.5 * Math.log(fact1) + Q * arg1);
+
+  // --- Instance-level (mos1temp.c:135-200); circuit temp = REFTEMP ---
+  const vt = REFTEMP * KoverQ;
+  const ratio = REFTEMP / p.TNOM;
+  const fact2 = 1;  // REFTEMP / REFTEMP
+  const kt = REFTEMP * CONSTboltz;
+  const egfet = 1.16 - (7.02e-4 * REFTEMP * REFTEMP) / (REFTEMP + 1108);
+  const arg = -egfet / (kt + kt) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP));
+  const pbfact = -2 * vt * (1.5 * Math.log(fact2) + Q * arg);
+
+  // mos1temp.c:165-166
+  const ratio4 = ratio * Math.sqrt(ratio);
+  const tTransconductance = p.KP / ratio4;
+
+  // mos1temp.c:168-169
+  const phio = (p.PHI - pbfact1) / fact1;
+  const tPhi = fact2 * phio + pbfact;
+
+  // mos1temp.c:170-175
+  const tVbi = p.VTO - polarity * (p.GAMMA * Math.sqrt(p.PHI))
+    + 0.5 * (egfet1 - egfet)
+    + polarity * 0.5 * (tPhi - p.PHI);
+  const tVto = tVbi + polarity * p.GAMMA * Math.sqrt(tPhi);
+
+  // mos1temp.c:177-178
+  const tempFactor = Math.exp(-egfet / vt + egfet1 / vtnom);
+  const tSatCur = p.IS * tempFactor;
+  const tSatCurDens = p.JS * tempFactor;
+
+  // mos1temp.c:181-200
+  const pbo = (p.PB - pbfact1) / fact1;
+  const gmaold = (p.PB - pbo) / pbo;
+  let capfact = 1 / (1 + p.MJ * (4e-4 * (p.TNOM - REFTEMP) - gmaold));
+  let tCbd = p.CBD * capfact;
+  let tCbs = p.CBS * capfact;
+  let tCj = p.CJ * capfact;
+  capfact = 1 / (1 + p.MJSW * (4e-4 * (p.TNOM - REFTEMP) - gmaold));
+  let tCjsw = p.CJSW * capfact;
+  const tBulkPot = fact2 * pbo + pbfact;
+  const gmanew = (tBulkPot - pbo) / pbo;
+  capfact = 1 + p.MJ * (4e-4 * (REFTEMP - REFTEMP) - gmanew);
+  tCbd *= capfact;
+  tCbs *= capfact;
+  tCj *= capfact;
+  capfact = 1 + p.MJSW * (4e-4 * (REFTEMP - REFTEMP) - gmanew);
+  tCjsw *= capfact;
+  const tDepCap = p.FC * tBulkPot;
+
+  // mos1load.c:131-141: drain/source saturation currents scaled by M
+  const m = p.M;
+  let drainSatCur: number;
+  let sourceSatCur: number;
+  if (tSatCurDens === 0 || p.AD === 0 || p.AS === 0) {
+    drainSatCur = tSatCur * m;
+    sourceSatCur = tSatCur * m;
+  } else {
+    drainSatCur = tSatCurDens * p.AD * m;
+    sourceSatCur = tSatCurDens * p.AS * m;
+  }
+
+  // mos1temp.c:202-216: drain/source vcrit
+  let drainVcrit: number, sourceVcrit: number;
+  if (tSatCurDens === 0 || p.AD === 0 || p.AS === 0) {
+    drainVcrit = sourceVcrit = vt * Math.log(vt / (Math.SQRT2 * tSatCur));
+  } else {
+    drainVcrit = vt * Math.log(vt / (Math.SQRT2 * tSatCurDens * p.AD));
+    sourceVcrit = vt * Math.log(vt / (Math.SQRT2 * tSatCurDens * p.AS));
+  }
+
+  // --- Junction cap f2/f3/f4 coefficients (mos1temp.c:218-289) ---
+  const mj = p.MJ;
+  const mjsw = p.MJSW;
+  const fc = p.FC;
+
+  // Drain side (mos1temp.c:218-253)
+  let czbd: number;
+  if (p.CBD > 0) czbd = tCbd;
+  else if (p.CJ > 0 && p.AD > 0) czbd = tCj * p.AD;
+  else czbd = 0;
+  const czbdsw = p.CJSW > 0 ? tCjsw * p.PD : 0;
+
+  const argFC = 1 - fc;
+  const sarg = Math.exp(-mj * Math.log(argFC));
+  const sargsw = Math.exp(-mjsw * Math.log(argFC));
+
+  const f2d = czbd * (1 - fc * (1 + mj)) * sarg / argFC
+    + czbdsw * (1 - fc * (1 + mjsw)) * sargsw / argFC;
+  const f3d = czbd * mj * sarg / argFC / tBulkPot
+    + czbdsw * mjsw * sargsw / argFC / tBulkPot;
+  const f4d = czbd * tBulkPot * (1 - argFC * sarg) / (1 - mj)
+    + czbdsw * tBulkPot * (1 - argFC * sargsw) / (1 - mjsw)
+    - f3d / 2 * (tDepCap * tDepCap)
+    - tDepCap * f2d;
+
+  // Source side (mos1temp.c:254-289)
+  let czbs: number;
+  if (p.CBS > 0) czbs = tCbs;
+  else if (p.CJ > 0 && p.AS > 0) czbs = tCj * p.AS;
+  else czbs = 0;
+  const czbssw = p.CJSW > 0 ? tCjsw * p.PS : 0;
+
+  const f2s = czbs * (1 - fc * (1 + mj)) * sarg / argFC
+    + czbssw * (1 - fc * (1 + mjsw)) * sargsw / argFC;
+  const f3s = czbs * mj * sarg / argFC / tBulkPot
+    + czbssw * mjsw * sargsw / argFC / tBulkPot;
+  const f4s = czbs * tBulkPot * (1 - argFC * sarg) / (1 - mj)
+    + czbssw * tBulkPot * (1 - argFC * sargsw) / (1 - mjsw)
+    - f3s / 2 * (tDepCap * tDepCap)
+    - tDepCap * f2s;
+
+  return {
+    tTransconductance, tPhi, tVbi, tVto,
+    tSatCur, tSatCurDens,
+    tBulkPot, tDepCap, tCbd, tCbs, tCj, tCjsw,
+    drainSatCur, sourceSatCur, drainVcrit, sourceVcrit,
+    czbd, czbdsw, czbs, czbssw,
+    f2d, f3d, f4d, f2s, f3s, f4s,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// computeIds / computeGm / computeGds / computeGmbs — standalone functions
+// exported for unit tests that exercise the I-V model directly.
+// The `vsb` argument is the legacy digiTS VSB = vs - vb convention; these
+// helpers invert it to ngspice's vbs for internal use per mos1load.c:500-509.
 // ---------------------------------------------------------------------------
 
 /**
- * Compute MOSFET drain-source current and threshold voltage.
+ * Compute MOSFET drain-source current, threshold, and vdsat.
+ * Mirrors mos1load.c:483-546 saturation/triode block.
  *
- * Uses temperature-corrected KP, PHI, VTO when available in params (_tKP, _tPhi, _tVto).
- * Returns vdsat and von for Meyer gate cap model.
- *
- * @param vgs  - Gate-source voltage (polarity-corrected)
- * @param vds  - Drain-source voltage (polarity-corrected, always >= 0 after swap)
- * @param vsb  - Source-bulk voltage (polarity-corrected, >= 0 for NMOS)
- * @param p    - Resolved model parameters
- * @returns    - { ids, vth, vdsat, von } drain current, threshold, saturation voltage, von
+ * Inputs: `vgs`, `vds`, and `vsb` (VSB legacy = vs - vb → vbs = -vsb inside).
  */
 export function computeIds(
   vgs: number,
@@ -535,7 +552,9 @@ export function computeIds(
   const tVto = rp._tVto;
   const phi = Math.max(tPhi, 0.1);
 
-  // Body effect — allow forward body bias (ngspice mos1load.c)
+  // mos1load.c:500-506: sarg = sqrt(tPhi - vbs) when vbs <= 0,
+  //                     else sarg = sqrt(tPhi) - vbs/(2*sarg), clamped >= 0.
+  // Legacy vsb = -vbs; vsb >= 0 means vbs <= 0 → normal reverse bias.
   let sarg: number;
   if (vsb >= 0) {
     sarg = Math.sqrt(phi + vsb);
@@ -543,19 +562,17 @@ export function computeIds(
     sarg = Math.sqrt(phi);
     sarg = Math.max(0, sarg + vsb / (2 * sarg));
   }
-  // Use tVbi-based von when tVto is available, otherwise VTO-based
+
+  // mos1load.c:507: von = tVbi*type + gamma*sarg — threshold w/ body effect.
   const vth = tVto !== undefined
     ? tVto + p.GAMMA * (sarg - Math.sqrt(phi))
     : p.VTO + p.GAMMA * (sarg - Math.sqrt(phi));
-  // von = vth including body effect (same as vth here)
   const von = vth;
 
   const vgst = vgs - vth;
   const vdsat = Math.max(vgst, 0);
 
-  if (vgst <= 0) {
-    return { ids: 0, vth, vdsat, von };
-  }
+  if (vgst <= 0) return { ids: 0, vth, vdsat, von };
 
   const ld = p.LD ?? 0;
   const effectiveLength = p.L - 2 * ld;
@@ -563,171 +580,96 @@ export function computeIds(
   const lambda = p.LAMBDA;
   const betap = Beta * (1 + lambda * vds);
 
+  // mos1load.c:527-545: saturation / linear region dispatch.
   if (vds < vgst) {
-    // Linear (triode) region
     const ids = betap * vds * (vgst - 0.5 * vds);
     return { ids, vth, vdsat, von };
   } else {
-    // Saturation region
     const ids = betap * vgst * vgst * 0.5;
     return { ids, vth, vdsat, von };
   }
 }
 
-// ---------------------------------------------------------------------------
-// computeGm — transconductance dId/dVgs
-// ---------------------------------------------------------------------------
-
-/**
- * Compute MOSFET transconductance gm = dId/dVgs.
- */
-export function computeGm(
-  vgs: number,
-  vds: number,
-  vsb: number,
-  p: MosfetParams,
-): number {
+/** Compute MOSFET transconductance gm = dId/dVgs. */
+export function computeGm(vgs: number, vds: number, vsb: number, p: MosfetParams): number {
   const rp = p as ResolvedMosfetParams;
   const tKP = rp._tKP ?? p.KP;
   const tPhi = rp._tPhi ?? p.PHI;
   const tVto = rp._tVto;
   const phi = Math.max(tPhi, 0.1);
   let sarg: number;
-  if (vsb >= 0) {
-    sarg = Math.sqrt(phi + vsb);
-  } else {
-    sarg = Math.sqrt(phi);
-    sarg = Math.max(0, sarg + vsb / (2 * sarg));
-  }
+  if (vsb >= 0) sarg = Math.sqrt(phi + vsb);
+  else { sarg = Math.sqrt(phi); sarg = Math.max(0, sarg + vsb / (2 * sarg)); }
   const vth = tVto !== undefined
     ? tVto + p.GAMMA * (sarg - Math.sqrt(phi))
     : p.VTO + p.GAMMA * (sarg - Math.sqrt(phi));
   const vgst = vgs - vth;
-
-  if (vgst <= 0) {
-    return 0;
-  }
-
+  if (vgst <= 0) return 0;
   const ld = p.LD ?? 0;
   const effectiveLength = p.L - 2 * ld;
   const Beta = tKP * p.W / effectiveLength * (p.M ?? 1);
-  const lambda = p.LAMBDA;
-  const betap = Beta * (1 + lambda * vds);
-
-  if (vds < vgst) {
-    return betap * vds + GMIN;
-  } else {
-    return betap * vgst + GMIN;
-  }
+  const betap = Beta * (1 + p.LAMBDA * vds);
+  // mos1load.c:530, 539 (no +GMIN in standalone; load() adds gmin at stamp time)
+  return (vds < vgst ? betap * vds : betap * vgst) + GMIN;
 }
 
-// ---------------------------------------------------------------------------
-// computeGds — output conductance dId/dVds
-// ---------------------------------------------------------------------------
-
-/**
- * Compute MOSFET output conductance gds = dId/dVds.
- */
-export function computeGds(
-  vgs: number,
-  vds: number,
-  vsb: number,
-  p: MosfetParams,
-): number {
+/** Compute MOSFET output conductance gds = dId/dVds. */
+export function computeGds(vgs: number, vds: number, vsb: number, p: MosfetParams): number {
   const rp = p as ResolvedMosfetParams;
   const tKP = rp._tKP ?? p.KP;
   const tPhi = rp._tPhi ?? p.PHI;
   const tVto = rp._tVto;
   const phi = Math.max(tPhi, 0.1);
   let sarg: number;
-  if (vsb >= 0) {
-    sarg = Math.sqrt(phi + vsb);
-  } else {
-    sarg = Math.sqrt(phi);
-    sarg = Math.max(0, sarg + vsb / (2 * sarg));
-  }
+  if (vsb >= 0) sarg = Math.sqrt(phi + vsb);
+  else { sarg = Math.sqrt(phi); sarg = Math.max(0, sarg + vsb / (2 * sarg)); }
   const vth = tVto !== undefined
     ? tVto + p.GAMMA * (sarg - Math.sqrt(phi))
     : p.VTO + p.GAMMA * (sarg - Math.sqrt(phi));
   const vgst = vgs - vth;
-
-  if (vgst <= 0) {
-    return 0;
-  }
-
+  if (vgst <= 0) return 0;
   const ld = p.LD ?? 0;
   const effectiveLength = p.L - 2 * ld;
   const Beta = tKP * p.W / effectiveLength * (p.M ?? 1);
   const lambda = p.LAMBDA;
-
   if (vds < vgst) {
+    // mos1load.c:540-543
     const betap = Beta * (1 + lambda * vds);
-    const term1 = betap * (vgst - vds);
-    const term2 = Beta * lambda * vds * (vgst - 0.5 * vds);
-    return term1 + term2 + GMIN;
+    return betap * (vgst - vds) + Beta * lambda * vds * (vgst - 0.5 * vds) + GMIN;
   } else {
+    // mos1load.c:531
     return Beta * lambda * vgst * vgst * 0.5 + GMIN;
   }
 }
 
-// ---------------------------------------------------------------------------
-// computeGmbs — bulk transconductance dId/dVbs
-// ---------------------------------------------------------------------------
-
-/**
- * Compute MOSFET bulk transconductance gmbs = dId/dVbs.
- *
- * ngspice mos1load.c: gmbs = gm * arg, where arg = GAMMA / (2 * sarg).
- */
-export function computeGmbs(
-  vgs: number,
-  vds: number,
-  vsb: number,
-  p: MosfetParams,
-): number {
+/** Compute MOSFET bulk transconductance gmbs = dId/dVbs. */
+export function computeGmbs(vgs: number, vds: number, vsb: number, p: MosfetParams): number {
   const rp = p as ResolvedMosfetParams;
   const tPhi = rp._tPhi ?? p.PHI;
   const phi = Math.max(tPhi, 0.1);
   let sarg: number;
-  if (vsb >= 0) {
-    sarg = Math.sqrt(phi + vsb);
-  } else {
-    sarg = Math.sqrt(phi);
-    sarg = Math.max(0, sarg + vsb / (2 * sarg));
-  }
+  if (vsb >= 0) sarg = Math.sqrt(phi + vsb);
+  else { sarg = Math.sqrt(phi); sarg = Math.max(0, sarg + vsb / (2 * sarg)); }
   const tVto = rp._tVto;
   const vth = tVto !== undefined
     ? tVto + p.GAMMA * (sarg - Math.sqrt(phi))
     : p.VTO + p.GAMMA * (sarg - Math.sqrt(phi));
   const vgst = vgs - vth;
-
-  if (vgst <= 0 || p.GAMMA <= 0) {
-    return 0;
-  }
-
+  if (vgst <= 0 || p.GAMMA <= 0) return 0;
   const gm = computeGm(vgs, vds, vsb, p);
-  const dVthdVsb = sarg > 0 ? p.GAMMA / (2 * sarg) : 0;
-  return gm * dVthdVsb;
+  // mos1load.c:511-514, 532, 544: arg = gamma/(sarg+sarg); gmbs = gm*arg.
+  const arg = sarg > 0 ? p.GAMMA / (2 * sarg) : 0;
+  return gm * arg;
 }
 
-// ---------------------------------------------------------------------------
-// limitVoltages — fetlim on Vgs with source/drain swap detection
-// ---------------------------------------------------------------------------
-
 /**
- * Apply fetlim/limvds voltage limiting — exact mos1load.c:363-386 algorithm.
- *
+ * Apply SPICE3f5 fetlim+limvds limiting algorithm (mos1load.c:363-406).
  * Forward (vdsOld >= 0): fetlim vgs, derive vds, limvds, derive vgd.
- * Reverse (vdsOld < 0): fetlim vgd, derive vds, -limvds(-vds,-vdsOld), derive vgs.
- * Mode from FINAL vds sign.
- *
- * @param von - threshold voltage including body effect from previous iteration
+ * Reverse (vdsOld < 0): fetlim vgd, derive vds, -limvds(-vds,-vdsOld), vgs.
  */
 export function limitVoltages(
-  vgsOld: number,
-  vgsNew: number,
-  vdsOld: number,
-  vdsNew: number,
+  vgsOld: number, vgsNew: number,
+  vdsOld: number, vdsNew: number,
   von: number,
 ): { vgs: number; vds: number; swapped: boolean } {
   let vgs = vgsNew;
@@ -736,42 +678,20 @@ export function limitVoltages(
   const vgdOld = vgsOld - vdsOld;
 
   if (vdsOld >= 0) {
-    // Forward: fetlim vgs, derive vds, limvds, derive vgd
     vgs = fetlim(vgs, vgsOld, von);
     vds = vgs - vgd;
     vds = limvds(vds, vdsOld);
   } else {
-    // Reverse: fetlim vgd, derive vds, -limvds(-vds,-vdsOld), derive vgs
     const vgdLim = fetlim(vgd, vgdOld, von);
     vds = vgs - vgdLim;
     vds = -limvds(-vds, -vdsOld);
     vgs = vgdLim + vds;
   }
-
-  // Mode from FINAL vds sign
   const swapped = vds < 0;
   return { vgs, vds, swapped };
 }
 
-// ---------------------------------------------------------------------------
-// computeCapacitances — junction and overlap capacitances
-// ---------------------------------------------------------------------------
-
-/**
- * Compute gate and junction capacitances from model parameters.
- *
- * Returns zero for all capacitances when the relevant parameters are zero.
- * Overlap capacitances scale with channel width W (CGDO, CGSO) or length L (CGBO).
- *
- * Junction capacitances (CBD, CBS) are returned directly — any CJ/CJSW area
- * derivation was already done in resolveParams before the element is constructed.
- *
- * The FC parameter linearizes junction caps in forward bias (standard SPICE):
- *   For V < FC*PB: C = C0 * (1 - V/PB)^(-MJ)
- *   For V >= FC*PB: C = C0 * (1 - FC*(1+MJ) + MJ*V/PB) / (1 - FC)^(1+MJ)
- * This function returns the zero-bias value; linearization is applied in
- * stampCompanion when vdb/vsb voltages are available.
- */
+/** Returns overlap + junction capacitance totals for tests (no state read). */
 export function computeCapacitances(
   p: MosfetParams | ResolvedMosfetParams,
 ): { cgs: number; cgd: number; cgb: number; cbd: number; cbs: number } {
@@ -786,20 +706,15 @@ export function computeCapacitances(
 }
 
 // ---------------------------------------------------------------------------
-// devQmeyer — Meyer gate capacitance model (devsup.c:625-689)
+// devQmeyer — Meyer gate capacitance model (devsup.c:625-689 port)
 // ---------------------------------------------------------------------------
 
 /**
  * Evaluate Meyer gate capacitances. Returns 1/2 of the non-constant portion.
- * Caller must double and add overlap caps.
- *
- * Four regions:
- * 1. Accumulation (vgst <= -phi): capgb = cox/2, capgs = capgd = 0
- * 2. Depletion (vgst <= -phi/2): capgb = -vgst*cox/(2*phi), capgs = capgd = 0
- * 3. Weak inversion (vgst <= 0): voltage-dependent split
- * 4. Strong inversion: saturation or linear split
+ * Caller must double (MODETRANOP / MODEINITSMSIG) or add previous-step half
+ * (normal MODETRAN integration, mos1load.c:789-806).
  */
-export function devQmeyer(
+function devQmeyer(
   vgs: number, vgd: number, _vgb: number,
   von: number, vdsat: number,
   phi: number, cox: number,
@@ -808,18 +723,12 @@ export function devQmeyer(
   const vgst = vgs - von;
   vdsat = Math.max(vdsat, MAGIC_VDS);
 
-  let capgs: number;
-  let capgd: number;
-  let capgb: number;
+  let capgs: number, capgd: number, capgb: number;
 
   if (vgst <= -phi) {
-    capgb = cox / 2;
-    capgs = 0;
-    capgd = 0;
+    capgb = cox / 2; capgs = 0; capgd = 0;
   } else if (vgst <= -phi / 2) {
-    capgb = -vgst * cox / (2 * phi);
-    capgs = 0;
-    capgd = 0;
+    capgb = -vgst * cox / (2 * phi); capgs = 0; capgd = 0;
   } else if (vgst <= 0) {
     capgb = -vgst * cox / (2 * phi);
     capgs = vgst * cox / (1.5 * phi) + cox / 3;
@@ -837,9 +746,7 @@ export function devQmeyer(
     const vds = vgs - vgd;
     vdsat = Math.max(vdsat, MAGIC_VDS);
     if (vdsat <= vds) {
-      capgs = cox / 3;
-      capgd = 0;
-      capgb = 0;
+      capgs = cox / 3; capgd = 0; capgb = 0;
     } else {
       const vddif = 2.0 * vdsat - vds;
       const vddif1 = vdsat - vds;
@@ -854,1116 +761,128 @@ export function devQmeyer(
 }
 
 // ---------------------------------------------------------------------------
-// MosfetAnalogElement — AbstractFetElement subclass
+// State schema — MOSFET SPICE L1 (Phase 2.5 W1.3 A1 post-excision).
+//
+// Only slots with direct correspondence in `mos1defs.h:269-291` MOS1state<n>
+// offsets, plus a small set of DC-op-only scalar slots required by our
+// factory (cd / gm / gds / gmbs / mode / von / vbs_old / vbd_old / gbd / gbs /
+// cbd / cbs). The 11 invented cap+Q cross-method slots (per C-AUD-6) are
+// deleted — the cap companion geq/ieq values lump inline into gbd/gbs and
+// the gate-stamp matrix/RHS entries per `mos1load.c:900-end`.
+//
+// Deleted invented slots (the 11 cited in C-AUD-6):
+//   1. CAP_GEQ_GS   (fet-base.ts SLOT 6)  — lumped inline per mos1load.c:930,942
+//   2. CAP_IEQ_GS   (fet-base.ts SLOT 7)  — lumped inline into ceqgs
+//   3. CAP_GEQ_GD   (fet-base.ts SLOT 8)  — lumped inline per mos1load.c:941
+//   4. CAP_IEQ_GD   (fet-base.ts SLOT 9)  — lumped inline into ceqgd
+//   5. CAP_GEQ_GB   (fet-base.ts SLOT 18) — lumped inline per mos1load.c:930,940
+//   6. CAP_IEQ_GB   (fet-base.ts SLOT 19) — lumped inline into ceqgb
+//   7. CAP_GEQ_DB   (fet-base.ts SLOT 12) — lumped into gbd per mos1load.c:717
+//   8. CAP_IEQ_DB   (fet-base.ts SLOT 13) — lumped into cbd per mos1load.c:718-719
+//   9. CAP_GEQ_SB   (fet-base.ts SLOT 14) — lumped into gbs per mos1load.c:723
+//  10. CAP_IEQ_SB   (fet-base.ts SLOT 15) — lumped into cbs per mos1load.c:724
+//  11. MEYER_GB     (fet-base.ts SLOT 37) — ngspice uses CKTstate0/1 capgb
+//                   averaging (mos1load.c:800-806), not a separate half-cap stash
+//
+// Surviving slots have direct mos1defs.h correspondence:
+//
+//   VBD (0) = mos1defs.h MOS1vbd
+//   VBS (1) = mos1defs.h MOS1vbs
+//   VGS (2) = mos1defs.h MOS1vgs
+//   VDS (3) = mos1defs.h MOS1vds
+//   CAPGS (4) = mos1defs.h MOS1capgs
+//   QGS (5) = mos1defs.h MOS1qgs
+//   CQGS (6) = mos1defs.h MOS1cqgs
+//   CAPGD (7) = mos1defs.h MOS1capgd
+//   QGD (8) = mos1defs.h MOS1qgd
+//   CQGD (9) = mos1defs.h MOS1cqgd
+//   CAPGB (10) = mos1defs.h MOS1capgb
+//   QGB (11) = mos1defs.h MOS1qgb
+//   CQGB (12) = mos1defs.h MOS1cqgb
+//   QBD (13) = mos1defs.h MOS1qbd
+//   CQBD (14) = mos1defs.h MOS1cqbd
+//   QBS (15) = mos1defs.h MOS1qbs
+//   CQBS (16) = mos1defs.h MOS1cqbs
+//
+// DC operating-point scalars (non-cross-method, mirror MOS1instance fields):
+//   CD (17)    = MOS1instance MOS1cd      (channel + drain jct current)
+//   CBD (18)   = MOS1instance MOS1cbd
+//   CBS (19)   = MOS1instance MOS1cbs
+//   GBD (20)   = MOS1instance MOS1gbd
+//   GBS (21)   = MOS1instance MOS1gbs
+//   GM  (22)   = MOS1instance MOS1gm
+//   GDS (23)   = MOS1instance MOS1gds
+//   GMBS (24)  = MOS1instance MOS1gmbs
+//   MODE (25)  = MOS1instance MOS1mode (+1 normal, -1 reverse)
+//   VON (26)   = MOS1instance MOS1von
+//   VDSAT (27) = MOS1instance MOS1vdsat
 // ---------------------------------------------------------------------------
 
-/**
- * Concrete FET analog element for MOSFET (N-channel or P-channel).
- *
- * Extends AbstractFetElement with the Level 2 SPICE MOSFET I-V model,
- * body effect, junction/overlap capacitances, and source/drain swap detection.
- */
-// ---------------------------------------------------------------------------
-// Physical constants for temperature model
-// ---------------------------------------------------------------------------
-
-/** Boltzmann constant / electron charge (CONSTKoverQ in ngspice const.h). */
-const KoverQ = 1.3806226e-23 / 1.6021918e-19;
-
-/** Reference temperature (REFTEMP in ngspice const.h). */
-const REFTEMP = 300.15;
-
-class MosfetAnalogElement extends AbstractFetElement {
-  readonly polaritySign: 1 | -1;
-
-  private readonly _p: ResolvedMosfetParams;
-  private readonly _nodeB: number;
-
-  private readonly _nodeDext: number;
-  private readonly _nodeSext: number;
-
-  // Precomputed temperature-adjusted saturation currents (mos1temp.c:176-179)
-  private _tSatCur: number = 0;
-  private _tSatCurDens: number = 0;
-  private _drainSatCur: number = 0;
-  private _sourceSatCur: number = 0;
-  private _drainVcrit: number = 0;
-  private _sourceVcrit: number = 0;
-
-  // Full temperature model (mos1temp.c:44-200)
-  private _tTransconductance: number = 0;
-  private _tPhi: number = 0;
-  private _tVbi: number = 0;
-  private _tVto: number = 0;
-  private _tBulkPot: number = 0;
-  private _tDepCap: number = 0;
-  private _tCbd: number = 0;
-  private _tCbs: number = 0;
-  private _tCj: number = 0;
-  private _tCjsw: number = 0;
-
-  // Junction cap f2/f3/f4 coefficients (mos1temp.c:238-289)
-  private _f2d: number = 0;
-  private _f3d: number = 0;
-  private _f4d: number = 0;
-  private _f2s: number = 0;
-  private _f3s: number = 0;
-  private _f4s: number = 0;
-  private _czbd: number = 0;
-  private _czbdsw: number = 0;
-  private _czbs: number = 0;
-  private _czbssw: number = 0;
-
-  // Last computed vdsat for Meyer caps
-  private _lastVdsat: number = 0;
-
-  /** Junction charge at forward-bias boundary (drain/source). Used by charge-based integration. */
-  get _junctionChargeAtDepCap(): { qd: number; qs: number } {
-    return { qd: this._f4d, qs: this._f4s };
-  }
-
-  constructor(
-    polarity: 1 | -1,
-    nodeD: number,
-    nodeG: number,
-    nodeS: number,
-    nodeB: number,
-    p: ResolvedMosfetParams,
-    nodeDint: number,
-    nodeSint: number,
-  ) {
-    // The base class drainNode/sourceNode refer to the internal nodes (after RD/RS).
-    // When RD=0/RS=0, nodeDint==nodeD and nodeSint==nodeS (no internal nodes allocated).
-    // Pass nodeB as extra node so pinNodeIds = [G, Dint, Sint, B] (bulk always included).
-    super(nodeG, nodeDint, nodeSint, [nodeB]);
-    this.polaritySign = polarity;
-    this._p = p;
-    this._nodeB = nodeB;
-    this._nodeDext = nodeD;
-    this._nodeSext = nodeS;
-
-    // For PMOS, VTO is stored as magnitude; polarity inversion applies sign during I-V evaluation
-    if (polarity === -1) {
-      this._p.VTO = Math.abs(this._p.VTO);
-    }
-
-    this._recomputeTempParams();
-
-    const caps = computeCapacitances(p);
-    const ld = p.LD ?? 0;
-    const effectiveLength = p.L - 2 * ld;
-    const oxideCap = p.TOX > 0 ? (EPS_OX * EPS0 / p.TOX) * effectiveLength * p.W : 0;
-    const hasCaps = caps.cbd > 0 || caps.cbs > 0 || caps.cgs > 0 || caps.cgd > 0 || caps.cgb > 0 || oxideCap > 0;
-    this._initReactive(hasCaps);
-  }
-
-  /**
-   * Recompute temperature-adjusted parameters.
-   * Full mos1temp.c:44-289 chain: transconductance, phi, vbi, vto,
-   * saturation currents, junction caps, and f2/f3/f4 coefficients.
-   *
-   * Circuit temperature = REFTEMP (300.15 K), nominal = p.TNOM.
-   */
-  private _recomputeTempParams(): void {
-    const p = this._p;
-    const CONSTboltz = 1.3806226e-23;
-
-    // --- Model-level computations (mos1temp.c:45-51) ---
-    const fact1 = p.TNOM / REFTEMP;
-    const vtnom = p.TNOM * KoverQ;
-    const kt1 = CONSTboltz * p.TNOM;
-    const egfet1 = 1.16 - (7.02e-4 * p.TNOM * p.TNOM) / (p.TNOM + 1108);
-    const arg1 = -egfet1 / (kt1 + kt1) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP));
-    const pbfact1 = -2 * vtnom * (1.5 * Math.log(fact1) + Q * arg1);
-
-    // --- Instance-level computations (mos1temp.c:135-201) ---
-    // here->MOS1temp = REFTEMP (circuit temperature)
-    const vt = REFTEMP * KoverQ;
-    const ratio = REFTEMP / p.TNOM;
-    const fact2 = REFTEMP / REFTEMP; // = 1 (circuit temp / REFTEMP)
-    const kt = REFTEMP * CONSTboltz;
-    const egfet = 1.16 - (7.02e-4 * REFTEMP * REFTEMP) / (REFTEMP + 1108);
-    const arg = -egfet / (kt + kt) + 1.1150877 / (CONSTboltz * (REFTEMP + REFTEMP));
-    const pbfact = -2 * vt * (1.5 * Math.log(fact2) + Q * arg);
-
-    // mos1temp.c:165-166: temperature-adjusted transconductance
-    const ratio4 = ratio * Math.sqrt(ratio);
-    this._tTransconductance = p.KP / ratio4;
-
-    // mos1temp.c:168-169: temperature-adjusted phi
-    const phio = (p.PHI - pbfact1) / fact1;
-    this._tPhi = fact2 * phio + pbfact;
-
-    // mos1temp.c:170-176: temperature-adjusted vbi and vto
-    const type = this.polaritySign;
-    this._tVbi = p.VTO - type * (p.GAMMA * Math.sqrt(p.PHI))
-      + 0.5 * (egfet1 - egfet)
-      + type * 0.5 * (this._tPhi - p.PHI);
-    this._tVto = this._tVbi + type * p.GAMMA * Math.sqrt(this._tPhi);
-
-    // mos1temp.c:177-180: saturation currents
-    const tempFactor = Math.exp(-egfet / vt + egfet1 / vtnom);
-    this._tSatCur = p.IS * tempFactor;
-    this._tSatCurDens = p.JS * tempFactor;
-
-    // mos1temp.c:181-200: junction cap temperature adjustment
-    const pbo = (p.PB - pbfact1) / fact1;
-    const gmaold = (p.PB - pbo) / pbo;
-    let capfact = 1 / (1 + p.MJ * (4e-4 * (p.TNOM - REFTEMP) - gmaold));
-    this._tCbd = p.CBD * capfact;
-    this._tCbs = p.CBS * capfact;
-    this._tCj = p.CJ * capfact;
-    capfact = 1 / (1 + p.MJSW * (4e-4 * (p.TNOM - REFTEMP) - gmaold));
-    this._tCjsw = p.CJSW * capfact;
-    this._tBulkPot = fact2 * pbo + pbfact;
-    const gmanew = (this._tBulkPot - pbo) / pbo;
-    capfact = 1 + p.MJ * (4e-4 * (REFTEMP - REFTEMP) - gmanew);
-    this._tCbd *= capfact;
-    this._tCbs *= capfact;
-    this._tCj *= capfact;
-    capfact = 1 + p.MJSW * (4e-4 * (REFTEMP - REFTEMP) - gmanew);
-    this._tCjsw *= capfact;
-    this._tDepCap = p.FC * this._tBulkPot;
-
-    // mos1load.c:128-138: drain/source saturation currents scaled by multiplicity M
-    const m = p.M ?? 1;
-    if (this._tSatCurDens === 0 || p.AD === 0 || p.AS === 0) {
-      this._drainSatCur = this._tSatCur * m;
-      this._sourceSatCur = this._tSatCur * m;
-    } else {
-      this._drainSatCur = this._tSatCurDens * p.AD * m;
-      this._sourceSatCur = this._tSatCurDens * p.AS * m;
-    }
-
-    // mos1temp.c:202-216: separate drain/source vcrit
-    if (this._tSatCurDens === 0 || p.AD === 0 || p.AS === 0) {
-      this._drainVcrit = this._sourceVcrit = vt * Math.log(vt / (Math.SQRT2 * this._tSatCur));
-    } else {
-      this._drainVcrit = vt * Math.log(vt / (Math.SQRT2 * this._tSatCurDens * p.AD));
-      this._sourceVcrit = vt * Math.log(vt / (Math.SQRT2 * this._tSatCurDens * p.AS));
-    }
-
-    // Thread temperature values into params for standalone functions
-    (this._p as ResolvedMosfetParams)._tKP = this._tTransconductance;
-    (this._p as ResolvedMosfetParams)._tPhi = this._tPhi;
-    (this._p as ResolvedMosfetParams)._tVto = this._tVto;
-
-    // Compute junction f2/f3/f4 coefficients
-    this._computeJunctionF234();
-  }
-
-  /**
-   * Precompute zero-bias junction caps and f2/f3/f4 linearization coefficients.
-   * Matches mos1temp.c:218-289.
-   */
-  private _computeJunctionF234(): void {
-    const p = this._p;
-    const mj = p.MJ;
-    const mjsw = p.MJSW;
-    const fc = p.FC;
-    const tBulkPot = this._tBulkPot;
-
-    // --- Drain side (mos1temp.c:218-253) ---
-    // Priority: CBD given > CJ*AD > 0
-    let czbd: number;
-    if (p.CBD > 0) {
-      czbd = this._tCbd;
-    } else if (p.CJ > 0 && p.AD > 0) {
-      czbd = this._tCj * p.AD;
-    } else {
-      czbd = 0;
-    }
-    const czbdsw = p.CJSW > 0 ? this._tCjsw * p.PD : 0;
-
-    const argFC = 1 - fc;
-    const sarg = Math.exp(-mj * Math.log(argFC));
-    const sargsw = Math.exp(-mjsw * Math.log(argFC));
-
-    this._czbd = czbd;
-    this._czbdsw = czbdsw;
-    this._f2d = czbd * (1 - fc * (1 + mj)) * sarg / argFC
-      + czbdsw * (1 - fc * (1 + mjsw)) * sargsw / argFC;
-    this._f3d = czbd * mj * sarg / argFC / tBulkPot
-      + czbdsw * mjsw * sargsw / argFC / tBulkPot;
-    this._f4d = czbd * tBulkPot * (1 - argFC * sarg) / (1 - mj)
-      + czbdsw * tBulkPot * (1 - argFC * sargsw) / (1 - mjsw)
-      - this._f3d / 2 * (this._tDepCap * this._tDepCap)
-      - this._tDepCap * this._f2d;
-
-    // --- Source side (mos1temp.c:254-289) ---
-    let czbs: number;
-    if (p.CBS > 0) {
-      czbs = this._tCbs;
-    } else if (p.CJ > 0 && p.AS > 0) {
-      czbs = this._tCj * p.AS;
-    } else {
-      czbs = 0;
-    }
-    const czbssw = p.CJSW > 0 ? this._tCjsw * p.PS : 0;
-
-    // sarg/sargsw same as drain side (same FC, MJ, MJSW)
-    this._czbs = czbs;
-    this._czbssw = czbssw;
-    this._f2s = czbs * (1 - fc * (1 + mj)) * sarg / argFC
-      + czbssw * (1 - fc * (1 + mjsw)) * sargsw / argFC;
-    this._f3s = czbs * mj * sarg / argFC / tBulkPot
-      + czbssw * mjsw * sargsw / argFC / tBulkPot;
-    this._f4s = czbs * tBulkPot * (1 - argFC * sarg) / (1 - mj)
-      + czbssw * tBulkPot * (1 - argFC * sargsw) / (1 - mjsw)
-      - this._f3s / 2 * (this._tDepCap * this._tDepCap)
-      - this._tDepCap * this._f2s;
-  }
-
-  limitVoltages(
-    vgsOld: number,
-    _vdsOld: number,
-    vgsNew: number,
-    vdsNew: number,
-  ): { vgs: number; vds: number; swapped: boolean } {
-    // Use tVto (temperature-adjusted) instead of bare VTO
-    const base = this.stateBaseOffset;
-    const storedVon = this._s0[base + SLOT_VON];
-    // First iteration (NaN): use tVto as initial von
-    const von = isNaN(storedVon) ? this._tVto : storedVon;
-    return limitVoltages(vgsOld, vgsNew, _vdsOld, vdsNew, von);
-  }
-
-  private get _vsb(): number { return this._s0[this.stateBaseOffset + SLOT_VSB]; }
-  private set _vsb(v: number) { this._s0[this.stateBaseOffset + SLOT_VSB] = v; }
-
-  private get _gmbs(): number { return this._s0[this.stateBaseOffset + SLOT_GMBS]; }
-  private set _gmbs(v: number) { this._s0[this.stateBaseOffset + SLOT_GMBS] = v; }
-
-  computeIds(vgs: number, vds: number): number {
-    const { ids } = computeIds(vgs, vds, this._vsb, this._p);
-    return ids;
-  }
-
-  computeGm(vgs: number, vds: number): number {
-    return computeGm(vgs, vds, this._vsb, this._p);
-  }
-
-  computeGds(vgs: number, vds: number): number {
-    return computeGds(vgs, vds, this._vsb, this._p);
-  }
-
-  computeCapacitances(vgs: number, vds: number): FetCapacitances {
-    const p = this._p;
-    const ld = p.LD ?? 0;
-    const effectiveLength = p.L - 2 * ld;
-    const oxideCap = p.TOX > 0 ? (EPS_OX * EPS0 / p.TOX) * effectiveLength * p.W : 0;
-    const gsOverlap = (p.CGSO ?? 0) * p.W;
-    const gdOverlap = (p.CGDO ?? 0) * p.W;
-
-    if (oxideCap > 0) {
-      // Meyer gate cap model with mode-dependent arg swap (mos1load.c:753-775)
-      const base = this.stateBaseOffset;
-      const von = this._s0[base + SLOT_VON] || this._tVto;
-      const vdsat = this._lastVdsat;
-      const vgd = vgs - vds;
-      const mode = this._swapped ? -1 : 1;
-      let meyerGs: number, meyerGd: number;
-      if (mode > 0) {
-        const meyer = devQmeyer(vgs, vgd, 0, von, vdsat, this._tPhi, oxideCap);
-        meyerGs = meyer.capgs;
-        meyerGd = meyer.capgd;
-      } else {
-        // Reverse mode: swap vgs<->vgd and capgs<->capgd
-        const meyer = devQmeyer(vgd, vgs, 0, von, vdsat, this._tPhi, oxideCap);
-        meyerGs = meyer.capgd;
-        meyerGd = meyer.capgs;
-      }
-      // Store half-caps for averaging
-      this._s0[base + SLOT_MEYER_GS] = meyerGs;
-      this._s0[base + SLOT_MEYER_GD] = meyerGd;
-
-      // Average with previous step's half-cap (mos1load.c:769-786)
-      const prevMeyerGs = this.s1[base + SLOT_MEYER_GS];
-      const prevMeyerGd = this.s1[base + SLOT_MEYER_GD];
-      // mos1load.c:789-795: MODETRANOP or MODEINITSMSIG uses 2×state0; all
-      // other modes integrate incrementally from state1.
-      const useDoubleCap = (this._ctxCktMode & (MODETRANOP | MODEINITSMSIG)) !== 0;
-      const cgs = (useDoubleCap ? 2 * meyerGs : meyerGs + prevMeyerGs) + gsOverlap;
-      const cgd = (useDoubleCap ? 2 * meyerGd : meyerGd + prevMeyerGd) + gdOverlap;
-      return { cgs, cgd };
-    }
-
-    // No oxide cap: overlap only
-    return { cgs: gsOverlap, cgd: gdOverlap };
-  }
-
-  protected override _updateOp(ctx: LoadContext): void {
-    const voltages = ctx.voltages;
-    const limitingCollector = ctx.limitingCollector;
-    this._updateOpImpl(voltages, limitingCollector ?? null, ctx);
-  }
-
-  /** mos1load.c:762 */
-  protected override _capGate(ctx: LoadContext): boolean {
-    const cktMode = ctx.cktMode;
-    return (cktMode & (MODETRAN | MODETRANOP | MODEINITSMSIG)) !== 0;
-  }
-
-  private _updateOpImpl(voltages: Readonly<Float64Array>, limitingCollector: LimitingEvent[] | null, ctx: LoadContext): void {
-    const mode = ctx.cktMode;
-    if (mode & MODEINITPRED) {
-      // mos1load.c:206-225: copy voltage-old references for fetlim/pnjlim limiting
-      const base = this.stateBaseOffset;
-      const s0 = this._s0;
-      const s1 = this.s1;
-      s0[base + SLOT_VGS]     = s1[base + SLOT_VGS];      // fetlim vold for vgs
-      s0[base + SLOT_VDS]     = s1[base + SLOT_VDS];      // limvds vold for vds
-      s0[base + SLOT_VBS_OLD] = s1[base + SLOT_VBS_OLD];  // pnjlim vold for vbs
-      s0[base + SLOT_VBD_OLD] = s1[base + SLOT_VBD_OLD];  // pnjlim vold for vbd
-    }
-
-    // mos1load.c:419-433: during MODEINITJCT, primeJunctions() has already set
-    // _vgs, _vds, _vsb directly. Skip MNA voltage reads and all voltage limiting —
-    // use primed values as-is for I-V evaluation.
-    if (mode & MODEINITJCT) {
-      this._pnjlimLimited = false;
-      this._swapped = false;
-      const base = this.stateBaseOffset;
-      const s0 = this._s0;
-      s0[base + SLOT_MODE] = 1;
-
-      const result = computeIds(this._vgs, this._vds, this._vsb, this._p);
-      this._ids = result.ids;
-      this._lastVdsat = result.vdsat;
-      this._gm = computeGm(this._vgs, this._vds, this._vsb, this._p);
-      this._gds = computeGds(this._vgs, this._vds, this._vsb, this._p);
-      this._gmbs = computeGmbs(this._vgs, this._vds, this._vsb, this._p);
-      s0[base + SLOT_VON] = result.vth;
-
-      // Bulk junctions: use primed vbs/vbd (reversed-biased, no pnjlim)
-      const vbs = -this._vsb;
-      const vbd = vbs - this._vds;
-      s0[base + SLOT_VBS_OLD] = vbs;
-      s0[base + SLOT_VBD_OLD] = vbd;
-
-      const drainSatCur = this._drainSatCur;
-      const sourceSatCur = this._sourceSatCur;
-      const MAX_EXP_ARG = 709.0;
-
-      let gbs: number, cbsI: number;
-      if (vbs <= -3 * VT) {
-        gbs = GMIN;
-        cbsI = GMIN * vbs - sourceSatCur;
-      } else {
-        const evbs = Math.exp(Math.min(vbs / VT, MAX_EXP_ARG));
-        gbs = sourceSatCur * evbs / VT + GMIN;
-        cbsI = sourceSatCur * (evbs - 1) + GMIN * vbs;
-      }
-
-      let gbd: number, cbdI: number;
-      if (vbd <= -3 * VT) {
-        gbd = GMIN;
-        cbdI = GMIN * vbd - drainSatCur;
-      } else {
-        const evbd = Math.exp(Math.min(vbd / VT, MAX_EXP_ARG));
-        gbd = drainSatCur * evbd / VT + GMIN;
-        cbdI = drainSatCur * (evbd - 1) + GMIN * vbd;
-      }
-
-      s0[base + SLOT_GBD] = gbd;
-      s0[base + SLOT_GBS] = gbs;
-      s0[base + SLOT_CBD_I] = cbdI;
-      s0[base + SLOT_CBS_I] = cbsI;
-      s0[base + SLOT_VBD] = vbd;
-      return;
-    }
-
-    const nodeD = this.drainNode;
-    const nodeG = this.gateNode;
-    const nodeS = this.sourceNode;
-    const nodeB = this._nodeB;
-
-    const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
-    const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-    const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
-    const vBulk = nodeB > 0 ? voltages[nodeB - 1] : 0;
-
-    // Apply polarity for PMOS (negate all voltages relative to device)
-    const vGraw = this.polaritySign * (vG - vS);
-    const vDraw = this.polaritySign * (vD - vS);
-    const vBraw = this.polaritySign * (vBulk - vS);
-
-    // Voltage limiting on Vgs via fetlim with von (Fix 2)
-    const limited = this.limitVoltages(this._vgs, this._vds, vGraw, vDraw);
-    if (limitingCollector) {
-      limitingCollector.push({
-        elementIndex: this.elementIndex ?? -1,
-        label: this.label ?? "",
-        junction: "GS",
-        limitType: "fetlim",
-        vBefore: vGraw,
-        vAfter: limited.vgs,
-        wasLimited: limited.vgs !== vGraw,
-      });
-      limitingCollector.push({
-        elementIndex: this.elementIndex ?? -1,
-        label: this.label ?? "",
-        junction: "DS",
-        limitType: "limvds",
-        vBefore: vDraw,
-        vAfter: limited.vds,
-        wasLimited: limited.vds !== vDraw,
-      });
-    }
-    this._vgs = limited.vgs;
-    this._vds = limited.vds;
-    this._swapped = limited.swapped;
-
-    const base = this.stateBaseOffset;
-    const s0 = this._s0;
-
-    // Store mode for convergence check and Norton current (Fix 9, 10)
-    const polSign = limited.swapped ? -1 : 1;
-    s0[base + SLOT_MODE] = polSign;
-
-    // Source-bulk voltage — allow forward body bias (no clamp to >= 0)
-    // In reverse mode, body effect uses vbd (mos1load.c:480)
-    if (limited.swapped) {
-      // Reverse mode: effective source is the physical drain node
-      this._vsb = -this.polaritySign * (vBulk - vD);
-    } else {
-      this._vsb = -vBraw;
-    }
-
-    // Recompute operating point at limited voltages
-    const result = computeIds(this._vgs, this._vds, this._vsb, this._p);
-    this._ids = result.ids;
-    this._lastVdsat = result.vdsat;
-    this._gm = computeGm(this._vgs, this._vds, this._vsb, this._p);
-    this._gds = computeGds(this._vgs, this._vds, this._vsb, this._p);
-    this._gmbs = computeGmbs(this._vgs, this._vds, this._vsb, this._p);
-
-    // Store von (Vth including body effect) for next iteration's fetlim
-    s0[base + SLOT_VON] = result.vth;
-
-    // Bulk junction DC diode: compute gbd, gbs, Ibd, Ibs and store VBD
-    // VBS = -VSB (bulk-source), VBD = VBS - VDS
-    let vbs = -this._vsb;
-    let vbd = vbs - this._vds;
-
-    // mos1load.c:378-386: apply pnjlim once based on vds sign
-    const vbsOld = s0[base + SLOT_VBS_OLD];
-    const vbdOld = s0[base + SLOT_VBD_OLD];
-    let pnjLimited = false;
-    if (this._vds >= 0) {
-      const vbsBefore = vbs;
-      const vbsResult = pnjlim(vbs, vbsOld, VT, this._sourceVcrit);
-      vbs = vbsResult.value;
-      vbd = vbs - this._vds;
-      pnjLimited = vbsResult.limited;
-      if (limitingCollector) {
-        limitingCollector.push({
-          elementIndex: this.elementIndex ?? -1,
-          label: this.label ?? "",
-          junction: "BS",
-          limitType: "pnjlim",
-          vBefore: vbsBefore,
-          vAfter: vbs,
-          wasLimited: pnjLimited,
-        });
-      }
-    } else {
-      const vbdBefore = vbd;
-      const vbdResult = pnjlim(vbd, vbdOld, VT, this._drainVcrit);
-      vbd = vbdResult.value;
-      vbs = vbd + this._vds;
-      pnjLimited = vbdResult.limited;
-      if (limitingCollector) {
-        limitingCollector.push({
-          elementIndex: this.elementIndex ?? -1,
-          label: this.label ?? "",
-          junction: "BD",
-          limitType: "pnjlim",
-          vBefore: vbdBefore,
-          vAfter: vbd,
-          wasLimited: pnjLimited,
-        });
-      }
-    }
-    s0[base + SLOT_VBS_OLD] = vbs;
-    s0[base + SLOT_VBD_OLD] = vbd;
-    this._pnjlimLimited = pnjLimited;
-
-    // mos1load.c:433-448: junction I-V with area-scaled saturation currents
-    const drainSatCur = this._drainSatCur;
-    const sourceSatCur = this._sourceSatCur;
-
-    const MAX_EXP_ARG = 709.0;
-
-    // Source-bulk junction
-    let gbs: number, cbsI: number;
-    if (vbs <= -3 * VT) {
-      gbs = GMIN;
-      cbsI = GMIN * vbs - sourceSatCur;
-    } else {
-      const evbs = Math.exp(Math.min(vbs / VT, MAX_EXP_ARG));
-      gbs = sourceSatCur * evbs / VT + GMIN;
-      cbsI = sourceSatCur * (evbs - 1) + GMIN * vbs;
-    }
-
-    // Drain-bulk junction
-    let gbd: number, cbdI: number;
-    if (vbd <= -3 * VT) {
-      gbd = GMIN;
-      cbdI = GMIN * vbd - drainSatCur;
-    } else {
-      const evbd = Math.exp(Math.min(vbd / VT, MAX_EXP_ARG));
-      gbd = drainSatCur * evbd / VT + GMIN;
-      cbdI = drainSatCur * (evbd - 1) + GMIN * vbd;
-    }
-
-    // Store in pool for convergence check (MOS1convTest) and stamping
-    s0[base + SLOT_GBD] = gbd;
-    s0[base + SLOT_GBS] = gbs;
-    s0[base + SLOT_CBD_I] = cbdI;
-    s0[base + SLOT_CBS_I] = cbsI;
-    s0[base + SLOT_VBD] = vbd;
-    if (this._pnjlimLimited) ctx.noncon.value++;
-  }
-
-  protected override _stampNonlinear(solver: SparseSolver): void {
-    const nodeG = this.gateNode;
-    const effectiveD = this._swapped ? this.sourceNode : this.drainNode;
-    const effectiveS = this._swapped ? this.drainNode : this.sourceNode;
-    const nodeB = this._nodeB;
-
-    const gmS = this._gm;
-    const gdsS = this._gds;
-    const gmbsS = this._gmbs;
-
-    // Transconductance gm (Vgs): current from S to D
-    stampG(solver, effectiveD, nodeG, gmS);
-    stampG(solver, effectiveD, effectiveS, -gmS);
-    stampG(solver, effectiveS, nodeG, -gmS);
-    stampG(solver, effectiveS, effectiveS, gmS);
-
-    // Output conductance gds (Vds): current from S to D
-    stampG(solver, effectiveD, effectiveD, gdsS);
-    stampG(solver, effectiveD, effectiveS, -gdsS);
-    stampG(solver, effectiveS, effectiveD, -gdsS);
-    stampG(solver, effectiveS, effectiveS, gdsS);
-
-    // Body transconductance gmbs (Vbs = Vb - Vs): only when bulk ≠ source
-    if (nodeB !== effectiveS && gmbsS > 0) {
-      stampG(solver, effectiveD, nodeB, gmbsS);
-      stampG(solver, effectiveD, effectiveS, -gmbsS);
-      stampG(solver, effectiveS, nodeB, -gmbsS);
-      stampG(solver, effectiveS, effectiveS, gmbsS);
-    }
-
-    // Fix 9: Norton current — mode-dependent formula (ngspice mos1load.c)
-    const base = this.stateBaseOffset;
-    const s0 = this._s0;
-    const mode = s0[base + SLOT_MODE];
-    const polarity = this.polaritySign;
-    let nortonId: number;
-    const vbsOp = -this._vsb; // Vbs = -Vsb
-    if (mode >= 0) {
-      // Normal mode
-      nortonId = polarity * (this._ids - this._gm * this._vgs - this._gds * this._vds - this._gmbs * vbsOp);
-    } else {
-      // Reverse mode: vgd = vgs - vds, vbd = vbs - vds
-      const vgd = this._vgs - this._vds;
-      const vbd = vbsOp - this._vds;
-      nortonId = -polarity * (this._ids - this._gds * (-this._vds) - this._gm * vgd - this._gmbs * vbd);
-    }
-
-    stampRHS(solver, effectiveD, -nortonId);
-    stampRHS(solver, effectiveS, nortonId);
-
-    // Fix 3: Stamp bulk junction diode conductances and Norton currents
-    const nodeD = this.drainNode;
-    const nodeS = this.sourceNode;
-    const gbd = s0[base + SLOT_GBD];
-    const gbs = s0[base + SLOT_GBS];
-    const cbdI = s0[base + SLOT_CBD_I];
-    const cbsI = s0[base + SLOT_CBS_I];
-    const vbd_stored = s0[base + SLOT_VBD];
-
-    // Drain-bulk junction conductance stamps
-    stampG(solver, nodeD, nodeD, gbd);
-    stampG(solver, nodeD, nodeB, -gbd);
-    stampG(solver, nodeB, nodeD, -gbd);
-    stampG(solver, nodeB, nodeB, gbd);
-
-    // Source-bulk junction conductance stamps
-    stampG(solver, nodeS, nodeS, gbs);
-    stampG(solver, nodeS, nodeB, -gbs);
-    stampG(solver, nodeB, nodeS, -gbs);
-    stampG(solver, nodeB, nodeB, gbs);
-
-    // Norton currents for junction diodes.
-    // Use pnjlim-limited vbd/vbs from SLOT_VBD_OLD/SLOT_VBS_OLD (written by
-    // updateOperatingPoint) — not raw vbsOp which is the un-limited current-iter
-    // value. ngspice mos1load.c:698-703 uses the stored state0 vbs/vbd.
-    const vbs_limited = s0[base + SLOT_VBS_OLD]; // pnjlim-limited Vbs (mos1load.c:698)
-    const ceqbd = cbdI - gbd * vbd_stored;
-    const ceqbs = cbsI - gbs * vbs_limited;
-    stampRHS(solver, nodeD, -polarity * ceqbd);
-    stampRHS(solver, nodeB, polarity * (ceqbd + ceqbs));
-    stampRHS(solver, nodeS, -polarity * ceqbs);
-  }
-
-  protected override _stampLinear(solver: SparseSolver): void {
-    // Drain ohmic resistance RD between external drain pin and internal drain node
-    if (this._p.RD > 0 && this.drainNode !== this._nodeDext) {
-      const gRD = 1 / this._p.RD;
-      stampG(solver, this._nodeDext, this._nodeDext, gRD);
-      stampG(solver, this._nodeDext, this.drainNode, -gRD);
-      stampG(solver, this.drainNode, this._nodeDext, -gRD);
-      stampG(solver, this.drainNode, this.drainNode, gRD);
-    }
-
-    // Source ohmic resistance RS between external source pin and internal source node
-    if (this._p.RS > 0 && this.sourceNode !== this._nodeSext) {
-      const gRS = 1 / this._p.RS;
-      stampG(solver, this._nodeSext, this._nodeSext, gRS);
-      stampG(solver, this._nodeSext, this.sourceNode, -gRS);
-      stampG(solver, this.sourceNode, this._nodeSext, -gRS);
-      stampG(solver, this.sourceNode, this.sourceNode, gRS);
-    }
-  }
-
-  protected override _stampReactiveCompanion(solver: SparseSolver): void {
-    // GS and GD gate overlap capacitances via base class
-    super._stampReactiveCompanion(solver);
-
-    const base = this.stateBaseOffset;
-    const s0 = this._s0;
-
-    // Gate-bulk overlap capacitance (CGBO * L)
-    const capGeqGB = s0[base + SLOT_CAP_GEQ_GB];
-    const capIeqGB = s0[base + SLOT_CAP_IEQ_GB];
-    if (capGeqGB !== 0 || capIeqGB !== 0) {
-      const nodeG = this.gateNode;
-      const nodeB = this._nodeB;
-      stampG(solver, nodeG, nodeG, capGeqGB);
-      stampG(solver, nodeG, nodeB, -capGeqGB);
-      stampG(solver, nodeB, nodeG, -capGeqGB);
-      stampG(solver, nodeB, nodeB, capGeqGB);
-      stampRHS(solver, nodeG, -capIeqGB);
-      stampRHS(solver, nodeB, capIeqGB);
-    }
-
-    const nodeD = this.drainNode;
-    const nodeS = this.sourceNode;
-    const nodeB = this._nodeB;
-
-    // Drain-bulk junction capacitance. Convention: ngspice uses vbd (bulk-drain)
-    // as the controlling voltage, so the Norton companion's positive terminal
-    // is the BULK node. RHS stamp is therefore rhs[bulk] -= ceq, rhs[drain] += ceq.
-    // Matches mos1load.c stamping of qbd companion.
-    const capGeqDB = s0[base + SLOT_CAP_GEQ_DB];
-    const capIeqDB = s0[base + SLOT_CAP_IEQ_DB];
-    if (capGeqDB !== 0 || capIeqDB !== 0) {
-      stampG(solver, nodeD, nodeD, capGeqDB);
-      stampG(solver, nodeD, nodeB, -capGeqDB);
-      stampG(solver, nodeB, nodeD, -capGeqDB);
-      stampG(solver, nodeB, nodeB, capGeqDB);
-      stampRHS(solver, nodeD, capIeqDB);
-      stampRHS(solver, nodeB, -capIeqDB);
-    }
-
-    // Source-bulk junction capacitance. Same ngspice (+ = bulk) convention.
-    const capGeqSB = s0[base + SLOT_CAP_GEQ_SB];
-    const capIeqSB = s0[base + SLOT_CAP_IEQ_SB];
-    if (capGeqSB !== 0 || capIeqSB !== 0) {
-      stampG(solver, nodeS, nodeS, capGeqSB);
-      stampG(solver, nodeS, nodeB, -capGeqSB);
-      stampG(solver, nodeB, nodeS, -capGeqSB);
-      stampG(solver, nodeB, nodeB, capGeqSB);
-      stampRHS(solver, nodeS, capIeqSB);
-      stampRHS(solver, nodeB, -capIeqSB);
-    }
-  }
-
-  setParam(key: string, value: number): void {
-    if (key in this._p) {
-      (this._p as unknown as Record<string, number>)[key] = value;
-      this._recomputeTempParams();
-    }
-  }
-
-  override checkConvergence(ctx: LoadContext): boolean {
-    if (this._p.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
-    return super.checkConvergence(ctx);
-  }
-
-  primeJunctions(): void {
-    if (this._p.OFF) {
-      this._vgs = 0;
-      this._vds = 0;
-      const base = this.stateBaseOffset;
-      this._s0[base + SLOT_VBS_OLD] = 0;
-      this._s0[base + SLOT_VBD_OLD] = 0;
-      this._vsb = 0;
-    } else {
-      this._vgs = this._tVto;
-      this._vds = 0;
-      const base = this.stateBaseOffset;
-      this._s0[base + SLOT_VBS_OLD] = -1;
-      this._s0[base + SLOT_VBD_OLD] = -1;
-      this._vsb = 1;
-    }
-  }
-
-  protected override _stampCompanion(dt: number, method: IntegrationMethod, voltages: Float64Array, order: number, deltaOld: readonly number[], ag: Float64Array): void {
-    // Gate overlap capacitances (Cgs, Cgd) via base class
-    super._stampCompanion(dt, method, voltages, order, deltaOld, ag);
-
-    const nodeD = this.drainNode;
-    const nodeS = this.sourceNode;
-    const nodeG = this.gateNode;
-    const nodeB = this._nodeB;
-
-    const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
-    const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
-    const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-    const vBulkV = nodeB > 0 ? voltages[nodeB - 1] : 0;
-
-    const vdb = vD - vBulkV;
-    const vsbCap = vS - vBulkV;
-    const vgb = vG - vBulkV;
-
-    const base = this.stateBaseOffset;
-    const s0 = this._s0;
-
-    const s1 = this.s1;
-
-    s0[base + SLOT_V_DB] = vdb;
-    s0[base + SLOT_V_SB] = vsbCap;
-    s0[base + SLOT_V_GB] = vgb;
-
-    const pb = this._tBulkPot;
-    const mj = this._p.MJ;
-    const mjsw = this._p.MJSW;
-
-    // Junction-cap formulas follow ngspice mos1load.c exactly, which uses
-    // vbd = V_bulk - V_drain and vbs = V_bulk - V_source as the controlling
-    // voltages. Prior code here used vdb/vsbCap (opposite sign) with ngspice's
-    // formula shape, which is wrong: tDepCap guard fired on the wrong
-    // polarity, the linear-extension branch was used for normal reverse-biased
-    // operation, and the depletion formula (when taken) evaluated with a
-    // flipped argument. SLOT_Q_DB / SLOT_Q_SB now hold ngspice's qbd / qbs
-    // directly (bulk-drain / bulk-source charge), matching the harness
-    // mapping one-to-one.
-    const vbd = -vdb;           // = vBulkV - vD, ngspice convention
-    const vbs = -vsbCap;        // = vBulkV - vS, ngspice convention
-
-    // --- Drain-bulk junction capacitance (mos1load.c:629-669, 701-724) ---
-    const czbd = this._czbd;
-    const czbdsw = this._czbdsw;
-    const cktMode = this._ctxCktMode;
-    // mos1load.c:701-702: NIintegrate for bulk junctions only during MODETRAN,
-    // or MODEINITTRAN without UIC (MODETRANOP and MODEINITSMSIG skip NIintegrate here)
-    const runBulkNIintegrate = (cktMode & MODETRAN) !== 0 ||
-      ((cktMode & MODEINITTRAN) !== 0 && (cktMode & MODEUIC) === 0);
-    if (czbd > 0 || czbdsw > 0) {
-      let capbd: number;
-      let qbd: number;
-      if (vbd < this._tDepCap) {
-        const argD = 1 - vbd / pb;
-        const sargD = Math.exp(-mj * Math.log(argD));
-        const sargswD = Math.exp(-mjsw * Math.log(argD));
-        capbd = czbd * sargD + czbdsw * sargswD;
-        qbd = pb * (czbd * (1 - argD * sargD) / (1 - mj)
-          + czbdsw * (1 - argD * sargswD) / (1 - mjsw));
-      } else {
-        capbd = this._f2d + vbd * this._f3d;
-        qbd = this._f4d + vbd * (this._f2d + vbd * this._f3d / 2);
-      }
-      s0[base + SLOT_Q_DB] = qbd;
-      if (runBulkNIintegrate) {
-        const q1_db = s1[base + SLOT_Q_DB];
-        const q2_db = this.s2[base + SLOT_Q_DB];
-        const ccap_db = order >= 2 ? ag[0] * qbd + ag[1] * q1_db + ag[2] * q2_db : ag[0] * qbd + ag[1] * q1_db;
-        s0[base + SLOT_CAP_GEQ_DB] = ag[0] * capbd;
-        s0[base + SLOT_CAP_IEQ_DB] = ccap_db - ag[0] * qbd;
-        s0[base + SLOT_CCAP_DB] = ccap_db;
-      } else {
-        s0[base + SLOT_CAP_GEQ_DB] = 0;
-        s0[base + SLOT_CAP_IEQ_DB] = 0;
-        s0[base + SLOT_CCAP_DB] = 0;
-      }
-    } else {
-      s0[base + SLOT_CAP_GEQ_DB] = 0;
-      s0[base + SLOT_CAP_IEQ_DB] = 0;
-      s0[base + SLOT_CCAP_DB] = 0;
-      s0[base + SLOT_Q_DB] = 0;
-    }
-
-    // --- Source-bulk junction capacitance (mos1load.c:569-614, 701-724) ---
-    const czbs = this._czbs;
-    const czbssw = this._czbssw;
-    if (czbs > 0 || czbssw > 0) {
-      let capbs: number;
-      let qbs: number;
-      if (vbs < this._tDepCap) {
-        const argS = 1 - vbs / pb;
-        const sargS = Math.exp(-mj * Math.log(argS));
-        const sargswS = Math.exp(-mjsw * Math.log(argS));
-        capbs = czbs * sargS + czbssw * sargswS;
-        qbs = pb * (czbs * (1 - argS * sargS) / (1 - mj)
-          + czbssw * (1 - argS * sargswS) / (1 - mjsw));
-      } else {
-        capbs = this._f2s + vbs * this._f3s;
-        qbs = this._f4s + vbs * (this._f2s + vbs * this._f3s / 2);
-      }
-      s0[base + SLOT_Q_SB] = qbs;
-      if (runBulkNIintegrate) {
-        const q1_sb = s1[base + SLOT_Q_SB];
-        const q2_sb = this.s2[base + SLOT_Q_SB];
-        const ccap_sb = order >= 2 ? ag[0] * qbs + ag[1] * q1_sb + ag[2] * q2_sb : ag[0] * qbs + ag[1] * q1_sb;
-        s0[base + SLOT_CAP_GEQ_SB] = ag[0] * capbs;
-        s0[base + SLOT_CAP_IEQ_SB] = ccap_sb - ag[0] * qbs;
-        s0[base + SLOT_CCAP_SB] = ccap_sb;
-      } else {
-        s0[base + SLOT_CAP_GEQ_SB] = 0;
-        s0[base + SLOT_CAP_IEQ_SB] = 0;
-        s0[base + SLOT_CCAP_SB] = 0;
-      }
-    } else {
-      s0[base + SLOT_CAP_GEQ_SB] = 0;
-      s0[base + SLOT_CAP_IEQ_SB] = 0;
-      s0[base + SLOT_CCAP_SB] = 0;
-      s0[base + SLOT_Q_SB] = 0;
-    }
-
-    // --- Gate-bulk capacitance: Meyer capgb + CGBO overlap (mos1load.c:753-775) ---
-    const p = this._p;
-    const ld = p.LD ?? 0;
-    const effectiveLength = p.L - 2 * ld;
-    const oxideCap = p.TOX > 0 ? (EPS_OX * EPS0 / p.TOX) * effectiveLength * p.W : 0;
-    const gbOverlap = (p.CGBO ?? 0) * effectiveLength;
-
-    if (oxideCap > 0 || gbOverlap > 0) {
-      // Compute Meyer capgb for gate-bulk.
-      // mos1load.c:773-784: DEVqmeyer receives the pnjlim/fetlim-limited vgs and
-      // vgd (stored in CKTstate0), not raw node voltages. Use this._vgs (limited)
-      // and this._vgs - this._vds (= limited vgd) to match ngspice exactly.
-      const vgsM = this._vgs; // pnjlim/fetlim-limited Vgs (mos1load.c:774)
-      const vgdM = this._vgs - this._vds; // limited Vgd = Vgs - Vds (mos1load.c:774)
-      const mode = this._swapped ? -1 : 1;
-      let meyerCapgb: number;
-      if (mode > 0) {
-        const meyer = devQmeyer(vgsM, vgdM, vgb, this._s0[this.stateBaseOffset + SLOT_VON] || this._tVto, this._lastVdsat, this._tPhi, oxideCap);
-        meyerCapgb = meyer.capgb;
-      } else {
-        const meyer = devQmeyer(vgdM, vgsM, vgb, this._s0[this.stateBaseOffset + SLOT_VON] || this._tVto, this._lastVdsat, this._tPhi, oxideCap);
-        meyerCapgb = meyer.capgb;
-      }
-      s0[base + SLOT_MEYER_GB] = meyerCapgb;
-      const prevMeyerGb = this.s1[base + SLOT_MEYER_GB];
-      // mos1load.c:789-795: MODETRANOP or MODEINITSMSIG uses 2×state0.
-      const useDoubleGb = (this._ctxCktMode & (MODETRANOP | MODEINITSMSIG)) !== 0;
-      const totalGb = (useDoubleGb ? 2 * meyerCapgb : meyerCapgb + prevMeyerGb) + gbOverlap;
-      const qgb = totalGb * vgb;
-      const q1_gb = s1[base + SLOT_Q_GB];
-      const q2_gb = this.s2[base + SLOT_Q_GB];
-      const ccap_gb = order >= 2 ? ag[0] * qgb + ag[1] * q1_gb + ag[2] * q2_gb : ag[0] * qgb + ag[1] * q1_gb;
-      s0[base + SLOT_CAP_GEQ_GB] = ag[0] * totalGb;
-      s0[base + SLOT_CAP_IEQ_GB] = ccap_gb - ag[0] * qgb;
-      s0[base + SLOT_CCAP_GB] = ccap_gb;
-      s0[base + SLOT_Q_GB] = qgb;
-    } else {
-      s0[base + SLOT_CAP_GEQ_GB] = 0;
-      s0[base + SLOT_CAP_IEQ_GB] = 0;
-      s0[base + SLOT_CCAP_GB] = 0;
-    }
-
-    // ngspice mos1load.c:842-853 — zero gate-bulk cap companions during MODEINITTRAN
-    if (this._ctxCktMode & MODEINITTRAN) {
-      s0[base + SLOT_CAP_GEQ_GB] = 0;
-      s0[base + SLOT_CAP_IEQ_GB] = 0;
-      s0[base + SLOT_CCAP_GB] = 0;
-      s0[base + SLOT_CCAP_DB] = 0;
-      s0[base + SLOT_CCAP_SB] = 0;
-    }
-  }
-
-  protected override _updateChargeFlux(voltages: Float64Array, dt: number, method: IntegrationMethod, order: number, deltaOld: readonly number[], ag: Float64Array): void {
-    // GS and GD charges via base class
-    super._updateChargeFlux(voltages, dt, method, order, deltaOld, ag);
-
-    const nodeD = this.drainNode;
-    const nodeS = this.sourceNode;
-    const nodeG = this.gateNode;
-    const nodeB = this._nodeB;
-
-    const vD = nodeD > 0 ? voltages[nodeD - 1] : 0;
-    const vS = nodeS > 0 ? voltages[nodeS - 1] : 0;
-    const vG = nodeG > 0 ? voltages[nodeG - 1] : 0;
-    const vBulkV = nodeB > 0 ? voltages[nodeB - 1] : 0;
-
-    const vdb = vD - vBulkV;
-    const vsbCap = vS - vBulkV;
-    const vgb = vG - vBulkV;
-
-    const base = this.stateBaseOffset;
-    const s0 = this._s0;
-    const s1 = this.s1;
-
-    const p = this._p;
-    const ld = p.LD ?? 0;
-    const effectiveLength = p.L - 2 * ld;
-    const oxideCap = p.TOX > 0 ? (EPS_OX * EPS0 / p.TOX) * effectiveLength * p.W : 0;
-    const gbOverlap = (p.CGBO ?? 0) * effectiveLength;
-
-    if (oxideCap > 0 || gbOverlap > 0) {
-      // mos1load.c:773-784: use pnjlim/fetlim-limited vgs/vgd (same as stampCompanion)
-      const vgsM = this._vgs; // pnjlim/fetlim-limited Vgs (mos1load.c:774)
-      const vgdM = this._vgs - this._vds; // limited Vgd (mos1load.c:774)
-      const mode = this._swapped ? -1 : 1;
-      let meyerCapgb: number;
-      if (mode > 0) {
-        const meyer = devQmeyer(vgsM, vgdM, vgb, this._s0[this.stateBaseOffset + SLOT_VON] || this._tVto, this._lastVdsat, this._tPhi, oxideCap);
-        meyerCapgb = meyer.capgb;
-      } else {
-        const meyer = devQmeyer(vgdM, vgsM, vgb, this._s0[this.stateBaseOffset + SLOT_VON] || this._tVto, this._lastVdsat, this._tPhi, oxideCap);
-        meyerCapgb = meyer.capgb;
-      }
-      const prevMeyerGbU = s1[base + SLOT_MEYER_GB];
-      // mos1load.c:789-795: MODETRANOP or MODEINITSMSIG uses 2×state0.
-      const useDoubleCapU = (this._ctxCktMode & (MODETRANOP | MODEINITSMSIG)) !== 0;
-      const totalGb = (useDoubleCapU ? 2 * meyerCapgb : meyerCapgb + prevMeyerGbU) + gbOverlap;
-      const prevVgb = s1[base + SLOT_V_GB];
-      const prevQgb = s1[base + SLOT_Q_GB];
-      if (useDoubleCapU) {
-        s0[base + SLOT_Q_GB] = totalGb * vgb;
-      } else {
-        s0[base + SLOT_Q_GB] = totalGb * (vgb - prevVgb) + prevQgb;
-      }
-      s0[base + SLOT_V_GB] = vgb;
-    } else {
-      s0[base + SLOT_Q_GB] = 0;
-      s0[base + SLOT_V_GB] = vgb;
-    }
-
-    // Recompute Q_DB and Q_SB from converged voltages, then recompute ccap for
-    // GB/DB/SB so the next step's trapezoidal recursion starts from the correct
-    // companion current (fixes stale CCAP slots). Uses ngspice vbd/vbs
-    // convention to match stampCompanion above.
-    if (dt > 0) {
-      const agLocal = new Float64Array(7);
-      const agScratch = new Float64Array(49);
-      computeNIcomCof(dt, deltaOld, order, method, agLocal, agScratch);
-
-      const vbd = -vdb;
-      const vbs = -vsbCap;
-
-      // Drain-bulk charge recomputation
-      const czbd = this._czbd;
-      const czbdsw = this._czbdsw;
-      if (czbd > 0 || czbdsw > 0) {
-        const pb = this._tBulkPot;
-        const mj = this._p.MJ;
-        const mjsw = this._p.MJSW;
-        let qbd: number;
-        if (vbd < this._tDepCap) {
-          const argD = 1 - vbd / pb;
-          const sargD = Math.exp(-mj * Math.log(argD));
-          const sargswD = Math.exp(-mjsw * Math.log(argD));
-          qbd = pb * (czbd * (1 - argD * sargD) / (1 - mj)
-            + czbdsw * (1 - argD * sargswD) / (1 - mjsw));
-        } else {
-          qbd = this._f4d + vbd * (this._f2d + vbd * this._f3d / 2);
-        }
-        s0[base + SLOT_Q_DB] = qbd;
-        const q1_db = s1[base + SLOT_Q_DB];
-        const q2_db = this.s2[base + SLOT_Q_DB];
-        s0[base + SLOT_CCAP_DB] = order >= 2
-          ? agLocal[0] * qbd + agLocal[1] * q1_db + agLocal[2] * q2_db
-          : agLocal[0] * qbd + agLocal[1] * q1_db;
-      }
-
-      // Source-bulk charge recomputation
-      const czbs = this._czbs;
-      const czbssw = this._czbssw;
-      if (czbs > 0 || czbssw > 0) {
-        const pb = this._tBulkPot;
-        const mj = this._p.MJ;
-        const mjsw = this._p.MJSW;
-        let qbs: number;
-        if (vbs < this._tDepCap) {
-          const argS = 1 - vbs / pb;
-          const sargS = Math.exp(-mj * Math.log(argS));
-          const sargswS = Math.exp(-mjsw * Math.log(argS));
-          qbs = pb * (czbs * (1 - argS * sargS) / (1 - mj)
-            + czbssw * (1 - argS * sargswS) / (1 - mjsw));
-        } else {
-          qbs = this._f4s + vbs * (this._f2s + vbs * this._f3s / 2);
-        }
-        s0[base + SLOT_Q_SB] = qbs;
-        const q1_sb = s1[base + SLOT_Q_SB];
-        const q2_sb = this.s2[base + SLOT_Q_SB];
-        s0[base + SLOT_CCAP_SB] = order >= 2
-          ? agLocal[0] * qbs + agLocal[1] * q1_sb + agLocal[2] * q2_sb
-          : agLocal[0] * qbs + agLocal[1] * q1_sb;
-      }
-
-      // Gate-bulk ccap recomputation
-      const q0_gb = s0[base + SLOT_Q_GB];
-      if (q0_gb !== 0 || s1[base + SLOT_Q_GB] !== 0) {
-        const q1_gb = s1[base + SLOT_Q_GB];
-        const q2_gb = this.s2[base + SLOT_Q_GB];
-        const meyerGbNow = s0[base + SLOT_MEYER_GB];
-        const meyerGbPrev = s1[base + SLOT_MEYER_GB];
-        // mos1load.c:789-795: MODETRANOP or MODEINITSMSIG uses 2×state0.
-        const useDoubleCapU2 = (this._ctxCktMode & (MODETRANOP | MODEINITSMSIG)) !== 0;
-        const totalGbRecalc = (useDoubleCapU2 ? 2 * meyerGbNow : meyerGbNow + meyerGbPrev) + gbOverlap;
-        if (totalGbRecalc > 0) {
-          s0[base + SLOT_CCAP_GB] = order >= 2
-            ? agLocal[0] * q0_gb + agLocal[1] * q1_gb + agLocal[2] * q2_gb
-            : agLocal[0] * q0_gb + agLocal[1] * q1_gb;
-        }
-      }
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // LTE estimation — ngspice CKTterr on gate charge quantities Qgs, Qgd, Qgb
-  // ---------------------------------------------------------------------------
-
-  override getLteTimestep(
-    dt: number,
-    deltaOld: readonly number[],
-    order: number,
-    method: IntegrationMethod,
-    lteParams: import("../../solver/analog/ckt-terr.js").LteParams,
-  ): number {
-    // GS + GD from base class
-    let minDt = super.getLteTimestep(dt, deltaOld, order, method, lteParams);
-
-    const base = this.stateBaseOffset;
-    const s0 = this._s0;
-    const s1 = this.s1;
-    const s2 = this.s2;
-    const s3 = this.s3;
-
-    // Gate-bulk
-    {
-      const ccap0 = s0[base + SLOT_CCAP_GB];
-      const ccap1 = s1[base + SLOT_CCAP_GB];
-      const q0 = s0[base + SLOT_Q_GB];
-      const q1 = s1[base + SLOT_Q_GB];
-      const q2 = s2[base + SLOT_Q_GB];
-      const q3 = s3[base + SLOT_Q_GB];
-      const dtGB = cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
-      if (dtGB < minDt) minDt = dtGB;
-    }
-
-    return minDt;
-  }
-
-}
+export const MOSFET_SCHEMA: StateSchema = defineStateSchema("MosfetElement", [
+  { name: "VBD",   doc: "mos1defs.h MOS1vbd=0",   init: { kind: "zero" } },
+  { name: "VBS",   doc: "mos1defs.h MOS1vbs=1",   init: { kind: "zero" } },
+  { name: "VGS",   doc: "mos1defs.h MOS1vgs=2",   init: { kind: "zero" } },
+  { name: "VDS",   doc: "mos1defs.h MOS1vds=3",   init: { kind: "zero" } },
+  { name: "CAPGS", doc: "mos1defs.h MOS1capgs=4", init: { kind: "zero" } },
+  { name: "QGS",   doc: "mos1defs.h MOS1qgs=5",   init: { kind: "zero" } },
+  { name: "CQGS",  doc: "mos1defs.h MOS1cqgs=6",  init: { kind: "zero" } },
+  { name: "CAPGD", doc: "mos1defs.h MOS1capgd=7", init: { kind: "zero" } },
+  { name: "QGD",   doc: "mos1defs.h MOS1qgd=8",   init: { kind: "zero" } },
+  { name: "CQGD",  doc: "mos1defs.h MOS1cqgd=9",  init: { kind: "zero" } },
+  { name: "CAPGB", doc: "mos1defs.h MOS1capgb=10",init: { kind: "zero" } },
+  { name: "QGB",   doc: "mos1defs.h MOS1qgb=11",  init: { kind: "zero" } },
+  { name: "CQGB",  doc: "mos1defs.h MOS1cqgb=12", init: { kind: "zero" } },
+  { name: "QBD",   doc: "mos1defs.h MOS1qbd=13",  init: { kind: "zero" } },
+  { name: "CQBD",  doc: "mos1defs.h MOS1cqbd=14", init: { kind: "zero" } },
+  { name: "QBS",   doc: "mos1defs.h MOS1qbs=15",  init: { kind: "zero" } },
+  { name: "CQBS",  doc: "mos1defs.h MOS1cqbs=16", init: { kind: "zero" } },
+  { name: "CD",    doc: "MOS1instance MOS1cd",    init: { kind: "zero" } },
+  { name: "CBD",   doc: "MOS1instance MOS1cbd",   init: { kind: "zero" } },
+  { name: "CBS",   doc: "MOS1instance MOS1cbs",   init: { kind: "zero" } },
+  { name: "GBD",   doc: "MOS1instance MOS1gbd",   init: { kind: "zero" } },
+  { name: "GBS",   doc: "MOS1instance MOS1gbs",   init: { kind: "zero" } },
+  { name: "GM",    doc: "MOS1instance MOS1gm",    init: { kind: "zero" } },
+  { name: "GDS",   doc: "MOS1instance MOS1gds",   init: { kind: "zero" } },
+  { name: "GMBS",  doc: "MOS1instance MOS1gmbs",  init: { kind: "zero" } },
+  { name: "MODE",  doc: "MOS1instance MOS1mode (+1 / -1)", init: { kind: "constant", value: 1 } },
+  { name: "VON",   doc: "MOS1instance MOS1von",   init: { kind: "zero" } },
+  { name: "VDSAT", doc: "MOS1instance MOS1vdsat", init: { kind: "zero" } },
+]);
+
+// Slot index constants (match MOSFET_SCHEMA order).
+const SLOT_VBD = 0;
+const SLOT_VBS = 1;
+const SLOT_VGS = 2;
+const SLOT_VDS = 3;
+const SLOT_CAPGS = 4;
+const SLOT_QGS = 5;
+const SLOT_CQGS = 6;
+const SLOT_CAPGD = 7;
+const SLOT_QGD = 8;
+const SLOT_CQGD = 9;
+const SLOT_CAPGB = 10;
+const SLOT_QGB = 11;
+const SLOT_CQGB = 12;
+const SLOT_QBD = 13;
+const SLOT_CQBD = 14;
+const SLOT_QBS = 15;
+const SLOT_CQBS = 16;
+const SLOT_CD = 17;
+const SLOT_CBD = 18;
+const SLOT_CBS = 19;
+const SLOT_GBD = 20;
+const SLOT_GBS = 21;
+const SLOT_GM = 22;
+const SLOT_GDS = 23;
+const SLOT_GMBS = 24;
+const SLOT_MODE = 25;
+const SLOT_VON = 26;
+const SLOT_VDSAT = 27;
 
 // ---------------------------------------------------------------------------
-// createMosfetElement — AnalogElement factory
+// createMosfetElement — AnalogElement factory (closure-based, BJT pattern)
+// Single load() ported from mos1load.c line-by-line. No _updateOp/_stampCompanion.
+// No cached Float64Array state refs — pool.states[N] at call time.
 // ---------------------------------------------------------------------------
 
 export function createMosfetElement(
@@ -1973,91 +892,890 @@ export function createMosfetElement(
   _branchIdx: number,
   props: PropertyBag,
   kpDefault: number = 2e-5,
-): MosfetAnalogElement {
-  const nodeG = pinNodes.get("G")!; // gate
-  const nodeS = pinNodes.get("S")!; // source
-  const nodeD = pinNodes.get("D")!; // drain
+) {
+  const nodeG = pinNodes.get("G")!;
+  const nodeS_ext = pinNodes.get("S")!;
+  const nodeD_ext = pinNodes.get("D")!;
+
+  // 3-terminal MOSFET: bulk = source (no separate bulk pin).
+  const nodeB = nodeS_ext;
 
   const rawRD = props.getModelParam<number>("RD");
   const rawRS = props.getModelParam<number>("RS");
 
-  // 3-terminal MOSFET: bulk is always tied to source (no separate bulk pin).
-  // Internal nodes are only allocated for RD/RS series resistances.
-  const nodeB = nodeS;
   let intIdx = 0;
-  const nodeDint = rawRD > 0 && internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeD;
-  const nodeSint = rawRS > 0 && internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeS;
+  const nodeD = rawRD > 0 && internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeD_ext;
+  const nodeS = rawRS > 0 && internalNodeIds.length > intIdx ? internalNodeIds[intIdx++] : nodeS_ext;
 
   const rawParams: MosfetParams = {
-    VTO:    props.getModelParam<number>("VTO"),
-    KP:     props.getModelParam<number>("KP"),
+    VTO: props.getModelParam<number>("VTO"),
+    KP: props.getModelParam<number>("KP"),
     LAMBDA: props.getModelParam<number>("LAMBDA"),
-    PHI:    props.getModelParam<number>("PHI"),
-    GAMMA:  props.getModelParam<number>("GAMMA"),
-    CBD:    props.getModelParam<number>("CBD"),
-    CBS:    props.getModelParam<number>("CBS"),
-    CGDO:   props.getModelParam<number>("CGDO"),
-    CGSO:   props.getModelParam<number>("CGSO"),
-    CGBO:   props.getModelParam<number>("CGBO"),
-    W:      props.getModelParam<number>("W"),
-    L:      props.getModelParam<number>("L"),
-    RD:     rawRD,
-    RS:     rawRS,
-    IS:     props.getModelParam<number>("IS"),
-    PB:     props.getModelParam<number>("PB"),
-    CJ:     props.getModelParam<number>("CJ"),
-    MJ:     props.getModelParam<number>("MJ"),
-    CJSW:   props.getModelParam<number>("CJSW"),
-    MJSW:   props.getModelParam<number>("MJSW"),
-    JS:     props.getModelParam<number>("JS"),
-    RSH:    props.getModelParam<number>("RSH"),
-    AD:     props.getModelParam<number>("AD"),
-    AS:     props.getModelParam<number>("AS"),
-    PD:     props.getModelParam<number>("PD"),
-    PS:     props.getModelParam<number>("PS"),
-    TNOM:   props.getModelParam<number>("TNOM"),
-    TOX:    props.getModelParam<number>("TOX"),
-    NSUB:   props.getModelParam<number>("NSUB"),
-    NSS:    props.getModelParam<number>("NSS"),
-    TPG:    props.getModelParam<number>("TPG"),
-    LD:     props.getModelParam<number>("LD"),
-    UO:     props.getModelParam<number>("UO"),
-    KF:     props.getModelParam<number>("KF"),
-    AF:     props.getModelParam<number>("AF"),
-    FC:     props.getModelParam<number>("FC"),
-    M:      props.getModelParam<number>("M"),
-    OFF:    props.getModelParam<number>("OFF"),
+    PHI: props.getModelParam<number>("PHI"),
+    GAMMA: props.getModelParam<number>("GAMMA"),
+    CBD: props.getModelParam<number>("CBD"),
+    CBS: props.getModelParam<number>("CBS"),
+    CGDO: props.getModelParam<number>("CGDO"),
+    CGSO: props.getModelParam<number>("CGSO"),
+    CGBO: props.getModelParam<number>("CGBO"),
+    W: props.getModelParam<number>("W"),
+    L: props.getModelParam<number>("L"),
+    RD: rawRD, RS: rawRS,
+    IS: props.getModelParam<number>("IS"),
+    PB: props.getModelParam<number>("PB"),
+    CJ: props.getModelParam<number>("CJ"),
+    MJ: props.getModelParam<number>("MJ"),
+    CJSW: props.getModelParam<number>("CJSW"),
+    MJSW: props.getModelParam<number>("MJSW"),
+    JS: props.getModelParam<number>("JS"),
+    RSH: props.getModelParam<number>("RSH"),
+    AD: props.getModelParam<number>("AD"),
+    AS: props.getModelParam<number>("AS"),
+    PD: props.getModelParam<number>("PD"),
+    PS: props.getModelParam<number>("PS"),
+    TNOM: props.getModelParam<number>("TNOM"),
+    TOX: props.getModelParam<number>("TOX"),
+    NSUB: props.getModelParam<number>("NSUB"),
+    NSS: props.getModelParam<number>("NSS"),
+    TPG: props.getModelParam<number>("TPG"),
+    LD: props.getModelParam<number>("LD"),
+    UO: props.getModelParam<number>("UO"),
+    KF: props.getModelParam<number>("KF"),
+    AF: props.getModelParam<number>("AF"),
+    FC: props.getModelParam<number>("FC"),
+    M: props.getModelParam<number>("M"),
+    OFF: props.getModelParam<number>("OFF"),
   };
 
-  const p = resolveParams(rawParams, kpDefault);
+  const params = resolveParams(rawParams, kpDefault);
+  // For PMOS, VTO is stored as magnitude (matching legacy expectation);
+  // type sign is applied via polarity at use sites.
+  if (polarity === -1) {
+    params.VTO = Math.abs(params.VTO);
+  }
 
-  return new MosfetAnalogElement(polarity, nodeD, nodeG, nodeS, nodeB, p, nodeDint, nodeSint);
+  let tp = computeTempParams(params, polarity);
+  // Thread temp-corrected values into params for standalone helper functions.
+  params._tKP = tp.tTransconductance;
+  params._tPhi = tp.tPhi;
+  params._tVto = tp.tVto;
+
+  // Derived reactive detection (mirrors ngspice's cap-companion gate bitmask).
+  const ld = params.LD;
+  const effectiveLength = params.L - 2 * ld;
+  const oxideCapProbe = params.TOX > 0 ? (EPS_OX * EPS0 / params.TOX) * effectiveLength * params.W : 0;
+  const hasCapacitance = params.CBD > 0 || params.CBS > 0
+    || params.CJ > 0 || params.CJSW > 0
+    || params.CGDO > 0 || params.CGSO > 0 || params.CGBO > 0
+    || oxideCapProbe > 0;
+
+  let pool: StatePoolRef;
+  let base: number;
+
+  // Ephemeral per-iteration icheck flag (mos1load.c:739-742 CKTnoncon bump).
+  let icheckLimited = false;
+
+  // One-shot cold-start seed flag from primeJunctions(); consumed by next load().
+  let primedFromJct = false;
+
+  return {
+    branchIndex: -1,
+    isNonlinear: true,
+    isReactive: hasCapacitance,
+    poolBacked: true as const,
+    stateSchema: MOSFET_SCHEMA,
+    stateSize: MOSFET_SCHEMA.size,
+    stateBaseOffset: -1,
+
+    initState(poolRef: StatePoolRef): void {
+      pool = poolRef;
+      base = this.stateBaseOffset;
+      applyInitialValues(MOSFET_SCHEMA, pool, base, {});
+    },
+
+    /**
+     * Single-pass load mirroring `mos1load.c::MOS1load` line-by-line.
+     *
+     * G1 — Uses ngspice's VBS / VBD convention verbatim. `vbs = vb - vs` and
+     * `vbd = vb - vd` (mos1load.c:231-247). Legacy digiTS VSB = -VBS; every
+     * sign site here uses ngspice's convention.
+     *
+     * Cap companion lumping (mos1load.c:900-end): geq contributions fold into
+     * gbd/gbs/gm-matrix stamps; ieq contributions fold into ceqbd/ceqbs/
+     * ceqgs/ceqgd/ceqgb RHS terms. No cross-method cap+Q slots.
+     */
+    load(ctx: LoadContext): void {
+      const s0 = pool.states[0];
+      const s1 = pool.states[1];
+      const s2 = pool.states[2];
+      const mode = ctx.cktMode;
+      const voltages = ctx.voltages;
+      const solver = ctx.solver;
+
+      // mos1load.c:107: vt = CONSTKoverQ * MOS1temp — device-level thermal voltage.
+      const vt = ctx.vt;
+
+      // mos1load.c:130-147: precomputed operation-point constants.
+      const m = params.M;
+      const lde = params.L - 2 * params.LD;
+      const drainSatCur = tp.drainSatCur;
+      const sourceSatCur = tp.sourceSatCur;
+      const GateSourceOverlapCap = params.CGSO * m * params.W;
+      const GateDrainOverlapCap = params.CGDO * m * params.W;
+      const GateBulkOverlapCap = params.CGBO * m * lde;
+      const Beta = tp.tTransconductance * m * params.W / lde;
+      const OxideCap = params.TOX > 0 ? (EPS_OX * EPS0 / params.TOX) * lde * m * params.W : 0;
+
+      // mos1load.c:200-204: MODEINITFLOAT | MODEINITPRED | MODEINITSMSIG | MODEINITTRAN
+      // or (MODEINITFIX && !OFF) → fall through to the "simple" dispatch block.
+      //
+      // Else (mos1load.c:412-434) → MODEINITJCT / MODEINITFIX+OFF / default-zero.
+      let vbs: number, vgs: number, vds: number, vbd: number, vgd: number;
+
+      // mos1load.c:201-203: gate bits for "simple/general iteration" dispatch.
+      const simpleGate = (mode & (MODEINITFLOAT | MODEINITPRED | MODEINITSMSIG | MODEINITTRAN)) !== 0
+        || ((mode & MODEINITFIX) !== 0 && params.OFF === 0);
+
+      if (primedFromJct) {
+        // Consume one-shot seeds written by primeJunctions() — the MODEINITJCT
+        // path below (mos1load.c:419-430) but driven from slot state rather
+        // than re-reading MOS1icVBS/VDS/VGS. Voltages are already polarity-
+        // applied and stored in {VBS,VGS,VDS} slots.
+        vbs = s0[base + SLOT_VBS];
+        vgs = s0[base + SLOT_VGS];
+        vds = s0[base + SLOT_VDS];
+        vbd = vbs - vds;
+        vgd = vgs - vds;
+        primedFromJct = false;
+      } else if (simpleGate) {
+        if (mode & (MODEINITPRED | MODEINITTRAN)) {
+          // mos1load.c:205-225: predictor step (#ifndef PREDICTOR).
+          const deltaOldRatio = ctx.deltaOld[1] > 0 ? ctx.delta / ctx.deltaOld[1] : 0;
+          const xfact = deltaOldRatio;
+          const vbs1 = s1[base + SLOT_VBS];
+          const vgs1 = s1[base + SLOT_VGS];
+          const vds1 = s1[base + SLOT_VDS];
+          s0[base + SLOT_VBS] = vbs1;
+          vbs = (1 + xfact) * vbs1 - xfact * s2[base + SLOT_VBS];
+          s0[base + SLOT_VGS] = vgs1;
+          vgs = (1 + xfact) * vgs1 - xfact * s2[base + SLOT_VGS];
+          s0[base + SLOT_VDS] = vds1;
+          vds = (1 + xfact) * vds1 - xfact * s2[base + SLOT_VDS];
+          s0[base + SLOT_VBD] = s0[base + SLOT_VBS] - s0[base + SLOT_VDS];
+        } else if (mode & MODEINITSMSIG) {
+          // mos1load.c:187-193 SENSDEBUG-free default: seed from state0.
+          vbs = s0[base + SLOT_VBS];
+          vgs = s0[base + SLOT_VGS];
+          vds = s0[base + SLOT_VDS];
+        } else {
+          // mos1load.c:229-240: general iteration. vbs/vgs/vds from CKTrhsOld
+          // with polarity sign flip for PMOS.
+          const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+          const vS_volt = nodeS > 0 ? voltages[nodeS - 1] : 0;
+          const vG_volt = nodeG > 0 ? voltages[nodeG - 1] : 0;
+          const vD_volt = nodeD > 0 ? voltages[nodeD - 1] : 0;
+          // mos1load.c:231-239 — G1: ngspice computes vbs = B - S, vgs = G - S,
+          // vds = D - S; polarity scales the result (MOS1type factor).
+          vbs = polarity * (vB - vS_volt);
+          vgs = polarity * (vG_volt - vS_volt);
+          vds = polarity * (vD_volt - vS_volt);
+        }
+
+        // mos1load.c:246-254: now some common crunching.
+        vbd = vbs - vds;
+        vgd = vgs - vds;
+
+        // mos1load.c:356-406 — voltage limiting (NODELIMITING is undef).
+        // Skip during init dispatch cases (predictor & smsig handle their own
+        // state seed; hand-stored predictor-vbs value is considered a
+        // clean predictor estimate without pnjlim).
+        if ((mode & (MODEINITPRED | MODEINITSMSIG | MODEINITTRAN)) === 0) {
+          // mos1load.c:356: von = MOS1type * here->MOS1von.
+          const vonStored = s0[base + SLOT_VON];
+          const vonForLim = vonStored !== 0 ? vonStored : tp.tVto;
+
+          const vgsOldStored = s0[base + SLOT_VGS];
+          const vdsOldStored = s0[base + SLOT_VDS];
+
+          if (vdsOldStored >= 0) {
+            // mos1load.c:368-378: forward — fetlim vgs, derive vds, limvds.
+            const vgsBefore = vgs;
+            vgs = fetlim(vgs, vgsOldStored, vonForLim);
+            vds = vgs - vgd;
+            const vdsBefore = vds;
+            vds = limvds(vds, vdsOldStored);
+            vgd = vgs - vds;
+
+            if (ctx.limitingCollector) {
+              ctx.limitingCollector.push({
+                elementIndex: (this as any).elementIndex ?? -1,
+                label: (this as any).label ?? "",
+                junction: "GS", limitType: "fetlim",
+                vBefore: vgsBefore, vAfter: vgs,
+                wasLimited: vgs !== vgsBefore,
+              });
+              ctx.limitingCollector.push({
+                elementIndex: (this as any).elementIndex ?? -1,
+                label: (this as any).label ?? "",
+                junction: "DS", limitType: "limvds",
+                vBefore: vdsBefore, vAfter: vds,
+                wasLimited: vds !== vdsBefore,
+              });
+            }
+          } else {
+            // mos1load.c:380-392: reverse — fetlim vgd, derive vds, neg limvds.
+            const vgdOldStored = vgsOldStored - vdsOldStored;
+            const vgdBefore = vgd;
+            vgd = fetlim(vgd, vgdOldStored, vonForLim);
+            vds = vgs - vgd;
+            const vdsBefore = vds;
+            vds = -limvds(-vds, -vdsOldStored);
+            vgs = vgd + vds;
+
+            if (ctx.limitingCollector) {
+              ctx.limitingCollector.push({
+                elementIndex: (this as any).elementIndex ?? -1,
+                label: (this as any).label ?? "",
+                junction: "GS", limitType: "fetlim",
+                vBefore: vgdBefore, vAfter: vgd,
+                wasLimited: vgd !== vgdBefore,
+              });
+              ctx.limitingCollector.push({
+                elementIndex: (this as any).elementIndex ?? -1,
+                label: (this as any).label ?? "",
+                junction: "DS", limitType: "limvds",
+                vBefore: vdsBefore, vAfter: vds,
+                wasLimited: vds !== vdsBefore,
+              });
+            }
+          }
+
+          // mos1load.c:393-406: pnjlim on bulk junctions — vds sign-based dispatch.
+          if (vds >= 0) {
+            // G1: pnjlim on vbs (bulk-source), vbd derives from vbs - vds.
+            const vbsBefore = vbs;
+            const vbsOldStored = s0[base + SLOT_VBS];
+            const vbsResult = pnjlim(vbs, vbsOldStored, vt, tp.sourceVcrit);
+            vbs = vbsResult.value;
+            vbd = vbs - vds;
+
+            if (vbsResult.limited) icheckLimited = true;
+            if (ctx.limitingCollector) {
+              ctx.limitingCollector.push({
+                elementIndex: (this as any).elementIndex ?? -1,
+                label: (this as any).label ?? "",
+                junction: "BS", limitType: "pnjlim",
+                vBefore: vbsBefore, vAfter: vbs,
+                wasLimited: vbsResult.limited,
+              });
+            }
+          } else {
+            // G1: pnjlim on vbd (bulk-drain), vbs derives from vbd + vds.
+            const vbdBefore = vbd;
+            const vbdOldStored = s0[base + SLOT_VBD];
+            const vbdResult = pnjlim(vbd, vbdOldStored, vt, tp.drainVcrit);
+            vbd = vbdResult.value;
+            vbs = vbd + vds;
+
+            if (vbdResult.limited) icheckLimited = true;
+            if (ctx.limitingCollector) {
+              ctx.limitingCollector.push({
+                elementIndex: (this as any).elementIndex ?? -1,
+                label: (this as any).label ?? "",
+                junction: "BD", limitType: "pnjlim",
+                vBefore: vbdBefore, vAfter: vbd,
+                wasLimited: vbdResult.limited,
+              });
+            }
+          }
+        } else {
+          icheckLimited = false;
+        }
+      } else {
+        // mos1load.c:412-434: not one of the simple cases — MODEINITJCT /
+        // MODEINITFIX+OFF / default-zero dispatch.
+        if ((mode & MODEINITJCT) && params.OFF === 0) {
+          // mos1load.c:419-430: MODEINITJCT path — use MOS1icVDS/GS/BS if
+          // all zero AND (MODETRAN|MODEDCOP|MODEDCTRANCURVE or !MODEUIC),
+          // fall back to (vbs=-1, vgs=type*tVto, vds=0).
+          // digiTS no longer carries icVBS/ICVDS/ICVGS params; the
+          // all-zero branch always applies. Ngspice wraps with polarity
+          // (type multiplier) — apply it.
+          vbs = -1;
+          vgs = polarity * tp.tVto;
+          vds = 0;
+        } else {
+          // mos1load.c:431-433: default (MODEINITFIX+OFF or unhandled) → zero.
+          vbs = 0; vgs = 0; vds = 0;
+        }
+        vbd = vbs - vds;
+        vgd = vgs - vds;
+        icheckLimited = false;
+      }
+
+      // mos1load.c:443-445: recompute common quantities post-limiting.
+      vbd = vbs - vds;
+      vgd = vgs - vds;
+      // vgb unused except in Meyer cap block; compute at that site.
+
+      // mos1load.c:453-468: bulk-source and bulk-drain junction currents.
+      let gbs: number, cbs: number;
+      if (vbs <= -3 * vt) {
+        gbs = GMIN;
+        cbs = gbs * vbs - sourceSatCur;
+      } else {
+        const evbs = Math.exp(Math.min(MAX_EXP_ARG, vbs / vt));
+        gbs = sourceSatCur * evbs / vt + GMIN;
+        cbs = sourceSatCur * (evbs - 1) + GMIN * vbs;
+      }
+      let gbd: number, cbd: number;
+      if (vbd <= -3 * vt) {
+        gbd = GMIN;
+        cbd = gbd * vbd - drainSatCur;
+      } else {
+        const evbd = Math.exp(Math.min(MAX_EXP_ARG, vbd / vt));
+        gbd = drainSatCur * evbd / vt + GMIN;
+        cbd = drainSatCur * (evbd - 1) + GMIN * vbd;
+      }
+
+      // mos1load.c:472-478: device mode (normal/inverse) from vds sign.
+      const opMode = vds >= 0 ? 1 : -1;
+
+      // mos1load.c:483-546: Shichman-Hodges drain current evaluation.
+      const tPhi = tp.tPhi;
+      let sarg: number;
+      const vbEffective = opMode === 1 ? vbs : vbd;
+      if (vbEffective <= 0) {
+        sarg = Math.sqrt(tPhi - vbEffective);
+      } else {
+        sarg = Math.sqrt(tPhi);
+        sarg = sarg - vbEffective / (sarg + sarg);
+        sarg = Math.max(0, sarg);
+      }
+      const von = tp.tVbi * polarity + params.GAMMA * sarg;
+      const vgst = (opMode === 1 ? vgs : vgd) - von;
+      const vdsat = Math.max(vgst, 0);
+      const argBE = sarg <= 0 ? 0 : params.GAMMA / (sarg + sarg);
+
+      let cdrain: number, gmNR: number, gdsNR: number, gmbsNR: number;
+      if (vgst <= 0) {
+        // cutoff region (mos1load.c:515-522)
+        cdrain = 0; gmNR = 0; gdsNR = 0; gmbsNR = 0;
+      } else {
+        const betap = Beta * (1 + params.LAMBDA * (vds * opMode));
+        if (vgst <= vds * opMode) {
+          // saturation (mos1load.c:527-532)
+          cdrain = betap * vgst * vgst * 0.5;
+          gmNR = betap * vgst;
+          gdsNR = params.LAMBDA * Beta * vgst * vgst * 0.5;
+          gmbsNR = gmNR * argBE;
+        } else {
+          // linear/triode (mos1load.c:533-545)
+          const vdsMode = vds * opMode;
+          cdrain = betap * vdsMode * (vgst - 0.5 * vdsMode);
+          gmNR = betap * vdsMode;
+          gdsNR = betap * (vgst - vdsMode)
+            + params.LAMBDA * Beta * vdsMode * (vgst - 0.5 * vdsMode);
+          gmbsNR = gmNR * argBE;
+        }
+      }
+
+      // mos1load.c:557-563: von, vdsat, cd write-back with polarity.
+      s0[base + SLOT_VON] = polarity * von;
+      s0[base + SLOT_VDSAT] = polarity * vdsat;
+      const cd = opMode * cdrain - cbd;
+      s0[base + SLOT_CD] = cd;
+
+      // mos1load.c:565-725: cap + charge block.
+      // Gate on (MODETRAN|MODETRANOP|MODEINITSMSIG).
+      const capGate = (mode & (MODETRAN | MODETRANOP | MODEINITSMSIG)) !== 0;
+
+      let capbd = 0, capbs = 0;
+      if (capGate) {
+        // mos1load.c:586-638: bulk-source depletion cap + charge.
+        if (tp.czbs > 0 || tp.czbssw > 0) {
+          if (vbs < tp.tDepCap) {
+            const argS = 1 - vbs / tp.tBulkPot;
+            const sargS = Math.exp(-params.MJ * Math.log(argS));
+            const sargswS = Math.exp(-params.MJSW * Math.log(argS));
+            s0[base + SLOT_QBS] = tp.tBulkPot * (
+              tp.czbs * (1 - argS * sargS) / (1 - params.MJ)
+              + tp.czbssw * (1 - argS * sargswS) / (1 - params.MJSW));
+            capbs = tp.czbs * sargS + tp.czbssw * sargswS;
+          } else {
+            s0[base + SLOT_QBS] = tp.f4s + vbs * (tp.f2s + vbs * (tp.f3s / 2));
+            capbs = tp.f2s + tp.f3s * vbs;
+          }
+        } else {
+          s0[base + SLOT_QBS] = 0;
+          capbs = 0;
+        }
+
+        // mos1load.c:641-694: bulk-drain depletion cap + charge.
+        if (tp.czbd > 0 || tp.czbdsw > 0) {
+          if (vbd < tp.tDepCap) {
+            const argD = 1 - vbd / tp.tBulkPot;
+            const sargD = Math.exp(-params.MJ * Math.log(argD));
+            const sargswD = Math.exp(-params.MJSW * Math.log(argD));
+            s0[base + SLOT_QBD] = tp.tBulkPot * (
+              tp.czbd * (1 - argD * sargD) / (1 - params.MJ)
+              + tp.czbdsw * (1 - argD * sargswD) / (1 - params.MJSW));
+            capbd = tp.czbd * sargD + tp.czbdsw * sargswD;
+          } else {
+            s0[base + SLOT_QBD] = tp.f4d + vbd * (tp.f2d + vbd * tp.f3d / 2);
+            capbd = tp.f2d + vbd * tp.f3d;
+          }
+        } else {
+          s0[base + SLOT_QBD] = 0;
+          capbd = 0;
+        }
+
+        // mos1load.c:701-725: NIintegrate bulk junctions into gbd/gbs
+        // (direct lumping — no invented CAP_GEQ_DB/SB slots).
+        const runBulkNIintegrate = (mode & MODETRAN) !== 0
+          || ((mode & MODEINITTRAN) !== 0 && (mode & MODEUIC) === 0);
+        if (runBulkNIintegrate) {
+          const ag = ctx.ag;
+          // mos1load.c:714-719: BD junction integrate, lump into gbd & cbd.
+          {
+            const qbd_now = s0[base + SLOT_QBD];
+            const qbd1 = s1[base + SLOT_QBD];
+            let qbd2 = 0;
+            if (ctx.order >= 2) qbd2 = s2[base + SLOT_QBD];
+            let ccap_bd: number;
+            if (ctx.method === "trapezoidal") {
+              if (ctx.order === 1) {
+                ccap_bd = ag[0] * qbd_now + ag[1] * qbd1;
+              } else {
+                const ccapPrev = s1[base + SLOT_CQBD];
+                ccap_bd = -ccapPrev * ag[1] + ag[0] * (qbd_now - qbd1);
+              }
+            } else {
+              ccap_bd = ag[0] * qbd_now + ag[1] * qbd1;
+              if (ctx.order >= 2) ccap_bd += ag[2] * qbd2;
+            }
+            const geq_bd = ag[0] * capbd;
+            s0[base + SLOT_CQBD] = ccap_bd;
+            // mos1load.c:717-719: gbd += geq; cbd += CKTstate0[cqbd]; cd -= CKTstate0[cqbd].
+            gbd += geq_bd;
+            cbd += ccap_bd;
+            // Store updated cd
+            s0[base + SLOT_CD] = cd - ccap_bd;
+          }
+          // mos1load.c:720-724: BS junction integrate, lump into gbs & cbs.
+          {
+            const qbs_now = s0[base + SLOT_QBS];
+            const qbs1 = s1[base + SLOT_QBS];
+            let qbs2 = 0;
+            if (ctx.order >= 2) qbs2 = s2[base + SLOT_QBS];
+            let ccap_bs: number;
+            if (ctx.method === "trapezoidal") {
+              if (ctx.order === 1) {
+                ccap_bs = ag[0] * qbs_now + ag[1] * qbs1;
+              } else {
+                const ccapPrev = s1[base + SLOT_CQBS];
+                ccap_bs = -ccapPrev * ag[1] + ag[0] * (qbs_now - qbs1);
+              }
+            } else {
+              ccap_bs = ag[0] * qbs_now + ag[1] * qbs1;
+              if (ctx.order >= 2) ccap_bs += ag[2] * qbs2;
+            }
+            const geq_bs = ag[0] * capbs;
+            s0[base + SLOT_CQBS] = ccap_bs;
+            gbs += geq_bs;
+            cbs += ccap_bs;
+          }
+        }
+      }
+
+      // mos1load.c:750-753: save vbs, vbd, vgs, vds back to state0.
+      s0[base + SLOT_VBS] = vbs;
+      s0[base + SLOT_VBD] = vbd;
+      s0[base + SLOT_VGS] = vgs;
+      s0[base + SLOT_VDS] = vds;
+
+      // mos1load.c:759-856: Meyer capacitance + overlap + NIintegrate.
+      // capgs/capgd/capgb hold totals (including overlap) used for stamping.
+      let capgs = 0, capgd = 0, capgb = 0;
+      let ceqgs = 0, ceqgd = 0, ceqgb = 0;
+      let gcgs = 0, gcgd = 0, gcgb = 0;
+
+      if (capGate) {
+        // mos1load.c:773-785: DEVqmeyer — mode-dependent vgs/vgd swap.
+        const vgb_read = vgs - vbs;  // vgb = vgs - vbs (computed lazily here).
+        let meyerCapgs: number, meyerCapgd: number, meyerCapgb: number;
+        if (opMode > 0) {
+          const meyer = devQmeyer(vgs, vgd, vgb_read, von, vdsat, tp.tPhi, OxideCap);
+          meyerCapgs = meyer.capgs; meyerCapgd = meyer.capgd; meyerCapgb = meyer.capgb;
+        } else {
+          // Reverse mode: swap vgs<->vgd and capgs<->capgd per mos1load.c:780-784.
+          const meyer = devQmeyer(vgd, vgs, vgb_read, von, vdsat, tp.tPhi, OxideCap);
+          meyerCapgs = meyer.capgd; meyerCapgd = meyer.capgs; meyerCapgb = meyer.capgb;
+        }
+
+        // mos1load.c:787-806: cap averaging.
+        // MODETRANOP | MODEINITSMSIG → 2 * state0.
+        // else → state0 + state1 (incremental averaging).
+        const prevCapgs = s1[base + SLOT_CAPGS];
+        const prevCapgd = s1[base + SLOT_CAPGD];
+        const prevCapgb = s1[base + SLOT_CAPGB];
+        const useDouble = (mode & (MODETRANOP | MODEINITSMSIG)) !== 0;
+        // Store half-cap in state0 for next-step averaging.
+        s0[base + SLOT_CAPGS] = meyerCapgs;
+        s0[base + SLOT_CAPGD] = meyerCapgd;
+        s0[base + SLOT_CAPGB] = meyerCapgb;
+        capgs = (useDouble ? 2 * meyerCapgs : meyerCapgs + prevCapgs) + GateSourceOverlapCap;
+        capgd = (useDouble ? 2 * meyerCapgd : meyerCapgd + prevCapgd) + GateDrainOverlapCap;
+        capgb = (useDouble ? 2 * meyerCapgb : meyerCapgb + prevCapgb) + GateBulkOverlapCap;
+
+        // mos1load.c:827-855: update charges (MODETRAN → incremental,
+        // TRANOP → q = c*v).
+        const vgs1 = s1[base + SLOT_VGS];
+        const vgd1 = vgs1 - s1[base + SLOT_VDS];
+        const vgb1 = vgs1 - s1[base + SLOT_VBS];
+        if (mode & (MODEINITPRED | MODEINITTRAN)) {
+          // mos1load.c:828-837: predictor extrapolation (PREDICTOR #undef
+          // default uses xfact=0 → q0 = q1).
+          s0[base + SLOT_QGS] = s1[base + SLOT_QGS];
+          s0[base + SLOT_QGD] = s1[base + SLOT_QGD];
+          s0[base + SLOT_QGB] = s1[base + SLOT_QGB];
+        } else if (mode & MODETRAN) {
+          // mos1load.c:840-846: incremental charge.
+          s0[base + SLOT_QGS] = (vgs - vgs1) * capgs + s1[base + SLOT_QGS];
+          s0[base + SLOT_QGD] = (vgd - vgd1) * capgd + s1[base + SLOT_QGD];
+          s0[base + SLOT_QGB] = (vgs - vbs - vgb1) * capgb + s1[base + SLOT_QGB];
+        } else {
+          // TRANOP / SMSIG (mos1load.c:847-852): q = c * v.
+          s0[base + SLOT_QGS] = vgs * capgs;
+          s0[base + SLOT_QGD] = vgd * capgd;
+          s0[base + SLOT_QGB] = (vgs - vbs) * capgb;
+        }
+      }
+
+      // mos1load.c:860-894: NIintegrate the three gate caps, fold companion
+      // geq/ceq inline into gcgs/gcgd/gcgb (NOT into invented slots).
+      const initOrNoTran = (mode & MODEINITTRAN) !== 0 || (mode & MODETRAN) === 0;
+      if (initOrNoTran) {
+        // mos1load.c:862-873: MODEINITTRAN or not-in-TRAN → zero companions.
+        gcgs = 0; ceqgs = 0;
+        gcgd = 0; ceqgd = 0;
+        gcgb = 0; ceqgb = 0;
+        // mos1load.c:875-877: zero cqgs/gd/gb when corresponding capgs/gd/gb = 0.
+        if (capgs === 0) s0[base + SLOT_CQGS] = 0;
+        if (capgd === 0) s0[base + SLOT_CQGD] = 0;
+        if (capgb === 0) s0[base + SLOT_CQGB] = 0;
+      } else {
+        // mos1load.c:878-894: MODETRAN-only path. NIintegrate the three caps.
+        const ag = ctx.ag;
+        // Gate-source cap companion.
+        {
+          const q0 = s0[base + SLOT_QGS];
+          const q1 = s1[base + SLOT_QGS];
+          let q2 = 0;
+          if (ctx.order >= 2) q2 = s2[base + SLOT_QGS];
+          let ccap_gs: number;
+          if (ctx.method === "trapezoidal") {
+            if (ctx.order === 1) {
+              ccap_gs = ag[0] * q0 + ag[1] * q1;
+            } else {
+              const ccapPrev = s1[base + SLOT_CQGS];
+              ccap_gs = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
+            }
+          } else {
+            ccap_gs = ag[0] * q0 + ag[1] * q1;
+            if (ctx.order >= 2) ccap_gs += ag[2] * q2;
+          }
+          gcgs = ag[0] * capgs;
+          // mos1load.c:888-889: ceqgs = ccap - gcgs*vgs + ag[0]*qgs.
+          ceqgs = ccap_gs - gcgs * vgs + ag[0] * q0;
+          s0[base + SLOT_CQGS] = ccap_gs;
+        }
+        // Gate-drain cap companion.
+        {
+          const q0 = s0[base + SLOT_QGD];
+          const q1 = s1[base + SLOT_QGD];
+          let q2 = 0;
+          if (ctx.order >= 2) q2 = s2[base + SLOT_QGD];
+          let ccap_gd: number;
+          if (ctx.method === "trapezoidal") {
+            if (ctx.order === 1) {
+              ccap_gd = ag[0] * q0 + ag[1] * q1;
+            } else {
+              const ccapPrev = s1[base + SLOT_CQGD];
+              ccap_gd = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
+            }
+          } else {
+            ccap_gd = ag[0] * q0 + ag[1] * q1;
+            if (ctx.order >= 2) ccap_gd += ag[2] * q2;
+          }
+          gcgd = ag[0] * capgd;
+          ceqgd = ccap_gd - gcgd * vgd + ag[0] * q0;
+          s0[base + SLOT_CQGD] = ccap_gd;
+        }
+        // Gate-bulk cap companion.
+        {
+          const q0 = s0[base + SLOT_QGB];
+          const q1 = s1[base + SLOT_QGB];
+          let q2 = 0;
+          if (ctx.order >= 2) q2 = s2[base + SLOT_QGB];
+          let ccap_gb: number;
+          if (ctx.method === "trapezoidal") {
+            if (ctx.order === 1) {
+              ccap_gb = ag[0] * q0 + ag[1] * q1;
+            } else {
+              const ccapPrev = s1[base + SLOT_CQGB];
+              ccap_gb = -ccapPrev * ag[1] + ag[0] * (q0 - q1);
+            }
+          } else {
+            ccap_gb = ag[0] * q0 + ag[1] * q1;
+            if (ctx.order >= 2) ccap_gb += ag[2] * q2;
+          }
+          gcgb = ag[0] * capgb;
+          const vgb_now = vgs - vbs;
+          ceqgb = ccap_gb - gcgb * vgb_now + ag[0] * q0;
+          s0[base + SLOT_CQGB] = ccap_gb;
+        }
+      }
+
+      // mos1load.c:902-916: ceqbs, ceqbd, cdreq RHS terms.
+      const ceqbs = polarity * (cbs - gbs * vbs);
+      const ceqbd = polarity * (cbd - gbd * vbd);
+      let xnrm: number, xrev: number, cdreq: number;
+      if (opMode >= 0) {
+        xnrm = 1; xrev = 0;
+        cdreq = polarity * (cdrain - gdsNR * vds - gmNR * vgs - gmbsNR * vbs);
+      } else {
+        xnrm = 0; xrev = 1;
+        cdreq = -polarity * (cdrain - gdsNR * (-vds) - gmNR * vgd - gmbsNR * vbd);
+      }
+
+      // Store DC-op scalars for convergence test (mos1conv.c / MOS1convTest).
+      s0[base + SLOT_CBD] = cbd;
+      s0[base + SLOT_CBS] = cbs;
+      s0[base + SLOT_GBD] = gbd;
+      s0[base + SLOT_GBS] = gbs;
+      s0[base + SLOT_GM] = gmNR;
+      s0[base + SLOT_GDS] = gdsNR;
+      s0[base + SLOT_GMBS] = gmbsNR;
+      s0[base + SLOT_MODE] = opMode;
+
+      // mos1load.c:917-924: RHS stamps.
+      // NOTE: ngspice accounts for Meyer caps at gate node separately from
+      // bulk via (ceqgs + ceqgb + ceqgd) lump; ditto bulk-side via -(ceqbs +
+      // ceqbd - type*ceqgb). Same reading here.
+      stampRHS(solver, nodeG, -(polarity * (ceqgs + ceqgb + ceqgd)));
+      stampRHS(solver, nodeB, -(ceqbs + ceqbd - polarity * ceqgb));
+      stampRHS(solver, nodeD, (ceqbd - cdreq + polarity * ceqgd));
+      stampRHS(solver, nodeS, (cdreq + ceqbs + polarity * ceqgs));
+
+      // RS/RD external terminal stamps (mos1load.c linear model pieces).
+      if (params.RD > 0 && nodeD !== nodeD_ext) {
+        const gRD = 1 / params.RD;
+        stampG(solver, nodeD_ext, nodeD_ext, gRD);
+        stampG(solver, nodeD_ext, nodeD, -gRD);
+        stampG(solver, nodeD, nodeD_ext, -gRD);
+        stampG(solver, nodeD, nodeD, gRD);
+      }
+      if (params.RS > 0 && nodeS !== nodeS_ext) {
+        const gRS = 1 / params.RS;
+        stampG(solver, nodeS_ext, nodeS_ext, gRS);
+        stampG(solver, nodeS_ext, nodeS, -gRS);
+        stampG(solver, nodeS, nodeS_ext, -gRS);
+        stampG(solver, nodeS, nodeS, gRS);
+      }
+
+      // mos1load.c:929-956: Y-matrix stamps.
+      // NOTE: ngspice uses MOS1DdPtr (drain-drain), MOS1DPdpPtr (drainPrime-
+      // drainPrime), etc. With RD=0 / RS=0 the "prime" nodes collapse to the
+      // external pins, so only the DPdp/SPsp stamps apply (our nodeD/nodeS).
+      //   MOS1GgPtr += gcgd + gcgs + gcgb       → (nodeG, nodeG)
+      //   MOS1BbPtr += gbd + gbs + gcgb          → (nodeB, nodeB)
+      //   MOS1DPdpPtr += gds + gbd + xrev*(gm+gmbs) + gcgd (+drainConductance)
+      //   MOS1SPspPtr += gds + gbs + xnrm*(gm+gmbs) + gcgs (+sourceConductance)
+      //   MOS1GbPtr -= gcgb
+      //   MOS1GdpPtr -= gcgd
+      //   MOS1GspPtr -= gcgs
+      //   MOS1BgPtr -= gcgb
+      //   MOS1BdpPtr -= gbd
+      //   MOS1BspPtr -= gbs
+      //   MOS1DPgPtr += (xnrm-xrev)*gm - gcgd
+      //   MOS1DPbPtr += -gbd + (xnrm-xrev)*gmbs
+      //   MOS1DPspPtr += -gds - xnrm*(gm+gmbs)
+      //   MOS1SPgPtr += -(xnrm-xrev)*gm - gcgs
+      //   MOS1SPbPtr += -gbs - (xnrm-xrev)*gmbs
+      //   MOS1SPdpPtr += -gds - xrev*(gm+gmbs)
+      stampG(solver, nodeG, nodeG, gcgd + gcgs + gcgb);
+      stampG(solver, nodeB, nodeB, gbd + gbs + gcgb);
+      stampG(solver, nodeD, nodeD, gdsNR + gbd + xrev * (gmNR + gmbsNR) + gcgd);
+      stampG(solver, nodeS, nodeS, gdsNR + gbs + xnrm * (gmNR + gmbsNR) + gcgs);
+      stampG(solver, nodeG, nodeB, -gcgb);
+      stampG(solver, nodeG, nodeD, -gcgd);
+      stampG(solver, nodeG, nodeS, -gcgs);
+      stampG(solver, nodeB, nodeG, -gcgb);
+      stampG(solver, nodeB, nodeD, -gbd);
+      stampG(solver, nodeB, nodeS, -gbs);
+      stampG(solver, nodeD, nodeG, (xnrm - xrev) * gmNR - gcgd);
+      stampG(solver, nodeD, nodeB, -gbd + (xnrm - xrev) * gmbsNR);
+      stampG(solver, nodeD, nodeS, -gdsNR - xnrm * (gmNR + gmbsNR));
+      stampG(solver, nodeS, nodeG, -(xnrm - xrev) * gmNR - gcgs);
+      stampG(solver, nodeS, nodeB, -gbs - (xnrm - xrev) * gmbsNR);
+      stampG(solver, nodeS, nodeD, -gdsNR - xrev * (gmNR + gmbsNR));
+
+      if (icheckLimited) ctx.noncon.value++;
+    },
+
+    checkConvergence(ctx: LoadContext): boolean {
+      const s0 = pool.states[0];
+      // mos1conv.c: MOS1convTest early-return on INITFIX/INITSMSIG w/ OFF.
+      if (params.OFF && (ctx.cktMode & (MODEINITFIX | MODEINITSMSIG))) return true;
+      // Limiting flag → non-convergence.
+      if (icheckLimited) return false;
+
+      const voltages = ctx.voltages;
+      const vB = nodeB > 0 ? voltages[nodeB - 1] : 0;
+      const vS_v = nodeS > 0 ? voltages[nodeS - 1] : 0;
+      const vG_v = nodeG > 0 ? voltages[nodeG - 1] : 0;
+      const vD_v = nodeD > 0 ? voltages[nodeD - 1] : 0;
+      // G1: vbs = polarity*(vB - vS), vds = polarity*(vD - vS).
+      const vbsRaw = polarity * (vB - vS_v);
+      const vgsRaw = polarity * (vG_v - vS_v);
+      const vdsRaw = polarity * (vD_v - vS_v);
+      const vbdRaw = vbsRaw - vdsRaw;
+
+      // mos1conv.c: predicted drain current deltas, mode-dependent.
+      const storedVbs = s0[base + SLOT_VBS];
+      const storedVbd = s0[base + SLOT_VBD];
+      const storedVgs = s0[base + SLOT_VGS];
+      const storedVds = s0[base + SLOT_VDS];
+      const delvbs = vbsRaw - storedVbs;
+      const delvbd = vbdRaw - storedVbd;
+      const delvgs = vgsRaw - storedVgs;
+      const delvds = vdsRaw - storedVds;
+
+      const cd = s0[base + SLOT_CD];
+      const gm = s0[base + SLOT_GM];
+      const gds = s0[base + SLOT_GDS];
+      const gmbs = s0[base + SLOT_GMBS];
+      const gbd = s0[base + SLOT_GBD];
+      const gbs = s0[base + SLOT_GBS];
+      const cbs = s0[base + SLOT_CBS];
+      const cbd = s0[base + SLOT_CBD];
+      const opMode = s0[base + SLOT_MODE];
+
+      let cdhat: number;
+      if (opMode >= 0) {
+        cdhat = cd + gm * delvgs + gds * delvds + gmbs * delvbs - gbd * delvbd;
+      } else {
+        const delvgd = delvgs - delvds;
+        cdhat = cd - (gbd - gmbs) * delvbd - gm * delvgd + gds * delvds;
+      }
+      const cbhat = cbs + cbd + gbd * delvbd + gbs * delvbs;
+
+      const tolD = ctx.reltol * Math.max(Math.abs(cdhat), Math.abs(cd)) + ctx.iabstol;
+      const tolB = ctx.reltol * Math.max(Math.abs(cbhat), Math.abs(cbs + cbd)) + ctx.iabstol;
+      return Math.abs(cdhat - cd) <= tolD && Math.abs(cbhat - (cbs + cbd)) <= tolB;
+    },
+
+    primeJunctions(): void {
+      // mos1load.c:419-430: MODEINITJCT seed state.
+      //   OFF=0: vbs=-1, vgs=type*tVto, vds=0
+      //   OFF=1: vbs=vgs=vds=0
+      // primeJunctions() is invoked once before the first NR iteration; the
+      // next load() consumes these seeds (primedFromJct flag) and clears.
+      const s0 = pool.states[0];
+      if (params.OFF) {
+        s0[base + SLOT_VGS] = 0;
+        s0[base + SLOT_VDS] = 0;
+        s0[base + SLOT_VBS] = 0;
+        s0[base + SLOT_VBD] = 0;
+      } else {
+        s0[base + SLOT_VGS] = polarity * tp.tVto;
+        s0[base + SLOT_VDS] = 0;
+        s0[base + SLOT_VBS] = -1;
+        s0[base + SLOT_VBD] = -1;
+      }
+      primedFromJct = true;
+    },
+
+    getPinCurrents(_voltages: Float64Array): number[] {
+      const s0 = pool.states[0];
+      // Drain current: polarity * cd per mos1load.c:563.
+      const id = polarity * s0[base + SLOT_CD];
+      const iG = 0;
+      const iD = id;
+      const iS = -id;
+      const iB = 0;
+      // pinLayout order: [G, D, S, B] per registry.
+      return [iG, iD, iS, iB];
+    },
+
+    setParam(key: string, value: number): void {
+      if (key in params) {
+        (params as unknown as Record<string, number>)[key] = value;
+        tp = computeTempParams(params, polarity);
+        params._tKP = tp.tTransconductance;
+        params._tPhi = tp.tPhi;
+        params._tVto = tp.tVto;
+      }
+    },
+
+    // Stored temperature-corrected parameters exposed for tests.
+    get _p(): ResolvedMosfetParams {
+      return params;
+    },
+
+    getLteTimestep(
+      dt: number,
+      deltaOld: readonly number[],
+      order: number,
+      method: IntegrationMethod,
+      lteParams: LteParams,
+    ): number {
+      // CKTterr on qgs, qgd, qgb, qbd, qbs per mos1load.c state layout.
+      const s0 = pool.states[0];
+      const s1 = pool.states[1];
+      const s2 = pool.states[2];
+      const s3 = pool.states[3];
+      let minDt = Infinity;
+      const pairs: [number, number][] = [
+        [SLOT_QGS, SLOT_CQGS],
+        [SLOT_QGD, SLOT_CQGD],
+        [SLOT_QGB, SLOT_CQGB],
+        [SLOT_QBD, SLOT_CQBD],
+        [SLOT_QBS, SLOT_CQBS],
+      ];
+      for (const [slotQ, slotCcap] of pairs) {
+        const q0 = s0[base + slotQ];
+        const q1 = s1[base + slotQ];
+        const q2 = s2[base + slotQ];
+        const q3 = s3[base + slotQ];
+        const ccap0 = s0[base + slotCcap];
+        const ccap1 = s1[base + slotCcap];
+        const dtSlot = cktTerr(dt, deltaOld, order, method, q0, q1, q2, q3, ccap0, ccap1, lteParams);
+        if (dtSlot < minDt) minDt = dtSlot;
+      }
+      return minDt;
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
-// getMosfetInternalNodeCount — bulk node + optional RD/RS internal nodes
+// getMosfetInternalNodeCount / Labels
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the number of internal nodes needed for this MOSFET instance.
- *
- * Always 1 for the bulk node, plus 1 for RD > 0, plus 1 for RS > 0.
+ * Returns the number of internal nodes allocated for a MOSFET instance.
+ * 1 per non-zero RD, 1 per non-zero RS; bulk is tied to source (no extra node).
  */
 export function getMosfetInternalNodeCount(props: PropertyBag): number {
-  let count = 0; // 3-terminal: bulk = source, no internal node needed
+  let count = 0;
   if (props.getModelParam<number>("RD") > 0) count++;
   if (props.getModelParam<number>("RS") > 0) count++;
   return count;
 }
 
-// ---------------------------------------------------------------------------
-// getMosfetInternalNodeLabels — mirror of getMosfetInternalNodeCount
-// ---------------------------------------------------------------------------
-
 /**
- * Returns internal node labels for a MOSFET instance. Order MUST match
- * getMosfetInternalNodeCount / createMosfetElement's internalNodeIds
- * consumption: D' first (for RD > 0), then S' (for RS > 0).
+ * Internal node labels in allocation order: D' (RD>0), S' (RS>0).
  */
 export function getMosfetInternalNodeLabels(props: PropertyBag): readonly string[] {
   const labels: string[] = [];
@@ -2067,7 +1785,7 @@ export function getMosfetInternalNodeLabels(props: PropertyBag): readonly string
 }
 
 // ---------------------------------------------------------------------------
-// NmosfetElement + PmosfetElement — CircuitElement implementations
+// NmosfetElement + PmosfetElement — CircuitElement (visual) implementations
 // ---------------------------------------------------------------------------
 
 export class NmosfetElement extends AbstractCircuitElement {
@@ -2106,44 +1824,29 @@ export class NmosfetElement extends AbstractCircuitElement {
     const chanX = 2.625;
     const gateBarX = 2.25;
 
-    // Body (channel segments, gate bar, body connection line, arrow) stays COMPONENT color
-    // Channel segments (with gap in middle for depletion-mode styling)
     ctx.drawLine(chanX, 1, chanX, 0.6875);
     ctx.drawLine(chanX, 0.3125, chanX, 0);
     ctx.drawLine(chanX, 0, chanX, -0.3125);
     ctx.drawLine(chanX, -0.6875, chanX, -1);
-
-    // Stub extensions at drain/source sides
     ctx.drawLine(chanX, 1, chanX, 1.3125);
     ctx.drawLine(chanX, -1, chanX, -1.3125);
-
-    // Gate bar
     ctx.drawLine(gateBarX, -0.5, gateBarX, 0.5);
-
-    // Body connection line (channel to body node)
     ctx.drawLine(chanX, 0, 2.625, 0);
 
-    // Arrow (pointing inward for N-channel)
     ctx.drawPolygon([
       { x: 2.625, y: 0 },
       { x: 3.375, y: 0.3125 },
       { x: 3.375, y: -0.3125 },
     ], true);
 
-    // Gate lead (horizontal from pin to gate bar)
     drawColoredLead(ctx, signals, vG, 0, 0, gateBarX, 0);
-
-    // Drain lead (horizontal stub from channel to drain pin)
     drawColoredLead(ctx, signals, vD, 4, -1, chanX, -1);
-
-    // Source lead (horizontal stub + vertical to body + body horizontal)
     drawColoredLead(ctx, signals, vS, 4, 1, chanX, 1);
     ctx.drawLine(4, 1, 4, 0);
     ctx.drawLine(4, 0, chanX, 0);
 
     ctx.restore();
   }
-
 }
 
 export class PmosfetElement extends AbstractCircuitElement {
@@ -2182,28 +1885,20 @@ export class PmosfetElement extends AbstractCircuitElement {
     const chanX = 2.625;
     const gateBarX = 2.25;
 
-    // Line 1: D lead (signal D color)
     drawColoredLead(ctx, signals, vD, 4, 1, chanX, 1);
-
-    // Line 2: S stub horizontal (signal S color)
     drawColoredLead(ctx, signals, vS, 4, -1, chanX, -1);
 
-    // Lines 3-6: channel segments (COMPONENT color)
     ctx.setColor("COMPONENT");
     ctx.drawLine(chanX, 1, chanX, 0.6875);
     ctx.drawLine(chanX, 0.3125, chanX, 0);
     ctx.drawLine(chanX, 0, chanX, -0.3125);
     ctx.drawLine(chanX, -0.6875, chanX, -1);
-
-    // Lines 7-8: extended stubs beyond D/S (COMPONENT color)
     ctx.drawLine(chanX, 1, chanX, 1.3125);
     ctx.drawLine(chanX, -1, chanX, -1.3125);
 
-    // Lines 9-10: S body vertical + horizontal (signal S color)
     drawColoredLead(ctx, signals, vS, 4, -1, 4, 0);
     ctx.drawLine(4, 0, chanX, 0);
 
-    // Line 11: arrow (COMPONENT color)
     ctx.setColor("COMPONENT");
     ctx.drawPolygon([
       { x: 4, y: 0 },
@@ -2211,16 +1906,12 @@ export class PmosfetElement extends AbstractCircuitElement {
       { x: 3.25, y: 0.3125 },
     ], true);
 
-    // Line 12: gate lead (signal G color)
     drawColoredLead(ctx, signals, vG, 0, 0, gateBarX, 0);
-
-    // Line 13: gate bar (COMPONENT color)
     ctx.setColor("COMPONENT");
     ctx.drawLine(gateBarX, -0.5, gateBarX, 0.5);
 
     ctx.restore();
   }
-
 }
 
 // ---------------------------------------------------------------------------
@@ -2229,93 +1920,33 @@ export class PmosfetElement extends AbstractCircuitElement {
 
 function buildNmosPinDeclarations(): PinDeclaration[] {
   return [
-    {
-      direction: PinDirection.INPUT,
-      label: "G",
-      defaultBitWidth: 1,
-      position: { x: 0, y: 0 },
-      isNegatable: false,
-      isClockCapable: false,
-      kind: "signal",
-    },
-    {
-      direction: PinDirection.OUTPUT,
-      label: "S",
-      defaultBitWidth: 1,
-      position: { x: 4, y: 1 },
-      isNegatable: false,
-      isClockCapable: false,
-      kind: "signal",
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "D",
-      defaultBitWidth: 1,
-      position: { x: 4, y: -1 },
-      isNegatable: false,
-      isClockCapable: false,
-      kind: "signal",
-    },
+    { direction: PinDirection.INPUT, label: "G", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "S", defaultBitWidth: 1, position: { x: 4, y: 1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "D", defaultBitWidth: 1, position: { x: 4, y: -1 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
 function buildPmosPinDeclarations(): PinDeclaration[] {
   return [
-    {
-      direction: PinDirection.INPUT,
-      label: "G",
-      defaultBitWidth: 1,
-      position: { x: 0, y: 0 },
-      isNegatable: false,
-      isClockCapable: false,
-      kind: "signal",
-    },
-    {
-      direction: PinDirection.OUTPUT,
-      label: "D",
-      defaultBitWidth: 1,
-      position: { x: 4.0, y: 1.0 },
-      isNegatable: false,
-      isClockCapable: false,
-      kind: "signal",
-    },
-    {
-      direction: PinDirection.INPUT,
-      label: "S",
-      defaultBitWidth: 1,
-      position: { x: 4.0, y: -1.0 },
-      isNegatable: false,
-      isClockCapable: false,
-      kind: "signal",
-    },
+    { direction: PinDirection.INPUT, label: "G", defaultBitWidth: 1, position: { x: 0, y: 0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.OUTPUT, label: "D", defaultBitWidth: 1, position: { x: 4.0, y: 1.0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
+    { direction: PinDirection.INPUT, label: "S", defaultBitWidth: 1, position: { x: 4.0, y: -1.0 }, isNegatable: false, isClockCapable: false, kind: "signal" },
   ];
 }
 
 // ---------------------------------------------------------------------------
-// Property definitions
+// Property definitions + attribute mappings
 // ---------------------------------------------------------------------------
 
 const MOSFET_PROPERTY_DEFS: PropertyDefinition[] = [
   LABEL_PROPERTY_DEF,
 ];
 
-// ---------------------------------------------------------------------------
-// Attribute mappings
-// ---------------------------------------------------------------------------
-
 export const MOSFET_ATTRIBUTE_MAPPINGS: AttributeMapping[] = [
-  {
-    xmlName: "model",
-    propertyKey: "model",
-    convert: (v) => v,
-  },
+  { xmlName: "model", propertyKey: "model", convert: (v) => v },
   { xmlName: "W", propertyKey: "W", convert: (v) => parseFloat(v), modelParam: true },
   { xmlName: "L", propertyKey: "L", convert: (v) => parseFloat(v), modelParam: true },
-  {
-    xmlName: "Label",
-    propertyKey: "label",
-    convert: (v) => v,
-  },
+  { xmlName: "Label", propertyKey: "label", convert: (v) => v },
 ];
 
 // ---------------------------------------------------------------------------
