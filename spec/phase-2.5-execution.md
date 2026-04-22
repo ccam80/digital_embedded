@@ -458,6 +458,21 @@ Hard rules (non-negotiable):
   - Banned vocabulary: mapping, tolerance, close enough, equivalent to, pre-existing, partial.
   - Escalate ambiguity to user. Do not guess.
 
+Do NOT (build-green discipline — empirically needed per post-W1.3 review):
+  - Do NOT run `tsc`, `npm run build`, `npm test`, `npm run test:q`, or any test/build command.
+    The spec guarantees the tree is broken throughout Phase 2.5 execution. Seeing red output
+    is not new information and will not change your port decisions.
+  - Do NOT try to make the build green. If the compiler reports errors in files outside your
+    scope, that is expected and on-spec. Leave them alone.
+  - Do NOT debug TypeScript errors by hypothesizing about filesystem caching, Cygwin/Windows
+    path translation, or editor state. If your scope files compile when read at face value,
+    they are correct; any surviving tsc error in them is your bug, any tsc error outside them
+    is out of scope.
+  - Do NOT add temporary fixes, stubs, or shims to unbreak unrelated code. Your deliverable is
+    the mechanical port of your scope files; the rest is W3's problem.
+  - If you find yourself about to run a verification command for the Nth time, STOP, commit
+    what you have, write the report, and exit. The user verifies convergence, not you.
+
 Report to me under 300 words:
   - What landed (file-by-file)
   - What tests were deleted and why
